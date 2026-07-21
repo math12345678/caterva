@@ -1,0 +1,81 @@
+<!--
+Fixture for EC 3.4.21.4 (Trypsin), built from real rows captured off a
+live BRENDA fetch (2026-07), not invented data. Real BRENDA does not use
+textbook acronyms like BAPNA/TAME - it renders full chemical names. Now
+also includes the real nav-link + tab-container structure. This fixture
+intentionally also includes an inhibitor row (leupeptin) and a row with
+no substrate cell at all, both of which must be excluded, to mirror
+exactly what a real trypsin page looks like.
+-->
+<html>
+<body>
+<a href="javascript:showTable('tab12')">KM Values</a>
+<div id="tab12">
+<div class="row">
+  <div class="cell">0.07744</div>
+  <div class="cell">benzoyl-DL-Arg-7-amido-4-methylcoumarin</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">in 10 mM Tris, 20 mM CaCl2, pH 7.4, at 37°C</div>
+</div>
+<div class="row">
+  <div class="cell">3</div>
+  <div class="cell">benzoyl-DL-Arg-p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">in 10 mM Tris, 20 mM CaCl2, pH 7.4, at 37°C</div>
+</div>
+<div class="row">
+  <div class="cell">0.485</div>
+  <div class="cell">Glu-Gly-Arg-4-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">pH 7.4, 25°C</div>
+</div>
+<!-- engineered FRET reporter substrate, not a classic small-molecule
+     substrate - real BRENDA data (verified live), used to test
+     substrate_type classification -->
+<div class="row">
+  <div class="cell">0.00399</div>
+  <div class="cell">enhanced green fluorescent protein-T1</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">in 10 mM Tris, 20 mM CaCl2, pH 7.4, at 37°C</div>
+</div>
+<!-- inhibitor, not a substrate: must be excluded (not in substrate list) -->
+<div class="row">
+  <div class="cell">0.000031</div>
+  <div class="cell">leupeptin</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">in 10 mM Tris, 20 mM CaCl2, pH 7.4, at 37°C</div>
+</div>
+<!-- fulvic acid row: has a real uniprot cell, useful for confirming
+     per-row extraction, but fulvic acid is also not a real substrate so
+     it must still be excluded by the substrate filter -->
+<div class="row">
+  <div class="cell">3.6</div>
+  <div class="cell">fulvic acid</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P07477</div>
+  <div class="cell">25°C, pH not specified in the publication</div>
+</div>
+<!-- row with no substrate name cell at all: must be excluded -->
+<div class="row">
+  <div class="cell">7.5</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">protease activity assay at</div>
+  <div class="cell">717901</div>
+</div>
+<!-- non-human row: must be excluded -->
+<div class="row">
+  <div class="cell">0.27</div>
+  <div class="cell">benzoyl-DL-Arg-p-nitroanilide</div>
+  <div class="cell">Bos taurus</div>
+  <div class="cell">P00760</div>
+  <div class="cell">pH 8.0, 25°C</div>
+</div>
+</div>
+</body>
+</html>

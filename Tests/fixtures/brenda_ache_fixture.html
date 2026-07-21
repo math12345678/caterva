@@ -1,0 +1,84 @@
+<!--
+Fixture for EC 3.1.1.7 (AChE), rebuilt 2026-07 from real rows captured
+live via brenda_ache_realrows_debug.py. The prior version of this file
+was labeled "Synthetic" but claimed several rows reproduced real
+shapes/values from an earlier, not-directly-visible session - this
+re-verifies against a fresh live capture rather than trusting that old
+claim.
+
+Real captured human rows (4, each a different real substrate spelling):
+  0.09   | acetyl thiocholine            | Homo sapiens | -      | ref 649716
+  0.025  | acetylthiocholine              | Homo sapiens | -      | ref 728999
+  0.0714 | Acetylcholine                  | Homo sapiens | -      | ref 713996
+  0.038  | 2,6-dichlorophenolindophenol   | Homo sapiens | P22303 | ref 751211
+(confirms both "acetyl thiocholine" and "acetylthiocholine" - the exact
+two-word/one-word spelling variance this fixture exists to test - are
+both real, and that P22303 is a real per-row accession on this enzyme's
+page, not an invented one.)
+
+Real captured non-human row:
+  0.08 | acetylcholine chloride | Macroptilium atropurpureum | - | pH 8.0, 30°C, native enzyme | 682475
+
+This fixture previously also carried two rows (km=6500 "Kcat disguised
+as Km", km=0.0146 organism-in-compound-position) claimed by an earlier
+part of this project to reproduce real BRENDA row shapes. A targeted
+live re-check this session (brenda_ache_edgecases_debug.py, searching
+all ~409 rows in the KM Values table for both shapes directly) found
+ZERO live matches for either. Rather than keep unconfirmed rows in a
+fixture whose entire purpose is real captured data, they were removed
+from here. The two parser code paths they used to exercise
+(implausible-Kcat-value flagging, organism-cell-skip in permissive mode)
+are still real, tested code - see test_brenda_client.py's
+test_ache_flags_implausible_kcat_row and
+test_permissive_mode_does_not_mislabel_organism_as_substrate, which now
+build small inline HTML snippets for that purpose instead, explicitly
+labeled as synthetic unit-test input rather than claimed BRENDA data.
+-->
+<html>
+<body>
+<a href="javascript:showTable('tab12')">KM Values</a>
+<div id="tab12">
+<div class="row">
+  <div class="cell">0.09</div>
+  <div class="cell">acetyl thiocholine</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">pH 8, 27°C, attachment of polyethylene glycol side chains to lysine residues does not alter the Km value</div>
+  <div class="cell">649716</div>
+</div>
+<div class="row">
+  <div class="cell">0.025</div>
+  <div class="cell">acetylthiocholine</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">at pH 7.4 and 37°C</div>
+  <div class="cell">728999</div>
+</div>
+<div class="row">
+  <div class="cell">0.0714</div>
+  <div class="cell">Acetylcholine</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">in 0.1 M MOPS buffer (pH 7.4), at 37°C</div>
+  <div class="cell">713996</div>
+</div>
+<div class="row">
+  <div class="cell">0.038</div>
+  <div class="cell">2,6-dichlorophenolindophenol</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P22303</div>
+  <div class="cell">recombinant enzyme, pH and temperature not specified in the publication</div>
+  <div class="cell">751211</div>
+</div>
+<!-- non-human row: must be excluded -->
+<div class="row">
+  <div class="cell">0.08</div>
+  <div class="cell">acetylcholine chloride</div>
+  <div class="cell">Macroptilium atropurpureum</div>
+  <div class="cell">-</div>
+  <div class="cell">pH 8.0, 30°C, native enzyme</div>
+  <div class="cell">682475</div>
+</div>
+</div>
+</body>
+</html>

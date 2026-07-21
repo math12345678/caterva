@@ -1,0 +1,41 @@
+<!--
+Fixture proving the core structural fix: a page with TWO tables that use
+the identical row/cell markup - "KM Values" and "Ki Values" - each with a
+row for the same substrate name. Before table-scoping, a Ki row like this
+could leak into Km results and only get caught (or missed) by the
+numeric-range heuristic. After table-scoping, the Ki row must never
+appear at all, regardless of its numeric value or wording, because it's
+never even looked at - it's not inside the "KM Values" container.
+-->
+<html>
+<body>
+<a href="javascript:showTable('tab12')">KM Values</a>
+<a href="javascript:showTable('tab49')">Ki Values</a>
+
+<div id="tab12">
+<div class="row">
+  <div class="cell">0.5</div>
+  <div class="cell">lactate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P00338</div>
+  <div class="cell">genuine Km row, pH 7.4, 37°C</div>
+  <div class="cell">111111</div>
+</div>
+</div>
+
+<div id="tab49">
+<!-- structurally identical row/cell markup, same substrate name, entirely
+     plausible numeric value - would have been indistinguishable from a
+     real Km row under the old whole-page-scan approach -->
+<div class="row">
+  <div class="cell">0.3</div>
+  <div class="cell">lactate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P00338</div>
+  <div class="cell">this is actually a Ki value, not Km, pH 7.4, 37°C</div>
+  <div class="cell">222222</div>
+</div>
+</div>
+
+</body>
+</html>

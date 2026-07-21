@@ -1,0 +1,106 @@
+<!--
+Fixture for EC 3.4.21.1 (Chymotrypsin), rebuilt 2026-07 from real rows
+captured live via brenda_chymotrypsin_debug.py and
+brenda_chymotrypsin_nonhuman_debug.py - not invented data. An earlier
+version of this fixture used "ATEE"/"BTEE" as substrate names, which are
+textbook acronyms that never appear in real BRENDA text (the same class
+of error already caught and fixed for trypsin's BAPNA/TAME earlier this
+session - BRENDA renders full chemical names, not acronyms). Every
+substrate name, UniProt accession, condition string, and reference ID
+below is copied verbatim from live output.
+
+Real captured human rows (all share UniProt "Q6GPI1,P17538" and
+reference 769319 - a single publication reporting wild-type + 2 mutants
+across 2 substrates):
+  0.214  | L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide           | mutant D236R
+  0.304  | L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide           | (no mutant note)
+  0.55   | L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide           | mutant S242T
+  0.575  | L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide           | wild-type
+  0.0179 | N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide | mutant D236R
+  0.0204 | N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide | (no mutant note)
+  0.219  | N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide | wild-type
+  0.22   | N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide | mutant S242T
+
+Real captured non-human row used for the organism-exclusion test case:
+  7.27 | acetyl-L-Leu methyl ester | Bos taurus | - | - | 171873
+-->
+<html>
+<body>
+<a href="javascript:showTable('tab12')">KM Values</a>
+<div id="tab12">
+<div class="row">
+  <div class="cell">0.214</div>
+  <div class="cell">L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">mutant D236R, pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<div class="row">
+  <div class="cell">0.304</div>
+  <div class="cell">L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<div class="row">
+  <div class="cell">0.55</div>
+  <div class="cell">L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">mutant S242T, pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<div class="row">
+  <div class="cell">0.575</div>
+  <div class="cell">L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">wild-type, pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<div class="row">
+  <div class="cell">0.0179</div>
+  <div class="cell">N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">mutant D236R, pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<div class="row">
+  <div class="cell">0.0204</div>
+  <div class="cell">N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<div class="row">
+  <div class="cell">0.219</div>
+  <div class="cell">N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">wild-type, pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<div class="row">
+  <div class="cell">0.22</div>
+  <div class="cell">N-succinyl-L-alanyl-L-alanyl-L-prolyl-L-phenylalanine p-nitroanilide</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">Q6GPI1,P17538</div>
+  <div class="cell">mutant S242T, pH 8, temperature not specified in the publication</div>
+  <div class="cell">769319</div>
+</div>
+<!-- non-human row: must be excluded -->
+<div class="row">
+  <div class="cell">7.27</div>
+  <div class="cell">acetyl-L-Leu methyl ester</div>
+  <div class="cell">Bos taurus</div>
+  <div class="cell">-</div>
+  <div class="cell">-</div>
+  <div class="cell">171873</div>
+</div>
+</div>
+</body>
+</html>
