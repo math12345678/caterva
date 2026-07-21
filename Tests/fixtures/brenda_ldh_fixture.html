@@ -1,0 +1,105 @@
+<!--
+Fixture for EC 1.1.1.27 (LDH), rebuilt 2026-07 from real rows captured
+live via brenda_ldh_realrows_debug.py and brenda_ldh_nonhuman_debug.py.
+The prior version of this file was honestly labeled "Synthetic" (not a
+false "real data" claim), but its row shape (5 cells, substrate name and
+assay conditions merged into one cell) didn't match real BRENDA pages
+either - every other fixture rebuilt this session uses the real 6-cell
+shape (Km | substrate | organism | uniprot | comment | reference).
+
+Real captured human rows (3 distinct substrates, all ref 740253 except
+pyruvate):
+  10.73 | (S)-lactate | Homo sapiens | P07864 | healthy breast tissue enzyme | 740253
+  21.78 | (S)-lactate | Homo sapiens | P07864 | breast cancer tissue enzyme  | 740253
+  0.5   | NAD+        | Homo sapiens | P07864 | healthy breast tissue enzyme | 740253
+  0.99  | NAD+        | Homo sapiens | P07864 | breast cancer tissue enzyme  | 740253
+  0.03  | pyruvate    | Homo sapiens | -       | -                            | 286469
+  0.398 | pyruvate    | Homo sapiens | -       | -                            | 286442
+
+Real captured non-human row (Sus scrofa isozyme H4, same substrate as the
+human lactate rows - needed for the cross-species test):
+  0.0026 | (S)-lactate | Sus scrofa | P00339,P00336 | pH 8.5, 25°C, isozyme H4 | 740001
+
+The two rows below (oxamate, and the malformed row) are NOT captured live
+data - they are disclosed structural edge cases testing "no substrate
+match" exclusion and "too-few-cells" exclusion respectively. They exist
+to test parser robustness, not to represent real kinetic measurements.
+-->
+<html>
+<body>
+<a href="javascript:showTable('tab12')">KM Values</a>
+<div id="tab12">
+<div class="row">
+  <div class="cell">10.73</div>
+  <div class="cell">(S)-lactate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P07864</div>
+  <div class="cell">pH 8.0, temperature not specified in the publication, healthy breast tissue enzyme</div>
+  <div class="cell">740253</div>
+</div>
+<div class="row">
+  <div class="cell">21.78</div>
+  <div class="cell">(S)-lactate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P07864</div>
+  <div class="cell">pH 8.0, temperature not specified in the publication, breast cancer tissue enzyme</div>
+  <div class="cell">740253</div>
+</div>
+<div class="row">
+  <div class="cell">0.5</div>
+  <div class="cell">NAD+</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P07864</div>
+  <div class="cell">pH 8.0, temperature not specified in the publication, healthy breast tissue enzyme</div>
+  <div class="cell">740253</div>
+</div>
+<div class="row">
+  <div class="cell">0.99</div>
+  <div class="cell">NAD+</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P07864</div>
+  <div class="cell">pH 8.0, temperature not specified in the publication, breast cancer tissue enzyme</div>
+  <div class="cell">740253</div>
+</div>
+<div class="row">
+  <div class="cell">0.03</div>
+  <div class="cell">pyruvate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">-</div>
+  <div class="cell">286469</div>
+</div>
+<div class="row">
+  <div class="cell">0.398</div>
+  <div class="cell">pyruvate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">-</div>
+  <div class="cell">286442</div>
+</div>
+<!-- non-human row: must be excluded in default (target_organism="Homo sapiens") mode -->
+<div class="row">
+  <div class="cell">0.0026</div>
+  <div class="cell">(S)-lactate</div>
+  <div class="cell">Sus scrofa</div>
+  <div class="cell">P00339,P00336</div>
+  <div class="cell">pH 8.5, 25°C, isozyme H4</div>
+  <div class="cell">740001</div>
+</div>
+<!-- disclosed structural edge case (not live-captured): row with no real substrate match -->
+<div class="row">
+  <div class="cell">0.045</div>
+  <div class="cell">oxamate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">inhibition assay, pH 7.4, 37°C</div>
+  <div class="cell">998877</div>
+</div>
+<!-- disclosed structural edge case (not live-captured): malformed row, too few cells -->
+<div class="row">
+  <div class="cell">1.1</div>
+  <div class="cell">Homo sapiens</div>
+</div>
+</div>
+</body>
+</html>

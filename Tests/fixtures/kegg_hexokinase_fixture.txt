@@ -1,0 +1,36 @@
+// Re-verified live 2026-07 via kegg_hexokinase_verify_debug.py: the
+// SUBSTRATE field below ("ATP [CPD:C00002]; D-hexose [CPD:C00738]") is
+// byte-for-byte identical to a fresh live fetch of
+// https://rest.kegg.jp/get/ec:2.7.1.1 - confirmed real, not assumed.
+//
+// Every other field below (NAME, REACTION, ALL_REAC, PRODUCT, COMMENT,
+// PATHWAY, GENES, DBLINKS) IS stale relative to live KEGG, same as the
+// LDH fixture and for the same reason: KEGG continuously adds newly
+// sequenced genomes (live GENES now lists ~1400+ lines vs. this
+// fixture's single human line) and accumulates more cross-references,
+// literature citations, and pathway links over time. None of those
+// fields are read by parse_kegg_substrates() (which only extracts the
+// SUBSTRATE block), so this fixture is kept abbreviated to the fields
+// that were real at capture time and re-confirmed real for the one
+// field this codebase actually parses - not reproducing ~1400 lines
+// with zero effect on what's tested.
+ENTRY       EC 2.7.1.1                 Enzyme
+NAME        hexokinase;
+            hexokinase type IV;
+            glucokinase
+CLASS       Transferases;
+            Transferring phosphorus-containing groups;
+            Phosphotransferases with an alcohol group as acceptor
+SYSNAME     ATP:D-hexose 6-phosphotransferase
+REACTION    ATP + D-hexose = ADP + D-hexose 6-phosphate [RN:R01786]
+ALL_REAC    R01786
+SUBSTRATE   ATP [CPD:C00002];
+            D-hexose [CPD:C00738]
+PRODUCT     ADP [CPD:C00008];
+            D-hexose 6-phosphate [CPD:C01209]
+COMMENT     Wide specificity for hexoses.
+PATHWAY     ec00010  Glycolysis / Gluconeogenesis
+ORTHOLOGY   K00844  hexokinase
+GENES       HSA: 3098(HK1) 3099(HK2) 3101(HK3)
+DBLINKS     ExplorEnz - The Enzyme Database: 2.7.1.1
+///

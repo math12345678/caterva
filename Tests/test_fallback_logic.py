@@ -1,0 +1,269 @@
+"""
+pytest suite for fallback_logic.py
+
+Exercises the full exact -> cross-species -> literature resolution chain
+entirely offline by injecting fixture HTML as the html_provider, a fake
+uniprot_provider (standing in for the real UniProt API call), and by
+monkeypatching the PubMed literature call. No network access required.
+"""
+
+import os
+
+import pytest
+
+import fallback_logic
+from fallback_logic import LiteratureCandidate, resolve_kinetic_value
+
+FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
+
+# Stand-in for enzyme_lookup.fetch_uniprot_accession in offline tests.
+# Real accessions (previously verified against live BRENDA/UniProt), so
+# tests still exercise meaningful values rather than placeholders.
+FAKE_UNIPROT_BY_EC = {
+    "1.1.1.27": "P00338",
+    "3.1.1.7": "P22303",
+}
+
+
+def fake_uniprot_provider(ec_number: str, taxon_id: str):
+    return FAKE_UNIPROT_BY_EC.get(ec_number)
+
+
+# Stand-in for enzyme_lookup.fetch_taxon_id in offline tests - real NCBI
+# taxon IDs (previously verified), so tests exercise meaningful values
+# without a live network call.
+FAKE_TAXON_IDS = {
+    "Homo sapiens": "9606",
+    "Sus scrofa": "9823",
+    "Mus musculus": "10090",
+}
+
+
+def fake_taxon_id_provider(organism_name: str):
+    return FAKE_TAXON_IDS.get(organism_name)
+
+
+def load_fixture(name: str) -> str:
+    with open(os.path.join(FIXTURES_DIR, name), encoding="utf-8") as f:
+        return f.read()
+
+
+def make_html_provider(html_by_ec: dict):
+    """Build an html_provider function (matches HtmlProvider signature)
+    that returns fixture HTML by EC number instead of hitting BRENDA."""
+
+    def provider(ec_number: str) -> str:
+        return html_by_ec[ec_number]
+
+    return provider
+
+
+@pytest.fixture
+def ldh_provider():
+    return make_html_provider({"1.1.1.27": load_fixture("brenda_ldh_fixture.html")})
+
+
+@pytest.fixture
+def ache_provider():
+    return make_html_provider({"3.1.1.7": load_fixture("brenda_ache_fixture.html")})
+
+
+# ---------------------------------------------------------------------------
+# Tier 1: exact match
+# ---------------------------------------------------------------------------
+
+def test_resolves_exact_human_match_for_ldh(ldh_provider):
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "lactate",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.found is True
+    assert result.source == "brenda_exact"
+    # Two real (S)-lactate rows exist for Homo sapiens in the fixture
+    # (10.73 healthy tissue, 21.78 cancer tissue, both ref 740253);
+    # resolve_kinetic_value takes the minimum among exact matches.
+    assert result.value == 10.73
+    assert result.organism == "Homo sapiens"
+    assert result.cross_species_flag is False
+
+
+def test_exact_match_carries_a_real_citation(ldh_provider):
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "lactate",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.citation is not None
+    assert result.citation.source == "BRENDA"
+    assert result.citation.reference_id == "740253"
+    assert result.citation.url is not None
+
+
+def test_exact_match_search_log_records_the_attempt(ldh_provider):
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "lactate",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert any("BRENDA exact" in entry for entry in result.search_log)
+
+
+# ---------------------------------------------------------------------------
+# Tier 1 excludes flagged rows: the implausible AChE Kcat-as-Km row must
+# never surface as a "found" exact-match result.
+# ---------------------------------------------------------------------------
+
+def test_flagged_brenda_row_is_not_returned_as_exact_match(ache_provider):
+    result = resolve_kinetic_value(
+        "3.1.1.7",
+        "Homo sapiens",
+        "acetyl thiocholine",
+        html_provider=ache_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    # Two matching rows exist (0.09 genuine, 6500 flagged). Must pick the
+    # genuine one and never the flagged one.
+    assert result.found is True
+    assert result.value == 0.09
+
+
+# ---------------------------------------------------------------------------
+# Tier 2: cross-species fallback
+# ---------------------------------------------------------------------------
+
+def test_falls_back_to_cross_species_when_no_human_row_matches(ldh_provider):
+    # "L-lactate" isn't literally in the LDH fixture as its own substrate
+    # string separate from "lactate", so instead exercise cross-species by
+    # asking for an organism with no human row: use a substrate that only
+    # appears on the non-human (Sus scrofa) row's condition text? The
+    # fixture's Sus scrofa row uses "lactate" too, so query with a human
+    # organism string that won't match human but will match pig via
+    # cross-species by asking for a substrate present only there.
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Mus musculus",  # no mouse row exists in the fixture at all
+        "lactate",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.found is True
+    assert result.source == "brenda_cross_species"
+    assert result.cross_species_flag is True
+    assert result.organism in {"Homo sapiens", "Sus scrofa"}
+
+
+def test_cross_species_result_still_has_citation(ldh_provider):
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Mus musculus",
+        "lactate",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.citation is not None
+    assert result.citation.source == "BRENDA"
+
+
+# ---------------------------------------------------------------------------
+# Tier 3: literature candidates (mocked, no real PubMed call)
+# ---------------------------------------------------------------------------
+
+def test_falls_back_to_literature_when_brenda_has_nothing(monkeypatch, ldh_provider):
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5):
+        return [
+            LiteratureCandidate(
+                pmid="99999999",
+                title="A fake but structurally valid candidate paper",
+                url="https://pubmed.ncbi.nlm.nih.gov/99999999/",
+            )
+        ]
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", fake_pubmed)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Homo sapiens",
+        "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.found is False
+    assert result.source == "literature_candidates"
+    assert len(result.literature_candidates) == 1
+    assert result.literature_candidates[0].pmid == "99999999"
+
+
+def test_literature_search_never_fabricates_a_numeric_value(monkeypatch, ldh_provider):
+    """Regression guard for the original stub, which hardcoded a fake
+    literature result (1.02 mM / Sus scrofa / PMID 34962677) regardless of
+    input. The real implementation must never return found=True from the
+    literature tier - only candidate references for human review."""
+
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5):
+        return [
+            LiteratureCandidate(
+                pmid="34962677",
+                title="Some paper that mentions Km somewhere in its abstract",
+                url="https://pubmed.ncbi.nlm.nih.gov/34962677/",
+            )
+        ]
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", fake_pubmed)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Homo sapiens",
+        "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.found is False
+    assert result.value is None
+    assert result.source == "literature_candidates"
+
+
+def test_genuine_gap_when_nothing_found_anywhere(monkeypatch, ldh_provider):
+    def empty_pubmed(enzyme_name, organism, substrate, max_results=5):
+        return []
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", empty_pubmed)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Homo sapiens",
+        "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.found is False
+    assert result.source == "not_found"
+    assert "genuine gap" in result.search_log[-1]
+
+
+def test_search_literature_false_skips_pubmed_entirely(monkeypatch, ldh_provider):
+    def should_not_be_called(*args, **kwargs):
+        raise AssertionError("search_pubmed_candidates should not be called")
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", should_not_be_called)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Homo sapiens",
+        "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.found is False
+    assert result.source == "not_found"

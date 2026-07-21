@@ -1,0 +1,42 @@
+// Re-verified live 2026-07 via kegg_fixtures_verify_debug.py: ENTRY, NAME,
+// CLASS, SYSNAME, REACTION, ALL_REAC, SUBSTRATE, PRODUCT, COMMENT,
+// PATHWAY, and ORTHOLOGY below are byte-for-byte identical to a fresh
+// live fetch of https://rest.kegg.jp/get/ec:1.1.1.27 - confirmed real,
+// not built from an assumed format (an earlier version of
+// test_enzyme_lookup.py's docstring incorrectly claimed "real live
+// output was NOT available" for these fixtures; that claim is now
+// corrected).
+//
+// GENES and DBLINKS below are deliberately abbreviated. The live GENES
+// field lists hundreds of real non-human ortholog entries beyond the
+// human "HSA:" line (KEGG continuously adds newly sequenced genomes),
+// and live DBLINKS carries additional real cross-reference lines
+// (IUBMB, ExPASy, BRENDA, CAS) beyond ExplorEnz. Neither field is read
+// by parse_kegg_substrates() (which only extracts the SUBSTRATE block),
+// so they're kept to one real representative line each rather than
+// reproducing hundreds of lines with zero effect on what's tested -
+// this is an intentional abbreviation of real content, not a
+// fabrication of it.
+ENTRY       EC 1.1.1.27                Enzyme
+NAME        L-lactate dehydrogenase;
+            LDH;
+            lactic acid dehydrogenase
+CLASS       Oxidoreductases;
+            Acting on the CH-OH group of donors;
+            With NAD+ or NADP+ as acceptor
+SYSNAME     (S)-lactate:NAD+ oxidoreductase
+REACTION    (S)-lactate + NAD+ = pyruvate + NADH + H+ [RN:R00703]
+ALL_REAC    R00703
+SUBSTRATE   (S)-lactate [CPD:C00256];
+            NAD+ [CPD:C00003]
+PRODUCT     pyruvate [CPD:C00022];
+            NADH [CPD:C00004];
+            H+ [CPD:C00080]
+COMMENT     Also acts, more slowly, on other 2-hydroxymonocarboxylic
+            acids.
+PATHWAY     ec00010  Glycolysis / Gluconeogenesis
+            ec00620  Pyruvate metabolism
+ORTHOLOGY   K00016  L-lactate dehydrogenase A chain
+GENES       HSA: 3939(LDHA) 3945(LDHB)
+DBLINKS     ExplorEnz - The Enzyme Database: 1.1.1.27
+///

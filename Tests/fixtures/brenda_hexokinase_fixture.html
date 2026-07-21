@@ -1,0 +1,75 @@
+<!--
+Fixture for EC 2.7.1.1 (Hexokinase), rebuilt 2026-07 from real rows
+captured live via brenda_hexokinase_realrows_debug.py - not
+approximated/representative data. An earlier version of this fixture
+used "D-glucose"/"fructose"/"mannose" as substrate names with Km values
+described as "representative of published kinetics" rather than
+verbatim - the real substrate strings BRENDA renders are different
+("2-deoxy-D-glucose", not "D-glucose"; "ATP" confirmed correct).
+
+Real captured human rows:
+  0.5        | 2-deoxy-D-glucose | hexokinase I,  37°C, pH 8.1  | ref 640237
+  0.56       | 2-deoxy-D-glucose | hexokinase Ib, 37°C, pH 7.2  | ref 640230
+  0.77       | 2-deoxy-D-glucose | hexokinase Ia, 37°C, pH 7.2  | ref 640230
+  0.00000023 | ATP               | wild-type + 20-30% glycerol  | ref 721735
+  0.00000046 | ATP               | wild-type                    | ref 721735
+
+Real captured non-human row (for the organism-exclusion test case):
+  20 | 1,5-anhydro-D-glucitol | Saccharomyces cerevisiae | - | at 37°C, pH 7.4 | ref 640224
+-->
+<html>
+<body>
+<a href="javascript:showTable('tab12')">KM Values</a>
+<div id="tab12">
+<div class="row">
+  <div class="cell">0.5</div>
+  <div class="cell">2-deoxy-D-glucose</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">hexokinase I, at 37°C, pH 8.1</div>
+  <div class="cell">640237</div>
+</div>
+<div class="row">
+  <div class="cell">0.56</div>
+  <div class="cell">2-deoxy-D-glucose</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">hexokinase Ib, at 37°C, pH 7.2</div>
+  <div class="cell">640230</div>
+</div>
+<div class="row">
+  <div class="cell">0.77</div>
+  <div class="cell">2-deoxy-D-glucose</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">hexokinase Ia, at 37°C, pH 7.2</div>
+  <div class="cell">640230</div>
+</div>
+<div class="row">
+  <div class="cell">0.00000023</div>
+  <div class="cell">ATP</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">wild-type in the presence of 20-30% glycerol, pH and temperature not specified in the publication</div>
+  <div class="cell">721735</div>
+</div>
+<div class="row">
+  <div class="cell">0.00000046</div>
+  <div class="cell">ATP</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">wild-type, pH and temperature not specified in the publication</div>
+  <div class="cell">721735</div>
+</div>
+<!-- non-human row: must be excluded -->
+<div class="row">
+  <div class="cell">20</div>
+  <div class="cell">1,5-anhydro-D-glucitol</div>
+  <div class="cell">Saccharomyces cerevisiae</div>
+  <div class="cell">-</div>
+  <div class="cell">at 37°C, pH 7.4</div>
+  <div class="cell">640224</div>
+</div>
+</div>
+</body>
+</html>

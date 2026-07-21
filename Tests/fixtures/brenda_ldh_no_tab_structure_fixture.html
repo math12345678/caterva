@@ -1,0 +1,25 @@
+<!--
+Deliberately the OLD-style fixture with no nav sidebar / tab container at
+all - used to test the whole-page fallback path in parse_brenda_km_html
+when _find_table_container can't locate the "KM Values" table. Every
+resulting entry should come back table_scoped=False and flagged=True
+(low-confidence, not "something's definitely wrong").
+
+Row content is one real captured LDH row (same one used in
+brenda_ldh_fixture.html, confirmed live via brenda_ldh_realrows_debug.py)
+rather than invented text - only the surrounding page structure (no tab
+container) is deliberately altered, since that's the specific thing this
+fixture exists to test.
+-->
+<html>
+<body>
+<div class="row">
+  <div class="cell">10.73</div>
+  <div class="cell">(S)-lactate</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P07864</div>
+  <div class="cell">pH 8.0, temperature not specified in the publication, healthy breast tissue enzyme</div>
+  <div class="cell">740253</div>
+</div>
+</body>
+</html>

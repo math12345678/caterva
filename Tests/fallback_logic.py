@@ -1,0 +1,230 @@
+"""
+fallback_logic.py
+
+The kinetic-value resolution chain: for a given (enzyme, organism, substrate)
+triple, try progressively broader sources until something is found, and
+record exactly what was tried so a "not found" result is provably a real
+gap rather than a lookup that gave up early.
+
+Tiers, in order:
+  1. BRENDA, exact organism match
+  2. BRENDA, any organism (cross-species) - flagged as such
+  3. PubMed literature search - returns *candidate papers*, not a
+     fabricated numeric value. Extracting a reliable Km from free-text
+     abstracts needs real NLP/human review; this module will not guess.
+
+Every found value carries a real Citation (see citation.py) instead of a
+bare string, and BRENDA rows that brenda_client flagged as implausible
+(e.g. mislabeled Kcat) are excluded from "found" results by default -
+they're surfaced in search_log instead, so nothing dubious flows into the
+product silently.
+
+This replaces the earlier stubbed version, which called fake search_brenda /
+search_literature_with_patience functions that always returned canned data
+(including a hardcoded, non-real "1.02 mM, PMID 34962677" literature
+result). That stub was fine for sketching the shape of KineticResult but
+was never wired to anything real - this version is.
+"""
+
+from typing import Callable, Optional
+
+import httpx
+from pydantic import BaseModel
+
+import enzyme_lookup
+from brenda_client import (
+    BRENDAKmEntry,
+    fetch_brenda_html,
+    parse_brenda_km_html,
+)
+from citation import Citation, citation_from_brenda_entry, pubmed_url
+
+PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+PUBMED_ESUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+
+
+class LiteratureCandidate(BaseModel):
+    pmid: str
+    title: str
+    url: str
+
+
+class KineticResult(BaseModel):
+    found: bool
+    value: Optional[float] = None
+    unit: Optional[str] = None
+    organism: Optional[str] = None
+    source: str  # "brenda_exact" | "brenda_cross_species" | "literature_candidates" | "not_found"
+    citation: Optional[Citation] = None
+    cross_species_flag: bool = False
+    literature_candidates: list[LiteratureCandidate] = []
+    search_log: list[str] = []
+
+
+HtmlProvider = Callable[[str], str]
+UniprotProvider = Callable[[str, str], Optional[str]]
+TaxonIdProvider = Callable[[str], Optional[str]]
+
+
+def _resolve_fallback_uniprot(
+    ec_number: str,
+    organism: Optional[str],
+    uniprot_provider: UniprotProvider,
+    taxon_id_provider: TaxonIdProvider = enzyme_lookup.fetch_taxon_id,
+) -> Optional[str]:
+    """Resolve a UniProt fallback accession for a specific organism. Only
+    attempted when the organism is known (exact-match tier); for
+    cross-species results there's no single correct accession to guess,
+    so this returns None and per-row accessions (if any) are used as-is.
+
+    The organism -> taxon ID step is resolved dynamically via NCBI's
+    taxonomy database (enzyme_lookup.fetch_taxon_id), not a fixed dict -
+    an earlier version covered only ~7 hardcoded organisms and silently
+    returned no fallback accession for anything else. taxon_id_provider
+    is injectable so this stays testable offline."""
+    if organism is None:
+        return None
+    taxon_id = taxon_id_provider(organism)
+    if not taxon_id:
+        return None
+    return uniprot_provider(ec_number, taxon_id)
+
+
+def _brenda_entries(
+    ec_number: str,
+    organism: Optional[str],
+    substrate: str,
+    html_provider: HtmlProvider,
+    uniprot_provider: UniprotProvider,
+    taxon_id_provider: TaxonIdProvider = enzyme_lookup.fetch_taxon_id,
+) -> list[BRENDAKmEntry]:
+    html = html_provider(ec_number)
+    fallback_uniprot = _resolve_fallback_uniprot(
+        ec_number, organism, uniprot_provider, taxon_id_provider
+    )
+    entries = parse_brenda_km_html(
+        html,
+        ec_number,
+        target_substrates=[substrate],
+        target_organism=organism,
+        fallback_uniprot=fallback_uniprot,
+    )
+    # Never surface flagged (implausible) rows as a "found" result -
+    # they're data-quality problems, not answers.
+    return [e for e in entries if not e.flagged]
+
+
+def search_pubmed_candidates(
+    enzyme_name: str, organism: str, substrate: str, max_results: int = 5
+) -> list[LiteratureCandidate]:
+    """Search PubMed for candidate papers. Returns titles/links only -
+    does not attempt to extract a numeric Km from abstract text, since
+    that requires human judgment to do reliably and safely."""
+    query = f"{enzyme_name} {organism} {substrate} Km kinetics"
+    r = httpx.get(
+        PUBMED_ESEARCH_URL,
+        params={"db": "pubmed", "term": query, "retmax": max_results, "retmode": "json"},
+        timeout=15,
+    )
+    r.raise_for_status()
+    ids = r.json()["esearchresult"]["idlist"]
+    if not ids:
+        return []
+
+    r2 = httpx.get(
+        PUBMED_ESUMMARY_URL,
+        params={"db": "pubmed", "id": ",".join(ids), "retmode": "json"},
+        timeout=15,
+    )
+    r2.raise_for_status()
+    result = r2.json()["result"]
+
+    candidates = []
+    for uid in result.get("uids", []):
+        title = result[uid].get("title", "")
+        candidates.append(
+            LiteratureCandidate(pmid=uid, title=title, url=pubmed_url(uid))
+        )
+    return candidates
+
+
+def resolve_kinetic_value(
+    enzyme_ec: str,
+    organism: str,
+    substrate: str,
+    enzyme_name: Optional[str] = None,
+    html_provider: HtmlProvider = fetch_brenda_html,
+    uniprot_provider: UniprotProvider = enzyme_lookup.fetch_uniprot_accession,
+    taxon_id_provider: TaxonIdProvider = enzyme_lookup.fetch_taxon_id,
+    search_literature: bool = True,
+) -> KineticResult:
+    """Resolve a Km value for (enzyme, organism, substrate) by trying
+    BRENDA exact match, then BRENDA cross-species, then PubMed literature
+    (candidates only, no fabricated numbers).
+
+    html_provider, uniprot_provider, and taxon_id_provider are injectable
+    so this can be tested offline: pass functions that return fixture
+    data instead of hitting the network.
+    """
+    log = []
+
+    log.append(f"BRENDA exact: {enzyme_ec}, {organism}, {substrate}")
+    exact = _brenda_entries(
+        enzyme_ec, organism, substrate, html_provider, uniprot_provider, taxon_id_provider
+    )
+    if exact:
+        best = min(exact, key=lambda e: e.km_value)
+        return KineticResult(
+            found=True,
+            value=best.km_value,
+            unit=best.unit,
+            organism=best.organism,
+            source="brenda_exact",
+            citation=citation_from_brenda_entry(best),
+            search_log=log,
+        )
+
+    log.append(f"BRENDA any organism: {enzyme_ec}, {substrate}")
+    broad = _brenda_entries(
+        enzyme_ec, None, substrate, html_provider, uniprot_provider, taxon_id_provider
+    )
+    if broad:
+        best = min(broad, key=lambda e: e.km_value)
+        return KineticResult(
+            found=True,
+            value=best.km_value,
+            unit=best.unit,
+            organism=best.organism,
+            source="brenda_cross_species",
+            citation=citation_from_brenda_entry(best),
+            cross_species_flag=True,
+            search_log=log,
+        )
+
+    if not search_literature:
+        log.append("Literature search skipped (search_literature=False)")
+        return KineticResult(found=False, source="not_found", search_log=log)
+
+    log.append(f"PubMed literature search: {enzyme_name or enzyme_ec}, {organism}, {substrate}")
+    candidates = search_pubmed_candidates(enzyme_name or enzyme_ec, organism, substrate)
+    if candidates:
+        log.append(
+            f"Found {len(candidates)} candidate paper(s); numeric Km NOT "
+            f"auto-extracted, needs manual review"
+        )
+        return KineticResult(
+            found=False,
+            source="literature_candidates",
+            literature_candidates=candidates,
+            search_log=log,
+        )
+
+    log.append("Exhausted BRENDA (exact + cross-species) and PubMed - genuine gap")
+    return KineticResult(found=False, source="not_found", search_log=log)
+
+
+if __name__ == "__main__":
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "lactate", enzyme_name="lactate dehydrogenase"
+    )
+    print(result.model_dump_json(indent=2))
