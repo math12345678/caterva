@@ -1,0 +1,24 @@
+# Terrium runtime dependencies.
+# Pinned to versions verified working together on 2026-07-22.
+#
+# Python 3.10-3.12 is required. See requirements-dev.txt and README for the
+# reason (prebuilt wheels for the SBML C extensions stop at cp312).
+
+# --- Simulation engines (Tier 2 ODE domains) -------------------------------
+# NOTE: do NOT `pip install tellurium`. The umbrella package pulls in
+# python-libcombine and python-libnuml, which are only needed for COMBINE
+# archives and numerical markup -- neither of which Terrium uses. On any
+# platform without prebuilt wheels for them, that install fails at the cmake
+# step. These three packages are the parts that actually do the work.
+libroadrunner==2.9.0
+antimony==2.14.0
+python-libsbml==5.21.1
+
+# --- Numerics --------------------------------------------------------------
+numpy==1.26.4
+scipy==1.15.3
+
+# --- Literature layer (BRENDA / KEGG / PubMed scraping) --------------------
+requests==2.34.2
+beautifulsoup4==4.15.0
+lxml==6.1.1

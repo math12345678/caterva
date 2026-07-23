@@ -9,6 +9,11 @@ __pycache__/
 *$py.class
 *.egg-info/
 .pytest_cache/
+.hypothesis/
+
+# Local backup / scratch files
+*.bak
+*.orig
 
 # OS
 .DS_Store
