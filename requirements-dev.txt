@@ -1,0 +1,6 @@
+# Development and test dependencies.
+-r requirements.txt
+
+pytest==9.1.1
+pytest-timeout==2.4.0
+hypothesis==6.160.0
