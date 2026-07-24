@@ -29,3 +29,9 @@ Thumbs.db
 
 # Word temp/lock files
 ~$*.docx
+
+# Science-Agent-Pipeline is its own independent git repository (own remote,
+# own history). It must NOT be tracked as a submodule/gitlink of this repo --
+# doing so once broke CI, because GitHub Actions checkout tries to resolve
+# the gitlink and there's no .gitmodules pointing anywhere real.
+Science-Agent-Pipeline/
