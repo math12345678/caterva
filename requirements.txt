@@ -10,7 +10,15 @@
 # archives and numerical markup -- neither of which Terrium uses. On any
 # platform without prebuilt wheels for them, that install fails at the cmake
 # step. These three packages are the parts that actually do the work.
-libroadrunner==2.9.0
+#
+# libroadrunner is pinned to 2.7.0, not the newer 2.9.x line. 2.9.0/2.9.2
+# dropped cp310 wheels entirely (their PyPI releases start at cp311), which
+# breaks installation on Python 3.10 -- the floor this project claims to
+# support. This was caught because CI failed on the 3.10 job with
+# "No matching distribution found for libroadrunner==2.9.0". 2.7.0 ships
+# wheels for cp39 through cp312 and is what the full test suite has actually
+# been verified against.
+libroadrunner==2.7.0
 antimony==2.14.0
 python-libsbml==5.21.1
 
@@ -22,3 +30,5 @@ scipy==1.15.3
 requests==2.34.2
 beautifulsoup4==4.15.0
 lxml==6.1.1
+httpx==0.28.1
+pydantic==2.13.4
