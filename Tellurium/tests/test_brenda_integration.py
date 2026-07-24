@@ -133,6 +133,38 @@ def test_flagged_brenda_entries_do_not_become_confident_numbers(ldh_entries):
             "a flagged entry must always carry a human-readable reason")
 
 
+def test_flagged_entries_do_not_become_confident_numbers_deterministic():
+    """Same contract as the test above, without depending on scraped data.
+
+    The fixture-driven version above skips whenever the real captured BRENDA
+    page for LDH happens to contain zero flagged rows (it currently does --
+    every Km on that particular page was plausible). That's a legitimate
+    property of real data, not a bug, but it means the "flagged Km stays
+    flagged all the way through the engine" contract could go unexercised for
+    however long the fixture stays clean. This test builds a flagged entry
+    directly, so the contract always runs regardless of what's in the
+    fixture.
+    """
+    out_of_range_km = KM_PLAUSIBLE_MAX_MM * 10
+    entry = brenda_client.BRENDAKmEntry(
+        km_value=out_of_range_km,
+        substrate="pyruvate",
+        organism="Homo sapiens",
+        flagged=True,
+        flag_reason=f"Km {out_of_range_km} mM exceeds the plausible range",
+    )
+
+    assert entry.km_value < KM_PLAUSIBLE_MIN_MM or entry.km_value > KM_PLAUSIBLE_MAX_MM
+    result = simulate_michaelis_menten(
+        km=entry.km_value, vmax=1.0, s0=1.0, end=0.1, points=3)
+    assert result.flagged, (
+        "a Km outside the plausible range must come back flagged from the "
+        "engine, regardless of what upstream (BRENDA) already flagged it as"
+    )
+    assert entry.flag_reason, (
+        "a flagged entry must always carry a human-readable reason")
+
+
 def test_real_km_values_produce_physically_sane_trajectories(ldh_entries):
     usable = [e for e in ldh_entries
               if not getattr(e, "flagged", False) and e.km_value][:5]
