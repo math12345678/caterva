@@ -1,0 +1,20 @@
+Copyright (c) 2026 Smyan Reddy and contributors. All rights reserved.
+
+This is a placeholder, not a considered legal decision. No license has been
+chosen yet, so this file defaults to the conservative option: all rights
+reserved, no permission granted to copy, modify, or distribute this code.
+
+This default was picked deliberately over a permissive open-source license
+(MIT, Apache 2.0, etc.) because Terrium's business model (see
+Business/ROADMAP.md and the pitch deck's pricing tiers) assumes institutional
+licensing revenue, and giving the whole codebase away under a permissive
+license before that model is validated would foreclose an option rather
+than preserve one. That reasoning itself should be revisited, not assumed
+correct forever -- plenty of research-tooling startups do go open-core or
+fully OSS deliberately, often for exactly the credibility and adoption
+reasons this project cares about (see README.md's "traceable to a citation"
+framing).
+
+Decide this with a lawyer as part of actual incorporation
+(see Business/INCORPORATION_CHECKLIST.md), not by editing this file
+directly without that conversation happening first.

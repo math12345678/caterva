@@ -1,0 +1,13 @@
+# CODEOWNERS
+#
+# This only has one confirmed entry right now -- the team is still small
+# (see Business/CAP_TABLE.md) and GitHub usernames for the rest of the team
+# aren't on file yet. Add them here once known instead of leaving this file
+# stale; a CODEOWNERS file nobody updates is worse than not having one.
+
+* @math12345678
+
+# When the backend/infra role is finalized, add that person as an owner of
+# anything infrastructure-related once they have commit access:
+# /Tellurium/  @math12345678
+# /.github/    @math12345678
