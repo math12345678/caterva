@@ -130,6 +130,10 @@ def test_all_errors_are_collected_not_just_the_first():
     v = validate_michaelis_menten_params(km=-1.0, vmax=-1.0, s0=-1.0)
     assert not v.ok
     assert len(v.errors) == 3
+    # Check that we get error messages for all three parameters
+    assert any("Km" in error for error in v.errors)
+    assert any("Vmax" in error for error in v.errors)
+    assert any("S0" in error for error in v.errors)
 
 
 # ---------------------------------------------------------------------------
