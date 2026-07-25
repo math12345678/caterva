@@ -1,0 +1,23 @@
+# This image is the Python simulation/literature stack only. The frontend
+# (Science-Agent-Pipeline) is a separate project with its own tooling and
+# has no business inside this container -- excluding it keeps the image
+# small and the build fast.
+Science-Agent-Pipeline/
+node_modules/
+
+.git/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
+.venv/
+venv/
+*.bak
+*.orig
+.DS_Store
+
+Docw/
+terrium_pitch_deck.pptx
+Logo.png
+Screenshot*.png
+Business/

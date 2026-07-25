@@ -16,12 +16,29 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 382 tests
+make test      # runs all 429 tests
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
 model, translates it to SBML, integrates it, and compares the result to the
 exact closed-form solution. If it passes, the numerics are trustworthy.
+
+### Sandbox (Docker / Dev Containers)
+
+If you'd rather not touch your local Python at all -- reviewing this for
+Kickstart, onboarding as the backend hire, or just don't want a `.venv`
+lying around -- there's a container that gives you the exact same verified
+environment:
+
+```bash
+docker build -t terrium-sandbox .
+docker run -it --rm terrium-sandbox
+# you're now in a shell where check_env.py has already passed
+```
+
+This is also wired up as a [Dev Container](https://containers.dev/) — open
+the repo in VS Code with the Dev Containers extension installed and it'll
+offer to build and attach automatically.
 
 ## Requirements
 
