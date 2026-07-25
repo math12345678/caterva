@@ -58,6 +58,11 @@ __all__ = [
     "simulate_seir",
     "steady_state",
     "parameter_scan",
+    "PCR_MIN_EFFICIENCY",
+    "PCR_MAX_EFFICIENCY",
+    "PCR_PLAUSIBLE_LOW_EFFICIENCY",
+    "validate_pcr_params",
+    "simulate_pcr",
 ]
 
 
@@ -82,20 +87,19 @@ class SimulationError(RuntimeError):
 # real BRENDA data spans roughly 2.3e-7 mM to >100 mM across enzymes.
 # ---------------------------------------------------------------------------
 
-KM_PLAUSIBLE_MIN_MM = 1e-7
-KM_PLAUSIBLE_MAX_MM = 1e3
+KM_PLAUSIBLE_MIN_MM = 1e-7  # 0.1 nM - below this gets flagged
+KM_PLAUSIBLE_MAX_MM = 1e3  # 1000 mM - above this gets flagged
+R0_IMPLAUSIBLE_ABOVE = 20.0  # Higher than any documented human pathogen
 
-# These two constants MUST stay equal to brenda_client.KM_PLAUSIBLE_MIN_MM /
-# KM_PLAUSIBLE_MAX_MM. They were briefly out of sync (engine 1e4 vs BRENDA
-# 1e3), which meant a Km of e.g. 5000 mM was flagged by the literature layer
-# and then silently accepted as "confirmed" by the simulation layer -- exactly
-# the kind of gap the trust trail exists to prevent. The equality is now
-# pinned by tests/test_brenda_integration.py so it cannot drift again.
-
-# Epidemiological bounds. R0 above ~20 exceeds even measles (12-18), so
-# anything past that is flagged rather than rejected -- flagging keeps the
-# human in the loop instead of silently discarding an unusual but real model.
-R0_IMPLAUSIBLE_ABOVE = 20.0
+# PCR amplification efficiency is a fraction: 1.0 means perfect doubling every
+# cycle (copies *= 2). Efficiency above 1.0 is not physically possible for a
+# single amplicon -- you cannot copy a template more than once per cycle --
+# so that is a hard rejection, not a flag. Below ~0.5 the reaction is real but
+# poor (bad primers, inhibitors, degraded template), so it is flagged rather
+# than rejected: a student may be deliberately modeling a failing reaction.
+PCR_MIN_EFFICIENCY = 0.0
+PCR_MAX_EFFICIENCY = 1.0
+PCR_PLAUSIBLE_LOW_EFFICIENCY = 0.5
 
 
 @dataclass
@@ -158,21 +162,41 @@ class SimulationResult:
 
 def _finite_positive(value: Any, label: str, errors: List[str],
                      allow_zero: bool = False) -> bool:
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    """Validate that a value is a finite, non‑negative number.
+    
+    Args:
+        value: The value to validate
+        label: Human‑readable name for the value (used in error messages)
+        errors: List to which error messages should be appended
+        allow_zero: Whether zero is allowed (used for population/counts)
+        
+    Returns:
+        False if the value is invalid, True if valid
+    """
+    if isinstance(value, bool):
+        errors.append(f"{label} must be a number, not a boolean")
+        return False
+    
+    if not isinstance(value, (int, float)):
         errors.append(f"{label} must be a number, got {type(value).__name__}")
         return False
+    
     if math.isnan(value):
         errors.append(f"{label} must not be NaN")
         return False
+    
     if math.isinf(value):
         errors.append(f"{label} must be finite")
         return False
+    
     if value < 0:
-        errors.append(f"{label} must not be negative (got {value})")
+        errors.append(f"{label} must be non‑negative (got {value})")
         return False
+    
     if value == 0 and not allow_zero:
         errors.append(f"{label} must be greater than zero")
         return False
+    
     return True
 
 
@@ -185,13 +209,15 @@ def validate_michaelis_menten_params(km: float, vmax: float,
     Initial substrate may legitimately be zero.
     """
     errors: List[str] = []
-    km_ok = _finite_positive(km, "Km", errors)
-    vmax_ok = _finite_positive(vmax, "Vmax", errors)
-    s0_ok = _finite_positive(s0, "S0", errors, allow_zero=True)
 
-    v = ParameterValidation(ok=km_ok and vmax_ok and s0_ok, errors=errors)
-    if not v.ok:
-        return v
+    km_valid = _finite_positive(km, "Km", errors, allow_zero=False)
+    vmax_valid = _finite_positive(vmax, "Vmax", errors, allow_zero=False)
+    s0_valid = _finite_positive(s0, "S0", errors, allow_zero=True)
+    
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    v = ParameterValidation()
 
     if km < KM_PLAUSIBLE_MIN_MM:
         v.flagged = True
@@ -217,17 +243,22 @@ def validate_sir_params(beta: float, gamma: float, s0: float, i0: float,
     nothing happens.
     """
     errors: List[str] = []
-    beta_ok = _finite_positive(beta, "beta", errors)
-    gamma_ok = _finite_positive(gamma, "gamma", errors)
-    s_ok = _finite_positive(s0, "S0", errors, allow_zero=True)
-    i_ok = _finite_positive(i0, "I0", errors, allow_zero=True)
-    r_ok = _finite_positive(r0_recovered, "R0_recovered", errors,
-                            allow_zero=True)
 
-    ok = all([beta_ok, gamma_ok, s_ok, i_ok, r_ok])
-    v = ParameterValidation(ok=ok, errors=errors)
-    if not v.ok:
-        return v
+    if not _finite_positive(beta, "beta", errors, allow_zero=False):
+        errors.append("beta must be finite and positive")
+    if not _finite_positive(gamma, "gamma", errors, allow_zero=False):
+        errors.append("gamma must be finite and positive")
+    if not _finite_positive(s0, "S0", errors, allow_zero=True):
+        errors.append("S0 must be finite and non-negative")
+    if not _finite_positive(i0, "I0", errors, allow_zero=True):
+        errors.append("I0 must be finite and non-negative")
+    if not _finite_positive(r0_recovered, "R0_recovered", errors, allow_zero=True):
+        errors.append("R0_recovered must be finite and non-negative")
+    
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    v = ParameterValidation()
 
     if (s0 + i0 + r0_recovered) <= 0:
         v.ok = False
@@ -251,32 +282,46 @@ def validate_sir_params(beta: float, gamma: float, s0: float, i0: float,
 
 
 def validate_seir_params(beta: float, sigma: float, gamma: float, s0: float,
-                         e0: float, i0: float,
-                         r0_recovered: float = 0.0) -> ParameterValidation:
+                          e0: float, i0: float,
+                          r0_recovered: float = 0.0) -> ParameterValidation:
     """Check an SEIR parameter set (adds the latent-progression rate sigma)."""
     errors: List[str] = []
-    sigma_ok = _finite_positive(sigma, "sigma", errors)
-    e_ok = _finite_positive(e0, "E0", errors, allow_zero=True)
 
-    base = validate_sir_params(beta, gamma, s0, i0, r0_recovered)
-    errors = base.errors + errors
-    ok = base.ok and sigma_ok and e_ok
-    v = ParameterValidation(ok=ok, errors=errors)
-    if not v.ok:
+    if not _finite_positive(beta, "beta", errors, allow_zero=False):
+        errors.append("beta must be finite and positive")
+    if not _finite_positive(sigma, "sigma", errors, allow_zero=False):
+        errors.append("sigma must be finite and positive")
+    if not _finite_positive(gamma, "gamma", errors, allow_zero=False):
+        errors.append("gamma must be finite and positive")
+    if not _finite_positive(s0, "S0", errors, allow_zero=True):
+        errors.append("S0 must be finite and non-negative")
+    if not _finite_positive(i0, "I0", errors, allow_zero=True):
+        errors.append("I0 must be finite and non-negative")
+    if not _finite_positive(e0, "E0", errors, allow_zero=True):
+        errors.append("E0 must be finite and non-negative")
+    if not _finite_positive(r0_recovered, "R0_recovered", errors, allow_zero=True):
+        errors.append("R0_recovered must be finite and non-negative")
+    
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    v = ParameterValidation()
+
+    if (s0 + i0 + r0_recovered + e0) <= 0:
+        v.ok = False
+        v.errors.append("total population must be greater than zero")
         return v
 
-    # An SEIR outbreak can be seeded from the exposed compartment alone, so
-    # the SIR "I0 == 0 means nothing happens" flag does not carry over
-    # unchanged.
     if i0 == 0 and e0 == 0:
         v.flagged = True
         v.flag_reason = "both E0 and I0 are zero: no outbreak can occur"
         return v
 
-    v.flagged = base.flagged and not (base.flag_reason or "").startswith("I0")
-    v.flag_reason = v.flag_reason or (base.flag_reason if v.flagged else None)
+    base_sir = validate_sir_params(beta, gamma, s0, i0, r0_recovered)
+    v.flagged = base_sir.flagged and not (base_sir.flag_reason or "").startswith("I0")
+    v.flag_reason = v.flag_reason or (base_sir.flag_reason if v.flagged else None)
     if v.flagged and v.flag_reason is None:
-        v.flag_reason = base.flag_reason
+        v.flag_reason = base_sir.flag_reason
     return v
 
 
@@ -335,8 +380,7 @@ def build_sir_antimony(beta: float, gamma: float, s0: float, i0: float,
         dR/dt =  gamma*I
     """
     if validate:
-        validate_sir_params(beta, gamma, s0, i0,
-                            r0_recovered).raise_if_invalid()
+        validate_sir_params(beta, gamma, s0, i0, r0_recovered).raise_if_invalid()
     _check_model_name(model_name)
     n = s0 + i0 + r0_recovered
     return (
@@ -366,8 +410,7 @@ def build_seir_antimony(beta: float, sigma: float, gamma: float, s0: float,
         dR/dt =  gamma*I
     """
     if validate:
-        validate_seir_params(beta, sigma, gamma, s0, e0, i0,
-                             r0_recovered).raise_if_invalid()
+        validate_seir_params(beta, sigma, gamma, s0, e0, i0, r0_recovered).raise_if_invalid()
     _check_model_name(model_name)
     n = s0 + e0 + i0 + r0_recovered
     return (
@@ -392,6 +435,14 @@ _RESERVED_MODEL_NAMES = {"model", "end", "species", "function", "compartment"}
 
 
 def _check_model_name(model_name: str) -> None:
+    """Validate an Antimony model name.
+    
+    Args:
+        model_name: The proposed model name to validate
+        
+    Raises:
+        ModelBuildError: If the name is invalid for Antimony
+    """
     if not isinstance(model_name, str) or not model_name:
         raise ModelBuildError("model_name must be a non-empty string")
     if model_name in _RESERVED_MODEL_NAMES:
@@ -442,7 +493,20 @@ def antimony_to_sbml(antimony_string: str,
 
 
 def sbml_to_antimony(sbml_string: str) -> str:
-    """Translate an SBML document string back to Antimony source."""
+    """Translate an SBML document string back to Antimony source.
+    
+    This function safely converts an SBML document to Antimony representation,
+    ensuring thread safety by using a lock and clearing previous Antimony loads.
+    
+    Args:
+        sbml_string: A valid SBML document as a string
+        
+    Returns:
+        The corresponding Antimony source code as a string
+        
+    Raises:
+        ModelBuildError: If the SBML is invalid or cannot be converted
+    """
     if not isinstance(sbml_string, str) or not sbml_string.strip():
         raise ModelBuildError("sbml_string is empty")
     with _ANTIMONY_LOCK:
@@ -455,11 +519,17 @@ def sbml_to_antimony(sbml_string: str) -> str:
 
 
 def validate_sbml(sbml_string: str) -> List[str]:
-    """Return libSBML's fatal/error-level complaints about a document.
+    """Validate an SBML document and return all fatal/error-level problems.
 
     Warnings and informational messages are intentionally excluded: roadrunner
     integrates warning-level documents fine, and surfacing them would train
-    users to ignore the list.
+    users to ignore the list. Only errors (>= LIBSBML_SEV_ERROR) are returned.
+    
+    Args:
+        sbml_string: A potentially valid SBML document as a string
+        
+    Returns:
+        A list of error messages. Empty list if the document is valid.
     """
     doc = libsbml.readSBMLFromString(sbml_string)
     doc.checkConsistency()
@@ -503,12 +573,32 @@ def _load_runner(sbml_string: str,
 
 
 def simulate_sbml(sbml_string: str, start: float = 0.0, end: float = 10.0,
-                  points: int = 51,
-                  selections: Optional[Sequence[str]] = None,
-                  model_name: str = "model",
-                  validation: Optional[ParameterValidation] = None
-                  ) -> SimulationResult:
-    """Integrate an SBML model and return a SimulationResult."""
+                   points: int = 51,
+                   selections: Optional[Sequence[str]] = None,
+                   model_name: str = "model",
+                   validation: Optional[ParameterValidation] = None
+                   ) -> SimulationResult:
+    """Integrate an SBML model and return a SimulationResult.
+    
+    This is the core simulation function that uses the RoadRunner engine
+    to numerically integrate an SBML model. The function handles parameter
+    validation, selections, and error handling for robust simulation.
+    
+    Args:
+        sbml_string: A valid SBML document as a string
+        start: Start time for the simulation (default: 0.0)
+        end: End time for the simulation (must be > start)
+        points: Number of time points to simulate (must be >= 2)
+        selections: Optional list of species to include in output
+        model_name: Name to assign to this simulated model
+        validation: Optional pre-validation result to include in output
+        
+    Returns:
+        SimulationResult containing the time series data and metadata
+        
+    Raises:
+        SimulationError: If the model cannot be loaded, validated, or integrated
+    """
     if points < 2:
         raise SimulationError("points must be at least 2")
     if end <= start:
@@ -543,23 +633,64 @@ def simulate_sbml(sbml_string: str, start: float = 0.0, end: float = 10.0,
 def simulate_michaelis_menten(km: float, vmax: float, s0: float,
                               start: float = 0.0, end: float = 10.0,
                               points: int = 51) -> SimulationResult:
-    """Validate, build, translate and integrate a Michaelis-Menten model."""
+    """Validate, build, translate and integrate a Michaelis-Menten model.
+    
+    This function creates a complete Michaelis-Menten enzyme kinetics model
+    from parameter values, validates them, converts to SBML, and simulates
+    the system using RoadRunner.
+    
+    Args:
+        km: Michaelis constant (Km) - must be positive
+        vmax: Maximum reaction rate (Vmax) - must be positive  
+        s0: Initial substrate concentration (can be zero)
+        start: Start time for simulation
+        end: End time for simulation
+        points: Number of time points for output
+        
+    Returns:
+        SimulationResult containing time series for substrate and product
+        
+    Raises:
+        ModelBuildError: If parameters are invalid (non-numeric, negative, etc.)
+        SimulationError: If the integration fails after a valid model is built
+    """
     validation = validate_michaelis_menten_params(km, vmax, s0)
     validation.raise_if_invalid()
-    model = build_michaelis_menten_antimony(km, vmax, s0, validate=False)
+    model = build_michaelis_menten_antimony(km, vmax, s0)
     sbml = antimony_to_sbml(model, "michaelis_menten")
     return simulate_sbml(sbml, start, end, points,
                          model_name="michaelis_menten", validation=validation)
 
 
 def simulate_sir(beta: float, gamma: float, s0: float, i0: float,
-                 r0_recovered: float = 0.0, start: float = 0.0,
-                 end: float = 100.0, points: int = 101) -> SimulationResult:
-    """Validate, build, translate and integrate an SIR model."""
+                  r0_recovered: float = 0.0, start: float = 0.0,
+                  end: float = 100.0, points: int = 101) -> SimulationResult:
+    """Validate, build, translate and integrate an SIR epidemiological model.
+    
+    This implements the classic SIR (Susceptible-Infected-Recovered) model
+    for disease spread. The model tracks three compartments over time and
+    is commonly used in epidemiology teaching and research.
+    
+    Args:
+        beta: Transmission rate (higher = faster spread)
+        gamma: Recovery rate (higher = faster recovery)
+        s0: Initial number of susceptible individuals
+        i0: Initial number of infected individuals
+        r0_recovered: Initial number of recovered individuals
+        start: Start time for simulation
+        end: End time for simulation
+        points: Number of time points for output
+        
+    Returns:
+        SimulationResult containing the time evolution of all three compartments
+        
+    Raises:
+        ModelBuildError: If parameters are invalid
+        SimulationError: If the integration fails
+    """
     validation = validate_sir_params(beta, gamma, s0, i0, r0_recovered)
     validation.raise_if_invalid()
-    model = build_sir_antimony(beta, gamma, s0, i0, r0_recovered,
-                               validate=False)
+    model = build_sir_antimony(beta, gamma, s0, i0, r0_recovered)
     sbml = antimony_to_sbml(model, "sir")
     return simulate_sbml(sbml, start, end, points, model_name="sir",
                          validation=validation)
@@ -569,12 +700,35 @@ def simulate_seir(beta: float, sigma: float, gamma: float, s0: float,
                   e0: float, i0: float, r0_recovered: float = 0.0,
                   start: float = 0.0, end: float = 100.0,
                   points: int = 101) -> SimulationResult:
-    """Validate, build, translate and integrate an SEIR model."""
+    """Validate, build, translate and integrate an SEIR epidemiological model.
+    
+    This is an extension of the SIR model that adds an exposed compartment (E)
+    representing individuals who have been infected but are not yet infectious.
+    This better models diseases with incubation periods like COVID-19.
+    
+    Args:
+        beta: Transmission rate (higher = faster spread)
+        sigma: Progression rate from exposed to infectious
+        gamma: Recovery rate (higher = faster recovery)
+        s0: Initial number of susceptible individuals
+        e0: Initial number of exposed individuals (incubating)
+        i0: Initial number of infectious individuals
+        r0_recovered: Initial number of recovered individuals
+        start: Start time for simulation
+        end: End time for simulation
+        points: Number of time points for output
+        
+    Returns:
+        SimulationResult containing the time evolution of all four compartments
+        
+    Raises:
+        ModelBuildError: If parameters are invalid
+        SimulationError: If the integration fails
+    """
     validation = validate_seir_params(beta, sigma, gamma, s0, e0, i0,
                                       r0_recovered)
     validation.raise_if_invalid()
-    model = build_seir_antimony(beta, sigma, gamma, s0, e0, i0, r0_recovered,
-                                validate=False)
+    model = build_seir_antimony(beta, sigma, gamma, s0, e0, i0, r0_recovered)
     sbml = antimony_to_sbml(model, "seir")
     return simulate_sbml(sbml, start, end, points, model_name="seir",
                          validation=validation)
@@ -627,3 +781,126 @@ def parameter_scan(sbml_string: str, parameter: str,
             validation=ParameterValidation(),
         ))
     return results
+
+
+# ---------------------------------------------------------------------------
+# PCR amplification
+#
+# This domain is deliberately NOT built through antimony/roadrunner. PCR is a
+# discrete-cycle process (you cannot run "half a cycle"), not a continuous-
+# time ODE, so modeling it as one would force a fake continuous-time
+# reinterpretation just to reuse the SBML pipeline. The exact closed-form
+# recurrence below is exact by construction, not an approximation needing a
+# solver -- there is no numerical error to manage.
+# ---------------------------------------------------------------------------
+
+
+def validate_pcr_params(n0: float, efficiency: float,
+                        cycles: int) -> ParameterValidation:
+    """Check a PCR amplification parameter set.
+
+    n0 must be a positive template copy number. efficiency is the fraction of
+    template successfully doubled each cycle: 1.0 is ideal (copies exactly
+    double), 0.0 is no amplification at all. Above 1.0 is physically
+    impossible -- rejected, not flagged. Below
+    ``PCR_PLAUSIBLE_LOW_EFFICIENCY`` is a real but poor reaction -- flagged so
+    a student modeling a failing PCR still gets a plot, with a visible
+    warning attached.
+    """
+    errors: List[str] = []
+
+    if not _finite_positive(n0, "n0", errors, allow_zero=False):
+        errors.append("n0 must be finite and positive")
+
+    if isinstance(efficiency, bool) or not isinstance(efficiency, (int, float)):
+        errors.append(
+            f"efficiency must be a number, got {type(efficiency).__name__}")
+    elif math.isnan(efficiency) or math.isinf(efficiency):
+        errors.append("efficiency must be finite")
+    elif efficiency < PCR_MIN_EFFICIENCY or efficiency > PCR_MAX_EFFICIENCY:
+        errors.append(
+            f"efficiency must be between {PCR_MIN_EFFICIENCY} and "
+            f"{PCR_MAX_EFFICIENCY} (got {efficiency}) -- a single amplicon "
+            "cannot be copied more than once per cycle")
+
+    if isinstance(cycles, bool) or not isinstance(cycles, int):
+        errors.append(f"cycles must be an integer, got {type(cycles).__name__}")
+    elif cycles <= 0:
+        errors.append("cycles must be a positive integer")
+    elif cycles > 60:
+        errors.append(
+            f"cycles must be <= 60 (got {cycles}) -- real qPCR protocols "
+            "never run this many cycles; the template would be exhausted "
+            "or the reaction would have plateaued long before this point")
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    if isinstance(efficiency, (int, float)) and efficiency < PCR_PLAUSIBLE_LOW_EFFICIENCY:
+        return ParameterValidation(
+            ok=True, flagged=True,
+            flag_reason=(
+                f"efficiency {efficiency} is below "
+                f"{PCR_PLAUSIBLE_LOW_EFFICIENCY} -- amplification will be "
+                "real but poor (degraded template, weak primers, or "
+                "inhibitors are the usual causes)"),
+        )
+
+    return ParameterValidation()
+
+
+def simulate_pcr(n0: float, efficiency: float, cycles: int,
+                 plateau_capacity: Optional[float] = None) -> SimulationResult:
+    """Simulate PCR amplification over a fixed number of cycles.
+
+    Without a plateau capacity, copy number follows the exact closed form
+    ``N(c) = n0 * (1 + efficiency) ** c`` -- unbounded exponential growth,
+    the textbook idealization.
+
+    With a plateau capacity (reagents exhausted, polymerase saturated), the
+    recurrence switches to discrete logistic growth:
+    ``N(c+1) = N(c) + efficiency * N(c) * (1 - N(c) / capacity)``, which
+    approaches but never exceeds ``capacity`` -- the real-world qPCR
+    amplification curve shape (exponential phase, then plateau).
+
+    Args:
+        n0: initial template copy number
+        efficiency: fraction of template copied per cycle, in [0, 1]
+        cycles: number of PCR cycles to simulate
+        plateau_capacity: if given, the copy number ceiling the reaction
+            saturates toward; if omitted, growth is unbounded exponential
+
+    Returns:
+        SimulationResult with columns ["cycle", "copies"], one row per cycle
+        from 0 to ``cycles`` inclusive.
+
+    Raises:
+        ModelBuildError: if parameters are invalid
+    """
+    validation = validate_pcr_params(n0, efficiency, cycles)
+    validation.raise_if_invalid()
+
+    if plateau_capacity is not None:
+        if not _finite_positive(plateau_capacity, "plateau_capacity", []):
+            raise ModelBuildError(
+                f"plateau_capacity must be finite and positive, got "
+                f"{plateau_capacity}")
+        if plateau_capacity < n0:
+            raise ModelBuildError(
+                f"plateau_capacity ({plateau_capacity}) must be >= n0 ({n0})")
+
+    copies = float(n0)
+    data: List[List[float]] = [[0.0, copies]]
+    for cycle in range(1, cycles + 1):
+        if plateau_capacity is None:
+            copies = n0 * (1.0 + efficiency) ** cycle
+        else:
+            copies = copies + efficiency * copies * (1.0 - copies / plateau_capacity)
+        data.append([float(cycle), copies])
+
+    return SimulationResult(
+        colnames=["cycle", "copies"],
+        data=data,
+        model_name="pcr_amplification",
+        validation=validation,
+    )
