@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: >-
+  If you use Terrium in academic or research work, please cite it as below.
+  This file exists for the same reason the test suite checks every number
+  against an exact solution: a claim should be traceable back to something
+  concrete, and "cite this project" deserves the same treatment as "cite
+  this Km value."
+title: Terrium
+abstract: >-
+  A biology simulation engine built on antimony/SBML/roadrunner, providing
+  validated enzyme kinetics (Michaelis-Menten), epidemiology (SIR/SEIR), and
+  PCR amplification models with literature-grounded parameter plausibility
+  checks.
+authors:
+  - name: Terrium
+    website: "https://github.com/math12345678/terrium"
+license: LicenseRef-Terrium-Proprietary
+repository-code: "https://github.com/math12345678/terrium"
+date-released: 2026-07-25

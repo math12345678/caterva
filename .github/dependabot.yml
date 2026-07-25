@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  # Root Python dependencies (Tellurium/, Tests/) -- requirements.txt.
+  # This is exactly the class of bug that broke CI earlier (libroadrunner
+  # 2.9.0 with no cp310 wheels): dependabot won't catch a missing wheel by
+  # itself, but it does catch drift before it accumulates into a surprise,
+  # and every bump still has to pass the full suite + the dependency-
+  # declaration guard (test_dependencies_declared.py) before merging.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+
+  # Landing page (pnpm workspace).
+  - package-ecosystem: "npm"
+    directory: "/Science-Agent-Pipeline"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "landing-page"
+
+  # GitHub Actions workflow dependencies themselves.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"
