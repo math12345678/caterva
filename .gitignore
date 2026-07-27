@@ -35,3 +35,4 @@ Thumbs.db
 # doing so once broke CI, because GitHub Actions checkout tries to resolve
 # the gitlink and there's no .gitmodules pointing anywhere real.
 Science-Agent-Pipeline/
+.gstack/
