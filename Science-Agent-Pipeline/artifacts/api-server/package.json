@@ -20,7 +20,7 @@
     "drizzle-orm": "catalog:",
     "dunder-proto": "^1.0.1",
     "express": "^5.2.1",
-    "pino": "^9.14.0",
+    "pino": "^10.3.1",
     "pino-http": "^10.5.0",
     "zod": "catalog:"
   },
