@@ -1,0 +1,267 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: simulate
+    description: Science agent simulation pipeline
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /simulate:
+    get:
+      operationId: listSimulationJobs
+      tags: [simulate]
+      summary: List recent simulation jobs
+      description: |
+        Returns the most recent simulation jobs from the in-memory queue,
+        ordered by updatedAt descending. Completed jobs include their
+        result; failed jobs include the error.
+      responses:
+        "200":
+          description: List of recent simulation jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SimulationJob"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: runSimulation
+      tags: [simulate]
+      summary: Submit a science-agent simulation job
+      description: |
+        Accepts a natural-language request, enqueues an simulation job, and
+        returns a job object. Poll `GET /simulate/{jobId}` or subscribe to
+        `GET /simulate/{jobId}/stream` for real-time progress.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SimulationRequest"
+      responses:
+        "202":
+          description: Simulation job accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulationJob"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Simulation or pipeline failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /simulate/{jobId}:
+    get:
+      operationId: getSimulationJob
+      tags: [simulate]
+      summary: Get a simulation job by ID
+      description: |
+        Returns the current job status and, when completed, the full
+        simulation result.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulationJob"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /simulate/{jobId}/stream:
+    get:
+      operationId: streamSimulationJob
+      tags: [simulate]
+      summary: Stream simulation job progress
+      description: |
+        Server-Sent Events endpoint that emits status updates and the final
+        result for a simulation job.
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: SSE stream of job events
+          content:
+            text/event-stream:
+              schema:
+                $ref: "#/components/schemas/SimulationJob"
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    SimulationRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Natural-language simulation request (e.g. "simulate lactate dehydrogenase with pyruvate")
+      required:
+        - query
+    SimulationJobStatus:
+      type: string
+      enum: [pending, resolving, validating, running, completed, failed]
+      description: Current pipeline stage for a submitted job
+    SimulationJob:
+      type: object
+      properties:
+        jobId:
+          type: string
+          description: Unique identifier for this pipeline run
+        status:
+          $ref: "#/components/schemas/SimulationJobStatus"
+        query:
+          type: string
+          description: Original natural-language query
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Completion percentage based on pipeline stage
+        result:
+          $ref: "#/components/schemas/SimulationResponse"
+        error:
+          $ref: "#/components/schemas/ErrorResponse"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - jobId
+        - status
+        - query
+        - progress
+        - createdAt
+        - updatedAt
+    SimulationResponse:
+      type: object
+      properties:
+        runId:
+          type: string
+          description: Unique identifier for this pipeline run
+        domain:
+          type: string
+          enum: [mm, sir, seir]
+          description: Resolved simulation domain
+        parameters:
+          type: object
+          description: Resolved simulation parameters
+          additionalProperties: true
+        trajectory:
+          type: array
+          description: Time-series output from the simulation engine
+          items:
+            type: object
+            additionalProperties: true
+        provenance:
+          $ref: "#/components/schemas/Provenance"
+        completedAt:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when the run finished
+      required:
+        - runId
+        - domain
+        - parameters
+        - trajectory
+        - provenance
+        - completedAt
+    Provenance:
+      type: object
+      properties:
+        citations:
+          type: array
+          description: Literature references used to resolve parameters
+          items:
+            type: string
+        flags:
+          type: array
+          description: Human-readable warnings about the parameters or result
+          items:
+            type: string
+        reasoning:
+          type: string
+          description: Short explanation of how the query was mapped to a domain
+      required: []
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Short error code
+        message:
+          type: string
+          description: Human-readable error message
+      required:
+        - error
+        - message

@@ -1,0 +1,316 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import request from "supertest";
+import app from "../app";
+import * as queue from "../lib/queue";
+import { resetCache } from "../lib/cache";
+import { resetWaitlist } from "../routes/waitlist";
+import type { Server } from "node:http";
+import { mkdtempSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+const tmpDir = mkdtempSync(join(tmpdir(), "api-test-"));
+process.env.CACHE_FILE = join(tmpDir, "cache.json");
+process.env.WAITLIST_FILE = join(tmpDir, "waitlist.json");
+
+let server: Server;
+
+beforeAll(() => {
+  server = app.listen(0);
+});
+
+afterAll(() => {
+  server?.close();
+});
+
+beforeEach(() => {
+  queue.reset();
+  resetWaitlist();
+});
+
+describe("GET /api/healthz", () => {
+  it("returns 200 with status ok", async () => {
+    const res = await request(server).get("/api/healthz");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "ok" });
+  });
+});
+
+describe("GET /api/pipeline/status", () => {
+  it("returns 200 with subsystems array", async () => {
+    const res = await request(server).get("/api/pipeline/status");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("status");
+    expect(res.body).toHaveProperty("subsystems");
+    expect(res.body).toHaveProperty("queue");
+    expect(Array.isArray(res.body.subsystems)).toBe(true);
+  });
+});
+
+describe("POST /api/simulate", () => {
+  it("returns 400 for empty body", async () => {
+    const res = await request(server)
+      .post("/api/simulate")
+      .send({})
+      .expect("Content-Type", /json/);
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 400 for missing query", async () => {
+    const res = await request(server)
+      .post("/api/simulate")
+      .send({})
+      .expect("Content-Type", /json/);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("BAD_REQUEST");
+  });
+
+  it("returns 202 with a job for a valid query", async () => {
+    const res = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate SIR" });
+    expect(res.status).toBe(202);
+    expect(res.body).toHaveProperty("jobId");
+    expect(res.body.status).toBe("pending");
+    expect(res.body.query).toBe("simulate SIR");
+  });
+
+  it("stores the original query (normalization is internal only)", async () => {
+    const res = await request(server)
+      .post("/api/simulate")
+      .send({ query: "  simulate SIR Outbreak  " });
+    expect(res.body.query).toBe("  simulate SIR Outbreak  ");
+  });
+
+  it("creates a job that can be fetched via GET /simulate/:jobId, even if it fails", async () => {
+    const createRes = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate SEIR" });
+    const { jobId } = createRes.body;
+
+    await new Promise((r) => setTimeout(r, 800));
+
+    const getRes = await request(server).get(`/api/simulate/${jobId}`);
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.jobId).toBe(jobId);
+    expect(["pending", "running", "failed", "completed"]).toContain(getRes.body.status);
+  });
+
+  it("pipeline runs asynchronously to completion when Python bridge is available", async () => {
+    const createRes = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate sir beta=0.5 gamma=0.1" });
+    const { jobId } = createRes.body;
+
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const getRes = await request(server).get(`/api/simulate/${jobId}`);
+      if (getRes.body.status === "completed") {
+        expect(getRes.body.result).toBeDefined();
+        expect(getRes.body.result.domain).toBe("sir");
+        expect(Array.isArray(getRes.body.result.trajectory)).toBe(true);
+        expect(getRes.body.result.trajectory.length).toBeGreaterThan(0);
+        expect(getRes.body.result.parameters.beta).toBe(0.5);
+        expect(getRes.body.result.parameters.gamma).toBe(0.1);
+        return;
+      }
+      if (getRes.body.status === "failed") {
+        // Pipeline may fail if Python/Tellurium environment isn't available
+        return;
+      }
+    }
+    // Timed out — acceptable if the Python environment isn't configured
+  });
+});
+
+describe("GET /api/simulate/:jobId", () => {
+  it("returns 404 for unknown job", async () => {
+    const res = await request(server).get("/api/simulate/nonexistent-id");
+    expect(res.status).toBe(404);
+  });
+});
+
+describe("GET /api/simulate", () => {
+  it("returns empty array when no jobs exist", async () => {
+    const res = await request(server).get("/api/simulate");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
+  });
+
+  it("returns all jobs in reverse chronological order", async () => {
+    const r1 = await request(server).post("/api/simulate").send({ query: "first" });
+    const r2 = await request(server).post("/api/simulate").send({ query: "second" });
+    const res = await request(server).get("/api/simulate");
+    expect(res.body.length).toBe(2);
+    expect(res.body[0].query).toBe("second");
+    expect(res.body[1].query).toBe("first");
+  });
+});
+
+describe("POST /api/simulate/:jobId/cancel", () => {
+  it("returns 404 for unknown job", async () => {
+    const res = await request(server).post("/api/simulate/nonexistent/cancel");
+    expect(res.status).toBe(404);
+  });
+
+  it("cancels a pending job", async () => {
+    const create = await request(server).post("/api/simulate").send({ query: "to cancel" });
+    const { jobId } = create.body;
+
+    const res = await request(server).post(`/api/simulate/${jobId}/cancel`);
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe("cancelled");
+  });
+
+  it("returns 409 for already completed job", async () => {
+    const create = await request(server).post("/api/simulate").send({ query: "simulate sir" });
+    const { jobId } = create.body;
+
+    // Wait for completion
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const get = await request(server).get(`/api/simulate/${jobId}`);
+      if (get.body.status === "completed") break;
+    }
+
+    const res = await request(server).post(`/api/simulate/${jobId}/cancel`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("ALREADY_TERMINAL");
+  });
+});
+
+describe("POST /api/waitlist", () => {
+  it("returns 400 for missing email", async () => {
+    const res = await request(server).post("/api/waitlist").send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("BAD_REQUEST");
+  });
+
+  it("returns 400 for invalid email", async () => {
+    const res = await request(server).post("/api/waitlist").send({ email: "not-an-email" });
+    expect(res.status).toBe(400);
+  });
+
+  it("returns 201 with position for valid signup", async () => {
+    const res = await request(server)
+      .post("/api/waitlist")
+      .send({ email: "test@example.com" });
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty("position");
+    expect(res.body.message).toContain("list");
+  });
+
+  it("returns 409 for duplicate email", async () => {
+    await request(server).post("/api/waitlist").send({ email: "dup@example.com" });
+    const res = await request(server).post("/api/waitlist").send({ email: "dup@example.com" });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("ALREADY_SIGNED_UP");
+  });
+
+  it("normalizes emails to lowercase", async () => {
+    const r1 = await request(server).post("/api/waitlist").send({ email: "UPPER@EXAMPLE.COM" });
+    expect(r1.status).toBe(201);
+    const r2 = await request(server).post("/api/waitlist").send({ email: "upper@example.com" });
+    expect(r2.status).toBe(409);
+  });
+});
+
+describe("GET /api/waitlist/count", () => {
+  it("returns 0 when waitlist is empty", async () => {
+    const res = await request(server).get("/api/waitlist/count");
+    expect(res.status).toBe(200);
+    expect(res.body.count).toBe(0);
+  });
+
+  it("returns correct count after signups", async () => {
+    await request(server).post("/api/waitlist").send({ email: "a@b.com" });
+    await request(server).post("/api/waitlist").send({ email: "b@c.com" });
+    const res = await request(server).get("/api/waitlist/count");
+    expect(res.body.count).toBe(2);
+  });
+});
+
+describe("GET /api/metrics", () => {
+  it("returns aggregate platform metrics", async () => {
+    const res = await request(server).get("/api/metrics");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("totalSimulations");
+    expect(res.body).toHaveProperty("completedSimulations");
+    expect(res.body).toHaveProperty("enqueuedSimulations");
+    expect(res.body).toHaveProperty("failedSimulations");
+    expect(res.body).toHaveProperty("waitlistSignups");
+    expect(res.body).toHaveProperty("uptime");
+    expect(typeof res.body.uptime).toBe("number");
+  });
+});
+
+describe("GET /api/enzymes", () => {
+  it("returns an array of enzymes", async () => {
+    const res = await request(server).get("/api/enzymes");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThanOrEqual(15);
+    expect(res.body[0]).toHaveProperty("ecNumber");
+    expect(res.body[0]).toHaveProperty("name");
+  });
+});
+
+describe("POST /api/resolve", () => {
+  it("returns 400 for missing query", async () => {
+    const res = await request(server).post("/api/resolve").send({});
+    expect(res.status).toBe(400);
+  });
+
+  it("resolves an SIR query", async () => {
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "simulate sir beta=0.5" });
+    expect(res.status).toBe(200);
+    expect(res.body.domain).toBe("sir");
+    expect(res.body.parameters.beta).toBe(0.5);
+    expect(res.body.provenance).toHaveProperty("reasoning");
+  });
+
+  it("resolves an MM query", async () => {
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "simulate lactate dehydrogenase" });
+    expect(res.status).toBe(200);
+    expect(res.body.domain).toBe("mm");
+    expect(res.body.parameters).toHaveProperty("km");
+  });
+});
+
+describe("GET /api/simulate/:jobId/export", () => {
+  it("returns 404 for unknown job", async () => {
+    const res = await request(server).get("/api/simulate/unknown/export");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 for incomplete job", async () => {
+    const create = await request(server).post("/api/simulate").send({ query: "something" });
+    const res = await request(server).get(`/api/simulate/${create.body.jobId}/export`);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("NO_DATA");
+  });
+
+  it("returns CSV for completed job", async () => {
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate sir beta=0.3 gamma=0.1" });
+    const { jobId } = create.body;
+
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const get = await request(server).get(`/api/simulate/${jobId}`);
+      if (get.body.status === "completed") break;
+    }
+
+    const res = await request(server)
+      .get(`/api/simulate/${jobId}/export`)
+      .expect("Content-Type", /text\/csv/);
+    expect(res.status).toBe(200);
+    expect(res.text).toContain("S");
+    expect(res.text.split("\n").length).toBeGreaterThan(2);
+  });
+});

@@ -30,9 +30,12 @@ Thumbs.db
 # Word temp/lock files
 ~$*.docx
 
-# Science-Agent-Pipeline is its own independent git repository (own remote,
-# own history). It must NOT be tracked as a submodule/gitlink of this repo --
-# doing so once broke CI, because GitHub Actions checkout tries to resolve
-# the gitlink and there's no .gitmodules pointing anywhere real.
-Science-Agent-Pipeline/
 .gstack/
+
+# Science-Agent-Pipeline is folded into this repo as regular files (it used
+# to be tracked as a gitlink to its own separate repo, which broke CI --
+# GitHub Actions checkout tried to resolve the gitlink and there was no
+# .gitmodules pointing anywhere real). Its own node_modules/build output are
+# covered by Science-Agent-Pipeline/.gitignore; this repo's pnpm store cache
+# (created while verifying the merge) should never be committed either.
+.pnpm-store/
