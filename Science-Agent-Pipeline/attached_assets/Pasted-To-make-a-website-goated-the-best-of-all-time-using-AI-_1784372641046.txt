@@ -1,0 +1,41 @@
+To make a website "goated" (the best of all time) using AI, your prompt must be highly detailed. It needs to clearly define the purpose, target audience, design vibe, tech stack, and core features. [1, 2, 3, 4]  
+Use the following plug-and-play prompt template, tailored with your specific details: 
+The "Goated Website" Master Prompt 
+Act as an elite, award-winning web designer and full-stack developer. Build a sleek, modern, and highly converting website with the following specifications: 
+
+• Project Purpose: [Insert your business/project type, e.g., an e-commerce store for handmade ceramics or an AI personal training service]. 
+• Target Audience: [Insert your demographic, e.g., tech-savvy millennials and Gen-Z looking for minimalist, sustainable goods]. 
+• Design Vibe & Aesthetics: [Insert visual direction, e.g., brutalist and high-energy, or minimalist and airy with heavy white space, large serif typography, and premium micro-animations]. 
+• Required Pages: Home (featuring a high-conversion hero section), Services/Products, About Us, and a mobile-responsive Contact form. 
+• Key Features: Include a prominent call-to-action (CTA), a testimonial slider, an FAQ accordion, and clean logo placeholders. 
+• Tech Stack: Build using [Insert desired stack, e.g., React and Tailwind CSS] for optimal loading speed and SEO. 
+• Requirements: Ensure 100% responsiveness across all desktop, tablet, and mobile breakpoints. The color scheme should be a refined palette of [Insert 3 hex codes or color families]. [15]  
+
+Pro-Tips to Perfect the Output 
+
+• Build in Sections: Instead of asking for a full website all at once, ask the AI to build section-by-section (e.g., "Build a high-conversion hero section for [X]"). 
+• Use Specialized Tools: Paste your customized prompt into builders like Wix or Rocket to generate instant layouts. 
+• Check for Accessibility: After generating, review the site for high color contrast and responsive design. [1, 9, 16, 17, 18]  
+
+To help tailor this prompt perfectly, tell me:What is the specific industry or niche for your website?Are you aiming for a minimalist, bold, corporate, or playful aesthetic?Do you need e-commerce (shopping cart) functionality? 
+AI responses may include mistakes.
+
+[1] https://base44.com/blog/best-ai-prompts-to-build-a-website
+[2] https://zoer.ai/posts/zoer/best-prompt-website-design-examples-templates
+[3] https://www.hostinger.com/in/tutorials/prompting-with-hostinger-horizons
+[4] https://rpn.beehiiv.com/p/full-tutorial-build-a-website-with-ai-in-15-minutes
+[5] https://www.youtube.com/watch?v=FbffrjNmufE
+[6] https://www.wix.com/blog/how-to-make-a-website-with-a-prompt
+[7] https://wowslider.com/ai-builder/mozilla.html
+[8] https://www.youtube.com/watch?v=pEM21nbC5tI
+[9] https://www.wix.com/blog/ai-prompts-to-build-a-website
+[10] https://10web.io/blog/best-website-prompts/
+[11] https://usabilitygeek.com/how-to-structure-your-website-layout-for-maximum-conversions/
+[12] https://elfsight.com/blog/how-to-put-testimonials-slider-on-any-website-for-free/
+[13] https://www.sundaebar.ai/prompt/best-prompts-to-build-a-website
+[14] https://dev.to/james_miller_8dc58a89cb9e/one-prompt-one-app-hands-on-with-google-antigravity-2jme
+[15] https://www.instagram.com/reel/DOTX5Q0iPHJ/
+[16] https://www.rocket.new/blog/best-ai-prompts-to-build-a-website
+[17] https://www.tisatech.in/blog/best-prompts-for-website-design/
+[18] https://www.rocket.new/blog/best-ai-prompts-to-build-a-website
+

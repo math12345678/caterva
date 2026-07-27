@@ -1,0 +1,48 @@
+name: terrium-landing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/terrium-landing/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/landing.yml"
+  pull_request:
+    paths:
+      - "artifacts/terrium-landing/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # PORT and BASE_PATH are normally injected by Replit at dev/build time
+    # (see artifacts/terrium-landing/.replit-artifact/artifact.toml). Outside
+    # Replit -- including here in CI -- vite.config.ts throws immediately if
+    # either is unset, so they're set explicitly to the same values.
+    env:
+      PORT: "18612"
+      BASE_PATH: "/"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm --filter @workspace/terrium-landing run typecheck
+
+      - name: Build
+        run: pnpm --filter @workspace/terrium-landing run build

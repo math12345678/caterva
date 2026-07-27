@@ -1,0 +1,27 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock 2>/dev/null; :'",
+    "dev": "PORT=18612 BASE_PATH=/ pnpm --filter @workspace/terrium-landing dev",
+    "dev:api": "cd artifacts/api-server && PORT=5000 pnpm run dev",
+    "dev:all": "concurrently --names api,landing --prefix-colors green,blue \"pnpm run dev:api\" \"pnpm run dev\"",
+    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build:api": "cd artifacts/api-server && pnpm run build",
+    "build:landing": "PORT=18612 BASE_PATH=/ pnpm --filter @workspace/terrium-landing run build",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "test:api": "pnpm --filter @workspace/api-server run test"
+  },
+  "private": true,
+  "dependencies": {
+    "@replit/connectors-sdk": "^0.4.1"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "prettier": "^3.9.5",
+    "typescript": "~5.9.3"
+  }
+}

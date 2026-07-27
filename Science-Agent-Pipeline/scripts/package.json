@@ -1,0 +1,27 @@
+{
+  "name": "@workspace/scripts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "sci-pipe": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/cli.ts",
+    "cli": "tsx src/cli.ts",
+    "demo": "tsx src/demo.ts"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/node-fetch": "^2.6.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}
