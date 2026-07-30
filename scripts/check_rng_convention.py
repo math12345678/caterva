@@ -79,28 +79,26 @@ def check() -> list[str]:
                 "(required by ADR 0005)")
             continue  # skip body check if param is missing
 
-        # Check 2: body calls np.random.default_rng(seed) or
-        # numpy.random.default_rng(seed)
+        # Check 2: body calls default_rng(seed) in any import style.
+        # Handles all three common patterns:
+        #   np.random.default_rng(seed)
+        #   numpy.random.default_rng(seed)
+        #   from numpy.random import default_rng; default_rng(seed)
         calls_default_rng = False
         for child in ast.walk(node):
             if isinstance(child, ast.Call):
                 func = child.func
-                # np.random.default_rng(...)
+                # Bare-name call: default_rng(seed)
+                if isinstance(func, ast.Name) and func.id == "default_rng":
+                    calls_default_rng = True
+                    break
+                # Qualified call: <module>.random.default_rng(...)
                 if (isinstance(func, ast.Attribute)
                         and func.attr == "default_rng"
                         and isinstance(func.value, ast.Attribute)
                         and func.value.attr == "random"
                         and isinstance(func.value.value, ast.Name)
                         and func.value.value.id in ("np", "numpy")):
-                    calls_default_rng = True
-                    break
-                # numpy.random.default_rng(...)
-                if (isinstance(func, ast.Attribute)
-                        and func.attr == "default_rng"
-                        and isinstance(func.value, ast.Attribute)
-                        and func.value.attr == "random"
-                        and isinstance(func.value.value, ast.Name)
-                        and func.value.value.id == "numpy"):
                     calls_default_rng = True
                     break
         if not calls_default_rng:
