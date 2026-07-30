@@ -1,11 +1,13 @@
 """Wright-Fisher neutral drift: validation, heterozygosity decay, fixation
-probability, reproducibility, and mutation tests.
+probability, reproducibility, allele-frequency variance, and mutation tests.
 
 This is a discrete/stochastic domain (not an ODE), so "correctness" means:
 (a) heterozygosity decays at the exact theoretical rate (1 - 1/(2N))^t,
 (b) fixation probability equals the starting frequency p0 (Kimura 1962),
 (c) a fixed seed produces bit-identical output across repeated calls,
-(d) different seeds produce different trajectories.
+(d) different seeds produce different trajectories,
+(e) allele-frequency variance across replicates matches the theoretical
+    Var(p_t) = p0(1-p0) * [1 - (1 - 1/(2N))^t].
 
 The underlying model: each generation's 2N allele copies are drawn
 Binomial(2N, p_t) from the previous generation, where p_t is the
@@ -569,6 +571,11 @@ def test_same_seed_produces_bit_identical_output() -> None:
     assert len(r1.data) == len(r2.data)
     for row1, row2 in zip(r1.data, r2.data):
         assert row1 == row2, f"rows diverge: {row1} vs {row2}"
+
+
+# ---------------------------------------------------------------------------
+# Verification Target D: different seeds diverge
+# ---------------------------------------------------------------------------
 
 
 def test_different_seeds_produce_different_output() -> None:
