@@ -16,7 +16,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 429 tests
+make test      # runs all 512 tests
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
