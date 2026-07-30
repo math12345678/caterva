@@ -46,8 +46,6 @@ Stage 2 Part 4, and re-verified after Stage 2 refactoring):
    core blast radius for this mutation alone is 3 tests.)
 """
 
-import math
-
 import numpy as np
 import pytest
 
