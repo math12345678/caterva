@@ -15,18 +15,32 @@ Mutation-test record (verified by independent reproduction during
 Stage 2 Part 4):
 
 1. "Diploid off-by-factor-of-2" (pre-specified, Stage 2 Part 1).
-   Mutation: rng.binomial(two_n, frequencies) -> rng.binomial(N, frequencies)
-   Caught by: test_heterozygosity_decay_matches_exact_rate (3 tests fail:
-              decay target, fixation target, and mutation-detection guard).
+   Mutation: two_n = 2 * population_size -> two_n = population_size
+   Independently reproduced, Stage 2 Part 4 (2026-07-30): exactly 2 tests
+   fail, not 3 as originally recorded here — test_heterozygosity_decay_
+   matches_exact_rate and test_mutation_pre_specified_two_n_to_n_changes_
+   decay_rate. No fixation-target test fails, because the mutation-test
+   invocation uses Target A's parameters (N=100, generations=200), not
+   Target B's (N=20, generations=500) — the two verification targets run
+   against different simulate_wright_fisher calls, so a mutation only
+   trips the assertions in the call it actually affects. The original
+   "3 tests fail" claim was an overclaim; corrected here per the
+   constitution's divergence-resolution procedure (Section 7): the
+   permanent record is updated, not just noted in conversation.
 
 2. "Skip the last generation" (implementer-discovered).
    Mutation: range(1, generations + 1) -> range(1, generations) for the
              main loop — the generation-0 row is still written, but the
              final generation is silently dropped.
-   Caught by: test_last_generation_is_present (last generation is
-              `generations - 1`, not `generations`) and
-              test_n_rows_equals_generations_plus_one (gens rows vs
-              gens + 1).
+   Independently reproduced, Stage 2 Part 4 (2026-07-30): 5 tests fail,
+   not 2 as originally recorded — test_last_generation_is_present,
+   test_n_rows_equals_generations_plus_one, test_single_replicate_
+   produces_valid_output, and (incidentally) both tests in mutation 1's
+   set, since dropping generation 200 causes a KeyError in the decay-rate
+   check at t=200 before it can even evaluate the decay rate itself. The
+   original record was not wrong about the two tests it named — both do
+   fail — but understated the mutation's actual blast radius by three
+   tests. Corrected here for the same reason as above.
 """
 
 import math

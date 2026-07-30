@@ -90,12 +90,21 @@ fi
 echo ""
 echo "=== Step 3: new-domain test file collects ==="
 
-TEST_FILE="$REPO_DIR/Tellurium/tests/test_${DOMAIN}_correctness.py"
+# Optional second arg: explicit test file basename, for domains whose test
+# file doesn't follow the test_<domain>_correctness.py convention (e.g.
+# Wright-Fisher's spec name is "wright_fisher" but its test file is named
+# test_popgen_correctness.py, after the domain category). Found during
+# Stage 2 Part 4 verification, when this script false-failed Step 3 for
+# exactly this reason.
+TEST_BASENAME="${2:-test_${DOMAIN}_correctness.py}"
+TEST_FILE="$REPO_DIR/Tellurium/tests/$TEST_BASENAME"
 if [ ! -f "$TEST_FILE" ]; then
     echo "  [FAIL] test file not found: $TEST_FILE"
+    echo "         (pass the actual filename as a 2nd arg if it doesn't"
+    echo "         follow the test_<domain>_correctness.py convention)"
     FAIL=$((FAIL + 1))
 else
-    COLLECT_OUT=$(cd "$REPO_DIR/Tellurium" && python3 -m pytest "tests/test_${DOMAIN}_correctness.py" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
+    COLLECT_OUT=$(cd "$REPO_DIR/Tellurium" && python3 -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
     check "test file collects" "$COLLECT_OK"
     if [ "$COLLECT_OK" -ne 0 ]; then
         echo "$COLLECT_OUT" | tail -10
