@@ -182,11 +182,11 @@ def _finite_positive(value: Any, label: str, errors: List[str],
     Returns:
         False if the value is invalid, True if valid
     """
-    if isinstance(value, bool):
+    if isinstance(value, (bool, np.bool_)):
         errors.append(f"{label} must be a number, not a boolean")
         return False
     
-    if not isinstance(value, (int, float)):
+    if not isinstance(value, (int, float, np.integer, np.floating)):
         errors.append(f"{label} must be a number, got {type(value).__name__}")
         return False
     
@@ -832,7 +832,7 @@ def validate_pcr_params(n0: float, efficiency: float,
             f"{PCR_MAX_EFFICIENCY} (got {efficiency}) -- a single amplicon "
             "cannot be copied more than once per cycle")
 
-    if isinstance(cycles, bool) or not isinstance(cycles, int):
+    if isinstance(cycles, (bool, np.bool_)) or not isinstance(cycles, (int, np.integer)):
         errors.append(f"cycles must be an integer, got {type(cycles).__name__}")
     elif cycles <= 0:
         errors.append("cycles must be a positive integer")
@@ -947,9 +947,9 @@ def validate_monte_carlo_params(n_samples: int) -> ParameterValidation:
     """
     errors: List[str] = []
 
-    if isinstance(n_samples, bool):
+    if isinstance(n_samples, (bool, np.bool_)):
         errors.append("n_samples must be an integer, not a boolean")
-    elif not isinstance(n_samples, int):
+    elif not isinstance(n_samples, (int, np.integer)):
         errors.append(
             f"n_samples must be an integer, got {type(n_samples).__name__}")
     elif n_samples <= 0:
@@ -1107,9 +1107,9 @@ def validate_wright_fisher_params(
     errors: List[str] = []
 
     # --- population_size ---
-    if isinstance(population_size, bool):
+    if isinstance(population_size, (bool, np.bool_)):
         errors.append("population_size must be an integer, not a boolean")
-    elif not isinstance(population_size, int):
+    elif not isinstance(population_size, (int, np.integer)):
         errors.append(
             f"population_size must be an integer, got "
             f"{type(population_size).__name__}")
@@ -1118,7 +1118,7 @@ def validate_wright_fisher_params(
             f"population_size must be >= 1 (got {population_size})")
 
     # --- starting_frequency ---
-    if isinstance(starting_frequency, bool):
+    if isinstance(starting_frequency, (bool, np.bool_)):
         errors.append("starting_frequency must be a number, not a boolean")
     elif not isinstance(starting_frequency, (int, float)):
         errors.append(
@@ -1133,9 +1133,9 @@ def validate_wright_fisher_params(
             f"starting_frequency must be in [0, 1] (got {starting_frequency})")
 
     # --- generations ---
-    if isinstance(generations, bool):
+    if isinstance(generations, (bool, np.bool_)):
         errors.append("generations must be an integer, not a boolean")
-    elif not isinstance(generations, int):
+    elif not isinstance(generations, (int, np.integer)):
         errors.append(
             f"generations must be an integer, got "
             f"{type(generations).__name__}")
@@ -1143,9 +1143,9 @@ def validate_wright_fisher_params(
         errors.append(f"generations must be >= 1 (got {generations})")
 
     # --- replicate_runs ---
-    if isinstance(replicate_runs, bool):
+    if isinstance(replicate_runs, (bool, np.bool_)):
         errors.append("replicate_runs must be an integer, not a boolean")
-    elif not isinstance(replicate_runs, int):
+    elif not isinstance(replicate_runs, (int, np.integer)):
         errors.append(
             f"replicate_runs must be an integer, got "
             f"{type(replicate_runs).__name__}")
