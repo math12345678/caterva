@@ -368,6 +368,23 @@ def test_generation_zero_has_exact_starting_values() -> None:
     assert result.column("n_a_fixed")[0] == 0.0
 
 
+def test_generation_zero_fixation_counts_for_degenerate_p0() -> None:
+    """For p0=0 or 1, gen 0 fixation counts must reflect the degenerate
+    starting state — not hardcoded to zero.
+    """
+    result_0 = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.0, generations=5,
+        replicate_runs=10, seed=0)
+    assert result_0.column("n_a_fixed")[0] == 10.0
+    assert result_0.column("n_A_fixed")[0] == 0.0
+
+    result_1 = simulate_wright_fisher(
+        population_size=50, starting_frequency=1.0, generations=5,
+        replicate_runs=10, seed=0)
+    assert result_1.column("n_A_fixed")[0] == 10.0
+    assert result_1.column("n_a_fixed")[0] == 0.0
+
+
 def test_fixed_population_stays_fixed() -> None:
     """A population starting at p0=0 (or 1) stays there forever — no
     mutation reintroduces variation. All replicates should remain at the
