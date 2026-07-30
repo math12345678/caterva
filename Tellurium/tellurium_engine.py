@@ -925,11 +925,10 @@ def simulate_pcr(n0: float, efficiency: float, cycles: int,
 # explicitly warned against — forcing a solver into a domain that doesn't
 # need one, just for pipeline consistency.
 #
-# Judgment call: the RNG is numpy's default_rng (PCG64), the NumPy-recommended
-# modern generator. If a future stochastic domain (e.g. population genetics)
-# needs correlated or low-discrepancy sequences, it should document why it
-# deviates from this default rather than picking a different generator
-# silently.
+# RNG convention: see ADR 0005 (docs/adr/0005-rng-convention.md) for the
+# formal decision. All discrete/stochastic domains use
+# numpy.random.default_rng(seed) with seed: int | None = None.
+# This comment was the original judgment call that ADR 0005 superseded.
 # ---------------------------------------------------------------------------
 
 # Fewer than 100 samples gives SE ≈ 0.16 — too large for a meaningful pi
@@ -1238,20 +1237,7 @@ def simulate_wright_fisher(
 
     data: List[List[float]] = []
 
-    # Generation 0: starting state
-    data.append([
-        0.0,
-        float(np.mean(frequencies)),
-        float(np.mean(2.0 * frequencies * (1.0 - frequencies))),
-        0.0,  # n_A_fixed
-        0.0,  # n_a_fixed
-    ])
-
-    for gen in range(1, generations + 1):
-        # Binomial sampling: draw 2N allele copies for each replicate
-        counts = rng.binomial(two_n, frequencies)  # shape (replicate_runs,)
-        frequencies = counts.astype(np.float64) / two_n
-
+    for gen in range(generations + 1):
         mean_freq = float(np.mean(frequencies))
         heterozygosity = float(np.mean(2.0 * frequencies * (1.0 - frequencies)))
         n_A_fixed = float(np.sum(frequencies == 1.0))
@@ -1264,6 +1250,11 @@ def simulate_wright_fisher(
             n_A_fixed,
             n_a_fixed,
         ])
+
+        if gen < generations:
+            # Binomial sampling: draw 2N allele copies for each replicate
+            counts = rng.binomial(two_n, frequencies)  # shape (replicate_runs,)
+            frequencies = counts.astype(np.float64) / two_n
 
     return SimulationResult(
         colnames=["generation", "mean_frequency", "heterozygosity",
