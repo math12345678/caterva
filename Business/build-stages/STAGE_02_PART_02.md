@@ -162,12 +162,18 @@ BitGenerator caveat on reproducibility (Section 0 above). ADR 0001, 0003,
 ## 8. SHARED-CONSTRAINT CHECK
 
 RNG convention (ADR 0005) is the shared constraint with Monte Carlo — the
-second domain following it, formalized now rather than deferred to a
-third. Not yet enforced by an automated test (an AST-based guard
-analogous to `scripts/check_dependencies_declared.py`, checking for
-`default_rng` usage, is a plausible future addition if a third stochastic
-domain makes manual review insufficient — noted, not built now, since
-building it wasn't asked for by this spec).
+second domain following it. **Update (2026-07-30, post-close "continue
+improving" pass):** the deferred automated guard was built —
+`scripts/check_rng_convention.py`, an AST-based check (same pattern as
+`scripts/check_dependencies_declared.py`) confirming every `simulate_*`
+function that draws randomness has a `seed` parameter and constructs its
+RNG via `np.random.default_rng(seed)` specifically. Wired into the test
+suite via `Tellurium/tests/test_rng_convention.py` and into
+`scripts/verify_domain.sh`'s automated Step 2b. Verified by deliberately
+mutating `tellurium_engine.py`'s RNG constructor to `RandomState` and
+confirming the guard fails, then reverting and confirming it passes —
+the same mutation-test discipline Rule 6 requires for domain code applied
+here to the tooling itself.
 
 ## 9. OUT OF SCOPE FOR THIS STAGE
 
