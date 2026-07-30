@@ -31,6 +31,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 
 import antimony
 import libsbml
+import numpy as np
 import roadrunner
 
 __all__ = [
@@ -63,6 +64,9 @@ __all__ = [
     "PCR_PLAUSIBLE_LOW_EFFICIENCY",
     "validate_pcr_params",
     "simulate_pcr",
+    "MC_PLAUSIBLE_MIN_SAMPLES",
+    "validate_monte_carlo_params",
+    "simulate_monte_carlo_pi",
 ]
 
 
@@ -902,5 +906,145 @@ def simulate_pcr(n0: float, efficiency: float, cycles: int,
         colnames=["cycle", "copies"],
         data=data,
         model_name="pcr_amplification",
+        validation=validation,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Monte Carlo simulation (pi estimation)
+#
+# Like PCR, this is a discrete/stochastic domain, not a continuous-time ODE.
+# There is no state to integrate: the estimator is a direct sample mean whose
+# convergence properties follow from the Central Limit Theorem. Routing this
+# through antimony/roadrunner would be the same category error ADR 0002
+# explicitly warned against — forcing a solver into a domain that doesn't
+# need one, just for pipeline consistency.
+#
+# Judgment call: the RNG is numpy's default_rng (PCG64), the NumPy-recommended
+# modern generator. If a future stochastic domain (e.g. population genetics)
+# needs correlated or low-discrepancy sequences, it should document why it
+# deviates from this default rather than picking a different generator
+# silently.
+# ---------------------------------------------------------------------------
+
+# Fewer than 100 samples gives SE ≈ 0.16 — too large for a meaningful pi
+# estimate, but the simulation is physically valid and the student may be
+# experimenting, so it is flagged rather than rejected.
+MC_PLAUSIBLE_MIN_SAMPLES = 100
+
+
+def validate_monte_carlo_params(n_samples: int) -> ParameterValidation:
+    """Check Monte Carlo pi-estimation parameters.
+
+    ``n_samples`` must be a positive integer. Fewer than
+    ``MC_PLAUSIBLE_MIN_SAMPLES`` (100) is flagged as implausible — the
+    standard error will be too large for a meaningful estimate — but the
+    simulation is still valid and will run.
+    """
+    errors: List[str] = []
+
+    if isinstance(n_samples, bool):
+        errors.append("n_samples must be an integer, not a boolean")
+    elif not isinstance(n_samples, int):
+        errors.append(
+            f"n_samples must be an integer, got {type(n_samples).__name__}")
+    elif n_samples <= 0:
+        errors.append("n_samples must be a positive integer")
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    if n_samples < MC_PLAUSIBLE_MIN_SAMPLES:
+        return ParameterValidation(
+            ok=True, flagged=True,
+            flag_reason=(
+                f"n_samples={n_samples} is below "
+                f"{MC_PLAUSIBLE_MIN_SAMPLES}; the standard error will be "
+                "too large for a meaningful estimate"),
+        )
+
+    return ParameterValidation()
+
+
+def simulate_monte_carlo_pi(
+    n_samples: int,
+    seed: int | None = None,
+) -> SimulationResult:
+    """Estimate pi via Monte Carlo sampling with a reported standard error.
+
+    Draw ``n_samples`` points uniformly in [-1, 1] x [-1, 1] and compute
+    pi_estimate = 4 * (fraction landing inside the unit circle).
+    The standard error is 4 * sqrt(p_hat * (1 - p_hat) / N)
+    where p_hat is the sample proportion inside the circle.
+
+    The result includes convergence-checkpoint rows (log-spaced sample counts
+    with running estimate and standard error) so callers can plot how the
+    estimate stabilizes as samples accumulate.
+
+    Args:
+        n_samples: number of random points to draw (must be >= 1)
+        seed: optional seed for reproducibility; passed to
+            ``numpy.random.default_rng``
+
+    Returns:
+        SimulationResult with columns ``["n", "estimate", "se"]``, one row
+        per convergence checkpoint. The final row contains the full-sample
+        estimate and standard error.
+
+    Raises:
+        ModelBuildError: if ``n_samples`` is invalid
+    """
+    validation = validate_monte_carlo_params(n_samples)
+    validation.raise_if_invalid()
+
+    rng = np.random.default_rng(seed)
+
+    # Sample points uniformly in [-1, 1] x [-1, 1]
+    xs = rng.uniform(-1.0, 1.0, size=n_samples)
+    ys = rng.uniform(-1.0, 1.0, size=n_samples)
+
+    # Indicator: 1.0 if (x, y) falls inside the unit circle, 0.0 otherwise
+    inside = (xs ** 2 + ys ** 2) <= 1.0
+
+    # Running estimate of pi at each sample index
+    cumulative_n = np.arange(1, n_samples + 1, dtype=np.float64)
+    cumulative_p_hat = np.cumsum(inside, dtype=np.float64) / cumulative_n
+    cumulative_estimate = 4.0 * cumulative_p_hat
+
+    # Running standard error: SE = 4 * sqrt(p_hat * (1 - p_hat) / n)
+    cumulative_se = 4.0 * np.sqrt(
+        cumulative_p_hat * (1.0 - cumulative_p_hat) / cumulative_n
+    )
+
+    # Build convergence checkpoints: log-spaced integers plus explicit
+    # milestones so the first few data points are always visible.
+    milestones: set[int] = {1, 2, 5, 10, 20, 50, 100, 200, 500,
+                            1_000, 2_000, 5_000, 10_000, 20_000, 50_000,
+                            100_000, 200_000, 500_000, 1_000_000}
+    milestones = {m for m in milestones if m <= n_samples}
+    milestones.add(n_samples)
+
+    if n_samples > 1:
+        log_points = np.geomspace(1, n_samples,
+                                  num=min(150, n_samples),
+                                  dtype=int)
+        milestones.update(int(p) for p in log_points)
+
+    checkpoints = sorted(milestones)
+
+    # Build data rows
+    data: List[List[float]] = []
+    for n in checkpoints:
+        idx = n - 1  # 0-based
+        data.append([
+            float(n),
+            float(cumulative_estimate[idx]),
+            float(cumulative_se[idx]),
+        ])
+
+    return SimulationResult(
+        colnames=["n", "estimate", "se"],
+        data=data,
+        model_name="monte_carlo_pi",
         validation=validation,
     )
