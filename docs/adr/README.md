@@ -27,3 +27,4 @@ Each ADR has:
 | [0002](0002-pcr-not-modeled-as-an-ode.md) | Model PCR as a discrete recurrence, not through antimony/roadrunner |
 | [0003](0003-shared-plausibility-bounds.md) | Km plausibility bounds must be identical across the literature and simulation layers |
 | [0004](0004-gamma-reserved-keyword.md) | Emit the SIR/SEIR recovery rate as `gamma_rate`, not `gamma` |
+| [0005](0005-rng-convention.md) | Discrete/stochastic domains share a single RNG convention |
