@@ -14,6 +14,8 @@ __pycache__/
 # Local backup / scratch files
 *.bak
 *.orig
+*.Rhistory
+terrium_data_flow.html
 
 # OS
 .DS_Store
