@@ -116,6 +116,13 @@ real bug in this exact codebase, not as generic best practice:
     what it caught, and any judgment call you made that wasn't fully
     specified in the task. A bare "tests pass" is not sufficient.
 
+If this is a discrete/stochastic domain, also read
+``docs/adr/0005-rng-convention.md`` before starting — it formalizes the
+``numpy.random.default_rng(seed)`` convention that all stochastic domains
+in Terrium share. Complying with this ADR is checked automatically by
+``scripts/check_rng_convention.py`` and ``Tellurium/tests/
+test_rng_convention.py``.
+
 [DOMAIN-SPEC GOES HERE]
 ```
 

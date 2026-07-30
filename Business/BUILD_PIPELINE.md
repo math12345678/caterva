@@ -135,6 +135,8 @@ Read these first and match their conventions exactly:
 - docs/adr/0002-pcr-not-modeled-as-an-ode.md
 - docs/adr/0003-shared-plausibility-bounds.md
 - docs/adr/0004-gamma-reserved-keyword.md
+- docs/adr/0005-rng-convention.md (all discrete/stochastic domains use
+  ``numpy.random.default_rng(seed)`` with ``seed: int | None``)
 - docs/API.md
 - docs/CONSTITUTION.md (the engineering constitution — the preamble above
   is Section 3; the full document governs what "done" means)
