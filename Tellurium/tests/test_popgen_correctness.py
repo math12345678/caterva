@@ -327,10 +327,18 @@ def test_fixation_counts_are_non_negative_and_bounded() -> None:
         replicate_runs=30, seed=789)
     n_A = result.column("n_A_fixed")
     n_a = result.column("n_a_fixed")
+    prev_a = prev_b = -1.0
     for a_fixed, a_lost in zip(n_A, n_a):
         assert a_fixed >= 0
         assert a_lost >= 0
         assert a_fixed + a_lost <= 30.0
+        # Once a replicate's frequency hits 0.0 or 1.0, binomial sampling
+        # keeps it there forever — fixation counts are monotonic.
+        assert a_fixed >= prev_a, (
+            f"n_A_fixed decreased from {prev_a} to {a_fixed}")
+        assert a_lost >= prev_b, (
+            f"n_a_fixed decreased from {prev_b} to {a_lost}")
+        prev_a, prev_b = a_fixed, a_lost
 
 
 def test_single_replicate_produces_valid_output() -> None:
