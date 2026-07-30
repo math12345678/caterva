@@ -62,18 +62,48 @@ in `requirements.txt`:
 | `antimony` | human-readable model definition → SBML |
 | `python-libsbml` | SBML validation |
 
+## Domains
+
+Six simulation domains, two pipelines:
+
+**Continuous (antimony → SBML → roadrunner):**
+- **Michaelis-Menten** — irreversible single-substrate enzyme kinetics.
+  Verified against the implicit closed form `Km·ln(S₀/S) + (S₀−S) = Vmax·t`.
+- **SIR** — frequency-dependent epidemic model. Verified against conserved
+  population, final-size relation, and peak condition `S = N/R₀`.
+- **SEIR** — SIR with an explicit latent (exposed) compartment.
+
+**Discrete/stochastic (direct Python, no ODE solver):**
+- **PCR amplification** — exact closed-form recurrence `N(c) = n₀ · (1+E)ᶜ`,
+  optionally with a logistic plateau. Verified against copy-number conservation
+  and plateau approach.
+- **Monte Carlo π estimation** — uniform sampling in [-1,1]². Verified against
+  the CLT error rate `1/√N`.
+- **Wright-Fisher neutral drift** — binomial sampling of 2N allele copies each
+  generation. Verified against the exact heterozygosity decay
+  `Hₜ = H₀ · (1 − 1/(2N))ᵗ` and Kimura's fixation probability `P(fix) = p₀`.
+
+All discrete/stochastic domains share a common RNG convention
+(`numpy.random.default_rng(seed)` with `seed: int | None = None`), formalised
+in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
+`scripts/check_rng_convention.py`.
+
 ## Layout
 
 ```
 Terrium/
-├── Tellurium/              simulation engine (Tier 2 ODE domains)
+├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              258 tests
+│   └── tests/              385 tests
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
 │   └── ...                 124 tests
 ├── Docw/                   specs, roadmap, build plan
-└── scripts/check_env.py    environment verification
+└── scripts/
+    ├── check_env.py            environment verification
+    ├── verify_domain.sh        automated verification (Steps 1-3)
+    ├── check_rng_convention.py ADR 0005 RNG compliance guard
+    └── check_dependencies_declared.py  undeclared import guard
 ```
 
 ## How the tests are built
