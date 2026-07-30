@@ -213,3 +213,20 @@ they happen:
   of the verification procedure; updated `Business/BUILD_PIPELINE.md` to
   reflect the actual 5-part stage structure established during Stage 1;
   added the script reference to Section 6.
+- 2026-07 — Stage 2 (Wright-Fisher population genetics): confirmed the
+  existing divergence-resolution procedure (Section 7) needs no amendment
+  after catching two more mutation-test blast-radius overclaims/
+  underclaims in one domain (see `Business/build-stages/
+  STAGE_02_PART_04.md`) — the procedure already requires independent
+  reproduction precisely because self-reported blast radius is
+  unreliable; this is the procedure working, not a gap. Fixed a real bug
+  in `scripts/verify_domain.sh`: Step 3's test-file lookup assumed a
+  `test_<domain>_correctness.py` naming convention, which false-failed for
+  Wright-Fisher's `test_popgen_correctness.py` (named after the domain
+  category, not the specific model). The script now accepts an optional
+  second argument for the actual filename. Briefly added, then removed, a
+  third implementer (Claude Code running qwen3-coder:30b locally) after
+  it proved too resource-intensive on the user's machine — the pipeline
+  reverts to two implementers (OpenCode, FreeBuff); no permanent change
+  to Section 2's roles was needed since the addition was reverted before
+  producing any real output to build a lasting process around.
