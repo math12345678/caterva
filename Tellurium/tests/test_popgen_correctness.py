@@ -594,6 +594,45 @@ def test_no_seed_gives_different_estimates_across_repeated_calls() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Variance of allele frequency matches drift theory
+# ---------------------------------------------------------------------------
+
+
+def test_allele_frequency_variance_matches_theory() -> None:
+    """Under WF drift, the variance of allele frequency across independent
+    replicate populations at generation t follows:
+
+        Var(p_t) = p0(1-p0) * [1 - (1 - 1/(2N))^t]
+
+    Runs 500 single-replicate simulations, records the frequency at a
+    mid-drift generation, and checks that the empirical variance matches
+    the theoretical value within an acceptance window that accounts for
+    estimation noise (simulated annealing: 500 sets × ~3 SE).
+    """
+    n = 100
+    p0 = 0.5
+    gens = 50
+    n_sims = 500
+
+    theoretical_var = p0 * (1.0 - p0) * (1.0 - (1.0 - 1.0 / (2.0 * n)) ** gens)
+
+    freqs = np.empty(n_sims, dtype=np.float64)
+    for i in range(n_sims):
+        result = simulate_wright_fisher(
+            population_size=n, starting_frequency=p0, generations=gens,
+            replicate_runs=1, seed=i)
+        freqs[i] = result.column("mean_frequency")[gens]
+
+    observed_var = float(np.var(freqs, ddof=1))
+    # With 500 sets, the SE of the variance estimate is
+    # var * sqrt(2/(k-1)) ≈ 0.0035. The window ±0.015 covers ~4 SE.
+    assert abs(observed_var - theoretical_var) < 0.015, (
+        f"variance={observed_var:.4f}, expected={theoretical_var:.4f}, "
+        f"diff={abs(observed_var - theoretical_var):.4f}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Mutation test: pre-specified 2N -> N off-by-factor-of-2
 # ---------------------------------------------------------------------------
 
