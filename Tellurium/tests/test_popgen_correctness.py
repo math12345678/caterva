@@ -331,6 +331,87 @@ def test_single_replicate_produces_valid_output() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+
+def test_n_equals_one_is_valid() -> None:
+    """N=1 is the minimum population size (2 allele copies). Valid."""
+    result = simulate_wright_fisher(
+        population_size=1, starting_frequency=0.5, generations=5,
+        replicate_runs=10, seed=0)
+    assert len(result.data) == 6
+    # With N=1, drift is extremely rapid (flagged).
+    assert result.flagged
+
+
+def test_minimum_generations() -> None:
+    """generations=1 produces exactly 2 rows (gen 0 and gen 1)."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=1,
+        replicate_runs=5, seed=0)
+    assert len(result.data) == 2
+    assert result.column("generation") == [0.0, 1.0]
+
+
+def test_generation_zero_has_exact_starting_values() -> None:
+    """At generation 0, mean_frequency = p0 and heterozygosity = 2*p0*(1-p0)
+    exactly (no stochastic noise yet).
+    """
+    p0 = 0.3
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=p0, generations=10,
+        replicate_runs=20, seed=42)
+    assert result.column("mean_frequency")[0] == pytest.approx(p0)
+    assert result.column("heterozygosity")[0] == pytest.approx(2.0 * p0 * (1.0 - p0))
+    assert result.column("n_A_fixed")[0] == 0.0
+    assert result.column("n_a_fixed")[0] == 0.0
+
+
+def test_fixed_population_stays_fixed() -> None:
+    """A population starting at p0=0 (or 1) stays there forever — no
+    mutation reintroduces variation. All replicates should remain at the
+    same frequency throughout, with zero heterozygosity.
+    """
+    for p0 in (0.0, 1.0):
+        result = simulate_wright_fisher(
+            population_size=50, starting_frequency=p0, generations=20,
+            replicate_runs=10, seed=7)
+        for freq, het in zip(result.column("mean_frequency"),
+                             result.column("heterozygosity")):
+            assert freq == pytest.approx(p0), (
+                f"frequency drifted from {p0} to {freq} at generation "
+                f"{result.column('generation')}")
+            assert het == 0.0, (
+                f"heterozygosity became {het} for fixed population at "
+                f"generation {result.column('generation')}")
+    # Flagged case (degenerate starting frequency)
+    v = validate_wright_fisher_params(
+        population_size=50, starting_frequency=0.0, generations=10)
+    assert v.flagged
+
+
+def test_odd_population_size_with_non_trivial_frequency() -> None:
+    """N=2, p0=0.25 → 2N=4, round(4*0.25)=1 → actual p0=0.25 exactly.
+    Quick check that the simulation runs cleanly at this edge.
+    """
+    result = simulate_wright_fisher(
+        population_size=2, starting_frequency=0.25, generations=5,
+        replicate_runs=10, seed=42)
+    assert len(result.data) == 6
+    assert 0.0 <= result.column("mean_frequency")[-1] <= 1.0
+
+
+def test_large_population_completes_quickly() -> None:
+    """N=100000 with 50 replicates should complete quickly (vectorized)."""
+    result = simulate_wright_fisher(
+        population_size=100_000, starting_frequency=0.5, generations=10,
+        replicate_runs=50, seed=1)
+    assert len(result.data) == 11
+    assert 0.0 <= result.column("mean_frequency")[-1] <= 1.0
+
+
+# ---------------------------------------------------------------------------
 # Verification Target A: heterozygosity decay matches exact theoretical rate
 # ---------------------------------------------------------------------------
 
