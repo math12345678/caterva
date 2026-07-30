@@ -217,14 +217,20 @@ def test_different_seeds_produce_different_output() -> None:
     assert r1.column("estimate")[-1] != r2.column("estimate")[-1]
 
 
-def test_no_seed_produces_different_output_each_call() -> None:
-    n = 2_000
-    r1 = simulate_monte_carlo_pi(n_samples=n)
-    r2 = simulate_monte_carlo_pi(n_samples=n)
+def test_no_seed_gives_different_estimates_across_repeated_calls() -> None:
+    """Without a fixed seed, estimates should vary across runs.
 
-    # Without a seed, successive calls should (with overwhelming probability)
-    # produce different estimates.
-    assert r1.column("estimate")[-1] != r2.column("estimate")[-1]
+    Checks that 10 successive seedless calls produce estimates with
+    non-zero variance — a stronger assertion than pairwise inequality,
+    which can fail by chance when two different seeds happen to give
+    the same estimate to float precision.
+    """
+    n = 2_000
+    estimates = [simulate_monte_carlo_pi(n_samples=n).column("estimate")[-1]
+                 for _ in range(10)]
+    assert len(set(estimates)) > 1, (
+        f"all 10 seedless runs gave the same estimate {estimates[0]}"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+# scripts/verify_domain.sh
+# Usage: scripts/verify_domain.sh <domain_name>
+#
+# Runs the mechanical verification steps from the Terrium Engineering
+# Constitution (docs/CONSTITUTION.md, Section 6) for a newly implemented
+# domain. Step 4 (mutation-test reproduction) is deliberately not
+# automated — it requires a human (or Claude-as-reviewer) to read the
+# implementer's mutation report, independently reproduce at least one
+# claimed mutation, read the actual failure message, revert, and confirm
+# the suite is clean.
+#
+# This script exists because the procedure in Part 3 was described as
+# commands that could be assembled into a script — this is that script,
+# refined against the Monte Carlo verification that exercised it.
+#
+# See also:
+#   docs/CONSTITUTION.md Section 6
+#   Business/build-stages/STAGE_01_PART_03.md
+
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <domain_name>"
+    echo "Example: $0 monte_carlo"
+    exit 1
+fi
+
+DOMAIN="$1"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+PASS=0
+FAIL=0
+
+check() {
+    local label="$1"
+    local result="$2"
+    if [ "$result" -eq 0 ]; then
+        echo "  [PASS] $label"
+        PASS=$((PASS + 1))
+    else
+        echo "  [FAIL] $label"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+echo "=========================================="
+echo " Verification: $DOMAIN domain"
+echo " Repo: $REPO_DIR"
+echo "=========================================="
+echo ""
+
+# ------------------------------------------------------------------
+# Step 1: Full test suites (both Tellurium/ and Tests/)
+# ------------------------------------------------------------------
+echo "=== Step 1: full test suite ==="
+
+cd "$REPO_DIR/Tellurium"
+TELLURIUM_OUT=$(python3 -m pytest tests/ -q 2>&1) && TELLURIUM_OK=0 || TELLURIUM_OK=1
+check "Tellurium/ tests pass" "$TELLURIUM_OK"
+if [ "$TELLURIUM_OK" -ne 0 ]; then
+    echo "$TELLURIUM_OUT" | tail -10
+fi
+
+cd "$REPO_DIR/Tests"
+TESTS_OUT=$(python3 -m pytest -q 2>&1) && TESTS_OK=0 || TESTS_OK=1
+check "Tests/ pass" "$TESTS_OK"
+if [ "$TESTS_OK" -ne 0 ]; then
+    echo "$TESTS_OUT" | tail -10
+fi
+
+cd "$REPO_DIR"
+
+# ------------------------------------------------------------------
+# Step 2: Dependency-declaration guard
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 2: dependency guard ==="
+
+DEP_OUT=$(python3 "$REPO_DIR/scripts/check_dependencies_declared.py" 2>&1) && DEP_OK=0 || DEP_OK=1
+check "dependencies declared" "$DEP_OK"
+if [ "$DEP_OK" -ne 0 ]; then
+    echo "$DEP_OUT"
+fi
+
+# ------------------------------------------------------------------
+# Step 3: New-domain test file exists and collects
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 3: new-domain test file collects ==="
+
+TEST_FILE="$REPO_DIR/Tellurium/tests/test_${DOMAIN}_correctness.py"
+if [ ! -f "$TEST_FILE" ]; then
+    echo "  [FAIL] test file not found: $TEST_FILE"
+    FAIL=$((FAIL + 1))
+else
+    COLLECT_OUT=$(cd "$REPO_DIR/Tellurium" && python3 -m pytest "tests/test_${DOMAIN}_correctness.py" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
+    check "test file collects" "$COLLECT_OK"
+    if [ "$COLLECT_OK" -ne 0 ]; then
+        echo "$COLLECT_OUT" | tail -10
+    fi
+fi
+
+# ------------------------------------------------------------------
+# Step 4: Mutation-test reproduction (manual)
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 4: manual mutation-test reproduction required ==="
+echo ""
+echo "  This step is NOT automated — it requires reading the"
+echo "  implementer's mutation-test report and manually reproducing"
+echo "  at least one claimed mutation per the procedure in"
+echo "  docs/CONSTITUTION.md Section 6 Step 4."
+echo ""
+echo "  Procedure:"
+echo "    1. Backup: cp Tellurium/tellurium_engine.py /tmp/tellurium_engine.py.bak"
+echo "    2. Apply the exact mutation described in the report"
+echo "    3. Run the specific test(s) claimed to catch it"
+echo "    4. Confirm failure matches the claimed cause"
+echo "    5. Revert: cp /tmp/tellurium_engine.py.bak Tellurium/tellurium_engine.py"
+echo "    6. Confirm suite clean: python3 -m pytest tests/ -q"
+echo ""
+echo "  IMPORTANT: Do NOT chain steps 3-5 with && — the mutated test"
+echo "  is *supposed* to fail (nonzero exit), which would short-circuit"
+echo "  && and skip the revert. Use ; or a trap ... EXIT."
+echo "  (This was found by FreeBuff during Stage 1's own review — see"
+echo "  Business/build-stages/STAGE_01_PART_04.md Section 0.)"
+echo ""
+
+# ------------------------------------------------------------------
+# Summary
+# ------------------------------------------------------------------
+echo "=========================================="
+echo " Results: $PASS passed, $FAIL failed"
+echo "=========================================="
+
+if [ "$FAIL" -gt 0 ]; then
+    echo ""
+    echo "  Step 4 (mutation reproduction) must still be done by hand"
+    echo "  before this domain is considered reviewed."
+    exit 1
+fi
+
+echo ""
+echo "  Mechanical checks passed. Step 4 (mutation reproduction)"
+echo "  must be done by hand before this domain is reviewed."
+exit 0
