@@ -169,7 +169,13 @@ Applied to every diff, in order, stop at first failure:
    by an actual build, not by inspection.
 6. Confirm the diff's file list matches the spec's out-of-scope section.
 
-Full procedure with commands: `Business/build-stages/STAGE_01_PART_03.md`.
+Steps 1-3 are automated by `scripts/verify_domain.sh <domain>` (run from
+the repo root). Step 4 remains manual — the script prints the procedure
+and a reminder about the `&&`-chaining trap, then exits without
+performing the mutation. Run the script first, then do Step 4 by hand.
+
+Full procedure with commands and the `&&`-chaining incident:
+`Business/build-stages/STAGE_01_PART_03.md`.
 
 ## 7. Divergence resolution
 
@@ -202,3 +208,8 @@ they happen:
 - 2026-07 — Stage 1, Part 4: added the `&&`-chaining safety amendment to
   Section 6, Step 4, found by FreeBuff during independent verification of
   the Monte Carlo domain.
+- 2026-07 — Stage 1 improvements (post-close): created
+  `scripts/verify_domain.sh` from the Part 3 draft, automated Steps 1-3
+  of the verification procedure; updated `Business/BUILD_PIPELINE.md` to
+  reflect the actual 5-part stage structure established during Stage 1;
+  added the script reference to Section 6.

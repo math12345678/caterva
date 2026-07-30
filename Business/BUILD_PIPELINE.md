@@ -67,63 +67,65 @@ So the spec I write for each new domain has to include, every time:
   into the spec as a checklist, not left to whichever implementer
   remembers to do it.
 
-## The pipeline, stage by stage
+## How a stage works: the 5-part structure
 
-### Stage 0 — I scope the task
+Every stage follows the same five-part cycle, established and verified
+during Stage 1 (Monte Carlo). The Constitution at `docs/CONSTITUTION.md`
+is the canonical reference — read it for the operative rules; this section
+describes the workflow.
 
-Input: you telling me what's next (e.g., "start Monte Carlo"). Output: a
-spec document, written the way `docs/API.md` and the ADRs are written —
-concrete signatures, concrete test invariants, explicit "don't do X because
-ADR 000Y says Y broke before." This stage doesn't touch code.
+**Part 1 — The standards preamble.** Every implementation prompt is
+prefaced with the text in `docs/CONSTITUTION.md` Section 3 (the nine
+non-negotiable rules, the mutation-testing requirement, the report-back
+requirement). This is not optional — the rules exist because each was
+learned from a real bug in this exact codebase.
 
-### Stage 1 — research (optional, only when grounding is missing)
+**Part 2 — The domain-specific spec.** Written by Claude following the
+10-field template in `docs/CONSTITUTION.md` Section 4: one-sentence
+definition, governing model, continuous-or-discrete (with justification),
+public function signatures, validation contract, verification target,
+relevant ADRs, shared-constraint check, out-of-scope boundary, and
+deliverables checklist. This is the spec sent to OpenCode/FreeBuff.
 
-If the domain needs literature/algorithm grounding I don't already have
-confidently, this is where Perplexity or Kimi gets used — a scoped question
-like "what's the standard closed-form or reference implementation to
-validate a Monte Carlo integrator against for the birthday-problem-style
-sanity checks used in scientific computing." Output folds into the Stage 0
-spec, doesn't go straight to an implementer.
+**Part 3 — Implementation.** OpenCode and/or FreeBuff receive the exact
+same spec (prefaced with the Part 1 preamble). Both implement
+independently. Output: code + tests + mutation-test report.
 
-### Stage 2 — implementation (OpenCode and/or FreeBuff)
+**Part 4 — Verification and divergence resolution.** Claude runs the
+mechanical verification steps (`scripts/verify_domain.sh <domain>` — see
+below), independently reproduces at least one claimed mutation test, and
+resolves any substantive divergence between the two implementers' outputs
+per `docs/CONSTITUTION.md` Section 7.
 
-Give the exact same spec to whichever implementer(s) you're running.
-Below are the two prompt templates to paste in.
+**Part 5 — Closing.** The stage-closing report is written (see
+`Business/build-stages/STAGE_01_PART_05.md` Section 3 for the format),
+and the commit lands with a message stating what shipped, what was
+verified, what's still open, and whether the next stage is ready.
 
-### Stage 3 — I review the diff
+### Tools
 
-Before anything gets treated as done, I check it against the spec: does
-the closed-form/invariant test actually exist and actually check what it
-claims to. Does it touch `tellurium_engine.py`'s shared bounds/`ok`/
-`flagged` pattern correctly. Does it collide with any antimony reserved
-word. Does `requirements.txt` get updated if a new import was added (this
-is exactly the bug `test_dependencies_declared.py` now catches
-automatically — but a human/orchestrator check catches it before CI has to).
-
-### Stage 4 — verification (I run this, not the implementer's self-report)
-
-```bash
-make test                              # full suite, nothing skipped silently
-python3 scripts/check_dependencies_declared.py   # the guard this repo already built
-```
-
-Plus the mutation-testing step for the new code specifically: deliberately
-break the implementation (flip a sign, remove a bounds check, swap `<` for
-`<=`), confirm the relevant test actually fails, then restore it. This is
-the same method used for the PCR domain this session — it's cheap and it's
-the actual reason to trust a test suite instead of just having one.
-
-### Stage 5 — commit
-
-I write the commit message (matches the pattern already established: what
-changed, why, what was verified, what wasn't). You decide when to push.
+- **Research groundings** (optional, before Part 2): Perplexity or Kimi
+  when a domain needs literature grounding you don't already have. Output
+  folds into the spec's Verification Target section — it does not go
+  straight to an implementer.
+- **Verification script**: `scripts/verify_domain.sh <domain>` runs Steps
+  1-3 of the verification procedure mechanically (full suite, dependency
+  guard, test collection). Step 4 (mutation-test reproduction) is
+  deliberately manual — run it per `docs/CONSTITUTION.md` Section 6, Step
+  4, with the `&&`-chaining trap noted there (found by FreeBuff during
+  Stage 1's own review).
 
 ## Prompt templates
 
 ### For a new simulation domain (OpenCode or FreeBuff)
 
+Build the prompt by concatenating:
+
+1. `docs/CONSTITUTION.md` Section 3 (the permanent preamble, verbatim).
+2. This domain-specific block:
+
 ```
-You're implementing [DOMAIN NAME] for the Terrium simulation engine, in
+You are implementing [DOMAIN NAME] for the Terrium simulation engine, in
 Tellurium/tellurium_engine.py, following the exact patterns already in that
 file for [closest existing domain — e.g. PCR or SIR].
 
@@ -134,11 +136,12 @@ Read these first and match their conventions exactly:
 - docs/adr/0003-shared-plausibility-bounds.md
 - docs/adr/0004-gamma-reserved-keyword.md
 - docs/API.md
+- docs/CONSTITUTION.md (the engineering constitution — the preamble above
+  is Section 3; the full document governs what "done" means)
 
 Spec:
-[PASTE STAGE 0 SPEC HERE — signature, params, ok/flagged bounds, whether
-this is continuous (antimony/roadrunner) or discrete (direct recurrence,
-see PCR for the pattern), the exact closed-form/invariant to test against]
+[PASTE DOMAIN SPEC HERE — the 10-field template from CONSTITUTION.md
+Section 4, fully filled in for this domain]
 
 Requirements:
 - Match the ParameterValidation / SimulationResult contract exactly as used
@@ -152,9 +155,12 @@ Requirements:
 - If you add any new import, add it to requirements.txt in the same change
   — do not leave that for CI to catch.
 - Do not modify any file outside Tellurium/ unless the spec says to.
+- Document at least one mutation test in your report (what you broke, which
+  test caught it).
 
-When done, report: what you implemented, what you tested it against, and
-any judgment call you made that wasn't explicit in the spec.
+When done, report: what you implemented, what you tested it against, what
+mutation test you ran and what it caught, and any judgment call you made
+that wasn't explicit in the spec.
 ```
 
 ### For a bugfix / small change
@@ -187,15 +193,22 @@ Cite sources.
 
 ## Working agreement
 
-- Nothing gets called "done" on your side until it's passed Stage 4 here —
-  an implementer saying "tests pass" isn't the same as me having actually
-  run them and mutation-tested the new code.
-- If OpenCode and FreeBuff genuinely diverge on the same spec, that goes to
-  me before either version lands — divergence on a spec this concrete
-  usually means the spec was ambiguous, which is useful information, not
-  just noise to break a tie on.
-- Scope stays inside what you've already decided: per `ROADMAP.md`, the
-  next real domains (Monte Carlo, population genetics, molecular dynamics)
-  are scoped and ready, but check with yourself first whether this is still
-  the right use of time given funding/backend-hire are still open — that's
-  a call this document doesn't make for you.
+- Nothing gets called "done" until verification (Part 4 above) is run
+  directly, not taken from an implementer's self-report. An implementer
+  saying "tests pass" is not the same as Claude (or a human reviewer)
+  having actually run them, run the dependency guard, independently
+  reproduced the mutation test, and confirmed the suite is clean after
+  reverting.
+- If OpenCode and FreeBuff genuinely diverge on the same spec, that goes
+  to Claude before either version lands — divergence on a spec this
+  concrete usually means the spec was ambiguous, which is useful
+  information, not just noise to break a tie on. Resolution procedure:
+  `docs/CONSTITUTION.md` Section 7.
+- Scope stays inside what the domain spec's "out of scope" section
+  explicitly defines. Any diff touching files outside those boundaries
+  is a scope violation regardless of whether the extra changes are
+  individually good.
+- The verification script at `scripts/verify_domain.sh` automates Steps
+  1-3 of the mechanical procedure. Step 4 (mutation-test reproduction)
+  is deliberately manual — run it yourself per `docs/CONSTITUTION.md`
+  Section 6 Step 4 every time.
