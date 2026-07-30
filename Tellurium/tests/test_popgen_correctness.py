@@ -253,6 +253,18 @@ def test_clean_params_not_flagged() -> None:
     assert not v.flagged
 
 
+def test_numpy_integer_types_are_accepted() -> None:
+    """numpy.int64/32/uint64 are NOT subclasses of Python int in numpy 2.x.
+    Validation must accept them via isinstance(x, (int, np.integer)).
+    """
+    import numpy as np
+    for int_type in (np.int64, np.int32, np.uint32):
+        v = validate_wright_fisher_params(
+            population_size=int_type(100), starting_frequency=0.5,
+            generations=int_type(100), replicate_runs=int_type(10))
+        assert v.ok, f"{int_type.__name__} was rejected: {v.errors}"
+
+
 def test_multiple_flag_conditions_are_all_reported() -> None:
     # N below threshold AND p0 degenerate AND few reps — the old elif chain
     # silently dropped all but the first. Every condition must be visible.
