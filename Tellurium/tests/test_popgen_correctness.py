@@ -27,6 +27,10 @@ Stage 2 Part 4, and re-verified after Stage 2 refactoring):
    (N=100, generations=200), not Target B's (N=20, generations=500).
    The original "3 tests fail" claim was an overclaim, corrected per
    the constitution's divergence-resolution procedure.
+   Re-verified 2026-07-30 after adding test_allele_frequency
+   _variance_matches_theory (Target E): blast radius is now 3 — the
+   variance test also fails (observed variance shifts from ~0.055
+   theoretical to ~0.107 under 2N→N, well outside the 0.015 tolerance).
 
 2. "Skip the last generation" (implementer-discovered).
    Mutation: range(generations + 1) -> range(generations) for the main
@@ -608,13 +612,7 @@ def test_no_seed_gives_different_estimates_across_repeated_calls() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Verification Target D: different seeds produce different trajectories
-# (already covered by test_different_seeds_produce_different_output above)
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Variance of allele frequency matches drift theory
+# Verification Target E: allele-frequency variance matches drift theory
 # ---------------------------------------------------------------------------
 
 
