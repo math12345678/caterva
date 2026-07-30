@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/verify_domain.sh
-# Usage: scripts/verify_domain.sh <domain_name>
+# Usage: scripts/verify_domain.sh <domain_name> [test_file_basename]
 #
 # Runs the mechanical verification steps from the Terrium Engineering
 # Constitution (docs/CONSTITUTION.md, Section 6) for a newly implemented
@@ -21,8 +21,9 @@
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
-    echo "Usage: $0 <domain_name>"
+    echo "Usage: $0 <domain_name> [test_file_basename]"
     echo "Example: $0 monte_carlo"
+    echo "         $0 wright_fisher test_popgen_correctness.py"
     exit 1
 fi
 
@@ -85,25 +86,52 @@ if [ "$DEP_OK" -ne 0 ]; then
 fi
 
 # ------------------------------------------------------------------
+# Step 2b: RNG convention guard (ADR 0005 compliance)
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 2b: RNG convention guard ==="
+
+RNG_OUT=$(python3 "$REPO_DIR/scripts/check_rng_convention.py" 2>&1) && RNG_OK=0 || RNG_OK=1
+check "RNG convention (ADR 0005)" "$RNG_OK"
+if [ "$RNG_OK" -ne 0 ]; then
+    echo "$RNG_OUT"
+fi
+
+# ------------------------------------------------------------------
 # Step 3: New-domain test file exists and collects
 # ------------------------------------------------------------------
 echo ""
 echo "=== Step 3: new-domain test file collects ==="
 
-# Optional second arg: explicit test file basename, for domains whose test
-# file doesn't follow the test_<domain>_correctness.py convention (e.g.
-# Wright-Fisher's spec name is "wright_fisher" but its test file is named
-# test_popgen_correctness.py, after the domain category). Found during
-# Stage 2 Part 4 verification, when this script false-failed Step 3 for
-# exactly this reason.
-TEST_BASENAME="${2:-test_${DOMAIN}_correctness.py}"
+# Auto-detect: if a test file wasn't given as 2nd arg, search for one
+# that matches the domain. Tries test_<domain>_correctness.py first,
+# then falls back to scanning for any test file whose path mentions
+# the domain name (handling cases like wright_fisher ->
+# test_popgen_correctness.py).
+if [ $# -ge 2 ]; then
+    TEST_BASENAME="$2"
+else
+    TEST_BASENAME="test_${DOMAIN}_correctness.py"
+    TEST_FILE="$REPO_DIR/Tellurium/tests/$TEST_BASENAME"
+    if [ ! -f "$TEST_FILE" ]; then
+        # Fall back: search for test files that import simulate_<domain>.
+        # This handles naming mismatches like wright_fisher ->
+        # test_popgen_correctness.py (named after the domain category).
+        CANDIDATE=$(grep -rl "simulate_${DOMAIN}" "$REPO_DIR/Tellurium/tests/" \
+            --include='*.py' 2>/dev/null | head -1)
+        if [ -n "$CANDIDATE" ]; then
+            TEST_BASENAME=$(basename "$CANDIDATE")
+        fi
+    fi
+fi
+
 TEST_FILE="$REPO_DIR/Tellurium/tests/$TEST_BASENAME"
 if [ ! -f "$TEST_FILE" ]; then
     echo "  [FAIL] test file not found: $TEST_FILE"
-    echo "         (pass the actual filename as a 2nd arg if it doesn't"
-    echo "         follow the test_<domain>_correctness.py convention)"
+    echo "         (pass the actual filename as a 2nd arg if auto-detect fails)"
     FAIL=$((FAIL + 1))
 else
+    echo "  test file: $TEST_BASENAME"
     COLLECT_OUT=$(cd "$REPO_DIR/Tellurium" && python3 -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
     check "test file collects" "$COLLECT_OK"
     if [ "$COLLECT_OK" -ne 0 ]; then

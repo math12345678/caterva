@@ -153,8 +153,11 @@ Applied to every diff, in order, stop at first failure:
 1. Run the full suite — both `Tellurium/` and `Tests/`, not just the new
    domain's tests.
 2. Run `python3 scripts/check_dependencies_declared.py`.
+2b. Run `python3 scripts/check_rng_convention.py` — checks all
+    discrete/stochastic domains use `numpy.random.default_rng(seed)`
+    per ADR 0005.
 3. Check any new dependency's version pin against what's actually
-   installable for the Python/Node version in use.
+    installable for the Python/Node version in use.
 4. **Independently reproduce at least one claimed mutation test.** Back up
    the file, apply the exact mutation described, run the specific test(s)
    claimed to catch it, confirm the failure matches the claimed cause,
@@ -169,9 +172,9 @@ Applied to every diff, in order, stop at first failure:
    by an actual build, not by inspection.
 6. Confirm the diff's file list matches the spec's out-of-scope section.
 
-Steps 1-3 are automated by `scripts/verify_domain.sh <domain>` (run from
-the repo root). Step 4 remains manual — the script prints the procedure
-and a reminder about the `&&`-chaining trap, then exits without
+Steps 1-3 (including 2b) are automated by `scripts/verify_domain.sh <domain>`
+(run from the repo root). Step 4 remains manual — the script prints the
+procedure and a reminder about the `&&`-chaining trap, then exits without
 performing the mutation. Run the script first, then do Step 4 by hand.
 
 Full procedure with commands and the `&&`-chaining incident:
@@ -223,10 +226,20 @@ they happen:
   in `scripts/verify_domain.sh`: Step 3's test-file lookup assumed a
   `test_<domain>_correctness.py` naming convention, which false-failed for
   Wright-Fisher's `test_popgen_correctness.py` (named after the domain
-  category, not the specific model). The script now accepts an optional
-  second argument for the actual filename. Briefly added, then removed, a
-  third implementer (Claude Code running qwen3-coder:30b locally) after
-  it proved too resource-intensive on the user's machine — the pipeline
-  reverts to two implementers (OpenCode, FreeBuff); no permanent change
-  to Section 2's roles was needed since the addition was reverted before
-  producing any real output to build a lasting process around.
+  category, not the specific model). The script now auto-detects the test
+  file by searching for `simulate_<domain>` imports in the tests
+  directory, and falls back to the explicit second-argument override.
+  Briefly added, then removed, a third implementer (Claude Code running
+  qwen3-coder:30b locally) after it proved too resource-intensive on the
+  user's machine — the pipeline reverts to two implementers (OpenCode,
+  FreeBuff); no permanent change to Section 2's roles was needed since
+  the addition was reverted before producing any real output to build a
+  lasting process around.
+- 2026-07 — Stage 2 improvements (post-close): added `scripts/
+  check_rng_convention.py` as an AST-based guard for ADR 0005 compliance
+  (all discrete/stochastic domains must use `numpy.random.default_rng(seed)`
+  with `seed: int | None = None`), referenced as Step 2b in Section 6's
+  verification procedure and automated by `scripts/verify_domain.sh`.
+  Added edge-case test coverage to the Wright-Fisher domain (N=1, minimum
+  generations, fixed-population stability, odd population size, large-N
+  performance).

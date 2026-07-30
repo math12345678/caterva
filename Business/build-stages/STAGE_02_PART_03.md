@@ -12,7 +12,7 @@ outright rather than keeping it as dead optionality for later.
 
 The honest status of Stage 2's implementation:
 `Tellurium/tests/test_popgen_correctness.py` exists (534 lines) — a real,
-substantial test file, written against the Part 2 spec's Verification
+substantial test file, written against the Part 2 spec's Verification Continue building. 
 Targets A through D and the pre-specified `2N`-vs-`N` mutation. It does
 not currently pass, because it can't even be collected —
 `from tellurium_engine import (... WF_PLAUSIBLE_MIN_POPULATION_SIZE ...)`
