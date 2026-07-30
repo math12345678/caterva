@@ -67,6 +67,11 @@ __all__ = [
     "MC_PLAUSIBLE_MIN_SAMPLES",
     "validate_monte_carlo_params",
     "simulate_monte_carlo_pi",
+    "WF_PLAUSIBLE_MIN_POPULATION_SIZE",
+    "WF_PLAUSIBLE_MAX_GENERATIONS",
+    "WF_PLAUSIBLE_MIN_REPLICATE_RUNS",
+    "validate_wright_fisher_params",
+    "simulate_wright_fisher",
 ]
 
 
@@ -1046,5 +1051,224 @@ def simulate_monte_carlo_pi(
         colnames=["n", "estimate", "se"],
         data=data,
         model_name="monte_carlo_pi",
+        validation=validation,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Wright-Fisher population genetics (neutral drift)
+#
+# Like PCR and Monte Carlo, this is a discrete/stochastic domain, not an ODE.
+# Wright-Fisher is fundamentally a discrete-generation model — there is no
+# meaningful continuous-time state between generation t and t+1 to integrate
+# through. Direct Python + numpy binomial sampling, per ADR 0002 and 0005.
+#
+# ADR 0005 applies: the RNG is numpy.random.default_rng(seed), with
+# seed: int | None = None. A fixed seed guarantees bit-identical output
+# within a fixed numpy installation (the default BitGenerator may differ
+# across numpy major versions — PCG64 under 1.x, Philox under 2.x).
+# ---------------------------------------------------------------------------
+
+# Population size < 10 gives drift so rapid it is unlikely to be the
+# intended teaching-lab scenario, but the simulation is valid and will run.
+WF_PLAUSIBLE_MIN_POPULATION_SIZE = 10
+
+# More than 10,000 generations is valid but may be slow; flagged rather
+# than rejected so a student exploring long-term drift is not blocked.
+WF_PLAUSIBLE_MAX_GENERATIONS = 10_000
+
+# Fewer than 10 replicate runs makes the standard error on mean
+# heterozygosity too large for a meaningful estimate; flagged, not rejected.
+WF_PLAUSIBLE_MIN_REPLICATE_RUNS = 10
+
+
+def validate_wright_fisher_params(
+    population_size: int,
+    starting_frequency: float,
+    generations: int,
+    replicate_runs: int = 1,
+) -> ParameterValidation:
+    """Check a Wright-Fisher neutral-drift parameter set.
+
+    Hard rejections (``ok=False``):
+        * ``population_size`` is boolean, not an integer, or < 1
+        * ``starting_frequency`` is boolean, not a finite float, or outside [0, 1]
+        * ``generations`` is boolean, not an integer, or < 1
+        * ``replicate_runs`` is boolean, not an integer, or < 1
+
+    Flags (``ok=True, flagged=True``):
+        * ``population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE`` — drift
+          extremely rapid, valid but unlikely to be intended
+        * ``starting_frequency`` exactly 0.0 or 1.0 — allele already
+          lost or fixed, valid but degenerate
+        * ``generations > WF_PLAUSIBLE_MAX_GENERATIONS`` — valid, may be slow
+        * ``replicate_runs < WF_PLAUSIBLE_MIN_REPLICATE_RUNS`` — standard
+          error of mean heterozygosity will be large
+    """
+    errors: List[str] = []
+
+    # --- population_size ---
+    if isinstance(population_size, bool):
+        errors.append("population_size must be an integer, not a boolean")
+    elif not isinstance(population_size, int):
+        errors.append(
+            f"population_size must be an integer, got "
+            f"{type(population_size).__name__}")
+    elif population_size < 1:
+        errors.append(
+            f"population_size must be >= 1 (got {population_size})")
+
+    # --- starting_frequency ---
+    if isinstance(starting_frequency, bool):
+        errors.append("starting_frequency must be a number, not a boolean")
+    elif not isinstance(starting_frequency, (int, float)):
+        errors.append(
+            f"starting_frequency must be a number, got "
+            f"{type(starting_frequency).__name__}")
+    elif math.isnan(starting_frequency):
+        errors.append("starting_frequency must not be NaN")
+    elif math.isinf(starting_frequency):
+        errors.append("starting_frequency must be finite")
+    elif not (0.0 <= starting_frequency <= 1.0):
+        errors.append(
+            f"starting_frequency must be in [0, 1] (got {starting_frequency})")
+
+    # --- generations ---
+    if isinstance(generations, bool):
+        errors.append("generations must be an integer, not a boolean")
+    elif not isinstance(generations, int):
+        errors.append(
+            f"generations must be an integer, got "
+            f"{type(generations).__name__}")
+    elif generations < 1:
+        errors.append(f"generations must be >= 1 (got {generations})")
+
+    # --- replicate_runs ---
+    if isinstance(replicate_runs, bool):
+        errors.append("replicate_runs must be an integer, not a boolean")
+    elif not isinstance(replicate_runs, int):
+        errors.append(
+            f"replicate_runs must be an integer, got "
+            f"{type(replicate_runs).__name__}")
+    elif replicate_runs < 1:
+        errors.append(
+            f"replicate_runs must be >= 1 (got {replicate_runs})")
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    v = ParameterValidation()
+
+    if population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE:
+        v.flagged = True
+        v.flag_reason = (
+            f"population_size={population_size} is below "
+            f"{WF_PLAUSIBLE_MIN_POPULATION_SIZE}; drift will be "
+            "extremely rapid")
+    elif starting_frequency == 0.0:
+        v.flagged = True
+        v.flag_reason = (
+            "starting_frequency is 0.0; the allele is already lost "
+            "and no drift can occur")
+    elif starting_frequency == 1.0:
+        v.flagged = True
+        v.flag_reason = (
+            "starting_frequency is 1.0; the allele is already fixed "
+            "and no drift can occur")
+    elif generations > WF_PLAUSIBLE_MAX_GENERATIONS:
+        v.flagged = True
+        v.flag_reason = (
+            f"generations={generations} exceeds "
+            f"{WF_PLAUSIBLE_MAX_GENERATIONS}; simulation may be "
+            "noticeably slow")
+    elif replicate_runs < WF_PLAUSIBLE_MIN_REPLICATE_RUNS:
+        v.flagged = True
+        v.flag_reason = (
+            f"replicate_runs={replicate_runs} is below "
+            f"{WF_PLAUSIBLE_MIN_REPLICATE_RUNS}; the standard error "
+            "of mean heterozygosity will be large")
+
+    return v
+
+
+def simulate_wright_fisher(
+    population_size: int,
+    starting_frequency: float,
+    generations: int,
+    replicate_runs: int = 1,
+    seed: int | None = None,
+) -> SimulationResult:
+    """Simulate neutral genetic drift in a diploid Wright-Fisher population.
+
+    Each generation, the next generation's 2N allele copies are formed by
+    binomial sampling from the current generation's allele pool:
+    ``X_{t+1} ~ Binomial(2N, p_t)``, and ``p_{t+1} = X_{t+1} / 2N``.
+
+    Returns a ``SimulationResult`` with columns ``["generation",
+    "mean_frequency", "heterozygosity", "n_A_fixed", "n_a_fixed"]`` —
+    one row per generation (from 0 to ``generations`` inclusive),
+    aggregated across all replicate populations. Once a replicate fixes
+    (frequency reaches 0.0 or 1.0), its frequency holds at that value for
+    all subsequent generations.
+
+    Args:
+        population_size: number of diploid individuals (N); 2N allele copies
+        starting_frequency: initial frequency of allele A, in [0, 1]
+        generations: number of generations to simulate forward
+        replicate_runs: number of independent replicate populations
+        seed: optional seed for reproducibility; passed to
+            ``numpy.random.default_rng``
+
+    Returns:
+        SimulationResult with aggregated per-generation statistics
+
+    Raises:
+        ModelBuildError: if parameters are invalid
+    """
+    validation = validate_wright_fisher_params(
+        population_size, starting_frequency, generations, replicate_runs)
+    validation.raise_if_invalid()
+
+    rng = np.random.default_rng(seed)
+    two_n = 2 * population_size
+
+    # Each replicate tracks the current frequency of allele A.
+    # Shape: (replicate_runs,) — one frequency per replicate.
+    frequencies = np.full(replicate_runs, starting_frequency, dtype=np.float64)
+
+    data: List[List[float]] = []
+
+    # Generation 0: starting state
+    data.append([
+        0.0,
+        float(np.mean(frequencies)),
+        float(np.mean(2.0 * frequencies * (1.0 - frequencies))),
+        0.0,  # n_A_fixed
+        0.0,  # n_a_fixed
+    ])
+
+    for gen in range(1, generations + 1):
+        # Binomial sampling: draw 2N allele copies for each replicate
+        counts = rng.binomial(two_n, frequencies)  # shape (replicate_runs,)
+        frequencies = counts.astype(np.float64) / two_n
+
+        mean_freq = float(np.mean(frequencies))
+        heterozygosity = float(np.mean(2.0 * frequencies * (1.0 - frequencies)))
+        n_A_fixed = float(np.sum(frequencies == 1.0))
+        n_a_fixed = float(np.sum(frequencies == 0.0))
+
+        data.append([
+            float(gen),
+            mean_freq,
+            heterozygosity,
+            n_A_fixed,
+            n_a_fixed,
+        ])
+
+    return SimulationResult(
+        colnames=["generation", "mean_frequency", "heterozygosity",
+                  "n_A_fixed", "n_a_fixed"],
+        data=data,
+        model_name="wright_fisher",
         validation=validation,
     )
