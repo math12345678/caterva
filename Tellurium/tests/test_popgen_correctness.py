@@ -253,6 +253,20 @@ def test_clean_params_not_flagged() -> None:
     assert not v.flagged
 
 
+def test_multiple_flag_conditions_are_all_reported() -> None:
+    # N below threshold AND p0 degenerate AND few reps — the old elif chain
+    # silently dropped all but the first. Every condition must be visible.
+    v = validate_wright_fisher_params(
+        population_size=5, starting_frequency=0.0, generations=10,
+        replicate_runs=1)
+    assert v.ok
+    assert v.flagged
+    assert "population_size=5" in v.flag_reason
+    assert "lost" in v.flag_reason
+    assert "standard error" in v.flag_reason
+    assert "replicate_runs=1" in v.flag_reason
+
+
 # ---------------------------------------------------------------------------
 # Result structure
 # ---------------------------------------------------------------------------

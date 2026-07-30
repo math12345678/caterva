@@ -1157,36 +1157,39 @@ def validate_wright_fisher_params(
         return ParameterValidation(ok=False, errors=errors)
 
     v = ParameterValidation()
+    flag_reasons: List[str] = []
 
     if population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE:
         v.flagged = True
-        v.flag_reason = (
+        flag_reasons.append(
             f"population_size={population_size} is below "
             f"{WF_PLAUSIBLE_MIN_POPULATION_SIZE}; drift will be "
             "extremely rapid")
-    elif starting_frequency == 0.0:
+    if starting_frequency == 0.0:
         v.flagged = True
-        v.flag_reason = (
+        flag_reasons.append(
             "starting_frequency is 0.0; the allele is already lost "
             "and no drift can occur")
-    elif starting_frequency == 1.0:
+    if starting_frequency == 1.0:
         v.flagged = True
-        v.flag_reason = (
+        flag_reasons.append(
             "starting_frequency is 1.0; the allele is already fixed "
             "and no drift can occur")
-    elif generations > WF_PLAUSIBLE_MAX_GENERATIONS:
+    if generations > WF_PLAUSIBLE_MAX_GENERATIONS:
         v.flagged = True
-        v.flag_reason = (
+        flag_reasons.append(
             f"generations={generations} exceeds "
             f"{WF_PLAUSIBLE_MAX_GENERATIONS}; simulation may be "
             "noticeably slow")
-    elif replicate_runs < WF_PLAUSIBLE_MIN_REPLICATE_RUNS:
+    if replicate_runs < WF_PLAUSIBLE_MIN_REPLICATE_RUNS:
         v.flagged = True
-        v.flag_reason = (
+        flag_reasons.append(
             f"replicate_runs={replicate_runs} is below "
             f"{WF_PLAUSIBLE_MIN_REPLICATE_RUNS}; the standard error "
             "of mean heterozygosity will be large")
 
+    if flag_reasons:
+        v.flag_reason = "; ".join(flag_reasons)
     return v
 
 
