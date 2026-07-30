@@ -18,8 +18,10 @@ from tellurium_engine import (
     simulate_michaelis_menten,
     simulate_seir,
     simulate_sir,
+    simulate_wright_fisher,
     validate_michaelis_menten_params,
     validate_sir_params,
+    validate_wright_fisher_params,
 )
 
 SLOW = settings(max_examples=40, deadline=None,
@@ -246,6 +248,89 @@ def test_seir_compartments_are_never_negative(beta, gamma, sigma, s0, e0):
 
 
 # ---------------------------------------------------------------------------
+# Wright-Fisher
+# ---------------------------------------------------------------------------
+
+wf_population_sizes = st.integers(min_value=1, max_value=500)
+wf_starting_frequencies = st.floats(
+    min_value=0.0, max_value=1.0,
+    allow_nan=False, allow_infinity=False)
+wf_generations = st.integers(min_value=1, max_value=200)
+wf_replicate_runs = st.integers(min_value=1, max_value=50)
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=wf_starting_frequencies,
+       generations=wf_generations, replicate_runs=wf_replicate_runs)
+@SLOW
+def test_wf_allele_frequency_stays_in_bounds(
+        population_size, starting_frequency, generations, replicate_runs):
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs)
+    # Mean frequency across replicates must stay in [0, 1].
+    mf = res.column("mean_frequency")
+    assert all(0.0 - 1e-12 <= v <= 1.0 + 1e-12 for v in mf), (
+        f"mean_frequency out of bounds: min={min(mf)}, max={max(mf)}")
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=wf_starting_frequencies,
+       generations=wf_generations, replicate_runs=wf_replicate_runs)
+@SLOW
+def test_wf_heterozygosity_is_bounded(
+        population_size, starting_frequency, generations, replicate_runs):
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs)
+    h = res.column("heterozygosity")
+    assert all(v >= -1e-12 for v in h), f"negative heterozygosity: min={min(h)}"
+    # Maximum heterozygosity for a biallelic locus is 0.5 (at p = q = 0.5).
+    assert all(v <= 0.5 + 1e-12 for v in h), (
+        f"heterozygosity > 0.5: max={max(h)}")
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=wf_starting_frequencies,
+       generations=wf_generations, replicate_runs=wf_replicate_runs)
+@SLOW
+def test_wf_fixation_bookkeeping(
+        population_size, starting_frequency, generations, replicate_runs):
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs)
+    n_a = res.column("n_A_fixed")
+    n_b = res.column("n_a_fixed")
+    for a, b in zip(n_a, n_b):
+        assert a + b <= replicate_runs, (
+            f"n_A_fixed + n_a_fixed = {a + b} > replicate_runs = {replicate_runs}")
+        assert a >= 0, f"n_A_fixed = {a} < 0"
+        assert b >= 0, f"n_a_fixed = {b} < 0"
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=st.floats(
+           min_value=0.05, max_value=0.95,
+           allow_nan=False, allow_infinity=False),
+       generations=wf_generations, replicate_runs=wf_replicate_runs)
+@SLOW
+def test_wf_initial_heterozygosity_is_correct(
+        population_size, starting_frequency, generations, replicate_runs):
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs)
+    expected_h0 = 2.0 * starting_frequency * (1.0 - starting_frequency)
+    actual_h0 = res.column("heterozygosity")[0]
+    assert math.isclose(actual_h0, expected_h0, rel_tol=1e-12, abs_tol=1e-12), (
+        f"H0 = {actual_h0}, expected = {expected_h0} "
+        f"(p0={starting_frequency})")
+
+
+# ---------------------------------------------------------------------------
 # Validation never crashes
 # ---------------------------------------------------------------------------
 
@@ -270,6 +355,22 @@ def test_validation_never_raises_on_arbitrary_floats(km, vmax, s0):
 @settings(max_examples=200, deadline=None)
 def test_sir_validation_never_raises_on_arbitrary_floats(beta, gamma, s0, i0):
     v = validate_sir_params(beta=beta, gamma=gamma, s0=s0, i0=i0)
+    assert isinstance(v.ok, bool)
+    if not v.ok:
+        assert v.errors
+
+
+@given(population_size=st.integers(min_value=-100, max_value=1000),
+       starting_frequency=st.floats(allow_nan=True, allow_infinity=True),
+       generations=st.integers(min_value=-50, max_value=500),
+       replicate_runs=st.integers(min_value=-10, max_value=20))
+@settings(max_examples=200, deadline=None)
+def test_wf_validation_never_raises_on_arbitrary_input(
+        population_size, starting_frequency, generations, replicate_runs):
+    v = validate_wright_fisher_params(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs)
     assert isinstance(v.ok, bool)
     if not v.ok:
         assert v.errors
