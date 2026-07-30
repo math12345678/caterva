@@ -43,8 +43,12 @@ different generator class (`random.Random`, a third-party RNG), by
 omitting the seed parameter, or by not guaranteeing bit-identical
 reproducibility — must state its reasons in its implementation report per
 the constitution's Rule 9 (judgment calls flagged explicitly, not silently
-made). Compliance with this ADR is checked during the verification stage
-by confirming the seed parameter exists and `default_rng` is used.
+made). Compliance with this ADR is checked automatically by
+`scripts/check_rng_convention.py` (AST-based static analysis) and
+`Tellurium/tests/test_rng_convention.py` (pytest wrapper that runs the
+script as a CI step). The check runs as Step 2b of the verification
+procedure (`docs/CONSTITUTION.md` Section 6) and is automated by
+`scripts/verify_domain.sh`.
 
 ## Consequences
 

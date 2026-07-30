@@ -129,6 +129,95 @@ Verified by exact-equality tests against the closed form (no tolerance
 band, since there's no numerical integration to have error) in
 `tests/test_pcr_correctness.py`.
 
+## Monte Carlo pi estimation
+
+```python
+simulate_monte_carlo_pi(
+    n_samples: int,
+    seed: int | None = None,
+) -> SimulationResult
+```
+
+**Not** built through antimony/roadrunner -- a direct stochastic sampling
+domain, same category as PCR. See ``docs/adr/0002-pcr-not-modeled-as-an-ode.md``
+and ``docs/adr/0005-rng-convention.md``.
+
+Draws ``n_samples`` uniform random points in ``[-1, 1] x [-1, 1]`` and
+estimates pi as ``4 * (fraction inside the unit circle)``.
+
+- ``n_samples`` -- must be a positive integer. Below 100
+  (``MC_PLAUSIBLE_MIN_SAMPLES``) is flagged -- the standard error is large
+  but the simulation is still valid.
+- ``seed`` -- optional RNG seed per ADR 0005. Omit for nondeterministic
+  output.
+
+Result columns are ``["n", "estimate", "se"]`` -- one row per convergence
+checkpoint (log-spaced sample counts), not one row per sample.
+
+Verified in ``tests/test_monte_carlo_correctness.py``:
+- Error shrinks at the theoretical ``1/sqrt(N)`` rate (Target A).
+- Reported standard error is statistically consistent with empirical
+  variation across repeated runs (Target B).
+- Fixed seed produces bit-identical output; different seeds diverge.
+
+## Population genetics (Wright-Fisher neutral drift)
+
+```python
+validate_wright_fisher_params(
+    population_size: int,
+    starting_frequency: float,
+    generations: int,
+    replicate_runs: int = 1,
+) -> ParameterValidation
+
+simulate_wright_fisher(
+    population_size: int,
+    starting_frequency: float,
+    generations: int,
+    replicate_runs: int = 1,
+    seed: int | None = None,
+) -> SimulationResult
+```
+
+**Not** built through antimony/roadrunner -- discrete-generation stochastic
+process (binomial sampling each generation). Same category as PCR and Monte
+Carlo. See ``docs/adr/0002-pcr-not-modeled-as-an-ode.md`` and
+``docs/adr/0005-rng-convention.md``.
+
+Models neutral drift at a single biallelic locus in a diploid Wright-Fisher
+population. Each generation, the next generation's ``2N`` allele copies are
+drawn ``Binomial(2N, p_t)`` from the current generation's allele pool.
+
+- ``population_size`` -- diploid census size N, must be a positive integer.
+  Below 10 (``WF_PLAUSIBLE_MIN_POPULATION_SIZE``) is flagged -- drift is
+  extremely rapid.
+- ``starting_frequency`` -- initial frequency of allele A, in ``[0, 1]``.
+  Exactly 0 or 1 is flagged (degenerate -- allele already lost or fixed).
+- ``generations`` -- number of discrete generations, must be a positive
+  integer. Above 10000 (``WF_PLAUSIBLE_MAX_GENERATIONS``) is flagged --
+  simulation may be slow.
+- ``replicate_runs`` -- number of independent replicate populations, must
+  be a positive integer. Below 10 (``WF_PLAUSIBLE_MIN_REPLICATE_RUNS``) is
+  flagged -- standard error of mean heterozygosity will be large.
+- ``seed`` -- optional RNG seed per ADR 0005. Omit for nondeterministic
+  output.
+
+Result columns are ``["generation", "mean_frequency", "heterozygosity",
+"n_A_fixed", "n_a_fixed"]`` -- one row per generation from 0 to
+``generations`` inclusive. Stats are aggregated across all replicate
+populations: mean frequency, mean heterozygosity, count of populations
+fixed for allele A, count fixed for allele a.
+
+Verified in ``tests/test_popgen_correctness.py``:
+- Heterozygosity decays at the exact rate ``(1 - 1/(2N))^t`` (Target A,
+  within 0.02 absolute).
+- Fixation probability equals the starting frequency p0, per Kimura 1962
+  (Target B, within 0.04).
+- Fixed-seed reproducibility and seed-dependent divergence (Targets C-D).
+- ADR 0005 RNG compliance checked automatically by
+  ``scripts/check_rng_convention.py`` and
+  ``tests/test_rng_convention.py``.
+
 ## Lower-level: raw SBML operations
 
 These are what the `simulate_*` convenience functions call internally.
@@ -169,4 +258,6 @@ validate_michaelis_menten_params(km, vmax, s0) -> ParameterValidation
 validate_sir_params(beta, gamma, s0, i0, r0_recovered=0.0) -> ParameterValidation
 validate_seir_params(beta, sigma, gamma, s0, e0, i0, r0_recovered=0.0) -> ParameterValidation
 validate_pcr_params(n0, efficiency, cycles) -> ParameterValidation
+validate_monte_carlo_params(n_samples) -> ParameterValidation
+validate_wright_fisher_params(population_size, starting_frequency, generations, replicate_runs=1) -> ParameterValidation
 ```
