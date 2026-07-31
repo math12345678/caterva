@@ -168,6 +168,7 @@ validate_wright_fisher_params(
     starting_frequency: float,
     generations: int,
     replicate_runs: int = 1,
+    mutation_rate: float = 0.0,
 ) -> ParameterValidation
 
 simulate_wright_fisher(
@@ -175,6 +176,7 @@ simulate_wright_fisher(
     starting_frequency: float,
     generations: int,
     replicate_runs: int = 1,
+    mutation_rate: float = 0.0,
     seed: int | None = None,
 ) -> SimulationResult
 ```
@@ -184,9 +186,10 @@ process (binomial sampling each generation). Same category as PCR and Monte
 Carlo. See ``docs/adr/0002-pcr-not-modeled-as-an-ode.md`` and
 ``docs/adr/0005-rng-convention.md``.
 
-Models neutral drift at a single biallelic locus in a diploid Wright-Fisher
-population. Each generation, the next generation's ``2N`` allele copies are
-drawn ``Binomial(2N, p_t)`` from the current generation's allele pool.
+Models neutral drift (optionally with symmetric mutation) at a single
+biallelic locus in a diploid Wright-Fisher population. Each generation,
+the next generation's ``2N`` allele copies are drawn
+``Binomial(2N, p_t)`` from the current generation's allele pool.
 
 - ``population_size`` -- diploid census size N, must be a positive integer.
   Below 10 (``WF_PLAUSIBLE_MIN_POPULATION_SIZE``) is flagged -- drift is
@@ -199,6 +202,10 @@ drawn ``Binomial(2N, p_t)`` from the current generation's allele pool.
 - ``replicate_runs`` -- number of independent replicate populations, must
   be a positive integer. Below 10 (``WF_PLAUSIBLE_MIN_REPLICATE_RUNS``) is
   flagged -- standard error of mean heterozygosity will be large.
+- ``mutation_rate`` -- per-generation symmetric mutation probability per
+  allele copy (default 0 = neutral drift). Must be in ``[0, 1]``.
+  Above ``WF_PLAUSIBLE_MAX_MUTATION_RATE (0.01)`` is flagged --
+  biologically implausible, mutation will dominate drift.
 - ``seed`` -- optional RNG seed per ADR 0005. Omit for nondeterministic
   output.
 
@@ -214,6 +221,8 @@ Verified in ``tests/test_popgen_correctness.py``:
 - Fixation probability equals the starting frequency p0, per Kimura 1962
   (Target B, within 0.04).
 - Fixed-seed reproducibility and seed-dependent divergence (Targets C-D).
+- Mutation-drift equilibrium: heterozygosity approaches the predicted
+  stationary value ``H_eq = 4Nμ/(8Nμ+1)`` (Target F, within 0.03).
 - ADR 0005 RNG compliance checked automatically by
   ``scripts/check_rng_convention.py`` and
   ``tests/test_rng_convention.py``.
@@ -259,5 +268,5 @@ validate_sir_params(beta, gamma, s0, i0, r0_recovered=0.0) -> ParameterValidatio
 validate_seir_params(beta, sigma, gamma, s0, e0, i0, r0_recovered=0.0) -> ParameterValidation
 validate_pcr_params(n0, efficiency, cycles) -> ParameterValidation
 validate_monte_carlo_params(n_samples) -> ParameterValidation
-validate_wright_fisher_params(population_size, starting_frequency, generations, replicate_runs=1) -> ParameterValidation
+validate_wright_fisher_params(population_size, starting_frequency, generations, replicate_runs=1, mutation_rate=0.0) -> ParameterValidation
 ```

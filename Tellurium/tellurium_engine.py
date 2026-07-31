@@ -1,25 +1,40 @@
 """
-Terrium Tellurium/roadrunner integration layer.
+Terrium simulation engine: continuous (antimony/SBML/roadrunner) and
+discrete (direct Python) domains, built up one stage at a time per
+docs/CONSTITUTION.md.
 
-Covers the two Tier-2 ODE domains from the Terrium spec:
+Continuous-time domains (Tier-2 ODE, via antimony -> SBML -> roadrunner):
   * Michaelis-Menten enzyme kinetics
   * SIR / SEIR epidemiological modeling
+
+Discrete/stochastic domains (direct Python, no ODE solver -- see ADR 0002
+for why continuous-vs-discrete is a per-domain decision, not a default):
+  * PCR amplification (deterministic recurrence)
+  * Monte Carlo pi estimation (stochastic, ADR 0005 RNG convention)
+  * Wright-Fisher population genetics / neutral drift (stochastic, ADR 0005)
 
 Design notes
 ------------
 The full ``tellurium`` umbrella package pulls in python-libcombine and
 python-libnuml, which are only needed for COMBINE archives and numerical
-markup -- neither of which Terrium uses. This module targets the three
-engines that actually do the work and that install cleanly:
+markup -- neither of which Terrium uses (see ADR 0001). This module targets
+the three engines that actually do the work and that install cleanly, for
+the continuous-time domains:
 
     antimony  -- human-readable model definition -> SBML
     libsbml   -- SBML validation
     roadrunner -- ODE integration
 
+Discrete/stochastic domains use numpy directly and never touch antimony/
+libsbml/roadrunner at all.
+
 Parameter plausibility checking deliberately mirrors the flagged /
 flag_reason pattern already established in Tests/brenda_client.py, so a
 value that BRENDA flagged as implausible stays flagged when it reaches the
 simulation layer instead of silently becoming a "confirmed" model input.
+Every domain in this file follows the same ok/flagged/flag_reason contract
+via the shared ParameterValidation and SimulationResult dataclasses below,
+regardless of whether it's continuous or discrete.
 """
 
 from __future__ import annotations
@@ -70,6 +85,7 @@ __all__ = [
     "WF_PLAUSIBLE_MIN_POPULATION_SIZE",
     "WF_PLAUSIBLE_MAX_GENERATIONS",
     "WF_PLAUSIBLE_MIN_REPLICATE_RUNS",
+    "WF_PLAUSIBLE_MAX_MUTATION_RATE",
     "validate_wright_fisher_params",
     "simulate_wright_fisher",
 ]
@@ -253,17 +269,12 @@ def validate_sir_params(beta: float, gamma: float, s0: float, i0: float,
     """
     errors: List[str] = []
 
-    if not _finite_positive(beta, "beta", errors, allow_zero=False):
-        errors.append("beta must be finite and positive")
-    if not _finite_positive(gamma, "gamma", errors, allow_zero=False):
-        errors.append("gamma must be finite and positive")
-    if not _finite_positive(s0, "S0", errors, allow_zero=True):
-        errors.append("S0 must be finite and non-negative")
-    if not _finite_positive(i0, "I0", errors, allow_zero=True):
-        errors.append("I0 must be finite and non-negative")
-    if not _finite_positive(r0_recovered, "R0_recovered", errors, allow_zero=True):
-        errors.append("R0_recovered must be finite and non-negative")
-    
+    _finite_positive(beta, "beta", errors, allow_zero=False)
+    _finite_positive(gamma, "gamma", errors, allow_zero=False)
+    _finite_positive(s0, "S0", errors, allow_zero=True)
+    _finite_positive(i0, "I0", errors, allow_zero=True)
+    _finite_positive(r0_recovered, "R0_recovered", errors, allow_zero=True)
+
     if errors:
         return ParameterValidation(ok=False, errors=errors)
 
@@ -296,21 +307,14 @@ def validate_seir_params(beta: float, sigma: float, gamma: float, s0: float,
     """Check an SEIR parameter set (adds the latent-progression rate sigma)."""
     errors: List[str] = []
 
-    if not _finite_positive(beta, "beta", errors, allow_zero=False):
-        errors.append("beta must be finite and positive")
-    if not _finite_positive(sigma, "sigma", errors, allow_zero=False):
-        errors.append("sigma must be finite and positive")
-    if not _finite_positive(gamma, "gamma", errors, allow_zero=False):
-        errors.append("gamma must be finite and positive")
-    if not _finite_positive(s0, "S0", errors, allow_zero=True):
-        errors.append("S0 must be finite and non-negative")
-    if not _finite_positive(i0, "I0", errors, allow_zero=True):
-        errors.append("I0 must be finite and non-negative")
-    if not _finite_positive(e0, "E0", errors, allow_zero=True):
-        errors.append("E0 must be finite and non-negative")
-    if not _finite_positive(r0_recovered, "R0_recovered", errors, allow_zero=True):
-        errors.append("R0_recovered must be finite and non-negative")
-    
+    _finite_positive(beta, "beta", errors, allow_zero=False)
+    _finite_positive(sigma, "sigma", errors, allow_zero=False)
+    _finite_positive(gamma, "gamma", errors, allow_zero=False)
+    _finite_positive(s0, "S0", errors, allow_zero=True)
+    _finite_positive(i0, "I0", errors, allow_zero=True)
+    _finite_positive(e0, "E0", errors, allow_zero=True)
+    _finite_positive(r0_recovered, "R0_recovered", errors, allow_zero=True)
+
     if errors:
         return ParameterValidation(ok=False, errors=errors)
 
@@ -818,8 +822,7 @@ def validate_pcr_params(n0: float, efficiency: float,
     """
     errors: List[str] = []
 
-    if not _finite_positive(n0, "n0", errors, allow_zero=False):
-        errors.append("n0 must be finite and positive")
+    _finite_positive(n0, "n0", errors, allow_zero=False)
 
     if isinstance(efficiency, bool) or not isinstance(efficiency, (int, float)):
         errors.append(
@@ -1080,12 +1083,17 @@ WF_PLAUSIBLE_MAX_GENERATIONS = 10_000
 # heterozygosity too large for a meaningful estimate; flagged, not rejected.
 WF_PLAUSIBLE_MIN_REPLICATE_RUNS = 10
 
+# More than 0.01 per-generation mutation rate is biologically implausible
+# for most teaching scenarios, but the simulation is valid and will run.
+WF_PLAUSIBLE_MAX_MUTATION_RATE = 0.01
+
 
 def validate_wright_fisher_params(
     population_size: int,
     starting_frequency: float,
     generations: int,
     replicate_runs: int = 1,
+    mutation_rate: float = 0.0,
 ) -> ParameterValidation:
     """Check a Wright-Fisher neutral-drift parameter set.
 
@@ -1094,6 +1102,7 @@ def validate_wright_fisher_params(
         * ``starting_frequency`` is boolean, not a finite float, or outside [0, 1]
         * ``generations`` is boolean, not an integer, or < 1
         * ``replicate_runs`` is boolean, not an integer, or < 1
+        * ``mutation_rate`` is boolean, NaN, infinite, < 0, or > 1
 
     Flags (``ok=True, flagged=True``):
         * ``population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE`` — drift
@@ -1103,6 +1112,8 @@ def validate_wright_fisher_params(
         * ``generations > WF_PLAUSIBLE_MAX_GENERATIONS`` — valid, may be slow
         * ``replicate_runs < WF_PLAUSIBLE_MIN_REPLICATE_RUNS`` — standard
           error of mean heterozygosity will be large
+        * ``mutation_rate > WF_PLAUSIBLE_MAX_MUTATION_RATE`` — biologically
+          implausible, mutation will dominate drift
     """
     errors: List[str] = []
 
@@ -1153,6 +1164,24 @@ def validate_wright_fisher_params(
         errors.append(
             f"replicate_runs must be >= 1 (got {replicate_runs})")
 
+    # --- mutation_rate ---
+    if isinstance(mutation_rate, (bool, np.bool_)):
+        errors.append("mutation_rate must be a number, not a boolean")
+    elif not isinstance(mutation_rate, (int, float, np.integer, np.floating)):
+        errors.append(
+            f"mutation_rate must be a number, got "
+            f"{type(mutation_rate).__name__}")
+    elif math.isnan(mutation_rate):
+        errors.append("mutation_rate must not be NaN")
+    elif math.isinf(mutation_rate):
+        errors.append("mutation_rate must be finite")
+    elif mutation_rate < 0.0:
+        errors.append(
+            f"mutation_rate must be >= 0 (got {mutation_rate})")
+    elif mutation_rate > 1.0:
+        errors.append(
+            f"mutation_rate must be <= 1 (got {mutation_rate})")
+
     if errors:
         return ParameterValidation(ok=False, errors=errors)
 
@@ -1187,6 +1216,12 @@ def validate_wright_fisher_params(
             f"replicate_runs={replicate_runs} is below "
             f"{WF_PLAUSIBLE_MIN_REPLICATE_RUNS}; the standard error "
             "of mean heterozygosity will be large")
+    if mutation_rate > WF_PLAUSIBLE_MAX_MUTATION_RATE:
+        v.flagged = True
+        flag_reasons.append(
+            f"mutation_rate={mutation_rate} exceeds "
+            f"{WF_PLAUSIBLE_MAX_MUTATION_RATE}; mutation will "
+            "dominate drift")
 
     if flag_reasons:
         v.flag_reason = "; ".join(flag_reasons)
@@ -1198,6 +1233,7 @@ def simulate_wright_fisher(
     starting_frequency: float,
     generations: int,
     replicate_runs: int = 1,
+    mutation_rate: float = 0.0,
     seed: int | None = None,
 ) -> SimulationResult:
     """Simulate neutral genetic drift in a diploid Wright-Fisher population.
@@ -1211,13 +1247,16 @@ def simulate_wright_fisher(
     one row per generation (from 0 to ``generations`` inclusive),
     aggregated across all replicate populations. Once a replicate fixes
     (frequency reaches 0.0 or 1.0), its frequency holds at that value for
-    all subsequent generations.
+    all subsequent generations (unless mutation reintroduces the other
+    allele).
 
     Args:
         population_size: number of diploid individuals (N); 2N allele copies
         starting_frequency: initial frequency of allele A, in [0, 1]
         generations: number of generations to simulate forward
         replicate_runs: number of independent replicate populations
+        mutation_rate: per-generation probability of mutation per allele
+            copy (symmetric, forward and backward); 0 = neutral drift
         seed: optional seed for reproducibility; passed to
             ``numpy.random.default_rng``
 
@@ -1228,7 +1267,8 @@ def simulate_wright_fisher(
         ModelBuildError: if parameters are invalid
     """
     validation = validate_wright_fisher_params(
-        population_size, starting_frequency, generations, replicate_runs)
+        population_size, starting_frequency, generations, replicate_runs,
+        mutation_rate)
     validation.raise_if_invalid()
 
     rng = np.random.default_rng(seed)
@@ -1257,6 +1297,15 @@ def simulate_wright_fisher(
         if gen < generations:
             # Binomial sampling: draw 2N allele copies for each replicate
             counts = rng.binomial(two_n, frequencies)  # shape (replicate_runs,)
+
+            if mutation_rate > 0.0:
+                # Symmetric mutation: each allele copy mutates to the other
+                # with probability mutation_rate.
+                n_a_copies = two_n - counts
+                mut_A_to_a = rng.binomial(counts, mutation_rate)
+                mut_a_to_A = rng.binomial(n_a_copies, mutation_rate)
+                counts = counts - mut_A_to_a + mut_a_to_A
+
             frequencies = counts.astype(np.float64) / two_n
 
     return SimulationResult(

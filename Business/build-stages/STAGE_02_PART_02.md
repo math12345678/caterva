@@ -183,6 +183,31 @@ population size ($N_e$) corrections — census size $N$ only. No changes
 outside `Tellurium/tellurium_engine.py` and its tests. No new runtime
 dependency (`numpy` already declared).
 
+**Amendment (2026-07-30, found during "audit and polish" pass):** a
+`mutation_rate` parameter (symmetric per-allele-copy mutation each
+generation, `WF_PLAUSIBLE_MAX_MUTATION_RATE = 0.01`) was added to both
+`validate_wright_fisher_params` and `simulate_wright_fisher` after this
+spec was written — despite this section explicitly listing mutation as
+out of scope. This is flagged here rather than silently accepted, per
+Rule 9 (judgment calls get flagged, not silently made) and review
+checklist item 9 (diff scope must match the spec's stated out-of-scope
+boundaries). On inspection: the addition is well-built — 15+ dedicated
+tests covering validation, flagging, `mutation_rate=0.0` producing
+bit-identical output to the original no-mutation behavior (so it's
+additive, not a breaking change to the neutral-drift path this spec
+actually verifies), and its own mutation-test-on-the-mutation-feature
+(`test_mutation_mutation_rate_ignored`). Verification Targets A and B
+(heterozygosity decay, Kimura fixation probability) are unaffected,
+since both are tested at `mutation_rate=0.0`, the default. This is
+recorded as a real scope deviation from this document, not retroactively
+edited into the original spec above — the constitution's ADR rule (Rule
+8) exists precisely so this kind of expansion is visible, not folded in
+as if it had been planned from the start. No corrective action taken
+beyond this note, since the deviation is additive, tested, and doesn't
+compromise anything this spec verifies — but it should inform Stage 3's
+scoping discipline: state what's out of scope, and if it changes anyway,
+say so here, not just in a commit message.
+
 ## 10. DELIVERABLES CHECKLIST
 
 - [ ] `validate_wright_fisher_params()`, `simulate_wright_fisher()` in

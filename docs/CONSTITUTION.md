@@ -250,3 +250,21 @@ they happen:
   Added edge-case test coverage to the Wright-Fisher domain (N=1, minimum
   generations, fixed-population stability, odd population size, large-N
   performance).
+- 2026-07 — Full-codebase audit and polish pass. Fixed a real bug: SIR,
+  SEIR, and PCR's validators double-appended error messages (`_finite_
+  positive` already appends a specific message on failure; the callers
+  appended a second, generic one on top), producing redundant text in
+  `ModelBuildError`. Michaelis-Menten's validator never had this bug —
+  the others now match its pattern. Fixed the module-level docstring in
+  `tellurium_engine.py`, stale since Stage 1 (still said "the two Tier-2
+  ODE domains" with three more domains since added). Found, via this
+  audit, that a `mutation_rate` parameter had been added to Wright-Fisher
+  after Stage 2 Part 2's spec explicitly listed mutation as out of scope
+  — well-built and well-tested, but a real scope deviation from the
+  documented spec, flagged in `STAGE_02_PART_02.md` Section 9 rather than
+  silently absorbed. Corrected stale numbers in `README.md` (test counts,
+  a domain list that included molecular dynamics setup, which was never
+  built). This is the review checklist (Section 5) and Rule 9 (judgment
+  calls flagged, not silently made) applied retroactively across the
+  whole repo, not just to the most recent stage's diff — worth doing
+  periodically, not only at each stage's close.

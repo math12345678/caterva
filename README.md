@@ -5,9 +5,9 @@ language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
 been independently checked.
 
-Six launch domains: enzyme kinetics, SIR/SEIR epidemiological modeling, PCR
-amplification, Monte Carlo simulation, population genetics, and molecular
-dynamics setup.
+Five launch domains built so far: enzyme kinetics, SIR/SEIR epidemiological
+modeling, PCR amplification, Monte Carlo simulation, and population genetics.
+Molecular dynamics setup is a candidate for the next domain, not yet built.
 
 ## Quick start
 
@@ -16,7 +16,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 512 tests
+make test      # runs all 524 tests
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -94,7 +94,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              385 tests
+│   └── tests/              400 tests (399 run, 1 skipped)
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
 │   └── ...                 124 tests
@@ -119,10 +119,16 @@ claims are verified against one of:
 - **Physical invariants** — mass and population conservation, monotonicity,
   non-negativity — checked across the input space with Hypothesis.
 
-The suite has been mutation-tested: 13 deliberate scientific errors were
-injected into the engine (breaking the rate law, driving SEIR infection off the
-exposed compartment instead of the infectious one, disabling validation,
-loosening solver tolerances). All 13 were caught.
+The suite is mutation-tested: deliberate scientific errors are injected into
+the engine (breaking the rate law, driving SEIR infection off the exposed
+compartment instead of the infectious one, disabling validation, loosening
+solver tolerances, dropping the diploid factor of 2 in Wright-Fisher's
+binomial sampling) and confirmed caught, one at a time, as each domain is
+built. Every mutation claimed in an implementation report is independently
+reproduced by a reviewer before being trusted — see
+`Business/build-stages/STAGE_01_PART_04.md` and `STAGE_02_PART_04.md` for
+the worked examples, including two cases where the original claimed blast
+radius was wrong and got corrected.
 
 ## Two gotchas worth knowing
 
