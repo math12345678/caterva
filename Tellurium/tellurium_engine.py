@@ -92,6 +92,7 @@ __all__ = [
     "list_scenarios",
     "wright_fisher_scenario",
     "kimura_fixation_probability",
+    "wright_stationary_distribution",
 ]
 
 
@@ -427,6 +428,115 @@ class SimulationResult:
             "bin_edges": [float(e) for e in edges],
             "counts": [int(c) for c in hist],
             "n_observations": len(freqs),
+        }
+
+    def estimate_ne(self) -> Dict[str, Any]:
+        """Estimate the effective population size from the rate of
+        heterozygosity decay.
+
+        Under neutral drift the expected heterozygosity decays as
+        ``H_t = H_0 * (1 - 1/(2N))^t``, so a linear regression of
+        ``ln(H_t)`` on ``t`` gives ``slope = ln(1 - 1/(2N))`` and
+        ``Ne_hat = 1 / (2 * (1 - exp(slope)))``.
+
+        Returns a dict with ``method`` ("heterozygosity_decay"),
+        ``ne_estimate``, ``decay_rate_per_generation``,
+        ``n_generations_used``, and a note that selection, mutation,
+        and migration bias the estimate. Use ``estimate_ne_variance()``
+        for the variance method (requires replicate data).
+
+        Returns ``{"error": ...}`` when fewer than 3 non-zero
+        heterozygosity values are available.
+        """
+        H = np.asarray(self.column("heterozygosity"), dtype=np.float64)
+        t = np.arange(len(H))
+        valid = H > 1e-12
+        if np.sum(valid) < 3:
+            return {
+                "error": "at least 3 non-zero heterozygosity values "
+                         "are required"}
+        slope, _ = np.polyfit(t[valid], np.log(H[valid]), 1)
+        decay = math.exp(slope)
+        ne = 1.0 / (2.0 * (1.0 - decay))
+        return {
+            "method": "heterozygosity_decay",
+            "ne_estimate": float(ne),
+            "decay_rate_per_generation": float(decay),
+            "n_generations_used": int(np.sum(valid)),
+            "note": ("inbreeding-effective size from heterozygosity "
+                     "decay; biased by selection, mutation, and "
+                     "migration"),
+        }
+
+    def estimate_ne_variance(self) -> Dict[str, Any]:
+        """Estimate the effective population size from the variance of
+        allele frequency change across replicates (the variance method,
+        Nei & Tajima 1981).
+
+        Requires ``return_replicate_data=True`` at simulation time.
+
+        For each generation interval ``t -> t+1``, the per-replicate
+        frequency change has variance ``Var(Δp) = p(1-p) / (2 Ne)``
+        under pure drift, giving per-generation estimates
+        ``Ne_hat = mean(p(1-p)) / (2 * Var(Δp))``. Generations with
+        ``Var(Δp) = 0`` (no drift observed) are excluded.
+
+        NOTE: this estimator is biased upward as drift accumulates
+        (observed ``p_bar(1-p_bar)`` overestimates ``E[p(1-p)]``), so
+        prefer ``estimate_ne()`` for a quantitative answer; this method
+        is provided for teaching the classical estimator.
+
+        Returns a dict with ``ne_estimate`` (mean over usable
+        generation intervals), ``per_generation_ne``, ``n_generations``
+        (usable intervals), ``n_replicates``.
+
+        Returns ``{"error": ...}`` when replicate data is missing or
+        there are too few replicates (< 2).
+        """
+        if self.replicate_data is None or len(self.replicate_data) < 2:
+            return {
+                "error": "estimate_ne_variance requires "
+                         "return_replicate_data=True and at least 2 "
+                         "recorded generations"}
+        freqs = np.asarray(
+            [row[1:] for row in self.replicate_data], dtype=np.float64)
+        if freqs.shape[0] < 3:
+            return {"error": "at least 3 generations are required"}
+        if freqs.shape[1] < 2:
+            return {"error": "at least 2 replicates are required"}
+        if self.wright_fisher_params is None:
+            return {"error": "no Wright-Fisher parameters stored"}
+
+        # Unstructured replicates only: demes within a replicate are not
+        # independent drift units, so pool only across replicate index
+        structured = self.wright_fisher_params.get("n_demes", 1) > 1
+        if structured:
+            reps = self.wright_fisher_params.get("replicate_runs", 1)
+            n_demes = self.wright_fisher_params.get("n_demes", 1)
+            if freqs.shape[1] != reps * n_demes:
+                return {"error": "replicate_data shape unexpected"}
+            # Mean across demes per replicate -> one frequency per replicate
+            freqs = freqs.reshape(freqs.shape[0], reps, n_demes).mean(axis=2)
+
+        deltas = np.diff(freqs, axis=0)  # shape (gens-1, reps)
+        p_mean = freqs[:-1].mean(axis=1)  # mean p at start of each interval
+        pq_mean = (p_mean * (1.0 - p_mean))
+        var_delta = deltas.var(axis=1, ddof=1)  # per-interval variance
+
+        usable = (var_delta > 0.0) & (pq_mean > 0.0)
+        if not np.any(usable):
+            return {"error": "no usable generation intervals "
+                             "(zero variance in frequency change)"}
+        per_gen_ne = np.where(usable, pq_mean / (2.0 * var_delta), np.nan)
+        ne_estimate = float(np.nanmean(per_gen_ne))
+        return {
+            "ne_estimate": ne_estimate,
+            "per_generation_ne": [float(x) for x in per_gen_ne],
+            "n_generations_used": int(np.sum(usable)),
+            "n_replicates": int(freqs.shape[1]),
+            "note": ("variance-method estimate (Nei & Tajima 1981); "
+                     "biased upward as drift accumulates — prefer "
+                     "estimate_ne() for quantitative work"),
         }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -1413,6 +1523,7 @@ def validate_wright_fisher_params(
     population_size_series: Optional[Sequence[int]] = None,
     n_demes: int = 1,
     migration_rate: float = 0.0,
+    migration_model: str = "island",
 ) -> ParameterValidation:
     """Check a Wright-Fisher neutral-drift parameter set.
 
@@ -1428,6 +1539,9 @@ def validate_wright_fisher_params(
           its length does not match ``generations + 1``
         * ``n_demes`` is boolean, not an integer, or < 1
         * ``migration_rate`` is boolean, NaN, infinite, or outside [0, 1]
+        * ``migration_model`` is not "island" or "stepping-stone"
+        * ``migration_model="stepping-stone"`` with ``n_demes < 3``
+          (a ring of fewer than 3 demes is degenerate)
 
     Flags (``ok=True, flagged=True``):
         * ``population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE`` — drift
@@ -1572,6 +1686,20 @@ def validate_wright_fisher_params(
         errors.append(
             f"migration_rate must be in [0, 1] (got {migration_rate})")
 
+    # --- migration_model ---
+    if not isinstance(migration_model, str):
+        errors.append(
+            f"migration_model must be a string, got "
+            f"{type(migration_model).__name__}")
+    elif migration_model not in ("island", "stepping-stone"):
+        errors.append(
+            f"migration_model must be 'island' or 'stepping-stone' "
+            f"(got {migration_model!r})")
+    elif migration_model == "stepping-stone" and n_demes < 3:
+        errors.append(
+            "migration_model='stepping-stone' requires n_demes >= 3 "
+            "(a ring of fewer than 3 demes is degenerate)")
+
     # --- population_size_series ---
     if population_size_series is not None:
         if not isinstance(population_size_series, (list, tuple, np.ndarray)):
@@ -1653,6 +1781,12 @@ def validate_wright_fisher_params(
             f"|selection_coefficient|={abs(selection_coefficient)} "
             f"exceeds {WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT}; "
             "selection will dominate drift")
+    if dominance is not None and dominance > 1.0:
+        v.flagged = True
+        flag_reasons.append(
+            f"dominance={dominance} exceeds 1; heterozygote fitness is "
+            "not intermediate between the homozygotes "
+            "(overdominance if s > 0, underdominance if s < 0)")
     if migration_rate > WF_PLAUSIBLE_MAX_MUTATION_RATE:
         v.flagged = True
         flag_reasons.append(
@@ -1678,6 +1812,7 @@ def simulate_wright_fisher(
     population_size_series: Optional[Sequence[int]] = None,
     n_demes: int = 1,
     migration_rate: float = 0.0,
+    migration_model: str = "island",
     verbose: bool = False,
 ) -> SimulationResult:
     """Simulate genetic drift in a diploid Wright-Fisher population, with
@@ -1689,9 +1824,12 @@ def simulate_wright_fisher(
            ``Binomial(2N, p_adj)`` from the post-selection frequency.
         3. Mutation — each copy mutates to the other allele with
            probability ``mutation_rate``.
-        4. Migration (when ``n_demes > 1``) — each deme exchanges a
-           fraction ``migration_rate`` of its alleles with the global
-           pool (Wright's island model).
+        4. Migration (when ``n_demes > 1``) — allele exchange between
+           demes. ``migration_model="island"`` (default) exchanges a
+           fraction ``migration_rate`` of each deme's alleles with the
+           global pool (Wright's island model);
+           ``migration_model="stepping-stone"`` arranges the demes on a
+           ring and exchanges each deme with its two neighbours only.
 
     When ``selection_coefficient=0`` and ``dominance=None`` (the defaults),
     selection is skipped and the model reduces to neutral drift.
@@ -1717,6 +1855,12 @@ def simulate_wright_fisher(
     from the global pool each generation. When ``n_demes = 1`` (default)
     the model reduces to the standard panmictic WF population.
 
+    Use ``migration_model="stepping-stone"`` to arrange the demes on a
+    ring instead: each deme exchanges a fraction ``migration_rate/2``
+    of its allele pool with each of its two immediate neighbours,
+    so allele flow is local rather than global. Requires
+    ``n_demes >= 3``.
+
     Set ``verbose=True`` to print progress per 10 % of generations
     (useful for long simulations with thousands of generations).
 
@@ -1739,14 +1883,18 @@ def simulate_wright_fisher(
         selection_coefficient: selective advantage of allele A (s);
             positive = beneficial, negative = deleterious; must be > -1
         dominance: dominance coefficient (h) for diploid selection;
-            None = haploid selection; in [0, 1] for diploid
+            None = haploid selection; in [0, 2] for diploid
+            (h > 1 = overdominance when s > 0, underdominance when s < 0)
         seed: optional seed for reproducibility; passed to
             ``numpy.random.default_rng``
         return_replicate_data: if True, store per-replicate frequencies
         population_size_series: time-varying N per generation
         n_demes: number of demes per replicate (1 = panmictic)
-        migration_rate: fraction of alleles exchanged with the global
-            pool each generation, in [0, 1]
+        migration_rate: fraction of alleles exchanged per generation,
+            in [0, 1]
+        migration_model: "island" (global pool) or "stepping-stone"
+            (ring of neighbours); requires n_demes >= 3 for
+            "stepping-stone"
         verbose: if True, print progress every 10 % of generations
 
     Returns:
@@ -1758,7 +1906,7 @@ def simulate_wright_fisher(
     validation = validate_wright_fisher_params(
         population_size, starting_frequency, generations, replicate_runs,
         mutation_rate, selection_coefficient, dominance,
-        population_size_series, n_demes, migration_rate)
+        population_size_series, n_demes, migration_rate, migration_model)
     validation.raise_if_invalid()
 
     rng = np.random.default_rng(seed)
@@ -1896,11 +2044,21 @@ def simulate_wright_fisher(
 
             frequencies = counts.astype(np.float64) / two_n_gen
 
-            # Step 4: Migration (island model) — vectorized across replicates
+            # Step 4: Migration — island model (global pool) or
+            # stepping-stone (ring of neighbours), vectorized across
+            # replicates
             if structured and migration_rate > 0.0:
                 m = migration_rate
-                p_global = np.mean(frequencies, axis=1, keepdims=True)
-                frequencies = (1.0 - m) * frequencies + m * p_global
+                if migration_model == "island":
+                    p_global = np.mean(frequencies, axis=1, keepdims=True)
+                    frequencies = (1.0 - m) * frequencies + m * p_global
+                else:
+                    p_left = np.roll(frequencies, 1, axis=1)
+                    p_right = np.roll(frequencies, -1, axis=1)
+                    frequencies = (
+                        (1.0 - m) * frequencies
+                        + (m / 2.0) * p_left
+                        + (m / 2.0) * p_right)
 
         if verbose and generations > 0 and (
                 gen % report_interval == 0 or gen == generations):
@@ -1945,6 +2103,7 @@ def simulate_wright_fisher(
         "population_size_series": population_size_series,
         "n_demes": n_demes,
         "migration_rate": migration_rate,
+        "migration_model": migration_model,
         "fixation_gen_A": fixation_gen_A.tolist(),
         "fixation_gen_a": fixation_gen_a.tolist(),
         "final_frequencies": frequencies.flatten().tolist(),
@@ -2054,6 +2213,25 @@ _SCENARIO_REGISTRY: Dict[str, Dict[str, Any]] = {
         "generations": 200,
         "replicate_runs": 100,
     },
+    "balancing-selection": {
+        "description": "Overdominance (h=2, s=0.2): heterozygote advantage keeps both alleles at p*=2/3",
+        "population_size": 100,
+        "starting_frequency": 0.1,
+        "generations": 300,
+        "replicate_runs": 100,
+        "selection_coefficient": 0.2,
+        "dominance": 2.0,
+    },
+    "stepping-stone": {
+        "description": "Stepping-stone: 10 demes on a ring, m=0.01 — Fst rises faster than island model",
+        "population_size": 100,
+        "starting_frequency": 0.5,
+        "generations": 200,
+        "replicate_runs": 50,
+        "n_demes": 10,
+        "migration_rate": 0.01,
+        "migration_model": "stepping-stone",
+    },
 }
 
 
@@ -2073,8 +2251,9 @@ def wright_fisher_scenario(
         - neutral-drift, rapid-drift
         - mutation-drift
         - weak-selection, strong-selection, purifying-selection
+        - balancing-selection (overdominance, h=2)
         - bottleneck
-        - island-model, structured-neutral
+        - island-model, structured-neutral, stepping-stone
         - founder-effect, population-expansion
 
     Any keyword ``**overrides`` is merged into the scenario's parameter
@@ -2217,3 +2396,58 @@ def kimura_fixation_probability(
     if den == 0.0:
         return 1.0
     return float(num / den)
+
+
+# ---------------------------------------------------------------------------
+# Wright's stationary distribution (mutation-drift balance)
+# ---------------------------------------------------------------------------
+
+
+def wright_stationary_distribution(
+    points: Sequence[float],
+    mutation_rate: float,
+    population_size: int,
+) -> List[float]:
+    """Wright's (1931) stationary distribution of allele frequency under
+    mutation-drift balance.
+
+    For a diploid population of size N with per-copy symmetric mutation
+    rate u, the equilibrium distribution of allele frequency is
+    Beta(4Nu, 4Nu)::
+
+        phi(p) = C * p^(4Nu-1) * (1-p)^(4Nu-1)
+
+    where C normalizes the density. With 4Nu < 1 the density is
+    unbounded at the edges (most populations fixed); with 4Nu > 1 it is
+    a single central hump (polymorphism maintained).
+
+    Args:
+        points: frequencies at which to evaluate the density
+        mutation_rate: per-copy symmetric mutation rate u
+        population_size: diploid census size N
+
+    Returns:
+        the density evaluated at each point (0.0 outside (0, 1),
+        math.inf at the boundaries when 4Nu < 1)
+
+    Raises:
+        ValueError: if mutation_rate or population_size is not positive
+    """
+    if mutation_rate <= 0.0:
+        raise ValueError("mutation_rate must be > 0")
+    if population_size <= 0:
+        raise ValueError("population_size must be positive")
+
+    a = 4.0 * mutation_rate * population_size
+    from scipy.special import gammaln
+    log_norm = gammaln(2.0 * a) - 2.0 * gammaln(a)
+
+    out: List[float] = []
+    for p in points:
+        if p <= 0.0 or p >= 1.0:
+            out.append(0.0 if a > 1.0 else math.inf)
+        else:
+            log_d = ((a - 1.0) * math.log(p)
+                     + (a - 1.0) * math.log(1.0 - p) + log_norm)
+            out.append(math.exp(log_d))
+    return out

@@ -44,8 +44,11 @@ def _build_wf_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--n-demes", type=int, metavar="D",
                    help="number of demes per replicate (default 1)")
     p.add_argument("--migration-rate", type=float, metavar="M",
-                   help="fraction of alleles exchanged with the global pool "
-                        "per generation (default 0)")
+                   help="fraction of alleles exchanged per generation "
+                        "(default 0)")
+    p.add_argument("--migration-model", metavar="MODEL",
+                   help="'island' (global pool, default) or "
+                        "'stepping-stone' (ring of neighbours)")
     p.add_argument("--seed", type=int, metavar="N",
                    help="RNG seed for reproducibility")
     p.add_argument("--out", metavar="FILE",
@@ -94,6 +97,7 @@ def _cmd_wf(args: argparse.Namespace) -> int:
         ("dominance", "dominance"),
         ("n_demes", "n_demes"),
         ("migration_rate", "migration_rate"),
+        ("migration_model", "migration_model"),
     ):
         value = getattr(args, attr)
         if value is not None:
