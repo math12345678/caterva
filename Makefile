@@ -6,7 +6,7 @@ VENV    := .venv
 BIN     := $(VENV)/bin
 
 .DEFAULT_GOAL := help
-.PHONY: help setup check test test-fast test-sim test-lit test-slow clean
+.PHONY: help setup check test test-fast test-sim test-lit test-slow cli clean
 
 help:
 	@echo "Terrium"
@@ -17,6 +17,7 @@ help:
 	@echo "  make test-fast  skip the slow property/robustness suites"
 	@echo "  make test-sim   simulation engine only (Tellurium/)"
 	@echo "  make test-lit   literature layer only (Tests/)"
+	@echo "  make cli        Tellurium CLI help (python -m Tellurium.cli)"
 	@echo "  make clean      remove caches and build artifacts"
 	@echo ""
 	@echo "First time here? Run: make setup && make check && make test"
@@ -62,6 +63,14 @@ test-lit:
 test-slow:
 	@cd Tellurium && $(PY) -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
+
+cli:
+	@$(PY) -m Tellurium.cli --help
+	@echo ""
+	@echo "Examples:"
+	@echo "  python -m Tellurium.cli wf --population-size 100 --generations 200 --seed 42"
+	@echo "  python -m Tellurium.cli wf --scenario bottleneck --out results.csv"
+	@echo "  python -m Tellurium.cli kimura --p0 0.3 --s 0.03 --population-size 50"
 
 clean:
 	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true

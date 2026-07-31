@@ -28,15 +28,113 @@ what's outright impossible.
 Returned by every `simulate_*` function.
 
 ```python
-result.colnames        # list[str] - column names, e.g. ["time", "[S]"]
-result.data            # list[list[float]] - one row per time/cycle point
-result.model_name       # str
-result.flagged          # bool - shortcut for result.validation.flagged
-result.column("S")      # list[float] - tolerates roadrunner's "[S]" form
-result.time             # list[float] - shortcut for result.column("time")
-result.final("S")       # float - last value of a column
-len(result)             # number of rows
+result.colnames                   # list[str] - column names, e.g. ["time", "[S]"]
+result.data                       # list[list[float]] - one row per time/cycle point
+result.model_name                 # str
+result.flagged                    # bool - shortcut for result.validation.flagged
+result.column("S")                # list[float] - tolerates roadrunner's "[S]" form
+result.time                       # list[float] - shortcut for result.column("time")
+result.final("S")                 # float - last value of a column
+result.describe()                 # str - human-readable multi-line summary
+result.summarize()                # dict - key result stats (mean, SE, fixation counts)
+result.replicate_data             # list[list[float]] | None - per-replicate freqs
+result.replicate_colnames         # list[str] | None - column names for replicate_data
+
+# Wright-Fisher specific (None / empty for other model types)
+result.wright_fisher_params       # dict | None - all WF input params + fixation tracking
+result.fixation_analysis()        # dict - per-replicate fixation times, proportions
+result.theoretical_heterozygosity() # list[float] - expected H under neutral drift
+result.theoretical_frequency()    # list[float] - deterministic p under selection
+result.allele_frequency_spectrum(generation=None, bins=10)  # dict - frequency distribution
+result.to_dict()                  # dict - JSON-serializable whole result
+result.to_csv("out.csv", include_replicate_data=False)  # str - path written
+result.to_json("out.json")        # str - JSON string (also written to path)
+
+len(result)                       # number of rows
 ```
+
+Wright-Fisher result methods:
+
+- ``result.wright_fisher_params`` -- dict of all WF input parameters
+  (``population_size``, ``starting_frequency``, ``generations``,
+  ``replicate_runs``, ``mutation_rate``, ``selection_coefficient``,
+  ``dominance``, ``population_size_series``, ``n_demes``,
+  ``migration_rate``) plus ``fixation_gen_A`` and ``fixation_gen_a``
+  (list of the first generation each replicate reached frequency 1.0
+  or 0.0, or -1 if never fixed within the simulation window), and
+  ``final_frequencies`` (per-replicate final allele frequencies,
+  pooled across demes for structured populations).
+
+- ``result.fixation_analysis()`` -- returns a dict with ``n_replicates``,
+  ``n_fixed_A``, ``n_fixed_a``, ``n_polymorphic``, ``prop_fixed_A``,
+  ``prop_fixed_a``, and when replicates fixed: ``mean_fixation_time_A``,
+  ``sd_fixation_time_A``, ``min/max_fixation_time_A`` (and the
+  corresponding keys for allele a).
+
+- ``result.theoretical_heterozygosity()`` -- for neutral drift without
+  selection or mutation, returns ``[H_0, H_1, ..., H_generations]``
+  where ``H_t = H_0 * (1 - 1/(2N))^t`` (cumulative product for
+  time-varying N). Returns empty list when selection or mutation is
+  active.
+
+- ``result.theoretical_frequency()`` -- when selection is active and
+  mutation is off, returns the deterministic frequency trajectory
+  under selection (haploid closed-form or diploid iterative). Returns
+  empty list for neutral or mutation-active simulations.
+
+- Enhanced ``result.describe()`` -- includes expected heterozygosity
+  (neutral drift), fixation proportions, and mean fixation times when
+  available.
+
+- Enhanced ``result.summarize()`` -- includes
+  ``expected_heterozygosity_final``, ``expected_heterozygosity_trajectory``
+  (neutral drift), ``expected_frequency_final``,
+  ``expected_frequency_trajectory`` (selection), and a ``fixation`` dict
+  with full fixation analysis.
+
+- ``result.allele_frequency_spectrum(generation=None, bins=10)`` --
+  returns the distribution of allele A frequencies across replicates:
+  ``{"generation", "bin_edges", "counts", "n_observations"}``. Defaults
+  to the final generation (from ``final_frequencies``, always
+  available); other generations require ``return_replicate_data=True``.
+  Structured populations pool all demes.
+
+- ``result.to_dict()`` / ``result.to_csv(path, include_replicate_data=False)``
+  / ``result.to_json(path=None)`` -- export the result. ``to_csv`` writes
+  the main table; with ``include_replicate_data=True`` it also writes
+  ``<stem>_replicates.csv``. ``to_json`` returns (and optionally writes)
+  a JSON document with everything, including WF parameters.
+
+## Kimura fixation probability
+
+```python
+kimura_fixation_probability(
+    starting_frequency: float,
+    selection_coefficient: float,
+    population_size: int,
+    dominance: float | None = None,
+) -> float
+```
+
+Kimura's (1962) probability that allele A fixes under selection and
+drift, given its initial frequency p0, selection coefficient s, and
+population size N.
+
+- ``dominance=None`` (haploid selection over the 2N allele copies):
+  closed form ``P_fix = (1 - e^(-4Ns·p0)) / (1 - e^(-4Ns))``.
+- ``dominance=h`` (diploid, fitnesses AA: 1+s, Aa: 1+hs, aa: 1):
+  diffusion approximation evaluated numerically,
+  ``P_fix(p0) = ∫₀^p0 G(x)dx / ∫₀^1 G(x)dx`` with
+  ``G(x) = exp(-4Ns(h·x + (1-2h)·x²/2))``. Verified against simulation
+  within ~0.01 for weak-to-moderate selection.
+- ``s=0`` returns ``p0`` (neutral); very strong selection saturates at
+  1.0 (positive) or 0.0 (negative).
+- Raises ``ValueError`` for invalid parameters (N <= 0, p0 outside
+  [0, 1], s <= -1, h outside [0, 1]).
+
+Useful for teaching the classic "selection vs drift" comparison: run a
+simulation, compare ``fixation_analysis()["prop_fixed_A"]`` against the
+Kimura prediction, then try other values of s.
 
 ## Enzyme kinetics (Michaelis-Menten)
 
@@ -169,6 +267,11 @@ validate_wright_fisher_params(
     generations: int,
     replicate_runs: int = 1,
     mutation_rate: float = 0.0,
+    selection_coefficient: float = 0.0,
+    dominance: float | None = None,
+    population_size_series: Sequence[int] | None = None,
+    n_demes: int = 1,
+    migration_rate: float = 0.0,
 ) -> ParameterValidation
 
 simulate_wright_fisher(
@@ -177,7 +280,14 @@ simulate_wright_fisher(
     generations: int,
     replicate_runs: int = 1,
     mutation_rate: float = 0.0,
+    selection_coefficient: float = 0.0,
+    dominance: float | None = None,
     seed: int | None = None,
+    return_replicate_data: bool = False,
+    population_size_series: Sequence[int] | None = None,
+    n_demes: int = 1,
+    migration_rate: float = 0.0,
+    verbose: bool = False,
 ) -> SimulationResult
 ```
 
@@ -186,10 +296,14 @@ process (binomial sampling each generation). Same category as PCR and Monte
 Carlo. See ``docs/adr/0002-pcr-not-modeled-as-an-ode.md`` and
 ``docs/adr/0005-rng-convention.md``.
 
-Models neutral drift (optionally with symmetric mutation) at a single
-biallelic locus in a diploid Wright-Fisher population. Each generation,
-the next generation's ``2N`` allele copies are drawn
-``Binomial(2N, p_t)`` from the current generation's allele pool.
+Models evolution at a single biallelic locus in a diploid Wright-Fisher
+population, with optional symmetric mutation and natural selection.
+Each generation follows three steps:
+1. Selection — fitness differences change the expected frequency.
+2. Reproduction — the next generation's ``2N`` allele copies are drawn
+   ``Binomial(2N, p_adj)`` from the post-selection frequency.
+3. Mutation — each copy mutates to the other allele with probability
+   ``mutation_rate``.
 
 - ``population_size`` -- diploid census size N, must be a positive integer.
   Below 10 (``WF_PLAUSIBLE_MIN_POPULATION_SIZE``) is flagged -- drift is
@@ -206,14 +320,48 @@ the next generation's ``2N`` allele copies are drawn
   allele copy (default 0 = neutral drift). Must be in ``[0, 1]``.
   Above ``WF_PLAUSIBLE_MAX_MUTATION_RATE (0.01)`` is flagged --
   biologically implausible, mutation will dominate drift.
+- ``selection_coefficient`` -- selective advantage of allele A (s),
+  default 0 = neutral. Must be > -1. ``|s| > 0.5`` is flagged --
+  implausibly strong selection for most teaching scenarios.
+- ``dominance`` -- dominance coefficient (h) for diploid selection;
+  ``None`` (default) = haploid selection ``p' = p(1+s)/(1+ps)``;
+  in ``[0, 1]`` for diploid selection with fitnesses ``AA: 1+s``,
+  ``Aa: 1+hs``, ``aa: 1``.
 - ``seed`` -- optional RNG seed per ADR 0005. Omit for nondeterministic
   output.
+- ``return_replicate_data`` -- if ``True``, store per-replicate allele
+  frequencies in ``result.replicate_data`` (columns: generation,
+  rep_0, rep_1, ..., rep_{replicate_runs-1}). Off by default --
+  storage scales as O(generations x replicate_runs).
+- ``population_size_series`` -- time-varying N, a sequence of length
+  ``generations + 1`` where each entry is the census size N for that
+  generation. Must contain only positive integers. Overrides the
+  constant ``population_size`` when given. Use for bottlenecks, founder
+  events, or population expansion.
+- ``n_demes`` -- number of subpopulations (demes) per replicate.
+  ``1`` (default) = standard panmictic population. ``> 1`` activates
+  Wright's island model: demes drift partially independently, and
+  ``migration_rate`` controls the exchange of alleles between them.
+- ``migration_rate`` -- fraction of each deme's allele pool replaced
+  by migrants from the global pool each generation, in ``[0, 1]``.
+  ``0`` (default) = no migration, demes drift independently.
+  Ignored when ``n_demes = 1``.
+- ``verbose`` -- if ``True``, print progress every 10 % of generations
+  (useful for large simulations with thousands of generations).
 
-Result columns are ``["generation", "mean_frequency", "heterozygosity",
-"n_A_fixed", "n_a_fixed"]`` -- one row per generation from 0 to
-``generations`` inclusive. Stats are aggregated across all replicate
-populations: mean frequency, mean heterozygosity, count of populations
-fixed for allele A, count fixed for allele a.
+Result columns for ``n_demes = 1``: ``["generation", "mean_frequency",
+"heterozygosity", "mean_frequency_se", "heterozygosity_se",
+"n_A_fixed", "n_a_fixed"]``.
+
+Result columns for ``n_demes > 1``: the same plus ``"fst"`` and
+``"fst_se"``. Fst (Wright's fixation index) measures population
+differentiation: ``Fst = 1 - Hs/Ht`` where Hs is mean within-deme
+heterozygosity and Ht is total metapopulation heterozygosity.
+
+One row per generation from 0 to ``generations`` inclusive. Stats are
+aggregated across all replicate populations: mean frequency, mean
+heterozygosity, their standard errors (``std(x, ddof=1)/sqrt(reps)``),
+and counts of populations fixed for allele A / allele a.
 
 Verified in ``tests/test_popgen_correctness.py``:
 - Heterozygosity decays at the exact rate ``(1 - 1/(2N))^t`` (Target A,
@@ -223,9 +371,82 @@ Verified in ``tests/test_popgen_correctness.py``:
 - Fixed-seed reproducibility and seed-dependent divergence (Targets C-D).
 - Mutation-drift equilibrium: heterozygosity approaches the predicted
   stationary value ``H_eq = 4Nμ/(8Nμ+1)`` (Target F, within 0.03).
+- Selection-drift balance: fixation probability under haploid selection
+  follows Kimura's formula ``P_fix = (1-e^{-4Nsp_0})/(1-e^{-4Ns})``
+  (Target G, within 0.06).
 - ADR 0005 RNG compliance checked automatically by
   ``scripts/check_rng_convention.py`` and
   ``tests/test_rng_convention.py``.
+
+### Scenario presets for teaching
+
+```python
+list_scenarios() -> list[str]
+
+wright_fisher_scenario(
+    name: str, seed: int | None = None,
+    return_replicate_data: bool = False,
+    **overrides,
+) -> SimulationResult
+```
+
+Run a named teaching scenario without specifying every parameter manually.
+Available scenarios (``list_scenarios()`` returns the current list):
+
+- ``neutral-drift`` -- moderate N, neutral (default params)
+- ``rapid-drift`` -- N=10, drift is fast and visible
+- ``mutation-drift`` -- mutation-drift balance, N=50, μ=0.02
+- ``weak-selection`` -- s=0.03, haploid, slight bias
+- ``strong-selection`` -- s=0.2, haploid, beneficial allele fixes rapidly
+- ``purifying-selection`` -- s=-0.1, haploid, deleterious allele rarely fixes
+- ``bottleneck`` -- N=100 drops to N=5 at generation 50 for 10 gens,
+  then recovers. Uses ``population_size_series`` internally.
+- ``island-model`` -- 10 demes, low migration (m=0.01). Fst tracks
+  differentiation.
+- ``structured-neutral`` -- 10 demes, no migration. Demes drift
+  independently; Fst rises to near 1.
+- ``founder-effect`` -- N=20, rare allele (p0=0.1): drift decides
+  whether the rare allele survives.
+- ``population-expansion`` -- N=10 grows linearly to N=1000 over 200
+  generations (time-varying N): heterozygosity loss slows as N grows.
+
+Any ``**overrides`` are merged into the scenario's parameter dict, so
+callers can tweak e.g. ``generations=100`` without modifying the preset.
+
+```python
+# Quick comparison: neutral vs selection with one seed
+neutral = wright_fisher_scenario("neutral-drift", seed=42)
+selected = wright_fisher_scenario("strong-selection", seed=42)
+```
+
+## Command-line interface
+
+The engine ships a small CLI, runnable as a module:
+
+```bash
+python -m Tellurium.cli scenarios
+python -m Tellurium.cli wf --population-size 100 --generations 200 --seed 42
+python -m Tellurium.cli wf --scenario bottleneck --out results.csv
+python -m Tellurium.cli kimura --p0 0.3 --s 0.03 --population-size 50
+```
+
+- ``scenarios`` -- list the available scenario presets with descriptions.
+- ``wf`` -- run a Wright-Fisher simulation. Either give ``--scenario``
+  (preset, overridable by any other option) or the core parameters
+  ``--population-size`` and ``--generations``. Optional:
+  ``--starting-frequency``, ``--replicate-runs``, ``--mutation-rate``,
+  ``--selection-coefficient``, ``--dominance``, ``--n-demes``,
+  ``--migration-rate``, ``--seed``, ``--out FILE`` (CSV),
+  ``--json FILE`` (full result incl. WF params), ``--replicate-data``,
+  ``--verbose``, ``--quiet``. Prints ``result.describe()`` by default.
+- ``kimura`` -- compute ``kimura_fixation_probability`` for a single
+  ``--s`` or as a sweep over ``--s-start/--s-end/--s-steps`` (prints an
+  ``s`` vs ``P_fix`` table).
+
+Exit codes: 0 success, 1 invalid parameters/unknown scenario,
+2 missing required arguments.
+
+`make cli` prints this help from the repository root.
 
 ## Lower-level: raw SBML operations
 
@@ -268,5 +489,5 @@ validate_sir_params(beta, gamma, s0, i0, r0_recovered=0.0) -> ParameterValidatio
 validate_seir_params(beta, sigma, gamma, s0, e0, i0, r0_recovered=0.0) -> ParameterValidation
 validate_pcr_params(n0, efficiency, cycles) -> ParameterValidation
 validate_monte_carlo_params(n_samples) -> ParameterValidation
-validate_wright_fisher_params(population_size, starting_frequency, generations, replicate_runs=1, mutation_rate=0.0) -> ParameterValidation
+validate_wright_fisher_params(population_size, starting_frequency, generations, replicate_runs=1, mutation_rate=0.0, selection_coefficient=0.0, dominance=None, population_size_series=None, n_demes=1, migration_rate=0.0) -> ParameterValidation
 ```
