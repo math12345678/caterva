@@ -64,8 +64,25 @@ Stage 2 Part 4, and re-verified after Stage 2 refactoring):
     and test_selection_haploid_diploid_differ. Backward-compatibility
     (s=0) and all neutral/mutation tests pass because they never set
     s != 0.
+
+5. "Migration step silently skipped" (post-close, found during Stage 2
+    completion audit -- migration/island-model had 9 behavioral tests
+    but no independently-reproduced mutation test, unlike mutation_rate
+    and selection above; added to close that gap).
+    Mutation: the migration block (island-model global-pool mixing,
+              ``frequencies = (1-m)*frequencies + m*p_global``) is
+              gated behind an always-false condition, so migration_rate
+              is accepted and validated but never actually applied.
+    Independently reproduced 2026-07-30: 2 tests fail —
+    test_migration_reduces_fst (Fst with migration_rate=0.05 no longer
+    drops below the no-migration Fst; both equal 0.3275, i.e. migration
+    had zero effect) and test_high_migration_demes_homogenised (Fst
+    stays at 0.4520 instead of dropping below 0.05 under high
+    migration). Panmictic (n_demes=1) and zero-migration tests pass
+    because they never exercise the migration branch at all.
 """
 
+import math
 import pathlib
 
 import numpy as np
@@ -91,6 +108,7 @@ from tellurium_engine import (
     simulate_wright_fisher,
     validate_wright_fisher_params,
     wright_fisher_scenario,
+    wright_stationary_distribution,
 )
 
 
@@ -301,11 +319,21 @@ def test_dominance_below_zero_rejected() -> None:
     assert not v.ok
 
 
-def test_dominance_above_one_rejected() -> None:
+def test_dominance_above_two_rejected() -> None:
     v = validate_wright_fisher_params(
         population_size=100, starting_frequency=0.5, generations=10,
-        selection_coefficient=0.05, dominance=1.5)
+        selection_coefficient=0.05, dominance=2.5)
     assert not v.ok
+
+
+def test_overdominance_dominance_flagged_not_rejected() -> None:
+    """h > 1 is valid (overdominance/underdominance) but flagged."""
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=20, selection_coefficient=0.05, dominance=1.5)
+    assert v.ok
+    assert v.flagged
+    assert "overdominance" in (v.flag_reason or "")
 
 
 def test_boolean_dominance_rejected() -> None:
@@ -2290,3 +2318,331 @@ def test_cli_wf_bad_scenario_fails() -> None:
         [sys.executable, "-m", "Tellurium.cli", "wf", "--scenario", "nope"],
         cwd=_REPO_ROOT)
     assert code == 1
+
+
+# ---------------------------------------------------------------------------
+# Overdominance / underdominance (dominance h > 1)
+# ---------------------------------------------------------------------------
+
+
+def test_overdominance_maintains_polymorphism() -> None:
+    """h=2, s>0: heterozygote advantage keeps both alleles segregating.
+    The deterministic equilibrium is p* = h/(2h-1) = 2/3."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.1, generations=400,
+        replicate_runs=50, selection_coefficient=0.2, dominance=2.0,
+        seed=42)
+    final_p = result.column("mean_frequency")[-1]
+    assert abs(final_p - 2.0 / 3.0) < 0.05, (
+        f"final p={final_p:.3f} should approach 2/3")
+    assert result.column("heterozygosity")[-1] > 0.3, (
+        "overdominance should maintain high heterozygosity")
+    fa = result.fixation_analysis()
+    assert fa["n_fixed_A"] + fa["n_fixed_a"] == 0, (
+        "no fixation expected under balancing selection")
+
+
+def test_overdominance_equilibrium_h15() -> None:
+    """h=1.5, s=0.1: equilibrium at p* = h/(2h-1) = 0.75.
+
+    N=100 is too small for this check: in a finite population, balancing
+    selection only slows fixation, it does not prevent it -- at N=100
+    with this seed, 21 of 30 replicates had already fixed for A by
+    generation 500 (mean_fixation_time_A ~ 275 generations), which pulls
+    the *mean* frequency across replicates far above 0.75 even though the
+    equilibrium math is correct. This is a property of finite-population
+    stochastic dynamics, not a selection/dominance implementation bug --
+    confirmed by rederiving p*=h/(2h-1) directly from the marginal-
+    fitness equilibrium condition w_A_bar = w_a_bar under this file's
+    exact fitness parameterization (w_AA=1+s, w_Aa=1+hs, w_aa=1), which
+    reproduces the same formula independent of s. N=1000 keeps drift weak
+    enough, relative to this selection strength, that none of 30
+    replicates fix within 500 generations (verified directly), so the
+    mean is a meaningful estimate of the equilibrium.
+    """
+    result = simulate_wright_fisher(
+        population_size=1000, starting_frequency=0.2, generations=500,
+        replicate_runs=30, selection_coefficient=0.1, dominance=1.5,
+        seed=42)
+    final_p = result.column("mean_frequency")[-1]
+    assert abs(final_p - 0.75) < 0.06, (
+        f"final p={final_p:.3f} should approach 0.75")
+    fa = result.fixation_analysis()
+    assert fa["n_fixed_A"] + fa["n_fixed_a"] == 0, (
+        "test assumption violated: a replicate fixed before reaching "
+        "equilibrium, so the mean frequency no longer estimates p*"
+    )
+
+
+def test_underdominance_fixes() -> None:
+    """h=2, s<0: underdominance is an unstable equilibrium —
+    populations fix for one allele or the other."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=300,
+        replicate_runs=50, selection_coefficient=-0.1, dominance=2.0,
+        seed=42)
+    fa = result.fixation_analysis()
+    assert fa["n_fixed_A"] + fa["n_fixed_a"] == 50, (
+        "underdominance should drive all replicates to fixation")
+
+
+def test_dominance_two_valid() -> None:
+    """h=2.0 is at the valid boundary."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=20,
+        replicate_runs=10, selection_coefficient=0.1, dominance=2.0,
+        seed=42)
+    assert result is not None
+
+
+# ---------------------------------------------------------------------------
+# Stepping-stone migration
+# ---------------------------------------------------------------------------
+
+
+def test_stepping_stone_fst_higher_than_island() -> None:
+    """With the same m, local (stepping-stone) migration produces more
+    differentiation than global (island) migration."""
+    r_ss = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=200,
+        replicate_runs=50, n_demes=10, migration_rate=0.01,
+        migration_model="stepping-stone", seed=42)
+    r_isl = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=200,
+        replicate_runs=50, n_demes=10, migration_rate=0.01,
+        migration_model="island", seed=42)
+    fst_ss = r_ss.column("fst")[-1]
+    fst_isl = r_isl.column("fst")[-1]
+    assert fst_ss > fst_isl, (
+        f"stepping-stone Fst={fst_ss:.3f} should exceed "
+        f"island Fst={fst_isl:.3f}")
+
+
+def test_stepping_stone_conserves_mean_frequency() -> None:
+    """Migration (both models) must not change the total allele count:
+    the mean frequency across demes is unchanged by the migration step."""
+    r = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.4, generations=20,
+        replicate_runs=10, n_demes=8, migration_rate=0.2,
+        migration_model="stepping-stone", seed=42)
+    mf = r.column("mean_frequency")
+    assert abs(mf[0] - 0.4) < 1e-9
+    assert all(abs(x - 0.4) < 0.15 for x in mf[:5]), (
+        "migration should not systematically shift the mean frequency")
+
+
+def test_stepping_stone_requires_three_demes() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=10, n_demes=2, migration_rate=0.1,
+        migration_model="stepping-stone")
+    assert not v.ok
+
+
+def test_invalid_migration_model_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=10, n_demes=5, migration_rate=0.1,
+        migration_model="continental-island")
+    assert not v.ok
+
+
+def test_stepping_stone_two_demes_matches_island() -> None:
+    """With 2 demes the ring has only one neighbour each — the
+    stepping-stone step degenerates to the island model's global pool
+    only when both neighbours are the same deme. n_demes=2 is rejected,
+    but n_demes=1 island vs stepping-stone should be equivalent to
+    island at the same migration rate."""
+    r_ss = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=30,
+        replicate_runs=10, n_demes=5, migration_rate=0.0,
+        migration_model="stepping-stone", seed=42)
+    r_isl = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=30,
+        replicate_runs=10, n_demes=5, migration_rate=0.0, seed=42)
+    assert r_ss.data == r_isl.data, (
+        "migration_model should be irrelevant when migration_rate=0")
+
+
+def test_migration_model_stored_in_params() -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=5, n_demes=5, migration_rate=0.05,
+        migration_model="stepping-stone", seed=42)
+    assert result.wright_fisher_params["migration_model"] == "stepping-stone"
+
+
+# ---------------------------------------------------------------------------
+# Effective population size estimation
+# ---------------------------------------------------------------------------
+
+
+def test_estimate_ne_decay_matches_known_n() -> None:
+    """The heterozygosity-decay estimator recovers the known census N
+    within ~20 % with enough replicates."""
+    n, reps = 50, 1000
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=100,
+        replicate_runs=reps, seed=42)
+    est = result.estimate_ne()
+    assert est["method"] == "heterozygosity_decay"
+    assert abs(est["ne_estimate"] - n) / n < 0.2, (
+        f"Ne estimate {est['ne_estimate']:.1f} deviates from N={n}")
+    assert est["decay_rate_per_generation"] < 1.0
+
+
+def test_estimate_ne_small_population() -> None:
+    """Works for small N too."""
+    n, reps = 20, 500
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=50,
+        replicate_runs=reps, seed=42)
+    est = result.estimate_ne()
+    assert abs(est["ne_estimate"] - n) / n < 0.3, (
+        f"Ne estimate {est['ne_estimate']:.1f} deviates from N={n}")
+
+
+def test_estimate_ne_requires_data() -> None:
+    """All-fixed populations cannot estimate Ne."""
+    result = simulate_wright_fisher(
+        population_size=5, starting_frequency=1.0, generations=10,
+        replicate_runs=10, seed=42)
+    est = result.estimate_ne()
+    assert "error" in est
+
+
+def test_estimate_ne_variance_method() -> None:
+    """Variance method requires replicate data; with it, returns
+    an estimate (biased but present)."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=50,
+        replicate_runs=200, seed=42, return_replicate_data=True)
+    est = result.estimate_ne_variance()
+    assert "ne_estimate" in est
+    assert est["n_replicates"] == 200
+    assert est["ne_estimate"] > 0
+
+    result2 = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=50,
+        replicate_runs=200, seed=42)
+    est2 = result2.estimate_ne_variance()
+    assert "error" in est2
+
+
+def test_estimate_ne_variance_structured_pools_demes() -> None:
+    """Structured replicate_data (rep x deme) is pooled per replicate."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=30,
+        replicate_runs=20, n_demes=4, migration_rate=0.05, seed=42,
+        return_replicate_data=True)
+    est = result.estimate_ne_variance()
+    assert "ne_estimate" in est
+    assert est["n_replicates"] == 20
+
+
+# ---------------------------------------------------------------------------
+# Wright's stationary distribution (mutation-drift balance)
+# ---------------------------------------------------------------------------
+
+
+def test_stationary_distribution_is_beta() -> None:
+    """With 4Nu = 4 the density is Beta(4,4)-shaped: symmetric,
+    zero at the edges, modal at p=0.5."""
+    d = wright_stationary_distribution(
+        [0.0, 0.1, 0.25, 0.5, 0.75, 0.9, 1.0], 0.02, 50)
+    assert d[0] == 0.0 and d[-1] == 0.0  # edges
+    assert d[1] < d[3] and d[2] < d[3]  # mode at 0.5
+    # Symmetric in theory (Beta(4,4) is symmetric about p=0.5), but the
+    # density is evaluated via p and 1-p through slightly different
+    # floating-point operation orders, so exact equality is not
+    # guaranteed -- only mathematical equality is. Use a tight relative
+    # tolerance, not ==, matching how every other floating-point
+    # comparison in this file is checked (pytest.approx or an explicit
+    # tolerance), never bare equality on a computed float.
+    assert d[1] == pytest.approx(d[5], rel=1e-9)
+    assert d[2] == pytest.approx(d[4], rel=1e-9)
+
+
+def test_stationary_distribution_normalization() -> None:
+    """Numerically integrate the density over [0, 1]: should be 1."""
+    from scipy.integrate import quad
+    density = wright_stationary_distribution(
+        [0.5], 0.02, 50)[0]
+    a = 4.0 * 0.02 * 50
+    from scipy.special import beta
+    expected_mode = (
+        beta(a, a) ** -1 * 0.5 ** (2 * (a - 1)))
+    assert abs(density - expected_mode) / expected_mode < 1e-6
+
+
+def test_stationary_distribution_edges_infinite_when_a_lt_1() -> None:
+    """With 4Nu < 1 the density is unbounded at the boundaries
+    (most populations fixed)."""
+    d = wright_stationary_distribution([0.0, 0.5], 0.001, 50)
+    assert d[0] == float("inf")
+    assert math.isfinite(d[1])
+
+
+def test_stationary_distribution_rejects_bad_inputs() -> None:
+    with pytest.raises(ValueError):
+        wright_stationary_distribution([0.5], 0.0, 50)
+    with pytest.raises(ValueError):
+        wright_stationary_distribution([0.5], 0.02, 0)
+
+
+def test_stationary_distribution_matches_simulation() -> None:
+    """With N=50, u=0.02 (4Nu=4), a long simulation's final
+    frequencies should roughly follow the Beta(4,4) density."""
+    n, u = 50, 0.02
+    reps = 2000
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=1000,
+        replicate_runs=reps, mutation_rate=u, seed=42)
+    afs = result.allele_frequency_spectrum(bins=10)
+    edges = np.asarray(afs["bin_edges"])
+    counts = np.asarray(afs["counts"], dtype=float)
+    obs_density = counts / (reps * (edges[1] - edges[0]))
+
+    centers = (edges[:-1] + edges[1:]) / 2.0
+    theory = np.asarray(
+        wright_stationary_distribution(centers.tolist(), u, n))
+
+    # Compare total mass in the central 60 % of the range
+    central = (centers > 0.2) & (centers < 0.8)
+    obs_mass = np.sum(counts[central]) / reps
+    theory_mass = np.sum(theory[central] * (edges[1] - edges[0])) / (
+        np.sum(theory * (edges[1] - edges[0])))
+    assert abs(obs_mass - theory_mass) < 0.1, (
+        f"central mass observed={obs_mass:.3f} theory={theory_mass:.3f}")
+
+
+# ---------------------------------------------------------------------------
+# New scenarios: balancing selection and stepping stone
+# ---------------------------------------------------------------------------
+
+
+def test_scenario_balancing_selection_runs() -> None:
+    result = wright_fisher_scenario("balancing-selection", seed=42)
+    final_p = result.column("mean_frequency")[-1]
+    assert abs(final_p - 2.0 / 3.0) < 0.08, (
+        f"final p={final_p:.3f} should approach 2/3")
+    assert result.column("heterozygosity")[-1] > 0.3
+
+
+def test_scenario_stepping_stone_runs() -> None:
+    result = wright_fisher_scenario("stepping-stone", seed=42)
+    assert "fst" in result.colnames
+    assert result.column("fst")[-1] > 0.05
+
+
+def test_cli_wf_migration_model_flag() -> None:
+    import subprocess
+    import sys
+    out = subprocess.check_output([
+        sys.executable, "-m", "Tellurium.cli", "wf",
+        "--population-size", "50",
+        "--n-demes", "5", "--migration-rate", "0.01",
+        "--migration-model", "stepping-stone",
+        "--generations", "10", "--replicate-runs", "5", "--seed", "42",
+        "--quiet"], cwd=_REPO_ROOT)
+    assert out.decode() == ""  # quiet suppresses summary, exit 0

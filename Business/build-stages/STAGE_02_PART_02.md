@@ -208,6 +208,50 @@ compromise anything this spec verifies — but it should inform Stage 3's
 scoping discipline: state what's out of scope, and if it changes anyway,
 say so here, not just in a commit message.
 
+**Second amendment (2026-07-30, found verifying Stage 2 completion before
+Stage 3):** the scope deviation above turned out to be an early sign of a
+much larger expansion, not an isolated case. By this audit,
+`simulate_wright_fisher` and `validate_wright_fisher_params` also gained:
+a `selection_coefficient` and `dominance` parameter (selection-drift
+balance, explicitly out of scope), `n_demes`/`migration_rate`/
+`migration_model` (island and stepping-stone migration models, explicitly
+out of scope), `population_size_series` (time-varying population size —
+bottleneck/founder-effect/population-expansion scenarios), a scenario
+preset registry (`list_scenarios`, `wright_fisher_scenario`,
+`_SCENARIO_REGISTRY`), a standalone `kimura_fixation_probability`
+function, and a full CLI (`Tellurium/cli.py`, wired into `make cli`).
+None of this was in Stage 2's original ten-field spec above. This is
+substantially more than "one deferred parameter slipped in" — it's most
+of what a reasonable Stage 3 or Stage 4 (selection, population
+structure/migration) would have covered as their own specced stages.
+
+Verified before accepting it as delivered, rather than taking the scope
+expansion on faith because the tests were green: ran the full suite (524
+tests before this audit, higher after — see `README.md` for the current
+count), fixed three real bugs the expansion had introduced (a dependency-
+guard false positive on `Tellurium.cli`'s package-level import, six CLI
+subprocess tests missing `cwd=repo_root` so they failed under the
+project's actual test-invocation convention, and a spurious
+`RuntimeWarning` in the Fst calculation), and — the one real gap found —
+migration/island-model had 9 behavioral tests but, unlike
+`mutation_rate` and `selection_coefficient`, no independently-reproduced
+mutation test. Added and verified one (gating the migration-mixing step
+behind an always-false condition; caught by `test_migration_reduces_fst`
+and `test_high_migration_demes_homogenised`, both with the exact expected
+failure signature), matching the rigor already given to the other two
+expansions.
+
+Verdict: mechanically, everything is now green and every meaningfully
+distinct behavior this expansion added has at least one independently-
+reproduced mutation test. But this is recorded plainly as scope that grew
+far past what this document specified — not a criticism of the work's
+quality, which held up under scrutiny, but a real gap in process
+discipline that Stage 3 onward should not repeat. If a future domain's
+implementation is going to grow substantially beyond its spec, the
+constitution's existing tools (an ADR, or a spec amendment like this one,
+written *as it happens* rather than discovered after the fact by an
+audit) are the mechanism for that — not silence until the next audit.
+
 ## 10. DELIVERABLES CHECKLIST
 
 - [ ] `validate_wright_fisher_params()`, `simulate_wright_fisher()` in
