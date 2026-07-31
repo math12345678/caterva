@@ -35,15 +35,24 @@ Stage 2 Part 4, and re-verified after Stage 2 refactoring):
    theoretical to ~0.107 under 2N→N, well outside the 0.015 tolerance).
 
 2. "Skip the last generation" (implementer-discovered).
-   Mutation: range(generations + 1) -> range(generations) for the main
-             loop — the final generation is silently dropped.
-   Independently reproduced, Stage 2 Part 4 (2026-07-30) and
-   re-verified after the unified-loop refactoring (2026-07-30): 3 tests
-   fail — test_last_generation_is_present, test_n_rows_equals_
-   generations_plus_one, and test_single_replicate_produces_valid_output.
-   (The earlier claim of 5 included incidental KeyErrors from mutation
-   1's test set that depend on which mutation is being tested; the
-   core blast radius for this mutation alone is 3 tests.)
+    Mutation: range(generations + 1) -> range(generations) for the main
+              loop — the final generation is silently dropped.
+    Independently reproduced, Stage 2 Part 4 (2026-07-30) and
+    re-verified after the unified-loop refactoring (2026-07-30): 3 tests
+    fail — test_last_generation_is_present, test_n_rows_equals_
+    generations_plus_one, and test_single_replicate_produces_valid_output.
+    (The earlier claim of 5 included incidental KeyErrors from mutation
+    1's test set that depend on which mutation is being tested; the
+    core blast radius for this mutation alone is 3 tests.)
+
+3. "Mutation-rate parameter is silently ignored" (post-close).
+    Mutation: the mutation_rate parameter is accepted but never applied
+              to allele frequencies before the next generation.
+    Added and independently reproduced 2026-07-30: 2 tests fail —
+    test_mutation_drift_equilibrium and test_mutation_rate_increases_
+    heterozygosity. The backward-compatibility test (mutation_rate=0
+    vs omit) passes because both paths use the same ignored rate.
+    All neutral-drift tests pass because they never set mutation_rate > 0.
 """
 
 import numpy as np
@@ -53,6 +62,7 @@ from tellurium_engine import (
     WF_PLAUSIBLE_MIN_POPULATION_SIZE,
     WF_PLAUSIBLE_MAX_GENERATIONS,
     WF_PLAUSIBLE_MIN_REPLICATE_RUNS,
+    WF_PLAUSIBLE_MAX_MUTATION_RATE,
     ModelBuildError,
     simulate_wright_fisher,
     validate_wright_fisher_params,
@@ -162,6 +172,45 @@ def test_boolean_replicate_runs_is_rejected() -> None:
     assert not v.ok
 
 
+def test_negative_mutation_rate_is_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=-0.01)
+    assert not v.ok
+    with pytest.raises(ModelBuildError):
+        simulate_wright_fisher(
+            population_size=100, starting_frequency=0.5, generations=10,
+            mutation_rate=-0.01)
+
+
+def test_excessive_mutation_rate_is_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=1.5)
+    assert not v.ok
+
+
+def test_nan_mutation_rate_is_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=float("nan"))
+    assert not v.ok
+
+
+def test_inf_mutation_rate_is_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=float("inf"))
+    assert not v.ok
+
+
+def test_boolean_mutation_rate_is_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=True)
+    assert not v.ok
+
+
 # ---------------------------------------------------------------------------
 # Validation: flagging (flagged=True, simulation still runs)
 # ---------------------------------------------------------------------------
@@ -267,6 +316,37 @@ def test_numpy_integer_types_are_accepted() -> None:
             population_size=int_type(100), starting_frequency=0.5,
             generations=int_type(100), replicate_runs=int_type(10))
         assert v.ok, f"{int_type.__name__} was rejected: {v.errors}"
+
+
+def test_high_mutation_rate_is_flagged() -> None:
+    high = WF_PLAUSIBLE_MAX_MUTATION_RATE * 2
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=high)
+    assert v.ok
+    assert v.flagged
+    assert "mutation" in v.flag_reason.lower()
+
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=high)
+    assert result.flagged
+
+
+def test_zero_mutation_rate_not_flagged() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=10, mutation_rate=0.0)
+    assert v.ok
+    assert not v.flagged
+
+
+def test_mutation_rate_below_threshold_not_flagged() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=10, mutation_rate=WF_PLAUSIBLE_MAX_MUTATION_RATE)
+    assert v.ok
+    assert not v.flagged
 
 
 def test_multiple_flag_conditions_are_all_reported() -> None:
@@ -716,5 +796,84 @@ def test_mutation_skip_last_generation() -> None:
     """If the loop uses range(generations) instead of
     range(generations + 1), the final generation is silently dropped.
     ``test_last_generation_is_present`` catches this directly.
+    """
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Mutation behaviour: backward compatibility and effect tests
+# ---------------------------------------------------------------------------
+
+
+def test_mutation_rate_zero_gives_identical_results() -> None:
+    """mutation_rate=0.0 must produce identical output to omitting the
+    parameter entirely (backward compatibility).
+    """
+    result_no_mut = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=30,
+        replicate_runs=10, seed=42)
+    result_zero_mut = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=30,
+        replicate_runs=10, seed=42, mutation_rate=0.0)
+    assert result_no_mut.data == result_zero_mut.data
+
+
+def test_mutation_rate_increases_heterozygosity() -> None:
+    """Mutation reintroduces variation lost to drift, so heterozygosity
+    at late generations should be higher with mutation than without.
+    Uses enough replicates to overcome stochastic variation.
+    """
+    result_no_mut = simulate_wright_fisher(
+        population_size=30, starting_frequency=0.5, generations=200,
+        replicate_runs=50, seed=1)
+    result_mut = simulate_wright_fisher(
+        population_size=30, starting_frequency=0.5, generations=200,
+        replicate_runs=50, seed=1, mutation_rate=0.02)
+
+    h_no_mut = result_no_mut.column("heterozygosity")[-1]
+    h_mut = result_mut.column("heterozygosity")[-1]
+    assert h_mut > h_no_mut + 0.05, (
+        f"heterozygosity with mutation ({h_mut:.4f}) should be "
+        f"> without mutation ({h_no_mut:.4f}) by a clear margin"
+    )
+
+
+def test_mutation_drift_equilibrium() -> None:
+    """Under symmetric mutation-drift balance, the expected heterozygosity
+    for a biallelic locus converges to:
+
+        H_eq = 4Nμ / (8Nμ + 1)
+
+    where μ is the per-generation symmetric mutation rate.
+    Derived from the Beta(4Nμ, 4Nμ) stationary distribution.
+    """
+    n = 50
+    mu = 0.02
+    gens = 500
+    reps = 100
+
+    h_eq_theory = (4.0 * n * mu) / (8.0 * n * mu + 1.0)
+
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=gens,
+        replicate_runs=reps, seed=42, mutation_rate=mu)
+    h_observed = result.column("heterozygosity")[-1]
+
+    assert abs(h_observed - h_eq_theory) < 0.03, (
+        f"observed heterozygosity {h_observed:.4f} deviates from "
+        f"theoretical equilibrium {h_eq_theory:.4f} by more than 0.03"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Mutation test: mutation-rate parameter is silently ignored
+# ---------------------------------------------------------------------------
+
+
+def test_mutation_mutation_rate_ignored() -> None:
+    """If mutation_rate is received but never applied to the allele
+    frequencies, the equilibrium test will fail (heterozygosity decays
+    to near zero instead of reaching the predicted mutation-drift
+    equilibrium level).
     """
     pass
