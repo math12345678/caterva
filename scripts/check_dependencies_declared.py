@@ -62,6 +62,11 @@ def _local_module_stems() -> set[str]:
     for src_dir in [*SOURCE_DIRS, REPO_ROOT / "scripts"]:
         if not src_dir.exists():
             continue
+        # The directory itself is a local package root when something
+        # imports it by name (e.g. `from Tellurium.tellurium_engine import
+        # ...`, used by Tellurium/cli.py when run as `python -m
+        # Tellurium.cli` from the repo root) -- not just its file stems.
+        stems.add(src_dir.name.lower())
         for path in src_dir.rglob("*.py"):
             if any(part in EXCLUDE_DIR_NAMES for part in path.parts):
                 continue

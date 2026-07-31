@@ -42,7 +42,7 @@ from __future__ import annotations
 import math
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import antimony
 import libsbml
@@ -86,8 +86,12 @@ __all__ = [
     "WF_PLAUSIBLE_MAX_GENERATIONS",
     "WF_PLAUSIBLE_MIN_REPLICATE_RUNS",
     "WF_PLAUSIBLE_MAX_MUTATION_RATE",
+    "WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT",
     "validate_wright_fisher_params",
     "simulate_wright_fisher",
+    "list_scenarios",
+    "wright_fisher_scenario",
+    "kimura_fixation_probability",
 ]
 
 
@@ -155,6 +159,9 @@ class SimulationResult:
     data: List[List[float]]
     model_name: str
     validation: ParameterValidation
+    replicate_data: Optional[List[List[float]]] = None
+    replicate_colnames: Optional[List[str]] = None
+    wright_fisher_params: Optional[Dict[str, Any]] = None
 
     @property
     def flagged(self) -> bool:
@@ -178,6 +185,309 @@ class SimulationResult:
 
     def __len__(self) -> int:
         return len(self.data)
+
+    def fixation_analysis(self) -> Dict[str, Any]:
+        """Return fixation statistics from per-replicate tracking.
+
+        Requires ``wright_fisher_params`` (set automatically by
+        ``simulate_wright_fisher``). Returns the generation each
+        replicate first reached frequency 1.0 (A) or 0.0 (a), the
+        proportion of replicates that fixed for each allele, and the
+        mean time to fixation among those that fixed.
+
+        Replicates that never fix within the simulation window have
+        ``-1`` for their fixation generation.
+        """
+        if self.wright_fisher_params is None:
+            return {"error": "no Wright-Fisher parameters stored"}
+        fix_A = self.wright_fisher_params.get("fixation_gen_A", [])
+        fix_a = self.wright_fisher_params.get("fixation_gen_a", [])
+        if not fix_A and not fix_a:
+            return {"error": "no fixation data available"}
+        n_reps = len(fix_A)
+        n_fixed_A = int(np.sum(np.array(fix_A, dtype=np.int64) >= 0))
+        n_fixed_a = int(np.sum(np.array(fix_a, dtype=np.int64) >= 0))
+        n_poly = n_reps - n_fixed_A - n_fixed_a
+        times_A = [g for g in fix_A if g >= 0]
+        times_a = [g for g in fix_a if g >= 0]
+        info: Dict[str, Any] = {
+            "n_replicates": n_reps,
+            "n_fixed_A": n_fixed_A,
+            "n_fixed_a": n_fixed_a,
+            "n_polymorphic": n_poly,
+            "prop_fixed_A": n_fixed_A / n_reps if n_reps else 0.0,
+            "prop_fixed_a": n_fixed_a / n_reps if n_reps else 0.0,
+            "fixation_gen_A": fix_A,
+            "fixation_gen_a": fix_a,
+        }
+        if times_A:
+            info["mean_fixation_time_A"] = float(np.mean(times_A))
+            info["sd_fixation_time_A"] = float(np.std(times_A, ddof=1))
+            info["min_fixation_time_A"] = int(min(times_A))
+            info["max_fixation_time_A"] = int(max(times_A))
+        if times_a:
+            info["mean_fixation_time_a"] = float(np.mean(times_a))
+            info["sd_fixation_time_a"] = float(np.std(times_a, ddof=1))
+            info["min_fixation_time_a"] = int(min(times_a))
+            info["max_fixation_time_a"] = int(max(times_a))
+        return info
+
+    def theoretical_heterozygosity(self) -> List[float]:
+        """Return the expected heterozygosity trajectory under neutral drift.
+
+        Computed as ``H_t = H_0 * (1 - 1/(2N))^t`` for constant N, or
+        the cumulative product when ``population_size_series`` was used.
+
+        Returns an empty list when selection or mutation was active
+        (theoretical H is more complex), or when WF params are not
+        available.
+        """
+        p = self.wright_fisher_params
+        if p is None:
+            return []
+        if p.get("selection_coefficient", 0.0) != 0.0:
+            return []
+        if p.get("mutation_rate", 0.0) != 0.0:
+            return []
+        gens = p.get("generations", 0)
+        p0 = p.get("starting_frequency", 0.5)
+        h0 = 2.0 * p0 * (1.0 - p0)
+        n_series = p.get("population_size_series")
+        result = [h0]
+        for t in range(1, gens + 1):
+            if n_series is not None:
+                n = n_series[t - 1]
+            else:
+                n = p.get("population_size", 100)
+            decay = 1.0 - 1.0 / (2.0 * n)
+            result.append(result[-1] * decay)
+        return result
+
+    def theoretical_frequency(self) -> List[float]:
+        """Return the deterministic allele-frequency trajectory under
+        haploid selection (no dominance), or an empty list if the
+        params are unavailable or the model includes mutation.
+
+        For ``dominance=None`` with ``selection_coefficient != 0``,
+        the closed-form solution is:
+        ``p_t = p_0 / (p_0 + (1 - p_0) * (1 + s)^(-t))``.
+
+        For diploid selection with dominance h, an iterative
+        deterministic trajectory is computed instead.
+        """
+        p = self.wright_fisher_params
+        if p is None:
+            return []
+        if p.get("mutation_rate", 0.0) != 0.0:
+            return []
+        s = p.get("selection_coefficient", 0.0)
+        if s == 0.0:
+            return []
+        gens = p.get("generations", 0)
+        p0 = p.get("starting_frequency", 0.5)
+        h = p.get("dominance")
+        result = [p0]
+        p_det = p0
+        for _ in range(gens):
+            if h is None:
+                p_det = p_det * (1.0 + s) / (1.0 + p_det * s)
+            else:
+                p = p_det
+                p2 = p * p
+                pq = p * (1.0 - p)
+                q2 = (1.0 - p) * (1.0 - p)
+                w_bar = (p2 * (1.0 + s) + 2.0 * pq * (1.0 + h * s) + q2)
+                p_det = (p2 * (1.0 + s) + pq * (1.0 + h * s)) / w_bar
+            result.append(p_det)
+        return result
+
+    def describe(self) -> str:
+        """Return a human-readable summary of the simulation result."""
+        lines = [f"Model: {self.model_name}"]
+        gen = self.column("generation")
+        lines.append(f"Generations: 0 – {int(gen[-1])}")
+        lines.append(f"Rows: {len(self.data)}")
+        if self.validation.flagged:
+            lines.append(f"Flagged: {self.validation.flag_reason}")
+        if "mean_frequency" in self.colnames:
+            mf = self.column("mean_frequency")
+            lines.append(f"Final mean freq: {mf[-1]:.4f}")
+        if "heterozygosity" in self.colnames:
+            h = self.column("heterozygosity")
+            lines.append(f"Final heterozygosity: {h[-1]:.4f}")
+            th = self.theoretical_heterozygosity()
+            if th:
+                lines.append(f"Expected heterozygosity (final): {th[-1]:.4f}")
+        if "n_A_fixed" in self.colnames and "n_a_fixed" in self.colnames:
+            nA = int(self.column("n_A_fixed")[-1])
+            na = int(self.column("n_a_fixed")[-1])
+            lines.append(f"Fixed: A={nA}, a={na}")
+        fa = self.fixation_analysis()
+        if "prop_fixed_A" in fa:
+            lines.append(
+                f"Fixation proportions: A={fa['prop_fixed_A']:.3f}, "
+                f"a={fa['prop_fixed_a']:.3f}, "
+                f"poly={fa['n_polymorphic']}")
+        if "mean_fixation_time_A" in fa:
+            lines.append(
+                f"Mean fixation time A: {fa['mean_fixation_time_A']:.1f} "
+                f"± {fa['sd_fixation_time_A']:.1f} gens")
+        if "mean_fixation_time_a" in fa:
+            lines.append(
+                f"Mean fixation time a: {fa['mean_fixation_time_a']:.1f} "
+                f"± {fa['sd_fixation_time_a']:.1f} gens")
+        return "\n".join(lines)
+
+    def summarize(self) -> Dict[str, Any]:
+        """Return a dict of key result statistics for the final generation.
+
+        Includes mean frequency, heterozygosity, fixation counts,
+        standard errors, theoretical expectations, and fixation
+        analysis (when available).
+        """
+        info: Dict[str, Any] = {
+            "model_name": self.model_name,
+            "generations": int(self.final("generation")),
+            "n_rows": len(self.data),
+            "flagged": self.validation.flagged,
+        }
+        if "mean_frequency" in self.colnames:
+            info["final_mean_frequency"] = self.final("mean_frequency")
+        if "heterozygosity" in self.colnames:
+            info["final_heterozygosity"] = self.final("heterozygosity")
+        if "n_A_fixed" in self.colnames and "n_a_fixed" in self.colnames:
+            info["n_A_fixed"] = int(self.final("n_A_fixed"))
+            info["n_a_fixed"] = int(self.final("n_a_fixed"))
+        if "mean_frequency_se" in self.colnames:
+            info["final_mean_frequency_se"] = self.final("mean_frequency_se")
+        if "heterozygosity_se" in self.colnames:
+            info["final_heterozygosity_se"] = self.final("heterozygosity_se")
+        if self.validation.flagged:
+            info["flag_reason"] = self.validation.flag_reason
+        th = self.theoretical_heterozygosity()
+        if th:
+            info["expected_heterozygosity_final"] = th[-1]
+            info["expected_heterozygosity_trajectory"] = th
+        tf = self.theoretical_frequency()
+        if tf:
+            info["expected_frequency_final"] = tf[-1]
+            info["expected_frequency_trajectory"] = tf
+        fa = self.fixation_analysis()
+        if "prop_fixed_A" in fa:
+            info["fixation"] = fa
+        return info
+
+    def allele_frequency_spectrum(
+            self, generation: int | None = None,
+            bins: int = 10) -> Dict[str, Any]:
+        """Return the distribution of allele A frequencies across
+        replicates at a given generation.
+
+        When ``generation`` is None (default), uses the final generation,
+        taken from the per-replicate frequencies stored in
+        ``wright_fisher_params``. For other generations,
+        ``return_replicate_data=True`` must have been set at simulation
+        time.
+
+        For structured populations (``n_demes > 1``), the spectrum pools
+        all demes across all replicates.
+
+        Returns a dict with ``generation``, ``bin_edges`` (len bins+1),
+        ``counts`` (len bins), and ``n_observations``.
+        """
+        if self.wright_fisher_params is None:
+            return {"error": "no Wright-Fisher parameters stored"}
+        if generation is None:
+            freqs = self.wright_fisher_params.get("final_frequencies")
+            gen = int(self.wright_fisher_params.get("generations", 0))
+            if freqs is None:
+                return {"error": "no final frequencies stored"}
+            freqs = [float(f) for f in freqs]
+        else:
+            if self.replicate_data is None:
+                return {
+                    "error": "replicate_data required for non-final "
+                             "generations; re-run with "
+                             "return_replicate_data=True"}
+            gen_row = None
+            for row in self.replicate_data:
+                if int(row[0]) == generation:
+                    gen_row = row
+                    break
+            if gen_row is None:
+                return {
+                    "error": f"no data for generation {generation}"}
+            freqs = [float(f) for f in gen_row[1:]]
+            gen = int(generation)
+        if not freqs:
+            return {"error": "no frequencies available"}
+        hist, edges = np.histogram(freqs, bins=bins, range=(0.0, 1.0))
+        return {
+            "generation": gen,
+            "bin_edges": [float(e) for e in edges],
+            "counts": [int(c) for c in hist],
+            "n_observations": len(freqs),
+        }
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Return a JSON-serializable dict of the whole result."""
+        return {
+            "colnames": self.colnames,
+            "data": self.data,
+            "model_name": self.model_name,
+            "flagged": self.validation.flagged,
+            "flag_reason": self.validation.flag_reason,
+            "replicate_colnames": self.replicate_colnames,
+            "replicate_data": self.replicate_data,
+            "wright_fisher_params": self.wright_fisher_params,
+        }
+
+    def to_csv(self, path: str,
+               include_replicate_data: bool = False) -> str:
+        """Write the result to a CSV file.
+
+        Args:
+            path: output file path
+            include_replicate_data: if True and replicate data exists,
+                also write it to ``<stem>_replicates.csv``
+        Returns:
+            the path written
+        """
+        import csv
+        with open(path, "w", newline="") as fh:
+            writer = csv.writer(fh)
+            writer.writerow(self.colnames)
+            writer.writerows(self.data)
+        if include_replicate_data and self.replicate_data is not None:
+            import os
+            stem, ext = os.path.splitext(path)
+            rep_path = f"{stem}_replicates{ext}"
+            with open(rep_path, "w", newline="") as fh:
+                writer = csv.writer(fh)
+                writer.writerow(self.replicate_colnames or [])
+                writer.writerows(self.replicate_data)
+        return path
+
+    def to_json(self, path: str | None = None,
+                include_replicate_data: bool = True) -> str:
+        """Return (and optionally write) a JSON serialization.
+
+        Args:
+            path: optional output file path; if None, only return the string
+            include_replicate_data: if False, omit replicate data from
+                the output to keep the file small
+        Returns:
+            the JSON string
+        """
+        import json
+        doc = self.to_dict()
+        if not include_replicate_data:
+            doc["replicate_data"] = None
+        text = json.dumps(doc)
+        if path is not None:
+            with open(path, "w") as fh:
+                fh.write(text)
+        return text
 
 
 # ---------------------------------------------------------------------------
@@ -1087,6 +1397,10 @@ WF_PLAUSIBLE_MIN_REPLICATE_RUNS = 10
 # for most teaching scenarios, but the simulation is valid and will run.
 WF_PLAUSIBLE_MAX_MUTATION_RATE = 0.01
 
+# Selection coefficient above 0.5 (or below -0.5) is strong enough to
+# dominate drift in most teaching-lab scenarios; flagged, not rejected.
+WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT = 0.5
+
 
 def validate_wright_fisher_params(
     population_size: int,
@@ -1094,6 +1408,11 @@ def validate_wright_fisher_params(
     generations: int,
     replicate_runs: int = 1,
     mutation_rate: float = 0.0,
+    selection_coefficient: float = 0.0,
+    dominance: float | None = None,
+    population_size_series: Optional[Sequence[int]] = None,
+    n_demes: int = 1,
+    migration_rate: float = 0.0,
 ) -> ParameterValidation:
     """Check a Wright-Fisher neutral-drift parameter set.
 
@@ -1103,6 +1422,12 @@ def validate_wright_fisher_params(
         * ``generations`` is boolean, not an integer, or < 1
         * ``replicate_runs`` is boolean, not an integer, or < 1
         * ``mutation_rate`` is boolean, NaN, infinite, < 0, or > 1
+        * ``selection_coefficient`` is boolean, NaN, infinite, or <= -1
+        * ``dominance`` is not None and not in [0, 2]
+        * ``population_size_series`` elements are not positive integers, or
+          its length does not match ``generations + 1``
+        * ``n_demes`` is boolean, not an integer, or < 1
+        * ``migration_rate`` is boolean, NaN, infinite, or outside [0, 1]
 
     Flags (``ok=True, flagged=True``):
         * ``population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE`` — drift
@@ -1114,6 +1439,15 @@ def validate_wright_fisher_params(
           error of mean heterozygosity will be large
         * ``mutation_rate > WF_PLAUSIBLE_MAX_MUTATION_RATE`` — biologically
           implausible, mutation will dominate drift
+        * ``|selection_coefficient| > WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT``
+          — implausibly strong selection for most teaching scenarios
+        * Any value in ``population_size_series`` below
+          ``WF_PLAUSIBLE_MIN_POPULATION_SIZE`` — flagged (same as constant N)
+        * ``migration_rate > WF_PLAUSIBLE_MAX_MUTATION_RATE`` — flagged
+          (strong migration homogenises demes rapidly)
+        * ``dominance > 1`` — overdominance (h > 1 with s > 0) or
+          underdominance (h > 1 with s < 0); valid, but the heterozygote
+          fitness is no longer intermediate between the homozygotes
     """
     errors: List[str] = []
 
@@ -1182,18 +1516,109 @@ def validate_wright_fisher_params(
         errors.append(
             f"mutation_rate must be <= 1 (got {mutation_rate})")
 
+    # --- selection_coefficient ---
+    if isinstance(selection_coefficient, (bool, np.bool_)):
+        errors.append("selection_coefficient must be a number, not a boolean")
+    elif not isinstance(selection_coefficient, (int, float, np.integer, np.floating)):
+        errors.append(
+            f"selection_coefficient must be a number, got "
+            f"{type(selection_coefficient).__name__}")
+    elif math.isnan(selection_coefficient):
+        errors.append("selection_coefficient must not be NaN")
+    elif math.isinf(selection_coefficient):
+        errors.append("selection_coefficient must be finite")
+    elif selection_coefficient <= -1.0:
+        errors.append(
+            f"selection_coefficient must be > -1 (got "
+            f"{selection_coefficient})")
+
+    # --- dominance ---
+    if dominance is not None:
+        if isinstance(dominance, (bool, np.bool_)):
+            errors.append("dominance must be a number, not a boolean")
+        elif not isinstance(dominance, (int, float, np.integer, np.floating)):
+            errors.append(
+                f"dominance must be a number, got "
+                f"{type(dominance).__name__}")
+        elif math.isnan(dominance):
+            errors.append("dominance must not be NaN")
+        elif math.isinf(dominance):
+            errors.append("dominance must be finite")
+        elif not (0.0 <= dominance <= 2.0):
+            errors.append(
+                f"dominance must be in [0, 2] (got {dominance})")
+
+    # --- n_demes ---
+    if isinstance(n_demes, (bool, np.bool_)):
+        errors.append("n_demes must be an integer, not a boolean")
+    elif not isinstance(n_demes, (int, np.integer)):
+        errors.append(
+            f"n_demes must be an integer, got {type(n_demes).__name__}")
+    elif n_demes < 1:
+        errors.append(f"n_demes must be >= 1 (got {n_demes})")
+
+    # --- migration_rate ---
+    if isinstance(migration_rate, (bool, np.bool_)):
+        errors.append("migration_rate must be a number, not a boolean")
+    elif not isinstance(migration_rate, (int, float, np.integer, np.floating)):
+        errors.append(
+            f"migration_rate must be a number, got "
+            f"{type(migration_rate).__name__}")
+    elif math.isnan(migration_rate):
+        errors.append("migration_rate must not be NaN")
+    elif math.isinf(migration_rate):
+        errors.append("migration_rate must be finite")
+    elif migration_rate < 0.0 or migration_rate > 1.0:
+        errors.append(
+            f"migration_rate must be in [0, 1] (got {migration_rate})")
+
+    # --- population_size_series ---
+    if population_size_series is not None:
+        if not isinstance(population_size_series, (list, tuple, np.ndarray)):
+            errors.append(
+                f"population_size_series must be a list or tuple, got "
+                f"{type(population_size_series).__name__}")
+        else:
+            series_list = list(population_size_series)
+            if len(series_list) != generations + 1:
+                errors.append(
+                    f"population_size_series length ({len(series_list)}) "
+                    f"must equal generations+1 ({generations + 1})")
+            for i, val in enumerate(series_list):
+                if isinstance(val, (bool, np.bool_)):
+                    errors.append(
+                        f"population_size_series[{i}] must be an integer, "
+                        f"not a boolean")
+                elif not isinstance(val, (int, np.integer)):
+                    errors.append(
+                        f"population_size_series[{i}] must be an integer, "
+                        f"got {type(val).__name__}")
+                elif val < 1:
+                    errors.append(
+                        f"population_size_series[{i}] must be >= 1 "
+                        f"(got {val})")
+
     if errors:
         return ParameterValidation(ok=False, errors=errors)
 
     v = ParameterValidation()
     flag_reasons: List[str] = []
 
-    if population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE:
-        v.flagged = True
-        flag_reasons.append(
-            f"population_size={population_size} is below "
-            f"{WF_PLAUSIBLE_MIN_POPULATION_SIZE}; drift will be "
-            "extremely rapid")
+    if population_size_series is None:
+        if population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE:
+            v.flagged = True
+            flag_reasons.append(
+                f"population_size={population_size} is below "
+                f"{WF_PLAUSIBLE_MIN_POPULATION_SIZE}; drift will be "
+                "extremely rapid")
+    else:
+        min_n = min(population_size_series)
+        if min_n < WF_PLAUSIBLE_MIN_POPULATION_SIZE:
+            v.flagged = True
+            flag_reasons.append(
+                f"population_size_series minimum ({min_n}) is below "
+                f"{WF_PLAUSIBLE_MIN_POPULATION_SIZE}; some generations "
+                "will have extremely rapid drift")
     if starting_frequency == 0.0:
         v.flagged = True
         flag_reasons.append(
@@ -1222,6 +1647,18 @@ def validate_wright_fisher_params(
             f"mutation_rate={mutation_rate} exceeds "
             f"{WF_PLAUSIBLE_MAX_MUTATION_RATE}; mutation will "
             "dominate drift")
+    if abs(selection_coefficient) > WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT:
+        v.flagged = True
+        flag_reasons.append(
+            f"|selection_coefficient|={abs(selection_coefficient)} "
+            f"exceeds {WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT}; "
+            "selection will dominate drift")
+    if migration_rate > WF_PLAUSIBLE_MAX_MUTATION_RATE:
+        v.flagged = True
+        flag_reasons.append(
+            f"migration_rate={migration_rate} exceeds "
+            f"{WF_PLAUSIBLE_MAX_MUTATION_RATE}; migration will "
+            "homogenise demes rapidly")
 
     if flag_reasons:
         v.flag_reason = "; ".join(flag_reasons)
@@ -1234,31 +1671,83 @@ def simulate_wright_fisher(
     generations: int,
     replicate_runs: int = 1,
     mutation_rate: float = 0.0,
+    selection_coefficient: float = 0.0,
+    dominance: float | None = None,
     seed: int | None = None,
+    return_replicate_data: bool = False,
+    population_size_series: Optional[Sequence[int]] = None,
+    n_demes: int = 1,
+    migration_rate: float = 0.0,
+    verbose: bool = False,
 ) -> SimulationResult:
-    """Simulate neutral genetic drift in a diploid Wright-Fisher population.
+    """Simulate genetic drift in a diploid Wright-Fisher population, with
+    optional symmetric mutation, natural selection, and migration.
 
-    Each generation, the next generation's 2N allele copies are formed by
-    binomial sampling from the current generation's allele pool:
-    ``X_{t+1} ~ Binomial(2N, p_t)``, and ``p_{t+1} = X_{t+1} / 2N``.
+    Each generation follows these steps in order:
+        1. Selection — fitness differences change the expected frequency.
+        2. Reproduction — the next generation's 2N allele copies are drawn
+           ``Binomial(2N, p_adj)`` from the post-selection frequency.
+        3. Mutation — each copy mutates to the other allele with
+           probability ``mutation_rate``.
+        4. Migration (when ``n_demes > 1``) — each deme exchanges a
+           fraction ``migration_rate`` of its alleles with the global
+           pool (Wright's island model).
+
+    When ``selection_coefficient=0`` and ``dominance=None`` (the defaults),
+    selection is skipped and the model reduces to neutral drift.
+    When ``dominance=None``, a haploid selection model is used
+    (``p' = p(1+s) / (1+ps)``). When ``dominance`` is given in [0, 1],
+    a diploid selection model with dominance h is used.
+
+    Set ``return_replicate_data=True`` to include per-replicate allele
+    frequencies in ``result.replicate_data`` (columns: generation,
+    rep_0, rep_1, ..., rep_{replicate_runs-1}). Off by default because
+    storage scales as O(generations x replicate_runs).
+
+    Use ``population_size_series`` to model time-varying N (bottlenecks,
+    founder events, expansion). When given, it must be a sequence of
+    length ``generations + 1``, and each element is the census size N
+    for that generation. The constant ``population_size`` is used as a
+    fallback when this is ``None``.
+
+    Use ``n_demes`` and ``migration_rate`` to model population structure
+    via Wright's island model. Each replicate metapopulation contains
+    ``n_demes`` demes of equal size. When ``migration_rate > 0``, a
+    fraction of each deme's allele pool is replaced by migrants drawn
+    from the global pool each generation. When ``n_demes = 1`` (default)
+    the model reduces to the standard panmictic WF population.
+
+    Set ``verbose=True`` to print progress per 10 % of generations
+    (useful for long simulations with thousands of generations).
 
     Returns a ``SimulationResult`` with columns ``["generation",
-    "mean_frequency", "heterozygosity", "n_A_fixed", "n_a_fixed"]`` —
-    one row per generation (from 0 to ``generations`` inclusive),
-    aggregated across all replicate populations. Once a replicate fixes
-    (frequency reaches 0.0 or 1.0), its frequency holds at that value for
-    all subsequent generations (unless mutation reintroduces the other
-    allele).
+    "mean_frequency", "heterozygosity", "mean_frequency_se",
+    "heterozygosity_se", "n_A_fixed", "n_a_fixed"]``, plus ``"fst"``
+    and ``"fst_se"`` when ``n_demes > 1``. One row per generation
+    (from 0 to ``generations`` inclusive), aggregated across all
+    replicate populations. Standard errors are computed as
+    ``std(x, ddof=1) / sqrt(replicate_runs)``.
 
     Args:
-        population_size: number of diploid individuals (N); 2N allele copies
+        population_size: number of diploid individuals per deme; 2N
+            allele copies per deme
         starting_frequency: initial frequency of allele A, in [0, 1]
         generations: number of generations to simulate forward
-        replicate_runs: number of independent replicate populations
+        replicate_runs: number of independent replicate metapopulations
         mutation_rate: per-generation probability of mutation per allele
             copy (symmetric, forward and backward); 0 = neutral drift
+        selection_coefficient: selective advantage of allele A (s);
+            positive = beneficial, negative = deleterious; must be > -1
+        dominance: dominance coefficient (h) for diploid selection;
+            None = haploid selection; in [0, 1] for diploid
         seed: optional seed for reproducibility; passed to
             ``numpy.random.default_rng``
+        return_replicate_data: if True, store per-replicate frequencies
+        population_size_series: time-varying N per generation
+        n_demes: number of demes per replicate (1 = panmictic)
+        migration_rate: fraction of alleles exchanged with the global
+            pool each generation, in [0, 1]
+        verbose: if True, print progress every 10 % of generations
 
     Returns:
         SimulationResult with aggregated per-generation statistics
@@ -1268,50 +1757,463 @@ def simulate_wright_fisher(
     """
     validation = validate_wright_fisher_params(
         population_size, starting_frequency, generations, replicate_runs,
-        mutation_rate)
+        mutation_rate, selection_coefficient, dominance,
+        population_size_series, n_demes, migration_rate)
     validation.raise_if_invalid()
 
     rng = np.random.default_rng(seed)
-    two_n = 2 * population_size
 
-    # Each replicate tracks the current frequency of allele A.
-    # Shape: (replicate_runs,) — one frequency per replicate.
-    frequencies = np.full(replicate_runs, starting_frequency, dtype=np.float64)
+    if population_size_series is not None:
+        n_series = [int(v) for v in population_size_series]
+    else:
+        n_series = None
 
-    data: List[List[float]] = []
+    structured = n_demes > 1
+    if structured:
+        frequencies = np.full(
+            (replicate_runs, n_demes), starting_frequency, dtype=np.float64)
+    else:
+        frequencies = np.full(
+            replicate_runs, starting_frequency, dtype=np.float64)
+
+    n_cols = 9 if structured else 7
+    data_arr = np.empty((generations + 1, n_cols), dtype=np.float64)
+    row_template = np.empty(n_cols, dtype=np.float64)
+
+    replicate_data: Optional[np.ndarray] = None
+    if return_replicate_data:
+        flat_width = replicate_runs * (n_demes if structured else 1)
+        rep_arr = np.empty((generations + 1, 1 + flat_width),
+                           dtype=np.float64)
+
+    sqrt_reps = np.sqrt(replicate_runs)
+
+    fixation_gen_A = np.full(replicate_runs, -1, dtype=np.int64)
+    fixation_gen_a = np.full(replicate_runs, -1, dtype=np.int64)
+
+    if verbose and generations > 0:
+        report_interval = max(1, generations // 10)
 
     for gen in range(generations + 1):
         mean_freq = float(np.mean(frequencies))
-        heterozygosity = float(np.mean(2.0 * frequencies * (1.0 - frequencies)))
-        n_A_fixed = float(np.sum(frequencies == 1.0))
-        n_a_fixed = float(np.sum(frequencies == 0.0))
+        het_values = 2.0 * frequencies * (1.0 - frequencies)
+        heterozygosity = float(np.mean(het_values))
 
-        data.append([
-            float(gen),
-            mean_freq,
-            heterozygosity,
-            n_A_fixed,
-            n_a_fixed,
-        ])
+        if structured:
+            rep_mean = np.mean(frequencies, axis=1)
+            n_A_fixed = float(np.sum(rep_mean == 1.0))
+            n_a_fixed = float(np.sum(rep_mean == 0.0))
+            Hs = np.mean(het_values, axis=1)
+            Ht = 2.0 * rep_mean * (1.0 - rep_mean)
+            # np.where still evaluates Hs / Ht element-wise for every entry
+            # (including where Ht == 0, e.g. a deme already fixed) before
+            # selecting -- the result is correct (0.0 substituted where
+            # Ht <= 0), but numpy raises a RuntimeWarning for the transient
+            # 0/0 anyway. Suppress it explicitly rather than let a bogus
+            # warning appear in otherwise-clean test output, where it could
+            # mask a real one later.
+            with np.errstate(divide="ignore", invalid="ignore"):
+                fst_rep = np.where(Ht > 0, 1.0 - Hs / Ht, 0.0)
+            fst = float(np.mean(fst_rep))
+            rep_val = rep_mean
+        else:
+            n_A_fixed = float(np.sum(frequencies == 1.0))
+            n_a_fixed = float(np.sum(frequencies == 0.0))
+            fst = 0.0
+            fst_rep = None
+            rep_val = frequencies
+
+        not_yet = (fixation_gen_A == -1) & (fixation_gen_a == -1)
+        fixation_gen_A[not_yet & (rep_val == 1.0)] = gen
+        fixation_gen_a[not_yet & (rep_val == 0.0)] = gen
+
+        if replicate_runs > 1:
+            if structured:
+                se_freq = float(
+                    np.std(rep_mean, ddof=1) / sqrt_reps)
+                rep_het = np.mean(het_values, axis=1)
+                se_het = float(
+                    np.std(rep_het, ddof=1) / sqrt_reps)
+                fst_se = float(
+                    np.std(fst_rep, ddof=1) / sqrt_reps)
+            else:
+                se_freq = float(
+                    np.std(frequencies, ddof=1) / sqrt_reps)
+                se_het = float(
+                    np.std(het_values, ddof=1) / sqrt_reps)
+                fst_se = 0.0
+        else:
+            se_freq = 0.0
+            se_het = 0.0
+            fst_se = 0.0
+
+        row_template[0] = float(gen)
+        row_template[1] = mean_freq
+        row_template[2] = heterozygosity
+        row_template[3] = se_freq
+        row_template[4] = se_het
+        row_template[5] = n_A_fixed
+        row_template[6] = n_a_fixed
+        if structured:
+            row_template[7] = fst
+            row_template[8] = fst_se
+        data_arr[gen] = row_template
+
+        if return_replicate_data:
+            freqs_flat = frequencies.flatten() if structured else frequencies
+            rep_arr[gen, 0] = float(gen)
+            rep_arr[gen, 1:] = freqs_flat
 
         if gen < generations:
-            # Binomial sampling: draw 2N allele copies for each replicate
-            counts = rng.binomial(two_n, frequencies)  # shape (replicate_runs,)
+            two_n_gen = 2 * (n_series[gen] if n_series is not None
+                             else population_size)
+
+            if selection_coefficient != 0.0:
+                s = selection_coefficient
+                if dominance is None:
+                    p_adj = frequencies * (1.0 + s) / (
+                        1.0 + frequencies * s)
+                else:
+                    h = dominance
+                    p = frequencies
+                    p2 = p * p
+                    pq = p * (1.0 - p)
+                    q2 = (1.0 - p) * (1.0 - p)
+                    w_bar = (p2 * (1.0 + s) + 2.0 * pq * (
+                        1.0 + h * s) + q2)
+                    p_adj = (p2 * (1.0 + s) + pq * (
+                        1.0 + h * s)) / w_bar
+            else:
+                p_adj = frequencies
+
+            counts = rng.binomial(two_n_gen, p_adj)
 
             if mutation_rate > 0.0:
-                # Symmetric mutation: each allele copy mutates to the other
-                # with probability mutation_rate.
-                n_a_copies = two_n - counts
+                n_a_copies = two_n_gen - counts
                 mut_A_to_a = rng.binomial(counts, mutation_rate)
                 mut_a_to_A = rng.binomial(n_a_copies, mutation_rate)
                 counts = counts - mut_A_to_a + mut_a_to_A
 
-            frequencies = counts.astype(np.float64) / two_n
+            frequencies = counts.astype(np.float64) / two_n_gen
+
+            # Step 4: Migration (island model) — vectorized across replicates
+            if structured and migration_rate > 0.0:
+                m = migration_rate
+                p_global = np.mean(frequencies, axis=1, keepdims=True)
+                frequencies = (1.0 - m) * frequencies + m * p_global
+
+        if verbose and generations > 0 and (
+                gen % report_interval == 0 or gen == generations):
+            pct = gen * 100 // generations
+            print(f"  Wright-Fisher: {pct}% complete "
+                  f"(generation {gen}/{generations})")
+
+    data = data_arr.tolist()
+    if return_replicate_data:
+        replicate_data = rep_arr.tolist()
+
+    base_colnames = ["generation", "mean_frequency", "heterozygosity",
+                     "mean_frequency_se", "heterozygosity_se",
+                     "n_A_fixed", "n_a_fixed"]
+    if structured:
+        colnames = base_colnames + ["fst", "fst_se"]
+    else:
+        colnames = base_colnames
+
+    if return_replicate_data and replicate_data is not None:
+        if structured:
+            replicate_colnames = (
+                ["generation"] +
+                [f"rep_{i}_deme_{d}"
+                 for i in range(replicate_runs)
+                 for d in range(n_demes)])
+        else:
+            replicate_colnames = (
+                ["generation"] +
+                [f"rep_{i}" for i in range(replicate_runs)])
+    else:
+        replicate_colnames = None
+
+    wf_params: Dict[str, Any] = {
+        "population_size": population_size,
+        "starting_frequency": starting_frequency,
+        "generations": generations,
+        "replicate_runs": replicate_runs,
+        "mutation_rate": mutation_rate,
+        "selection_coefficient": selection_coefficient,
+        "dominance": dominance,
+        "population_size_series": population_size_series,
+        "n_demes": n_demes,
+        "migration_rate": migration_rate,
+        "fixation_gen_A": fixation_gen_A.tolist(),
+        "fixation_gen_a": fixation_gen_a.tolist(),
+        "final_frequencies": frequencies.flatten().tolist(),
+    }
 
     return SimulationResult(
-        colnames=["generation", "mean_frequency", "heterozygosity",
-                  "n_A_fixed", "n_a_fixed"],
+        colnames=colnames,
         data=data,
         model_name="wright_fisher",
         validation=validation,
+        replicate_data=replicate_data,
+        replicate_colnames=replicate_colnames,
+        wright_fisher_params=wf_params,
     )
+
+
+# ---------------------------------------------------------------------------
+# Scenario presets for the Wright-Fisher model
+# ---------------------------------------------------------------------------
+
+_SCENARIO_REGISTRY: Dict[str, Dict[str, Any]] = {
+    "neutral-drift": {
+        "description": "Neutral drift at a moderate population size",
+        "population_size": 100,
+        "starting_frequency": 0.5,
+        "generations": 200,
+        "replicate_runs": 50,
+    },
+    "rapid-drift": {
+        "description": "Small population — drift is fast and visible",
+        "population_size": 10,
+        "starting_frequency": 0.5,
+        "generations": 50,
+        "replicate_runs": 50,
+    },
+    "mutation-drift": {
+        "description": "Mutation-drift balance — heterozygosity reaches H_eq",
+        "population_size": 50,
+        "starting_frequency": 0.5,
+        "generations": 500,
+        "replicate_runs": 100,
+        "mutation_rate": 0.02,
+    },
+    "weak-selection": {
+        "description": "Weak positive selection (s=0.03) — slight bias",
+        "population_size": 100,
+        "starting_frequency": 0.3,
+        "generations": 300,
+        "replicate_runs": 100,
+        "selection_coefficient": 0.03,
+        "dominance": None,
+    },
+    "strong-selection": {
+        "description": "Strong positive selection (s=0.2) — beneficial allele fixes rapidly",
+        "population_size": 100,
+        "starting_frequency": 0.2,
+        "generations": 100,
+        "replicate_runs": 100,
+        "selection_coefficient": 0.2,
+        "dominance": None,
+    },
+    "purifying-selection": {
+        "description": "Negative selection (s=-0.1) — deleterious allele rarely fixes",
+        "population_size": 100,
+        "starting_frequency": 0.5,
+        "generations": 300,
+        "replicate_runs": 100,
+        "selection_coefficient": -0.1,
+        "dominance": None,
+    },
+    "bottleneck": {
+        "description": "Population bottleneck: N=100 drops to N=5 at gen 50, then recovers",
+        "population_size": 100,
+        "starting_frequency": 0.5,
+        "generations": 200,
+        "replicate_runs": 100,
+    },
+    "island-model": {
+        "description": "Wright's island model: 10 demes, low migration (m=0.01)",
+        "population_size": 100,
+        "starting_frequency": 0.5,
+        "generations": 200,
+        "replicate_runs": 50,
+        "n_demes": 10,
+        "migration_rate": 0.01,
+    },
+    "structured-neutral": {
+        "description": "10 demes, no migration — demes drift independently",
+        "population_size": 100,
+        "starting_frequency": 0.5,
+        "generations": 200,
+        "replicate_runs": 50,
+        "n_demes": 10,
+        "migration_rate": 0.0,
+    },
+    "founder-effect": {
+        "description": "Founder event: N=20, rare allele (p0=0.1) — drift decides its fate",
+        "population_size": 20,
+        "starting_frequency": 0.1,
+        "generations": 200,
+        "replicate_runs": 100,
+    },
+    "population-expansion": {
+        "description": "Population expansion: N=10 grows to N=1000 over 200 generations",
+        "population_size": 10,
+        "starting_frequency": 0.5,
+        "generations": 200,
+        "replicate_runs": 100,
+    },
+}
+
+
+def list_scenarios() -> List[str]:
+    """Return the names of all available WF scenario presets."""
+    return list(_SCENARIO_REGISTRY.keys())
+
+
+def wright_fisher_scenario(
+    name: str, seed: int | None = None,
+    return_replicate_data: bool = False,
+    **overrides: Any,
+) -> SimulationResult:
+    """Run a named WF teaching scenario.
+
+    Available scenarios (use ``list_scenarios()`` to list them):
+        - neutral-drift, rapid-drift
+        - mutation-drift
+        - weak-selection, strong-selection, purifying-selection
+        - bottleneck
+        - island-model, structured-neutral
+        - founder-effect, population-expansion
+
+    Any keyword ``**overrides`` is merged into the scenario's parameter
+    dict before running, so callers can tweak e.g. ``generations`` or
+    ``replicate_runs`` without modifying the preset.
+
+    Args:
+        name: scenario name (must be in the registry)
+        seed: optional RNG seed
+        return_replicate_data: forward to ``simulate_wright_fisher``
+        **overrides: parameter overrides for this run
+
+    Returns:
+        SimulationResult from the scenario's parameter set
+    """
+    if name not in _SCENARIO_REGISTRY:
+        known = ", ".join(sorted(_SCENARIO_REGISTRY))
+        raise KeyError(
+            f"unknown scenario {name!r}; choose from: {known}")
+
+    params = dict(_SCENARIO_REGISTRY[name])
+    params.pop("description", None)
+    params.update(overrides)
+
+    # Build population_size_series for scenarios that define it
+    if name == "bottleneck" and "population_size_series" not in overrides:
+        n_before = params.get("population_size", 100)
+        gens = params.get("generations", 200)
+        series = [n_before] * (gens + 1)
+        # Bottleneck at generation 50: drops to 5 for 10 generations
+        bottleneck_start = 50
+        bottleneck_end = 60
+        for i in range(bottleneck_start, min(bottleneck_end, gens + 1)):
+            series[i] = 5
+        params["population_size_series"] = series
+
+    if (name == "population-expansion"
+            and "population_size_series" not in overrides):
+        n_start = params.get("population_size", 10)
+        n_end = 1000
+        gens = params.get("generations", 200)
+        series = []
+        for i in range(gens + 1):
+            frac = i / gens if gens > 0 else 1.0
+            series.append(int(round(n_start + (n_end - n_start) * frac)))
+        params["population_size_series"] = series
+
+    return simulate_wright_fisher(
+        **params,
+        seed=seed,
+        return_replicate_data=return_replicate_data,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Kimura fixation probability (selection-drift balance)
+# ---------------------------------------------------------------------------
+
+
+def kimura_fixation_probability(
+    starting_frequency: float,
+    selection_coefficient: float,
+    population_size: int,
+    dominance: float | None = None,
+) -> float:
+    """Kimura's (1962) probability that allele A fixes under selection
+    and drift in a diploid Wright-Fisher population of size ``N``.
+
+    With ``dominance=None`` (haploid selection over the 2N allele
+    copies) the closed form is::
+
+        P_fix = (1 - exp(-4Ns p0)) / (1 - exp(-4Ns))
+
+    With ``dominance=h`` (diploid fitnesses AA: 1+s, Aa: 1+hs, aa: 1),
+    the diffusion approximation is evaluated numerically::
+
+        P_fix(p0) = ∫₀^p0 G(x) dx / ∫₀^1 G(x) dx
+        G(x) = exp(-4Ns (h x + (1-2h) x² / 2))
+
+    For ``s=0`` the neutral result ``P_fix = p0`` is returned, and for
+    very strong positive selection the probability saturates at 1.0.
+
+    Args:
+        starting_frequency: initial frequency of allele A, in [0, 1]
+        selection_coefficient: selective advantage of A (s); > -1
+        population_size: diploid census size N
+        dominance: None = haploid selection; in [0, 1] for diploid
+
+    Returns:
+        the fixation probability of allele A in [0, 1]
+
+    Raises:
+        ValueError: on invalid parameters
+    """
+    if population_size <= 0:
+        raise ValueError("population_size must be positive")
+    if not 0.0 <= starting_frequency <= 1.0:
+        raise ValueError(
+            "starting_frequency must be in [0, 1]")
+    if selection_coefficient <= -1.0:
+        raise ValueError("selection_coefficient must be > -1")
+    if dominance is not None and not 0.0 <= dominance <= 1.0:
+        raise ValueError("dominance must be in [0, 1] or None")
+
+    if starting_frequency == 0.0:
+        return 0.0
+    if starting_frequency == 1.0:
+        return 1.0
+    if selection_coefficient == 0.0:
+        return float(starting_frequency)
+
+    s = selection_coefficient
+    N = int(population_size)
+
+    if dominance is None:
+        # Closed form for haploid selection over 2N copies
+        if s > 0.0 and 4.0 * N * s > 700.0:
+            return 1.0
+        if s < 0.0 and -4.0 * N * s > 700.0:
+            return 0.0
+        e1 = math.exp(-4.0 * N * s * starting_frequency)
+        e2 = math.exp(-4.0 * N * s)
+        return (1.0 - e1) / (1.0 - e2)
+
+    # Diploid with dominance: numerical diffusion integral
+    h = dominance
+    alpha = 4.0 * N * s
+    if alpha * (h + (1.0 - 2.0 * h) * 0.5) > 700.0:
+        # exp(-alpha * I(x)) underflows to 0 everywhere -> fixation certain
+        return 1.0
+
+    def integrand(x: float) -> float:
+        return math.exp(-alpha * (h * x + (1.0 - 2.0 * h) * x * x / 2.0))
+
+    # scipy is a declared runtime dependency; import lazily to keep
+    # module import fast for the other models
+    from scipy.integrate import quad
+    num, _ = quad(integrand, 0.0, starting_frequency)
+    den, _ = quad(integrand, 0.0, 1.0)
+    if den == 0.0:
+        return 1.0
+    return float(num / den)

@@ -53,19 +53,44 @@ Stage 2 Part 4, and re-verified after Stage 2 refactoring):
     heterozygosity. The backward-compatibility test (mutation_rate=0
     vs omit) passes because both paths use the same ignored rate.
     All neutral-drift tests pass because they never set mutation_rate > 0.
+
+4. "Selection-coefficient parameter is silently ignored" (post-close).
+    Mutation: the selection_coefficient and dominance parameters are
+              accepted but never used to adjust expected frequencies
+              before binomial sampling.
+    Added and independently reproduced 2026-07-30: 4 tests fail —
+    test_selection_fixation_probability, test_positive_selection_
+    increases_fixation, test_negative_selection_decreases_fixation,
+    and test_selection_haploid_diploid_differ. Backward-compatibility
+    (s=0) and all neutral/mutation tests pass because they never set
+    s != 0.
 """
+
+import pathlib
 
 import numpy as np
 import pytest
+
+# Tellurium/cli.py is invoked as `python -m Tellurium.cli` (see its own
+# docstring), which requires the repo root -- the parent of Tellurium/ --
+# as the subprocess's working directory. Tests here run with cwd=Tellurium/
+# (see Makefile's `test-sim` target and CI's `working-directory:
+# Tellurium`), so every CLI subprocess call must pass cwd explicitly, not
+# rely on the test runner's own working directory.
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 from tellurium_engine import (
     WF_PLAUSIBLE_MIN_POPULATION_SIZE,
     WF_PLAUSIBLE_MAX_GENERATIONS,
     WF_PLAUSIBLE_MIN_REPLICATE_RUNS,
     WF_PLAUSIBLE_MAX_MUTATION_RATE,
+    WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT,
     ModelBuildError,
+    kimura_fixation_probability,
+    list_scenarios,
     simulate_wright_fisher,
     validate_wright_fisher_params,
+    wright_fisher_scenario,
 )
 
 
@@ -190,6 +215,20 @@ def test_excessive_mutation_rate_is_rejected() -> None:
     assert not v.ok
 
 
+def test_mutation_rate_one_is_valid() -> None:
+    """mutation_rate=1.0 is the upper boundary of [0,1]; every allele
+    flips every generation. Valid but extreme.
+    """
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        mutation_rate=1.0)
+    assert v.ok
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42, mutation_rate=1.0)
+    assert len(result.data) == 11
+
+
 def test_nan_mutation_rate_is_rejected() -> None:
     v = validate_wright_fisher_params(
         population_size=100, starting_frequency=0.5, generations=10,
@@ -209,6 +248,112 @@ def test_boolean_mutation_rate_is_rejected() -> None:
         population_size=100, starting_frequency=0.5, generations=10,
         mutation_rate=True)
     assert not v.ok
+
+
+def test_selection_below_minus_one_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=-1.5)
+    assert not v.ok
+    with pytest.raises(ModelBuildError):
+        simulate_wright_fisher(
+            population_size=100, starting_frequency=0.5, generations=10,
+            selection_coefficient=-1.5)
+
+
+def test_selection_coefficient_minus_one_boundary_rejected() -> None:
+    """s = -1.0 is the boundary of the valid range (must be > -1).
+    s = -1 would make allele A lethal (fitness=0), which causes a
+    division-by-zero in the haploid selection formula.
+    """
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=-1.0)
+    assert not v.ok
+    assert any("> -1" in e for e in v.errors)
+
+
+def test_nan_selection_coefficient_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=float("nan"))
+    assert not v.ok
+
+
+def test_inf_selection_coefficient_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=float("inf"))
+    assert not v.ok
+
+
+def test_boolean_selection_coefficient_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=True)
+    assert not v.ok
+
+
+def test_dominance_below_zero_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=0.05, dominance=-0.1)
+    assert not v.ok
+
+
+def test_dominance_above_one_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=0.05, dominance=1.5)
+    assert not v.ok
+
+
+def test_boolean_dominance_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=0.05, dominance=True)
+    assert not v.ok
+
+
+def test_nan_dominance_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=0.05, dominance=float("nan"))
+    assert not v.ok
+
+
+def test_dominance_boundaries_zero_and_one_are_valid() -> None:
+    for h in (0.0, 1.0):
+        v = validate_wright_fisher_params(
+            population_size=100, starting_frequency=0.5, generations=10,
+            selection_coefficient=0.05, dominance=h)
+        assert v.ok, f"dominance={h} was rejected: {v.errors}"
+        result = simulate_wright_fisher(
+            population_size=100, starting_frequency=0.5, generations=10,
+            replicate_runs=5, seed=42, selection_coefficient=0.05,
+            dominance=h)
+        assert len(result.data) == 11
+
+
+def test_numpy_float_types_for_selection_params() -> None:
+    """numpy.float64/32 are NOT subclasses of Python float in numpy 2.x.
+    selection_coefficient and dominance must accept them.
+    """
+    import numpy as np
+    for float_type in (np.float64, np.float32):
+        v = validate_wright_fisher_params(
+            population_size=100, starting_frequency=0.5, generations=10,
+            selection_coefficient=float_type(0.05))
+        assert v.ok, f"{float_type.__name__} selection_coefficient rejected"
+        v = validate_wright_fisher_params(
+            population_size=100, starting_frequency=0.5, generations=10,
+            selection_coefficient=float_type(0.05),
+            dominance=float_type(0.5))
+        assert v.ok, f"{float_type.__name__} dominance rejected"
+        v = validate_wright_fisher_params(
+            population_size=100, starting_frequency=0.5, generations=10,
+            mutation_rate=float_type(0.01))
+        assert v.ok, f"{float_type.__name__} mutation_rate rejected"
 
 
 # ---------------------------------------------------------------------------
@@ -349,6 +494,56 @@ def test_mutation_rate_below_threshold_not_flagged() -> None:
     assert not v.flagged
 
 
+def test_strong_positive_selection_is_flagged() -> None:
+    high = WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT + 0.1
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=high)
+    assert v.ok
+    assert v.flagged
+    assert "selection" in v.flag_reason.lower()
+
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=high)
+    assert result.flagged
+
+
+def test_strong_negative_selection_is_flagged() -> None:
+    high = -(WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT + 0.1)
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        selection_coefficient=high)
+    assert v.ok
+    assert v.flagged
+    assert "selection" in v.flag_reason.lower()
+
+
+def test_zero_selection_not_flagged() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=10, selection_coefficient=0.0)
+    assert v.ok
+    assert not v.flagged
+
+
+def test_moderate_selection_not_flagged() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=10,
+        selection_coefficient=WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT)
+    assert v.ok
+    assert not v.flagged
+
+
+def test_dominance_none_with_selection_is_valid() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=10, selection_coefficient=0.1, dominance=None)
+    assert v.ok
+    assert not v.flagged
+
+
 def test_multiple_flag_conditions_are_all_reported() -> None:
     # N below threshold AND p0 degenerate AND few reps — the old elif chain
     # silently dropped all but the first. Every condition must be visible.
@@ -374,6 +569,7 @@ def test_result_has_expected_columns() -> None:
         replicate_runs=5, seed=42)
     assert result.colnames == [
         "generation", "mean_frequency", "heterozygosity",
+        "mean_frequency_se", "heterozygosity_se",
         "n_A_fixed", "n_a_fixed"]
     assert result.model_name == "wright_fisher"
 
@@ -428,8 +624,10 @@ def test_fixation_counts_are_non_negative_and_bounded() -> None:
         assert a_fixed >= 0
         assert a_lost >= 0
         assert a_fixed + a_lost <= 30.0
-        # Once a replicate's frequency hits 0.0 or 1.0, binomial sampling
-        # keeps it there forever — fixation counts are monotonic.
+        # Without mutation (default 0), once a replicate's frequency hits
+        # 0.0 or 1.0, binomial sampling keeps it there forever — fixation
+        # counts are monotonic. With mutation_rate > 0 this would not hold
+        # (mutation can reintroduce the lost allele).
         assert a_fixed >= prev_a, (
             f"n_A_fixed decreased from {prev_a} to {a_fixed}")
         assert a_lost >= prev_b, (
@@ -866,6 +1064,141 @@ def test_mutation_drift_equilibrium() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Selection behaviour: backward compatibility and effect tests
+# ---------------------------------------------------------------------------
+
+
+def test_selection_zero_gives_identical_results() -> None:
+    """selection_coefficient=0.0 must produce identical output to omitting
+    the parameter entirely (backward compatibility).
+    """
+    result_no_sel = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=30,
+        replicate_runs=10, seed=42)
+    result_zero_sel = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=30,
+        replicate_runs=10, seed=42, selection_coefficient=0.0)
+    assert result_no_sel.data == result_zero_sel.data
+
+
+def test_positive_selection_increases_fixation() -> None:
+    """Under positive selection, a beneficial allele fixes more often
+    than under neutrality.
+    """
+    n = 50
+    p0 = 0.2
+    s = 0.08
+    gens = 300
+    reps = 100
+
+    result_sel = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42, selection_coefficient=s)
+    result_neutral = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42, selection_coefficient=0.0)
+
+    n_A_sel = result_sel.column("n_A_fixed")[-1]
+    n_A_neutral = result_neutral.column("n_A_fixed")[-1]
+    assert n_A_sel > n_A_neutral, (
+        f"positive selection (s={s}) gave {n_A_sel} A-fixed replicates "
+        f"vs neutral {n_A_neutral}"
+    )
+
+
+def test_negative_selection_decreases_fixation() -> None:
+    """Under negative selection, a deleterious allele fixes less often
+    than under neutrality.
+    """
+    n = 50
+    p0 = 0.8
+    s = -0.08
+    gens = 300
+    reps = 100
+
+    result_sel = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42, selection_coefficient=s)
+    result_neutral = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42, selection_coefficient=0.0)
+
+    n_A_sel = result_sel.column("n_A_fixed")[-1]
+    n_A_neutral = result_neutral.column("n_A_fixed")[-1]
+    assert n_A_sel < n_A_neutral, (
+        f"negative selection (s={s}) gave {n_A_sel} A-fixed replicates "
+        f"vs neutral {n_A_neutral}"
+    )
+
+
+def test_selection_haploid_diploid_differ() -> None:
+    """Haploid (dominance=None) and diploid (dominance=h) selection
+    models produce different fixation counts for the same s.
+    """
+    n = 100
+    p0 = 0.3
+    s = 0.1
+    gens = 200
+    reps = 100
+
+    result_hap = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42, selection_coefficient=s,
+        dominance=None)
+    result_dip = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42, selection_coefficient=s,
+        dominance=0.5)
+
+    n_A_hap = result_hap.column("n_A_fixed")[-1]
+    n_A_dip = result_dip.column("n_A_fixed")[-1]
+    assert n_A_hap != n_A_dip, (
+        f"haploid and diploid models gave identical A-fixed count "
+        f"({n_A_hap}) — expected different counts"
+    )
+
+
+def test_selection_fixation_probability() -> None:
+    """Under haploid selection, the fixation probability of a beneficial
+    allele follows Kimura's formula:
+
+        P_fix = (1 - e^(-4Nsp0)) / (1 - e^(-4Ns))
+
+    Verified with N=50, s=0.03, p0=0.3, 500 replicates.
+    """
+    n = 50
+    p0 = 0.3
+    s = 0.03
+    gens = 500
+    reps = 500
+
+    # Kimura fixation probability for haploid model with 2N copies
+    p_fix_theory = (
+        (1.0 - np.exp(-4.0 * n * s * p0)) /
+        (1.0 - np.exp(-4.0 * n * s)))
+
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42, selection_coefficient=s,
+        dominance=None)
+
+    n_A = result.column("n_A_fixed")[-1]
+    n_a = result.column("n_a_fixed")[-1]
+    total_fixed = n_A + n_a
+    if total_fixed > 0:
+        obs_p_fix = n_A / total_fixed
+    else:
+        obs_p_fix = 0.0
+
+    # Tolerance: 0.06, covering ~3 SE for 500 reps
+    assert abs(obs_p_fix - p_fix_theory) < 0.06, (
+        f"observed fixation probability {obs_p_fix:.4f} "
+        f"deviates from Kimura prediction {p_fix_theory:.4f} "
+        f"(A_fixed={int(n_A)}, a_fixed={int(n_a)})"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Mutation test: mutation-rate parameter is silently ignored
 # ---------------------------------------------------------------------------
 
@@ -877,3 +1210,1083 @@ def test_mutation_mutation_rate_ignored() -> None:
     equilibrium level).
     """
     pass
+
+
+# ---------------------------------------------------------------------------
+# Mutation test: selection-coefficient parameter is silently ignored
+# ---------------------------------------------------------------------------
+
+
+def test_mutation_selection_ignored() -> None:
+    """If selection_coefficient is received but never applied to the
+    expected allele frequency before binomial sampling, then simulations
+    with s > 0 behave identically to neutral (s=0) ones. The fixation-
+    probability target and the directional-comparison tests catch this.
+    """
+    pass
+
+
+# ---------------------------------------------------------------------------
+# Per-replicate data (return_replicate_data=True)
+# ---------------------------------------------------------------------------
+
+
+def test_replicate_data_default_not_present() -> None:
+    """By default, replicate_data should be None (backward compat)."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42)
+    assert result.replicate_data is None
+    assert result.replicate_colnames is None
+
+
+def test_replicate_data_has_expected_shape() -> None:
+    gens = 20
+    reps = 5
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=gens,
+        replicate_runs=reps, seed=42, return_replicate_data=True)
+    assert result.replicate_data is not None
+    assert result.replicate_colnames is not None
+    # One row per generation (0..gens inclusive) = gens+1 rows
+    assert len(result.replicate_data) == gens + 1
+    # Columns: generation + rep_0 .. rep_{reps-1}
+    assert len(result.replicate_colnames) == 1 + reps
+    assert result.replicate_colnames[0] == "generation"
+    assert result.replicate_colnames[1] == "rep_0"
+    assert result.replicate_colnames[-1] == f"rep_{reps - 1}"
+    # Each row has the right number of columns
+    for row in result.replicate_data:
+        assert len(row) == 1 + reps
+
+
+def test_replicate_data_generation_zero() -> None:
+    """At gen 0, all replicates should be at starting_frequency."""
+    p0 = 0.3
+    reps = 10
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=p0, generations=5,
+        replicate_runs=reps, seed=42, return_replicate_data=True)
+    assert result.replicate_data is not None
+    row0 = result.replicate_data[0]
+    assert row0[0] == 0.0  # generation
+    for freq in row0[1:]:
+        assert freq == pytest.approx(p0)
+
+
+def test_replicate_data_seeded_reproducibility() -> None:
+    """Same seed + return_replicate_data must produce bit-identical
+    per-replicate trajectories.
+    """
+    r1 = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=99, return_replicate_data=True)
+    r2 = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=99, return_replicate_data=True)
+    assert r1.replicate_data is not None
+    assert r2.replicate_data is not None
+    for row1, row2 in zip(r1.replicate_data, r2.replicate_data):
+        assert row1 == row2
+
+
+def test_replicate_data_selection_diverge() -> None:
+    """With return_replicate_data, selection should cause replicate
+    trajectories to differ between selection and neutral runs with
+    the same seed.
+    """
+    result_sel = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.3, generations=30,
+        replicate_runs=5, seed=42, selection_coefficient=0.1,
+        return_replicate_data=True)
+    result_neut = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.3, generations=30,
+        replicate_runs=5, seed=42, selection_coefficient=0.0,
+        return_replicate_data=True)
+    assert result_sel.replicate_data is not None
+    assert result_neut.replicate_data is not None
+    # At least one row should differ between selection and neutral
+    sel_rows = [tuple(row) for row in result_sel.replicate_data]
+    neut_rows = [tuple(row) for row in result_neut.replicate_data]
+    assert sel_rows != neut_rows, (
+        "selection and neutral trajectories are identical — "
+        "selection likely not applied")
+
+
+# ---------------------------------------------------------------------------
+# Scenario presets
+# ---------------------------------------------------------------------------
+
+
+def test_list_scenarios_returns_known_names() -> None:
+    scenarios = list_scenarios()
+    assert isinstance(scenarios, list)
+    assert len(scenarios) >= 6
+    for name in ("neutral-drift", "rapid-drift", "mutation-drift",
+                 "weak-selection", "strong-selection",
+                 "purifying-selection"):
+        assert name in scenarios
+
+
+def test_invalid_scenario_raises_key_error() -> None:
+    with pytest.raises(KeyError, match="unknown scenario"):
+        wright_fisher_scenario("nonexistent-scenario")
+
+
+def test_scenario_neutral_drift_runs() -> None:
+    result = wright_fisher_scenario(
+        "neutral-drift", seed=42, return_replicate_data=True)
+    assert result.model_name == "wright_fisher"
+    assert result.replicate_data is not None
+    assert result.column("generation")[0] == 0.0
+
+
+def test_scenario_with_overrides() -> None:
+    result = wright_fisher_scenario(
+        "neutral-drift", seed=42, generations=10, replicate_runs=5)
+    assert len(result.data) == 11  # generations=10 => 11 rows
+
+
+def test_scenario_mutation_drift() -> None:
+    result = wright_fisher_scenario(
+        "mutation-drift", seed=42, return_replicate_data=False)
+    # Mutation-drift equilibrium: H should be well above zero
+    h_final = result.column("heterozygosity")[-1]
+    assert h_final > 0.1, (
+        f"mutation-drift scenario H={h_final:.4f} — mutation likely "
+        f"not applied")
+
+
+def test_scenario_strong_selection() -> None:
+    """Strong positive selection should fix allele A in most replicates."""
+    result = wright_fisher_scenario(
+        "strong-selection", seed=42)
+    n_A = result.column("n_A_fixed")[-1]
+    n_a = result.column("n_a_fixed")[-1]
+    assert n_A > n_a, (
+        f"strong selection: A_fixed={n_A} <= a_fixed={n_a}, "
+        f"expected A to fix more often"
+    )
+
+
+# ---------------------------------------------------------------------------
+# describe()
+# ---------------------------------------------------------------------------
+
+
+def test_describe_includes_model_name() -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=0)
+    summary = result.describe()
+    assert "wright_fisher" in summary
+    assert "Generations" in summary
+    assert "Rows" in summary
+
+
+# ---------------------------------------------------------------------------
+# Standard error columns
+# ---------------------------------------------------------------------------
+
+
+def test_result_has_se_columns() -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=20, seed=42)
+    assert "mean_frequency_se" in result.colnames
+    assert "heterozygosity_se" in result.colnames
+
+
+def test_se_at_generation_zero_is_zero() -> None:
+    """At gen 0 all replicates are identical, so SE is zero."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=20, seed=42)
+    assert result.column("mean_frequency_se")[0] == 0.0
+    assert result.column("heterozygosity_se")[0] == 0.0
+
+
+def test_se_increases_with_drift() -> None:
+    """As drift progresses, replicates diverge → SE grows."""
+    result = simulate_wright_fisher(
+        population_size=20, starting_frequency=0.5, generations=50,
+        replicate_runs=100, seed=42)
+    se_trajectory = result.column("mean_frequency_se")
+    # SE should be non-decreasing on average (monotonicity not guaranteed
+    # due to sampling noise, but the last value should exceed the first)
+    assert se_trajectory[-1] > se_trajectory[0]
+
+
+def test_single_replicate_se_is_zero() -> None:
+    """With 1 replicate, SE cannot be estimated — return 0."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=1, seed=42)
+    for se in result.column("mean_frequency_se"):
+        assert se == 0.0
+    for se in result.column("heterozygosity_se"):
+        assert se == 0.0
+
+
+def test_many_replicates_se_is_small() -> None:
+    """With many replicates, the SE of mean frequency should be small
+    relative to the theoretical variance.
+    """
+    n = 100
+    p0 = 0.5
+    gens = 50
+    reps = 500
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42)
+    se = result.column("mean_frequency_se")[-1]
+    # Theoretical maximum SD under drift: sqrt(p0*(1-p0)) = 0.5
+    # With 500 reps, SE should be well below 0.1
+    assert se < 0.1, f"SE={se:.4f}, expected < 0.1 for {reps} replicates"
+
+
+def test_se_and_replicate_data_agree() -> None:
+    """The SE column should match std across per-replicate data."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=20,
+        replicate_runs=10, seed=42, return_replicate_data=True)
+    assert result.replicate_data is not None
+    se_col = result.column("mean_frequency_se")
+    for i, row in enumerate(result.replicate_data):
+        freqs = row[1:]  # skip generation column
+        expected_se = float(np.std(freqs, ddof=1) / np.sqrt(len(freqs)))
+        assert abs(se_col[i] - expected_se) < 1e-10, (
+            f"generation {i}: reported SE {se_col[i]} != computed {expected_se}"
+        )
+
+
+def test_summarize_returns_expected_keys() -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=20, seed=42)
+    info = result.summarize()
+    assert info["model_name"] == "wright_fisher"
+    assert info["generations"] == 10
+    assert "final_mean_frequency" in info
+    assert "final_heterozygosity" in info
+    assert "n_A_fixed" in info
+    assert "n_a_fixed" in info
+    assert "final_mean_frequency_se" in info
+    assert "final_heterozygosity_se" in info
+    assert "flagged" in info
+
+
+def test_summarize_se_consistency() -> None:
+    """summarize SE should match the last row of the SE column."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=20, seed=42)
+    info = result.summarize()
+    assert info["final_mean_frequency_se"] == (
+        result.column("mean_frequency_se")[-1])
+    assert info["final_heterozygosity_se"] == (
+        result.column("heterozygosity_se")[-1])
+
+
+# ---------------------------------------------------------------------------
+# Population size series (time-varying N)
+# ---------------------------------------------------------------------------
+
+
+def test_constant_series_matches_constant_n() -> None:
+    """population_size_series with all same values is identical
+    to using constant population_size.
+    """
+    n = 50
+    gens = 10
+    reps = 5
+    series = [n] * (gens + 1)
+
+    r_const = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=gens,
+        replicate_runs=reps, seed=42)
+    r_series = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=gens,
+        replicate_runs=reps, seed=42, population_size_series=series)
+
+    assert r_const.data == r_series.data
+    assert r_const.colnames == r_series.colnames
+
+
+def test_bottleneck_accelerates_drift() -> None:
+    """A population bottleneck (N drops then recovers) should cause
+    faster heterozygosity decay than constant N.
+    """
+    n = 100
+    gens = 100
+    reps = 200
+
+    series = [n] * (gens + 1)
+    # Bottleneck at gen 30–40: N drops to 5
+    for i in range(30, min(40, gens + 1)):
+        series[i] = 5
+
+    r_const = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=gens,
+        replicate_runs=reps, seed=42)
+    r_bn = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=gens,
+        replicate_runs=reps, seed=42, population_size_series=series)
+
+    h_const = r_const.column("heterozygosity")[-1]
+    h_bn = r_bn.column("heterozygosity")[-1]
+    assert h_bn < h_const, (
+        f"bottleneck H={h_bn:.4f} should be < constant N H={h_const:.4f}"
+    )
+
+
+def test_series_wrong_length_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        population_size_series=[100] * 5)
+    assert not v.ok
+
+
+def test_series_negative_value_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        population_size_series=[100, 100, -1, 100, 100, 100,
+                                100, 100, 100, 100, 100])
+    assert not v.ok
+
+
+def test_series_boolean_value_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=5,
+        population_size_series=[100, 100, True, 100, 100, 100])
+    assert not v.ok
+
+
+def test_series_small_n_flagged() -> None:
+    """Element below WF_PLAUSIBLE_MIN_POPULATION_SIZE should flag."""
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        population_size_series=[100] * 5 + [5] + [100] * 5)
+    assert v.ok
+    assert v.flagged
+    assert "extremely rapid" in v.flag_reason.lower()
+
+
+def test_series_not_a_list_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=5,
+        population_size_series="not-a-list")
+    assert not v.ok
+
+
+def test_scenario_bottleneck_runs() -> None:
+    result = wright_fisher_scenario("bottleneck", seed=42)
+    assert result.column("n_A_fixed")[-1] >= 0
+    assert result.column("n_a_fixed")[-1] >= 0
+    assert result.column("heterozygosity")[-1] < 0.5
+
+
+# ---------------------------------------------------------------------------
+# Migration / island model (n_demes, migration_rate)
+# ---------------------------------------------------------------------------
+
+
+def test_n_demes_one_with_migration_is_single_population() -> None:
+    """n_demes=1 with migration_rate>0 is the same as no migration
+    (a single deme has no structure to homogenise).
+    """
+    r1 = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42, n_demes=1, migration_rate=0.0)
+    r2 = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42, n_demes=1, migration_rate=0.1)
+    assert r1.data == r2.data
+    assert "fst" not in r1.colnames
+
+
+def test_structured_result_has_fst_column() -> None:
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42, n_demes=5, migration_rate=0.0)
+    assert "fst" in result.colnames
+    assert "fst_se" in result.colnames
+
+
+def test_fst_starts_at_zero() -> None:
+    """At gen 0, all demes are identical → Fst = 0."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42, n_demes=5, migration_rate=0.0)
+    assert result.column("fst")[0] == 0.0
+
+
+def test_no_migration_fst_increases() -> None:
+    """Without migration, demes drift apart → Fst increases over time."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=50,
+        replicate_runs=20, seed=42, n_demes=10, migration_rate=0.0)
+    fst = result.column("fst")
+    assert fst[-1] > fst[0]
+
+
+def test_migration_reduces_fst() -> None:
+    """With migration, Fst stays lower than without migration."""
+    result_no_mig = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=50,
+        replicate_runs=20, seed=42, n_demes=10, migration_rate=0.0)
+    result_mig = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=50,
+        replicate_runs=20, seed=42, n_demes=10, migration_rate=0.05)
+    fst_no = result_no_mig.column("fst")[-1]
+    fst_mig = result_mig.column("fst")[-1]
+    assert fst_mig < fst_no, (
+        f"migration Fst={fst_mig:.4f} should be < no-migration "
+        f"Fst={fst_no:.4f}")
+
+
+def test_high_migration_demes_homogenised() -> None:
+    """With very high migration, Fst stays near zero."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=50,
+        replicate_runs=10, seed=42, n_demes=5, migration_rate=0.5)
+    fst = result.column("fst")[-1]
+    assert fst < 0.05, f"high migration Fst={fst:.4f} should be near 0"
+
+
+def test_invalid_n_demes_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        n_demes=0)
+    assert not v.ok
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        n_demes=-1)
+    assert not v.ok
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        n_demes=True)
+    assert not v.ok
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        n_demes=2.5)
+    assert not v.ok
+
+
+def test_invalid_migration_rate_rejected() -> None:
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        migration_rate=-0.1)
+    assert not v.ok
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        migration_rate=1.5)
+    assert not v.ok
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        migration_rate=float("nan"))
+    assert not v.ok
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        migration_rate=float("inf"))
+    assert not v.ok
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        migration_rate=True)
+    assert not v.ok
+
+
+def test_scenario_island_model_runs() -> None:
+    result = wright_fisher_scenario("island-model", seed=42)
+    assert "fst" in result.colnames
+    assert result.column("fst")[-1] >= 0
+
+
+def test_scenario_structured_neutral_runs() -> None:
+    result = wright_fisher_scenario("structured-neutral", seed=42)
+    assert "fst" in result.colnames
+    # Without migration, Fst should be non-trivial
+    assert result.column("fst")[-1] > 0
+
+
+# ---------------------------------------------------------------------------
+# Performance benchmarks (order-of-magnitude checks, not precise timing)
+# ---------------------------------------------------------------------------
+
+def test_wf_performance_large_generations():
+    """A large simulation (N=1000, gens=20000, rep=10) must finish in
+    under 20 seconds on a modern laptop. Catches accidental quadratic
+    or Python-loop regressions."""
+    import time
+    t0 = time.time()
+    result = simulate_wright_fisher(
+        population_size=1000,
+        starting_frequency=0.5,
+        generations=20000,
+        replicate_runs=10,
+        seed=42,
+    )
+    elapsed = time.time() - t0
+    assert result.column("mean_frequency")[0] == 0.5
+    assert len(result.data) == 20001
+    assert elapsed < 20.0, (
+        f"WF simulation took {elapsed:.1f}s (threshold: 20s)")
+
+
+def test_wf_performance_many_replicates():
+    """Many replicates (N=100, gens=1000, rep=1000) must finish
+    in under 30 seconds. Catches Python-loop regressions in
+    aggregation or data-store overhead."""
+    import time
+    t0 = time.time()
+    result = simulate_wright_fisher(
+        population_size=100,
+        starting_frequency=0.5,
+        generations=1000,
+        replicate_runs=1000,
+        seed=42,
+    )
+    elapsed = time.time() - t0
+    assert len(result.data) == 1001
+    assert elapsed < 30.0, (
+        f"WF simulation took {elapsed:.1f}s (threshold: 30s)")
+
+
+def test_wf_performance_full_feature():
+    """All features enabled (selection + mutation + structure + time-varying
+    N) at moderate scale must finish in under 20 seconds."""
+    import time
+    gens = 5000
+    series = [50 + (i % 50) for i in range(gens + 1)]
+    t0 = time.time()
+    result = simulate_wright_fisher(
+        population_size=100,
+        starting_frequency=0.3,
+        generations=gens,
+        replicate_runs=10,
+        mutation_rate=0.001,
+        selection_coefficient=0.05,
+        dominance=0.5,
+        n_demes=5,
+        migration_rate=0.02,
+        population_size_series=series,
+        seed=42,
+    )
+    elapsed = time.time() - t0
+    assert len(result.data) == gens + 1
+    assert "fst" in result.colnames
+    assert elapsed < 20.0, (
+        f"Full-feature WF took {elapsed:.1f}s (threshold: 20s)")
+
+
+# ---------------------------------------------------------------------------
+# Wright-Fisher parameters, fixation analysis, theoretical trajectories
+# ---------------------------------------------------------------------------
+
+
+def test_wf_params_stored_in_result() -> None:
+    """WF-specific parameters are stored in result.wright_fisher_params."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.3, generations=20,
+        replicate_runs=5, mutation_rate=0.01, selection_coefficient=-0.1,
+        dominance=0.5, n_demes=3, migration_rate=0.05, seed=42)
+    p = result.wright_fisher_params
+    assert p is not None
+    assert p["population_size"] == 50
+    assert p["starting_frequency"] == 0.3
+    assert p["generations"] == 20
+    assert p["replicate_runs"] == 5
+    assert p["mutation_rate"] == 0.01
+    assert p["selection_coefficient"] == -0.1
+    assert p["dominance"] == 0.5
+    assert p["n_demes"] == 3
+    assert p["migration_rate"] == 0.05
+    assert len(p["fixation_gen_A"]) == 5
+    assert len(p["fixation_gen_a"]) == 5
+
+
+def test_fixation_analysis_returns_expected_keys() -> None:
+    """fixation_analysis returns all expected keys."""
+    result = simulate_wright_fisher(
+        population_size=20, starting_frequency=0.4, generations=500,
+        replicate_runs=50, seed=42)
+    fa = result.fixation_analysis()
+    assert "n_replicates" in fa
+    assert "n_fixed_A" in fa
+    assert "n_fixed_a" in fa
+    assert "n_polymorphic" in fa
+    assert "prop_fixed_A" in fa
+    assert "prop_fixed_a" in fa
+    assert "fixation_gen_A" in fa
+    assert "fixation_gen_a" in fa
+    assert fa["n_replicates"] == 50
+
+
+def test_fixation_analysis_replicate_tracking() -> None:
+    """Fixation generations are in [0, generations] or -1 for unfixed."""
+    result = simulate_wright_fisher(
+        population_size=20, starting_frequency=0.4, generations=200,
+        replicate_runs=30, seed=42)
+    fa = result.fixation_analysis()
+    gens = 200
+    for g in fa["fixation_gen_A"]:
+        assert g == -1 or (0 <= g <= gens), f"fixation gen A={g} out of range"
+    for g in fa["fixation_gen_a"]:
+        assert g == -1 or (0 <= g <= gens), f"fixation gen a={g} out of range"
+    assert fa["n_fixed_A"] + fa["n_fixed_a"] + fa["n_polymorphic"] == 30
+
+
+def test_fixation_analysis_no_duplicates() -> None:
+    """A replicate cannot be fixed for both A and a."""
+    result = simulate_wright_fisher(
+        population_size=20, starting_frequency=0.5, generations=300,
+        replicate_runs=30, seed=42)
+    fa = result.fixation_analysis()
+    for gA, ga in zip(fa["fixation_gen_A"], fa["fixation_gen_a"]):
+        assert not (gA >= 0 and ga >= 0), (
+            f"replicate fixed for both A (gen {gA}) and a (gen {ga})")
+
+
+def test_non_wf_result_returns_error() -> None:
+    """Non WF results return error from fixation_analysis."""
+    from tellurium_engine import simulate_sir
+    result = simulate_sir(beta=0.3, gamma=0.1, s0=0.99, i0=0.01)
+    fa = result.fixation_analysis()
+    assert "error" in fa
+
+
+def test_theoretical_heterozygosity_neutral_drift() -> None:
+    """theoretical_heterozygosity matches H_0 * (1 - 1/(2N))^t."""
+    n = 100
+    p0 = 0.5
+    gens = 50
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=10, seed=42)
+    th = result.theoretical_heterozygosity()
+    assert len(th) == gens + 1
+    h0 = 2.0 * p0 * (1.0 - p0)
+    decay = 1.0 - 1.0 / (2.0 * n)
+    for t in range(gens + 1):
+        expected = h0 * (decay ** t)
+        assert abs(th[t] - expected) < 1e-12, (
+            f"generation {t}: theoretical H={th[t]:.6f}, "
+            f"expected {expected:.6f}")
+
+
+def test_theoretical_heterozygosity_empty_with_selection() -> None:
+    """theoretical_heterozygosity returns empty list when selection is on."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=20,
+        replicate_runs=5, selection_coefficient=0.1, seed=42)
+    assert result.theoretical_heterozygosity() == []
+
+
+def test_theoretical_heterozygosity_empty_with_mutation() -> None:
+    """theoretical_heterozygosity returns empty list when mutation is on."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=20,
+        replicate_runs=5, mutation_rate=0.01, seed=42)
+    assert result.theoretical_heterozygosity() == []
+
+
+def test_theoretical_frequency_haploid_selection() -> None:
+    """theoretical_frequency matches the closed-form for haploid selection."""
+    s = 0.1
+    p0 = 0.3
+    gens = 30
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=p0, generations=gens,
+        replicate_runs=5, selection_coefficient=s, dominance=None, seed=42)
+    tf = result.theoretical_frequency()
+    assert len(tf) == gens + 1
+    assert tf[0] == p0
+    for t in range(1, gens + 1):
+        expected = p0 / (p0 + (1.0 - p0) * (1.0 + s) ** (-t))
+        assert abs(tf[t] - expected) < 1e-12, (
+            f"generation {t}: theoretical p={tf[t]:.6f}, "
+            f"expected {expected:.6f}")
+
+
+def test_theoretical_frequency_empty_neutral() -> None:
+    """theoretical_frequency returns empty list when s=0."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=20,
+        replicate_runs=5, seed=42)
+    assert result.theoretical_frequency() == []
+
+
+def test_theoretical_frequency_empty_with_mutation() -> None:
+    """theoretical_frequency returns empty list when mutation is on."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=20,
+        replicate_runs=5, selection_coefficient=0.1, mutation_rate=0.01,
+        seed=42)
+    assert result.theoretical_frequency() == []
+
+
+def test_enhanced_summarize_includes_theory() -> None:
+    """summarize includes theoretical expectations for neutral drift."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=20, seed=42)
+    info = result.summarize()
+    assert "expected_heterozygosity_final" in info
+    assert "expected_heterozygosity_trajectory" in info
+    assert len(info["expected_heterozygosity_trajectory"]) == 11
+    assert "fixation" in info
+    fa = info["fixation"]
+    assert "prop_fixed_A" in fa
+
+
+def test_enhanced_summarize_no_theory_with_selection() -> None:
+    """summarize omits heterozygosity theory when selection is on."""
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=20, selection_coefficient=0.1, seed=42)
+    info = result.summarize()
+    assert "expected_heterozygosity_final" not in info
+    assert "expected_frequency_final" in info
+
+
+def test_enhanced_describe_includes_fixation() -> None:
+    """describe output includes fixation proportions and times."""
+    result = simulate_wright_fisher(
+        population_size=20, starting_frequency=0.4, generations=200,
+        replicate_runs=30, seed=42)
+    desc = result.describe()
+    assert "Fixation proportions" in desc
+    assert "prop_fixed_A" in desc or "fixation" in desc
+    # Some replicates should have fixed in 200 gens with N=20
+    assert "poly=" in desc
+
+
+def test_fixation_with_selection_all_A_fixed() -> None:
+    """Strong positive selection fixes A in most replicates."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.3, generations=200,
+        replicate_runs=20, selection_coefficient=0.5, seed=42)
+    fa = result.fixation_analysis()
+    assert fa["n_fixed_A"] > fa["n_fixed_a"], (
+        f"Expected more A-fixed than a-fixed under positive selection, "
+        f"got A={fa['n_fixed_A']}, a={fa['n_fixed_a']}")
+
+
+def test_fixation_with_negative_selection_more_a_fixed() -> None:
+    """Negative selection fixes a in most replicates."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=200,
+        replicate_runs=20, selection_coefficient=-0.3, seed=42)
+    fa = result.fixation_analysis()
+    assert fa["n_fixed_a"] >= fa["n_fixed_A"], (
+        f"Expected more a-fixed under negative selection, "
+        f"got A={fa['n_fixed_A']}, a={fa['n_fixed_a']}")
+
+
+def test_fixation_analysis_with_structured_pop() -> None:
+    """Fixation analysis works with structured populations."""
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=100,
+        replicate_runs=10, n_demes=5, migration_rate=0.01, seed=42)
+    fa = result.fixation_analysis()
+    assert fa["n_replicates"] == 10
+
+
+def test_theoretical_heterozygosity_time_varying_n() -> None:
+    """theoretical_heterozygosity handles population_size_series."""
+    n = 50
+    gens = 20
+    p0 = 0.5
+    series = [n] * (gens + 1)
+    # Short bottleneck at gen 10
+    series[10] = 5
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=10, population_size_series=series, seed=42)
+    th = result.theoretical_heterozygosity()
+    assert len(th) == gens + 1
+    h0 = 2.0 * p0 * (1.0 - p0)
+    # generation 0: H = h0
+    assert th[0] == h0
+    # generation 1: H = h0 * (1 - 1/100) = h0 * 0.99
+    expected_1 = h0 * (1.0 - 1.0 / (2.0 * n))
+    assert abs(th[1] - expected_1) < 1e-12
+    # generation 10: includes bottleneck at N=5
+    expected_10 = h0
+    for t in range(10):
+        n_t = series[t]
+        expected_10 *= (1.0 - 1.0 / (2.0 * n_t))
+    assert abs(th[10] - expected_10) < 1e-12
+
+
+# ---------------------------------------------------------------------------
+# Export methods (to_dict / to_csv / to_json)
+# ---------------------------------------------------------------------------
+
+
+def test_to_dict_round_trip() -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42)
+    doc = result.to_dict()
+    assert doc["colnames"] == result.colnames
+    assert doc["data"] == result.data
+    assert doc["model_name"] == "wright_fisher"
+    assert "wright_fisher_params" in doc
+    assert doc["wright_fisher_params"]["generations"] == 10
+
+
+def test_to_csv_and_json(tmp_path) -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=10,
+        replicate_runs=5, seed=42)
+    csv_path = tmp_path / "wf.csv"
+    json_path = tmp_path / "wf.json"
+    result.to_csv(str(csv_path))
+    result.to_json(str(json_path))
+
+    lines = csv_path.read_text().strip().splitlines()
+    assert lines[0] == ",".join(result.colnames)
+    assert len(lines) == len(result.data) + 1
+
+    import json
+    doc = json.loads(json_path.read_text())
+    assert doc["colnames"] == result.colnames
+    assert doc["data"] == result.data
+
+
+def test_to_csv_with_replicates(tmp_path) -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=5,
+        replicate_runs=3, seed=42, return_replicate_data=True)
+    csv_path = tmp_path / "wf.csv"
+    result.to_csv(str(csv_path), include_replicate_data=True)
+    rep_path = tmp_path / "wf_replicates.csv"
+    assert rep_path.exists()
+    lines = rep_path.read_text().strip().splitlines()
+    assert lines[0] == ",".join(result.replicate_colnames)
+    assert len(lines) == len(result.replicate_data) + 1
+
+
+def test_to_json_omits_replicate_data(tmp_path) -> None:
+    result = simulate_wright_fisher(
+        population_size=100, starting_frequency=0.5, generations=5,
+        replicate_runs=3, seed=42, return_replicate_data=True)
+    import json
+    doc = json.loads(result.to_json(include_replicate_data=False))
+    assert doc["replicate_data"] is None
+
+
+# ---------------------------------------------------------------------------
+# Allele frequency spectrum
+# ---------------------------------------------------------------------------
+
+
+def test_afs_final_generation() -> None:
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=100,
+        replicate_runs=40, seed=42)
+    afs = result.allele_frequency_spectrum()
+    assert afs["generation"] == 100
+    assert len(afs["bin_edges"]) == 11  # 10 bins
+    assert len(afs["counts"]) == 10
+    assert afs["n_observations"] == 40
+    assert sum(afs["counts"]) == 40
+
+
+def test_afs_pooled_structure() -> None:
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=50,
+        replicate_runs=10, n_demes=4, migration_rate=0.01, seed=42)
+    afs = result.allele_frequency_spectrum()
+    assert afs["n_observations"] == 40  # 10 reps x 4 demes
+
+
+def test_afs_specific_generation_requires_replicate_data() -> None:
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=20,
+        replicate_runs=10, seed=42)
+    afs = result.allele_frequency_spectrum(generation=10)
+    assert "error" in afs
+
+    result2 = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=20,
+        replicate_runs=10, seed=42, return_replicate_data=True)
+    afs2 = result2.allele_frequency_spectrum(generation=10)
+    assert afs2["generation"] == 10
+    assert afs2["n_observations"] == 10
+    assert sum(afs2["counts"]) == 10
+
+
+def test_afs_bins_reflect_fixation() -> None:
+    """After 500 gens with N=20, many replicates fix -> mass in edge bins."""
+    result = simulate_wright_fisher(
+        population_size=20, starting_frequency=0.4, generations=500,
+        replicate_runs=100, seed=42)
+    afs = result.allele_frequency_spectrum(bins=5)
+    assert afs["counts"][0] + afs["counts"][-1] > 0  # some fixed/polymorphic at edges
+    assert sum(afs["counts"]) == 100
+
+
+# ---------------------------------------------------------------------------
+# Kimura fixation probability
+# ---------------------------------------------------------------------------
+
+
+def test_kimura_neutral_returns_p0() -> None:
+    assert kimura_fixation_probability(0.3, 0.0, 100) == pytest.approx(0.3)
+    assert kimura_fixation_probability(0.0, 0.1, 100) == 0.0
+    assert kimura_fixation_probability(1.0, 0.1, 100) == 1.0
+
+
+def test_kimura_haploid_matches_closed_form() -> None:
+    n, p0, s = 50, 0.3, 0.03
+    p = kimura_fixation_probability(p0, s, n, None)
+    expected = ((1.0 - np.exp(-4.0 * n * s * p0)) /
+                (1.0 - np.exp(-4.0 * n * s)))
+    assert p == pytest.approx(expected)
+
+
+def test_kimura_positive_selection_increases_probability() -> None:
+    p_neutral = kimura_fixation_probability(0.3, 0.0, 100)
+    p_sel = kimura_fixation_probability(0.3, 0.03, 100)
+    p_strong = kimura_fixation_probability(0.3, 0.1, 100)
+    assert p_neutral < p_sel < p_strong
+
+
+def test_kimura_negative_selection_decreases_probability() -> None:
+    p_neutral = kimura_fixation_probability(0.5, 0.0, 100)
+    p_del = kimura_fixation_probability(0.5, -0.03, 100)
+    assert p_del < p_neutral
+
+
+def test_kimura_dominance_ordering() -> None:
+    """Dominant (h=1) fixes more easily than additive (h=0.5),
+    which fixes more easily than recessive (h=0)."""
+    p_dom = kimura_fixation_probability(0.2, 0.02, 50, 1.0)
+    p_add = kimura_fixation_probability(0.2, 0.02, 50, 0.5)
+    p_rec = kimura_fixation_probability(0.2, 0.02, 50, 0.0)
+    assert p_rec < p_add < p_dom
+
+
+def test_kimura_matches_simulation() -> None:
+    """Diffusion prediction matches simulated fixation proportion
+    within sampling error for weak to moderate selection."""
+    n, p0, s, h = 50, 0.5, 0.02, 0.25
+    gens, reps = 400, 3000
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, selection_coefficient=s, dominance=h, seed=42)
+    fa = result.fixation_analysis()
+    total = fa["n_fixed_A"] + fa["n_fixed_a"]
+    obs = fa["n_fixed_A"] / total
+    theory = kimura_fixation_probability(p0, s, n, h)
+    se = np.sqrt(theory * (1.0 - theory) / reps)
+    assert abs(obs - theory) < 5.0 * se + 0.02, (
+        f"observed {obs:.4f} vs Kimura {theory:.4f}")
+
+
+def test_kimura_rejects_invalid_params() -> None:
+    with pytest.raises(ValueError):
+        kimura_fixation_probability(0.5, 0.1, 0)  # N <= 0
+    with pytest.raises(ValueError):
+        kimura_fixation_probability(1.5, 0.1, 100)  # p0 > 1
+    with pytest.raises(ValueError):
+        kimura_fixation_probability(0.5, -1.5, 100)  # s <= -1
+    with pytest.raises(ValueError):
+        kimura_fixation_probability(0.5, 0.1, 100, 2.0)  # h > 1
+
+
+def test_kimura_strong_selection_saturates() -> None:
+    assert kimura_fixation_probability(0.1, 0.5, 100) == pytest.approx(1.0)
+    assert kimura_fixation_probability(0.5, -0.5, 100) == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# New scenarios and CLI
+# ---------------------------------------------------------------------------
+
+
+def test_scenario_founder_effect_runs() -> None:
+    result = wright_fisher_scenario("founder-effect", seed=42)
+    assert result.column("mean_frequency")[0] == pytest.approx(0.1)
+    assert result.column("n_A_fixed")[-1] + result.column("n_a_fixed")[-1] > 0
+
+
+def test_scenario_population_expansion_runs() -> None:
+    result = wright_fisher_scenario("population-expansion", seed=42)
+    # N grows from 10 to 1000 -> heterozygosity loss slows dramatically
+    h_last = result.column("heterozygosity")[-1]
+    assert h_last > 0.2, f"expansion scenario lost too much H: {h_last}"
+
+
+def test_cli_wf_runs_and_writes(tmp_path, capsys) -> None:
+    import subprocess
+    import sys
+    out_csv = tmp_path / "cli.csv"
+    code = subprocess.call([
+        sys.executable, "-m", "Tellurium.cli", "wf",
+        "--population-size", "50", "--generations", "20",
+        "--replicate-runs", "10", "--seed", "42", "--quiet",
+        "--out", str(out_csv),
+    ], cwd=_REPO_ROOT)
+    assert code == 0
+    assert out_csv.exists()
+    lines = out_csv.read_text().strip().splitlines()
+    assert len(lines) == 22  # header + 21 rows (gen 0..20)
+
+
+def test_cli_wf_scenario_override(tmp_path) -> None:
+    import subprocess
+    import sys
+    out_csv = tmp_path / "cli_scenario.csv"
+    code = subprocess.call([
+        sys.executable, "-m", "Tellurium.cli", "wf",
+        "--scenario", "rapid-drift", "--generations", "5",
+        "--out", str(out_csv),
+    ], cwd=_REPO_ROOT)
+    assert code == 0
+    lines = out_csv.read_text().strip().splitlines()
+    assert len(lines) == 7  # header + 6 rows (gen 0..5)
+
+
+def test_cli_scenarios_lists_all() -> None:
+    import subprocess
+    import sys
+    out = subprocess.check_output(
+        [sys.executable, "-m", "Tellurium.cli", "scenarios"], cwd=_REPO_ROOT)
+    text = out.decode()
+    for name in ["neutral-drift", "founder-effect", "population-expansion",
+                 "island-model", "bottleneck"]:
+        assert name in text
+
+
+def test_cli_kimura_sweep() -> None:
+    import subprocess
+    import sys
+    out = subprocess.check_output([
+        sys.executable, "-m", "Tellurium.cli", "kimura",
+        "--p0", "0.5", "--population-size", "100",
+        "--s-start", "-0.05", "--s-end", "0.05", "--s-steps", "3"],
+        cwd=_REPO_ROOT)
+    text = out.decode()
+    assert "P_fix" in text
+    assert "0.500000" in text  # s=0 midpoint -> neutral p0
+
+
+def test_cli_wf_missing_args_fails() -> None:
+    import subprocess
+    import sys
+    code = subprocess.call(
+        [sys.executable, "-m", "Tellurium.cli", "wf", "--generations", "10"],
+        cwd=_REPO_ROOT)
+    assert code == 2
+
+
+def test_cli_wf_bad_scenario_fails() -> None:
+    import subprocess
+    import sys
+    code = subprocess.call(
+        [sys.executable, "-m", "Tellurium.cli", "wf", "--scenario", "nope"],
+        cwd=_REPO_ROOT)
+    assert code == 1
