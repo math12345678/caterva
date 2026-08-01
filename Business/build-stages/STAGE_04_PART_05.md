@@ -120,6 +120,78 @@ OK: all modelCitations entries carry authors, a year, and volume/pages, a publis
 - **Stage 5 provenance contract:** decide whether a `resolved` citation
   must satisfy a stricter format than a `modelCitations` entry (Part 4 §5;
   ADR 0008). This guard deliberately stops at `modelCitations`.
-- **CI:** the repo has no workflow files; guards run manually in each
-  stage's verification. If CI is ever added, this guard belongs in the
-  merge gate next to the other two.
+
+## 9. Audit amendment (2026-08-01) — the guard was enforced nowhere
+
+Two corrections to this document, found by auditing it rather than re-reading
+it.
+
+### 9.1 The CI claim in §8 was false, and it had a consequence
+
+The original §8 stated: *"the repo has no workflow files; guards run manually
+in each stage's verification. If CI is ever added, this guard belongs in the
+merge gate next to the other two."*
+
+`.github/workflows/tests.yml` exists, is tracked in git, and runs two jobs
+(`test` and `api-server`). It has been in the repository since before Stage 1
+and was extended with the api-server job during Stage 4 Part 1.
+
+This is not a trivia error. It produced a wrong conclusion — that CI
+enforcement was hypothetical and deferred — which is precisely why the guard
+shipped connected to nothing. A false premise about the environment led to
+real work being left undone. The claim was checkable in one command.
+
+### 9.2 The guard existed but nothing ran it
+
+Verified at audit time: `check_citation_format.py` was referenced by **no**
+pytest test, **no** CI step, and **no** step in `verify_domain.sh`. It ran
+only when a human typed its name.
+
+This is the same failure as `check_rng_convention.py` after Stage 2, which
+sat unenforced until a test wrapped it. The lesson did not transfer, so it is
+now recorded in the constitution with standing force rather than left as a
+per-stage observation: **a guard is not delivered until something runs it
+without being asked.**
+
+Now wired in three places, deliberately overlapping:
+
+| Where | Why this one too |
+|---|---|
+| `Tellurium/tests/test_citation_format.py` | fails the suite locally, before a push |
+| `.github/workflows/tests.yml` (`test` job) | fails the merge gate, and fast — before the full suite |
+| `scripts/verify_domain.sh` Step 2c | fails a stage's own verification run |
+
+### 9.3 The guard was verified against the defect that motivated it
+
+A guard that cannot catch its own founding case is decoration. Checked by
+restoring the exact pre-correction string and running it:
+
+```
+MUTATED   "Hoare M.R., Pal P. (1971) Physical clusters of simple liquids."
+          line 108: no volume/page range and no publisher; an entry with a
+          bare title cannot be looked up
+          exit code 1
+
+REVERTED  OK: all modelCitations entries carry authors, a year, and
+          volume/pages, a publisher, or a URL.
+          exit code 0
+```
+
+The exit codes were checked directly rather than through a pipe — an earlier
+attempt read `tail`'s status instead of the script's and appeared to show a
+guard that reported violations while exiting 0, which would never fail CI.
+It does exit 1. But the near-miss is worth recording: **when verifying that a
+guard fails, verify the exit code, not the output.**
+
+Six tests now cover it: the live check, rejection of the fabricated string,
+acceptance of the corrected replacement, acceptance of a database URL,
+rejection of a missing year, and rejection of an empty entry.
+
+### 9.4 One more infrastructure fix folded in
+
+`Tellurium/conftest.py` (added alongside the guard) makes the flat
+`from tellurium_engine import ...` imports resolve regardless of pytest's
+rootdir. `pytest.ini`'s `pythonpath = . ..` — added during the Part 3 audit —
+only works when rootdir is `Tellurium/`; running pytest from the repo root
+made those relative entries resolve elsewhere. Correct fix, and it closes a
+gap the Part 3 audit left open.

@@ -142,6 +142,23 @@ if [ "$RNG_OK" -ne 0 ]; then
 fi
 
 # ------------------------------------------------------------------
+# Step 2c: Citation-format guard
+#
+# Stage 4 Part 4 found three of seven modelCitations wrong, including a
+# molecular-dynamics title that does not exist. No structural test caught
+# it -- a fabricated title is a well-shaped string. This guard requires the
+# fields that make a citation checkable by hand.
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 2c: citation-format guard ==="
+
+CIT_OUT=$("$PYTHON" "$REPO_DIR/scripts/check_citation_format.py" 2>&1) && CIT_OK=0 || CIT_OK=1
+check "citation format" "$CIT_OK"
+if [ "$CIT_OK" -ne 0 ]; then
+    echo "$CIT_OUT"
+fi
+
+# ------------------------------------------------------------------
 # Step 3: New-domain test file exists and collects
 # ------------------------------------------------------------------
 echo ""
