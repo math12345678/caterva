@@ -34,6 +34,11 @@ jobs:
       - name: Verify the environment is genuinely working
         run: python scripts/check_env.py
 
+      # Runs standalone as well as via the pytest wrapper: this job fails
+      # fast on a bad citation rather than waiting out the full suite.
+      - name: Citation-format guard
+        run: python scripts/check_citation_format.py
+
       - name: Simulation engine tests
         working-directory: Tellurium
         run: python -m pytest -v
