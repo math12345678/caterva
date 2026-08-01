@@ -28,3 +28,4 @@ Each ADR has:
 | [0003](0003-shared-plausibility-bounds.md) | Km plausibility bounds must be identical across the literature and simulation layers |
 | [0004](0004-gamma-reserved-keyword.md) | Emit the SIR/SEIR recovery rate as `gamma_rate`, not `gamma` |
 | [0005](0005-rng-convention.md) | Discrete/stochastic domains share a single RNG convention |
+| [0006](0006-md-direct-python-not-roadrunner.md) | Model molecular dynamics as direct Python (velocity Verlet), not through antimony/roadrunner |
