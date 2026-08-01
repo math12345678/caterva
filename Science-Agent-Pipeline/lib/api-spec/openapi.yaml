@@ -225,6 +225,11 @@ components:
             additionalProperties: true
         provenance:
           $ref: "#/components/schemas/Provenance"
+        parameterProvenance:
+          type: object
+          description: Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)
+          additionalProperties:
+            $ref: "#/components/schemas/ParameterProvenance"
         completedAt:
           type: string
           format: date-time
@@ -235,13 +240,14 @@ components:
         - parameters
         - trajectory
         - provenance
+        - parameterProvenance
         - completedAt
     Provenance:
       type: object
       properties:
-        citations:
+        modelCitations:
           type: array
-          description: Literature references used to resolve parameters
+          description: Literature references for the MODEL/domain, never for individual parameter values (ADR 0008)
           items:
             type: string
         flags:
@@ -253,6 +259,27 @@ components:
           type: string
           description: Short explanation of how the query was mapped to a domain
       required: []
+    ParameterProvenance:
+      type: object
+      properties:
+        origin:
+          type: string
+          enum: [resolved, user, default]
+          description: How this value was obtained for THIS query (ADR 0008)
+        source:
+          type: string
+          description: What looked the value up; present only when origin is resolved
+        citation:
+          type: string
+          description: Citation supporting THIS value; present only when origin is resolved
+        organism:
+          type: string
+          description: Organism for this value; present only when origin is resolved
+        note:
+          type: string
+          description: Why a lookup was attempted and failed, if so
+      required:
+        - origin
     ErrorResponse:
       type: object
       properties:

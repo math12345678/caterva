@@ -7,6 +7,7 @@
  */
 import type { Provenance } from './provenance';
 import type { SimulationResponseDomain } from './simulationResponseDomain';
+import type { SimulationResponseParameterProvenance } from './simulationResponseParameterProvenance';
 import type { SimulationResponseParameters } from './simulationResponseParameters';
 import type { SimulationResponseTrajectoryItem } from './simulationResponseTrajectoryItem';
 
@@ -20,6 +21,8 @@ export interface SimulationResponse {
   /** Time-series output from the simulation engine */
   trajectory: SimulationResponseTrajectoryItem[];
   provenance: Provenance;
+  /** Per-parameter provenance; exactly one entry per key in parameters (ADR 0008) */
+  parameterProvenance: SimulationResponseParameterProvenance;
   /** ISO 8601 timestamp when the run finished */
   completedAt: Date;
 }

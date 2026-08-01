@@ -254,11 +254,12 @@ async function findCachedSimulation(query: string): Promise<queue.SimulationResp
       domain: row.domain,
       parameters: (row.parameters as Record<string, unknown>) || {},
       trajectory: (row.trajectory as Record<string, unknown>[]) || [],
-      provenance: (row.provenance as { reasoning: string; citations: string[]; flags: string[] }) || {
+      provenance: (row.provenance as { reasoning: string; modelCitations: string[]; flags: string[] }) || {
         reasoning: "",
-        citations: [],
+        modelCitations: [],
         flags: [],
       },
+      parameterProvenance: {},
       completedAt: row.createdAt.toISOString(),
     };
   } catch (err) {
@@ -310,7 +311,7 @@ async function runPipeline(jobId: string, query: string): Promise<void> {
 
     const provenance = {
       reasoning: resolved.provenance.reasoning,
-      citations: resolved.provenance.citations,
+      modelCitations: resolved.provenance.modelCitations,
       flags: [
         ...resolved.provenance.flags,
         ...(engineResult.flagged && engineResult.flagReason ? [engineResult.flagReason] : []),
@@ -335,6 +336,7 @@ async function runPipeline(jobId: string, query: string): Promise<void> {
       parameters: engineResult.parameters,
       trajectory: engineResult.trajectory,
       provenance,
+      parameterProvenance: resolved.parameterProvenance,
       completedAt: new Date().toISOString(),
     };
 

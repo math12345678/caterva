@@ -503,10 +503,10 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
                                     ))}
                                   </div>
                                 )}
-                              {run.result.provenance.citations &&
-                                run.result.provenance.citations.length > 0 && (
+                              {run.result.provenance.modelCitations &&
+                                run.result.provenance.modelCitations.length > 0 && (
                                   <div className="border-t border-white/[0.04] pt-2 mt-2 space-y-0.5">
-                                    {run.result.provenance.citations.map((citation, i) => (
+                                    {run.result.provenance.modelCitations.map((citation, i) => (
                                       <div key={i} className="text-[10px] text-white/25 truncate">{citation}</div>
                                     ))}
                                   </div>

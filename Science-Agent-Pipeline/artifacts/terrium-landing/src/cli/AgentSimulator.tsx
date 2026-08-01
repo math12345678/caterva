@@ -136,7 +136,7 @@ export default function AgentSimulator({ rerunQuery, onRerunConsumed }: AgentSim
   const [resolvedParams, setResolvedParams] = useState<Record<string, number>>({});
   const [editableParams, setEditableParams] = useState<Record<string, string>>({});
   const [reasoning, setReasoning] = useState('');
-  const [citations, setCitations] = useState<string[]>([]);
+  const [modelCitations, setModelCitations] = useState<string[]>([]);
   const [flags, setFlags] = useState<string[]>([]);
   const [enzymes, setEnzymes] = useState<EnzymeInfo[]>([]);
   const [enzymesLoading, setEnzymesLoading] = useState(true);
@@ -229,7 +229,7 @@ export default function AgentSimulator({ rerunQuery, onRerunConsumed }: AgentSim
       setResolvedDomain(data.domain);
       setResolvedParams(data.parameters);
       setReasoning(data.provenance.reasoning);
-      setCitations(data.provenance.citations || []);
+      setModelCitations(data.provenance.modelCitations || []);
       setFlags(data.provenance.flags || []);
       setEditableParams(
         Object.fromEntries(
@@ -514,9 +514,9 @@ export default function AgentSimulator({ rerunQuery, onRerunConsumed }: AgentSim
               </div>
             )}
 
-            {citations.length > 0 && (
+            {modelCitations.length > 0 && (
               <div className="text-[10px] text-white/20 space-y-0.5 border-t border-white/[0.04] pt-2 mt-2">
-                {citations.map((c, i) => (
+                {modelCitations.map((c, i) => (
                   <div key={i} className="truncate">{c}</div>
                 ))}
               </div>
@@ -636,9 +636,9 @@ export default function AgentSimulator({ rerunQuery, onRerunConsumed }: AgentSim
                     ))}
                   </div>
                 )}
-                {result.provenance.citations && result.provenance.citations.length > 0 && (
+                {result.provenance.modelCitations && result.provenance.modelCitations.length > 0 && (
                   <div className="border-t border-white/[0.04] pt-2 mt-2 space-y-0.5">
-                    {result.provenance.citations.map((citation, i) => (
+                    {result.provenance.modelCitations.map((citation, i) => (
                       <div key={i} className="text-[10px] text-white/25 truncate">{citation}</div>
                     ))}
                   </div>

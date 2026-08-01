@@ -12,7 +12,7 @@ export interface LLMResolvedSimulation {
   domain: SimulationDomain;
   parameters: Record<string, number | number[]>;
   reasoning: string;
-  citations: string[];
+  modelCitations: string[];
   entities?: EntityExtraction;
 }
 
@@ -37,7 +37,7 @@ Given a natural-language query, return a single JSON object (no markdown, no pro
   "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" | "wright_fisher" | "two_locus_wright_fisher" | "molecular_dynamics",
   "parameters": { ...numeric parameters... },
   "reasoning": "short explanation of how you mapped the query",
-  "citations": ["optional literature reference"],
+  "modelCitations": ["optional literature reference"],
   "entities": {
     "enzymeName": "full enzyme name if mentioned",
     "substrate": "specific substrate if mentioned",
@@ -165,7 +165,7 @@ export async function resolveQueryWithLLM(
       domain: parsed.domain,
       parameters: normalizeParameters(parsed.parameters),
       reasoning: parsed.reasoning || "Resolved via LLM.",
-      citations: Array.isArray(parsed.citations) ? parsed.citations : [],
+      modelCitations: Array.isArray(parsed.modelCitations) ? parsed.modelCitations : [],
       entities: normalizeEntities(parsed.entities),
     };
   } catch (err) {

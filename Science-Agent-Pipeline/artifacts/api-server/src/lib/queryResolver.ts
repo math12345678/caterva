@@ -3,6 +3,11 @@ import type { SimulationDomain } from "./telluriumRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
 import { resolveKineticValue } from "./scienceAgent";
 import { matchEnzyme } from "./enzymes";
+import {
+  isAllDefaults,
+  validateParameterProvenance,
+  type ParameterProvenance,
+} from "./provenance";
 
 export interface ResolvedSimulation {
   runId: string;
@@ -10,9 +15,10 @@ export interface ResolvedSimulation {
   parameters: Record<string, number | number[]>;
   provenance: {
     reasoning: string;
-    citations: string[];
+    modelCitations: string[];
     flags: string[];
   };
+  parameterProvenance: Record<string, ParameterProvenance>;
 }
 
 interface DomainDefaults {
@@ -20,7 +26,7 @@ interface DomainDefaults {
   parameters: Record<string, number | number[]>;
   keywords: string[];
   reasoning: string;
-  citations: string[];
+  modelCitations: string[];
 }
 
 const DOMAIN_DEFAULTS: DomainDefaults[] = [
@@ -31,7 +37,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "hexokinase", "catalase", "alcohol dehydrogenase", "trypsin", "rubisco", "kinase"],
     reasoning:
       "Keywords related to enzyme kinetics were found; defaulting to a Michaelis-Menten simulation.",
-    citations: [
+    modelCitations: [
       "BRENDA — The Comprehensive Enzyme Information System, https://www.brenda-enzymes.org/",
     ],
   },
@@ -41,7 +47,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     keywords: ["sir", "infection", "epidemic", "virus", "disease", "outbreak"],
     reasoning:
       "Keywords related to infectious disease spread were found; defaulting to an SIR epidemic simulation.",
-    citations: [
+    modelCitations: [
       "Kermack W.O., McKendrick A.G. (1927) A Contribution to the Mathematical Theory of Epidemics.",
     ],
   },
@@ -51,7 +57,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     keywords: ["seir", "exposed", "latent", "incubation"],
     reasoning:
       "Keywords related to latent-period epidemiology were found; defaulting to an SEIR simulation.",
-    citations: [
+    modelCitations: [
       "Kermack W.O., McKendrick A.G. (1927) A Contribution to the Mathematical Theory of Epidemics.",
     ],
   },
@@ -60,35 +66,35 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     parameters: { n0: 100, efficiency: 0.95, cycles: 30 },
     keywords: ["pcr", "polymerase chain", "amplification", "template", "cycles"],
     reasoning: "PCR amplification keywords were found; defaulting to a discrete PCR simulation.",
-    citations: ["Mullis K. et al. (1986) Specific enzymatic amplification of DNA in vitro."],
+    modelCitations: ["Mullis K. et al. (1986) Specific enzymatic amplification of DNA in vitro."],
   },
   {
     domain: "monte_carlo_pi",
     parameters: { n_samples: 10_000 },
     keywords: ["monte carlo", "estimate pi", "pi estimate", "random points"],
     reasoning: "Monte Carlo estimation keywords were found; defaulting to pi estimation.",
-    citations: ["Metropolis N., Ulam S. (1949) The Monte Carlo method."],
+    modelCitations: ["Metropolis N., Ulam S. (1949) The Monte Carlo method."],
   },
   {
     domain: "wright_fisher",
     parameters: { population_size: 100, starting_frequency: 0.5, generations: 100, replicate_runs: 100, mutation_rate: 0, selection_coefficient: 0 },
     keywords: ["wright-fisher", "genetic drift", "allele frequency", "population genetics", "fixation"],
     reasoning: "Population-genetics keywords were found; defaulting to a Wright-Fisher simulation.",
-    citations: ["Fisher R.A. (1930) The Genetical Theory of Natural Selection."],
+    modelCitations: ["Fisher R.A. (1930) The Genetical Theory of Natural Selection."],
   },
   {
     domain: "two_locus_wright_fisher",
     parameters: { population_size: 100, generations: 20, recombination_rate: 0.1, starting_frequencies: [0.5, 0, 0, 0.5], mutation_rate: 0, replicate_runs: 50 },
     keywords: ["linkage disequilibrium", "two locus", "two-locus", "recombination", "haplotype"],
     reasoning: "Linkage and recombination keywords were found; defaulting to a two-locus Wright-Fisher simulation.",
-    citations: ["Lewontin R.C. (1964) The interaction of selection and linkage."],
+    modelCitations: ["Lewontin R.C. (1964) The interaction of selection and linkage."],
   },
   {
     domain: "molecular_dynamics",
     parameters: { n_particles: 108, temperature: 0.4, timestep: 0.005, n_steps: 1000, density: 0.85 },
     keywords: ["molecular dynamics", "lennard-jones", "lennard jones", "lj cluster", "particles"],
     reasoning: "Molecular-dynamics keywords were found; defaulting to a Lennard-Jones simulation.",
-    citations: ["Hoare M.R., Pal P. (1971) Physical clusters of simple liquids."],
+    modelCitations: ["Hoare M.R., Pal P. (1971) Physical clusters of simple liquids."],
   },
 ];
 
@@ -135,6 +141,45 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
 }
 
 /**
+ * Per-parameter provenance for a fully merged parameter set.
+ *
+ * - Keys explicitly supplied in the query text -> origin "user".
+ * - Keys supplied by the LLM resolver -> origin "default" with a note that
+ *   they were not verified against literature.
+ * - Everything else -> origin "default".
+ */
+function buildParameterProvenance(
+  parameters: Record<string, number | number[]>,
+  overrides: Record<string, number>,
+  llmSupplied: Record<string, number | number[]>,
+): Record<string, ParameterProvenance> {
+  const provenance: Record<string, ParameterProvenance> = {};
+  for (const key of Object.keys(parameters)) {
+    if (key in overrides) {
+      provenance[key] = { origin: "user" };
+    } else if (key in llmSupplied) {
+      provenance[key] = {
+        origin: "default",
+        note: "Value supplied by the LLM resolver; not verified against literature.",
+      };
+    } else {
+      provenance[key] = { origin: "default" };
+    }
+  }
+  return provenance;
+}
+
+function provenanceViolations(
+  parameters: Record<string, number | number[]>,
+  parameterProvenance: Record<string, ParameterProvenance>,
+): string[] {
+  return validateParameterProvenance(
+    parameters as Record<string, unknown>,
+    parameterProvenance,
+  );
+}
+
+/**
  * Resolve a natural-language query to a simulation domain and parameters.
  *
  * The resolver tries an LLM first (if an API key is configured). If the LLM
@@ -158,28 +203,45 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       DOMAIN_DEFAULTS.find((d) => d.domain === llmResult.domain) || DOMAIN_DEFAULTS[0]!;
     let parameters = { ...domainDefaults.parameters, ...llmResult.parameters, ...overrides };
     const flags: string[] = [];
-    const citations = [...llmResult.citations];
+    const modelCitations = [...llmResult.modelCitations];
+    let parameterProvenance = buildParameterProvenance(
+      parameters,
+      overrides,
+      llmResult.parameters,
+    );
 
     if (
       llmResult.domain === "mm" &&
-      llmResult.entities?.ecNumber
+      llmResult.entities?.ecNumber &&
+      !("km" in overrides)
     ) {
       const agentResult = await resolveKineticValue(llmResult.entities);
       if (agentResult.found && agentResult.km !== undefined) {
         parameters = { ...parameters, km: agentResult.km };
+        parameterProvenance = {
+          ...parameterProvenance,
+          km: {
+            origin: "resolved",
+            source: agentResult.source,
+            citation: agentResult.citation
+              ? `${agentResult.citation.source} (ref ${agentResult.citation.referenceId ?? "n/a"})` +
+                (agentResult.citation.url ? ` — ${agentResult.citation.url}` : "")
+              : undefined,
+            organism: agentResult.organism,
+          },
+        };
         flags.push(
           `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
         );
-        if (agentResult.citation) {
-          citations.push(
-            `${agentResult.citation.source} (ref ${agentResult.citation.referenceId ?? "n/a"})` +
-              (agentResult.citation.url ? ` — ${agentResult.citation.url}` : ""),
-          );
-        }
       } else {
-        flags.push(
-          "Could not resolve a real Km value from BRENDA/KEGG/PubMed; using default Km."
-        );
+        parameterProvenance = {
+          ...parameterProvenance,
+          km: {
+            origin: "default",
+            note:
+              "Could not resolve a real Km value from BRENDA/KEGG/PubMed; using default Km.",
+          },
+        };
       }
     }
 
@@ -189,6 +251,14 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     if (Object.keys(overrides).length > 0) {
       flags.push("Applied parameter overrides found in the query string.");
     }
+    if (isAllDefaults(parameterProvenance)) {
+      flags.push("No parameter values were resolved from literature; all values are defaults.");
+    }
+
+    const violations = provenanceViolations(parameters, parameterProvenance);
+    if (violations.length > 0) {
+      throw new Error(`Internal error: invalid parameter provenance: ${violations.join("; ")}`);
+    }
 
     return {
       runId: randomUUID(),
@@ -196,9 +266,10 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       parameters,
       provenance: {
         reasoning: llmResult.reasoning,
-        citations,
+        modelCitations,
         flags,
       },
+      parameterProvenance,
     };
   }
 
@@ -218,24 +289,54 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
 
   let parameters = { ...best.parameters, ...overrides };
   const flags: string[] = [];
+  let parameterProvenance = buildParameterProvenance(parameters, overrides, {});
 
   // If this looks like an enzyme query and no LLM is available, try the
   // hardcoded entity map and the science agent.
   const fallbackEntities = extractEntitiesFromQuery(query);
-  if (best.domain === "mm" && fallbackEntities?.ecNumber) {
+  if (best.domain === "mm" && fallbackEntities?.ecNumber && !("km" in overrides)) {
     const agentResult = await resolveKineticValue(fallbackEntities);
     if (agentResult.found && agentResult.km !== undefined) {
       parameters = { ...parameters, km: agentResult.km };
+      parameterProvenance = {
+        ...parameterProvenance,
+        km: {
+          origin: "resolved",
+          source: agentResult.source,
+          citation: agentResult.citation
+            ? `${agentResult.citation.source} (ref ${agentResult.citation.referenceId ?? "n/a"})` +
+              (agentResult.citation.url ? ` — ${agentResult.citation.url}` : "")
+            : undefined,
+          organism: agentResult.organism,
+        },
+      };
       flags.push(
         `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
       );
     } else {
-      flags.push("Could not resolve a real Km value from BRENDA/KEGG/PubMed; using default Km.");
+      parameterProvenance = {
+        ...parameterProvenance,
+        km: {
+          origin: "default",
+          note: "Could not resolve a real Km value from BRENDA/KEGG/PubMed; using default Km.",
+        },
+      };
     }
   }
 
   if (Object.keys(overrides).length === 0) {
     flags.push("No parameters were extracted from the query; using defaults.");
+  }
+  if (Object.keys(overrides).length > 0) {
+    flags.push("Applied parameter overrides found in the query string.");
+  }
+  if (isAllDefaults(parameterProvenance)) {
+    flags.push("No parameter values were resolved from literature; all values are defaults.");
+  }
+
+  const violations = provenanceViolations(parameters, parameterProvenance);
+  if (violations.length > 0) {
+    throw new Error(`Internal error: invalid parameter provenance: ${violations.join("; ")}`);
   }
 
   return {
@@ -244,8 +345,9 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     parameters,
     provenance: {
       reasoning: best.reasoning,
-      citations: best.citations,
+      modelCitations: best.modelCitations,
       flags,
     },
+    parameterProvenance,
   };
 }

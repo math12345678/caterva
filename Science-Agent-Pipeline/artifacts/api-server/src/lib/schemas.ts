@@ -104,4 +104,10 @@ export const SimulationParameterSchemas: Record<
     n_steps: integer,
     seed: integer.nullish(),
   }),
+  sbml: z.object({
+    sbml_string: z.string(),
+    start: optionalNumeric,
+    end: optionalNumeric,
+    points: integer.nullish(),
+  }),
 };

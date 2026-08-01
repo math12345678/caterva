@@ -85,7 +85,8 @@ describe("updateJob", () => {
         domain: "sir",
         parameters: {},
         trajectory: [],
-        provenance: { reasoning: "test", citations: [], flags: [] },
+        provenance: { reasoning: "test", modelCitations: [], flags: [] },
+        parameterProvenance: {},
         completedAt: new Date().toISOString(),
       });
     });
@@ -100,7 +101,8 @@ describe("setJobResult", () => {
       domain: "mm" as const,
       parameters: { km: 5 },
       trajectory: [{ t: 0, S: 100 }, { t: 1, S: 50 }],
-      provenance: { reasoning: "test", citations: [], flags: [] },
+      provenance: { reasoning: "test", modelCitations: [], flags: [] },
+      parameterProvenance: {},
       completedAt: new Date().toISOString(),
     };
     const updated = queue.setJobResult(job.jobId, result);
@@ -186,7 +188,8 @@ describe("cancelJob", () => {
     queue.setJobResult(job.jobId, {
       runId: "r1", domain: "sir",
       parameters: {}, trajectory: [],
-      provenance: { reasoning: "x", citations: [], flags: [] },
+      provenance: { reasoning: "x", modelCitations: [], flags: [] },
+      parameterProvenance: {},
       completedAt: new Date().toISOString(),
     });
     const updated = queue.cancelJob(job.jobId);

@@ -8,11 +8,14 @@
 
 export * from './errorResponse';
 export * from './healthStatus';
+export * from './parameterProvenance';
+export * from './parameterProvenanceOrigin';
 export * from './provenance';
 export * from './simulationJob';
 export * from './simulationJobStatus';
 export * from './simulationRequest';
 export * from './simulationResponse';
 export * from './simulationResponseDomain';
+export * from './simulationResponseParameterProvenance';
 export * from './simulationResponseParameters';
 export * from './simulationResponseTrajectoryItem';

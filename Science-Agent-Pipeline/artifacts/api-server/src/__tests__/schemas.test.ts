@@ -29,6 +29,12 @@ const VALID: Record<keyof typeof SimulationParameterSchemas, Record<string, unkn
     timestep: 0.005,
     n_steps: 1000,
   },
+  sbml: {
+    sbml_string: "model M()\n  A = 1\nend",
+    start: 0,
+    end: 1,
+    points: 11,
+  },
 };
 
 const INVALID: Record<string, Record<string, unknown>> = {
@@ -46,10 +52,11 @@ const INVALID: Record<string, Record<string, unknown>> = {
     replicate_runs: 50,
   },
   molecular_dynamics: { n_particles: 10, temperature: 0.4 }, // missing timestep, n_steps
+  sbml: { start: 0, end: 1, points: 11 }, // missing sbml_string
 };
 
 describe("SimulationParameterSchemas", () => {
-  for (const domain of Object.keys(SimulationParameterSchemas)) {
+  for (const domain of Object.keys(SimulationParameterSchemas) as Array<keyof typeof SimulationParameterSchemas>) {
     it(`accepts valid ${domain} parameters`, () => {
       const parse = SimulationParameterSchemas[domain].safeParse(VALID[domain]);
       expect(parse.success).toBe(true);
