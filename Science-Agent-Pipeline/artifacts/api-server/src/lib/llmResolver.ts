@@ -29,6 +29,9 @@ interface OpenAIResponse {
   }[];
 }
 
+// `sbml` is intentionally absent here: it is the internal raw-SBML escape
+// hatch, not a natural-language domain offered by the resolver. It remains
+// part of the runner/API dispatch contract and is validated separately.
 const SYSTEM_PROMPT = `You are the "science agent" resolver for a computational biology simulation pipeline.
 
 Given a natural-language query, return a single JSON object (no markdown, no prose) with this exact shape:
