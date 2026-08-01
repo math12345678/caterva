@@ -2,18 +2,27 @@ import { spawn } from "node:child_process";
 import { access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { findRepositoryRoot } from "./repoRoot";
 
-export type SimulationDomain = "mm" | "sir" | "seir";
+export type SimulationDomain =
+  | "mm"
+  | "sir"
+  | "seir"
+  | "pcr"
+  | "monte_carlo_pi"
+  | "wright_fisher"
+  | "two_locus_wright_fisher"
+  | "molecular_dynamics"
+  | "sbml";
 
 export interface TelluriumPoint {
-  t: number;
   [species: string]: number;
 }
 
 export interface TelluriumResult {
   ok: true;
   domain: SimulationDomain;
-  parameters: Record<string, number | string | boolean>;
+  parameters: Record<string, number | string | boolean | null | number[]>;
   trajectory: TelluriumPoint[];
   flagged: boolean;
   flagReason: string | null;
@@ -25,11 +34,7 @@ interface PythonError {
 }
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
-// When running from the built dist/index.mjs, _dirname is api-server/dist/
-// When running from source directly (vitest), _dirname is api-server/src/lib/
-// The Terrium repo root is 4 levels up from dist/ or 5 levels up from src/lib/
-const LEVELS_UP = _dirname.replace(/\\/g, "/").endsWith("/dist") ? 4 : 5;
-const REPO_ROOT = path.resolve(_dirname, ...Array(LEVELS_UP).fill(".."));
+export const REPO_ROOT = findRepositoryRoot(_dirname);
 const SCRIPT_PATH = path.join(
   REPO_ROOT,
   "Science-Agent-Pipeline",
@@ -58,19 +63,12 @@ async function ensureRunnerScript(): Promise<void> {
 /**
  * Run the Python Tellurium engine for a given domain and parameters.
  *
- * This function spawns `python3` with the Tellurium runner script. The script
- * imports the Python simulation engine from the repo root, so we add the repo
- * root to PYTHONPATH and run the script with the working directory set to the
- * repo root.
- *
- * TODO(OpenCode): Replace this child_process bridge with a proper Python
- * microservice or FFI binding once the pipeline is stable. The current bridge
- * is intentionally simple so the frontend can call the engine end-to-end
- * without adding network dependencies.
+ * Physical validation remains authoritative in the Python engine. This bridge
+ * only transports the request and preserves the engine's stable result shape.
  */
 export async function runTellurium(
   domain: SimulationDomain,
-  parameters: Record<string, number | string | boolean>,
+  parameters: Record<string, number | string | boolean | null | number[]>,
   signal?: AbortSignal,
 ): Promise<TelluriumResult> {
   await ensureRunnerScript();
@@ -94,9 +92,7 @@ export async function runTellurium(
       reject(new Error("Cancelled"));
     };
 
-    if (signal) {
-      signal.addEventListener("abort", onAbort, { once: true });
-    }
+    if (signal) signal.addEventListener("abort", onAbort, { once: true });
 
     let stdout = "";
     let stderr = "";
@@ -114,13 +110,10 @@ export async function runTellurium(
     });
 
     proc.on("close", (code) => {
-      if (signal) {
-        signal.removeEventListener("abort", onAbort);
-      }
+      if (signal) signal.removeEventListener("abort", onAbort);
       const trimmed = stdout.trim();
       if (code !== 0 || !trimmed) {
-        const message = stderr || `Tellurium runner exited with code ${code}`;
-        reject(new Error(message));
+        reject(new Error(stderr || `Tellurium runner exited with code ${code}`));
         return;
       }
 

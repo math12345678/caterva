@@ -11,7 +11,19 @@ import { pgTable, text, timestamp, uuid, jsonb } from "drizzle-orm/pg-core";
 export const simulationsTable = pgTable("simulations", {
   id: uuid("id").primaryKey().defaultRandom(),
   query: text("query").notNull(),
-  domain: text("domain", { enum: ["mm", "sir", "seir"] }).notNull(),
+  domain: text("domain", {
+    enum: [
+      "mm",
+      "sir",
+      "seir",
+      "pcr",
+      "monte_carlo_pi",
+      "wright_fisher",
+      "two_locus_wright_fisher",
+      "molecular_dynamics",
+      "sbml",
+    ],
+  }).notNull(),
   parameters: jsonb("parameters").notNull().default({}),
   trajectory: jsonb("trajectory").notNull().default([]),
   provenance: jsonb("provenance").notNull().default({}),

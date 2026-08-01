@@ -7,7 +7,7 @@ import { matchEnzyme } from "./enzymes";
 export interface ResolvedSimulation {
   runId: string;
   domain: SimulationDomain;
-  parameters: Record<string, number>;
+  parameters: Record<string, number | number[]>;
   provenance: {
     reasoning: string;
     citations: string[];
@@ -17,7 +17,7 @@ export interface ResolvedSimulation {
 
 interface DomainDefaults {
   domain: SimulationDomain;
-  parameters: Record<string, number>;
+  parameters: Record<string, number | number[]>;
   keywords: string[];
   reasoning: string;
   citations: string[];
@@ -55,9 +55,44 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "Kermack W.O., McKendrick A.G. (1927) A Contribution to the Mathematical Theory of Epidemics.",
     ],
   },
+  {
+    domain: "pcr",
+    parameters: { n0: 100, efficiency: 0.95, cycles: 30 },
+    keywords: ["pcr", "polymerase chain", "amplification", "template", "cycles"],
+    reasoning: "PCR amplification keywords were found; defaulting to a discrete PCR simulation.",
+    citations: ["Mullis K. et al. (1986) Specific enzymatic amplification of DNA in vitro."],
+  },
+  {
+    domain: "monte_carlo_pi",
+    parameters: { n_samples: 10_000 },
+    keywords: ["monte carlo", "estimate pi", "pi estimate", "random points"],
+    reasoning: "Monte Carlo estimation keywords were found; defaulting to pi estimation.",
+    citations: ["Metropolis N., Ulam S. (1949) The Monte Carlo method."],
+  },
+  {
+    domain: "wright_fisher",
+    parameters: { population_size: 100, starting_frequency: 0.5, generations: 100, replicate_runs: 100, mutation_rate: 0, selection_coefficient: 0 },
+    keywords: ["wright-fisher", "genetic drift", "allele frequency", "population genetics", "fixation"],
+    reasoning: "Population-genetics keywords were found; defaulting to a Wright-Fisher simulation.",
+    citations: ["Fisher R.A. (1930) The Genetical Theory of Natural Selection."],
+  },
+  {
+    domain: "two_locus_wright_fisher",
+    parameters: { population_size: 100, generations: 20, recombination_rate: 0.1, starting_frequencies: [0.5, 0, 0, 0.5], mutation_rate: 0, replicate_runs: 50 },
+    keywords: ["linkage disequilibrium", "two locus", "two-locus", "recombination", "haplotype"],
+    reasoning: "Linkage and recombination keywords were found; defaulting to a two-locus Wright-Fisher simulation.",
+    citations: ["Lewontin R.C. (1964) The interaction of selection and linkage."],
+  },
+  {
+    domain: "molecular_dynamics",
+    parameters: { n_particles: 108, temperature: 0.4, timestep: 0.005, n_steps: 1000, density: 0.85 },
+    keywords: ["molecular dynamics", "lennard-jones", "lennard jones", "lj cluster", "particles"],
+    reasoning: "Molecular-dynamics keywords were found; defaulting to a Lennard-Jones simulation.",
+    citations: ["Hoare M.R., Pal P. (1971) Physical clusters of simple liquids."],
+  },
 ];
 
-const PARAMETER_PATTERN = /(km|vmax|s0|beta|gamma|sigma|e0|i0|r0|end|points)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
+const PARAMETER_PATTERN = /(km|vmax|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
 
 /**
  * Extract numeric overrides from the query string.

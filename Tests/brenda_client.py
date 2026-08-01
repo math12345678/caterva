@@ -194,7 +194,10 @@ def _find_table_container(soup: BeautifulSoup, label: str):
     for a in soup.find_all("a", href=True):
         if a.get_text(strip=True).strip().lower() != label.lower():
             continue
-        match = _SHOW_TABLE_HREF_PATTERN.search(a["href"])
+        href = a["href"]
+        if isinstance(href, list):
+            href = href[0] if href else ""
+        match = _SHOW_TABLE_HREF_PATTERN.search(str(href))
         if not match:
             continue
         tab_id = match.group(1)

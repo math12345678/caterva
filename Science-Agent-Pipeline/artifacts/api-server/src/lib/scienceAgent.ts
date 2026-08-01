@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "./logger";
+import { findRepositoryRoot } from "./repoRoot";
 
 export interface Citation {
   source: string;
@@ -43,8 +44,7 @@ interface PythonError {
 }
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
-const LEVELS_UP = _dirname.replace(/\\/g, "/").endsWith("/dist") ? 4 : 5;
-const REPO_ROOT = path.resolve(_dirname, ...Array(LEVELS_UP).fill(".."));
+const REPO_ROOT = findRepositoryRoot(_dirname);
 
 const SCRIPT_PATH = path.join(
   REPO_ROOT,

@@ -35,7 +35,7 @@ export const ListSimulationJobsResponseItem = zod.object({
   "progress": zod.number().min(listSimulationJobsResponseProgressMin).max(listSimulationJobsResponseProgressMax).describe('Completion percentage based on pipeline stage'),
   "result": zod.object({
   "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir']).describe('Resolved simulation domain'),
+  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'sbml']).describe('Resolved simulation domain'),
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
@@ -77,7 +77,7 @@ export const RunSimulationResponse = zod.object({
   "progress": zod.number().min(runSimulationResponseProgressMin).max(runSimulationResponseProgressMax).describe('Completion percentage based on pipeline stage'),
   "result": zod.object({
   "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir']).describe('Resolved simulation domain'),
+  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'sbml']).describe('Resolved simulation domain'),
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
@@ -117,7 +117,7 @@ export const GetSimulationJobResponse = zod.object({
   "progress": zod.number().min(getSimulationJobResponseProgressMin).max(getSimulationJobResponseProgressMax).describe('Completion percentage based on pipeline stage'),
   "result": zod.object({
   "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir']).describe('Resolved simulation domain'),
+  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'sbml']).describe('Resolved simulation domain'),
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({

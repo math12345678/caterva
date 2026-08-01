@@ -41,3 +41,35 @@ jobs:
       - name: Literature layer tests
         working-directory: Tests
         run: python -m pytest -v
+
+  api-server:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Install pnpm
+        run: corepack prepare pnpm@11.4.0 --activate
+
+      - name: Install workspace dependencies
+        working-directory: Science-Agent-Pipeline
+        run: pnpm install --frozen-lockfile
+
+      - name: Application layer tests
+        working-directory: Science-Agent-Pipeline
+        run: pnpm --filter @workspace/api-server run test

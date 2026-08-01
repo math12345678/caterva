@@ -39,6 +39,12 @@ export const SimulationResponseDomain = {
   mm: 'mm',
   sir: 'sir',
   seir: 'seir',
+  pcr: 'pcr',
+  monte_carlo_pi: 'monte_carlo_pi',
+  wright_fisher: 'wright_fisher',
+  two_locus_wright_fisher: 'two_locus_wright_fisher',
+  molecular_dynamics: 'molecular_dynamics',
+  sbml: 'sbml',
 } as const;
 
 export interface Provenance {

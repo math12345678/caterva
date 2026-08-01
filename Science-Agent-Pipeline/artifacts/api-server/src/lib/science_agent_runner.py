@@ -103,7 +103,7 @@ def main() -> None:
     try:
         raw = sys.stdin.read()
         if not raw:
-            raise ValueError("no input JSON provided")
+            raise ValueError("no input JSON provided")  # noqa: TRY301
         payload = json.loads(raw)
 
         enzyme_name = payload.get("enzymeName", "")
@@ -112,7 +112,7 @@ def main() -> None:
         ec_number = payload.get("ecNumber", "")
 
         if not ec_number:
-            raise ValueError("ecNumber is required to resolve real enzyme parameters")
+            raise ValueError("ecNumber is required to resolve real enzyme parameters")  # noqa: TRY301
 
         result = resolve_kinetic_value(enzyme_name, substrate, organism, ec_number)
 
