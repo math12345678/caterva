@@ -1857,6 +1857,25 @@ def validate_wright_fisher_params(
     return v
 
 
+_WF_FST_ROUNDOFF_TOLERANCE = 1e-10
+
+
+def _clamp_wf_fst_roundoff(values: np.ndarray) -> np.ndarray:
+    """Remove only float roundoff outside Fst's mathematical [0, 1] range."""
+    values = np.asarray(values, dtype=np.float64)
+    values = np.where(
+        (values < 0.0) & (values >= -_WF_FST_ROUNDOFF_TOLERANCE),
+        0.0,
+        values,
+    )
+    return np.where(
+        (values > 1.0) &
+        (values <= 1.0 + _WF_FST_ROUNDOFF_TOLERANCE),
+        1.0,
+        values,
+    )
+
+
 def simulate_wright_fisher(
     population_size: int,
     starting_frequency: float,
@@ -2020,6 +2039,10 @@ def simulate_wright_fisher(
             # mask a real one later.
             with np.errstate(divide="ignore", invalid="ignore"):
                 fst_rep = np.where(Ht > 0, 1.0 - Hs / Ht, 0.0)
+            # Nei's Fst is bounded by [0, 1] here. At the boundary,
+            # subtraction can leave a tiny float64 residue; remove only
+            # that roundoff-sized residue and preserve material violations.
+            fst_rep = _clamp_wf_fst_roundoff(fst_rep)
             fst = float(np.mean(fst_rep))
             rep_val = rep_mean
         else:
