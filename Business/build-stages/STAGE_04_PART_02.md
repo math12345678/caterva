@@ -1,7 +1,17 @@
 # Stage 4, Part 2 — Boundary Contract Specification
 
-Stage 4 of 100. Part 2 of 2. This is a mechanical integration stage; no new
-scientific domain is introduced.
+Stage 4 of 100. This is a mechanical integration stage; no new scientific
+domain is introduced.
+
+> **Amendment (2026-08-01):** this document was written as "Part 2 of 2" and
+> was accurate for the boundary work it specifies — that work was audited
+> independently and holds. The stage does not close here, though. Making all
+> eight domains reachable surfaced a problem that was invisible while five of
+> them were not: the resolver attaches model citations to hardcoded default
+> parameters, so a looked-up value and an invented one are indistinguishable
+> in the response. Only `km` in domain `mm` is genuinely resolved. That is
+> specified in **Part 3**, which continues this stage rather than reopening
+> it. Nothing below is retracted.
 
 ## 1. One-sentence definition
 
