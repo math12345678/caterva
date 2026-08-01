@@ -108,3 +108,28 @@ mutation checks: citation on a default entry, dropped provenance key,
 `resolved` without citation, renaming `modelCitations` back to
 `citations`, and breaking the EC branch. All five were caught by the suite
 (see the Stage 4 Part 3 report for before/after outputs).
+
+## Amendment (Stage 5 Part 1): resolved citations must be locatable
+
+- **Status**: Accepted (Stage 5 Part 1, 2026-08-01).
+- **Context**: carried from Stage 4 Part 5 / the Stage 4 close — whether a
+  `resolved` citation must satisfy a stricter format than a `modelCitations`
+  entry. The old resolver template rendered a citation with no ref id as
+  `"BRENDA (ref n/a)"`: a locator-shaped string that locates nothing.
+- **Decision**: a `resolved` citation is attached to a NUMBER, so it must
+  let a human re-find the exact source of that number. Locatable means the
+  string carries a URL or a `(ref <id>)` with an id other than the `n/a`
+  placeholder (`isLocatableCitation` in `lib/provenance.ts`). Validation
+  rejects any `resolved` citation that is not locatable. The resolver
+  (`formatResolvedCitation` in `lib/queryResolver.ts`) refuses to fabricate
+  a locator: when the agent returns a value whose citation has no ref id
+  and no URL, the parameter degrades to origin `default` with an honest
+  `note` instead of claiming `resolved`. `resolved` now means "value with a
+  locatable citation", not merely "value found".
+- **Consequences**: a consumer can trust that a `resolved` citation can be
+  re-found. A found-but-unverifiable value is reported as a default with an
+  explanation, never as resolved. The strictness rule runs with the rest of
+  `validateParameterProvenance` on every response.
+- **Verification**: Targets A–F plus Mutation 6 in
+  `api-server/src/__tests__/provenance.test.ts` (locator unit tests, the
+  honest-degradation path, and the `(ref n/a)` reintroduction check).

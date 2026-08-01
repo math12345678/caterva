@@ -203,6 +203,29 @@ function provenanceViolations(
  * agent (BRENDA/KEGG/PubMed) to fetch literature-backed Km values when an EC
  * number is available.
  */
+/**
+ * Build the citation string attached to a resolved parameter value.
+ *
+ * Stage 5 Part 1 strictness: a resolved citation must be locatable — a ref id
+ * (other than the "n/a" placeholder) or a URL. Returns undefined when the
+ * citation is missing or carries no locator, so the caller degrades honestly
+ * instead of emitting a locator-shaped string like "BRENDA (ref n/a)" that
+ * locates nothing.
+ */
+function formatResolvedCitation(citation?: {
+  source?: string;
+  referenceId?: string | null;
+  url?: string | null;
+}): string | undefined {
+  if (!citation?.source) return undefined;
+  const hasRef = citation.referenceId !== undefined && citation.referenceId !== null;
+  const hasUrl = citation.url !== undefined && citation.url !== null;
+  if (!hasRef && !hasUrl) return undefined;
+  const refPart = hasRef ? ` (ref ${citation.referenceId})` : "";
+  const urlPart = hasUrl ? ` — ${citation.url}` : "";
+  return `${citation.source}${refPart}${urlPart}`;
+}
+
 export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
   const overrides = extractParameterOverrides(query);
 
@@ -229,22 +252,32 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     ) {
       const agentResult = await resolveKineticValue(llmResult.entities);
       if (agentResult.found && agentResult.km !== undefined) {
-        parameters = { ...parameters, km: agentResult.km };
-        parameterProvenance = {
-          ...parameterProvenance,
-          km: {
-            origin: "resolved",
-            source: agentResult.source,
-            citation: agentResult.citation
-              ? `${agentResult.citation.source} (ref ${agentResult.citation.referenceId ?? "n/a"})` +
-                (agentResult.citation.url ? ` — ${agentResult.citation.url}` : "")
-              : undefined,
-            organism: agentResult.organism,
-          },
-        };
-        flags.push(
-          `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
-        );
+        const citation = formatResolvedCitation(agentResult.citation);
+        if (citation !== undefined) {
+          parameters = { ...parameters, km: agentResult.km };
+          parameterProvenance = {
+            ...parameterProvenance,
+            km: {
+              origin: "resolved",
+              source: agentResult.source,
+              citation,
+              organism: agentResult.organism,
+            },
+          };
+          flags.push(
+            `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
+          );
+        } else {
+          parameterProvenance = {
+            ...parameterProvenance,
+            km: {
+              origin: "default",
+              note:
+                "Found a Km but its citation carries no locator (ref id or URL); not trusted as resolved — using default Km.",
+            },
+          };
+          flags.push("Found a Km but its citation was not locatable; using default Km.");
+        }
       } else {
         parameterProvenance = {
           ...parameterProvenance,
@@ -309,22 +342,32 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
   if (best.domain === "mm" && fallbackEntities?.ecNumber && !("km" in overrides)) {
     const agentResult = await resolveKineticValue(fallbackEntities);
     if (agentResult.found && agentResult.km !== undefined) {
-      parameters = { ...parameters, km: agentResult.km };
-      parameterProvenance = {
-        ...parameterProvenance,
-        km: {
-          origin: "resolved",
-          source: agentResult.source,
-          citation: agentResult.citation
-            ? `${agentResult.citation.source} (ref ${agentResult.citation.referenceId ?? "n/a"})` +
-              (agentResult.citation.url ? ` — ${agentResult.citation.url}` : "")
-            : undefined,
-          organism: agentResult.organism,
-        },
-      };
-      flags.push(
-        `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
-      );
+      const citation = formatResolvedCitation(agentResult.citation);
+      if (citation !== undefined) {
+        parameters = { ...parameters, km: agentResult.km };
+        parameterProvenance = {
+          ...parameterProvenance,
+          km: {
+            origin: "resolved",
+            source: agentResult.source,
+            citation,
+            organism: agentResult.organism,
+          },
+        };
+        flags.push(
+          `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
+        );
+      } else {
+        parameterProvenance = {
+          ...parameterProvenance,
+          km: {
+            origin: "default",
+            note:
+              "Found a Km but its citation carries no locator (ref id or URL); not trusted as resolved — using default Km.",
+          },
+        };
+        flags.push("Found a Km but its citation was not locatable; using default Km.");
+      }
     } else {
       parameterProvenance = {
         ...parameterProvenance,
