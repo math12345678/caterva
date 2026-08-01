@@ -1,91 +1,115 @@
-# Engine package split — status as of 2026-08-01
+# Engine package split — COMPLETE
 
-`Tellurium/tellurium_engine.py` (4283 lines) is being split into a package
-per `REFACTORING_PROPOSAL.md`. This file records exactly where that stands,
-because the state is ambiguous from the tree alone and was mid-flight during
-the Stage 4 Part 3 audit.
+`Tellurium/tellurium_engine.py` has been split into a package per
+`REFACTORING_PROPOSAL.md`. This file previously tracked an in-flight,
+partially-broken refactor. That work has landed.
 
-## Current state: package exists, engine does not use it
+## Verified in effect, not merely present
 
-    Tellurium/core/{data_structures,validation,utils}.py
-    Tellurium/continuous/{model_building,simulations}.py
-    Tellurium/discrete/{pcr,monte_carlo,molecular_dynamics}.py
-    Tellurium/discrete/population_genetics/{core,analysis,probability,
-                                            theoretical,two_locus}.py
-    Tellurium/scenarios/wf_scenarios.py
+The distinction matters. During the Stage 4 Part 3 audit the shim imported all
+67 public names from the package **and then redefined 64 of them below**.
+Python takes the later definition, so the package was imported and immediately
+shadowed — and the entire suite passed, because the monolith was still doing
+the work. A green suite said nothing about whether the split had taken effect.
 
-**The package is complete.** All 67 names in `tellurium_engine.__all__`
-resolve from these modules — verified by importing every module directly and
-matching against `__all__`, with zero missing.
+Checked directly this time:
 
-**The engine does not import it.** `tellurium_engine.py` currently holds the
-original monolithic implementation. An earlier revision converted it into a
-re-export shim; that was rolled back. The package is therefore orphaned: it
-exists, it is complete, and nothing loads it.
+```
+tellurium_engine.py                       292 lines  (was 4283)
+def simulate_* / validate_* / build_*       0        (was 64)
 
-## Why the intermediate state was dangerous
+simulate_michaelis_menten        -> Tellurium.continuous.simulations
+simulate_pcr                     -> Tellurium.discrete.pcr
+simulate_monte_carlo_pi          -> Tellurium.discrete.monte_carlo
+simulate_molecular_dynamics      -> Tellurium.discrete.molecular_dynamics
+simulate_wright_fisher           -> Tellurium.discrete.population_genetics.core
+simulate_two_locus_wright_fisher -> Tellurium.discrete.population_genetics.two_locus
+validate_md_params               -> Tellurium.core.validation
+```
 
-While the shim was in place, `tellurium_engine.py` imported every name from
-the package **and then redefined all 64 of them below**. Python takes the
-later definition, so the package was imported and immediately shadowed. Every
-test passed — not because the split worked, but because the monolith was
-still doing the work. A green suite proved nothing about the refactor.
+Every public name resolves to a package module. The shim re-exports and
+defines nothing.
 
-Worth stating plainly: *"tests pass"* is not evidence that a refactor took
-effect. It is evidence that something is producing correct answers.
+## Layout
 
-## Fixes applied during the audit (kept — they are correct either way)
+```
+Tellurium/
+  tellurium_engine.py            re-export shim; the only public entry point
+  core/          data_structures, validation, utils
+  continuous/    model_building, simulations        (antimony/SBML/roadrunner)
+  discrete/      pcr, monte_carlo, molecular_dynamics
+                 population_genetics/{core,analysis,probability,
+                                      theoretical,two_locus}
+  scenarios/     wf_scenarios
+```
 
-1. **`ModelBuildError` / `SimulationError` added to `core/data_structures.py`.**
-   The package could not import without them; they belong there because every
-   layer raises them and a module everything imports must not import from a
-   sibling domain.
-2. **Relative imports throughout the package** (13 files). Each module had a
-   `try: from Tellurium.X import ... except ModuleNotFoundError: from X
-   import ...` pair. That pattern created a circular import through
-   `core/__init__.py` *and* masked the real error, so every submodule failed
-   with a misleading `No module named 'core'`. Relative imports resolve
-   correctly in both package and flat mode. One deliberate deferred import
-   inside a method was left alone — it breaks a genuine cycle.
-3. **`Tellurium/pytest.ini`: `pythonpath = . ..`.** The repo root must be on
-   `sys.path` or the shim falls back to treating `continuous`/`discrete` as
-   top-level packages, whose relative imports then fail with *"attempted
-   relative import beyond top-level package."*
-4. **`scripts/check_dependencies_declared.py`** now registers every directory
-   containing an `__init__.py` as a local package, at any depth. Without it,
-   `from continuous.simulations import ...` looked like an undeclared
-   third-party dependency. Same blind spot as the package-level import fixed
-   in Stage 4 Part 1, one level deeper.
-5. Removed two stray `* 2.py` duplicate files under `core/`.
+## The regression guard
 
-## Semantic divergence found in `core/validation.py` — UNRESOLVED
+`Tellurium/tests/test_validator_agreement.py` — 49 tests, in two halves.
 
-`core/validation.py` does **not** reproduce the engine's validation
-semantics. It converts plausibility flags into hard rejections:
+**The split stays in effect.** One test parses `tellurium_engine.py` and fails
+if it defines any `simulate_*`, `validate_*` or `build_*`. Eighteen more
+assert each public name's `__module__` ends with its expected package path.
+This is constitution amendment (c) applied: *when a refactor claims to
+relocate code, assert the relocation directly.*
 
-    engine  validate_md_params(108, 0.9, ...)  -> ok=True,  flagged=True
-    core/   validate_md_params(108, 0.9, ...)  -> ok=False (appends to errors)
+Verified against the real regression — appending a `simulate_pcr` definition
+to the shim produces:
 
-Affected: MD temperature above/below bounds, timestep above bound,
-`n_particles` below minimum. All four are `flagged` in the engine and
-`errors` in the package copy.
+```
+AssertionError: tellurium_engine.py defines implementations instead of
+re-exporting: ['simulate_pcr']. A local definition shadows the package import
+and the split stops being in effect, with every test still green.
+```
 
-This directly violates Rule 2 — *"Do not collapse this distinction in either
-direction"* — and would invert Stage 3's deliberate decision that a hot
-cluster is valid-but-implausible physics a student may legitimately want to
-model. It is latent only because nothing imports the package.
+**The flag/reject boundary holds.** Thirty parametrised cases covering every
+validator in all three states — accepted, flagged, rejected — because a
+validator exercised only on its happy path cannot reveal an inversion.
 
-**This must be fixed before the split is completed.** A byte-exact extraction
-would not have this problem; the validators were evidently rewritten rather
-than moved.
+## The semantic inversion: fixed
 
-## To finish the split
+While both copies existed, `core/validation.py` converted four
+molecular-dynamics plausibility **flags** into hard **rejections**:
 
-1. Fix the four semantic inversions in `core/validation.py` above.
-2. Add a test asserting engine and package validators agree, for every
-   domain, across ok/flagged/rejected — Rule 4 applies: two copies of one
-   constraint need an executable test or they drift.
-3. Only then replace the monolith body with the re-export shim.
-4. Confirm the split actually took effect — e.g. assert
-   `tellurium_engine.simulate_pcr.__module__` is the package module, not
-   `tellurium_engine`. Without a check like that, step 3 is unverifiable.
+```
+engine  validate_md_params(108, 0.9, ...)  ->  ok=True,  flagged=True
+package validate_md_params(108, 0.9, ...)  ->  ok=False
+```
+
+A direct Rule 2 violation, and it would have inverted Stage 3's deliberate
+decision that a hot cluster is valid-but-implausible physics a student may
+legitimately want to model.
+
+Fixed. Confirmed by a 26-case differential across every validator: **zero
+divergences**. The package uses `v.flagged = True` with `flag_reasons` for
+temperature, timestep and particle count, matching the engine exactly.
+
+With the shim holding no definitions there is now only one copy of each
+constraint, so this class of drift is impossible by construction rather than
+merely tested for. The three-state cases remain because they pin the boundary
+itself — which is what the drift corrupted.
+
+## Fixes that made the split possible
+
+Applied during the Stage 4 Part 3 audit, when the package could not import at
+all:
+
+1. `ModelBuildError` / `SimulationError` added to `core/data_structures.py`.
+   Every layer raises them, and a module everything imports must not import
+   from a sibling domain.
+2. Relative imports across 13 modules. Each had a
+   `try: from Tellurium.X ... except ModuleNotFoundError: from X ...` pair
+   that created a circular import through `core/__init__.py` *and masked the
+   real error* — every submodule reported a misleading
+   `No module named 'core'`.
+3. `Tellurium/pytest.ini`: `pythonpath = . ..`.
+4. `Tellurium/conftest.py`, so the flat `tellurium_engine` import resolves
+   regardless of pytest's rootdir.
+5. `scripts/check_dependencies_declared.py` now treats any directory with an
+   `__init__.py` as a local package at any depth.
+6. Removed two stray `* 2.py` duplicates.
+
+## Nothing outstanding
+
+The split is complete, in effect, and guarded. No follow-up work is carried
+from this document.
