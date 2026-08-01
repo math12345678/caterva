@@ -240,7 +240,7 @@ describe("mutation tests — provenance contract enforcement", () => {
   });
 
   describe("Mutation 4: rename modelCitations back to citations", () => {
-    it("PREDICTED: naming test should catch this", () => {
+    it("PREDICTED: naming test should catch this", async () => {
       // Mutation: rename modelCitations back to citations
       // Predicted catcher: naming test asserting field presence
       // This would require modifying the actual source code to change
@@ -255,7 +255,7 @@ describe("mutation tests — provenance contract enforcement", () => {
   });
 
   describe("Mutation 5: break EC branch for mm domain", () => {
-    it("PREDICTED: Target C should catch this", () => {
+    it("PREDICTED: Target C should catch this", async () => {
       // Mutation: break the EC-number branch so mm silently uses default km
       // Predicted catcher: Target C (the resolved path still resolves)
       // This would require modifying queryResolver.ts to disable the

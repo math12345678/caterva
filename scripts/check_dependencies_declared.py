@@ -71,6 +71,16 @@ def _local_module_stems() -> set[str]:
             if any(part in EXCLUDE_DIR_NAMES for part in path.parts):
                 continue
             stems.add(path.stem.lower())
+            # Any directory holding an __init__.py is an importable package,
+            # at any depth. After the engine was split into subpackages
+            # (core/, continuous/, discrete/, scenarios/) a bare
+            # `from continuous.simulations import ...` looked like a
+            # third-party import to this guard purely because only the top
+            # source directory was registered. Register every package
+            # directory instead -- the same blind spot as the package-level
+            # import fixed in Stage 4 Part 1, one level deeper.
+            if path.name == "__init__.py":
+                stems.add(path.parent.name.lower())
     return stems
 
 
