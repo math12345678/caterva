@@ -220,3 +220,37 @@ The big_test collection quirk (present only when a Tellurium path joined
 the pytest command line) was not fully root-caused — a pytest 8.4.2
 multi-arg collection oddity; the rename removes the dependency on it,
 which is the point.
+
+## 11. Follow-up (2026-08-01) — the other guards were wired to nothing, and one was silently broken
+
+The §9.2 rule — *a guard is not delivered until something runs it without
+being asked* — applied to the guards that shipped after the citation one:
+`check_engine_contract.py` and `check_plausibility_constants.py` were only
+reachable through `verify_build.py`, which nothing ran. Two real defects
+surfaced while wiring them:
+
+1. **`verify_build.py` never ran the RNG guard.** It looked for
+   `REPO_ROOT / "check_rng_convention.py"`; the guard lives in `scripts/`.
+   The existence check made the miss silent — no error, just zero results.
+   `scripts/README.md` documented the same false location ("at repo root"),
+   which is how the wrong path got written: a plausible, unchecked claim —
+   the exact bug class this stage exists to kill. Both fixed; the guard
+   now runs and passes under `--quick`.
+
+2. **The new guards had no pytest wrappers and no CI step.** Wired in
+   three overlapping places, mirroring §9.2's table:
+   - `Tellurium/tests/test_engine_contract.py` and
+     `Tellurium/tests/test_plausibility_constants.py` — subprocess
+     wrappers asserting exit code (not output, per §9.3's lesson);
+   - `.github/workflows/tests.yml` — a `Build guards` step running
+     `python scripts/verify_build.py --quick` (all five guards, <1s);
+   - `scripts/verify_domain.sh` — Steps 2d (engine contract) and 2e
+     (plausibility constants), mirroring Step 2c.
+
+Verification: bare `pytest` → 896 passed, 1 skipped; `verify_build.py
+--quick` → all five guards pass in 0.9s; the new wrappers pass.
+`verify_domain.sh` locally fails Steps 1/2d/3 only because the only
+locally-available 3.10–3.12 interpreter (`.local/bin/python3.12`) is bare
+— no numpy; CI installs `requirements-dev` and is the arbiter for those
+steps. The failure is now loud rather than a silent skip, which is the
+point of the wiring.

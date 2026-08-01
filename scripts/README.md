@@ -96,13 +96,16 @@ python scripts/check_plausibility_constants.py
 
 ---
 
-### 🎯 `check_rng_convention.py` (at repo root)
+### 🎯 `check_rng_convention.py`
 
 **Purpose**: Enforces the random number generator convention used throughout
-Terrium. Every `rng = np.random.Generator(np.random.PCG64())` or equivalent
-must use the PCG64 algorithm with no seed for reproducibility.
+Terrium (ADR 0005): every stochastic domain must use
+`numpy.random.default_rng(seed)` with `seed: int | None = None`.
 
-**Note**: This guard is at the repository root level, not in this directory.
+**Usage**:
+```bash
+python scripts/check_rng_convention.py
+```
 
 ---
 

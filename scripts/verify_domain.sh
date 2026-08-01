@@ -159,6 +159,39 @@ if [ "$CIT_OK" -ne 0 ]; then
 fi
 
 # ------------------------------------------------------------------
+# Step 2d: Engine-contract guard
+#
+# The engine was split from a 4,283-line monolith into 14 modules behind a
+# dual-mode shim (Stage 4 Part 3). This guard verifies the split kept the
+# public API intact: dual try/except imports, module structure, package and
+# flat import compatibility, __all__ resolution, and the Rule 2 contract.
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 2d: engine-contract guard ==="
+
+ENG_OUT=$("$PYTHON" "$REPO_DIR/scripts/check_engine_contract.py" 2>&1) && ENG_OK=0 || ENG_OK=1
+check "engine contract" "$ENG_OK"
+if [ "$ENG_OK" -ne 0 ]; then
+    echo "$ENG_OUT"
+fi
+
+# ------------------------------------------------------------------
+# Step 2e: Plausibility-constants guard
+#
+# Verifies the plausibility constants used by validation (KM bounds,
+# R0 thresholds, PCR/MC/WF/MD limits, tolerances) hold identical values
+# across every module that uses them.
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 2e: plausibility-constants guard ==="
+
+PLA_OUT=$("$PYTHON" "$REPO_DIR/scripts/check_plausibility_constants.py" 2>&1) && PLA_OK=0 || PLA_OK=1
+check "plausibility constants" "$PLA_OK"
+if [ "$PLA_OK" -ne 0 ]; then
+    echo "$PLA_OUT"
+fi
+
+# ------------------------------------------------------------------
 # Step 3: New-domain test file exists and collects
 # ------------------------------------------------------------------
 echo ""

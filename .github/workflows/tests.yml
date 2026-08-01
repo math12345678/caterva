@@ -39,6 +39,12 @@ jobs:
       - name: Citation-format guard
         run: python scripts/check_citation_format.py
 
+      # The remaining guards (RNG convention, dependencies, engine contract,
+      # plausibility constants) run in one step via the build-verification
+      # script. --quick runs the guards only, not the test suites.
+      - name: Build guards
+        run: python scripts/verify_build.py --quick
+
       - name: Simulation engine tests
         working-directory: Tellurium
         run: python -m pytest -v
