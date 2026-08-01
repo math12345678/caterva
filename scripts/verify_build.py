@@ -152,7 +152,7 @@ def run_rng_guard() -> List[Tuple[str, bool, str]]:
     """Run RNG convention guard."""
     guards = []
     
-    rng_guard = REPO_ROOT / "check_rng_convention.py"
+    rng_guard = SCRIPTS_DIR / "check_rng_convention.py"
     if rng_guard.exists():
         guards.append(run_guard(
             "RNG Convention Guard",
