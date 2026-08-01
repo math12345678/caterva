@@ -293,3 +293,45 @@ they happen:
   has no citation or source field, and provenance is re-attached to the
   response after simulation. Rule 1 applies to parameter provenance, not
   only to numerics. See `Business/ARCHITECTURE_ASSESSMENT.md`.
+- 2026-08 — Stage 4 (engine/application boundary), closed. Four amendments
+  with standing force. Two of them are repeats of lessons that failed to
+  transfer between stages, which is the argument for recording them here
+  rather than in another closing report.
+
+  **(a) Rule 1 governs every factual claim, not only numerical ones.**
+  Five instances across four stages of the same failure: a report claiming
+  three failing tests when two fail; a comment citing a document section
+  that does not exist; a timing of "~11s" that was never measured (7.32s);
+  a paper title that does not exist (*"Physical clusters of simple
+  liquids"*); and a claim that the repo has no CI workflow when two jobs
+  have been running since before Stage 1. Every one was plausible,
+  structurally valid, unchecked, wrong, and cheap to check. Bibliographic,
+  environmental and timing claims are claims. Check them.
+
+  The last case shows why this is not pedantry: believing there was no CI
+  made enforcement look hypothetical, so a completed guard shipped wired
+  to nothing. A false premise about the environment produced real undone
+  work.
+
+  **(b) A guard is not delivered until something runs it unasked.** Both
+  `check_rng_convention.py` (Stage 2) and `check_citation_format.py`
+  (Stage 4) were written, correct, verified — and referenced by no test,
+  no CI step, and no verification script. A guard that runs only when a
+  human types its name is a guard that rots. Wire it into pytest, CI, and
+  `verify_domain.sh` in the same change that creates it.
+
+  **(c) A passing suite does not prove a change took effect.** During the
+  Stage 4 Part 3 audit, `tellurium_engine.py` imported all 67 public names
+  from the new package and then redefined all 64 below. Python takes the
+  later definition, so the package was imported and immediately shadowed —
+  and every test passed, because the monolith was still doing the work.
+  *"The suite is green"* answers "is something producing correct output,"
+  not "is my change in effect." When a refactor claims to relocate code,
+  assert the relocation directly (e.g. `fn.__module__`).
+
+  **(d) Structural tests are blind to semantic emptiness.** Part 3's tests
+  verified that provenance records had matching keys and that citations
+  appeared only on resolved parameters. Both passed continuously while
+  three of seven citations were wrong, one of them fabricated — because a
+  false title is a well-shaped string. The useful question about a suite
+  is not "does it pass" but "what is it structurally unable to see."
