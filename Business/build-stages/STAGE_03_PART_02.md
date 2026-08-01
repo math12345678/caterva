@@ -2,6 +2,12 @@
 
 ## 0. Amendments, recorded at implementation time
 
+> **See also Section 13** — three further amendments (2026-07-31) from a
+> literature-verification pass: one measured correction to a validation
+> bound that shipped too permissive, one retraction of an incorrect
+> claim made during that same pass, and a new literature-backed
+> verification target (published LJ cluster global minima).
+
 Two clarifications landed while the implementation was being reviewed,
 recorded here so both implementers share the same contract (the Stage 2
 lesson: write the amendment *at the time*, not silently):
@@ -365,6 +371,162 @@ Stage: 3   Part: 2
 
 [Sections 1 through 10 from this document, pasted in full]
 ```
+
+## 13. Amendments from literature verification (2026-07-31)
+
+A pass over this spec against the published Lennard-Jones literature.
+Three amendments: one measured correction to a shipped validation bound,
+one retraction of a claim made during this same pass that measurement
+disproved, and one new verification target.
+
+### 13.1 Amendment 3 — `MD_PLAUSIBLE_TEMPERATURE_HIGH = 2.0` is too permissive
+
+**The problem.** The shipped bound declares any `temperature` in
+`[0.1, 2.0]` plausible and unflagged. The flag's own message promises to
+warn when "the cluster will evaporate within the run." But the published
+melting range for Lennard-Jones clusters is far below the upper bound:
+core melting for LJ55 occurs at roughly `T* ≈ 0.26–0.30`, with surface
+melting of the Mackay overlayer beginning lower still. A bound of `2.0`
+is roughly seven times the melting temperature.
+
+**Measured, not asserted.** Rather than argue from the literature alone,
+the shipped configuration (`n=108`, `ρ*=0.85`, `Δt=0.005`, 3000 steps,
+`seed=42`) was re-implemented independently and run across the
+temperature range, tracking the cluster's radius of gyration and
+counting particles that escape beyond `3×` the initial `Rg`:
+
+| `T*_init` | `T*_equil` | `Rg` growth | escaped |
+|---|---|---|---|
+| 0.1 | 0.288 | 0.93× | 0 |
+| 0.4 | 0.332 | 0.95× | 0 |
+| 0.6 | 0.392 | 0.97× | 0 |
+| 0.8 | 0.451 | 0.98× | 0 |
+| **1.0** | 0.496 | **1.60×** | **1** |
+| 1.5 | 0.612 | 2.59× | 3 |
+| 2.0 | 0.750 | **3.69×** | **9** |
+
+The break is sharp and sits between `0.8` and `1.0`. At the shipped
+upper bound of `2.0`, the cluster loses nine particles and nearly
+quadruples in radius — it is not a cluster any more. The validation
+contract currently certifies that state as plausible and unflagged,
+which is precisely the failure the `ok`/`flagged` distinction exists to
+prevent.
+
+**Recommendation:** `MD_PLAUSIBLE_TEMPERATURE_HIGH = 0.8` — the highest
+value measured to leave the cluster fully intact. `1.0` is defensible as
+a looser alternative but already shows evaporation onset. This is a
+one-constant change plus its test; it is *not* urgent enough to justify
+re-running the whole domain, and it does not invalidate any existing
+test result (Target A's working temperature is unaffected — see 13.2).
+
+### 13.2 Amendment 4 — retraction: `temperature=0.4` in Target A is fine
+
+Honesty about a wrong call made during this same pass. On first reading
+the published melting range (`T* ≈ 0.26–0.30`), the conclusion drawn was
+that Target A's `temperature=0.4` is above melting and would evaporate
+the cluster mid-run — and that Part 1's earlier `T* = 0.3–0.5`
+suggestion was therefore an error to correct.
+
+Measurement disproved that. At `T*_init = 0.4` the cluster is stable:
+`Rg` growth `0.95×`, zero escapes. The reasoning missed that `T*_init`
+is not the equilibrated temperature — the fcc lattice at `ρ* = 0.85` is
+not at the relaxed potential minimum, so kinetic and potential energy
+redistribute during the first relaxation. The measured relationship is
+not a simple halving in either direction: at `T*_init = 0.1` the
+equilibrated `T*_equil = 0.288` (*higher* than the initial value, as
+excess lattice potential energy converts to kinetic), while at
+`T*_init = 2.0` it is `0.750` (much lower). **Target A's parameters
+stand unchanged.** No test needs to move.
+
+Two things worth keeping from this: the published melting temperature
+applies to `T*_equil`, not `T*_init`, and the two are not interchangeable
+— a distinction the spec should state wherever it quotes a temperature.
+And the general lesson, which is this project's own standing rule: a
+literature value plus a plausible-sounding inference is not a finding
+until it is measured.
+
+### 13.3 Amendment 5 — new Target E: published cluster global-minimum energies
+
+**The gap.** Every current target (A, B, C, D) is either an invariant, a
+scaling law, or a self-consistency check. None compares Terrium's output
+to an absolute number that Terrium did not itself produce. The
+Lennard-Jones literature supplies exactly that, freely, and using it
+costs nothing.
+
+**Target E — potential energy of known LJ cluster global minima.**
+Evaluate the potential-energy function on a known global-minimum
+geometry and compare to the published value:
+
+| `N` | Published `E/ε` | Tolerance | Basis |
+|---|---|---|---|
+| 2 | `-1.000000` | `1e-12` | analytic: one pair at `r_min` |
+| 3 | `-3.000000` | `1e-12` | analytic: 3 pairs, equilateral triangle, all at `r_min` |
+| 4 | `-6.000000` | `1e-12` | analytic: 6 pairs, regular tetrahedron, all at `r_min` |
+| 13 | `-44.326801` | `1e-6` | Hoare & Pal (1971), via Cambridge Cluster Database |
+
+Three properties make this target unusually strong. All three were
+confirmed numerically before being written here:
+
+1. **`N = 2, 3, 4` are exact by two independent routes.** They are
+   analytically derivable — a regular tetrahedron places all six pairs
+   simultaneously at `r_min`, giving exactly `6 × (−ε)` — *and* they
+   appear in the published table as `-1.000000`, `-3.000000`,
+   `-6.000000`. Independent derivation and published value agree
+   exactly. `N = 5` is the first size where geometric frustration makes
+   this impossible (`-9.103852`, not `-10`), which is a useful docstring
+   fact in its own right.
+2. **`LJ13`'s global minimum is a *perfect* icosahedron**, so only its
+   overall scale is free. It is reproducible from the golden ratio plus
+   a one-dimensional golden-section scale search — **no downloaded
+   coordinate file, no general-purpose optimizer, no new dependency.**
+   Confirmed: `−44.326801419534` at scale `0.568756044521143` against
+   the published `−44.326801`; the `4.2e-07` residual is entirely the
+   published table's six-decimal rounding, which is why the tolerance is
+   `1e-6` and not tighter.
+3. **The structure carries a checkable physical signature.** In the
+   relaxed LJ13 icosahedron the twelve centre-to-shell distances are
+   *compressed* to `≈ 1.0818 σ` (below `r_min = 1.1225 σ`) while the
+   nearest shell-to-shell distances are *stretched* to `≈ 1.1375 σ`
+   (above it). That frustration is real physics, and asserting it catches
+   a "scale applied to the wrong quantity" bug that a total-energy check
+   alone could absorb.
+
+**Scope note, per this stage's own discipline:** Target E needs a
+geometry constructor that the current spec does not have (Section 4
+ships `_fcc_lattice_positions` only). That is an addition to the
+deliverables, stated here rather than slipped in silently — the exact
+failure mode Stage 2's audit caught. The one-dimensional scale search
+must be hand-written in the engine module; `scipy` stays a test-only
+dependency and the engine's runtime surface stays `numpy` (Rule 5).
+
+### 13.4 References
+
+Verified directly during this pass:
+
+- **Cambridge Cluster Database**, table of Lennard-Jones global minima
+  for `N ≤ 150` (D. J. Wales, J. P. K. Doye *et al.*),
+  <https://www-wales.ch.cam.ac.uk/~jon/structures/LJ/tables.150.html>
+  — source of `LJ13 = −44.326801`, and of the `LJ2/3/4` values that
+  independently confirm the analytic derivation.
+- **Hoare, M. R. & Pal, P.** (1971), *Adv. Phys.* **20**, 161 — credited
+  by the database above as the first report of the `LJ13` and `LJ55`
+  icosahedral global minima.
+- **Swope, W. C., Andersen, H. C., Berens, P. H. & Wilson, K. R.**
+  (1982), *J. Chem. Phys.* **76**, 637–649 — the original publication of
+  the velocity Verlet algorithm (in the Appendix). This is the primary
+  citation for Section 2's integrator.
+- **LJ cluster melting**, `T* ≈ 0.26–0.30` core melting for LJ55 with
+  surface melting lower — Cambridge/Doye cluster-thermodynamics
+  literature. Basis for Amendment 3.
+
+Cited from the database's own reference key, not independently
+retrieved: Gomez & Romero (1994); Pillardy & Piela, *J. Phys. Chem.*
+**99**, 11805 (1995); Doye, Wales & Berry, *J. Chem. Phys.* **103**,
+4234 (1995) — for the `LJ38` truncated-octahedron minimum
+(`−173.928427`), not used by any target above.
+
+Background, not load-bearing: Verlet, L. (1967), *Phys. Rev.* **159**,
+98 — the original Verlet integrator.
 
 ## 12. What Part 3 covers
 
