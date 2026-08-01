@@ -195,3 +195,28 @@ rootdir. `pytest.ini`'s `pythonpath = . ..` — added during the Part 3 audit �
 only works when rootdir is `Tellurium/`; running pytest from the repo root
 made those relative entries resolve elsewhere. Correct fix, and it closes a
 gap the Part 3 audit left open.
+
+## 10. Follow-up (2026-08-01) — plain `pytest` collects clean end to end
+
+With the conftest in place, one collection error remained in bare runs
+(`python3 -m pytest` from the repo root): `Tests/big_test.py`, a
+straight-line scratch script (no functions) that matched pytest's
+`*_test.py` pattern and instantiated `OpenAI()` at module level, failing
+without `GROQ_API_KEY`. `scripts/check_dependencies_declared.py` already
+treats `big_test*` as scratch via `EXCLUDE_NAME_PREFIXES`.
+
+Renamed to `Tests/big_test_scratch.py` (git mv, no references anywhere).
+Bare pytest now collects 846 tests with zero errors, and the full battery
+is green:
+
+| Check | Result |
+|---|---|
+| `python3 -m pytest` (bare, repo root) | 845 passed, 1 skipped |
+| vitest (api-server) | 111 passed (6 files) |
+| `npm run typecheck` | clean |
+| `check_rng_convention.py` / `check_dependencies_declared.py` / `check_citation_format.py` / `check_engine_contract.py` | all pass |
+
+The big_test collection quirk (present only when a Tellurium path joined
+the pytest command line) was not fully root-caused — a pytest 8.4.2
+multi-arg collection oddity; the rename removes the dependency on it,
+which is the point.
