@@ -35,14 +35,25 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # venv must not shadow a supported interpreter merely because its directory
 # exists; missing dependencies should fail transparently under Python 3.10–3.12.
 is_supported_python() {
-    "$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12)) else 1' >/dev/null 2>&1
+    "$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12)) else 1)' >/dev/null 2>&1
 }
 
-if [ -n "${TERRIUM_PYTHON:-}" ] && [ -x "$TERRIUM_PYTHON" ] \
-        && is_supported_python "$TERRIUM_PYTHON"; then
-    PYTHON="$TERRIUM_PYTHON"
-elif [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ] \
-        && is_supported_python "$VIRTUAL_ENV/bin/python"; then
+if [ -n "${TERRIUM_PYTHON:-}" ]; then
+    TERRIUM_PYTHON_PATH="$TERRIUM_PYTHON"
+    case "$TERRIUM_PYTHON_PATH" in
+        /*) ;;
+        *) TERRIUM_PYTHON_PATH="$REPO_DIR/$TERRIUM_PYTHON_PATH" ;;
+    esac
+    if [ ! -x "$TERRIUM_PYTHON_PATH" ] || ! is_supported_python "$TERRIUM_PYTHON_PATH"; then
+        echo "TERRIUM_PYTHON must point to a supported Python 3.10–3.12 interpreter: $TERRIUM_PYTHON"
+        exit 2
+    fi
+    PYTHON="$TERRIUM_PYTHON_PATH"
+elif [ -n "${VIRTUAL_ENV:-}" ]; then
+    if [ ! -x "$VIRTUAL_ENV/bin/python" ] || ! is_supported_python "$VIRTUAL_ENV/bin/python"; then
+        echo "Active VIRTUAL_ENV must use supported Python 3.10–3.12: $VIRTUAL_ENV/bin/python"
+        exit 2
+    fi
     PYTHON="$VIRTUAL_ENV/bin/python"
 elif [ -x "$REPO_DIR/.venv/bin/python" ] \
         && is_supported_python "$REPO_DIR/.venv/bin/python"; then

@@ -2,6 +2,8 @@
 # Run `make` with no arguments to see what's available.
 
 PYTHON  ?= python3
+TERRIUM_PYTHON ?=
+TERRIUM_PYTHON_ABS := $(if $(TERRIUM_PYTHON),$(if $(filter /%,$(TERRIUM_PYTHON)),$(TERRIUM_PYTHON),$(CURDIR)/$(TERRIUM_PYTHON)),)
 VENV    := .venv
 BIN     := $(VENV)/bin
 
@@ -22,9 +24,9 @@ help:
 	@echo ""
 	@echo "First time here? Run: make setup && make check && make test"
 
-setup:
-	@echo ">> creating virtualenv in $(VENV)"
-	$(PYTHON) -m venv $(VENV)
+setup: check-python
+	@echo ">> creating virtualenv in $(VENV) with $(PY)"
+	"$(PY)" -m venv $(VENV)
 	$(BIN)/pip install --upgrade pip --quiet
 	@echo ">> installing dependencies (this builds C extensions; give it a minute)"
 	$(BIN)/pip install -r requirements-dev.txt
@@ -37,8 +39,10 @@ setup:
 # Missing packages then fail transparently under the supported interpreter.
 PY := $(shell \
 	is_supported() { "$$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12)) else 1)' >/dev/null 2>&1; }; \
-	if [ -n "$$VIRTUAL_ENV" ] && [ -x "$$VIRTUAL_ENV/bin/python" ] && is_supported "$$VIRTUAL_ENV/bin/python"; then \
-		echo "$$VIRTUAL_ENV/bin/python"; \
+	if [ -n "$(TERRIUM_PYTHON_ABS)" ]; then \
+		if [ -x "$(TERRIUM_PYTHON_ABS)" ] && is_supported "$(TERRIUM_PYTHON_ABS)"; then echo "$(TERRIUM_PYTHON_ABS)"; else echo ""; fi; \
+	elif [ -n "$$VIRTUAL_ENV" ]; then \
+		if [ -x "$$VIRTUAL_ENV/bin/python" ] && is_supported "$$VIRTUAL_ENV/bin/python"; then echo "$$VIRTUAL_ENV/bin/python"; else echo ""; fi; \
 	elif [ -x "$(BIN)/python" ] && is_supported "$(BIN)/python"; then \
 		echo "$(CURDIR)/$(BIN)/python"; \
 	else \
@@ -61,33 +65,33 @@ check-python:
 	@echo ">> using $(PY)"
 
 check: check-python
-	@$(PY) scripts/check_env.py
+	@"$(PY)" scripts/check_env.py
 
 test: check-python
 	@echo ">> simulation engine"
-	@cd Tellurium && $(PY) -m pytest
+	@cd Tellurium && "$(PY)" -m pytest
 	@echo ""
 	@echo ">> literature layer"
-	@cd Tests && $(PY) -m pytest
+	@cd Tests && "$(PY)" -m pytest
 
 test-fast: check-python
-	@cd Tellurium && $(PY) -m pytest \
+	@cd Tellurium && "$(PY)" -m pytest \
 		--ignore=tests/test_properties.py \
 		--ignore=tests/test_numerical_robustness.py
-	@cd Tests && $(PY) -m pytest
+	@cd Tests && "$(PY)" -m pytest
 
 test-sim: check-python
-	@cd Tellurium && $(PY) -m pytest
+	@cd Tellurium && "$(PY)" -m pytest
 
 test-lit: check-python
-	@cd Tests && $(PY) -m pytest
+	@cd Tests && "$(PY)" -m pytest
 
 test-slow: check-python
-	@cd Tellurium && $(PY) -m pytest tests/test_properties.py \
+	@cd Tellurium && "$(PY)" -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
 
 cli: check-python
-	@$(PY) -m Tellurium.cli --help
+	@"$(PY)" -m Tellurium.cli --help
 	@echo ""
 	@echo "Examples:"
 	@echo "  python -m Tellurium.cli wf --population-size 100 --generations 200 --seed 42"

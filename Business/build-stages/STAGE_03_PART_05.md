@@ -205,6 +205,88 @@ assertion states the physics the test is named for.
 
 ---
 
+## Amendment (2026-08-01) — audit of this document, and one overturned recommendation
+
+Stage 3 was audited end to end after this report was written. Every claim
+above was re-checked against the repository. Three things came out of it.
+
+### A1. The Stage 4 recommendation above is overturned
+
+This report recommends Gillespie SSA as the Stage 4 domain. The reasoning is
+sound *on its own terms* — it does complete the discrete/stochastic category,
+ADR 0005 applies cleanly, and it needs no new dependency. But it was written
+from inside the engine, with no visibility into the application layer, and
+that layer changes the answer.
+
+Measured during the audit:
+
+```
+engine simulate_* functions   8   (mm, sir, seir, pcr, monte_carlo_pi,
+                                   wright_fisher, two_locus_wright_fisher,
+                                   molecular_dynamics)
+exposed by tellurium_runner   3   (run_mm, run_sir, run_seir)
+```
+
+**Five domains cannot be reached by any user of the product**, including
+everything Stages 1, 2 and 3 produced. Adding Gillespie SSA as Stage 4 makes
+that six. The verification rigour that makes this project unusual currently
+stops at a boundary the product's users sit on the far side of.
+
+Worse, the trust trail — the product's headline claim — has no verification
+discipline applied to it at all. `tellurium_engine.py` contains no citation,
+source, or organism field; provenance lives entirely in `queryResolver.ts` and
+is re-attached to the response after the engine has run. A parameter resolved
+from the wrong organism would be simulated faithfully and returned
+`ok: true, flagged: false` with a citation attached. Nothing in the repository
+would catch it.
+
+**Revised recommendation:** Stage 4 is integration and CI coverage for the
+application layer; Stage 5 is the provenance contract; domains resume at
+Stage 6, by which point every new domain reaches the product automatically.
+Full reasoning, with the file-by-file audit behind it, in
+`Business/ARCHITECTURE_ASSESSMENT.md`.
+
+Gillespie SSA remains a good domain choice and should be first in the queue
+when domains resume.
+
+### A2. Duplicate regression tests consolidated
+
+The eigenvector fix arrived with two functionally identical tests —
+`test_normalise_stationary_vector_handles_negative_sign` and
+`test_normalise_stationary_vector_sign_and_clamp` — asserting the same
+behaviour on the same input, one from each implementer. Consolidated into a
+single test, keeping the better docstring and adding two assertions neither
+had: an explicit finiteness check (the old logic's actual failure was NaN,
+not a wrong value) and a sign-symmetry check that negating the input does not
+change the result.
+
+The removed copy also used `from Tellurium.tellurium_engine import ...`
+inside the test body, while the rest of the file imports `tellurium_engine`
+directly. That form only resolves because pytest inserts the rootdir into
+`sys.path`; run from `Tellurium/` with a plain interpreter it raises
+`ModuleNotFoundError`, and CI runs with `working-directory: Tellurium`. It
+was redundant with the module-level import in any case.
+
+### A3. Both regression tests verified against the old logic
+
+The point of a regression test is that it fails on the bug. Confirmed rather
+than assumed: the helper was reverted to clamp-before-orient and the suite
+re-run.
+
+```
+MUTATED  FAILED test_normalise_stationary_vector_handles_negative_sign
+MUTATED  FAILED test_stationary_vector_eigenvector_sign_regression
+REVERTED 2 passed
+```
+
+Both fire. Neither is decorative.
+
+### A4. One miscategorisation in this document
+
+The "Carried Forward" list includes *"Test count documentation: per the
+constitution, no test-count numbers in documents."* That is a convention this
+report already follows, not outstanding work. Not carried.
+
 ## Final Verification
 
 | Check | Result |

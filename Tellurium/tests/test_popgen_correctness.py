@@ -295,6 +295,7 @@ from tellurium_engine import (
     expected_fst_after_split,
     simulate_two_locus_wright_fisher,
     theoretical_ld_decay,
+    _clamp_wf_fst_roundoff,
 )
 
 
@@ -1844,6 +1845,21 @@ def test_fst_starts_at_zero() -> None:
     assert result.column("fst")[0] == 0.0
 
 
+def test_fst_clamps_boundary_roundoff() -> None:
+    """The small-N boundary case must not report negative Fst."""
+    result = simulate_wright_fisher(
+        population_size=1, starting_frequency=0.99999, generations=1,
+        replicate_runs=1, n_demes=7, migration_rate=0.0,
+        migration_model="island")
+    assert min(result.column("fst")) == 0.0
+
+
+def test_fst_clamp_preserves_material_out_of_range_values() -> None:
+    """Only roundoff-sized violations may be clamped; real violations stay visible."""
+    values = np.array([-1.1e-10, 1.0 + 1.1e-10], dtype=np.float64)
+    np.testing.assert_array_equal(_clamp_wf_fst_roundoff(values), values)
+
+
 def test_no_migration_fst_increases() -> None:
     """Without migration, demes drift apart → Fst increases over time."""
     result = simulate_wright_fisher(
@@ -3329,15 +3345,40 @@ def test_stationary_vector_validation() -> None:
 
 
 def test_normalise_stationary_vector_handles_negative_sign() -> None:
-    """Sign orientation is deterministic and independent of LAPACK."""
+    """Build-independent regression test for the eigenvector sign bug.
+
+    The helper is extracted to module level precisely so this can be tested
+    without going through scipy: LAPACK's sign choice is arbitrary and not
+    stable across builds, so a test that calls the full eigen-decomposition
+    only catches the bug on configurations that happen to return a negative
+    vector. This forces the negative input directly.
+
+    The OLD logic clamped before orienting:
+        np.maximum([-0.2, -0.5, -0.3], 0)  ->  [0, 0, 0]
+        total = 0.0
+        v / total                          ->  NaN
+
+    The fix orients toward the positive orthant first, then clamps, then
+    checks the total actually being divided by.
+    """
     result = _normalise_stationary_vector(
         np.array([-0.2, -0.5, -0.3], dtype=np.float64))
+
     assert sum(result) == pytest.approx(1.0, abs=1e-12)
     assert np.all(result >= 0.0)
+    assert np.all(np.isfinite(result)), "the old logic produced NaN here"
     np.testing.assert_allclose(
         result, np.array([0.2, 0.5, 0.3]), atol=1e-12)
-    with pytest.raises(ValueError):
+
+    # An all-zero vector has no valid orientation and must raise rather than
+    # divide by zero.
+    with pytest.raises(ValueError, match="failed to compute"):
         _normalise_stationary_vector(np.zeros(3, dtype=np.float64))
+
+    # Sign symmetry: negating the input must not change the result.
+    pos = _normalise_stationary_vector(
+        np.array([0.2, 0.5, 0.3], dtype=np.float64))
+    np.testing.assert_allclose(result, pos, atol=1e-15)
 
 
 def test_stationary_vector_eigenvector_sign_regression() -> None:
@@ -3367,40 +3408,6 @@ def test_stationary_vector_eigenvector_sign_regression() -> None:
     assert np.max(np.abs(drift - np.asarray(v))) < 1e-10, (
         f"max |pi Q - pi| = {np.max(np.abs(drift - np.asarray(v))):.2e}")
 
-
-def test_normalise_stationary_vector_sign_and_clamp() -> None:
-    """Build-independent regression test for the eigenvector sign fix.
-
-    The normalisation helper is extracted to module level so it can be
-    tested directly. This test does not depend on scipy/LAPACK's
-    arbitrary sign choice — it forces an all-negative input and asserts
-    the correct orientation-and-normalisation behaviour.
-
-    The OLD logic (clamp first, then orient, then divide) would:
-      1. np.maximum([-0.2, -0.5, -0.3], 0) -> [0, 0, 0]
-      2. sum = 0.0
-      3. 0/0 -> NaN (or ValueError if guarded)
-
-    The NEW logic (orient, then clamp, then check total) correctly
-    produces [0.2, 0.5, 0.3] summing to 1.
-    """
-    from Tellurium.tellurium_engine import _normalise_stationary_vector
-
-    # All-negative input (simulating LAPACK returning a sign-flipped eigenvector)
-    v_neg = np.array([-0.2, -0.5, -0.3], dtype=np.float64)
-    result = _normalise_stationary_vector(v_neg)
-
-    # Should orient toward positive orthant before clamping
-    expected = np.array([0.2, 0.5, 0.3], dtype=np.float64)
-    expected = expected / expected.sum()
-    assert np.allclose(result, expected), (
-        f"sign-flipped input: got {result}, expected {expected}")
-    assert abs(result.sum() - 1.0) < 1e-12, "must sum to 1"
-    assert np.all(result >= 0.0), "all entries non-negative"
-
-    # All-zero input should raise
-    with pytest.raises(ValueError, match="failed to compute"):
-        _normalise_stationary_vector(np.array([0.0, 0.0, 0.0]))
 
 
 

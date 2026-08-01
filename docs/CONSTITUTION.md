@@ -268,3 +268,28 @@ they happen:
   calls flagged, not silently made) applied retroactively across the
   whole repo, not just to the most recent stage's diff — worth doing
   periodically, not only at each stage's close.
+- 2026-08 — Stage 3 (molecular dynamics), closed. Three amendments with
+  standing force beyond this stage:
+
+  **(a) A verification target backed by a published value outranks one
+  backed by an invariant.** Targets A-D were invariants, scaling laws and
+  self-consistency checks — all of which compare the engine to itself.
+  Target E compared it to `-44.326801`, published by Hoare & Pal in 1971.
+  Where a domain has a literature value available, the spec must use it;
+  invariants alone leave a class of error undetectable by construction.
+
+  **(b) A green test run is evidence only about the configuration it ran
+  on.** The eigenvector sign bug (`wright_fisher_stationary_vector`
+  clamped an eigenvector before orienting it, so a validly sign-flipped
+  LAPACK result became all zeros and normalised to NaN) passed on Python
+  3.13 and failed deterministically on the pinned 3.10 / numpy 1.26.4
+  configuration that CI actually runs. Local runs outside the supported
+  range prove nothing. Recorded in `CONTRIBUTING.md`.
+
+  **(c) Verification rigour must not stop at a module boundary.** The
+  audit found five of eight engine `simulate_*` functions unreachable
+  from the application layer, and the trust trail — the product's
+  headline claim — carrying no verification discipline at all: the engine
+  has no citation or source field, and provenance is re-attached to the
+  response after simulation. Rule 1 applies to parameter provenance, not
+  only to numerics. See `Business/ARCHITECTURE_ASSESSMENT.md`.
