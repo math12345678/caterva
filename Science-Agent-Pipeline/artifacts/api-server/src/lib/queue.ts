@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { SimulationDomain } from "./telluriumRunner";
 
 export type JobStatus =
   | "pending"
@@ -11,7 +12,7 @@ export type JobStatus =
 
 export interface SimulationResponse {
   runId: string;
-  domain: "mm" | "sir" | "seir";
+  domain: SimulationDomain;
   parameters: Record<string, unknown>;
   trajectory: Record<string, unknown>[];
   provenance: {

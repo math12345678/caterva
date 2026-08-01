@@ -1,6 +1,7 @@
 import httpx
 from bs4 import BeautifulSoup
 import re
+from typing import List
 
 r = httpx.get(
     "https://www.brenda-enzymes.org/enzyme.php",
@@ -13,10 +14,10 @@ soup = BeautifulSoup(r.text, "lxml")
 # Find all rows in BRENDA's data tables
 rows = soup.find_all("div", class_=re.compile(r"row"))
 
-human_km_rows = []
+human_km_rows: List[str] = []
 
-for row in rows:
-    cells = row.find_all("div", class_="cell")
+for row_tag in rows:
+    cells = row_tag.find_all("div", class_="cell")
     if not cells:
         continue
     
@@ -28,5 +29,5 @@ for row in rows:
 
 print(f"Human rows with numeric data: {len(human_km_rows)}")
 print("\nFirst 10:")
-for row in human_km_rows[:10]:
-    print(" ", row[:200])
+for row_text in human_km_rows[:10]:
+    print(" ", row_text[:200])

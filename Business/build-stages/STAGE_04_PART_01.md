@@ -268,6 +268,118 @@ and MD belong in a request/response API at all, given both can run for
 seconds — the queue exists, but no `run_*` has yet had a genuine runtime
 concern.
 
+## 5b. Completion audit (2026-08-01)
+
+Implementers delivered against this part's scope ahead of Part 2 — OpenCode,
+FreeBuff and now Mistral Vibe. Audited by running the code, not by reading
+the reports.
+
+### Verified working
+
+**All eight domains reachable.** Every one exercised end to end through the
+real runner:
+
+```
+mm  sir  seir  pcr  monte_carlo_pi  wright_fisher
+two_locus_wright_fisher  molecular_dynamics        -> all ok:true
+```
+
+**The three-state contract survives for the new domains** — the thing most
+likely to have been stubbed, so it was checked directly rather than assumed:
+
+| probe | result |
+|---|---|
+| MD `temperature=1.5` (above the 0.8 bound) | `flagged:true` — *"initialization temperature 1.5 is outside [0.1, 0.8]: cluster will evaporate"* |
+| WF `replicate_runs=2` (below 10) | `flagged:true` — *"standard error of mean heterozygosity will be large"* |
+| PCR `efficiency=1.4` (impossible) | `ok:false` — the engine's own rejection text |
+
+Note the MD reason carries the corrected `0.8` bound from Stage 3 and the
+words *"initialization temperature"* from Part 2's retraction. Two stages of
+correction survived to the API surface intact.
+
+**The contract test is real, not decorative.** `test_boundary_contract.py`
+loads the actual runner from source, checks drift in both directions, and
+ships three self-mutation tests. Those use `monkeypatch`, which tests the
+helper rather than the real path — so an independent check was run by
+editing the engine file itself:
+
+```
+MUTATION  engine __all__ gains "simulate_gillespie_ssa"
+          FAILED test_every_engine_domain_is_dispatched
+          FAILED test_engine_all_contains_expected_domains
+REVERTED  18 passed
+```
+
+That is precisely the Stage 6 scenario. Rule 6's pre-specified mutation for
+this stage is satisfied against a genuine file edit.
+
+**`LEVELS_UP` is gone**, replaced by `repoRoot.ts` walking upward for two
+markers that straddle the boundary (`Tellurium/` and
+`Science-Agent-Pipeline/pnpm-workspace.yaml`), with `repoRoot.test.ts`
+covering it.
+
+**Runtime ceilings landed** (`MAX_API_MONTE_CARLO_SAMPLES = 1_000_000`,
+`MAX_API_MD_STEPS = 10_000`) with a comment distinguishing them from
+scientific plausibility bounds — the right distinction, correctly made.
+
+**CI job added and checked.** Node 22, Python 3.12 (inside the supported
+range), `corepack prepare pnpm@11.4.0`, `--frozen-lockfile`, filtered to
+`@workspace/api-server`. The filter name matches `package.json` exactly and
+`artifacts/*` is in the workspace globs — a mismatched filter exits 0 having
+run nothing, so it was verified rather than eyeballed.
+
+### One defect found and fixed: duplicate ADR 0007
+
+Two files both claimed ADR 0007:
+
+```
+0007-contract-test-for-engine-application-boundary.md   82 lines, indexed
+0007-engine-application-boundary.md                     52 lines, orphaned
+```
+
+One per implementer, same decision, different depth. ADR numbers are unique
+by construction, and only the first was in the index — so the second was
+invisible to anyone reading `docs/adr/README.md` while still sitting in the
+tree.
+
+Resolved per Section 7 of the constitution rather than by deleting the
+smaller one on sight. The orphan contained something the indexed version
+lacked: an explicit answer to this part's §2.4 open question — *scientific
+validation stays authoritative in Python; TypeScript checks structural
+presence only.* That reasoning was merged into the surviving ADR, together
+with the runtime-ceiling distinction and a note that duplicating a bound like
+`MD_PLAUSIBLE_TEMPERATURE_HIGH` into a Zod schema would create the exact
+two-sources-of-truth drift ADR 0003 was written to stop. The orphan was then
+removed and the index re-verified: seven ADRs, no duplicate numbers, every
+indexed file present.
+
+Also fixed in that ADR: a formatting break where two paragraphs had run
+together mid-sentence and the following lines carried stray indentation.
+
+### One risk checked and cleared
+
+`pnpm-workspace.yaml` strips platform binaries under a comment reading
+*"We're on macOS darwin-arm64."* CI runs `ubuntu-latest`. That combination
+looks like a broken CI job waiting to happen, so it was checked: the
+exclusions are only ARM, ppc64 and s390x variants, and the lockfile carries
+nine `linux-x64` entries. `ubuntu-latest` is x64 and resolves fine. Recorded
+because the next person to read that comment will have the same worry.
+
+### Status against this part's scope
+
+| item | status |
+|---|---|
+| 1. Expose five unreachable domains | done, all eight verified end to end |
+| 2. Application-layer CI job | done, filter name verified |
+| 3. Cross-boundary contract test | done, verified against a real file edit |
+| 4. Replace `LEVELS_UP` | done, with its own test |
+| 5. Parameter-validation decision, in writing | done — now in ADR 0007 |
+| 6. Runtime ceilings (open item 3) | done, and distinguished from science |
+
+Full Python suite green, both guard scripts clean. The vitest suite was not
+run here — no Node toolchain in the review sandbox — and is now gated by CI,
+which is the point of item 2.
+
 ## 6. What Part 2 must resolve
 
 1. The dispatch shape for five new domains, including their default

@@ -10,7 +10,7 @@ export interface EntityExtraction {
 
 export interface LLMResolvedSimulation {
   domain: SimulationDomain;
-  parameters: Record<string, number>;
+  parameters: Record<string, number | number[]>;
   reasoning: string;
   citations: string[];
   entities?: EntityExtraction;
@@ -34,7 +34,7 @@ const SYSTEM_PROMPT = `You are the "science agent" resolver for a computational 
 Given a natural-language query, return a single JSON object (no markdown, no prose) with this exact shape:
 
 {
-  "domain": "mm" | "sir" | "seir",
+  "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" | "wright_fisher" | "two_locus_wright_fisher" | "molecular_dynamics",
   "parameters": { ...numeric parameters... },
   "reasoning": "short explanation of how you mapped the query",
   "citations": ["optional literature reference"],
@@ -47,9 +47,14 @@ Given a natural-language query, return a single JSON object (no markdown, no pro
 }
 
 Domain meanings:
-- "mm": Michaelis-Menten enzyme kinetics. Parameters include km, vmax, s0, end, points.
-- "sir": SIR epidemiology. Parameters include beta, gamma, s0, i0, r0_recovered, end, points.
-- "seir": SEIR epidemiology. Parameters include beta, sigma, gamma, s0, e0, i0, r0_recovered, end, points.
+- "mm": Michaelis-Menten enzyme kinetics.
+- "sir": SIR epidemiology.
+- "seir": SEIR epidemiology.
+- "pcr": discrete PCR amplification.
+- "monte_carlo_pi": Monte Carlo estimation of pi.
+- "wright_fisher": Wright-Fisher population genetics.
+- "two_locus_wright_fisher": two-locus linkage disequilibrium.
+- "molecular_dynamics": Lennard-Jones molecular dynamics.
 
 Rules:
 1. Infer sensible defaults for any missing numeric parameters.
@@ -143,7 +148,10 @@ export async function resolveQueryWithLLM(
 
     const parsed = JSON.parse(content) as Partial<LLMResolvedSimulation>;
 
-    if (!parsed.domain || !["mm", "sir", "seir"].includes(parsed.domain)) {
+    if (
+      !parsed.domain ||
+      !["mm", "sir", "seir", "pcr", "monte_carlo_pi", "wright_fisher", "two_locus_wright_fisher", "molecular_dynamics"].includes(parsed.domain)
+    ) {
       logger.warn({ parsed }, "LLM resolver returned invalid domain");
       return null;
     }

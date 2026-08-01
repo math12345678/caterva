@@ -4,7 +4,8 @@ import { RunSimulationBody, GetSimulationJobParams, StreamSimulationJobParams } 
 import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { resolveQuery } from "../lib/queryResolver";
-import { runTellurium } from "../lib/telluriumRunner";
+import { runTellurium, type SimulationDomain } from "../lib/telluriumRunner";
+import { SimulationParameterSchemas } from "../lib/schemas";
 import * as queue from "../lib/queue";
 import { findCachedResultByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
@@ -353,26 +354,27 @@ async function runPipeline(jobId: string, query: string): Promise<void> {
 }
 
 /**
- * Basic validation of resolved parameters before invoking the engine. This is
- * intentionally lightweight; the engine itself performs more thorough checks.
+ * Structural validation of resolved parameters before invoking the engine.
+ *
+ * Shape validation (presence, numeric types, integer counts, the four-entry
+ * haplotype array) happens here against the Zod schemas in `lib/schemas.ts`.
+ * Scientific plausibility bounds remain in the engine only, so the two
+ * layers cannot drift on physical constraints (ADR 0003). A malformed
+ * request is rejected here with a structured message instead of reaching
+ * Python and surfacing as a ValueError string.
  */
-function validateParameters(domain: string, parameters: Record<string, number>): void {
-  const required: Record<string, string[]> = {
-    mm: ["km", "vmax", "s0"],
-    sir: ["beta", "gamma", "s0", "i0"],
-    seir: ["beta", "sigma", "gamma", "s0", "e0", "i0"],
-  };
-
-  const fields = required[domain];
-  if (!fields) {
+function validateParameters(domain: string, parameters: Record<string, unknown>): void {
+  const schema = SimulationParameterSchemas[domain as SimulationDomain];
+  if (!schema) {
     throw new Error(`Unknown simulation domain: ${domain}`);
   }
 
-  for (const field of fields) {
-    const value = parameters[field];
-    if (value === undefined || Number.isNaN(value)) {
-      throw new Error(`Missing or invalid required parameter: ${field}`);
-    }
+  const parse = schema.safeParse(parameters);
+  if (!parse.success) {
+    const messages = parse.error.errors.map(
+      (e) => `parameter ${e.path.join(".")}: ${e.message}`,
+    );
+    throw new Error(`Invalid simulation parameters: ${messages.join("; ")}`);
   }
 }
 

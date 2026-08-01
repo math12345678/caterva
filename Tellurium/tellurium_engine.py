@@ -3353,6 +3353,11 @@ class TwoLocusResult:
     seed: Optional[int] = None
     replicate_data: Optional[List[List[float]]] = None
     replicate_colnames: Optional[List[str]] = None
+    validation: ParameterValidation = field(default_factory=ParameterValidation)
+
+    @property
+    def flagged(self) -> bool:
+        return self.validation.flagged
 
     def column(self, name: str) -> List[float]:
         if name not in self.colnames:
@@ -3600,7 +3605,7 @@ def simulate_two_locus_wright_fisher(
         n_replicates=replicate_runs, seed=seed,
         replicate_data=rep_data if return_replicate_data else None,
         replicate_colnames=["generation", "D"] if return_replicate_data
-        else None)
+        else None, validation=v)
 
 
 def theoretical_ld_decay(

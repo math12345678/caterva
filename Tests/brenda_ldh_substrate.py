@@ -1,6 +1,7 @@
 import httpx
 from bs4 import BeautifulSoup
 import re
+from typing import List
 
 import enzyme_lookup
 
@@ -22,9 +23,9 @@ try:
 except Exception:
     real_substrates = []
 
-substrate_km_rows = []
-for row in rows:
-    cells = row.find_all("div", class_="cell")
+substrate_km_rows: List[List[str]] = []
+for row_tag in rows:
+    cells = row_tag.find_all("div", class_="cell")
     if len(cells) < 3:
         continue
     cell_texts = [c.get_text(strip=True) for c in cells]
@@ -39,5 +40,5 @@ for row in rows:
 
 print(f"Human LDH rows with real substrates: {len(substrate_km_rows)}")
 print()
-for row in substrate_km_rows[:20]:
-    print("  " + " | ".join(str(c)[:60] for c in row[:5]))
+for row_cells in substrate_km_rows[:20]:
+    print("  " + " | ".join(str(c)[:60] for c in row_cells[:5]))

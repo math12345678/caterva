@@ -50,7 +50,8 @@ def test_pubmed_url_handles_missing_id():
 
 
 def _make_entry(**overrides) -> BRENDAKmEntry:
-    base = dict(
+    from typing import Any
+    base: dict[str, Any] = dict(
         km_value=0.6,
         unit="mM",
         substrate="lactate",

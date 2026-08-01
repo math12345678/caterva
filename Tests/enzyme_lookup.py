@@ -87,7 +87,7 @@ def fetch_uniprot_accession(
     """Fetch the canonical (reviewed/Swiss-Prot) UniProt accession for an
     EC number in a given organism. Returns None if nothing is found -
     never guesses or fabricates an accession."""
-    params = {
+    params: dict[str, str | int] = {
         "query": f"ec:{ec_number} AND organism_id:{taxon_id} AND reviewed:true",
         "fields": "accession",
         "format": "json",

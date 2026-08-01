@@ -8,6 +8,7 @@ rebuilt from actual captured cells instead of approximated ones.
 """
 
 import re
+from typing import List
 
 from brenda_client import _find_table_container, fetch_brenda_html
 from bs4 import BeautifulSoup
@@ -27,8 +28,8 @@ else:
     all_rows = rows + subrows
     print(f"Total rows (including sub-rows): {len(all_rows)}")
 
-    human_rows = []
-    non_human_rows = []
+    human_rows: List[List[str]] = []
+    non_human_rows: List[List[str]] = []
     for row in all_rows:
         cells = row.find_all("div", class_="cell")
         cell_texts = [c.get_text(strip=True) for c in cells]
