@@ -48,7 +48,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     reasoning:
       "Keywords related to infectious disease spread were found; defaulting to an SIR epidemic simulation.",
     modelCitations: [
-      "Kermack W.O., McKendrick A.G. (1927) A Contribution to the Mathematical Theory of Epidemics.",
+      "Kermack W.O., McKendrick A.G. (1927) A contribution to the mathematical theory of epidemics. Proceedings of the Royal Society A 115(772), 700-721.",
     ],
   },
   {
@@ -58,7 +58,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     reasoning:
       "Keywords related to latent-period epidemiology were found; defaulting to an SEIR simulation.",
     modelCitations: [
-      "Kermack W.O., McKendrick A.G. (1927) A Contribution to the Mathematical Theory of Epidemics.",
+      "Kermack W.O., McKendrick A.G. (1927) A contribution to the mathematical theory of epidemics. Proceedings of the Royal Society A 115(772), 700-721.",
     ],
   },
   {
@@ -66,35 +66,47 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     parameters: { n0: 100, efficiency: 0.95, cycles: 30 },
     keywords: ["pcr", "polymerase chain", "amplification", "template", "cycles"],
     reasoning: "PCR amplification keywords were found; defaulting to a discrete PCR simulation.",
-    modelCitations: ["Mullis K. et al. (1986) Specific enzymatic amplification of DNA in vitro."],
+    modelCitations: [
+      "Mullis K., Faloona F., Scharf S., Saiki R., Horn G., Erlich H. (1986) Specific enzymatic amplification of DNA in vitro: the polymerase chain reaction. Cold Spring Harbor Symposia on Quantitative Biology 51, 263-273.",
+    ],
   },
   {
     domain: "monte_carlo_pi",
     parameters: { n_samples: 10_000 },
     keywords: ["monte carlo", "estimate pi", "pi estimate", "random points"],
     reasoning: "Monte Carlo estimation keywords were found; defaulting to pi estimation.",
-    modelCitations: ["Metropolis N., Ulam S. (1949) The Monte Carlo method."],
+    modelCitations: [
+      "Metropolis N., Ulam S. (1949) The Monte Carlo method. Journal of the American Statistical Association 44(247), 335-341.",
+    ],
   },
   {
     domain: "wright_fisher",
     parameters: { population_size: 100, starting_frequency: 0.5, generations: 100, replicate_runs: 100, mutation_rate: 0, selection_coefficient: 0 },
     keywords: ["wright-fisher", "genetic drift", "allele frequency", "population genetics", "fixation"],
     reasoning: "Population-genetics keywords were found; defaulting to a Wright-Fisher simulation.",
-    modelCitations: ["Fisher R.A. (1930) The Genetical Theory of Natural Selection."],
+    // The model carries both names; citing only Fisher attributes half of it.
+    modelCitations: [
+      "Fisher R.A. (1930) The Genetical Theory of Natural Selection. Oxford: Clarendon Press.",
+      "Wright S. (1931) Evolution in Mendelian populations. Genetics 16(2), 97-159.",
+    ],
   },
   {
     domain: "two_locus_wright_fisher",
     parameters: { population_size: 100, generations: 20, recombination_rate: 0.1, starting_frequencies: [0.5, 0, 0, 0.5], mutation_rate: 0, replicate_runs: 50 },
     keywords: ["linkage disequilibrium", "two locus", "two-locus", "recombination", "haplotype"],
     reasoning: "Linkage and recombination keywords were found; defaulting to a two-locus Wright-Fisher simulation.",
-    modelCitations: ["Lewontin R.C. (1964) The interaction of selection and linkage."],
+    modelCitations: [
+      "Lewontin R.C. (1964) The interaction of selection and linkage. I. General considerations; heterotic models. Genetics 49(1), 49-67.",
+    ],
   },
   {
     domain: "molecular_dynamics",
     parameters: { n_particles: 108, temperature: 0.4, timestep: 0.005, n_steps: 1000, density: 0.85 },
     keywords: ["molecular dynamics", "lennard-jones", "lennard jones", "lj cluster", "particles"],
     reasoning: "Molecular-dynamics keywords were found; defaulting to a Lennard-Jones simulation.",
-    modelCitations: ["Hoare M.R., Pal P. (1971) Physical clusters of simple liquids."],
+    modelCitations: [
+      "Hoare M.R., Pal P. (1971) Physical cluster mechanics: statics and energy surfaces for monatomic systems. Advances in Physics 20(84), 161-196.",
+    ],
   },
 ];
 
