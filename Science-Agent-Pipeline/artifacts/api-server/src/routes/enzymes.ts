@@ -30,9 +30,10 @@ router.post("/resolve", validate(ResolveBody), async (req: Request, res: Respons
       parameters: resolved.parameters,
       provenance: {
         reasoning: resolved.provenance.reasoning,
-        citations: resolved.provenance.citations,
+        modelCitations: resolved.provenance.modelCitations,
         flags: resolved.provenance.flags,
       },
+      parameterProvenance: resolved.parameterProvenance,
     });
   } catch (err) {
     next(err);

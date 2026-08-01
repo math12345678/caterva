@@ -21,7 +21,7 @@ interface SimulateResponse {
     domain: string;
     parameters: Record<string, number>;
     trajectory: Record<string, number>[];
-    provenance: { reasoning: string; citations: string[]; flags: string[] };
+    provenance: { reasoning: string; modelCitations: string[]; flags: string[] };
     completedAt: string;
   };
   error?: { error: string; message: string };
@@ -153,7 +153,7 @@ function printResult(r: SimulateResponse["result"]): void {
   console.log(`  Parameters: ${JSON.stringify(r.parameters, null, 2)}`);
   console.log(`  Trajectory points: ${r.trajectory.length}`);
   console.log(`  Flags: ${r.provenance.flags.join("; ") || "none"}`);
-  console.log(`  Citations: ${r.provenance.citations.length}`);
+  console.log(`  Model citations: ${r.provenance.modelCitations.length}`);
   console.log(`  Completed: ${r.completedAt}`);
 }
 

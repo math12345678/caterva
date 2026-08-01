@@ -226,6 +226,46 @@ class TestRunnerExecution:
         with pytest.raises(ValueError, match="API runtime ceiling"):
             runner.run_molecular_dynamics({"n_steps": 10_001})
 
+    # ---- MD quadratic-cost ceiling -------------------------------------
+    #
+    # n_steps alone does not bound an MD request: cost is O(N^2 * steps) and
+    # the engine ACCEPTS n_particles=5000 (ok=True, merely flagged, then
+    # rounded up to 5324). Measured before the fix: 800 particles at 200
+    # steps -- 4% of the step ceiling -- already cost 9.94s, and 5000
+    # particles at the step ceiling is roughly six hours.
+
+    def test_md_pair_step_budget_rejects_large_particle_counts(self):
+        """A request under every scalar ceiling but quadratically huge."""
+        with pytest.raises(ValueError, match="pair-steps"):
+            runner.run_molecular_dynamics({"n_particles": 5000, "n_steps": 100})
+
+    def test_md_pair_step_budget_rejects_at_step_ceiling(self):
+        with pytest.raises(ValueError, match="pair-steps"):
+            runner.run_molecular_dynamics(
+                {"n_particles": 5000, "n_steps": runner.MAX_API_MD_STEPS})
+
+    def test_md_documented_reference_case_stays_within_budget(self):
+        """108 particles x 10k steps is the documented case and must remain
+        allowed -- a budget that rejects it would be miscalibrated."""
+        actual = runner._fcc_particle_count(108)
+        assert actual * actual * runner.MAX_API_MD_STEPS <= runner.MAX_API_MD_PAIR_STEPS
+
+    def test_fcc_round_up_matches_engine(self):
+        """The budget must use the count the engine actually simulates.
+
+        Rounding is always upward, so budgeting on the requested count would
+        systematically underestimate cost.
+        """
+        assert runner._fcc_particle_count(108) == 108      # 4 * 3^3
+        assert runner._fcc_particle_count(5000) == 5324    # 4 * 11^3
+        assert runner._fcc_particle_count(1) == 4          # smallest cell
+        for requested in (5, 33, 100, 500, 900):
+            actual = runner._fcc_particle_count(requested)
+            assert actual >= requested
+            k = round((actual / 4) ** (1 / 3))
+            assert actual == 4 * k**3
+            assert 4 * (k - 1) ** 3 < requested  # k is the smallest sufficient
+
     def test_unknown_domain_returns_error(self, capsys):
         import json
 
@@ -242,3 +282,36 @@ class TestRunnerExecution:
         out = json.loads(capsys.readouterr().out)
         assert out["ok"] is False
         assert "unknown domain" in out["error"]
+
+    @pytest.mark.parametrize(
+        ("domain", "params", "ceiling_name"),
+        [
+            ("molecular_dynamics", {"n_steps": 10_001}, "MAX_API_MD_STEPS"),
+            ("monte_carlo_pi", {"n_samples": 1_000_001}, "MAX_API_MONTE_CARLO_SAMPLES"),
+            ("wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
+            ("two_locus_wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
+        ],
+    )
+    def test_runtime_ceiling_rejects_oversized_request(
+        self, domain, params, ceiling_name, capsys
+    ):
+        """A request that would tie up a runner slot for many seconds is
+        rejected with a structured error instead of running (STAGE_04_PART_01
+        §6.3: the queue limits concurrency, the runner limits duration)."""
+        import json
+
+        import io
+
+        payload = dict(self.SMALL_PARAMS[domain])
+        payload.update(params)
+        old_stdin = sys.stdin
+        sys.stdin = io.StringIO(json.dumps({"domain": domain, "parameters": payload}))
+        try:
+            with pytest.raises(SystemExit) as exc:
+                runner.main()
+            assert exc.value.code == 1
+        finally:
+            sys.stdin = old_stdin
+        out = json.loads(capsys.readouterr().out)
+        assert out["ok"] is False
+        assert ceiling_name in out["error"]

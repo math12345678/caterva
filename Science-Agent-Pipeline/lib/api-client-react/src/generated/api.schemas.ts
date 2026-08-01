@@ -48,12 +48,37 @@ export const SimulationResponseDomain = {
 } as const;
 
 export interface Provenance {
-  /** Literature references used to resolve parameters */
-  citations?: string[];
+  /** Literature references for the MODEL/domain, never for individual parameter values (ADR 0008) */
+  modelCitations?: string[];
   /** Human-readable warnings about the parameters or result */
   flags?: string[];
   /** Short explanation of how the query was mapped to a domain */
   reasoning?: string;
+}
+
+/**
+ * How this value was obtained for THIS query (ADR 0008)
+ */
+export type ParameterProvenanceOrigin = typeof ParameterProvenanceOrigin[keyof typeof ParameterProvenanceOrigin];
+
+
+export const ParameterProvenanceOrigin = {
+  resolved: 'resolved',
+  user: 'user',
+  default: 'default',
+} as const;
+
+export interface ParameterProvenance {
+  /** How this value was obtained for THIS query (ADR 0008) */
+  origin: ParameterProvenanceOrigin;
+  /** What looked the value up; present only when origin is resolved */
+  source?: string;
+  /** Citation supporting THIS value; present only when origin is resolved */
+  citation?: string;
+  /** Organism for this value; present only when origin is resolved */
+  organism?: string;
+  /** Why a lookup was attempted and failed, if so */
+  note?: string;
 }
 
 /**
@@ -62,6 +87,11 @@ export interface Provenance {
 export type SimulationResponseParameters = { [key: string]: unknown };
 
 export type SimulationResponseTrajectoryItem = { [key: string]: unknown };
+
+/**
+ * Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)
+ */
+export type SimulationResponseParameterProvenance = {[key: string]: ParameterProvenance};
 
 export interface SimulationResponse {
   /** Unique identifier for this pipeline run */
@@ -73,6 +103,8 @@ export interface SimulationResponse {
   /** Time-series output from the simulation engine */
   trajectory: SimulationResponseTrajectoryItem[];
   provenance: Provenance;
+  /** Per-parameter provenance; exactly one entry per key in parameters (ADR 0008) */
+  parameterProvenance: SimulationResponseParameterProvenance;
   /** ISO 8601 timestamp when the run finished */
   completedAt: string;
 }

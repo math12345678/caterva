@@ -30,3 +30,4 @@ Each ADR has:
 | [0005](0005-rng-convention.md) | Discrete/stochastic domains share a single RNG convention |
 | [0006](0006-md-direct-python-not-roadrunner.md) | Model molecular dynamics as direct Python (velocity Verlet), not through antimony/roadrunner |
 | [0007](0007-contract-test-for-engine-application-boundary.md) | Enforce the engine/application boundary with a contract test, not a shared schema or code generation |
+| [0008](0008-parameter-provenance.md) | Honest parameter provenance at the API surface: per-parameter origins and a breaking `citations` → `modelCitations` rename |

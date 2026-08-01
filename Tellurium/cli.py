@@ -407,6 +407,7 @@ def _cmd_ld(args: argparse.Namespace) -> int:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    """Run the Tellurium CLI."""
     parser = argparse.ArgumentParser(
         prog="Tellurium.cli",
         description="Tellurium simulation engine command line")

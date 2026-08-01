@@ -39,10 +39,17 @@ export const ListSimulationJobsResponseItem = zod.object({
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
-  "citations": zod.array(zod.string()).optional().describe('Literature references used to resolve parameters'),
+  "modelCitations": zod.array(zod.string()).optional().describe('Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)'),
   "flags": zod.array(zod.string()).optional().describe('Human-readable warnings about the parameters or result'),
   "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
 }),
+  "parameterProvenance": zod.record(zod.string(), zod.object({
+  "origin": zod.enum(['resolved', 'user', 'default']).describe('How this value was obtained for THIS query (ADR 0008)'),
+  "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
+  "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
+  "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
+  "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
+})).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
   "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
 }).optional(),
   "error": zod.object({
@@ -81,10 +88,17 @@ export const RunSimulationResponse = zod.object({
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
-  "citations": zod.array(zod.string()).optional().describe('Literature references used to resolve parameters'),
+  "modelCitations": zod.array(zod.string()).optional().describe('Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)'),
   "flags": zod.array(zod.string()).optional().describe('Human-readable warnings about the parameters or result'),
   "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
 }),
+  "parameterProvenance": zod.record(zod.string(), zod.object({
+  "origin": zod.enum(['resolved', 'user', 'default']).describe('How this value was obtained for THIS query (ADR 0008)'),
+  "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
+  "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
+  "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
+  "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
+})).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
   "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
 }).optional(),
   "error": zod.object({
@@ -121,10 +135,17 @@ export const GetSimulationJobResponse = zod.object({
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
-  "citations": zod.array(zod.string()).optional().describe('Literature references used to resolve parameters'),
+  "modelCitations": zod.array(zod.string()).optional().describe('Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)'),
   "flags": zod.array(zod.string()).optional().describe('Human-readable warnings about the parameters or result'),
   "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
 }),
+  "parameterProvenance": zod.record(zod.string(), zod.object({
+  "origin": zod.enum(['resolved', 'user', 'default']).describe('How this value was obtained for THIS query (ADR 0008)'),
+  "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
+  "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
+  "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
+  "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
+})).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
   "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
 }).optional(),
   "error": zod.object({

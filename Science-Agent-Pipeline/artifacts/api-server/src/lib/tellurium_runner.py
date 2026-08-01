@@ -26,7 +26,7 @@ Output JSON shape:
       "flagReason": null
     }
 
-or on error:
+or on error (including a runtime-ceiling rejection):
     { "ok": false, "error": "..." }
 
 The ``DISPATCH`` table below is the contract between the application layer
@@ -34,6 +34,11 @@ and the engine: every domain maps to exactly one ``simulate_*`` function.
 ``Tellurium/tests/test_boundary_contract.py`` fails if the engine's
 ``__all__`` gains a ``simulate_*`` the runner does not dispatch here, and
 vice versa. See ADR 0007.
+
+Runtime ceilings (``MAX_API_*`` below) reject request sizes whose wall-clock
+time would make a request look hung: MD integration and Wright-Fisher
+generations scale linearly with their counters, and the queue limits
+*concurrency*, not *duration* (STAGE_04_PART_01 §6.3).
 """
 
 from __future__ import annotations
@@ -44,9 +49,57 @@ from typing import Any, Callable, Dict, List, Sequence
 
 
 # Application-runtime ceilings, not scientific plausibility bounds. The engine
-# remains authoritative for physical validity and domain flags.
+# remains authoritative for physical validity and domain flags. These bound
+# wall-clock time per request: the queue governs concurrency, these govern
+# duration.
+#
+# Measured on the pinned CI configuration (Python 3.10, numpy 1.26.4),
+# 2026-08-01, by timing the engine directly:
+#
+#     MC   1e6 samples ............................. 0.31s
+#     WF   10k generations x 10 replicates ......... 0.86s
+#     MD   108 particles x 10k steps ............... 7.32s
+#
+# An earlier revision of this comment cited "STAGE_04_PART_01 §6.3" for these
+# numbers and quoted MD at ~11s. That section does not exist and the figure
+# was never measured; both are corrected above.
 MAX_API_MONTE_CARLO_SAMPLES = 1_000_000
 MAX_API_MD_STEPS = 10_000
+MAX_API_WF_GENERATIONS = 10_000
+MAX_API_WF_REPLICATES = 1_000
+
+# MD cost is O(N^2 * steps) -- pairwise forces, no neighbour lists (ADR 0006
+# put those out of scope). Capping n_steps alone therefore does NOT bound a
+# request, because the quadratic term is unconstrained. Measured at a step
+# count 50x BELOW the ceiling:
+#
+#     n=108   0.15s      n=500   3.64s
+#     n=256   0.95s      n=800   9.94s
+#
+# and the engine accepts n_particles=5000 (ok=True, merely flagged, then
+# rounded UP to the next fcc count, 5324). That request passes every ceiling
+# above and costs roughly six hours at the step limit.
+#
+# So the budget is applied to the product that actually drives cost. Measured
+# throughput is ~1.6e7 pair-steps/second, so 1.2e8 is about a 7.5-second
+# ceiling -- chosen to keep the documented 108-particle x 10k-step case
+# (1.17e8) inside the budget while rejecting the pathological shapes.
+MAX_API_MD_PAIR_STEPS = 120_000_000
+
+
+def _fcc_particle_count(requested: int) -> int:
+    """Mirror the engine's fcc round-up: 4*k^3 for the smallest sufficient k.
+
+    The budget must be computed on the count the engine will actually
+    simulate, not the count the caller asked for -- rounding is always
+    upward, so using the request would systematically underestimate cost.
+    """
+    if requested <= 0:
+        return 0
+    cells = 1
+    while 4 * cells**3 < requested:
+        cells += 1
+    return 4 * cells**3
 
 # The repo root must be on PYTHONPATH so we can import Tellurium.tellurium_engine.
 # The API server sets this when spawning the process.
@@ -155,7 +208,7 @@ def run_monte_carlo_pi(params: Dict[str, Any]) -> Dict[str, Any]:
     if n_samples > MAX_API_MONTE_CARLO_SAMPLES:
         raise ValueError(
             f"n_samples={n_samples} exceeds API runtime ceiling "
-            f"{MAX_API_MONTE_CARLO_SAMPLES}"
+            f"(MAX_API_MONTE_CARLO_SAMPLES) {MAX_API_MONTE_CARLO_SAMPLES}"
         )
 
     seed = params.get("seed")
@@ -179,6 +232,17 @@ def run_wright_fisher(params: Dict[str, Any]) -> Dict[str, Any]:
     selection_coefficient = float(params.get("selection_coefficient", 0.0))
     dominance = params.get("dominance")
     seed = params.get("seed")
+
+    if generations > MAX_API_WF_GENERATIONS:
+        raise ValueError(
+            f"generations={generations} exceeds API runtime ceiling "
+            f"(MAX_API_WF_GENERATIONS) {MAX_API_WF_GENERATIONS}"
+        )
+    if replicate_runs > MAX_API_WF_REPLICATES:
+        raise ValueError(
+            f"replicate_runs={replicate_runs} exceeds API runtime ceiling "
+            f"(MAX_API_WF_REPLICATES) {MAX_API_WF_REPLICATES}"
+        )
 
     result = tellurium_engine.simulate_wright_fisher(
         population_size=population_size, starting_frequency=starting_frequency,
@@ -210,6 +274,17 @@ def run_two_locus_wright_fisher(params: Dict[str, Any]) -> Dict[str, Any]:
     mutation_rate = float(params.get("mutation_rate", 0.0))
     seed = params.get("seed")
 
+    if generations > MAX_API_WF_GENERATIONS:
+        raise ValueError(
+            f"generations={generations} exceeds API runtime ceiling "
+            f"(MAX_API_WF_GENERATIONS) {MAX_API_WF_GENERATIONS}"
+        )
+    if replicate_runs > MAX_API_WF_REPLICATES:
+        raise ValueError(
+            f"replicate_runs={replicate_runs} exceeds API runtime ceiling "
+            f"(MAX_API_WF_REPLICATES) {MAX_API_WF_REPLICATES}"
+        )
+
     result = tellurium_engine.simulate_two_locus_wright_fisher(
         population_size=population_size, generations=generations,
         recombination_rate=recombination_rate,
@@ -235,21 +310,37 @@ def run_molecular_dynamics(params: Dict[str, Any]) -> Dict[str, Any]:
     temperature = float(params.get("temperature", 0.4))
     timestep = float(params.get("timestep", 0.005))
     n_steps = int(params.get("n_steps", 1000))
+    density = float(params.get("density", 0.85))
     if n_steps > MAX_API_MD_STEPS:
         raise ValueError(
-            f"n_steps={n_steps} exceeds API runtime ceiling {MAX_API_MD_STEPS}"
+            f"n_steps={n_steps} exceeds API runtime ceiling "
+            f"(MAX_API_MD_STEPS) {MAX_API_MD_STEPS}"
         )
+
+    # Bound the quadratic term too -- n_steps alone does not bound the request.
+    actual_n = _fcc_particle_count(n_particles)
+    pair_steps = actual_n * actual_n * max(n_steps, 1)
+    if pair_steps > MAX_API_MD_PAIR_STEPS:
+        raise ValueError(
+            f"n_particles={n_particles} (simulated as {actual_n} after fcc "
+            f"round-up) with n_steps={n_steps} is {pair_steps:.3g} pair-steps, "
+            f"exceeding the API runtime ceiling (MAX_API_MD_PAIR_STEPS) "
+            f"{MAX_API_MD_PAIR_STEPS:.3g}. MD cost scales as N^2 * steps; "
+            f"reduce either."
+        )
+
     seed = params.get("seed")
 
     result = tellurium_engine.simulate_molecular_dynamics(
         n_particles=n_particles, temperature=temperature, timestep=timestep,
-        n_steps=n_steps, seed=seed
+        n_steps=n_steps, density=density, seed=seed
     )
 
     return _serialise_result(
         result, "molecular_dynamics",
         {"n_particles": n_particles, "temperature": temperature,
-         "timestep": timestep, "n_steps": n_steps, "seed": seed},
+         "timestep": timestep, "n_steps": n_steps, "density": density,
+         "seed": seed},
     )
 
 

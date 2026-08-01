@@ -7,8 +7,8 @@
  */
 
 export interface Provenance {
-  /** Literature references used to resolve parameters */
-  citations?: string[];
+  /** Literature references for the MODEL/domain, never for individual parameter values (ADR 0008) */
+  modelCitations?: string[];
   /** Human-readable warnings about the parameters or result */
   flags?: string[];
   /** Short explanation of how the query was mapped to a domain */

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./telluriumRunner";
+import type { ParameterProvenance } from "./provenance";
 
 export type JobStatus =
   | "pending"
@@ -17,9 +18,10 @@ export interface SimulationResponse {
   trajectory: Record<string, unknown>[];
   provenance: {
     reasoning: string;
-    citations: string[];
+    modelCitations: string[];
     flags: string[];
   };
+  parameterProvenance: Record<string, ParameterProvenance>;
   completedAt: string;
 }
 

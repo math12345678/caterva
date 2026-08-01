@@ -33,6 +33,106 @@ inventory must equal the engine's exported `simulate_*` inventory. This is the
 boundary equivalent of an independent source of truth; it is not a numerical
 claim.
 
+## 2b. Completion audit (2026-08-01) — one real defect in the runtime ceilings
+
+The boundary work in this document was audited by reading and measuring, not
+by re-running the tests that already pass. Everything specified below holds,
+with one exception found in the runtime ceilings.
+
+### 2b.1 The MD runtime ceiling did not bound MD requests
+
+§5 states two ceilings: `n_samples <= 1,000,000` for Monte Carlo and
+`n_steps <= 10,000` for MD, described as protecting "the request/response
+worker from accidental unbounded work."
+
+`n_steps` does not bound an MD request. MD cost is **O(N² × steps)** —
+pairwise forces with no neighbour lists, which ADR 0006 deliberately put out
+of scope — and only the linear term was capped. Measured at 200 steps, i.e.
+2% of the ceiling:
+
+| `n_particles` | wall clock |
+|---|---|
+| 108 | 0.15 s |
+| 256 | 0.95 s |
+| 500 | 3.64 s |
+| 800 | 9.94 s |
+
+Meanwhile the engine **accepts** large particle counts. `validate_md_params`
+returns `ok=True` for `n_particles=5000`, merely flagged, and the engine then
+rounds it *up* to the next fcc count, 5324. A request of
+`{n_particles: 5000, n_steps: 10000}` therefore passed every stated ceiling.
+
+Its actual behaviour, confirmed by disabling the new guard and running it: the
+worker process was **OOM-killed**, not merely slow. The engine's vectorised
+force calculation allocates an N×N×3 array — roughly 680 MB per array at 5324
+particles. So the failure mode was worse than a hung request; it was a dead
+worker.
+
+### 2b.2 Fix: budget the term that actually drives cost
+
+`MAX_API_MD_PAIR_STEPS = 120_000_000`, applied to
+`fcc_round_up(n_particles)² × n_steps`.
+
+Calibrated from measurement rather than chosen: throughput is roughly
+1.6 × 10⁷ pair-steps per second, so the budget is about a 7.5-second ceiling.
+It was picked to keep the documented reference case — 108 particles ×
+10,000 steps, 1.17 × 10⁸ pair-steps — inside the budget, which a
+miscalibrated ceiling would have rejected.
+
+The round-up matters and is not cosmetic: the engine simulates
+`4k³ ≥ n_particles`, always upward, so budgeting on the *requested* count
+would systematically underestimate cost. `_fcc_particle_count()` mirrors the
+engine's rule and has its own test asserting `k` is the smallest sufficient
+value.
+
+Rejection is now explicit and actionable:
+
+```
+n_particles=5000 (simulated as 5324 after fcc round-up) with n_steps=100
+is 2.83e+09 pair-steps, exceeding the API runtime ceiling
+(MAX_API_MD_PAIR_STEPS) 1.2e+08. MD cost scales as N^2 * steps; reduce either.
+```
+
+### 2b.3 The other domains were checked, not assumed
+
+Wright-Fisher looked like it had the same shape — cost across generations,
+replicates *and* population size, with only the first two capped. Measured:
+flat in `N` (0.09 s at N=100, N=1000 and N=10000), because the engine draws
+`rng.binomial(2N, p)` in one numpy call rather than summing Bernoulli trials.
+At **both** ceilings simultaneously — 10,000 generations × 1,000 replicates —
+the worst case is 1.16 s. Genuinely bounded; no change needed.
+
+Monte Carlo at its ceiling: 0.31 s.
+
+### 2b.4 Two documentation defects in the same file
+
+The measurement comment cited **"STAGE_04_PART_01 §6.3"**. That section does
+not exist — Part 1 §6 is "What Part 2 must resolve" and contains no timings —
+and its quoted figure of *"MD 10k steps ~11s"* was never measured. Real value
+on the pinned configuration: 7.32 s. Citation removed, figures replaced with
+measured ones and dated.
+
+This is a small instance of the pattern Stage 3 recorded as a standing
+amendment: a plausible-sounding number attached to a source that does not
+contain it. Cheap to check, and it was wrong.
+
+Also fixed: the module docstring had `< request.json` and
+`Expected input JSON shape:` run together on one line.
+
+### 2b.5 Regression coverage
+
+Four tests added to `test_boundary_contract.py` (18 → 26):
+
+- large particle count rejected below the step ceiling,
+- large particle count rejected at the step ceiling,
+- the documented 108 × 10k reference case stays inside the budget — a guard
+  against a future ceiling being tightened into uselessness,
+- `_fcc_particle_count` matches the engine's round-up, including that `k` is
+  the smallest sufficient value.
+
+Verified against the mutation: disabling the budget kills the test process.
+Re-enabling it, 26 pass.
+
 ## 3. Continuous or discrete
 
 Not applicable to the integration layer. No simulation algorithm is added.
