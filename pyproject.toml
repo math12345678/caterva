@@ -1,0 +1,74 @@
+[project]
+name = "terrium"
+version = "0.1.0"
+description = "Scientific computing for teaching labs"
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "libroadrunner==2.7.0",
+    "antimony==2.14.0",
+    "python-libsbml==5.21.1",
+    "numpy==1.26.4",
+    "scipy==1.15.3",
+    "requests==2.34.2",
+    "beautifulsoup4==4.15.0",
+    "lxml==6.1.1",
+    "httpx==0.28.1",
+    "pydantic==2.13.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "pytest-timeout==2.4.0",
+    "hypothesis==6.160.0",
+    "ruff==0.11.11",
+    "mypy==1.15.0",
+]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+select = ["E", "F", "I", "W", "UP", "B", "C4", "C9", "SIM", "T20", "ARG", "PTH", "ERA", "PL", "TRY", "NPY", "TID", "PYI", "RSE", "RET", "ASYNC", "LOG", "PERF", "PD", "FLY", "ISC", "ICN", "PIE", "TCH", "EXE", "Q", "D", "N", "PT", "RUF", "FA", "INT", "A", "SLF", "SLOT", "YTT"]
+ignore = ["D100", "D101", "D102", "D103", "D105", "D202", "D205", "D208", "D209", "D212", "D213", "D301", "D400", "D401", "D403", "D404", "D413", "D415", "T201", "PLR2004", "PLR0911", "PLR0912", "PLR0913", "PLR0915", "C901", "ERA001", "PIE810", "PERF203", "PLC0415", "PLW2901", "RUF100", "EXE001", "C408", "ARG001", "ARG005", "TRY003", "TRY004", "UP045", "UP035", "UP038", "UP006", "RET507", "ISC002", "RUF013", "RUF002", "RUF003", "RUF001", "RUF046", "Q000", "W291", "W292", "W293", "B905", "RUF007", "PT011", "PT018", "PT006", "PT017", "PTH118", "PTH120", "PTH123", "I001", "N806", "N802", "SIM108", "PIE790", "PLW1510", "E501", "N999"]
+
+[tool.ruff.per-file-ignores]
+"Tests/*.py" = ["S101", "T201"]
+"Tellurium/tests/*.py" = ["S101", "T201"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = false
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+no_implicit_optional = false
+strict_optional = false
+implicit_reexport = false
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "scipy.*",
+    "libsbml",
+    "antimony",
+    "libroadrunner",
+    "roadrunner",
+    "check_dependencies_declared",
+    "check_rng_convention",
+    "tellurium_engine",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tellurium_engine"
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["Tellurium/tests", "Tests"]
+timeout = 300
+addopts = "-v --tb=short"
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

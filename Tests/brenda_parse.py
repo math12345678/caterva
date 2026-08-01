@@ -27,7 +27,7 @@ for i, line in enumerate(lines):
 print(f"Total Km-like values found in page: {len(km_patterns)}")
 print(f"First 10: {km_patterns[:10]}")
 print(f"\nHomo sapiens mentions: {len(human_sections)}")
-print(f"\nFirst 2 human contexts:")
+print("\nFirst 2 human contexts:")
 for ctx in human_sections[:2]:
     print("---")
     print(ctx[:300])

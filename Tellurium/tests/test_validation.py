@@ -6,7 +6,6 @@ Collapsing those two would either silently drop unusual-but-real models or
 hard-fail on values BRENDA genuinely reports.
 """
 
-import math
 
 import pytest
 

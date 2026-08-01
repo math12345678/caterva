@@ -82,6 +82,38 @@ Six simulation domains, two pipelines:
 - **Wright-Fisher neutral drift** — binomial sampling of 2N allele copies each
   generation. Verified against the exact heterozygosity decay
   `Hₜ = H₀ · (1 − 1/(2N))ᵗ` and Kimura's fixation probability `P(fix) = p₀`.
+  Also: selection with dominance (incl. over/underdominance), symmetric
+  mutation, time-varying N, structured populations (island / stepping-stone
+  migration with Fst), Kimura & Ohta expected fixation time, Ne estimation
+  from heterozygosity decay, Wright's stationary distribution
+  `Beta(4Nu, 4Nu)`, the island-model equilibrium Fst
+  (`1/(1+4N(m+u))`), parameter sweeps (`wright_fisher_sweep`, CLI
+  `sweep`), and an exact Markov-chain layer
+  (`wright_fisher_transition_matrix`,
+  `wright_fisher_fixation_probability`,
+  `wright_fisher_expected_fixation_time`,
+  `wright_fisher_expected_loss_time`,
+  `wright_fisher_expected_absorption_time`,
+  `wright_fisher_stationary_vector`) whose values cross-check
+  the diffusion approximations -- and resolve Kimura's documented
+  `dominance > 1` failure exactly. The three times obey
+  `E[T] = E[T|fix]·P_fix + E[T|loss]·(1 − P_fix)` exactly, and
+  `fixation_analysis()` reports the observed mean fixation, loss, and
+  absorption times to compare against them; the exact stationary
+  distribution (Perron-Frobenius eigenvector of the chain) matches
+  both Wright's `Beta(4Nu, 4Nu)` density and long simulations within
+  ~0.007 in central mass. The effective size of a time-varying-N
+  trajectory is the harmonic mean of the census sizes
+  (`effective_size_harmonic_mean`) -- the textbook bottleneck result,
+  verified against the heterozygosity-decay estimator. Two-locus
+  haploid simulation with recombination and symmetric mutation
+  (`simulate_two_locus_wright_fisher`): linkage disequilibrium decays
+  as `Dₜ = D₀·(1−r)ᵗ·(1−2u)²ᵗ·(1−1/N)ᵗ`, verified against simulation
+  within ~3%, with D and r² reported per generation. Divergence after a
+  split: `expected_fst_after_split` gives the exact Fst trajectory of
+  two isolated daughter populations (matches simulation within 0.01),
+  including its counterintuitive limit — Fst approaches the
+  probability of *divergent* fixation `2p₀(1−p₀)`, not 1.
 
 All discrete/stochastic domains share a common RNG convention
 (`numpy.random.default_rng(seed)` with `seed: int | None = None`), formalised
@@ -94,7 +126,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              506 tests (505 run, 1 skipped)
+│   └── tests/              671 tests (670 run, 1 skipped)
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
 │   └── ...                 124 tests

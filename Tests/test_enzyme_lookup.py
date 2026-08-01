@@ -18,7 +18,6 @@ fields are never read by any code in this project).
 
 import os
 
-import pytest
 
 from enzyme_lookup import (
     expand_substrates_with_synonyms,

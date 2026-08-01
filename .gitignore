@@ -42,3 +42,6 @@ Thumbs.db
 # covered by Science-Agent-Pipeline/.gitignore; this repo's pnpm store cache
 # (created while verifying the merge) should never be committed either.
 .pnpm-store/
+
+# Marketing site — lives in its own repo (see site/README.md)
+site/

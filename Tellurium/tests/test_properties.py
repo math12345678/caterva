@@ -376,6 +376,158 @@ def test_wf_validation_never_raises_on_arbitrary_input(
         assert v.errors
 
 
+# The newer WF parameters must be just as safe: the validation front door
+# must never raise on arbitrary junk, even combinations nobody thought of
+# (this guards e.g. the n_demes-as-string + stepping-stone crash).
+@given(population_size=st.integers(min_value=-100, max_value=1000),
+       starting_frequency=st.floats(allow_nan=True, allow_infinity=True),
+       generations=st.integers(min_value=-50, max_value=500),
+       replicate_runs=st.integers(min_value=-10, max_value=20),
+       mutation_rate=st.floats(allow_nan=True, allow_infinity=True),
+       selection_coefficient=st.floats(allow_nan=True, allow_infinity=True),
+       dominance=st.floats(allow_nan=True, allow_infinity=True),
+       n_demes=st.one_of(
+           st.integers(min_value=-10, max_value=30), st.text()),
+       migration_rate=st.floats(allow_nan=True, allow_infinity=True),
+       migration_model=st.one_of(
+           st.text(), st.none(), st.integers(min_value=-5, max_value=5)),
+       population_size_series=st.one_of(
+           st.none(),
+           st.lists(st.integers(min_value=-10, max_value=500),
+                    min_size=1, max_size=10)))
+@settings(max_examples=300, deadline=None)
+def test_wf_validation_never_raises_on_extended_arbitrary_input(
+        population_size, starting_frequency, generations, replicate_runs,
+        mutation_rate, selection_coefficient, dominance, n_demes,
+        migration_rate, migration_model, population_size_series):
+    v = validate_wright_fisher_params(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs,
+        mutation_rate=mutation_rate,
+        selection_coefficient=selection_coefficient,
+        dominance=dominance, n_demes=n_demes,
+        migration_rate=migration_rate,
+        migration_model=migration_model,
+        population_size_series=population_size_series)
+    assert isinstance(v.ok, bool)
+    if not v.ok:
+        assert v.errors
+
+
+# --- structured populations (n_demes > 1, both migration models) ---
+
+wf_demes = st.integers(min_value=3, max_value=12)
+wf_migration_rates = st.floats(
+    min_value=0.0, max_value=0.5, allow_nan=False, allow_infinity=False)
+wf_migration_models = st.sampled_from(["island", "stepping-stone"])
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=wf_starting_frequencies,
+       generations=wf_generations, replicate_runs=wf_replicate_runs,
+       n_demes=wf_demes, migration_rate=wf_migration_rates,
+       migration_model=wf_migration_models)
+@SLOW
+def test_wf_structured_frequency_and_heterozygosity_bounds(
+        population_size, starting_frequency, generations, replicate_runs,
+        n_demes, migration_rate, migration_model):
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs,
+        n_demes=n_demes, migration_rate=migration_rate,
+        migration_model=migration_model)
+    mf = res.column("mean_frequency")
+    assert all(0.0 - 1e-12 <= v <= 1.0 + 1e-12 for v in mf), (
+        f"mean_frequency out of bounds: min={min(mf)}, max={max(mf)}")
+    h = res.column("heterozygosity")
+    assert all(-1e-12 <= v <= 0.5 + 1e-12 for v in h), (
+        f"heterozygosity out of bounds: min={min(h)}, max={max(h)}")
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=wf_starting_frequencies,
+       generations=wf_generations, replicate_runs=wf_replicate_runs,
+       n_demes=wf_demes, migration_rate=wf_migration_rates,
+       migration_model=wf_migration_models)
+@SLOW
+def test_wf_fst_stays_in_unit_interval(
+        population_size, starting_frequency, generations, replicate_runs,
+        n_demes, migration_rate, migration_model):
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs,
+        n_demes=n_demes, migration_rate=migration_rate,
+        migration_model=migration_model)
+    fst = res.column("fst")
+    assert all(-1e-12 <= v <= 1.0 + 1e-12 for v in fst), (
+        f"Fst out of [0, 1]: min={min(fst)}, max={max(fst)}")
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=wf_starting_frequencies,
+       generations=wf_generations, replicate_runs=wf_replicate_runs)
+@SLOW
+def test_wf_fixation_counts_are_monotone(
+        population_size, starting_frequency, generations, replicate_runs):
+    """Without mutation, a fixed replicate stays fixed: n_A_fixed and
+    n_a_fixed must be non-decreasing over generations."""
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs)
+    n_a = res.column("n_A_fixed")
+    n_b = res.column("n_a_fixed")
+    for a_prev, a_cur in zip(n_a, n_a[1:]):
+        assert a_cur >= a_prev, "n_A_fixed decreased: fixation not absorbing"
+    for b_prev, b_cur in zip(n_b, n_b[1:]):
+        assert b_cur >= b_prev, "n_a_fixed decreased: fixation not absorbing"
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=st.floats(
+           min_value=0.05, max_value=0.95,
+           allow_nan=False, allow_infinity=False),
+       generations=wf_generations, replicate_runs=wf_replicate_runs)
+@SLOW
+def test_wf_absorption_preserves_fixed_state(
+        population_size, starting_frequency, generations, replicate_runs):
+    """A replicate at p=0 or p=1 (without mutation) stays there forever:
+    all-demes-fixed counts plus polymorphic count must sum to the
+    replicate count at every generation, and once a replicate is counted
+    fixed it never leaves."""
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=starting_frequency,
+        generations=generations, replicate_runs=replicate_runs)
+    n_a = res.column("n_A_fixed")
+    n_b = res.column("n_a_fixed")
+    for a, b in zip(n_a, n_b):
+        assert a + b <= replicate_runs + 1e-12
+        assert a >= 0 and b >= 0
+
+
+@given(population_size=wf_population_sizes,
+       starting_frequency=st.floats(
+           min_value=0.05, max_value=0.95,
+           allow_nan=False, allow_infinity=False),
+       generations=wf_generations, replicate_runs=wf_replicate_runs)
+@SLOW
+def test_wf_p0_at_boundary_is_absorbing(
+        population_size, starting_frequency, generations, replicate_runs):
+    """p0=0 (or 1) with mutation_rate=0: no drift, no selection can
+    change the allele count -- the trajectory is constant."""
+    res = simulate_wright_fisher(
+        population_size=population_size,
+        starting_frequency=1.0, generations=generations,
+        replicate_runs=replicate_runs)
+    mf = res.column("mean_frequency")
+    assert all(math.isclose(v, 1.0) for v in mf)
+    assert res.column("n_A_fixed")[-1] == replicate_runs
+
+
 @given(value=st.one_of(st.text(), st.none(), st.booleans(), st.lists(st.floats()),
                        st.dictionaries(st.text(), st.floats())))
 @settings(max_examples=100, deadline=None)

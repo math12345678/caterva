@@ -80,21 +80,191 @@ Stage 2 Part 4, and re-verified after Stage 2 refactoring):
     stays at 0.4520 instead of dropping below 0.05 under high
     migration). Panmictic (n_demes=1) and zero-migration tests pass
     because they never exercise the migration branch at all.
-"""
 
+6. "Stepping-stone migration replaced by island model" (post-close,
+   added with the migration_model feature 2026-07-31).
+   Mutation: the stepping-stone branch (ring exchange with m/2 per
+   neighbour) is replaced by the island-model global-pool step, so
+   migration_model has no effect.
+   Independently reproduced 2026-07-31: 5 tests fail — the mutated
+   branch references ``p_global`` which the island-only mutation never
+   defines, so stepping-stone runs raise UnboundLocalError instead of
+   producing output: test_stepping_stone_fst_higher_than_island,
+   test_stepping_stone_conserves_mean_frequency,
+   test_migration_model_stored_in_params, test_scenario_stepping_stone_
+   runs, and test_cli_wf_migration_model_flag. (The m=0 equivalence
+   test passes because it never enters either branch.)
+
+7. "Ne estimate off by factor of 2" (post-close, added with the
+   heterozygosity-decay estimator 2026-07-31).
+   Mutation: ``ne = 1/(2(1-decay))`` -> ``ne = 1/(1-decay)`` (the
+   diploid factor of 2 dropped from the estimator).
+   Independently reproduced 2026-07-31: 2 tests fail —
+   test_estimate_ne_decay_matches_known_n (estimate ~2N instead of N)
+   and test_estimate_ne_small_population. The variance-method and
+   error-path tests pass because they never check the decay estimate's
+   scale.
+
+8. "Stationary distribution uses 2Nu instead of 4Nu" (post-close, added
+   with wright_stationary_distribution 2026-07-31).
+   Mutation: ``a = 4Nu`` -> ``a = 2Nu`` (haploid instead of diploid
+   allele-copy count).
+   Independently reproduced 2026-07-31: 2 tests fail —
+   test_stationary_distribution_normalization (density value at p=0.5
+   no longer matches Beta(4Nu,4Nu)) and test_stationary_distribution_
+   matches_simulation (observed vs theoretical central mass diverges).
+   The symmetry/mode and edge-case tests pass because they only check
+   qualitative shape.
+
+9. "Theoretical Fst uses 2N(m+u) instead of 4N(m+u)" (post-close, added
+   with theoretical_fst 2026-07-31).
+   Mutation: ``1 + 4N(m+u)`` -> ``1 + 2N(m+u)`` in the island-model
+   equilibrium formula.
+   Independently reproduced 2026-07-31: 2 tests fail —
+   test_theoretical_fst_closed_form (exact closed-form check against
+   1/(1+4N(m+u))) and test_theoretical_fst_matches_simulation (theory
+   0.089 vs simulation 0.042 at 30 demes diverges). The validation
+   test passes because it never checks the formula's scale.
+
+10. "Transition matrix samples Binomial(N, p) instead of Binomial(2N, p)"
+    (post-close, added with wright_fisher_transition_matrix 2026-07-31).
+    Mutation: the reproduction step of the matrix uses ``N`` allele
+    copies instead of ``2N``.
+    Independently reproduced 2026-07-31: 9 tests fail — hand-checked
+    N=1 matrix, rows-sum-to-one, neutral mean- and variance-
+    preservation, absorbing states (Binomial(N, .) from state 0 no
+    longer puts all mass on 0), matrix-power-vs-simulation, closed-form
+    match, selection monotonicity, simulation-under-selection, and
+    diploid-dominance ordering. The validation and boundary tests pass
+    because they only check the error paths, not the sampling scale.
+
+11. "Fixation time solves the unconditional absorption system instead of
+    conditioning on fixation" (post-close, added with
+    wright_fisher_expected_fixation_time 2026-07-31).
+    Mutation: ``E[T | fixation] = w/f`` replaced by the plain
+    absorption-time solve ``w = (I - Q_t)^{-1} . 1``.
+    Independently reproduced 2026-07-31: 3 tests fail —
+    test_chain_fixation_time_matches_closed_form (p0=0.2: unconditional
+    ~200 vs conditional ~355; the p0=0.5 case passes because
+    conditional == unconditional by symmetry),
+    test_chain_fixation_time_selection_monotone (under strong s the
+    unconditional time exceeds the neutral unconditional time, breaking
+    the ordering), and test_chain_fixation_time_matches_simulation_
+    under_selection (sim 89.5 vs unconditional ~200). Boundaries,
+    validation, and diploid-dominance tests pass because they never
+    check the conditioning.
+
+12. "Fixation-probability solve drops the p_top term"
+    (post-close, added with wright_fisher_fixation_probability
+    2026-07-31).
+    Mutation: ``f = solve(I - Q_t, 0)`` instead of
+    ``f = solve(I - Q_t, p_top)`` in the shared absorption helper
+    ``_wf_fixation_vector`` (so f = 0 everywhere and every interior
+    state returns P_fix = 0).
+    Independently reproduced 2026-07-31: 7 tests fail — neutral
+    martingale (0 vs p0), matches-Kimura-genic, overdominance-vs-sim,
+    underdominance-beats-kimura, monotone-in-s, and both CLI tests
+    (the exact P_fix line and, via the shared helper, the
+    ``--time --exact`` line, which now hits the ``f <= 1e-15`` guard
+    and exits 1). The boundaries/validation test passes because the
+    p0=0/p0=1 shortcuts and error paths never reach the solve.
+
+13. "Loss time conditions on the wrong boundary (v/f instead of
+    v/(1-f))" (post-close, added with wright_fisher_expected_loss_time
+    2026-07-31).
+    Mutation: ``E[T | loss] = v / (1 - f)`` replaced by ``v / f``.
+    Independently reproduced 2026-07-31: 4 tests fail — closed-form
+    match at p0=0.1/0.9 (9x off; the p0=0.5 case passes because
+    f = 1-f there), chain symmetry (loss(0.3) vs fix(0.7)), loss-vs-
+    simulation (p0=0.2: 4x off), and the absorption-time consistency
+    identity. The selection-monotonicity test passes (v/f still
+    decreases with s), as do the boundaries and closed-form-only
+    tests.
+
+14. "Fixation-generation tracking swaps the A and a boundaries"
+    (post-close, added with the absorption-time extension of
+    fixation_analysis 2026-07-31).
+    Mutation: ``fixation_gen_A[... == 1.0]`` and
+    ``fixation_gen_a[... == 0.0]`` exchange their conditions, so
+    every replicate's fixation/loss label flips.
+    Independently reproduced 2026-07-31: 9 tests fail -- the
+    selection/sweep/overdominance/underdominance and exact-chain
+    tests that read prop_fixed_A or the boundary-specific mean times
+    (under s=0.05 the swapped "fixation" times are the loss times,
+    59 % off; under dominance the proportions flip). The neutral
+    p0=0.5 tests pass because fixation and loss are symmetric there
+    (means and proportions coincide), and the absorption-time tests
+    pass because the union of the two lists is unchanged.
+
+15. "Stationary vector uses the right eigenvectors of Q instead of the
+    left eigenvectors of Q^T" (post-close, added with the exact-chain
+    stationary distribution 2026-07-31).
+    Mutation: ``scipy.linalg.eig(Q)`` instead of ``eig(Q.T)``, so the
+    Perron-Frobenius vector is taken from the wrong side of the
+    matrix (scipy's right eigenvectors for eigenvalue 1 are
+    degenerate here and the argmin picks a numerically worthless
+    vector -- the test run produced an all-NaN vector).
+    Independently reproduced 2026-07-31: 5 tests fail -- the
+    fixed-point, symmetry, Beta-density, simulation-spectrum, and
+    selection-mode tests. Only the validation test passes, because it
+    checks parameters, not values.
+
+16. "Effective size uses the arithmetic mean instead of the harmonic
+    mean" (post-close, added with effective_size_harmonic_mean
+    2026-07-31).
+    Mutation: ``k / sum(1/N_t)`` -> ``sum(N_t) / k``.
+    Independently reproduced 2026-07-31: 4 tests fail -- the
+    known-values, harmonic<=arithmetic (AM-GM), oscillating-series
+    simulated-Ne, and bottleneck-dominance tests. The constant-series
+    test passes, because the two means coincide there (also its only
+    blind spot as a mutation target).
+
+17. "Recombination step is skipped" (post-close, added with the
+    two-locus simulation 2026-07-31).
+    Mutation: the four recombination updates of the haplotype
+    frequencies are deleted, so D decays by drift alone.
+    Independently reproduced 2026-07-31: 4 tests fail -- the
+    recombination-only decay (D20 stays ~0.25 instead of 0.030),
+    drift+recombination decay, r=0 vs r=0.5 ordering (both decay at
+    the same drift rate), and repulsion-sign decay tests. The
+    theoretical-decay test passes (it tests the theory function, not
+    the simulation), and the random-association / frequency-
+    conservation / determinism tests pass because they never depend
+    on the recombination step.
+
+18. "Expected Fst after split uses the classic variance-based formula
+    instead of the exact expectation over the joint chain"
+    (post-close, added with expected_fst_after_split 2026-07-31).
+    Mutation: the transition-matrix double-sum is replaced by
+    ``1 - (1 - 1/(2N))^t``.
+    Independently reproduced 2026-07-31: 3 tests fail -- the
+    simulation match (the classic formula runs 1.8x too high at
+    t=200), the monotone/limit property test, and the
+    divergent-fixation limit test (0.982 instead of 0.5, and the
+    formula is p0-independent so the p0=0.3/0.7 symmetry assertion
+    also breaks). The validation test passes, because it checks
+    parameters, not values.
+
+19. "Two-locus mutation step is skipped" (post-close, added with the
+    two-locus mutation_rate extension 2026-07-31).
+    Mutation: the per-copy mutation operator is neutralized
+    (uu = cu = 0, mu = 1), so u is accepted but never applied.
+    Independently reproduced 2026-07-31: 2 tests fail -- the
+    mutation-accelerates-LD-decay test (D15 = 0.0443, the pure
+    recombination+drift value, instead of 0.0130) and the
+    frequencies-pushed-to-0.5 test (freq A stays 0.80 instead of
+    drifting to 0.5). The theoretical-decay and validation tests
+    pass, because they do not exercise the simulation's mutation
+    step. NOTE: an earlier candidate mutation (asymmetric one-way
+    operator ``uu=u, cu=0, mu=1-u``) was rejected as a record
+    because its cyclic mixing still equilibrates at uniform
+    frequencies, so only 1 test caught it.
+"""
 import math
 import pathlib
 
 import numpy as np
 import pytest
-
-# Tellurium/cli.py is invoked as `python -m Tellurium.cli` (see its own
-# docstring), which requires the repo root -- the parent of Tellurium/ --
-# as the subprocess's working directory. Tests here run with cwd=Tellurium/
-# (see Makefile's `test-sim` target and CI's `working-directory:
-# Tellurium`), so every CLI subprocess call must pass cwd explicitly, not
-# rely on the test runner's own working directory.
-_REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 from tellurium_engine import (
     WF_PLAUSIBLE_MIN_POPULATION_SIZE,
@@ -103,13 +273,38 @@ from tellurium_engine import (
     WF_PLAUSIBLE_MAX_MUTATION_RATE,
     WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT,
     ModelBuildError,
+    estimate_ne_from_heterozygosity,
+    expected_fixation_time,
+    expected_loss_time,
     kimura_fixation_probability,
     list_scenarios,
     simulate_wright_fisher,
+    theoretical_fst,
     validate_wright_fisher_params,
+    wright_fisher_expected_absorption_time,
+    wright_fisher_expected_fixation_time,
+    wright_fisher_expected_loss_time,
+    wright_fisher_fixation_probability,
     wright_fisher_scenario,
+    wright_fisher_sweep,
+    _normalise_stationary_vector,
+    wright_fisher_stationary_vector,
+    wright_fisher_transition_matrix,
     wright_stationary_distribution,
+    effective_size_harmonic_mean,
+    expected_fst_after_split,
+    simulate_two_locus_wright_fisher,
+    theoretical_ld_decay,
 )
+
+
+# Tellurium/cli.py is invoked as `python -m Tellurium.cli` (see its own
+# docstring), which requires the repo root -- the parent of Tellurium/ --
+# as the subprocess's working directory. Tests here run with cwd=Tellurium/
+# (see Makefile's `test-sim` target and CI's `working-directory:
+# Tellurium`), so every CLI subprocess call must pass cwd explicitly, not
+# rely on the test runner's own working directory.
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
 # ---------------------------------------------------------------------------
@@ -2222,12 +2417,74 @@ def test_kimura_rejects_invalid_params() -> None:
     with pytest.raises(ValueError):
         kimura_fixation_probability(0.5, -1.5, 100)  # s <= -1
     with pytest.raises(ValueError):
-        kimura_fixation_probability(0.5, 0.1, 100, 2.0)  # h > 1
+        kimura_fixation_probability(0.5, 0.1, 100, 2.5)  # h > 2
+
+
+def test_kimura_accepts_overdominance_dominance() -> None:
+    """h in (1, 2] is now valid (overdominance/underdominance), matching
+    simulate_wright_fisher. The diffusion approximation is documented as
+    unreliable there, but must compute without raising."""
+    p = kimura_fixation_probability(0.5, 0.1, 100, 1.5)
+    assert 0.0 <= p <= 1.0
+    p2 = kimura_fixation_probability(0.5, 0.1, 100, 2.0)
+    assert 0.0 <= p2 <= 1.0
 
 
 def test_kimura_strong_selection_saturates() -> None:
     assert kimura_fixation_probability(0.1, 0.5, 100) == pytest.approx(1.0)
     assert kimura_fixation_probability(0.5, -0.5, 100) == pytest.approx(0.0)
+
+
+# ---------------------------------------------------------------------------
+# Expected fixation time (Kimura & Ohta 1969)
+# ---------------------------------------------------------------------------
+
+
+def test_expected_fixation_time_matches_closed_form() -> None:
+    """t_bar = -4N (1-p0) ln(1-p0) / p0. For p0=0.5 this is 4N ln2."""
+    assert expected_fixation_time(0.5, 100) == pytest.approx(
+        400.0 * math.log(2.0))
+    assert expected_fixation_time(0.2, 50) == pytest.approx(
+        -200.0 * 0.8 * math.log(0.8) / 0.2)
+
+
+def test_expected_fixation_time_matches_simulation() -> None:
+    """Diffusion prediction matches simulated mean fixation time when the
+    simulation window is long enough that all replicates fix (a truncated
+    window biases the mean downward, because late-fixing replicates are
+    excluded)."""
+    n, p0, reps, gens = 50, 0.5, 500, 1000
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=42)
+    fa = result.fixation_analysis()
+    assert fa["n_fixed_A"] + fa["n_fixed_a"] == reps, (
+        "test assumption violated: some replicates never fixed within "
+        "the window, so the mean fixation time is truncated")
+    obs = fa["mean_fixation_time_A"]
+    theory = expected_fixation_time(p0, n)
+    assert abs(obs - theory) < 0.15 * theory, (
+        f"observed mean fixation time {obs:.1f} vs theory {theory:.1f}")
+
+
+def test_expected_fixation_time_new_mutation_is_4n() -> None:
+    """A single new mutation (p0 = 1/(2N)) takes on average ~4N
+    generations to fix, given it fixes."""
+    n = 100
+    t = expected_fixation_time(1.0 / (2.0 * n), n)
+    assert t == pytest.approx(4.0 * n, rel=0.05)
+
+
+def test_expected_fixation_time_edges() -> None:
+    assert expected_fixation_time(1.0, 100) == 0.0  # already fixed
+    with pytest.raises(ValueError):
+        expected_fixation_time(0.0, 100)  # never fixes
+    with pytest.raises(ValueError):
+        expected_fixation_time(0.5, 0)  # N <= 0
+    with pytest.raises(ValueError):
+        expected_fixation_time(1.5, 100)  # p0 > 1
+    with pytest.raises(ValueError):
+        expected_fixation_time(float("nan"), 100)
 
 
 # ---------------------------------------------------------------------------
@@ -2439,6 +2696,17 @@ def test_stepping_stone_requires_three_demes() -> None:
     assert not v.ok
 
 
+def test_stepping_stone_with_non_numeric_n_demes_no_crash() -> None:
+    """n_demes='5' is already invalid; the stepping-stone check must
+    not crash with a TypeError when comparing a string to 3."""
+    v = validate_wright_fisher_params(
+        population_size=100, starting_frequency=0.5, generations=10,
+        n_demes="5", migration_rate=0.1,
+        migration_model="stepping-stone")
+    assert not v.ok
+    assert any("n_demes" in e for e in v.errors)
+
+
 def test_invalid_migration_model_rejected() -> None:
     v = validate_wright_fisher_params(
         population_size=100, starting_frequency=0.5, generations=10,
@@ -2511,6 +2779,374 @@ def test_estimate_ne_requires_data() -> None:
     assert "error" in est
 
 
+def test_effective_size_harmonic_mean_constant_series() -> None:
+    """A constant series returns the constant itself."""
+    assert effective_size_harmonic_mean([100] * 5) == 100.0
+    assert effective_size_harmonic_mean([10]) == 10.0
+    assert abs(effective_size_harmonic_mean([50, 50, 50]) - 50.0) < 1e-12
+
+
+def test_effective_size_harmonic_mean_known_values() -> None:
+    """Classic bottleneck numbers: k / sum(1/N_t)."""
+    assert abs(effective_size_harmonic_mean([1000, 10, 1000]) - 29.41) < 0.01
+    assert abs(effective_size_harmonic_mean([100, 10, 100]) - 25.0) < 1e-12
+    series = [1000] * 101 + [10] * 10 + [1000] * 90
+    ne = effective_size_harmonic_mean(series)
+    assert abs(ne - 168.77) < 0.01, f"Ne={ne:.4f}"
+
+
+def test_effective_size_harmonic_mean_never_exceeds_arithmetic() -> None:
+    """Harmonic <= arithmetic, strict unless constant (AM-GM)."""
+    for series in ([1000, 10, 1000], [500, 50, 500, 50],
+                   [1000, 200] * 50 + [1000], [7, 7, 7, 7]):
+        hm = effective_size_harmonic_mean(series)
+        am = sum(series) / len(series)
+        if all(n == series[0] for n in series):
+            assert abs(hm - am) < 1e-12
+        else:
+            assert hm < am, f"harmonic {hm} should be < arithmetic {am}"
+
+
+def test_effective_size_harmonic_mean_matches_simulated_ne() -> None:
+    """A 1000<->200 oscillating series has effectively linear log-H
+    decay, so the heterozygosity-decay estimator recovers the
+    harmonic mean within 15 %."""
+    series = [1000 if i % 2 == 0 else 200 for i in range(101)]
+    ne_har = effective_size_harmonic_mean(series)
+    result = simulate_wright_fisher(
+        population_size=1000, starting_frequency=0.5, generations=100,
+        replicate_runs=2000, population_size_series=series, seed=42)
+    est = estimate_ne_from_heterozygosity(
+        result.column("heterozygosity"))
+    rel = abs(est["ne_estimate"] - ne_har) / ne_har
+    assert rel < 0.15, (
+        f"estimator {est['ne_estimate']:.1f} vs Ne_har {ne_har:.1f} "
+        f"({rel:.3f})")
+
+
+def test_effective_size_harmonic_mean_bottleneck_dominates() -> None:
+    """A single severe bottleneck generation makes the effective size
+    far smaller than any census size and than the arithmetic mean, and
+    the simulation's Ne estimate reflects the bottleneck, not the
+    flanking large populations."""
+    series = [1000] * 101 + [10] * 10 + [1000] * 90
+    ne_har = effective_size_harmonic_mean(series)
+    am = sum(series) / len(series)
+    assert ne_har < 0.5 * am, (
+        f"Ne_har {ne_har:.1f} should be well below arithmetic {am:.1f}")
+    assert ne_har < 200.0
+    result = simulate_wright_fisher(
+        population_size=1000, starting_frequency=0.5, generations=200,
+        replicate_runs=2000, population_size_series=series, seed=42)
+    est = estimate_ne_from_heterozygosity(
+        result.column("heterozygosity"))
+    assert est["ne_estimate"] < 300.0, (
+        "estimate should be bottleneck-dominated, got "
+        f"{est['ne_estimate']:.1f} (census 1000)")
+    assert est["ne_estimate"] > ne_har * 0.4, (
+        "estimate should still track the harmonic mean roughly, got "
+        f"{est['ne_estimate']:.1f} vs Ne_har {ne_har:.1f}")
+
+
+def test_effective_size_harmonic_mean_validation() -> None:
+    with pytest.raises(ValueError):
+        effective_size_harmonic_mean([])
+    with pytest.raises(ValueError):
+        effective_size_harmonic_mean([0])
+    with pytest.raises(ValueError):
+        effective_size_harmonic_mean([100, -1])
+    with pytest.raises(ValueError):
+        effective_size_harmonic_mean([100, True])
+    with pytest.raises(ValueError):
+        effective_size_harmonic_mean([100, 50.0])
+    with pytest.raises(ValueError):
+        effective_size_harmonic_mean("100,50")
+
+
+# ---------------------------------------------------------------------------
+# Two-locus recombination and linkage disequilibrium
+# ---------------------------------------------------------------------------
+
+
+def test_two_locus_theoretical_decay_exact() -> None:
+    """Theoretical LD decay: D_t = D0 (1-r)^t, optionally with the
+    haploid drift factor (1-1/N)^t and the mutation factor
+    (1-2u)^(2t)."""
+    assert abs(theoretical_ld_decay(0.25, 0.1, 20, None)
+               - 0.25 * 0.9 ** 20) < 1e-12
+    assert abs(theoretical_ld_decay(0.25, 0.1, 20, 100)
+               - 0.25 * 0.9 ** 20 * 0.99 ** 20) < 1e-12
+    assert theoretical_ld_decay(0.25, 0.0, 100, None) == 0.25
+    assert abs(theoretical_ld_decay(0.25, 0.5, 1, None) - 0.125) < 1e-12
+    assert abs(theoretical_ld_decay(0.25, 0.1, 30, None, 0.05)
+               - 0.25 * 0.9 ** 30 * 0.9 ** 60) < 1e-12
+    assert abs(theoretical_ld_decay(0.25, 0.1, 30, 100, 0.05)
+               - 0.25 * 0.9 ** 30 * 0.9 ** 60 * 0.99 ** 30) < 1e-12
+    assert abs(theoretical_ld_decay(0.25, 0.1, 10, None, 0.5)
+               - 0.25 * 0.9 ** 10 * 0.0) < 1e-12
+    with pytest.raises(ValueError):
+        theoretical_ld_decay(0.25, 0.6, 5)
+    with pytest.raises(ValueError):
+        theoretical_ld_decay(0.25, 0.1, -1)
+    with pytest.raises(ValueError):
+        theoretical_ld_decay(0.25, 0.1, 5, population_size=0)
+    with pytest.raises(ValueError):
+        theoretical_ld_decay(0.25, 0.1, True)
+    with pytest.raises(ValueError):
+        theoretical_ld_decay(0.25, True, 5)
+    with pytest.raises(ValueError):
+        theoretical_ld_decay(0.25, 0.1, 5, mutation_rate=1.5)
+    with pytest.raises(ValueError):
+        theoretical_ld_decay(0.25, 0.1, 5, mutation_rate=True)
+
+
+def test_two_locus_recombination_only_decay_matches_theory() -> None:
+    """With N huge, drift is negligible and a single population's D
+    follows D_t = D0 (1-r)^t closely."""
+    r = simulate_two_locus_wright_fisher(
+        population_size=100000, generations=20, recombination_rate=0.1,
+        starting_frequencies=(0.5, 0, 0, 0.5), seed=1)
+    d = r.column("mean_D")
+    assert d[0] == 0.25
+    expect = 0.25 * 0.9 ** 20
+    rel = abs(d[20] - expect) / expect
+    assert rel < 0.05, f"D20={d[20]:.5f} vs {expect:.5f} ({rel:.3f})"
+    for t in (5, 10, 15):
+        assert abs(d[t] - 0.25 * 0.9 ** t) / (0.25 * 0.9 ** t) < 0.1
+
+
+def test_two_locus_drift_plus_recombination_matches_theory() -> None:
+    """E[D_t] = D0 (1-r)^t (1-1/N)^t over many replicates (N=100,
+    r=0.1, t=30)."""
+    r = simulate_two_locus_wright_fisher(
+        population_size=100, generations=30, recombination_rate=0.1,
+        starting_frequencies=(0.5, 0, 0, 0.5), replicate_runs=3000, seed=42)
+    d = r.column("mean_D")
+    expect = 0.25 * 0.9 ** 30 * 0.99 ** 30
+    rel = abs(d[30] - expect) / expect
+    assert rel < 0.1, f"D30={d[30]:.5f} vs {expect:.5f} ({rel:.3f})"
+    assert d[0] == 0.25
+
+
+def test_two_locus_recombination_rate_controls_decay() -> None:
+    """r=0 keeps LD (decay by drift alone), r=0.5 destroys it fastest."""
+    args = dict(population_size=100, generations=30,
+                starting_frequencies=(0.5, 0, 0, 0.5),
+                replicate_runs=3000, seed=42)
+    d0 = simulate_two_locus_wright_fisher(
+        recombination_rate=0.0, **args).column("mean_D")[30]
+    d05 = simulate_two_locus_wright_fisher(
+        recombination_rate=0.5, **args).column("mean_D")[30]
+    drift_only = 0.25 * 0.99 ** 30
+    assert abs(d0 - drift_only) / drift_only < 0.1
+    assert d05 < 0.001
+    assert d0 > 0.05 * d05
+
+
+def test_two_locus_repulsion_negative_d_decays_same() -> None:
+    """Starting in repulsion (Ab/aB) gives negative D that decays at
+    the same rate."""
+    r = simulate_two_locus_wright_fisher(
+        population_size=100, generations=30, recombination_rate=0.1,
+        starting_frequencies=(0, 0.5, 0.5, 0), replicate_runs=3000, seed=42)
+    d = r.column("mean_D")
+    assert d[0] == -0.25
+    expect = -0.25 * 0.9 ** 30 * 0.99 ** 30
+    rel = abs(d[30] - expect) / abs(expect)
+    assert rel < 0.1, f"D30={d[30]:.5f} vs {expect:.5f} ({rel:.3f})"
+
+
+def test_two_locus_random_association_no_spurious_ld() -> None:
+    """Starting with D=0, mean D stays near zero (drift creates LD but
+    with no expectation), while r2 stays positive."""
+    r = simulate_two_locus_wright_fisher(
+        population_size=100, generations=20, recombination_rate=0.1,
+        starting_frequencies=(0.25, 0.25, 0.25, 0.25), replicate_runs=2000,
+        seed=42)
+    d = r.column("mean_D")
+    assert abs(d[0]) < 1e-12
+    assert abs(d[20]) < 0.05, f"D20={d[20]:.5f}"
+    assert r.column("mean_r2")[20] > 0.001
+
+
+def test_two_locus_frequencies_conserved_in_expectation() -> None:
+    """Neither recombination nor drift changes the mean per-locus
+    allele frequencies."""
+    r = simulate_two_locus_wright_fisher(
+        population_size=100, generations=30, recombination_rate=0.1,
+        starting_frequencies=(0.5, 0, 0, 0.5), replicate_runs=3000, seed=42)
+    assert r.column("mean_freq_A")[0] == 0.5
+    assert r.column("mean_freq_B")[0] == 0.5
+    assert abs(r.column("mean_freq_A")[-1] - 0.5) < 0.05
+    assert abs(r.column("mean_freq_B")[-1] - 0.5) < 0.05
+
+
+def test_two_locus_determinism_and_replicate_data() -> None:
+    """Same seed -> identical output; replicate data exposes the
+    per-replicate D spread; sd_D_final matches the sd_D column."""
+    a = simulate_two_locus_wright_fisher(
+        population_size=100, generations=10, recombination_rate=0.1,
+        starting_frequencies=(0.5, 0, 0, 0.5), replicate_runs=5, seed=7,
+        return_replicate_data=True)
+    b = simulate_two_locus_wright_fisher(
+        population_size=100, generations=10, recombination_rate=0.1,
+        starting_frequencies=(0.5, 0, 0, 0.5), replicate_runs=5, seed=7,
+        return_replicate_data=True)
+    c = simulate_two_locus_wright_fisher(
+        population_size=100, generations=10, recombination_rate=0.1,
+        starting_frequencies=(0.5, 0, 0, 0.5), replicate_runs=5, seed=8,
+        return_replicate_data=True)
+    assert a.data == b.data
+    assert a.data != c.data
+    assert a.replicate_colnames == ["generation", "D"]
+    assert len(a.replicate_data) == 11
+    assert len(a.replicate_data[0]) == 6
+    la = a.ld_analysis()
+    assert abs(la["sd_D_final"] - a.column("sd_D")[-1]) < 1e-12
+    assert la["d_initial"] == 0.25
+    assert la["decay_factor"] < 1.0
+    d_no_rep = simulate_two_locus_wright_fisher(
+        population_size=100, generations=10, recombination_rate=0.1,
+        starting_frequencies=(0.5, 0, 0, 0.5), replicate_runs=5, seed=7)
+    assert d_no_rep.ld_analysis()["sd_D_final"] is None
+
+
+def test_fst_after_split_matches_simulation() -> None:
+    """The exact chain expectation of the engine's Nei-style Fst
+    matches a 2-deme isolated simulation's fst column within 0.02 at
+    every generation (N=100, p0=0.5, 2000 replicates)."""
+    n, reps, gens = 100, 2000, 200
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=gens,
+        replicate_runs=reps, n_demes=2, migration_rate=0.0, seed=42)
+    sim = result.column("fst")
+    assert sim[0] == 0.0
+    for t in (10, 50, 100, 150, 200):
+        exact = expected_fst_after_split(n, t)
+        assert abs(sim[t] - exact) < 0.02, (
+            f"t={t}: sim {sim[t]:.4f} vs exact {exact:.4f}")
+
+
+def test_fst_after_split_properties() -> None:
+    """Fst starts at 0, rises monotonically, and small populations
+    diverge faster than large ones."""
+    n = 100
+    vals = [expected_fst_after_split(n, t) for t in range(0, 401, 25)]
+    assert vals[0] == 0.0
+    assert all(vals[i + 1] >= vals[i] - 1e-12 for i in range(len(vals) - 1))
+    assert 0.3 < vals[-1] < 0.5
+    assert expected_fst_after_split(50, 50) > expected_fst_after_split(
+        100, 50)
+
+
+def test_fst_after_split_approaches_divergent_fixation() -> None:
+    """Isolation does not push Fst to 1: both demes fix
+    independently, so Fst(t) -> 2 p0 (1-p0)."""
+    n = 100
+    assert abs(expected_fst_after_split(n, 800) - 0.5) < 0.01
+    assert abs(expected_fst_after_split(n, 800, 0.3) - 0.42) < 0.01
+    assert abs(expected_fst_after_split(n, 800, 0.7)
+               - expected_fst_after_split(n, 800, 0.3)) < 1e-12
+
+
+def test_fst_after_split_validation() -> None:
+    with pytest.raises(ValueError):
+        expected_fst_after_split(0, 10)
+    with pytest.raises(ValueError):
+        expected_fst_after_split(2.5, 10)
+    with pytest.raises(ValueError):
+        expected_fst_after_split(100, -1)
+    with pytest.raises(ValueError):
+        expected_fst_after_split(100, True)
+    with pytest.raises(ValueError):
+        expected_fst_after_split(100, 10, starting_frequency=1.5)
+    with pytest.raises(ValueError):
+        expected_fst_after_split(100, 10, starting_frequency=True)
+
+
+def test_two_locus_mutation_accelerates_ld_decay() -> None:
+    """E[D_t] = D0 (1-r)^t (1-2u)^(2t) (1-1/N)^t: mutation erodes LD
+    beyond recombination+drift (N=100, r=0.1, u=0.02, t=15)."""
+    args = dict(population_size=100, generations=15,
+                recombination_rate=0.1, starting_frequencies=(0.5, 0, 0, 0.5),
+                replicate_runs=3000, seed=42)
+    d_mut = simulate_two_locus_wright_fisher(
+        mutation_rate=0.02, **args).column("mean_D")[15]
+    d_none = simulate_two_locus_wright_fisher(
+        mutation_rate=0.0, **args).column("mean_D")[15]
+    expect = 0.25 * 0.9 ** 15 * 0.96 ** 30 * 0.99 ** 15
+    assert abs(d_mut - expect) / expect < 0.1, (
+        f"mut D15={d_mut:.5f} vs {expect:.5f}")
+    assert d_mut < 0.5 * d_none, (
+        "mutation should roughly halve LD, got "
+        f"{d_mut:.5f} vs no-mutation {d_none:.5f}")
+
+
+def test_two_locus_mutation_pushes_frequencies_to_half() -> None:
+    """With mutation, a skewed per-locus frequency drifts toward 0.5
+    (without mutation it stays ~0.8)."""
+    args = dict(population_size=100, generations=100,
+                recombination_rate=0.1, starting_frequencies=(0.8, 0, 0, 0.2),
+                replicate_runs=3000, seed=42)
+    r = simulate_two_locus_wright_fisher(mutation_rate=0.05, **args)
+    r0 = simulate_two_locus_wright_fisher(mutation_rate=0.0, **args)
+    assert abs(r.column("mean_freq_A")[100] - 0.5) < 0.05
+    assert abs(r.column("mean_freq_B")[100] - 0.5) < 0.05
+    assert r0.column("mean_freq_A")[100] > 0.7
+
+
+def test_two_locus_mutation_validation() -> None:
+    base = dict(population_size=100, generations=10,
+                recombination_rate=0.1)
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "mutation_rate": 1.5})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "mutation_rate": -0.1})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "mutation_rate": True})
+
+
+def test_two_locus_validation() -> None:
+    base = dict(population_size=100, generations=10,
+                recombination_rate=0.1)
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "population_size": 0})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "population_size": 2.5})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "recombination_rate": 0.6})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "recombination_rate": -0.1})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "recombination_rate": True})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "generations": True})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "generations": 0})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(**{**base, "replicate_runs": 0})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(
+            **{**base, "starting_frequencies": (0.5, 0.1, 0.1, 0.4)})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(
+            **{**base, "starting_frequencies": (0.5, 0, 0.5)})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(
+            **{**base, "starting_frequencies": (1.0, 0, 0, 0.5)})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(
+            **{**base, "starting_frequencies": (0.5, 0, 0, -0.1)})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(
+            **{**base, "starting_frequencies": (0.5, 0, 0, math.nan)})
+    with pytest.raises(ValueError):
+        simulate_two_locus_wright_fisher(
+            **{**base, "starting_frequencies": (0.5, 0, 0, True)})
+
+
+
+
 def test_estimate_ne_variance_method() -> None:
     """Variance method requires replicate data; with it, returns
     an estimate (biased but present)."""
@@ -2565,7 +3201,6 @@ def test_stationary_distribution_is_beta() -> None:
 
 def test_stationary_distribution_normalization() -> None:
     """Numerically integrate the density over [0, 1]: should be 1."""
-    from scipy.integrate import quad
     density = wright_stationary_distribution(
         [0.5], 0.02, 50)[0]
     a = 4.0 * 0.02 * 50
@@ -2601,7 +3236,6 @@ def test_stationary_distribution_matches_simulation() -> None:
     afs = result.allele_frequency_spectrum(bins=10)
     edges = np.asarray(afs["bin_edges"])
     counts = np.asarray(afs["counts"], dtype=float)
-    obs_density = counts / (reps * (edges[1] - edges[0]))
 
     centers = (edges[:-1] + edges[1:]) / 2.0
     theory = np.asarray(
@@ -2614,6 +3248,160 @@ def test_stationary_distribution_matches_simulation() -> None:
         np.sum(theory * (edges[1] - edges[0])))
     assert abs(obs_mass - theory_mass) < 0.1, (
         f"central mass observed={obs_mass:.3f} theory={theory_mass:.3f}")
+
+
+def test_stationary_vector_is_fixed_point() -> None:
+    """pi Q = pi exactly (Perron-Frobenius eigenvector), sums to 1."""
+    n, u = 50, 0.02
+    v = wright_fisher_stationary_vector(n, u)
+    q = wright_fisher_transition_matrix(n, mutation_rate=u)
+    drift = np.asarray(v) @ q
+    assert abs(sum(v) - 1.0) < 1e-12
+    assert np.all(np.asarray(v) >= 0.0)
+    assert np.max(np.abs(drift - np.asarray(v))) < 1e-10, (
+        f"max |pi Q - pi| = {np.max(np.abs(drift - np.asarray(v))):.2e}")
+
+
+def test_stationary_vector_symmetric_for_neutral_mutation() -> None:
+    """With symmetric mutation and no selection the chain is A<->a
+    symmetric, so the stationary distribution is too."""
+    n, u = 50, 0.02
+    v = wright_fisher_stationary_vector(n, u)
+    for i in range(n + 1):
+        assert abs(v[i] - v[2 * n - i]) < 1e-9, (
+            f"pi[{i}]={v[i]:.6f} != pi[{2*n-i}]={v[2*n-i]:.6f}")
+
+
+def test_stationary_vector_matches_beta_density() -> None:
+    """The exact chain stationary distribution (N=50, u=0.02, 4Nu=4)
+    should carry essentially the same central mass as Wright's
+    Beta(4,4) diffusion density."""
+    n, u = 50, 0.02
+    v = wright_fisher_stationary_vector(n, u)
+    i_lo, i_hi = int(round(0.3 * 2 * n)), int(round(0.7 * 2 * n))
+    chain_mass = sum(v[i_lo:i_hi + 1])
+    pts = np.linspace(0.3, 0.7, 501)
+    dens = np.asarray(wright_stationary_distribution(pts.tolist(), u, n))
+    beta_mass = (dens.sum() - 0.5 * (dens[0] + dens[-1])) * 0.4 / 500.0
+    assert abs(chain_mass - beta_mass) < 0.02, (
+        f"central mass chain={chain_mass:.4f} beta={beta_mass:.4f}")
+
+
+def test_stationary_vector_matches_simulation_spectrum() -> None:
+    """A long simulation's final frequencies should be drawn from the
+    exact chain's stationary distribution (same central-mass
+    criterion as the Beta test)."""
+    n, u = 50, 0.02
+    v = wright_fisher_stationary_vector(n, u)
+    i_lo, i_hi = int(round(0.3 * 2 * n)), int(round(0.7 * 2 * n))
+    chain_mass = sum(v[i_lo:i_hi + 1])
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=1000,
+        replicate_runs=2000, mutation_rate=u, seed=42,
+        return_replicate_data=True)
+    freqs = np.asarray(result.replicate_data)[-1, 1:]
+    obs_mass = np.mean((freqs >= 0.3) & (freqs <= 0.7))
+    assert abs(obs_mass - chain_mass) < 0.02, (
+        f"central mass sim={obs_mass:.4f} chain={chain_mass:.4f}")
+
+
+def test_stationary_vector_selection_shifts_mode() -> None:
+    """Positive selection should push the stationary mode toward more
+    A copies than the neutral case."""
+    n, u = 50, 0.02
+    neutral = wright_fisher_stationary_vector(n, u)
+    selected = wright_fisher_stationary_vector(
+        n, u, selection_coefficient=0.05)
+    assert np.argmax(selected) > np.argmax(neutral), (
+        f"mode neutral={np.argmax(neutral)} selected={np.argmax(selected)}")
+
+
+def test_stationary_vector_validation() -> None:
+    for bad in (0.0, 1.0, -0.05, 1.5):
+        with pytest.raises(ValueError):
+            wright_fisher_stationary_vector(50, bad)
+    with pytest.raises(ValueError):
+        wright_fisher_stationary_vector(0, 0.02)
+    with pytest.raises(ValueError):
+        wright_fisher_stationary_vector(50, True)
+    with pytest.raises(ValueError):
+        wright_fisher_stationary_vector(50, 0.02, selection_coefficient=-1.5)
+
+
+def test_normalise_stationary_vector_handles_negative_sign() -> None:
+    """Sign orientation is deterministic and independent of LAPACK."""
+    result = _normalise_stationary_vector(
+        np.array([-0.2, -0.5, -0.3], dtype=np.float64))
+    assert sum(result) == pytest.approx(1.0, abs=1e-12)
+    assert np.all(result >= 0.0)
+    np.testing.assert_allclose(
+        result, np.array([0.2, 0.5, 0.3]), atol=1e-12)
+    with pytest.raises(ValueError):
+        _normalise_stationary_vector(np.zeros(3, dtype=np.float64))
+
+
+def test_stationary_vector_eigenvector_sign_regression() -> None:
+    """Regression test for the eigenvector sign bug (Part 4 finding).
+
+    LAPACK's choice of eigenvector sign is not stable across builds;
+    some configurations return an all-negative Perron-Frobenius vector.
+    The old code clamped first (zeroing a valid sign-flipped vector)
+    then normalised, causing 0/0 -> NaN. The fix orients toward the
+    positive orthant BEFORE clamping, then checks the total AFTER
+    clamping. This test would fail on the buggy code if the eigenvector
+    happened to be negative (e.g., numpy 1.26.4 / Python 3.10).
+    """
+    # Use a configuration known to trigger the sign issue under the
+    # pinned CI environment (N=10, u=0.01, neutral).
+    n, u = 10, 0.01
+    v = wright_fisher_stationary_vector(n, u)
+
+    # Basic validity checks that would fail if sign handling was broken
+    assert abs(sum(v) - 1.0) < 1e-12, "distribution must sum to 1"
+    assert np.all(np.asarray(v) >= 0.0), "all entries must be non-negative"
+    assert np.all(np.isfinite(v)), "no NaN or inf allowed"
+
+    # Verify it's actually the stationary distribution: pi Q = pi
+    q = wright_fisher_transition_matrix(n, mutation_rate=u)
+    drift = np.asarray(v) @ q
+    assert np.max(np.abs(drift - np.asarray(v))) < 1e-10, (
+        f"max |pi Q - pi| = {np.max(np.abs(drift - np.asarray(v))):.2e}")
+
+
+def test_normalise_stationary_vector_sign_and_clamp() -> None:
+    """Build-independent regression test for the eigenvector sign fix.
+
+    The normalisation helper is extracted to module level so it can be
+    tested directly. This test does not depend on scipy/LAPACK's
+    arbitrary sign choice — it forces an all-negative input and asserts
+    the correct orientation-and-normalisation behaviour.
+
+    The OLD logic (clamp first, then orient, then divide) would:
+      1. np.maximum([-0.2, -0.5, -0.3], 0) -> [0, 0, 0]
+      2. sum = 0.0
+      3. 0/0 -> NaN (or ValueError if guarded)
+
+    The NEW logic (orient, then clamp, then check total) correctly
+    produces [0.2, 0.5, 0.3] summing to 1.
+    """
+    from Tellurium.tellurium_engine import _normalise_stationary_vector
+
+    # All-negative input (simulating LAPACK returning a sign-flipped eigenvector)
+    v_neg = np.array([-0.2, -0.5, -0.3], dtype=np.float64)
+    result = _normalise_stationary_vector(v_neg)
+
+    # Should orient toward positive orthant before clamping
+    expected = np.array([0.2, 0.5, 0.3], dtype=np.float64)
+    expected = expected / expected.sum()
+    assert np.allclose(result, expected), (
+        f"sign-flipped input: got {result}, expected {expected}")
+    assert abs(result.sum() - 1.0) < 1e-12, "must sum to 1"
+    assert np.all(result >= 0.0), "all entries non-negative"
+
+    # All-zero input should raise
+    with pytest.raises(ValueError, match="failed to compute"):
+        _normalise_stationary_vector(np.array([0.0, 0.0, 0.0]))
+
 
 
 # ---------------------------------------------------------------------------
@@ -2646,3 +3434,595 @@ def test_cli_wf_migration_model_flag() -> None:
         "--generations", "10", "--replicate-runs", "5", "--seed", "42",
         "--quiet"], cwd=_REPO_ROOT)
     assert out.decode() == ""  # quiet suppresses summary, exit 0
+
+
+def test_cli_kimura_time_flag() -> None:
+    import subprocess
+    import sys
+    out = subprocess.check_output([
+        sys.executable, "-m", "Tellurium.cli", "kimura",
+        "--p0", "0.5", "--s", "0.0", "--population-size", "50",
+        "--time"], cwd=_REPO_ROOT)
+    text = out.decode()
+    assert "P_fix" in text
+    assert "t_fix" in text
+    assert "277" in text or "138" in text
+
+
+def test_cli_ne_from_csv() -> None:
+    import pathlib
+    import subprocess
+    import sys
+    import tempfile
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=100,
+        replicate_runs=1000, seed=42)
+    with tempfile.TemporaryDirectory() as tmp:
+        csv_path = str(pathlib.Path(tmp) / "out.csv")
+        result.to_csv(csv_path)
+        out = subprocess.check_output([
+            sys.executable, "-m", "Tellurium.cli", "ne",
+            "--file", csv_path], cwd=_REPO_ROOT)
+        text = out.decode()
+        assert "Ne estimate" in text
+        assert "heterozygosity decay" in text
+
+
+def test_cli_ld_runs_and_reports_decay() -> None:
+    """The ld command prints the D table and compares the final D
+    against theoretical_ld_decay."""
+    import subprocess
+    import sys
+    out = subprocess.check_output([
+        sys.executable, "-m", "Tellurium.cli", "ld",
+        "--population-size", "100", "--generations", "20",
+        "--recombination-rate", "0.1", "--replicate-runs", "3000",
+        "--seed", "42"], cwd=_REPO_ROOT)
+    text = out.decode()
+    assert "generation" in text
+    assert "mean_D" in text
+    assert "D0 = 0.250000" in text
+    assert "theory (1-r)^t*(1-2u)^(2t)*(1-1/N)^t = 0.099438" in text
+
+
+def test_cli_ld_bad_input_fails() -> None:
+    import subprocess
+    import sys
+    r = subprocess.run([
+        sys.executable, "-m", "Tellurium.cli", "ld",
+        "--starting-frequencies", "0.5,0,0.5"], cwd=_REPO_ROOT,
+        capture_output=True, text=True)
+    assert r.returncode == 1
+    assert "exactly 4 entries" in r.stderr
+    r2 = subprocess.run([
+        sys.executable, "-m", "Tellurium.cli", "ld",
+        "--recombination-rate", "0.7"], cwd=_REPO_ROOT,
+        capture_output=True, text=True)
+    assert r2.returncode == 1
+    assert "recombination_rate must be in [0, 0.5]" in r2.stderr
+
+
+def test_cli_ne_missing_column_fails() -> None:
+    import pathlib
+    import subprocess
+    import sys
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        bad = pathlib.Path(tmp) / "bad.csv"
+        bad.write_text("generation,mean_frequency\n0,0.5\n1,0.4\n")
+        code = subprocess.call(
+            [sys.executable, "-m", "Tellurium.cli", "ne",
+             "--file", str(bad)], cwd=_REPO_ROOT)
+        assert code == 1
+
+
+def test_estimate_ne_from_heterozygosity_rejects_bad_input() -> None:
+    assert "error" in estimate_ne_from_heterozygosity([])
+    assert "error" in estimate_ne_from_heterozygosity([0.5, 0.5])
+    assert "error" in estimate_ne_from_heterozygosity([0.0, 0.0, 0.0])
+    est = estimate_ne_from_heterozygosity([0.5, 0.45, 0.4, 0.36, 0.33])
+    assert "ne_estimate" in est
+    assert est["ne_estimate"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Theoretical island-model Fst (Wright 1931)
+# ---------------------------------------------------------------------------
+
+
+def test_theoretical_fst_closed_form() -> None:
+    n = 100
+    m = 0.05
+    u = 0.001
+    expected = 1.0 / (1.0 + 4.0 * n * (m + u))
+    assert math.isclose(theoretical_fst(n, m, u), expected, rel_tol=1e-12)
+    assert math.isclose(
+        theoretical_fst(50, 0.1, 0.0), 1.0 / (1.0 + 4.0 * 50 * 0.1))
+    assert theoretical_fst(100, 0.0, 0.0) == 1.0
+
+
+def test_theoretical_fst_validation() -> None:
+    with pytest.raises(ValueError):
+        theoretical_fst(0, 0.1)
+    with pytest.raises(ValueError):
+        theoretical_fst(-10, 0.1)
+    with pytest.raises(ValueError):
+        theoretical_fst(100, -0.01)
+    with pytest.raises(ValueError):
+        theoretical_fst(100, 1.5)
+    with pytest.raises(ValueError):
+        theoretical_fst(100, 0.05, 1.0)
+    with pytest.raises(ValueError):
+        theoretical_fst(100, 0.05, -0.5)
+
+
+def test_theoretical_fst_matches_simulation() -> None:
+    n = 100
+    m = 0.05
+    u = 0.001
+    result = simulate_wright_fisher(
+        population_size=n, starting_frequency=0.5, generations=400,
+        replicate_runs=30, mutation_rate=u, n_demes=30,
+        migration_rate=m, seed=12345)
+    sim_fst = result.column("fst")[-1]
+    theory = theoretical_fst(n, m, u)
+    assert abs(sim_fst - theory) < 0.01, (
+        f"simulated Fst {sim_fst:.4f} should be within 0.01 of "
+        f"theory {theory:.4f} at 30 demes")
+
+
+# ---------------------------------------------------------------------------
+# Wright-Fisher parameter sweep
+# ---------------------------------------------------------------------------
+
+
+def test_wright_fisher_sweep_orders_results() -> None:
+    rows = wright_fisher_sweep(
+        "selection_coefficient", [0.0, 0.02, 0.05],
+        population_size=100, generations=300, replicate_runs=20, seed=99)
+    assert [r["value"] for r in rows] == [0.0, 0.02, 0.05]
+    assert all(r["parameter"] == "selection_coefficient" for r in rows)
+    freqs = [r["final_mean_frequency"] for r in rows]
+    assert freqs[0] < freqs[1] < freqs[2]
+    assert rows[2]["final_heterozygosity"] < rows[0]["final_heterozygosity"]
+    assert rows[0]["prop_fixed_A"] < rows[2]["prop_fixed_A"]
+
+
+def test_wright_fisher_sweep_structured_includes_fst() -> None:
+    rows = wright_fisher_sweep(
+        "migration_rate", [0.0, 0.1],
+        population_size=100, generations=200, replicate_runs=15,
+        n_demes=10, seed=7)
+    assert "final_fst" in rows[0]
+    assert "final_fst" in rows[1]
+    assert rows[0]["final_fst"] > rows[1]["final_fst"]
+
+
+def test_wright_fisher_sweep_rejects_invalid() -> None:
+    with pytest.raises(ValueError):
+        wright_fisher_sweep("bogus", [1.0])
+    with pytest.raises(ValueError):
+        wright_fisher_sweep("starting_frequency", [0.2, 0.8])
+
+
+def test_cli_sweep_runs(tmp_path) -> None:
+    import subprocess
+    import sys
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "sweep",
+         "--parameter", "selection_coefficient",
+         "--values", "0,0.05",
+         "--generations", "200", "--seed", "5"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=300)
+    assert proc.returncode == 0, proc.stderr
+    assert "selection_coefficient" in proc.stdout
+    assert "0.0500" in proc.stdout or "0.05" in proc.stdout
+
+
+def test_cli_sweep_structured_shows_fst(tmp_path) -> None:
+    import subprocess
+    import sys
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "sweep",
+         "--parameter", "migration_rate",
+         "--values", "0.0,0.2",
+         "--n-demes", "10", "--seed", "11"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=300)
+    assert proc.returncode == 0, proc.stderr
+    assert "Fst" in proc.stdout
+
+
+def test_cli_sweep_bad_input_fails(tmp_path) -> None:
+    import subprocess
+    import sys
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "sweep",
+         "--parameter", "bogus", "--values", "1"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=120)
+    assert proc.returncode == 1
+    assert "error" in proc.stderr
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "sweep",
+         "--parameter", "selection_coefficient", "--values", "abc"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=120)
+    assert proc.returncode == 2
+    assert "comma-separated" in proc.stderr
+
+
+# ---------------------------------------------------------------------------
+# Exact Markov chain: transition matrix
+# ---------------------------------------------------------------------------
+
+
+def test_transition_matrix_hand_checked_small() -> None:
+    Q = wright_fisher_transition_matrix(1)
+    expected = np.array([
+        [1.0, 0.0, 0.0],
+        [0.25, 0.5, 0.25],
+        [0.0, 0.0, 1.0],
+    ])
+    assert np.allclose(Q, expected)
+
+
+def test_transition_matrix_rows_sum_to_one() -> None:
+    for kwargs in ({}, {"mutation_rate": 0.01},
+                   {"selection_coefficient": 0.05},
+                   {"selection_coefficient": 0.05, "dominance": 1.5},
+                   {"selection_coefficient": -0.2, "dominance": 2.0},
+                   {"mutation_rate": 0.001, "selection_coefficient": 0.02,
+                    "dominance": 0.5}):
+        Q = wright_fisher_transition_matrix(10, **kwargs)
+        assert Q.shape == (21, 21)
+        assert np.all(Q >= 0.0)
+        assert np.allclose(Q.sum(axis=1), 1.0)
+
+
+def test_transition_matrix_neutral_mean_and_variance() -> None:
+    N = 100
+    Q = wright_fisher_transition_matrix(N)
+    copies = np.arange(2 * N + 1, dtype=np.float64)
+    mean = Q @ copies
+    assert np.allclose(mean, copies, atol=1e-9)
+    second = Q @ (copies ** 2)
+    var = second - mean ** 2
+    expected_var = copies * (2 * N - copies) / (2 * N)
+    assert np.allclose(var, expected_var, atol=1e-8)
+
+
+def test_transition_matrix_absorbing_states() -> None:
+    Q = wright_fisher_transition_matrix(20)
+    assert Q[0, 0] == 1.0
+    assert Q[40, 40] == 1.0
+    Qm = wright_fisher_transition_matrix(20, mutation_rate=0.01)
+    assert Qm[0, 0] < 1.0
+    assert Qm[40, 40] < 1.0
+
+
+def test_transition_matrix_matches_simulation_distribution() -> None:
+    N, t, p0, reps, seed = 20, 50, 0.3, 4000, 42
+    rng = np.random.default_rng(seed)
+    freqs = np.full(reps, p0)
+    for _ in range(t):
+        freqs = rng.binomial(2 * N, freqs) / (2 * N)
+    sim_fix = np.mean(freqs >= 1.0 - 1e-12)
+    sim_mean = float(np.mean(freqs))
+
+    Q = np.linalg.matrix_power(
+        wright_fisher_transition_matrix(N), t)
+    i0 = round(p0 * 2 * N)
+    chain_fix = Q[i0, 2 * N]
+    chain_mean = float((Q[i0] @ np.arange(2 * N + 1)) / (2 * N))
+    assert abs(sim_fix - chain_fix) < 0.03
+    assert abs(sim_mean - chain_mean) < 0.02
+
+
+def test_transition_matrix_validation() -> None:
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(0)
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(True)
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(10.5)
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(10, mutation_rate=1.0)
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(10, mutation_rate=-0.1)
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(10, selection_coefficient=-1.0)
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(10, dominance=2.5)
+    with pytest.raises(ValueError):
+        wright_fisher_transition_matrix(10, mutation_rate=float("nan"))
+
+
+# ---------------------------------------------------------------------------
+# Exact Markov chain: expected fixation time (linear solve)
+# ---------------------------------------------------------------------------
+
+
+def test_chain_fixation_time_matches_closed_form() -> None:
+    closed_05 = expected_fixation_time(0.5, 100)
+    chain_05 = wright_fisher_expected_fixation_time(0.5, 100)
+    assert abs(chain_05 - closed_05) / closed_05 < 0.02
+    closed_02 = expected_fixation_time(0.2, 100)
+    chain_02 = wright_fisher_expected_fixation_time(0.2, 100)
+    assert abs(chain_02 - closed_02) / closed_02 < 0.02
+    new_mut = 1.0 / 200.0
+    chain_new = wright_fisher_expected_fixation_time(new_mut, 100)
+    assert abs(chain_new - 4.0 * 100) / (4.0 * 100) < 0.02
+
+
+def test_chain_fixation_time_boundaries() -> None:
+    assert wright_fisher_expected_fixation_time(1.0, 100) == 0.0
+    with pytest.raises(ValueError):
+        wright_fisher_expected_fixation_time(0.0, 100)
+    with pytest.raises(ValueError):
+        wright_fisher_expected_fixation_time(0.5, 0)
+    with pytest.raises(ValueError):
+        wright_fisher_expected_fixation_time(1.5, 100)
+
+
+def test_chain_fixation_time_selection_monotone() -> None:
+    t0 = wright_fisher_expected_fixation_time(0.01, 100, 0.0)
+    t1 = wright_fisher_expected_fixation_time(0.01, 100, 0.01)
+    t2 = wright_fisher_expected_fixation_time(0.01, 100, 0.05)
+    t3 = wright_fisher_expected_fixation_time(0.01, 100, 0.2)
+    assert t0 > t1 > t2 > t3
+
+
+def test_chain_fixation_time_matches_simulation_under_selection() -> None:
+    N, s, p0, gens, reps, seed = 50, 0.05, 0.2, 600, 3000, 123
+    chain = wright_fisher_expected_fixation_time(p0, N, s)
+    result = simulate_wright_fisher(
+        population_size=N, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, selection_coefficient=s, seed=seed)
+    fa = result.fixation_analysis()
+    sim = fa["mean_fixation_time_A"]
+    assert abs(sim - chain) / chain < 0.05
+
+
+def test_chain_fixation_time_diploid_dominance() -> None:
+    t_hap = wright_fisher_expected_fixation_time(
+        0.1, 50, 0.05, dominance=None)
+    t_dom = wright_fisher_expected_fixation_time(0.1, 50, 0.05, dominance=1.0)
+    t_under = wright_fisher_expected_fixation_time(
+        0.1, 50, 0.05, dominance=2.0)
+    assert t_hap > 0 and t_dom > 0 and t_under > 0
+    assert t_under > t_dom
+
+
+def test_cli_kimura_exact_flag(tmp_path) -> None:
+    import subprocess
+    import sys
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "kimura",
+         "--p0", "0.5", "--s", "0.05", "--population-size", "50",
+         "--time", "--exact"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    assert "t_fix (exact WF chain)" in proc.stdout
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "kimura",
+         "--p0", "0.5", "--s", "0.0", "--population-size", "50",
+         "--time"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    assert "t_fix (exact WF chain)" not in proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# Exact Markov chain: fixation probability (absorption solve)
+# ---------------------------------------------------------------------------
+
+
+def test_exact_fixation_probability_neutral_martingale() -> None:
+    for p0 in (0.1, 0.3, 0.5, 0.7, 0.9):
+        got = wright_fisher_fixation_probability(p0, 100)
+        assert abs(got - p0) < 1e-9, f"neutral P_fix at p0={p0} is {got}"
+
+
+def test_exact_fixation_probability_matches_kimura_genic() -> None:
+    for s in (0.01, 0.05):
+        exact = wright_fisher_fixation_probability(0.3, 50, s)
+        kimura = kimura_fixation_probability(0.3, s, 50)
+        assert abs(exact - kimura) < 0.01, (
+            f"at s={s}: exact {exact:.5f} vs kimura {kimura:.5f}")
+
+
+def test_exact_fixation_probability_overdominance_matches_simulation() -> None:
+    exact = wright_fisher_fixation_probability(0.5, 50, 0.05, dominance=2.0)
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=1500,
+        replicate_runs=4000, selection_coefficient=0.05, dominance=2.0,
+        seed=7)
+    fa = result.fixation_analysis()
+    fixed = fa["n_fixed_A"] + fa["n_fixed_a"]
+    sim = fa["n_fixed_A"] / fixed if fixed else float("nan")
+    assert abs(exact - sim) < 0.02, f"exact {exact:.4f} vs sim {sim:.4f}"
+
+
+def test_exact_fixation_probability_underdominance_beats_kimura() -> None:
+    exact = wright_fisher_fixation_probability(0.5, 50, -0.2, dominance=2.0)
+    kimura = kimura_fixation_probability(0.5, -0.2, 50, dominance=2.0)
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=1000,
+        replicate_runs=4000, selection_coefficient=-0.2, dominance=2.0,
+        seed=7)
+    fa = result.fixation_analysis()
+    fixed = fa["n_fixed_A"] + fa["n_fixed_a"]
+    sim = fa["n_fixed_A"] / fixed if fixed else float("nan")
+    assert abs(exact - sim) < 0.01, f"exact {exact:.4f} vs sim {sim:.4f}"
+    assert abs(kimura - sim) > 0.01, (
+        "Kimura's diffusion approximation should be measurably wrong "
+        "under underdominance (the documented failure this function "
+        "resolves)")
+
+
+def test_exact_fixation_probability_boundaries_and_validation() -> None:
+    assert wright_fisher_fixation_probability(0.0, 100) == 0.0
+    assert wright_fisher_fixation_probability(1.0, 100) == 1.0
+    with pytest.raises(ValueError):
+        wright_fisher_fixation_probability(-0.1, 100)
+    with pytest.raises(ValueError):
+        wright_fisher_fixation_probability(1.5, 100)
+    with pytest.raises(ValueError):
+        wright_fisher_fixation_probability(0.5, 0)
+    with pytest.raises(ValueError):
+        wright_fisher_fixation_probability(True, 100)
+
+
+def test_exact_fixation_probability_monotone_in_s() -> None:
+    values = [wright_fisher_fixation_probability(0.2, 50, s)
+              for s in (0.0, 0.01, 0.05, 0.1)]
+    assert values == sorted(values)
+    assert values[-1] > 0.9
+
+
+def test_cli_kimura_exact_probability(tmp_path) -> None:
+    import subprocess
+    import sys
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "kimura",
+         "--p0", "0.5", "--s", "0.0", "--population-size", "50",
+         "--exact"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    assert "P_fix (exact WF chain) = 0.500000" in proc.stdout
+    proc = subprocess.run(
+        [sys.executable, "-m", "Tellurium.cli", "kimura",
+         "--p0", "0.5", "--s", "0.0", "--population-size", "50"],
+        capture_output=True, text=True, cwd=_REPO_ROOT, timeout=120)
+    assert proc.returncode == 0, proc.stderr
+    assert "P_fix (exact WF chain)" not in proc.stdout
+
+
+# ---------------------------------------------------------------------------
+# Time to loss and to absorption (Kimura & Ohta 1969; exact chain)
+# ---------------------------------------------------------------------------
+
+
+def test_expected_loss_time_closed_form() -> None:
+    assert math.isclose(
+        expected_loss_time(0.5, 100),
+        -4.0 * 100 * 0.5 * math.log(0.5) / 0.5)
+    assert math.isclose(
+        expected_loss_time(0.1, 100),
+        -4.0 * 100 * 0.1 * math.log(0.1) / 0.9)
+    assert expected_loss_time(0.0, 100) == 0.0
+    assert expected_loss_time(1.0, 100) == 400.0  # limit 4N
+    with pytest.raises(ValueError):
+        expected_loss_time(-0.1, 100)
+    with pytest.raises(ValueError):
+        expected_loss_time(0.5, 0)
+
+
+def test_expected_loss_time_symmetry_with_fixation() -> None:
+    for p0 in (0.05, 0.2, 0.4, 0.8):
+        assert math.isclose(
+            expected_loss_time(p0, 100), expected_fixation_time(1.0 - p0, 100))
+
+
+def test_chain_loss_time_matches_closed_form() -> None:
+    for p0 in (0.5, 0.1, 0.9):
+        closed = expected_loss_time(p0, 100)
+        chain = wright_fisher_expected_loss_time(p0, 100)
+        assert abs(chain - closed) / closed < 0.02, f"p0={p0}"
+
+
+def test_chain_loss_time_symmetry_exact() -> None:
+    assert abs(wright_fisher_expected_loss_time(0.3, 100)
+               - wright_fisher_expected_fixation_time(0.7, 100)) < 1e-9
+
+
+def test_chain_loss_time_matches_simulation() -> None:
+    chain = wright_fisher_expected_loss_time(0.2, 50)
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.2, generations=1000,
+        replicate_runs=4000, seed=77)
+    fa = result.fixation_analysis()
+    sim = fa["mean_fixation_time_a"]
+    assert abs(sim - chain) / chain < 0.06
+
+
+def test_fixation_analysis_absorption_times_match_chain_neutral() -> None:
+    N, p0, gens, reps, seed = 50, 0.5, 1000, 3000, 42
+    result = simulate_wright_fisher(
+        population_size=N, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, seed=seed)
+    fa = result.fixation_analysis()
+    assert fa["n_absorbed"] == fa["n_fixed_A"] + fa["n_fixed_a"] == reps
+    chain_fix = wright_fisher_expected_fixation_time(p0, N)
+    chain_loss = wright_fisher_expected_loss_time(p0, N)
+    chain_abs = wright_fisher_expected_absorption_time(p0, N)
+    assert abs(fa["mean_fixation_time_A"] - chain_fix) / chain_fix < 0.06
+    assert abs(fa["mean_fixation_time_a"] - chain_loss) / chain_loss < 0.06
+    assert abs(fa["mean_absorption_time"] - chain_abs) / chain_abs < 0.06
+
+
+def test_fixation_analysis_absorption_times_match_chain_selection() -> None:
+    N, s, p0, gens, reps, seed = 50, 0.05, 0.2, 1000, 3000, 9
+    result = simulate_wright_fisher(
+        population_size=N, starting_frequency=p0, generations=gens,
+        replicate_runs=reps, selection_coefficient=s, seed=seed)
+    fa = result.fixation_analysis()
+    assert fa["n_absorbed"] == reps
+    chain_fix = wright_fisher_expected_fixation_time(p0, N, s)
+    chain_abs = wright_fisher_expected_absorption_time(p0, N, s)
+    assert abs(fa["mean_fixation_time_A"] - chain_fix) / chain_fix < 0.06
+    assert abs(fa["mean_absorption_time"] - chain_abs) / chain_abs < 0.06
+    assert fa["mean_absorption_time"] < fa["mean_fixation_time_A"]
+
+
+def test_fixation_analysis_absorption_censoring_reported() -> None:
+    result = simulate_wright_fisher(
+        population_size=50, starting_frequency=0.5, generations=20,
+        replicate_runs=500, seed=3)
+    fa = result.fixation_analysis()
+    assert fa["n_polymorphic"] == fa["n_replicates"] - fa["n_absorbed"]
+    assert fa["n_polymorphic"] > 0
+    assert "mean_absorption_time" in fa
+
+
+def test_chain_loss_time_selection_decreases_with_s() -> None:
+    t0 = wright_fisher_expected_loss_time(0.2, 50, 0.0)
+    t1 = wright_fisher_expected_loss_time(0.2, 50, 0.01)
+    t2 = wright_fisher_expected_loss_time(0.2, 50, 0.05)
+    assert t0 > t1 > t2
+
+
+def test_chain_loss_time_boundaries() -> None:
+    assert wright_fisher_expected_loss_time(0.0, 100) == 0.0
+    with pytest.raises(ValueError):
+        wright_fisher_expected_loss_time(1.0, 100)
+    with pytest.raises(ValueError):
+        wright_fisher_expected_loss_time(0.5, 0)
+
+
+def test_chain_absorption_time_matches_closed_form() -> None:
+    closed = -4.0 * 100 * (0.5 * math.log(0.5) + 0.5 * math.log(0.5))
+    chain = wright_fisher_expected_absorption_time(0.5, 100)
+    assert abs(chain - closed) / closed < 0.02
+    assert math.isclose(
+        wright_fisher_expected_absorption_time(0.5, 100),
+        wright_fisher_expected_fixation_time(0.5, 100))
+
+
+def test_chain_absorption_time_consistency_identity() -> None:
+    for p0 in (0.2, 0.4, 0.6, 0.8):
+        f = wright_fisher_fixation_probability(p0, 100)
+        lhs = wright_fisher_expected_absorption_time(p0, 100)
+        rhs = (wright_fisher_expected_fixation_time(p0, 100) * f
+               + wright_fisher_expected_loss_time(p0, 100) * (1.0 - f))
+        assert abs(lhs - rhs) < 1e-9, f"p0={p0}: {lhs} vs {rhs}"
+    f = wright_fisher_fixation_probability(0.2, 50, 0.05)
+    lhs = wright_fisher_expected_absorption_time(0.2, 50, 0.05)
+    rhs = (wright_fisher_expected_fixation_time(0.2, 50, 0.05) * f
+           + wright_fisher_expected_loss_time(0.2, 50, 0.05) * (1.0 - f))
+    assert abs(lhs - rhs) < 1e-9
+
+
+def test_chain_absorption_time_boundaries() -> None:
+    assert wright_fisher_expected_absorption_time(0.0, 100) == 0.0
+    assert wright_fisher_expected_absorption_time(1.0, 100) == 0.0
+    with pytest.raises(ValueError):
+        wright_fisher_expected_absorption_time(0.5, 0)

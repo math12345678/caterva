@@ -7,7 +7,6 @@ own coverage rather than being tested only incidentally through
 test_fallback_logic.py.
 """
 
-import pytest
 
 from brenda_client import BRENDAKmEntry
 from citation import (
