@@ -3,8 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { resolveQuery } from "../lib/queryResolver";
 import type { ParameterProvenance } from "../lib/provenance";
 import {
+  isLocatableCitation,
   validateParameterProvenance,
 } from "../lib/provenance";
+import { resolveKineticValue } from "../lib/scienceAgent";
 
 vi.mock("../lib/scienceAgent", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/scienceAgent")>();
@@ -175,6 +177,97 @@ describe("validateParameterProvenance", () => {
   });
 });
 
+describe("strict resolved-citation format (Stage 5 Part 1)", () => {
+  const parameters = { km: 2, vmax: 5, s0: 10 };
+  const resolved: Record<string, ParameterProvenance> = {
+    km: { origin: "resolved", citation: "BRENDA (ref 12345)" },
+    vmax: { origin: "default" },
+    s0: { origin: "default" },
+  };
+
+  it("isLocatableCitation: a ref id is a locator", () => {
+    expect(isLocatableCitation("BRENDA (ref 12345)")).toBe(true);
+  });
+
+  it("isLocatableCitation: a URL is a locator", () => {
+    expect(
+      isLocatableCitation("BRENDA (ref 12345) — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27"),
+    ).toBe(true);
+  });
+
+  it("isLocatableCitation: the 'n/a' placeholder is NOT a locator", () => {
+    expect(isLocatableCitation("BRENDA (ref n/a)")).toBe(false);
+  });
+
+  it("isLocatableCitation: a bare source with no ref and no URL is NOT a locator", () => {
+    expect(isLocatableCitation("BRENDA")).toBe(false);
+  });
+
+  it("rejects a resolved citation whose ref is 'n/a'", () => {
+    expect(
+      validateParameterProvenance(parameters, {
+        ...resolved,
+        km: { origin: "resolved", citation: "BRENDA (ref n/a)" },
+      }),
+    ).toEqual([
+      "km is marked resolved but its citation carries no locator (ref id or URL)",
+    ]);
+  });
+
+  it("rejects a resolved citation with no ref and no URL", () => {
+    expect(
+      validateParameterProvenance(parameters, {
+        ...resolved,
+        km: { origin: "resolved", citation: "BRENDA" },
+      }),
+    ).not.toEqual([]);
+  });
+
+  it("accepts a resolved citation with a ref id", () => {
+    expect(validateParameterProvenance(parameters, resolved)).toEqual([]);
+  });
+
+  it("accepts a resolved citation with a URL", () => {
+    expect(
+      validateParameterProvenance(parameters, {
+        ...resolved,
+        km: {
+          origin: "resolved",
+          citation: "BRENDA — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        },
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("Target F — the resolved path degrades honestly when the citation has no locator", () => {
+  it("a found Km with no ref id and no URL is NOT reported as resolved", async () => {
+    vi.mocked(resolveKineticValue).mockResolvedValueOnce({
+      found: true,
+      km: 0.2,
+      unit: "mM",
+      organism: "Homo sapiens",
+      source: "BRENDA EC 1.1.1.27",
+      citation: { source: "BRENDA" },
+      literatureCandidates: [],
+      logs: ["Looked up Km for lactate dehydrogenase (1.1.1.27)"],
+    });
+    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("default");
+    expect(km.citation).toBeUndefined();
+    expect(km.note).toMatch(/no locator/i);
+    expect(JSON.stringify(resolved)).not.toContain("(ref n/a)");
+  });
+
+  it("the standard mock path still resolves (locatable citation)", async () => {
+    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("resolved");
+    expect(km.citation).toContain("(ref 12345)");
+  });
+});
+
 // =========================================================================
 // Mutation tests (Stage 4 Part 3, Rule 6)
 // These deliberately break the implementation in realistic ways to verify
@@ -268,6 +361,27 @@ describe("mutation tests — provenance contract enforcement", () => {
       expect(km.origin).toBe("resolved");
       expect(km.citation).toBeTruthy();
       // ACTUAL CATCHER: Target C test (mm + EC number -> km origin "resolved")
+    });
+  });
+
+  describe("Mutation 6: reintroduce the '(ref n/a)' template (Stage 5 Part 1)", () => {
+    it("PREDICTED: the locator rule should catch this", () => {
+      // Mutation: a resolver change that renders a citation without a ref id
+      // as "BRENDA (ref n/a)" — a locator-shaped string that locates nothing.
+      // Predicted catcher: the strict resolved-citation format rule.
+      const badProvenance: Record<string, ParameterProvenance> = {
+        km: { origin: "resolved", citation: "BRENDA (ref n/a)" },
+        vmax: { origin: "default" },
+        s0: { origin: "default" },
+      };
+      const violations = validateParameterProvenance(
+        { km: 2, vmax: 5, s0: 10 },
+        badProvenance,
+      );
+      expect(violations).toContain(
+        "km is marked resolved but its citation carries no locator (ref id or URL)",
+      );
+      // ACTUAL CATCHER: validateParameterProvenance (unit test)
     });
   });
 });

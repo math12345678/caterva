@@ -19,6 +19,21 @@ export interface ParameterProvenance {
 }
 
 /**
+ * Stage 5 Part 1: a resolved citation is stricter than a modelCitations entry.
+ * A `resolved` citation is attached to a NUMBER; it must let a human re-find
+ * the exact source of that number. A citation with no locator cannot.
+ */
+export function isLocatableCitation(citation: string): boolean {
+  if (/https?:\/\//.test(citation)) return true;
+  const refMatch = citation.match(/\(ref ([^)]*)\)/);
+  if (refMatch) {
+    const id = refMatch[1]!.trim();
+    return id !== "" && id !== "n/a";
+  }
+  return false;
+}
+
+/**
  * Rule 2's analogue for provenance: hard violations mean the response must
  * not be returned. Returns a list of human-readable violations (empty when
  * the provenance is structurally sound).
@@ -27,6 +42,8 @@ export interface ParameterProvenance {
  *  - a key in `parameterProvenance` absent from `parameters`, or vice versa
  *  - `origin: "resolved"` with no `citation`
  *  - a `citation` on any entry whose origin is not `"resolved"`
+ *  - a `resolved` citation that carries no locator (ref id or URL) — the
+ *    strict format rule (Stage 5 Part 1)
  */
 export function validateParameterProvenance(
   parameters: Record<string, unknown>,
@@ -53,6 +70,11 @@ export function validateParameterProvenance(
     }
     if (prov.origin !== "resolved" && prov.citation !== undefined) {
       violations.push(`${key} has a citation but origin is '${prov.origin}'`);
+    }
+    if (prov.origin === "resolved" && prov.citation && !isLocatableCitation(prov.citation)) {
+      violations.push(
+        `${key} is marked resolved but its citation carries no locator (ref id or URL)`,
+      );
     }
   }
 
