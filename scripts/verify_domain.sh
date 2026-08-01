@@ -31,6 +31,39 @@ DOMAIN="$1"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Use the same supported interpreter for every audit step. A stale repository
+# venv must not shadow a supported interpreter merely because its directory
+# exists; missing dependencies should fail transparently under Python 3.10–3.12.
+is_supported_python() {
+    "$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12)) else 1' >/dev/null 2>&1
+}
+
+if [ -n "${TERRIUM_PYTHON:-}" ] && [ -x "$TERRIUM_PYTHON" ] \
+        && is_supported_python "$TERRIUM_PYTHON"; then
+    PYTHON="$TERRIUM_PYTHON"
+elif [ -n "${VIRTUAL_ENV:-}" ] && [ -x "$VIRTUAL_ENV/bin/python" ] \
+        && is_supported_python "$VIRTUAL_ENV/bin/python"; then
+    PYTHON="$VIRTUAL_ENV/bin/python"
+elif [ -x "$REPO_DIR/.venv/bin/python" ] \
+        && is_supported_python "$REPO_DIR/.venv/bin/python"; then
+    PYTHON="$REPO_DIR/.venv/bin/python"
+else
+    PYTHON=""
+    for candidate in python3.12 python3.11 python3.10; do
+        if command -v "$candidate" >/dev/null 2>&1 \
+                && is_supported_python "$(command -v "$candidate")"; then
+            PYTHON="$(command -v "$candidate")"
+            break
+        fi
+    done
+fi
+
+if [ -z "$PYTHON" ]; then
+    echo "No supported Python 3.10–3.12 interpreter was found."
+    echo "Install Python 3.12 and requirements-dev.txt, or set TERRIUM_PYTHON."
+    exit 2
+fi
+
 PASS=0
 FAIL=0
 
@@ -58,14 +91,14 @@ echo ""
 echo "=== Step 1: full test suite ==="
 
 cd "$REPO_DIR/Tellurium"
-TELLURIUM_OUT=$(python3 -m pytest tests/ -q 2>&1) && TELLURIUM_OK=0 || TELLURIUM_OK=1
+TELLURIUM_OUT=$("$PYTHON" -m pytest tests/ -q 2>&1) && TELLURIUM_OK=0 || TELLURIUM_OK=1
 check "Tellurium/ tests pass" "$TELLURIUM_OK"
 if [ "$TELLURIUM_OK" -ne 0 ]; then
     echo "$TELLURIUM_OUT" | tail -10
 fi
 
 cd "$REPO_DIR/Tests"
-TESTS_OUT=$(python3 -m pytest -q 2>&1) && TESTS_OK=0 || TESTS_OK=1
+TESTS_OUT=$("$PYTHON" -m pytest -q 2>&1) && TESTS_OK=0 || TESTS_OK=1
 check "Tests/ pass" "$TESTS_OK"
 if [ "$TESTS_OK" -ne 0 ]; then
     echo "$TESTS_OUT" | tail -10
@@ -79,7 +112,7 @@ cd "$REPO_DIR"
 echo ""
 echo "=== Step 2: dependency guard ==="
 
-DEP_OUT=$(python3 "$REPO_DIR/scripts/check_dependencies_declared.py" 2>&1) && DEP_OK=0 || DEP_OK=1
+DEP_OUT=$("$PYTHON" "$REPO_DIR/scripts/check_dependencies_declared.py" 2>&1) && DEP_OK=0 || DEP_OK=1
 check "dependencies declared" "$DEP_OK"
 if [ "$DEP_OK" -ne 0 ]; then
     echo "$DEP_OUT"
@@ -91,7 +124,7 @@ fi
 echo ""
 echo "=== Step 2b: RNG convention guard ==="
 
-RNG_OUT=$(python3 "$REPO_DIR/scripts/check_rng_convention.py" 2>&1) && RNG_OK=0 || RNG_OK=1
+RNG_OUT=$("$PYTHON" "$REPO_DIR/scripts/check_rng_convention.py" 2>&1) && RNG_OK=0 || RNG_OK=1
 check "RNG convention (ADR 0005)" "$RNG_OK"
 if [ "$RNG_OK" -ne 0 ]; then
     echo "$RNG_OUT"
@@ -132,7 +165,7 @@ if [ ! -f "$TEST_FILE" ]; then
     FAIL=$((FAIL + 1))
 else
     echo "  test file: $TEST_BASENAME"
-    COLLECT_OUT=$(cd "$REPO_DIR/Tellurium" && python3 -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
+    COLLECT_OUT=$(cd "$REPO_DIR/Tellurium" && "$PYTHON" -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
     check "test file collects" "$COLLECT_OK"
     if [ "$COLLECT_OK" -ne 0 ]; then
         echo "$COLLECT_OUT" | tail -10
@@ -153,11 +186,11 @@ echo ""
 echo "  Procedure (run all from repo root):"
 echo "    1. Backup: cp Tellurium/tellurium_engine.py /tmp/tellurium_engine.py.bak"
 echo "    2. Apply the exact mutation described in the report"
-echo "    3. Run the specific test(s): cd Tellurium && python -m pytest \\"
+echo "    3. Run the specific test(s): cd Tellurium && $PYTHON -m pytest \\"
 echo "       tests/test_popgen_correctness.py::<test_name> -q"
 echo "    4. Confirm failure matches the claimed cause"
 echo "    5. Revert: cp /tmp/tellurium_engine.py.bak Tellurium/tellurium_engine.py"
-echo "    6. Confirm suite clean: cd Tellurium && python -m pytest tests/ -q"
+echo "    6. Confirm suite clean: cd Tellurium && $PYTHON -m pytest tests/ -q"
 echo ""
 echo "  IMPORTANT: Do NOT chain steps 3-5 with && — the mutated test"
 echo "  is *supposed* to fail (nonzero exit), which would short-circuit"

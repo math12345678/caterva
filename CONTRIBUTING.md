@@ -54,6 +54,24 @@ ceremony -- it's how the KM_PLAUSIBLE_MAX_MM bug and the PCR
 exponential-vs-linear check were both actually validated, not just written
 and assumed correct.
 
+## Supported Python versions
+
+Terrium supports Python 3.10–3.12. This is a hard constraint: the SBML C
+extensions publish wheels through cp312. CI tests 3.10 and 3.12 (see
+`.github/workflows/tests.yml`); `requirements.txt` pins `numpy==1.26.4` and
+`libroadrunner==2.7.0`. A green run outside this range or with unpinned
+dependencies is not evidence about the supported configuration. The
+eigenvector-sign bug is the worked example: LAPACK chose different signs
+across builds, producing silent NaN rather than an exception; it passed on
+Python 3.13 but failed deterministically on the pinned configuration.
+
+The one-line setup for a correct environment is:
+
+```bash
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install -r requirements-dev.txt
+```
+
 ## Running tests
 
 ```bash

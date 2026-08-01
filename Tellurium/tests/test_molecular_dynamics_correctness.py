@@ -38,9 +38,12 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from tellurium_engine import (  # noqa: E402
+    MD_PLAUSIBLE_TEMPERATURE_HIGH,
     ModelBuildError,
     SimulationResult,
+    _compute_lj_potential,
     lennard_jones_force,
+    lj_cluster_positions,
     simulate_molecular_dynamics,
     validate_md_params,
 )
@@ -374,6 +377,21 @@ class TestValidationFlags:
         assert v.flagged
         assert "evaporat" in (v.flag_reason or "").lower()
 
+    def test_temperature_at_high_bound_unflagged(self) -> None:
+        """0.8 is the highest unflagged initialization temperature per
+        Amendment 3 (measured: 0 escaped, Rg growth < 1x)."""
+        v = validate_md_params(108, 0.8, 0.005, 1000)
+        assert v.ok
+        assert not v.flagged, (
+            f"T_init=0.8 should be unflagged, got flag: {v.flag_reason}")
+
+    def test_temperature_above_high_bound_flagged(self) -> None:
+        """0.9 exceeds the new bound (0.8) and should be flagged for evaporation."""
+        v = validate_md_params(108, 0.9, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "evaporat" in (v.flag_reason or "").lower()
+
     def test_n_particles_below_min_is_flagged(self) -> None:
         v = validate_md_params(5, 0.4, 0.005, 1000)
         assert v.ok
@@ -586,3 +604,209 @@ class TestMutationRVSR2Confusion:
 #   e.g., `r1 = math.sqrt(r_sq)` then `r8_inv = 1.0 / (r1 ** 8)`.
 #   Still conservative, antisymmetric. Target A and B pass.
 #   Caught ONLY by: test_force_magnitude_matches_closed_form (Target C).
+#
+# MUTATION 6 (broken icosahedron — only 2 of 3 cyclic-permutation
+#   families, giving 8 shell particles instead of 12):
+#   Predicted catches: test_n13_has_12_shell_particles (shell count 8
+#   vs 12) AND test_n13_energy_matches_published (energy -20.836780 vs
+#   published -44.326801, diff 23.49 >> 1e-6 tolerance).
+#   Independently reproduced 2026-07-31: both tests fired exactly as
+#   predicted. The structural frustration test also caught it (the
+#   qualitative pattern centre-to-shell < r_min < shell-to-shell holds
+#   under the mutation, but the numeric values shift by ~8e-06, exceeding
+#   the 1e-5 tolerance — the test's name promises the physics but the
+#   assertion only checks the numbers; see Part 4 recommendation to add a
+#   qualitative assertion alongside the numeric ones).
+
+
+# =========================================================================
+# Work Item 1 — temperature bound pinning
+# =========================================================================
+
+
+class TestTemperatureBoundAmendment:
+    """MD_PLAUSIBLE_TEMPERATURE_HIGH = 0.8 (measured: highest T keeping
+    the LJ108 cluster fully intact). 0.8 is unflagged; 0.9 is flagged
+    with an evaporation message."""
+
+    def test_temperature_0_8_is_unflagged(self) -> None:
+        v = validate_md_params(108, 0.8, 0.005, 1000)
+        assert v.ok
+        assert not v.flagged, (
+            f"temperature 0.8 should be unflagged; "
+            f"flag_reason={v.flag_reason}"
+        )
+
+    def test_temperature_0_9_is_flagged(self) -> None:
+        v = validate_md_params(108, 0.9, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "evaporat" in (v.flag_reason or "").lower(), (
+            f"flag_reason should mention evaporation; got {v.flag_reason}"
+        )
+
+    def test_temperature_high_constant_equals_0_8(self) -> None:
+        assert MD_PLAUSIBLE_TEMPERATURE_HIGH == 0.8, (
+            f"MD_PLAUSIBLE_TEMPERATURE_HIGH = {MD_PLAUSIBLE_TEMPERATURE_HIGH}; "
+            "expected 0.8"
+        )
+
+    def test_flag_message_mentions_initialization(self) -> None:
+        """The flag message must explicitly say 'initialization temperature'
+        — not let the reader confuse T*_init with T*_equil."""
+        v = validate_md_params(108, 3.0, 0.005, 1000)
+        assert "initialization temperature" in (v.flag_reason or "").lower(), (
+            f"expected 'initialization temperature' in flag message; "
+            f"got {v.flag_reason}"
+        )
+
+
+# =========================================================================
+# Target E — published cluster global-minimum energies
+# =========================================================================
+
+
+class TestTargetEClusterGlobalMinima:
+    """lj_cluster_positions(n) generates known global-minimum geometries
+    whose total LJ potential energy matches published values.
+
+    N=2,3,4 are exact by construction (all pairs at r_min == 2^(1/6)).
+    N=5 is the first frustrated size (published -9.103852, not -10)
+    — worth noting, not testing.
+    N=13 uses a golden-section search for the Mackay icosahedron scale,
+    compared to Hoare & Pal (1971) via the Cambridge Cluster Database.
+    """
+
+    def test_n2_energy(self) -> None:
+        pos = lj_cluster_positions(2)
+        assert pos.shape == (2, 3)
+        # One pair at r_min: eps = -1.0
+        r = np.linalg.norm(pos[0] - pos[1])
+        assert abs(r - 2.0 ** (1.0 / 6.0)) < 1e-12
+        # Energy: -1 per pair -> -1.000000
+        pe = _compute_lj_potential(pos, 2)
+        assert abs(pe - (-1.0)) < 1e-12, f"N=2 PE = {pe:.12f}, expected -1"
+
+    def test_n3_energy(self) -> None:
+        pos = lj_cluster_positions(3)
+        assert pos.shape == (3, 3)
+        # Three pairs at r_min: -3.000000
+        pe = _compute_lj_potential(pos, 3)
+        assert abs(pe - (-3.0)) < 1e-12, f"N=3 PE = {pe:.12f}, expected -3"
+
+    def test_n4_energy(self) -> None:
+        pos = lj_cluster_positions(4)
+        assert pos.shape == (4, 3)
+        # Six pairs at r_min: -6.000000
+        pe = _compute_lj_potential(pos, 4)
+        assert abs(pe - (-6.0)) < 1e-12, f"N=4 PE = {pe:.12f}, expected -6"
+
+    def test_n13_energy_matches_published(self) -> None:
+        pos = lj_cluster_positions(13)
+        assert pos.shape == (13, 3)
+        pe = _compute_lj_potential(pos, 13)
+        published = -44.326801
+        assert abs(pe - published) < 1e-6, (
+            f"LJ13 PE = {pe:.12f}, published {published}; "
+            f"diff = {abs(pe - published):.2e}"
+        )
+
+    def test_n13_scale_search_converges(self) -> None:
+        """The golden-section scale search should converge to the known
+        value within 1e-10."""
+        pos = lj_cluster_positions(13)
+        # Centre-to-shell distance
+        shell_dists = np.linalg.norm(pos[1:], axis=1)
+        centre_to_shell = float(np.mean(shell_dists))
+        # Expected: ~1.081838 (compressed below r_min = 1.122462)
+        r_min = 2.0 ** (1.0 / 6.0)
+        assert centre_to_shell < r_min, (
+            f"centre-to-shell {centre_to_shell:.6f} not below r_min {r_min:.6f}"
+        )
+        assert abs(centre_to_shell - 1.081838) < 1e-5, (
+            f"centre-to-shell {centre_to_shell:.6f} vs expected ~1.081838"
+        )
+
+    def test_n13_shell_structure(self) -> None:
+        """The relaxed icosahedron is frustrated: centre-to-shell
+        compressed below r_min, nearest shell-to-shell stretched above."""
+        pos = lj_cluster_positions(13)
+        r_min = 2.0 ** (1.0 / 6.0)
+        # Centre-to-shell distance (needed for qualitative assertion)
+        shell = pos[1:]  # 12 shell particles
+        centre_to_shell = float(np.mean(np.linalg.norm(shell, axis=1)))
+        # Nearest shell-to-shell distance
+        min_dist = float("inf")
+        for i in range(12):
+            for j in range(i + 1, 12):
+                d = float(np.linalg.norm(shell[i] - shell[j]))
+                min_dist = min(min_dist, d)
+        # Expected: ~1.137512 (stretched above r_min)
+        assert min_dist > r_min, (
+            f"shell-to-shell {min_dist:.6f} not above r_min {r_min:.6f}"
+        )
+        assert abs(min_dist - 1.137512) < 1e-5, (
+            f"shell-to-shell {min_dist:.6f} vs expected ~1.137512"
+        )
+        # Qualitative frustration signature: the physics this test is named for.
+        # The relaxed icosahedron MUST have centre-to-shell compressed below r_min
+        # AND shell-to-shell stretched above it — this is the geometric
+        # frustration that distinguishes a true Mackay icosahedron from a mere
+        # vertex subset that happens to share the qualitative pattern.
+        assert centre_to_shell < r_min < min_dist, (
+            f"qualitative frustration failed: "
+            f"centre-to-shell={centre_to_shell:.6f}, r_min={r_min:.6f}, "
+            f"shell-to-shell={min_dist:.6f}"
+        )
+
+
+# =========================================================================
+# lj_cluster_positions — validation
+# =========================================================================
+
+
+class TestLjClusterPositionsValidation:
+    """Unsupported n_particles must raise ModelBuildError."""
+
+    def test_unsupported_n_raises(self) -> None:
+        for bad in (1, 5, 10, 14, 100):
+            with pytest.raises(ModelBuildError, match=r"\{2, 3, 4, 13\}"):
+                lj_cluster_positions(bad)
+
+    def test_supported_n_returns_correct_shape(self) -> None:
+        for n in (2, 3, 4, 13):
+            pos = lj_cluster_positions(n)
+            assert pos.shape == (n, 3), f"n={n}: shape {pos.shape}"
+            assert pos.dtype == np.float64
+
+
+# =========================================================================
+# Pre-specified mutation 6 — broken icosahedron
+# =========================================================================
+
+
+class TestMutationBrokenIcosahedron:
+    """Mutation 6: break the icosahedron construction — use only two of
+    the three cyclic-permutation families, giving 8 shell particles
+    instead of 12.  The energy drops far above the published minimum
+    and the shell-structure assertions fire.
+
+    This test verifies that the real implementation HAS 12 shell particles
+    — it checks the output shape, not mutating the code."""
+
+    def test_n13_has_12_shell_particles(self) -> None:
+        pos = lj_cluster_positions(13)
+        # One particle at origin, 12 on shell
+        assert pos.shape == (13, 3)
+        dists = np.linalg.norm(pos, axis=1)
+        at_origin = int(np.sum(dists < 1e-10))
+        assert at_origin == 1, (
+            f"expected 1 central particle, found {at_origin}"
+        )
+        shell_count = int(np.sum(dists > 1e-10))
+        assert shell_count == 12, (
+            f"expected 12 shell particles, found {shell_count} — "
+            "icosahedron may be missing cyclic-permutation families"
+        )
+
+

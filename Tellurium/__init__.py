@@ -1,6 +1,6 @@
 """Terrium simulation engine package."""
 
-from .tellurium_engine import (  # noqa: F401,F403
+from .tellurium_engine import (
     ModelBuildError,
     SimulationError,
     ParameterValidation,
@@ -67,6 +67,7 @@ from .tellurium_engine import (  # noqa: F401,F403
     validate_md_params,
     simulate_molecular_dynamics,
     lennard_jones_force,
+    lj_cluster_positions,
 )
 
 __all__ = [
@@ -92,7 +93,6 @@ __all__ = [
     "ParameterValidation",
     "SimulationError",
     "SimulationResult",
-    "SimulationResult",
     "TwoLocusResult",
     "antimony_to_sbml",
     "build_michaelis_menten_antimony",
@@ -106,6 +106,7 @@ __all__ = [
     "kimura_fixation_probability",
     "lennard_jones_force",
     "list_scenarios",
+    "lj_cluster_positions",
     "parameter_scan",
     "sbml_to_antimony",
     "simulate_michaelis_menten",

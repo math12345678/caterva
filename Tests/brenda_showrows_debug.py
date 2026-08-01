@@ -24,7 +24,7 @@ print(f"Fetching EC {EC} ...")
 html = fetch_brenda_html(EC)
 soup = BeautifulSoup(html, "lxml")
 
-print(f"\n=== Searching <script> tags for 'showRows' function definition ===")
+print("\n=== Searching <script> tags for 'showRows' function definition ===")
 found_def = False
 for script in soup.find_all("script"):
     text = script.string or ""
@@ -45,6 +45,6 @@ print(f"Found {len(matches)} elements with id containing {ROW_ID!r}:")
 for el in matches:
     print(f"  <{el.name} id={el.get('id')!r} class={el.get('class')}>")
 
-print(f"\n=== Searching for external script src attributes (in case showRows lives there) ===")
+print("\n=== Searching for external script src attributes (in case showRows lives there) ===")
 for script in soup.find_all("script", src=True):
     print(f"  {script['src']}")
