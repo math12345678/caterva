@@ -115,10 +115,72 @@ def test_every_unflagged_brenda_km_is_simulable(ldh_entries):
 
 
 def test_flagged_brenda_entries_do_not_become_confident_numbers(ldh_entries):
-    flagged = [e for e in ldh_entries if getattr(e, "flagged", False)]
-    if not flagged:
-        pytest.skip("no flagged entries in this fixture")
+    """The core Rule 2 assertion at this seam.
 
+    This test previously read:
+
+        flagged = [e for e in ldh_entries if e.flagged]
+        if not flagged:
+            pytest.skip("no flagged entries in this fixture")
+
+    Every fixture in the repository parses to **zero** flagged entries, so
+    the skip fired every time and the assertions below had never executed
+    once. It was counted in the suite while testing nothing -- the Stage 4
+    amendment ("structural tests are blind to semantic emptiness") in a new
+    costume: a test that skips itself into vacuity.
+
+    Real flagged rows cannot simply be added to a fixture, because the
+    fixtures are live BRENDA captures and BRENDA does not happen to serve a
+    flagged row for these enzymes. So the entries below are constructed
+    directly and labelled as synthetic. They are not claimed to be BRENDA
+    data; they exist to drive the contract, and each one mirrors a flag
+    cause that `parse_brenda_km_html` genuinely produces.
+    """
+    # Any real flagged entries the fixture does produce are still checked.
+    flagged = [e for e in ldh_entries if getattr(e, "flagged", False)]
+
+    # SYNTHETIC (not BRENDA data): one per real flag cause in brenda_client.
+    flagged = flagged + [
+        # Cause 1: outside the plausible Km range -- the engine must agree.
+        #
+        # 50000 mM is a fixed literal, deliberately NOT derived from
+        # KM_PLAUSIBLE_MAX_MM. A value written as `KM_PLAUSIBLE_MAX_MM * 10`
+        # moves with the bound, so widening the bound would move the test
+        # value too and the assertion would keep passing -- the test would
+        # be blind to exactly the regression it exists to catch. Verified:
+        # mutating the constant to 1e12 leaves this test green when the
+        # value is derived, and fails it when the value is a literal.
+        brenda_client.BRENDAKmEntry(
+            km_value=50000.0,
+            substrate="pyruvate",
+            organism="Homo sapiens",
+            ec_number="1.1.1.27",
+            flagged=True,
+            flag_reason=(
+                "Km value 50000.0 mM is outside plausible range; likely a "
+                "unit error or an anomalous entry"
+            ),
+        ),
+        # Cause 2: commentary mentions Kcat -- may be a turnover number, not
+        # a Km. In range, so the engine will NOT flag it; the entry must
+        # still carry its own reason.
+        brenda_client.BRENDAKmEntry(
+            km_value=0.5,
+            substrate="pyruvate",
+            organism="Homo sapiens",
+            ec_number="1.1.1.27",
+            conditions="pH 7.4, 25C, kcat measurement",
+            flagged=True,
+            flag_reason=(
+                "conditions text mentions Kcat; row may report a turnover "
+                "number rather than a true Km"
+            ),
+        ),
+    ]
+
+    assert flagged, "the synthetic entries above must make this non-empty"
+
+    checked_out_of_range = False
     for entry in flagged:
         if not entry.km_value:
             continue
@@ -128,9 +190,18 @@ def test_flagged_brenda_entries_do_not_become_confident_numbers(ldh_entries):
         # entry itself must still be carrying its reason.
         if km < KM_PLAUSIBLE_MIN_MM or km > KM_PLAUSIBLE_MAX_MM:
             assert simulate_michaelis_menten(
-                km=km, vmax=1.0, s0=1.0, end=0.1, points=3).flagged
+                km=km, vmax=1.0, s0=1.0, end=0.1, points=3).flagged, (
+                f"Km {km} mM is outside the plausible range and was flagged by "
+                "the literature layer, but the engine accepted it silently")
+            checked_out_of_range = True
         assert getattr(entry, "flag_reason", None), (
             "a flagged entry must always carry a human-readable reason")
+
+    # Guards against the whole loop degenerating again: at least one entry
+    # must have exercised the engine-agreement branch, not just the
+    # cheaper reason-is-present check.
+    assert checked_out_of_range, (
+        "no flagged entry exercised the engine-agreement path")
 
 
 def test_flagged_entries_do_not_become_confident_numbers_deterministic():
