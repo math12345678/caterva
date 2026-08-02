@@ -34,6 +34,16 @@ SOURCE_DIRS = [
     REPO_ROOT / "Tests",
 ]
 
+# api-server's science-agent bridge is Python product code that Tests/
+# imports directly (Tests/test_runner_contract.py, Stage 5 Part 4) but that
+# lives outside SOURCE_DIRS. Like scripts/, it's local code — its imports
+# are stdlib-only — so its stems belong in the local set, not in
+# requirements. If it ever grows third-party imports, those must be
+# declared; this listing only covers its module names.
+API_SERVER_LIB = (
+    REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-server" / "src" / "lib"
+)
+
 EXCLUDE_NAME_PREFIXES = ("big_test",)
 EXCLUDE_DIR_NAMES = {"__pycache__", ".pytest_cache", ".hypothesis", "node_modules", ".venv"}
 
@@ -59,7 +69,7 @@ def _local_module_stems() -> set[str]:
     # scripts/ isn't scanned for imports (it's tooling, not product code or
     # tests) but its modules (e.g. check_dependencies_declared itself, used
     # by tests/test_dependencies_declared.py) are still local, not pip deps.
-    for src_dir in [*SOURCE_DIRS, REPO_ROOT / "scripts"]:
+    for src_dir in [*SOURCE_DIRS, REPO_ROOT / "scripts", API_SERVER_LIB]:
         if not src_dir.exists():
             continue
         # The directory itself is a local package root when something
