@@ -121,3 +121,50 @@ class TestMutationTraps:
             b -= 1
             c += 1
         assert a + c != GOLDEN["a0"]  # A-side conservation broken
+
+
+class TestCli:
+    """The `ssa --bimolecular` CLI path wraps the engine; smoke-test it."""
+
+    def _run_cli(self, *args: str):
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "Tellurium.cli", "ssa", *args],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parents[2]),
+        )
+        return proc
+
+    def test_cli_bimolecular_prints_events_and_ode_reference(self):
+        proc = self._run_cli(
+            "--bimolecular", "--a0", "60", "--b0", "40",
+            "--k", "0.01", "--end", "5", "--seed", "12345",
+        )
+        assert proc.returncode == 0
+        assert "time" in proc.stdout and "expected A(end) (ODE)" in proc.stdout
+        # the golden run above: 36 events, final A 24, final C 36
+        assert "events = 36" in proc.stdout
+        assert "final A = 24" in proc.stdout
+        assert "final C = 36" in proc.stdout
+
+    def test_cli_writes_bimolecular_csv(self, tmp_path):
+        out = tmp_path / "bimol.csv"
+        proc = self._run_cli(
+            "--bimolecular", "--a0", "60", "--b0", "40",
+            "--k", "0.01", "--end", "5", "--seed", "12345",
+            "--out", str(out),
+        )
+        assert proc.returncode == 0
+        lines = out.read_text().strip().splitlines()
+        assert lines[0] == "time,a,b,c"
+        assert lines[1] == "0.0,60.0,40.0,0.0"
+        assert len(lines) == 38 + 1  # header + the pinned 38 rows
+
+    def test_cli_rejects_invalid_bimolecular_params(self):
+        proc = self._run_cli("--bimolecular", "--a0", "0")
+        assert proc.returncode == 1
+        assert "error:" in proc.stderr

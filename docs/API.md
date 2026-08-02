@@ -996,6 +996,8 @@ python -m Tellurium.cli sweep --parameter selection_coefficient \
     --values 0,0.01,0.05 --seed 7
 python -m Tellurium.cli ld --population-size 100 --generations 30 \
     --recombination-rate 0.1 --replicate-runs 3000 --seed 42
+python -m Tellurium.cli ssa --bimolecular --a0 60 --b0 40 --k 0.01 \
+    --end 5 --seed 12345
 ```
 
 - ``scenarios`` -- list the available scenario presets with descriptions.
@@ -1049,7 +1051,14 @@ python -m Tellurium.cli ld --population-size 100 --generations 30 \
   (``time``, ``a``, ``b``) plus the event count, final A, and the
   closed-form expectation ``a0*(1-e^(-k*end))`` for comparison.
   Options: ``--a0`` (default 1000), ``--k`` (default 0.5),
-  ``--end`` (default 10), ``--seed``, ``--out FILE``. Exit 1 on
+  ``--end`` (default 10), ``--seed``, ``--out FILE`` (CSV). With
+  ``--bimolecular`` (Stage 7) it runs
+  ``simulate_gillespie_ssa_bimolecular`` (A + B → C) instead: table
+  columns ``time``, ``a``, ``b``, ``c`` plus the event count, final
+  A/B/C, and the ODE reference ``A(end)``
+  (``(a0-b0)/(1-(b0/a0)*e^(-k(a0-b0)*end))``, or
+  ``a0/(1+k*a0*end)`` when ``a0 == b0``); extra options ``--b0``
+  (default 100) and the bimolecular ``--k`` default 0.005. Exit 1 on
   invalid parameters.
 
 Exit codes: 0 success, 1 invalid parameters/unknown scenario,
