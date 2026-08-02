@@ -86,9 +86,67 @@ def test_golden_found_output_shape(monkeypatch):
             "organism": "Homo sapiens",
             "notes": None,
         },
+        # STRENDA assay conditions (ADR 0010). This golden KineticResult
+        # carries none, so every field crosses as null -- absence is
+        # transmitted as absence. The TypeScript side reads that as
+        # "incomplete" and degrades the citation to flagged, which is the
+        # honest outcome for a value whose conditions were never reported.
+        "assayConditions": {
+            "ph": None,
+            "temperatureC": None,
+            "buffer": None,
+            "unreported": [],
+        },
         "literatureCandidates": [],
         "logs": ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
     }
+
+
+def test_assay_conditions_cross_the_boundary(monkeypatch):
+    """A populated set of conditions must survive the JSON boundary.
+
+    The null-valued golden case above cannot distinguish "transmitted
+    correctly" from "dropped and defaulted to null", so it is paired with
+    a populated case that can.
+    """
+    populated = golden_result()
+    populated.assay_ph = 8.5
+    populated.assay_temperature_c = 25.0
+    populated.assay_buffer = "phosphate buffer"
+    populated.assay_unreported = []
+
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: populated,
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+    )
+    assert result["assayConditions"] == {
+        "ph": 8.5,
+        "temperatureC": 25.0,
+        "buffer": "phosphate buffer",
+        "unreported": [],
+    }
+
+
+def test_explicitly_unreported_field_crosses_the_boundary(monkeypatch):
+    """BRENDA stating "temperature not specified in the publication" is a
+    fact about the literature, not a parse failure, and must reach the
+    API distinguishable from a silent absence."""
+    partial = golden_result()
+    partial.assay_ph = 8.0
+    partial.assay_temperature_c = None
+    partial.assay_unreported = ["temperature"]
+
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: partial,
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+    )
+    assert result["assayConditions"]["ph"] == 8.0
+    assert result["assayConditions"]["temperatureC"] is None
+    assert result["assayConditions"]["unreported"] == ["temperature"]
 
 
 def test_cross_species_flag_crosses_the_boundary(monkeypatch):

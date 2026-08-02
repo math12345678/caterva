@@ -189,8 +189,23 @@ describe("validateParameterProvenance", () => {
 
 describe("strict resolved-citation format (Stage 5 Part 1)", () => {
   const parameters = { km: 2, vmax: 5, s0: 10 };
+
+  // These cases test citation *format* (locator present, status set). Km is
+  // STRENDA-governed (ADR 0010), so a resolved km without assay conditions
+  // also earns a completeness violation -- which would mask the format
+  // violation each case is actually asserting. Complete conditions are
+  // supplied so the two rules stay independently testable; the STRENDA rule
+  // itself is exercised in strenda.test.ts.
+  const COMPLETE_CONDITIONS = { ph: 7.4, temperatureC: 25 };
+
   const resolved: Record<string, ParameterProvenance> = {
-    km: { origin: "resolved", citation: "BRENDA (ref 12345)", citationStatus: "verified" },
+    km: {
+      origin: "resolved",
+      citation: "BRENDA (ref 12345)",
+      citationStatus: "verified",
+      assayConditions: COMPLETE_CONDITIONS,
+      strendaStatus: "complete",
+    },
     vmax: { origin: "default" },
     s0: { origin: "default" },
   };
@@ -217,7 +232,13 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
     expect(
       validateParameterProvenance(parameters, {
         ...resolved,
-        km: { origin: "resolved", citation: "BRENDA (ref n/a)", citationStatus: "verified" },
+        km: {
+          origin: "resolved",
+          citation: "BRENDA (ref n/a)",
+          citationStatus: "verified",
+          assayConditions: COMPLETE_CONDITIONS,
+          strendaStatus: "complete",
+        },
       }),
     ).toEqual([
       "km is marked resolved but its citation carries no locator (ref id or URL)",
@@ -245,6 +266,8 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
           origin: "resolved",
           citation: "BRENDA — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
           citationStatus: "verified",
+          assayConditions: COMPLETE_CONDITIONS,
+          strendaStatus: "complete",
         },
       }),
     ).toEqual([]);
@@ -346,7 +369,14 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
       validateParameterProvenance(
         { km: 2, vmax: 5, s0: 10 },
         {
-          km: { origin: "resolved", citation: "BRENDA (ref 12345)" },
+          // Conditions supplied so the missing citationStatus is the only
+          // violation under test; km is STRENDA-governed (ADR 0010).
+          km: {
+            origin: "resolved",
+            citation: "BRENDA (ref 12345)",
+            assayConditions: { ph: 7.4, temperatureC: 25 },
+            strendaStatus: "complete",
+          },
           vmax: { origin: "default" },
           s0: { origin: "default" },
         },
@@ -372,8 +402,23 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
       validateParameterProvenance(
         { km: 2, vmax: 5, s0: 10 },
         {
-          km: { origin: "resolved", citation: "BRENDA (ref 12345)", citationStatus: "verified" },
-          vmax: { origin: "resolved", citation: "BRENDA (ref 67890)", citationStatus: "flagged" },
+          // Both km and vmax are in STRENDA_GOVERNED_FIELDS, so both need
+          // conditions. vmax stays 'flagged' with complete conditions:
+          // buildResolvedKineticProvenance degrades, it never promotes.
+          km: {
+            origin: "resolved",
+            citation: "BRENDA (ref 12345)",
+            citationStatus: "verified",
+            assayConditions: { ph: 7.4, temperatureC: 25 },
+            strendaStatus: "complete",
+          },
+          vmax: {
+            origin: "resolved",
+            citation: "BRENDA (ref 67890)",
+            citationStatus: "flagged",
+            assayConditions: { ph: 7.4, temperatureC: 25 },
+            strendaStatus: "complete",
+          },
           s0: { origin: "default" },
         },
       ),
