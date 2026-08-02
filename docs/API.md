@@ -1044,6 +1044,13 @@ python -m Tellurium.cli ld --population-size 100 --generations 30 \
   frequencies, default ``0.5,0,0,0.5`` = full coupling, D0 = 0.25),
   ``--replicate-runs`` (default 50), ``--seed``, ``--out FILE``. Exit
   1 on invalid parameters.
+- ``ssa`` -- run ``simulate_gillespie_ssa`` (exact stochastic A → B
+  decay, ADR 0009) and print a sampled slice of the event table
+  (``time``, ``a``, ``b``) plus the event count, final A, and the
+  closed-form expectation ``a0*(1-e^(-k*end))`` for comparison.
+  Options: ``--a0`` (default 1000), ``--k`` (default 0.5),
+  ``--end`` (default 10), ``--seed``, ``--out FILE``. Exit 1 on
+  invalid parameters.
 
 Exit codes: 0 success, 1 invalid parameters/unknown scenario,
 2 missing required arguments.
