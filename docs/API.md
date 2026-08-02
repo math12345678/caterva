@@ -946,6 +946,42 @@ neutral = wright_fisher_scenario("neutral-drift", seed=42)
 selected = wright_fisher_scenario("strong-selection", seed=42)
 ```
 
+## Stochastic kinetics (Gillespie SSA)
+
+```python
+simulate_gillespie_ssa(
+    a0: int,
+    k: float,
+    end: float,
+    seed: int | None = None,
+) -> SimulationResult
+
+validate_ssa_params(a0: int, k: float, end: float) -> ParameterValidation
+```
+
+**Not** built through antimony/roadrunner -- event-driven stochastic
+simulation, same direct Python/numpy category as Monte Carlo and
+Wright-Fisher (ADR 0005 RNG). See ``docs/adr/0009-gillespie-ssa.md``.
+
+Exact Gillespie Direct Method for the single first-order decay reaction
+$A \to B$ (propensity $k \cdot a$): each event draws the waiting time
+$\tau = -\ln(u)/\alpha$ from the total propensity and decrements $a$.
+Conservation $a + b = a_0$ holds on every row; the final row is snapped
+to `end`. The count at time $t$ is Binomial$(a_0, e^{-kt})$, so
+$E[a(t)] = a_0 e^{-kt}$ — the closed form used by the verification
+tests (`tests/test_gillespie_ssa_correctness.py`).
+
+- ``a0`` -- initial A molecules, positive integer. Below 30 molecules
+  the trajectory is flagged (stochastic effects dominate).
+- ``k`` -- per-molecule rate, finite $\ge 0$; $k = 0$ emits no events.
+  Above $k = 10$ the trajectory is flagged (dense random walk).
+- ``end`` -- simulation time, finite $> 0$; the final row is exactly
+  `end`.
+- ``seed`` -- optional ADR 0005 seed; fixed seed → bit-identical
+  trajectory.
+
+Result columns: ``time``, ``a``, ``b``.
+
 ## Command-line interface
 
 The engine ships a small CLI, runnable as a module:
@@ -1057,6 +1093,7 @@ validate_pcr_params(n0, efficiency, cycles) -> ParameterValidation
 validate_monte_carlo_params(n_samples) -> ParameterValidation
 validate_wright_fisher_params(population_size, starting_frequency, generations, replicate_runs=1, mutation_rate=0.0, selection_coefficient=0.0, dominance=None, population_size_series=None, n_demes=1, migration_rate=0.0, migration_model="island") -> ParameterValidation
 validate_md_params(n_particles, temperature, timestep, n_steps, density=0.85) -> ParameterValidation
+validate_ssa_params(a0, k, end) -> ParameterValidation
 ```
 
 ## Molecular Dynamics (Lennard-Jones, Velocity Verlet)
@@ -1159,3 +1196,61 @@ icosahedron — 12 vertices from cyclic permutations of $(0, \pm 1,
 \pm \phi)$ with $\phi = (1+\sqrt{5})/2$, plus origin, uniformly scaled
 by the golden-section minimizer of total LJ potential. Raises
 `ModelBuildError` for unsupported $N$.
+
+## Gillespie SSA (exact stochastic simulation, ADR 0009)
+
+```python
+simulate_gillespie_ssa(
+    a0: int,
+    k: float,
+    end: float,
+    seed: int | None = None,
+) -> SimulationResult
+
+validate_ssa_params(a0: int, k: float, end: float) -> ParameterValidation
+```
+
+A single irreversible first-order decay reaction $A \to B$ with
+per-molecule rate $k$ (propensity $k \cdot a$), simulated with
+Gillespie's exact Direct Method — no antimony/roadrunner involved,
+direct Python/numpy with the ADR 0005 RNG convention.
+
+- `a0`: initial number of A molecules (integer $\ge 1$).
+- `k`: per-molecule decay rate (finite, $\ge 0$). $k = 0$ means no
+  reaction: the simulation emits only the initial and final rows.
+- `end`: simulation time (finite, $> 0$). The final row is always
+  snapped to exactly `end`.
+- `seed`: optional RNG seed (ADR 0005); a fixed seed reproduces the
+  trajectory bit-identically.
+
+Result columns: `time`, `a`, `b` — one row per event, plus the initial
+row at $t=0$ and the final row at `end`. Conservation $a + b = a_0$
+holds on every row. The exact distribution of the count at time $t$ is
+Binomial$(a_0, e^{-kt})$, so $E[a(t)] = a_0 e^{-kt}$.
+
+**Verification targets** (all in
+`tests/test_gillespie_ssa_correctness.py`):
+
+- Target A — closed-form agreement: mean final A across 50 seeded
+  replicates within $3\sigma$ of $a_0 e^{-k \cdot \text{end}}$ (using
+  the exact binomial variance); mean event count near
+  $a_0 (1 - e^{-k \cdot \text{end}})$.
+- Target B — conservation: $a + b = a_0$ on every row.
+- Target C — seed determinism (ADR 0005): same seed $\to$ bit-identical
+  trajectory; different seeds $\to$ diverge.
+- Target D — edge cases: $k = 0$ emits no events; complete decay snaps
+  to `end` without negative counts; rows strictly increasing in time.
+
+**Flags** (`ok=True, flagged=True`):
+- `a0 < 30` molecules — stochastic effects dominate below this size,
+  trajectories differ wildly between seeds
+- `k > 10` — events so dense the trajectory is a random walk far from
+  the smooth closed form
+
+**Hard rejections** (`ok=False`): `a0` not a positive integer (bool
+rejected too); `k` not a finite number $\ge 0$ (bool rejected);
+`end` not a finite positive number.
+
+The API runtime ceiling (ADR 0007) is `MAX_API_SSA_POPULATION =
+1_000_000` molecules: SSA cost is $O(\text{initial population})$,
+so `a0` bounds the event count directly.

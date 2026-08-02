@@ -109,7 +109,7 @@ def verify_module_exports() -> List[str]:
     
     # Check discrete submodules
     discrete_dir = tellurium_dir / 'discrete'
-    expected_discrete = ['__init__.py', 'pcr.py', 'monte_carlo.py', 'molecular_dynamics.py', 'population_genetics']
+    expected_discrete = ['__init__.py', 'pcr.py', 'monte_carlo.py', 'molecular_dynamics.py', 'gillespie_ssa.py', 'population_genetics']
     
     for discrete_file in expected_discrete:
         if discrete_file == 'population_genetics':
