@@ -127,6 +127,16 @@ def main() -> None:
                         "organism": result.organism,
                         "source": result.source,
                         "crossSpecies": result.cross_species_flag,
+                        # STRENDA-mandated assay conditions (ADR 0010). Keys are
+                        # omitted-as-null rather than defaulted: the TypeScript
+                        # side treats absence as "incomplete", which is the
+                        # honest reading when the source never reported them.
+                        "assayConditions": {
+                            "ph": result.assay_ph,
+                            "temperatureC": result.assay_temperature_c,
+                            "buffer": result.assay_buffer,
+                            "unreported": result.assay_unreported,
+                        },
                         "citation": _citation_to_dict(result.citation),
                         "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                         "logs": result.search_log,

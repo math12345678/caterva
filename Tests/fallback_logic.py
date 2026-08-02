@@ -57,6 +57,20 @@ class KineticResult(BaseModel):
     source: str  # "brenda_exact" | "brenda_cross_species" | "literature_candidates" | "not_found"
     citation: Optional[Citation] = None
     cross_species_flag: bool = False
+
+    #: Assay conditions the Km was measured under, parsed from the BRENDA
+    #: commentary. STRENDA requires temperature and pH for all reported
+    #: kinetic data, and Km moves with both -- a Km without them cannot be
+    #: reproduced or compared. Absent when the source did not report them;
+    #: never guessed. See ADR 0010.
+    assay_ph: Optional[float] = None
+    assay_temperature_c: Optional[float] = None
+    assay_buffer: Optional[str] = None
+
+    #: Fields BRENDA explicitly states the original publication did not
+    #: report. A fact about the literature, distinct from a parse failure.
+    assay_unreported: list[str] = []
+
     literature_candidates: list[LiteratureCandidate] = []
     search_log: list[str] = []
 
@@ -181,6 +195,10 @@ def resolve_kinetic_value(
             organism=best.organism,
             source="brenda_exact",
             citation=citation_from_brenda_entry(best),
+            assay_ph=best.assay_ph,
+            assay_temperature_c=best.assay_temperature_c,
+            assay_buffer=best.assay_buffer,
+            assay_unreported=list(best.assay_unreported),
             search_log=log,
         )
 
@@ -198,6 +216,10 @@ def resolve_kinetic_value(
             source="brenda_cross_species",
             citation=citation_from_brenda_entry(best),
             cross_species_flag=True,
+            assay_ph=best.assay_ph,
+            assay_temperature_c=best.assay_temperature_c,
+            assay_buffer=best.assay_buffer,
+            assay_unreported=list(best.assay_unreported),
             search_log=log,
         )
 

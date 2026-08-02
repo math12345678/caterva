@@ -250,6 +250,72 @@ def test_genuine_gap_when_nothing_found_anywhere(monkeypatch, ldh_provider):
     assert "genuine gap" in result.search_log[-1]
 
 
+class TestAssayConditionsReachTheResult:
+    """The Km carries the conditions it was measured under (ADR 0010).
+
+    STRENDA requires temperature and pH for all reported kinetic data.
+    These tests assert the values survive the whole exact/cross-species
+    chain rather than being dropped at the KineticResult boundary --
+    which is exactly where they were silently lost before.
+    """
+
+    def test_ph_reaches_the_result_and_absent_temperature_is_reported(
+        self, ldh_provider
+    ):
+        """The (S)-lactate rows read 'pH 8.0, temperature not specified
+        in the publication'. BRENDA is stating the original authors did
+        not report the temperature -- a fact about the literature. The
+        pH must arrive; the temperature must stay absent and be named
+        as unreported rather than guessed."""
+        result = resolve_kinetic_value(
+            "1.1.1.27",
+            "Homo sapiens",
+            "(S)-lactate",
+            html_provider=ldh_provider,
+            uniprot_provider=fake_uniprot_provider,
+            taxon_id_provider=fake_taxon_id_provider,
+            search_literature=False,
+        )
+        assert result.found is True
+        assert result.assay_ph == 8.0
+        assert result.assay_temperature_c is None
+        assert "temperature" in result.assay_unreported
+
+    def test_absent_conditions_are_absent_not_defaulted(self, ldh_provider):
+        """The pyruvate rows have '-' as their comment: no conditions
+        reported at all. Nothing may be invented to fill the gap."""
+        result = resolve_kinetic_value(
+            "1.1.1.27",
+            "Homo sapiens",
+            "pyruvate",
+            html_provider=ldh_provider,
+            uniprot_provider=fake_uniprot_provider,
+            taxon_id_provider=fake_taxon_id_provider,
+            search_literature=False,
+        )
+        assert result.found is True
+        assert result.assay_ph is None
+        assert result.assay_temperature_c is None
+
+    def test_cross_species_result_also_carries_conditions(self, ldh_provider):
+        """The cross-species path is a separate construction site, so it
+        can drop the fields independently of the exact path. The Sus
+        scrofa row reads 'pH 8.5, 25 C, isozyme H4' -- STRENDA-complete."""
+        result = resolve_kinetic_value(
+            "1.1.1.27",
+            "Mus musculus",  # absent from the fixture -> forces cross-species
+            "(S)-lactate",
+            html_provider=ldh_provider,
+            uniprot_provider=fake_uniprot_provider,
+            taxon_id_provider=fake_taxon_id_provider,
+            search_literature=False,
+        )
+        assert result.found is True
+        assert result.cross_species_flag is True
+        # Conditions must be present on this path too, whichever row won.
+        assert result.assay_ph is not None
+
+
 def test_search_literature_false_skips_pubmed_entirely(monkeypatch, ldh_provider):
     def should_not_be_called(*args, **kwargs):
         raise AssertionError("search_pubmed_candidates should not be called")

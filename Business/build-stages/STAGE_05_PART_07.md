@@ -130,9 +130,8 @@ labelled `verified`.
 
 ## 7. Carried forward
 
-1. **Extract pH and temperature in `Tests/brenda_client.py`** from the
-   commentary field. This ADR defines the contract the extraction will
-   satisfy, so it cannot land without wiring into it.
+1. ~~**Extract pH and temperature in `Tests/brenda_client.py`** from the
+   commentary field.~~ **Closed 2026-08-02.** See §10.
 2. **A golden tuple with real assay conditions** — hand-verified
    enzyme/substrate/Km/pH/temperature/citation — asserted end to end. Stage 5
    Part 5 established the golden-tuple pattern; it now needs the conditions
@@ -157,3 +156,69 @@ indexed.
 - **Schomburg, I. *et al.*** BRENDA, the enzyme database. *Nucleic Acids
   Research* — kinetic entries carry pH optimum, temperature optimum and an
   experimental-conditions commentary.
+
+## 10. Addendum (2026-08-02) — the enforcement shipped ahead of its producer
+
+Part 7 landed the STRENDA rule in `validateParameterProvenance` and did not
+update the one call site required to satisfy it. `queryResolver.ts` kept
+hand-building the resolved-Km provenance object, so it emitted no
+`strendaStatus`, and `resolveQuery` throws on any violation.
+
+**Every Km resolution returned HTTP 500.** Sixteen vitest failures: eleven
+integration (Targets B, C, E, F, G, H, I, Mutation 5, the MM route) and five
+unit expectations whose fixtures predated the rule.
+
+§6 above called the consequence "every currently-resolved Km degrades to
+`flagged`." That was wrong in a specific and instructive way: it described
+what the *contract* said while the *system* did something worse. A validation
+rule and the producer that must satisfy it are one change, not two, and the
+half that was written first was the half that could not be observed without
+running the suite. This is the Stage 4 amendment — *a guard is not delivered
+until something runs it unasked* — recurring in the opposite direction: the
+guard ran, and nothing had been taught to satisfy it.
+
+### What was built to close it
+
+The extraction now reaches the API. The chain, each link previously absent:
+
+| Layer | Change |
+|---|---|
+| `Tests/assay_conditions.py` | Parses the BRENDA commentary (already present) |
+| `Tests/brenda_client.py` | Populates `assay_*` on `BRENDAKmEntry` |
+| `Tests/fallback_logic.py` | **New** — `KineticResult` carries the fields; both exact and cross-species sites populate them |
+| `science_agent_runner.py` | **New** — emits `assayConditions` across the JSON boundary |
+| `scienceAgent.ts` | **New** — types the field |
+| `queryResolver.ts` | **New** — both Km sites call `buildResolvedKineticProvenance()` |
+
+`toAssayConditions()` drops JSON `null` rather than passing it through: the
+runner uses null for "not reported" and `AssayConditions` uses absence for the
+same thing, so a surviving null would be a present-but-empty field that
+`strendaStatusFor` would have to interpret.
+
+### Verification
+
+- **182 Python tests pass** (up from 176). Six new: three asserting conditions
+  survive `resolve_kinetic_value` on both the exact and cross-species paths,
+  three pinning the runner's JSON contract.
+- **Mutation-tested.** Deleting `assay_ph=best.assay_ph` from the exact-match
+  site fails `test_ph_reaches_the_result_and_absent_temperature_is_reported`
+  with `assert None == 8.0`. The test was confirmed to catch its own break
+  rather than assumed to.
+- **`test_runner_contract.py` caught the payload change unprompted** — a
+  strict `==` on the runner's output shape, which is precisely why it is
+  written that way. It was updated to assert the new key, not loosened.
+- **`tsc --strict` clean**; seven assertions run against the compiled
+  provenance module confirm the producer's output validates and that the five
+  previously-failing unit shapes now yield exactly their intended violations.
+
+### Measured outcome on real data
+
+The LDH fixture's `(S)-lactate` rows read *"pH 8.0, temperature not specified
+in the publication."* Km 10.73 mM now arrives with `ph: 8.0`,
+`temperatureC: null`, `unreported: ["temperature"]` — and therefore
+`citationStatus: "flagged"`, `strendaStatus: "incomplete"`, with a note naming
+the missing field.
+
+That is the correct result. The publication did not report its assay
+temperature, so Terrium cannot claim the value is verified. It says so, and
+says why.

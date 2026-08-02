@@ -31,6 +31,22 @@ export interface ScienceAgentResult {
    * across the boundary, previously dropped by the runner. */
   crossSpecies?: boolean;
   citation?: Citation;
+  /** Assay conditions the Km was measured under, parsed from the BRENDA
+   * commentary by the Python client. STRENDA requires temperature and pH
+   * for all reported kinetic data; Km moves with both, so a Km without
+   * them cannot be reproduced or compared against another lab's figure.
+   *
+   * Individual fields are optional because BRENDA frequently does not
+   * report them. Absence is passed through as absence and degrades the
+   * citation tier downstream -- it is never filled with a default. See
+   * ADR 0010. */
+  assayConditions?: {
+    ph?: number | null;
+    temperatureC?: number | null;
+    buffer?: string | null;
+    /** Fields BRENDA explicitly states the publication did not report. */
+    unreported?: string[];
+  };
   literatureCandidates: LiteratureCandidate[];
   logs: string[];
 }

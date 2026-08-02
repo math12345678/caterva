@@ -5,10 +5,38 @@ import { resolveKineticValue } from "./scienceAgent";
 import { matchEnzyme } from "./enzymes";
 import {
   RESOLVABLE_FIELDS,
+  buildResolvedKineticProvenance,
   isAllDefaults,
   validateParameterProvenance,
+  type AssayConditions,
   type ParameterProvenance,
 } from "./provenance";
+import type { ScienceAgentResult } from "./scienceAgent";
+
+/** Convert the Python runner's assay-conditions payload into the provenance
+ * shape. The runner emits JSON `null` for values the source did not report;
+ * `AssayConditions` uses absence for the same thing, so nulls are dropped
+ * rather than passed through. A null that survived as `null` would be a
+ * present-but-empty field, which `strendaStatusFor` would have to guess at.
+ *
+ * Nothing is defaulted here. If BRENDA did not report a pH, the result has
+ * no pH, and the citation degrades to `flagged` downstream. See ADR 0010. */
+function toAssayConditions(
+  raw: ScienceAgentResult["assayConditions"]
+): AssayConditions | undefined {
+  if (!raw) return undefined;
+  const conditions: AssayConditions = {};
+  if (typeof raw.ph === "number" && Number.isFinite(raw.ph)) {
+    conditions.ph = raw.ph;
+  }
+  if (typeof raw.temperatureC === "number" && Number.isFinite(raw.temperatureC)) {
+    conditions.temperatureC = raw.temperatureC;
+  }
+  if (typeof raw.buffer === "string" && raw.buffer.trim() !== "") {
+    conditions.buffer = raw.buffer;
+  }
+  return conditions;
+}
 
 export interface ResolvedSimulation {
   runId: string;
@@ -299,16 +327,16 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
           parameters = { ...parameters, km: agentResult.km };
           parameterProvenance = {
             ...parameterProvenance,
-            km: {
-              origin: "resolved",
-              source: agentResult.source,
+            km: buildResolvedKineticProvenance({
+              source: agentResult.source ?? "unknown",
               citation,
               organism: agentResult.organism,
               citationStatus:
                 agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
                   ? "flagged"
                   : "verified",
-            },
+              assayConditions: toAssayConditions(agentResult.assayConditions),
+            }),
           };
           flags.push(
             `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
@@ -393,16 +421,16 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
         parameters = { ...parameters, km: agentResult.km };
         parameterProvenance = {
           ...parameterProvenance,
-          km: {
-            origin: "resolved",
-            source: agentResult.source,
+          km: buildResolvedKineticProvenance({
+            source: agentResult.source ?? "unknown",
             citation,
             organism: agentResult.organism,
             citationStatus:
               agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
                 ? "flagged"
                 : "verified",
-          },
+            assayConditions: toAssayConditions(agentResult.assayConditions),
+          }),
         };
         flags.push(
           `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
