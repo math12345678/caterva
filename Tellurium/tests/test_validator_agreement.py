@@ -149,6 +149,10 @@ CASES: list[tuple[str, dict[str, Any], str, str]] = [
     ("validate_md_params", dict(n_particles=108, temperature=0.05, timestep=0.005, n_steps=100), "flagged", "MD T below bound"),
     ("validate_md_params", dict(n_particles=108, temperature=0.4, timestep=0.05, n_steps=100), "flagged", "MD timestep high"),
     ("validate_md_params", dict(n_particles=108, temperature=-1.0, timestep=0.005, n_steps=100), "rejected", "MD T negative"),
+
+    ("validate_ssa_replicates_params", dict(n_replicates=100), "accepted", "SSA replicates nominal"),
+    ("validate_ssa_replicates_params", dict(n_replicates=5), "flagged", "SSA few replicates"),
+    ("validate_ssa_replicates_params", dict(n_replicates=0), "rejected", "SSA zero replicates"),
 ]
 
 

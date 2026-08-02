@@ -31,3 +31,5 @@ Each ADR has:
 | [0006](0006-md-direct-python-not-roadrunner.md) | Model molecular dynamics as direct Python (velocity Verlet), not through antimony/roadrunner |
 | [0007](0007-contract-test-for-engine-application-boundary.md) | Enforce the engine/application boundary with a contract test, not a shared schema or code generation |
 | [0008](0008-parameter-provenance.md) | Honest parameter provenance at the API surface: per-parameter origins and a breaking `citations` → `modelCitations` rename |
+| [0009](0009-gillespie-ssa.md) | Gillespie SSA domain — single first-order decay reaction (A → B) |
+| [0010](0010-strenda-assay-conditions.md) | A resolved kinetic constant without assay conditions cannot be `verified` (STRENDA) |

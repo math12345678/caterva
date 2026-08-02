@@ -28,6 +28,73 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   mm: ["km"],
 };
 
+/**
+ * Assay conditions under which a kinetic constant was measured.
+ *
+ * This is not bookkeeping. The STRENDA Guidelines — the reporting standard
+ * for enzymology data, registered in FAIRsharing and recommended by more than
+ * 60 biochemistry journals — state the requirement without qualification:
+ *
+ *   "The temperature, pH and pressure (if other than atmospheric) of the
+ *    assay MUST always be included, even if previously published."
+ *   — STRENDA Guidelines v1.4.0, Beilstein-Institut
+ *
+ * The reason is physical, not clerical. Km is not a property of an enzyme; it
+ * is a property of an enzyme measured under conditions. The same enzyme and
+ * substrate yield different Km values at different pH and temperature, so a
+ * Km reported without them cannot be reproduced and cannot be compared
+ * against another laboratory's number.
+ *
+ * BRENDA — the source Terrium resolves from — stores pH optimum, temperature
+ * optimum, and an experimental-conditions commentary alongside every Km
+ * entry (Schomburg et al., Nucleic Acids Research). So these fields are
+ * available upstream; omitting them discards data the source already
+ * supplied.
+ *
+ * `pressure` is deliberately absent: STRENDA requires it only when other than
+ * atmospheric, and no path in Terrium currently resolves a non-atmospheric
+ * measurement. Adding it later is a field addition, not a contract change.
+ */
+export interface AssayConditions {
+  /** Assay pH. STRENDA: mandatory. */
+  ph?: number;
+  /** Assay temperature in degrees Celsius. STRENDA: mandatory. */
+  temperatureC?: number;
+  /** Buffer system, when reported. Not STRENDA-mandatory but materially useful. */
+  buffer?: string;
+}
+
+/**
+ * Whether a resolved value meets STRENDA's minimum reporting requirement.
+ *
+ *  - `complete`   — pH and temperature both present.
+ *  - `incomplete` — one or both missing. The value may still be correct; it
+ *                   is not independently reproducible, which is what the
+ *                   standard is about.
+ *
+ * There is deliberately no `not_applicable`: this status is only ever set on
+ * parameters in `STRENDA_GOVERNED_FIELDS`, and for anything else the field is
+ * simply absent.
+ */
+export type StrendaStatus = "complete" | "incomplete";
+
+/**
+ * Parameters that are enzyme kinetic constants, and therefore fall under
+ * STRENDA's reporting requirement.
+ *
+ * Km is the only one Terrium currently resolves (see RESOLVABLE_FIELDS). vmax
+ * and kcat are listed because they are governed by the same standard the
+ * moment a lookup path exists for them — the list states the rule, not the
+ * current implementation, so extending RESOLVABLE_FIELDS cannot silently
+ * bypass the requirement.
+ */
+export const STRENDA_GOVERNED_FIELDS: ReadonlySet<string> = new Set([
+  "km",
+  "vmax",
+  "kcat",
+  "ki",
+]);
+
 export interface ParameterProvenance {
   /** How this value was obtained for THIS query. */
   origin: ParameterOrigin;
@@ -39,8 +106,54 @@ export interface ParameterProvenance {
   organism?: string;
   /** Only when `origin === "resolved"` (Stage 5 Part 3). */
   citationStatus?: CitationStatus;
+  /**
+   * Only when `origin === "resolved"` and the parameter is a kinetic constant.
+   * The conditions the value was measured under (STRENDA).
+   */
+  assayConditions?: AssayConditions;
+  /**
+   * Only for STRENDA-governed resolved parameters: whether the assay
+   * conditions meet the standard's minimum.
+   */
+  strendaStatus?: StrendaStatus;
   /** Why a lookup was attempted and failed, if so. */
   note?: string;
+}
+
+/**
+ * STRENDA completeness for a single parameter.
+ *
+ * Both pH and temperature must be present and finite. A `null` pH is not the
+ * same as pH 0 — 0 is a real (if extreme) value, so the check is on presence
+ * and finiteness rather than truthiness, which would silently reject pH 0.
+ */
+export function strendaStatusFor(
+  conditions: AssayConditions | undefined,
+): StrendaStatus {
+  if (!conditions) return "incomplete";
+  const hasPh = typeof conditions.ph === "number" && Number.isFinite(conditions.ph);
+  const hasTemp =
+    typeof conditions.temperatureC === "number" &&
+    Number.isFinite(conditions.temperatureC);
+  return hasPh && hasTemp ? "complete" : "incomplete";
+}
+
+/** Which STRENDA-mandatory fields are missing, for a human-readable reason. */
+export function missingStrendaFields(
+  conditions: AssayConditions | undefined,
+): string[] {
+  const missing: string[] = [];
+  if (!conditions || typeof conditions.ph !== "number" || !Number.isFinite(conditions.ph)) {
+    missing.push("pH");
+  }
+  if (
+    !conditions ||
+    typeof conditions.temperatureC !== "number" ||
+    !Number.isFinite(conditions.temperatureC)
+  ) {
+    missing.push("temperature");
+  }
+  return missing;
 }
 
 /**
@@ -109,9 +222,106 @@ export function validateParameterProvenance(
     if (prov.origin !== "resolved" && prov.citationStatus !== undefined) {
       violations.push(`${key} has a citation status but origin is '${prov.origin}'`);
     }
+
+    // --- STRENDA reporting requirement ---------------------------------
+    //
+    // The rule that carries the weight: a kinetic constant whose assay
+    // conditions are unknown cannot be called `verified`. It may well be the
+    // right number, but "verified" in this codebase means a human can go and
+    // check it, and a Km without pH and temperature cannot be re-measured or
+    // compared. Degrading it to `flagged` keeps the value usable while
+    // saying plainly what is missing -- the same shape as Rule 2's
+    // impossible/implausible distinction, applied to reporting completeness
+    // rather than to physics.
+    const strendaGoverned =
+      prov.origin === "resolved" && STRENDA_GOVERNED_FIELDS.has(key.toLowerCase());
+
+    if (strendaGoverned) {
+      const expected = strendaStatusFor(prov.assayConditions);
+      if (prov.strendaStatus === undefined) {
+        violations.push(
+          `${key} is a resolved kinetic constant but carries no STRENDA status`,
+        );
+      } else if (prov.strendaStatus !== expected) {
+        violations.push(
+          `${key} claims STRENDA status '${prov.strendaStatus}' but its assay ` +
+            `conditions are '${expected}' (missing: ` +
+            `${missingStrendaFields(prov.assayConditions).join(", ") || "none"})`,
+        );
+      }
+      if (prov.citationStatus === "verified" && expected === "incomplete") {
+        violations.push(
+          `${key} is marked citationStatus 'verified' but its assay conditions ` +
+            `are incomplete (missing: ${missingStrendaFields(prov.assayConditions).join(", ")}). ` +
+            `STRENDA requires temperature and pH for kinetic data; a value ` +
+            `without them is not independently reproducible, so it must be ` +
+            `'flagged' rather than 'verified'.`,
+        );
+      }
+    }
+
+    if (!strendaGoverned && prov.strendaStatus !== undefined) {
+      violations.push(
+        `${key} carries a STRENDA status but is not a resolved kinetic constant`,
+      );
+    }
+    if (prov.origin !== "resolved" && prov.assayConditions !== undefined) {
+      violations.push(
+        `${key} carries assay conditions but origin is '${prov.origin}'`,
+      );
+    }
   }
 
   return violations;
+}
+
+/**
+ * Build the provenance entry for a resolved kinetic constant, applying the
+ * STRENDA rule in one place so no caller can forget it.
+ *
+ * Callers pass the citation tier they believe applies; this function may
+ * degrade `verified` to `flagged` when the assay conditions are incomplete.
+ * It never upgrades — a cross-species match with perfect conditions is still
+ * cross-species.
+ */
+export function buildResolvedKineticProvenance(args: {
+  source: string;
+  citation: string;
+  organism?: string;
+  citationStatus: CitationStatus;
+  assayConditions?: AssayConditions;
+  note?: string;
+}): ParameterProvenance {
+  const strendaStatus = strendaStatusFor(args.assayConditions);
+  const missing = missingStrendaFields(args.assayConditions);
+
+  const citationStatus: CitationStatus =
+    args.citationStatus === "verified" && strendaStatus === "incomplete"
+      ? "flagged"
+      : args.citationStatus;
+
+  const notes: string[] = [];
+  if (args.note) notes.push(args.note);
+  if (strendaStatus === "incomplete") {
+    notes.push(
+      `Assay ${missing.join(" and ")} not reported by the source; ` +
+        `STRENDA requires ${missing.length > 1 ? "them" : "it"} for kinetic data, ` +
+        `so this value is flagged rather than verified.`,
+    );
+  }
+
+  return {
+    origin: "resolved",
+    source: args.source,
+    citation: args.citation,
+    ...(args.organism !== undefined ? { organism: args.organism } : {}),
+    citationStatus,
+    ...(args.assayConditions !== undefined
+      ? { assayConditions: args.assayConditions }
+      : {}),
+    strendaStatus,
+    ...(notes.length > 0 ? { note: notes.join(" ") } : {}),
+  };
 }
 
 /** True when every parameter entry has origin "default". */
