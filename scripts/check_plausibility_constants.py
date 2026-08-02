@@ -82,16 +82,61 @@ def extract_constants_from_file(filepath: Path) -> Dict[str, Any]:
     return constants
 
 
+def _normalise(value: Any) -> Any:
+    """Compare constants by VALUE, not by how they were spelled.
+
+    `1e3`, `1000` and `1000.0` are the same bound written three ways, and
+    they legitimately appear as all three across the engine and the
+    literature layer. Comparing `str(v)` reported them as a conflict --
+    a false positive, which is worse than useless in a guard: it trains
+    people to ignore the output, and the next real drift goes with it.
+
+    Non-numeric constants (e.g. GAMMA_PARAM = 'gamma_rate') fall through
+    to string comparison unchanged.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value)
+    return str(value)
+
+
+def _collect_py_files(repo_root: Path) -> List[Path]:
+    """Python files that may define plausibility constants.
+
+    Both sides of the ADR 0003 contract: the simulation engine and the
+    literature layer. Excludes the venv and bytecode caches.
+    """
+    files: List[Path] = []
+    for sub in ('Tellurium', 'Tests'):
+        directory = repo_root / sub
+        if not directory.is_dir():
+            continue
+        files.extend(
+            f for f in directory.rglob('*.py')
+            if '.venv' not in f.parts and '__pycache__' not in f.parts
+        )
+    return files
+
+
 def check_constants_consistency() -> List[str]:
     """Check that all plausibility constants have consistent values."""
     errors = []
     
     repo_root = Path(__file__).parent.parent
-    tellurium_dir = repo_root / 'Tellurium'
-    
-    # Find all Python files that might contain constants
-    py_files = list(tellurium_dir.rglob('*.py'))
-    
+
+    # Both layers, not just the engine. ADR 0003 makes the Km plausibility
+    # bounds a contract BETWEEN the literature layer and the simulation
+    # layer, and the real bug it was written for was exactly a cross-layer
+    # split (engine 1e4 vs BRENDA 1e3, so a Km of 5000 mM was flagged
+    # upstream and silently accepted downstream).
+    #
+    # This guard scanned Tellurium/ only, so Tests/brenda_client.py -- the
+    # other half of the contract -- was outside its search path entirely.
+    # Verified: setting brenda_client's KM_PLAUSIBLE_MAX_MM to 9999 while
+    # the engine said 1000 PASSED this guard before this change.
+    py_files = _collect_py_files(repo_root)
+
     # Collect all constant definitions
     all_constants = {}
     
@@ -108,13 +153,13 @@ def check_constants_consistency() -> List[str]:
     # constant) is caught instead of passing because no second definition
     # existed to compare against.
     for const_name, sources in all_constants.items():
-        values = set(str(v) for v in sources.values())
+        values = set(_normalise(v) for v in sources.values())
         if len(values) > 1:
             errors.append(f"Constant {const_name} has inconsistent values: {dict(sources)}")
         elif const_name in EXPECTED_CONSTANTS:
             expected = EXPECTED_CONSTANTS[const_name]
             actual = list(sources.values())[0]
-            if str(actual) != str(expected):
+            if _normalise(actual) != _normalise(expected):
                 errors.append(f"Constant {const_name} has unexpected value: expected {expected}, got {actual}")
 
     return errors
@@ -125,11 +170,10 @@ def check_missing_constants() -> List[str]:
     errors = []
     
     repo_root = Path(__file__).parent.parent
-    tellurium_dir = repo_root / 'Tellurium'
-    
-    # Find all Python files
-    py_files = list(tellurium_dir.rglob('*.py'))
-    
+
+    # Both layers -- see _collect_py_files.
+    py_files = _collect_py_files(repo_root)
+
     # Collect all defined constants
     defined_constants = set()
     
