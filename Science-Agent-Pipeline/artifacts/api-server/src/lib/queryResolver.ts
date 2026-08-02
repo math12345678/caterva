@@ -4,6 +4,7 @@ import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
 import { resolveKineticValue } from "./scienceAgent";
 import { matchEnzyme } from "./enzymes";
 import {
+  RESOLVABLE_FIELDS,
   isAllDefaults,
   validateParameterProvenance,
   type ParameterProvenance,
@@ -158,13 +159,18 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
  * - Keys explicitly supplied in the query text -> origin "user".
  * - Keys supplied by the LLM resolver -> origin "default" with a note that
  *   they were not verified against literature.
- * - Everything else -> origin "default".
+ * - Everything else -> origin "default". In a domain that HAS
+ *   literature-resolvable fields (RESOLVABLE_FIELDS), a default whose key
+ *   is not among them states the narrowness explicitly (Stage 5 Part 5):
+ *   it is a teaching default by decision, not by a failed lookup.
  */
 function buildParameterProvenance(
   parameters: Record<string, number | number[]>,
   overrides: Record<string, number>,
   llmSupplied: Record<string, number | number[]>,
+  domain: string,
 ): Record<string, ParameterProvenance> {
+  const resolvable = RESOLVABLE_FIELDS[domain] ?? [];
   const provenance: Record<string, ParameterProvenance> = {};
   for (const key of Object.keys(parameters)) {
     if (key in overrides) {
@@ -173,6 +179,11 @@ function buildParameterProvenance(
       provenance[key] = {
         origin: "default",
         note: "Value supplied by the LLM resolver; not verified against literature.",
+      };
+    } else if (resolvable.length > 0 && !resolvable.includes(key)) {
+      provenance[key] = {
+        origin: "default",
+        note: `No literature lookup exists for ${key}; only ${resolvable.join(", ")} is resolved from literature in this domain.`,
       };
     } else {
       provenance[key] = { origin: "default" };
@@ -243,6 +254,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       parameters,
       overrides,
       llmResult.parameters,
+      llmResult.domain,
     );
 
     if (
@@ -338,7 +350,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
 
   let parameters = { ...best.parameters, ...overrides };
   const flags: string[] = [];
-  let parameterProvenance = buildParameterProvenance(parameters, overrides, {});
+  let parameterProvenance = buildParameterProvenance(parameters, overrides, {}, best.domain);
 
   // If this looks like an enzyme query and no LLM is available, try the
   // hardcoded entity map and the science agent.
