@@ -12,7 +12,8 @@ Expected input JSON shape:
     {
       "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" |
                  "wright_fisher" | "two_locus_wright_fisher" |
-                 "molecular_dynamics" | "gillespie_ssa" | "sbml",
+                 "molecular_dynamics" | "gillespie_ssa" |
+                 "gillespie_ssa_bimolecular" | "sbml",
       "parameters": { ...domain-specific params... }
     }
 
@@ -250,6 +251,29 @@ def run_gillespie_ssa(params: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+def run_gillespie_ssa_bimolecular(params: Dict[str, Any]) -> Dict[str, Any]:
+    a0 = int(params.get("a0", 100))
+    b0 = int(params.get("b0", 100))
+    k = float(params.get("k", 0.005))
+    end = float(params.get("end", 10.0))
+    if a0 + b0 > MAX_API_SSA_POPULATION:
+        raise ValueError(
+            f"a0+b0={a0 + b0} exceeds API runtime ceiling "
+            f"(MAX_API_SSA_POPULATION) {MAX_API_SSA_POPULATION}"
+        )
+
+    seed = params.get("seed")
+    seed = None if seed is None else int(seed)
+    result = tellurium_engine.simulate_gillespie_ssa_bimolecular(
+        a0=a0, b0=b0, k=k, end=end, seed=seed
+    )
+
+    return _serialise_result(
+        result, "gillespie_ssa_bimolecular",
+        {"a0": a0, "b0": b0, "k": k, "end": end, "seed": seed},
+    )
+
+
 def run_wright_fisher(params: Dict[str, Any]) -> Dict[str, Any]:
     population_size = int(params.get("population_size", 100))
     starting_frequency = float(params.get("starting_frequency", 0.5))
@@ -404,6 +428,7 @@ DISPATCH: Dict[str, str] = {
     "two_locus_wright_fisher": "simulate_two_locus_wright_fisher",
     "molecular_dynamics": "simulate_molecular_dynamics",
     "gillespie_ssa": "simulate_gillespie_ssa",
+    "gillespie_ssa_bimolecular": "simulate_gillespie_ssa_bimolecular",
     "sbml": "simulate_sbml",
 }
 
@@ -417,6 +442,7 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "two_locus_wright_fisher": run_two_locus_wright_fisher,
     "molecular_dynamics": run_molecular_dynamics,
     "gillespie_ssa": run_gillespie_ssa,
+    "gillespie_ssa_bimolecular": run_gillespie_ssa_bimolecular,
     "sbml": run_sbml,
 }
 

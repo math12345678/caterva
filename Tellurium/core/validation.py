@@ -10,9 +10,9 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import math
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE)
+    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE)
+    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE)
 
 def _finite_positive(value: Any, label: str, errors: List[str],
                      allow_zero: bool = False) -> bool:
@@ -269,6 +269,69 @@ def validate_ssa_params(a0: float, k: float, end: float) -> ParameterValidation:
             "trajectory will be a dense random walk far from the closed form")
     if reasons:
         return ParameterValidation(ok=True, flagged=True, flag_reason=" ".join(reasons))
+
+    return ParameterValidation()
+
+
+def validate_ssa_bimolecular_params(
+    a0: float, b0: float, k: float, end: float
+) -> ParameterValidation:
+    """Check a Gillespie SSA parameter set (bimolecular A + B -> C).
+
+    a0 and b0 are initial molecule counts and must be positive integers —
+    the SSA operates on whole molecules. k is the second-order rate
+    constant per molecule pair per time unit; zero is physically valid
+    (no reaction) but negative is impossible. Flags, not rejections:
+    either species below ``SSA_PLAUSIBLE_MIN_POPULATION`` molecules makes
+    the trajectory noise-dominated; k above
+    ``SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE`` makes events so dense the
+    trajectory diverges from the ODE reference.
+    """
+    errors: List[str] = []
+
+    for label, value in (("a0", a0), ("b0", b0)):
+        if isinstance(value, (bool, np.bool_)):
+            errors.append(
+                f"{label} must be an integer molecule count, not a boolean")
+        elif not isinstance(value, (int, np.integer)):
+            errors.append(
+                f"{label} must be an integer molecule count, "
+                f"got {type(value).__name__}")
+        elif value < 1:
+            errors.append(
+                f"{label} must be at least 1 molecule (got {value}) -- "
+                "an SSA needs something to react")
+
+    if isinstance(k, (bool, np.bool_)):
+        errors.append("k must be a number, not a boolean")
+    elif not isinstance(k, (int, float, np.integer, np.floating)):
+        errors.append(f"k must be a number, got {type(k).__name__}")
+    elif math.isnan(k) or math.isinf(k):
+        errors.append("k must be finite")
+    elif k < 0:
+        errors.append(
+            f"k must be >= 0 (got {k}) -- a rate constant cannot be negative")
+
+    _finite_positive(end, "end", errors)
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    reasons: List[str] = []
+    for label, value in (("a0", a0), ("b0", b0)):
+        if value < SSA_PLAUSIBLE_MIN_POPULATION:
+            reasons.append(
+                f"{label}={value} is below {SSA_PLAUSIBLE_MIN_POPULATION} "
+                "molecules -- stochastic effects dominate below this size")
+    if k > SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE:
+        reasons.append(
+            f"k={k} exceeds {SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE} per "
+            "molecule pair per time unit -- events will be dense, a random "
+            "walk far from the ODE reference")
+    if reasons:
+        return ParameterValidation(ok=True, flagged=True, flag_reason=" ".join(reasons))
+
+    return ParameterValidation()
 
     return ParameterValidation()
 

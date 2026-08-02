@@ -1261,3 +1261,69 @@ rejected too); `k` not a finite number $\ge 0$ (bool rejected);
 The API runtime ceiling (ADR 0007) is `MAX_API_SSA_POPULATION =
 1_000_000` molecules: SSA cost is $O(\text{initial population})$,
 so `a0` bounds the event count directly.
+
+### Bimolecular association $A + B \to C$ (Stage 7)
+
+```python
+simulate_gillespie_ssa_bimolecular(
+    a0: int,
+    b0: int,
+    k: float,
+    end: float,
+    seed: int | None = None,
+) -> SimulationResult
+
+validate_ssa_bimolecular_params(a0: int, b0: int, k: float, end: float) -> ParameterValidation
+```
+
+The same exact Direct Method with the second-order propensity
+$k \cdot a \cdot b$: the first event in the pinned golden trajectory
+(seed 12345, a0=60, b0=40, k=0.01, end=5) is
+$-\ln(u_1)/(k \cdot a_0 \cdot b_0) = 0.06172192003509486$, hand-verified
+against numpy's own uniform stream.
+
+- `a0`, `b0`: initial numbers of A and B molecules (integers $\ge 1$).
+- `k`: per-molecule-pair association rate (finite, $\ge 0$).
+- `end`: simulation time (finite, $> 0$), final row snapped to `end`.
+- `seed`: optional RNG seed (ADR 0005); fixed seed $\to$ bit-identical.
+
+Result columns: `time`, `a`, `b`, `c` — one row per event plus initial
+and final rows. Conservation $a + c = a_0$ and $b + c = b_0$ holds on
+every row. The simulation halts when either reactant is exhausted, so
+the reaction's extent is bounded by $\min(a_0, b_0)$.
+
+**Deterministic reference** (ODE limit of the same reaction; used as
+test ground truth):
+
+- $a_0 \ne b_0$: $a(t) = \dfrac{a_0 - b_0}{1 - \frac{b_0}{a_0}e^{-k(a_0-b_0)t}}$
+- $a_0 = b_0$: $a(t) = \dfrac{a_0}{1 + k a_0 t}$
+
+**Verification targets** (in
+`tests/test_gillespie_ssa_bimolecular_correctness.py`):
+
+- Target A — closed-form agreement: mean trajectory across seeded
+  replicates within $3\sigma$ of the ODE reference (unequal and equal
+  stoichiometry).
+- Target B — conservation on every row, and exact exhaustion at the
+  minor species.
+- Target C — seed determinism.
+- Target D — edge cases: $k = 0$ emits no events; flags; all rejection
+  classes.
+- Golden — pinned trajectory in
+  `tests/test_gillespie_ssa_bimolecular_golden.py` (mutation traps:
+  constant propensity, first-order propensity, unequal decrement).
+
+**Flags** (`ok=True, flagged=True`):
+- `a0 < 30` or `b0 < 30` molecules — stochastic effects dominate below
+  this size
+- `k > 0.1` (`SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE`) — events so dense
+  the trajectory is a random walk far from the ODE reference
+
+**Hard rejections** (`ok=False`): `a0`/`b0` not positive integers
+(bools rejected); `k` not a finite number $\ge 0$; `end` not a finite
+positive number.
+
+API ceiling: `a0 + b0 ≤ MAX_API_SSA_POPULATION` (event count is bounded
+by $\min(a_0, b_0)$). Keyword resolution gives this domain priority over
+first-order `gillespie_ssa`, so "bimolecular association reaction"
+cannot fall through to decay.

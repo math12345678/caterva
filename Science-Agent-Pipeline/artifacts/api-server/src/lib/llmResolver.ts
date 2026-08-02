@@ -37,7 +37,7 @@ const SYSTEM_PROMPT = `You are the "science agent" resolver for a computational 
 Given a natural-language query, return a single JSON object (no markdown, no prose) with this exact shape:
 
 {
-  "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" | "wright_fisher" | "two_locus_wright_fisher" | "molecular_dynamics" | "gillespie_ssa",
+  "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" | "wright_fisher" | "two_locus_wright_fisher" | "molecular_dynamics" | "gillespie_ssa" | "gillespie_ssa_bimolecular",
   "parameters": { ...numeric parameters... },
   "reasoning": "short explanation of how you mapped the query",
   "modelCitations": ["optional literature reference"],
@@ -59,6 +59,7 @@ Domain meanings:
 - "two_locus_wright_fisher": two-locus linkage disequilibrium.
 - "molecular_dynamics": Lennard-Jones molecular dynamics.
 - "gillespie_ssa": Gillespie stochastic simulation of a first-order decay reaction (A -> B), parameters a0 (initial molecules), k (per-molecule decay rate), end (simulation time).
+- "gillespie_ssa_bimolecular": Gillespie stochastic simulation of a bimolecular association reaction (A + B -> C), parameters a0, b0 (initial molecules), k (per-molecule-pair rate), end (simulation time).
 
 Rules:
 1. Infer sensible defaults for any missing numeric parameters.
@@ -154,7 +155,7 @@ export async function resolveQueryWithLLM(
 
     if (
       !parsed.domain ||
-      !["mm", "sir", "seir", "pcr", "monte_carlo_pi", "wright_fisher", "two_locus_wright_fisher", "molecular_dynamics", "gillespie_ssa"].includes(parsed.domain)
+      !["mm", "sir", "seir", "pcr", "monte_carlo_pi", "wright_fisher", "two_locus_wright_fisher", "molecular_dynamics", "gillespie_ssa", "gillespie_ssa_bimolecular"].includes(parsed.domain)
     ) {
       logger.warn({ parsed }, "LLM resolver returned invalid domain");
       return null;

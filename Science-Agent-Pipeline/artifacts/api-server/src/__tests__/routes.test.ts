@@ -327,6 +327,46 @@ describe("POST /api/resolve", () => {
     expect(res.body.parameters).toHaveProperty("a0");
     expect(res.body.parameters).toHaveProperty("k");
   });
+
+  it("resolves a bimolecular SSA query", async () => {
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "bimolecular association reaction" });
+    expect(res.status).toBe(200);
+    expect(res.body.domain).toBe("gillespie_ssa_bimolecular");
+    expect(res.body.parameters).toHaveProperty("a0");
+    expect(res.body.parameters).toHaveProperty("b0");
+    expect(res.body.parameters).toHaveProperty("k");
+  });
+});
+
+describe("POST /api/simulate — bimolecular SSA end to end", () => {
+  it("runs a seeded bimolecular SSA through the queue and reproduces it bit-identically", async () => {
+    const query = "bimolecular association reaction a0=60 b0=40 k=0.01 end=5 seed=12345";
+    const create = await request(server).post("/api/simulate").send({ query });
+    expect(create.status).toBe(202);
+    expect(create.body.jobId).toBeTruthy();
+    const { jobId } = create.body;
+
+    const poll = async () => {
+      for (let i = 0; i < 40; i++) {
+        const res = await request(server).get(`/api/simulate/${jobId}`);
+        if (res.body.status === "completed") return res;
+        await new Promise((r) => setTimeout(r, 250));
+      }
+      throw new Error("timed out waiting for bimolecular SSA job");
+    };
+
+    const first = await poll();
+    expect(first.body.result.domain).toBe("gillespie_ssa_bimolecular");
+    const trajectory = first.body.result.trajectory;
+    expect(trajectory).toHaveLength(38);
+    expect(trajectory[0]).toEqual({ time: 0, a: 60, b: 40, c: 0 });
+    expect(trajectory[trajectory.length - 1]).toEqual({ time: 5, a: 24, b: 4, c: 36 });
+
+    const second = await poll();
+    expect(second.body.result.trajectory).toEqual(trajectory);
+  });
 });
 
 describe("GET /api/simulate/:jobId/export", () => {

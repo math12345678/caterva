@@ -45,6 +45,7 @@ export const SimulationResponseDomain = {
   two_locus_wright_fisher: 'two_locus_wright_fisher',
   molecular_dynamics: 'molecular_dynamics',
   gillespie_ssa: 'gillespie_ssa',
+  gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
   sbml: 'sbml',
 } as const;
 
