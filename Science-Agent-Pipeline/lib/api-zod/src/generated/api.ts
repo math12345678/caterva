@@ -44,7 +44,7 @@ export const ListSimulationJobsResponseItem = zod.object({
   "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
 }),
   "parameterProvenance": zod.record(zod.string(), zod.object({
-  "origin": zod.enum(['resolved', 'user', 'default']).describe('How this value was obtained for THIS query (ADR 0008)'),
+  "origin": zod.enum(['resolved', 'user', 'llm', 'default']).describe('How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.'),
   "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
   "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
   "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
@@ -93,7 +93,7 @@ export const RunSimulationResponse = zod.object({
   "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
 }),
   "parameterProvenance": zod.record(zod.string(), zod.object({
-  "origin": zod.enum(['resolved', 'user', 'default']).describe('How this value was obtained for THIS query (ADR 0008)'),
+  "origin": zod.enum(['resolved', 'user', 'llm', 'default']).describe('How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.'),
   "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
   "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
   "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
@@ -140,7 +140,7 @@ export const GetSimulationJobResponse = zod.object({
   "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
 }),
   "parameterProvenance": zod.record(zod.string(), zod.object({
-  "origin": zod.enum(['resolved', 'user', 'default']).describe('How this value was obtained for THIS query (ADR 0008)'),
+  "origin": zod.enum(['resolved', 'user', 'llm', 'default']).describe('How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.'),
   "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
   "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
   "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),

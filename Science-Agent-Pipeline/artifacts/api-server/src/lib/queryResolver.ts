@@ -234,8 +234,12 @@ function buildParameterProvenance(
     if (key in overrides) {
       provenance[key] = { origin: "user" };
     } else if (key in llmSupplied) {
+      // Not `default`: a default is a value this project chose and
+      // documented, whereas this is a number a language model produced from
+      // a prompt. Labelling the two the same way overstates the second and
+      // understates nothing -- see ADR 0011.
       provenance[key] = {
-        origin: "default",
+        origin: "llm",
         note: "Value supplied by the LLM resolver; not verified against literature.",
       };
     } else if (resolvable.length > 0 && !resolvable.includes(key)) {

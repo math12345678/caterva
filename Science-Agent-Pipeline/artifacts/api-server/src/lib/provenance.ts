@@ -3,7 +3,27 @@
  * resolver returns. See ADR 0008 and Business/build-stages/STAGE_04_PART_03.md.
  */
 
-export type ParameterOrigin = "resolved" | "user" | "default";
+/**
+ * Where a parameter's value came from.
+ *
+ * - `resolved` — looked up from a primary source (BRENDA/KEGG/PubMed) and
+ *   carrying a locatable citation.
+ * - `user` — supplied explicitly in the query by the person running it.
+ * - `llm` — produced by the LLM query resolver with no corroborating
+ *   record.
+ * - `default` — the domain's documented default value.
+ *
+ * `llm` exists because collapsing it into `default` states something false.
+ * A default is a value this project chose and documented; an LLM-supplied
+ * number is one a language model generated from a prompt, and the two carry
+ * different warrants entirely. Stage 4 Part 6 (open question 2) proposed
+ * treating "LLM-generated with no corroborating record" as its own tier and
+ * called it "the one that matters" — this is that tier.
+ *
+ * It is deliberately NOT `resolved`: nothing was looked up, so it must never
+ * be able to carry a citation. `validateParameterProvenance` enforces that.
+ */
+export type ParameterOrigin = "resolved" | "user" | "llm" | "default";
 
 /**
  * Stage 5 Part 3: the citation-status contract, as distinct from the value
@@ -221,6 +241,19 @@ export function validateParameterProvenance(
     }
     if (prov.origin !== "resolved" && prov.citationStatus !== undefined) {
       violations.push(`${key} has a citation status but origin is '${prov.origin}'`);
+    }
+
+    // --- LLM-supplied values must say so --------------------------------
+    //
+    // An `llm` value has no citation by construction (the rule above already
+    // forbids one), so the note is the ONLY thing standing between a student
+    // and a number a language model invented. An unexplained `llm` entry is
+    // indistinguishable from a documented default at the API surface, which
+    // is exactly the conflation this origin was introduced to end.
+    if (prov.origin === "llm" && !prov.note) {
+      violations.push(
+        `${key} is marked llm but carries no note explaining that the value is unverified`
+      );
     }
 
     // --- STRENDA reporting requirement ---------------------------------

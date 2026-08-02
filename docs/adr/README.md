@@ -33,3 +33,4 @@ Each ADR has:
 | [0008](0008-parameter-provenance.md) | Honest parameter provenance at the API surface: per-parameter origins and a breaking `citations` → `modelCitations` rename |
 | [0009](0009-gillespie-ssa.md) | Gillespie SSA domain — single first-order decay reaction (A → B) |
 | [0010](0010-strenda-assay-conditions.md) | A resolved kinetic constant without assay conditions cannot be `verified` (STRENDA) |
+| [0011](0011-llm-parameter-origin.md) | An LLM-supplied parameter is its own origin, not a `default` |

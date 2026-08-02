@@ -7,7 +7,7 @@
  */
 
 /**
- * How this value was obtained for THIS query (ADR 0008)
+ * How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.
  */
 export type ParameterProvenanceOrigin = typeof ParameterProvenanceOrigin[keyof typeof ParameterProvenanceOrigin];
 
@@ -15,5 +15,6 @@ export type ParameterProvenanceOrigin = typeof ParameterProvenanceOrigin[keyof t
 export const ParameterProvenanceOrigin = {
   resolved: 'resolved',
   user: 'user',
+  llm: 'llm',
   default: 'default',
 } as const;
