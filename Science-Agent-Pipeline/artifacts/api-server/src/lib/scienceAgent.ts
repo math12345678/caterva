@@ -26,6 +26,10 @@ export interface ScienceAgentResult {
   unit?: string;
   organism?: string;
   source?: string;
+  /** True when the value came from a different organism than the query
+   * asked for (BRENDA cross-species fallback). Stage 5 Part 3: first-class
+   * across the boundary, previously dropped by the runner. */
+  crossSpecies?: boolean;
   citation?: Citation;
   literatureCandidates: LiteratureCandidate[];
   logs: string[];

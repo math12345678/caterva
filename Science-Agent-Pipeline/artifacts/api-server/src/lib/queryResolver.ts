@@ -262,6 +262,10 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
               source: agentResult.source,
               citation,
               organism: agentResult.organism,
+              citationStatus:
+                agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
+                  ? "flagged"
+                  : "verified",
             },
           };
           flags.push(
@@ -352,6 +356,10 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
             source: agentResult.source,
             citation,
             organism: agentResult.organism,
+            citationStatus:
+              agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
+                ? "flagged"
+                : "verified",
           },
         };
         flags.push(
