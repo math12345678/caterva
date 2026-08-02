@@ -5,9 +5,11 @@ language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
 been independently checked.
 
-Five launch domains built so far: enzyme kinetics, SIR/SEIR epidemiological
-modeling, PCR amplification, Monte Carlo simulation, and population genetics.
-Molecular dynamics setup is a candidate for the next domain, not yet built.
+Eight simulation domains built so far: enzyme kinetics, SIR/SEIR
+epidemiological modeling, PCR amplification, Monte Carlo simulation,
+population genetics (Wright-Fisher, single- and two-locus), molecular
+dynamics (Lennard-Jones cluster), and Gillespie SSA stochastic
+chemical kinetics.
 
 ## Quick start
 
@@ -64,7 +66,7 @@ in `requirements.txt`:
 
 ## Domains
 
-Six simulation domains, two pipelines:
+Nine simulation domains, two pipelines:
 
 **Continuous (antimony → SBML → roadrunner):**
 - **Michaelis-Menten** — irreversible single-substrate enzyme kinetics.
@@ -79,6 +81,15 @@ Six simulation domains, two pipelines:
   and plateau approach.
 - **Monte Carlo π estimation** — uniform sampling in [-1,1]². Verified against
   the CLT error rate `1/√N`.
+- **Molecular dynamics** — Lennard-Jones cluster, velocity Verlet. Verified
+  against energy/momentum conservation, the O(Δt²) symplectic error rate,
+  and published global-minimum energies (LJ13 = −44.326801 ε, Hoare & Pal
+  1971). Not built through roadrunner — see ADR 0006.
+- **Gillespie SSA** — exact stochastic simulation (ADR 0009) of a single
+  first-order decay A → B. Verified against the closed form
+  `E[a(t)] = a₀·e^(−kt)` (the count at time t is exactly Binomial(a₀, e^(−kt)))
+  and a hand-verified seeded golden trajectory pinned through the API
+  (`test_gillespie_ssa_golden.py`, `gillespieGolden.test.ts`).
 - **Wright-Fisher neutral drift** — binomial sampling of 2N allele copies each
   generation. Verified against the exact heterozygosity decay
   `Hₜ = H₀ · (1 − 1/(2N))ᵗ` and Kimura's fixation probability `P(fix) = p₀`.
@@ -126,7 +137,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              671 tests (670 run, 1 skipped)
+│   └── tests/              803 tests (802 run, 1 skipped)
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
 │   └── ...                 124 tests
