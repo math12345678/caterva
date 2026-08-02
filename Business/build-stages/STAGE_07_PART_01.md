@@ -36,8 +36,11 @@ Deliverables:
   try/flat branches).
 - `Tellurium/tests/test_gillespie_ssa_bimolecular_correctness.py` (14)
   — closed form, conservation, determinism, edge cases, output contract.
-- `Tellurium/tests/test_gillespie_ssa_bimolecular_golden.py` (11) —
-  pinned trajectory + mutation traps.
+- `Tellurium/tests/test_gillespie_ssa_bimolecular_golden.py` (14) —
+  pinned trajectory + mutation traps + CLI smoke tests.
+- `Tellurium/cli.py` — `ssa --bimolecular` (table `time,a,b,c`, event
+  count, final A/B/C, ODE reference, `--b0`, `--out` CSV; the dead
+  `--out` flag from Stage 6 now writes the table in both modes).
 - `Tellurium/tests/test_boundary_contract.py` — expected sets,
   `SMALL_PARAMS`, summed-population ceiling row.
 - `Science-Agent-Pipeline/artifacts/api-server/src/lib/tellurium_runner.py`
@@ -75,8 +78,7 @@ Seed 12345, a0=60, b0=40, k=0.01, end=5.0:
 
 ## 4. Verification
 
-- pytest: 829 passed, 1 skipped (was 936 → 949 total across repo:
-  830 collected in Tellurium/tests).
+- pytest: 832 passed, 1 skipped (833 collected in Tellurium/tests).
 - vitest: 161 passed (was 151) — includes the bimolecular golden
   through the runner boundary and the HTTP E2E through the queue,
   which reproduces the seeded trajectory bit-identically.
@@ -89,6 +91,12 @@ Seed 12345, a0=60, b0=40, k=0.01, end=5.0:
 
 ## 5. Deliberate decisions
 
+- **CLI `--bimolecular` flag on the existing `ssa` command** rather
+  than a new subcommand: the two domains share every flag except `b0`
+  and the default rate, and the metavar list stays `{wf,kimura,ne,
+  sweep,scenarios,ld,ssa}`. Fixing the Stage 6 `--out` dead flag (the
+  help promised CSV, the handler never wrote it) is included so the
+  new CSV contract works in both modes.
 - **One constant for the bimolecular rate ceiling**
   (`SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE = 0.1`): the first-order ceiling
   (10.0) makes no sense for a second-order propensity (units

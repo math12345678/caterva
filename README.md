@@ -145,7 +145,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              830 tests (829 run, 1 skipped)
+│   └── tests/              833 tests (832 run, 1 skipped)
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
 │   └── ...                 124 tests
