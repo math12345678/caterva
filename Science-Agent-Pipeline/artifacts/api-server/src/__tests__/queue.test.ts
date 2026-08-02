@@ -252,4 +252,22 @@ describe("acquireRunnerSlot / releaseRunnerSlot", () => {
     queue.releaseRunnerSlot();
     queue.releaseRunnerSlot();
   });
+
+  it("rejects queued runners when the queue is reset", async () => {
+    const a = queue.acquireRunnerSlot();
+    const b = queue.acquireRunnerSlot();
+    await a;
+    await b;
+
+    const queued = queue.acquireRunnerSlot();
+    queue.reset();
+
+    await expect(queued).rejects.toThrow("Runner queue reset");
+    queue.releaseRunnerSlot();
+    queue.releaseRunnerSlot();
+
+    const next = queue.acquireRunnerSlot();
+    await expect(next).resolves.toBeUndefined();
+    queue.releaseRunnerSlot();
+  });
 });

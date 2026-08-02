@@ -26,25 +26,29 @@ bit-identical trajectories.
 from __future__ import annotations
 
 import math
-from typing import Any, List, Optional
+from typing import List
 
 import numpy as np
 
 try:
     from Tellurium.core.data_structures import (
-        ModelBuildError, ParameterValidation, SimulationResult)
+        ParameterValidation,  # type: ignore[no-redef]
+        SimulationResult,  # type: ignore[no-redef]
+    )
     from Tellurium.core.validation import (
-        validate_ssa_bimolecular_params,
-        validate_ssa_params,
-        validate_ssa_replicates_params,
+        validate_ssa_bimolecular_params,  # type: ignore[no-redef]
+        validate_ssa_params,  # type: ignore[no-redef]
+        validate_ssa_replicates_params,  # type: ignore[no-redef]
     )
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
     from core.data_structures import (
-        ModelBuildError, ParameterValidation, SimulationResult)
+        ParameterValidation,  # type: ignore[no-redef]
+        SimulationResult,  # type: ignore[no-redef]
+    )
     from core.validation import (
-        validate_ssa_bimolecular_params,
-        validate_ssa_params,
-        validate_ssa_replicates_params,
+        validate_ssa_bimolecular_params,  # type: ignore[no-redef]
+        validate_ssa_params,  # type: ignore[no-redef]
+        validate_ssa_replicates_params,  # type: ignore[no-redef]
     )
 
 
@@ -242,8 +246,8 @@ def simulate_gillespie_ssa_replicates(
     validation.raise_if_invalid()
 
     master = np.random.default_rng(seed)
-    replicate_seeds = master.integers(0, 2**63, size=int(n_replicates))
-    replicate_seeds = [int(s) for s in replicate_seeds]
+    replicate_seeds_arr = master.integers(0, 2**63, size=int(n_replicates))
+    replicate_seeds = [int(s) for s in replicate_seeds_arr]
 
     if b0 is None:
         colnames = ["time", "mean_a", "mean_b"]

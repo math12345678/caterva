@@ -53,10 +53,8 @@ try:
         DEFAULT_RELATIVE_TOLERANCE,
         DEFAULT_ABSOLUTE_TOLERANCE,
         GAMMA_PARAM,
-        _GAMMA_NOTE,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.core.validation import (
-        _finite_positive,
         validate_michaelis_menten_params,
         validate_sir_params,
         validate_seir_params,
@@ -65,10 +63,9 @@ try:
         validate_wright_fisher_params,
         validate_md_params,
         validate_ssa_bimolecular_params,
-    validate_ssa_params,
+        validate_ssa_params,
         validate_ssa_replicates_params,
-    )
-    from Tellurium.core.utils import _fmt, _RESERVED_MODEL_NAMES, _check_model_name, _load_runner
+    )  # type: ignore[no-redef]
     from Tellurium.continuous.model_building import (
         build_michaelis_menten_antimony,
         build_sir_antimony,
@@ -76,7 +73,7 @@ try:
         antimony_to_sbml,
         sbml_to_antimony,
         validate_sbml,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.continuous.simulations import (
         simulate_sbml,
         simulate_michaelis_menten,
@@ -84,28 +81,28 @@ try:
         simulate_seir,
         steady_state,
         parameter_scan,
-    )
-    from Tellurium.discrete.pcr import simulate_pcr
-    from Tellurium.discrete.monte_carlo import simulate_monte_carlo_pi
+    )  # type: ignore[no-redef]
+    from Tellurium.discrete.pcr import simulate_pcr  # type: ignore[no-redef]
+    from Tellurium.discrete.monte_carlo import simulate_monte_carlo_pi  # type: ignore[no-redef]
     from Tellurium.discrete.gillespie_ssa import (
         simulate_gillespie_ssa,
         simulate_gillespie_ssa_bimolecular,
         simulate_gillespie_ssa_replicates,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.discrete.molecular_dynamics import (
         lennard_jones_force,
         lj_cluster_positions,
-        simulate_molecular_dynamics,
         _compute_lj_potential,
-    )
+        simulate_molecular_dynamics,
+    )  # type: ignore[no-redef]
     from Tellurium.discrete.population_genetics.core import (
         simulate_wright_fisher,
         _clamp_wf_fst_roundoff,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.discrete.population_genetics.analysis import (
         wright_fisher_sweep,
         expected_loss_time,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.discrete.population_genetics.probability import (
         wright_fisher_transition_matrix,
         wright_fisher_fixation_probability,
@@ -115,7 +112,7 @@ try:
         wright_fisher_stationary_vector,
         wright_stationary_distribution,
         _normalise_stationary_vector,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.discrete.population_genetics.theoretical import (
         kimura_fixation_probability,
         expected_fixation_time,
@@ -123,17 +120,17 @@ try:
         effective_size_harmonic_mean,
         theoretical_fst,
         expected_fst_after_split,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.discrete.population_genetics.two_locus import (
         TwoLocusResult,
         simulate_two_locus_wright_fisher,
         theoretical_ld_decay,
-    )
+    )  # type: ignore[no-redef]
     from Tellurium.scenarios.wf_scenarios import (
         _SCENARIO_REGISTRY,
         list_scenarios,
         wright_fisher_scenario,
-    )
+    )  # type: ignore[no-redef]
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
     from core.data_structures import (
         ModelBuildError,
@@ -163,10 +160,8 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         DEFAULT_RELATIVE_TOLERANCE,
         DEFAULT_ABSOLUTE_TOLERANCE,
         GAMMA_PARAM,
-        _GAMMA_NOTE,
-    )
+    )  # type: ignore[no-redef]
     from core.validation import (
-        _finite_positive,
         validate_michaelis_menten_params,
         validate_sir_params,
         validate_seir_params,
@@ -175,10 +170,9 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         validate_wright_fisher_params,
         validate_md_params,
         validate_ssa_bimolecular_params,
-    validate_ssa_params,
+        validate_ssa_params,
         validate_ssa_replicates_params,
-    )
-    from core.utils import _fmt, _RESERVED_MODEL_NAMES, _check_model_name, _load_runner
+    )  # type: ignore[no-redef]
     from continuous.model_building import (
         build_michaelis_menten_antimony,
         build_sir_antimony,
@@ -186,7 +180,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         antimony_to_sbml,
         sbml_to_antimony,
         validate_sbml,
-    )
+    )  # type: ignore[no-redef]
     from continuous.simulations import (
         simulate_sbml,
         simulate_michaelis_menten,
@@ -194,28 +188,28 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         simulate_seir,
         steady_state,
         parameter_scan,
-    )
-    from discrete.pcr import simulate_pcr
-    from discrete.monte_carlo import simulate_monte_carlo_pi
+    )  # type: ignore[no-redef]
+    from discrete.pcr import simulate_pcr  # type: ignore[no-redef]
+    from discrete.monte_carlo import simulate_monte_carlo_pi  # type: ignore[no-redef]
     from discrete.gillespie_ssa import (
         simulate_gillespie_ssa,
         simulate_gillespie_ssa_bimolecular,
         simulate_gillespie_ssa_replicates,
-    )
+    )  # type: ignore[no-redef]
     from discrete.molecular_dynamics import (
         lennard_jones_force,
         lj_cluster_positions,
-        simulate_molecular_dynamics,
         _compute_lj_potential,
-    )
+        simulate_molecular_dynamics,
+    )  # type: ignore[no-redef]
     from discrete.population_genetics.core import (
         simulate_wright_fisher,
         _clamp_wf_fst_roundoff,
-    )
+    )  # type: ignore[no-redef]
     from discrete.population_genetics.analysis import (
         wright_fisher_sweep,
         expected_loss_time,
-    )
+    )  # type: ignore[no-redef]
     from discrete.population_genetics.probability import (
         wright_fisher_transition_matrix,
         wright_fisher_fixation_probability,
@@ -225,7 +219,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         wright_fisher_stationary_vector,
         wright_stationary_distribution,
         _normalise_stationary_vector,
-    )
+    )  # type: ignore[no-redef]
     from discrete.population_genetics.theoretical import (
         kimura_fixation_probability,
         expected_fixation_time,
@@ -233,17 +227,17 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         effective_size_harmonic_mean,
         theoretical_fst,
         expected_fst_after_split,
-    )
+    )  # type: ignore[no-redef]
     from discrete.population_genetics.two_locus import (
         TwoLocusResult,
         simulate_two_locus_wright_fisher,
         theoretical_ld_decay,
-    )
+    )  # type: ignore[no-redef]
     from scenarios.wf_scenarios import (
         _SCENARIO_REGISTRY,
         list_scenarios,
         wright_fisher_scenario,
-    )
+    )  # type: ignore[no-redef]
 
 __all__ = [
     "DEFAULT_ABSOLUTE_TOLERANCE",
@@ -251,6 +245,7 @@ __all__ = [
     "GAMMA_PARAM",
     "KM_PLAUSIBLE_MAX_MM",
     "KM_PLAUSIBLE_MIN_MM",
+    "R0_IMPLAUSIBLE_ABOVE",
     "MC_PLAUSIBLE_MIN_SAMPLES",
     "MD_PLAUSIBLE_MAX_TIMESTEP",
     "MD_PLAUSIBLE_MIN_PARTICLES",
@@ -259,9 +254,10 @@ __all__ = [
     "PCR_MAX_EFFICIENCY",
     "PCR_MIN_EFFICIENCY",
     "PCR_PLAUSIBLE_LOW_EFFICIENCY",
-    "SSA_PLAUSIBLE_MAX_RATE",
     "SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE",
+    "SSA_PLAUSIBLE_MAX_RATE",
     "SSA_PLAUSIBLE_MIN_POPULATION",
+    "SSA_PLAUSIBLE_MIN_REPLICATES",
     "WF_PLAUSIBLE_MAX_GENERATIONS",
     "WF_PLAUSIBLE_MAX_MUTATION_RATE",
     "WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT",
@@ -283,10 +279,16 @@ __all__ = [
     "expected_loss_time",
     "kimura_fixation_probability",
     "lennard_jones_force",
+    "_compute_lj_potential",
+    "_clamp_wf_fst_roundoff",
     "list_scenarios",
+    "_SCENARIO_REGISTRY",
     "lj_cluster_positions",
     "parameter_scan",
     "sbml_to_antimony",
+    "simulate_gillespie_ssa",
+    "simulate_gillespie_ssa_bimolecular",
+    "simulate_gillespie_ssa_replicates",
     "simulate_michaelis_menten",
     "simulate_molecular_dynamics",
     "simulate_monte_carlo_pi",
@@ -294,11 +296,6 @@ __all__ = [
     "simulate_sbml",
     "simulate_seir",
     "simulate_sir",
-    "simulate_gillespie_ssa",
-    "simulate_gillespie_ssa_bimolecular",
-    "simulate_gillespie_ssa_replicates",
-    "validate_ssa_replicates_params",
-    "SSA_PLAUSIBLE_MIN_REPLICATES",
     "simulate_two_locus_wright_fisher",
     "simulate_wright_fisher",
     "steady_state",
@@ -311,8 +308,9 @@ __all__ = [
     "validate_sbml",
     "validate_seir_params",
     "validate_sir_params",
-    "validate_ssa_params",
     "validate_ssa_bimolecular_params",
+    "validate_ssa_params",
+    "validate_ssa_replicates_params",
     "validate_wright_fisher_params",
     "wright_fisher_expected_absorption_time",
     "wright_fisher_expected_fixation_time",
@@ -320,6 +318,7 @@ __all__ = [
     "wright_fisher_fixation_probability",
     "wright_fisher_scenario",
     "wright_fisher_stationary_vector",
+    "_normalise_stationary_vector",
     "wright_fisher_sweep",
     "wright_fisher_transition_matrix",
     "wright_stationary_distribution",

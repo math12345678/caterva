@@ -46,19 +46,22 @@ const abortControllers = new Map<string, AbortController>();
 // Semaphore for the Python bridge concurrency limit.
 const MAX_CONCURRENT = 2;
 let activeRunners = 0;
-const pendingQueue: (() => void)[] = [];
+const pendingQueue: Array<{
+  resolve: () => void;
+  reject: (reason?: unknown) => void;
+}> = [];
 
 /**
  * Acquire a slot in the Python bridge semaphore. Resolves when concurrency
  * drops below MAX_CONCURRENT. Caller must release after finishing.
  */
 export function acquireRunnerSlot(): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (activeRunners < MAX_CONCURRENT) {
       activeRunners++;
       resolve();
     } else {
-      pendingQueue.push(resolve);
+      pendingQueue.push({ resolve, reject });
     }
   });
 }
@@ -70,7 +73,7 @@ export function acquireRunnerSlot(): Promise<void> {
 export function releaseRunnerSlot(): void {
   const next = pendingQueue.shift();
   if (next) {
-    next();
+    next.resolve();
   } else {
     activeRunners = Math.max(0, activeRunners - 1);
   }
@@ -244,9 +247,20 @@ export function listJobs(): Job[] {
  * Reset all internal state. Intended for test use only.
  */
 export function reset(): void {
+  for (const controller of abortControllers.values()) {
+    if (!controller.signal.aborted) controller.abort();
+  }
   jobs.clear();
   listeners.clear();
   abortControllers.clear();
-  activeRunners = 0;
-  pendingQueue.length = 0;
+  // Cancel waiters rather than resolving them as if they acquired a slot.
+  // Resolving would make their later release decrement activeRunners even
+  // though no slot was transferred, corrupting the semaphore accounting.
+  const pending = pendingQueue.splice(0);
+  for (const waiter of pending) {
+    waiter.reject(new Error("Runner queue reset"));
+  }
+  // Do not reset activeRunners here. Aborted pipelines may still be
+  // unwinding and will release their slots; clearing the count would allow
+  // new work to exceed MAX_CONCURRENT when those releases arrive.
 }

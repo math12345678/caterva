@@ -23,8 +23,9 @@ afterAll(() => {
   server?.close();
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   queue.reset();
+  await resetCache(true);
   resetWaitlist();
 });
 

@@ -21,7 +21,6 @@ suite fails.
 """
 
 import math
-from pathlib import Path
 
 import numpy as np
 
@@ -154,16 +153,15 @@ class TestCli:
 
     def _run_cli(self, *args: str):
         import subprocess
-
         import sys
+        from pathlib import Path
 
-        proc = subprocess.run(
+        return subprocess.run(
             [sys.executable, "-m", "Tellurium.cli", "ssa", *args],
             capture_output=True,
             text=True,
             cwd=str(Path(__file__).resolve().parents[2]),
         )
-        return proc
 
     def test_cli_prints_events_and_closed_form(self):
         proc = self._run_cli("--a0", "200", "--k", "0.5", "--end", "5", "--seed", "9")

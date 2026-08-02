@@ -77,7 +77,7 @@ def extract_constants_from_file(filepath: Path) -> Dict[str, Any]:
                             elif isinstance(node.value, ast.Str):
                                 constants[const_name] = node.value.s
     except Exception as e:
-        print(f"Warning: Error parsing {filepath}: {e}", file=sys.stderr)
+        errors.append(f"Error parsing {filepath}: {e}")
     
     return constants
 

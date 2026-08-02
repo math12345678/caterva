@@ -55,6 +55,15 @@ describe("Gillespie SSA resolution (Target I-style narrowness)", () => {
     expect(resolved.parameters).toHaveProperty("end");
   });
 
+  it("forwards a numeric seed override into resolved parameters", async () => {
+    const resolved = await resolveQuery(
+      "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9",
+    );
+    expect(resolved.domain).toBe("gillespie_ssa");
+    expect(resolved.parameters.seed).toBe(9);
+    expect(resolved.parameterProvenance.seed).toEqual({ origin: "user" });
+  });
+
   it("has no literature resolution and no narrowness notes", async () => {
     const resolved = await resolveQuery("gillespie stochastic decay of molecules");
     const entries = Object.entries(resolved.parameterProvenance);

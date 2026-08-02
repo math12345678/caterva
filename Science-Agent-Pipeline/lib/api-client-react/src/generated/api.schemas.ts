@@ -46,6 +46,7 @@ export const SimulationResponseDomain = {
   molecular_dynamics: 'molecular_dynamics',
   gillespie_ssa: 'gillespie_ssa',
   gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
+  gillespie_ssa_replicates: 'gillespie_ssa_replicates',
   sbml: 'sbml',
 } as const;
 
@@ -59,8 +60,7 @@ export interface Provenance {
 }
 
 /**
- * How this value was obtained for THIS query (ADR 0008).
-`llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.
+ * How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.
  */
 export type ParameterProvenanceOrigin = typeof ParameterProvenanceOrigin[keyof typeof ParameterProvenanceOrigin];
 
@@ -73,7 +73,7 @@ export const ParameterProvenanceOrigin = {
 } as const;
 
 export interface ParameterProvenance {
-  /** How this value was obtained for THIS query (ADR 0008) */
+  /** How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation. */
   origin: ParameterProvenanceOrigin;
   /** What looked the value up; present only when origin is resolved */
   source?: string;

@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import math
-import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import roadrunner
 try:
     from Tellurium.core.data_structures import (ModelBuildError, SimulationError, DEFAULT_RELATIVE_TOLERANCE, DEFAULT_ABSOLUTE_TOLERANCE)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ModelBuildError, SimulationError, DEFAULT_RELATIVE_TOLERANCE, DEFAULT_ABSOLUTE_TOLERANCE)
+    from core.data_structures import (ModelBuildError, SimulationError, DEFAULT_RELATIVE_TOLERANCE, DEFAULT_ABSOLUTE_TOLERANCE)  # type: ignore[no-redef]
 
 def _fmt(value: float) -> str:
     """Format a float for Antimony without losing precision to repr quirks."""

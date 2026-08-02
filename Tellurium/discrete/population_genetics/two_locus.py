@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import math
-import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
-import math
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, SimulationResult, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS)
+    from Tellurium.core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, SimulationResult, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS)
+    from core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS)  # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------
 # Two-locus Wright-Fisher simulation (haploid, recombination)

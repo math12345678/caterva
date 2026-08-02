@@ -7,7 +7,7 @@ const VALID: Record<keyof typeof SimulationParameterSchemas, Record<string, unkn
   sir: { beta: 0.3, gamma: 0.1, s0: 990, i0: 10, end: 100, points: 101 },
   seir: { beta: 0.3, sigma: 0.2, gamma: 0.1, s0: 990, e0: 10, i0: 0, end: 100, points: 101 },
   pcr: { n0: 100, efficiency: 0.95, cycles: 30 },
-  monte_carlo_pi: { n_samples: 10_000 },
+  monte_carlo_pi: { n_samples: 10_000, seed: 42 },
   wright_fisher: {
     population_size: 100,
     starting_frequency: 0.5,
@@ -28,6 +28,7 @@ const VALID: Record<keyof typeof SimulationParameterSchemas, Record<string, unkn
     temperature: 0.4,
     timestep: 0.005,
     n_steps: 1000,
+    density: 0.85,
   },
   gillespie_ssa: { a0: 1000, k: 0.5, end: 10 },
   gillespie_ssa_bimolecular: { a0: 100, b0: 100, k: 0.005, end: 10 },
@@ -91,5 +92,26 @@ describe("SimulationParameterSchemas", () => {
       s0: 10,
     });
     expect(parse.success).toBe(false);
+  });
+
+  it("rejects malformed Monte Carlo seed", () => {
+    const parse = SimulationParameterSchemas.monte_carlo_pi.safeParse({
+      n_samples: 10_000,
+      seed: "42",
+    });
+    expect(parse.success).toBe(false);
+  });
+
+  it("rejects malformed molecular-dynamics density", () => {
+    for (const density of ["0.85", null]) {
+      const parse = SimulationParameterSchemas.molecular_dynamics.safeParse({
+        n_particles: 108,
+        temperature: 0.4,
+        timestep: 0.005,
+        n_steps: 1000,
+        density,
+      });
+      expect(parse.success).toBe(false);
+    }
   });
 });

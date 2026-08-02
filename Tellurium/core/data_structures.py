@@ -6,10 +6,8 @@ Byte-exact extraction from the original monolithic `tellurium_engine.py`
 
 from __future__ import annotations
 
-import math
-import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 # Errors
@@ -380,11 +378,11 @@ class SimulationResult:
         try:
             from Tellurium.discrete.population_genetics.theoretical import (
                 estimate_ne_from_heterozygosity,
-            )
+            )  # type: ignore[no-redef]
         except ModuleNotFoundError:  # flat mode
             from discrete.population_genetics.theoretical import (
                 estimate_ne_from_heterozygosity,
-            )
+            )  # type: ignore[no-redef]
         return estimate_ne_from_heterozygosity(H)
 
     def estimate_ne_variance(self) -> Dict[str, Any]:

@@ -161,7 +161,8 @@ def test_flagged_brenda_entries_do_not_become_confident_numbers(ldh_entries):
     flagged = [e for e in ldh_entries if getattr(e, "flagged", False)]
 
     # SYNTHETIC (not BRENDA data): one per real flag cause in brenda_client.
-    flagged = flagged + [
+    flagged = [
+        *flagged,
         # Cause 1: outside the plausible Km range -- the engine must agree.
         #
         # 50000 mM is a fixed literal, deliberately NOT derived from

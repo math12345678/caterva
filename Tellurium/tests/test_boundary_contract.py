@@ -18,6 +18,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -62,7 +63,7 @@ def _contract_violations(
     issues: list[str] = []
     dispatched = set(runner_module.DISPATCH.values())
     domains = set(runner_module.DISPATCH.keys())
-    handlers = set(runner_module._RUNNERS.keys())
+    handlers = set(runner_module._RUNNERS.keys())  # noqa: SLF001
 
     engine_only = engine_functions - dispatched
     if engine_only:
@@ -122,7 +123,7 @@ class TestBoundaryContract:
             "simulate_gillespie_ssa_replicates",
             "simulate_sbml",
         }
-        assert ENGINE_SIMULATE_FUNCTIONS == expected
+        assert expected == ENGINE_SIMULATE_FUNCTIONS
 
     def test_runner_dispatches_expected_domains(self):
         assert set(runner.DISPATCH.keys()) == {
@@ -140,7 +141,7 @@ class TestBoundaryContract:
             "sbml",
         }
 
-    def test_mutation_engine_gain_is_detected(self, monkeypatch):
+    def test_mutation_engine_gain_is_detected(self):
         """Simulated mutation: engine gains simulate_* the runner lacks."""
         mutated_engine = frozenset((*ENGINE_SIMULATE_FUNCTIONS, "simulate_bogus"))
         violations = _contract_violations(runner, mutated_engine)
@@ -159,7 +160,7 @@ class TestBoundaryContract:
         dispatch.pop("molecular_dynamics")
         monkeypatch.setattr(runner, "DISPATCH", dispatch)
         monkeypatch.setattr(
-            runner, "_RUNNERS", {k: v for k, v in runner._RUNNERS.items() if k != "molecular_dynamics"}
+            runner, "_RUNNERS", {k: v for k, v in runner._RUNNERS.items() if k != "molecular_dynamics"}  # noqa: SLF001
         )
         violations = _contract_violations(runner)
         assert any("simulate_molecular_dynamics" in v for v in violations)
@@ -168,7 +169,7 @@ class TestBoundaryContract:
 class TestRunnerExecution:
     """Each domain runs end-to-end and honours the ok/flagged/flagReason shape."""
 
-    SMALL_PARAMS = {
+    SMALL_PARAMS: ClassVar[dict[str, dict[str, float | int | str]]] = {
         "mm": {"km": 2.0, "vmax": 5.0, "s0": 10.0, "end": 1.0, "points": 3},
         "sir": {"beta": 0.3, "gamma": 0.1, "s0": 990.0, "i0": 10.0, "end": 10.0, "points": 4},
         "seir": {"beta": 0.3, "sigma": 0.2, "gamma": 0.1, "e0": 10.0, "end": 10.0, "points": 4},
@@ -189,15 +190,15 @@ class TestRunnerExecution:
         "gillespie_ssa_bimolecular": {"a0": 60, "b0": 40, "k": 0.01, "end": 2.0},
         "gillespie_ssa_replicates": {"a0": 60, "k": 0.5, "end": 2.0, "n_replicates": 10},
         "sbml": {
-            "sbml_string": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" level=\"3\" version=\"1\">"
-            "<model id=\"m\"><listOfCompartments>"
-            "<compartment id=\"c\" size=\"1\"/></listOfCompartments>"
+            "sbml_string": '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" level="3" version="1">'
+            '<model id="m"><listOfCompartments>'
+            '<compartment id="c" size="1"/></listOfCompartments>'
             "<listOfSpecies>"
-            "<species id=\"S\" compartment=\"c\" initialConcentration=\"10\"/></listOfSpecies>"
-            "<listOfReactions><reaction id=\"r\" reversible=\"false\">"
-            "<listOfReactants><speciesReference species=\"S\" stoichiometry=\"1\"/></listOfReactants>"
-            "<kineticLaw><math xmlns=\"http://www.w3.org/1998/Math/MathML\">"
+            '<species id="S" compartment="c" initialConcentration="10"/></listOfSpecies>'
+            '<listOfReactions><reaction id="r" reversible="false">'
+            '<listOfReactants><speciesReference species="S" stoichiometry="1"/></listOfReactants>'
+            '<kineticLaw><math xmlns="http://www.w3.org/1998/Math/MathML">'
             "<apply><times/><cn>1.0</cn><ci>S</ci></apply></math></kineticLaw>"
             "</reaction></listOfReactions></model></sbml>",
             "start": 0.0, "end": 1.0, "points": 3,
@@ -258,7 +259,7 @@ class TestRunnerExecution:
     def test_md_documented_reference_case_stays_within_budget(self):
         """108 particles x 10k steps is the documented case and must remain
         allowed -- a budget that rejects it would be miscalibrated."""
-        actual = runner._fcc_particle_count(108)
+        actual = runner._fcc_particle_count(108)  # noqa: SLF001
         assert actual * actual * runner.MAX_API_MD_STEPS <= runner.MAX_API_MD_PAIR_STEPS
 
     def test_fcc_round_up_matches_engine(self):
@@ -267,11 +268,11 @@ class TestRunnerExecution:
         Rounding is always upward, so budgeting on the requested count would
         systematically underestimate cost.
         """
-        assert runner._fcc_particle_count(108) == 108      # 4 * 3^3
-        assert runner._fcc_particle_count(5000) == 5324    # 4 * 11^3
-        assert runner._fcc_particle_count(1) == 4          # smallest cell
+        assert runner._fcc_particle_count(108) == 108      # 4 * 3^3  # noqa: SLF001
+        assert runner._fcc_particle_count(5000) == 5324    # 4 * 11^3  # noqa: SLF001
+        assert runner._fcc_particle_count(1) == 4          # smallest cell  # noqa: SLF001
         for requested in (5, 33, 100, 500, 900):
-            actual = runner._fcc_particle_count(requested)
+            actual = runner._fcc_particle_count(requested)  # noqa: SLF001
             assert actual >= requested
             k = round((actual / 4) ** (1 / 3))
             assert actual == 4 * k**3

@@ -1,5 +1,5 @@
 import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
-import { desc, eq } from "drizzle-orm";
+import { desc, sql } from "drizzle-orm";
 import { RunSimulationBody, GetSimulationJobParams, StreamSimulationJobParams } from "@workspace/api-zod";
 import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
@@ -240,7 +240,9 @@ async function findCachedSimulation(query: string): Promise<queue.SimulationResp
     const rows = await db
       .select()
       .from(simulationsTable)
-      .where(eq(simulationsTable.query, query))
+      .where(
+        sql`lower(trim(regexp_replace(${simulationsTable.query}, '\\s+', ' ', 'g'))) = ${query}`,
+      )
       .orderBy(desc(simulationsTable.createdAt))
       .limit(1);
 
@@ -300,6 +302,11 @@ async function runPipeline(jobId: string, query: string): Promise<void> {
     queue.updateJob(jobId, { status: "running" });
 
     await queue.acquireRunnerSlot();
+    if (abort.signal.aborted || queue.isCancelled(jobId)) {
+      queue.releaseRunnerSlot();
+      return;
+    }
+
     let engineResult;
     try {
       engineResult = await runTellurium(resolved.domain, resolved.parameters, abort.signal);

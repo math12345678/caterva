@@ -131,13 +131,12 @@ class TestCli:
         import sys
         from pathlib import Path
 
-        proc = subprocess.run(
+        return subprocess.run(
             [sys.executable, "-m", "Tellurium.cli", "ssa", *args],
             capture_output=True,
             text=True,
             cwd=str(Path(__file__).resolve().parents[2]),
         )
-        return proc
 
     def test_cli_bimolecular_prints_events_and_ode_reference(self):
         proc = self._run_cli(

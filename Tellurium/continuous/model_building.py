@@ -6,26 +6,24 @@ domains never import them (ADR 0001, ADR 0002, ADR 0006).
 
 from __future__ import annotations
 
-import math
 import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import List, Optional
 
 import antimony
 import libsbml
 try:
-    from Tellurium.core.data_structures import (ModelBuildError, GAMMA_PARAM, _GAMMA_NOTE)
+    from Tellurium.core.data_structures import (ModelBuildError, GAMMA_PARAM, _GAMMA_NOTE)  # type: ignore[no-redef]
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ModelBuildError, GAMMA_PARAM, _GAMMA_NOTE)
+    from core.data_structures import (ModelBuildError, GAMMA_PARAM, _GAMMA_NOTE)  # type: ignore[no-redef]
 
 try:
     from Tellurium.core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)
-    from Tellurium.core.utils import _fmt, _check_model_name
+        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+    from Tellurium.core.utils import _fmt, _check_model_name  # type: ignore[no-redef]
 except ModuleNotFoundError:
     from core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)
-    from core.utils import _fmt, _check_model_name
+        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+    from core.utils import _fmt, _check_model_name  # type: ignore[no-redef]
 
 def build_michaelis_menten_antimony(km: float, vmax: float, s0: float,
                                     model_name: str = "michaelis_menten",
