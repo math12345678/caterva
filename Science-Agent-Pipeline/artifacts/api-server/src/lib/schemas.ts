@@ -77,6 +77,7 @@ export const SimulationParameterSchemas: Record<
   }),
   monte_carlo_pi: z.object({
     n_samples: integer,
+    seed: integer.nullish(),
   }),
   wright_fisher: z.object({
     population_size: integer,
@@ -102,6 +103,7 @@ export const SimulationParameterSchemas: Record<
     temperature: numeric,
     timestep: numeric,
     n_steps: integer,
+    density: numeric.optional(),
     seed: integer.nullish(),
   }),
   gillespie_ssa: z.object({

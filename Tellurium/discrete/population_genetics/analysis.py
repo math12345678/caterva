@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import math
-import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Sequence
 
-import math
 try:
     from Tellurium.discrete.population_genetics.core import (simulate_wright_fisher)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from discrete.population_genetics.core import (simulate_wright_fisher)
+    from discrete.population_genetics.core import (simulate_wright_fisher)  # type: ignore[no-redef]
 
 def wright_fisher_sweep(
     parameter: str,

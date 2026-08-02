@@ -169,7 +169,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
 ];
 
-const PARAMETER_PATTERN = /(km|vmax|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
+const PARAMETER_PATTERN = /(km|vmax|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
 
 /**
  * Extract numeric overrides from the query string.

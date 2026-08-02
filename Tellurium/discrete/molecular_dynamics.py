@@ -3,21 +3,18 @@
 from __future__ import annotations
 
 import math
-import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import List, Tuple
 
 import numpy as np
-import math
 try:
     from Tellurium.core.data_structures import (ModelBuildError, SimulationResult)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ModelBuildError, SimulationResult)
+    from core.data_structures import (ModelBuildError, SimulationResult)  # type: ignore[no-redef]
 
 try:
     from Tellurium.core.validation import validate_md_params
 except ModuleNotFoundError:
-    from core.validation import validate_md_params
+    from core.validation import validate_md_params  # type: ignore[no-redef]
 
 # Reduced units throughout: epsilon = sigma = mass = 1.
 # ---------------------------------------------------------------------------

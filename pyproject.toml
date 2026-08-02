@@ -61,7 +61,27 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "tellurium_engine"
+module = "Tellurium.tellurium_engine"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = [
+    "Tellurium.core.data_structures",
+    "Tellurium.core.validation",
+    "Tellurium.core.utils",
+    "Tellurium.continuous.model_building",
+    "Tellurium.continuous.simulations",
+    "Tellurium.discrete.pcr",
+    "Tellurium.discrete.monte_carlo",
+    "Tellurium.discrete.molecular_dynamics",
+    "Tellurium.discrete.gillespie_ssa",
+    "Tellurium.discrete.population_genetics.core",
+    "Tellurium.discrete.population_genetics.analysis",
+    "Tellurium.discrete.population_genetics.probability",
+    "Tellurium.discrete.population_genetics.theoretical",
+    "Tellurium.discrete.population_genetics.two_locus",
+    "Tellurium.scenarios.wf_scenarios",
+]
 ignore_errors = true
 
 [tool.pytest.ini_options]

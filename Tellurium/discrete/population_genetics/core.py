@@ -2,21 +2,18 @@
 
 from __future__ import annotations
 
-import math
-import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Optional, Sequence
 
 import numpy as np
 try:
     from Tellurium.core.data_structures import (SimulationResult)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (SimulationResult)
+    from core.data_structures import (SimulationResult)  # type: ignore[no-redef]
 
 try:
     from Tellurium.core.validation import validate_wright_fisher_params
 except ModuleNotFoundError:
-    from core.validation import validate_wright_fisher_params
+    from core.validation import validate_wright_fisher_params  # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------
 # Wright-Fisher population genetics (neutral drift)

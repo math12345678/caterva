@@ -23,5 +23,6 @@ export const SimulationResponseDomain = {
   molecular_dynamics: 'molecular_dynamics',
   gillespie_ssa: 'gillespie_ssa',
   gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
+  gillespie_ssa_replicates: 'gillespie_ssa_replicates',
   sbml: 'sbml',
 } as const;

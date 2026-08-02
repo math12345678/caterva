@@ -2,30 +2,27 @@
 
 from __future__ import annotations
 
-import math
-import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence
 
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, SimulationError, SimulationResult)
+    from Tellurium.core.data_structures import (ParameterValidation, SimulationError, SimulationResult)  # type: ignore[no-redef]
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, SimulationError, SimulationResult)
+    from core.data_structures import (ParameterValidation, SimulationError, SimulationResult)  # type: ignore[no-redef]
 
 try:
-    from Tellurium.core.utils import _load_runner
+    from Tellurium.core.utils import _load_runner  # type: ignore[no-redef]
     from Tellurium.core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)
+        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
     from Tellurium.continuous.model_building import (
         build_michaelis_menten_antimony, build_sir_antimony, build_seir_antimony,
-        antimony_to_sbml)
+        antimony_to_sbml)  # type: ignore[no-redef]
 except ModuleNotFoundError:
-    from core.utils import _load_runner
+    from core.utils import _load_runner  # type: ignore[no-redef]
     from core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)
+        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
     from continuous.model_building import (
         build_michaelis_menten_antimony, build_sir_antimony, build_seir_antimony,
-        antimony_to_sbml)
+        antimony_to_sbml)  # type: ignore[no-redef]
 
 def simulate_sbml(sbml_string: str, start: float = 0.0, end: float = 10.0,
                    points: int = 51,

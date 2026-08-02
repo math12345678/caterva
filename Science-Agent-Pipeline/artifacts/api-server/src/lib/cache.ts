@@ -7,7 +7,11 @@ import type { Job, SimulationResponse } from "./queue";
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.resolve(_dirname, "..", "data");
-const CACHE_FILE = process.env["CACHE_FILE"] || path.join(DATA_DIR, "cache.json");
+
+/** Resolve this lazily so tests and embedders can configure CACHE_FILE before use. */
+function cacheFile(): string {
+  return process.env["CACHE_FILE"] || path.join(DATA_DIR, "cache.json");
+}
 
 const SCHEMA_VERSION = 1;
 
@@ -25,17 +29,25 @@ function emptyStore(): CacheStore {
   return { entries: [] };
 }
 
+function normalizeQuery(query: string): string {
+  return query.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
 let store: CacheStore | null = null;
+// Persist operations are serialized so concurrent jobs cannot load the same
+// snapshot and overwrite one another's entries.
+let mutationQueue: Promise<void> = Promise.resolve();
 
 async function ensureDataDir(): Promise<void> {
-  if (!existsSync(DATA_DIR)) {
-    await mkdir(DATA_DIR, { recursive: true });
+  const directory = path.dirname(cacheFile());
+  if (!existsSync(directory)) {
+    await mkdir(directory, { recursive: true });
   }
 }
 
 async function loadStore(): Promise<CacheStore> {
   try {
-    const raw = await readFile(CACHE_FILE, "utf-8");
+    const raw = await readFile(cacheFile(), "utf-8");
     const parsed = JSON.parse(raw) as CacheStore;
     if (Array.isArray(parsed.entries)) {
       return parsed;
@@ -48,7 +60,7 @@ async function loadStore(): Promise<CacheStore> {
 
 async function saveStore(s: CacheStore): Promise<void> {
   await ensureDataDir();
-  await writeFile(CACHE_FILE, JSON.stringify(s, null, 2), "utf-8");
+  await writeFile(cacheFile(), JSON.stringify(s, null, 2), "utf-8");
 }
 
 /**
@@ -73,23 +85,29 @@ export async function restoreCache(): Promise<number> {
 /**
  * Persist a completed/cancelled/failed job to disk.
  */
-export async function persistJob(job: Job): Promise<void> {
-  if (!job.result && !job.error) return;
-  if (job.status !== "completed" && job.status !== "failed" && job.status !== "cancelled") return;
-
-  try {
-    if (!store) {
-      store = await loadStore();
-    }
-    store.entries.push({
-      schemaVersion: SCHEMA_VERSION,
-      createdAt: new Date().toISOString(),
-      job,
-    });
-    await saveStore(store);
-  } catch (err) {
-    logger.warn({ err, jobId: job.jobId }, "Failed to persist job to disk cache");
+export function persistJob(job: Job | undefined): Promise<void> {
+  if (!job || (!job.result && !job.error)) return Promise.resolve();
+  if (job.status !== "completed" && job.status !== "failed" && job.status !== "cancelled") {
+    return Promise.resolve();
   }
+
+  const operation = mutationQueue.then(async () => {
+    try {
+      if (!store) {
+        store = await loadStore();
+      }
+      store.entries.push({
+        schemaVersion: SCHEMA_VERSION,
+        createdAt: new Date().toISOString(),
+        job,
+      });
+      await saveStore(store);
+    } catch (err) {
+      logger.warn({ err, jobId: job.jobId }, "Failed to persist job to disk cache");
+    }
+  });
+  mutationQueue = operation;
+  return operation;
 }
 
 /**
@@ -113,8 +131,16 @@ export function findCachedJob(jobId: string): Job | undefined {
  */
 export function findCachedResultByQuery(query: string): SimulationResponse | undefined {
   if (!store) return undefined;
-  for (const entry of store.entries) {
-    if (entry.job.status === "completed" && entry.job.result && entry.job.query === query) {
+  // Persisted entries are append-only; the newest result must win when a
+  // query has been rerun with different explicit parameters such as a seed.
+  for (let i = store.entries.length - 1; i >= 0; i--) {
+    const entry = store.entries[i];
+    if (
+      entry &&
+      entry.job.status === "completed" &&
+      entry.job.result &&
+      normalizeQuery(entry.job.query) === normalizeQuery(query)
+    ) {
       return entry.job.result;
     }
   }
@@ -125,14 +151,18 @@ export function findCachedResultByQuery(query: string): SimulationResponse | und
  * Reset the in-memory store and optionally delete the cache file.
  * Intended for test use.
  */
-export async function resetCache(deleteFile = false): Promise<void> {
-  store = emptyStore();
-  if (deleteFile) {
-    try {
-      const { unlink } = await import("node:fs/promises");
-      await unlink(CACHE_FILE);
-    } catch {
-      // File may not exist
+export function resetCache(deleteFile = false): Promise<void> {
+  const operation = mutationQueue.then(async () => {
+    store = emptyStore();
+    if (deleteFile) {
+      try {
+        const { unlink } = await import("node:fs/promises");
+        await unlink(cacheFile());
+      } catch {
+        // File may not exist
+      }
     }
-  }
+  });
+  mutationQueue = operation;
+  return operation;
 }

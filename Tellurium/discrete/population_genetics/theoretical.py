@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import math
-import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Sequence
 
 import numpy as np
-import math
 try:
     from Tellurium.discrete.population_genetics.probability import (wright_fisher_transition_matrix)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from discrete.population_genetics.probability import (wright_fisher_transition_matrix)
+    from discrete.population_genetics.probability import (wright_fisher_transition_matrix)  # type: ignore[no-redef]
 
 def kimura_fixation_probability(
     starting_frequency: float,

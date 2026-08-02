@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import math
-import threading
-from dataclasses import dataclass, field
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import List, Sequence, Tuple
 
 import numpy as np
-import math
 def _wf_p_adj(
     p: np.ndarray,
     selection_coefficient: float,

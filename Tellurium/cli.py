@@ -300,7 +300,7 @@ def _cmd_kimura(args: argparse.Namespace) -> int:
 
 
 def _cmd_scenarios(_args: argparse.Namespace) -> int:
-    from Tellurium.tellurium_engine import _SCENARIO_REGISTRY  # noqa: PLC0415
+    from Tellurium.scenarios.wf_scenarios import _SCENARIO_REGISTRY  # noqa: PLC0415
     for name in list_scenarios():
         desc = _SCENARIO_REGISTRY[name].get("description", "")
         print(f"{name:<22} {desc}")
