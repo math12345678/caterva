@@ -10,9 +10,9 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import math
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE)
+    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE)
+    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES)
 
 def _finite_positive(value: Any, label: str, errors: List[str],
                      allow_zero: bool = False) -> bool:
@@ -332,6 +332,44 @@ def validate_ssa_bimolecular_params(
         return ParameterValidation(ok=True, flagged=True, flag_reason=" ".join(reasons))
 
     return ParameterValidation()
+
+
+def validate_ssa_replicates_params(n_replicates: int) -> ParameterValidation:
+    """Check the replicate count for the SSA ensemble view.
+
+    ``n_replicates`` must be a positive integer -- the ensemble mean and
+    standard deviation are defined over a whole number of independent
+    trajectories. Fewer than ``SSA_PLAUSIBLE_MIN_REPLICATES`` (10)
+    replicates makes the sample mean too noisy to compare against the
+    deterministic reference; flagged, not rejected (a student may
+    deliberately be exploring single-seed noise).
+    """
+    errors: List[str] = []
+
+    if isinstance(n_replicates, (bool, np.bool_)):
+        errors.append(
+            "n_replicates must be an integer count, not a boolean")
+    elif not isinstance(n_replicates, (int, np.integer)):
+        errors.append(
+            f"n_replicates must be an integer count, "
+            f"got {type(n_replicates).__name__}")
+    elif n_replicates < 1:
+        errors.append(
+            f"n_replicates must be at least 1 (got {n_replicates}) -- "
+            "an ensemble needs at least one trajectory")
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    if n_replicates < SSA_PLAUSIBLE_MIN_REPLICATES:
+        return ParameterValidation(
+            ok=True,
+            flagged=True,
+            flag_reason=(
+                f"n_replicates={n_replicates} is below "
+                f"{SSA_PLAUSIBLE_MIN_REPLICATES} -- fewer replicates gives "
+                "a noisy estimate of the mean and standard deviation"),
+        )
 
     return ParameterValidation()
 

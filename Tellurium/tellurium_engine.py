@@ -49,6 +49,7 @@ try:
         SSA_PLAUSIBLE_MAX_RATE,
         SSA_PLAUSIBLE_MIN_POPULATION,
         SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE,
+        SSA_PLAUSIBLE_MIN_REPLICATES,
         DEFAULT_RELATIVE_TOLERANCE,
         DEFAULT_ABSOLUTE_TOLERANCE,
         GAMMA_PARAM,
@@ -65,6 +66,7 @@ try:
         validate_md_params,
         validate_ssa_bimolecular_params,
     validate_ssa_params,
+        validate_ssa_replicates_params,
     )
     from Tellurium.core.utils import _fmt, _RESERVED_MODEL_NAMES, _check_model_name, _load_runner
     from Tellurium.continuous.model_building import (
@@ -88,6 +90,7 @@ try:
     from Tellurium.discrete.gillespie_ssa import (
         simulate_gillespie_ssa,
         simulate_gillespie_ssa_bimolecular,
+        simulate_gillespie_ssa_replicates,
     )
     from Tellurium.discrete.molecular_dynamics import (
         lennard_jones_force,
@@ -156,6 +159,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         SSA_PLAUSIBLE_MAX_RATE,
         SSA_PLAUSIBLE_MIN_POPULATION,
         SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE,
+        SSA_PLAUSIBLE_MIN_REPLICATES,
         DEFAULT_RELATIVE_TOLERANCE,
         DEFAULT_ABSOLUTE_TOLERANCE,
         GAMMA_PARAM,
@@ -172,6 +176,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         validate_md_params,
         validate_ssa_bimolecular_params,
     validate_ssa_params,
+        validate_ssa_replicates_params,
     )
     from core.utils import _fmt, _RESERVED_MODEL_NAMES, _check_model_name, _load_runner
     from continuous.model_building import (
@@ -195,6 +200,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
     from discrete.gillespie_ssa import (
         simulate_gillespie_ssa,
         simulate_gillespie_ssa_bimolecular,
+        simulate_gillespie_ssa_replicates,
     )
     from discrete.molecular_dynamics import (
         lennard_jones_force,
@@ -290,6 +296,9 @@ __all__ = [
     "simulate_sir",
     "simulate_gillespie_ssa",
     "simulate_gillespie_ssa_bimolecular",
+    "simulate_gillespie_ssa_replicates",
+    "validate_ssa_replicates_params",
+    "SSA_PLAUSIBLE_MIN_REPLICATES",
     "simulate_two_locus_wright_fisher",
     "simulate_wright_fisher",
     "steady_state",

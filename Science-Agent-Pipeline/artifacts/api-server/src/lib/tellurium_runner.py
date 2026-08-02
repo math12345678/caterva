@@ -13,7 +13,7 @@ Expected input JSON shape:
       "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" |
                  "wright_fisher" | "two_locus_wright_fisher" |
                  "molecular_dynamics" | "gillespie_ssa" |
-                 "gillespie_ssa_bimolecular" | "sbml",
+                 "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates" | "sbml",
       "parameters": { ...domain-specific params... }
     }
 
@@ -74,6 +74,14 @@ MAX_API_WF_REPLICATES = 1_000
 # teaching ceiling, far above any realistic request.
 MAX_API_SSA_POPULATION = 1_000_000
 
+# The SSA ensemble view (Stage 7 Part 2) costs n_replicates x one-run
+# cost. The scalar ceilings below bound each dimension; the product
+# budget bounds the wall-clock total: n_replicates * population must
+# stay within the single-request event budget, so a 1e6-molecule
+# request can only ask for a handful of replicates, and a 1000-run
+# ensemble can only use a small population.
+MAX_API_SSA_REPLICATES = 1_000
+
 # MD cost is O(N^2 * steps) -- pairwise forces, no neighbour lists (ADR 0006
 # put those out of scope). Capping n_steps alone therefore does NOT bound a
 # request, because the quadratic term is unconstrained. Measured at a step
@@ -120,7 +128,7 @@ def _serialise_result(result: Any, domain: str, parameters: Dict[str, Any]) -> D
     """Shared result-serialisation with the boundary validation contract."""
     flagged = bool(getattr(result, "flagged", False))
     validation = getattr(result, "validation", None)
-    return {
+    payload: Dict[str, Any] = {
         "ok": True,
         "domain": domain,
         "parameters": parameters,
@@ -130,6 +138,11 @@ def _serialise_result(result: Any, domain: str, parameters: Dict[str, Any]) -> D
         "flagged": flagged,
         "flagReason": getattr(validation, "flag_reason", None) if flagged else None,
     }
+    replicate_data = getattr(result, "replicate_data", None)
+    if replicate_data is not None:
+        payload["replicateColnames"] = getattr(result, "replicate_colnames", None)
+        payload["replicateData"] = replicate_data
+    return payload
 
 
 def run_mm(params: Dict[str, Any]) -> Dict[str, Any]:
@@ -248,6 +261,45 @@ def run_gillespie_ssa(params: Dict[str, Any]) -> Dict[str, Any]:
     return _serialise_result(
         result, "gillespie_ssa",
         {"a0": a0, "k": k, "end": end, "seed": seed},
+    )
+
+
+def run_gillespie_ssa_replicates(params: Dict[str, Any]) -> Dict[str, Any]:
+    a0 = int(params.get("a0", 100))
+    b0 = params.get("b0")
+    b0 = None if b0 is None else int(b0)
+    k = float(params.get("k", 0.005 if b0 is not None else 0.5))
+    end = float(params.get("end", 10.0))
+    n_replicates = int(params.get("n_replicates", 100))
+
+    population = a0 + (b0 or 0)
+    if population > MAX_API_SSA_POPULATION:
+        raise ValueError(
+            f"initial population {population} exceeds API runtime ceiling "
+            f"(MAX_API_SSA_POPULATION) {MAX_API_SSA_POPULATION}"
+        )
+    if n_replicates > MAX_API_SSA_REPLICATES:
+        raise ValueError(
+            f"n_replicates={n_replicates} exceeds API runtime ceiling "
+            f"(MAX_API_SSA_REPLICATES) {MAX_API_SSA_REPLICATES}"
+        )
+    if n_replicates * population > MAX_API_SSA_POPULATION:
+        raise ValueError(
+            f"n_replicates x initial population {n_replicates * population} "
+            f"exceeds the API runtime ceiling (MAX_API_SSA_POPULATION) "
+            f"{MAX_API_SSA_POPULATION}"
+        )
+
+    seed = params.get("seed")
+    seed = None if seed is None else int(seed)
+    result = tellurium_engine.simulate_gillespie_ssa_replicates(
+        a0=a0, b0=b0, k=k, end=end, n_replicates=n_replicates, seed=seed
+    )
+
+    return _serialise_result(
+        result, "gillespie_ssa_replicates",
+        {"a0": a0, "b0": b0, "k": k, "end": end,
+         "n_replicates": n_replicates, "seed": seed},
     )
 
 
@@ -429,6 +481,7 @@ DISPATCH: Dict[str, str] = {
     "molecular_dynamics": "simulate_molecular_dynamics",
     "gillespie_ssa": "simulate_gillespie_ssa",
     "gillespie_ssa_bimolecular": "simulate_gillespie_ssa_bimolecular",
+    "gillespie_ssa_replicates": "simulate_gillespie_ssa_replicates",
     "sbml": "simulate_sbml",
 }
 
@@ -443,6 +496,7 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "molecular_dynamics": run_molecular_dynamics,
     "gillespie_ssa": run_gillespie_ssa,
     "gillespie_ssa_bimolecular": run_gillespie_ssa_bimolecular,
+    "gillespie_ssa_replicates": run_gillespie_ssa_replicates,
     "sbml": run_sbml,
 }
 

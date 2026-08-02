@@ -618,3 +618,9 @@ SSA_PLAUSIBLE_MAX_RATE = 10.0
 # are dense enough that the trajectory is a random walk far from the ODE
 # reference. Flagged, not rejected.
 SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE = 0.1
+
+# Replicate/ensemble view (Stage 7 Part 2). Fewer than 10 replicates
+# makes the sample mean and standard deviation too noisy to compare
+# meaningfully against the deterministic reference; flagged, not
+# rejected -- a student may deliberately be exploring single-seed noise.
+SSA_PLAUSIBLE_MIN_REPLICATES = 10

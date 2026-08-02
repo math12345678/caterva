@@ -110,6 +110,16 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     ],
   },
   {
+    domain: "gillespie_ssa_replicates",
+    parameters: { a0: 100, k: 0.5, end: 10, n_replicates: 100 },
+    keywords: ["replicates", "many seeds", "multiple runs", "ensemble"],
+    reasoning:
+      "Keywords related to repeated independent runs were found; defaulting to a Gillespie SSA ensemble view over n_replicates seeded trajectories.",
+    modelCitations: [
+      "Gillespie D.T. (1977) Exact stochastic simulation of coupled chemical reactions. The Journal of Physical Chemistry 81(25), 2340-2361.",
+    ],
+  },
+  {
     domain: "gillespie_ssa_bimolecular",
     parameters: { a0: 100, b0: 100, k: 0.005, end: 10 },
     keywords: ["bimolecular", "second order", "second-order", "association", "two reactants", "a + b", "a plus b", "binding"],
@@ -131,7 +141,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
 ];
 
-const PARAMETER_PATTERN = /(km|vmax|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
+const PARAMETER_PATTERN = /(km|vmax|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
 
 /**
  * Extract numeric overrides from the query string.

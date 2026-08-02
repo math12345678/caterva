@@ -31,17 +31,71 @@ from typing import Any, List, Optional
 import numpy as np
 
 try:
-    from Tellurium.core.data_structures import (ModelBuildError, SimulationResult)
+    from Tellurium.core.data_structures import (
+        ModelBuildError, ParameterValidation, SimulationResult)
     from Tellurium.core.validation import (
         validate_ssa_bimolecular_params,
         validate_ssa_params,
+        validate_ssa_replicates_params,
     )
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ModelBuildError, SimulationResult)
+    from core.data_structures import (
+        ModelBuildError, ParameterValidation, SimulationResult)
     from core.validation import (
         validate_ssa_bimolecular_params,
         validate_ssa_params,
+        validate_ssa_replicates_params,
     )
+
+
+def _run_first_order_once(a0: int, k: float, end: float, rng) -> List[List[float]]:
+    """One first-order SSA trajectory (columns time, a, b) from a given RNG."""
+    a = int(a0)
+    b = 0
+    t = 0.0
+    data: List[List[float]] = [[0.0, float(a), float(b)]]
+
+    # k == 0: propensity is identically zero, no reaction ever fires.
+    while t < end and a > 0 and k > 0:
+        propensity = k * a
+        tau = -math.log(rng.uniform(0.0, 1.0)) / propensity
+        if t + tau > end:
+            break
+        t += tau
+        a -= 1
+        b += 1
+        data.append([t, float(a), float(b)])
+
+    # Final row snapped to the horizon, so the trajectory is comparable
+    # across domains (all other engines include their endpoint).
+    data.append([float(end), float(a), float(b)])
+    return data
+
+
+def _run_bimolecular_once(
+    a0: int, b0: int, k: float, end: float, rng
+) -> List[List[float]]:
+    """One bimolecular SSA trajectory (columns time, a, b, c) from an RNG."""
+    a = int(a0)
+    b = int(b0)
+    c = 0
+    t = 0.0
+    data: List[List[float]] = [[0.0, float(a), float(b), float(c)]]
+
+    # k == 0 or either species exhausted: propensity is zero, no event.
+    while t < end and a > 0 and b > 0 and k > 0:
+        propensity = k * a * b
+        tau = -math.log(rng.uniform(0.0, 1.0)) / propensity
+        if t + tau > end:
+            break
+        t += tau
+        a -= 1
+        b -= 1
+        c += 1
+        data.append([t, float(a), float(b), float(c)])
+
+    data.append([float(end), float(a), float(b), float(c)])
+    return data
 
 
 def simulate_gillespie_ssa(
@@ -71,26 +125,7 @@ def simulate_gillespie_ssa(
     validation.raise_if_invalid()
 
     rng = np.random.default_rng(seed)
-
-    a = int(a0)
-    b = 0
-    t = 0.0
-    data: List[List[float]] = [[0.0, float(a), float(b)]]
-
-    # k == 0: propensity is identically zero, no reaction ever fires.
-    while t < end and a > 0 and k > 0:
-        propensity = k * a
-        tau = -math.log(rng.uniform(0.0, 1.0)) / propensity
-        if t + tau > end:
-            break
-        t += tau
-        a -= 1
-        b += 1
-        data.append([t, float(a), float(b)])
-
-    # Final row snapped to the horizon, so the trajectory is comparable
-    # across domains (all other engines include their endpoint).
-    data.append([float(end), float(a), float(b)])
+    data = _run_first_order_once(int(a0), k, end, rng)
 
     return SimulationResult(
         colnames=["time", "a", "b"],
@@ -129,30 +164,137 @@ def simulate_gillespie_ssa_bimolecular(
     validation.raise_if_invalid()
 
     rng = np.random.default_rng(seed)
-
-    a = int(a0)
-    b = int(b0)
-    c = 0
-    t = 0.0
-    data: List[List[float]] = [[0.0, float(a), float(b), float(c)]]
-
-    # k == 0 or either species exhausted: propensity is zero, no event.
-    while t < end and a > 0 and b > 0 and k > 0:
-        propensity = k * a * b
-        tau = -math.log(rng.uniform(0.0, 1.0)) / propensity
-        if t + tau > end:
-            break
-        t += tau
-        a -= 1
-        b -= 1
-        c += 1
-        data.append([t, float(a), float(b), float(c)])
-
-    data.append([float(end), float(a), float(b), float(c)])
+    data = _run_bimolecular_once(int(a0), int(b0), k, end, rng)
 
     return SimulationResult(
         colnames=["time", "a", "b", "c"],
         data=data,
         model_name="gillespie_ssa_bimolecular",
         validation=validation,
+    )
+
+
+def _merge_validations(
+    reaction: ParameterValidation, replicates: ParameterValidation
+) -> ParameterValidation:
+    """Combine a reaction validation with the replicate-count validation.
+
+    A rejection in either is a rejection; flag reasons are joined so the
+    student sees every implausibility at once.
+    """
+    if not reaction.ok or not replicates.ok:
+        return ParameterValidation(ok=False, errors=reaction.errors + replicates.errors)
+    if reaction.flagged or replicates.flagged:
+        reasons = [r for r in (reaction.flag_reason, replicates.flag_reason) if r]
+        return ParameterValidation(ok=True, flagged=True, flag_reason=" ".join(reasons))
+    return ParameterValidation()
+
+
+def simulate_gillespie_ssa_replicates(
+    a0: float,
+    k: float,
+    end: float,
+    n_replicates: int,
+    seed: int | None = None,
+    b0: float | None = None,
+) -> SimulationResult:
+    """Simulate the SSA ensemble view: ``n_replicates`` independent runs.
+
+    The teaching purpose is comparing the *sample* mean and spread of
+    the stochastic process against the deterministic reference. Each
+    replicate is an independent SSA trajectory; the returned mean
+    trajectory is the sample mean of the step functions on a fixed
+    uniform time grid, and ``replicate_data`` holds each replicate's
+    final counts.
+
+    Args:
+        a0: initial number of A molecules (positive integer)
+        k: rate constant (first-order per molecule, or second-order per
+            molecule pair when ``b0`` is given)
+        end: simulation time horizon
+        n_replicates: number of independent trajectories (positive
+            integer)
+        seed: RNG seed for the whole ensemble (ADR 0005). Replicate rngs
+            are derived deterministically: the master
+            ``numpy.random.default_rng(seed)`` draws one 63-bit integer
+            per replicate, and each replicate uses
+            ``numpy.random.default_rng(that integer)``. A fixed seed
+            therefore reproduces the entire ensemble bit-identically.
+        b0: when given, simulate the bimolecular association
+            ``A + B -> C`` instead of first-order decay
+
+    Returns:
+        SimulationResult with mean-trajectory columns
+        ``["time", "mean_a", "mean_b"]`` (plus ``"mean_c"`` when
+        ``b0`` is given) on a 101-point grid from 0 to ``end``,
+        ``replicate_colnames`` of final counts and ``replicate_data``
+        one row per replicate.
+
+    Raises:
+        ModelBuildError: if parameters are invalid
+    """
+    if b0 is None:
+        reaction_validation = validate_ssa_params(a0, k, end)
+    else:
+        reaction_validation = validate_ssa_bimolecular_params(a0, b0, k, end)
+    replicate_validation = validate_ssa_replicates_params(n_replicates)
+    validation = _merge_validations(reaction_validation, replicate_validation)
+    validation.raise_if_invalid()
+
+    master = np.random.default_rng(seed)
+    replicate_seeds = master.integers(0, 2**63, size=int(n_replicates))
+    replicate_seeds = [int(s) for s in replicate_seeds]
+
+    if b0 is None:
+        colnames = ["time", "mean_a", "mean_b"]
+        replicate_colnames = ["final_a"]
+    else:
+        colnames = ["time", "mean_a", "mean_b", "mean_c"]
+        replicate_colnames = ["final_a", "final_b", "final_c"]
+
+    grid = np.linspace(0.0, float(end), 101)
+    mean_a = np.zeros_like(grid)
+    mean_b = np.zeros_like(grid)
+    mean_c = np.zeros_like(grid)
+    replicate_data: List[List[float]] = []
+
+    for rep_seed in replicate_seeds:
+        rep_rng = np.random.default_rng(rep_seed)
+        if b0 is None:
+            rows = _run_first_order_once(int(a0), k, end, rep_rng)
+            finals = [rows[-1][1]]
+            replicate_data.append(finals)
+            times = np.array([row[0] for row in rows])
+            a_col = np.array([row[1] for row in rows])
+            b_col = np.array([row[2] for row in rows])
+            mean_a += np.interp(grid, times, a_col)
+            mean_b += np.interp(grid, times, b_col)
+        else:
+            rows = _run_bimolecular_once(int(a0), int(b0), k, end, rep_rng)
+            replicate_data.append([rows[-1][1], rows[-1][2], rows[-1][3]])
+            times = np.array([row[0] for row in rows])
+            a_col = np.array([row[1] for row in rows])
+            b_col = np.array([row[2] for row in rows])
+            c_col = np.array([row[3] for row in rows])
+            mean_a += np.interp(grid, times, a_col)
+            mean_b += np.interp(grid, times, b_col)
+            mean_c += np.interp(grid, times, c_col)
+
+    n = int(n_replicates)
+    data: List[List[float]] = []
+    for i, t in enumerate(grid):
+        row = [float(t), float(mean_a[i] / n), float(mean_b[i] / n)]
+        if b0 is not None:
+            row.append(float(mean_c[i] / n))
+        data.append(row)
+
+    return SimulationResult(
+        colnames=colnames,
+        data=data,
+        model_name=(
+            "gillespie_ssa_bimolecular_replicates"
+            if b0 is not None else "gillespie_ssa_replicates"),
+        validation=validation,
+        replicate_data=replicate_data,
+        replicate_colnames=replicate_colnames,
     )

@@ -31,6 +31,7 @@ const VALID: Record<keyof typeof SimulationParameterSchemas, Record<string, unkn
   },
   gillespie_ssa: { a0: 1000, k: 0.5, end: 10 },
   gillespie_ssa_bimolecular: { a0: 100, b0: 100, k: 0.005, end: 10 },
+  gillespie_ssa_replicates: { a0: 100, k: 0.5, end: 10, n_replicates: 100 },
   sbml: {
     sbml_string: "model M()\n  A = 1\nend",
     start: 0,
@@ -56,6 +57,7 @@ const INVALID: Record<string, Record<string, unknown>> = {
   molecular_dynamics: { n_particles: 10, temperature: 0.4 }, // missing timestep, n_steps
   gillespie_ssa: { a0: 1000, k: 0.5 }, // missing end
   gillespie_ssa_bimolecular: { a0: 100, b0: 100, k: 0.005 }, // missing end
+  gillespie_ssa_replicates: { a0: 100, k: 0.5, end: 10 }, // missing n_replicates
   sbml: { start: 0, end: 1, points: 11 }, // missing sbml_string
 };
 
