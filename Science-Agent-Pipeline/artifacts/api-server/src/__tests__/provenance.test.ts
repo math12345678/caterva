@@ -340,11 +340,70 @@ describe("Target G — the golden set flows through the API (Stage 5 Part 2)", (
 });
 
 describe("Target H — the verified/flagged citation-status contract (Stage 5 Part 3)", () => {
-  it("exact BRENDA match -> citationStatus 'verified'", async () => {
+  // ADR 0010 changed what 'verified' means. Before, an exact organism and
+  // substrate match from a primary source was sufficient. Now STRENDA
+  // completeness is also required: a Km measured at an unreported pH or
+  // temperature cannot be reproduced or compared, so it cannot be claimed
+  // as verified however exact the organism match is.
+  //
+  // The golden LDH record is a real captured BRENDA row reading "pH 8.0,
+  // temperature not specified in the publication". It is therefore an
+  // exact match that is NOT verifiable -- previously an impossible
+  // combination, and exactly the case that makes the new rule load-bearing.
+  it("exact BRENDA match with incomplete conditions -> 'flagged', not 'verified'", async () => {
     const resolved = await resolveQuery("simulate lactate dehydrogenase");
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
+    // Not cross-species -- the organism matched exactly. The degradation is
+    // driven purely by the missing assay conditions.
+    expect(km.organism).toBe("Homo sapiens");
+    expect(km.citationStatus).toBe("flagged");
+    expect(km.strendaStatus).toBe("incomplete");
+  });
+
+  it("exact BRENDA match with complete conditions -> citationStatus 'verified'", async () => {
+    // ADR 0010 carried item 2: a golden tuple with real assay conditions.
+    //
+    // Hand-verified against fixtures/brenda_ache_fixture.html, which
+    // documents this row as live-captured (not a synthetic edge case):
+    //   AChE (EC 3.1.1.7) | Homo sapiens | Acetylcholine | Km 0.0714 mM
+    //   "in 0.1 M MOPS buffer (pH 7.4), at 37 C" | BRENDA ref 713996
+    //
+    // This is the positive control for the rule above. Without it, Target H
+    // could pass with a resolver that never returns 'verified' at all.
+    vi.mocked(resolveKineticValue).mockResolvedValueOnce({
+      found: true,
+      km: 0.0714,
+      unit: "mM",
+      organism: "Homo sapiens",
+      source: "brenda_exact",
+      crossSpecies: false,
+      citation: {
+        source: "BRENDA",
+        referenceId: "713996",
+        url: "https://www.brenda-enzymes.org/enzyme.php?ecno=3.1.1.7",
+      },
+      assayConditions: {
+        ph: 7.4,
+        temperatureC: 37,
+        buffer: "0.1 M MOPS buffer",
+        unreported: [],
+      },
+      literatureCandidates: [],
+      logs: ["Looked up Km for acetylcholinesterase (3.1.1.7)"],
+    });
+    const resolved = await resolveQuery("simulate acetylcholinesterase");
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("resolved");
     expect(km.citationStatus).toBe("verified");
+    expect(km.strendaStatus).toBe("complete");
+    expect(km.assayConditions).toEqual({
+      ph: 7.4,
+      temperatureC: 37,
+      buffer: "0.1 M MOPS buffer",
+    });
+    // A complete record has nothing to warn about.
+    expect(km.note).toBeUndefined();
   });
 
   it("cross-species fallback -> citationStatus 'flagged'", async () => {
@@ -452,6 +511,31 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
   });
 
   it("the resolved km itself carries the lookup note, not the narrowness note", async () => {
+    // This test previously asserted `note` was undefined, which ADR 0010
+    // now deliberately contradicts: a resolved kinetic constant with
+    // incomplete assay conditions carries a note naming what is missing.
+    // Asserting undefined would forbid that explanation from reaching the
+    // student -- so the assertion is narrowed to its actual intent rather
+    // than relaxed. The point was always that the resolved entry does not
+    // inherit the *narrowness* note meant for unresolvable parameters.
+    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("resolved");
+    expect(km.note).not.toContain("No literature lookup exists");
+    // The note it does carry is the STRENDA degradation, and it names the
+    // specific field that was missing rather than warning generically.
+    expect(km.note).toContain("temperature");
+    expect(km.note).toContain("STRENDA");
+  });
+
+  it("a STRENDA-complete resolved km carries no note at all", async () => {
+    // The pairing that keeps the test above honest: the note must be a
+    // consequence of incompleteness, not something every resolved entry
+    // carries regardless.
+    vi.mocked(resolveKineticValue).mockResolvedValueOnce({
+      ...GOLDEN_LDH_RESULT,
+      assayConditions: { ph: 7.4, temperatureC: 37, buffer: null, unreported: [] },
+    });
     const resolved = await resolveQuery("simulate lactate dehydrogenase");
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");

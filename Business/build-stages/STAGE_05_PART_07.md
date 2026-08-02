@@ -132,10 +132,8 @@ labelled `verified`.
 
 1. ~~**Extract pH and temperature in `Tests/brenda_client.py`** from the
    commentary field.~~ **Closed 2026-08-02.** See §10.
-2. **A golden tuple with real assay conditions** — hand-verified
-   enzyme/substrate/Km/pH/temperature/citation — asserted end to end. Stage 5
-   Part 5 established the golden-tuple pattern; it now needs the conditions
-   fields.
+2. ~~**A golden tuple with real assay conditions.**~~ **Closed 2026-08-02.**
+   See §11.
 3. **`vmax` and `kcat`** are named in `STRENDA_GOVERNED_FIELDS` with no lookup
    path. When one is added, the requirement applies automatically.
 
@@ -222,3 +220,73 @@ the missing field.
 That is the correct result. The publication did not report its assay
 temperature, so Terrium cannot claim the value is verified. It says so, and
 says why.
+
+## 11. The golden tuple, and what the fixture audit found
+
+Two failures survived the §10 fix. Both traced to `GOLDEN_LDH_RESULT` — the
+mock the whole provenance suite treats as ground truth — carrying no assay
+conditions. The obvious repair was to add some. **That would have been
+fabrication**, and checking first is what prevented it.
+
+### Every row in the golden LDH record is STRENDA-incomplete
+
+The Km 10.73 mM tuple — Terrium's canonical "exact match → verified" example —
+is a real captured BRENDA row reading *"pH 8.0, temperature not specified in
+the publication."* So is every other ref-740253 row. The two pyruvate rows
+carry no commentary at all.
+
+Adding a temperature to make the test pass would have invented a number the
+source explicitly states was never reported, and written it into the one
+fixture the suite trusts most. The Stage 4 fabricated-citation failure in a
+new costume.
+
+### The consequence: `verified` means something stricter now
+
+Target H asserted *exact BRENDA match → `verified`*. Under ADR 0010 that is no
+longer sound. Exactness of the organism match and completeness of the
+reporting are independent axes, and the golden LDH row occupies a cell that
+was previously assumed empty: **an exact match that is not verifiable.**
+
+The test was split rather than relaxed:
+
+- **`exact match + incomplete conditions → 'flagged'`** — asserts `organism`
+  is still `Homo sapiens`, so the degradation is provably driven by the
+  missing conditions and not by a cross-species fallback.
+- **`exact match + complete conditions → 'verified'`** — the positive
+  control. Without it, Target H would pass against a resolver that never
+  returns `verified` at all.
+
+### The golden tuple (carried item 2, closed)
+
+A fixture sweep found 5 STRENDA-complete rows in 14. The LDH candidate
+(Km 0.045, ref 998877, pH 7.4, 37 °C) was **rejected**: the fixture header
+discloses that row as a synthetic structural edge case for testing
+substrate-exclusion, not live-captured data. It would have looked perfect in
+a diff.
+
+The tuple used is documented as live-captured:
+
+> **AChE** (EC 3.1.1.7) · *Homo sapiens* · Acetylcholine · **Km 0.0714 mM**
+> *"in 0.1 M MOPS buffer (pH 7.4), at 37 °C"* · BRENDA ref 713996
+
+Exact organism match, STRENDA-complete, real. It resolves as `verified` /
+`complete` with no note.
+
+### Target I's assertion was wrong, not its intent
+
+Target I asserted a resolved km carries `note === undefined`. ADR 0010
+deliberately attaches a note naming the missing field, so that assertion now
+forbids the degradation message from reaching the student. Its actual intent —
+the resolved entry must not inherit the *narrowness* note meant for
+unresolvable parameters — was preserved by asserting the note is **not** the
+narrowness string while **is** the STRENDA one. A paired test asserts a
+complete record carries no note at all, so the note is provably a consequence
+of incompleteness rather than boilerplate on every resolved entry.
+
+### Verification
+
+Eleven assertions against the compiled module, including the one that keeps
+the rule from over-reaching: **complete conditions do not promote a
+cross-species match to `verified`.** `buildResolvedKineticProvenance`
+degrades only. `tsc --strict` clean; 182 Python tests pass; all five repo
+guards exit 0.
