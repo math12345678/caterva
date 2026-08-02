@@ -41,13 +41,14 @@ pass every known spelling variant for a substrate name when they have one.
 """
 
 import re
-from typing import Optional
+from typing import List, Optional
 
 import httpx
 from bs4 import BeautifulSoup
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import enzyme_lookup
+from assay_conditions import parse_assay_conditions
 
 
 class BRENDAKmEntry(BaseModel):
@@ -56,7 +57,24 @@ class BRENDAKmEntry(BaseModel):
     substrate: str
     organism: str
     uniprot: Optional[str] = None
+    #: Raw commentary cell from BRENDA, e.g. "pH 8.5, 25°C, isozyme H4".
     conditions: Optional[str] = None
+    # --- Structured assay conditions, parsed from `conditions` -------------
+    #
+    # STRENDA requires temperature and pH for all reported kinetic data
+    # ("...MUST always be included, even if previously published",
+    # Guidelines v1.4.0). Km is a property of an enzyme *measured under
+    # conditions* and moves with both, so a Km without them cannot be
+    # reproduced or compared. BRENDA supplies them in the commentary; before
+    # this they were captured as raw text and never read. See ADR 0010.
+    #
+    # None means "not available", never a default. Nothing here is guessed.
+    assay_ph: Optional[float] = None
+    assay_temperature_c: Optional[float] = None
+    assay_buffer: Optional[str] = None
+    #: Fields BRENDA explicitly states the original publication did not
+    #: report -- a fact about the literature, distinct from a parse failure.
+    assay_unreported: List[str] = Field(default_factory=list)
     reference_id: Optional[str] = None
     ec_number: Optional[str] = None
     flagged: bool = False
@@ -405,6 +423,10 @@ def parse_brenda_km_html(
                 "value has not been confirmed to be a true Km"
             )
 
+        # Parse the commentary into structured assay conditions (ADR 0010).
+        # Never raises; absent fields stay None rather than being defaulted.
+        parsed_conditions = parse_assay_conditions(conditions)
+
         results.append(
             BRENDAKmEntry(
                 km_value=km_value,
@@ -413,6 +435,10 @@ def parse_brenda_km_html(
                 organism=row_organism,
                 uniprot=uniprot,
                 conditions=conditions,
+                assay_ph=parsed_conditions.ph,
+                assay_temperature_c=parsed_conditions.temperature_c,
+                assay_buffer=parsed_conditions.buffer,
+                assay_unreported=parsed_conditions.explicitly_unreported,
                 reference_id=ref_id,
                 ec_number=ec_number,
                 flagged=flagged,
