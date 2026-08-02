@@ -8,7 +8,7 @@ VENV    := .venv
 BIN     := $(VENV)/bin
 
 .DEFAULT_GOAL := help
-.PHONY: help setup check check-python test test-fast test-sim test-lit test-slow cli clean
+.PHONY: help setup check check-python require-pytest test test-fast test-sim test-lit test-slow cli clean
 
 help:
 	@echo "Terrium"
@@ -49,7 +49,9 @@ setup: check-python
 # bare system python3.12 and `make test` died with "No module named pytest" --
 # an accurate message that named the wrong problem. `is_usable` makes the
 # selection reflect what the recipe needs; `check-python` explains the
-# remaining cases rather than failing bare.
+# remaining cases rather than failing bare, and `require-pytest` (a separate
+# target, depended on only by the targets that RUN tests) explains the
+# no-pytest case without blocking `setup`, which is what installs it.
 PY := $(shell \
 	is_supported() { "$$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12)) else 1)' >/dev/null 2>&1; }; \
 	is_usable() { "$$1" -c 'import pytest' >/dev/null 2>&1; }; \
@@ -101,8 +103,14 @@ check-python:
 		echo "    rm -rf $(VENV) && make setup"; \
 		exit 2; \
 	fi
+	@echo ">> using $(PY)"
+
+# Targets that RUN tests need pytest; `setup` is the target that installs it,
+# so it must not require it. Keeping this separate from check-python is the
+# whole point: depending on it from `setup` makes `make setup` fail on the
+# very condition it exists to fix.
+require-pytest: check-python
 	@if ! "$(PY)" -c 'import pytest' >/dev/null 2>&1; then \
-		echo ">> using $(PY)"; \
 		echo ""; \
 		echo "That interpreter is a supported version but has no pytest, so no"; \
 		echo "test target can run. Create the project venv:"; \
@@ -113,31 +121,30 @@ check-python:
 		echo "    $(PY) -m pip install -r requirements-dev.txt)"; \
 		exit 2; \
 	fi
-	@echo ">> using $(PY)"
 
 check: check-python
 	@"$(PY)" scripts/check_env.py
 
-test: check-python
+test: require-pytest
 	@echo ">> simulation engine"
 	@cd Tellurium && "$(PY)" -m pytest
 	@echo ""
 	@echo ">> literature layer"
 	@cd Tests && "$(PY)" -m pytest
 
-test-fast: check-python
+test-fast: require-pytest
 	@cd Tellurium && "$(PY)" -m pytest \
 		--ignore=tests/test_properties.py \
 		--ignore=tests/test_numerical_robustness.py
 	@cd Tests && "$(PY)" -m pytest
 
-test-sim: check-python
+test-sim: require-pytest
 	@cd Tellurium && "$(PY)" -m pytest
 
-test-lit: check-python
+test-lit: require-pytest
 	@cd Tests && "$(PY)" -m pytest
 
-test-slow: check-python
+test-slow: require-pytest
 	@cd Tellurium && "$(PY)" -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
 
