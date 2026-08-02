@@ -8,24 +8,30 @@ import {
 } from "../lib/provenance";
 import { resolveKineticValue } from "../lib/scienceAgent";
 
+// The golden record captured from the offline resolution chain
+// (Tests/test_golden_set.py, G1: LDH/lactate/Homo sapiens — hand-verified
+// against the BRENDA fixture: 10.73 mM, ref 740253). The mock payload IS
+// this record, so the TS pairing must preserve the literature tuple.
+const GOLDEN_LDH_RESULT = {
+  found: true,
+  km: 10.73,
+  unit: "mM",
+  organism: "Homo sapiens",
+  source: "brenda_exact",
+  citation: {
+    source: "BRENDA",
+    referenceId: "740253",
+    url: "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+  },
+  literatureCandidates: [],
+  logs: ["Looked up Km for lactate dehydrogenase (1.1.1.27)"],
+};
+
 vi.mock("../lib/scienceAgent", async (importOriginal) => {
   const original = await importOriginal<typeof import("../lib/scienceAgent")>();
   return {
     ...original,
-    resolveKineticValue: vi.fn(async () => ({
-      found: true,
-      km: 0.2,
-      unit: "mM",
-      organism: "Homo sapiens",
-      source: "BRENDA EC 1.1.1.27",
-      citation: {
-        source: "BRENDA",
-        referenceId: "12345",
-        url: "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
-      },
-      literatureCandidates: [],
-      logs: ["Looked up Km for lactate dehydrogenase (1.1.1.27)"],
-    })),
+    resolveKineticValue: vi.fn(async () => GOLDEN_LDH_RESULT),
   };
 });
 
@@ -264,7 +270,43 @@ describe("Target F — the resolved path degrades honestly when the citation has
     const resolved = await resolveQuery("simulate lactate dehydrogenase");
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
-    expect(km.citation).toContain("(ref 12345)");
+    expect(km.citation).toContain("(ref 740253)");
+  });
+});
+
+describe("Target G — the golden set flows through the API (Stage 5 Part 2)", () => {
+  it("G1: LDH/lactate/Homo sapiens -> km 10.73 with BRENDA ref 740253", async () => {
+    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    expect(resolved.parameters["km"]).toBe(10.73);
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("resolved");
+    expect(km.source).toBe("brenda_exact");
+    expect(km.organism).toBe("Homo sapiens");
+    expect(km.citation).toContain("(ref 740253)");
+    expect(km.citation).toContain("https://www.brenda-enzymes.org/");
+    const flag = resolved.provenance.flags.find((f) => /resolved km/i.test(f));
+    expect(flag).toMatch(/10\.73/);
+  });
+
+  it("a wrong-organism swap makes the golden assertion fail (sensitivity)", async () => {
+    // The G3 golden record (LDH via cross-species fallback): a plausible
+    // wrong answer for a Homo sapiens query. If the pipeline ever lets this
+    // through, the G1 assertions above must fail — so this test proves the
+    // golden assertions are sensitive, not vacuous.
+    vi.mocked(resolveKineticValue).mockResolvedValueOnce({
+      ...GOLDEN_LDH_RESULT,
+      km: 0.0026,
+      organism: "Sus scrofa",
+      source: "brenda_cross_species",
+      citation: {
+        ...GOLDEN_LDH_RESULT.citation,
+        referenceId: "740001",
+      },
+    });
+    const swapped = await resolveQuery("simulate lactate dehydrogenase");
+    expect(swapped.parameters["km"]).not.toBe(10.73);
+    expect(swapped.parameterProvenance["km"]!.citation).not.toContain("(ref 740253)");
+    expect(swapped.parameterProvenance["km"]!.organism).toBe("Sus scrofa");
   });
 });
 
