@@ -12,7 +12,7 @@ Expected input JSON shape:
     {
       "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" |
                  "wright_fisher" | "two_locus_wright_fisher" |
-                 "molecular_dynamics" | "sbml",
+                 "molecular_dynamics" | "gillespie_ssa" | "sbml",
       "parameters": { ...domain-specific params... }
     }
 
@@ -67,6 +67,11 @@ MAX_API_MONTE_CARLO_SAMPLES = 1_000_000
 MAX_API_MD_STEPS = 10_000
 MAX_API_WF_GENERATIONS = 10_000
 MAX_API_WF_REPLICATES = 1_000
+
+# SSA cost is O(initial population): each reaction event consumes one
+# molecule of A. 1e6 events is a few seconds in the engine — a hard
+# teaching ceiling, far above any realistic request.
+MAX_API_SSA_POPULATION = 1_000_000
 
 # MD cost is O(N^2 * steps) -- pairwise forces, no neighbour lists (ADR 0006
 # put those out of scope). Capping n_steps alone therefore does NOT bound a
@@ -223,6 +228,28 @@ def run_monte_carlo_pi(params: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+def run_gillespie_ssa(params: Dict[str, Any]) -> Dict[str, Any]:
+    a0 = int(params.get("a0", 1000))
+    k = float(params.get("k", 0.5))
+    end = float(params.get("end", 10.0))
+    if a0 > MAX_API_SSA_POPULATION:
+        raise ValueError(
+            f"a0={a0} exceeds API runtime ceiling "
+            f"(MAX_API_SSA_POPULATION) {MAX_API_SSA_POPULATION}"
+        )
+
+    seed = params.get("seed")
+    seed = None if seed is None else int(seed)
+    result = tellurium_engine.simulate_gillespie_ssa(
+        a0=a0, k=k, end=end, seed=seed
+    )
+
+    return _serialise_result(
+        result, "gillespie_ssa",
+        {"a0": a0, "k": k, "end": end, "seed": seed},
+    )
+
+
 def run_wright_fisher(params: Dict[str, Any]) -> Dict[str, Any]:
     population_size = int(params.get("population_size", 100))
     starting_frequency = float(params.get("starting_frequency", 0.5))
@@ -376,6 +403,7 @@ DISPATCH: Dict[str, str] = {
     "wright_fisher": "simulate_wright_fisher",
     "two_locus_wright_fisher": "simulate_two_locus_wright_fisher",
     "molecular_dynamics": "simulate_molecular_dynamics",
+    "gillespie_ssa": "simulate_gillespie_ssa",
     "sbml": "simulate_sbml",
 }
 
@@ -388,6 +416,7 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "wright_fisher": run_wright_fisher,
     "two_locus_wright_fisher": run_two_locus_wright_fisher,
     "molecular_dynamics": run_molecular_dynamics,
+    "gillespie_ssa": run_gillespie_ssa,
     "sbml": run_sbml,
 }
 

@@ -104,6 +104,12 @@ export const SimulationParameterSchemas: Record<
     n_steps: integer,
     seed: integer.nullish(),
   }),
+  gillespie_ssa: z.object({
+    a0: integer,
+    k: numeric,
+    end: numeric,
+    seed: integer.nullish(),
+  }),
   sbml: z.object({
     sbml_string: z.string(),
     start: optionalNumeric,

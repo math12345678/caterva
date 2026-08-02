@@ -597,3 +597,18 @@ MD_PLAUSIBLE_TEMPERATURE_LOW = 0.1
 # fully intact (0 escaped, Rg growth < 1x). Above this the flag warns
 # of evaporation.
 MD_PLAUSIBLE_TEMPERATURE_HIGH = 0.8
+
+# ---------------------------------------------------------------------------
+# Gillespie SSA (ADR 0009). First-order decay A -> B.
+# ---------------------------------------------------------------------------
+
+# Below 30 molecules the stochastic trajectory visibly deviates from the
+# deterministic closed form; valid but likely not the intended teaching
+# scenario — flagged, not rejected (a student may deliberately model
+# small-population noise).
+SSA_PLAUSIBLE_MIN_POPULATION = 30
+
+# Rate constants above 10 per time unit mean thousands of events per time
+# unit — the simulation is valid but the trajectory is a dense random walk
+# far from the closed form; flagged, not rejected.
+SSA_PLAUSIBLE_MAX_RATE = 10.0

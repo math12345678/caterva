@@ -21,6 +21,7 @@ export const simulationsTable = pgTable("simulations", {
       "wright_fisher",
       "two_locus_wright_fisher",
       "molecular_dynamics",
+      "gillespie_ssa",
       "sbml",
     ],
   }).notNull(),

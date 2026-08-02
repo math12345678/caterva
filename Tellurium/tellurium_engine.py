@@ -46,6 +46,8 @@ try:
         MD_PLAUSIBLE_MAX_TIMESTEP,
         MD_PLAUSIBLE_TEMPERATURE_LOW,
         MD_PLAUSIBLE_TEMPERATURE_HIGH,
+        SSA_PLAUSIBLE_MAX_RATE,
+        SSA_PLAUSIBLE_MIN_POPULATION,
         DEFAULT_RELATIVE_TOLERANCE,
         DEFAULT_ABSOLUTE_TOLERANCE,
         GAMMA_PARAM,
@@ -60,6 +62,7 @@ try:
         validate_monte_carlo_params,
         validate_wright_fisher_params,
         validate_md_params,
+        validate_ssa_params,
     )
     from Tellurium.core.utils import _fmt, _RESERVED_MODEL_NAMES, _check_model_name, _load_runner
     from Tellurium.continuous.model_building import (
@@ -80,6 +83,7 @@ try:
     )
     from Tellurium.discrete.pcr import simulate_pcr
     from Tellurium.discrete.monte_carlo import simulate_monte_carlo_pi
+    from Tellurium.discrete.gillespie_ssa import simulate_gillespie_ssa
     from Tellurium.discrete.molecular_dynamics import (
         lennard_jones_force,
         lj_cluster_positions,
@@ -144,6 +148,8 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         MD_PLAUSIBLE_MAX_TIMESTEP,
         MD_PLAUSIBLE_TEMPERATURE_LOW,
         MD_PLAUSIBLE_TEMPERATURE_HIGH,
+        SSA_PLAUSIBLE_MAX_RATE,
+        SSA_PLAUSIBLE_MIN_POPULATION,
         DEFAULT_RELATIVE_TOLERANCE,
         DEFAULT_ABSOLUTE_TOLERANCE,
         GAMMA_PARAM,
@@ -158,6 +164,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         validate_monte_carlo_params,
         validate_wright_fisher_params,
         validate_md_params,
+        validate_ssa_params,
     )
     from core.utils import _fmt, _RESERVED_MODEL_NAMES, _check_model_name, _load_runner
     from continuous.model_building import (
@@ -178,6 +185,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
     )
     from discrete.pcr import simulate_pcr
     from discrete.monte_carlo import simulate_monte_carlo_pi
+    from discrete.gillespie_ssa import simulate_gillespie_ssa
     from discrete.molecular_dynamics import (
         lennard_jones_force,
         lj_cluster_positions,
@@ -235,6 +243,8 @@ __all__ = [
     "PCR_MAX_EFFICIENCY",
     "PCR_MIN_EFFICIENCY",
     "PCR_PLAUSIBLE_LOW_EFFICIENCY",
+    "SSA_PLAUSIBLE_MAX_RATE",
+    "SSA_PLAUSIBLE_MIN_POPULATION",
     "WF_PLAUSIBLE_MAX_GENERATIONS",
     "WF_PLAUSIBLE_MAX_MUTATION_RATE",
     "WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT",
@@ -267,6 +277,7 @@ __all__ = [
     "simulate_sbml",
     "simulate_seir",
     "simulate_sir",
+    "simulate_gillespie_ssa",
     "simulate_two_locus_wright_fisher",
     "simulate_wright_fisher",
     "steady_state",
@@ -279,6 +290,7 @@ __all__ = [
     "validate_sbml",
     "validate_seir_params",
     "validate_sir_params",
+    "validate_ssa_params",
     "validate_wright_fisher_params",
     "wright_fisher_expected_absorption_time",
     "wright_fisher_expected_fixation_time",

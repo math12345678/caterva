@@ -10,9 +10,9 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 import math
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH)
+    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH)
+    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE)
 
 def _finite_positive(value: Any, label: str, errors: List[str],
                      allow_zero: bool = False) -> bool:
@@ -215,6 +215,60 @@ def validate_pcr_params(n0: float, efficiency: float,
                 "real but poor (degraded template, weak primers, or "
                 "inhibitors are the usual causes)"),
         )
+
+    return ParameterValidation()
+
+
+def validate_ssa_params(a0: float, k: float, end: float) -> ParameterValidation:
+    """Check a Gillespie SSA parameter set (first-order decay A -> B).
+
+    a0 is the initial molecule count of A and must be a positive integer —
+    the SSA operates on whole molecules. k is the first-order rate constant
+    per molecule per time unit; zero is physically valid (no reaction) but
+    negative is impossible. Above ``SSA_PLAUSIBLE_MAX_RATE`` the trajectory
+    becomes a dense random walk far from the deterministic closed form —
+    flagged, not rejected. Below ``SSA_PLAUSIBLE_MIN_POPULATION`` molecules
+    the stochastic trajectory visibly deviates from ``a0 * exp(-k t)`` —
+    flagged, not rejected.
+    """
+    errors: List[str] = []
+
+    if isinstance(a0, (bool, np.bool_)):
+        errors.append("a0 must be an integer molecule count, not a boolean")
+    elif not isinstance(a0, (int, np.integer)):
+        errors.append(
+            f"a0 must be an integer molecule count, got {type(a0).__name__}")
+    elif a0 < 1:
+        errors.append(
+            f"a0 must be at least 1 molecule (got {a0}) -- an SSA needs "
+            "something to react")
+
+    if isinstance(k, (bool, np.bool_)):
+        errors.append("k must be a number, not a boolean")
+    elif not isinstance(k, (int, float, np.integer, np.floating)):
+        errors.append(f"k must be a number, got {type(k).__name__}")
+    elif math.isnan(k) or math.isinf(k):
+        errors.append("k must be finite")
+    elif k < 0:
+        errors.append(
+            f"k must be >= 0 (got {k}) -- a rate constant cannot be negative")
+
+    _finite_positive(end, "end", errors)
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    reasons: List[str] = []
+    if a0 < SSA_PLAUSIBLE_MIN_POPULATION:
+        reasons.append(
+            f"a0={a0} is below {SSA_PLAUSIBLE_MIN_POPULATION} molecules -- "
+            "stochastic effects dominate below this size")
+    if k > SSA_PLAUSIBLE_MAX_RATE:
+        reasons.append(
+            f"k={k} exceeds {SSA_PLAUSIBLE_MAX_RATE} per time unit -- the "
+            "trajectory will be a dense random walk far from the closed form")
+    if reasons:
+        return ParameterValidation(ok=True, flagged=True, flag_reason=" ".join(reasons))
 
     return ParameterValidation()
 
