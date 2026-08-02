@@ -612,3 +612,9 @@ SSA_PLAUSIBLE_MIN_POPULATION = 30
 # unit — the simulation is valid but the trajectory is a dense random walk
 # far from the closed form; flagged, not rejected.
 SSA_PLAUSIBLE_MAX_RATE = 10.0
+
+# Bimolecular A + B -> C (Stage 7). Rate constant per molecule pair per
+# time unit. k*a0*b0 is the initial event rate; with k > 0.1 the events
+# are dense enough that the trajectory is a random walk far from the ODE
+# reference. Flagged, not rejected.
+SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE = 0.1

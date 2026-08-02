@@ -47,6 +47,7 @@ const DOMAIN_QUERIES: Array<[string, string]> = [
   ["two_locus_wright_fisher", "linkage disequilibrium two locus"],
   ["molecular_dynamics", "molecular dynamics lennard-jones"],
   ["gillespie_ssa", "gillespie stochastic decay reaction"],
+  ["gillespie_ssa_bimolecular", "bimolecular association reaction"],
 ];
 
 function entries(resolved: {
@@ -56,7 +57,7 @@ function entries(resolved: {
 }
 
 describe("parameter provenance", () => {
-  describe("Target A — structural correspondence for all 9 domains", () => {
+  describe("Target A — structural correspondence for all 10 domains", () => {
     for (const [domain, query] of DOMAIN_QUERIES) {
       it(`${domain}: keys(parameters) === keys(parameterProvenance)`, async () => {
         const resolved = await resolveQuery(query);

@@ -66,7 +66,7 @@ in `requirements.txt`:
 
 ## Domains
 
-Nine simulation domains, two pipelines:
+Ten simulation domains, two pipelines:
 
 **Continuous (antimony → SBML → roadrunner):**
 - **Michaelis-Menten** — irreversible single-substrate enzyme kinetics.
@@ -90,6 +90,14 @@ Nine simulation domains, two pipelines:
   `E[a(t)] = a₀·e^(−kt)` (the count at time t is exactly Binomial(a₀, e^(−kt)))
   and a hand-verified seeded golden trajectory pinned through the API
   (`test_gillespie_ssa_golden.py`, `gillespieGolden.test.ts`).
+- **Gillespie SSA bimolecular** — same Direct Method (Stage 7) for the
+  association A + B → C with second-order propensity `k·a·b`, conserved
+  `a+c = a₀`, `b+c = b₀`, halting at minor-species exhaustion. Verified
+  against the ODE closed form
+  `a(t) = (a₀−b₀)/(1 − (b₀/a₀)·e^(−k(a₀−b₀)t))` (equal counts:
+  `a(t) = a₀/(1 + k·a₀·t)`) and a hand-verified seeded golden trajectory
+  pinned through the API (`test_gillespie_ssa_bimolecular_golden.py`,
+  `gillespieBimolecularGolden.test.ts`).
 - **Wright-Fisher neutral drift** — binomial sampling of 2N allele copies each
   generation. Verified against the exact heterozygosity decay
   `Hₜ = H₀ · (1 − 1/(2N))ᵗ` and Kimura's fixation probability `P(fix) = p₀`.
@@ -137,7 +145,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              803 tests (802 run, 1 skipped)
+│   └── tests/              830 tests (829 run, 1 skipped)
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
 │   └── ...                 124 tests

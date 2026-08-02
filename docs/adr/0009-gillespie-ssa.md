@@ -87,3 +87,11 @@ time), and optional `seed` (ADR 0005). Defaults in
   contract to the API.
 - The narrow scope means no parameters beyond a0/k/end; a future
   reaction-network extension is a new ADR.
+
+## Amendment (Stage 7): bimolecular association A + B → C
+
+- The engine additionally exposes `simulate_gillespie_ssa_bimolecular(a0, b0, k, end, seed=None)` with the second-order propensity `k·a·b`, the Direct Method, columns `["time","a","b","c"]`, and conservation `a+c = a0`, `b+c = b0` on every row. The same ADR 0005 RNG and endpoint-snap conventions apply; `seed=12345, a0=60, b0=40, k=0.01, end=5` is the pinned golden trajectory (first event `0.06172192003509486`, final `[5, 24, 4, 36]`, 38 rows).
+- Deterministic reference for the tests (ODE limit of the same reaction): for `a0 ≠ b0`, `a(t) = (a0−b0)/(1 − (b0/a0)·e^(−k(a0−b0)t))`; for `a0 = b0`, `a(t) = a0/(1 + k·a0·t)`.
+- `validate_ssa_bimolecular_params` flags (not rejects) counts below `SSA_PLAUSIBLE_MIN_POPULATION` (30) and rates above the new `SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE` (0.1), where events become dense and the trajectory is a random walk far from the ODE reference.
+- The runner dispatches `gillespie_ssa_bimolecular`; the API ceiling applies to the summed initial population `a0+b0 ≤ MAX_API_SSA_POPULATION` (event count is bounded by `min(a0,b0)`).
+- Keyword resolution gives `gillespie_ssa_bimolecular` priority over `gillespie_ssa` (bimolecular/second-order/association keywords), so "bimolecular association reaction" never falls through to first-order decay.

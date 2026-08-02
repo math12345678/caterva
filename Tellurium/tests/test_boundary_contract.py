@@ -118,6 +118,7 @@ class TestBoundaryContract:
             "simulate_two_locus_wright_fisher",
             "simulate_molecular_dynamics",
             "simulate_gillespie_ssa",
+            "simulate_gillespie_ssa_bimolecular",
             "simulate_sbml",
         }
         assert ENGINE_SIMULATE_FUNCTIONS == expected
@@ -133,6 +134,7 @@ class TestBoundaryContract:
             "two_locus_wright_fisher",
             "molecular_dynamics",
             "gillespie_ssa",
+            "gillespie_ssa_bimolecular",
             "sbml",
         }
 
@@ -182,6 +184,7 @@ class TestRunnerExecution:
             "n_particles": 13, "temperature": 0.4, "timestep": 0.005, "n_steps": 5,
         },
         "gillespie_ssa": {"a0": 100, "k": 1.0, "end": 2.0},
+        "gillespie_ssa_bimolecular": {"a0": 60, "b0": 40, "k": 0.01, "end": 2.0},
         "sbml": {
             "sbml_string": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" level=\"3\" version=\"1\">"
@@ -296,6 +299,7 @@ class TestRunnerExecution:
             ("wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
             ("two_locus_wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
             ("gillespie_ssa", {"a0": 1_000_001}, "MAX_API_SSA_POPULATION"),
+            ("gillespie_ssa_bimolecular", {"a0": 600_000, "b0": 500_000}, "MAX_API_SSA_POPULATION"),
         ],
     )
     def test_runtime_ceiling_rejects_oversized_request(
