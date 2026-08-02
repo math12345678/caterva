@@ -166,3 +166,29 @@ mutation checks: citation on a default entry, dropped provenance key,
 - **Verification**: Target H and Mutation 7 in
   `api-server/src/__tests__/provenance.test.ts`; the runner output verified
   live (`crossSpecies: true` on a cross-species lookup).
+
+## Amendment (Stage 5 Part 4): provenance travels with the parameter, and the pairing is contract-tested
+
+- **Status**: Accepted (Stage 5 Part 4, 2026-08-01).
+- **Context**: Stage 5 question 1 — does provenance travel **with** the
+  parameter or in a parallel channel? Within the science-agent boundary the
+  record already travels as one unit (`KineticResult` → one JSON record →
+  one `ScienceAgentResult` → one resolved branch). The real hole was
+  contractual: the runner's JSON↔`ScienceAgentResult` field mapping was
+  hand-maintained and untested, so a refactor could rename a field on
+  either side and the value and its citation would silently drift apart.
+- **Decision**: provenance travels with the parameter inside a single
+  record; nothing in the resolver assembles a value and its citation from
+  independent sources. The simulation engine boundary stays flag-only
+  (ADR 0007) — provenance is about parameters, not simulation outputs. The
+  pairing is enforced, not hoped: `parseAgentOutput` (extracted from the
+  spawn callback) is the single parser, and the boundary is contract-tested
+  from both directions — `Tests/test_runner_contract.py` pins the runner's
+  exact JSON for golden, cross-species, not-found, and error outputs;
+  `src/lib/scienceAgent.test.ts` pins parsing of the same shapes, plus
+  empty/malformed/error-report handling.
+- **Consequences**: a field rename or drop on either side of the boundary
+  fails CI immediately. The golden set (Part 2) now covers the full chain:
+  fixtures → resolution chain → runner JSON → parse → pairing → response.
+- **Verification**: 4 new pytest tests and 7 new vitest tests; full suites
+  green.

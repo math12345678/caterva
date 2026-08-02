@@ -1,0 +1,148 @@
+"""
+Stage 5 Part 4: the runner-boundary contract, Python side.
+
+Runs the real science_agent_runner.main() in-process with a golden
+KineticResult substituted for the lookup, and pins the exact JSON the
+runner emits. Together with the TS-side contract test
+(api-server/src/lib/scienceAgent.test.ts) the boundary is pinned from
+both directions: a field renamed or dropped on either side fails
+immediately, so the value and its citation cannot silently drift apart.
+"""
+
+import io
+import json
+import os
+import sys
+
+import pytest
+
+LIB_DIR = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "Science-Agent-Pipeline",
+    "artifacts",
+    "api-server",
+    "src",
+    "lib",
+)
+if LIB_DIR not in sys.path:
+    sys.path.insert(0, LIB_DIR)
+
+import fallback_logic  # noqa: E402
+import science_agent_runner  # noqa: E402
+from citation import Citation  # noqa: E402
+from fallback_logic import KineticResult  # noqa: E402
+
+
+def golden_result(cross_species: bool = False) -> KineticResult:
+    """The golden G1 record, as the Python layer hands it to the runner."""
+    return KineticResult(
+        found=True,
+        value=10.73,
+        unit="mM",
+        organism="Sus scrofa" if cross_species else "Homo sapiens",
+        source="brenda_cross_species" if cross_species else "brenda_exact",
+        citation=Citation(
+            source="BRENDA",
+            reference_id="740001" if cross_species else "740253",
+            url="https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+            organism="Sus scrofa" if cross_species else "Homo sapiens",
+            notes=None,
+        ),
+        cross_species_flag=cross_species,
+        search_log=["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
+    )
+
+
+def run_main(monkeypatch, fake_resolve, payload):
+    monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", fake_resolve)
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
+    monkeypatch.setattr(sys, "stdout", stdout)
+    science_agent_runner.main()
+    return json.loads(stdout.getvalue())
+
+
+def test_golden_found_output_shape(monkeypatch):
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: golden_result(),
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+    )
+    assert result == {
+        "ok": True,
+        "found": True,
+        "km": 10.73,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "source": "brenda_exact",
+        "crossSpecies": False,
+        "citation": {
+            "source": "BRENDA",
+            "referenceId": "740253",
+            "url": "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+            "title": None,
+            "organism": "Homo sapiens",
+            "notes": None,
+        },
+        "literatureCandidates": [],
+        "logs": ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
+    }
+
+
+def test_cross_species_flag_crosses_the_boundary(monkeypatch):
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: golden_result(cross_species=True),
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Mus musculus", "ecNumber": "1.1.1.27"},
+    )
+    assert result["crossSpecies"] is True
+    assert result["source"] == "brenda_cross_species"
+    assert result["citation"]["referenceId"] == "740001"
+    assert result["organism"] == "Sus scrofa"
+
+
+def test_not_found_output_shape(monkeypatch):
+    def not_found(*a, **k):
+        return KineticResult(
+            found=False,
+            source="literature_candidates",
+            literature_candidates=[
+                fallback_logic.LiteratureCandidate(
+                    pmid="34962677",
+                    title="Some paper",
+                    url="https://pubmed.ncbi.nlm.nih.gov/34962677/",
+                )
+            ],
+            search_log=["genuine gap"],
+        )
+
+    result = run_main(
+        monkeypatch,
+        not_found,
+        {"enzymeName": "lactate dehydrogenase", "substrate": "x",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+    )
+    assert result == {
+        "ok": True,
+        "found": False,
+        "source": "literature_candidates",
+        "literatureCandidates": [
+            {"pmid": "34962677", "title": "Some paper",
+             "url": "https://pubmed.ncbi.nlm.nih.gov/34962677/"}
+        ],
+        "logs": ["genuine gap"],
+    }
+
+
+def test_missing_ec_number_reports_an_error(monkeypatch):
+    stdout = io.StringIO()
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"enzymeName": "x"})))
+    monkeypatch.setattr(sys, "stdout", stdout)
+    with pytest.raises(SystemExit):
+        science_agent_runner.main()
+    result = json.loads(stdout.getvalue())
+    assert result["ok"] is False
+    assert "ecNumber is required" in result["error"]

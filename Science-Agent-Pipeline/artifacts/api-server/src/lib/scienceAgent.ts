@@ -47,6 +47,26 @@ interface PythonError {
   error: string;
 }
 
+/**
+ * Stage 5 Part 4: the runner-boundary contract, testable without spawning
+ * Python. Parses the runner's stdout JSON into a ScienceAgentResult.
+ * Throws on empty output, unexpected shape, or a Python-side error report.
+ */
+export function parseAgentOutput(stdout: string): ScienceAgentResult {
+  const trimmed = stdout.trim();
+  if (!trimmed) {
+    throw new Error("Science agent runner returned no output");
+  }
+  const parsed = JSON.parse(trimmed) as ScienceAgentResult | PythonError;
+  if (!("ok" in parsed)) {
+    throw new Error("Science agent runner returned unexpected JSON");
+  }
+  if (!parsed.ok) {
+    throw new Error((parsed as PythonError).error);
+  }
+  return parsed as unknown as ScienceAgentResult;
+}
+
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = findRepositoryRoot(_dirname);
 
@@ -131,23 +151,10 @@ export async function resolveKineticValue(
       }
 
       try {
-        const parsed = JSON.parse(trimmed) as ScienceAgentResult | PythonError;
-        if (!("ok" in parsed)) {
-          reject(new Error("Science agent runner returned unexpected JSON"));
-          return;
-        }
-        if (!parsed.ok) {
-          reject(new Error(parsed.error));
-          return;
-        }
-        const result = parsed as unknown as ScienceAgentResult;
+        const result = parseAgentOutput(trimmed);
         resolve(result);
       } catch (err) {
-        reject(
-          new Error(
-            `Science agent runner returned invalid JSON: ${err instanceof Error ? err.message : String(err)}`,
-          ),
-        );
+        reject(err instanceof Error ? err : new Error(String(err)));
       }
     });
 
