@@ -77,10 +77,25 @@ def test_values_accepted_upstream_are_accepted_downstream(km):
 
 @pytest.fixture(scope="module")
 def ldh_entries():
-    """Km entries parsed from the real captured BRENDA page for LDH."""
+    """Km entries parsed from the real captured BRENDA page for LDH.
+
+    Both conditions below were `pytest.skip` and are now hard failures.
+
+    The fixture file is committed to this repository, so its absence is a
+    broken checkout, not an environment this suite should tolerate. And if
+    the parser returns nothing from a fixture that demonstrably contains
+    rows, that is precisely the regression these tests exist to catch --
+    skipping on it would make *every test in this file* vanish from the run
+    while the suite stayed green.
+
+    That is not hypothetical: a sibling test in this file skipped itself
+    into vacuity for months on a near-identical `if not X: skip` (see
+    test_flagged_brenda_entries_do_not_become_confident_numbers).
+    """
     fixture = _BRENDA_DIR / "fixtures" / "brenda_ldh_fixture.html"
-    if not fixture.exists():
-        pytest.skip("BRENDA LDH fixture not available")
+    assert fixture.exists(), (
+        f"committed fixture missing: {fixture} -- this is a broken checkout, "
+        "not a reason to skip the literature/simulation seam tests")
     entries = brenda_client.parse_brenda_km_html(
         html=fixture.read_text(),
         ec_number="1.1.1.27",
@@ -88,8 +103,10 @@ def ldh_entries():
         target_organism="Homo sapiens",
         require_substrate_match=False,
     )
-    if not entries:
-        pytest.skip("no entries parsed from the LDH fixture")
+    assert entries, (
+        "parsed zero Km entries from the committed LDH fixture; the fixture "
+        "contains rows, so this is a parser regression -- failing loudly "
+        "rather than skipping every test in this file")
     return entries
 
 
@@ -102,8 +119,12 @@ def test_every_unflagged_brenda_km_is_simulable(ldh_entries):
     """The core contract: anything the literature layer blesses must run."""
     usable = [e for e in ldh_entries
               if not getattr(e, "flagged", False) and e.km_value]
-    if not usable:
-        pytest.skip("no unflagged entries in this fixture")
+    # Assertion, not skip: the LDH fixture demonstrably yields unflagged
+    # entries, so an empty list means the parser or the flagging logic
+    # regressed. Skipping would retire this contract silently.
+    assert usable, (
+        "no unflagged entries parsed from the LDH fixture; it contains "
+        "several, so this is a regression rather than a reason to skip")
 
     for entry in usable:
         km = float(entry.km_value)
@@ -239,8 +260,10 @@ def test_flagged_entries_do_not_become_confident_numbers_deterministic():
 def test_real_km_values_produce_physically_sane_trajectories(ldh_entries):
     usable = [e for e in ldh_entries
               if not getattr(e, "flagged", False) and e.km_value][:5]
-    if not usable:
-        pytest.skip("no unflagged entries in this fixture")
+    # Assertion, not skip -- see test_every_unflagged_brenda_km_is_simulable.
+    assert usable, (
+        "no unflagged entries parsed from the LDH fixture; it contains "
+        "several, so this is a regression rather than a reason to skip")
 
     for entry in usable:
         km = float(entry.km_value)

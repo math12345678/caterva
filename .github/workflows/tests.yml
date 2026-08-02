@@ -60,6 +60,14 @@ jobs:
         working-directory: Tests
         run: python -m pytest -v
 
+      # A green suite cannot distinguish "ran and passed" from "declined to
+      # run". test_flagged_brenda_entries_do_not_become_confident_numbers
+      # skipped itself on every run for months while being counted in the
+      # total, and it guarded a real contract. This fails the build when the
+      # skip count rises, and names what stopped running.
+      - name: Silent-skip guard
+        run: python scripts/check_no_silent_skips.py
+
   api-server:
     runs-on: ubuntu-latest
 
