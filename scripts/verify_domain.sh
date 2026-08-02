@@ -159,6 +159,24 @@ if [ "$CIT_OK" -ne 0 ]; then
 fi
 
 # ------------------------------------------------------------------
+# Step 2c-2: Documented-counts guard
+#
+# The Stage 7 audit found three stale test counts in README.md (524 vs
+# 1,040; 833 vs 858; 124 vs 182) and a domain count stated twice with two
+# different values. No executable check covered any of them, so nothing
+# objected as they went stale -- the same failure mode as the citation
+# guard above.
+# ------------------------------------------------------------------
+echo ""
+echo "=== Step 2c-2: documented-counts guard ==="
+
+CNT_OUT=$("$PYTHON" "$REPO_DIR/scripts/check_documented_counts.py" 2>&1) && CNT_OK=0 || CNT_OK=1
+check "documented counts" "$CNT_OK"
+if [ "$CNT_OK" -ne 0 ]; then
+    echo "$CNT_OUT"
+fi
+
+# ------------------------------------------------------------------
 # Step 2d: Engine-contract guard
 #
 # The engine was split from a 4,283-line monolith into 14 modules behind a

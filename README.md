@@ -5,11 +5,11 @@ language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
 been independently checked.
 
-Eight simulation domains built so far: enzyme kinetics, SIR/SEIR
+Ten simulation domains built so far: enzyme kinetics, SIR/SEIR
 epidemiological modeling, PCR amplification, Monte Carlo simulation,
 population genetics (Wright-Fisher, single- and two-locus), molecular
 dynamics (Lennard-Jones cluster), and Gillespie SSA stochastic
-chemical kinetics.
+chemical kinetics (first-order decay and bimolecular association).
 
 ## Quick start
 
@@ -18,7 +18,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 524 tests
+make test      # runs all 1,040 tests (858 engine + 182 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -145,10 +145,10 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              833 tests (832 run, 1 skipped)
+│   └── tests/              858 tests
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
-│   └── ...                 124 tests
+│   └── ...                 182 tests
 ├── Docw/                   specs, roadmap, build plan
 └── scripts/
     ├── check_env.py            environment verification
