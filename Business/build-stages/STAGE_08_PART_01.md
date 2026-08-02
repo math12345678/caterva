@@ -159,14 +159,61 @@ picks 3.11; only unsupported 3.14 with pytest → still rejected. Real exit
 codes checked directly, not read off a piped `head` (which returns 141 on
 SIGPIPE and hides them).
 
+## 4a. The full suite ran, and the one skip was a defect
+
+`make test` on a rebuilt venv: **857 passed, 1 skipped** (engine) and
+**182 passed** (literature) — **1,040 total**, matching the documented-counts
+guard exactly. Python 3.12.13, all C extensions installed from cp312 wheels,
+which is direct confirmation that the 3.10–3.12 gate is load-bearing rather
+than arbitrary.
+
+Chasing the single skip found a test that had **never executed an
+assertion**:
+
+```python
+flagged = [e for e in ldh_entries if e.flagged]
+if not flagged:
+    pytest.skip("no flagged entries in this fixture")
+```
+
+Every fixture in the repository parses to **zero** flagged entries — verified
+across all six. So the skip fired every run while the test was counted in the
+suite total.
+
+It guards the exact failure its own file's docstring names: *"a value that
+the literature layer marked as suspicious quietly becoming a confident number
+in a student's plot."* The Stage 4 amendment — *structural tests are blind to
+semantic emptiness* — in a new costume: not an empty assertion, but a test
+that opts out of running.
+
+Real flagged rows cannot be added to the fixtures; they are live BRENDA
+captures and BRENDA does not serve a flagged row for these enzymes. The test
+now constructs two entries directly, **explicitly labelled synthetic and not
+claimed to be BRENDA data**, one per real flag cause in `brenda_client`
+(out-of-range, and commentary mentioning Kcat).
+
+**The first fix was wrong in an instructive way.** I wrote the out-of-range
+value as `KM_PLAUSIBLE_MAX_MM * 10`. Mutating the engine constant to `1e12`
+left the test **green** — the test value moved with the bound, making it
+blind to precisely the regression it exists to catch. As the literal
+`50000.0`, the same mutation fails it. A test derived from the constant it is
+testing is not a test of that constant.
+
 ## 5. Carried forward
 
 1. **Candidate A**, per §2, once the Turnover Numbers fixture is captured.
 2. **The NumPy 2.x / roadrunner 2.9.3 upgrade**, if Python 3.13+ support is
    wanted. Scope it as a stage; it is not a version-gate edit.
-3. **The full 1,040-test suite has not been run in one pass** by me — the
-   engine suite exceeds the sandbox's process lifetime. `make test` on a
-   working venv closes this.
+3. ~~**The full 1,040-test suite has not been run in one pass.**~~ **Closed** —
+   see §4a. 857 passed / 1 skipped (engine) + 182 passed (literature), and the
+   skip turned out to be a defect, now fixed.
+4. **Other silent skips.** `pytest.importorskip` and conditional
+   `pytest.skip` remain in `test_brenda_integration.py` and
+   `test_validator_agreement.py`. They are legitimate (a missing BRENDA layer,
+   an absent package split) but the same shape as the defect above: a green
+   suite cannot distinguish "ran and passed" from "declined to run." A guard
+   that fails when the skip count changes unexpectedly would catch the next
+   one.
 
 ## 6. References
 
