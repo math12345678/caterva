@@ -8,6 +8,7 @@ Usage:
     python -m Tellurium.cli ne --file results.csv
     python -m Tellurium.cli ld --population-size 100 --generations 30 \
         --recombination-rate 0.1 --replicate-runs 3000 --seed 42
+    python -m Tellurium.cli ssa --a0 200 --k 0.5 --end 5 --seed 9
 """
 
 import argparse
@@ -22,6 +23,7 @@ from Tellurium.tellurium_engine import (
     expected_fixation_time,
     kimura_fixation_probability,
     list_scenarios,
+    simulate_gillespie_ssa,
     simulate_two_locus_wright_fisher,
     simulate_wright_fisher,
     theoretical_ld_decay,
@@ -406,18 +408,56 @@ def _cmd_ld(args: argparse.Namespace) -> int:
     return 0
 
 
+def _build_ssa_parser(sub: argparse._SubParsersAction) -> None:
+    p = sub.add_parser(
+        "ssa", help="Gillespie SSA: exact stochastic A -> B decay")
+    p.add_argument("--a0", type=int, metavar="A0", default=1000,
+                   help="initial A molecules (default 1000)")
+    p.add_argument("--k", type=float, metavar="K", default=0.5,
+                   help="per-molecule decay rate (default 0.5)")
+    p.add_argument("--end", type=float, metavar="T", default=10.0,
+                   help="simulation time (default 10)")
+    p.add_argument("--seed", type=int, metavar="N",
+                   help="RNG seed for reproducibility")
+    p.add_argument("--out", metavar="FILE",
+                   help="write the result table to CSV")
+    p.set_defaults(func=_cmd_ssa)
+
+
+def _cmd_ssa(args: argparse.Namespace) -> int:
+    try:
+        result = simulate_gillespie_ssa(
+            a0=args.a0, k=args.k, end=args.end, seed=args.seed)
+    except ModelBuildError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    header = ["time", "a", "b"]
+    print("  ".join(h.rjust(12) for h in header))
+    step = max(1, len(result.data) // 12)
+    for row in result.data[::step]:
+        print("  ".join(f"{v:12.6f}" for v in row[:len(header)]))
+    a0, k, end = args.a0, args.k, args.end
+    expected = a0 * (1.0 - __import__("math").exp(-k * end))
+    n_events = len(result.data) - 2
+    print(f"\nA(0) = {a0}   events = {n_events}   "
+          f"final A = {result.final('a'):.0f}")
+    print(f"expected B(end) = a0*(1-e^(-k*end)) = {expected:.1f}")
+    return 0
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     """Run the Tellurium CLI."""
     parser = argparse.ArgumentParser(
         prog="Tellurium.cli",
         description="Tellurium simulation engine command line")
     sub = parser.add_subparsers(dest="command", required=True,
-                                metavar="{wf,kimura,ne,sweep,scenarios,ld}")
+                                metavar="{wf,kimura,ne,sweep,scenarios,ld,ssa}")
     _build_wf_parser(sub)
     _build_sweep_parser(sub)
     _build_kimura_parser(sub)
     _build_ne_parser(sub)
     _build_ld_parser(sub)
+    _build_ssa_parser(sub)
     sub.add_parser("scenarios", help="list WF scenario presets").set_defaults(
         func=_cmd_scenarios)
 

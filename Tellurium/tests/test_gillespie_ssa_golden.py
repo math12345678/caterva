@@ -21,6 +21,7 @@ suite fails.
 """
 
 import math
+from pathlib import Path
 
 import numpy as np
 
@@ -146,6 +147,36 @@ class TestMutationTraps:
         # decrements).
         assert n_events != GOLDEN["rows"] - 2
         assert a != GOLDEN["final"][1]
+
+
+class TestCli:
+    """The `ssa` CLI subcommand wraps the engine; smoke-test the wiring."""
+
+    def _run_cli(self, *args: str):
+        import subprocess
+
+        import sys
+
+        proc = subprocess.run(
+            [sys.executable, "-m", "Tellurium.cli", "ssa", *args],
+            capture_output=True,
+            text=True,
+            cwd=str(Path(__file__).resolve().parents[2]),
+        )
+        return proc
+
+    def test_cli_prints_events_and_closed_form(self):
+        proc = self._run_cli("--a0", "200", "--k", "0.5", "--end", "5", "--seed", "9")
+        assert proc.returncode == 0
+        assert "time" in proc.stdout and "expected B(end)" in proc.stdout
+        # seeded golden: 190 events, final A 10 (matches the pinned run above)
+        assert "events = 190" in proc.stdout
+        assert "final A = 10" in proc.stdout
+
+    def test_cli_rejects_invalid_params(self):
+        proc = self._run_cli("--a0", "0")
+        assert proc.returncode == 1
+        assert "error:" in proc.stderr
 
 
 import pytest  # noqa: E402  (used by TestHandVerification)

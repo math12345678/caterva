@@ -121,6 +121,44 @@ describe("POST /api/simulate", () => {
     }
     // Timed out — acceptable if the Python environment isn't configured
   });
+
+  it("runs a Gillespie SSA query to completion with seeded trajectory", async () => {
+    const createRes = await request(server)
+      .post("/api/simulate")
+      .send({ query: "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9" });
+    const { jobId } = createRes.body;
+
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const getRes = await request(server).get(`/api/simulate/${jobId}`);
+      if (getRes.body.status === "completed") {
+        const result = getRes.body.result;
+        expect(result.domain).toBe("gillespie_ssa");
+        expect(result.parameters.a0).toBe(200);
+        expect(result.parameters.k).toBe(0.5);
+        expect(result.trajectory.length).toBeGreaterThan(0);
+        expect(result.trajectory[0]).toMatchObject({ a: 200, b: 0 });
+        // The final row snaps to `end` exactly.
+        expect(result.trajectory[result.trajectory.length - 1].time).toBe(5);
+        // Seeded run: reproducible; run the same query again and compare.
+        const again = await request(server)
+          .post("/api/simulate")
+          .send({ query: "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9" });
+        for (let j = 0; j < 30; j++) {
+          await new Promise((r) => setTimeout(r, 500));
+          const getAgain = await request(server).get(`/api/simulate/${again.body.jobId}`);
+          if (getAgain.body.status === "completed") {
+            expect(getAgain.body.result.trajectory).toEqual(result.trajectory);
+            return;
+          }
+        }
+        return;
+      }
+      if (getRes.body.status === "failed") {
+        return; // Python/Tellurium environment unavailable
+      }
+    }
+  });
 });
 
 describe("GET /api/simulate/:jobId", () => {
