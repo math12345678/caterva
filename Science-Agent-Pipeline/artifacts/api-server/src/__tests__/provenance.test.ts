@@ -18,6 +18,7 @@ const GOLDEN_LDH_RESULT = {
   unit: "mM",
   organism: "Homo sapiens",
   source: "brenda_exact",
+  crossSpecies: false,
   citation: {
     source: "BRENDA",
     referenceId: "740253",
@@ -186,7 +187,7 @@ describe("validateParameterProvenance", () => {
 describe("strict resolved-citation format (Stage 5 Part 1)", () => {
   const parameters = { km: 2, vmax: 5, s0: 10 };
   const resolved: Record<string, ParameterProvenance> = {
-    km: { origin: "resolved", citation: "BRENDA (ref 12345)" },
+    km: { origin: "resolved", citation: "BRENDA (ref 12345)", citationStatus: "verified" },
     vmax: { origin: "default" },
     s0: { origin: "default" },
   };
@@ -213,7 +214,7 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
     expect(
       validateParameterProvenance(parameters, {
         ...resolved,
-        km: { origin: "resolved", citation: "BRENDA (ref n/a)" },
+        km: { origin: "resolved", citation: "BRENDA (ref n/a)", citationStatus: "verified" },
       }),
     ).toEqual([
       "km is marked resolved but its citation carries no locator (ref id or URL)",
@@ -240,6 +241,7 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
         km: {
           origin: "resolved",
           citation: "BRENDA — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+          citationStatus: "verified",
         },
       }),
     ).toEqual([]);
@@ -298,6 +300,7 @@ describe("Target G — the golden set flows through the API (Stage 5 Part 2)", (
       km: 0.0026,
       organism: "Sus scrofa",
       source: "brenda_cross_species",
+      crossSpecies: true,
       citation: {
         ...GOLDEN_LDH_RESULT.citation,
         referenceId: "740001",
@@ -307,6 +310,71 @@ describe("Target G — the golden set flows through the API (Stage 5 Part 2)", (
     expect(swapped.parameters["km"]).not.toBe(10.73);
     expect(swapped.parameterProvenance["km"]!.citation).not.toContain("(ref 740253)");
     expect(swapped.parameterProvenance["km"]!.organism).toBe("Sus scrofa");
+  });
+});
+
+describe("Target H — the verified/flagged citation-status contract (Stage 5 Part 3)", () => {
+  it("exact BRENDA match -> citationStatus 'verified'", async () => {
+    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("resolved");
+    expect(km.citationStatus).toBe("verified");
+  });
+
+  it("cross-species fallback -> citationStatus 'flagged'", async () => {
+    vi.mocked(resolveKineticValue).mockResolvedValueOnce({
+      ...GOLDEN_LDH_RESULT,
+      km: 0.0026,
+      organism: "Sus scrofa",
+      source: "brenda_cross_species",
+      crossSpecies: true,
+      citation: {
+        ...GOLDEN_LDH_RESULT.citation,
+        referenceId: "740001",
+      },
+    });
+    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.citationStatus).toBe("flagged");
+  });
+
+  it("no citation status on a resolved entry is a violation", () => {
+    expect(
+      validateParameterProvenance(
+        { km: 2, vmax: 5, s0: 10 },
+        {
+          km: { origin: "resolved", citation: "BRENDA (ref 12345)" },
+          vmax: { origin: "default" },
+          s0: { origin: "default" },
+        },
+      ),
+    ).toEqual(["km is marked resolved but carries no citation status"]);
+  });
+
+  it("a citation status on a non-resolved entry is a violation", () => {
+    expect(
+      validateParameterProvenance(
+        { km: 2, vmax: 5, s0: 10 },
+        {
+          km: { origin: "default", citationStatus: "verified" },
+          vmax: { origin: "default" },
+          s0: { origin: "default" },
+        },
+      ),
+    ).toEqual(["km has a citation status but origin is 'default'"]);
+  });
+
+  it("accepts verified and flagged on resolved entries", () => {
+    expect(
+      validateParameterProvenance(
+        { km: 2, vmax: 5, s0: 10 },
+        {
+          km: { origin: "resolved", citation: "BRENDA (ref 12345)", citationStatus: "verified" },
+          vmax: { origin: "resolved", citation: "BRENDA (ref 67890)", citationStatus: "flagged" },
+          s0: { origin: "default" },
+        },
+      ),
+    ).toEqual([]);
   });
 });
 
@@ -423,6 +491,26 @@ describe("mutation tests — provenance contract enforcement", () => {
       expect(violations).toContain(
         "km is marked resolved but its citation carries no locator (ref id or URL)",
       );
+      // ACTUAL CATCHER: validateParameterProvenance (unit test)
+    });
+  });
+
+  describe("Mutation 7: drop citationStatus from the resolved branch (Stage 5 Part 3)", () => {
+    it("PREDICTED: the citation-status rule should catch this", () => {
+      // Mutation: a refactor removes the citationStatus field from the
+      // resolved provenance (e.g. when re-pairing parameters). The value and
+      // citation still look fine; the status is gone.
+      // Predicted catcher: the citation-status rule.
+      const badProvenance: Record<string, ParameterProvenance> = {
+        km: { origin: "resolved", citation: "BRENDA (ref 740253)" },
+        vmax: { origin: "default" },
+        s0: { origin: "default" },
+      };
+      const violations = validateParameterProvenance(
+        { km: 2, vmax: 5, s0: 10 },
+        badProvenance,
+      );
+      expect(violations).toContain("km is marked resolved but carries no citation status");
       // ACTUAL CATCHER: validateParameterProvenance (unit test)
     });
   });

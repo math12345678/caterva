@@ -133,3 +133,36 @@ mutation checks: citation on a default entry, dropped provenance key,
 - **Verification**: Targets A–F plus Mutation 6 in
   `api-server/src/__tests__/provenance.test.ts` (locator unit tests, the
   honest-degradation path, and the `(ref n/a)` reintroduction check).
+
+## Amendment (Stage 5 Part 2): the golden set
+
+- **Status**: Accepted (Stage 5 Part 2, 2026-08-01).
+- **Decision**: Rule 1 for provenance — a golden set of hand-verified
+  enzyme/substrate/Km/citation tuples (`Tests/test_golden_set.py`: G1 LDH
+  10.73 mM/ref 740253, G2 AChE 0.09 mM/ref 649716, G3 LDH cross-species
+  0.0026 mM/ref 740001), asserted end to end through the real offline
+  resolution chain, mirrored at the API level (Target G in
+  `provenance.test.ts`).
+- **Verification**: the mutation proof (Stage 5 question 4) — flipping the
+  exact-match row selection (`min`→`max`) fails G1; dropping the citation
+  from the resolved branch fails 8 tests across 2 files. The trust trail
+  is non-decorative.
+
+## Amendment (Stage 5 Part 3): the verified/flagged citation-status contract
+
+- **Status**: Accepted (Stage 5 Part 3, 2026-08-01).
+- **Context**: the BRENDA cross-species flag was dropped at the runner
+  boundary; the API could not tell a verified exact match from a flagged
+  cross-species one except by string-matching `source`.
+- **Decision**: every `resolved` entry carries `citationStatus` —
+  `verified` (exact organism and substrate match from a primary source;
+  BRENDA exact tier) or `flagged` (cross-species fallback). There is no
+  `rejected` on a resolved entry: a citation with no source, or an
+  LLM-generated one with no corroborating record, cannot support a
+  resolved value at all — it manifests as origin `default` with a note.
+  Validation enforces: resolved-with-citation must have a status;
+  non-resolved entries must not. The runner now emits `crossSpecies` as a
+  first-class field.
+- **Verification**: Target H and Mutation 7 in
+  `api-server/src/__tests__/provenance.test.ts`; the runner output verified
+  live (`crossSpecies: true` on a cross-species lookup).

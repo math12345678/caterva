@@ -126,6 +126,7 @@ def main() -> None:
                         "unit": result.unit,
                         "organism": result.organism,
                         "source": result.source,
+                        "crossSpecies": result.cross_species_flag,
                         "citation": _citation_to_dict(result.citation),
                         "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                         "logs": result.search_log,

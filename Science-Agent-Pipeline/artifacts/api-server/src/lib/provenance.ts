@@ -5,6 +5,18 @@
 
 export type ParameterOrigin = "resolved" | "user" | "default";
 
+/**
+ * Stage 5 Part 3: the citation-status contract, as distinct from the value
+ * contract. A citation that supports a resolved value is either:
+ *  - `verified` — exact organism and substrate match from a primary source
+ *    (BRENDA exact tier);
+ *  - `flagged` — cross-species or inferred (BRENDA cross-species tier).
+ * There is no `rejected` on a resolved entry: a citation with no source, or
+ * one that is LLM-generated with no corroborating record, cannot support a
+ * `resolved` value at all — it manifests as origin `default` with a note.
+ */
+export type CitationStatus = "verified" | "flagged";
+
 export interface ParameterProvenance {
   /** How this value was obtained for THIS query. */
   origin: ParameterOrigin;
@@ -14,6 +26,8 @@ export interface ParameterProvenance {
   citation?: string;
   /** Only when `origin === "resolved"`. */
   organism?: string;
+  /** Only when `origin === "resolved"` (Stage 5 Part 3). */
+  citationStatus?: CitationStatus;
   /** Why a lookup was attempted and failed, if so. */
   note?: string;
 }
@@ -44,6 +58,8 @@ export function isLocatableCitation(citation: string): boolean {
  *  - a `citation` on any entry whose origin is not `"resolved"`
  *  - a `resolved` citation that carries no locator (ref id or URL) — the
  *    strict format rule (Stage 5 Part 1)
+ *  - a `resolved` entry with no `citationStatus`, or a `citationStatus` on
+ *    an entry whose origin is not `"resolved"` (Stage 5 Part 3)
  */
 export function validateParameterProvenance(
   parameters: Record<string, unknown>,
@@ -75,6 +91,12 @@ export function validateParameterProvenance(
       violations.push(
         `${key} is marked resolved but its citation carries no locator (ref id or URL)`,
       );
+    }
+    if (prov.origin === "resolved" && prov.citation && prov.citationStatus === undefined) {
+      violations.push(`${key} is marked resolved but carries no citation status`);
+    }
+    if (prov.origin !== "resolved" && prov.citationStatus !== undefined) {
+      violations.push(`${key} has a citation status but origin is '${prov.origin}'`);
     }
   }
 
