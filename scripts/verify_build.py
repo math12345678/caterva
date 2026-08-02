@@ -100,7 +100,14 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         "Plausibility Constants Guard",
         f"python {SCRIPTS_DIR / 'check_plausibility_constants.py'}"
     ))
-    
+
+    # Documented counts guard -- README test/domain counts vs reality.
+    # Added Stage 7 Part 3 after three counts were found stale by hand.
+    guards.append(run_guard(
+        "Documented Counts Guard",
+        f"python {SCRIPTS_DIR / 'check_documented_counts.py'}"
+    ))
+
     return guards
 
 

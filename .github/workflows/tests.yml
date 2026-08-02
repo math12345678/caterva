@@ -39,6 +39,13 @@ jobs:
       - name: Citation-format guard
         run: python scripts/check_citation_format.py
 
+      # Documented test/domain counts in README.md. Runs after the suites
+      # would have changed them, and catches the silent drift found in the
+      # Stage 7 audit (three stale counts, plus two conflicting domain
+      # counts in the same file).
+      - name: Documented-counts guard
+        run: python scripts/check_documented_counts.py
+
       # The remaining guards (RNG convention, dependencies, engine contract,
       # plausibility constants) run in one step via the build-verification
       # script. --quick runs the guards only, not the test suites.
