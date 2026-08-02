@@ -13,6 +13,7 @@ export type SimulationDomain =
   | "wright_fisher"
   | "two_locus_wright_fisher"
   | "molecular_dynamics"
+  | "gillespie_ssa"
   | "sbml";
 
 export interface TelluriumPoint {

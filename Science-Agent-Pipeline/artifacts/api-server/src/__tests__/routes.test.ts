@@ -279,6 +279,16 @@ describe("POST /api/resolve", () => {
     expect(res.body.domain).toBe("mm");
     expect(res.body.parameters).toHaveProperty("km");
   });
+
+  it("resolves a Gillespie SSA query", async () => {
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "gillespie stochastic decay of 100 molecules" });
+    expect(res.status).toBe(200);
+    expect(res.body.domain).toBe("gillespie_ssa");
+    expect(res.body.parameters).toHaveProperty("a0");
+    expect(res.body.parameters).toHaveProperty("k");
+  });
 });
 
 describe("GET /api/simulate/:jobId/export", () => {

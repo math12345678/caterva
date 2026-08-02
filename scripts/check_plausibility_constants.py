@@ -17,27 +17,34 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Any
 
 
-# Constants that should have consistent values across modules
+# Constants that should have consistent values across modules.
+# NOTE: the engine's definitions in Tellurium/core/data_structures.py are
+# the single source of truth — these values must match them exactly. The
+# list was stale (14 of 19 mismatched) and the old code only value-checked
+# constants defined in 2+ files, so the drift was silent; the check below
+# now verifies every EXPECTED constant against its actual definition.
 EXPECTED_CONSTANTS = {
-    'KM_PLAUSIBLE_MIN_MM': 0.001,
+    'KM_PLAUSIBLE_MIN_MM': 1e-07,
     'KM_PLAUSIBLE_MAX_MM': 1000.0,
-    'R0_IMPLAUSIBLE_ABOVE': 100.0,
-    'PCR_MIN_EFFICIENCY': 0.5,
-    'PCR_MAX_EFFICIENCY': 1.2,
-    'PCR_PLAUSIBLE_LOW_EFFICIENCY': 0.8,
+    'R0_IMPLAUSIBLE_ABOVE': 20.0,
+    'PCR_MIN_EFFICIENCY': 0.0,
+    'PCR_MAX_EFFICIENCY': 1.0,
+    'PCR_PLAUSIBLE_LOW_EFFICIENCY': 0.5,
     'MC_PLAUSIBLE_MIN_SAMPLES': 100,
-    'WF_PLAUSIBLE_MIN_POPULATION_SIZE': 2,
+    'WF_PLAUSIBLE_MIN_POPULATION_SIZE': 10,
     'WF_PLAUSIBLE_MAX_GENERATIONS': 10000,
-    'WF_PLAUSIBLE_MIN_REPLICATE_RUNS': 1,
-    'WF_PLAUSIBLE_MAX_MUTATION_RATE': 0.5,
-    'WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT': 10.0,
-    'MD_PLAUSIBLE_MIN_PARTICLES': 1,
-    'MD_PLAUSIBLE_MAX_TIMESTEP': 0.1,
-    'MD_PLAUSIBLE_TEMPERATURE_LOW': 0.01,
-    'MD_PLAUSIBLE_TEMPERATURE_HIGH': 10.0,
-    'DEFAULT_RELATIVE_TOLERANCE': 1e-6,
-    'DEFAULT_ABSOLUTE_TOLERANCE': 1e-8,
-    'GAMMA_PARAM': 'gamma',
+    'WF_PLAUSIBLE_MIN_REPLICATE_RUNS': 10,
+    'WF_PLAUSIBLE_MAX_MUTATION_RATE': 0.01,
+    'WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT': 0.5,
+    'MD_PLAUSIBLE_MIN_PARTICLES': 10,
+    'MD_PLAUSIBLE_MAX_TIMESTEP': 0.01,
+    'MD_PLAUSIBLE_TEMPERATURE_LOW': 0.1,
+    'MD_PLAUSIBLE_TEMPERATURE_HIGH': 0.8,
+    'SSA_PLAUSIBLE_MIN_POPULATION': 30,
+    'SSA_PLAUSIBLE_MAX_RATE': 10.0,
+    'DEFAULT_RELATIVE_TOLERANCE': 1e-10,
+    'DEFAULT_ABSOLUTE_TOLERANCE': 1e-12,
+    'GAMMA_PARAM': 'gamma_rate',
 }
 
 
@@ -93,21 +100,21 @@ def check_constants_consistency() -> List[str]:
                 all_constants[name] = {}
             all_constants[name][str(py_file)] = value
     
-    # Check consistency
+    # Check consistency. Every EXPECTED constant is verified against its
+    # actual definition(s) — a constant defined in a single file is still
+    # checked, so a stale expected value (or a silently changed engine
+    # constant) is caught instead of passing because no second definition
+    # existed to compare against.
     for const_name, sources in all_constants.items():
-        if len(sources) > 1:
-            # Check if all values are the same
-            values = set(str(v) for v in sources.values())
-            if len(values) > 1:
-                errors.append(f"Constant {const_name} has inconsistent values: {dict(sources)}")
-            else:
-                # Check against expected value if we have one
-                if const_name in EXPECTED_CONSTANTS:
-                    expected = EXPECTED_CONSTANTS[const_name]
-                    actual = list(sources.values())[0]
-                    if str(actual) != str(expected):
-                        errors.append(f"Constant {const_name} has unexpected value: expected {expected}, got {actual}")
-    
+        values = set(str(v) for v in sources.values())
+        if len(values) > 1:
+            errors.append(f"Constant {const_name} has inconsistent values: {dict(sources)}")
+        elif const_name in EXPECTED_CONSTANTS:
+            expected = EXPECTED_CONSTANTS[const_name]
+            actual = list(sources.values())[0]
+            if str(actual) != str(expected):
+                errors.append(f"Constant {const_name} has unexpected value: expected {expected}, got {actual}")
+
     return errors
 
 

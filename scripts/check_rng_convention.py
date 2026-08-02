@@ -4,9 +4,10 @@ ADR 0005 requires every discrete/stochastic domain to use
 ``numpy.random.default_rng(seed)`` as the single RNG constructor, with
 ``seed: int | None = None`` as the parameter signature.
 
-This script scans Tellurium/tellurium_engine.py for all functions that
-appear to simulate a stochastic process (defined as any function whose
-name matches ``simulate_*``) and checks two things:
+This script scans every ``simulate_*`` function defined anywhere under
+Tellurium/ (the engine re-exports them through ``__all__``; the scan goes
+to the real definitions, which all live in submodules) and checks two
+things:
 
 1. The function signature includes ``seed: int | None = None``.
 2. The function body calls ``np.random.default_rng(seed)``.
@@ -24,16 +25,16 @@ import ast
 import pathlib
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-ENGINE_FILE = REPO_ROOT / "Tellurium" / "tellurium_engine.py"
+TELLURIUM_DIR = REPO_ROOT / "Tellurium"
 
 # Functions whose names match this pattern are expected to comply with
 # ADR 0005. The prefix 'simulate_' is broad enough to catch Monte Carlo,
 # Wright-Fisher, and any future stochastic domain.
 SIMULATE_FN_PREFIX = "simulate_"
 
-# Domains that legitimately don't use RNG (continuous ODE simulations).
-# These are excluded from the check because they use roadrunner, not
-# numpy random generation — they're not stochastic.
+# Domains that legitimately don't use RNG (continuous ODE simulations or
+# deterministic recurrences). These are excluded because they use
+# roadrunner, not numpy random generation — they're not stochastic.
 EXCLUDED_FNS: set[str] = {
     "simulate_sbml",
     "simulate_michaelis_menten",
@@ -43,27 +44,35 @@ EXCLUDED_FNS: set[str] = {
 }
 
 
+def _simulate_functions() -> list[tuple[ast.FunctionDef, pathlib.Path]]:
+    """Yield (node, file) for every non-excluded simulate_* definition
+    under Tellurium/, in the module that actually defines it."""
+    found: list[tuple[ast.FunctionDef, pathlib.Path]] = []
+    for path in TELLURIUM_DIR.rglob("*.py"):
+        if any(part in {"__pycache__", ".pytest_cache", ".hypothesis"}
+               for part in path.parts):
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        except (SyntaxError, OSError):
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.FunctionDef):
+                continue
+            name = node.name
+            if not name.startswith(SIMULATE_FN_PREFIX):
+                continue
+            if name in EXCLUDED_FNS:
+                continue
+            found.append((node, path))
+    return found
+
+
 def check() -> list[str]:
-    if not ENGINE_FILE.exists():
-        return [f"engine file not found: {ENGINE_FILE}"]
-
-    source = ENGINE_FILE.read_text(encoding="utf-8")
-    try:
-        tree = ast.parse(source, filename=str(ENGINE_FILE))
-    except SyntaxError as exc:
-        return [f"syntax error in {ENGINE_FILE}: {exc}"]
-
     violations: list[str] = []
 
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.FunctionDef):
-            continue
+    for node, path in _simulate_functions():
         name = node.name
-        if not name.startswith(SIMULATE_FN_PREFIX):
-            continue
-        if name in EXCLUDED_FNS:
-            continue
-
         lineno = node.lineno
 
         # Check 1: signature has seed: int | None = None
@@ -74,7 +83,7 @@ def check() -> list[str]:
                 break
         if not has_seed_param:
             violations.append(
-                f"{name} (line {lineno}): missing 'seed' parameter "
+                f"{path.name}:{lineno} {name}: missing 'seed' parameter "
                 "(required by ADR 0005)")
             continue  # skip body check if param is missing
 
@@ -102,7 +111,7 @@ def check() -> list[str]:
                     break
         if not calls_default_rng:
             violations.append(
-                f"{name} (line {lineno}): has 'seed' parameter but does "
+                f"{path.name}:{lineno} {name}: has 'seed' parameter but does "
                 "not call np.random.default_rng(seed) "
                 "(required by ADR 0005)")
 

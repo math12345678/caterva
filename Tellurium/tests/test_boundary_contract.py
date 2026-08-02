@@ -117,6 +117,7 @@ class TestBoundaryContract:
             "simulate_wright_fisher",
             "simulate_two_locus_wright_fisher",
             "simulate_molecular_dynamics",
+            "simulate_gillespie_ssa",
             "simulate_sbml",
         }
         assert ENGINE_SIMULATE_FUNCTIONS == expected
@@ -131,6 +132,7 @@ class TestBoundaryContract:
             "wright_fisher",
             "two_locus_wright_fisher",
             "molecular_dynamics",
+            "gillespie_ssa",
             "sbml",
         }
 
@@ -179,6 +181,7 @@ class TestRunnerExecution:
         "molecular_dynamics": {
             "n_particles": 13, "temperature": 0.4, "timestep": 0.005, "n_steps": 5,
         },
+        "gillespie_ssa": {"a0": 100, "k": 1.0, "end": 2.0},
         "sbml": {
             "sbml_string": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
             "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" level=\"3\" version=\"1\">"
@@ -225,6 +228,8 @@ class TestRunnerExecution:
             runner.run_monte_carlo_pi({"n_samples": 1_000_001})
         with pytest.raises(ValueError, match="API runtime ceiling"):
             runner.run_molecular_dynamics({"n_steps": 10_001})
+        with pytest.raises(ValueError, match="API runtime ceiling"):
+            runner.run_gillespie_ssa({"a0": 1_000_001})
 
     # ---- MD quadratic-cost ceiling -------------------------------------
     #
@@ -290,6 +295,7 @@ class TestRunnerExecution:
             ("monte_carlo_pi", {"n_samples": 1_000_001}, "MAX_API_MONTE_CARLO_SAMPLES"),
             ("wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
             ("two_locus_wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
+            ("gillespie_ssa", {"a0": 1_000_001}, "MAX_API_SSA_POPULATION"),
         ],
     )
     def test_runtime_ceiling_rejects_oversized_request(
