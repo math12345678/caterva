@@ -192,3 +192,20 @@ mutation checks: citation on a default entry, dropped provenance key,
   fixtures → resolution chain → runner JSON → parse → pairing → response.
 - **Verification**: 4 new pytest tests and 7 new vitest tests; full suites
   green.
+
+## Amendment (Stage 5 Part 5): the deliberate narrowness
+
+- **Status**: Accepted (Stage 5 Part 5, 2026-08-01).
+- **Context**: Stage 5 question 5 — only one parameter in one domain
+  (`km` in `mm`) is resolved from literature. Decide deliberately, in
+  writing, whether to widen it or make the narrowness explicit.
+- **Decision**: **not widened, and made explicit.** `RESOLVABLE_FIELDS`
+  (`lib/provenance.ts`, currently `{ mm: ["km"] }`) is the single source
+  of truth for what CAN be resolved. In a domain with resolvable fields, a
+  default parameter that has no lookup carries the note "No literature
+  lookup exists for X; only ... is resolved from literature in this
+  domain" — the narrowness is a per-parameter property of the response,
+  not a hidden convention. Widen later only deliberately: a new field
+  needs a lookup path (e.g. mm Vmax via BRENDA), a hand-verified golden
+  tuple, runner serialization, and contract tests.
+- **Verification**: Target I in `api-server/src/__tests__/provenance.test.ts`.

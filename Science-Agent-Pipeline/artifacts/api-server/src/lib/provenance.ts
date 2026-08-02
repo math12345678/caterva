@@ -17,6 +17,17 @@ export type ParameterOrigin = "resolved" | "user" | "default";
  */
 export type CitationStatus = "verified" | "flagged";
 
+/**
+ * Stage 5 Part 5: the deliberate narrowness. Only these parameters are
+ * ever resolved from literature; everything else in the domain is a
+ * teaching default, by decision, not by accident. Extending this list is
+ * a new trust commitment: each entry needs a lookup path, a hand-verified
+ * golden tuple, and contract tests (see STAGE_05_PART_05.md).
+ */
+export const RESOLVABLE_FIELDS: Record<string, string[]> = {
+  mm: ["km"],
+};
+
 export interface ParameterProvenance {
   /** How this value was obtained for THIS query. */
   origin: ParameterOrigin;

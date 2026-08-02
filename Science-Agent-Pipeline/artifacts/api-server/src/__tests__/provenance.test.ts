@@ -378,6 +378,39 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
   });
 });
 
+describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5)", () => {
+  it("mm defaults beyond km state that no lookup exists for them", async () => {
+    const resolved = await resolveQuery("simulate enzyme kinetics");
+    for (const key of ["vmax", "s0"]) {
+      const prov = resolved.parameterProvenance[key]!;
+      expect(prov.origin).toBe("default");
+      expect(prov.note).toMatch(/no literature lookup exists for/i);
+      expect(prov.note).toMatch(/only km is resolved from literature/i);
+    }
+  });
+
+  it("a user-supplied mm parameter does not carry the narrowness note", async () => {
+    const resolved = await resolveQuery("simulate enzyme kinetics vmax=12");
+    const vmax = resolved.parameterProvenance["vmax"]!;
+    expect(vmax.origin).toBe("user");
+    expect(vmax.note).toBeUndefined();
+  });
+
+  it("domains without resolvable fields stay quiet (no noise notes)", async () => {
+    const resolved = await resolveQuery("simulate sir outbreak");
+    for (const [key, prov] of entries(resolved)) {
+      expect(prov.note, `${key} must not carry a narrowness note`).toBeUndefined();
+    }
+  });
+
+  it("the resolved km itself carries the lookup note, not the narrowness note", async () => {
+    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("resolved");
+    expect(km.note).toBeUndefined();
+  });
+});
+
 // =========================================================================
 // Mutation tests (Stage 4 Part 3, Rule 6)
 // These deliberately break the implementation in realistic ways to verify
