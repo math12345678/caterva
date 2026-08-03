@@ -36,3 +36,4 @@ Each ADR has:
 | [0011](0011-llm-parameter-origin.md) | An LLM-supplied parameter is its own origin, not a `default` |
 | [0012](0012-kcat-resolved-but-not-simulated.md) | kcat is resolved from literature but is not a simulation parameter |
 | [0013](0013-enzyme-concentration-bridges-kcat-to-vmax.md) | Enzyme concentration is a caller input, and it bridges kcat to Vmax |
+| [0014](0014-python-version-support.md) | Python 3.10–3.12, and what actually constrains it |

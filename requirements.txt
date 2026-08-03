@@ -1,8 +1,23 @@
 # Terrium runtime dependencies.
 # Pinned to versions verified working together on 2026-07-22.
 #
-# Python 3.10-3.12 is required. See requirements-dev.txt and README for the
-# reason (prebuilt wheels for the SBML C extensions stop at cp312).
+# Python 3.10-3.12 is required.
+#
+# The reason, verified against PyPI 2026-08-02 -- an earlier version of this
+# comment named the wrong cause:
+#
+#   libroadrunner 2.7.0   cp39-cp312 only     <- BLOCKS 3.13+
+#   numpy         1.26.4  cp39-cp312 only     <- BLOCKS 3.13+
+#   python-libsbml 5.21.1 cp38-cp314          NOT a blocker
+#   antimony      2.14.0  py3-none-<platform> NOT a blocker (version-agnostic)
+#
+# So it is NOT "the SBML C extensions stop at cp312", which this file, the
+# README and CONTRIBUTING.md all claimed. python-libsbml already ships cp314
+# wheels, and antimony's wheels are Python-version agnostic.
+#
+# Raising the floor to 3.13 needs libroadrunner >= 2.8.0 and numpy >= 2.1.0
+# -- a NumPy 2.x major upgrade, which is a stage of work with its own
+# verification, not a pin bump. See docs/adr/0014-python-version-support.md.
 
 # --- Simulation engines (Tier 2 ODE domains) -------------------------------
 # NOTE: do NOT `pip install tellurium`. The umbrella package pulls in
