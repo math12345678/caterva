@@ -211,7 +211,22 @@ components:
           description: Unique identifier for this pipeline run
         domain:
           type: string
-          enum: [mm, sir, seir, pcr, monte_carlo_pi, wright_fisher, two_locus_wright_fisher, molecular_dynamics, gillespie_ssa, gillespie_ssa_bimolecular, gillespie_ssa_replicates, sbml]
+          enum:
+            [
+              mm,
+              sir,
+              seir,
+              pcr,
+              monte_carlo_pi,
+              wright_fisher,
+              two_locus_wright_fisher,
+              molecular_dynamics,
+              gillespie_ssa,
+              gillespie_ssa_bimolecular,
+              gillespie_ssa_replicates,
+              sbml,
+              mm_competitive_inhibition,
+            ]
           description: Resolved simulation domain
         parameters:
           type: object

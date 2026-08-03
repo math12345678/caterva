@@ -75,9 +75,13 @@ def extract_constants_from_file(
                             elif isinstance(node.value, ast.Num):  # Python 3.7 compatibility
                                 constants[const_name] = node.value.n
                             elif isinstance(node.value, ast.UnaryOp) and isinstance(node.value.op, ast.USub):
-                                if isinstance(node.value.operand, ast.Constant):
+                                if isinstance(node.value.operand, ast.Constant) and isinstance(
+                                    node.value.operand.value, (int, float)
+                                ):
                                     constants[const_name] = -node.value.operand.value
-                                elif isinstance(node.value.operand, ast.Num):
+                                elif isinstance(node.value.operand, ast.Num) and isinstance(
+                                    node.value.operand.n, (int, float)
+                                ):
                                     constants[const_name] = -node.value.operand.n
                             elif isinstance(node.value, ast.Str):
                                 constants[const_name] = node.value.s

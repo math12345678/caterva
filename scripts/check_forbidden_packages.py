@@ -81,6 +81,52 @@ def _normalise(name: str) -> str:
     return re.sub(r"[-_.]+", "-", name).lower()
 
 
+def _strip_toml_comment(line: str) -> str:
+    """Remove a TOML comment without touching # characters in strings."""
+    quote: str | None = None
+    escaped = False
+    for index, char in enumerate(line):
+        if quote:
+            if quote == '"' and escaped:
+                escaped = False
+            elif quote == '"' and char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in {"'", '"'}:
+            quote = char
+        elif char == "#":
+            return line[:index]
+    return line
+
+
+def _toml_string_values(line: str) -> List[str]:
+    """Extract basic or literal TOML strings from one array line."""
+    values: List[str] = []
+    for match in re.finditer(r'"((?:\\.|[^"\\])*)"|\'([^\']*)\'', line):
+        values.append(match.group(1) if match.group(1) is not None else match.group(2))
+    return values
+
+
+def _array_has_terminator(line: str) -> bool:
+    """Return whether an array-closing bracket appears outside a TOML string."""
+    quote: str | None = None
+    escaped = False
+    for char in line:
+        if quote:
+            if quote == '"' and escaped:
+                escaped = False
+            elif quote == '"' and char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in {"'", '"'}:
+            quote = char
+        elif char == "]":
+            return True
+    return False
+
+
 def _requirement_names(path: Path) -> List[Tuple[int, str]]:
     """(line number, distribution name) for each requirement in a manifest.
 
@@ -102,7 +148,7 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
     dependency_key_allowed = True
 
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        line = raw.split("#", 1)[0].strip()
+        line = _strip_toml_comment(raw).strip()
 
         if path.suffix == ".toml":
             # Dependencies can live in either [project].dependencies or an
@@ -112,7 +158,7 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
             # "-dependencies".
             section = re.match(r"^\[([^]]+)\]$", line)
             if section:
-                section_name = section.group(1)
+                section_name = section.group(1).strip()
                 in_dependency_section = section_name in {
                     "project",
                     "project.optional-dependencies",
@@ -137,7 +183,8 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
                 )
                 if not array_start:
                     continue
-                if not dependency_key_allowed and array_start.group("key") != "dependencies":
+                key = array_start.group("key").strip('"').strip("'")
+                if not dependency_key_allowed and key != "dependencies":
                     continue
                 in_dependency_array = True
                 line = line[array_start.end():].strip()
@@ -148,14 +195,13 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
                 continue
 
             # TOML dependency arrays contain quoted requirement strings.
-            candidates = re.findall(r"[\"']([^\"']+)[\"']", line)
-            for candidate in candidates:
+            for candidate in _toml_string_values(line):
                 match = re.match(
                     r"^([A-Za-z0-9][A-Za-z0-9._-]*)", candidate
                 )
                 if match:
                     found.append((lineno, match.group(1)))
-            if "]" in line:
+            if _array_has_terminator(line):
                 in_dependency_array = False
             continue
 

@@ -38,7 +38,7 @@ setup: check-python
 # system Python must never be selected merely because it has pytest installed.
 #
 # Version support is 3.10-3.13 and that gate is authoritative: libroadrunner
-# 2.8.0 and numpy 2.1.3 publish cp313 wheels (and keep cp310), verified against
+# 2.8.0 and numpy 2.2.6 publish cp313 wheels (and keep cp310), verified against
 # PyPI. Windows outside it cannot install this project's dependencies. The
 # 2.9.x libroadrunner line drops cp310, so we stay on 2.8.0 to keep the floor.
 #
@@ -83,7 +83,7 @@ check-python:
 	@if [ -z "$(PY)" ]; then \
 		echo "No supported Python 3.10-3.13 interpreter found."; \
 		echo ""; \
-		echo "Terrium pins libroadrunner 2.8.0 and numpy 2.1.3, which publish"; \
+		echo "Terrium pins libroadrunner 2.8.0 and numpy 2.2.6, which publish"; \
 		echo "wheels for Python 3.10 through 3.13. Install one of python3.13,"; \
 		echo "python3.12, python3.11 or python3.10, then:"; \
 		echo ""; \

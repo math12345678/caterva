@@ -107,7 +107,7 @@ def documented_numbers(text: str) -> dict:
     return found
 
 
-def documented_domain_counts(text: str) -> List[Tuple[int, str]]:
+def documented_domain_counts(text: str) -> List[Tuple[int, int]]:
     """Every "<N> simulation domains" claim, with its line number.
 
     Returned as a list so that two claims disagreeing with *each other* is

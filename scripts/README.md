@@ -46,7 +46,7 @@ and behavior as the original monolithic `tellurium_engine.py`.
 1. Shim import structure (dual try/except pattern)
 2. Module structure (all expected modules exist)
 3. Import compatibility (both package and flat mode work)
-4. `__all__` exports (all 67 names resolve correctly)
+4. `__all__` exports (all 84 names resolve correctly)
 5. Rule 2 contract (ParameterValidation has ok/flagged/flag_reason)
 
 **Usage**:
@@ -106,6 +106,91 @@ Terrium (ADR 0005): every stochastic domain must use
 ```bash
 python scripts/check_rng_convention.py
 ```
+
+---
+
+### 📊 `check_documented_counts.py`
+
+**Purpose**: Verifies that README test counts, domain counts, and the actual
+repository counts match. Any inconsistency — a domain added without updating
+the README's claim — is a build failure.
+
+**Usage**:
+```bash
+python scripts/check_documented_counts.py
+```
+
+---
+
+### 🔢 `check_python_support_claim.py`
+
+**Purpose**: Verifies that every file claiming a Python support window
+(README, CONTRIBUTING, Makefile gate) states the same range consistently.
+With `--online`, also checks PyPI wheel coverage.
+
+**Usage**:
+```bash
+python scripts/check_python_support_claim.py [--online]
+```
+
+---
+
+### 📦 `check_forbidden_packages.py`
+
+**Purpose**: Enforces Rules 7 and 8 of the constitution: no dependency
+manifest lists `tellurium` (the umbrella package), and every ADR is indexed
+exactly once in `docs/adr/README.md`.
+
+**Usage**:
+```bash
+python scripts/check_forbidden_packages.py
+```
+
+---
+
+### 🔗 `check_guard_wiring.py`
+
+**Purpose**: Ensures every guard script runs in at least one harness
+(verify_build, CI, or a pytest wrapper). A guard that runs nowhere is a
+guard that rots — this is the executable form of the Stage 4 amendment.
+
+**Usage**:
+```bash
+python scripts/check_guard_wiring.py
+```
+
+---
+
+### 🤫 `check_no_silent_skips.py`
+
+**Purpose**: Runs both test suites and fails if any test is skipped without
+explicit reason. Catches `@pytest.mark.skip` with no explanation and
+`@unittest.skip` without a message.
+
+**Usage**:
+```bash
+python scripts/check_no_silent_skips.py
+```
+
+**Note**: This guard is deliberately narrow — it runs only in CI because it
+executes both full test suites (~5 min).
+
+---
+
+### 🔧 `check_env.py`
+
+**Purpose**: Verifies the installed environment — imports roadrunner,
+builds a real Michaelis-Menten model, integrates it, and compares the
+result to the exact closed-form solution. This is `make check`.
+
+**Usage**:
+```bash
+python scripts/check_env.py
+```
+
+**Note**: This guard is deliberately narrow — it is an environment probe,
+not a repository check. It runs in CI to confirm the container image is
+valid before any other step.
 
 ---
 
@@ -202,7 +287,7 @@ which is the difference between a review habit and a build guard.
 | Engine Contract | 1-2s | Multiple imports |
 | Dependencies | <1s | File system scan |
 | Plausibility Constants | <1s | AST parsing |
-| Python Tests | 60-120s | Full test suite |
-| TypeScript Tests | 30-60s | npm test |
+| Python Tests | 120–300s | Full test suite (881 engine + 214 literature) |
+| TypeScript Tests | 15–30s | vitest (220 tests across 15 files) |
 
 Use `--quick` for development workflows where you want immediate feedback.
