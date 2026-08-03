@@ -85,6 +85,46 @@ def validate_michaelis_menten_params(km: float, vmax: float,
     return v
 
 
+def validate_mm_competitive_params(km: float, vmax: float, ki: float,
+                                   s0: float, i: float) -> ParameterValidation:
+    """Check a competitive-inhibition Michaelis-Menten parameter set.
+
+    Km, Vmax and Ki must be strictly positive (Ki = 0 makes the inhibition
+    term divide by zero). Initial substrate and inhibitor concentration may
+    legitimately be zero -- I = 0 must reduce exactly to plain MM.
+    """
+    errors: List[str] = []
+
+    _finite_positive(km, "Km", errors, allow_zero=False)
+    _finite_positive(vmax, "Vmax", errors, allow_zero=False)
+    _finite_positive(ki, "Ki", errors, allow_zero=False)
+    _finite_positive(s0, "S0", errors, allow_zero=True)
+    _finite_positive(i, "I", errors, allow_zero=True)
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    v = ParameterValidation()
+
+    # Reuse the Km plausibility bounds -- Ki has no dedicated bounds in this
+    # project yet (BRENDA Ki reporting is being wired up separately); Km is
+    # flagged the same way plain MM flags it, since it carries the same
+    # physical meaning here.
+    if km < KM_PLAUSIBLE_MIN_MM:
+        v.flagged = True
+        v.flag_reason = (
+            f"Km {km:g} mM is below the plausible lower bound "
+            f"{KM_PLAUSIBLE_MIN_MM:g} mM"
+        )
+    elif km > KM_PLAUSIBLE_MAX_MM:
+        v.flagged = True
+        v.flag_reason = (
+            f"Km {km:g} mM is above the plausible upper bound "
+            f"{KM_PLAUSIBLE_MAX_MM:g} mM"
+        )
+    return v
+
+
 def vmax_from_kcat(
     kcat: float, enzyme_conc: float, km: float | None = None
 ) -> tuple[float, ParameterValidation]:

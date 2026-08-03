@@ -38,6 +38,7 @@ SIMULATE_FN_PREFIX = "simulate_"
 EXCLUDED_FNS: set[str] = {
     "simulate_sbml",
     "simulate_michaelis_menten",
+    "simulate_mm_competitive_inhibition",
     "simulate_sir",
     "simulate_seir",
     "simulate_pcr",  # deterministic recurrence, no RNG involved

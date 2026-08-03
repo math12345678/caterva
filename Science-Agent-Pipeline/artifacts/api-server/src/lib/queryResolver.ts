@@ -22,20 +22,121 @@ import type { ScienceAgentResult } from "./scienceAgent";
  * Nothing is defaulted here. If BRENDA did not report a pH, the result has
  * no pH, and the citation degrades to `flagged` downstream. See ADR 0010. */
 function toAssayConditions(
-  raw: ScienceAgentResult["assayConditions"]
+  raw: ScienceAgentResult["assayConditions"],
 ): AssayConditions | undefined {
   if (!raw) return undefined;
   const conditions: AssayConditions = {};
   if (typeof raw.ph === "number" && Number.isFinite(raw.ph)) {
     conditions.ph = raw.ph;
   }
-  if (typeof raw.temperatureC === "number" && Number.isFinite(raw.temperatureC)) {
+  if (
+    typeof raw.temperatureC === "number" &&
+    Number.isFinite(raw.temperatureC)
+  ) {
     conditions.temperatureC = raw.temperatureC;
   }
   if (typeof raw.buffer === "string" && raw.buffer.trim() !== "") {
     conditions.buffer = raw.buffer;
   }
   return conditions;
+}
+
+/**
+ * Apply literature resolution for kinetic constants (km, ki) from BRENDA.
+ *
+ * For `mm` only `km` is resolved. For `mm_competitive_inhibition` both
+ * `km` and `ki` are resolved from the same literature lookup. Unresolved
+ * values fall back to the defaults already in `parameters`; the provenance
+ * records whether the lookup succeeded, was locatable, or failed entirely.
+ */
+async function applyKineticResolution(
+  entities: EntityExtraction | undefined,
+  overrides: Record<string, number>,
+  domain: string,
+  parameters: Record<string, number | number[]>,
+  parameterProvenance: Record<string, ParameterProvenance>,
+  flags: string[],
+): Promise<{
+  parameters: Record<string, number | number[]>;
+  parameterProvenance: Record<string, ParameterProvenance>;
+  flags: string[];
+}> {
+  if (!entities?.ecNumber) {
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const resolvable = RESOLVABLE_FIELDS[domain] ?? [];
+  const kineticKeys = resolvable.filter((k) => !(k in overrides));
+  if (kineticKeys.length === 0) {
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const agentResult = await resolveKineticValue(entities);
+  if (!agentResult.found) {
+    for (const key of kineticKeys) {
+      parameterProvenance = {
+        ...parameterProvenance,
+        [key]: {
+          origin: "default",
+          note: `Could not resolve a real ${key.toUpperCase()} value from BRENDA/KEGG/PubMed; using default ${key.toUpperCase()}.`,
+        },
+      };
+    }
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const citation = formatResolvedCitation(agentResult.citation);
+  if (citation === undefined) {
+    for (const key of kineticKeys) {
+      parameterProvenance = {
+        ...parameterProvenance,
+        [key]: {
+          origin: "default",
+          note: `Found a ${key.toUpperCase()} but its citation carries no locator (ref id or URL); not trusted as resolved — using default ${key.toUpperCase()}.`,
+        },
+      };
+    }
+    flags.push(
+      `Found kinetic values but citation was not locatable; using defaults for ${kineticKeys.join(", ")}.`,
+    );
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const citationStatus =
+    agentResult.crossSpecies === true ||
+    agentResult.source === "brenda_cross_species"
+      ? "flagged"
+      : "verified";
+
+  for (const key of kineticKeys) {
+    const value = key === "km" ? agentResult.km : agentResult.ki;
+    if (value !== undefined) {
+      parameters = { ...parameters, [key]: value };
+      parameterProvenance = {
+        ...parameterProvenance,
+        [key]: buildResolvedKineticProvenance({
+          source: agentResult.source ?? "unknown",
+          citation,
+          organism: agentResult.organism,
+          citationStatus,
+          assayConditions: toAssayConditions(agentResult.assayConditions),
+        }),
+      };
+      flags.push(
+        `Resolved ${key.toUpperCase()}=${value} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`,
+      );
+    } else {
+      parameterProvenance = {
+        ...parameterProvenance,
+        [key]: {
+          origin: "default",
+          note: `Could not resolve a real ${key.toUpperCase()} value from BRENDA/KEGG/PubMed; using default ${key.toUpperCase()}.`,
+        },
+      };
+    }
+  }
+
+  return { parameters, parameterProvenance, flags };
 }
 
 export interface ResolvedSimulation {
@@ -60,10 +161,54 @@ interface DomainDefaults {
 
 const DOMAIN_DEFAULTS: DomainDefaults[] = [
   {
+    domain: "mm_competitive_inhibition",
+    parameters: { km: 2, ki: 1.0, vmax: 5, s0: 10, i0: 0.1, end: 10, points: 51 },
+    keywords: [
+      "competitive inhibition",
+      "competitive",
+      "inhibition",
+      "inhibitor",
+      "ki",
+      "enzyme",
+      "michaelis",
+      "km",
+      "vmax",
+      "substrate",
+      "ldh",
+      "pyruvate",
+      "lactate",
+      "hexokinase",
+      "catalase",
+      "alcohol dehydrogenase",
+      "trypsin",
+      "rubisco",
+      "kinase",
+    ],
+    reasoning:
+      "Keywords related to enzyme kinetics with competitive inhibition were found; defaulting to a Michaelis-Menten competitive inhibition simulation.",
+    modelCitations: [
+      "BRENDA — The Comprehensive Enzyme Information System, https://www.brenda-enzymes.org/",
+    ],
+  },
+  {
     domain: "mm",
     parameters: { km: 2, vmax: 5, s0: 10, end: 10, points: 51 },
-    keywords: ["enzyme", "michaelis", "km", "vmax", "substrate", "ldh", "pyruvate", "lactate",
-      "hexokinase", "catalase", "alcohol dehydrogenase", "trypsin", "rubisco", "kinase"],
+    keywords: [
+      "enzyme",
+      "michaelis",
+      "km",
+      "vmax",
+      "substrate",
+      "ldh",
+      "pyruvate",
+      "lactate",
+      "hexokinase",
+      "catalase",
+      "alcohol dehydrogenase",
+      "trypsin",
+      "rubisco",
+      "kinase",
+    ],
     reasoning:
       "Keywords related to enzyme kinetics were found; defaulting to a Michaelis-Menten simulation.",
     modelCitations: [
@@ -72,7 +217,15 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
   {
     domain: "sir",
-    parameters: { beta: 0.3, gamma: 0.1, s0: 990, i0: 10, r0_recovered: 0, end: 100, points: 101 },
+    parameters: {
+      beta: 0.3,
+      gamma: 0.1,
+      s0: 990,
+      i0: 10,
+      r0_recovered: 0,
+      end: 100,
+      points: 101,
+    },
     keywords: ["sir", "infection", "epidemic", "virus", "disease", "outbreak"],
     reasoning:
       "Keywords related to infectious disease spread were found; defaulting to an SIR epidemic simulation.",
@@ -82,7 +235,17 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
   {
     domain: "seir",
-    parameters: { beta: 0.3, sigma: 0.2, gamma: 0.1, s0: 990, e0: 10, i0: 0, r0_recovered: 0, end: 100, points: 101 },
+    parameters: {
+      beta: 0.3,
+      sigma: 0.2,
+      gamma: 0.1,
+      s0: 990,
+      e0: 10,
+      i0: 0,
+      r0_recovered: 0,
+      end: 100,
+      points: 101,
+    },
     keywords: ["seir", "exposed", "latent", "incubation"],
     reasoning:
       "Keywords related to latent-period epidemiology were found; defaulting to an SEIR simulation.",
@@ -93,8 +256,15 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   {
     domain: "pcr",
     parameters: { n0: 100, efficiency: 0.95, cycles: 30 },
-    keywords: ["pcr", "polymerase chain", "amplification", "template", "cycles"],
-    reasoning: "PCR amplification keywords were found; defaulting to a discrete PCR simulation.",
+    keywords: [
+      "pcr",
+      "polymerase chain",
+      "amplification",
+      "template",
+      "cycles",
+    ],
+    reasoning:
+      "PCR amplification keywords were found; defaulting to a discrete PCR simulation.",
     modelCitations: [
       "Mullis K., Faloona F., Scharf S., Saiki R., Horn G., Erlich H. (1986) Specific enzymatic amplification of DNA in vitro: the polymerase chain reaction. Cold Spring Harbor Symposia on Quantitative Biology 51, 263-273.",
     ],
@@ -103,16 +273,31 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "monte_carlo_pi",
     parameters: { n_samples: 10_000 },
     keywords: ["monte carlo", "estimate pi", "pi estimate", "random points"],
-    reasoning: "Monte Carlo estimation keywords were found; defaulting to pi estimation.",
+    reasoning:
+      "Monte Carlo estimation keywords were found; defaulting to pi estimation.",
     modelCitations: [
       "Metropolis N., Ulam S. (1949) The Monte Carlo method. Journal of the American Statistical Association 44(247), 335-341.",
     ],
   },
   {
     domain: "wright_fisher",
-    parameters: { population_size: 100, starting_frequency: 0.5, generations: 100, replicate_runs: 100, mutation_rate: 0, selection_coefficient: 0 },
-    keywords: ["wright-fisher", "genetic drift", "allele frequency", "population genetics", "fixation"],
-    reasoning: "Population-genetics keywords were found; defaulting to a Wright-Fisher simulation.",
+    parameters: {
+      population_size: 100,
+      starting_frequency: 0.5,
+      generations: 100,
+      replicate_runs: 100,
+      mutation_rate: 0,
+      selection_coefficient: 0,
+    },
+    keywords: [
+      "wright-fisher",
+      "genetic drift",
+      "allele frequency",
+      "population genetics",
+      "fixation",
+    ],
+    reasoning:
+      "Population-genetics keywords were found; defaulting to a Wright-Fisher simulation.",
     // The model carries both names; citing only Fisher attributes half of it.
     modelCitations: [
       "Fisher R.A. (1930) The Genetical Theory of Natural Selection. Oxford: Clarendon Press.",
@@ -121,18 +306,45 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
   {
     domain: "two_locus_wright_fisher",
-    parameters: { population_size: 100, generations: 20, recombination_rate: 0.1, starting_frequencies: [0.5, 0, 0, 0.5], mutation_rate: 0, replicate_runs: 50 },
-    keywords: ["linkage disequilibrium", "two locus", "two-locus", "recombination", "haplotype"],
-    reasoning: "Linkage and recombination keywords were found; defaulting to a two-locus Wright-Fisher simulation.",
+    parameters: {
+      population_size: 100,
+      generations: 20,
+      recombination_rate: 0.1,
+      starting_frequencies: [0.5, 0, 0, 0.5],
+      mutation_rate: 0,
+      replicate_runs: 50,
+    },
+    keywords: [
+      "linkage disequilibrium",
+      "two locus",
+      "two-locus",
+      "recombination",
+      "haplotype",
+    ],
+    reasoning:
+      "Linkage and recombination keywords were found; defaulting to a two-locus Wright-Fisher simulation.",
     modelCitations: [
       "Lewontin R.C. (1964) The interaction of selection and linkage. I. General considerations; heterotic models. Genetics 49(1), 49-67.",
     ],
   },
   {
     domain: "molecular_dynamics",
-    parameters: { n_particles: 108, temperature: 0.4, timestep: 0.005, n_steps: 1000, density: 0.85 },
-    keywords: ["molecular dynamics", "lennard-jones", "lennard jones", "lj cluster", "particles"],
-    reasoning: "Molecular-dynamics keywords were found; defaulting to a Lennard-Jones simulation.",
+    parameters: {
+      n_particles: 108,
+      temperature: 0.4,
+      timestep: 0.005,
+      n_steps: 1000,
+      density: 0.85,
+    },
+    keywords: [
+      "molecular dynamics",
+      "lennard-jones",
+      "lennard jones",
+      "lj cluster",
+      "particles",
+    ],
+    reasoning:
+      "Molecular-dynamics keywords were found; defaulting to a Lennard-Jones simulation.",
     modelCitations: [
       "Hoare M.R., Pal P. (1971) Physical cluster mechanics: statics and energy surfaces for monatomic systems. Advances in Physics 20(84), 161-196.",
     ],
@@ -150,7 +362,16 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   {
     domain: "gillespie_ssa_bimolecular",
     parameters: { a0: 100, b0: 100, k: 0.005, end: 10 },
-    keywords: ["bimolecular", "second order", "second-order", "association", "two reactants", "a + b", "a plus b", "binding"],
+    keywords: [
+      "bimolecular",
+      "second order",
+      "second-order",
+      "association",
+      "two reactants",
+      "a + b",
+      "a plus b",
+      "binding",
+    ],
     reasoning:
       "Keywords related to a two-reactant association were found; defaulting to a Gillespie SSA simulation of the bimolecular reaction A + B -> C.",
     modelCitations: [
@@ -160,7 +381,16 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   {
     domain: "gillespie_ssa",
     parameters: { a0: 1000, k: 0.5, end: 10 },
-    keywords: ["gillespie", "stochastic", "ssa", "chemical master equation", "decay", "reaction", "random walk", "birth-death"],
+    keywords: [
+      "gillespie",
+      "stochastic",
+      "ssa",
+      "chemical master equation",
+      "decay",
+      "reaction",
+      "random walk",
+      "birth-death",
+    ],
     reasoning:
       "Keywords related to stochastic chemical kinetics were found; defaulting to a Gillespie SSA simulation of a single first-order decay reaction.",
     modelCitations: [
@@ -169,7 +399,8 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
 ];
 
-const PARAMETER_PATTERN = /(km|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
+const PARAMETER_PATTERN =
+  /(km|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
 
 /**
  * Extract numeric overrides from the query string.
@@ -202,7 +433,8 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   if (!matched) return undefined;
 
   const lower = query.toLowerCase();
-  const substrate = matched.substrates.find((s) => lower.includes(s)) ?? matched.substrates[0]!;
+  const substrate =
+    matched.substrates.find((s) => lower.includes(s)) ?? matched.substrates[0]!;
   return {
     enzymeName: matched.enzymeName,
     substrate,
@@ -291,7 +523,8 @@ function formatResolvedCitation(citation?: {
   url?: string | null;
 }): string | undefined {
   if (!citation?.source) return undefined;
-  const hasRef = citation.referenceId !== undefined && citation.referenceId !== null;
+  const hasRef =
+    citation.referenceId !== undefined && citation.referenceId !== null;
   const hasUrl = citation.url !== undefined && citation.url !== null;
   if (!hasRef && !hasUrl) return undefined;
   const refPart = hasRef ? ` (ref ${citation.referenceId})` : "";
@@ -308,9 +541,14 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
 
   if (llmResult) {
     const domainDefaults =
-      DOMAIN_DEFAULTS.find((d) => d.domain === llmResult.domain) || DOMAIN_DEFAULTS[0]!;
-    let parameters = { ...domainDefaults.parameters, ...llmResult.parameters, ...overrides };
-    const flags: string[] = [];
+      DOMAIN_DEFAULTS.find((d) => d.domain === llmResult.domain) ||
+      DOMAIN_DEFAULTS[0]!;
+    let parameters = {
+      ...domainDefaults.parameters,
+      ...llmResult.parameters,
+      ...overrides,
+    };
+    let flags: string[] = [];
     const modelCitations = [...llmResult.modelCitations];
     let parameterProvenance = buildParameterProvenance(
       parameters,
@@ -319,68 +557,51 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       llmResult.domain,
     );
 
+    const resolvableForDomain = RESOLVABLE_FIELDS[llmResult.domain] ?? [];
+    const hasUnoverriddenKinetic = resolvableForDomain.some(
+      (k) => !(k in overrides),
+    );
     if (
-      llmResult.domain === "mm" &&
+      (llmResult.domain === "mm" ||
+        llmResult.domain === "mm_competitive_inhibition") &&
       llmResult.entities?.ecNumber &&
-      !("km" in overrides)
+      hasUnoverriddenKinetic
     ) {
-      const agentResult = await resolveKineticValue(llmResult.entities);
-      if (agentResult.found && agentResult.km !== undefined) {
-        const citation = formatResolvedCitation(agentResult.citation);
-        if (citation !== undefined) {
-          parameters = { ...parameters, km: agentResult.km };
-          parameterProvenance = {
-            ...parameterProvenance,
-            km: buildResolvedKineticProvenance({
-              source: agentResult.source ?? "unknown",
-              citation,
-              organism: agentResult.organism,
-              citationStatus:
-                agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
-                  ? "flagged"
-                  : "verified",
-              assayConditions: toAssayConditions(agentResult.assayConditions),
-            }),
-          };
-          flags.push(
-            `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
-          );
-        } else {
-          parameterProvenance = {
-            ...parameterProvenance,
-            km: {
-              origin: "default",
-              note:
-                "Found a Km but its citation carries no locator (ref id or URL); not trusted as resolved — using default Km.",
-            },
-          };
-          flags.push("Found a Km but its citation was not locatable; using default Km.");
-        }
-      } else {
-        parameterProvenance = {
-          ...parameterProvenance,
-          km: {
-            origin: "default",
-            note:
-              "Could not resolve a real Km value from BRENDA/KEGG/PubMed; using default Km.",
-          },
-        };
-      }
+      const result = await applyKineticResolution(
+        llmResult.entities,
+        overrides,
+        llmResult.domain,
+        parameters,
+        parameterProvenance,
+        flags,
+      );
+      parameters = result.parameters;
+      parameterProvenance = result.parameterProvenance;
+      flags = result.flags;
     }
 
-    if (Object.keys(overrides).length === 0 && Object.keys(llmResult.parameters).length === 0) {
-      flags.push("No parameters were extracted from the query; using defaults.");
+    if (
+      Object.keys(overrides).length === 0 &&
+      Object.keys(llmResult.parameters).length === 0
+    ) {
+      flags.push(
+        "No parameters were extracted from the query; using defaults.",
+      );
     }
     if (Object.keys(overrides).length > 0) {
       flags.push("Applied parameter overrides found in the query string.");
     }
     if (isAllDefaults(parameterProvenance)) {
-      flags.push("No parameter values were resolved from literature; all values are defaults.");
+      flags.push(
+        "No parameter values were resolved from literature; all values are defaults.",
+      );
     }
 
     const violations = provenanceViolations(parameters, parameterProvenance);
     if (violations.length > 0) {
-      throw new Error(`Internal error: invalid parameter provenance: ${violations.join("; ")}`);
+      throw new Error(
+        `Internal error: invalid parameter provenance: ${violations.join("; ")}`,
+      );
     }
 
     return {
@@ -411,54 +632,37 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
   }
 
   let parameters = { ...best.parameters, ...overrides };
-  const flags: string[] = [];
-  let parameterProvenance = buildParameterProvenance(parameters, overrides, {}, best.domain);
+  let flags: string[] = [];
+  let parameterProvenance = buildParameterProvenance(
+    parameters,
+    overrides,
+    {},
+    best.domain,
+  );
 
   // If this looks like an enzyme query and no LLM is available, try the
   // hardcoded entity map and the science agent.
   const fallbackEntities = extractEntitiesFromQuery(query);
-  if (best.domain === "mm" && fallbackEntities?.ecNumber && !("km" in overrides)) {
-    const agentResult = await resolveKineticValue(fallbackEntities);
-    if (agentResult.found && agentResult.km !== undefined) {
-      const citation = formatResolvedCitation(agentResult.citation);
-      if (citation !== undefined) {
-        parameters = { ...parameters, km: agentResult.km };
-        parameterProvenance = {
-          ...parameterProvenance,
-          km: buildResolvedKineticProvenance({
-            source: agentResult.source ?? "unknown",
-            citation,
-            organism: agentResult.organism,
-            citationStatus:
-              agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
-                ? "flagged"
-                : "verified",
-            assayConditions: toAssayConditions(agentResult.assayConditions),
-          }),
-        };
-        flags.push(
-          `Resolved Km=${agentResult.km} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`
-        );
-      } else {
-        parameterProvenance = {
-          ...parameterProvenance,
-          km: {
-            origin: "default",
-            note:
-              "Found a Km but its citation carries no locator (ref id or URL); not trusted as resolved — using default Km.",
-          },
-        };
-        flags.push("Found a Km but its citation was not locatable; using default Km.");
-      }
-    } else {
-      parameterProvenance = {
-        ...parameterProvenance,
-        km: {
-          origin: "default",
-          note: "Could not resolve a real Km value from BRENDA/KEGG/PubMed; using default Km.",
-        },
-      };
-    }
+  const resolvableForDomain = RESOLVABLE_FIELDS[best.domain] ?? [];
+  const hasUnoverriddenKinetic = resolvableForDomain.some(
+    (k) => !(k in overrides),
+  );
+  if (
+    (best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
+    fallbackEntities?.ecNumber &&
+    hasUnoverriddenKinetic
+  ) {
+    const result = await applyKineticResolution(
+      fallbackEntities,
+      overrides,
+      best.domain,
+      parameters,
+      parameterProvenance,
+      flags,
+    );
+    parameters = result.parameters;
+    parameterProvenance = result.parameterProvenance;
+    flags = result.flags;
   }
 
   if (Object.keys(overrides).length === 0) {
@@ -468,12 +672,16 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     flags.push("Applied parameter overrides found in the query string.");
   }
   if (isAllDefaults(parameterProvenance)) {
-    flags.push("No parameter values were resolved from literature; all values are defaults.");
+    flags.push(
+      "No parameter values were resolved from literature; all values are defaults.",
+    );
   }
 
   const violations = provenanceViolations(parameters, parameterProvenance);
   if (violations.length > 0) {
-    throw new Error(`Internal error: invalid parameter provenance: ${violations.join("; ")}`);
+    throw new Error(
+      `Internal error: invalid parameter provenance: ${violations.join("; ")}`,
+    );
   }
 
   return {

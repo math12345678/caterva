@@ -25,11 +25,15 @@ export const simulationsTable = pgTable("simulations", {
       "gillespie_ssa_bimolecular",
       "gillespie_ssa_replicates",
       "sbml",
+      "mm_competitive_inhibition",
     ],
   }).notNull(),
   parameters: jsonb("parameters").notNull().default({}),
   trajectory: jsonb("trajectory").notNull().default([]),
   provenance: jsonb("provenance").notNull().default({}),
+  // Nullable per-parameter provenance. Default null (not {}), so after migration
+  // we can distinguish "never written" (null) from "written empty" ({}).
+  parameterProvenance: jsonb("parameter_provenance").default(null),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

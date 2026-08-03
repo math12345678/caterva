@@ -216,6 +216,30 @@ def run_mm(params: Dict[str, Any]) -> Dict[str, Any]:
     return payload
 
 
+def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
+    km = float(params.get("km", 2.0))
+    vmax = float(params.get("vmax", 5.0))
+    ki = float(params.get("ki", 1.0))
+    s0 = float(params.get("s0", 10.0))
+    # Wire name is "i0" (inhibitor concentration at t=0), matching the
+    # SimulationParameterSchemas shape in schemas.ts and the DOMAIN_DEFAULTS
+    # entry in queryResolver.ts. The engine's own keyword argument is "i" --
+    # that is an internal name inside tellurium_engine, not the API contract.
+    i0 = float(params.get("i0", 0.0))
+    end = float(params.get("end", 10.0))
+    points = int(params.get("points", 51))
+
+    result = tellurium_engine.simulate_mm_competitive_inhibition(
+        km=km, vmax=vmax, ki=ki, s0=s0, i=i0, end=end, points=points
+    )
+
+    reported: Dict[str, Any] = {
+        "km": km, "vmax": vmax, "ki": ki, "s0": s0, "i0": i0,
+        "end": end, "points": points,
+    }
+    return _serialise_result(result, "mm_competitive_inhibition", reported)
+
+
 def run_sir(params: Dict[str, Any]) -> Dict[str, Any]:
     beta = float(params.get("beta", 0.3))
     gamma = float(params.get("gamma", 0.1))
@@ -526,6 +550,7 @@ def run_sbml(params: Dict[str, Any]) -> Dict[str, Any]:
 # Tellurium/tests/test_boundary_contract.py.
 DISPATCH: Dict[str, str] = {
     "mm": "simulate_michaelis_menten",
+    "mm_competitive_inhibition": "simulate_mm_competitive_inhibition",
     "sir": "simulate_sir",
     "seir": "simulate_seir",
     "pcr": "simulate_pcr",
@@ -541,6 +566,7 @@ DISPATCH: Dict[str, str] = {
 
 _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "mm": run_mm,
+    "mm_competitive_inhibition": run_mm_competitive_inhibition,
     "sir": run_sir,
     "seir": run_seir,
     "pcr": run_pcr,
