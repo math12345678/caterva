@@ -18,12 +18,12 @@
 # "No matching distribution found for libroadrunner==2.9.0". 2.7.0 ships
 # wheels for cp39 through cp312 and is what the full test suite has actually
 # been verified against.
-libroadrunner==2.7.0
+libroadrunner>=2.8.0
 antimony==2.14.0
 python-libsbml==5.21.1
 
 # --- Numerics --------------------------------------------------------------
-numpy==1.26.4
+numpy>=2.1.0
 scipy==1.15.3
 
 # --- Literature layer (BRENDA / KEGG / PubMed scraping) --------------------
