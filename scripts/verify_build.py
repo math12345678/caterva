@@ -108,6 +108,15 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_documented_counts.py'}"
     ))
 
+    # Python support window stated consistently across requirements.txt,
+    # README, CONTRIBUTING and the Makefile gate. Offline; --online adds a
+    # PyPI wheel-coverage check. Added Stage 8 after the stated REASON for
+    # the window was found wrong in all three files (ADR 0014).
+    guards.append(run_guard(
+        "Python Support Claim Guard",
+        f"python {SCRIPTS_DIR / 'check_python_support_claim.py'}"
+    ))
+
     return guards
 
 

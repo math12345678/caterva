@@ -44,9 +44,13 @@ offer to build and attach automatically.
 
 ## Requirements
 
-**Python 3.10–3.12.** This is a hard constraint, not a preference. The SBML C
-extensions publish prebuilt wheels up to cp312; past that, pip builds from
-source and needs `cmake` and `swig` installed.
+**Python 3.10–3.12.** This is a hard constraint, not a preference.
+`libroadrunner` 2.7.0 and `numpy` 1.26.4 publish wheels only through cp312
+(verified against PyPI, 2026-08-02), so on 3.13+ pip has nothing to install.
+
+Raising the floor means `libroadrunner ≥ 2.8.0` and `numpy ≥ 2.1.0` — a NumPy
+2.x major upgrade, not a pin bump. See
+[ADR 0014](docs/adr/0014-python-version-support.md).
 
 ## Do not `pip install tellurium`
 

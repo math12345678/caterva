@@ -46,6 +46,13 @@ jobs:
       - name: Documented-counts guard
         run: python scripts/check_documented_counts.py
 
+      # The stated reason for the 3.10-3.12 window was wrong in three files
+      # at once ("the SBML C extensions stop at cp312" -- python-libsbml
+      # already ships cp314). Offline here so CI cannot flake on PyPI; run
+      # with --online when changing a pin.
+      - name: Python-support-claim guard
+        run: python scripts/check_python_support_claim.py
+
       # The remaining guards (RNG convention, dependencies, engine contract,
       # plausibility constants) run in one step via the build-verification
       # script. --quick runs the guards only, not the test suites.
