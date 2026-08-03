@@ -11,6 +11,11 @@ __pycache__/
 .pytest_cache/
 .hypothesis/
 .ruff_cache/
+# mypy is configured in pyproject.toml ([tool.mypy]), so this directory was
+# always going to appear -- it was simply missing here until it did. Stage 3
+# had to untrack committed __pycache__ bytecode; catching this one before
+# anything was tracked is the cheaper version of the same fix.
+.mypy_cache/
 
 # Local backup / scratch files
 *.bak
