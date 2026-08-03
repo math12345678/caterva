@@ -111,6 +111,7 @@ class TestBoundaryContract:
     def test_engine_all_contains_expected_domains(self):
         expected = {
             "simulate_michaelis_menten",
+            "simulate_mm_competitive_inhibition",
             "simulate_sir",
             "simulate_seir",
             "simulate_pcr",
@@ -128,6 +129,7 @@ class TestBoundaryContract:
     def test_runner_dispatches_expected_domains(self):
         assert set(runner.DISPATCH.keys()) == {
             "mm",
+            "mm_competitive_inhibition",
             "sir",
             "seir",
             "pcr",

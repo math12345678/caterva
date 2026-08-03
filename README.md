@@ -5,11 +5,12 @@ language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
 been independently checked.
 
-Ten simulation domains built so far: enzyme kinetics, SIR/SEIR
-epidemiological modeling, PCR amplification, Monte Carlo simulation,
-population genetics (Wright-Fisher, single- and two-locus), molecular
-dynamics (Lennard-Jones cluster), and Gillespie SSA stochastic
-chemical kinetics (first-order decay and bimolecular association).
+Eleven simulation domains built so far: enzyme kinetics (plain and
+competitively-inhibited Michaelis-Menten), SIR/SEIR epidemiological modeling,
+PCR amplification, Monte Carlo simulation, population genetics
+(Wright-Fisher, single- and two-locus), molecular dynamics (Lennard-Jones
+cluster), and Gillespie SSA stochastic chemical kinetics (first-order decay
+and bimolecular association).
 
 ## Quick start
 
@@ -18,7 +19,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,093 tests (879 engine + 214 literature)
+make test      # runs all 1,097 tests (883 engine + 214 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -44,12 +45,10 @@ offer to build and attach automatically.
 
 ## Requirements
 
-**Python 3.10–3.12.** This is a hard constraint, not a preference.
-`libroadrunner` 2.7.0 and `numpy` 1.26.4 publish wheels only through cp312
-(verified against PyPI, 2026-08-02), so on 3.13+ pip has nothing to install.
-
-Raising the floor means `libroadrunner ≥ 2.8.0` and `numpy ≥ 2.1.0` — a NumPy
-2.x major upgrade, not a pin bump. See
+**Python 3.10–3.13.** This is a hard constraint, not a preference.
+`libroadrunner` 2.8.0 and `numpy` 2.1.3 publish wheels through cp313 and keep
+the cp310 floor (verified against PyPI). The 2.9.x libroadrunner line drops
+cp310, so we stay on 2.8.0. See
 [ADR 0014](docs/adr/0014-python-version-support.md).
 
 ## Do not `pip install tellurium`
@@ -70,11 +69,14 @@ in `requirements.txt`:
 
 ## Domains
 
-Ten simulation domains, two pipelines:
+Eleven simulation domains, two pipelines:
 
 **Continuous (antimony → SBML → roadrunner):**
 - **Michaelis-Menten** — irreversible single-substrate enzyme kinetics.
   Verified against the implicit closed form `Km·ln(S₀/S) + (S₀−S) = Vmax·t`.
+- **Michaelis-Menten with competitive inhibition** — `v = Vmax·S / (Km·(1+I/Ki) + S)`.
+  Verified against the apparent-Km closed form `Km_app = Km·(1 + I/Ki)`, and
+  against plain Michaelis-Menten exactly at I=0.
 - **SIR** — frequency-dependent epidemic model. Verified against conserved
   population, final-size relation, and peak condition `S = N/R₀`.
 - **SEIR** — SIR with an explicit latent (exposed) compartment.
@@ -147,18 +149,24 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 
 ```
 Terrium/
-├── Tellurium/              simulation engine
-│   ├── tellurium_engine.py
-│   └── tests/              879 tests
-├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
-│   ├── brenda_client.py
-│   └── ...                 214 tests
-├── Docw/                   specs, roadmap, build plan
-└── scripts/
-    ├── check_env.py            environment verification
-    ├── verify_domain.sh        automated verification (Steps 1-3)
-    ├── check_rng_convention.py ADR 0005 RNG compliance guard
-    └── check_dependencies_declared.py  undeclared import guard
+├── Tellurium/                  simulation engine (ODE + discrete/stochastic)
+│   ├── tellurium_engine.py     public entry point (84 names)│   └── tests/              883 tests
+├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
+│   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
+│   ├── fallback_logic.py       kinetic-value resolver orchestrator
+│   └── ...                     214 tests
+├── Science-Agent-Pipeline/     API server, database layer, landing page
+│   ├── artifacts/api-server/   Express + TypeScript API
+│   ├── lib/db/                 Drizzle ORM schema + migrations
+│   └── lib/api-spec/           OpenAPI 3.1 spec
+├── docs/                       ADRs, engineering constitution, API docs
+│   └── adr/                    16 decision records (and counting)
+├── Business/                   build stages, roadmap, fundraising
+├── scripts/                    11 guard scripts + build verification
+│   ├── verify_build.py         runs all guards + tests in one command
+│   ├── check_guard_wiring.py   every guard must run somewhere, unasked
+│   └── ...                     see scripts/README.md for the full list
+└── Docw/                       original specs (Word documents)
 ```
 
 ## How the tests are built
@@ -202,8 +210,11 @@ them together.
 ## Common commands
 
 ```bash
+make check       # verify the environment actually works (builds + integrates a real model)
+make test        # run all 1,095 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only
-make test-lit    # literature layer only
+make test-sim    # simulation engine only (881 tests)
+make test-lit    # literature layer only (214 tests)
+python3 scripts/verify_build.py --quick  # all 11 guard scripts (~8s)
 make clean       # remove caches
 ```
