@@ -121,7 +121,14 @@ than duplicated — but named here so nobody assumes the script covers it.
 
 ## 4. What remains open, and exactly what is needed
 
-### 4.1 `kcat`/`vmax` literature resolution — blocked on a fixture
+### 4.1 ~~`kcat`/`vmax` literature resolution — blocked on a fixture~~ CLOSED
+
+**Closed 2026-08-02.** You captured the fixture; the extraction is built,
+tested and mutation-checked. See §7 below for what was found on the way, and
+**ADR 0012** for why kcat is resolved but deliberately *not* wired into
+`RESOLVABLE_FIELDS`.
+
+The original blocker, for the record:
 
 Already in `STRENDA_GOVERNED_FIELDS`, so the reporting requirement applies
 automatically the moment a lookup exists. Blocked because:
@@ -177,6 +184,98 @@ One process note for myself: a `cp`-based backup restored a **stale** copy of
 `tellurium_engine.py` mid-audit, silently reverting unrelated changes. Caught
 by `git diff`, restored with `git checkout`. Backups during mutation testing
 should come from git, not `cp`.
+
+## 7. Addendum (2026-08-02) — kcat built, three bugs found
+
+The fixture capture succeeded (`FOUND label='Turnover Numbers'`, 15 data
+rows), which unblocked the last open item. Building against **real** data
+immediately exposed three defects that a hand-written fixture would have
+hidden — two of them pre-existing in code that had been green for months.
+
+### 7.1 Duplicate rows (pre-existing, shared with the Km path)
+
+`rows + subrows` concatenated two selector results without deduplicating. A
+sub-row that also carries `class="row"` was therefore parsed **twice**, and
+the same measurement returned as two entries.
+
+The Km fixtures never tripped it — their sub-rows are not `class="row"`. The
+AChE Turnover Numbers capture has **11 such rows**, so every heavily-studied
+substrate came back duplicated. Fixed by identity dedup preserving document
+order.
+
+This is the value of testing against captured rather than constructed data:
+the bug was in shared code, reachable from the Km path, and no existing
+fixture could reach it.
+
+### 7.2 An inverted heuristic
+
+The Km parser flags any row whose commentary mentions "Kcat", on the theory
+that a turnover number has landed in the KM Values table by mistake. Correct
+there — and **nonsense** in the Turnover Numbers table, where such commentary
+is exactly what belongs.
+
+Applied unconditionally, it flagged the real captured human row
+(6500 s⁻¹, *"…does not alter the Kcat value"*) as suspect **for being
+precisely what it claims to be**. Now scoped to the Km table, with a test
+asserting it still fires there — the fix must not disable the check where it
+was right.
+
+### 7.3 An unscoped fixture (my capture script's fault)
+
+`_find_table_container` locates a table by its **navigation link**, so a
+fixture holding only the container has nothing to match: the parser falls
+back to a whole-page scan and flags every row as unconfirmed. The existing Km
+fixtures include the anchor for exactly this reason; my script saved only the
+container. Fixed in `brenda_kcat_capture.py`, which now stores both.
+
+### 7.4 Bounds, anchored to literature
+
+kcat needs its own plausibility range — the Km bounds are meaningless for a
+turnover number. A kcat of 6500 s⁻¹ is an ordinary fast enzyme; a Km of
+6500 mM is a unit error.
+
+| | value | source |
+|---|---|---|
+| median kcat | ~10 s⁻¹ | Bar-Even *et al.* 2011, *Biochemistry* **50**(21), 4402–4410 |
+| fastest known (catalase) | ~4 × 10⁷ s⁻¹ | |
+| `KCAT_PLAUSIBLE_MAX_PER_S` | 10⁹ s⁻¹ | diffusion limit — above this it cannot be a kcat |
+| `KCAT_PLAUSIBLE_MIN_PER_S` | 10⁻⁶ s⁻¹ | admits the real captured 8.83 × 10⁻⁶ *Schizaphis* row |
+
+The ceiling sits at the diffusion limit rather than at catalase deliberately:
+faster than catalase is *remarkable*, faster than diffusion is *impossible*.
+
+### 7.5 Result
+
+7 unique entries, 3.72–6500 s⁻¹, every one STRENDA-complete. Golden tuple:
+**118 s⁻¹, 6-monoacetylmorphine, *Homo sapiens*, pH 7.4, 37 °C, ref 750291.**
+
+Nine tests, four mutations, each caught:
+
+```
+revert the row dedup                    -> FAIL
+use Km bounds for kcat                  -> FAIL
+un-scope the kcat-commentary heuristic  -> FAIL
+point the wrapper at the KM table       -> FAIL
+```
+
+### 7.6 And it stopped short, on purpose
+
+kcat is **not** in `RESOLVABLE_FIELDS`. The MM engine takes `vmax`, and
+`Vmax = kcat · [E]₀` needs an enzyme concentration Terrium does not have.
+Defaulting it would produce a smooth plausible curve whose `Vmax` came from a
+number nobody measured — invisible to every test. **ADR 0012.**
+
+### 7.7 The counts guard earned itself
+
+Adding 9 tests broke `check_documented_counts.py` on its first real outing:
+
+```
+FAIL: make_test: README says 1,040, actual is 1,049
+      literature: README says 182, actual is 191
+```
+
+That is precisely the drift that went unnoticed for several stages before the
+guard existed.
 
 ## 6. References
 
