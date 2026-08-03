@@ -3,6 +3,7 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findRepositoryRoot } from "./repoRoot";
+import { resolvePythonExecutable } from "./python";
 
 export type SimulationDomain =
   | "mm"
@@ -16,7 +17,8 @@ export type SimulationDomain =
   | "gillespie_ssa"
   | "gillespie_ssa_bimolecular"
   | "gillespie_ssa_replicates"
-  | "sbml";
+  | "sbml"
+  | "mm_competitive_inhibition";
 
 export interface TelluriumPoint {
   [species: string]: number;
@@ -38,6 +40,20 @@ interface PythonError {
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = findRepositoryRoot(_dirname);
+
+/** Preserve caller-provided import paths while adding the repository root. */
+export function buildTelluriumEnvironment(
+  baseEnv: NodeJS.ProcessEnv,
+  repoRoot: string,
+): NodeJS.ProcessEnv {
+  return {
+    ...baseEnv,
+    PYTHONPATH: [baseEnv.PYTHONPATH, repoRoot]
+      .filter(Boolean)
+      .join(path.delimiter),
+  };
+}
+
 const SCRIPT_PATH = path.join(
   REPO_ROOT,
   "Science-Agent-Pipeline",
@@ -76,18 +92,17 @@ export async function runTellurium(
 ): Promise<TelluriumResult> {
   await ensureRunnerScript();
 
+  const pythonExecutable = resolvePythonExecutable(REPO_ROOT);
+
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(new Error("Cancelled"));
       return;
     }
 
-    const proc = spawn("python3", [SCRIPT_PATH], {
+    const proc = spawn(pythonExecutable, [SCRIPT_PATH], {
       cwd: REPO_ROOT,
-      env: {
-        ...process.env,
-        PYTHONPATH: REPO_ROOT,
-      },
+      env: buildTelluriumEnvironment(process.env, REPO_ROOT),
     });
 
     const onAbort = () => {
@@ -116,7 +131,9 @@ export async function runTellurium(
       if (signal) signal.removeEventListener("abort", onAbort);
       const trimmed = stdout.trim();
       if (code !== 0 || !trimmed) {
-        reject(new Error(stderr || `Tellurium runner exited with code ${code}`));
+        reject(
+          new Error(stderr || `Tellurium runner exited with code ${code}`),
+        );
         return;
       }
 

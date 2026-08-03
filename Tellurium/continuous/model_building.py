@@ -18,11 +18,13 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
 
 try:
     from Tellurium.core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+        validate_michaelis_menten_params, validate_mm_competitive_params,
+        validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
     from Tellurium.core.utils import _fmt, _check_model_name  # type: ignore[no-redef]
 except ModuleNotFoundError:
     from core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+        validate_michaelis_menten_params, validate_mm_competitive_params,
+        validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
     from core.utils import _fmt, _check_model_name  # type: ignore[no-redef]
 
 def build_michaelis_menten_antimony(km: float, vmax: float, s0: float,
@@ -42,6 +44,33 @@ def build_michaelis_menten_antimony(km: float, vmax: float, s0: float,
         f"  P = 0;\n"
         f"  Vmax = {_fmt(vmax)};\n"
         f"  Km = {_fmt(km)};\n"
+        f"end\n"
+    )
+
+
+def build_mm_competitive_antimony(km: float, vmax: float, ki: float, s0: float,
+                                  i: float, model_name: str = "mm_competitive_inhibition",
+                                  validate: bool = True) -> str:
+    """Build a single-substrate Michaelis-Menten model with competitive
+    inhibition:
+
+        v = Vmax * [S] / (Km * (1 + [I]/Ki) + [S])
+
+    At I = 0 this reduces exactly to build_michaelis_menten_antimony's rate
+    law (the (1 + I/Ki) factor becomes 1).
+    """
+    if validate:
+        validate_mm_competitive_params(km, vmax, ki, s0, i).raise_if_invalid()
+    _check_model_name(model_name)
+    return (
+        f"model {model_name}\n"
+        f"  J0: S -> P; Vmax * S / (Km * (1 + I / Ki) + S);\n"
+        f"  S = {_fmt(s0)};\n"
+        f"  P = 0;\n"
+        f"  Vmax = {_fmt(vmax)};\n"
+        f"  Km = {_fmt(km)};\n"
+        f"  Ki = {_fmt(ki)};\n"
+        f"  I = {_fmt(i)};\n"
         f"end\n"
     )
 
