@@ -1,13 +1,13 @@
 # Terrium runtime dependencies.
 # Pinned to versions verified working together on 2026-07-22.
 #
-# Python 3.10-3.12 is required.
+# Python 3.10-3.13 is required.
 #
 # The reason, verified against PyPI 2026-08-02 -- an earlier version of this
 # comment named the wrong cause:
 #
-#   libroadrunner 2.7.0   cp39-cp312 only     <- BLOCKS 3.13+
-#   numpy         1.26.4  cp39-cp312 only     <- BLOCKS 3.13+
+#   libroadrunner 2.8.0   cp310-cp313          covers the full window
+#   numpy         2.1.3   cp310-cp313          covers the full window
 #   python-libsbml 5.21.1 cp38-cp314          NOT a blocker
 #   antimony      2.14.0  py3-none-<platform> NOT a blocker (version-agnostic)
 #
@@ -15,9 +15,10 @@
 # README and CONTRIBUTING.md all claimed. python-libsbml already ships cp314
 # wheels, and antimony's wheels are Python-version agnostic.
 #
-# Raising the floor to 3.13 needs libroadrunner >= 2.8.0 and numpy >= 2.1.0
-# -- a NumPy 2.x major upgrade, which is a stage of work with its own
-# verification, not a pin bump. See docs/adr/0014-python-version-support.md.
+# 3.13 support landed via the NumPy 2.x upgrade (ADR 0014): libroadrunner is
+# on the 2.8.0 line and numpy on 2.1.x -- the first lines that publish cp313
+# wheels while still covering the cp310 floor. See
+# docs/adr/0014-python-version-support.md.
 
 # --- Simulation engines (Tier 2 ODE domains) -------------------------------
 # NOTE: do NOT `pip install tellurium`. The umbrella package pulls in
@@ -26,19 +27,17 @@
 # platform without prebuilt wheels for them, that install fails at the cmake
 # step. These three packages are the parts that actually do the work.
 #
-# libroadrunner is pinned to 2.7.0, not the newer 2.9.x line. 2.9.0/2.9.2
-# dropped cp310 wheels entirely (their PyPI releases start at cp311), which
-# breaks installation on Python 3.10 -- the floor this project claims to
-# support. This was caught because CI failed on the 3.10 job with
-# "No matching distribution found for libroadrunner==2.9.0". 2.7.0 ships
-# wheels for cp39 through cp312 and is what the full test suite has actually
-# been verified against.
-libroadrunner==2.7.0
+# libroadrunner is pinned to 2.8.0 because it is the only release line that
+# still ships cp310 wheels while adding cp313 (verified against PyPI). The
+# 2.9.x line dropped cp310 wheels entirely (releases start at cp311), which
+# would break the Python 3.10 floor -- the exact failure that 2.9.0 caused
+# in CI ("No matching distribution found for libroadrunner==2.9.0").
+libroadrunner==2.8.0
 antimony==2.14.0
 python-libsbml==5.21.1
 
 # --- Numerics --------------------------------------------------------------
-numpy==1.26.4
+numpy==2.1.3
 scipy==1.15.3
 
 # --- Literature layer (BRENDA / KEGG / PubMed scraping) --------------------

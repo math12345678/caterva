@@ -15,8 +15,8 @@
 
 FROM python:3.12-slim
 
-# Python 3.10-3.12 is the supported range (see README.md); 3.12 is used here
-# since it's the ceiling with prebuilt wheels for the SBML C extensions.
+# Python 3.10-3.13 is the supported range (see README.md); 3.12 is used here
+# as a supported option (libroadrunner 2.8.0 / numpy 2.1.3 also ship cp313 wheels).
 
 WORKDIR /terrium
 

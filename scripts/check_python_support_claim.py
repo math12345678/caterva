@@ -7,7 +7,7 @@ actually publish wheels for that range.
 Why this exists
 ---------------
 `requirements.txt`, `README.md` and `CONTRIBUTING.md` all gave the same reason
-for the 3.10-3.12 window:
+for the 3.10-3.13 window (previously 3.10-3.12):
 
     "the SBML C extensions publish prebuilt wheels up to cp312"
 
@@ -49,7 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # The single source of truth for the supported window. Changing this without
 # changing the Makefile gate is exactly what this guard catches.
-SUPPORTED: Tuple[Tuple[int, int], ...] = ((3, 10), (3, 11), (3, 12))
+SUPPORTED: Tuple[Tuple[int, int], ...] = ((3, 10), (3, 11), (3, 12), (3, 13))
 
 # Files that state the window in prose, and the pattern that finds it.
 # "3.10-3.12" or "3.10–3.12" (ASCII hyphen or en dash).
@@ -63,8 +63,8 @@ CLAIM_FILES = [
 
 # Runtime dependencies whose wheel coverage defines the window.
 PINNED = {
-    "libroadrunner": "2.7.0",
-    "numpy": "1.26.4",
+    "libroadrunner": "2.8.0",
+    "numpy": "2.1.3",
     "python-libsbml": "5.21.1",
     "antimony": "2.14.0",
     "scipy": "1.15.3",
