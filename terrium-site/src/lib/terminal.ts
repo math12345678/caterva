@@ -11,6 +11,14 @@
 import { CONFIG, prepare, type PreparedData } from './drift';
 import { lj13, exactCluster, R_MIN } from './md';
 import { LEDGER, PIPELINE } from './pipeline';
+import {
+  simulateMichaelisMenten,
+  simulateSIR,
+  DEFAULT_MM,
+  DEFAULT_SIR,
+  MM_TOLERANCE,
+  SIR_TOLERANCE,
+} from './simulate';
 
 export type LineKind =
   | 'out'
@@ -136,10 +144,58 @@ export const COMMANDS: Command[] = [
         ];
       }
 
+      if (t === 'kinetics' || t === 'michaelis_menten' || t === 'mm') {
+        const t0 = performance.now();
+        const r = simulateMichaelisMenten(DEFAULT_MM);
+        const ms = Math.round(performance.now() - t0);
+        const passes = r.finalResidual < MM_TOLERANCE;
+        return [
+          head('MICHAELIS-MENTEN KINETICS'),
+          rule(),
+          d(`  Km=${DEFAULT_MM.km} Vmax=${DEFAULT_MM.vmax} S0=${DEFAULT_MM.s0}   RK4, 200 substeps/interval`),
+          o(),
+          o(`  S(0)   ${r.trajectory[0].S.toFixed(6)}`),
+          o(`  S(${DEFAULT_MM.end})  ${r.trajectory[r.trajectory.length - 1].S.toFixed(6)}`),
+          o(),
+          (passes ? ok : err)(
+            `  closed-form residual  ${r.finalResidual.toExponential(3)}  ${
+              passes ? '< tolerance ' + MM_TOLERANCE : '> tolerance ' + MM_TOLERANCE
+            }`,
+          ),
+          d(`  Km·ln(S0/S) + (S0 - S) = Vmax·t, the exact implicit MM solution`),
+          d(`  ${ms}ms · same rate law as Tellurium/tellurium_engine.py::simulate_michaelis_menten`),
+        ];
+      }
+
+      if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
+        const t0 = performance.now();
+        const r = simulateSIR(DEFAULT_SIR);
+        const ms = Math.round(performance.now() - t0);
+        const passes = r.conservationError < SIR_TOLERANCE;
+        const N = DEFAULT_SIR.s0 + DEFAULT_SIR.i0;
+        const last = r.trajectory[r.trajectory.length - 1];
+        return [
+          head('SIR EPIDEMIOLOGY'),
+          rule(),
+          d(`  beta=${DEFAULT_SIR.beta} gamma=${DEFAULT_SIR.gamma} R0=${(DEFAULT_SIR.beta / DEFAULT_SIR.gamma).toFixed(2)}   N=${N}`),
+          o(),
+          o(`  S(${DEFAULT_SIR.end})  ${last.S.toFixed(3)}`),
+          o(`  I(${DEFAULT_SIR.end})  ${last.I.toFixed(3)}`),
+          o(`  R(${DEFAULT_SIR.end})  ${last.R.toFixed(3)}`),
+          o(),
+          (passes ? ok : err)(
+            `  conservation |S+I+R-N|  ${r.conservationError.toExponential(3)}  ${
+              passes ? '< tolerance ' + SIR_TOLERANCE : '> tolerance ' + SIR_TOLERANCE
+            }`,
+          ),
+          d(`  ${ms}ms · same compartment model as Tellurium/tellurium_engine.py::simulate_sir`),
+        ];
+      }
+
       if (DOMAINS.some(([n]) => n === t)) {
         return [
           warn(`  '${t}' runs in the Python engine, not in this browser.`),
-          d('  the two domains compiled to the web are: popgen, md'),
+          d('  domains compiled to the web are: popgen, md, kinetics, epidemiology'),
         ];
       }
       return [err(`unknown domain '${t}' — try: domains`)];
@@ -181,6 +237,36 @@ export const COMMANDS: Command[] = [
           d('  and independently listed in the Cambridge Cluster Database.'),
           d('  LJ5 is the first size where frustration makes this impossible:'),
           d('  -9.103852, not -10.'),
+        ];
+      }
+      if (t === 'kinetics' || t === 'michaelis_menten' || t === 'mm') {
+        const r = simulateMichaelisMenten(DEFAULT_MM);
+        const passes = r.finalResidual < MM_TOLERANCE;
+        return [
+          head('VERIFY · KINETICS'),
+          rule(),
+          o(`  target      Km·ln(S0/S) + (S0 - S) = Vmax·t     exact implicit solution`),
+          o(`  measured    residual ${r.finalResidual.toExponential(3)}`),
+          o(`  tolerance   ${MM_TOLERANCE}`),
+          (passes ? ok : err)(`  ${passes ? 'PASS' : 'FAIL'}        margin ${(MM_TOLERANCE / r.finalResidual).toFixed(1)}x`),
+          o(),
+          d('  computed by RK4 integration of dS/dt = -Vmax·S / (Km + S), then'),
+          d('  checked against the closed form the ODE has no free parameters left to fit.'),
+        ];
+      }
+      if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
+        const r = simulateSIR(DEFAULT_SIR);
+        const passes = r.conservationError < SIR_TOLERANCE;
+        return [
+          head('VERIFY · EPIDEMIOLOGY'),
+          rule(),
+          o(`  target      S + I + R = N at every t     population conservation`),
+          o(`  measured    |S+I+R-N| ${r.conservationError.toExponential(3)}`),
+          o(`  tolerance   ${SIR_TOLERANCE}`),
+          (passes ? ok : err)(`  ${passes ? 'PASS' : 'FAIL'}        margin ${(SIR_TOLERANCE / r.conservationError).toFixed(1)}x`),
+          o(),
+          d('  same invariant Tellurium/tests/test_properties.py checks with Hypothesis'),
+          d('  across the whole input space; spot-checked here at the final point.'),
         ];
       }
       if (t === 'popgen' || t === 'wright_fisher') {
