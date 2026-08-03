@@ -60,15 +60,29 @@ export const SimulationParameterSchemas: Record<
     end: optionalNumeric,
     points: integer.nullish(),
   }).refine(
-    (p) =>
-      p.vmax !== undefined && p.vmax !== null
-        ? true
-        : (p.kcat !== undefined && p.kcat !== null) ===
-          (p.enzyme_conc !== undefined && p.enzyme_conc !== null),
+    (p) => {
+      const has = (v: unknown) => v !== undefined && v !== null;
+      // An explicit vmax is always sufficient -- it is what the engine
+      // integrates, and the runner prefers it over any derivable value.
+      if (has(p.vmax)) return true;
+      // Otherwise BOTH halves of the derivation are required. Two distinct
+      // failures collapse into this one rule:
+      //   - exactly one supplied: a turnover number alone is a per-molecule
+      //     property with nothing to multiply, and a concentration alone has
+      //     no rate
+      //   - neither supplied: there is no route to a Vmax at all
+      //
+      // That second case is why this is not simply a "supplied together"
+      // check. The first version of this refine() compared the two
+      // presence flags for EQUALITY, so `{km, s0}` with no vmax, no kcat
+      // and no enzyme_conc passed -- false === false. It was caught by
+      // writing the test before trusting the schema.
+      return has(p.kcat) && has(p.enzyme_conc);
+    },
     {
       message:
-        "kcat and enzyme_conc must be supplied together (Vmax = kcat * [E]0); " +
-        "supply vmax directly otherwise",
+        "mm needs a Vmax: supply vmax directly, or supply BOTH kcat and " +
+        "enzyme_conc (Vmax = kcat * [E]0)",
     },
   ),
   sir: z.object({

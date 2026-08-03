@@ -115,3 +115,58 @@ describe("SimulationParameterSchemas", () => {
     }
   });
 });
+
+describe("mm accepts Vmax either directly or as kcat x [E]0 (ADR 0013)", () => {
+  const base = { km: 0.1, s0: 1.0, end: 10, points: 51 };
+
+  it("accepts an explicit vmax with no kcat", () => {
+    const parse = SimulationParameterSchemas.mm.safeParse({ ...base, vmax: 5 });
+    expect(parse.success).toBe(true);
+  });
+
+  it("accepts kcat and enzyme_conc together with no vmax", () => {
+    // The real captured golden: 118 s^-1, 6-monoacetylmorphine,
+    // Homo sapiens, pH 7.4, 37 C, BRENDA ref 750291.
+    const parse = SimulationParameterSchemas.mm.safeParse({
+      ...base,
+      kcat: 118,
+      enzyme_conc: 1e-5,
+    });
+    expect(parse.success).toBe(true);
+  });
+
+  it("rejects kcat without enzyme_conc", () => {
+    // A turnover number alone cannot produce a Vmax -- it is a per-molecule
+    // property, and Vmax is a property of an assay containing some amount of
+    // enzyme. Accepting this would silently fall back to the default Vmax
+    // and run a simulation nobody asked for.
+    const parse = SimulationParameterSchemas.mm.safeParse({ ...base, kcat: 118 });
+    expect(parse.success).toBe(false);
+  });
+
+  it("rejects enzyme_conc without kcat", () => {
+    const parse = SimulationParameterSchemas.mm.safeParse({
+      ...base,
+      enzyme_conc: 1e-5,
+    });
+    expect(parse.success).toBe(false);
+  });
+
+  it("rejects a request with no route to a Vmax at all", () => {
+    const parse = SimulationParameterSchemas.mm.safeParse(base);
+    expect(parse.success).toBe(false);
+  });
+
+  it("accepts an explicit vmax alongside kcat and enzyme_conc", () => {
+    // Not a contradiction to reject: vmax is what the engine integrates, so
+    // the runner honours it and ignores the derivable value. The schema's
+    // job is to ensure SOME route exists, not to arbitrate between them.
+    const parse = SimulationParameterSchemas.mm.safeParse({
+      ...base,
+      vmax: 7,
+      kcat: 118,
+      enzyme_conc: 1e-5,
+    });
+    expect(parse.success).toBe(true);
+  });
+});
