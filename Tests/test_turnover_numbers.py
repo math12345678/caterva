@@ -413,6 +413,120 @@ class TestInvariantsAcrossEveryCapturedEnzyme:
                 )
 
 
+LDH_KCAT_FIXTURE = FIXTURES / "brenda_ldh_kcat_fixture.html"
+
+
+class TestLdhTurnoverGolden:
+    """A second enzyme, captured live 2026-08-02 from BRENDA EC 1.1.1.27.
+
+    The point of a second fixture is generality: the parser had only ever
+    seen one BRENDA page, and the commentary-cell bug (§ Stage 8 Part 3
+    §5a) existed precisely because one page could not expose it. This one
+    is structurally different -- 92 entries across eight-plus organisms,
+    heavy aggregate expansion, no human rows at all.
+
+    Every value below was read out of the fixture HTML before being
+    asserted, not copied from the parser's own output.
+    """
+
+    @staticmethod
+    def _entries():
+        # Assertion, not skipif. The fixture is committed, so its absence is
+        # a broken checkout rather than an environment to tolerate -- and a
+        # class-level skipif would retire all five goldens silently, which
+        # is the exact pattern check_no_silent_skips.py exists to catch.
+        assert LDH_KCAT_FIXTURE.exists(), (
+            f"committed fixture missing: {LDH_KCAT_FIXTURE}"
+        )
+        return parse_brenda_turnover_html(
+            html=LDH_KCAT_FIXTURE.read_text(encoding="utf-8"),
+            ec_number="1.1.1.27",
+            target_substrates=[],
+            target_organism=None,
+            require_substrate_match=False,
+        )
+
+    def test_the_fixture_yields_a_substantial_cross_species_table(self):
+        entries = self._entries()
+        assert len(entries) > 50, f"only {len(entries)} entries"
+        organisms = {e.organism for e in entries}
+        assert len(organisms) >= 8, organisms
+        # No human rows. Worth pinning: the AChE tests filtered to
+        # Homo sapiens, and that filter is exactly what hid the mutant
+        # rows which exposed the commentary-cell bug.
+        assert "Homo sapiens" not in organisms
+
+    def test_golden_row_hand_verified_against_the_fixture_html(self):
+        """Raw HTML row `tab44r16sr6`:
+
+            17479 | phenylpyruvate | Lacticaseibacillus casei | A0A2U9AUU1
+            | "mutant Q88R, presence of D-fructose-1,6-diphosphate,
+               pH 5.5, 30 C" | 761568
+        """
+        match = [
+            e for e in self._entries()
+            if e.km_value == 17479.0 and e.reference_id == "761568"
+        ]
+        assert len(match) == 1
+        entry = match[0]
+        assert entry.substrate == "phenylpyruvate"
+        assert entry.organism == "Lacticaseibacillus casei"
+        assert entry.assay_ph == 5.5
+        assert entry.assay_temperature_c == 30.0
+        assert "Q88R" in (entry.conditions or "")
+        assert entry.flagged is False
+
+    def test_zero_celsius_is_a_real_temperature_not_a_falsy_placeholder(self):
+        """*Champsocephalus gunnari* is an Antarctic icefish; 0 C is its
+        physiological assay temperature, and the commentary says so
+        ("pH 7.0, 0 C, recombinant enzyme").
+
+        A truthiness check anywhere in the chain would silently drop it and
+        report the record as temperature-less. This is the same class of
+        bug as pH 0 being discarded, guarded in the STRENDA suite.
+        """
+        icefish = [
+            e for e in self._entries()
+            if e.organism == "Champsocephalus gunnari"
+        ]
+        assert icefish, "the icefish rows vanished from the fixture"
+        zero_c = [e for e in icefish if e.assay_temperature_c == 0.0]
+        assert zero_c, "0 C was dropped as falsy"
+        assert zero_c[0].assay_ph == 7.0
+
+    def test_explicitly_unreported_is_distinguished_from_merely_absent(self):
+        """The distinction ADR 0010 exists for, holding on unseen data.
+
+        BRENDA states "temperature not specified in the publication" on
+        some rows -- a fact about the literature. Others simply carry no
+        temperature -- a fact about our parsing. Collapsing the two would
+        make an honest gap indistinguishable from a silent one.
+        """
+        entries = self._entries()
+        stated = [e for e in entries if "temperature" in (e.assay_unreported or [])]
+        assert stated, "no row records an explicitly-unreported temperature"
+        for entry in stated:
+            assert entry.assay_temperature_c is None
+            # The claim must come from the commentary, not from nowhere.
+            assert "not specified" in (entry.conditions or "").lower()
+
+    def test_a_majority_of_rows_carry_complete_assay_conditions(self):
+        """Measured, not aspirational: 52 of 92 rows (57%) are
+        STRENDA-complete in this capture, versus ~41% across the Km
+        fixtures. Asserted loosely so a fixture refresh does not fail on a
+        few rows, but tightly enough to catch the conditions pipeline
+        breaking wholesale.
+        """
+        entries = self._entries()
+        complete = [
+            e for e in entries
+            if e.assay_ph is not None and e.assay_temperature_c is not None
+        ]
+        assert len(complete) / len(entries) > 0.4, (
+            f"only {len(complete)}/{len(entries)} rows are STRENDA-complete"
+        )
+
+
 class TestCommentaryIsReadByPositionNotLength:
     """`conditions` used to be `max(cell_texts, key=len)` -- the longest cell.
 

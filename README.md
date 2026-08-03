@@ -18,7 +18,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,081 tests (878 engine + 203 literature)
+make test      # runs all 1,092 tests (878 engine + 214 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -148,7 +148,7 @@ Terrium/
 │   └── tests/              878 tests
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
-│   └── ...                 203 tests
+│   └── ...                 214 tests
 ├── Docw/                   specs, roadmap, build plan
 └── scripts/
     ├── check_env.py            environment verification
