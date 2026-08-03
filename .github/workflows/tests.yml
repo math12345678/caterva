@@ -53,6 +53,12 @@ jobs:
       - name: Python-support-claim guard
         run: python scripts/check_python_support_claim.py
 
+      # Rule 7 of the constitution, made executable. It had an ADR and a
+      # paragraph in requirements.txt, and adding `tellurium` to a manifest
+      # passed every other guard.
+      - name: Forbidden-packages guard
+        run: python scripts/check_forbidden_packages.py
+
       # The remaining guards (RNG convention, dependencies, engine contract,
       # plausibility constants) run in one step via the build-verification
       # script. --quick runs the guards only, not the test suites.
