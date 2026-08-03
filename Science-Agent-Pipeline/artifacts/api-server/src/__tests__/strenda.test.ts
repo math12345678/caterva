@@ -250,9 +250,16 @@ describe("STRENDA_GOVERNED_FIELDS", () => {
   });
 
   it("states the rule, not the current implementation", () => {
-    // vmax and kcat have no lookup path yet. They are listed so that adding
-    // one cannot silently bypass the reporting requirement.
+    // The set was written ahead of the implementation so that adding a
+    // lookup path could not silently bypass the reporting requirement.
+    //
+    // That has now been exercised for real: `kcat` gained a lookup path in
+    // Stage 8 (parse_brenda_turnover_html) and the STRENDA rule applied to
+    // it automatically, with no change to this set. `vmax` still has none --
+    // it is derived from kcat and [E]0 rather than resolved (ADR 0013), and
+    // [E]0 is a property of an experiment, not of an enzyme.
     expect(STRENDA_GOVERNED_FIELDS.has("vmax")).toBe(true);
+    expect(STRENDA_GOVERNED_FIELDS.has("kcat")).toBe(true);
     expect(STRENDA_GOVERNED_FIELDS.has("generations")).toBe(false);
   });
 });
