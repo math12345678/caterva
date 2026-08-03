@@ -98,32 +98,63 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
     """
     found: List[Tuple[int, str]] = []
     in_dependency_section = path.suffix != ".toml"  # .txt is all requirements
+    in_dependency_array = False
 
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = raw.split("#", 1)[0].strip()
 
         if path.suffix == ".toml":
-            # Track whether we are inside a dependency array.
-            if re.match(r"^\[", line):
-                in_dependency_section = False
-            if re.match(r"^(dependencies|.*-dependencies)\s*=", line):
-                in_dependency_section = True
-                continue
-            if in_dependency_section and line.startswith("]"):
-                in_dependency_section = False
+            # Dependencies can live in either [project].dependencies or an
+            # arbitrary key under [project.optional-dependencies] (usually
+            # `dev`, `test`, or `docs`). Track the section and then each TOML
+            # array, rather than assuming the key itself ends in
+            # "-dependencies".
+            section = re.match(r"^\[([^]]+)\]$", line)
+            if section:
+                in_dependency_section = section.group(1) in {
+                    "project",
+                    "project.optional-dependencies",
+                }
+                in_dependency_array = False
                 continue
 
-        if not line or line.startswith("-") or not in_dependency_section:
+            if not in_dependency_section:
+                continue
+
+            if not in_dependency_array:
+                array_start = re.match(
+                    r"^[A-Za-z0-9][A-Za-z0-9._-]*\s*=\s*\[", line
+                )
+                if not array_start:
+                    continue
+                in_dependency_array = True
+                line = line[array_start.end():].strip()
+
+            # A closing bracket may share a line with the final dependency.
+            if line.startswith("]"):
+                in_dependency_array = False
+                continue
+
+            # TOML dependency arrays contain quoted requirement strings.
+            candidates = re.findall(r"[\"']([^\"']+)[\"']", line)
+            for candidate in candidates:
+                match = re.match(
+                    r"^([A-Za-z0-9][A-Za-z0-9._-]*)", candidate
+                )
+                if match:
+                    found.append((lineno, match.group(1)))
+            if "]" in line:
+                in_dependency_array = False
             continue
 
-        # pyproject dependency entries look like:  "numpy==1.26.4",
-        candidate = line.strip().strip(",").strip('"').strip("'")
-
-        # Strip everything after the first version specifier or marker.
-        match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)", candidate)
-        if not match:
+        if not line or line.startswith("-"):
             continue
-        found.append((lineno, match.group(1)))
+
+        # requirements.txt entries are one requirement per line. Strip
+        # everything after the first version specifier or marker.
+        match = re.match(r"^([A-Za-z0-9][A-Za-z0-9._-]*)", line)
+        if match:
+            found.append((lineno, match.group(1)))
     return found
 
 
