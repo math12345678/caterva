@@ -147,19 +147,73 @@ def _serialise_result(result: Any, domain: str, parameters: Dict[str, Any]) -> D
 
 def run_mm(params: Dict[str, Any]) -> Dict[str, Any]:
     km = float(params.get("km", 2.0))
-    vmax = float(params.get("vmax", 5.0))
     s0 = float(params.get("s0", 10.0))
     end = float(params.get("end", 10.0))
     points = int(params.get("points", 51))
+
+    # kcat + enzyme_conc is an alternative way to specify Vmax
+    # (Vmax = kcat * [E]0, ADR 0013). Both must be present: a turnover
+    # number alone cannot produce a Vmax, and an enzyme concentration alone
+    # has nothing to multiply.
+    #
+    # An explicit vmax wins when supplied. That is not arbitrary -- vmax is
+    # the parameter the engine actually integrates, so honouring the derived
+    # value over a stated one would silently overwrite what the caller
+    # asked for.
+    kcat = params.get("kcat")
+    enzyme_conc = params.get("enzyme_conc")
+    derived_note = None
+
+    if "vmax" in params and params["vmax"] is not None:
+        vmax = float(params["vmax"])
+    elif kcat is not None and enzyme_conc is not None:
+        vmax, conversion = tellurium_engine.vmax_from_kcat(
+            kcat=float(kcat), enzyme_conc=float(enzyme_conc), km=km
+        )
+        conversion.raise_if_invalid()
+        derived_note = (
+            f"Vmax {vmax:g} mM/s derived from kcat {float(kcat):g} 1/s "
+            f"x [E]0 {float(enzyme_conc):g} mM"
+        )
+        if conversion.flagged:
+            derived_note += f". {conversion.flag_reason}"
+    elif kcat is not None or enzyme_conc is not None:
+        missing = "enzyme_conc" if kcat is not None else "kcat"
+        raise ValueError(
+            f"Vmax cannot be derived: {missing} is required alongside "
+            f"{'kcat' if missing == 'enzyme_conc' else 'enzyme_conc'} "
+            "(Vmax = kcat * [E]0)"
+        )
+    else:
+        vmax = 5.0
 
     result = tellurium_engine.simulate_michaelis_menten(
         km=km, vmax=vmax, s0=s0, end=end, points=points
     )
 
-    return _serialise_result(
-        result, "mm",
-        {"km": km, "vmax": vmax, "s0": s0, "end": end, "points": points},
-    )
+    reported: Dict[str, Any] = {
+        "km": km, "vmax": vmax, "s0": s0, "end": end, "points": points,
+    }
+    if derived_note is not None:
+        # Echo the inputs the Vmax was derived FROM, not just the result.
+        # A student who sees only vmax=0.00118 cannot tell it came from a
+        # literature turnover number at an enzyme concentration they chose.
+        reported["kcat"] = float(kcat)
+        reported["enzyme_conc"] = float(enzyme_conc)
+
+    payload = _serialise_result(result, "mm", reported)
+
+    if derived_note is not None:
+        payload["derivedNote"] = derived_note
+        # The conversion's own flag must survive. The simulation itself may
+        # be perfectly fine while [E]0 sits in the regime where the MM rate
+        # law is being stretched -- dropping that here would hide the one
+        # warning the conversion exists to raise.
+        if conversion.flagged and not payload["flagged"]:
+            payload["flagged"] = True
+            payload["flagReason"] = conversion.flag_reason
+
+    return payload
 
 
 def run_sir(params: Dict[str, Any]) -> Dict[str, Any]:

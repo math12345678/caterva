@@ -160,6 +160,104 @@ class TestEndToEndAgainstTheClosedForm:
 
         assert checked >= 10, f"only {checked} points checked; test is too weak"
 
+    def test_the_conversion_is_reachable_through_the_api_runner(self):
+        """The engine function existing is not the same as a request being
+        able to use it.
+
+        `parse_brenda_turnover_html` sat with no caller for a whole commit
+        because "built" and "reachable" were conflated. This drives
+        `run_mm` -- the actual API entry point -- rather than the engine
+        function directly.
+        """
+        runner_dir = (
+            _REPO
+            / "Science-Agent-Pipeline"
+            / "artifacts"
+            / "api-server"
+            / "src"
+            / "lib"
+        )
+        if not runner_dir.is_dir():
+            pytest.skip("api-server runner not present in this checkout")
+        if str(runner_dir) not in sys.path:
+            sys.path.insert(0, str(runner_dir))
+
+        import tellurium_runner  # noqa: PLC0415
+
+        payload = tellurium_runner.run_mm(
+            {"km": 0.1, "kcat": 118.0, "enzyme_conc": 1e-5, "s0": 1.0,
+             "end": 1.0, "points": 3}
+        )
+
+        assert payload["parameters"]["vmax"] == pytest.approx(118.0 * 1e-5)
+        # The inputs it was derived FROM are echoed back, so a student can
+        # see the number came from a turnover value and a concentration
+        # they chose -- not from thin air.
+        assert payload["parameters"]["kcat"] == 118.0
+        assert payload["parameters"]["enzyme_conc"] == 1e-5
+        assert "derived from kcat" in payload["derivedNote"]
+        assert payload["flagged"] is False
+
+    def test_the_runner_surfaces_the_stretched_approximation_flag(self):
+        """A conversion flag must survive to the response. The simulation
+        itself is fine here, so if the flag were only read off the
+        simulation result it would be silently dropped."""
+        runner_dir = (
+            _REPO / "Science-Agent-Pipeline" / "artifacts" / "api-server" / "src" / "lib"
+        )
+        if not runner_dir.is_dir():
+            pytest.skip("api-server runner not present in this checkout")
+        if str(runner_dir) not in sys.path:
+            sys.path.insert(0, str(runner_dir))
+
+        import tellurium_runner  # noqa: PLC0415
+
+        payload = tellurium_runner.run_mm(
+            {"km": 0.1, "kcat": 10.0, "enzyme_conc": 0.05, "s0": 1.0,
+             "end": 1.0, "points": 3}
+        )
+
+        assert payload["flagged"] is True
+        assert "Km" in payload["flagReason"]
+
+    def test_half_a_conversion_is_rejected(self):
+        """kcat alone cannot produce a Vmax, and [E]0 alone has nothing to
+        multiply. Silently falling back to the default Vmax would run a
+        simulation the caller did not ask for."""
+        runner_dir = (
+            _REPO / "Science-Agent-Pipeline" / "artifacts" / "api-server" / "src" / "lib"
+        )
+        if not runner_dir.is_dir():
+            pytest.skip("api-server runner not present in this checkout")
+        if str(runner_dir) not in sys.path:
+            sys.path.insert(0, str(runner_dir))
+
+        import tellurium_runner  # noqa: PLC0415
+
+        for partial in ({"kcat": 118.0}, {"enzyme_conc": 1e-5}):
+            with pytest.raises(ValueError, match="cannot be derived"):
+                tellurium_runner.run_mm({"km": 0.1, "s0": 1.0, **partial})
+
+    def test_an_explicit_vmax_wins_over_a_derivable_one(self):
+        """vmax is what the engine integrates. Honouring the derived value
+        over a stated one would silently overwrite the caller's request."""
+        runner_dir = (
+            _REPO / "Science-Agent-Pipeline" / "artifacts" / "api-server" / "src" / "lib"
+        )
+        if not runner_dir.is_dir():
+            pytest.skip("api-server runner not present in this checkout")
+        if str(runner_dir) not in sys.path:
+            sys.path.insert(0, str(runner_dir))
+
+        import tellurium_runner  # noqa: PLC0415
+
+        payload = tellurium_runner.run_mm(
+            {"km": 0.1, "vmax": 7.0, "kcat": 118.0, "enzyme_conc": 1e-5,
+             "s0": 1.0, "end": 1.0, "points": 3}
+        )
+        assert payload["parameters"]["vmax"] == 7.0
+        assert "derivedNote" not in payload
+
     def test_doubling_enzyme_halves_the_time_to_a_given_conversion(self):
         """A consequence a student can see on the plot, and one that would
         break if the conversion were, say, additive instead of

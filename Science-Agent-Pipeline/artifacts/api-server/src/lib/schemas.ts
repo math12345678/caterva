@@ -45,11 +45,32 @@ export const SimulationParameterSchemas: Record<
 > = {
   mm: z.object({
     km: numeric,
-    vmax: numeric,
+    // Optional because Vmax can instead be derived from kcat * enzyme_conc
+    // (ADR 0013). Exactly one route must be available; the runner rejects a
+    // request that supplies neither, and prefers an explicit vmax when both
+    // are present.
+    vmax: optionalNumeric,
+    /** Turnover number, s^-1. Requires enzyme_conc. */
+    kcat: optionalNumeric,
+    /** Total enzyme concentration [E]0, mM. Requires kcat.
+     *  Never resolved from literature -- it is a property of an experiment,
+     *  not of an enzyme. */
+    enzyme_conc: optionalNumeric,
     s0: numeric,
     end: optionalNumeric,
     points: integer.nullish(),
-  }),
+  }).refine(
+    (p) =>
+      p.vmax !== undefined && p.vmax !== null
+        ? true
+        : (p.kcat !== undefined && p.kcat !== null) ===
+          (p.enzyme_conc !== undefined && p.enzyme_conc !== null),
+    {
+      message:
+        "kcat and enzyme_conc must be supplied together (Vmax = kcat * [E]0); " +
+        "supply vmax directly otherwise",
+    },
+  ),
   sir: z.object({
     beta: numeric,
     gamma: numeric,
