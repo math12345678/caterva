@@ -1,4 +1,10 @@
-import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
+import {
+  Router,
+  type IRouter,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import { ENZYMES } from "../lib/enzymes";
 import { resolveQuery } from "../lib/queryResolver";
 import { logger } from "../lib/logger";
@@ -19,25 +25,29 @@ router.get("/enzymes", (_req: Request, res: Response) => {
   );
 });
 
-router.post("/resolve", validate(ResolveBody), async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { query } = req.body as { query: string };
-    logger.info({ query }, "Resolving query for preview");
-    const resolved = await resolveQuery(query);
+router.post(
+  "/resolve",
+  validate(ResolveBody),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { query } = req.body as { query: string };
+      logger.info({ query }, "Resolving query for preview");
+      const resolved = await resolveQuery(query);
 
-    res.json({
-      domain: resolved.domain,
-      parameters: resolved.parameters,
-      provenance: {
-        reasoning: resolved.provenance.reasoning,
-        modelCitations: resolved.provenance.modelCitations,
-        flags: resolved.provenance.flags,
-      },
-      parameterProvenance: resolved.parameterProvenance,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
+      res.json({
+        domain: resolved.domain,
+        parameters: resolved.parameters,
+        provenance: {
+          reasoning: resolved.provenance.reasoning,
+          modelCitations: resolved.provenance.modelCitations,
+          flags: resolved.provenance.flags,
+        },
+        parameterProvenance: resolved.parameterProvenance,
+      });
+    } catch (err) {
+      next(err);
+    }
+  },
+);
 
 export default router;

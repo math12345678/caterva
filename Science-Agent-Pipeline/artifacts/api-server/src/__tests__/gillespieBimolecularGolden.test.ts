@@ -28,7 +28,12 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
     expect(res.trajectory).toHaveLength(GOLDEN.rows);
     expect(res.trajectory[0]).toEqual({ time: 0, a: 60, b: 40, c: 0 });
     expect(res.trajectory[1].time).toBe(GOLDEN.firstEventTime);
-    expect(res.trajectory[1]).toEqual({ time: GOLDEN.firstEventTime, a: 59, b: 39, c: 1 });
+    expect(res.trajectory[1]).toEqual({
+      time: GOLDEN.firstEventTime,
+      a: 59,
+      b: 39,
+      c: 1,
+    });
     expect(res.trajectory[res.trajectory.length - 1]).toEqual(GOLDEN.final);
     expect(res.flagged).toBe(false);
     expect(res.flagReason).toBeNull();

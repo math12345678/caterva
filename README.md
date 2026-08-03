@@ -46,7 +46,7 @@ offer to build and attach automatically.
 ## Requirements
 
 **Python 3.10–3.13.** This is a hard constraint, not a preference.
-`libroadrunner` 2.8.0 and `numpy` 2.1.3 publish wheels through cp313 and keep
+`libroadrunner` 2.8.0 and `numpy` 2.2.6 publish wheels through cp313 and keep
 the cp310 floor (verified against PyPI). The 2.9.x libroadrunner line drops
 cp310, so we stay on 2.8.0. See
 [ADR 0014](docs/adr/0014-python-version-support.md).

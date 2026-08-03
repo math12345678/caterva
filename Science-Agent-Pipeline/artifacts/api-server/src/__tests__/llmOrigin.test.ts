@@ -17,7 +17,10 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { validateParameterProvenance, type ParameterProvenance } from "../lib/provenance";
+import {
+  validateParameterProvenance,
+  type ParameterProvenance,
+} from "../lib/provenance";
 import { resolveQuery } from "../lib/queryResolver";
 import { resolveQueryWithLLM } from "../lib/llmResolver";
 
@@ -42,7 +45,8 @@ vi.mock("../lib/scienceAgent", async (importOriginal) => {
   };
 });
 
-const NOTE = "Value supplied by the LLM resolver; not verified against literature.";
+const NOTE =
+  "Value supplied by the LLM resolver; not verified against literature.";
 
 describe("the llm origin is distinct from default", () => {
   it("accepts an llm entry that explains itself", () => {
@@ -110,7 +114,9 @@ describe("Target J — an LLM-supplied value reaches the API as llm, not default
       modelCitations: [],
     } as never);
 
-    const resolved = await resolveQuery("simulate a moderately contagious outbreak");
+    const resolved = await resolveQuery(
+      "simulate a moderately contagious outbreak",
+    );
     const beta = resolved.parameterProvenance["beta"];
 
     if (beta?.origin === "llm") {
@@ -136,7 +142,9 @@ describe("Target J — an LLM-supplied value reaches the API as llm, not default
       modelCitations: [],
     } as never);
 
-    const resolved = await resolveQuery("simulate an outbreak with made-up rates");
+    const resolved = await resolveQuery(
+      "simulate an outbreak with made-up rates",
+    );
     const violations = validateParameterProvenance(
       resolved.parameters,
       resolved.parameterProvenance,

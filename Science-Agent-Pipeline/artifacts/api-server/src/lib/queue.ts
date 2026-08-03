@@ -114,7 +114,10 @@ export function createJob(query: string): Job {
   if (jobs.size > MAX_JOBS) {
     const oldest = Array.from(jobs.values())
       .filter((j) => j.status === "completed" || j.status === "failed")
-      .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())[0];
+      .sort(
+        (a, b) =>
+          new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+      )[0];
     if (oldest) {
       jobs.delete(oldest.jobId);
       listeners.delete(oldest.jobId);
@@ -159,7 +162,10 @@ export function updateJob(jobId: string, update: JobUpdate): Job | undefined {
   return next;
 }
 
-export function setJobResult(jobId: string, result: SimulationResponse): Job | undefined {
+export function setJobResult(
+  jobId: string,
+  result: SimulationResponse,
+): Job | undefined {
   return updateJob(jobId, { status: "completed", result });
 }
 
@@ -182,7 +188,10 @@ export function setJobCancelled(jobId: string): Job | undefined {
  * Register an AbortController for a job. Used by the pipeline runner so that
  * cancelJob can signal the running Python process to stop.
  */
-export function registerAbortController(jobId: string, ctrl: AbortController): void {
+export function registerAbortController(
+  jobId: string,
+  ctrl: AbortController,
+): void {
   abortControllers.set(jobId, ctrl);
 }
 
@@ -198,7 +207,11 @@ export function isCancelled(jobId: string): boolean {
 export function cancelJob(jobId: string): Job | undefined {
   const job = jobs.get(jobId);
   if (!job) return undefined;
-  if (job.status === "completed" || job.status === "failed" || job.status === "cancelled") {
+  if (
+    job.status === "completed" ||
+    job.status === "failed" ||
+    job.status === "cancelled"
+  ) {
     return job;
   }
   return setJobCancelled(jobId);
@@ -234,13 +247,12 @@ export function cleanupJob(jobId: string): void {
 }
 
 export function listJobs(): Job[] {
-  return Array.from(jobs.values()).sort(
-    (a, b) => {
-      const timeDiff = new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      if (timeDiff !== 0) return timeDiff;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    },
-  );
+  return Array.from(jobs.values()).sort((a, b) => {
+    const timeDiff =
+      new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    if (timeDiff !== 0) return timeDiff;
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 }
 
 /**

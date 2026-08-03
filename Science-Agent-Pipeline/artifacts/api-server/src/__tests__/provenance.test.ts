@@ -76,8 +76,14 @@ describe("parameter provenance", () => {
         const resolved = await resolveQuery(query);
         for (const [key, prov] of entries(resolved)) {
           if (prov.origin !== "resolved") {
-            expect(prov.citation, `${key} must not carry a citation`).toBeUndefined();
-            expect(prov.source, `${key} must not carry a source`).toBeUndefined();
+            expect(
+              prov.citation,
+              `${key} must not carry a citation`,
+            ).toBeUndefined();
+            expect(
+              prov.source,
+              `${key} must not carry a source`,
+            ).toBeUndefined();
           }
         }
       });
@@ -85,7 +91,9 @@ describe("parameter provenance", () => {
 
     it("mm+EC: the resolved entry is the only one with a citation", async () => {
       const resolved = await resolveQuery("simulate lactate dehydrogenase");
-      const withCitation = entries(resolved).filter(([, p]) => p.citation !== undefined);
+      const withCitation = entries(resolved).filter(
+        ([, p]) => p.citation !== undefined,
+      );
       expect(withCitation.length).toBe(1);
       expect(withCitation[0]![0]).toBe("km");
       expect(withCitation[0]![1].origin).toBe("resolved");
@@ -115,7 +123,9 @@ describe("parameter provenance", () => {
     });
 
     it("a user value stays 'user' even when a literature value exists", async () => {
-      const resolved = await resolveQuery("simulate lactate dehydrogenase km=1.5");
+      const resolved = await resolveQuery(
+        "simulate lactate dehydrogenase km=1.5",
+      );
       const km = resolved.parameterProvenance["km"]!;
       expect(km.origin).toBe("user");
       expect(km.citation).toBeUndefined();
@@ -125,13 +135,17 @@ describe("parameter provenance", () => {
   describe("Target E — the all-defaults case is flagged", () => {
     it("bare domain query -> flag naming the absence of resolved parameters", async () => {
       const resolved = await resolveQuery("simulate genetic drift");
-      const flag = resolved.provenance.flags.find((f) => /resolved from literature/i.test(f));
+      const flag = resolved.provenance.flags.find((f) =>
+        /resolved from literature/i.test(f),
+      );
       expect(flag).toBeTruthy();
     });
 
     it("resolved km -> no all-defaults flag", async () => {
       const resolved = await resolveQuery("simulate lactate dehydrogenase");
-      const flag = resolved.provenance.flags.find((f) => /resolved from literature/i.test(f));
+      const flag = resolved.provenance.flags.find((f) =>
+        /resolved from literature/i.test(f),
+      );
       expect(flag).toBeUndefined();
     });
   });
@@ -159,7 +173,10 @@ describe("validateParameterProvenance", () => {
 
   it("rejects a provenance key missing from parameters", () => {
     expect(
-      validateParameterProvenance(parameters, { ...defaults, extra: { origin: "default" } }),
+      validateParameterProvenance(parameters, {
+        ...defaults,
+        extra: { origin: "default" },
+      }),
     ).not.toEqual([]);
   });
 
@@ -216,7 +233,9 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
 
   it("isLocatableCitation: a URL is a locator", () => {
     expect(
-      isLocatableCitation("BRENDA (ref 12345) — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27"),
+      isLocatableCitation(
+        "BRENDA (ref 12345) — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+      ),
     ).toBe(true);
   });
 
@@ -264,7 +283,8 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
         ...resolved,
         km: {
           origin: "resolved",
-          citation: "BRENDA — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+          citation:
+            "BRENDA — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
           citationStatus: "verified",
           assayConditions: COMPLETE_CONDITIONS,
           strendaStatus: "complete",
@@ -334,7 +354,9 @@ describe("Target G — the golden set flows through the API (Stage 5 Part 2)", (
     });
     const swapped = await resolveQuery("simulate lactate dehydrogenase");
     expect(swapped.parameters["km"]).not.toBe(10.73);
-    expect(swapped.parameterProvenance["km"]!.citation).not.toContain("(ref 740253)");
+    expect(swapped.parameterProvenance["km"]!.citation).not.toContain(
+      "(ref 740253)",
+    );
     expect(swapped.parameterProvenance["km"]!.organism).toBe("Sus scrofa");
   });
 });
@@ -506,7 +528,10 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
   it("domains without resolvable fields stay quiet (no noise notes)", async () => {
     const resolved = await resolveQuery("simulate sir outbreak");
     for (const [key, prov] of entries(resolved)) {
-      expect(prov.note, `${key} must not carry a narrowness note`).toBeUndefined();
+      expect(
+        prov.note,
+        `${key} must not carry a narrowness note`,
+      ).toBeUndefined();
     }
   });
 
@@ -534,7 +559,12 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
     // carries regardless.
     vi.mocked(resolveKineticValue).mockResolvedValueOnce({
       ...GOLDEN_LDH_RESULT,
-      assayConditions: { ph: 7.4, temperatureC: 37, buffer: null, unreported: [] },
+      assayConditions: {
+        ph: 7.4,
+        temperatureC: 37,
+        buffer: null,
+        unreported: [],
+      },
     });
     const resolved = await resolveQuery("simulate lactate dehydrogenase");
     const km = resolved.parameterProvenance["km"]!;
@@ -553,7 +583,7 @@ describe("mutation tests — provenance contract enforcement", () => {
   // Note: These tests require temporarily modifying the source code.
   // The predictions below are what SHOULD catch each mutation.
   // Actual results must be documented in the Stage 4 Part 3 report.
-  
+
   describe("Mutation 1: citation on a default-origin parameter", () => {
     it("PREDICTED: Target B should catch this", () => {
       // Mutation: attach a citation to a default-origin parameter
@@ -583,8 +613,13 @@ describe("mutation tests — provenance contract enforcement", () => {
         vmax: { origin: "default" },
         // s0 is missing from provenance
       };
-      const violations = validateParameterProvenance(parameters, incompleteProvenance);
-      expect(violations).toContain("s0 has a parameter value but no provenance");
+      const violations = validateParameterProvenance(
+        parameters,
+        incompleteProvenance,
+      );
+      expect(violations).toContain(
+        "s0 has a parameter value but no provenance",
+      );
       // ACTUAL CATCHER: validateParameterProvenance (unit test)
     });
   });
@@ -594,7 +629,7 @@ describe("mutation tests — provenance contract enforcement", () => {
       // Mutation: mark a default parameter "resolved" with no citation
       // Predicted catcher: validation rejection (hard violation)
       const badProvenance: Record<string, ParameterProvenance> = {
-        km: { origin: "resolved" },  // Missing citation
+        km: { origin: "resolved" }, // Missing citation
         vmax: { origin: "default" },
         s0: { origin: "default" },
       };
@@ -602,7 +637,9 @@ describe("mutation tests — provenance contract enforcement", () => {
         { km: 2, vmax: 5, s0: 10 },
         badProvenance,
       );
-      expect(violations).toContain("km is marked resolved but carries no citation");
+      expect(violations).toContain(
+        "km is marked resolved but carries no citation",
+      );
       // ACTUAL CATCHER: validateParameterProvenance (unit test)
     });
   });
@@ -675,7 +712,9 @@ describe("mutation tests — provenance contract enforcement", () => {
         { km: 2, vmax: 5, s0: 10 },
         badProvenance,
       );
-      expect(violations).toContain("km is marked resolved but carries no citation status");
+      expect(violations).toContain(
+        "km is marked resolved but carries no citation status",
+      );
       // ACTUAL CATCHER: validateParameterProvenance (unit test)
     });
   });

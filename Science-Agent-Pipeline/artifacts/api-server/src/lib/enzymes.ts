@@ -37,7 +37,8 @@ export const ENZYMES: EnzymeEntry[] = [
     enzymeName: "trypsin",
     substrates: ["protein"],
     ecNumber: "3.4.21.4",
-    description: "Serine protease that cleaves peptide chains at lysine/arginine",
+    description:
+      "Serine protease that cleaves peptide chains at lysine/arginine",
     organism: "Homo sapiens",
   },
   {

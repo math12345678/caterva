@@ -47,7 +47,9 @@ describe("runner-boundary contract (Stage 5 Part 4)", () => {
       organism: "Homo sapiens",
       notes: null,
     });
-    expect(result.logs).toContain("BRENDA exact: 1.1.1.27, Homo sapiens, lactate");
+    expect(result.logs).toContain(
+      "BRENDA exact: 1.1.1.27, Homo sapiens, lactate",
+    );
   });
 
   it("carries the cross-species flag when present", () => {
@@ -78,9 +80,11 @@ describe("runner-boundary contract (Stage 5 Part 4)", () => {
   });
 
   it("a Python-side error report throws with its message", () => {
-    expect(() => parseAgentOutput(JSON.stringify({ ok: false, error: "ecNumber is required" }))).toThrow(
-      "ecNumber is required",
-    );
+    expect(() =>
+      parseAgentOutput(
+        JSON.stringify({ ok: false, error: "ecNumber is required" }),
+      ),
+    ).toThrow("ecNumber is required");
   });
 
   it("unexpected JSON throws", () => {
@@ -90,7 +94,9 @@ describe("runner-boundary contract (Stage 5 Part 4)", () => {
   });
 
   it("empty output throws", () => {
-    expect(() => parseAgentOutput("  ")).toThrow("Science agent runner returned no output");
+    expect(() => parseAgentOutput("  ")).toThrow(
+      "Science agent runner returned no output",
+    );
   });
 
   it("malformed JSON throws", () => {

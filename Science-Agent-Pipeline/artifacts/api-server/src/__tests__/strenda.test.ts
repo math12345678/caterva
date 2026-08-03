@@ -29,7 +29,11 @@ import {
   type ParameterProvenance,
 } from "../lib/provenance";
 
-const FULL: AssayConditions = { ph: 7.4, temperatureC: 25, buffer: "50 mM phosphate" };
+const FULL: AssayConditions = {
+  ph: 7.4,
+  temperatureC: 25,
+  buffer: "50 mM phosphate",
+};
 const CITATION = "BRENDA EC 1.1.1.27 (ref 12345)";
 
 describe("strendaStatusFor", () => {
@@ -58,10 +62,12 @@ describe("strendaStatusFor", () => {
   });
 
   it("rejects NaN and Infinity", () => {
-    expect(strendaStatusFor({ ph: Number.NaN, temperatureC: 25 })).toBe("incomplete");
-    expect(strendaStatusFor({ ph: 7, temperatureC: Number.POSITIVE_INFINITY })).toBe(
+    expect(strendaStatusFor({ ph: Number.NaN, temperatureC: 25 })).toBe(
       "incomplete",
     );
+    expect(
+      strendaStatusFor({ ph: 7, temperatureC: Number.POSITIVE_INFINITY }),
+    ).toBe("incomplete");
   });
 });
 
@@ -214,7 +220,9 @@ describe("validateParameterProvenance — STRENDA rules", () => {
       { generations: 100 },
       { generations: { origin: "default", assayConditions: FULL } },
     );
-    expect(v.join(" ")).toContain("carries assay conditions but origin is 'default'");
+    expect(v.join(" ")).toContain(
+      "carries assay conditions but origin is 'default'",
+    );
   });
 
   it("rejects a STRENDA status on a non-kinetic parameter", () => {

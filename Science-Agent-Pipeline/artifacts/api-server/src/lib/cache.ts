@@ -87,7 +87,11 @@ export async function restoreCache(): Promise<number> {
  */
 export function persistJob(job: Job | undefined): Promise<void> {
   if (!job || (!job.result && !job.error)) return Promise.resolve();
-  if (job.status !== "completed" && job.status !== "failed" && job.status !== "cancelled") {
+  if (
+    job.status !== "completed" &&
+    job.status !== "failed" &&
+    job.status !== "cancelled"
+  ) {
     return Promise.resolve();
   }
 
@@ -103,7 +107,10 @@ export function persistJob(job: Job | undefined): Promise<void> {
       });
       await saveStore(store);
     } catch (err) {
-      logger.warn({ err, jobId: job.jobId }, "Failed to persist job to disk cache");
+      logger.warn(
+        { err, jobId: job.jobId },
+        "Failed to persist job to disk cache",
+      );
     }
   });
   mutationQueue = operation;
@@ -129,7 +136,9 @@ export function findCachedJob(jobId: string): Job | undefined {
 /**
  * Find a completed result by normalized query (for cache hit).
  */
-export function findCachedResultByQuery(query: string): SimulationResponse | undefined {
+export function findCachedResultByQuery(
+  query: string,
+): SimulationResponse | undefined {
   if (!store) return undefined;
   // Persisted entries are append-only; the newest result must win when a
   // query has been rerun with different explicit parameters such as a seed.
