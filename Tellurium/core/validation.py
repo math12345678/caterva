@@ -7,9 +7,9 @@ from typing import Any, List, Optional, Sequence
 
 import numpy as np
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES)
+    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES)  # type: ignore[no-redef]
+    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE)  # type: ignore[no-redef]
 
 def _finite_positive(value: Any, label: str, errors: List[str],
                      allow_zero: bool = False) -> bool:
@@ -83,6 +83,73 @@ def validate_michaelis_menten_params(km: float, vmax: float,
             f"{KM_PLAUSIBLE_MAX_MM:g} mM"
         )
     return v
+
+
+def vmax_from_kcat(
+    kcat: float, enzyme_conc: float, km: Optional[float] = None
+) -> "tuple[float, ParameterValidation]":
+    """Convert a turnover number into a Vmax: ``Vmax = kcat * [E]0``.
+
+    This is what makes a literature-resolved kcat simulable. kcat is a
+    property of one enzyme molecule (s^-1); Vmax is a property of an assay
+    containing some amount of enzyme (mM/s). The bridge between them is the
+    total enzyme concentration, and nothing can supply it but the caller --
+    BRENDA does not report it per row. See ADR 0012 and ADR 0013.
+
+    Units: ``kcat`` in s^-1, ``enzyme_conc`` in mM, returned Vmax in mM/s,
+    matching the mM convention Km already uses.
+
+    Returns ``(vmax, validation)``. The validation is not decoration:
+
+    - Non-finite or non-positive inputs are **rejected** (``ok=False``).
+      A zero enzyme concentration gives Vmax = 0, which
+      ``validate_michaelis_menten_params`` already rejects as a model that
+      provably cannot turn over -- catching it here names the real cause.
+    - ``[E]0`` above ``ENZYME_CONC_MM_RATIO_FLAG_ABOVE * Km`` is **flagged**,
+      not rejected. The Michaelis-Menten rate law assumes [E]0 << Km; past
+      that the ES complex sequesters a non-negligible share of substrate and
+      the curve is quantitatively wrong (the tight-binding/Morrison regime,
+      which this engine does not implement). The simulation still runs and
+      still teaches something -- the student is simply told the
+      approximation is being stretched.
+
+    ``km`` is optional because the ratio check is only possible when a Km is
+    known; the conversion itself does not need it.
+    """
+    errors: List[str] = []
+
+    _finite_positive(kcat, "kcat", errors, allow_zero=False)
+    _finite_positive(enzyme_conc, "enzyme_conc", errors, allow_zero=False)
+
+    if errors:
+        return 0.0, ParameterValidation(ok=False, errors=errors)
+
+    vmax = kcat * enzyme_conc
+
+    if not math.isfinite(vmax):
+        return 0.0, ParameterValidation(
+            ok=False,
+            errors=[
+                f"kcat {kcat:g} 1/s x [E]0 {enzyme_conc:g} mM overflowed to a "
+                "non-finite Vmax"
+            ],
+        )
+
+    v = ParameterValidation()
+
+    if km is not None and math.isfinite(km) and km > 0:
+        ratio = enzyme_conc / km
+        if ratio > ENZYME_CONC_MM_RATIO_FLAG_ABOVE:
+            v.flagged = True
+            v.flag_reason = (
+                f"[E]0 {enzyme_conc:g} mM is {ratio:.3g}x Km ({km:g} mM); the "
+                "Michaelis-Menten rate law assumes [E]0 << Km, so above "
+                f"{ENZYME_CONC_MM_RATIO_FLAG_ABOVE:g}x Km the free-substrate "
+                "approximation is being stretched and the curve understates "
+                "how much substrate is bound in the ES complex"
+            )
+
+    return vmax, v
 
 
 def validate_sir_params(beta: float, gamma: float, s0: float, i0: float,

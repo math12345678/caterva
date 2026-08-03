@@ -59,6 +59,25 @@ KM_PLAUSIBLE_MAX_MM = 1e3  # 1000 mM - above this gets flagged
 KCAT_PLAUSIBLE_MIN_PER_S = 1e-6  # below this, likely a unit error
 KCAT_PLAUSIBLE_MAX_PER_S = 1e9  # diffusion limit; above this is not a kcat
 
+# ---------------------------------------------------------------------------
+# Total enzyme concentration [E]0, units mM. Stage 8.
+#
+# Vmax = kcat * [E]0, which is what makes a resolved turnover number
+# simulable. But the Michaelis-Menten rate law is derived under the
+# free-ligand (or "reactant stationary") assumption [E]0 << [S]0, and it is
+# conventionally stated as [E]0 << Km. When the enzyme is a significant
+# fraction of the substrate, a non-negligible amount of substrate is
+# sequestered in the ES complex and the standard MM curve is quantitatively
+# wrong -- the tight-binding/Morrison regime, which needs a different
+# equation this engine does not implement.
+#
+# So this is a FLAG, not a rejection: the simulation still runs and still
+# means something, but the student is told the approximation is being
+# stretched. 1/100 is the usual textbook rule of thumb for "safely
+# negligible".
+# ---------------------------------------------------------------------------
+ENZYME_CONC_MM_RATIO_FLAG_ABOVE = 0.01  # flag when [E]0 / Km exceeds this
+
 R0_IMPLAUSIBLE_ABOVE = 20.0  # Higher than any documented human pathogen
 
 # PCR amplification efficiency is a fraction: 1.0 means perfect doubling every
