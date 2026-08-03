@@ -117,6 +117,41 @@ def _wired_in_pytest() -> set[str]:
     return found
 
 
+def check_tool_caches_are_ignored() -> list[str]:
+    """Every tool configured in pyproject.toml has its cache in .gitignore.
+
+    `[tool.mypy]` was configured while `.mypy_cache/` was absent from
+    `.gitignore` -- so the directory appeared the moment anyone ran mypy,
+    and a careless `git add -A` would have committed it. That is not
+    hypothetical: Stage 3 had to untrack committed `__pycache__` bytecode,
+    and this session committed 29 unrelated files by exactly that route.
+
+    Catching it before anything is tracked is the cheap version of the fix.
+    """
+    errors: list[str] = []
+    pyproject = REPO_ROOT / "pyproject.toml"
+    gitignore = REPO_ROOT / ".gitignore"
+
+    if not pyproject.exists() or not gitignore.exists():
+        return errors
+
+    ignored = gitignore.read_text(encoding="utf-8")
+    configured = set(
+        re.findall(r"^\[tool\.([a-z]+)", pyproject.read_text(encoding="utf-8"), re.M)
+    )
+
+    # Tools whose cache directory follows the .<name>_cache convention.
+    for tool in sorted(configured & {"mypy", "ruff", "pytest"}):
+        cache = f".{tool}_cache"
+        if cache not in ignored:
+            errors.append(
+                f"[tool.{tool}] is configured in pyproject.toml but {cache}/ "
+                "is not in .gitignore -- it will appear as untracked the "
+                "moment the tool runs"
+            )
+    return errors
+
+
 def main() -> int:
     guards = _guard_names()
     if not guards:
@@ -155,15 +190,18 @@ def main() -> int:
             if key in DELIBERATE_OMISSIONS:
                 continue
 
+    failures.extend(check_tool_caches_are_ignored())
+
     print()
     if failures:
-        print("FAIL: a guard is wired to nothing")
+        print("FAIL: something is configured but not wired up")
         for failure in failures:
             print(f"  - {failure}")
         print(
-            "\nThis is the Stage 4 amendment: a guard is not delivered until\n"
-            "something runs it unasked. Add it to verify_build.py, the CI\n"
-            "workflow, or wrap it in a pytest test."
+            "\nThe Stage 4 amendment: a guard is not delivered until something\n"
+            "runs it unasked. Add it to verify_build.py, the CI workflow, or\n"
+            "wrap it in a pytest test. For a missing cache entry, add the\n"
+            "directory to .gitignore."
         )
         return 1
 
