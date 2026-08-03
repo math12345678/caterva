@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { motion, useScroll, useSpring } from 'framer-motion';
+import { useEffect, useState } from "react";
+import { motion, useScroll, useSpring } from "framer-motion";
 
 export default function ScrollProgress() {
   const { scrollYProgress } = useScroll();
@@ -8,7 +8,10 @@ export default function ScrollProgress() {
 
   useEffect(() => {
     const start = Date.now();
-    const id = window.setInterval(() => setReadingTime(Math.floor((Date.now() - start) / 1000)), 1000);
+    const id = window.setInterval(
+      () => setReadingTime(Math.floor((Date.now() - start) / 1000)),
+      1000,
+    );
     return () => window.clearInterval(id);
   }, []);
 

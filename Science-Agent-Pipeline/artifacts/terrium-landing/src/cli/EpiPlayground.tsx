@@ -1,16 +1,16 @@
-import { useState, useMemo, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import TerminalWindow from './TerminalWindow';
-import LineChart from './LineChart';
-import { simulateSIR } from '@/lib/simulate';
+import { useState, useMemo, useCallback } from "react";
+import { motion } from "framer-motion";
+import TerminalWindow from "./TerminalWindow";
+import LineChart from "./LineChart";
+import { simulateSIR } from "@/lib/simulate";
 
-import ParamSlider from '@/components/ui/param-slider';
+import ParamSlider from "@/components/ui/param-slider";
 
 const PRESETS = [
-  { label: 'Flu (moderate)', beta: 0.3, gamma: 0.1, s0: 990, i0: 10 },
-  { label: 'COVID (mild)', beta: 0.2, gamma: 0.07, s0: 990, i0: 10 },
-  { label: 'Measles (high)', beta: 0.9, gamma: 0.08, s0: 990, i0: 10 },
-  { label: 'Ebola (slow)', beta: 0.15, gamma: 0.05, s0: 950, i0: 50 },
+  { label: "Flu (moderate)", beta: 0.3, gamma: 0.1, s0: 990, i0: 10 },
+  { label: "COVID (mild)", beta: 0.2, gamma: 0.07, s0: 990, i0: 10 },
+  { label: "Measles (high)", beta: 0.9, gamma: 0.08, s0: 990, i0: 10 },
+  { label: "Ebola (slow)", beta: 0.15, gamma: 0.05, s0: 950, i0: 50 },
 ];
 
 export default function EpiPlayground() {
@@ -32,7 +32,8 @@ export default function EpiPlayground() {
     [result.trajectory],
   );
   const totalPop = s0 + i0;
-  const finalSusceptible = result.trajectory[result.trajectory.length - 1]?.S ?? 0;
+  const finalSusceptible =
+    result.trajectory[result.trajectory.length - 1]?.S ?? 0;
 
   const applyPreset = useCallback((p: (typeof PRESETS)[number]) => {
     setBeta(p.beta);
@@ -126,15 +127,21 @@ export default function EpiPlayground() {
             </div>
             <div className="flex justify-between text-[11px]">
               <span className="text-white/35">final susceptible</span>
-              <span className="text-[#8B5CF6] font-mono">{finalSusceptible.toFixed(0)}</span>
+              <span className="text-[#8B5CF6] font-mono">
+                {finalSusceptible.toFixed(0)}
+              </span>
             </div>
             <div className="flex justify-between text-[11px]">
               <span className="text-white/35">cons. error</span>
-              <span className="text-[#F59E0B] font-mono">{result.conservationError.toExponential(2)}</span>
+              <span className="text-[#F59E0B] font-mono">
+                {result.conservationError.toExponential(2)}
+              </span>
             </div>
             <div className="flex justify-between text-[11px]">
               <span className="text-white/35">total population</span>
-              <span className="text-white/45 font-mono">{totalPop.toLocaleString()}</span>
+              <span className="text-white/45 font-mono">
+                {totalPop.toLocaleString()}
+              </span>
             </div>
           </div>
         </div>
@@ -144,11 +151,10 @@ export default function EpiPlayground() {
           <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
             <div className="flex items-center justify-between mb-2 text-[10px]">
               <span className="text-white/30 font-mono">
-                {r0 >= '1' ? 'epidemic (R₀ ≥ 1)' : 'outbreak fades (R₀ < 1)'} over {end} days
+                {r0 >= "1" ? "epidemic (R₀ ≥ 1)" : "outbreak fades (R₀ < 1)"}{" "}
+                over {end} days
               </span>
-              <span className="text-white/15 font-mono">
-                {points} points
-              </span>
+              <span className="text-white/15 font-mono">{points} points</span>
             </div>
             <motion.div
               key={`${beta}-${gamma}-${s0}-${i0}`}
@@ -159,9 +165,9 @@ export default function EpiPlayground() {
               <LineChart
                 data={result.trajectory}
                 series={[
-                  { key: 'S', color: '#3B82F6' },
-                  { key: 'I', color: '#EF4444' },
-                  { key: 'R', color: '#1D8A72' },
+                  { key: "S", color: "#3B82F6" },
+                  { key: "I", color: "#EF4444" },
+                  { key: "R", color: "#1D8A72" },
                 ]}
                 height={260}
               />

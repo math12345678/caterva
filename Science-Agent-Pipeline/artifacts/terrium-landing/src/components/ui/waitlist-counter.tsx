@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function WaitlistCounter() {
   const [count, setCount] = useState<number | null>(null);
@@ -11,7 +11,7 @@ export default function WaitlistCounter() {
     const ctrl = new AbortController();
     fetch(`${API_BASE}/api/waitlist/count`, { signal: ctrl.signal })
       .then((r) => {
-        if (!r.ok) throw new Error('Failed');
+        if (!r.ok) throw new Error("Failed");
         return r.json();
       })
       .then((d) => setCount(d.count ?? 0))
@@ -41,7 +41,8 @@ export default function WaitlistCounter() {
           ))}
         </div>
         <span className="text-[11px]">
-          <span className="text-[#1D8A72] font-medium">{count}</span> researcher{count !== 1 ? 's' : ''} already joined
+          <span className="text-[#1D8A72] font-medium">{count}</span> researcher
+          {count !== 1 ? "s" : ""} already joined
         </span>
       </motion.div>
     </AnimatePresence>

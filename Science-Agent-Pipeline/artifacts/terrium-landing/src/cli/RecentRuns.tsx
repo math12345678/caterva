@@ -1,38 +1,43 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
-import { listSimulationJobs } from '@workspace/api-client-react';
-import type { SimulationJob, SimulationResponse } from '@workspace/api-client-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import ExportButtons from '@/components/ui/export-buttons';
-import TerminalWindow from './TerminalWindow';
-import LineChart from './LineChart';
-import ComparePanel from './ComparePanel';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
+import { listSimulationJobs } from "@workspace/api-client-react";
+import type {
+  SimulationJob,
+  SimulationResponse,
+} from "@workspace/api-client-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import ExportButtons from "@/components/ui/export-buttons";
+import TerminalWindow from "./TerminalWindow";
+import LineChart from "./LineChart";
+import ComparePanel from "./ComparePanel";
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'text-blue-400/80',
-  resolving: 'text-yellow-400/80',
-  validating: 'text-orange-400/80',
-  running: 'text-[#1D8A72]',
-  completed: 'text-[#1D8A72]',
-  failed: 'text-red-400/80',
-  cancelled: 'text-white/30',
+  pending: "text-blue-400/80",
+  resolving: "text-yellow-400/80",
+  validating: "text-orange-400/80",
+  running: "text-[#1D8A72]",
+  completed: "text-[#1D8A72]",
+  failed: "text-red-400/80",
+  cancelled: "text-white/30",
 };
 
 const STATUS_BG: Record<string, string> = {
-  pending: 'bg-blue-400/[0.06]',
-  resolving: 'bg-yellow-400/[0.06]',
-  validating: 'bg-orange-400/[0.06]',
-  running: 'bg-[#1D8A72]/[0.06]',
-  completed: 'bg-[#1D8A72]/[0.06]',
-  failed: 'bg-red-400/[0.06]',
-  cancelled: 'bg-white/[0.03]',
+  pending: "bg-blue-400/[0.06]",
+  resolving: "bg-yellow-400/[0.06]",
+  validating: "bg-orange-400/[0.06]",
+  running: "bg-[#1D8A72]/[0.06]",
+  completed: "bg-[#1D8A72]/[0.06]",
+  failed: "bg-red-400/[0.06]",
+  cancelled: "bg-white/[0.03]",
 };
 
 function StatusBadge({ status }: { status: string }) {
   return (
-    <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wide transition-all ${STATUS_COLORS[status] ?? 'text-white/50'} ${STATUS_BG[status] ?? 'bg-white/[0.03]'}`}>
-      {status === 'running' && (
+    <span
+      className={`shrink-0 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wide transition-all ${STATUS_COLORS[status] ?? "text-white/50"} ${STATUS_BG[status] ?? "bg-white/[0.03]"}`}
+    >
+      {status === "running" && (
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#1D8A72] animate-pulse" />
       )}
       {status}
@@ -50,15 +55,15 @@ function formatTime(iso: string) {
 
 function seriesForResponse(response: SimulationResponse) {
   const colorMap: Record<string, string> = {
-    S: '#1D8A72',
-    P: '#F59E0B',
-    I: '#EF4444',
-    R: '#3B82F6',
-    E: '#8B5CF6',
+    S: "#1D8A72",
+    P: "#F59E0B",
+    I: "#EF4444",
+    R: "#3B82F6",
+    E: "#8B5CF6",
   };
   if (!response.trajectory || response.trajectory.length === 0) return [];
-  const keys = Object.keys(response.trajectory[0]!).filter((k) => k !== 't');
-  return keys.map((key) => ({ key, color: colorMap[key] ?? '#ffffff' }));
+  const keys = Object.keys(response.trajectory[0]!).filter((k) => k !== "t");
+  return keys.map((key) => ({ key, color: colorMap[key] ?? "#ffffff" }));
 }
 
 interface RecentRunsProps {
@@ -67,9 +72,9 @@ interface RecentRunsProps {
   pageSize?: number;
 }
 
-const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
+const TERMINAL = new Set(["completed", "failed", "cancelled"]);
 const PAGE_SIZE_DEFAULT = 8;
-const CACHE_KEY = 'terrium:recent-runs';
+const CACHE_KEY = "terrium:recent-runs";
 
 function loadCachedRuns(): SimulationJob[] {
   try {
@@ -84,11 +89,10 @@ function loadCachedRuns(): SimulationJob[] {
 function saveCachedRuns(runs: SimulationJob[]): void {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(runs));
-  } catch {
-  }
+  } catch {}
 }
 
-const BOOKMARK_KEY = 'terrium:bookmarked-runs';
+const BOOKMARK_KEY = "terrium:bookmarked-runs";
 
 function loadBookmarks(): Set<string> {
   try {
@@ -103,8 +107,7 @@ function loadBookmarks(): Set<string> {
 function saveBookmarks(ids: Set<string>): void {
   try {
     localStorage.setItem(BOOKMARK_KEY, JSON.stringify([...ids]));
-  } catch {
-  }
+  } catch {}
 }
 
 function SkeletonRow() {
@@ -122,14 +125,18 @@ function SkeletonRow() {
   );
 }
 
-export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PAGE_SIZE_DEFAULT }: RecentRunsProps) {
+export default function RecentRuns({
+  pollInterval = 5000,
+  onReRun,
+  pageSize = PAGE_SIZE_DEFAULT,
+}: RecentRunsProps) {
   const [runs, setRuns] = useState<SimulationJob[]>(loadCachedRuns);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [displayCount, setDisplayCount] = useState(pageSize);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [copiedParams, setCopiedParams] = useState<Set<string>>(new Set());
   const [compare, setCompare] = useState<Set<string>>(new Set());
   const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
@@ -160,7 +167,12 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
   };
 
   const filteredRuns = useMemo(
-    () => (search ? runs.filter((r) => r.query.toLowerCase().includes(search.toLowerCase())) : runs),
+    () =>
+      search
+        ? runs.filter((r) =>
+            r.query.toLowerCase().includes(search.toLowerCase()),
+          )
+        : runs,
     [runs, search],
   );
 
@@ -175,15 +187,23 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
           for (const job of data) {
             const prev = prevStatusRef.current.get(job.jobId);
             if (prev && prev !== job.status) {
-              if (job.status === 'completed') {
-                toast.success('Simulation completed', {
+              if (job.status === "completed") {
+                toast.success("Simulation completed", {
                   description: job.query,
                   duration: 4000,
                 });
                 newHighlighted.add(job.jobId);
-                setTimeout(() => setHighlighted((h) => { const n = new Set(h); n.delete(job.jobId); return n; }), 4000);
-              } else if (job.status === 'failed') {
-                toast.error('Simulation failed', {
+                setTimeout(
+                  () =>
+                    setHighlighted((h) => {
+                      const n = new Set(h);
+                      n.delete(job.jobId);
+                      return n;
+                    }),
+                  4000,
+                );
+              } else if (job.status === "failed") {
+                toast.error("Simulation failed", {
                   description: job.query,
                   duration: 4000,
                 });
@@ -201,7 +221,7 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to fetch runs');
+          setError(err instanceof Error ? err.message : "Failed to fetch runs");
           setRuns((prev) => (prev.length > 0 ? prev : loadCachedRuns()));
         }
       } finally {
@@ -221,11 +241,12 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
   }, []);
 
   const sortedRuns = useMemo(
-    () => [...filteredRuns].sort((a, b) => {
-      const aBm = bookmarked.has(a.jobId) ? 0 : 1;
-      const bBm = bookmarked.has(b.jobId) ? 0 : 1;
-      return aBm - bBm;
-    }),
+    () =>
+      [...filteredRuns].sort((a, b) => {
+        const aBm = bookmarked.has(a.jobId) ? 0 : 1;
+        const bBm = bookmarked.has(b.jobId) ? 0 : 1;
+        return aBm - bBm;
+      }),
     [filteredRuns, bookmarked],
   );
   const displayedRuns = sortedRuns.slice(0, displayCount);
@@ -239,7 +260,9 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
     e.stopPropagation();
     setCancelling((prev) => new Set(prev).add(jobId));
     try {
-      const response = await fetch(`/api/simulate/${jobId}/cancel`, { method: 'POST' });
+      const response = await fetch(`/api/simulate/${jobId}/cancel`, {
+        method: "POST",
+      });
       if (response.ok) {
         const updated = await response.json();
         setRuns((prev) => prev.map((r) => (r.jobId === jobId ? updated : r)));
@@ -261,7 +284,7 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
 
   const handleExport = (jobId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const anchor = document.createElement('a');
+    const anchor = document.createElement("a");
     anchor.href = `/api/simulate/${jobId}/export`;
     anchor.download = `simulation-${jobId.slice(0, 8)}.csv`;
     anchor.click();
@@ -287,7 +310,10 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
         <input
           type="text"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setDisplayCount(pageSize); }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setDisplayCount(pageSize);
+          }}
           placeholder="filter runs..."
           className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-white/60 text-[11px] outline-none transition-all duration-300 focus:border-[#1D8A72]/30 focus:bg-[#1D8A72]/[0.02] focus:shadow-[0_0_12px_rgba(29,138,114,0.04)] placeholder:text-white/20"
         />
@@ -329,7 +355,9 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
               animate={{ opacity: 1 }}
               className="text-white/25 text-[12px] italic"
             >
-              {search ? `No runs matching "${search}".` : 'No runs yet. Submit a query above to get started.'}
+              {search
+                ? `No runs matching "${search}".`
+                : "No runs yet. Submit a query above to get started."}
             </motion.div>
           )}
 
@@ -341,8 +369,8 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
               exit={{ opacity: 0 }}
               className={`rounded-lg border overflow-hidden transition-all duration-500 ${
                 highlighted.has(run.jobId)
-                  ? 'border-[#1D8A72]/40 shadow-[0_0_20px_rgba(29,138,114,0.15)]'
-                  : 'border-white/[0.04] hover:border-white/[0.08]'
+                  ? "border-[#1D8A72]/40 shadow-[0_0_20px_rgba(29,138,114,0.15)]"
+                  : "border-white/[0.04] hover:border-white/[0.08]"
               }`}
             >
               <div className="flex items-center justify-between">
@@ -352,14 +380,18 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
                 >
                   <div className="flex items-center justify-between gap-3 mb-1">
                     <span className="flex items-center gap-2 min-w-0">
-                      <span className="text-white/60 truncate text-[12px]" title={run.query}>
+                      <span
+                        className="text-white/60 truncate text-[12px]"
+                        title={run.query}
+                      >
                         {run.query}
                       </span>
-                      {!knownIdsRef.current.has(run.jobId) && run.status === 'completed' && (
-                        <span className="shrink-0 inline-flex items-center rounded bg-[#1D8A72]/15 px-1.5 py-0.5 text-[8px] text-[#1D8A72] uppercase tracking-wide animate-pulse-soft">
-                          new
-                        </span>
-                      )}
+                      {!knownIdsRef.current.has(run.jobId) &&
+                        run.status === "completed" && (
+                          <span className="shrink-0 inline-flex items-center rounded bg-[#1D8A72]/15 px-1.5 py-0.5 text-[8px] text-[#1D8A72] uppercase tracking-wide animate-pulse-soft">
+                            new
+                          </span>
+                        )}
                     </span>
                     <StatusBadge status={run.status} />
                   </div>
@@ -370,29 +402,36 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
                   </div>
                 </button>
                 <div className="flex gap-1 pr-3">
-                  {run.status === 'completed' && (
+                  {run.status === "completed" && (
                     <>
                       <button
                         onClick={(e) => toggleBookmark(run.jobId, e)}
                         className={`px-2 py-1 rounded-md border text-[9px] transition-all duration-200 ${
                           bookmarked.has(run.jobId)
-                            ? 'border-[#F59E0B]/30 text-[#F59E0B] bg-[#F59E0B]/[0.06]'
-                            : 'border-white/[0.06] text-white/20 hover:text-white/50 hover:bg-white/[0.03]'
+                            ? "border-[#F59E0B]/30 text-[#F59E0B] bg-[#F59E0B]/[0.06]"
+                            : "border-white/[0.06] text-white/20 hover:text-white/50 hover:bg-white/[0.03]"
                         }`}
-                        title={bookmarked.has(run.jobId) ? 'Remove bookmark' : 'Bookmark this run'}
+                        title={
+                          bookmarked.has(run.jobId)
+                            ? "Remove bookmark"
+                            : "Bookmark this run"
+                        }
                       >
-                        {bookmarked.has(run.jobId) ? '\u2605' : '\u2606'}
+                        {bookmarked.has(run.jobId) ? "\u2605" : "\u2606"}
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); toggleCompare(run.jobId, e); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCompare(run.jobId, e);
+                        }}
                         className={`px-2 py-1 rounded-md border text-[9px] transition-all duration-200 ${
                           compare.has(run.jobId)
-                            ? 'border-[#F59E0B]/30 text-[#F59E0B]/60 bg-[#F59E0B]/[0.06]'
-                            : 'border-white/[0.06] text-white/25 hover:text-white/50 hover:bg-white/[0.03]'
+                            ? "border-[#F59E0B]/30 text-[#F59E0B]/60 bg-[#F59E0B]/[0.06]"
+                            : "border-white/[0.06] text-white/25 hover:text-white/50 hover:bg-white/[0.03]"
                         }`}
                         title="Select for comparison"
                       >
-                        {compare.has(run.jobId) ? 'selected' : 'compare'}
+                        {compare.has(run.jobId) ? "selected" : "compare"}
                       </button>
                       <button
                         onClick={(e) => handleRerun(run.query, e)}
@@ -416,7 +455,7 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
                       disabled={cancelling.has(run.jobId)}
                       className="px-2 py-1 rounded-md border border-red-500/15 text-red-400/40 text-[9px] hover:bg-red-500/[0.06] hover:text-red-400/70 transition-all duration-200 disabled:opacity-30"
                     >
-                      {cancelling.has(run.jobId) ? '...' : 'cancel'}
+                      {cancelling.has(run.jobId) ? "..." : "cancel"}
                     </button>
                   )}
                 </div>
@@ -426,7 +465,7 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
                 {expanded === run.jobId && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
+                    animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     className="border-t border-white/[0.03] bg-white/[0.01]"
                   >
@@ -446,44 +485,69 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
                             <span>runId: {run.result.runId}</span>
                             <span className="ml-auto">
                               <ExportButtons
-                                trajectory={(run.result.trajectory ?? []) as Record<string, number>[]}
-                                result={run.result as unknown as Record<string, unknown>}
+                                trajectory={
+                                  (run.result.trajectory ?? []) as Record<
+                                    string,
+                                    number
+                                  >[]
+                                }
+                                result={
+                                  run.result as unknown as Record<
+                                    string,
+                                    unknown
+                                  >
+                                }
                                 filenamePrefix={run.result.domain}
                                 runId={run.result.runId}
                               />
                             </span>
                           </div>
 
-                          {run.result.trajectory && run.result.trajectory.length > 0 && (
-                            <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2">
-                              <LineChart
-                                data={
-                                  (run.result.trajectory ?? []) as unknown as import('@/lib/simulate').Point[]
-                                }
-                                series={seriesForResponse(run.result)}
-                              />
-                            </div>
-                          )}
+                          {run.result.trajectory &&
+                            run.result.trajectory.length > 0 && (
+                              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2">
+                                <LineChart
+                                  data={
+                                    (run.result.trajectory ??
+                                      []) as unknown as import("@/lib/simulate").Point[]
+                                  }
+                                  series={seriesForResponse(run.result)}
+                                />
+                              </div>
+                            )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div className="rounded-lg border border-white/[0.04] p-3">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-white/20 text-[10px] uppercase tracking-wide">parameters</span>
+                                <span className="text-white/20 text-[10px] uppercase tracking-wide">
+                                  parameters
+                                </span>
                                 <button
                                   onClick={() => {
                                     const p = run.result!.parameters;
-                                    navigator.clipboard.writeText(JSON.stringify(p, null, 2)).then(() => {
-                                      setCopiedParams((prev) => new Set(prev).add(run.jobId));
-                                      setTimeout(() => setCopiedParams((prev) => {
-                                        const next = new Set(prev);
-                                        next.delete(run.jobId);
-                                        return next;
-                                      }), 2000);
-                                    }).catch(() => {});
+                                    navigator.clipboard
+                                      .writeText(JSON.stringify(p, null, 2))
+                                      .then(() => {
+                                        setCopiedParams((prev) =>
+                                          new Set(prev).add(run.jobId),
+                                        );
+                                        setTimeout(
+                                          () =>
+                                            setCopiedParams((prev) => {
+                                              const next = new Set(prev);
+                                              next.delete(run.jobId);
+                                              return next;
+                                            }),
+                                          2000,
+                                        );
+                                      })
+                                      .catch(() => {});
                                   }}
                                   className="flex items-center gap-1 rounded border border-white/[0.06] px-1.5 py-0.5 text-[9px] text-white/25 hover:text-white/50 hover:border-white/[0.12] transition-all duration-200"
                                 >
-                                  {copiedParams.has(run.jobId) ? 'copied' : 'copy'}
+                                  {copiedParams.has(run.jobId)
+                                    ? "copied"
+                                    : "copy"}
                                 </button>
                               </div>
                               <pre className="text-white/60 overflow-x-auto text-[11px]">
@@ -491,24 +555,41 @@ export default function RecentRuns({ pollInterval = 5000, onReRun, pageSize = PA
                               </pre>
                             </div>
                             <div className="rounded-lg border border-white/[0.04] p-3">
-                              <div className="text-white/20 text-[10px] uppercase tracking-wide mb-2">provenance</div>
+                              <div className="text-white/20 text-[10px] uppercase tracking-wide mb-2">
+                                provenance
+                              </div>
                               <p className="text-white/60 mb-2 text-[11px] leading-relaxed">
                                 {run.result.provenance.reasoning}
                               </p>
                               {run.result.provenance.flags &&
                                 run.result.provenance.flags.length > 0 && (
                                   <div className="flex flex-wrap gap-1 mb-2">
-                                    {run.result.provenance.flags.map((flag, i) => (
-                                      <span key={i} className="text-[9px] text-yellow-500/50 bg-yellow-500/[0.04] rounded px-1.5 py-0.5">{flag}</span>
-                                    ))}
+                                    {run.result.provenance.flags.map(
+                                      (flag, i) => (
+                                        <span
+                                          key={i}
+                                          className="text-[9px] text-yellow-500/50 bg-yellow-500/[0.04] rounded px-1.5 py-0.5"
+                                        >
+                                          {flag}
+                                        </span>
+                                      ),
+                                    )}
                                   </div>
                                 )}
                               {run.result.provenance.modelCitations &&
-                                run.result.provenance.modelCitations.length > 0 && (
+                                run.result.provenance.modelCitations.length >
+                                  0 && (
                                   <div className="border-t border-white/[0.04] pt-2 mt-2 space-y-0.5">
-                                    {run.result.provenance.modelCitations.map((citation, i) => (
-                                      <div key={i} className="text-[10px] text-white/25 truncate">{citation}</div>
-                                    ))}
+                                    {run.result.provenance.modelCitations.map(
+                                      (citation, i) => (
+                                        <div
+                                          key={i}
+                                          className="text-[10px] text-white/25 truncate"
+                                        >
+                                          {citation}
+                                        </div>
+                                      ),
+                                    )}
                                   </div>
                                 )}
                             </div>

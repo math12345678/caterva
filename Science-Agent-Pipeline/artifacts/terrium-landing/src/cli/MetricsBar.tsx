@@ -1,6 +1,6 @@
-import { useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import AnimatedCounter from '@/components/ui/animated-counter';
+import { useEffect, useState, useRef } from "react";
+import { motion } from "framer-motion";
+import AnimatedCounter from "@/components/ui/animated-counter";
 
 interface MetricItem {
   key: string;
@@ -11,13 +11,37 @@ interface MetricItem {
 }
 
 const METRICS: MetricItem[] = [
-  { key: 'tests', target: 304, suffix: '+', label: 'tests passing', color: '#1D8A72' },
-  { key: 'domains', target: 6, suffix: '', label: 'simulation domains', color: '#3B82F6' },
-  { key: 'sources', target: 3, suffix: '', label: 'literature sources', color: '#F59E0B' },
-  { key: 'opensource', target: 100, suffix: '%', label: 'open source', color: '#8B5CF6' },
+  {
+    key: "tests",
+    target: 304,
+    suffix: "+",
+    label: "tests passing",
+    color: "#1D8A72",
+  },
+  {
+    key: "domains",
+    target: 6,
+    suffix: "",
+    label: "simulation domains",
+    color: "#3B82F6",
+  },
+  {
+    key: "sources",
+    target: 3,
+    suffix: "",
+    label: "literature sources",
+    color: "#F59E0B",
+  },
+  {
+    key: "opensource",
+    target: 100,
+    suffix: "%",
+    label: "open source",
+    color: "#8B5CF6",
+  },
 ];
 
-export default function MetricsBar({ className = '' }: { className?: string }) {
+export default function MetricsBar({ className = "" }: { className?: string }) {
   const [inView, setInView] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -44,7 +68,11 @@ export default function MetricsBar({ className = '' }: { className?: string }) {
           key={m.key}
           initial={{ opacity: 0, y: 12 }}
           animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 12 }}
-          transition={{ duration: 0.5, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
+          transition={{
+            duration: 0.5,
+            delay: i * 0.1,
+            ease: [0.16, 1, 0.3, 1],
+          }}
           className="flex items-center gap-2"
         >
           <span
@@ -52,7 +80,11 @@ export default function MetricsBar({ className = '' }: { className?: string }) {
             style={{ color: m.color }}
           >
             {inView ? (
-              <AnimatedCounter target={m.target} suffix={m.suffix} duration={1800} />
+              <AnimatedCounter
+                target={m.target}
+                suffix={m.suffix}
+                duration={1800}
+              />
             ) : (
               <span>0{m.suffix}</span>
             )}

@@ -1,17 +1,19 @@
 import "@testing-library/jest-dom/vitest";
 
-if (typeof IntersectionObserver === 'undefined') {
+if (typeof IntersectionObserver === "undefined") {
   class MockIntersectionObserver {
     readonly root: Element | null = null;
-    readonly rootMargin: string = '';
+    readonly rootMargin: string = "";
     readonly thresholds: ReadonlyArray<number> = [];
     constructor() {}
     observe() {}
     unobserve() {}
     disconnect() {}
-    takeRecords(): IntersectionObserverEntry[] { return []; }
+    takeRecords(): IntersectionObserverEntry[] {
+      return [];
+    }
   }
-  Object.defineProperty(globalThis, 'IntersectionObserver', {
+  Object.defineProperty(globalThis, "IntersectionObserver", {
     value: MockIntersectionObserver,
   });
 }

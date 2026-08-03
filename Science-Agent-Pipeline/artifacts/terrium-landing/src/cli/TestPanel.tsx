@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
-import { TEST_SUITES, SKIP_EXPLANATION, totals } from '@/lib/testResults';
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { TEST_SUITES, SKIP_EXPLANATION, totals } from "@/lib/testResults";
 
-function FileRow({ file, index }: { file: { file: string; passed: number; skipped: number; failed: number }; index: number }) {
+function FileRow({
+  file,
+  index,
+}: {
+  file: { file: string; passed: number; skipped: number; failed: number };
+  index: number;
+}) {
   const total = file.passed + file.skipped + file.failed;
   const passPct = total > 0 ? (file.passed / total) * 100 : 0;
 
@@ -18,26 +24,44 @@ function FileRow({ file, index }: { file: { file: string; passed: number; skippe
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: index * 0.03 + 0.1, type: 'spring', stiffness: 300 }}
+            transition={{
+              delay: index * 0.03 + 0.1,
+              type: "spring",
+              stiffness: 300,
+            }}
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-              file.failed > 0 ? 'bg-red-400' : file.skipped > 0 ? 'bg-yellow-400' : 'bg-[#1D8A72]'
+              file.failed > 0
+                ? "bg-red-400"
+                : file.skipped > 0
+                  ? "bg-yellow-400"
+                  : "bg-[#1D8A72]"
             }`}
           />
-          <span className="text-white/60 truncate group-hover:text-white/80 transition-colors">{file.file}</span>
+          <span className="text-white/60 truncate group-hover:text-white/80 transition-colors">
+            {file.file}
+          </span>
         </div>
         <span className="flex gap-3 shrink-0 font-mono text-[11px]">
           <span className="text-[#1D8A72]">{file.passed} passed</span>
-          {file.skipped > 0 && <span className="text-yellow-500/70">{file.skipped} skipped</span>}
-          {file.failed > 0 && <span className="text-red-400">{file.failed} failed</span>}
+          {file.skipped > 0 && (
+            <span className="text-yellow-500/70">{file.skipped} skipped</span>
+          )}
+          {file.failed > 0 && (
+            <span className="text-red-400">{file.failed} failed</span>
+          )}
         </span>
       </div>
       <div className="h-1 w-full bg-white/[0.03] rounded-full overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${passPct}%` }}
-          transition={{ duration: 0.6, delay: index * 0.03, ease: 'easeOut' }}
+          transition={{ duration: 0.6, delay: index * 0.03, ease: "easeOut" }}
           className={`h-full rounded-full ${
-            file.failed > 0 ? 'bg-red-400/40' : file.skipped > 0 ? 'bg-yellow-400/40' : 'bg-[#1D8A72]/40'
+            file.failed > 0
+              ? "bg-red-400/40"
+              : file.skipped > 0
+                ? "bg-yellow-400/40"
+                : "bg-[#1D8A72]/40"
           }`}
         />
       </div>
@@ -45,7 +69,13 @@ function FileRow({ file, index }: { file: { file: string; passed: number; skippe
   );
 }
 
-function AnimatedCount({ value, suffix = '' }: { value: number; suffix?: string }) {
+function AnimatedCount({
+  value,
+  suffix = "",
+}: {
+  value: number;
+  suffix?: string;
+}) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
     const duration = 600;
@@ -63,7 +93,12 @@ function AnimatedCount({ value, suffix = '' }: { value: number; suffix?: string 
     }, duration / steps);
     return () => window.clearInterval(id);
   }, [value]);
-  return <>{display}{suffix}</>;
+  return (
+    <>
+      {display}
+      {suffix}
+    </>
+  );
 }
 
 export default function TestPanelBody() {
@@ -72,7 +107,8 @@ export default function TestPanelBody() {
   return (
     <div>
       <div className="mb-4 text-white/90">
-        <span className="text-[#1D8A72]">$</span> terrium test --run --no-skip -v
+        <span className="text-[#1D8A72]">$</span> terrium test --run --no-skip
+        -v
       </div>
 
       {TEST_SUITES.map((suite, si) => (
@@ -97,20 +133,30 @@ export default function TestPanelBody() {
         transition={{ delay: 0.3 }}
         className="mt-6 pt-4 border-t border-white/[0.04] flex items-center gap-3 text-[13px]"
       >
-        <span className="text-white/70 font-semibold"><AnimatedCount value={total} /> total</span>
+        <span className="text-white/70 font-semibold">
+          <AnimatedCount value={total} /> total
+        </span>
         <span className="w-px h-3 bg-white/[0.06]" />
-        <span className="text-[#1D8A72]"><AnimatedCount value={passed} /> passed</span>
+        <span className="text-[#1D8A72]">
+          <AnimatedCount value={passed} /> passed
+        </span>
         {skipped > 0 && (
           <>
             <span className="w-px h-3 bg-white/[0.06]" />
-            <span className="text-yellow-500/70"><AnimatedCount value={skipped} /> skipped</span>
+            <span className="text-yellow-500/70">
+              <AnimatedCount value={skipped} /> skipped
+            </span>
           </>
         )}
         <span className="w-px h-3 bg-white/[0.06]" />
         {failed > 0 ? (
-          <span className="text-red-400"><AnimatedCount value={failed} /></span>
+          <span className="text-red-400">
+            <AnimatedCount value={failed} />
+          </span>
         ) : (
-          <span className="text-white/30"><AnimatedCount value={0} /> failed</span>
+          <span className="text-white/30">
+            <AnimatedCount value={0} /> failed
+          </span>
         )}
       </motion.div>
 

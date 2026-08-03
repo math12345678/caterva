@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
-import AnimatedCounter from '@/components/ui/animated-counter';
+import { useEffect, useState } from "react";
+import AnimatedCounter from "@/components/ui/animated-counter";
 
 const staticStats = [
-  { key: 'tests', target: 47, suffix: '+', label: 'tests passing' },
-  { key: 'domains', target: 2, suffix: '', label: 'live domains' },
-  { key: 'supported', target: 6, suffix: '', label: 'supported domains' },
+  { key: "tests", target: 47, suffix: "+", label: "tests passing" },
+  { key: "domains", target: 2, suffix: "", label: "live domains" },
+  { key: "supported", target: 6, suffix: "", label: "supported domains" },
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function StatsBar() {
   const [waitlistCount, setWaitlistCount] = useState<number>(0);
@@ -30,8 +30,18 @@ export default function StatsBar() {
   }, []);
 
   const liveStats = [
-    { key: 'waiting', target: waitlistCount || 47, suffix: '+', label: 'researchers waiting' },
-    { key: 'uptime', target: uptimeHours || 24, suffix: '/7', label: 'pipeline uptime' },
+    {
+      key: "waiting",
+      target: waitlistCount || 47,
+      suffix: "+",
+      label: "researchers waiting",
+    },
+    {
+      key: "uptime",
+      target: uptimeHours || 24,
+      suffix: "/7",
+      label: "pipeline uptime",
+    },
   ];
 
   const stats = [...staticStats, ...liveStats];
