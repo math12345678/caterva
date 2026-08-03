@@ -291,6 +291,196 @@ class TestTheOrchestratorIsReachable:
         )
 
 
+def _all_kcat_fixtures() -> list:
+    """Every captured turnover fixture in the repository.
+
+    Discovered by glob rather than listed, so a newly captured enzyme is
+    covered by the invariants below the moment it lands -- without anyone
+    remembering to add it here. The AChE-specific tests above still pin the
+    exact golden values; these check what must hold for ANY turnover table.
+    """
+    return sorted(FIXTURES.glob("brenda_*_kcat_fixture.html"))
+
+
+@pytest.mark.parametrize(
+    "fixture", _all_kcat_fixtures(), ids=lambda p: p.stem.replace("brenda_", "")
+)
+class TestInvariantsAcrossEveryCapturedEnzyme:
+    """Properties that must hold for every turnover table, not just AChE.
+
+    The parser had only ever seen one BRENDA page when it was written, and
+    that is exactly how the duplicate-row bug survived: the Km fixtures
+    could not reach it, so nothing caught it until a second page shape
+    arrived. These run against whatever has been captured.
+    """
+
+    @staticmethod
+    def _parse(fixture):
+        return parse_brenda_turnover_html(
+            html=fixture.read_text(encoding="utf-8"),
+            ec_number="0.0.0.0",  # not used for matching in permissive mode
+            target_substrates=[],
+            target_organism=None,  # cross-species: accept every organism
+            require_substrate_match=False,
+        )
+
+    def test_the_fixture_parses_to_at_least_one_entry(self, fixture):
+        entries = self._parse(fixture)
+        assert entries, f"{fixture.name} parsed to zero entries"
+
+    def test_no_duplicate_measurements(self, fixture):
+        """The regression that motivated capturing a second enzyme.
+
+        `rows + subrows` concatenated without dedup, so a sub-row also
+        carrying class="row" was parsed twice. It was invisible until a
+        page with 11 such rows showed up.
+
+        The key MUST include `conditions`. Without it this test reported a
+        false positive on real AChE data: three sub-rows carrying
+        kcat 2667 s^-1, ref 652194, Mus musculus, acetylthiocholine iodide
+        -- identical in every other cell -- are the **wild-type enzyme, the
+        A262C mutant, and the E81C mutant**, which share that turnover
+        number to the reported precision.
+
+        They are three measurements of three different proteins. A dedup
+        that collapsed them would silently delete real data, which is worse
+        than the duplication it set out to prevent.
+        """
+        entries = self._parse(fixture)
+        keys = [
+            (e.km_value, e.reference_id, e.substrate, e.organism, e.conditions)
+            for e in entries
+        ]
+        assert len(keys) == len(set(keys)), f"{fixture.name} returned duplicates"
+
+    def test_variants_sharing_a_value_are_kept_apart(self, fixture):
+        """Guards the distinction the test above depends on.
+
+        If `conditions` ever stopped being captured, the dedup key would
+        collapse genuinely different enzyme variants into one entry and the
+        test above would still pass -- silently, because there would be
+        nothing left to tell them apart.
+        """
+        entries = self._parse(fixture)
+        by_value: dict = {}
+        for entry in entries:
+            # `substrate` belongs in the key. Without it this grouped two
+            # real Mus musculus H287C rows -- kcat 3000 s^-1 measured on
+            # Acetylcholine (ref 652016) and on acetylthiocholine iodide
+            # (ref 652194) -- and then demanded they have distinct
+            # commentary, which they correctly do not: the same mutant can
+            # turn over two substrates at the same rate.
+            key = (entry.km_value, entry.reference_id, entry.organism, entry.substrate)
+            by_value.setdefault(key, []).append(entry)
+
+        for group in by_value.values():
+            if len(group) > 1:
+                commentaries = {e.conditions for e in group}
+                assert len(commentaries) == len(group), (
+                    f"{fixture.name}: {len(group)} entries share a value and "
+                    "reference but do not have distinct commentary -- either "
+                    "they are true duplicates, or `conditions` is no longer "
+                    "being captured"
+                )
+
+    def test_every_value_is_a_plausible_turnover_number(self, fixture):
+        """Km bounds would flag real fast enzymes; kcat bounds must not."""
+        for entry in self._parse(fixture):
+            assert KCAT_PLAUSIBLE_MIN_PER_S <= entry.km_value <= KCAT_PLAUSIBLE_MAX_PER_S, (
+                f"{fixture.name}: kcat {entry.km_value} outside plausible range"
+            )
+
+    def test_rows_are_table_scoped(self, fixture):
+        """Each fixture must carry its nav anchor. Without it the parser
+        falls back to a whole-page scan and flags everything -- the defect
+        the capture script was fixed for."""
+        for entry in self._parse(fixture):
+            assert getattr(entry, "table_scoped", True) is True, (
+                f"{fixture.name}: row not table-scoped; was the nav anchor "
+                "captured alongside the container?"
+            )
+
+    def test_assay_conditions_are_parsed_where_reported(self, fixture):
+        """Not every row reports conditions -- BRENDA often says so
+        explicitly. But any value that IS parsed must be physically
+        sensible, never a stray number from the commentary."""
+        for entry in self._parse(fixture):
+            if entry.assay_ph is not None:
+                assert 0.0 <= entry.assay_ph <= 14.0, f"{fixture.name}: pH {entry.assay_ph}"
+            if entry.assay_temperature_c is not None:
+                assert -20.0 <= entry.assay_temperature_c <= 150.0, (
+                    f"{fixture.name}: T {entry.assay_temperature_c}"
+                )
+
+
+class TestCommentaryIsReadByPositionNotLength:
+    """`conditions` used to be `max(cell_texts, key=len)` -- the longest cell.
+
+    That silently returns the SUBSTRATE whenever the substrate name is
+    longer than the commentary, which is common. Found by running the
+    invariants against the AChE turnover table cross-species: three real
+    Mus musculus sub-rows with commentaries "wild-type enzyme",
+    "A262C mutant" and "E81C mutant" (16, 12, 11 chars) all lost to
+    "acetylthiocholine iodide" (24 chars).
+
+    The consequence was not cosmetic. The three mutants became
+    indistinguishable, and every assay condition on an aggregate sub-row
+    was discarded -- the STRENDA data ADR 0010 exists to preserve.
+    """
+
+    def test_a_short_commentary_survives_a_long_substrate_name(self):
+        entries = parse_brenda_turnover_html(
+            html=KCAT_FIXTURE.read_text(encoding="utf-8"),
+            ec_number="3.1.1.7",
+            target_substrates=[],
+            target_organism=None,
+            require_substrate_match=False,
+        )
+        mutants = {
+            e.conditions
+            for e in entries
+            if e.organism == "Mus musculus" and e.km_value == 2667.0
+        }
+        assert mutants == {"wild-type enzyme", "A262C mutant", "E81C mutant"}, mutants
+
+    def test_the_commentary_is_never_the_substrate(self):
+        entries = parse_brenda_turnover_html(
+            html=KCAT_FIXTURE.read_text(encoding="utf-8"),
+            ec_number="3.1.1.7",
+            target_substrates=[],
+            target_organism=None,
+            require_substrate_match=False,
+        )
+        for entry in entries:
+            if entry.conditions is not None:
+                assert entry.conditions != entry.substrate, (
+                    f"commentary equals substrate for kcat {entry.km_value} -- "
+                    "the longest-cell heuristic is back"
+                )
+
+    def test_an_absent_commentary_is_none_not_the_organism(self):
+        """Rows whose commentary cell is "-" must report None.
+
+        The old heuristic filled them with whatever else was on the row --
+        usually the organism. Two real LDH pyruvate rows came back with
+        conditions="Homo sapiens", claiming a commentary that never existed.
+        """
+        ldh = FIXTURES / "brenda_ldh_fixture.html"
+        assert ldh.exists()
+        entries = parse_brenda_km_html(
+            html=ldh.read_text(encoding="utf-8"),
+            ec_number="1.1.1.27",
+            target_substrates=["pyruvate"],
+            target_organism=None,
+            require_substrate_match=False,
+        )
+        assert entries
+        for entry in entries:
+            assert entry.conditions != entry.organism, (
+                f"conditions leaked the organism for km {entry.km_value}"
+            )
+
+
 class TestTableScoping:
     def test_entries_are_table_scoped(self, kcat_entries):
         """A fixture holding only the container has no nav link to match, so

@@ -413,7 +413,54 @@ def parse_brenda_km_html(
         if uniprot is None:
             uniprot = fallback_uniprot
 
-        conditions = max(cell_texts, key=len) if cell_texts else None
+        # The commentary cell, by POSITION rather than by length.
+        #
+        # BRENDA's row layout is fixed:
+        #   value | substrate | organism | uniprot | commentary | reference id
+        # so the commentary is the cell after the organism and before the
+        # six-digit reference id.
+        #
+        # This was `max(cell_texts, key=len)` -- pick the longest cell -- which
+        # silently returns the SUBSTRATE whenever the substrate name happens to
+        # be longer than the commentary. Real case from the AChE turnover
+        # table: three Mus musculus sub-rows whose commentaries are
+        # "wild-type enzyme", "A262C mutant" and "E81C mutant" (16, 12 and 11
+        # characters) all lost to "acetylthiocholine iodide" (24). The three
+        # became indistinguishable, and every assay condition on an aggregate
+        # sub-row was discarded -- exactly the STRENDA data ADR 0010 exists to
+        # preserve.
+        conditions = None
+        if cell_texts:
+            ref_index = None
+            for idx in range(len(cell_texts) - 1, -1, -1):
+                if re.match(r"^\d{6}$", cell_texts[idx].strip()):
+                    ref_index = idx
+                    break
+            if ref_index is not None and ref_index >= 1:
+                candidate = cell_texts[ref_index - 1].strip()
+                # Guard against a row missing its commentary entirely, where
+                # cell[ref-1] would be the uniprot or a placeholder.
+                if (
+                    candidate
+                    and candidate != "-"
+                    and not UNIPROT_CELL_PATTERN.match(candidate)
+                ):
+                    conditions = candidate
+            if conditions is None and ref_index is None:
+                # Layout did not match at all (unusual page, or a fixture
+                # without a reference cell). Fall back to the old heuristic
+                # rather than dropping the commentary altogether.
+                conditions = max(cell_texts, key=len)
+            # When the layout DID match and the commentary cell was empty or
+            # "-", conditions stays None. That is the honest answer: BRENDA
+            # reported no commentary for this row.
+            #
+            # Previously the longest-cell heuristic filled it with whatever
+            # else was on the row -- usually the ORGANISM. Two real LDH
+            # pyruvate rows came back with conditions="Homo sapiens", which
+            # parse_assay_conditions then dutifully searched for a pH and a
+            # temperature. It found none, so nothing was fabricated, but the
+            # field claimed a commentary that did not exist.
 
         ref_id = None
         for cell in reversed(cell_texts):

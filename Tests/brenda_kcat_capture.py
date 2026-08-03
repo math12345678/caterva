@@ -1,12 +1,18 @@
 """Capture a real BRENDA Turnover Numbers (kcat) table as a fixture.
 
-Run this once, from the Tests/ directory, on a machine with network access:
+Run from the Tests/ directory, on a machine with network access:
 
     cd ~/Desktop/Coding/Terrium/Tests
-    ../.venv/bin/python brenda_kcat_capture.py
+    ../.venv/bin/python brenda_kcat_capture.py            # AChE (default)
+    ../.venv/bin/python brenda_kcat_capture.py 1.1.1.27   # LDH
 
 It prints what it found and, on success, writes
-`fixtures/brenda_ache_kcat_fixture.html`.
+`fixtures/brenda_<name>_kcat_fixture.html`.
+
+Only EC numbers in KNOWN_ENZYMES are accepted, so the fixture filename is
+never guessed from an arbitrary argument. Each of those enzymes already has
+a verified live Km capture, which means the turnover table can be compared
+against a Km table from the same page.
 
 Why a script and not a one-liner
 --------------------------------
@@ -30,10 +36,21 @@ from bs4 import BeautifulSoup
 
 from brenda_client import _find_table_container, fetch_brenda_html
 
-# Acetylcholinesterase. Chosen because its Km fixture is already a verified
-# live capture, and it is the enzyme behind the STRENDA-complete golden tuple
-# (Km 0.0714 mM, pH 7.4, 37 C, BRENDA ref 713996).
-EC = "3.1.1.7"
+# Enzymes whose Km fixtures are already verified live captures, so the two
+# tables can be compared on the same page. The short name becomes the fixture
+# filename: brenda_<name>_kcat_fixture.html
+#
+# Default is acetylcholinesterase -- the enzyme behind the STRENDA-complete
+# golden tuple (Km 0.0714 mM, pH 7.4, 37 C, BRENDA ref 713996).
+KNOWN_ENZYMES = {
+    "3.1.1.7": "ache",          # acetylcholinesterase
+    "1.1.1.27": "ldh",          # L-lactate dehydrogenase
+    "2.7.1.1": "hexokinase",
+    "3.4.21.1": "chymotrypsin",
+    "3.4.21.4": "trypsin",
+}
+
+DEFAULT_EC = "3.1.1.7"
 
 CANDIDATE_LABELS = [
     "Turnover Numbers",
@@ -45,17 +62,24 @@ CANDIDATE_LABELS = [
     "Turnover Number [1/s]",
 ]
 
-OUT = pathlib.Path("fixtures") / "brenda_ache_kcat_fixture.html"
-
 
 def main() -> int:
     if not pathlib.Path("fixtures").is_dir():
         print("ERROR: run this from the Tests/ directory (no fixtures/ here).")
         return 2
 
-    print(f"Fetching BRENDA EC {EC} ...")
+    ec = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_EC
+    name = KNOWN_ENZYMES.get(ec)
+    if name is None:
+        print(f"ERROR: unknown EC {ec}. Known: {', '.join(sorted(KNOWN_ENZYMES))}")
+        print("Add it to KNOWN_ENZYMES with a short name for the fixture file.")
+        return 2
+
+    out = pathlib.Path("fixtures") / f"brenda_{name}_kcat_fixture.html"
+
+    print(f"Fetching BRENDA EC {ec} ({name}) ...")
     try:
-        html = fetch_brenda_html(EC)
+        html = fetch_brenda_html(ec)
     except Exception as exc:  # network, timeout, HTTP error
         print(f"ERROR: could not fetch BRENDA: {exc}")
         return 1
@@ -91,8 +115,8 @@ def main() -> int:
             ])
             print(f"\nFOUND  label={label!r}  ({len(text):,} chars, {rows} data rows)")
             print(f"  nav anchor included: {anchor is not None}")
-            OUT.write_text(text, encoding="utf-8")
-            print(f"Wrote {OUT}")
+            out.write_text(text, encoding="utf-8")
+            print(f"Wrote {out}")
             print("\nPaste the whole output of this script back to Claude.")
             return 0
         print(f"  miss: {label!r}")
