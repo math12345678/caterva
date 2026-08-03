@@ -56,28 +56,28 @@ and assumed correct.
 
 ## Supported Python versions
 
-Terrium supports Python 3.10–3.12. This is a hard constraint, but not for the
+Terrium supports Python 3.10–3.13. This is a hard constraint, but not for the
 reason this file used to give. It is **not** "the SBML C extensions stop at
 cp312" — `python-libsbml` 5.21.1 already ships cp314 wheels, and `antimony`
 2.14.0 ships `py3-none-<platform>` wheels that are Python-version agnostic.
 
-The real blockers are `libroadrunner` 2.7.0 and `numpy` 1.26.4, both
-cp39–cp312 only (verified against PyPI, 2026-08-02). Raising the floor means
-`libroadrunner ≥ 2.8.0` and `numpy ≥ 2.1.0` — see
+The window is bounded by `libroadrunner` 2.8.0 and `numpy` 2.1.3, which
+publish cp310–cp313 wheels (verified against PyPI). The 2.9.x libroadrunner
+line drops cp310, so we stay on 2.8.0 to keep the floor — see
 [ADR 0014](docs/adr/0014-python-version-support.md).
 
-CI tests 3.10 and 3.12 (see
-`.github/workflows/tests.yml`); `requirements.txt` pins `numpy==1.26.4` and
-`libroadrunner==2.7.0`. A green run outside this range or with unpinned
-dependencies is not evidence about the supported configuration. The
-eigenvector-sign bug is the worked example: LAPACK chose different signs
-across builds, producing silent NaN rather than an exception; it passed on
-Python 3.13 but failed deterministically on the pinned configuration.
+CI tests 3.10, 3.12 and 3.13 (see
+`.github/workflows/tests.yml`); `requirements.txt` pins `numpy==2.1.3` and
+`libroadrunner==2.8.0`. A green run with unpinned dependencies is not
+evidence about the supported configuration. The eigenvector-sign bug is the
+worked example: LAPACK chose different signs across builds, producing silent
+NaN rather than an exception; it passed under one numpy build but failed
+deterministically under another.
 
 The one-line setup for a correct environment is:
 
 ```bash
-python3.12 -m venv .venv && . .venv/bin/activate
+python3.13 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 

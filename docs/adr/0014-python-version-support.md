@@ -1,6 +1,6 @@
-# ADR 0014: Python 3.10–3.12, and what actually constrains it
+# ADR 0014: Python 3.10–3.13, and what actually constrains it
 
-**Status:** Accepted
+**Status:** Accepted; the 3.10–3.12 window recorded below was widened to 3.10–3.13 on 2026-08-03 (see Amendment).
 
 **Date:** 2026-08-02
 
@@ -103,6 +103,35 @@ it was written after this was investigated).
 - The `Makefile` error message, `requirements.txt`, `README.md` and
   `CONTRIBUTING.md` now agree with each other and with PyPI.
 - Static NumPy 2.x survey across both Python layers: zero removed aliases.
+
+## Amendment (2026-08-03): the 3.13 step ships
+
+The decision recorded above — *"The support window stays 3.10–3.12"* — has now
+been superseded for the upper end: the window is **3.10–3.13**. What landed:
+
+- `requirements.txt`: `libroadrunner==2.7.0` → `==2.8.0`; `numpy==1.26.4` →
+  `==2.1.3`. These are pinned **exact**, not `>=`, because the 2.9.x
+  libroadrunner line drops cp310 wheels — `>=2.8.0` would let pip resolve to a
+  version that breaks the 3.10 floor (verified against PyPI).
+- `Makefile` `is_supported()` and `scripts/verify_domain.sh` gates now accept
+  `(3, 13)` and try `python3.13` first.
+- `README.md`, `CONTRIBUTING.md`, `requirements.txt`, the ADR index, and
+  ADR 0001 now state 3.10–3.13.
+- `.github/workflows/tests.yml` matrix is `["3.10","3.12","3.13"]`.
+
+**Verification:** `python3 scripts/check_python_support_claim.py --online`
+reports every pin publishes cp310–cp313 wheels (`libroadrunner` 2.8.0, `numpy`
+2.1.3, `scipy` 1.15.3, `python-libsbml` 5.21.1; `antimony` is version-agnostic)
+and that every file states the same window as the Makefile gate.
+
+**Still outstanding — and not claimed by this amendment:** steps 2 and 3 of the
+original plan. Bumping `libroadrunner` to 2.8.0 moves the ODE integrator under
+every continuous-domain golden, and `numpy` 1.26 → 2.x is a breaking major
+upgrade. The pins and window now *support* 3.13, but the full suite on 3.12 and
+the closed-form trajectory diff (the "real upgrade stage") must still be run
+and pass before that support is trusted as numerically sound. This amendment
+records the dependency/claim change only; it does not substitute for that
+verification.
 
 ## References
 

@@ -37,11 +37,10 @@ setup: check-python
 # repository venv must not shadow a supported interpreter, and an unsupported
 # system Python must never be selected merely because it has pytest installed.
 #
-# Version support is 3.10-3.12 and that gate is authoritative: libroadrunner
-# 2.7.0 and numpy 1.26.4 publish no cp313/cp314 wheels, so a newer interpreter
-# cannot install this project's dependencies at all (verified against PyPI,
-# 2026-08-02). Widening the range would trade a clear error for a cmake
-# failure during `pip install`.
+# Version support is 3.10-3.13 and that gate is authoritative: libroadrunner
+# 2.8.0 and numpy 2.1.3 publish cp313 wheels (and keep cp310), verified against
+# PyPI. Windows outside it cannot install this project's dependencies. The
+# 2.9.x libroadrunner line drops cp310, so we stay on 2.8.0 to keep the floor.
 #
 # Among supported interpreters, one that can actually run pytest is preferred
 # over one that merely has the right version number. The previous resolver
@@ -53,7 +52,7 @@ setup: check-python
 # target, depended on only by the targets that RUN tests) explains the
 # no-pytest case without blocking `setup`, which is what installs it.
 PY := $(shell \
-	is_supported() { "$$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12)) else 1)' >/dev/null 2>&1; }; \
+	is_supported() { "$$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12), (3, 13)) else 1)' >/dev/null 2>&1; }; \
 	is_usable() { "$$1" -c 'import pytest' >/dev/null 2>&1; }; \
 	if [ -n "$(TERRIUM_PYTHON_ABS)" ]; then \
 		if [ -x "$(TERRIUM_PYTHON_ABS)" ] && is_supported "$(TERRIUM_PYTHON_ABS)"; then echo "$(TERRIUM_PYTHON_ABS)"; else echo ""; fi; \
@@ -63,7 +62,7 @@ PY := $(shell \
 		echo "$(CURDIR)/$(BIN)/python"; \
 	else \
 		chosen=""; fallback=""; \
-		for candidate in python3.12 python3.11 python3.10; do \
+		for candidate in python3.13 python3.12 python3.11 python3.10; do \
 			command -v "$$candidate" >/dev/null 2>&1 || continue; \
 			is_supported "$$candidate" || continue; \
 			resolved="$$(command -v "$$candidate")"; \
@@ -82,10 +81,11 @@ VENV_BROKEN := $(shell \
 
 check-python:
 	@if [ -z "$(PY)" ]; then \
-		echo "No supported Python 3.10-3.12 interpreter found."; \
+		echo "No supported Python 3.10-3.13 interpreter found."; \
 		echo ""; \
-		echo "Terrium pins libroadrunner 2.7.0 and numpy 1.26.4, which publish"; \
-		echo "no wheels for Python 3.13+. Install Python 3.12, then:"; \
+		echo "Terrium pins libroadrunner 2.8.0 and numpy 2.1.3, which publish"; \
+		echo "wheels for Python 3.10 through 3.13. Install one of python3.13,"; \
+		echo "python3.12, python3.11 or python3.10, then:"; \
 		echo ""; \
 		echo "    make setup"; \
 		exit 2; \

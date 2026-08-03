@@ -36,6 +36,6 @@ Each ADR has:
 | [0011](0011-llm-parameter-origin.md) | An LLM-supplied parameter is its own origin, not a `default` |
 | [0012](0012-kcat-resolved-but-not-simulated.md) | kcat is resolved from literature but is not a simulation parameter |
 | [0013](0013-enzyme-concentration-bridges-kcat-to-vmax.md) | Enzyme concentration is a caller input, and it bridges kcat to Vmax |
-| [0014](0014-python-version-support.md) | Python 3.10–3.12, and what actually constrains it |
+| [0014](0014-python-version-support.md) | Python 3.10–3.13, and what actually constrains it |
 | [0015](0015-constitution-rules-must-be-executable.md) | A constitution rule that nothing executes is not enforced |
 | [0016](0016-cached-results-lose-parameter-provenance.md) | Cached results serve no per-parameter provenance |

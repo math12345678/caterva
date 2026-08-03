@@ -33,9 +33,9 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Use the same supported interpreter for every audit step. A stale repository
 # venv must not shadow a supported interpreter merely because its directory
-# exists; missing dependencies should fail transparently under Python 3.10–3.12.
+# exists; missing dependencies should fail transparently under Python 3.10–3.13.
 is_supported_python() {
-    "$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12)) else 1)' >/dev/null 2>&1
+    "$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12), (3, 13)) else 1)' >/dev/null 2>&1
 }
 
 if [ -n "${TERRIUM_PYTHON:-}" ]; then
@@ -45,13 +45,13 @@ if [ -n "${TERRIUM_PYTHON:-}" ]; then
         *) TERRIUM_PYTHON_PATH="$REPO_DIR/$TERRIUM_PYTHON_PATH" ;;
     esac
     if [ ! -x "$TERRIUM_PYTHON_PATH" ] || ! is_supported_python "$TERRIUM_PYTHON_PATH"; then
-        echo "TERRIUM_PYTHON must point to a supported Python 3.10–3.12 interpreter: $TERRIUM_PYTHON"
+        echo "TERRIUM_PYTHON must point to a supported Python 3.10–3.13 interpreter: $TERRIUM_PYTHON"
         exit 2
     fi
     PYTHON="$TERRIUM_PYTHON_PATH"
 elif [ -n "${VIRTUAL_ENV:-}" ]; then
     if [ ! -x "$VIRTUAL_ENV/bin/python" ] || ! is_supported_python "$VIRTUAL_ENV/bin/python"; then
-        echo "Active VIRTUAL_ENV must use supported Python 3.10–3.12: $VIRTUAL_ENV/bin/python"
+        echo "Active VIRTUAL_ENV must use supported Python 3.10–3.13: $VIRTUAL_ENV/bin/python"
         exit 2
     fi
     PYTHON="$VIRTUAL_ENV/bin/python"
@@ -60,7 +60,7 @@ elif [ -x "$REPO_DIR/.venv/bin/python" ] \
     PYTHON="$REPO_DIR/.venv/bin/python"
 else
     PYTHON=""
-    for candidate in python3.12 python3.11 python3.10; do
+    for candidate in python3.13 python3.12 python3.11 python3.10; do
         if command -v "$candidate" >/dev/null 2>&1 \
                 && is_supported_python "$(command -v "$candidate")"; then
             PYTHON="$(command -v "$candidate")"
@@ -70,8 +70,8 @@ else
 fi
 
 if [ -z "$PYTHON" ]; then
-    echo "No supported Python 3.10–3.12 interpreter was found."
-    echo "Install Python 3.12 and requirements-dev.txt, or set TERRIUM_PYTHON."
+    echo "No supported Python 3.10–3.13 interpreter was found."
+    echo "Install Python 3.13 and requirements-dev.txt, or set TERRIUM_PYTHON."
     exit 2
 fi
 

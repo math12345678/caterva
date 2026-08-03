@@ -30,7 +30,7 @@ section) so nobody re-adds it by habit, since `tellurium` is the
 
 - Installation is faster and more reliable across platforms, since all
   three real dependencies do publish prebuilt wheels for the supported
-  Python range (3.10-3.12).
+  Python range (3.10-3.13).
 - Anyone reading Terrium's imports and expecting to see `import tellurium`
   needs the README's explanation, or the deviation looks like a mistake.
 - If Terrium ever needs COMBINE archive import/export (e.g., accepting a

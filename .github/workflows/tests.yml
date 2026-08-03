@@ -12,10 +12,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.10 is the floor Terrium supports; 3.12 is the ceiling with
-        # prebuilt wheels for the SBML C extensions. Testing both ends
-        # catches version drift before it reaches anyone's laptop.
-        python-version: ["3.10", "3.12"]
+        # 3.10 is the floor Terrium supports; 3.13 is the ceiling. Testing
+        # across the window catches version drift before it reaches anyone's
+        # laptop; the 3.10 job also guards the libroadrunner==2.8.0 floor.
+        python-version: ["3.10", "3.12", "3.13"]
 
     steps:
       - uses: actions/checkout@v4
