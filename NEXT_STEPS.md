@@ -129,9 +129,9 @@ the golden set — the exact failure this project has caught three times.
 
 **Do you want Python 3.13/3.14 support?**
 
-Right now the project is pinned to Python 3.10–3.12. That is not arbitrary:
-`libroadrunner` 2.7.0 and `numpy` 1.26.4 publish no wheels past cp312, which
-is why your 3.14 venv could never have worked (I verified this against PyPI).
+Right now the project supports Python 3.10–3.13 (the 3.13 step of ADR 0014 has
+landed: `libroadrunner` 2.8.0 and `numpy` 2.1.3 publish cp313 wheels, verified
+against PyPI). The remaining question is only whether to go further, to 3.14.
 
 Getting to 3.14 means upgrading to `libroadrunner` 2.9.3 + `numpy` 2.5.x — a
 **NumPy 2.x major upgrade** with breaking API changes across 1,040 tests. It

@@ -46,6 +46,14 @@ export type CitationStatus = "verified" | "flagged";
  */
 export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   mm: ["km"],
+  // "ki" deliberately excluded: applyKineticResolution() (queryResolver.ts)
+  // reads agentResult.ki, but resolveKineticValue()/science_agent_runner.py
+  // never populate it -- Tests/brenda_client.py has no Ki lookup path.
+  // Listing "ki" here would silently always hit the "could not resolve"
+  // branch and report a real-looking flag for a lookup that never runs.
+  // Same class of decision as ADR 0012 excluding kcat. Add it back only
+  // once a real Ki lookup + golden tuple + contract test exist for it.
+  mm_competitive_inhibition: ["km"],
 };
 
 /**
@@ -151,7 +159,8 @@ export function strendaStatusFor(
   conditions: AssayConditions | undefined,
 ): StrendaStatus {
   if (!conditions) return "incomplete";
-  const hasPh = typeof conditions.ph === "number" && Number.isFinite(conditions.ph);
+  const hasPh =
+    typeof conditions.ph === "number" && Number.isFinite(conditions.ph);
   const hasTemp =
     typeof conditions.temperatureC === "number" &&
     Number.isFinite(conditions.temperatureC);
@@ -163,7 +172,11 @@ export function missingStrendaFields(
   conditions: AssayConditions | undefined,
 ): string[] {
   const missing: string[] = [];
-  if (!conditions || typeof conditions.ph !== "number" || !Number.isFinite(conditions.ph)) {
+  if (
+    !conditions ||
+    typeof conditions.ph !== "number" ||
+    !Number.isFinite(conditions.ph)
+  ) {
     missing.push("pH");
   }
   if (
@@ -231,16 +244,28 @@ export function validateParameterProvenance(
     if (prov.origin !== "resolved" && prov.citation !== undefined) {
       violations.push(`${key} has a citation but origin is '${prov.origin}'`);
     }
-    if (prov.origin === "resolved" && prov.citation && !isLocatableCitation(prov.citation)) {
+    if (
+      prov.origin === "resolved" &&
+      prov.citation &&
+      !isLocatableCitation(prov.citation)
+    ) {
       violations.push(
         `${key} is marked resolved but its citation carries no locator (ref id or URL)`,
       );
     }
-    if (prov.origin === "resolved" && prov.citation && prov.citationStatus === undefined) {
-      violations.push(`${key} is marked resolved but carries no citation status`);
+    if (
+      prov.origin === "resolved" &&
+      prov.citation &&
+      prov.citationStatus === undefined
+    ) {
+      violations.push(
+        `${key} is marked resolved but carries no citation status`,
+      );
     }
     if (prov.origin !== "resolved" && prov.citationStatus !== undefined) {
-      violations.push(`${key} has a citation status but origin is '${prov.origin}'`);
+      violations.push(
+        `${key} has a citation status but origin is '${prov.origin}'`,
+      );
     }
 
     // --- LLM-supplied values must say so --------------------------------
@@ -252,7 +277,7 @@ export function validateParameterProvenance(
     // is exactly the conflation this origin was introduced to end.
     if (prov.origin === "llm" && !prov.note) {
       violations.push(
-        `${key} is marked llm but carries no note explaining that the value is unverified`
+        `${key} is marked llm but carries no note explaining that the value is unverified`,
       );
     }
 
@@ -267,7 +292,8 @@ export function validateParameterProvenance(
     // impossible/implausible distinction, applied to reporting completeness
     // rather than to physics.
     const strendaGoverned =
-      prov.origin === "resolved" && STRENDA_GOVERNED_FIELDS.has(key.toLowerCase());
+      prov.origin === "resolved" &&
+      STRENDA_GOVERNED_FIELDS.has(key.toLowerCase());
 
     if (strendaGoverned) {
       const expected = strendaStatusFor(prov.assayConditions);
