@@ -11,7 +11,7 @@ interface MetricItem {
 }
 
 const METRICS: MetricItem[] = [
-  { key: 'tests', target: 304, suffix: '+', label: 'tests passing', color: '#1D8A72' },
+  { key: 'tests', target: 430, suffix: '+', label: 'tests passing', color: '#1D8A72' },
   { key: 'domains', target: 6, suffix: '', label: 'simulation domains', color: '#3B82F6' },
   { key: 'sources', target: 3, suffix: '', label: 'literature sources', color: '#F59E0B' },
   { key: 'opensource', target: 100, suffix: '%', label: 'open source', color: '#8B5CF6' },

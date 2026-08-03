@@ -32,7 +32,7 @@ Nothing currently staged beyond what's listed below.
 - Tellurium simulation engine (`tellurium_engine.py`): Michaelis-Menten
   enzyme kinetics and SIR/SEIR epidemiology, built on antimony/roadrunner
   rather than the full `tellurium` umbrella package.
-- 258-test simulation-engine suite, verified against exact closed-form
+- 306-test simulation-engine suite, verified against exact closed-form
   solutions, an independent solver (scipy), and property-based tests
   (Hypothesis) -- not just internal self-consistency.
 - `requirements.txt` / `requirements-dev.txt`, `Makefile`, GitHub Actions CI,

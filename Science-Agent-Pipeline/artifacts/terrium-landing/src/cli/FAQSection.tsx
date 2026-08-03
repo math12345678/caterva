@@ -21,7 +21,7 @@ const FAQS = [
   {
     id: 'domains',
     q: 'What scientific domains are supported?',
-    a: 'Currently live: enzyme kinetics (Michaelis-Menten) and epidemiology (SIR/SEIR). Planned: PCR amplification, Monte Carlo simulation, population genetics, and molecular dynamics setup. We release domains only after the full test suite passes — 304+ tests and counting across the engine and literature layers.',
+    a: 'Currently live: enzyme kinetics (Michaelis-Menten) and epidemiology (SIR/SEIR). Planned: PCR amplification, Monte Carlo simulation, population genetics, and molecular dynamics setup. We release domains only after the full test suite passes — 430+ tests and counting across the engine and literature layers.',
   },
   {
     id: 'pricing',

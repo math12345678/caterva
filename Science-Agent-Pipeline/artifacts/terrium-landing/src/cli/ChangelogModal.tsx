@@ -50,7 +50,7 @@ const RELEASES: Release[] = [
     date: 'May 15, 2026',
     tag: 'launch',
     title: 'Private Alpha Launch',
-    desc: 'First pilot cohort onboarded. Michaelis-Menten kinetics + SIR epidemiology fully operational. 48 tests passing, 3 database backends integrated.',
+    desc: 'First pilot cohort onboarded. Michaelis-Menten kinetics + SIR epidemiology fully operational. 430 tests passing, 3 database backends integrated.',
   },
 ];
 
