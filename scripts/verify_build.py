@@ -145,8 +145,8 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
 
 def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
     """Run Python tests."""
-    tests = []
-    
+    tests: List[Tuple[str, bool, str]] = []
+
     if quick:
         # Run a representative sample of tests
         test_files = [
