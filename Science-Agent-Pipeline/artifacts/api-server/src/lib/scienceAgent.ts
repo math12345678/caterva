@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { logger } from "./logger";
 import { findRepositoryRoot } from "./repoRoot";
+import { resolvePythonExecutable } from "./python";
 
 export interface Citation {
   source: string;
@@ -23,6 +24,7 @@ export interface LiteratureCandidate {
 export interface ScienceAgentResult {
   found: boolean;
   km?: number;
+  ki?: number;
   unit?: string;
   organism?: string;
   source?: string;
@@ -131,13 +133,18 @@ export async function resolveKineticValue(
   }
 
   await ensureRunnerScript();
+  const pythonExecutable = resolvePythonExecutable(REPO_ROOT);
 
   return new Promise((resolve, reject) => {
-    const proc = spawn("python3", [SCRIPT_PATH], {
+    const proc = spawn(pythonExecutable, [SCRIPT_PATH], {
       cwd: REPO_ROOT,
       env: {
         ...process.env,
-        PYTHONPATH: [process.env.PYTHONPATH, REPO_ROOT, path.join(REPO_ROOT, "Tests")]
+        PYTHONPATH: [
+          process.env.PYTHONPATH,
+          REPO_ROOT,
+          path.join(REPO_ROOT, "Tests"),
+        ]
           .filter(Boolean)
           .join(path.delimiter),
       },
@@ -161,7 +168,8 @@ export async function resolveKineticValue(
     proc.on("close", (code) => {
       const trimmed = stdout.trim();
       if (code !== 0 || !trimmed) {
-        const message = stderr || `Science agent runner exited with code ${code}`;
+        const message =
+          stderr || `Science agent runner exited with code ${code}`;
         reject(new Error(message));
         return;
       }

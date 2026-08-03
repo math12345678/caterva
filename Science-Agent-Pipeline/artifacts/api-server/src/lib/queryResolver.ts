@@ -162,27 +162,20 @@ interface DomainDefaults {
 const DOMAIN_DEFAULTS: DomainDefaults[] = [
   {
     domain: "mm_competitive_inhibition",
-    parameters: { km: 2, ki: 1.0, vmax: 5, s0: 10, i0: 0.1, end: 10, points: 51 },
+    parameters: {
+      km: 2,
+      ki: 1.0,
+      vmax: 5,
+      s0: 10,
+      i0: 0.1,
+      end: 10,
+      points: 51,
+    },
     keywords: [
       "competitive inhibition",
       "competitive",
       "inhibition",
       "inhibitor",
-      "ki",
-      "enzyme",
-      "michaelis",
-      "km",
-      "vmax",
-      "substrate",
-      "ldh",
-      "pyruvate",
-      "lactate",
-      "hexokinase",
-      "catalase",
-      "alcohol dehydrogenase",
-      "trypsin",
-      "rubisco",
-      "kinase",
     ],
     reasoning:
       "Keywords related to enzyme kinetics with competitive inhibition were found; defaulting to a Michaelis-Menten competitive inhibition simulation.",
@@ -628,7 +621,8 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
   }
 
   if (!best) {
-    best = DOMAIN_DEFAULTS[0]!;
+    best =
+      DOMAIN_DEFAULTS.find((d) => d.domain === "mm") ?? DOMAIN_DEFAULTS[0]!;
   }
 
   let parameters = { ...best.parameters, ...overrides };

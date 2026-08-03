@@ -2,10 +2,22 @@ import { describe, expect, it } from "vitest";
 
 import { SimulationParameterSchemas } from "../lib/schemas";
 
-const VALID: Record<keyof typeof SimulationParameterSchemas, Record<string, unknown>> = {
+const VALID: Record<
+  keyof typeof SimulationParameterSchemas,
+  Record<string, unknown>
+> = {
   mm: { km: 2, vmax: 5, s0: 10, end: 10, points: 51 },
   sir: { beta: 0.3, gamma: 0.1, s0: 990, i0: 10, end: 100, points: 101 },
-  seir: { beta: 0.3, sigma: 0.2, gamma: 0.1, s0: 990, e0: 10, i0: 0, end: 100, points: 101 },
+  seir: {
+    beta: 0.3,
+    sigma: 0.2,
+    gamma: 0.1,
+    s0: 990,
+    e0: 10,
+    i0: 0,
+    end: 100,
+    points: 101,
+  },
   pcr: { n0: 100, efficiency: 0.95, cycles: 30 },
   monte_carlo_pi: { n_samples: 10_000, seed: 42 },
   wright_fisher: {
@@ -39,6 +51,15 @@ const VALID: Record<keyof typeof SimulationParameterSchemas, Record<string, unkn
     end: 1,
     points: 11,
   },
+  mm_competitive_inhibition: {
+    km: 2,
+    ki: 1.5,
+    vmax: 5,
+    s0: 10,
+    i0: 0.1,
+    end: 10,
+    points: 51,
+  },
 };
 
 const INVALID: Record<string, Record<string, unknown>> = {
@@ -47,7 +68,11 @@ const INVALID: Record<string, Record<string, unknown>> = {
   seir: { beta: 0.3, sigma: 0.2, gamma: 0.1, s0: 990 }, // missing e0, i0
   pcr: { n0: 100, efficiency: 0.95 }, // missing cycles
   monte_carlo_pi: { n_samples: 0.5 }, // not an integer
-  wright_fisher: { population_size: 50.5, starting_frequency: 0.5, generations: 10 },
+  wright_fisher: {
+    population_size: 50.5,
+    starting_frequency: 0.5,
+    generations: 10,
+  },
   two_locus_wright_fisher: {
     population_size: 100,
     generations: 20,
@@ -63,14 +88,18 @@ const INVALID: Record<string, Record<string, unknown>> = {
 };
 
 describe("SimulationParameterSchemas", () => {
-  for (const domain of Object.keys(SimulationParameterSchemas) as Array<keyof typeof SimulationParameterSchemas>) {
+  for (const domain of Object.keys(SimulationParameterSchemas) as Array<
+    keyof typeof SimulationParameterSchemas
+  >) {
     it(`accepts valid ${domain} parameters`, () => {
       const parse = SimulationParameterSchemas[domain].safeParse(VALID[domain]);
       expect(parse.success).toBe(true);
     });
 
     it(`rejects structurally invalid ${domain} parameters`, () => {
-      const parse = SimulationParameterSchemas[domain].safeParse(INVALID[domain]);
+      const parse = SimulationParameterSchemas[domain].safeParse(
+        INVALID[domain],
+      );
       expect(parse.success).toBe(false);
     });
   }
@@ -140,7 +169,10 @@ describe("mm accepts Vmax either directly or as kcat x [E]0 (ADR 0013)", () => {
     // property, and Vmax is a property of an assay containing some amount of
     // enzyme. Accepting this would silently fall back to the default Vmax
     // and run a simulation nobody asked for.
-    const parse = SimulationParameterSchemas.mm.safeParse({ ...base, kcat: 118 });
+    const parse = SimulationParameterSchemas.mm.safeParse({
+      ...base,
+      kcat: 118,
+    });
     expect(parse.success).toBe(false);
   });
 

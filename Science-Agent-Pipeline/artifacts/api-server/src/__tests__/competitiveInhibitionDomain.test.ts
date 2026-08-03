@@ -36,7 +36,10 @@ import request from "supertest";
 import app from "../app";
 import * as queue from "../lib/queue";
 import { resetCache } from "../lib/cache";
-import { validateParameterProvenance, type ParameterProvenance } from "../lib/provenance";
+import {
+  validateParameterProvenance,
+  type ParameterProvenance,
+} from "../lib/provenance";
 import type { Server } from "node:http";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
@@ -84,14 +87,19 @@ async function runSimulation(
  * naming-insensitive) so the comparison is robust to the competitive engine
  * also reporting extra species (E, ES, EI, I).
  */
-function substrateCurve(trajectory: Record<string, number>[]): Record<
-  number,
-  { S: number; P: number }
-> {
-  const col = (row: Record<string, number>, names: string[]): number | undefined => {
-    const key = Object.keys(row).find((k) =>
-      names.includes(k.toLowerCase()),
-    );
+function substrateCurve(
+  trajectory: Record<string, number>[],
+): Record<number, { S: number; P: number }> {
+  const col = (
+    row: Record<string, number>,
+    names: string[],
+  ): number | undefined => {
+    const key = Object.keys(row).find((k) => {
+      // Roadrunner brackets species names as [S], [P], etc.; strip brackets
+      // before matching so both "S" and "[S]" are found.
+      const clean = k.toLowerCase().replace(/^\[|\]$/g, "");
+      return names.includes(clean);
+    });
     return key === undefined ? undefined : row[key];
   };
   const out: Record<number, { S: number; P: number }> = {};
@@ -179,4 +187,3 @@ describe("mm_competitive_inhibition (end to end)", () => {
     }
   });
 });
-
