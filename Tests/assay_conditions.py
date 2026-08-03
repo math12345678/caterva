@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 
 
 # pH 8.5 / pH 8 / pH7.4 / pH 7.0-8.0 (range -> midpoint is NOT taken; see below)
@@ -89,9 +89,9 @@ _BUFFER_RE = re.compile(
 class AssayConditions:
     """Structured assay conditions parsed from a BRENDA commentary."""
 
-    ph: Optional[float] = None
-    temperature_c: Optional[float] = None
-    buffer: Optional[str] = None
+    ph: float | None = None
+    temperature_c: float | None = None
+    buffer: str | None = None
 
     #: True when a value was given as a range; the *low* end is stored.
     ph_is_range: bool = False
@@ -120,7 +120,7 @@ class AssayConditions:
         return missing
 
 
-def _parse_ph(text: str) -> tuple[Optional[float], bool]:
+def _parse_ph(text: str) -> tuple[float | None, bool]:
     match = _PH_RE.search(text)
     if not match:
         return None, False
@@ -134,7 +134,7 @@ def _parse_ph(text: str) -> tuple[Optional[float], bool]:
     return low, is_range
 
 
-def _parse_temperature(text: str) -> tuple[Optional[float], bool]:
+def _parse_temperature(text: str) -> tuple[float | None, bool]:
     match = _TEMP_RE.search(text)
     if not match:
         return None, False
@@ -147,14 +147,14 @@ def _parse_temperature(text: str) -> tuple[Optional[float], bool]:
     return low, is_range
 
 
-def _parse_buffer(text: str) -> Optional[str]:
+def _parse_buffer(text: str) -> str | None:
     match = _BUFFER_RE.search(text)
     if not match:
         return None
     return " ".join(match.group(1).split())
 
 
-def parse_assay_conditions(commentary: Optional[str]) -> AssayConditions:
+def parse_assay_conditions(commentary: str | None) -> AssayConditions:
     """Parse a BRENDA commentary string into structured assay conditions.
 
     Never raises and never guesses. An unparseable or empty commentary yields

@@ -25,12 +25,13 @@ def test_forbidden_packages_in_optional_dependencies_are_scanned(
     manifest = tmp_path / "pyproject.toml"
     manifest.write_text(
         """[project]
-dependencies = [
-    \"numpy==1.26.4\",
+authors = [
+    \"tellurium is only a project name, not a dependency\",
 ]
+dependencies = [\"numpy==1.26.4\"]
 
 [project.optional-dependencies]
-dev = [
+\"dev tools\" = [
     \"pytest==9.1.1\",
     \"tellurium==2.2.10\",
 ]
@@ -42,7 +43,7 @@ dev = [
     )
 
     assert _requirement_names(manifest) == [
-        (3, "numpy"),
-        (8, "pytest"),
-        (9, "tellurium"),
+        (5, "numpy"),
+        (9, "pytest"),
+        (10, "tellurium"),
     ]

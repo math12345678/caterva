@@ -23,7 +23,6 @@ import os
 
 import pytest
 
-import fallback_logic
 from fallback_logic import KineticResult, resolve_kinetic_value
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")

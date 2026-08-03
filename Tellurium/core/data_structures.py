@@ -7,7 +7,7 @@ Byte-exact extraction from the original monolithic `tellurium_engine.py`
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import numpy as np
 # Errors
@@ -102,7 +102,7 @@ class ParameterValidation:
 
     ok: bool = True
     flagged: bool = False
-    flag_reason: Optional[str] = None
+    flag_reason: str | None = None
     errors: List[str] = field(default_factory=list)
 
     def raise_if_invalid(self) -> None:
@@ -117,9 +117,9 @@ class SimulationResult:
     data: List[List[float]]
     model_name: str
     validation: ParameterValidation
-    replicate_data: Optional[List[List[float]]] = None
-    replicate_colnames: Optional[List[str]] = None
-    wright_fisher_params: Optional[Dict[str, Any]] = None
+    replicate_data: List[List[float]] | None = None
+    replicate_colnames: List[str] | None = None
+    wright_fisher_params: Dict[str, Any] | None = None
 
     @property
     def flagged(self) -> bool:

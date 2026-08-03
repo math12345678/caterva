@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 try:
     from Tellurium.core.data_structures import (ModelBuildError, SimulationResult)
@@ -15,7 +15,7 @@ except ModuleNotFoundError:
     from core.validation import _finite_positive, validate_pcr_params  # type: ignore[no-redef]
 
 def simulate_pcr(n0: float, efficiency: float, cycles: int,
-                 plateau_capacity: Optional[float] = None) -> SimulationResult:
+                 plateau_capacity: float | None = None) -> SimulationResult:
     """Simulate PCR amplification over a fixed number of cycles.
 
     Without a plateau capacity, copy number follows the exact closed form

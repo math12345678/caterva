@@ -19,7 +19,7 @@ from __future__ import annotations
 import ast
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import List
 
 
 def get_all_names_from_file(filepath: Path) -> List[str]:
@@ -34,7 +34,7 @@ def get_all_names_from_file(filepath: Path) -> List[str]:
                     if isinstance(target, ast.Name) and target.id == '__all__':
                         if isinstance(node.value, ast.List):
                             return [elt.s for elt in node.value.elts if isinstance(elt, ast.Constant)]
-                        elif isinstance(node.value, (ast.Constant, ast.Str)):
+                        if isinstance(node.value, (ast.Constant, ast.Str)):
                             return [node.value.value] if hasattr(node.value, 'value') else []
     except Exception:
         pass
@@ -103,9 +103,11 @@ def verify_module_exports() -> List[str]:
         if not module_dir.exists():
             errors.append(f"Expected module directory missing: {module_dir}")
         elif module == 'core':
-            for core_file in expected_core:
-                if not (module_dir / core_file).exists():
-                    errors.append(f"Expected core file missing: {module_dir / core_file}")
+            errors.extend(
+                f"Expected core file missing: {module_dir / core_file}"
+                for core_file in expected_core
+                if not (module_dir / core_file).exists()
+            )
     
     # Check discrete submodules
     discrete_dir = tellurium_dir / 'discrete'
@@ -118,12 +120,13 @@ def verify_module_exports() -> List[str]:
                 errors.append(f"Expected discrete submodule missing: {pop_gen_dir}")
             else:
                 expected_pop_gen = ['__init__.py', 'core.py', 'analysis.py', 'theoretical.py', 'probability.py', 'two_locus.py']
-                for pop_file in expected_pop_gen:
-                    if not (pop_gen_dir / pop_file).exists():
-                        errors.append(f"Expected population genetics file missing: {pop_gen_dir / pop_file}")
-        else:
-            if not (discrete_dir / discrete_file).exists():
-                errors.append(f"Expected discrete file missing: {discrete_dir / discrete_file}")
+                errors.extend(
+                    f"Expected population genetics file missing: {pop_gen_dir / pop_file}"
+                    for pop_file in expected_pop_gen
+                    if not (pop_gen_dir / pop_file).exists()
+                )
+        elif not (discrete_dir / discrete_file).exists():
+            errors.append(f"Expected discrete file missing: {discrete_dir / discrete_file}")
     
     return errors
 
@@ -148,9 +151,6 @@ def verify_import_compatibility() -> List[str]:
     
     # Test flat mode (simulate being in Tellurium directory)
     try:
-        import importlib
-        import os
-        
         # Save current path
         original_path = sys.path[:]
         
@@ -159,16 +159,16 @@ def verify_import_compatibility() -> List[str]:
         sys.path = [str(tellurium_dir)] + [p for p in sys.path if p != str(Path(__file__).parent.parent)]
         
         # Clear any cached imports
-        modules_to_clear = [m for m in sys.modules.keys() if 'Tellurium' in m or m.startswith('core') or m.startswith('continuous') or m.startswith('discrete')]
+        modules_to_clear = [m for m in sys.modules if 'Tellurium' in m or m.startswith('core') or m.startswith('continuous') or m.startswith('discrete')]
         for m in modules_to_clear:
             if m in sys.modules:
                 del sys.modules[m]
         
         # Try flat mode imports
-        import tellurium_engine
-        from core.data_structures import ModelBuildError, SimulationResult
-        from core.validation import validate_michaelis_menten_params
-        from continuous.model_building import build_michaelis_menten_antimony
+        import tellurium_engine  # noqa: F401  # type: ignore[no-redef]
+        from core.data_structures import ModelBuildError, SimulationResult  # noqa: F401  # type: ignore[no-redef]
+        from core.validation import validate_michaelis_menten_params  # noqa: F401  # type: ignore[no-redef]
+        from continuous.model_building import build_michaelis_menten_antimony  # noqa: F401
         print("✓ Flat mode imports successful")
         
         # Restore path
@@ -195,11 +195,7 @@ def verify_all_exports() -> List[str]:
         # Get __all__ from the module
         if hasattr(tellurium_engine, '__all__'):
             all_names = tellurium_engine.__all__
-            missing_names = []
-            
-            for name in all_names:
-                if not hasattr(tellurium_engine, name):
-                    missing_names.append(name)
+            missing_names = [name for name in all_names if not hasattr(tellurium_engine, name)]
             
             if missing_names:
                 errors.append(f"Missing __all__ exports: {missing_names}")
@@ -222,7 +218,6 @@ def verify_rule2_contract() -> List[str]:
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent))
         
-        from Tellurium.core.validation import validate_michaelis_menten_params
         from Tellurium.core.data_structures import ParameterValidation
         
         # Create a ParameterValidation instance with defaults
@@ -275,9 +270,8 @@ def main() -> int:
         for error in all_errors:
             print(f"  - {error}")
         return 1
-    else:
-        print("✅ PASSED: All engine contract checks passed.")
-        return 0
+    print("✅ PASSED: All engine contract checks passed.")
+    return 0
 
 
 if __name__ == '__main__':

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, Iterable, List, Sequence
 
 try:
     from Tellurium.core.data_structures import (ParameterValidation, SimulationError, SimulationResult)  # type: ignore[no-redef]
@@ -26,9 +26,9 @@ except ModuleNotFoundError:
 
 def simulate_sbml(sbml_string: str, start: float = 0.0, end: float = 10.0,
                    points: int = 51,
-                   selections: Optional[Sequence[str]] = None,
+                   selections: Sequence[str] | None = None,
                    model_name: str = "model",
-                   validation: Optional[ParameterValidation] = None
+                   validation: ParameterValidation | None = None
                    ) -> SimulationResult:
     """Integrate an SBML model and return a SimulationResult.
     
@@ -202,7 +202,7 @@ def steady_state(sbml_string: str) -> Dict[str, float]:
 def parameter_scan(sbml_string: str, parameter: str,
                    values: Iterable[float], start: float = 0.0,
                    end: float = 10.0, points: int = 51,
-                   selections: Optional[Sequence[str]] = None
+                   selections: Sequence[str] | None = None
                    ) -> List[SimulationResult]:
     """Re-run a model across a range of values for one global parameter."""
     values = list(values)

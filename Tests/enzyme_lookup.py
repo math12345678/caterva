@@ -24,7 +24,6 @@ what the test suite exercises against saved fixture text.
 """
 
 import re
-from typing import Optional
 from urllib.parse import quote
 
 import httpx
@@ -51,7 +50,7 @@ DEFAULT_TAXON_ID = "9606"  # Homo sapiens
 # in this module.
 # ---------------------------------------------------------------------------
 
-def fetch_taxon_id(organism_name: str, timeout: float = 15) -> Optional[str]:
+def fetch_taxon_id(organism_name: str, timeout: float = 15) -> str | None:
     """Fetch the NCBI taxon ID for an organism name via NCBI's taxonomy
     E-utilities. Returns None if nothing is found - never guesses.
 
@@ -71,7 +70,7 @@ def fetch_taxon_id(organism_name: str, timeout: float = 15) -> Optional[str]:
     return parse_taxon_id(r.json())
 
 
-def parse_taxon_id(data: dict) -> Optional[str]:
+def parse_taxon_id(data: dict) -> str | None:
     """Pure function: NCBI esearch JSON response in, taxon ID string out."""
     ids = data.get("esearchresult", {}).get("idlist", [])
     return ids[0] if ids else None
@@ -83,7 +82,7 @@ def parse_taxon_id(data: dict) -> Optional[str]:
 
 def fetch_uniprot_accession(
     ec_number: str, taxon_id: str = DEFAULT_TAXON_ID, timeout: float = 15
-) -> Optional[str]:
+) -> str | None:
     """Fetch the canonical (reviewed/Swiss-Prot) UniProt accession for an
     EC number in a given organism. Returns None if nothing is found -
     never guesses or fabricates an accession."""
@@ -98,7 +97,7 @@ def fetch_uniprot_accession(
     return parse_uniprot_accession(r.json())
 
 
-def parse_uniprot_accession(data: dict) -> Optional[str]:
+def parse_uniprot_accession(data: dict) -> str | None:
     """Pure function: UniProt JSON response in, accession string out."""
     results = data.get("results", [])
     if not results:

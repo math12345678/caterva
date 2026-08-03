@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import fallback_logic
 from fallback_logic import KineticResult
@@ -75,7 +75,7 @@ def resolve_kinetic_value(
     )
 
 
-def _citation_to_dict(citation) -> Optional[Dict[str, Any]]:
+def _citation_to_dict(citation) -> Dict[str, Any] | None:
     if citation is None:
         return None
     return {
