@@ -12,16 +12,20 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
 try:
     from Tellurium.core.utils import _load_runner  # type: ignore[no-redef]
     from Tellurium.core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+        validate_michaelis_menten_params, validate_mm_competitive_params,
+        validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
     from Tellurium.continuous.model_building import (
-        build_michaelis_menten_antimony, build_sir_antimony, build_seir_antimony,
+        build_michaelis_menten_antimony, build_mm_competitive_antimony,
+        build_sir_antimony, build_seir_antimony,
         antimony_to_sbml)  # type: ignore[no-redef]
 except ModuleNotFoundError:
     from core.utils import _load_runner  # type: ignore[no-redef]
     from core.validation import (
-        validate_michaelis_menten_params, validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+        validate_michaelis_menten_params, validate_mm_competitive_params,
+        validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
     from continuous.model_building import (
-        build_michaelis_menten_antimony, build_sir_antimony, build_seir_antimony,
+        build_michaelis_menten_antimony, build_mm_competitive_antimony,
+        build_sir_antimony, build_seir_antimony,
         antimony_to_sbml)  # type: ignore[no-redef]
 
 def simulate_sbml(sbml_string: str, start: float = 0.0, end: float = 10.0,
@@ -112,6 +116,24 @@ def simulate_michaelis_menten(km: float, vmax: float, s0: float,
     sbml = antimony_to_sbml(model, "michaelis_menten")
     return simulate_sbml(sbml, start, end, points,
                          model_name="michaelis_menten", validation=validation)
+
+
+def simulate_mm_competitive_inhibition(km: float, vmax: float, ki: float,
+                                       s0: float, i: float,
+                                       start: float = 0.0, end: float = 10.0,
+                                       points: int = 51) -> SimulationResult:
+    """Validate, build, translate and integrate a competitive-inhibition
+    Michaelis-Menten model.
+
+    At I = 0 this must reproduce simulate_michaelis_menten's trajectory
+    exactly (the apparent Km, Km*(1 + I/Ki), reduces to plain Km).
+    """
+    validation = validate_mm_competitive_params(km, vmax, ki, s0, i)
+    validation.raise_if_invalid()
+    model = build_mm_competitive_antimony(km, vmax, ki, s0, i)
+    sbml = antimony_to_sbml(model, "mm_competitive_inhibition")
+    return simulate_sbml(sbml, start, end, points,
+                         model_name="mm_competitive_inhibition", validation=validation)
 
 
 def simulate_sir(beta: float, gamma: float, s0: float, i0: float,

@@ -57,6 +57,7 @@ try:
     )  # type: ignore[no-redef]
     from Tellurium.core.validation import (
         validate_michaelis_menten_params,
+        validate_mm_competitive_params,
         validate_sir_params,
         validate_seir_params,
         validate_pcr_params,
@@ -70,6 +71,7 @@ try:
     )  # type: ignore[no-redef]
     from Tellurium.continuous.model_building import (
         build_michaelis_menten_antimony,
+        build_mm_competitive_antimony,
         build_sir_antimony,
         build_seir_antimony,
         antimony_to_sbml,
@@ -79,6 +81,7 @@ try:
     from Tellurium.continuous.simulations import (
         simulate_sbml,
         simulate_michaelis_menten,
+        simulate_mm_competitive_inhibition,
         simulate_sir,
         simulate_seir,
         steady_state,
@@ -176,6 +179,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         vmax_from_kcat,
         validate_ssa_params,
         validate_ssa_replicates_params,
+        validate_mm_competitive_params,
     )  # type: ignore[no-redef]
     from continuous.model_building import (
         build_michaelis_menten_antimony,
@@ -184,6 +188,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         antimony_to_sbml,
         sbml_to_antimony,
         validate_sbml,
+        build_mm_competitive_antimony,
     )  # type: ignore[no-redef]
     from continuous.simulations import (
         simulate_sbml,
@@ -192,6 +197,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         simulate_seir,
         steady_state,
         parameter_scan,
+        simulate_mm_competitive_inhibition,
     )  # type: ignore[no-redef]
     from discrete.pcr import simulate_pcr  # type: ignore[no-redef]
     from discrete.monte_carlo import simulate_monte_carlo_pi  # type: ignore[no-redef]
@@ -328,4 +334,8 @@ __all__ = [
     "wright_fisher_sweep",
     "wright_fisher_transition_matrix",
     "wright_stationary_distribution",
+    # Competitive inhibition Michaelis-Menten
+    "validate_mm_competitive_params",
+    "build_mm_competitive_antimony",
+    "simulate_mm_competitive_inhibition",
 ]
