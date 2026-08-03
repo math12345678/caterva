@@ -63,6 +63,10 @@ __all__ = [
     "PCR_PLAUSIBLE_LOW_EFFICIENCY",
     "validate_pcr_params",
     "simulate_pcr",
+    # Competitive inhibition Michaelis-Menten
+    "validate_mm_competitive_params",
+    "build_mm_competitive_antimony",
+    "simulate_mm_competitive_inhibition",
 ]
 
 
@@ -634,11 +638,11 @@ def simulate_michaelis_menten(km: float, vmax: float, s0: float,
                               start: float = 0.0, end: float = 10.0,
                               points: int = 51) -> SimulationResult:
     """Validate, build, translate and integrate a Michaelis-Menten model.
-    
+
     This function creates a complete Michaelis-Menten enzyme kinetics model
     from parameter values, validates them, converts to SBML, and simulates
     the system using RoadRunner.
-    
+
     Args:
         km: Michaelis constant (Km) - must be positive
         vmax: Maximum reaction rate (Vmax) - must be positive  
@@ -660,6 +664,77 @@ def simulate_michaelis_menten(km: float, vmax: float, s0: float,
     sbml = antimony_to_sbml(model, "michaelis_menten")
     return simulate_sbml(sbml, start, end, points,
                          model_name="michaelis_menten", validation=validation)
+
+
+# ---------------------------------------------------------------------------
+# Competitive inhibition Michaelis-Menten
+# ---------------------------------------------------------------------------
+
+
+def validate_mm_competitive_params(km: float, vmax: float, ki: float, s0: float,
+                                  i: float) -> ParameterValidation:
+    """Validate parameters for competitive inhibition MM.
+
+    Km, Vmax and Ki must be strictly positive. S0 and I may be zero.
+    """
+    errors: List[str] = []
+    km_valid = _finite_positive(km, "Km", errors, allow_zero=False)
+    vmax_valid = _finite_positive(vmax, "Vmax", errors, allow_zero=False)
+    ki_valid = _finite_positive(ki, "Ki", errors, allow_zero=False)
+    s0_valid = _finite_positive(s0, "S0", errors, allow_zero=True)
+    i_valid = _finite_positive(i, "I", errors, allow_zero=True)
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+    v = ParameterValidation()
+    # reuse plausibility bounds for Km
+    if km < KM_PLAUSIBLE_MIN_MM:
+        v.flagged = True
+        v.flag_reason = (
+            f"Km {km:g} mM is below the plausible lower bound "
+            f"{KM_PLAUSIBLE_MIN_MM:g} mM"
+        )
+    elif km > KM_PLAUSIBLE_MAX_MM:
+        v.flagged = True
+        v.flag_reason = (
+            f"Km {km:g} mM is above the plausible upper bound "
+            f"{KM_PLAUSIBLE_MAX_MM:g} mM"
+        )
+    return v
+
+
+def build_mm_competitive_antimony(km: float, vmax: float, ki: float, s0: float,
+                                 i: float, model_name: str = "mm_competitive_inhibition",
+                                 validate: bool = True) -> str:
+    """Build an irreversible single-substrate Michaelis-Menten model with
+    competitive inhibition: v = Vmax * S / (Km * (1 + I/Ki) + S)
+    """
+    if validate:
+        validate_mm_competitive_params(km, vmax, ki, s0, i).raise_if_invalid()
+    _check_model_name(model_name)
+    return (
+        f"model {model_name}\n"
+        f"  J0: S -> P; Vmax * S / (Km * (1 + I / Ki) + S);\n"
+        f"  S = {_fmt(s0)};\n"
+        f"  P = 0;\n"
+        f"  Vmax = {_fmt(vmax)};\n"
+        f"  Km = {_fmt(km)};\n"
+        f"  Ki = {_fmt(ki)};\n"
+        f"  I = {_fmt(i)};\n"
+        f"end\n"
+    )
+
+
+def simulate_mm_competitive_inhibition(km: float, vmax: float, ki: float,
+                                      s0: float, i: float,
+                                      start: float = 0.0, end: float = 10.0,
+                                      points: int = 51) -> SimulationResult:
+    """Validate, build, translate and integrate a competitive inhibition MM model."""
+    validation = validate_mm_competitive_params(km, vmax, ki, s0, i)
+    validation.raise_if_invalid()
+    model = build_mm_competitive_antimony(km, vmax, ki, s0, i)
+    sbml = antimony_to_sbml(model, "mm_competitive_inhibition")
+    return simulate_sbml(sbml, start, end, points,
+                         model_name="mm_competitive_inhibition", validation=validation)
 
 
 def simulate_sir(beta: float, gamma: float, s0: float, i0: float,
