@@ -6,8 +6,12 @@ import { dirname, join } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-interface PackageJson { version: string }
-const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf8")) as PackageJson;
+interface PackageJson {
+  version: string;
+}
+const pkg = JSON.parse(
+  readFileSync(join(__dirname, "..", "package.json"), "utf8"),
+) as PackageJson;
 
 interface SimulateResponse {
   jobId: string;
@@ -21,7 +25,11 @@ interface SimulateResponse {
     domain: string;
     parameters: Record<string, number>;
     trajectory: Record<string, number>[];
-    provenance: { reasoning: string; modelCitations: string[]; flags: string[] };
+    provenance: {
+      reasoning: string;
+      modelCitations: string[];
+      flags: string[];
+    };
     completedAt: string;
   };
   error?: { error: string; message: string };
@@ -37,7 +45,11 @@ program
 program
   .command("simulate <query>")
   .description("Submit a natural-language simulation query")
-  .option("-b, --base <url>", `API base URL (default: ${DEFAULT_BASE})`, DEFAULT_BASE)
+  .option(
+    "-b, --base <url>",
+    `API base URL (default: ${DEFAULT_BASE})`,
+    DEFAULT_BASE,
+  )
   .option("--poll", "Wait for completion and show result")
   .option("--interval <ms>", "Polling interval in ms", "1000")
   .action(async (query, opts) => {
@@ -53,11 +65,13 @@ program
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ message: "Request failed" }));
-      console.error(`Error: ${(err as { message?: string }).message ?? "Unknown error"}`);
+      console.error(
+        `Error: ${(err as { message?: string }).message ?? "Unknown error"}`,
+      );
       process.exit(1);
     }
 
-    const job = await res.json() as SimulateResponse;
+    const job = (await res.json()) as SimulateResponse;
     console.log(`Job created: ${job.jobId}`);
     console.log(`Status: ${job.status} (${job.progress}%)`);
 
@@ -70,7 +84,11 @@ program
 program
   .command("status <jobId>")
   .description("Check status of a simulation job")
-  .option("-b, --base <url>", `API base URL (default: ${DEFAULT_BASE})`, DEFAULT_BASE)
+  .option(
+    "-b, --base <url>",
+    `API base URL (default: ${DEFAULT_BASE})`,
+    DEFAULT_BASE,
+  )
   .action(async (jobId, opts) => {
     const base = opts.base.replace(/\/$/, "");
     const res = await fetch(`${base}/simulate/${jobId}`);
@@ -78,14 +96,18 @@ program
       console.error("Job not found");
       process.exit(1);
     }
-    const job = await res.json() as SimulateResponse;
+    const job = (await res.json()) as SimulateResponse;
     printJob(job);
   });
 
 program
   .command("stream <jobId>")
   .description("Stream real-time updates via SSE")
-  .option("-b, --base <url>", `API base URL (default: ${DEFAULT_BASE})`, DEFAULT_BASE)
+  .option(
+    "-b, --base <url>",
+    `API base URL (default: ${DEFAULT_BASE})`,
+    DEFAULT_BASE,
+  )
   .action(async (jobId, opts) => {
     const base = opts.base.replace(/\/$/, "");
     const res = await fetch(`${base}/simulate/${jobId}/stream`);
@@ -108,14 +130,22 @@ program
 program
   .command("health")
   .description("Check API server health")
-  .option("-b, --base <url>", `API base URL (default: ${DEFAULT_BASE})`, DEFAULT_BASE)
+  .option(
+    "-b, --base <url>",
+    `API base URL (default: ${DEFAULT_BASE})`,
+    DEFAULT_BASE,
+  )
   .action(async (opts) => {
     const base = opts.base.replace(/\/$/, "");
     const res = await fetch(`${base}/healthz`);
     console.log(await res.json());
   });
 
-async function pollUntilDone(base: string, jobId: string, interval: number): Promise<void> {
+async function pollUntilDone(
+  base: string,
+  jobId: string,
+  interval: number,
+): Promise<void> {
   while (true) {
     await new Promise((r) => setTimeout(r, interval));
     const res = await fetch(`${base}/simulate/${jobId}`);
@@ -123,7 +153,7 @@ async function pollUntilDone(base: string, jobId: string, interval: number): Pro
       console.error("Job lookup failed");
       process.exit(1);
     }
-    const job = await res.json() as SimulateResponse;
+    const job = (await res.json()) as SimulateResponse;
     console.log(`  ${job.status} (${job.progress}%)`);
     if (job.status === "completed" && job.result) {
       console.log("\n✅ Completed!");

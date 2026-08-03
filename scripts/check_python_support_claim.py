@@ -64,7 +64,7 @@ CLAIM_FILES = [
 # Runtime dependencies whose wheel coverage defines the window.
 PINNED = {
     "libroadrunner": "2.8.0",
-    "numpy": "2.1.3",
+    "numpy": "2.2.6",
     "python-libsbml": "5.21.1",
     "antimony": "2.14.0",
     "scipy": "1.15.3",

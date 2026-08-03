@@ -7,7 +7,7 @@ partially-broken refactor. That work has landed.
 ## Verified in effect, not merely present
 
 The distinction matters. During the Stage 4 Part 3 audit the shim imported all
-67 public names from the package **and then redefined 64 of them below**.
+84 public names from the package **and then redefined most of them below**.
 Python takes the later definition, so the package was imported and immediately
 shadowed — and the entire suite passed, because the monolith was still doing
 the work. A green suite said nothing about whether the split had taken effect.

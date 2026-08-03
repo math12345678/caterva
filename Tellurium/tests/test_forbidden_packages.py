@@ -18,6 +18,48 @@ if str(_SCRIPTS_DIR) not in sys.path:
 from check_forbidden_packages import _requirement_names  # noqa: E402
 
 
+def test_forbidden_packages_after_extra_specifier_are_scanned(
+    tmp_path: Path,
+) -> None:
+    """A closing bracket inside an extra must not end the TOML array."""
+    manifest = tmp_path / "pyproject.toml"
+    manifest.write_text(
+        """[project]
+dependencies = [
+    \"numpy[dev]\",
+    \"tellurium==2.2.10\",
+]
+""",
+        encoding="utf-8",
+    )
+
+    assert _requirement_names(manifest) == [
+        (3, "numpy"),
+        (4, "tellurium"),
+    ]
+
+
+def test_quoted_dependencies_key_and_markers_are_scanned(
+    tmp_path: Path,
+) -> None:
+    """Quoted keys and # characters inside TOML strings remain valid data."""
+    manifest = tmp_path / "pyproject.toml"
+    manifest.write_text(
+        """[ project ]
+\"dependencies\" = [
+    \"numpy; python_version >= '3.10'\", # inline comment
+    \"tellurium==2.2.10\",
+]
+""",
+        encoding="utf-8",
+    )
+
+    assert _requirement_names(manifest) == [
+        (3, "numpy"),
+        (4, "tellurium"),
+    ]
+
+
 def test_forbidden_packages_in_optional_dependencies_are_scanned(
     tmp_path: Path,
 ) -> None:

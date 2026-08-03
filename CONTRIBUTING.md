@@ -61,13 +61,13 @@ reason this file used to give. It is **not** "the SBML C extensions stop at
 cp312" — `python-libsbml` 5.21.1 already ships cp314 wheels, and `antimony`
 2.14.0 ships `py3-none-<platform>` wheels that are Python-version agnostic.
 
-The window is bounded by `libroadrunner` 2.8.0 and `numpy` 2.1.3, which
+The window is bounded by `libroadrunner` 2.8.0 and `numpy` 2.2.6, which
 publish cp310–cp313 wheels (verified against PyPI). The 2.9.x libroadrunner
 line drops cp310, so we stay on 2.8.0 to keep the floor — see
 [ADR 0014](docs/adr/0014-python-version-support.md).
 
 CI tests 3.10, 3.12 and 3.13 (see
-`.github/workflows/tests.yml`); `requirements.txt` pins `numpy==2.1.3` and
+`.github/workflows/tests.yml`); `requirements.txt` pins `numpy==2.2.6` and
 `libroadrunner==2.8.0`. A green run with unpinned dependencies is not
 evidence about the supported configuration. The eigenvector-sign bug is the
 worked example: LAPACK chose different signs across builds, producing silent

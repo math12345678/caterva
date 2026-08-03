@@ -75,7 +75,7 @@ def _build_wf_parser(sub: argparse._SubParsersAction) -> None:
     p.add_argument("--replicate-data", action="store_true",
                    help="record per-replicate trajectories")
     p.add_argument("--verbose", action="store_true",
-                   help="print progress every 10 % of generations")
+                   help="print progress every 10 %% of generations")
     p.add_argument("--quiet", action="store_true",
                    help="suppress the summary output")
     p.set_defaults(func=_cmd_wf)

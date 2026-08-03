@@ -110,7 +110,7 @@ The decision recorded above — *"The support window stays 3.10–3.12"* — has
 been superseded for the upper end: the window is **3.10–3.13**. What landed:
 
 - `requirements.txt`: `libroadrunner==2.7.0` → `==2.8.0`; `numpy==1.26.4` →
-  `==2.1.3`. These are pinned **exact**, not `>=`, because the 2.9.x
+  `==2.2.6`. These are pinned **exact**, not `>=`, because the 2.9.x
   libroadrunner line drops cp310 wheels — `>=2.8.0` would let pip resolve to a
   version that breaks the 3.10 floor (verified against PyPI).
 - `Makefile` `is_supported()` and `scripts/verify_domain.sh` gates now accept
@@ -121,7 +121,7 @@ been superseded for the upper end: the window is **3.10–3.13**. What landed:
 
 **Verification:** `python3 scripts/check_python_support_claim.py --online`
 reports every pin publishes cp310–cp313 wheels (`libroadrunner` 2.8.0, `numpy`
-2.1.3, `scipy` 1.15.3, `python-libsbml` 5.21.1; `antimony` is version-agnostic)
+2.2.6, `scipy` 1.15.3, `python-libsbml` 5.21.1; `antimony` is version-agnostic)
 and that every file states the same window as the Makefile gate.
 
 **Still outstanding — and not claimed by this amendment:** steps 2 and 3 of the

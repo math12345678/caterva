@@ -33,9 +33,15 @@ def get_all_names_from_file(filepath: Path) -> List[str]:
                 for target in node.targets:
                     if isinstance(target, ast.Name) and target.id == '__all__':
                         if isinstance(node.value, ast.List):
-                            return [elt.s for elt in node.value.elts if isinstance(elt, ast.Constant)]
-                        if isinstance(node.value, (ast.Constant, ast.Str)):
-                            return [node.value.value] if hasattr(node.value, 'value') else []
+                            return [
+                                elt.value for elt in node.value.elts
+                                if isinstance(elt, ast.Constant)
+                                and isinstance(elt.value, str)
+                            ]
+                        if isinstance(node.value, ast.Constant):
+                            if isinstance(node.value.value, str):
+                                return [node.value.value]
+                            return []
     except Exception:
         pass
     return []
@@ -141,45 +147,53 @@ def verify_import_compatibility() -> List[str]:
         sys.path.insert(0, str(Path(__file__).parent.parent))
         
         # Try importing from Tellurium package
-        from Tellurium import tellurium_engine
-        from Tellurium.core.data_structures import ModelBuildError, SimulationResult
-        from Tellurium.core.validation import validate_michaelis_menten_params
+        from Tellurium import tellurium_engine  # noqa: F401
+        from Tellurium.core.data_structures import ModelBuildError, SimulationResult  # noqa: F401
+        from Tellurium.core.validation import validate_michaelis_menten_params  # noqa: F401
         print("✓ Package mode imports successful")
         
     except ImportError as e:
         errors.append(f"Package mode import failed: {e}")
-    
+
     # Test flat mode (simulate being in Tellurium directory)
+    flat_errors = _test_flat_mode_imports()
+    errors.extend(flat_errors)
+
+    return errors
+
+
+def _test_flat_mode_imports() -> List[str]:
+    """Verify that imports work when Tellurium/ is on the path directly."""
+    local_errors = []
+    original_path = sys.path[:]
     try:
-        # Save current path
-        original_path = sys.path[:]
-        
         # Set up flat mode path
         tellurium_dir = Path(__file__).parent.parent / 'Tellurium'
         sys.path = [str(tellurium_dir)] + [p for p in sys.path if p != str(Path(__file__).parent.parent)]
-        
+
         # Clear any cached imports
         modules_to_clear = [m for m in sys.modules if 'Tellurium' in m or m.startswith('core') or m.startswith('continuous') or m.startswith('discrete')]
         for m in modules_to_clear:
             if m in sys.modules:
                 del sys.modules[m]
-        
-        # Try flat mode imports
-        import tellurium_engine  # noqa: F401  # type: ignore[no-redef]
-        from core.data_structures import ModelBuildError, SimulationResult  # noqa: F401  # type: ignore[no-redef]
-        from core.validation import validate_michaelis_menten_params  # noqa: F401  # type: ignore[no-redef]
+
+        # Try flat mode imports — these are intentionally "unused"; the test
+        # is that they import without error.
+        import tellurium_engine  # noqa: F401
+        from core.data_structures import ModelBuildError, SimulationResult  # noqa: F401
+        from core.validation import validate_michaelis_menten_params  # noqa: F401
         from continuous.model_building import build_michaelis_menten_antimony  # noqa: F401
         print("✓ Flat mode imports successful")
-        
+
         # Restore path
         sys.path = original_path
-        
+
     except ImportError as e:
-        errors.append(f"Flat mode import failed: {e}")
+        local_errors.append(f"Flat mode import failed: {e}")
     except Exception as e:
-        errors.append(f"Flat mode test error: {e}")
-    
-    return errors
+        local_errors.append(f"Flat mode test error: {e}")
+
+    return local_errors
 
 
 def verify_all_exports() -> List[str]:
