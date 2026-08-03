@@ -231,6 +231,68 @@ parsing was never touched, and the suite passed. "The mutation didn't apply"
 and "the test caught nothing" produce identical output. Re-anchored on the
 temperature-specific guard, it fails as expected.
 
+## 5c. Scoping the Python upgrade found the stated reason was wrong
+
+Carried item 3 was "NumPy 2.x / roadrunner 2.9.3 for Python 3.13+". Scoping
+it began by verifying the claimed blocker — and the claim does not hold.
+
+`requirements.txt`, `README.md` and `CONTRIBUTING.md` all said:
+
+> the SBML C extensions publish prebuilt wheels up to cp312
+
+Verified against PyPI, 2026-08-02:
+
+| package | pinned | reality |
+|---|---|---|
+| `python-libsbml` | 5.21.1 | cp38–**cp314** — not a blocker |
+| `antimony` | 2.14.0 | `py3-none-<platform>` — version-agnostic, not a blocker |
+| `libroadrunner` | 2.7.0 | cp39–cp312 — **the real blocker** |
+| `numpy` | 1.26.4 | cp39–cp312 — **the real blocker** |
+| `scipy` | 1.15.3 | cp310–cp313 — not a blocker |
+
+The SBML packages have not been the constraint for some time. `antimony`
+ships `py3-none` wheels, carrying no interpreter requirement at all —
+confirmed independently by the operator's own anaconda environment, which
+runs `antimony==2.14.0` under Python 3.13.
+
+**Note this report repeated the wrong version too**, in the carried item
+above ("roadrunner 2.9.3"). 2.9.3 is the *latest* cp313 release; the
+*minimum* is 2.8.0. A number restated across four documents without anyone
+querying the source drifts in exactly this way.
+
+### The window stays 3.10–3.12
+
+Only the reason is corrected. Not upgrading here is deliberate: the failure
+mode that matters is a **numerically different but still plausible**
+trajectory — one that passes structural tests and quietly changes what
+students see.
+
+`CONTRIBUTING.md` already records the precedent. The eigenvector-sign bug
+produced silent `NaN` rather than an exception, **passed on Python 3.13**,
+and failed deterministically on the pinned configuration. The pins are
+load-bearing because numerical libraries fail quietly.
+
+ADR 0014 specifies the four-step upgrade stage. Steps 2 and 3 are the actual
+work: run on 3.12 first to isolate library changes from interpreter changes,
+then diff continuous-domain trajectories against **closed forms** rather than
+against previous output, so a changed integrator surfaces as a physics
+violation instead of a diff.
+
+### New guard
+
+`scripts/check_python_support_claim.py`. Offline it verifies that all three
+files and the `Makefile` gate state the same window; `--online` adds PyPI
+wheel-coverage. Mutation-tested three ways:
+
+```
+README claims 3.10-3.13          -> FAIL, names the file
+Makefile gate widened silently   -> FAIL, names the disagreement
+window raised without pin bumps  -> FAIL, names libroadrunner AND numpy
+```
+
+Wired into CI (offline, so it cannot flake on PyPI) and `verify_build
+--quick`, confirmed to fail the aggregate. Seven guards now.
+
 ## 6. Carried forward
 
 1. **`kcat` is still not in `RESOLVABLE_FIELDS`.** Resolving a kcat *still*
@@ -244,7 +306,10 @@ temperature-specific guard, it fails as expected.
    cd ~/Desktop/Coding/Terrium/Tests
    ../.venv/bin/python brenda_kcat_capture.py 2.7.1.1   # hexokinase
    ```
-3. **NumPy 2.x / roadrunner 2.9.3** for Python 3.13+, unchanged.
+3. **NumPy 2.x for Python 3.13+** — **scoped, not done.** See §5c and
+   **ADR 0014**. The blocker list in earlier parts of this report was itself
+   wrong; the corrected version is `libroadrunner ≥ 2.8.0` and
+   `numpy ≥ 2.1.0`.
 
 ## 7. References
 
