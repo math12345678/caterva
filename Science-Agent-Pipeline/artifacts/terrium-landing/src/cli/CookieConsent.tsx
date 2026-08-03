@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const STORAGE_KEY = 'terrium-cookie-consent';
+const STORAGE_KEY = "terrium-cookie-consent";
 
 export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
@@ -15,7 +15,7 @@ export default function CookieConsent() {
 
   const dismiss = () => {
     setVisible(false);
-    localStorage.setItem(STORAGE_KEY, 'dismissed');
+    localStorage.setItem(STORAGE_KEY, "dismissed");
   };
 
   return (
@@ -30,10 +30,13 @@ export default function CookieConsent() {
         >
           <div className="rounded-xl border border-white/[0.08] bg-[#0A0E0C]/95 backdrop-blur-xl p-4 shadow-2xl shadow-black/40">
             <div className="flex items-start gap-3">
-              <span className="text-[#F59E0B] text-[14px] shrink-0 mt-0.5">&#x1F36A;</span>
+              <span className="text-[#F59E0B] text-[14px] shrink-0 mt-0.5">
+                &#x1F36A;
+              </span>
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-white/50 leading-relaxed mb-3">
-                  We use essential cookies only — no tracking, no ads. Data sources (BRENDA, KEGG, PubMed) are queried server-side.
+                  We use essential cookies only — no tracking, no ads. Data
+                  sources (BRENDA, KEGG, PubMed) are queried server-side.
                 </p>
                 <div className="flex items-center gap-2">
                   <button

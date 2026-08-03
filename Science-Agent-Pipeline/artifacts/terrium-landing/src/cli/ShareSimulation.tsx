@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from '@/hooks/use-toast';
-import { TEAL } from '@/lib/constants';
+import { useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "@/hooks/use-toast";
+import { TEAL } from "@/lib/constants";
 
 interface ShareSimulationProps {
   query: string;
@@ -28,8 +28,21 @@ function ShareIcon() {
 function CopyIcon() {
   return (
     <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-      <rect x="1" y="1" width="7" height="9" rx="1" stroke="currentColor" strokeWidth="1.2" />
-      <path d="M4 1h6v7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <rect
+        x="1"
+        y="1"
+        width="7"
+        height="9"
+        rx="1"
+        stroke="currentColor"
+        strokeWidth="1.2"
+      />
+      <path
+        d="M4 1h6v7"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -43,7 +56,7 @@ function CheckIcon() {
       fill="none"
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+      transition={{ type: "spring", stiffness: 400, damping: 20 }}
     >
       <motion.path
         d="M2.5 7L5.5 10L11.5 4"
@@ -80,7 +93,7 @@ export default function ShareSimulation({
   domain,
   runId,
   parameters,
-  className = '',
+  className = "",
 }: ShareSimulationProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -95,11 +108,11 @@ export default function ShareSimulation({
 
   const { shareUrl, shareText, embedMarkdown } = useMemo(() => {
     const params = new URLSearchParams();
-    params.set('q', query.slice(0, 200));
-    if (domain) params.set('domain', domain);
-    if (runId) params.set('run', runId);
+    params.set("q", query.slice(0, 200));
+    if (domain) params.set("domain", domain);
+    if (runId) params.set("run", runId);
     if (parameters && Object.keys(parameters).length > 0) {
-      params.set('params', JSON.stringify(parameters).slice(0, 200));
+      params.set("params", JSON.stringify(parameters).slice(0, 200));
     }
     const base = `${window.location.origin}${window.location.pathname}`;
     const url = `${base}?${params.toString()}`;
@@ -112,33 +125,39 @@ export default function ShareSimulation({
   }, [query, domain, runId, parameters]);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(shareText).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      showToast('Link copied to clipboard');
-    }).catch(() => {
-      showToast('Failed to copy link');
-    });
+    navigator.clipboard
+      .writeText(shareText)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+        showToast("Link copied to clipboard");
+      })
+      .catch(() => {
+        showToast("Failed to copy link");
+      });
   };
 
   const handleCopyEmbed = () => {
-    navigator.clipboard.writeText(embedMarkdown).then(() => {
-      setCopiedEmbed(true);
-      setTimeout(() => setCopiedEmbed(false), 2000);
-      showToast('Embed code copied');
-    }).catch(() => {
-      showToast('Failed to copy embed code');
-    });
+    navigator.clipboard
+      .writeText(embedMarkdown)
+      .then(() => {
+        setCopiedEmbed(true);
+        setTimeout(() => setCopiedEmbed(false), 2000);
+        showToast("Embed code copied");
+      })
+      .catch(() => {
+        showToast("Failed to copy embed code");
+      });
   };
 
   const handleTwitter = () => {
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
-    window.open(url, '_blank', 'noopener,noreferrer,width=600,height=400');
+    window.open(url, "_blank", "noopener,noreferrer,width=600,height=400");
   };
 
   const handleLinkedIn = () => {
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`;
-    window.open(url, '_blank', 'noopener,noreferrer,width=600,height=500');
+    window.open(url, "_blank", "noopener,noreferrer,width=600,height=500");
   };
 
   return (
@@ -165,14 +184,21 @@ export default function ShareSimulation({
             className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/[0.08] bg-[#0d1311] p-4 shadow-2xl z-50 backdrop-blur-xl"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] text-white/50 font-medium">Share this simulation</span>
+              <span className="text-[11px] text-white/50 font-medium">
+                Share this simulation
+              </span>
               <button
                 onClick={() => setOpen(false)}
                 className="text-white/20 hover:text-white/50 transition-colors"
                 aria-label="Close share panel"
               >
                 <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-                  <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path
+                    d="M3 3l6 6M9 3l-6 6"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </button>
             </div>
@@ -186,7 +212,7 @@ export default function ShareSimulation({
                 whileTap={{ scale: 0.98 }}
               >
                 {copied ? <CheckIcon /> : <CopyIcon />}
-                {copied ? 'Copied!' : 'Copy link'}
+                {copied ? "Copied!" : "Copy link"}
               </motion.button>
             </div>
 
@@ -225,7 +251,7 @@ export default function ShareSimulation({
                   whileTap={{ scale: 0.97 }}
                 >
                   {copiedEmbed ? <CheckIcon /> : <CopyIcon />}
-                  {copiedEmbed ? 'copied' : 'copy'}
+                  {copiedEmbed ? "copied" : "copy"}
                 </motion.button>
               </div>
               <pre className="text-[10px] text-white/30 font-mono leading-relaxed bg-white/[0.02] rounded-lg p-2 overflow-x-auto max-h-24">

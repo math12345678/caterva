@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 interface TypedLineProps {
   command: string;
@@ -8,8 +8,13 @@ interface TypedLineProps {
 }
 
 // Types out a "$ command" line character by character, once, then stays put.
-export default function TypedLine({ command, delayMs = 0, speedMs = 22, onDone }: TypedLineProps) {
-  const [shown, setShown] = useState('');
+export default function TypedLine({
+  command,
+  delayMs = 0,
+  speedMs = 22,
+  onDone,
+}: TypedLineProps) {
+  const [shown, setShown] = useState("");
   const [done, setDone] = useState(false);
 
   useEffect(() => {
@@ -37,7 +42,9 @@ export default function TypedLine({ command, delayMs = 0, speedMs = 22, onDone }
     <div className="flex items-center gap-2">
       <span className="text-[#1D8A72]">$</span>
       <span className="text-white/90">{shown}</span>
-      {!done && <span className="inline-block h-4 w-2 bg-white/70 animate-pulse" />}
+      {!done && (
+        <span className="inline-block h-4 w-2 bg-white/70 animate-pulse" />
+      )}
     </div>
   );
 }

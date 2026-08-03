@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
-import LineChart from '@/cli/LineChart';
-import { simulateMichaelisMenten, simulateSIR } from '@/lib/simulate';
-import type { Point } from '@/lib/simulate';
+import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+import LineChart from "@/cli/LineChart";
+import { simulateMichaelisMenten, simulateSIR } from "@/lib/simulate";
+import type { Point } from "@/lib/simulate";
 
 interface ExampleCard {
   id: string;
@@ -14,63 +14,96 @@ interface ExampleCard {
   query: string;
 }
 
-const MM_EXAMPLE = simulateMichaelisMenten({ km: 2, vmax: 5, s0: 10, end: 3, points: 61 });
-const SIR_EXAMPLE = simulateSIR({ beta: 0.3, gamma: 0.1, s0: 990, i0: 10, end: 100, points: 101 });
-const SEIR_EXAMPLE = simulateSIR({ beta: 0.35, gamma: 0.05, s0: 990, i0: 10, end: 100, points: 101 });
+const MM_EXAMPLE = simulateMichaelisMenten({
+  km: 2,
+  vmax: 5,
+  s0: 10,
+  end: 3,
+  points: 61,
+});
+const SIR_EXAMPLE = simulateSIR({
+  beta: 0.3,
+  gamma: 0.1,
+  s0: 990,
+  i0: 10,
+  end: 100,
+  points: 101,
+});
+const SEIR_EXAMPLE = simulateSIR({
+  beta: 0.35,
+  gamma: 0.05,
+  s0: 990,
+  i0: 10,
+  end: 100,
+  points: 101,
+});
 
 const EXAMPLES: ExampleCard[] = [
   {
-    id: 'mm-demo',
-    domain: 'mm',
-    label: 'Michaelis-Menten',
-    description: 'Enzyme kinetics with literature-verified Km and Vmax values.',
+    id: "mm-demo",
+    domain: "mm",
+    label: "Michaelis-Menten",
+    description: "Enzyme kinetics with literature-verified Km and Vmax values.",
     stats: [
-      { label: 'final [S]', value: MM_EXAMPLE.trajectory[MM_EXAMPLE.trajectory.length - 1].S.toFixed(3) + ' mM' },
-      { label: 'residual', value: MM_EXAMPLE.finalResidual.toExponential(2) },
+      {
+        label: "final [S]",
+        value:
+          MM_EXAMPLE.trajectory[MM_EXAMPLE.trajectory.length - 1].S.toFixed(3) +
+          " mM",
+      },
+      { label: "residual", value: MM_EXAMPLE.finalResidual.toExponential(2) },
     ],
     chart: {
       data: MM_EXAMPLE.trajectory,
-      series: [{ key: 'S', color: '#1D8A72' }],
+      series: [{ key: "S", color: "#1D8A72" }],
     },
-    query: 'simulate lactate dehydrogenase with pyruvate',
+    query: "simulate lactate dehydrogenase with pyruvate",
   },
   {
-    id: 'sir-demo',
-    domain: 'sir',
-    label: 'SIR Outbreak',
-    description: 'Epidemiological spread with population conservation checking.',
+    id: "sir-demo",
+    domain: "sir",
+    label: "SIR Outbreak",
+    description:
+      "Epidemiological spread with population conservation checking.",
     stats: [
-      { label: 'peak infected', value: Math.max(...SIR_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0) },
-      { label: 'R\u2080', value: (0.3 / 0.1).toFixed(2) },
+      {
+        label: "peak infected",
+        value: Math.max(...SIR_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
+      },
+      { label: "R\u2080", value: (0.3 / 0.1).toFixed(2) },
     ],
     chart: {
       data: SIR_EXAMPLE.trajectory,
       series: [
-        { key: 'S', color: '#3B82F6' },
-        { key: 'I', color: '#EF4444' },
-        { key: 'R', color: '#1D8A72' },
+        { key: "S", color: "#3B82F6" },
+        { key: "I", color: "#EF4444" },
+        { key: "R", color: "#1D8A72" },
       ],
     },
-    query: 'model an outbreak with beta 0.3 and gamma 0.1',
+    query: "model an outbreak with beta 0.3 and gamma 0.1",
   },
   {
-    id: 'seir-demo',
-    domain: 'sir',
-    label: 'SEIR Model',
-    description: 'Extended epidemiology with incubation period and higher transmission.',
+    id: "seir-demo",
+    domain: "sir",
+    label: "SEIR Model",
+    description:
+      "Extended epidemiology with incubation period and higher transmission.",
     stats: [
-      { label: 'peak infected', value: Math.max(...SEIR_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0) },
-      { label: 'R\u2080', value: (0.35 / 0.05).toFixed(2) },
+      {
+        label: "peak infected",
+        value: Math.max(...SEIR_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
+      },
+      { label: "R\u2080", value: (0.35 / 0.05).toFixed(2) },
     ],
     chart: {
       data: SEIR_EXAMPLE.trajectory,
       series: [
-        { key: 'S', color: '#3B82F6' },
-        { key: 'I', color: '#EF4444' },
-        { key: 'R', color: '#1D8A72' },
+        { key: "S", color: "#3B82F6" },
+        { key: "I", color: "#EF4444" },
+        { key: "R", color: "#1D8A72" },
       ],
     },
-    query: 'model an outbreak with beta 0.35 and gamma 0.05',
+    query: "model an outbreak with beta 0.35 and gamma 0.05",
   },
 ];
 
@@ -99,12 +132,19 @@ export default function ExampleGallery({ onTryQuery }: ExampleGalleryProps) {
               <span className="inline-flex items-center rounded bg-[#1D8A72]/10 px-1.5 py-0.5 text-[9px] text-[#1D8A72] uppercase tracking-wide">
                 {example.domain}
               </span>
-              <span className="text-white/60 text-[11px] font-medium">{example.label}</span>
+              <span className="text-white/60 text-[11px] font-medium">
+                {example.label}
+              </span>
             </div>
-            <p className="text-white/25 text-[10px] mb-3 leading-relaxed">{example.description}</p>
+            <p className="text-white/25 text-[10px] mb-3 leading-relaxed">
+              {example.description}
+            </p>
 
             <div className="rounded border border-white/[0.04] bg-white/[0.01] p-1.5 mb-3">
-              <LineChart data={example.chart.data} series={example.chart.series} />
+              <LineChart
+                data={example.chart.data}
+                series={example.chart.series}
+              />
             </div>
 
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] mb-3">

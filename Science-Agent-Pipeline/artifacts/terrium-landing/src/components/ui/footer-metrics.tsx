@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
-const API_BASE = import.meta.env.VITE_API_URL || '';
+const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function FooterMetrics() {
   const [wc, setWc] = useState<number | null>(null);
@@ -17,7 +17,7 @@ export default function FooterMetrics() {
 
   return (
     <span className="text-white/15">
-      {wc} researcher{wc !== 1 ? 's' : ''} on the waitlist
+      {wc} researcher{wc !== 1 ? "s" : ""} on the waitlist
     </span>
   );
 }

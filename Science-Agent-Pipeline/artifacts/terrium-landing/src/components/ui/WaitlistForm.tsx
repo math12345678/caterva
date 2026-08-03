@@ -1,7 +1,7 @@
-import React, { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { TEAL } from '@/lib/constants';
-import Magnetic from '@/components/ui/Magnetic';
+import React, { useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { TEAL } from "@/lib/constants";
+import Magnetic from "@/components/ui/Magnetic";
 
 function CheckIcon() {
   return (
@@ -35,21 +35,21 @@ function LoadingDots() {
   );
 }
 
-export const WaitlistForm: React.FC<{ large?: boolean; className?: string }> = ({
-  large,
-  className = '',
-}) => {
-  const [val, setVal] = useState('');
+export const WaitlistForm: React.FC<{
+  large?: boolean;
+  className?: string;
+}> = ({ large, className = "" }) => {
+  const [val, setVal] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [shaking, setShaking] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const validate = (v: string) => {
-    if (!v.trim()) return 'Email is required';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return 'Invalid email';
-    return '';
+    if (!v.trim()) return "Email is required";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) return "Invalid email";
+    return "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -62,21 +62,21 @@ export const WaitlistForm: React.FC<{ large?: boolean; className?: string }> = (
       inputRef.current?.focus();
       return;
     }
-    setError('');
+    setError("");
     setLoading(true);
     try {
-      const response = await fetch('/api/waitlist', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: val.trim() }),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
-        throw new Error(data.message || 'Signup failed');
+        throw new Error(data.message || "Signup failed");
       }
       setSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong');
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,8 @@ export const WaitlistForm: React.FC<{ large?: boolean; className?: string }> = (
                 You&apos;re on the list.
               </p>
               <p className="text-[12px] text-white/30 mt-0.5">
-                We&apos;ll notify you when your spot is ready. Typically 1–2 weeks.
+                We&apos;ll notify you when your spot is ready. Typically 1–2
+                weeks.
               </p>
             </div>
           </div>
@@ -123,19 +124,15 @@ export const WaitlistForm: React.FC<{ large?: boolean; className?: string }> = (
               value={val}
               onChange={(e) => {
                 setVal(e.target.value);
-                if (error) setError('');
+                if (error) setError("");
               }}
               placeholder="Enter your email"
               aria-label="Email address"
               disabled={loading}
               className={`w-full rounded-lg border bg-white/[0.02] px-4 py-3 text-[13px] font-mono text-white/80 outline-none placeholder:text-white/15 transition-all duration-200 ${
-                error ? 'border-red-500/30' : 'border-white/[0.06]'
+                error ? "border-red-500/30" : "border-white/[0.06]"
               }`}
-              animate={
-                shaking
-                  ? { x: [0, -6, 6, -4, 4, 0] }
-                  : { x: 0 }
-              }
+              animate={shaking ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
               transition={{ duration: 0.35 }}
             />
             <AnimatePresence>
@@ -157,12 +154,12 @@ export const WaitlistForm: React.FC<{ large?: boolean; className?: string }> = (
               type="submit"
               disabled={loading}
               className={`rounded-lg border border-[#1D8A72]/20 px-6 py-3 text-[11px] font-mono tracking-[0.15em] uppercase text-white bg-[#1D8A72]/90 hover:bg-[#1D8A72] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
-                large ? 'px-8 py-4 text-[12px]' : ''
+                large ? "px-8 py-4 text-[12px]" : ""
               }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
             >
-              {loading ? <LoadingDots /> : 'Join Waitlist'}
+              {loading ? <LoadingDots /> : "Join Waitlist"}
             </motion.button>
           </Magnetic>
         </motion.form>

@@ -12,14 +12,25 @@ interface ParamSliderProps {
 }
 
 export default function ParamSlider({
-  label, value, min, max, step, unit, onChange,
-  color = '#1D8A72', hint, precision,
+  label,
+  value,
+  min,
+  max,
+  step,
+  unit,
+  onChange,
+  color = "#1D8A72",
+  hint,
+  precision,
 }: ParamSliderProps) {
   const pct = ((value - min) / (max - min)) * 100;
 
-  const fmt = precision !== undefined
-    ? value.toFixed(precision)
-    : Number.isInteger(value) ? value : value.toFixed(1);
+  const fmt =
+    precision !== undefined
+      ? value.toFixed(precision)
+      : Number.isInteger(value)
+        ? value
+        : value.toFixed(1);
 
   return (
     <div className="space-y-1.5">
@@ -31,7 +42,9 @@ export default function ParamSlider({
         </span>
       </div>
       {hint && (
-        <span className="text-[9px] text-white/15 font-mono -mt-0.5 block">{hint}</span>
+        <span className="text-[9px] text-white/15 font-mono -mt-0.5 block">
+          {hint}
+        </span>
       )}
       <div className="relative">
         <input

@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef } from "react";
 
 interface Particle {
-  x: number; y: number;
-  vx: number; vy: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
   size: number;
   alpha: number;
   pulse: number;
@@ -14,14 +16,18 @@ interface Particle {
 
 /** Detect low-end devices for performance scaling */
 function isLowEndDevice(): boolean {
-  if (typeof navigator === 'undefined') return false;
+  if (typeof navigator === "undefined") return false;
   // Mobile devices with limited memory heuristics
   const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
   if (mem !== undefined && mem <= 4) return true;
   // Check for reduced motion preference as proxy for low-power
-  if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  )
+    return true;
   // Small screen = likely mobile
-  if (typeof window !== 'undefined' && window.innerWidth < 768) return true;
+  if (typeof window !== "undefined" && window.innerWidth < 768) return true;
   return false;
 }
 
@@ -35,7 +41,7 @@ export default function AnimatedBackground() {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: true });
+    const ctx = canvas.getContext("2d", { alpha: true });
     if (!ctx) return;
 
     // Detect low-end device once
@@ -103,13 +109,13 @@ export default function AnimatedBackground() {
       mouseRef.current.y = e.clientY;
     };
 
-    window.addEventListener('mousemove', handleMouse);
+    window.addEventListener("mousemove", handleMouse);
 
     // Page Visibility API — pause rendering when tab is hidden
     const onVisibility = () => {
-      pageVisibleRef.current = document.visibilityState === 'visible';
+      pageVisibleRef.current = document.visibilityState === "visible";
     };
-    document.addEventListener('visibilitychange', onVisibility);
+    document.addEventListener("visibilitychange", onVisibility);
 
     let starTimer = 0;
 
@@ -131,9 +137,9 @@ export default function AnimatedBackground() {
 
       // cursor glow
       const glowGrad = ctx.createRadialGradient(mx, my, 0, mx, my, 200);
-      glowGrad.addColorStop(0, 'rgba(29, 138, 114, 0.06)');
-      glowGrad.addColorStop(0.5, 'rgba(29, 138, 114, 0.02)');
-      glowGrad.addColorStop(1, 'rgba(29, 138, 114, 0)');
+      glowGrad.addColorStop(0, "rgba(29, 138, 114, 0.06)");
+      glowGrad.addColorStop(0.5, "rgba(29, 138, 114, 0.02)");
+      glowGrad.addColorStop(1, "rgba(29, 138, 114, 0)");
       ctx.fillStyle = glowGrad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -153,17 +159,19 @@ export default function AnimatedBackground() {
           if (p.life > p.maxLife || p.alpha <= 0) return false;
           const tailLen = Math.min(p.life * 3, 40);
           const grad = ctx.createLinearGradient(
-            p.x, p.y,
-            p.x - p.vx * 3, p.y - p.vy * 3,
+            p.x,
+            p.y,
+            p.x - p.vx * 3,
+            p.y - p.vy * 3,
           );
           grad.addColorStop(0, `rgba(29, 138, 114, ${p.alpha * 0.8})`);
-          grad.addColorStop(1, 'rgba(29, 138, 114, 0)');
+          grad.addColorStop(1, "rgba(29, 138, 114, 0)");
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - p.vx * tailLen, p.y - p.vy * tailLen);
           ctx.strokeStyle = grad;
           ctx.lineWidth = p.size;
-          ctx.lineCap = 'round';
+          ctx.lineCap = "round";
           ctx.stroke();
           return true;
         }
@@ -179,7 +187,8 @@ export default function AnimatedBackground() {
           mouseBoost = 1 + (1 - dist / 150) * 0.5;
         }
 
-        const pulseAlpha = p.alpha * (0.6 + 0.4 * Math.sin(p.pulse)) * mouseBoost;
+        const pulseAlpha =
+          p.alpha * (0.6 + 0.4 * Math.sin(p.pulse)) * mouseBoost;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(29, 138, 114, ${pulseAlpha})`;
@@ -188,7 +197,9 @@ export default function AnimatedBackground() {
         return true;
       });
 
-      while (particles.length < Math.floor((canvas.width * canvas.height) / 7000)) {
+      while (
+        particles.length < Math.floor((canvas.width * canvas.height) / 7000)
+      ) {
         particles.push(createParticle());
       }
 
@@ -218,29 +229,27 @@ export default function AnimatedBackground() {
       const cy = canvas.height / 2;
       const maxDist = Math.min(canvas.width, canvas.height) * 0.5;
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDist);
-      grad.addColorStop(0, 'rgba(29, 138, 114, 0.02)');
-      grad.addColorStop(0.4, 'rgba(29, 138, 114, 0.01)');
-      grad.addColorStop(1, 'transparent');
+      grad.addColorStop(0, "rgba(29, 138, 114, 0.02)");
+      grad.addColorStop(0.4, "rgba(29, 138, 114, 0.01)");
+      grad.addColorStop(1, "transparent");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     };
 
     draw();
 
-    window.addEventListener('resize', () => { init(); });
+    window.addEventListener("resize", () => {
+      init();
+    });
 
     return () => {
       cancelAnimationFrame(animId);
-      window.removeEventListener('mousemove', handleMouse);
-      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener("mousemove", handleMouse);
+      document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0"
-    />
+    <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-0" />
   );
 }

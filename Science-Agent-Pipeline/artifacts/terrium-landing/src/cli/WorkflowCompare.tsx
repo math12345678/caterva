@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import TerminalWindow from './TerminalWindow';
-import Reveal from './Reveal';
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import TerminalWindow from "./TerminalWindow";
+import Reveal from "./Reveal";
 
 interface Step {
   icon: string;
@@ -11,67 +11,85 @@ interface Step {
 
 const WITHOUT_TERRIUM: Step[] = [
   {
-    icon: '\uD83D\uDCDA',
-    label: 'Literature search',
-    detail: 'Manually search BRENDA, PubMed, and KEGG for kinetic parameters. Cross-reference papers for consensus Km/Vmax values \u2014 hours of work.',
+    icon: "\uD83D\uDCDA",
+    label: "Literature search",
+    detail:
+      "Manually search BRENDA, PubMed, and KEGG for kinetic parameters. Cross-reference papers for consensus Km/Vmax values \u2014 hours of work.",
   },
   {
-    icon: '\uD83D\uDCBB',
-    label: 'Write ODE code',
-    detail: 'Code the rate equations from scratch. Debug numerical integration. Handle edge cases (saturation, stiffness).',
+    icon: "\uD83D\uDCBB",
+    label: "Write ODE code",
+    detail:
+      "Code the rate equations from scratch. Debug numerical integration. Handle edge cases (saturation, stiffness).",
   },
   {
-    icon: '\u270D\uFE0F',
-    label: 'Validate & cite',
-    detail: 'Check against closed-form solutions. Manually track every parameter to its source paper for your lab report.',
+    icon: "\u270D\uFE0F",
+    label: "Validate & cite",
+    detail:
+      "Check against closed-form solutions. Manually track every parameter to its source paper for your lab report.",
   },
   {
-    icon: '\u23F1\uFE0F',
-    label: 'Time: 2\u20134 hours',
-    detail: 'Per experiment. And students have to learn three different tools just to get one number.',
+    icon: "\u23F1\uFE0F",
+    label: "Time: 2\u20134 hours",
+    detail:
+      "Per experiment. And students have to learn three different tools just to get one number.",
   },
 ];
 
 const WITH_TERRIUM: Step[] = [
   {
-    icon: '\uD83D\uDDE3\uFE0F',
-    label: 'Ask in plain English',
-    detail: '"Lactate dehydrogenase with pyruvate" \u2014 that\'s it. Terrium resolves the correct enzyme, substrate, and literature parameters.',
+    icon: "\uD83D\uDDE3\uFE0F",
+    label: "Ask in plain English",
+    detail:
+      '"Lactate dehydrogenase with pyruvate" \u2014 that\'s it. Terrium resolves the correct enzyme, substrate, and literature parameters.',
   },
   {
-    icon: '\u2699\uFE0F',
-    label: 'Automatic pipeline',
-    detail: 'BRENDA lookup \u2192 KEGG pathway \u2192 PubMed verification \u2192 ODE assembly with conserved-quantity checks. All automated.',
+    icon: "\u2699\uFE0F",
+    label: "Automatic pipeline",
+    detail:
+      "BRENDA lookup \u2192 KEGG pathway \u2192 PubMed verification \u2192 ODE assembly with conserved-quantity checks. All automated.",
   },
   {
-    icon: '\u2705',
-    label: 'Verified result',
-    detail: 'RK4 integration validated against closed-form solutions to 1e-10 tolerance. Every number links to a PubMed citation.',
+    icon: "\u2705",
+    label: "Verified result",
+    detail:
+      "RK4 integration validated against closed-form solutions to 1e-10 tolerance. Every number links to a PubMed citation.",
   },
   {
-    icon: '\u26A1',
-    label: 'Time: 30 seconds',
-    detail: 'From question to citable result. No coding, no hunting through databases, no manual verification.',
+    icon: "\u26A1",
+    label: "Time: 30 seconds",
+    detail:
+      "From question to citable result. No coding, no hunting through databases, no manual verification.",
   },
 ];
 
 const CARD_COLORS = {
-  without: { border: 'border-red-500/15', bg: 'bg-red-500/[0.02]', dot: 'bg-red-400/60' },
-  with: { border: 'border-[#1D8A72]/20', bg: 'bg-[#1D8A72]/[0.02]', dot: 'bg-[#1D8A72]' },
+  without: {
+    border: "border-red-500/15",
+    bg: "bg-red-500/[0.02]",
+    dot: "bg-red-400/60",
+  },
+  with: {
+    border: "border-[#1D8A72]/20",
+    bg: "bg-[#1D8A72]/[0.02]",
+    dot: "bg-[#1D8A72]",
+  },
 };
 
 export default function WorkflowCompare() {
-  const [activeTab, setActiveTab] = useState<'without' | 'with'>('without');
+  const [activeTab, setActiveTab] = useState<"without" | "with">("without");
 
-  const steps = activeTab === 'without' ? WITHOUT_TERRIUM : WITH_TERRIUM;
+  const steps = activeTab === "without" ? WITHOUT_TERRIUM : WITH_TERRIUM;
   const colors = CARD_COLORS[activeTab];
-  const label = activeTab === 'without' ? 'Without Terrium' : 'With Terrium';
+  const label = activeTab === "without" ? "Without Terrium" : "With Terrium";
 
   return (
     <section className="max-w-3xl mx-auto px-4 md:px-6 py-10" id="compare">
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#F59E0B] text-[11px] font-mono font-medium">compare</span>
+          <span className="text-[#F59E0B] text-[11px] font-mono font-medium">
+            compare
+          </span>
           <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
         </div>
         <h2 className="section-header">The difference</h2>
@@ -79,31 +97,36 @@ export default function WorkflowCompare() {
           Toggle between the old way and the Terrium way.
         </p>
 
-        <TerminalWindow path={`~ — terrium compare --mode ${activeTab === 'without' ? 'traditional' : 'terrium'}`} glow>
+        <TerminalWindow
+          path={`~ — terrium compare --mode ${activeTab === "without" ? "traditional" : "terrium"}`}
+          glow
+        >
           <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span>{' '}
-            <span className="font-mono text-[12px]">terrium workflow --compare</span>
+            <span className="text-[#1D8A72]">$</span>{" "}
+            <span className="font-mono text-[12px]">
+              terrium workflow --compare
+            </span>
           </div>
 
           {/* Toggle */}
           <div className="flex items-center gap-2 mb-6">
             <button
-              onClick={() => setActiveTab('without')}
+              onClick={() => setActiveTab("without")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all duration-300 ${
-                activeTab === 'without'
-                  ? 'bg-red-500/10 border border-red-500/20 text-red-400'
-                  : 'border border-white/[0.04] text-white/25 hover:text-white/45'
+                activeTab === "without"
+                  ? "bg-red-500/10 border border-red-500/20 text-red-400"
+                  : "border border-white/[0.04] text-white/25 hover:text-white/45"
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-red-400/60" />
               traditional
             </button>
             <button
-              onClick={() => setActiveTab('with')}
+              onClick={() => setActiveTab("with")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all duration-300 ${
-                activeTab === 'with'
-                  ? 'bg-[#1D8A72]/10 border border-[#1D8A72]/20 text-[#1D8A72]'
-                  : 'border border-white/[0.04] text-white/25 hover:text-white/45'
+                activeTab === "with"
+                  ? "bg-[#1D8A72]/10 border border-[#1D8A72]/20 text-[#1D8A72]"
+                  : "border border-white/[0.04] text-white/25 hover:text-white/45"
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-[#1D8A72]" />
@@ -127,15 +150,26 @@ export default function WorkflowCompare() {
               {steps.map((step, i) => (
                 <motion.div
                   key={step.label}
-                  initial={{ opacity: 0, x: activeTab === 'without' ? -12 : 12 }}
+                  initial={{
+                    opacity: 0,
+                    x: activeTab === "without" ? -12 : 12,
+                  }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  transition={{
+                    duration: 0.4,
+                    delay: i * 0.08,
+                    ease: [0.16, 1, 0.3, 1],
+                  }}
                   className={`flex items-start gap-3 rounded-lg border ${colors.border} ${colors.bg} p-3 group hover:border-opacity-40 transition-all duration-300`}
                 >
-                  <span className="text-[16px] shrink-0 mt-0.5">{step.icon}</span>
+                  <span className="text-[16px] shrink-0 mt-0.5">
+                    {step.icon}
+                  </span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`w-1.5 h-1.5 rounded-full ${colors.dot} shrink-0`} />
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${colors.dot} shrink-0`}
+                      />
                       <span className="text-[12px] text-white/70 font-sans font-medium">
                         {step.label}
                       </span>
@@ -161,16 +195,18 @@ export default function WorkflowCompare() {
             className={`mt-5 pt-4 border-t border-white/[0.04] flex items-center justify-between text-[10px]`}
           >
             <span className="text-white/25 font-mono">
-              {activeTab === 'without'
-                ? '4 steps \u2022 3 tools \u2022 2\u20134 hours'
-                : '4 steps \u2022 1 tool \u2022 30 seconds'}
+              {activeTab === "without"
+                ? "4 steps \u2022 3 tools \u2022 2\u20134 hours"
+                : "4 steps \u2022 1 tool \u2022 30 seconds"}
             </span>
             <span
               className={`font-mono ${
-                activeTab === 'without' ? 'text-red-400/60' : 'text-[#1D8A72]'
+                activeTab === "without" ? "text-red-400/60" : "text-[#1D8A72]"
               }`}
             >
-              {activeTab === 'without' ? '\u2717 error-prone' : '\u2713 verified'}
+              {activeTab === "without"
+                ? "\u2717 error-prone"
+                : "\u2713 verified"}
             </span>
           </motion.div>
         </TerminalWindow>

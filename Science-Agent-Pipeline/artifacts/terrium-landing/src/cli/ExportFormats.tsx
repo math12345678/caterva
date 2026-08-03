@@ -1,15 +1,27 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import TerminalWindow from './TerminalWindow';
-import Reveal from './Reveal';
-import { toast } from '@/hooks/use-toast';
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import TerminalWindow from "./TerminalWindow";
+import Reveal from "./Reveal";
+import { toast } from "@/hooks/use-toast";
 
-type ExportFormat = 'sbml' | 'csv' | 'json';
+type ExportFormat = "sbml" | "csv" | "json";
 
-const FORMATS: { id: ExportFormat; label: string; ext: string; icon: string; color: string }[] = [
-  { id: 'sbml', label: 'SBML', ext: '.xml', icon: '\u2699', color: '#1D8A72' },
-  { id: 'csv', label: 'CSV', ext: '.csv', icon: '\u25A6', color: '#3B82F6' },
-  { id: 'json', label: 'JSON', ext: '.json', icon: '\u27E8\u27E9', color: '#F59E0B' },
+const FORMATS: {
+  id: ExportFormat;
+  label: string;
+  ext: string;
+  icon: string;
+  color: string;
+}[] = [
+  { id: "sbml", label: "SBML", ext: ".xml", icon: "\u2699", color: "#1D8A72" },
+  { id: "csv", label: "CSV", ext: ".csv", icon: "\u25A6", color: "#3B82F6" },
+  {
+    id: "json",
+    label: "JSON",
+    ext: ".json",
+    icon: "\u27E8\u27E9",
+    color: "#F59E0B",
+  },
 ];
 
 const SBML_PREVIEW = `<?xml version="1.0" encoding="UTF-8"?>
@@ -85,7 +97,7 @@ const PREVIEWS: Record<ExportFormat, string> = {
 };
 
 export default function ExportFormats() {
-  const [format, setFormat] = useState<ExportFormat>('sbml');
+  const [format, setFormat] = useState<ExportFormat>("sbml");
 
   const handleCopy = async (text: string, label: string) => {
     try {
@@ -102,19 +114,23 @@ export default function ExportFormats() {
     <section className="max-w-3xl mx-auto px-4 md:px-6 py-10" id="exports">
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#8B5CF6] text-[11px] font-mono font-medium">export</span>
+          <span className="text-[#8B5CF6] text-[11px] font-mono font-medium">
+            export
+          </span>
           <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
         </div>
         <h2 className="section-header">Export anywhere</h2>
         <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-md">
-          SBML for modeling tools, CSV for spreadsheets, JSON for custom pipelines.
-          Every export includes full provenance.
+          SBML for modeling tools, CSV for spreadsheets, JSON for custom
+          pipelines. Every export includes full provenance.
         </p>
 
         <TerminalWindow path={`~ — terrium export --format ${format}`} glow>
           <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span>{' '}
-            <span className="font-mono text-[12px]">terrium export --format {format} --include-citations</span>
+            <span className="text-[#1D8A72]">$</span>{" "}
+            <span className="font-mono text-[12px]">
+              terrium export --format {format} --include-citations
+            </span>
           </div>
 
           {/* Format tabs */}
@@ -124,14 +140,16 @@ export default function ExportFormats() {
                 key={f.id}
                 onClick={() => setFormat(f.id)}
                 className={`relative px-3 py-1.5 rounded-md text-[11px] font-mono transition-all duration-300 ${
-                  format === f.id ? 'text-white/90' : 'text-white/25 hover:text-white/50'
+                  format === f.id
+                    ? "text-white/90"
+                    : "text-white/25 hover:text-white/50"
                 }`}
               >
                 {format === f.id && (
                   <motion.div
                     layoutId="export-tab-active"
                     className="absolute inset-0 rounded-md border border-white/[0.08] bg-white/[0.04]"
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   />
                 )}
                 <span className="relative z-10 flex items-center gap-1.5">
@@ -168,9 +186,12 @@ export default function ExportFormats() {
           {/* Format description */}
           <div className="mt-4 pt-3 border-t border-white/[0.04] flex flex-wrap items-center gap-4 text-[10px]">
             <span className="text-white/25 font-mono">
-              {format === 'sbml' && 'Systems Biology Markup Language — opens in COPASI, Tellurium, libSBML'}
-              {format === 'csv' && 'Comma-Separated Values — opens in Excel, Python/Pandas, R, MATLAB'}
-              {format === 'json' && 'JavaScript Object Notation — machine-readable with full metadata tree'}
+              {format === "sbml" &&
+                "Systems Biology Markup Language — opens in COPASI, Tellurium, libSBML"}
+              {format === "csv" &&
+                "Comma-Separated Values — opens in Excel, Python/Pandas, R, MATLAB"}
+              {format === "json" &&
+                "JavaScript Object Notation — machine-readable with full metadata tree"}
             </span>
             <span className="ml-auto text-white/15 font-mono">
               citations included &middot; provenance preserved

@@ -1,10 +1,10 @@
-import { useRef, useState, ReactNode } from 'react';
-import { motion } from 'framer-motion';
+import { useRef, useState, ReactNode } from "react";
+import { motion } from "framer-motion";
 
 export default function Magnetic({
   children,
   strength = 0.25,
-  className = '',
+  className = "",
 }: {
   children: ReactNode;
   strength?: number;
@@ -34,7 +34,7 @@ export default function Magnetic({
       onMouseMove={handleMouse}
       onMouseLeave={reset}
       animate={{ x: pos.x, y: pos.y }}
-      transition={{ type: 'spring', stiffness: 150, damping: 12, mass: 0.3 }}
+      transition={{ type: "spring", stiffness: 150, damping: 12, mass: 0.3 }}
     >
       {children}
     </motion.div>

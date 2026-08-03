@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 
 const NAV_ITEMS = [
-  { id: 'how', label: 'How', icon: '⌂' },
-  { id: 'examples', label: 'Demo', icon: '◉' },
-  { id: 'agent', label: 'Agent', icon: '⚡' },
-  { id: 'simulate', label: 'Sim', icon: '⟐' },
-  { id: 'pricing', label: 'Plans', icon: '◆' },
+  { id: "how", label: "How", icon: "⌂" },
+  { id: "examples", label: "Demo", icon: "◉" },
+  { id: "agent", label: "Agent", icon: "⚡" },
+  { id: "simulate", label: "Sim", icon: "⟐" },
+  { id: "pricing", label: "Plans", icon: "◆" },
 ];
 
 export default function MobileBottomNav() {
-  const [active, setActive] = useState('');
+  const [active, setActive] = useState("");
   const [hidden, setHidden] = useState(false);
   const lastScrollYRef = useRef(0);
 
@@ -21,7 +21,7 @@ export default function MobileBottomNav() {
           if (entry.isIntersecting) setActive(entry.target.id);
         }
       },
-      { threshold: 0.3, rootMargin: '0px 0px -40px 0px' },
+      { threshold: 0.3, rootMargin: "0px 0px -40px 0px" },
     );
     NAV_ITEMS.forEach(({ id }) => {
       const el = document.getElementById(id);
@@ -49,8 +49,8 @@ export default function MobileBottomNav() {
         ticking = true;
       }
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
@@ -71,13 +71,15 @@ export default function MobileBottomNav() {
               href={`#${item.id}`}
               className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-2 py-1 rounded-lg transition-all duration-300 ${
                 isActive
-                  ? 'text-[#1D8A72]'
-                  : 'text-white/25 hover:text-white/50'
+                  ? "text-[#1D8A72]"
+                  : "text-white/25 hover:text-white/50"
               }`}
-              aria-current={isActive ? 'true' : undefined}
+              aria-current={isActive ? "true" : undefined}
             >
               <span className="text-[15px] leading-none">{item.icon}</span>
-              <span className="text-[9px] uppercase tracking-wider leading-none">{item.label}</span>
+              <span className="text-[9px] uppercase tracking-wider leading-none">
+                {item.label}
+              </span>
               {isActive && (
                 <motion.span
                   layoutId="mobile-nav-active"

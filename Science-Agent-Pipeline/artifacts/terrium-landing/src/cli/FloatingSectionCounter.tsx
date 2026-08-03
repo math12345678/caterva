@@ -1,28 +1,48 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 
-const NAV_ITEMS = ['how', 'examples', 'playground', 'compare', 'testimonials', 'glossary', 'trust', 'faq', 'domains', 'tests', 'agent', 'runs', 'simulate', 'exports', 'roadmap', 'team', 'pricing', 'cite', 'waitlist'] as const;
+const NAV_ITEMS = [
+  "how",
+  "examples",
+  "playground",
+  "compare",
+  "testimonials",
+  "glossary",
+  "trust",
+  "faq",
+  "domains",
+  "tests",
+  "agent",
+  "runs",
+  "simulate",
+  "exports",
+  "roadmap",
+  "team",
+  "pricing",
+  "cite",
+  "waitlist",
+] as const;
 
 const LABELS: Record<string, string> = {
-  how: 'How it works',
-  examples: 'Examples',
-  playground: 'Playground',
-  compare: 'Compare',
-  testimonials: 'Testimonials',
-  glossary: 'Glossary',
-  trust: 'Trust',
-  faq: 'FAQ',
-  domains: 'Domains',
-  tests: 'Test suite',
-  agent: 'Agent',
-  runs: 'Recent runs',
-  simulate: 'Live simulator',
-  exports: 'Exports',
-  roadmap: 'Roadmap',
-  team: 'Team',
-  pricing: 'Pricing',
-  cite: 'Cite',
-  waitlist: 'Waitlist',
+  how: "How it works",
+  examples: "Examples",
+  playground: "Playground",
+  compare: "Compare",
+  testimonials: "Testimonials",
+  glossary: "Glossary",
+  trust: "Trust",
+  faq: "FAQ",
+  domains: "Domains",
+  tests: "Test suite",
+  agent: "Agent",
+  runs: "Recent runs",
+  simulate: "Live simulator",
+  exports: "Exports",
+  roadmap: "Roadmap",
+  team: "Team",
+  pricing: "Pricing",
+  cite: "Cite",
+  waitlist: "Waitlist",
 };
 
 export default function FloatingSectionCounter() {
@@ -40,12 +60,14 @@ export default function FloatingSectionCounter() {
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            const idx = NAV_ITEMS.indexOf(entry.target.id as typeof NAV_ITEMS[number]);
+            const idx = NAV_ITEMS.indexOf(
+              entry.target.id as (typeof NAV_ITEMS)[number],
+            );
             if (idx >= 0) setIndex(idx);
           }
         }
       },
-      { threshold: 0.4, rootMargin: '-80px 0px 0px 0px' },
+      { threshold: 0.4, rootMargin: "-80px 0px 0px 0px" },
     );
 
     for (const item of NAV_ITEMS) {
@@ -53,15 +75,15 @@ export default function FloatingSectionCounter() {
       if (el) observer.observe(el);
     }
 
-    window.addEventListener('scroll', checkScroll, { passive: true });
+    window.addEventListener("scroll", checkScroll, { passive: true });
     return () => {
       observer.disconnect();
-      window.removeEventListener('scroll', checkScroll);
+      window.removeEventListener("scroll", checkScroll);
     };
   }, []);
 
   const sectionId = index >= 0 ? NAV_ITEMS[index] : null;
-  const label = sectionId ? LABELS[sectionId] ?? sectionId : null;
+  const label = sectionId ? (LABELS[sectionId] ?? sectionId) : null;
 
   return (
     <AnimatePresence>
@@ -80,7 +102,7 @@ export default function FloatingSectionCounter() {
               animate={{ opacity: 1, y: 0 }}
               className="text-[10px] text-white/30 font-mono tabular-nums"
             >
-              {String(index + 1).padStart(2, '0')}
+              {String(index + 1).padStart(2, "0")}
             </motion.span>
             <span className="w-px h-3 bg-white/[0.06]" />
             <motion.span

@@ -17,6 +17,8 @@ describe("AgentSimulator", () => {
 
   it("renders resolve and run buttons", () => {
     render(<AgentSimulator />);
-    expect(screen.getByRole("button", { name: /resolve/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /resolve/i }),
+    ).toBeInTheDocument();
   });
 });

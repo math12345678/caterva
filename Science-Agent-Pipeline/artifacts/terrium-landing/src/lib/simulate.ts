@@ -44,7 +44,7 @@ function integrate(
 
   let state = initial;
   const out: Point[] = [
-    Object.fromEntries([['t', 0], ...labels.map((l, i) => [l, initial[i]])]),
+    Object.fromEntries([["t", 0], ...labels.map((l, i) => [l, initial[i]])]),
   ] as Point[];
 
   for (let i = 1; i < points; i++) {
@@ -53,7 +53,7 @@ function integrate(
     }
     out.push(
       Object.fromEntries([
-        ['t', i * dt],
+        ["t", i * dt],
         ...labels.map((l, j) => [l, state[j]]),
       ]) as Point,
     );
@@ -82,7 +82,7 @@ export interface MMResult {
 
 export function simulateMichaelisMenten(p: MMParams): MMResult {
   const derivs = ([S]: number[]) => [-(p.vmax * S) / (p.km + S)];
-  const trajectory = integrate(derivs, [p.s0], p.end, p.points, ['S']);
+  const trajectory = integrate(derivs, [p.s0], p.end, p.points, ["S"]);
 
   const S_final = Math.max(trajectory[trajectory.length - 1].S, 1e-12);
   const lhs = p.km * Math.log(p.s0 / S_final) + (p.s0 - S_final);
@@ -116,13 +116,11 @@ export function simulateSIR(p: SIRParams): SIRResult {
     const recovery = p.gamma * I;
     return [-infection, infection - recovery, recovery];
   };
-  const trajectory = integrate(
-    derivs,
-    [p.s0, p.i0, 0],
-    p.end,
-    p.points,
-    ['S', 'I', 'R'],
-  );
+  const trajectory = integrate(derivs, [p.s0, p.i0, 0], p.end, p.points, [
+    "S",
+    "I",
+    "R",
+  ]);
 
   const last = trajectory[trajectory.length - 1];
   const conservationError = Math.abs(last.S + last.I + last.R - N);

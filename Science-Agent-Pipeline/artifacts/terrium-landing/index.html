@@ -1,34 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=5"
+    />
     <title>Terrium — Ask a question. Get a verified simulation.</title>
-    <meta name="description" content="Scientific computing for teaching labs — natural language in, validated ODE simulations out. Every number traceable to a citation. Powered by BRENDA, KEGG, PubMed, and Tellurium." />
-    <meta name="keywords" content="enzyme kinetics, Michaelis-Menten, BRENDA, ODE simulation, Tellurium, systems biology, scientific computing, SIR model, epidemiology, PCR simulation" />
+    <meta
+      name="description"
+      content="Scientific computing for teaching labs — natural language in, validated ODE simulations out. Every number traceable to a citation. Powered by BRENDA, KEGG, PubMed, and Tellurium."
+    />
+    <meta
+      name="keywords"
+      content="enzyme kinetics, Michaelis-Menten, BRENDA, ODE simulation, Tellurium, systems biology, scientific computing, SIR model, epidemiology, PCR simulation"
+    />
     <meta name="author" content="Terrium" />
-    <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+    <meta
+      name="robots"
+      content="index, follow, max-snippet:-1, max-image-preview:large"
+    />
     <meta name="theme-color" content="#0A0E0C" />
     <link rel="canonical" href="https://terrium.app" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Terrium — Verified Scientific Simulations" />
-    <meta property="og:description" content="Ask a question in plain language. Get a validated ODE simulation with full provenance — every number traceable to a citation." />
+    <meta
+      property="og:title"
+      content="Terrium — Verified Scientific Simulations"
+    />
+    <meta
+      property="og:description"
+      content="Ask a question in plain language. Get a validated ODE simulation with full provenance — every number traceable to a citation."
+    />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://terrium.app" />
     <meta property="og:image" content="https://terrium.app/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Terrium — Ask a question. Get a verified simulation." />
+    <meta
+      property="og:image:alt"
+      content="Terrium — Ask a question. Get a verified simulation."
+    />
     <meta property="og:site_name" content="Terrium" />
     <meta property="og:locale" content="en_US" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Terrium — Verified Scientific Simulations" />
-    <meta name="twitter:description" content="Ask a question in plain language. Get a validated ODE simulation with full provenance — every number traceable to a citation." />
+    <meta
+      name="twitter:title"
+      content="Terrium — Verified Scientific Simulations"
+    />
+    <meta
+      name="twitter:description"
+      content="Ask a question in plain language. Get a validated ODE simulation with full provenance — every number traceable to a citation."
+    />
     <meta name="twitter:image" content="https://terrium.app/og.png" />
-    <meta name="twitter:image:alt" content="Terrium — Ask a question. Get a verified simulation." />
+    <meta
+      name="twitter:image:alt"
+      content="Terrium — Ask a question. Get a verified simulation."
+    />
     <meta name="twitter:creator" content="@terrium" />
 
     <!-- Icons & PWA -->
@@ -39,33 +69,41 @@
     <!-- Fonts: preconnect early -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Space+Grotesk:wght@300..700&display=swap" />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&family=Space+Grotesk:wght@300..700&display=swap"
+    />
 
     <!-- Structured Data -->
     <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebApplication",
-      "name": "Terrium",
-      "url": "https://terrium.app",
-      "description": "Scientific computing for teaching labs — natural language in, validated ODE simulations out. Every number traceable to a citation.",
-      "applicationCategory": "ScientificSimulation",
-      "operatingSystem": "Web",
-      "browserRequirements": "Requires JavaScript",
-      "offers": {
-        "@type": "Offer",
-        "availability": "https://schema.org/PreOrder",
-        "description": "Pre-launch — pilot spots available"
-      },
-      "author": {
-        "@type": "Person",
-        "name": "Smyan Reddy"
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "Terrium",
+        "url": "https://terrium.app",
+        "description": "Scientific computing for teaching labs — natural language in, validated ODE simulations out. Every number traceable to a citation.",
+        "applicationCategory": "ScientificSimulation",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requires JavaScript",
+        "offers": {
+          "@type": "Offer",
+          "availability": "https://schema.org/PreOrder",
+          "description": "Pre-launch — pilot spots available"
+        },
+        "author": {
+          "@type": "Person",
+          "name": "Smyan Reddy"
+        }
       }
-    }
     </script>
   </head>
   <body>
-    <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[#1D8A72] focus:text-white focus:text-[13px] focus:outline-none focus:shadow-lg">Skip to main content</a>
+    <a
+      href="#main-content"
+      class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-[#1D8A72] focus:text-white focus:text-[13px] focus:outline-none focus:shadow-lg"
+      >Skip to main content</a
+    >
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

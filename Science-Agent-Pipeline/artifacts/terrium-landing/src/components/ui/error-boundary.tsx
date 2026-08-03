@@ -1,4 +1,4 @@
-import { Component, type ReactNode, type ErrorInfo } from 'react';
+import { Component, type ReactNode, type ErrorInfo } from "react";
 
 interface Props {
   children: ReactNode;
@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
     this.setState({ info });
-    console.error('[ErrorBoundary]', error, info.componentStack);
+    console.error("[ErrorBoundary]", error, info.componentStack);
   }
 
   handleReset = () => {
@@ -32,13 +32,16 @@ export class ErrorBoundary extends Component<Props, State> {
 
   handleCopyError = () => {
     const text = [
-      `Error: ${this.state.error?.message || 'Unknown error'}`,
-      this.state.info?.componentStack || '',
-    ].join('\n\n');
-    navigator.clipboard.writeText(text).then(() => {
-      this.setState({ copied: true });
-      setTimeout(() => this.setState({ copied: false }), 2000);
-    }).catch(() => {});
+      `Error: ${this.state.error?.message || "Unknown error"}`,
+      this.state.info?.componentStack || "",
+    ].join("\n\n");
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        this.setState({ copied: true });
+        setTimeout(() => this.setState({ copied: false }), 2000);
+      })
+      .catch(() => {});
   };
 
   render() {
@@ -51,9 +54,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-500/10 mb-5">
               <span className="text-red-400 text-lg">!</span>
             </div>
-            <h1 className="text-white/80 text-[16px] font-sans font-medium mb-2">Something went wrong</h1>
+            <h1 className="text-white/80 text-[16px] font-sans font-medium mb-2">
+              Something went wrong
+            </h1>
             <p className="text-white/30 text-[13px] font-sans mb-8 leading-relaxed">
-              {this.state.error.message || 'An unexpected error occurred.'}
+              {this.state.error.message || "An unexpected error occurred."}
             </p>
             <div className="flex items-center justify-center gap-3">
               <button
@@ -66,7 +71,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleCopyError}
                 className="inline-flex items-center gap-2 rounded-xl border border-white/[0.08] px-5 py-2.5 text-[12px] text-white/40 transition-all duration-300 hover:border-white/[0.15] hover:text-white/60"
               >
-                {this.state.copied ? 'copied' : 'copy error'}
+                {this.state.copied ? "copied" : "copy error"}
               </button>
             </div>
           </div>

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import Magnetic from '@/components/ui/Magnetic';
+import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Magnetic from "@/components/ui/Magnetic";
 
-const DISMISS_KEY = 'terrium:sticky-cta-dismissed';
+const DISMISS_KEY = "terrium:sticky-cta-dismissed";
 
 export default function StickyCTA() {
   const [visible, setVisible] = useState(false);
@@ -45,7 +45,7 @@ export default function StickyCTA() {
 
           // Show when scrolled past hero AND scrolling up, OR near bottom
           // Hide when reaching waitlist section
-          const waitlistEl = document.getElementById('waitlist');
+          const waitlistEl = document.getElementById("waitlist");
           const waitlistInView = waitlistEl
             ? waitlistEl.getBoundingClientRect().top < winHeight * 0.5
             : false;
@@ -61,17 +61,17 @@ export default function StickyCTA() {
       }
     };
 
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, [dismissed]);
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ y: '100%', opacity: 0 }}
+          initial={{ y: "100%", opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          exit={{ y: '100%', opacity: 0 }}
+          exit={{ y: "100%", opacity: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           className="sticky-cta"
         >
@@ -96,7 +96,13 @@ export default function StickyCTA() {
                 >
                   Join waitlist
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
-                    <path d="M2 6h7M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path
+                      d="M2 6h7M6 2l4 4-4 4"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                 </a>
               </Magnetic>
@@ -107,7 +113,12 @@ export default function StickyCTA() {
                 aria-label="Dismiss"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
-                  <path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path
+                    d="M3 3l8 8M11 3l-8 8"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
                 </svg>
               </button>
             </div>
