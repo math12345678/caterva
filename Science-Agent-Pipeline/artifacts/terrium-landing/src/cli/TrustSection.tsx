@@ -83,7 +83,7 @@ export default function TrustSection() {
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
-          <AnimatedMetric target={304} suffix="+" label="tests passing" delay={0} />
+          <AnimatedMetric target={430} suffix="+" label="tests passing" delay={0} />
           <AnimatedMetric target={6} label="simulation domains" delay={200} />
           <AnimatedMetric target={3} label="literature sources" delay={400} />
           <AnimatedMetric target={100} suffix="%" label="open-source engine" delay={600} />

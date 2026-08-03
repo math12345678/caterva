@@ -11,13 +11,11 @@
 # platform without prebuilt wheels for them, that install fails at the cmake
 # step. These three packages are the parts that actually do the work.
 #
-# libroadrunner is pinned to 2.7.0, not the newer 2.9.x line. 2.9.0/2.9.2
-# dropped cp310 wheels entirely (their PyPI releases start at cp311), which
-# breaks installation on Python 3.10 -- the floor this project claims to
-# support. This was caught because CI failed on the 3.10 job with
-# "No matching distribution found for libroadrunner==2.9.0". 2.7.0 ships
-# wheels for cp39 through cp312 and is what the full test suite has actually
-# been verified against.
+# libroadrunner historically needed pinning to 2.7.0 because early
+# 2.9.x releases dropped cp310 wheels, breaking Python 3.10 installs. The
+# minimum has been relaxed to >=2.8.0 to allow newer, compatible libroadrunner
+# wheels on platforms where they exist; CI/QA should still verify installs
+# across supported Python ABIs (3.10–3.12) before bumping further.
 libroadrunner>=2.8.0
 antimony==2.14.0
 python-libsbml==5.21.1
