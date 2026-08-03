@@ -53,7 +53,9 @@ EXPECTED_CONSTANTS = {
 }
 
 
-def extract_constants_from_file(filepath: Path) -> Dict[str, Any]:
+def extract_constants_from_file(
+    filepath: Path, errors: List[str]
+) -> Dict[str, Any]:
     """Extract constant definitions from a Python file."""
     constants = {}
     
@@ -144,7 +146,7 @@ def check_constants_consistency() -> List[str]:
     all_constants = {}
     
     for py_file in py_files:
-        constants = extract_constants_from_file(py_file)
+        constants = extract_constants_from_file(py_file, errors)
         for name, value in constants.items():
             if name not in all_constants:
                 all_constants[name] = {}
@@ -181,7 +183,7 @@ def check_missing_constants() -> List[str]:
     defined_constants = set()
     
     for py_file in py_files:
-        constants = extract_constants_from_file(py_file)
+        constants = extract_constants_from_file(py_file, errors)
         defined_constants.update(constants.keys())
     
     # Check for missing expected constants

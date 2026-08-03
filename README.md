@@ -18,7 +18,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,092 tests (878 engine + 214 literature)
+make test      # runs all 1,093 tests (879 engine + 214 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -149,7 +149,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/              simulation engine
 │   ├── tellurium_engine.py
-│   └── tests/              878 tests
+│   └── tests/              879 tests
 ├── Tests/                  literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py
 │   └── ...                 214 tests

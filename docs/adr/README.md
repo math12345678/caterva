@@ -37,3 +37,4 @@ Each ADR has:
 | [0012](0012-kcat-resolved-but-not-simulated.md) | kcat is resolved from literature but is not a simulation parameter |
 | [0013](0013-enzyme-concentration-bridges-kcat-to-vmax.md) | Enzyme concentration is a caller input, and it bridges kcat to Vmax |
 | [0014](0014-python-version-support.md) | Python 3.10–3.12, and what actually constrains it |
+| [0015](0015-constitution-rules-must-be-executable.md) | A constitution rule that nothing executes is not enforced |
