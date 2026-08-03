@@ -1,6 +1,15 @@
-"""Forbidden-package guard for Terrium.
+"""Constitution-rule guard for Terrium: Rules 7 and 8.
 
-Rule 7 of the constitution, made executable:
+Both were stated as non-negotiable, both had ADRs behind them, and neither
+was enforced by anything executable until this script.
+
+Rule 8 -- every architecturally significant decision gets an ADR -- is
+checked at the bottom of this file (`check_adrs_are_indexed`). It has failed
+twice in this project's history, both times caught by hand: ADR 0009 existed
+but was missing from the index, and ADR 0007 was written twice by two
+different implementers.
+
+Rule 7, made executable:
 
     Never `pip install tellurium` (the umbrella package). Use
     `libroadrunner`, `antimony`, `python-libsbml` directly. See ADR 0001.
@@ -118,6 +127,55 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
     return found
 
 
+def check_adrs_are_indexed() -> List[str]:
+    """Rule 8: every architecturally significant decision gets an ADR.
+
+    An ADR that exists but is absent from `docs/adr/README.md` is invisible
+    to anyone reading the index -- present in the tree, missing from the
+    record. That is not hypothetical: ADR 0009 was found unindexed during
+    the Stage 5 audit, and a *duplicate* ADR 0007 was found in Stage 4 (two
+    implementers each writing one). Both were caught by hand.
+
+    Checks both directions. An index row pointing at a file that does not
+    exist is the same defect wearing the other hat.
+    """
+    errors: List[str] = []
+    adr_dir = REPO_ROOT / "docs" / "adr"
+    index = adr_dir / "README.md"
+
+    if not adr_dir.is_dir() or not index.exists():
+        return ["docs/adr/README.md not found; cannot verify Rule 8"]
+
+    on_disk = {
+        p.name for p in adr_dir.glob("[0-9][0-9][0-9][0-9]-*.md")
+    }
+    index_text = index.read_text(encoding="utf-8")
+    linked = set(re.findall(r"\(([0-9]{4}-[^)]+\.md)\)", index_text))
+
+    for missing in sorted(on_disk - linked):
+        errors.append(
+            f"docs/adr/{missing} exists but is not linked from the ADR index "
+            "-- invisible to anyone reading it (Rule 8)"
+        )
+    for dangling in sorted(linked - on_disk):
+        errors.append(
+            f"the ADR index links docs/adr/{dangling}, which does not exist"
+        )
+
+    # Duplicate numbers: two ADRs claiming 0007 happened once already.
+    numbers: dict = {}
+    for name in on_disk:
+        numbers.setdefault(name[:4], []).append(name)
+    for number, names in sorted(numbers.items()):
+        if len(names) > 1:
+            errors.append(
+                f"ADR number {number} is claimed by {len(names)} files: "
+                f"{sorted(names)}"
+            )
+
+    return errors
+
+
 def main() -> int:
     violations: List[str] = []
     checked = 0
@@ -140,7 +198,7 @@ def main() -> int:
         print("FAIL: no dependency manifests found; nothing was checked.")
         return 1
 
-    print(f"Checked {checked} dependency manifest(s) for forbidden packages.")
+    print(f"Rule 7: checked {checked} dependency manifest(s).")
 
     if violations:
         print("\nFAIL: a forbidden package is declared")
@@ -153,7 +211,23 @@ def main() -> int:
         )
         return 1
 
-    print("OK: no forbidden packages declared.")
+    adr_errors = check_adrs_are_indexed()
+    adr_count = len(list((REPO_ROOT / "docs" / "adr").glob("[0-9][0-9][0-9][0-9]-*.md")))
+    print(f"Rule 8: checked {adr_count} ADR(s) against the index.")
+
+    if adr_errors:
+        print("\nFAIL: the ADR record is inconsistent")
+        for error in adr_errors:
+            print(f"  - {error}")
+        print(
+            "\nThis is Rule 8 of docs/CONSTITUTION.md. An ADR missing from "
+            "the index\nis present in the tree and absent from the record -- "
+            "which has happened\ntwice (ADR 0009 unindexed, ADR 0007 "
+            "duplicated)."
+        )
+        return 1
+
+    print("OK: no forbidden packages, and every ADR is indexed exactly once.")
     return 0
 
 

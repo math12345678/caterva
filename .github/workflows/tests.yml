@@ -56,7 +56,7 @@ jobs:
       # Rule 7 of the constitution, made executable. It had an ADR and a
       # paragraph in requirements.txt, and adding `tellurium` to a manifest
       # passed every other guard.
-      - name: Forbidden-packages guard
+      - name: Constitution Rules 7 and 8 guard
         run: python scripts/check_forbidden_packages.py
 
       # The remaining guards (RNG convention, dependencies, engine contract,

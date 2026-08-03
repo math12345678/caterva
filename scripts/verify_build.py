@@ -59,10 +59,15 @@ def run_command(
         return False, "", f"Command failed with exception: {e}"
 
 
-def run_guard(name: str, cmd: str, cwd: Optional[Path] = None) -> Tuple[str, bool, str]:
+def run_guard(
+    name: str,
+    cmd: str,
+    cwd: Optional[Path] = None,
+    timeout: int = 120,
+) -> Tuple[str, bool, str]:
     """Run a guard and return (name, success, message)."""
     print(f"  Running {name}...", end=" ", flush=True)
-    success, stdout, stderr = run_command(cmd, cwd=cwd, timeout=120)
+    success, stdout, stderr = run_command(cmd, cwd=cwd, timeout=timeout)
     
     if success:
         print("✅", flush=True)
@@ -121,7 +126,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # the nine non-negotiable rules, had ADR 0001 behind it, and adding
     # tellurium to requirements.txt passed every guard in the repo.
     guards.append(run_guard(
-        "Forbidden Packages Guard",
+        "Constitution Rules 7+8 Guard",
         f"python {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
     ))
 
