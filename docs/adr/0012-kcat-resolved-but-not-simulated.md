@@ -64,6 +64,14 @@ $V_{max}$ without an assay detail it does not have.
 
 ### Why not add `[E]_0` as a parameter
 
+> **Update (2026-08-02): done, in ADR 0013.** `[E]₀` is now an explicit
+> caller input feeding `vmax_from_kcat`, and the engine signature was left
+> unchanged after all — the conversion sits in the validation layer rather
+> than becoming a new engine parameter, so none of the blast radius below
+> materialised. The provenance question was answered the way this section
+> anticipated: `[E]₀` is a property of an experiment, not of an enzyme, so
+> it is never resolved from literature.
+
 That is a defensible future stage, not a side effect of this one. It changes
 the MM domain's parameter set, the API schema, the DB enum, the OpenAPI spec
 and the golden trajectories. It also raises its own provenance question —
