@@ -44,11 +44,20 @@ describe("Python bridge interpreter selection", () => {
   it("accepts a configured supported interpreter path", () => {
     delete process.env["TERRIUM_PYTHON"];
     const repoRoot = process.cwd();
+    // Mirror resolvePythonExecutable's own fallback order exactly (python.ts).
+    // A shorter candidate list here was the bug: it predicted "nothing will
+    // be found" by checking fewer paths than the function itself falls back
+    // to, so adding python3.13 to the source's list made this test's
+    // prediction wrong without changing anything test-visible until then.
     const candidates = [
       process.env["VIRTUAL_ENV"]
         ? `${process.env["VIRTUAL_ENV"]}/bin/python`
         : undefined,
       `${repoRoot}/.venv/bin/python`,
+      "python3.13",
+      "python3.12",
+      "python3.11",
+      "python3.10",
     ].filter((candidate): candidate is string => Boolean(candidate));
     const discovered = candidates.find((candidate) =>
       canRunSupportedPython(candidate, repoRoot),
