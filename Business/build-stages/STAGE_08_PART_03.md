@@ -117,14 +117,88 @@ a derived value over a stated one would silently discard the request.
 - Six guards exit 0. README 858 → 878 engine, 1,040 → 1,072 total; the
   documented-counts guard caught every one of those drifts.
 
+## 5a. Addendum — generalising the tests found a parser bug
+
+Carried item 2 below was "capture a second enzyme's turnover fixture, because
+a different page shape is how the duplicate-row bug surfaced." Preparing for
+that — parametrising the turnover tests over
+`glob("brenda_*_kcat_fixture.html")` and running them **cross-species**
+instead of human-only — found a real defect **without needing the second
+fixture at all**.
+
+### The commentary cell was picked by length
+
+```python
+conditions = max(cell_texts, key=len)   # pick the longest cell
+```
+
+That silently returns the **substrate** whenever the substrate name is longer
+than the commentary. Three real *Mus musculus* sub-rows whose commentaries are
+`"wild-type enzyme"`, `"A262C mutant"` and `"E81C mutant"` (16, 12, 11
+characters) all lost to `"acetylthiocholine iodide"` (24).
+
+Two consequences, neither cosmetic:
+
+- **The three mutants became indistinguishable** at the API surface — three
+  different proteins reported as one repeated measurement.
+- **Every assay condition on an aggregate sub-row was discarded**, which is
+  exactly the STRENDA data ADR 0010 exists to preserve.
+
+Now read by **position**. BRENDA's row layout is fixed
+(`value | substrate | organism | uniprot | commentary | reference id`), so the
+commentary is the cell immediately before the six-digit reference. The length
+heuristic remains only as a fallback for pages whose layout does not match.
+
+### A second, pre-existing bug in the same line
+
+Rows whose commentary cell is `-` were filled with whatever else was longest
+— usually the **organism**. Two real LDH pyruvate rows came back claiming
+`conditions="Homo sapiens"`.
+
+Nothing was fabricated downstream (`parse_assay_conditions` searched that
+string for a pH and found none), but the field asserted a commentary that
+never existed. They now report `None`, which is the honest answer.
+
+Verified as a strict improvement by diffing old against new across every LDH
+Km row: **identical on all eight**, with only the two false commentaries
+changing to `None`.
+
+### Two of my own test bugs, found by reading the HTML
+
+The first version of the dedup invariant keyed on
+`(value, ref, substrate, organism)` and called the three mutants duplicates.
+The second omitted `substrate` and grouped two genuine H287C rows measured on
+different substrates (refs 652016 and 652194).
+
+Both times the test was wrong and the data was right. A dedup that had
+collapsed either group would have **deleted real measurements** — worse than
+the duplication it set out to prevent. The fix in both cases came from
+opening the fixture and reading the actual cells rather than reasoning about
+what they should contain.
+
+### Verification
+
+Two mutations, both caught: reverting to longest-cell (5 failures), and an
+off-by-one on the commentary index (8 failures). 203 literature tests pass.
+
 ## 6. Carried forward
 
 1. **`kcat` is still not in `RESOLVABLE_FIELDS`.** Resolving a kcat *still*
    does not produce a simulable parameter on its own — it needs an `[E]₀` the
    caller supplies. The narrowness note remains true as written.
-2. **A second enzyme's turnover fixture.** The current one is AChE only.
-   A second would exercise the parser against a different BRENDA page shape,
-   which is how the duplicate-row bug surfaced in the first place.
+2. **A second enzyme's turnover fixture.** Still open, but the *tooling* is
+   ready: `brenda_kcat_capture.py` now takes an EC number from
+   `KNOWN_ENZYMES`, and the invariant tests are parametrised over
+   `glob("brenda_*_kcat_fixture.html")`, so a new capture is covered the
+   moment it lands. To add LDH:
+
+   ```bash
+   cd ~/Desktop/Coding/Terrium/Tests
+   ../.venv/bin/python brenda_kcat_capture.py 1.1.1.27
+   ```
+
+   See §5a for what generalising the tests found before the second fixture
+   even arrived.
 3. **NumPy 2.x / roadrunner 2.9.3** for Python 3.13+, unchanged.
 
 ## 7. References
