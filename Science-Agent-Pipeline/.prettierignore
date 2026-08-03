@@ -1,0 +1,14 @@
+# Generated code
+lib/api-zod/src/generated/
+lib/api-client-react/src/
+
+# Config and lock files
+pnpm-lock.yaml
+pnpm-workspace.yaml
+replit.md
+scripts/README.md
+
+# Build artifacts
+artifacts/mockup-sandbox/dist/
+artifacts/terrium-landing/dist/
+artifacts/api-server/dist/
