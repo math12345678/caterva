@@ -598,7 +598,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
           </div>
           <h2 className="section-header">Test suite</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">48 tests across the full stack — every one passing.</p>
+          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">430 tests across the full stack — every one passing.</p>
           <TerminalWindow path="~ &mdash; terrium test --run --no-skip -v" glow>
             <TestPanelBody />
           </TerminalWindow>
