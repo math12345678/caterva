@@ -66,9 +66,31 @@ def main() -> int:
     for label in CANDIDATE_LABELS:
         node = _find_table_container(soup, label)
         if node is not None:
+            # The container ALONE is not enough. `_find_table_container`
+            # locates a table by its navigation link, so a fixture holding
+            # only the container has nothing to match: the parser falls back
+            # to a whole-page scan and flags every row as unscoped.
+            #
+            # The existing Km fixtures include the nav anchor for exactly
+            # this reason. Save it alongside the container so the fixture
+            # behaves like the real page.
+            anchor = None
+            for a in soup.find_all("a", href=True):
+                if a.get_text(strip=True).strip().lower() == label.lower():
+                    anchor = a
+                    break
+
             text = str(node)
-            rows = text.count('class="row"')
-            print(f"\nFOUND  label={label!r}  ({len(text):,} chars, ~{rows} rows)")
+            if anchor is not None:
+                text = f"<html><body>\n{anchor}\n{node}\n</body></html>"
+
+            rows = len([
+                r for r in node.find_all("div")
+                if r.get("class") and "row" in r.get("class")
+                and "rowpreview" not in r.get("class")
+            ])
+            print(f"\nFOUND  label={label!r}  ({len(text):,} chars, {rows} data rows)")
+            print(f"  nav anchor included: {anchor is not None}")
             OUT.write_text(text, encoding="utf-8")
             print(f"Wrote {OUT}")
             print("\nPaste the whole output of this script back to Claude.")

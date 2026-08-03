@@ -137,6 +137,20 @@ def classify_substrate(substrate_name: str) -> str:
 KM_PLAUSIBLE_MIN_MM = 0.0000001
 KM_PLAUSIBLE_MAX_MM = 1000
 
+# kcat (turnover number), s^-1. Must match Tellurium/core/data_structures.py
+# exactly -- ADR 0003 makes these a cross-layer contract, and
+# scripts/check_plausibility_constants.py enforces the agreement.
+#
+# Anchored to Bar-Even et al. (2011), Biochemistry 50(21), 4402-4410
+# (median kcat ~10 s^-1 across several thousand enzymes); catalase, the
+# fastest known enzyme, is ~4e7 s^-1; the diffusion-limited ceiling is
+# ~1e8-1e9 s^-1. Above that a number cannot be a turnover rate at all.
+KCAT_PLAUSIBLE_MIN_PER_S = 0.000001
+KCAT_PLAUSIBLE_MAX_PER_S = 1000000000
+
+#: BRENDA's navigation label for the turnover-number table.
+TURNOVER_TABLE_LABEL = "Turnover Numbers"
+
 BRENDA_ENZYME_URL = "https://www.brenda-enzymes.org/enzyme.php"
 
 
@@ -232,6 +246,7 @@ def parse_brenda_km_html(
     target_organism: Optional[str] = "Homo sapiens",
     fallback_uniprot: Optional[str] = None,
     require_substrate_match: bool = True,
+    table_label: str = "KM Values",
 ) -> list[BRENDAKmEntry]:
     """Pure parsing function: HTML string in, structured Km entries out.
     No network access, no built-in knowledge of any specific enzyme.
@@ -266,9 +281,20 @@ def parse_brenda_km_html(
     downstream code can decide whether to trust it.
     """
 
+    # Plausibility bounds and labelling depend on which table is parsed.
+    # Km is in mM; kcat is a turnover number in s^-1, so the Km range is
+    # meaningless for it -- a kcat of 6500 is ordinary, a Km of 6500 mM is a
+    # unit error. Sharing the Km bounds would flag every fast enzyme.
+    if table_label == TURNOVER_TABLE_LABEL:
+        _quantity, _unit = "kcat", "1/s"
+        _min_value, _max_value = KCAT_PLAUSIBLE_MIN_PER_S, KCAT_PLAUSIBLE_MAX_PER_S
+    else:
+        _quantity, _unit = "Km", "mM"
+        _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
+
     soup = BeautifulSoup(html, "lxml")
 
-    km_table = _find_table_container(soup, "KM Values")
+    km_table = _find_table_container(soup, table_label)
     if km_table is not None:
         search_root = km_table
         table_scoped = True
@@ -298,7 +324,15 @@ def parse_brenda_km_html(
     # conditions, ref id). Pull them in so aggregate substrates aren't
     # silently dropped.
     subrows = search_root.find_all("div", id=re.compile(r"sr\d+$"))
-    rows = rows + subrows
+
+    # Deduplicate by identity. A sub-row that ALSO carries a "row" class is
+    # matched by both selectors, and plain concatenation then parsed it
+    # twice -- the same measurement returned as two entries. The Km fixtures
+    # never tripped this; the AChE Turnover Numbers capture has 11 such rows.
+    _seen: dict = {}
+    for _row in rows + subrows:
+        _seen.setdefault(id(_row), _row)
+    rows = list(_seen.values())
 
     results = []
     for row in rows:
@@ -396,14 +430,18 @@ def parse_brenda_km_html(
                  "Values table specifically (whole-page fallback scan) - "
                  "this may genuinely be a Ki/Turnover Number/IC50 value"
         )
-        if km_value > KM_PLAUSIBLE_MAX_MM or km_value < KM_PLAUSIBLE_MIN_MM:
+        if km_value > _max_value or km_value < _min_value:
             flagged = True
             flag_reason = (
-                f"Km value {km_value} mM is outside plausible range "
-                f"({KM_PLAUSIBLE_MIN_MM}-{KM_PLAUSIBLE_MAX_MM} mM); "
+                f"{_quantity} value {km_value} {_unit} is outside plausible range "
+                f"({_min_value}-{_max_value} {_unit}); "
                 f"likely a unit error or an anomalous entry ({scope_note})"
             )
-        elif conditions and re.search(r"\bkcat\b", conditions, re.IGNORECASE):
+        elif (
+            _quantity == "Km"
+            and conditions
+            and re.search(r"\bkcat\b", conditions, re.IGNORECASE)
+        ):
             flagged = True
             flag_reason = (
                 "conditions text mentions Kcat; row may report a turnover "
@@ -417,10 +455,10 @@ def parse_brenda_km_html(
             flagged = True
             flag_reason = (
                 "row-selection fell back to a whole-page scan (BRENDA's "
-                "'KM Values' table container could not be located in this "
+                f"'{table_label}' table container could not be located in this "
                 "HTML), so rows from other tables (Ki, Turnover Number, "
                 "IC50, Inhibitors) were not structurally excluded - this "
-                "value has not been confirmed to be a true Km"
+                f"value has not been confirmed to be a true {_quantity}"
             )
 
         # Parse the commentary into structured assay conditions (ADR 0010).
@@ -450,6 +488,46 @@ def parse_brenda_km_html(
         )
 
     return results
+
+
+def parse_brenda_turnover_html(
+    html: str,
+    ec_number: str,
+    target_substrates: list,
+    target_organism: Optional[str] = "Homo sapiens",
+    fallback_uniprot: Optional[str] = None,
+    require_substrate_match: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Parse BRENDA's "Turnover Numbers" table into structured entries.
+
+    kcat is a turnover number in s^-1, not a concentration -- but BRENDA
+    serves it with the identical six-cell row layout as KM Values (value,
+    substrate, organism, uniprot, commentary, reference id), including the
+    same aggregate "N entries" summary rows and the same free-text
+    commentary carrying pH and temperature.
+
+    So this delegates to the Km parser with a different table label and
+    different plausibility bounds, rather than duplicating ~250 lines of
+    row-scoping, aggregate expansion and assay-condition logic that would
+    then drift out of sync.
+
+    ``km_value`` on the returned entries carries the kcat in s^-1. The field
+    name is inherited from the shared row model; the unit is NOT mM.
+
+    STRENDA governs kcat exactly as it governs Km (ADR 0010): a turnover
+    number measured at an unreported pH or temperature cannot be reproduced
+    or compared, so assay conditions are parsed here too and travel with
+    the value.
+    """
+    return parse_brenda_km_html(
+        html=html,
+        ec_number=ec_number,
+        target_substrates=target_substrates,
+        target_organism=target_organism,
+        fallback_uniprot=fallback_uniprot,
+        require_substrate_match=require_substrate_match,
+        table_label=TURNOVER_TABLE_LABEL,
+    )
 
 
 def fetch_and_parse_brenda_km(
