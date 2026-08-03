@@ -44,7 +44,7 @@ router.post("/simulate", simulateLimiter, async (req: Request, res: Response, ne
     if (!parse.success) {
       res.status(400).json({
         error: "BAD_REQUEST",
-        message: parse.error.errors.map((e) => e.message).join("; "),
+        message: parse.error.errors.map((e: { message: string }) => e.message).join("; "),
       });
       return;
     }
@@ -98,7 +98,7 @@ router.get("/simulate/:jobId", async (req: Request, res: Response, next: NextFun
     if (!params.success) {
       res.status(400).json({
         error: "BAD_REQUEST",
-        message: params.error.errors.map((e) => e.message).join("; "),
+        message: params.error.errors.map((e: { message: string }) => e.message).join("; "),
       });
       return;
     }
@@ -128,7 +128,7 @@ router.get("/simulate/:jobId/stream", async (req: Request, res: Response, next: 
     if (!params.success) {
       res.status(400).json({
         error: "BAD_REQUEST",
-        message: params.error.errors.map((e) => e.message).join("; "),
+        message: params.error.errors.map((e: { message: string }) => e.message).join("; "),
       });
       return;
     }
