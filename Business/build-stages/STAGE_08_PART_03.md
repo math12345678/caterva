@@ -181,24 +181,69 @@ what they should contain.
 Two mutations, both caught: reverting to longest-cell (5 failures), and an
 off-by-one on the commentary index (8 failures). 203 literature tests pass.
 
+## 5b. The second fixture arrived, and the parser generalises
+
+LDH (EC 1.1.1.27) captured live 2026-08-02: **92 entries, eight-plus
+organisms, no human rows at all** — structurally unlike the AChE capture in
+every way that matters.
+
+The six parametrised invariants picked it up automatically through
+`glob("brenda_*_kcat_fixture.html")` and **all passed on a page shape the
+parser had never seen**. That is the generality claim tested rather than
+asserted.
+
+### Measured on unseen data
+
+**52 of 92 rows (57 %) are STRENDA-complete**, against ~41 % across the Km
+fixtures. Under the old longest-cell heuristic (§5a) these would have
+reported substrate names as conditions — the fix is doing real work here,
+not just on the page that exposed it.
+
+ADR 0010's central distinction also holds: **5 rows** where BRENDA
+explicitly states *"temperature not specified in the publication"* (a fact
+about the literature) versus **35** where it is merely absent (a fact about
+our parsing).
+
+### The golden that would have been silently lost
+
+*Champsocephalus gunnari* is an Antarctic icefish, and its commentary reads
+*"pH 7.0, 0 °C, recombinant enzyme"*. **0 °C is its real physiological assay
+temperature.**
+
+A truthiness check anywhere in the chain would drop it and report the record
+as temperature-less — the same class of bug as pH 0 being discarded, and
+invisible to any test that only exercises warm-blooded enzymes. It is pinned
+now, and the mutation confirms it: making `_parse_temperature` treat 0 as
+falsy fails that test specifically.
+
+### Two process notes
+
+**A `skipif` I wrote and then removed.** The LDH class started with
+`@pytest.mark.skipif(not FIXTURE.exists())`. The fixture is committed, so its
+absence is a broken checkout — and that decorator would have retired all five
+goldens *silently*, which is precisely the pattern
+`check_no_silent_skips.py` exists to catch. Replaced with an assertion.
+
+**A mutation that lied.** My first attempt at the falsy-0 mutation used
+`str.replace(..., 1)` on `return low, is_range` — which appears in **both**
+`_parse_ph` and `_parse_temperature`. It hit the pH function, temperature
+parsing was never touched, and the suite passed. "The mutation didn't apply"
+and "the test caught nothing" produce identical output. Re-anchored on the
+temperature-specific guard, it fails as expected.
+
 ## 6. Carried forward
 
 1. **`kcat` is still not in `RESOLVABLE_FIELDS`.** Resolving a kcat *still*
    does not produce a simulable parameter on its own — it needs an `[E]₀` the
    caller supplies. The narrowness note remains true as written.
-2. **A second enzyme's turnover fixture.** Still open, but the *tooling* is
-   ready: `brenda_kcat_capture.py` now takes an EC number from
-   `KNOWN_ENZYMES`, and the invariant tests are parametrised over
-   `glob("brenda_*_kcat_fixture.html")`, so a new capture is covered the
-   moment it lands. To add LDH:
+2. ~~**A second enzyme's turnover fixture.**~~ **Closed 2026-08-02** — LDH
+   captured, 92 entries, all invariants pass. See §5b. A third enzyme is
+   available the same way if a new page shape is ever suspected:
 
    ```bash
    cd ~/Desktop/Coding/Terrium/Tests
-   ../.venv/bin/python brenda_kcat_capture.py 1.1.1.27
+   ../.venv/bin/python brenda_kcat_capture.py 2.7.1.1   # hexokinase
    ```
-
-   See §5a for what generalising the tests found before the second fixture
-   even arrived.
 3. **NumPy 2.x / roadrunner 2.9.3** for Python 3.13+, unchanged.
 
 ## 7. References
