@@ -225,6 +225,50 @@ class TestTheOrchestratorIsReachable:
             for e in entries
         )
 
+    def test_every_matching_tier_reads_the_turnover_table(self, monkeypatch):
+        """`table_label` must thread through ALL THREE tiers, not just the
+        one a given query happens to reach.
+
+        Found by mutation: dropping `table_label` from the strict tier and
+        from the unverified-fallback tier both left the suite green,
+        because the stubbed substrates made an earlier tier succeed and the
+        later ones never ran. A call site no test reaches is a call site
+        with no coverage.
+
+        This drives each tier in isolation and asserts the label every
+        time, by spying on the shared parser.
+        """
+        html = KCAT_FIXTURE.read_text(encoding="utf-8")
+        self._stub_network(monkeypatch, html)
+
+        seen: list = []
+        original = brenda_client.parse_brenda_km_html
+
+        def spy(*args, **kwargs):
+            seen.append(kwargs.get("table_label", "<not passed>"))
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(brenda_client, "parse_brenda_km_html", spy)
+
+        # Tier 3: nothing matches by name, so strict and synonym-expanded
+        # both return empty and the unverified fallback runs.
+        monkeypatch.setattr(
+            enzyme_lookup, "parse_kegg_substrates", lambda text: ["not-a-real-substrate"]
+        )
+        monkeypatch.setattr(
+            enzyme_lookup,
+            "expand_substrates_with_synonyms",
+            lambda subs: ["still-not-a-real-substrate"],
+        )
+
+        entries = brenda_client.fetch_and_parse_brenda_kcat("3.1.1.7")
+
+        assert len(seen) == 3, f"expected all three tiers to run, saw {len(seen)}"
+        assert all(label == TURNOVER_TABLE_LABEL for label in seen), seen
+        # The fallback tier returns real rows, marked unverified.
+        assert entries
+        assert all(e.substrate_verified is False for e in entries)
+
     def test_it_reads_the_turnover_table_not_the_km_table(self, monkeypatch):
         """The delegation must actually change which table is read.
 
