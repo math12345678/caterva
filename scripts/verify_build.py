@@ -117,6 +117,14 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_python_support_claim.py'}"
     ))
 
+    # Rule 7 (never `pip install tellurium`) made executable. It was one of
+    # the nine non-negotiable rules, had ADR 0001 behind it, and adding
+    # tellurium to requirements.txt passed every guard in the repo.
+    guards.append(run_guard(
+        "Forbidden Packages Guard",
+        f"python {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
+    ))
+
     return guards
 
 
