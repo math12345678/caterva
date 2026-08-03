@@ -23,6 +23,8 @@ import pathlib
 
 import pytest
 
+import brenda_client
+import enzyme_lookup
 from brenda_client import (
     KCAT_PLAUSIBLE_MAX_PER_S,
     KCAT_PLAUSIBLE_MIN_PER_S,
@@ -170,6 +172,79 @@ class TestNoDuplicateRows:
         heavily-studied substrate came back duplicated."""
         keys = [(e.km_value, e.reference_id, e.substrate) for e in kcat_entries]
         assert len(keys) == len(set(keys)), "duplicate measurements returned"
+
+
+class TestTheOrchestratorIsReachable:
+    """`parse_brenda_turnover_html` had no caller when it was written.
+
+    An extraction nothing can invoke is half-delivered: the parser worked,
+    but there was no path from "EC number" to "kcat with its conditions"
+    the way `fetch_and_parse_brenda_km` provides for Km. These tests drive
+    that path with the network stubbed out.
+    """
+
+    @staticmethod
+    def _stub_network(monkeypatch, html: str):
+        """Replace every outbound call with fixture data.
+
+        Substrate resolution is stubbed rather than mocked away entirely so
+        the three-tier match (strict -> synonyms -> unverified) still runs.
+        """
+        monkeypatch.setattr(
+            brenda_client, "fetch_brenda_html", lambda ec, timeout=15: html
+        )
+        monkeypatch.setattr(
+            enzyme_lookup, "fetch_uniprot_accession", lambda ec, tax: "P22303"
+        )
+        monkeypatch.setattr(enzyme_lookup, "fetch_kegg_enzyme_text", lambda ec: "")
+        monkeypatch.setattr(
+            enzyme_lookup, "parse_kegg_substrates", lambda text: ["acetylcholine"]
+        )
+        monkeypatch.setattr(
+            enzyme_lookup,
+            "expand_substrates_with_synonyms",
+            lambda subs: list(subs) + SUBSTRATES,
+        )
+
+    def test_ec_number_in_kcat_entries_out(self, monkeypatch):
+        self._stub_network(monkeypatch, KCAT_FIXTURE.read_text(encoding="utf-8"))
+
+        entries = brenda_client.fetch_and_parse_brenda_kcat("3.1.1.7")
+
+        assert entries, "orchestrator returned nothing from a fixture with 7 rows"
+        for entry in entries:
+            assert entry.flagged is False, entry.flag_reason
+            assert entry.substrate_verified is True
+        # The golden tuple survives the full orchestrator path, not just the
+        # parser called directly.
+        assert any(
+            e.km_value == 118.0
+            and e.reference_id == "750291"
+            and e.assay_ph == 7.4
+            and e.assay_temperature_c == 37.0
+            for e in entries
+        )
+
+    def test_it_reads_the_turnover_table_not_the_km_table(self, monkeypatch):
+        """The delegation must actually change which table is read.
+
+        If `table_label` failed to thread through, this would fall back to a
+        whole-page scan and flag every row -- so the assertion is on the
+        flags, not merely on getting some result.
+        """
+        self._stub_network(monkeypatch, KCAT_FIXTURE.read_text(encoding="utf-8"))
+
+        kcat_entries = brenda_client.fetch_and_parse_brenda_kcat("3.1.1.7")
+        km_entries = brenda_client.fetch_and_parse_brenda_km("3.1.1.7")
+
+        assert all(e.flagged is False for e in kcat_entries)
+        # The same HTML read as a KM Values table has no such container, so
+        # every row comes back unscoped and flagged.
+        assert km_entries, "expected the Km path to still return rows"
+        assert any(e.flagged for e in km_entries), (
+            "reading the turnover fixture as KM Values should flag rows as "
+            "unscoped; if it does not, table_label is not threading through"
+        )
 
 
 class TestTableScoping:
