@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
 try:
@@ -31,9 +31,9 @@ class TwoLocusResult:
     data: List[List[float]]
     params: Dict[str, Any]
     n_replicates: int
-    seed: Optional[int] = None
-    replicate_data: Optional[List[List[float]]] = None
-    replicate_colnames: Optional[List[str]] = None
+    seed: int | None = None
+    replicate_data: List[List[float]] | None = None
+    replicate_colnames: List[str] | None = None
     validation: ParameterValidation = field(default_factory=ParameterValidation)
 
     @property
@@ -146,7 +146,7 @@ def simulate_two_locus_wright_fisher(
     starting_frequencies: Sequence[float] = (0.25, 0.25, 0.25, 0.25),
     mutation_rate: float = 0.0,
     replicate_runs: int = 1,
-    seed: Optional[int] = None,
+    seed: int | None = None,
     return_replicate_data: bool = False,
 ) -> TwoLocusResult:
     """Haploid two-locus Wright-Fisher simulation with recombination.
@@ -292,7 +292,7 @@ def theoretical_ld_decay(
     d_initial: float,
     recombination_rate: float,
     generations: int,
-    population_size: Optional[int] = None,
+    population_size: int | None = None,
     mutation_rate: float = 0.0,
 ) -> float:
     """Expected linkage disequilibrium after ``generations``::

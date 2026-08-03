@@ -59,6 +59,12 @@ jobs:
       - name: Constitution Rules 7 and 8 guard
         run: python scripts/check_forbidden_packages.py
 
+      # The Stage 4 amendment: a guard is not delivered until something runs
+      # it unasked. check_rng_convention sat wired to nothing for a whole
+      # stage before a test wrapped it.
+      - name: Guard-wiring guard
+        run: python scripts/check_guard_wiring.py
+
       # The remaining guards (RNG convention, dependencies, engine contract,
       # plausibility constants) run in one step via the build-verification
       # script. --quick runs the guards only, not the test suites.

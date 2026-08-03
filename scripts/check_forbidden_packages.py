@@ -99,6 +99,7 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
     found: List[Tuple[int, str]] = []
     in_dependency_section = path.suffix != ".toml"  # .txt is all requirements
     in_dependency_array = False
+    dependency_key_allowed = True
 
     for lineno, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = raw.split("#", 1)[0].strip()
@@ -111,10 +112,18 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
             # "-dependencies".
             section = re.match(r"^\[([^]]+)\]$", line)
             if section:
-                in_dependency_section = section.group(1) in {
+                section_name = section.group(1)
+                in_dependency_section = section_name in {
                     "project",
                     "project.optional-dependencies",
                 }
+                # In [project], only the dependencies key is a package list;
+                # fields such as authors and classifiers are arrays too, but
+                # they are not dependency declarations. Optional dependency
+                # groups may use any key (including a quoted TOML key).
+                dependency_key_allowed = (
+                    section_name == "project.optional-dependencies"
+                )
                 in_dependency_array = False
                 continue
 
@@ -123,9 +132,12 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
 
             if not in_dependency_array:
                 array_start = re.match(
-                    r"^[A-Za-z0-9][A-Za-z0-9._-]*\s*=\s*\[", line
+                    r"^(?P<key>[A-Za-z0-9][A-Za-z0-9._-]*|\"[^\"]+\"|'[^']+')\s*=\s*\[",
+                    line,
                 )
                 if not array_start:
+                    continue
+                if not dependency_key_allowed and array_start.group("key") != "dependencies":
                     continue
                 in_dependency_array = True
                 line = line[array_start.end():].strip()
@@ -183,15 +195,15 @@ def check_adrs_are_indexed() -> List[str]:
     index_text = index.read_text(encoding="utf-8")
     linked = set(re.findall(r"\(([0-9]{4}-[^)]+\.md)\)", index_text))
 
-    for missing in sorted(on_disk - linked):
-        errors.append(
-            f"docs/adr/{missing} exists but is not linked from the ADR index "
-            "-- invisible to anyone reading it (Rule 8)"
-        )
-    for dangling in sorted(linked - on_disk):
-        errors.append(
-            f"the ADR index links docs/adr/{dangling}, which does not exist"
-        )
+    errors.extend(
+        f"docs/adr/{missing} exists but is not linked from the ADR index "
+        "-- invisible to anyone reading it (Rule 8)"
+        for missing in sorted(on_disk - linked)
+    )
+    errors.extend(
+        f"the ADR index links docs/adr/{dangling}, which does not exist"
+        for dangling in sorted(linked - on_disk)
+    )
 
     # Duplicate numbers: two ADRs claiming 0007 happened once already.
     numbers: dict = {}

@@ -24,7 +24,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 
 REPO_ROOT = Path(__file__).parent.parent
@@ -35,7 +35,7 @@ API_SERVER_DIR = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-serve
 
 def run_command(
     cmd: str,
-    cwd: Optional[Path] = None,
+    cwd: Path | None = None,
     timeout: int = 300,
     capture_output: bool = False
 ) -> Tuple[bool, str, str]:
@@ -49,20 +49,21 @@ def run_command(
             capture_output=capture_output,
             text=True
         )
-        success = result.returncode == 0
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
-        return success, stdout, stderr
     except subprocess.TimeoutExpired:
         return False, "", f"Command timed out after {timeout}s: {cmd}"
     except Exception as e:
         return False, "", f"Command failed with exception: {e}"
+    else:
+        success = result.returncode == 0
+        stdout = result.stdout or ""
+        stderr = result.stderr or ""
+        return success, stdout, stderr
 
 
 def run_guard(
     name: str,
     cmd: str,
-    cwd: Optional[Path] = None,
+    cwd: Path | None = None,
     timeout: int = 120,
 ) -> Tuple[str, bool, str]:
     """Run a guard and return (name, success, message)."""
@@ -72,10 +73,9 @@ def run_guard(
     if success:
         print("✅", flush=True)
         return name, True, stdout.strip()
-    else:
-        print("❌", flush=True)
-        error_msg = stderr.strip() or stdout.strip() or f"Command failed: {cmd}"
-        return name, False, error_msg
+    print("❌", flush=True)
+    error_msg = stderr.strip() or stdout.strip() or f"Command failed: {cmd}"
+    return name, False, error_msg
 
 
 def run_python_guards() -> List[Tuple[str, bool, str]]:
@@ -130,6 +130,16 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
     ))
 
+    # The Stage 4 amendment made executable: a guard is not delivered until
+    # something runs it unasked. check_rng_convention sat wired to nothing
+    # for a whole stage, and check_citation_format shipped the same way --
+    # both found by hand. This one catches the next occurrence, including
+    # itself (it did, on its first run).
+    guards.append(run_guard(
+        "Guard Wiring Guard",
+        f"python {SCRIPTS_DIR / 'check_guard_wiring.py'}"
+    ))
+
     return guards
 
 
@@ -144,12 +154,14 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
             "tests/test_engine_api.py",
             "tests/test_rng_convention.py",
         ]
-        for test_file in test_files:
-            tests.append(run_guard(
+        tests.extend(
+            run_guard(
                 f"Python Test: {test_file}",
                 f"python -m pytest {test_file} -v",
                 cwd=TELLURIUM_DIR
-            ))
+            )
+            for test_file in test_files
+        )
     else:
         # Run all Python tests
         tests.append(run_guard(
@@ -282,10 +294,9 @@ def main() -> int:
         print(f"✅ ALL CHECKS PASSED in {duration:.1f}s")
         print("\n🎉 The codebase is in a deployable state!")
         return 0
-    else:
-        print(f"❌ {total_failures} CHECK(S) FAILED in {duration:.1f}s")
-        print("\n⚠️  Please fix the issues above before deploying.")
-        return 1
+    print(f"❌ {total_failures} CHECK(S) FAILED in {duration:.1f}s")
+    print("\n⚠️  Please fix the issues above before deploying.")
+    return 1
 
 
 if __name__ == '__main__':

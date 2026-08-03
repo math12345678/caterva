@@ -35,7 +35,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 README = REPO_ROOT / "README.md"
@@ -47,7 +47,7 @@ SUITES = [
 ]
 
 
-def collect_count(path: Path) -> Optional[int]:
+def collect_count(path: Path) -> int | None:
     """Number of tests pytest collects under `path`.
 
     Returns None (rather than raising or guessing) when collection cannot
@@ -118,7 +118,7 @@ def documented_domain_counts(text: str) -> List[Tuple[int, str]]:
         "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
         "twelve": 12, "thirteen": 13, "fourteen": 14, "fifteen": 15,
     }
-    claims: List[Tuple[int, str]] = []
+    claims: List[Tuple[int, int]] = []
     pattern = re.compile(r"\b([A-Za-z]+|\d+)\s+simulation domains\b", re.IGNORECASE)
     for lineno, line in enumerate(text.splitlines(), start=1):
         for match in pattern.finditer(line):

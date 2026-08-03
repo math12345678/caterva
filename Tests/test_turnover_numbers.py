@@ -98,7 +98,7 @@ class TestRealCapturedValues:
         fast = [e for e in kcat_entries if e.km_value == 6500.0]
         assert fast, "the 6500 s^-1 row vanished from the fixture"
         assert fast[0].flagged is False
-        assert 6500.0 > 1000.0  # i.e. it WOULD fail the Km bound
+        assert 6500.0 > 1000.0  # i.e. it WOULD fail the Km bound  # noqa: PLR0133
 
 
 class TestStrendaAppliesToKcat:

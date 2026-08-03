@@ -43,7 +43,7 @@ import re
 import sys
 import urllib.request
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
+from typing import List, Set, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -71,7 +71,7 @@ PINNED = {
 }
 
 
-def _claimed_window(text: str) -> Optional[Tuple[int, int]]:
+def _claimed_window(text: str) -> Tuple[int, int] | None:
     match = CLAIM_PATTERN.search(text)
     if match is None:
         return None
@@ -110,7 +110,7 @@ def check_internal_consistency() -> List[str]:
     return errors
 
 
-def _wheel_pythons(package: str, version: str) -> Optional[Set[str]]:
+def _wheel_pythons(package: str, version: str) -> Set[str] | None:
     """cp tags for a release, or {'*'} when it ships version-agnostic wheels."""
     url = f"https://pypi.org/pypi/{package}/json"
     try:

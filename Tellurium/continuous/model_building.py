@@ -7,7 +7,7 @@ domains never import them (ADR 0001, ADR 0002, ADR 0006).
 from __future__ import annotations
 
 import threading
-from typing import List, Optional
+from typing import List
 
 import antimony
 import libsbml
@@ -113,7 +113,7 @@ _ANTIMONY_LOCK = threading.Lock()
 
 
 def antimony_to_sbml(antimony_string: str,
-                     model_name: Optional[str] = None) -> str:
+                     model_name: str | None = None) -> str:
     """Translate Antimony source to an SBML document string."""
     if not isinstance(antimony_string, str):
         raise ModelBuildError("antimony_string must be a string")

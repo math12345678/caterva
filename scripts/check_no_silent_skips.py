@@ -43,7 +43,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,7 +57,7 @@ SUITES = [
 EXPECTED_MAX_SKIPS = 0
 
 
-def run_suite(path: Path) -> Optional[Tuple[int, int, List[str]]]:
+def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     """Run one suite. Returns (passed, skipped, skip_reasons) or None.
 
     `-rs` makes pytest print the reason for every skip, so a failure can name

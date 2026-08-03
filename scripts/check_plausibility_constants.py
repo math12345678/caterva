@@ -14,7 +14,7 @@ from __future__ import annotations
 import ast
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Any
 
 
 # Constants that should have consistent values across modules.
@@ -126,8 +126,7 @@ def _collect_py_files(repo_root: Path) -> List[Path]:
 
 def check_constants_consistency() -> List[str]:
     """Check that all plausibility constants have consistent values."""
-    errors = []
-    
+    errors: List[str] = []
     repo_root = Path(__file__).parent.parent
 
     # Both layers, not just the engine. ADR 0003 makes the Km plausibility
@@ -143,7 +142,7 @@ def check_constants_consistency() -> List[str]:
     py_files = _collect_py_files(repo_root)
 
     # Collect all constant definitions
-    all_constants = {}
+    all_constants: Dict[str, Dict[str, Any]] = {}
     
     for py_file in py_files:
         constants = extract_constants_from_file(py_file, errors)
@@ -158,12 +157,12 @@ def check_constants_consistency() -> List[str]:
     # constant) is caught instead of passing because no second definition
     # existed to compare against.
     for const_name, sources in all_constants.items():
-        values = set(_normalise(v) for v in sources.values())
+        values = {_normalise(v) for v in sources.values()}
         if len(values) > 1:
             errors.append(f"Constant {const_name} has inconsistent values: {dict(sources)}")
         elif const_name in EXPECTED_CONSTANTS:
             expected = EXPECTED_CONSTANTS[const_name]
-            actual = list(sources.values())[0]
+            actual = next(iter(sources.values()))
             if _normalise(actual) != _normalise(expected):
                 errors.append(f"Constant {const_name} has unexpected value: expected {expected}, got {actual}")
 
@@ -172,7 +171,7 @@ def check_constants_consistency() -> List[str]:
 
 def check_missing_constants() -> List[str]:
     """Check that all expected constants are defined."""
-    errors = []
+    errors: List[str] = []
     
     repo_root = Path(__file__).parent.parent
 
@@ -180,17 +179,17 @@ def check_missing_constants() -> List[str]:
     py_files = _collect_py_files(repo_root)
 
     # Collect all defined constants
-    defined_constants = set()
+    defined_constants: set[str] = set()
     
     for py_file in py_files:
         constants = extract_constants_from_file(py_file, errors)
         defined_constants.update(constants.keys())
     
     # Check for missing expected constants
-    missing = []
-    for const_name in EXPECTED_CONSTANTS:
-        if const_name not in defined_constants:
-            missing.append(const_name)
+    missing = [
+        const_name for const_name in EXPECTED_CONSTANTS
+        if const_name not in defined_constants
+    ]
     
     if missing:
         errors.append(f"Missing expected constants: {missing}")
@@ -251,9 +250,8 @@ def main() -> int:
         for error in all_errors:
             print(f"  - {error}")
         return 1
-    else:
-        print("✅ PASSED: All plausibility constants are consistent and complete.")
-        return 0
+    print("✅ PASSED: All plausibility constants are consistent and complete.")
+    return 0
 
 
 if __name__ == '__main__':

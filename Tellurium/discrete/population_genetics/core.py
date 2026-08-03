@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, Sequence
+from typing import Any, Dict, Sequence
 
 import numpy as np
 try:
@@ -58,7 +58,7 @@ def simulate_wright_fisher(
     dominance: float | None = None,
     seed: int | None = None,
     return_replicate_data: bool = False,
-    population_size_series: Optional[Sequence[int]] = None,
+    population_size_series: Sequence[int] | None = None,
     n_demes: int = 1,
     migration_rate: float = 0.0,
     migration_model: str = "island",
@@ -177,7 +177,7 @@ def simulate_wright_fisher(
     data_arr = np.empty((generations + 1, n_cols), dtype=np.float64)
     row_template = np.empty(n_cols, dtype=np.float64)
 
-    replicate_data: Optional[np.ndarray] = None
+    replicate_data: np.ndarray | None = None
     if return_replicate_data:
         flat_width = replicate_runs * (n_demes if structured else 1)
         rep_arr = np.empty((generations + 1, 1 + flat_width),

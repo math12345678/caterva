@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, List, Optional, Sequence
+from typing import Any, List, Sequence
 
 import numpy as np
 try:
@@ -86,8 +86,8 @@ def validate_michaelis_menten_params(km: float, vmax: float,
 
 
 def vmax_from_kcat(
-    kcat: float, enzyme_conc: float, km: Optional[float] = None
-) -> "tuple[float, ParameterValidation]":
+    kcat: float, enzyme_conc: float, km: float | None = None
+) -> tuple[float, ParameterValidation]:
     """Convert a turnover number into a Vmax: ``Vmax = kcat * [E]0``.
 
     This is what makes a literature-resolved kcat simulable. kcat is a
@@ -477,7 +477,7 @@ def validate_wright_fisher_params(
     mutation_rate: float = 0.0,
     selection_coefficient: float = 0.0,
     dominance: float | None = None,
-    population_size_series: Optional[Sequence[int]] = None,
+    population_size_series: Sequence[int] | None = None,
     n_demes: int = 1,
     migration_rate: float = 0.0,
     migration_model: str = "island",

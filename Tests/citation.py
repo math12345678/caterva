@@ -8,23 +8,22 @@ Citation object in the product) never has to branch on "which source
 gave me this number" - it just reads a Citation.
 """
 
-from typing import Optional
 
 from pydantic import BaseModel
 
 
 class Citation(BaseModel):
     source: str  # "BRENDA" | "PubMed" | "manual"
-    reference_id: Optional[str] = None      # BRENDA ref id or PMID
-    url: Optional[str] = None
-    title: Optional[str] = None
-    organism: Optional[str] = None
-    notes: Optional[str] = None             # e.g. flag_reason, caveats
+    reference_id: str | None = None      # BRENDA ref id or PMID
+    url: str | None = None
+    title: str | None = None
+    organism: str | None = None
+    notes: str | None = None             # e.g. flag_reason, caveats
 
 
 def brenda_reference_url(
-    reference_id: Optional[str], ec_number: Optional[str] = None
-) -> Optional[str]:
+    reference_id: str | None, ec_number: str | None = None
+) -> str | None:
     """Best available link for a BRENDA reference.
 
     IMPORTANT: BRENDA does NOT have a working per-reference deep link.
@@ -52,7 +51,7 @@ def brenda_reference_url(
     return f"https://www.brenda-enzymes.org/enzyme.php?ecno={ec_number}"
 
 
-def pubmed_url(pmid: Optional[str]) -> Optional[str]:
+def pubmed_url(pmid: str | None) -> str | None:
     if not pmid:
         return None
     return f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"

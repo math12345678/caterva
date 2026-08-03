@@ -46,7 +46,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, Callable, Dict, List, Sequence
+from typing import Any, Callable, Dict, Sequence
 
 
 # Application-runtime ceilings, not scientific plausibility bounds. The engine
@@ -117,7 +117,7 @@ def _fcc_particle_count(requested: int) -> int:
 
 # The repo root must be on PYTHONPATH so we can import Tellurium.tellurium_engine.
 # The API server sets this when spawning the process.
-from Tellurium import tellurium_engine  # type: ignore
+from Tellurium import tellurium_engine  # noqa: E402  # type: ignore
 
 
 def _to_point(row: Sequence[float], colnames: Sequence[str]) -> Dict[str, float]:
@@ -559,15 +559,15 @@ def main() -> None:
     try:
         raw = sys.stdin.read()
         if not raw:
-            raise ValueError("no input JSON provided")
+            raise ValueError("no input JSON provided")  # noqa: TRY301
         payload = json.loads(raw)
         domain = payload.get("domain")
         params = payload.get("parameters", {})
 
         if domain not in DISPATCH:
-            raise ValueError(f"unknown domain: {domain!r}")
+            raise ValueError(f"unknown domain: {domain!r}")  # noqa: TRY301
         if not isinstance(params, dict):
-            raise ValueError(f"parameters must be an object, got {type(params).__name__}")
+            raise ValueError(f"parameters must be an object, got {type(params).__name__}")  # noqa: TRY301
 
         result = _RUNNERS[domain](params)
         print(json.dumps(result))
