@@ -31,9 +31,7 @@ describe("POST /api/simulate — parameterProvenance survives cache hit", () => 
   it("returns identical parameterProvenance on a repeated query", async () => {
     const query = "simulate sir beta=0.5 gamma=0.1";
 
-    const create = await request(server)
-      .post("/api/simulate")
-      .send({ query });
+    const create = await request(server).post("/api/simulate").send({ query });
     expect(create.status).toBe(202);
     expect(create.body).toHaveProperty("jobId");
     const { jobId } = create.body;
@@ -57,9 +55,7 @@ describe("POST /api/simulate — parameterProvenance survives cache hit", () => 
       return;
     }
 
-    const again = await request(server)
-      .post("/api/simulate")
-      .send({ query });
+    const again = await request(server).post("/api/simulate").send({ query });
     expect(again.status).toBe(202);
     const { jobId: jobId2 } = again.body;
 

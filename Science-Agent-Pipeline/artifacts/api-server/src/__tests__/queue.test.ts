@@ -100,7 +100,10 @@ describe("setJobResult", () => {
       runId: "r1",
       domain: "mm" as const,
       parameters: { km: 5 },
-      trajectory: [{ t: 0, S: 100 }, { t: 1, S: 50 }],
+      trajectory: [
+        { t: 0, S: 100 },
+        { t: 1, S: 50 },
+      ],
       provenance: { reasoning: "test", modelCitations: [], flags: [] },
       parameterProvenance: {},
       completedAt: new Date().toISOString(),
@@ -148,7 +151,9 @@ describe("subscribe / unsubscribe", () => {
   it("unsubscribe stops receiving updates", () => {
     const job = queue.createJob("unsub test");
     let callCount = 0;
-    const unsub = queue.subscribe(job.jobId, () => { callCount++; });
+    const unsub = queue.subscribe(job.jobId, () => {
+      callCount++;
+    });
     unsub();
     queue.updateJob(job.jobId, { status: "completed" });
     expect(callCount).toBe(0);
@@ -158,8 +163,12 @@ describe("subscribe / unsubscribe", () => {
     const job = queue.createJob("multi sub");
     let count1 = 0;
     let count2 = 0;
-    const u1 = queue.subscribe(job.jobId, () => { count1++; });
-    const u2 = queue.subscribe(job.jobId, () => { count2++; });
+    const u1 = queue.subscribe(job.jobId, () => {
+      count1++;
+    });
+    const u2 = queue.subscribe(job.jobId, () => {
+      count2++;
+    });
     queue.updateJob(job.jobId, { status: "resolving" });
     expect(count1).toBe(1);
     expect(count2).toBe(1);
@@ -186,8 +195,10 @@ describe("cancelJob", () => {
   it("returns existing job for terminal statuses", () => {
     const job = queue.createJob("already done");
     queue.setJobResult(job.jobId, {
-      runId: "r1", domain: "sir",
-      parameters: {}, trajectory: [],
+      runId: "r1",
+      domain: "sir",
+      parameters: {},
+      trajectory: [],
       provenance: { reasoning: "x", modelCitations: [], flags: [] },
       parameterProvenance: {},
       completedAt: new Date().toISOString(),
@@ -241,7 +252,9 @@ describe("acquireRunnerSlot / releaseRunnerSlot", () => {
 
     // Third should NOT resolve until we release
     let thirdResolved = false;
-    const c = queue.acquireRunnerSlot().then(() => { thirdResolved = true; });
+    const c = queue.acquireRunnerSlot().then(() => {
+      thirdResolved = true;
+    });
     await sleep(10);
     expect(thirdResolved).toBe(false);
 

@@ -1,4 +1,9 @@
-import express, { type Express, type Request, type Response, type NextFunction } from "express";
+import express, {
+  type Express,
+  type Request,
+  type Response,
+  type NextFunction,
+} from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import router from "./routes";
@@ -43,7 +48,10 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   }
   bucket.count++;
   res.setHeader("X-RateLimit-Limit", String(RATE_LIMIT));
-  res.setHeader("X-RateLimit-Remaining", String(Math.max(0, RATE_LIMIT - bucket.count)));
+  res.setHeader(
+    "X-RateLimit-Remaining",
+    String(Math.max(0, RATE_LIMIT - bucket.count)),
+  );
   res.setHeader("X-RateLimit-Reset", String(Math.ceil(bucket.resetAt / 1000)));
   next();
 });

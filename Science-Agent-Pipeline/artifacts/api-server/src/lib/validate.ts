@@ -8,7 +8,7 @@ export function validate(schema: ZodSchema, target: ValidationTarget = "body") {
     const parse = schema.safeParse(req[target]);
     if (!parse.success) {
       const messages = (parse.error as ZodError).errors.map(
-        (e) => `${e.path.join(".")}: ${e.message}`
+        (e) => `${e.path.join(".")}: ${e.message}`,
       );
       res.status(400).json({
         error: "BAD_REQUEST",

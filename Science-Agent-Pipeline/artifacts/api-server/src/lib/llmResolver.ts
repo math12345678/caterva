@@ -141,7 +141,10 @@ export async function resolveQueryWithLLM(
 
     if (!response.ok) {
       const text = await response.text();
-      logger.warn({ status: response.status, body: text }, "LLM resolver returned non-2xx response");
+      logger.warn(
+        { status: response.status, body: text },
+        "LLM resolver returned non-2xx response",
+      );
       return null;
     }
 
@@ -156,7 +159,19 @@ export async function resolveQueryWithLLM(
 
     if (
       !parsed.domain ||
-      !["mm", "sir", "seir", "pcr", "monte_carlo_pi", "wright_fisher", "two_locus_wright_fisher", "molecular_dynamics", "gillespie_ssa", "gillespie_ssa_bimolecular", "gillespie_ssa_replicates"].includes(parsed.domain)
+      ![
+        "mm",
+        "sir",
+        "seir",
+        "pcr",
+        "monte_carlo_pi",
+        "wright_fisher",
+        "two_locus_wright_fisher",
+        "molecular_dynamics",
+        "gillespie_ssa",
+        "gillespie_ssa_bimolecular",
+        "gillespie_ssa_replicates",
+      ].includes(parsed.domain)
     ) {
       logger.warn({ parsed }, "LLM resolver returned invalid domain");
       return null;
@@ -171,16 +186,23 @@ export async function resolveQueryWithLLM(
       domain: parsed.domain,
       parameters: normalizeParameters(parsed.parameters),
       reasoning: parsed.reasoning || "Resolved via LLM.",
-      modelCitations: Array.isArray(parsed.modelCitations) ? parsed.modelCitations : [],
+      modelCitations: Array.isArray(parsed.modelCitations)
+        ? parsed.modelCitations
+        : [],
       entities: normalizeEntities(parsed.entities),
     };
   } catch (err) {
-    logger.warn({ err }, "LLM resolver failed; falling back to keyword resolver");
+    logger.warn(
+      { err },
+      "LLM resolver failed; falling back to keyword resolver",
+    );
     return null;
   }
 }
 
-function normalizeParameters(input: Record<string, unknown>): Record<string, number> {
+function normalizeParameters(
+  input: Record<string, unknown>,
+): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [key, value] of Object.entries(input)) {
     if (typeof value === "number") {

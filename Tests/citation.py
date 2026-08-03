@@ -8,7 +8,6 @@ Citation object in the product) never has to branch on "which source
 gave me this number" - it just reads a Citation.
 """
 
-
 from pydantic import BaseModel
 
 

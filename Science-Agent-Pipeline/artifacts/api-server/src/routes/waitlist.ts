@@ -39,40 +39,48 @@ function saveWaitlist(entries: WaitlistEntry[]): void {
 
 let WAITLIST = loadWaitlist();
 
-router.post("/waitlist", validate(WaitlistBody), async (req: Request, res: Response) => {
-  try {
-    const { email } = req.body as { email: string };
+router.post(
+  "/waitlist",
+  validate(WaitlistBody),
+  async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body as { email: string };
 
-    if (WAITLIST.some((entry) => entry.email === email)) {
-      res.status(409).json({
-        error: "ALREADY_SIGNED_UP",
-        message: "This email is already on the waitlist.",
+      if (WAITLIST.some((entry) => entry.email === email)) {
+        res.status(409).json({
+          error: "ALREADY_SIGNED_UP",
+          message: "This email is already on the waitlist.",
+        });
+        return;
+      }
+
+      const entry: WaitlistEntry = {
+        email,
+        createdAt: new Date().toISOString(),
+      };
+      WAITLIST.push(entry);
+      saveWaitlist(WAITLIST);
+
+      if (WAITLIST.length > 10000) {
+        WAITLIST = WAITLIST.slice(-10000);
+      }
+
+      logger.info({ email }, "Waitlist signup");
+
+      res.status(201).json({
+        position: WAITLIST.length,
+        message:
+          "You're on the list! We'll reach out when a pilot spot opens up.",
       });
-      return;
+    } catch (err) {
+      logger.error({ err }, "Waitlist signup failed");
+      res.status(500).json({
+        error: "INTERNAL_SERVER_ERROR",
+        message: "Failed to add to waitlist.",
+      });
     }
-
-    const entry: WaitlistEntry = { email, createdAt: new Date().toISOString() };
-    WAITLIST.push(entry);
-    saveWaitlist(WAITLIST);
-
-    if (WAITLIST.length > 10000) {
-      WAITLIST = WAITLIST.slice(-10000);
-    }
-
-    logger.info({ email }, "Waitlist signup");
-
-    res.status(201).json({
-      position: WAITLIST.length,
-      message: "You're on the list! We'll reach out when a pilot spot opens up.",
-    });
-  } catch (err) {
-    logger.error({ err }, "Waitlist signup failed");
-    res.status(500).json({
-      error: "INTERNAL_SERVER_ERROR",
-      message: "Failed to add to waitlist.",
-    });
-  }
-});
+  },
+);
 
 router.get("/waitlist/count", async (_req: Request, res: Response) => {
   res.json({ count: WAITLIST.length });
@@ -87,7 +95,9 @@ export function resetWaitlist(): void {
     if (existsSync(DB_PATH)) {
       writeFileSync(DB_PATH, "[]");
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export default router;

@@ -337,10 +337,8 @@ async function findCachedSimulation(
         modelCitations: [],
         flags: [],
       },
-      parameterProvenance: (row.parameterProvenance as Record<
-        string,
-        ParameterProvenance
-      >) || {},
+      parameterProvenance:
+        (row.parameterProvenance as Record<string, ParameterProvenance>) || {},
       completedAt: row.createdAt.toISOString(),
     };
   } catch (err) {

@@ -52,10 +52,24 @@ describe("findRepositoryRoot", () => {
   it("is indifferent to source vs dist depth", () => {
     const root = makeFakeRepo();
     const src = findRepositoryRoot(
-      path.join(root, "Science-Agent-Pipeline", "artifacts", "api-server", "src", "lib"),
+      path.join(
+        root,
+        "Science-Agent-Pipeline",
+        "artifacts",
+        "api-server",
+        "src",
+        "lib",
+      ),
     );
     const dist = findRepositoryRoot(
-      path.join(root, "Science-Agent-Pipeline", "artifacts", "api-server", "dist", "lib"),
+      path.join(
+        root,
+        "Science-Agent-Pipeline",
+        "artifacts",
+        "api-server",
+        "dist",
+        "lib",
+      ),
     );
     expect(src).toBe(dist);
   });
@@ -63,13 +77,17 @@ describe("findRepositoryRoot", () => {
   it("throws when no repo markers exist up the tree", () => {
     const root = mkdtempSync(path.join(tmpdir(), "terrium-empty-"));
     tempDirs.push(root);
-    expect(() => findRepositoryRoot(root)).toThrow(/Could not find Terrium repository root/);
+    expect(() => findRepositoryRoot(root)).toThrow(
+      /Could not find Terrium repository root/,
+    );
   });
 
   it("does not accept a directory with only one of the two markers", () => {
     const root = mkdtempSync(path.join(tmpdir(), "terrium-half-"));
     tempDirs.push(root);
     mkdirSync(path.join(root, "Tellurium"));
-    expect(() => findRepositoryRoot(root)).toThrow(/Could not find Terrium repository root/);
+    expect(() => findRepositoryRoot(root)).toThrow(
+      /Could not find Terrium repository root/,
+    );
   });
 });

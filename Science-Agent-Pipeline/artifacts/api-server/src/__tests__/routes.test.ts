@@ -94,7 +94,9 @@ describe("POST /api/simulate", () => {
     const getRes = await request(server).get(`/api/simulate/${jobId}`);
     expect(getRes.status).toBe(200);
     expect(getRes.body.jobId).toBe(jobId);
-    expect(["pending", "running", "failed", "completed"]).toContain(getRes.body.status);
+    expect(["pending", "running", "failed", "completed"]).toContain(
+      getRes.body.status,
+    );
   });
 
   it("pipeline runs asynchronously to completion when Python bridge is available", async () => {
@@ -142,12 +144,14 @@ describe("POST /api/simulate", () => {
         // The final row snaps to `end` exactly.
         expect(result.trajectory[result.trajectory.length - 1].time).toBe(5);
         // Seeded run: reproducible; run the same query again and compare.
-        const again = await request(server)
-          .post("/api/simulate")
-          .send({ query: "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9" });
+        const again = await request(server).post("/api/simulate").send({
+          query: "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9",
+        });
         for (let j = 0; j < 30; j++) {
           await new Promise((r) => setTimeout(r, 500));
-          const getAgain = await request(server).get(`/api/simulate/${again.body.jobId}`);
+          const getAgain = await request(server).get(
+            `/api/simulate/${again.body.jobId}`,
+          );
           if (getAgain.body.status === "completed") {
             expect(getAgain.body.result.trajectory).toEqual(result.trajectory);
             return;
@@ -177,8 +181,12 @@ describe("GET /api/simulate", () => {
   });
 
   it("returns all jobs in reverse chronological order", async () => {
-    const r1 = await request(server).post("/api/simulate").send({ query: "first" });
-    const r2 = await request(server).post("/api/simulate").send({ query: "second" });
+    const r1 = await request(server)
+      .post("/api/simulate")
+      .send({ query: "first" });
+    const r2 = await request(server)
+      .post("/api/simulate")
+      .send({ query: "second" });
     const res = await request(server).get("/api/simulate");
     expect(res.body.length).toBe(2);
     expect(res.body[0].query).toBe("second");
@@ -193,7 +201,9 @@ describe("POST /api/simulate/:jobId/cancel", () => {
   });
 
   it("cancels a pending job", async () => {
-    const create = await request(server).post("/api/simulate").send({ query: "to cancel" });
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "to cancel" });
     const { jobId } = create.body;
 
     const res = await request(server).post(`/api/simulate/${jobId}/cancel`);
@@ -202,7 +212,9 @@ describe("POST /api/simulate/:jobId/cancel", () => {
   });
 
   it("returns 409 for already completed job", async () => {
-    const create = await request(server).post("/api/simulate").send({ query: "simulate sir" });
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate sir" });
     const { jobId } = create.body;
 
     // Wait for completion
@@ -226,7 +238,9 @@ describe("POST /api/waitlist", () => {
   });
 
   it("returns 400 for invalid email", async () => {
-    const res = await request(server).post("/api/waitlist").send({ email: "not-an-email" });
+    const res = await request(server)
+      .post("/api/waitlist")
+      .send({ email: "not-an-email" });
     expect(res.status).toBe(400);
   });
 
@@ -240,16 +254,24 @@ describe("POST /api/waitlist", () => {
   });
 
   it("returns 409 for duplicate email", async () => {
-    await request(server).post("/api/waitlist").send({ email: "dup@example.com" });
-    const res = await request(server).post("/api/waitlist").send({ email: "dup@example.com" });
+    await request(server)
+      .post("/api/waitlist")
+      .send({ email: "dup@example.com" });
+    const res = await request(server)
+      .post("/api/waitlist")
+      .send({ email: "dup@example.com" });
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("ALREADY_SIGNED_UP");
   });
 
   it("normalizes emails to lowercase", async () => {
-    const r1 = await request(server).post("/api/waitlist").send({ email: "UPPER@EXAMPLE.COM" });
+    const r1 = await request(server)
+      .post("/api/waitlist")
+      .send({ email: "UPPER@EXAMPLE.COM" });
     expect(r1.status).toBe(201);
-    const r2 = await request(server).post("/api/waitlist").send({ email: "upper@example.com" });
+    const r2 = await request(server)
+      .post("/api/waitlist")
+      .send({ email: "upper@example.com" });
     expect(r2.status).toBe(409);
   });
 });
@@ -343,7 +365,8 @@ describe("POST /api/resolve", () => {
 
 describe("POST /api/simulate — bimolecular SSA end to end", () => {
   it("runs a seeded bimolecular SSA through the queue and reproduces it bit-identically", async () => {
-    const query = "bimolecular association reaction a0=60 b0=40 k=0.01 end=5 seed=12345";
+    const query =
+      "bimolecular association reaction a0=60 b0=40 k=0.01 end=5 seed=12345";
     const create = await request(server).post("/api/simulate").send({ query });
     expect(create.status).toBe(202);
     expect(create.body.jobId).toBeTruthy();
@@ -363,7 +386,12 @@ describe("POST /api/simulate — bimolecular SSA end to end", () => {
     const trajectory = first.body.result.trajectory;
     expect(trajectory).toHaveLength(38);
     expect(trajectory[0]).toEqual({ time: 0, a: 60, b: 40, c: 0 });
-    expect(trajectory[trajectory.length - 1]).toEqual({ time: 5, a: 24, b: 4, c: 36 });
+    expect(trajectory[trajectory.length - 1]).toEqual({
+      time: 5,
+      a: 24,
+      b: 4,
+      c: 36,
+    });
 
     const second = await poll();
     expect(second.body.result.trajectory).toEqual(trajectory);
@@ -377,8 +405,12 @@ describe("GET /api/simulate/:jobId/export", () => {
   });
 
   it("returns 409 for incomplete job", async () => {
-    const create = await request(server).post("/api/simulate").send({ query: "something" });
-    const res = await request(server).get(`/api/simulate/${create.body.jobId}/export`);
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "something" });
+    const res = await request(server).get(
+      `/api/simulate/${create.body.jobId}/export`,
+    );
     expect(res.status).toBe(409);
     expect(res.body.error).toBe("NO_DATA");
   });
