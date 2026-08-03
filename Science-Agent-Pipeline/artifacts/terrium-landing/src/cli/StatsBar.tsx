@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import AnimatedCounter from '@/components/ui/animated-counter';
 
 const staticStats = [
-  { key: 'tests', target: 47, suffix: '+', label: 'tests passing' },
+  { key: 'tests', target: 430, suffix: '+', label: 'tests passing' },
   { key: 'domains', target: 2, suffix: '', label: 'live domains' },
   { key: 'supported', target: 6, suffix: '', label: 'supported domains' },
 ];
@@ -18,7 +18,7 @@ export default function StatsBar() {
     Promise.all([
       fetch(`${API_BASE}/api/waitlist/count`, { signal: controller.signal })
         .then((r) => r.json().then((d) => d.count))
-        .catch(() => 47),
+        .catch(() => 430),
       fetch(`${API_BASE}/api/metrics`, { signal: controller.signal })
         .then((r) => r.json().then((d) => Math.round(d.uptime / 3600)))
         .catch(() => 24),
@@ -30,7 +30,7 @@ export default function StatsBar() {
   }, []);
 
   const liveStats = [
-    { key: 'waiting', target: waitlistCount || 47, suffix: '+', label: 'researchers waiting' },
+    { key: 'waiting', target: waitlistCount || 0, suffix: '+', label: 'researchers waiting' },
     { key: 'uptime', target: uptimeHours || 24, suffix: '/7', label: 'pipeline uptime' },
   ];
 
