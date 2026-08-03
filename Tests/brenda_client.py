@@ -537,6 +537,7 @@ def fetch_and_parse_brenda_km(
     taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
     expand_synonyms: bool = True,
     allow_unverified_fallback: bool = True,
+    table_label: str = "KM Values",
 ) -> list[BRENDAKmEntry]:
     """Orchestrator: given just an EC number, dynamically resolve its real
     substrate name(s) (via KEGG) and canonical UniProt accession (via the
@@ -590,7 +591,8 @@ def fetch_and_parse_brenda_km(
     html = fetch_brenda_html(ec_number)
 
     entries = parse_brenda_km_html(
-        html, ec_number, target_substrates, target_organism, fallback_uniprot
+        html, ec_number, target_substrates, target_organism, fallback_uniprot,
+        table_label=table_label,
     )
     if entries:
         return entries
@@ -600,7 +602,8 @@ def fetch_and_parse_brenda_km(
             target_substrates
         )
         entries = parse_brenda_km_html(
-            html, ec_number, expanded_substrates, target_organism, fallback_uniprot
+            html, ec_number, expanded_substrates, target_organism, fallback_uniprot,
+            table_label=table_label,
         )
         if entries:
             return entries
@@ -613,9 +616,51 @@ def fetch_and_parse_brenda_km(
             target_organism,
             fallback_uniprot,
             require_substrate_match=False,
+            table_label=table_label,
         )
 
     return []
+
+
+def fetch_and_parse_brenda_kcat(
+    ec_number: str,
+    target_organism: Optional[str] = "Homo sapiens",
+    target_substrates: Optional[list] = None,
+    taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
+    expand_synonyms: bool = True,
+    allow_unverified_fallback: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Orchestrator for turnover numbers: EC number in, kcat entries out.
+
+    The kcat counterpart of ``fetch_and_parse_brenda_km``. Identical
+    strategy -- KEGG substrate resolution, UniProt fallback accession, then
+    the three-tier match (strict -> synonym-expanded -> unverified
+    fallback) -- pointed at BRENDA's "Turnover Numbers" table instead of
+    "KM Values".
+
+    Implemented by delegation rather than duplication: the two differ only
+    in which table is read and which plausibility bounds apply, and an
+    80-line copy would drift the moment either strategy changed.
+
+    ``km_value`` on the returned entries carries the kcat in **s^-1**, not
+    mM -- the field name is inherited from the shared row model. Assay
+    conditions travel with each entry, because STRENDA governs kcat exactly
+    as it governs Km (ADR 0010).
+
+    Note this returns literature values; it does NOT feed the simulation
+    engine. Vmax = kcat * [E]0 needs an enzyme concentration Terrium does
+    not have, so kcat is deliberately absent from RESOLVABLE_FIELDS.
+    See ADR 0012.
+    """
+    return fetch_and_parse_brenda_km(
+        ec_number=ec_number,
+        target_organism=target_organism,
+        target_substrates=target_substrates,
+        taxon_id=taxon_id,
+        expand_synonyms=expand_synonyms,
+        allow_unverified_fallback=allow_unverified_fallback,
+        table_label=TURNOVER_TABLE_LABEL,
+    )
 
 
 if __name__ == "__main__":
