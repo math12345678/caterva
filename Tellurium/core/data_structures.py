@@ -32,6 +32,33 @@ class SimulationError(RuntimeError):
 
 KM_PLAUSIBLE_MIN_MM = 1e-7  # 0.1 nM - below this gets flagged
 KM_PLAUSIBLE_MAX_MM = 1e3  # 1000 mM - above this gets flagged
+
+# ---------------------------------------------------------------------------
+# kcat (turnover number), units s^-1. Stage 8.
+#
+# Bounds are literature-anchored, not chosen for convenience:
+#
+#   median kcat ~10 s^-1 across several thousand enzymes
+#       -- Bar-Even et al. (2011), Biochemistry 50(21), 4402-4410,
+#          "The Moderately Efficient Enzyme". DOI 10.1021/bi2002289
+#   catalase, the fastest known enzyme, ~4e7 s^-1
+#   diffusion-limited ceiling ~1e8-1e9 s^-1
+#
+# The upper bound is set at the diffusion limit rather than at catalase:
+# a value above catalase is remarkable but not impossible, whereas a value
+# above the diffusion limit cannot be a turnover number at all (almost
+# always a unit error -- min^-1 reported as s^-1, or a kcat/Km ratio
+# mislabelled as kcat).
+#
+# The lower bound admits genuinely sluggish enzymes: the AChE fixture
+# contains a real captured value of 8.83e-6 s^-1 (Schizaphis graminum),
+# so anything stricter than 1e-6 would flag real data.
+#
+# Flagged, never rejected -- same Rule 2 reasoning as Km.
+# ---------------------------------------------------------------------------
+KCAT_PLAUSIBLE_MIN_PER_S = 1e-6  # below this, likely a unit error
+KCAT_PLAUSIBLE_MAX_PER_S = 1e9  # diffusion limit; above this is not a kcat
+
 R0_IMPLAUSIBLE_ABOVE = 20.0  # Higher than any documented human pathogen
 
 # PCR amplification efficiency is a fraction: 1.0 means perfect doubling every
