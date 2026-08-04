@@ -316,6 +316,37 @@ class TestAssayConditionsReachTheResult:
         assert result.assay_ph is not None
 
 
+# ---------------------------------------------------------------------------
+# Empty substrate ("we don't know it yet" -- the live UniProt/KEGG path hits
+# this for peptidases, whose KEGG entries have no SUBSTRATE field).
+#
+# Regression test for a real bug found live-testing 'run kinetics trypsin':
+# an empty-string substrate with the implicit require_substrate_match=True
+# silently rejected every BRENDA row (an empty string is a substring of
+# everything, so it "matches", but "" is itself falsy -- the strict branch
+# saw `not matched_substrate` as True and continue'd past every row). Fixed
+# in _brenda_entries by switching to permissive matching whenever substrate
+# is empty, instead of passing an empty string into the strict matcher.
+# ---------------------------------------------------------------------------
+
+def test_empty_substrate_still_resolves_via_permissive_matching(ldh_provider):
+    """Before the fix, this returned found=False for every enzyme resolved
+    with no known substrate -- not just trypsin, ANY enzyme reached via the
+    live UniProt/KEGG path when KEGG had no SUBSTRATE field. The real
+    BRENDA data must still surface, correctly marked unverified."""
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Homo sapiens",
+        "",  # unknown substrate, exactly what science_agent_runner.py sends
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.found is True
+    assert result.value is not None
+
+
 def test_search_literature_false_skips_pubmed_entirely(monkeypatch, ldh_provider):
     def should_not_be_called(*args, **kwargs):
         raise AssertionError("search_pubmed_candidates should not be called")
