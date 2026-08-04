@@ -37,6 +37,12 @@ export default function Terminal() {
   const [history, setHistory] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
   const [busy, setBusy] = useState(false);
+  // True while a command's `run()` promise (e.g. a real /api/simulate
+  // round-trip for a literature-backed query) hasn't resolved yet. Kept
+  // separate from `busy` because the queue-drain effect below clears `busy`
+  // whenever the queue is empty -- which it always is before the network
+  // response arrives -- and that would re-enable input mid-request.
+  const [resolving, setResolving] = useState(false);
   const [hasRun, setHasRun] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -74,13 +80,19 @@ export default function Terminal() {
       setHistIdx(-1);
       if (cmd) setHistory((h) => [cmd, ...h].slice(0, 60));
 
-      const { lines: out, clear } = execute(cmd);
-      if (clear) {
-        setLines([]);
-        return;
-      }
-      setBusy(true);
-      setQueue(out);
+      // Real network round-trips (literature-resolved run commands) can take
+      // real time, so this is genuinely async, not a synchronous compute
+      // dressed as one.
+      setResolving(true);
+      void execute(cmd).then(({ lines: out, clear }) => {
+        setResolving(false);
+        if (clear) {
+          setLines([]);
+          return;
+        }
+        setBusy(true);
+        setQueue(out);
+      });
     },
     [],
   );
@@ -201,7 +213,7 @@ export default function Terminal() {
               <input
                 ref={inputRef}
                 value={input}
-                disabled={busy}
+                disabled={busy || resolving}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKey}
                 spellCheck={false}
@@ -209,6 +221,9 @@ export default function Terminal() {
                 aria-label="terminal input"
                 className="w-full bg-transparent font-mono text-[12.5px] text-ink caret-verified outline-none disabled:opacity-50"
               />
+              {resolving && (
+                <span className="ml-2 text-[11px] text-faint">resolving…</span>
+              )}
               {ghost && (
                 <span className="pointer-events-none absolute left-0 top-0 font-mono text-[12.5px] text-faint">
                   <span className="invisible">{input}</span>
@@ -228,7 +243,7 @@ export default function Terminal() {
                 key={c}
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!busy) submit(c);
+                  if (!busy && !resolving) submit(c);
                 }}
                 className="rounded-sm border border-line px-2 py-0.5 text-verified/80 transition-colors hover:border-verified/40 hover:text-verified"
               >
