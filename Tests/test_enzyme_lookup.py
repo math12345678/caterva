@@ -21,6 +21,7 @@ import os
 
 from enzyme_lookup import (
     expand_substrates_with_synonyms,
+    parse_ec_number_search,
     parse_kegg_substrates,
     parse_pubchem_synonyms,
     parse_taxon_id,
@@ -105,6 +106,74 @@ def test_parses_uniprot_accession_takes_first_result_only():
         ]
     }
     assert parse_uniprot_accession(data) == "P00338"
+
+
+# ---------------------------------------------------------------------------
+# UniProt name -> EC number parsing
+#
+# NOTE ON THIS FIXTURE'S PROVENANCE: unlike the KEGG fixtures above (whose
+# docstring confirms they were re-verified byte-for-byte against a live
+# fetch), this JSON shape was NOT captured from a live UniProt response --
+# the sandbox this was written in has no network access to
+# rest.uniprot.org. It is built from UniProt's documented REST JSON schema
+# (proteinDescription.recommendedName.ecNumbers[].value), which is stable
+# and used elsewhere in production UniProt tooling, but "documented" is not
+# "verified against a real response" per this project's own rule (Rule 1).
+# Run `python -c "import enzyme_lookup; print(enzyme_lookup.fetch_ec_number_by_name('alpha-amylase'))"`
+# with real network access and confirm it returns "3.2.1.1" before trusting
+# this fixture blindly.
+# ---------------------------------------------------------------------------
+
+UNIPROT_EC_SEARCH_FIXTURE = {
+    "results": [
+        {
+            "primaryAccession": "P04746",
+            "proteinDescription": {
+                "recommendedName": {
+                    "fullName": {"value": "Alpha-amylase"},
+                    "ecNumbers": [{"value": "3.2.1.1"}],
+                }
+            },
+        }
+    ]
+}
+
+
+def test_parses_ec_number_from_recommended_name():
+    assert parse_ec_number_search(UNIPROT_EC_SEARCH_FIXTURE) == "3.2.1.1"
+
+
+def test_parses_ec_number_from_alternative_name_when_no_recommended_ec():
+    data = {
+        "results": [
+            {
+                "proteinDescription": {
+                    "recommendedName": {"fullName": {"value": "Some enzyme"}},
+                    "alternativeNames": [
+                        {"ecNumbers": [{"value": "1.1.1.1"}]},
+                    ],
+                }
+            }
+        ]
+    }
+    assert parse_ec_number_search(data) == "1.1.1.1"
+
+
+def test_parses_ec_number_returns_none_for_empty_results():
+    assert parse_ec_number_search({"results": []}) is None
+
+
+def test_parses_ec_number_returns_none_when_no_ec_present_at_all():
+    data = {
+        "results": [
+            {"proteinDescription": {"recommendedName": {"fullName": {"value": "x"}}}}
+        ]
+    }
+    assert parse_ec_number_search(data) is None
+
+
+def test_parses_ec_number_handles_missing_results_key():
+    assert parse_ec_number_search({}) is None
 
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,14 @@ Expected input JSON shape:
       "ecNumber": "1.1.1.27"
     }
 
+"ecNumber" is optional. If omitted (or empty) and "enzymeName" is present,
+this script resolves an EC number live via UniProt's name search
+(enzyme_lookup.fetch_ec_number_by_name) before attempting BRENDA/KEGG/
+PubMed -- see resolve_ec_number() below. If UniProt has nothing indexed
+under that name, the result is an honest {"found": false}, never a
+fabricated EC number or Km. If BOTH "ecNumber" and "enzymeName" are
+missing, that's a hard error: there is nothing to search for at all.
+
 Output JSON shape (success):
     {
       "ok": true,
@@ -51,8 +59,30 @@ import json
 import sys
 from typing import Any, Dict
 
+import enzyme_lookup
 import fallback_logic
 from fallback_logic import KineticResult
+
+
+def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
+    """Live enzyme-name -> EC-number resolution via UniProt, used whenever
+    the caller didn't already supply one (e.g. an enzyme name outside the
+    small hardcoded pattern list in enzymes.ts, or a name guessed from free
+    text). Tries the query's stated organism first, then an unrestricted
+    search, so a mismatch between the caller's organism guess and what
+    UniProt actually has indexed doesn't sink an otherwise-real match.
+    Returns None -- never guesses -- if UniProt has nothing indexed under
+    this name at all.
+
+    Referenced via the enzyme_lookup module (not imported by name) so
+    tests can monkeypatch enzyme_lookup.fetch_taxon_id /
+    enzyme_lookup.fetch_ec_number_by_name and stay offline."""
+    taxon_id = enzyme_lookup.fetch_taxon_id(organism) if organism else None
+    if taxon_id:
+        ec = enzyme_lookup.fetch_ec_number_by_name(enzyme_name, taxon_id)
+        if ec:
+            return ec
+    return enzyme_lookup.fetch_ec_number_by_name(enzyme_name, None)
 
 
 def resolve_kinetic_value(
@@ -110,11 +140,37 @@ def main() -> None:
         substrate = payload.get("substrate", "")
         organism = payload.get("organism", "Homo sapiens")
         ec_number = payload.get("ecNumber", "")
+        resolution_log: list[str] = []
 
         if not ec_number:
-            raise ValueError("ecNumber is required to resolve real enzyme parameters")  # noqa: TRY301
+            if not enzyme_name:
+                raise ValueError(  # noqa: TRY301
+                    "enzymeName or ecNumber is required to resolve real enzyme parameters"
+                )
+            ec_number = resolve_ec_number(enzyme_name, organism) or ""
+            if ec_number:
+                resolution_log.append(
+                    f"Resolved EC {ec_number} for '{enzyme_name}' via UniProt name search."
+                )
+            else:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "ec_not_resolved",
+                            "literatureCandidates": [],
+                            "logs": [
+                                f"Could not resolve an EC number for '{enzyme_name}' via "
+                                "UniProt; no BRENDA/KEGG/PubMed lookup is possible without one."
+                            ],
+                        }
+                    )
+                )
+                return
 
         result = resolve_kinetic_value(enzyme_name, substrate, organism, ec_number)
+        result.search_log = resolution_log + result.search_log
 
         if result.found and result.value is not None:
             print(

@@ -195,12 +195,76 @@ def test_not_found_output_shape(monkeypatch):
     }
 
 
-def test_missing_ec_number_reports_an_error(monkeypatch):
+def test_missing_ec_and_name_reports_an_error(monkeypatch):
+    """With neither an EC number nor an enzyme name, there is nothing to
+    search for -- this must still be a hard error, not a network attempt."""
     stdout = io.StringIO()
-    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"enzymeName": "x"})))
+    monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps({"substrate": "x"})))
     monkeypatch.setattr(sys, "stdout", stdout)
     with pytest.raises(SystemExit):
         science_agent_runner.main()
     result = json.loads(stdout.getvalue())
     assert result["ok"] is False
-    assert "ecNumber is required" in result["error"]
+    assert "enzymeName or ecNumber is required" in result["error"]
+
+
+def test_missing_ec_number_resolves_it_live_via_uniprot(monkeypatch):
+    """The behaviour this replaces: previously, any query without an
+    explicit EC number was an unrecoverable error, which meant only the
+    hardcoded pattern list in enzymes.ts could ever reach a real lookup.
+    Now, an enzyme name with no EC number attempts a live UniProt
+    name search first (mocked here to stay offline) and, if that
+    succeeds, proceeds through the normal BRENDA chain using the
+    resolved EC number."""
+    import enzyme_lookup
+
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: "9606")
+    monkeypatch.setattr(
+        enzyme_lookup,
+        "fetch_ec_number_by_name",
+        lambda name, taxon_id: "3.2.1.1" if name == "alpha-amylase" else None,
+    )
+
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: golden_result(),
+        {"enzymeName": "alpha-amylase", "substrate": "starch", "organism": "Homo sapiens"},
+    )
+    assert result["ok"] is True
+    assert result["found"] is True
+    assert result["km"] == 10.73
+    # The live resolution step's own log line must survive alongside
+    # whatever fallback_logic.resolve_kinetic_value itself logged.
+    assert any("Resolved EC 3.2.1.1" in line for line in result["logs"])
+
+
+def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatch):
+    """When UniProt has nothing indexed under the given name, this must be
+    an honest 'not found' -- never a fabricated EC number or Km, and never
+    a crash."""
+    import enzyme_lookup
+
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: None)
+    monkeypatch.setattr(
+        enzyme_lookup, "fetch_ec_number_by_name", lambda name, taxon_id: None
+    )
+
+    stdout = io.StringIO()
+    monkeypatch.setattr(
+        sys,
+        "stdin",
+        io.StringIO(json.dumps({"enzymeName": "not a real enzyme name"})),
+    )
+    monkeypatch.setattr(sys, "stdout", stdout)
+    science_agent_runner.main()
+    result = json.loads(stdout.getvalue())
+    assert result == {
+        "ok": True,
+        "found": False,
+        "source": "ec_not_resolved",
+        "literatureCandidates": [],
+        "logs": [
+            "Could not resolve an EC number for 'not a real enzyme name' via "
+            "UniProt; no BRENDA/KEGG/PubMed lookup is possible without one."
+        ],
+    }

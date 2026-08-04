@@ -227,6 +227,67 @@ def expand_substrates_with_synonyms(
     return expanded
 
 
+# ---------------------------------------------------------------------------
+# UniProt: enzyme NAME -> EC number
+#
+# This is the live counterpart to the small hardcoded name->EC pattern list
+# that used to be the only way (Science-Agent-Pipeline .../lib/enzymes.ts)
+# to get from a query like "run kinetics amylase" to a real BRENDA lookup.
+# That list covered ~30 enzymes; anything else silently never reached the
+# network at all. UniProt's REST search indexes protein names as free text,
+# so this resolves an EC number for any enzyme name UniProt has indexed,
+# not just a fixed list, with no key required.
+# ---------------------------------------------------------------------------
+
+def fetch_ec_number_by_name(
+    enzyme_name: str, taxon_id: str | None = DEFAULT_TAXON_ID, timeout: float = 15
+) -> str | None:
+    """Fetch an EC number for an enzyme by its common/protein name via
+    UniProt's REST search. Returns None if nothing is found - never
+    guesses or fabricates an EC number.
+
+    taxon_id narrows the search to one organism when given; pass None to
+    search UniProt without an organism filter (the caller's second attempt
+    when a species-restricted search finds nothing, mirroring the
+    exact-then-cross-species pattern in fallback_logic.py)."""
+    query = f'protein_name:"{enzyme_name}" AND reviewed:true'
+    if taxon_id:
+        query += f" AND organism_id:{taxon_id}"
+    params: dict[str, str | int] = {
+        "query": query,
+        "fields": "accession,ec",
+        "format": "json",
+        "size": 1,
+    }
+    r = httpx.get(UNIPROT_SEARCH_URL, params=params, timeout=timeout)
+    r.raise_for_status()
+    return parse_ec_number_search(r.json())
+
+
+def parse_ec_number_search(data: dict) -> str | None:
+    """Pure function: UniProt JSON response (fields=accession,ec) in, the
+    first EC number string out, or None.
+
+    UniProt's documented response shape nests EC numbers under
+    proteinDescription.recommendedName.ecNumbers[].value; some entries
+    carry them only under an alternativeNames entry instead. Both are
+    checked. Returns None (never guesses) if neither is present -- e.g. a
+    matched protein with no assigned EC number, or an empty result set."""
+    results = data.get("results", [])
+    if not results:
+        return None
+    description = results[0].get("proteinDescription", {})
+    ec_numbers = description.get("recommendedName", {}).get("ecNumbers", [])
+    if not ec_numbers:
+        for alt in description.get("alternativeNames", []):
+            ec_numbers = alt.get("ecNumbers", [])
+            if ec_numbers:
+                break
+    if not ec_numbers:
+        return None
+    return ec_numbers[0].get("value")
+
+
 def resolve_enzyme(
     ec_number: str, taxon_id: str = DEFAULT_TAXON_ID
 ) -> dict:

@@ -61,7 +61,7 @@ async function applyKineticResolution(
   parameterProvenance: Record<string, ParameterProvenance>;
   flags: string[];
 }> {
-  if (!entities?.ecNumber) {
+  if (!entities?.ecNumber && !entities?.enzymeName) {
     return { parameters, parameterProvenance, flags };
   }
 
@@ -418,21 +418,90 @@ function extractParameterOverrides(query: string): Record<string, number> {
 }
 
 /**
- * Fallback entity extraction for common enzymes. This keeps the pipeline
- * useful when no LLM is configured.
+ * Words that are never themselves the name of the enzyme being asked
+ * about -- either generic query scaffolding, or (derived below) one of the
+ * single words making up a DOMAIN_DEFAULTS keyword phrase (e.g.
+ * "competitive"/"inhibition" from "competitive inhibition").
+ */
+const QUERY_CONNECTOR_WORDS = new Set([
+  "simulate", "run", "the", "a", "an", "of", "for", "please", "with",
+  "and", "to", "in", "on", "model", "reaction", "compute", "calculate",
+  "show", "me", "kinetics", "kinetic", "using", "via", "estimate", "study",
+  "analyze", "analyse", "dynamics", "system", "process",
+]);
+
+let cachedDomainKeywordWords: Set<string> | undefined;
+function domainKeywordWords(): Set<string> {
+  if (!cachedDomainKeywordWords) {
+    cachedDomainKeywordWords = new Set(
+      DOMAIN_DEFAULTS.flatMap((d) => d.keywords.flatMap((k) => k.split(/\s+/))),
+    );
+  }
+  return cachedDomainKeywordWords;
+}
+
+/**
+ * Best-effort enzyme-name guess from free text, used only when the
+ * hardcoded `enzymes.ts` pattern list doesn't match anything.
+ *
+ * This is NOT a real named-entity extractor -- it strips known query
+ * scaffolding and domain-routing keywords and returns whatever text is
+ * left. It can guess wrong (e.g. it will mis-extract a genuinely novel
+ * enzyme name that happens to share a word with a domain keyword, like
+ * "kinase"). That is an acceptable failure mode here specifically because
+ * the guess is never treated as ground truth: it is handed to a live
+ * UniProt name search (science_agent_runner.py), which either resolves a
+ * real EC number or comes back honestly empty. A wrong guess costs one
+ * failed lookup; it never fabricates a parameter value.
+ */
+function guessEnzymeNameFromQuery(query: string): string | undefined {
+  const domainWords = domainKeywordWords();
+  const words = query
+    .split(/\s+/)
+    .filter((token) => !PARAMETER_PATTERN.test(token))
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w && !QUERY_CONNECTOR_WORDS.has(w) && !domainWords.has(w));
+  if (words.length === 0) return undefined;
+  return words.join(" ");
+}
+
+/**
+ * Fallback entity extraction when no LLM is configured (or the LLM path
+ * didn't run).
+ *
+ * First tries the hardcoded `enzymes.ts` pattern list -- fast, and already
+ * carries a verified EC number/substrate/organism with no network round
+ * trip. If that list doesn't match, this used to give up entirely, which
+ * meant only those ~30 enzymes could ever reach a real BRENDA lookup.
+ * Instead it now falls through to a best-effort name guess with no EC
+ * number; `resolveKineticValue` (scienceAgent.ts) passes that name to the
+ * Python bridge, which resolves an EC number for it live via UniProt
+ * before attempting BRENDA -- see science_agent_runner.py::resolve_ec_number.
  */
 function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   const matched = matchEnzyme(query);
-  if (!matched) return undefined;
+  if (matched) {
+    const lower = query.toLowerCase();
+    const substrate =
+      matched.substrates.find((s) => lower.includes(s)) ?? matched.substrates[0]!;
+    return {
+      enzymeName: matched.enzymeName,
+      substrate,
+      organism: matched.organism,
+      ecNumber: matched.ecNumber,
+    };
+  }
 
-  const lower = query.toLowerCase();
-  const substrate =
-    matched.substrates.find((s) => lower.includes(s)) ?? matched.substrates[0]!;
+  const guess = guessEnzymeNameFromQuery(query);
+  if (!guess) return undefined;
   return {
-    enzymeName: matched.enzymeName,
-    substrate,
-    organism: matched.organism,
-    ecNumber: matched.ecNumber,
+    enzymeName: guess,
+    substrate: "",
+    organism: "Homo sapiens",
+    ecNumber: undefined,
   };
 }
 
@@ -557,7 +626,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     if (
       (llmResult.domain === "mm" ||
         llmResult.domain === "mm_competitive_inhibition") &&
-      llmResult.entities?.ecNumber &&
+      (llmResult.entities?.ecNumber || llmResult.entities?.enzymeName) &&
       hasUnoverriddenKinetic
     ) {
       const result = await applyKineticResolution(
@@ -643,7 +712,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
   );
   if (
     (best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
-    fallbackEntities?.ecNumber &&
+    (fallbackEntities?.ecNumber || fallbackEntities?.enzymeName) &&
     hasUnoverriddenKinetic
   ) {
     const result = await applyKineticResolution(
