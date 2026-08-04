@@ -116,12 +116,33 @@ def _brenda_entries(
     fallback_uniprot = _resolve_fallback_uniprot(
         ec_number, organism, uniprot_provider, taxon_id_provider
     )
+
+    # A real, confirmed bug (found live testing 'trypsin', a peptidase):
+    # passing target_substrates=[""] with require_substrate_match=True
+    # (the implicit default below) rejects EVERY row. parse_brenda_km_html's
+    # matching loop treats "" as matching any text (an empty string is a
+    # substring of everything), but "" is itself falsy, so
+    # `if not matched_substrate` is still True and, with strict matching on,
+    # every row hits its `else: continue` -- the strict path silently
+    # returns zero results instead of running the permissive fallback that
+    # already exists for exactly this case (best-effort compound label,
+    # substrate_verified=False). This happens for any enzyme resolved via
+    # the live UniProt/KEGG path (queryResolver.ts's guess -> science_agent_runner.py)
+    # when KEGG has no SUBSTRATE field to resolve one from -- a documented,
+    # common gap for peptidases (EC 3.4.x.x), not a rare edge case.
+    #
+    # A caller-supplied enzymes.ts-style substrate is never empty, so this
+    # was never reachable before that live path existed.
+    require_substrate_match = bool(substrate)
+    target_substrates = [substrate] if substrate else []
+
     entries = parse_brenda_km_html(
         html,
         ec_number,
-        target_substrates=[substrate],
+        target_substrates=target_substrates,
         target_organism=organism,
         fallback_uniprot=fallback_uniprot,
+        require_substrate_match=require_substrate_match,
     )
     # Never surface flagged (implausible) rows as a "found" result -
     # they're data-quality problems, not answers.
