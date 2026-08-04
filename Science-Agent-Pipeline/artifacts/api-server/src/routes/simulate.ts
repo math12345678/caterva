@@ -20,6 +20,7 @@ import * as queue from "../lib/queue";
 import { findCachedResultByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
 import {
+  RequiredParametersMissingError,
   validateParameterProvenance,
   type ParameterProvenance,
 } from "../lib/provenance";
@@ -439,6 +440,14 @@ async function runPipeline(jobId: string, query: string): Promise<void> {
   } catch (err) {
     if (abort.signal.aborted || queue.isCancelled(jobId)) {
       queue.setJobCancelled(jobId);
+    } else if (err instanceof RequiredParametersMissingError) {
+      // Not a pipeline failure -- the query itself was underspecified.
+      // Distinguishing this from PIPELINE_ERROR matters to callers: this
+      // one is fixable by editing the query, a real PIPELINE_ERROR isn't.
+      queue.setJobError(jobId, {
+        error: "MISSING_REQUIRED_INPUT",
+        message: err.message,
+      });
     } else {
       queue.setJobError(jobId, {
         error: "PIPELINE_ERROR",

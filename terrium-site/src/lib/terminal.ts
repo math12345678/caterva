@@ -152,6 +152,18 @@ async function runLiteratureBacked(query: string, domainLabel: string): Promise<
   try {
     const job = await resolveAndSimulate(query);
     if (job.status === 'failed' || !job.result) {
+      if (job.error?.error === 'MISSING_REQUIRED_INPUT') {
+        return [
+          err(`  cannot run: literature resolution was incomplete`),
+          o(),
+          d(`  ${job.error.message}`),
+          o(),
+          d(`  every parameter must either be resolved from literature or typed`),
+          d(`  by you -- nothing runs on an unsourced default. add the values`),
+          d(`  above to your query (e.g. 'run kinetics trypsin km=5 vmax=10') and`),
+          d(`  try again.`),
+        ];
+      }
       return [
         err(`  pipeline failed: ${job.error?.message ?? 'unknown error'}`),
       ];
@@ -168,7 +180,7 @@ async function runLiteratureBacked(query: string, domainLabel: string): Promise<
   }
 }
 
-const DOMAINS = [
+export const DOMAINS: Array<[string, string, string]> = [
   ['kinetics', 'Michaelis-Menten enzyme kinetics', 'continuous'],
   ['mm_competitive_inhibition', 'Competitive inhibition kinetics', 'continuous'],
   ['epidemiology', 'SIR / SEIR compartment models', 'continuous'],
@@ -267,6 +279,29 @@ export const COMMANDS: Command[] = [
           ];
         }
         return runLiteratureBacked(`simulate ${enzyme} kinetics`, 'kinetics');
+      }
+
+      if (t === 'mm_competitive_inhibition' || t === 'competitive' || t === 'inhibition') {
+        const t0 = performance.now();
+        const p = DEFAULT_MM_COMPETITIVE;
+        const r = simulateMMCompetitiveInhibition(p);
+        const ms = Math.round(performance.now() - t0);
+        const kmApp = p.km * (1 + p.i / p.ki);
+        const lines: Line[] = [
+          head('COMPETITIVE INHIBITION — MM WITH INHIBITOR'),
+          rule(),
+          o(`  Km      ${p.km}   Vmax     ${p.vmax}   Ki      ${p.ki}`),
+          o(`  S0      ${p.s0}   [I]      ${p.i}   points  ${p.points}`),
+          o(`  Km_app  ${kmApp.toFixed(6)}   = Km·(1 + I/Ki)`),
+          o(),
+          o(`  t       S(t)`),
+        ];
+        for (let i = 0; i < r.trajectory.length; i += 10) {
+          const pt = r.trajectory[i];
+          lines.push(o(`  ${pt.t.toFixed(2)}    ${pt.S.toFixed(6)}`));
+        }
+        lines.push(o(), ok(`  ${ms}ms · client-side RK4`));
+        return lines;
       }
 
       if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
@@ -394,7 +429,7 @@ export const COMMANDS: Command[] = [
           warn('  try:  mutate popgen     to break it deliberately'),
         ];
       }
-      return [err('usage: verify <md|popgen|kinetics|epidemiology>')];
+      return [err('usage: verify <md|popgen|kinetics|competitive|epidemiology>')];
     },
   },
 

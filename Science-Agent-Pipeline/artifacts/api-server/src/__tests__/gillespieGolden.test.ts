@@ -49,7 +49,7 @@ describe("Gillespie SSA golden through the runner boundary", () => {
 describe("Gillespie SSA resolution (Target I-style narrowness)", () => {
   it("resolves to gillespie_ssa with a0/k/end", async () => {
     const resolved = await resolveQuery(
-      "gillespie stochastic decay of molecules",
+      "gillespie stochastic decay of molecules a0=1000 k=0.5 end=10",
     );
     expect(resolved.domain).toBe("gillespie_ssa");
     expect(resolved.parameters).toHaveProperty("a0");
@@ -68,7 +68,7 @@ describe("Gillespie SSA resolution (Target I-style narrowness)", () => {
 
   it("has no literature resolution and no narrowness notes", async () => {
     const resolved = await resolveQuery(
-      "gillespie stochastic decay of molecules",
+      "gillespie stochastic decay of molecules a0=1000 k=0.5 end=10",
     );
     const entries = Object.entries(resolved.parameterProvenance);
     expect(entries.length).toBeGreaterThan(0);
