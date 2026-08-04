@@ -85,6 +85,34 @@ def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
     return enzyme_lookup.fetch_ec_number_by_name(enzyme_name, None)
 
 
+def resolve_substrate_from_kegg(ec_number: str) -> str | None:
+    """Live substrate-name lookup for an EC number via KEGG, used to fill
+    in a substrate name when the caller didn't supply one -- which happens
+    whenever the enzyme name came from the free-text guess in
+    queryResolver.ts rather than the hardcoded enzymes.ts list (that list
+    bundles a substrate per entry; a live-resolved enzyme has none yet).
+
+    This matters, not just fills a gap cosmetically: brenda_client.py
+    filters BRENDA's results by substrate name, and enzyme_lookup.py's own
+    module docstring explains why that filter exists -- without it, a
+    BRENDA enzyme page's Km data is dominated by every inhibitor and assay
+    surrogate anyone has ever tested, not the enzyme's real substrate. A
+    live-resolved enzyme with no substrate would silently get the same
+    noise a hardcoded entry is built to avoid.
+
+    Returns None -- never guesses -- if KEGG has no SUBSTRATE field for
+    this EC number, or the lookup fails outright (network error, unknown
+    EC). A failure here degrades to the unfiltered BRENDA fallback that
+    already exists for this exact case (see brenda_client.py); it must
+    never crash the whole resolution."""
+    try:
+        text = enzyme_lookup.fetch_kegg_enzyme_text(ec_number)
+    except Exception:
+        return None
+    substrates = enzyme_lookup.parse_kegg_substrates(text)
+    return substrates[0] if substrates else None
+
+
 def resolve_kinetic_value(
     enzyme_name: str,
     substrate: str,
@@ -152,6 +180,18 @@ def main() -> None:
                 resolution_log.append(
                     f"Resolved EC {ec_number} for '{enzyme_name}' via UniProt name search."
                 )
+                if not substrate:
+                    kegg_substrate = resolve_substrate_from_kegg(ec_number)
+                    if kegg_substrate:
+                        substrate = kegg_substrate
+                        resolution_log.append(
+                            f"Resolved substrate '{substrate}' for EC {ec_number} via KEGG."
+                        )
+                    else:
+                        resolution_log.append(
+                            f"No KEGG substrate found for EC {ec_number}; "
+                            "BRENDA lookup will be unfiltered by substrate."
+                        )
             else:
                 print(
                     json.dumps(

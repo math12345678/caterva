@@ -238,6 +238,44 @@ def test_missing_ec_number_resolves_it_live_via_uniprot(monkeypatch):
     assert any("Resolved EC 3.2.1.1" in line for line in result["logs"])
 
 
+def test_missing_ec_number_also_resolves_substrate_via_kegg(monkeypatch):
+    """A live-resolved enzyme has no substrate name from the (unused)
+    enzymes.ts entry, and BRENDA's Km table is dominated by noise without
+    one (see enzyme_lookup.py's module docstring). This confirms the
+    KEGG substrate lookup actually reaches fallback_logic.resolve_kinetic_value,
+    not just that the runner doesn't crash without one."""
+    import enzyme_lookup
+
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: "9606")
+    monkeypatch.setattr(
+        enzyme_lookup, "fetch_ec_number_by_name", lambda name, taxon_id: "3.2.1.1"
+    )
+    monkeypatch.setattr(
+        enzyme_lookup,
+        "fetch_kegg_enzyme_text",
+        lambda ec_number: "SUBSTRATE   starch [CPD:C00369]",
+    )
+
+    captured_args = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None):
+        captured_args["substrate"] = substrate
+        captured_args["enzyme_ec"] = enzyme_ec
+        return golden_result()
+
+    result = run_main(
+        monkeypatch,
+        fake_resolve,
+        {"enzymeName": "alpha-amylase", "organism": "Homo sapiens"},
+    )
+    assert result["ok"] is True
+    assert captured_args["substrate"] == "starch"
+    assert captured_args["enzyme_ec"] == "3.2.1.1"
+    assert any(
+        "Resolved substrate 'starch'" in line for line in result["logs"]
+    )
+
+
 def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatch):
     """When UniProt has nothing indexed under the given name, this must be
     an honest 'not found' -- never a fabricated EC number or Km, and never
