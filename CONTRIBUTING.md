@@ -56,7 +56,7 @@ and assumed correct.
 
 ## Supported Python versions
 
-Terrium supports Python 3.10–3.13. This is a hard constraint, but not for the
+Terrium supports Python 3.9–3.13. This is a hard constraint, but not for the
 reason this file used to give. It is **not** "the SBML C extensions stop at
 cp312" — `python-libsbml` 5.21.1 already ships cp314 wheels, and `antimony`
 2.14.0 ships `py3-none-<platform>` wheels that are Python-version agnostic.
