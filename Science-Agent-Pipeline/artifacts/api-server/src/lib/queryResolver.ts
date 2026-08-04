@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./telluriumRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
 import { resolveKineticValue } from "./scienceAgent";
-import { matchEnzyme } from "./enzymes";
 import {
   RESOLVABLE_FIELDS,
   buildResolvedKineticProvenance,
@@ -418,44 +417,66 @@ function extractParameterOverrides(query: string): Record<string, number> {
 }
 
 /**
- * Words that are never themselves the name of the enzyme being asked
- * about -- either generic query scaffolding, or (derived below) one of the
- * single words making up a DOMAIN_DEFAULTS keyword phrase (e.g.
- * "competitive"/"inhibition" from "competitive inhibition").
+ * Generic query scaffolding -- words that describe the ACT of asking for a
+ * simulation, never the enzyme itself. Deliberately small and manually
+ * curated: unlike an earlier version of this function, this does NOT
+ * derive stopwords from every DOMAIN_DEFAULTS keyword, because several of
+ * those keywords (e.g. "lactate", "hexokinase", "kinase", "trypsin") are
+ * themselves real substrings of real enzyme names -- stripping them would
+ * turn "simulate lactate dehydrogenase" into a mangled guess ("dehydrogenase"
+ * alone), which is worse than not guessing at all.
  */
 const QUERY_CONNECTOR_WORDS = new Set([
   "simulate", "run", "the", "a", "an", "of", "for", "please", "with",
   "and", "to", "in", "on", "model", "reaction", "compute", "calculate",
   "show", "me", "kinetics", "kinetic", "using", "via", "estimate", "study",
-  "analyze", "analyse", "dynamics", "system", "process",
+  "analyze", "analyse", "dynamics", "system", "process", "enzyme",
+  "substrate", "protein",
 ]);
 
-let cachedDomainKeywordWords: Set<string> | undefined;
-function domainKeywordWords(): Set<string> {
-  if (!cachedDomainKeywordWords) {
-    cachedDomainKeywordWords = new Set(
-      DOMAIN_DEFAULTS.flatMap((d) => d.keywords.flatMap((k) => k.split(/\s+/))),
+/**
+ * Routing words specific to OTHER domains (SIR/PCR/Monte Carlo/population
+ * genetics/molecular dynamics/Gillespie), plus the competitive-inhibition
+ * regime's own descriptive words ("competitive"/"inhibition"/"inhibitor" --
+ * these name a kinetics regime, not a protein). These can never be part of
+ * an enzyme name, unlike the `mm`/`mm_competitive_inhibition` domains' own
+ * keywords, which are deliberately left alone above.
+ */
+let cachedNonEnzymeDomainWords: Set<string> | undefined;
+function nonEnzymeDomainKeywordWords(): Set<string> {
+  if (!cachedNonEnzymeDomainWords) {
+    cachedNonEnzymeDomainWords = new Set(
+      DOMAIN_DEFAULTS.filter(
+        (d) => d.domain !== "mm" && d.domain !== "mm_competitive_inhibition",
+      ).flatMap((d) => d.keywords.flatMap((k) => k.split(/\s+/))),
     );
+    for (const w of ["competitive", "inhibition", "inhibitor"]) {
+      cachedNonEnzymeDomainWords.add(w);
+    }
   }
-  return cachedDomainKeywordWords;
+  return cachedNonEnzymeDomainWords;
 }
 
 /**
- * Best-effort enzyme-name guess from free text, used only when the
- * hardcoded `enzymes.ts` pattern list doesn't match anything.
+ * Enzyme-name guess from free text -- the only entity-extraction path when
+ * no LLM is configured. There is deliberately no hardcoded name->EC table
+ * feeding this anymore (that used to be enzymes.ts, ~30 entries; anything
+ * outside it never reached a real lookup at all). Every enzyme name, known
+ * or not, goes through the same live path: this function only guesses the
+ * NAME from the query text; `resolveKineticValue` (scienceAgent.ts) hands
+ * that name to a live UniProt search for the EC number and a live KEGG
+ * search for the substrate (science_agent_runner.py) before ever touching
+ * BRENDA.
  *
  * This is NOT a real named-entity extractor -- it strips known query
- * scaffolding and domain-routing keywords and returns whatever text is
- * left. It can guess wrong (e.g. it will mis-extract a genuinely novel
- * enzyme name that happens to share a word with a domain keyword, like
- * "kinase"). That is an acceptable failure mode here specifically because
- * the guess is never treated as ground truth: it is handed to a live
- * UniProt name search (science_agent_runner.py), which either resolves a
- * real EC number or comes back honestly empty. A wrong guess costs one
- * failed lookup; it never fabricates a parameter value.
+ * scaffolding and other-domain routing words and returns whatever text is
+ * left. It can guess wrong on odd phrasing. That is an acceptable failure
+ * mode specifically because the guess is never treated as ground truth: a
+ * wrong guess costs one failed UniProt search and comes back honestly
+ * empty (found: false) -- it never fabricates a parameter value.
  */
 function guessEnzymeNameFromQuery(query: string): string | undefined {
-  const domainWords = domainKeywordWords();
+  const nonEnzymeWords = nonEnzymeDomainKeywordWords();
   const words = query
     .split(/\s+/)
     .filter((token) => !PARAMETER_PATTERN.test(token))
@@ -463,38 +484,18 @@ function guessEnzymeNameFromQuery(query: string): string | undefined {
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
-    .filter((w) => w && !QUERY_CONNECTOR_WORDS.has(w) && !domainWords.has(w));
+    .filter((w) => w && !QUERY_CONNECTOR_WORDS.has(w) && !nonEnzymeWords.has(w));
   if (words.length === 0) return undefined;
   return words.join(" ");
 }
 
 /**
  * Fallback entity extraction when no LLM is configured (or the LLM path
- * didn't run).
- *
- * First tries the hardcoded `enzymes.ts` pattern list -- fast, and already
- * carries a verified EC number/substrate/organism with no network round
- * trip. If that list doesn't match, this used to give up entirely, which
- * meant only those ~30 enzymes could ever reach a real BRENDA lookup.
- * Instead it now falls through to a best-effort name guess with no EC
- * number; `resolveKineticValue` (scienceAgent.ts) passes that name to the
- * Python bridge, which resolves an EC number for it live via UniProt
- * before attempting BRENDA -- see science_agent_runner.py::resolve_ec_number.
+ * didn't run). Always a live-resolution guess now -- see
+ * guessEnzymeNameFromQuery's docstring for why the hardcoded enzymes.ts
+ * pattern list was removed from this path entirely.
  */
 function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
-  const matched = matchEnzyme(query);
-  if (matched) {
-    const lower = query.toLowerCase();
-    const substrate =
-      matched.substrates.find((s) => lower.includes(s)) ?? matched.substrates[0]!;
-    return {
-      enzymeName: matched.enzymeName,
-      substrate,
-      organism: matched.organism,
-      ecNumber: matched.ecNumber,
-    };
-  }
-
   const guess = guessEnzymeNameFromQuery(query);
   if (!guess) return undefined;
   return {
