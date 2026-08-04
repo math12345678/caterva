@@ -117,18 +117,22 @@ async function ensureRunnerScript(): Promise<void> {
  * Resolve real kinetic parameters for an enzyme/substrate pair.
  *
  * This function spawns a Python bridge that uses the existing BRENDA/KEGG/PubMed
- * lookup code in Tests/fallback_logic.py. If the lookup fails or no EC number
- * is provided, it returns `found: false` so the caller can fall back to
- * hardcoded defaults.
+ * lookup code in Tests/fallback_logic.py. If an EC number isn't already known,
+ * the Python side resolves one live via UniProt's name search
+ * (Tests/enzyme_lookup.py::fetch_ec_number_by_name) before attempting BRENDA --
+ * this is what lets an enzyme name outside the small hardcoded pattern list in
+ * enzymes.ts still reach a real literature lookup. Only skips the Python
+ * bridge entirely, returning `found: false`, when there is truly nothing to
+ * search for (no EC number AND no enzyme name).
  */
 export async function resolveKineticValue(
   entities: EntityExtraction,
 ): Promise<ScienceAgentResult> {
-  if (!entities.ecNumber) {
+  if (!entities.ecNumber && !entities.enzymeName) {
     return {
       found: false,
       literatureCandidates: [],
-      logs: ["No EC number provided; skipping real parameter lookup."],
+      logs: ["No enzyme name or EC number provided; skipping real parameter lookup."],
     };
   }
 
