@@ -19,6 +19,7 @@ import {
   MM_TOLERANCE,
   SIR_TOLERANCE,
 } from './simulate';
+import { resolveAndSimulate, ApiUnavailableError, API_BASE_URL } from './api';
 
 export type LineKind =
   | 'out'
@@ -54,7 +55,54 @@ export interface Command {
   name: string;
   args?: string;
   help: string;
-  run: (args: string[]) => Line[];
+  run: (args: string[]) => Line[] | Promise<Line[]>;
+}
+
+/**
+ * Render a resolved-and-simulated job's real provenance -- the citation is
+ * the actual claim. Never summarize this away.
+ */
+function renderProvenance(
+  domain: string,
+  parameters: Record<string, unknown>,
+  provenance: { reasoning: string; modelCitations: string[]; flags: string[] },
+): Line[] {
+  const lines: Line[] = [
+    head(`RESOLVED · ${domain.toUpperCase()}`),
+    rule(),
+    ...Object.entries(parameters).map(([k, v]) => o(`  ${k.padEnd(14)}${v}`)),
+    o(),
+    d(`  ${provenance.reasoning}`),
+    ...provenance.modelCitations.map((c) => d(`  source: ${c}`)),
+  ];
+  if (provenance.flags.length > 0) {
+    lines.push(o());
+    for (const f of provenance.flags) lines.push(warn(`  flag: ${f}`));
+  }
+  return lines;
+}
+
+async function runLiteratureBacked(query: string, domainLabel: string): Promise<Line[]> {
+  if (!API_BASE_URL) {
+    return [
+      err(`  no science-agent API configured (VITE_TERRIUM_API_URL is unset)`),
+      d(`  cannot claim a literature-backed ${domainLabel} result without one --`),
+      d(`  see 'verify ${domainLabel === 'kinetics' ? 'kinetics' : 'epidemiology'}'`),
+      d(`  for a pure math check of the integrator instead.`),
+    ];
+  }
+  try {
+    const job = await resolveAndSimulate(query);
+    if (job.status === 'failed' || !job.result) {
+      return [
+        err(`  pipeline failed: ${job.error?.message ?? 'unknown error'}`),
+      ];
+    }
+    return renderProvenance(job.result.domain, job.result.parameters, job.result.provenance);
+  } catch (e) {
+    const msg = e instanceof ApiUnavailableError ? e.message : String(e);
+    return [err(`  could not reach the literature resolution API: ${msg}`)];
+  }
 }
 
 const DOMAINS = [
@@ -145,57 +193,29 @@ export const COMMANDS: Command[] = [
       }
 
       if (t === 'kinetics' || t === 'michaelis_menten' || t === 'mm') {
-        const t0 = performance.now();
-        const r = simulateMichaelisMenten(DEFAULT_MM);
-        const ms = Math.round(performance.now() - t0);
-        const passes = r.finalResidual < MM_TOLERANCE;
-        return [
-          head('MICHAELIS-MENTEN KINETICS'),
-          rule(),
-          d(`  Km=${DEFAULT_MM.km} Vmax=${DEFAULT_MM.vmax} S0=${DEFAULT_MM.s0}   RK4, 200 substeps/interval`),
-          o(),
-          o(`  S(0)   ${r.trajectory[0].S.toFixed(6)}`),
-          o(`  S(${DEFAULT_MM.end})  ${r.trajectory[r.trajectory.length - 1].S.toFixed(6)}`),
-          o(),
-          (passes ? ok : err)(
-            `  closed-form residual  ${r.finalResidual.toExponential(3)}  ${
-              passes ? '< tolerance ' + MM_TOLERANCE : '> tolerance ' + MM_TOLERANCE
-            }`,
-          ),
-          d(`  Km·ln(S0/S) + (S0 - S) = Vmax·t, the exact implicit MM solution`),
-          d(`  ${ms}ms · same rate law as Tellurium/tellurium_engine.py::simulate_michaelis_menten`),
-        ];
+        const enzyme = args.slice(1).join(' ');
+        if (!enzyme) {
+          return [
+            err('  usage: run kinetics <enzyme>    (try: run kinetics lactate dehydrogenase)'),
+            d('  a bare "run kinetics" has no literature source to resolve --'),
+            d("  this command reports what BRENDA/KEGG/PubMed actually found for"),
+            d('  a named enzyme, not a demo number.'),
+          ];
+        }
+        return runLiteratureBacked(`simulate ${enzyme} kinetics`, 'kinetics');
       }
 
       if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
-        const t0 = performance.now();
-        const r = simulateSIR(DEFAULT_SIR);
-        const ms = Math.round(performance.now() - t0);
-        const passes = r.conservationError < SIR_TOLERANCE;
-        const N = DEFAULT_SIR.s0 + DEFAULT_SIR.i0;
-        const last = r.trajectory[r.trajectory.length - 1];
-        return [
-          head('SIR EPIDEMIOLOGY'),
-          rule(),
-          d(`  beta=${DEFAULT_SIR.beta} gamma=${DEFAULT_SIR.gamma} R0=${(DEFAULT_SIR.beta / DEFAULT_SIR.gamma).toFixed(2)}   N=${N}`),
-          o(),
-          o(`  S(${DEFAULT_SIR.end})  ${last.S.toFixed(3)}`),
-          o(`  I(${DEFAULT_SIR.end})  ${last.I.toFixed(3)}`),
-          o(`  R(${DEFAULT_SIR.end})  ${last.R.toFixed(3)}`),
-          o(),
-          (passes ? ok : err)(
-            `  conservation |S+I+R-N|  ${r.conservationError.toExponential(3)}  ${
-              passes ? '< tolerance ' + SIR_TOLERANCE : '> tolerance ' + SIR_TOLERANCE
-            }`,
-          ),
-          d(`  ${ms}ms · same compartment model as Tellurium/tellurium_engine.py::simulate_sir`),
-        ];
+        const rest = args.slice(1).join(' ');
+        const query = rest ? `simulate ${rest}` : 'simulate sir outbreak';
+        return runLiteratureBacked(query, 'epidemiology');
       }
 
       if (DOMAINS.some(([n]) => n === t)) {
         return [
           warn(`  '${t}' runs in the Python engine, not in this browser.`),
-          d('  domains compiled to the web are: popgen, md, kinetics, epidemiology'),
+          d('  domains compiled to the web: popgen, md (pure math demos)'),
+          d('  domains resolved via the literature API: kinetics, epidemiology'),
         ];
       }
       return [err(`unknown domain '${t}' — try: domains`)];
@@ -252,6 +272,9 @@ export const COMMANDS: Command[] = [
           o(),
           d('  computed by RK4 integration of dS/dt = -Vmax·S / (Km + S), then'),
           d('  checked against the closed form the ODE has no free parameters left to fit.'),
+          d(`  NOTE: Km=${DEFAULT_MM.km}, Vmax=${DEFAULT_MM.vmax} here are illustrative constants,`),
+          d('  not a literature-resolved enzyme -- this checks the solver only.'),
+          d("  for a real enzyme's resolved parameters, try 'run kinetics <enzyme>'."),
         ];
       }
       if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
@@ -267,6 +290,9 @@ export const COMMANDS: Command[] = [
           o(),
           d('  same invariant Tellurium/tests/test_properties.py checks with Hypothesis'),
           d('  across the whole input space; spot-checked here at the final point.'),
+          d(`  NOTE: beta=${DEFAULT_SIR.beta}, gamma=${DEFAULT_SIR.gamma} here are illustrative,`),
+          d('  not resolved from an outbreak literature source -- this checks the'),
+          d("  solver only. try 'run epidemiology <disease/outbreak>' for a resolved run."),
         ];
       }
       if (t === 'popgen' || t === 'wright_fisher') {
@@ -435,7 +461,7 @@ export const COMMANDS: Command[] = [
   { name: 'clear', help: 'clear the screen', run: () => [] },
 ];
 
-export function execute(input: string): { lines: Line[]; clear: boolean } {
+export async function execute(input: string): Promise<{ lines: Line[]; clear: boolean }> {
   const trimmed = input.trim();
   if (!trimmed) return { lines: [], clear: false };
   const [name, ...args] = trimmed.split(/\s+/);
@@ -450,7 +476,7 @@ export function execute(input: string): { lines: Line[]; clear: boolean } {
     };
   }
   if (cmd.name === 'clear') return { lines: [], clear: true };
-  return { lines: cmd.run(args), clear: false };
+  return { lines: await cmd.run(args), clear: false };
 }
 
 export const COMMAND_NAMES = COMMANDS.map((c) => c.name);

@@ -4,3 +4,5 @@ dist
 *.local
 .vite
 vite.config.ts.timestamp-*
+*.tsbuildinfo
+.env.local
