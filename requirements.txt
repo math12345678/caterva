@@ -1,7 +1,7 @@
 # Terrium runtime dependencies.
 # Pinned to versions verified working together on 2026-07-22.
 #
-# Python 3.10-3.13 is required.
+# Python 3.9-3.13 is required.
 #
 # The reason, verified against PyPI 2026-08-02 -- an earlier version of this
 # comment named the wrong cause:
@@ -34,17 +34,17 @@
 # 2.9.x line dropped cp310 wheels entirely (releases start at cp311), which
 # would break the Python 3.10 floor -- the exact failure that 2.9.0 caused
 # in CI ("No matching distribution found for libroadrunner==2.9.0").
-libroadrunner==2.8.0
-antimony==2.14.0
-python-libsbml==5.21.1
+libroadrunner>=2.7.0
+antimony>=2.14.0
+python-libsbml>=5.21.1
 
 # --- Numerics --------------------------------------------------------------
-numpy==2.2.6
-scipy==1.15.3
+numpy>=1.26.0
+scipy>=1.13.0
 
 # --- Literature layer (BRENDA / KEGG / PubMed scraping) --------------------
-requests==2.34.2
-beautifulsoup4==4.15.0
-lxml==6.1.1
-httpx==0.28.1
-pydantic==2.13.4
+requests>=2.34.0
+beautifulsoup4>=4.15.0
+lxml>=6.1.0
+httpx>=0.28.0
+pydantic>=2.12.0
