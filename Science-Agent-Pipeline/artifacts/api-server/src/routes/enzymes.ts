@@ -47,11 +47,10 @@ router.post(
       });
     } catch (err) {
       if (err instanceof RequiredParametersMissingError) {
-        res.status(400).json({
-          error: "MISSING_REQUIRED_INPUT",
+        res.status(422).json({
+          error: "RequiredParametersMissingError",
           message: err.message,
-          domain: err.domain,
-          missing: err.missing,
+          missingKeys: err.missing,
         });
         return;
       }

@@ -2,7 +2,7 @@
 name = "terrium"
 version = "0.1.0"
 description = "Scientific computing for teaching labs"
-requires-python = ">=3.9,<3.14"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     "libroadrunner==2.8.0",
     "antimony==2.14.0",
@@ -26,7 +26,7 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
@@ -38,7 +38,7 @@ ignore = ["D100", "D101", "D102", "D103", "D105", "D202", "D205", "D208", "D209"
 "Tellurium/tests/*.py" = ["S101", "T201"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.10"
 warn_return_any = false
 warn_unused_configs = false
 disallow_untyped_defs = false

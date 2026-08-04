@@ -1,4 +1,29 @@
 /**
+ * Thrown by resolveQuery() when one or more parameters could neither be
+ * resolved from literature nor were supplied by the person running the
+ * query. This is a hard requirement, not a soft warning: a simulation may
+ * never run on a value nobody chose and nothing verified. The message is
+ * built to be directly actionable -- copy-pasteable key=value syntax for
+ * exactly what's missing, not just a list of names.
+ */
+export class RequiredParametersMissingError extends Error {
+  readonly domain: string;
+  readonly missing: string[];
+
+  constructor(domain: string, missing: string[]) {
+    const example = missing.map((k) => `${k}=<value>`).join(" ");
+    super(
+      `Cannot simulate '${domain}': ${missing.join(", ")} could not be ` +
+        `resolved from literature and ${missing.length > 1 ? "were" : "was"} not ` +
+        `supplied in the query. Add ${example} to your query and try again.`,
+    );
+    this.name = "RequiredParametersMissingError";
+    this.domain = domain;
+    this.missing = missing;
+  }
+}
+
+/**
  * Per-parameter provenance: what is actually known about each value the
  * resolver returns. See ADR 0008 and Business/build-stages/STAGE_04_PART_03.md.
  */
@@ -408,26 +433,26 @@ export function defaultOriginKeys(
 }
 
 /**
- * Thrown by resolveQuery() when one or more parameters could neither be
- * resolved from literature nor were supplied by the person running the
- * query. This is a hard requirement, not a soft warning: a simulation may
- * never run on a value nobody chose and nothing verified. The message is
- * built to be directly actionable -- copy-pasteable key=value syntax for
- * exactly what's missing, not just a list of names.
+ * Thrown when a user-supplied array override in the query string is malformed.
+ *
+ * This is a user-input error, not a missing-parameter error: the key IS
+ * present, but its value does not meet the structural requirements (wrong
+ * number of elements, non-numeric entries, or failing a domain-specific
+ * invariant such as summing to 1). The message names the key and states
+ * exactly what is wrong so the caller can correct it.
  */
-export class RequiredParametersMissingError extends Error {
-  readonly domain: string;
-  readonly missing: string[];
+export class InvalidParameterOverrideError extends Error {
+  readonly parameter: string;
+  readonly reason: string;
 
-  constructor(domain: string, missing: string[]) {
-    const example = missing.map((k) => `${k}=<value>`).join(" ");
+  constructor(parameter: string, reason: string) {
     super(
-      `Cannot simulate '${domain}': ${missing.join(", ")} could not be ` +
-        `resolved from literature and ${missing.length > 1 ? "were" : "was"} not ` +
-        `supplied in the query. Add ${example} to your query and try again.`,
+      `Invalid override for '${parameter}': ${reason}. ` +
+        `Supply it as ${parameter}=<value1>,<value2>,<value3>,<value4> ` +
+        `with exactly 4 comma-separated numeric values that sum to 1.`,
     );
-    this.name = "RequiredParametersMissingError";
-    this.domain = domain;
-    this.missing = missing;
+    this.name = "InvalidParameterOverrideError";
+    this.parameter = parameter;
+    this.reason = reason;
   }
 }

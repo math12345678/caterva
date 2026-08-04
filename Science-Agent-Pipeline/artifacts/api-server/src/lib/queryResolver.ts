@@ -2,12 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./telluriumRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
 import { resolveKineticValue } from "./scienceAgent";
+import { matchEnzyme } from "./enzymes";
 import {
   RESOLVABLE_FIELDS,
+  RequiredParametersMissingError,
   buildResolvedKineticProvenance,
   defaultOriginKeys,
   isAllDefaults,
-  RequiredParametersMissingError,
   validateParameterProvenance,
   type AssayConditions,
   type ParameterProvenance,
@@ -52,7 +53,7 @@ function toAssayConditions(
  */
 async function applyKineticResolution(
   entities: EntityExtraction | undefined,
-  overrides: Record<string, number>,
+  overrides: Record<string, number | number[]>,
   domain: string,
   parameters: Record<string, number | number[]>,
   parameterProvenance: Record<string, ParameterProvenance>,
@@ -393,25 +394,205 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
 ];
 
-const PARAMETER_PATTERN =
-  /(km|ki|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0_recovered|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
+const PARAMETER_NAMES =
+  "km|ki|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|r0_recovered|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|starting_frequencies|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed";
+
+/**
+ * Matches a parameter token: the key name, an optional `=` or `:`
+ * delimiter, and the value portion (which may be a scalar or a
+ * comma-separated array).
+ */
+const PARAMETER_TOKEN_PATTERN = new RegExp(
+  `^(${PARAMETER_NAMES})\\s*[=:]\\s*(.+)$`,
+  "i",
+);
+
+/** Scalar: km=5, vmax 10, beta = 0.4 */
+const PARAMETER_PATTERN = new RegExp(
+  `(${PARAMETER_NAMES})\\s*[=:]?\\s*([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)`,
+  "i",
+);
+
+/**
+ * Validation errors for malformed array overrides.
+ */
+export class ArrayOverrideValidationError extends Error {
+  constructor(
+    public readonly key: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ArrayOverrideValidationError";
+  }
+}
+
+/**
+ * Parse a single comma-separated value string into a number array.
+ * Returns undefined if the string contains no commas (meaning it should
+ * be treated as a scalar, not an array).
+ *
+ * For array parameters, validation happens in `validateArrayOverride()`
+ * after parsing — this function only extracts the raw numbers.
+ */
+function parseArrayValue(raw: string): number[] | undefined {
+  const trimmed = raw.replace(/^\[|\]$/g, "").trim();
+  if (!trimmed.includes(",")) return undefined;
+  const parts = trimmed.split(",").map((s) => s.trim());
+  if (parts.length === 0 || parts.some((s) => s === "")) return undefined;
+  const nums = parts.map((s) => Number.parseFloat(s));
+  if (!nums.every((n) => Number.isFinite(n))) return undefined;
+  return nums;
+}
+
+/**
+ * Known array-valued parameters and their validation constraints.
+ *
+ * Each entry specifies:
+ *  - `length`: exact number of elements required
+ *  - `sumTo`: if set, the elements must sum to this value within tolerance
+ *  - `tolerance`: float tolerance for the sum check (default 1e-6)
+ */
+const ARRAY_VALIDATORS: Record<
+  string,
+  { length: number; sumTo?: number; tolerance?: number }
+> = {
+  starting_frequencies: { length: 4, sumTo: 1, tolerance: 1e-6 },
+};
+
+/**
+ * Validate an array override against its declared constraints.
+ * Throws `ArrayOverrideValidationError` with a clear, actionable message
+ * if validation fails.
+ */
+function validateArrayOverride(key: string, arr: number[]): void {
+  const spec = ARRAY_VALIDATORS[key];
+  if (!spec) {
+    throw new ArrayOverrideValidationError(
+      key,
+      `'${key}' is not an array-valued parameter. ` +
+        `Remove the commas or use a valid array parameter.`,
+    );
+  }
+
+  if (arr.length !== spec.length) {
+    throw new ArrayOverrideValidationError(
+      key,
+      `${key} must have exactly ${spec.length} values (${arr.length} provided). ` +
+        `Example: ${key}=${Array(spec.length).fill("0.25").join(",")}`,
+    );
+  }
+
+  if (spec.sumTo !== undefined) {
+    const sum = arr.reduce((a, b) => a + b, 0);
+    const tolerance = spec.tolerance ?? 1e-6;
+    if (Math.abs(sum - spec.sumTo) > tolerance) {
+      throw new ArrayOverrideValidationError(
+        key,
+        `${key} values must sum to ${spec.sumTo} (got ${sum.toPrecision(6)}). ` +
+          `Haplotype frequencies must sum to 1.0.`,
+      );
+    }
+  }
+}
 
 /**
  * Extract numeric overrides from the query string.
  *
- * Looks for patterns like "km=5", "vmax 10", "beta = 0.4" and returns them
- * as a record. This is intentionally simple; OpenCode can later replace it
- * with an LLM-based extractor.
+ * Supports both scalar and array-valued parameters:
+ *   - Scalar: "km=5", "vmax 10", "beta = 0.4"
+ *   - Array:  "starting_frequencies=0.5,0,0,0.5"
+ *            "starting_frequencies=[0.5,0,0,0.5]"
+ *
+ * Array syntax requires `=` or `:` so it cannot be confused with a scalar
+ * followed by unrelated text.
  */
-function extractParameterOverrides(query: string): Record<string, number> {
-  const overrides: Record<string, number> = {};
+export function extractParameterOverrides(
+  query: string,
+): Record<string, number | number[]> {
+  const overrides: Record<string, number | number[]> = {};
 
+  // --- Array overrides: scan the RAW query first -------------------------
+  //
+  // Tokenization splits on whitespace, which breaks `key=a, b, c, d` apart
+  // into `key=a,` `b,` `c,` `d`. Scanning the raw query with a dedicated
+  // pattern captures the full comma-separated group regardless of spaces.
+  const arrayKeys = new Set<string>();
+  for (const [key, spec] of Object.entries(ARRAY_VALIDATORS)) {
+    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const arrayRe = new RegExp(
+      `${escapedKey}\\s*[=:]\\s*([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?(?:,\\s*[0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)+)`,
+      "i",
+    );
+    const m = arrayRe.exec(query);
+    if (m) {
+      const arr = parseArrayValue(m[1]!);
+      if (arr !== undefined) {
+        validateArrayOverride(key, arr);
+        overrides[key] = arr;
+        arrayKeys.add(key);
+      }
+    }
+  }
+
+  // --- Scalar / token-based extraction ----------------------------------
+  //
+  // Keys already captured as arrays are skipped so a partial token
+  // (e.g. `starting_frequencies=0.5,` from a space-split list) cannot
+  // overwrite the validated array with a scalar.
   for (const token of query.split(/\s+/)) {
-    const match = PARAMETER_PATTERN.exec(token);
-    if (match) {
-      const key = match[1]!.toLowerCase();
-      const value = Number.parseFloat(match[2]!);
-      overrides[key] = value;
+    // Try key=value or key:value pattern first
+    const kvMatch = PARAMETER_TOKEN_PATTERN.exec(token);
+    if (kvMatch) {
+      const key = kvMatch[1]!.toLowerCase();
+      if (arrayKeys.has(key)) continue;
+
+      const rawValue = kvMatch[2]!;
+
+      // If the value contains commas or brackets, it MUST be an array.
+      // Do not fall back to scalar — a malformed array is rejected.
+      if (rawValue.includes(",") || /\[/.test(rawValue)) {
+        const arr = parseArrayValue(rawValue);
+        if (arr !== undefined) {
+          validateArrayOverride(key, arr);
+          overrides[key] = arr;
+        } else {
+          throw new ArrayOverrideValidationError(
+            key,
+            `'${key}' value '${rawValue}' is not a valid comma-separated number list. ` +
+              `Example: ${key}=0.5,0,0,0.5`,
+          );
+        }
+        continue;
+      }
+
+      // Scalar parse — but only if this key is not an array parameter.
+      // An array parameter supplied without commas (e.g. starting_frequencies=0.5)
+      // is malformed and must be rejected, not silently accepted as a scalar.
+      if (ARRAY_VALIDATORS[key] === undefined) {
+        const value = Number.parseFloat(rawValue);
+        if (Number.isFinite(value)) {
+          overrides[key] = value;
+          continue;
+        }
+      } else {
+        // Array parameter supplied as scalar — reject with actionable message.
+        throw new ArrayOverrideValidationError(
+          key,
+          `'${key}' requires a comma-separated list (e.g. ${key}=0.5,0,0,0.5), ` +
+            `not a single number.`,
+        );
+      }
+    }
+
+    // Fallback: try scalar match without explicit delimiter (e.g. "km 5")
+    const scalarMatch = PARAMETER_PATTERN.exec(token);
+    if (scalarMatch) {
+      const key = scalarMatch[1]!.toLowerCase();
+      if (arrayKeys.has(key)) continue;
+      const value = Number.parseFloat(scalarMatch[2]!);
+      if (Number.isFinite(value)) {
+        overrides[key] = value;
+      }
     }
   }
 
@@ -419,85 +600,83 @@ function extractParameterOverrides(query: string): Record<string, number> {
 }
 
 /**
- * Generic query scaffolding -- words that describe the ACT of asking for a
- * simulation, never the enzyme itself. Deliberately small and manually
- * curated: unlike an earlier version of this function, this does NOT
- * derive stopwords from every DOMAIN_DEFAULTS keyword, because several of
- * those keywords (e.g. "lactate", "hexokinase", "kinase", "trypsin") are
- * themselves real substrings of real enzyme names -- stripping them would
- * turn "simulate lactate dehydrogenase" into a mangled guess ("dehydrogenase"
- * alone), which is worse than not guessing at all.
+ * Words that are never themselves the name of the enzyme being asked
+ * about -- either generic query scaffolding, or (derived below) one of the
+ * single words making up a DOMAIN_DEFAULTS keyword phrase (e.g.
+ * "competitive"/"inhibition" from "competitive inhibition").
  */
 const QUERY_CONNECTOR_WORDS = new Set([
   "simulate", "run", "the", "a", "an", "of", "for", "please", "with",
   "and", "to", "in", "on", "model", "reaction", "compute", "calculate",
   "show", "me", "kinetics", "kinetic", "using", "via", "estimate", "study",
-  "analyze", "analyse", "dynamics", "system", "process", "enzyme",
-  "substrate", "protein",
+  "analyze", "analyse", "dynamics", "system", "process",
 ]);
 
-/**
- * Routing words specific to OTHER domains (SIR/PCR/Monte Carlo/population
- * genetics/molecular dynamics/Gillespie), plus the competitive-inhibition
- * regime's own descriptive words ("competitive"/"inhibition"/"inhibitor" --
- * these name a kinetics regime, not a protein). These can never be part of
- * an enzyme name, unlike the `mm`/`mm_competitive_inhibition` domains' own
- * keywords, which are deliberately left alone above.
- */
-let cachedNonEnzymeDomainWords: Set<string> | undefined;
-function nonEnzymeDomainKeywordWords(): Set<string> {
-  if (!cachedNonEnzymeDomainWords) {
-    cachedNonEnzymeDomainWords = new Set(
-      DOMAIN_DEFAULTS.filter(
-        (d) => d.domain !== "mm" && d.domain !== "mm_competitive_inhibition",
-      ).flatMap((d) => d.keywords.flatMap((k) => k.split(/\s+/))),
+let cachedDomainKeywordWords: Set<string> | undefined;
+function domainKeywordWords(): Set<string> {
+  if (!cachedDomainKeywordWords) {
+    cachedDomainKeywordWords = new Set(
+      DOMAIN_DEFAULTS.flatMap((d) => d.keywords.flatMap((k) => k.split(/\s+/))),
     );
-    for (const w of ["competitive", "inhibition", "inhibitor"]) {
-      cachedNonEnzymeDomainWords.add(w);
-    }
   }
-  return cachedNonEnzymeDomainWords;
+  return cachedDomainKeywordWords;
 }
 
 /**
- * Enzyme-name guess from free text -- the only entity-extraction path when
- * no LLM is configured. There is deliberately no hardcoded name->EC table
- * feeding this anymore (that used to be enzymes.ts, ~30 entries; anything
- * outside it never reached a real lookup at all). Every enzyme name, known
- * or not, goes through the same live path: this function only guesses the
- * NAME from the query text; `resolveKineticValue` (scienceAgent.ts) hands
- * that name to a live UniProt search for the EC number and a live KEGG
- * search for the substrate (science_agent_runner.py) before ever touching
- * BRENDA.
+ * Best-effort enzyme-name guess from free text, used only when the
+ * hardcoded `enzymes.ts` pattern list doesn't match anything.
  *
  * This is NOT a real named-entity extractor -- it strips known query
- * scaffolding and other-domain routing words and returns whatever text is
- * left. It can guess wrong on odd phrasing. That is an acceptable failure
- * mode specifically because the guess is never treated as ground truth: a
- * wrong guess costs one failed UniProt search and comes back honestly
- * empty (found: false) -- it never fabricates a parameter value.
+ * scaffolding and domain-routing keywords and returns whatever text is
+ * left. It can guess wrong (e.g. it will mis-extract a genuinely novel
+ * enzyme name that happens to share a word with a domain keyword, like
+ * "kinase"). That is an acceptable failure mode here specifically because
+ * the guess is never treated as ground truth: it is handed to a live
+ * UniProt name search (science_agent_runner.py), which either resolves a
+ * real EC number or comes back honestly empty. A wrong guess costs one
+ * failed lookup; it never fabricates a parameter value.
  */
 function guessEnzymeNameFromQuery(query: string): string | undefined {
-  const nonEnzymeWords = nonEnzymeDomainKeywordWords();
+  const domainWords = domainKeywordWords();
   const words = query
     .split(/\s+/)
-    .filter((token) => !PARAMETER_PATTERN.test(token))
+    .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token) && !PARAMETER_PATTERN.test(token))
     .join(" ")
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, " ")
     .split(/\s+/)
-    .filter((w) => w && !QUERY_CONNECTOR_WORDS.has(w) && !nonEnzymeWords.has(w));
+    .filter((w) => w && !QUERY_CONNECTOR_WORDS.has(w) && !domainWords.has(w));
   if (words.length === 0) return undefined;
   return words.join(" ");
 }
 
 /**
  * Fallback entity extraction when no LLM is configured (or the LLM path
- * didn't run). Always a live-resolution guess now -- see
- * guessEnzymeNameFromQuery's docstring for why the hardcoded enzymes.ts
- * pattern list was removed from this path entirely.
+ * didn't run).
+ *
+ * First tries the hardcoded `enzymes.ts` pattern list -- fast, and already
+ * carries a verified EC number/substrate/organism with no network round
+ * trip. If that list doesn't match, this used to give up entirely, which
+ * meant only those ~30 enzymes could ever reach a real BRENDA lookup.
+ * Instead it now falls through to a best-effort name guess with no EC
+ * number; `resolveKineticValue` (scienceAgent.ts) passes that name to the
+ * Python bridge, which resolves an EC number for it live via UniProt
+ * before attempting BRENDA -- see science_agent_runner.py::resolve_ec_number.
  */
 function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
+  const matched = matchEnzyme(query);
+  if (matched) {
+    const lower = query.toLowerCase();
+    const substrate =
+      matched.substrates.find((s) => lower.includes(s)) ?? matched.substrates[0]!;
+    return {
+      enzymeName: matched.enzymeName,
+      substrate,
+      organism: matched.organism,
+      ecNumber: matched.ecNumber,
+    };
+  }
+
   const guess = guessEnzymeNameFromQuery(query);
   if (!guess) return undefined;
   return {
@@ -521,7 +700,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
  */
 function buildParameterProvenance(
   parameters: Record<string, number | number[]>,
-  overrides: Record<string, number>,
+  overrides: Record<string, number | number[]>,
   llmSupplied: Record<string, number | number[]>,
   domain: string,
 ): Record<string, ParameterProvenance> {
@@ -656,12 +835,6 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     if (Object.keys(overrides).length > 0) {
       flags.push("Applied parameter overrides found in the query string.");
     }
-    if (isAllDefaults(parameterProvenance)) {
-      flags.push(
-        "No parameter values were resolved from literature; all values are defaults.",
-      );
-    }
-
     const violations = provenanceViolations(parameters, parameterProvenance);
     if (violations.length > 0) {
       throw new Error(
@@ -669,13 +842,12 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       );
     }
 
-    // Hard rule: no parameter may reach the simulation engine on an
-    // unrequested, unsourced default. Every value must trace to a literature
-    // lookup (origin "resolved") or to the person running the query (origin
-    // "user"). "llm" stays permitted here -- it is a distinct, already-
-    // disclosed, already-tested tier (ADR 0011), not silently mistaken for
-    // either of the other two -- but a plain "default" is exactly the thing
-    // this rule exists to stop.
+    if (isAllDefaults(parameterProvenance)) {
+      flags.push(
+        "No parameter values were resolved from literature; all values are defaults.",
+      );
+    }
+
     const missing = defaultOriginKeys(parameterProvenance);
     if (missing.length > 0) {
       throw new RequiredParametersMissingError(llmResult.domain, missing);
@@ -749,12 +921,6 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
   if (Object.keys(overrides).length > 0) {
     flags.push("Applied parameter overrides found in the query string.");
   }
-  if (isAllDefaults(parameterProvenance)) {
-    flags.push(
-      "No parameter values were resolved from literature; all values are defaults.",
-    );
-  }
-
   const violations = provenanceViolations(parameters, parameterProvenance);
   if (violations.length > 0) {
     throw new Error(
@@ -762,7 +928,13 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     );
   }
 
-  // Same hard rule as the LLM branch above -- see the comment there.
+  if (isAllDefaults(parameterProvenance)) {
+    flags.push(
+      "No parameter values were resolved from literature; all values are defaults.",
+    );
+  }
+
+  // Hard-block: no default-origin parameter may reach the simulation engine.
   const missing = defaultOriginKeys(parameterProvenance);
   if (missing.length > 0) {
     throw new RequiredParametersMissingError(best.domain, missing);

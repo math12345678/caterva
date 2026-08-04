@@ -19,7 +19,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,077 tests (883 engine + 194 literature)
+make test      # runs all 1,106 tests (883 engine + 223 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -45,7 +45,7 @@ offer to build and attach automatically.
 
 ## Requirements
 
-**Python 3.9–3.13.** This is a hard constraint, not a preference.
+**Python 3.10–3.13.** This is a hard constraint, not a preference.
 `libroadrunner` 2.8.0 and `numpy` 2.2.6 publish wheels through cp313 and keep
 the cp310 floor (verified against PyPI). The 2.9.x libroadrunner line drops
 cp310, so we stay on 2.8.0. See
@@ -154,7 +154,7 @@ Terrium/
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                     194 tests
+│   └── ...                     223 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
@@ -211,10 +211,10 @@ them together.
 
 ```bash
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 1,077 tests
+make test        # run all 1,106 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (883 tests)
-make test-lit    # literature layer only (194 tests)
+make test-lit    # literature layer only (223 tests)
 python3 scripts/verify_build.py --quick  # all 11 guard scripts (~8s)
 make clean       # remove caches
 ```
