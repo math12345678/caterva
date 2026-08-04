@@ -5,7 +5,9 @@ import { resolveKineticValue } from "./scienceAgent";
 import {
   RESOLVABLE_FIELDS,
   buildResolvedKineticProvenance,
+  defaultOriginKeys,
   isAllDefaults,
+  RequiredParametersMissingError,
   validateParameterProvenance,
   type AssayConditions,
   type ParameterProvenance,
@@ -392,7 +394,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
 ];
 
 const PARAMETER_PATTERN =
-  /(km|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
+  /(km|ki|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0_recovered|r0|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed)\s*[=:]?\s*([0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?)/i;
 
 /**
  * Extract numeric overrides from the query string.
@@ -667,6 +669,18 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       );
     }
 
+    // Hard rule: no parameter may reach the simulation engine on an
+    // unrequested, unsourced default. Every value must trace to a literature
+    // lookup (origin "resolved") or to the person running the query (origin
+    // "user"). "llm" stays permitted here -- it is a distinct, already-
+    // disclosed, already-tested tier (ADR 0011), not silently mistaken for
+    // either of the other two -- but a plain "default" is exactly the thing
+    // this rule exists to stop.
+    const missing = defaultOriginKeys(parameterProvenance);
+    if (missing.length > 0) {
+      throw new RequiredParametersMissingError(llmResult.domain, missing);
+    }
+
     return {
       runId: randomUUID(),
       domain: llmResult.domain,
@@ -746,6 +760,12 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     throw new Error(
       `Internal error: invalid parameter provenance: ${violations.join("; ")}`,
     );
+  }
+
+  // Same hard rule as the LLM branch above -- see the comment there.
+  const missing = defaultOriginKeys(parameterProvenance);
+  if (missing.length > 0) {
+    throw new RequiredParametersMissingError(best.domain, missing);
   }
 
   return {

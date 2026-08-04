@@ -392,3 +392,42 @@ export function isAllDefaults(
     Object.values(parameterProvenance).every((p) => p.origin === "default")
   );
 }
+
+/**
+ * The keys carrying a project-chosen default value rather than something
+ * this specific query actually established (literature lookup or the
+ * person typing the query). Used to enforce the hard rule: nothing may
+ * reach the simulation engine on an unrequested, unsourced number.
+ */
+export function defaultOriginKeys(
+  parameterProvenance: Record<string, ParameterProvenance>,
+): string[] {
+  return Object.entries(parameterProvenance)
+    .filter(([, p]) => p.origin === "default")
+    .map(([key]) => key);
+}
+
+/**
+ * Thrown by resolveQuery() when one or more parameters could neither be
+ * resolved from literature nor were supplied by the person running the
+ * query. This is a hard requirement, not a soft warning: a simulation may
+ * never run on a value nobody chose and nothing verified. The message is
+ * built to be directly actionable -- copy-pasteable key=value syntax for
+ * exactly what's missing, not just a list of names.
+ */
+export class RequiredParametersMissingError extends Error {
+  readonly domain: string;
+  readonly missing: string[];
+
+  constructor(domain: string, missing: string[]) {
+    const example = missing.map((k) => `${k}=<value>`).join(" ");
+    super(
+      `Cannot simulate '${domain}': ${missing.join(", ")} could not be ` +
+        `resolved from literature and ${missing.length > 1 ? "were" : "was"} not ` +
+        `supplied in the query. Add ${example} to your query and try again.`,
+    );
+    this.name = "RequiredParametersMissingError";
+    this.domain = domain;
+    this.missing = missing;
+  }
+}

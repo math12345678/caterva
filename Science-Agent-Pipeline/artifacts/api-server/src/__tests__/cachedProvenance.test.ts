@@ -29,7 +29,12 @@ beforeEach(async () => {
 
 describe("POST /api/simulate — parameterProvenance survives cache hit", () => {
   it("returns identical parameterProvenance on a repeated query", async () => {
-    const query = "simulate sir beta=0.5 gamma=0.1";
+    // Every non-resolvable parameter must be supplied explicitly (or
+    // resolved) or resolveQuery() throws RequiredParametersMissingError.
+    // `mm` is used here simply as a small, fast domain to exercise the
+    // cache-hit behaviour this test actually checks (parameterProvenance
+    // surviving a cache hit) -- which domain is used is orthogonal to that.
+    const query = "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51";
 
     const create = await request(server).post("/api/simulate").send({ query });
     expect(create.status).toBe(202);

@@ -7,6 +7,7 @@ import {
 } from "express";
 import { ENZYMES } from "../lib/enzymes";
 import { resolveQuery } from "../lib/queryResolver";
+import { RequiredParametersMissingError } from "../lib/provenance";
 import { logger } from "../lib/logger";
 import { validate } from "../lib/validate";
 import { ResolveBody } from "../lib/schemas";
@@ -45,6 +46,15 @@ router.post(
         parameterProvenance: resolved.parameterProvenance,
       });
     } catch (err) {
+      if (err instanceof RequiredParametersMissingError) {
+        res.status(400).json({
+          error: "MISSING_REQUIRED_INPUT",
+          message: err.message,
+          domain: err.domain,
+          missing: err.missing,
+        });
+        return;
+      }
       next(err);
     }
   },

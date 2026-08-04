@@ -25,7 +25,7 @@ import { validateParameterProvenance } from "../lib/provenance";
 describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
   it("a query supplying kcat and enzyme_conc gets provenance for both", async () => {
     const resolved = await resolveQuery(
-      "simulate enzyme kinetics kcat=118 enzyme_conc=0.00001",
+      "simulate enzyme kinetics kcat=118 enzyme_conc=0.00001 km=2 vmax=5 s0=10 end=10 points=51",
     );
 
     expect(resolved.domain).toBe("mm");
@@ -43,7 +43,7 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
 
   it("the resolved provenance satisfies the ADR 0008 contract", async () => {
     const resolved = await resolveQuery(
-      "simulate enzyme kinetics kcat=118 enzyme_conc=0.00001",
+      "simulate enzyme kinetics kcat=118 enzyme_conc=0.00001 km=2 vmax=5 s0=10 end=10 points=51",
     );
     // resolveQuery throws on violations, so reaching here already proves a
     // lot -- but assert explicitly rather than relying on absence of throw.
@@ -65,7 +65,7 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
      * something is inventing an assay.
      */
     const resolved = await resolveQuery(
-      "simulate lactate dehydrogenase enzyme_conc=0.00001",
+      "simulate lactate dehydrogenase enzyme_conc=0.00001 vmax=5 s0=10 end=10 points=51",
     );
     const provenance = resolved.parameterProvenance["enzyme_conc"];
     if (provenance) {
@@ -81,7 +81,9 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
      * not produce a simulable parameter on its own -- it needs an [E]0 the
      * caller supplies. The narrowness note must therefore stay true.
      */
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      "simulate lactate dehydrogenase vmax=5 s0=10 end=10 points=51",
+    );
     for (const key of ["kcat", "enzyme_conc"]) {
       const provenance = resolved.parameterProvenance[key];
       if (provenance) {
@@ -97,7 +99,9 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
      * for the wrong reason -- and every default simulation would claim a
      * turnover number nobody supplied.
      */
-    const resolved = await resolveQuery("simulate enzyme kinetics");
+    const resolved = await resolveQuery(
+      "simulate enzyme kinetics km=2 vmax=5 s0=10 end=10 points=51",
+    );
     expect(resolved.parameters).not.toHaveProperty("kcat");
     expect(resolved.parameters).not.toHaveProperty("enzyme_conc");
     expect(

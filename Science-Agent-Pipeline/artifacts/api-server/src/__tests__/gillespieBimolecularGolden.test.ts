@@ -48,7 +48,9 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
 
 describe("Bimolecular SSA resolution (Target I-style narrowness)", () => {
   it("resolves to gillespie_ssa_bimolecular with a0/b0/k/end", async () => {
-    const resolved = await resolveQuery("bimolecular association reaction");
+    const resolved = await resolveQuery(
+      "bimolecular association reaction a0=100 b0=100 k=0.005 end=10",
+    );
     expect(resolved.domain).toBe("gillespie_ssa_bimolecular");
     expect(resolved.parameters).toHaveProperty("a0");
     expect(resolved.parameters).toHaveProperty("b0");
@@ -57,7 +59,9 @@ describe("Bimolecular SSA resolution (Target I-style narrowness)", () => {
   });
 
   it("has no literature resolution and no narrowness notes", async () => {
-    const resolved = await resolveQuery("bimolecular association reaction");
+    const resolved = await resolveQuery(
+      "bimolecular association reaction a0=100 b0=100 k=0.005 end=10",
+    );
     for (const [key, prov] of Object.entries(resolved.parameterProvenance)) {
       expect(prov.origin).not.toBe("resolved");
       expect(prov.citation, `${key} must not carry a citation`).toBeUndefined();

@@ -107,15 +107,22 @@ describe("Target J — an LLM-supplied value reaches the API as llm, not default
   it("labels a parameter the LLM produced with origin 'llm' and a note", async () => {
     // The LLM resolver returns a parameter that is not in the query and has
     // no literature lookup behind it.
+    //
+    // sir's other non-beta parameters must still reach the result with a
+    // non-default origin, or resolveQuery() throws RequiredParametersMissingError
+    // before this test can observe beta's origin at all. PARAMETER_PATTERN
+    // now recognises `r0_recovered` as a query override too, but it is
+    // supplied here through the mocked LLM result instead, to demonstrate
+    // that origin as a legitimate path independent of query text.
     vi.mocked(resolveQueryWithLLM).mockResolvedValueOnce({
       domain: "sir",
-      parameters: { beta: 0.42 },
+      parameters: { beta: 0.42, r0_recovered: 0 },
       reasoning: "inferred a plausible transmission rate",
       modelCitations: [],
     } as never);
 
     const resolved = await resolveQuery(
-      "simulate a moderately contagious outbreak",
+      "simulate a moderately contagious outbreak gamma=0.1 s0=990 i0=10 end=100 points=101",
     );
     const beta = resolved.parameterProvenance["beta"];
 
@@ -134,16 +141,18 @@ describe("Target J — an LLM-supplied value reaches the API as llm, not default
 
   it("every provenance entry the resolver emits passes validation", async () => {
     // Rule 4-style check: whatever the resolver produces for this query must
-    // satisfy the contract, including the new llm rule.
+    // satisfy the contract, including the new llm rule. As above,
+    // `r0_recovered` is supplied via the mocked LLM result to demonstrate
+    // that path, even though query text could reach it too.
     vi.mocked(resolveQueryWithLLM).mockResolvedValueOnce({
       domain: "sir",
-      parameters: { beta: 0.42, gamma_rate: 0.1 },
+      parameters: { beta: 0.42, gamma_rate: 0.1, r0_recovered: 0 },
       reasoning: "inferred",
       modelCitations: [],
     } as never);
 
     const resolved = await resolveQuery(
-      "simulate an outbreak with made-up rates",
+      "simulate an outbreak with made-up rates gamma=0.1 s0=990 i0=10 end=100 points=101",
     );
     const violations = validateParameterProvenance(
       resolved.parameters,

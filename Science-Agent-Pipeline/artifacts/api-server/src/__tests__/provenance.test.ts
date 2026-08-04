@@ -5,6 +5,7 @@ import type { ParameterProvenance } from "../lib/provenance";
 import {
   isLocatableCitation,
   validateParameterProvenance,
+  RequiredParametersMissingError,
 } from "../lib/provenance";
 import { resolveKineticValue } from "../lib/scienceAgent";
 
@@ -37,18 +38,71 @@ vi.mock("../lib/scienceAgent", async (importOriginal) => {
 });
 
 // One query per domain, each reaching the deterministic keyword path.
+//
+// Since resolveQuery() now hard-blocks on ANY origin:"default" parameter
+// (RequiredParametersMissingError), every non-resolvable parameter in each
+// domain must be supplied explicitly as a key=value override -- a bare
+// query is no longer enough to reach a result. Overrides are written using
+// the exact key names PARAMETER_PATTERN recognises (queryResolver.ts).
+//
+// PARAMETER_PATTERN now recognises both "ki" and "r0_recovered" as override
+// keys, so "sir", "seir", and "mm_competitive_inhibition" can all be fully
+// satisfied through query overrides and are included below like every
+// other domain. "two_locus_wright_fisher" is the sole remaining exception:
+// it carries `starting_frequencies`, an array parameter, and
+// PARAMETER_PATTERN only ever extracts single numeric overrides, so an
+// array parameter can never be supplied this way -- it is covered
+// separately below (see "domains that can never satisfy the hard rule
+// through query overrides").
 const DOMAIN_QUERIES: Array<[string, string]> = [
-  ["mm", "simulate enzyme kinetics"],
-  ["sir", "simulate sir outbreak"],
-  ["seir", "simulate seir incubation"],
-  ["pcr", "simulate pcr amplification"],
-  ["monte_carlo_pi", "estimate pi with monte carlo"],
-  ["wright_fisher", "simulate genetic drift"],
-  ["two_locus_wright_fisher", "linkage disequilibrium two locus"],
-  ["molecular_dynamics", "molecular dynamics lennard-jones"],
-  ["gillespie_ssa", "gillespie stochastic decay reaction"],
-  ["gillespie_ssa_bimolecular", "bimolecular association reaction"],
-  ["gillespie_ssa_replicates", "gillespie many seeds"],
+  ["mm", "simulate enzyme kinetics km=2 vmax=5 s0=10 end=10 points=51"],
+  [
+    "mm_competitive_inhibition",
+    "simulate competitive inhibition km=2 ki=1 vmax=5 s0=10 i0=0 end=10 points=51",
+  ],
+  ["pcr", "simulate pcr amplification n0=100 efficiency=0.95 cycles=30"],
+  ["monte_carlo_pi", "estimate pi with monte carlo n_samples=10000"],
+  [
+    "sir",
+    "simulate sir outbreak beta=0.3 gamma=0.1 s0=990 i0=10 r0_recovered=0 end=100 points=101",
+  ],
+  [
+    "seir",
+    "simulate seir incubation beta=0.3 sigma=0.2 gamma=0.1 s0=990 e0=10 i0=0 r0_recovered=0 end=100 points=101",
+  ],
+  [
+    "wright_fisher",
+    "simulate genetic drift population_size=100 starting_frequency=0.5 " +
+      "generations=100 replicate_runs=100 mutation_rate=0 selection_coefficient=0",
+  ],
+  [
+    "molecular_dynamics",
+    "molecular dynamics lennard-jones n_particles=108 temperature=0.4 " +
+      "timestep=0.005 n_steps=1000 density=0.85",
+  ],
+  ["gillespie_ssa", "gillespie stochastic decay reaction a0=1000 k=0.5 end=10"],
+  [
+    "gillespie_ssa_bimolecular",
+    "bimolecular association reaction a0=100 b0=100 k=0.005 end=10",
+  ],
+  [
+    "gillespie_ssa_replicates",
+    "gillespie many seeds a0=100 k=0.5 end=10 n_replicates=100",
+  ],
+];
+
+// Domains that can never satisfy the hard rule through query overrides
+// alone (see comment above): a bare -- or even fully key=value-annotated --
+// query to these domains always throws RequiredParametersMissingError,
+// because at least one parameter has no override syntax that reaches it.
+const UNSATISFIABLE_DOMAIN_QUERIES: Array<
+  [string, string, string[]]
+> = [
+  [
+    "two_locus_wright_fisher",
+    "linkage disequilibrium two locus population_size=100 generations=20 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+    ["starting_frequencies"],
+  ],
 ];
 
 function entries(resolved: {
@@ -57,8 +111,20 @@ function entries(resolved: {
   return Object.entries(resolved.parameterProvenance);
 }
 
+// Overrides for every non-km mm parameter, appended to EC-recognisable
+// queries so km is left free to go through kinetic resolution while
+// nothing else in the domain reaches the resolver on a bare default.
+const MM_EC_OVERRIDES = "vmax=5 s0=10 end=10 points=51";
+// Full mm overrides including km, for tests exercising km's own origin.
+const MM_FULL_OVERRIDES = "km=2 vmax=5 s0=10 end=10 points=51";
+// A satisfiable, resolvable-field-free domain, fully overridden, used
+// wherever a test needs "some real result" but the domain itself is not
+// the point (e.g. checking modelCitations naming, or narrowness silence).
+const GILLESPIE_FULL_OVERRIDES =
+  "gillespie stochastic decay reaction a0=1000 k=0.5 end=10";
+
 describe("parameter provenance", () => {
-  describe("Target A — structural correspondence for all 11 domains", () => {
+  describe("Target A — structural correspondence for satisfiable domains", () => {
     for (const [domain, query] of DOMAIN_QUERIES) {
       it(`${domain}: keys(parameters) === keys(parameterProvenance)`, async () => {
         const resolved = await resolveQuery(query);
@@ -66,6 +132,32 @@ describe("parameter provenance", () => {
         const paramKeys = new Set(Object.keys(resolved.parameters));
         const provKeys = new Set(Object.keys(resolved.parameterProvenance));
         expect(provKeys).toEqual(paramKeys);
+      });
+    }
+  });
+
+  describe("Target A(unsatisfiable) — the hard rule blocks domains with no override path", () => {
+    // Documents, rather than works around, a real production consequence:
+    // these three domains have at least one parameter that PARAMETER_PATTERN
+    // can never populate from query text (a name mismatch for r0_recovered,
+    // an array for starting_frequencies), so under the new hard rule they
+    // can never return a result through resolveQuery() -- only throw.
+    for (const [domain, query, expectedMissing] of UNSATISFIABLE_DOMAIN_QUERIES) {
+      it(`${domain}: throws RequiredParametersMissingError naming the unreachable key(s)`, async () => {
+        await expect(resolveQuery(query)).rejects.toMatchObject({
+          name: "RequiredParametersMissingError",
+          domain,
+        });
+        try {
+          await resolveQuery(query);
+          expect.unreachable();
+        } catch (err) {
+          expect(err).toBeInstanceOf(RequiredParametersMissingError);
+          const missing = (err as RequiredParametersMissingError).missing;
+          for (const key of expectedMissing) {
+            expect(missing).toContain(key);
+          }
+        }
       });
     }
   });
@@ -90,7 +182,9 @@ describe("parameter provenance", () => {
     }
 
     it("mm+EC: the resolved entry is the only one with a citation", async () => {
-      const resolved = await resolveQuery("simulate lactate dehydrogenase");
+      const resolved = await resolveQuery(
+        `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+      );
       const withCitation = entries(resolved).filter(
         ([, p]) => p.citation !== undefined,
       );
@@ -102,7 +196,9 @@ describe("parameter provenance", () => {
 
   describe("Target C — the resolved path still resolves", () => {
     it("mm + recognisable EC number -> km origin 'resolved' with citation", async () => {
-      const resolved = await resolveQuery("simulate lactate dehydrogenase");
+      const resolved = await resolveQuery(
+        `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+      );
       expect(resolved.domain).toBe("mm");
       const km = resolved.parameterProvenance["km"]!;
       expect(km.origin).toBe("resolved");
@@ -114,7 +210,9 @@ describe("parameter provenance", () => {
 
   describe("Target D — user-supplied values are attributed to the user", () => {
     it("km=0.5 in the query -> km origin 'user', no citation", async () => {
-      const resolved = await resolveQuery("simulate enzyme kinetics km=0.5");
+      const resolved = await resolveQuery(
+        `simulate enzyme kinetics km=0.5 ${MM_EC_OVERRIDES}`,
+      );
       expect(resolved.parameters["km"]).toBe(0.5);
       const km = resolved.parameterProvenance["km"]!;
       expect(km.origin).toBe("user");
@@ -124,7 +222,7 @@ describe("parameter provenance", () => {
 
     it("a user value stays 'user' even when a literature value exists", async () => {
       const resolved = await resolveQuery(
-        "simulate lactate dehydrogenase km=1.5",
+        `simulate lactate dehydrogenase km=1.5 ${MM_EC_OVERRIDES}`,
       );
       const km = resolved.parameterProvenance["km"]!;
       expect(km.origin).toBe("user");
@@ -132,17 +230,23 @@ describe("parameter provenance", () => {
     });
   });
 
-  describe("Target E — the all-defaults case is flagged", () => {
-    it("bare domain query -> flag naming the absence of resolved parameters", async () => {
-      const resolved = await resolveQuery("simulate genetic drift");
-      const flag = resolved.provenance.flags.find((f) =>
-        /resolved from literature/i.test(f),
+  describe("Target E — the all-defaults case is now a hard block, not a flag", () => {
+    // Before the hard rule, an all-default result would still return with a
+    // flag naming the absence of literature resolution. Now that
+    // resolveQuery() throws whenever ANY parameter is origin:"default", a
+    // result that is ALL defaults can never be returned at all -- the throw
+    // fires before the caller ever sees the flag. So the load-bearing
+    // assertion is the throw itself.
+    it("bare domain query -> throws RequiredParametersMissingError, not a flagged default result", async () => {
+      await expect(resolveQuery("simulate genetic drift")).rejects.toThrow(
+        RequiredParametersMissingError,
       );
-      expect(flag).toBeTruthy();
     });
 
-    it("resolved km -> no all-defaults flag", async () => {
-      const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    it("resolved km + fully overridden rest -> no all-defaults flag (and no throw)", async () => {
+      const resolved = await resolveQuery(
+        `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+      );
       const flag = resolved.provenance.flags.find((f) =>
         /resolved from literature/i.test(f),
       );
@@ -152,7 +256,7 @@ describe("parameter provenance", () => {
 
   describe("naming — model citations are not value citations", () => {
     it("provenance exposes modelCitations, not citations", async () => {
-      const resolved = await resolveQuery("simulate genetic drift");
+      const resolved = await resolveQuery(GILLESPIE_FULL_OVERRIDES);
       expect(resolved.provenance).toHaveProperty("modelCitations");
       expect(resolved.provenance).not.toHaveProperty("citations");
     });
@@ -306,7 +410,9 @@ describe("Target F — the resolved path degrades honestly when the citation has
       literatureCandidates: [],
       logs: ["Looked up Km for lactate dehydrogenase (1.1.1.27)"],
     });
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("default");
     expect(km.citation).toBeUndefined();
@@ -315,7 +421,9 @@ describe("Target F — the resolved path degrades honestly when the citation has
   });
 
   it("the standard mock path still resolves (locatable citation)", async () => {
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
     expect(km.citation).toContain("(ref 740253)");
@@ -324,7 +432,9 @@ describe("Target F — the resolved path degrades honestly when the citation has
 
 describe("Target G — the golden set flows through the API (Stage 5 Part 2)", () => {
   it("G1: LDH/lactate/Homo sapiens -> km 10.73 with BRENDA ref 740253", async () => {
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     expect(resolved.parameters["km"]).toBe(10.73);
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
@@ -352,7 +462,9 @@ describe("Target G — the golden set flows through the API (Stage 5 Part 2)", (
         referenceId: "740001",
       },
     });
-    const swapped = await resolveQuery("simulate lactate dehydrogenase");
+    const swapped = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     expect(swapped.parameters["km"]).not.toBe(10.73);
     expect(swapped.parameterProvenance["km"]!.citation).not.toContain(
       "(ref 740253)",
@@ -373,7 +485,9 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
   // exact match that is NOT verifiable -- previously an impossible
   // combination, and exactly the case that makes the new rule load-bearing.
   it("exact BRENDA match with incomplete conditions -> 'flagged', not 'verified'", async () => {
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
     // Not cross-species -- the organism matched exactly. The degradation is
@@ -414,7 +528,9 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
       literatureCandidates: [],
       logs: ["Looked up Km for acetylcholinesterase (3.1.1.7)"],
     });
-    const resolved = await resolveQuery("simulate acetylcholinesterase");
+    const resolved = await resolveQuery(
+      `simulate acetylcholinesterase ${MM_EC_OVERRIDES}`,
+    );
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
     expect(km.citationStatus).toBe("verified");
@@ -440,7 +556,9 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
         referenceId: "740001",
       },
     });
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     const km = resolved.parameterProvenance["km"]!;
     expect(km.citationStatus).toBe("flagged");
   });
@@ -509,7 +627,13 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
 
 describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5)", () => {
   it("mm defaults beyond km state that no lookup exists for them", async () => {
-    const resolved = await resolveQuery("simulate enzyme kinetics");
+    // km is user-supplied here purely to satisfy the hard rule (this query
+    // has no recognisable EC entity, so km would otherwise default and the
+    // whole call would throw before vmax/s0 -- the actual parameters under
+    // test -- could be observed).
+    const resolved = await resolveQuery(
+      "simulate enzyme kinetics km=2 end=10 points=51",
+    );
     for (const key of ["vmax", "s0"]) {
       const prov = resolved.parameterProvenance[key]!;
       expect(prov.origin).toBe("default");
@@ -519,14 +643,16 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
   });
 
   it("a user-supplied mm parameter does not carry the narrowness note", async () => {
-    const resolved = await resolveQuery("simulate enzyme kinetics vmax=12");
+    const resolved = await resolveQuery(
+      "simulate enzyme kinetics vmax=12 km=2 s0=10 end=10 points=51",
+    );
     const vmax = resolved.parameterProvenance["vmax"]!;
     expect(vmax.origin).toBe("user");
     expect(vmax.note).toBeUndefined();
   });
 
   it("domains without resolvable fields stay quiet (no noise notes)", async () => {
-    const resolved = await resolveQuery("simulate sir outbreak");
+    const resolved = await resolveQuery(GILLESPIE_FULL_OVERRIDES);
     for (const [key, prov] of entries(resolved)) {
       expect(
         prov.note,
@@ -543,7 +669,9 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
     // student -- so the assertion is narrowed to its actual intent rather
     // than relaxed. The point was always that the resolved entry does not
     // inherit the *narrowness* note meant for unresolvable parameters.
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
     expect(km.note).not.toContain("No literature lookup exists");
@@ -566,7 +694,9 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
         unreported: [],
       },
     });
-    const resolved = await resolveQuery("simulate lactate dehydrogenase");
+    const resolved = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
     expect(km.note).toBeUndefined();
@@ -652,7 +782,7 @@ describe("mutation tests — provenance contract enforcement", () => {
       // provenance.modelCitations back to provenance.citations
       // For now, we test that the current implementation uses modelCitations
       // and that changing it would break the contract
-      const resolved = await resolveQuery("simulate genetic drift");
+      const resolved = await resolveQuery(GILLESPIE_FULL_OVERRIDES);
       expect(resolved.provenance).toHaveProperty("modelCitations");
       expect(resolved.provenance).not.toHaveProperty("citations");
       // ACTUAL CATCHER: naming test in provenance.test.ts
@@ -667,7 +797,9 @@ describe("mutation tests — provenance contract enforcement", () => {
       // resolveKineticValue call, then running the Target C test
       // The test expects km to have origin "resolved" but it would have "default"
       // For now, we verify that the current implementation works correctly
-      const resolved = await resolveQuery("simulate lactate dehydrogenase");
+      const resolved = await resolveQuery(
+        `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+      );
       expect(resolved.domain).toBe("mm");
       const km = resolved.parameterProvenance["km"]!;
       expect(km.origin).toBe("resolved");
