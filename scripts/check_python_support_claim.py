@@ -49,7 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # The single source of truth for the supported window. Changing this without
 # changing the Makefile gate is exactly what this guard catches.
-SUPPORTED: Tuple[Tuple[int, int], ...] = ((3, 9), (3, 10), (3, 11), (3, 12), (3, 13))
+SUPPORTED: Tuple[Tuple[int, int], ...] = ((3, 10), (3, 11), (3, 12), (3, 13))
 
 # Files that state the window in prose, and the pattern that finds it.
 # "3.10-3.12" or "3.10–3.12" (ASCII hyphen or en dash).

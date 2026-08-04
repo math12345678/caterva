@@ -52,7 +52,7 @@ setup: check-python
 # target, depended on only by the targets that RUN tests) explains the
 # no-pytest case without blocking `setup`, which is what installs it.
 PY := $(shell \
-	is_supported() { "$$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 9), (3, 10), (3, 11), (3, 12), (3, 13)) else 1)' >/dev/null 2>&1; }; \
+	is_supported() { "$$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12), (3, 13)) else 1)' >/dev/null 2>&1; }; \
 	is_usable() { "$$1" -c 'import pytest' >/dev/null 2>&1; }; \
 	if [ -n "$(TERRIUM_PYTHON_ABS)" ]; then \
 		if [ -x "$(TERRIUM_PYTHON_ABS)" ] && is_supported "$(TERRIUM_PYTHON_ABS)"; then echo "$(TERRIUM_PYTHON_ABS)"; else echo ""; fi; \

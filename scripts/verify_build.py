@@ -85,32 +85,32 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Citation format guard
     guards.append(run_guard(
         "Citation Format Guard",
-        f"python3 {SCRIPTS_DIR / 'check_citation_format.py'}"
+        f"python {SCRIPTS_DIR / 'check_citation_format.py'}"
     ))
     
     # Engine contract guard
     guards.append(run_guard(
         "Engine Contract Guard",
-        f"python3 {SCRIPTS_DIR / 'check_engine_contract.py'}"
+        f"python {SCRIPTS_DIR / 'check_engine_contract.py'}"
     ))
     
     # Dependencies guard
     guards.append(run_guard(
         "Dependencies Guard",
-        f"python3 {SCRIPTS_DIR / 'check_dependencies_declared.py'}"
+        f"python {SCRIPTS_DIR / 'check_dependencies_declared.py'}"
     ))
     
     # Plausibility constants guard
     guards.append(run_guard(
         "Plausibility Constants Guard",
-        f"python3 {SCRIPTS_DIR / 'check_plausibility_constants.py'}"
+        f"python {SCRIPTS_DIR / 'check_plausibility_constants.py'}"
     ))
 
     # Documented counts guard -- README test/domain counts vs reality.
     # Added Stage 7 Part 3 after three counts were found stale by hand.
     guards.append(run_guard(
         "Documented Counts Guard",
-        f"python3 {SCRIPTS_DIR / 'check_documented_counts.py'}"
+        f"python {SCRIPTS_DIR / 'check_documented_counts.py'}"
     ))
 
     # Python support window stated consistently across requirements.txt,
@@ -119,7 +119,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # the window was found wrong in all three files (ADR 0014).
     guards.append(run_guard(
         "Python Support Claim Guard",
-        f"python3 {SCRIPTS_DIR / 'check_python_support_claim.py'}"
+        f"python {SCRIPTS_DIR / 'check_python_support_claim.py'}"
     ))
 
     # Rule 7 (never `pip install tellurium`) made executable. It was one of
@@ -127,7 +127,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # tellurium to requirements.txt passed every guard in the repo.
     guards.append(run_guard(
         "Constitution Rules 7+8 Guard",
-        f"python3 {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
+        f"python {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
     ))
 
     # The Stage 4 amendment made executable: a guard is not delivered until
@@ -137,7 +137,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # itself (it did, on its first run).
     guards.append(run_guard(
         "Guard Wiring Guard",
-        f"python3 {SCRIPTS_DIR / 'check_guard_wiring.py'}"
+        f"python {SCRIPTS_DIR / 'check_guard_wiring.py'}"
     ))
 
     return guards
@@ -157,7 +157,7 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
         tests.extend(
             run_guard(
                 f"Python Test: {test_file}",
-                f"python3 -m pytest {test_file} -v",
+                f"python -m pytest {test_file} -v",
                 cwd=TELLURIUM_DIR
             )
             for test_file in test_files
@@ -166,7 +166,7 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
         # Run all Python tests
         tests.append(run_guard(
             "Python All Tests",
-            "python3 -m pytest tests/ -x --tb=short",
+            "python -m pytest tests/ -x --tb=short",
             cwd=TELLURIUM_DIR,
             timeout=600  # 10 minutes for full test suite
         ))
@@ -197,7 +197,7 @@ def run_rng_guard() -> List[Tuple[str, bool, str]]:
     if rng_guard.exists():
         guards.append(run_guard(
             "RNG Convention Guard",
-            f"python3 {rng_guard}"
+            f"python {rng_guard}"
         ))
     
     return guards

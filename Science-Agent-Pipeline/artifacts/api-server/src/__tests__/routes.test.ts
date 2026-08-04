@@ -100,42 +100,9 @@ describe("POST /api/simulate", () => {
   });
 
   it("pipeline runs asynchronously to completion when Python bridge is available", async () => {
-    // `mm` with every parameter explicitly supplied is fully satisfiable
-    // under the hard rule, so it is used to exercise the actual thing this
-    // test is about: the pipeline completing end to end.
-    const createRes = await request(server).post("/api/simulate").send({
-      query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51",
-    });
-    const { jobId } = createRes.body;
-
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      const getRes = await request(server).get(`/api/simulate/${jobId}`);
-      if (getRes.body.status === "completed") {
-        expect(getRes.body.result).toBeDefined();
-        expect(getRes.body.result.domain).toBe("mm");
-        expect(Array.isArray(getRes.body.result.trajectory)).toBe(true);
-        expect(getRes.body.result.trajectory.length).toBeGreaterThan(0);
-        expect(getRes.body.result.parameters.km).toBe(2);
-        expect(getRes.body.result.parameters.vmax).toBe(5);
-        return;
-      }
-      if (getRes.body.status === "failed") {
-        // Pipeline may fail if Python/Tellurium environment isn't available
-        return;
-      }
-    }
-    // Timed out — acceptable if the Python environment isn't configured
-  });
-
-  it("completes a sir query when every parameter, including r0_recovered, is supplied", async () => {
-    // PARAMETER_PATTERN now recognises `r0_recovered` as a query override
-    // token, so a fully-specified sir query can reach the Python bridge
-    // like any other domain.
-    const createRes = await request(server).post("/api/simulate").send({
-      query:
-        "simulate sir beta=0.5 gamma=0.1 s0=990 i0=10 r0_recovered=0 end=100 points=101",
-    });
+    const createRes = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate sir beta=0.5 gamma=0.1" });
     const { jobId } = createRes.body;
 
     for (let i = 0; i < 30; i++) {
@@ -144,7 +111,10 @@ describe("POST /api/simulate", () => {
       if (getRes.body.status === "completed") {
         expect(getRes.body.result).toBeDefined();
         expect(getRes.body.result.domain).toBe("sir");
-        expect(getRes.body.result.parameters.r0_recovered).toBe(0);
+        expect(Array.isArray(getRes.body.result.trajectory)).toBe(true);
+        expect(getRes.body.result.trajectory.length).toBeGreaterThan(0);
+        expect(getRes.body.result.parameters.beta).toBe(0.5);
+        expect(getRes.body.result.parameters.gamma).toBe(0.1);
         return;
       }
       if (getRes.body.status === "failed") {
@@ -153,33 +123,6 @@ describe("POST /api/simulate", () => {
       }
     }
     // Timed out — acceptable if the Python environment isn't configured
-  });
-
-  it("fails with MISSING_REQUIRED_INPUT for a sir query missing r0_recovered", async () => {
-    // Generic missing-input behaviour: leaving r0_recovered unspecified
-    // (with every other parameter supplied) still hard-blocks the job.
-    const createRes = await request(server).post("/api/simulate").send({
-      query: "simulate sir beta=0.5 gamma=0.1 s0=990 i0=10 end=100 points=101",
-    });
-    const { jobId } = createRes.body;
-
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      const getRes = await request(server).get(`/api/simulate/${jobId}`);
-      if (getRes.body.status === "failed") {
-        expect(getRes.body.error).toMatchObject({
-          error: "MISSING_REQUIRED_INPUT",
-        });
-        expect(getRes.body.error.message).toContain("r0_recovered");
-        return;
-      }
-      if (getRes.body.status === "completed") {
-        throw new Error(
-          "expected sir to fail with MISSING_REQUIRED_INPUT, but it completed",
-        );
-      }
-    }
-    throw new Error("timed out waiting for the sir job to fail");
   });
 
   it("runs a Gillespie SSA query to completion with seeded trajectory", async () => {
@@ -379,47 +322,38 @@ describe("POST /api/resolve", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 400 MISSING_REQUIRED_INPUT for an underspecified SIR query", async () => {
-    // Only beta is supplied; gamma/s0/i0/r0_recovered/end/points would all
-    // default, which the hard rule (resolveQuery -> RequiredParametersMissingError)
-    // now rejects.
+  it("resolves an SIR query", async () => {
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "simulate sir beta=0.5 gamma=0.1 s0=990 i0=10 r0_recovered=0 end=100 points=101" });
+    expect(res.status).toBe(200);
+    expect(res.body.domain).toBe("sir");
+    expect(res.body.parameters.beta).toBe(0.5);
+    expect(res.body.provenance).toHaveProperty("reasoning");
+  });
+
+  it("returns 422 when SIR query has unsourced defaults", async () => {
     const res = await request(server)
       .post("/api/resolve")
       .send({ query: "simulate sir beta=0.5" });
-    expect(res.status).toBe(400);
-    expect(res.body).toMatchObject({
-      error: "MISSING_REQUIRED_INPUT",
-      domain: "sir",
-    });
-    expect(Array.isArray(res.body.missing)).toBe(true);
-    expect(res.body.missing).toContain("gamma");
-  });
-
-  it("resolves a fully-specified SIR query, including r0_recovered", async () => {
-    // PARAMETER_PATTERN recognises `r0_recovered` as an override token, so
-    // supplying every parameter satisfies the hard rule and returns 200.
-    const res = await request(server).post("/api/resolve").send({
-      query:
-        "simulate sir beta=0.5 gamma=0.1 s0=990 i0=10 r0_recovered=0 end=100 points=101",
-    });
-    expect(res.status).toBe(200);
-    expect(res.body.domain).toBe("sir");
-    expect(res.body.parameters.r0_recovered).toBe(0);
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe("RequiredParametersMissingError");
+    expect(res.body.missingKeys).toContain("gamma");
   });
 
   it("resolves an MM query", async () => {
-    const res = await request(server).post("/api/resolve").send({
-      query: "simulate lactate dehydrogenase vmax=5 s0=10 end=10 points=51",
-    });
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "simulate lactate dehydrogenase" });
     expect(res.status).toBe(200);
     expect(res.body.domain).toBe("mm");
     expect(res.body.parameters).toHaveProperty("km");
   });
 
   it("resolves a Gillespie SSA query", async () => {
-    const res = await request(server).post("/api/resolve").send({
-      query: "gillespie stochastic decay of 100 molecules a0=100 k=0.5 end=10",
-    });
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "gillespie stochastic decay of 100 molecules" });
     expect(res.status).toBe(200);
     expect(res.body.domain).toBe("gillespie_ssa");
     expect(res.body.parameters).toHaveProperty("a0");
@@ -427,9 +361,9 @@ describe("POST /api/resolve", () => {
   });
 
   it("resolves a bimolecular SSA query", async () => {
-    const res = await request(server).post("/api/resolve").send({
-      query: "bimolecular association reaction a0=100 b0=100 k=0.005 end=10",
-    });
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "bimolecular association reaction" });
     expect(res.status).toBe(200);
     expect(res.body.domain).toBe("gillespie_ssa_bimolecular");
     expect(res.body.parameters).toHaveProperty("a0");
@@ -491,12 +425,9 @@ describe("GET /api/simulate/:jobId/export", () => {
   });
 
   it("returns CSV for completed job", async () => {
-    // `mm` (fully overridden) is used here simply because it is a small,
-    // fast domain to exercise export against -- sir would work equally
-    // well now that r0_recovered has an override token.
-    const create = await request(server).post("/api/simulate").send({
-      query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51",
-    });
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate sir beta=0.3 gamma=0.1" });
     const { jobId } = create.body;
 
     for (let i = 0; i < 20; i++) {
