@@ -26,7 +26,7 @@ result). That stub was fine for sketching the shape of KineticResult but
 was never wired to anything real - this version is.
 """
 
-from typing import Callable
+from typing import Callable, Optional
 
 import httpx
 from pydantic import BaseModel
@@ -51,11 +51,11 @@ class LiteratureCandidate(BaseModel):
 
 class KineticResult(BaseModel):
     found: bool
-    value: float | None = None
-    unit: str | None = None
-    organism: str | None = None
+    value: Optional[float] = None
+    unit: Optional[str] = None
+    organism: Optional[str] = None
     source: str  # "brenda_exact" | "brenda_cross_species" | "literature_candidates" | "not_found"
-    citation: Citation | None = None
+    citation: Optional[Citation] = None
     cross_species_flag: bool = False
 
     #: Assay conditions the Km was measured under, parsed from the BRENDA
@@ -63,9 +63,9 @@ class KineticResult(BaseModel):
     #: kinetic data, and Km moves with both -- a Km without them cannot be
     #: reproduced or compared. Absent when the source did not report them;
     #: never guessed. See ADR 0010.
-    assay_ph: float | None = None
-    assay_temperature_c: float | None = None
-    assay_buffer: str | None = None
+    assay_ph: Optional[float] = None
+    assay_temperature_c: Optional[float] = None
+    assay_buffer: Optional[str] = None
 
     #: Fields BRENDA explicitly states the original publication did not
     #: report. A fact about the literature, distinct from a parse failure.

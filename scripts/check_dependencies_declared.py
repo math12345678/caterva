@@ -19,6 +19,7 @@ Also exercised by tests/test_dependencies_declared.py in both suites.
 from __future__ import annotations
 
 import ast
+import os
 import pathlib
 import sys
 
@@ -59,7 +60,39 @@ IMPORT_TO_DISTRIBUTION = {
 
 
 def _stdlib_names() -> set[str]:
-    names = set(sys.stdlib_module_names) | set(sys.builtin_module_names)
+    # sys.stdlib_module_names was added in Python 3.10.
+    if hasattr(sys, "stdlib_module_names"):
+        names = set(sys.stdlib_module_names)
+    else:
+        # Fallback for Python 3.9: discover stdlib modules by walking
+        # the stdlib directory and checking builtins.
+        names = set()
+        # Builtins are always available.
+        names.update(sys.builtin_module_names)
+        # Walk the stdlib package directory to discover pure-Python modules.
+        stdlib_path = os.path.dirname(os.__file__)
+        if stdlib_path:
+            for entry in pathlib.Path(stdlib_path).iterdir():
+                if entry.is_file() and entry.suffix == ".py":
+                    names.add(entry.stem)
+                elif entry.is_dir() and (entry / "__init__.py").exists():
+                    names.add(entry.name)
+        # Also discover C extension modules (like math, cmath, etc.) by
+        # checking common known stdlib modules that aren't in the directory.
+        # This is a pragmatic list of modules that are part of the stdlib
+        # but implemented in C and not discoverable by directory walking.
+        known_stdlib_c_extensions = {
+            "math", "cmath", "_math", "_cmath", "_socket", "_ssl",
+            "_hashlib", "_hmac", "_sha1", "_sha256", "_sha512",
+            "_md5", "_blake2", "_crypt", "_dbm", "_gdbm", "_sqlite3",
+            "_decimal", "_elementtree", "_csv", "_json", "_pickle",
+            "_struct", "_multibytecodec", "_codecs_cn", "_codecs_hk",
+            "_codecs_jp", "_codecs_kr", "_codecs_tw", "_tkinter",
+            "_curses", "_curses_panel", "_bz2", "_lzma", "zlib",
+            "_queue", "_heapq", "_bisect", "_random", "_statistics",
+            "_datetime", "_zoneinfo", "_sha3", "_keccak",
+        }
+        names.update(known_stdlib_c_extensions)
     names.add("__future__")  # pseudo-module, not listed in stdlib_module_names
     return {n.lower() for n in names if not n.startswith("_") or n == "__future__"}
 
