@@ -19,7 +19,12 @@ import {
   MM_TOLERANCE,
   SIR_TOLERANCE,
 } from './simulate';
-import { resolveAndSimulate, ApiUnavailableError, API_BASE_URL } from './api';
+import {
+  resolveAndSimulate,
+  ApiUnavailableError,
+  API_BASE_URL,
+  type ParameterProvenanceEntry,
+} from './api';
 
 export type LineKind =
   | 'out'
@@ -59,22 +64,51 @@ export interface Command {
 }
 
 /**
- * Render a resolved-and-simulated job's real provenance -- the citation is
- * the actual claim. Never summarize this away.
+ * Render a resolved-and-simulated job's real provenance.
+ *
+ * IMPORTANT distinction, per the API's own test suite
+ * ("model citations are not value citations", provenance.test.ts):
+ * `provenance.modelCitations` documents the *model/methodology* this domain
+ * generally draws on (e.g. "BRENDA is the database this system would
+ * consult for enzyme kinetics") -- it is NOT a claim that any specific
+ * number below was actually looked up there. That claim, if true, lives
+ * per-parameter in `parameterProvenance[key].origin === "resolved"` with its
+ * own `source`. Printing modelCitations under a "source:" label (as an
+ * earlier version of this file did) conflates the two and makes an
+ * unresolved default look literature-backed. Every parameter line below
+ * must show its own real origin instead.
  */
 function renderProvenance(
   domain: string,
   parameters: Record<string, unknown>,
   provenance: { reasoning: string; modelCitations: string[]; flags: string[] },
+  parameterProvenance: Record<string, ParameterProvenanceEntry>,
 ): Line[] {
-  const lines: Line[] = [
-    head(`RESOLVED · ${domain.toUpperCase()}`),
-    rule(),
-    ...Object.entries(parameters).map(([k, v]) => o(`  ${k.padEnd(14)}${v}`)),
-    o(),
-    d(`  ${provenance.reasoning}`),
-    ...provenance.modelCitations.map((c) => d(`  source: ${c}`)),
-  ];
+  const originTag: Record<ParameterProvenanceEntry['origin'], string> = {
+    resolved: 'resolved',
+    user: 'user-supplied',
+    llm: 'llm-guessed',
+    default: 'default',
+  };
+  const originLine = (fn: typeof ok, k: string, v: unknown, entry?: ParameterProvenanceEntry) => {
+    const tag = entry ? originTag[entry.origin] : 'unlabeled';
+    const text = `  ${k.padEnd(10)}${String(v).padEnd(10)}[${tag}]`;
+    return fn(text);
+  };
+
+  const lines: Line[] = [head(`RESOLVED · ${domain.toUpperCase()}`), rule()];
+  for (const [k, v] of Object.entries(parameters)) {
+    const entry = parameterProvenance[k];
+    const fn = entry?.origin === 'resolved' ? ok : entry?.origin === 'default' ? warn : o;
+    lines.push(originLine(fn, k, v, entry));
+    if (entry?.source) lines.push(d(`    source: ${entry.source}`));
+    if (entry?.note) lines.push(d(`    ${entry.note}`));
+  }
+  lines.push(o(), d(`  ${provenance.reasoning}`));
+  if (provenance.modelCitations.length > 0) {
+    lines.push(d('  general reference for this model type (not a per-value citation):'));
+    for (const c of provenance.modelCitations) lines.push(d(`    ${c}`));
+  }
   if (provenance.flags.length > 0) {
     lines.push(o());
     for (const f of provenance.flags) lines.push(warn(`  flag: ${f}`));
@@ -98,7 +132,12 @@ async function runLiteratureBacked(query: string, domainLabel: string): Promise<
         err(`  pipeline failed: ${job.error?.message ?? 'unknown error'}`),
       ];
     }
-    return renderProvenance(job.result.domain, job.result.parameters, job.result.provenance);
+    return renderProvenance(
+      job.result.domain,
+      job.result.parameters,
+      job.result.provenance,
+      job.result.parameterProvenance,
+    );
   } catch (e) {
     const msg = e instanceof ApiUnavailableError ? e.message : String(e);
     return [err(`  could not reach the literature resolution API: ${msg}`)];

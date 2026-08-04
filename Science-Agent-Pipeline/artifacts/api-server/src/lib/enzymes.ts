@@ -129,6 +129,84 @@ export const ENZYMES: EnzymeEntry[] = [
     description: "Viral protease essential for HIV maturation",
     organism: "Human immunodeficiency virus 1",
   },
+  // The entries below were added after "amylase" and other common
+  // undergraduate-biochem enzymes silently fell through this list (matched
+  // no pattern, so no EC number, so no BRENDA lookup ever ran) and the
+  // resolver defaulted with no indication *why*. This list is still finite
+  // and still not a substitute for a real name -> EC lookup service; it
+  // just now covers more of the enzymes people actually type.
+  {
+    pattern: /(alpha[\s-]?)?amylase/i,
+    enzymeName: "alpha-amylase",
+    substrates: ["starch", "glycogen"],
+    ecNumber: "3.2.1.1",
+    description: "Hydrolyzes alpha-1,4-glycosidic bonds in starch",
+    organism: "Homo sapiens",
+  },
+  {
+    pattern: /pepsin/i,
+    enzymeName: "pepsin",
+    substrates: ["protein"],
+    ecNumber: "3.4.23.1",
+    description: "Acid protease that cleaves peptide bonds in the stomach",
+    organism: "Homo sapiens",
+  },
+  {
+    pattern: /lysozyme/i,
+    enzymeName: "lysozyme",
+    substrates: ["peptidoglycan"],
+    ecNumber: "3.2.1.17",
+    description: "Hydrolyzes peptidoglycan in bacterial cell walls",
+    organism: "Gallus gallus",
+  },
+  {
+    pattern: /carbonic anhydrase/i,
+    enzymeName: "carbonic anhydrase",
+    substrates: ["carbon dioxide", "water"],
+    ecNumber: "4.2.1.1",
+    description: "Catalyzes the reversible hydration of CO2",
+    organism: "Homo sapiens",
+  },
+  {
+    pattern: /beta[\s-]?galactosidase|lactase/i,
+    enzymeName: "beta-galactosidase",
+    substrates: ["lactose"],
+    ecNumber: "3.2.1.23",
+    description: "Hydrolyzes lactose into glucose and galactose",
+    organism: "Escherichia coli",
+  },
+  {
+    pattern: /glucose oxidase/i,
+    enzymeName: "glucose oxidase",
+    substrates: ["glucose", "oxygen"],
+    ecNumber: "1.1.3.4",
+    description: "Oxidizes beta-D-glucose to D-glucono-1,5-lactone",
+    organism: "Aspergillus niger",
+  },
+  {
+    pattern: /urease/i,
+    enzymeName: "urease",
+    substrates: ["urea"],
+    ecNumber: "3.5.1.5",
+    description: "Hydrolyzes urea into ammonia and carbamate",
+    organism: "Canavalia ensiformis",
+  },
+  {
+    pattern: /(triacylglycerol )?lipase/i,
+    enzymeName: "triacylglycerol lipase",
+    substrates: ["triglycerides"],
+    ecNumber: "3.1.1.3",
+    description: "Hydrolyzes ester bonds in triglycerides",
+    organism: "Homo sapiens",
+  },
+  {
+    pattern: /glucose-?6-?phosphate dehydrogenase|g6pd/i,
+    enzymeName: "glucose-6-phosphate dehydrogenase",
+    substrates: ["glucose-6-phosphate", "NADP+"],
+    ecNumber: "1.1.1.49",
+    description: "First and rate-limiting enzyme of the pentose phosphate pathway",
+    organism: "Homo sapiens",
+  },
 ];
 
 export function matchEnzyme(query: string): EnzymeEntry | undefined {
