@@ -40,8 +40,10 @@ intentionally permissive (case-insensitive substring), and callers should
 pass every known spelling variant for a substrate name when they have one.
 """
 
+from __future__ import annotations
+
 import re
-from typing import List
+from typing import List, Optional
 
 import httpx
 from bs4 import BeautifulSoup
@@ -56,9 +58,9 @@ class BRENDAKmEntry(BaseModel):
     unit: str = "mM"
     substrate: str
     organism: str
-    uniprot: str | None = None
+    uniprot: Optional[str] = None
     #: Raw commentary cell from BRENDA, e.g. "pH 8.5, 25°C, isozyme H4".
-    conditions: str | None = None
+    conditions: Optional[str] = None
     # --- Structured assay conditions, parsed from `conditions` -------------
     #
     # STRENDA requires temperature and pH for all reported kinetic data
@@ -69,16 +71,16 @@ class BRENDAKmEntry(BaseModel):
     # this they were captured as raw text and never read. See ADR 0010.
     #
     # None means "not available", never a default. Nothing here is guessed.
-    assay_ph: float | None = None
-    assay_temperature_c: float | None = None
-    assay_buffer: str | None = None
+    assay_ph: Optional[float] = None
+    assay_temperature_c: Optional[float] = None
+    assay_buffer: Optional[str] = None
     #: Fields BRENDA explicitly states the original publication did not
     #: report -- a fact about the literature, distinct from a parse failure.
     assay_unreported: List[str] = Field(default_factory=list)
-    reference_id: str | None = None
-    ec_number: str | None = None
+    reference_id: Optional[str] = None
+    ec_number: Optional[str] = None
     flagged: bool = False
-    flag_reason: str | None = None
+    flag_reason: Optional[str] = None
     # False when this row was NOT matched against a known substrate name
     # (or synonym) and was instead included via the unfiltered fallback -
     # see fetch_and_parse_brenda_km. When False, `substrate` is a
@@ -243,8 +245,8 @@ def parse_brenda_km_html(
     html: str,
     ec_number: str,
     target_substrates: list,
-    target_organism: str | None = "Homo sapiens",
-    fallback_uniprot: str | None = None,
+    target_organism: Optional[str] = "Homo sapiens",
+    fallback_uniprot: Optional[str] = None,
     require_substrate_match: bool = True,
     table_label: str = "KM Values",
 ) -> list[BRENDAKmEntry]:
@@ -541,8 +543,8 @@ def parse_brenda_turnover_html(
     html: str,
     ec_number: str,
     target_substrates: list,
-    target_organism: str | None = "Homo sapiens",
-    fallback_uniprot: str | None = None,
+    target_organism: Optional[str] = "Homo sapiens",
+    fallback_uniprot: Optional[str] = None,
     require_substrate_match: bool = True,
 ) -> list[BRENDAKmEntry]:
     """Parse BRENDA's "Turnover Numbers" table into structured entries.
@@ -579,8 +581,8 @@ def parse_brenda_turnover_html(
 
 def fetch_and_parse_brenda_km(
     ec_number: str,
-    target_organism: str | None = "Homo sapiens",
-    target_substrates: list | None = None,
+    target_organism: Optional[str] = "Homo sapiens",
+    target_substrates: Optional[list] = None,
     taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
     expand_synonyms: bool = True,
     allow_unverified_fallback: bool = True,
@@ -671,8 +673,8 @@ def fetch_and_parse_brenda_km(
 
 def fetch_and_parse_brenda_kcat(
     ec_number: str,
-    target_organism: str | None = "Homo sapiens",
-    target_substrates: list | None = None,
+    target_organism: Optional[str] = "Homo sapiens",
+    target_substrates: Optional[list] = None,
     taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
     expand_synonyms: bool = True,
     allow_unverified_fallback: bool = True,

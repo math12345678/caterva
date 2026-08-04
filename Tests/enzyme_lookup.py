@@ -23,6 +23,8 @@ only ones that touch the network; parse_* functions are pure and are
 what the test suite exercises against saved fixture text.
 """
 
+from __future__ import annotations
+
 import re
 from urllib.parse import quote
 

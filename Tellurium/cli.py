@@ -13,11 +13,13 @@ Usage:
         --end 5 --seed 12345
 """
 
+from __future__ import annotations
+
 import argparse
 import csv
 import pathlib
 import sys
-from typing import Sequence
+from typing import Optional, Sequence
 
 from Tellurium.tellurium_engine import (
     ModelBuildError,
@@ -476,7 +478,7 @@ def _cmd_ssa(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Optional[Sequence[str]] = None) -> int:
     """Run the Tellurium CLI."""
     parser = argparse.ArgumentParser(
         prog="Tellurium.cli",
