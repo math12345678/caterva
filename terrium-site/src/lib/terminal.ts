@@ -13,8 +13,10 @@ import { lj13, exactCluster, R_MIN } from './md';
 import { LEDGER, PIPELINE } from './pipeline';
 import {
   simulateMichaelisMenten,
+  simulateMMCompetitiveInhibition,
   simulateSIR,
   DEFAULT_MM,
+  DEFAULT_MM_COMPETITIVE,
   DEFAULT_SIR,
   MM_TOLERANCE,
   SIR_TOLERANCE,
@@ -96,9 +98,31 @@ function renderProvenance(
     return fn(text);
   };
 
-  const lines: Line[] = [head(`RESOLVED · ${domain.toUpperCase()}`), rule()];
-  for (const [k, v] of Object.entries(parameters)) {
-    const entry = parameterProvenance[k];
+  const entries = Object.entries(parameters).map(([k, v]) => [
+    k,
+    v,
+    parameterProvenance[k],
+  ] as const);
+  const resolvedCount = entries.filter(([, , e]) => e?.origin === 'resolved').length;
+  // The header must say what actually happened, always as a ratio -- never
+  // a bare "RESOLVED" that a single resolved parameter out of five can
+  // trigger while the other four are silently defaults. That exact framing
+  // was reported back as misleading (a user saw km resolve correctly and
+  // read the unqualified "RESOLVED" header as a claim about all five
+  // parameters). Most domains only have ONE resolvable field at all
+  // (RESOLVABLE_FIELDS on the API side) -- e.g. mm only resolves km, never
+  // vmax/s0/end/points, because those aren't things literature reports a
+  // single true value for (s0/end/points are simulation choices; vmax
+  // needs an enzyme concentration nothing in BRENDA records). A query that
+  // resolves its one resolvable field is a full, correct success for that
+  // domain, not a partial one -- so the header states the count plainly
+  // and lets the per-parameter [default] notes (already printed below)
+  // explain why the rest were never resolvable in the first place, rather
+  // than a status word implying they should have been.
+  const status = `${resolvedCount}/${entries.length} RESOLVED FROM LITERATURE`;
+
+  const lines: Line[] = [head(`${status} · ${domain.toUpperCase()}`), rule()];
+  for (const [k, v, entry] of entries) {
     const fn = entry?.origin === 'resolved' ? ok : entry?.origin === 'default' ? warn : o;
     lines.push(originLine(fn, k, v, entry));
     if (entry?.source) lines.push(d(`    source: ${entry.source}`));
@@ -146,6 +170,7 @@ async function runLiteratureBacked(query: string, domainLabel: string): Promise<
 
 const DOMAINS = [
   ['kinetics', 'Michaelis-Menten enzyme kinetics', 'continuous'],
+  ['mm_competitive_inhibition', 'Competitive inhibition kinetics', 'continuous'],
   ['epidemiology', 'SIR / SEIR compartment models', 'continuous'],
   ['pcr', 'PCR amplification', 'discrete'],
   ['monte_carlo', 'Monte Carlo pi estimation', 'stochastic'],
@@ -316,6 +341,26 @@ export const COMMANDS: Command[] = [
           d("  for a real enzyme's resolved parameters, try 'run kinetics <enzyme>'."),
         ];
       }
+      if (t === 'competitive' || t === 'mm_competitive_inhibition' || t === 'inhibition') {
+        const p = DEFAULT_MM_COMPETITIVE;
+        const r = simulateMMCompetitiveInhibition(p);
+        const passes = r.finalResidual < MM_TOLERANCE;
+        const kmApp = p.km * (1 + p.i / p.ki);
+        return [
+          head('VERIFY · COMPETITIVE INHIBITION'),
+          rule(),
+          o(`  target      Km_app·ln(S0/S) + (S0 - S) = Vmax·t     Km_app = Km·(1 + I/Ki)`),
+          o(`  Km_app      ${kmApp.toFixed(6)}   (Km=${p.km}, I=${p.i}, Ki=${p.ki})`),
+          o(`  measured    residual ${r.finalResidual.toExponential(3)}`),
+          o(`  tolerance   ${MM_TOLERANCE}`),
+          (passes ? ok : err)(`  ${passes ? 'PASS' : 'FAIL'}        margin ${(MM_TOLERANCE / r.finalResidual).toFixed(1)}x`),
+          o(),
+          d('  same apparent-Km closed form Tellurium/tests/test_mm_competitive_inhibition.py'),
+          d('  checks against the Python engine; reduces exactly to plain MM at I=0.'),
+          d(`  NOTE: these are illustrative constants, not a literature-resolved enzyme --`),
+          d('  this checks the solver only, same caveat as verify kinetics.'),
+        ];
+      }
       if (t === 'epidemiology' || t === 'sir' || t === 'seir') {
         const r = simulateSIR(DEFAULT_SIR);
         const passes = r.conservationError < SIR_TOLERANCE;
@@ -349,7 +394,7 @@ export const COMMANDS: Command[] = [
           warn('  try:  mutate popgen     to break it deliberately'),
         ];
       }
-      return [err('usage: verify <md|popgen>')];
+      return [err('usage: verify <md|popgen|kinetics|epidemiology>')];
     },
   },
 
