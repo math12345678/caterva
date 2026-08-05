@@ -709,6 +709,55 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
 });
 
 // =========================================================================
+// Regression — the runner's dead `vmax = 5.0` fallback must stay dead
+// (tellurium_runner.py run_mm). The Python runner used to silently default
+// to vmax = 5.0 when a request supplied neither vmax nor kcat+enzyme_conc.
+// That branch is unreachable only because the hard rule below fires first;
+// if the hard rule is ever weakened so vmax can default, the fallback
+// becomes live and a simulation runs on a number nobody chose. These tests
+// pin the hard rule for exactly that case; the runner-side rejection is
+// pinned in Tellurium/tests/test_vmax_from_kcat.py.
+// =========================================================================
+
+describe("regression — mm query with no route to a Vmax is hard-blocked", () => {
+  it("everything supplied except a Vmax route -> vmax is the ONLY missing key", async () => {
+    await expect(
+      resolveQuery("simulate enzyme kinetics km=2 s0=10 end=10 points=51"),
+    ).rejects.toMatchObject({
+      name: "RequiredParametersMissingError",
+      domain: "mm",
+    });
+    try {
+      await resolveQuery("simulate enzyme kinetics km=2 s0=10 end=10 points=51");
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(RequiredParametersMissingError);
+      // s0/end/points are all user-supplied here, so vmax is the exact key
+      // the runner's old fallback would have fabricated.
+      expect((err as RequiredParametersMissingError).missing).toEqual([
+        "vmax",
+      ]);
+    }
+  });
+
+  it("half a conversion (kcat alone or enzyme_conc alone) is still blocked", async () => {
+    // ADR 0013: a turnover number alone is a per-molecule property with
+    // nothing to multiply, and a concentration alone has no rate. Neither
+    // partial route may slip through as a default.
+    await expect(
+      resolveQuery(
+        "simulate enzyme kinetics km=2 kcat=118 s0=10 end=10 points=51",
+      ),
+    ).rejects.toThrow(RequiredParametersMissingError);
+    await expect(
+      resolveQuery(
+        "simulate enzyme kinetics km=2 enzyme_conc=0.00001 s0=10 end=10 points=51",
+      ),
+    ).rejects.toThrow(RequiredParametersMissingError);
+  });
+});
+
+// =========================================================================
 // Array-valued query-string overrides (starting_frequencies)
 // Verification targets from the task spec.
 // =========================================================================
