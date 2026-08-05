@@ -62,6 +62,7 @@ from typing import Any, Dict
 import enzyme_lookup
 import fallback_logic
 from fallback_logic import KineticResult
+import httpx
 import popgen_resolver
 
 
@@ -108,7 +109,7 @@ def resolve_substrate_from_kegg(ec_number: str) -> str | None:
     never crash the whole resolution."""
     try:
         text = enzyme_lookup.fetch_kegg_enzyme_text(ec_number)
-    except Exception:
+    except httpx.HTTPError:
         return None
     substrates = enzyme_lookup.parse_kegg_substrates(text)
     return substrates[0] if substrates else None
