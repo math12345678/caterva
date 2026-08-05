@@ -50,3 +50,10 @@ Thumbs.db
 
 # Marketing site — lives in its own repo (see site/README.md)
 site/
+
+# Local coding-agent tool state -- not source, and not small (FreeBuff's
+# own working directory has been observed at tens of MB locally). Never
+# belongs in the repo regardless of which tool produced it.
+.freebuff/
+.aider.chat.history.md
+.aider*.json

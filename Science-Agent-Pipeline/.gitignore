@@ -56,4 +56,16 @@ __pycache__/
 
 # Runtime data written by the api-server (waitlist signups, job result
 # cache) -- these are generated on first run, not source.
+#
+# cache.ts resolves DATA_DIR as `../data` relative to its own compiled
+# location, which is `dist/` when running the built bundle (`pnpm dev`
+# builds to dist/index.mjs and runs that) -- so the real runtime path is
+# artifacts/api-server/data/, not src/data/. The old pattern below only
+# matched a location the app never actually writes to when run the normal
+# way, so a real cache.json (BRENDA/KEGG-resolved simulation results, not
+# source) could slip past `git status` looking clean and get swept in by
+# `git add -A`. Ignoring both locations since either can exist depending on
+# how the server was started (built bundle vs. a future direct-from-src
+# runner).
+artifacts/api-server/data/*.json
 artifacts/api-server/src/data/*.json
