@@ -33,6 +33,7 @@ import httpx
 from pydantic import BaseModel
 
 import enzyme_lookup
+from http_retry import retry_get
 from brenda_client import (
     BRENDAKmEntry,
     fetch_brenda_html,
@@ -157,7 +158,7 @@ def search_pubmed_candidates(
     does not attempt to extract a numeric Km from abstract text, since
     that requires human judgment to do reliably and safely."""
     query = f"{enzyme_name} {organism} {substrate} Km kinetics"
-    r = httpx.get(
+    r = retry_get(
         PUBMED_ESEARCH_URL,
         params={"db": "pubmed", "term": query, "retmax": max_results, "retmode": "json"},
         timeout=15,
@@ -167,7 +168,7 @@ def search_pubmed_candidates(
     if not ids:
         return []
 
-    r2 = httpx.get(
+    r2 = retry_get(
         PUBMED_ESUMMARY_URL,
         params={"db": "pubmed", "id": ",".join(ids), "retmode": "json"},
         timeout=15,

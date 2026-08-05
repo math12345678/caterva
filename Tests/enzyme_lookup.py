@@ -30,6 +30,8 @@ from urllib.parse import quote
 
 import httpx
 
+from http_retry import retry_get
+
 UNIPROT_SEARCH_URL = "https://rest.uniprot.org/uniprotkb/search"
 KEGG_GET_URL = "https://rest.kegg.jp/get/ec:{ec_number}"
 PUBCHEM_SYNONYMS_URL = (
@@ -67,7 +69,7 @@ def fetch_taxon_id(organism_name: str, timeout: float = 15) -> str | None:
         "term": f"{organism_name}[Scientific Name]",
         "retmode": "json",
     }
-    r = httpx.get(NCBI_TAXONOMY_ESEARCH_URL, params=params, timeout=timeout)
+    r = retry_get(NCBI_TAXONOMY_ESEARCH_URL, params=params, timeout=timeout)
     r.raise_for_status()
     return parse_taxon_id(r.json())
 
@@ -94,7 +96,7 @@ def fetch_uniprot_accession(
         "format": "json",
         "size": 1,
     }
-    r = httpx.get(UNIPROT_SEARCH_URL, params=params, timeout=timeout)
+    r = retry_get(UNIPROT_SEARCH_URL, params=params, timeout=timeout)
     r.raise_for_status()
     return parse_uniprot_accession(r.json())
 
@@ -114,7 +116,7 @@ def parse_uniprot_accession(data: dict) -> str | None:
 def fetch_kegg_enzyme_text(ec_number: str, timeout: float = 15) -> str:
     """Fetch the raw KEGG flat-file text for an EC number."""
     url = KEGG_GET_URL.format(ec_number=ec_number)
-    r = httpx.get(url, timeout=timeout)
+    r = retry_get(url, timeout=timeout)
     r.raise_for_status()
     return r.text
 
@@ -189,7 +191,7 @@ def fetch_pubchem_synonyms(compound_name: str, timeout: float = 15) -> list:
     PubChem doesn't recognize, not a failure worth surfacing."""
     url = PUBCHEM_SYNONYMS_URL.format(name=quote(compound_name, safe=""))
     try:
-        r = httpx.get(url, timeout=timeout)
+        r = retry_get(url, timeout=timeout)
         if r.status_code == 404:
             return []
         r.raise_for_status()
@@ -261,7 +263,7 @@ def fetch_ec_number_by_name(
         "format": "json",
         "size": 1,
     }
-    r = httpx.get(UNIPROT_SEARCH_URL, params=params, timeout=timeout)
+    r = retry_get(UNIPROT_SEARCH_URL, params=params, timeout=timeout)
     r.raise_for_status()
     return parse_ec_number_search(r.json())
 

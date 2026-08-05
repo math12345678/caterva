@@ -51,6 +51,7 @@ from pydantic import BaseModel, Field
 
 import enzyme_lookup
 from assay_conditions import parse_assay_conditions
+from http_retry import retry_get
 
 
 class BRENDAKmEntry(BaseModel):
@@ -159,7 +160,7 @@ BRENDA_ENZYME_URL = "https://www.brenda-enzymes.org/enzyme.php"
 def fetch_brenda_html(ec_number: str, timeout: float = 15) -> str:
     """Fetch the raw HTML for a BRENDA enzyme page. The only network call
     in this module - keep it isolated so parsing stays testable offline."""
-    r = httpx.get(BRENDA_ENZYME_URL, params={"ecno": ec_number}, timeout=timeout)
+    r = retry_get(BRENDA_ENZYME_URL, params={"ecno": ec_number}, timeout=timeout)
     r.raise_for_status()
     return r.text
 
