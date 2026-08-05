@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { resolveQuery } from "../lib/queryResolver";
+import { resolveQuery, ArrayOverrideValidationError } from "../lib/queryResolver";
 import type { ParameterProvenance } from "../lib/provenance";
 import {
   isLocatableCitation,
@@ -399,7 +399,7 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
 });
 
 describe("Target F — the resolved path degrades honestly when the citation has no locator", () => {
-  it("a found Km with no ref id and no URL is NOT reported as resolved", async () => {
+  it("a found Km with no ref id and no URL is blocked by the hard rule", async () => {
     vi.mocked(resolveKineticValue).mockResolvedValueOnce({
       found: true,
       km: 0.2,
@@ -410,14 +410,13 @@ describe("Target F — the resolved path degrades honestly when the citation has
       literatureCandidates: [],
       logs: ["Looked up Km for lactate dehydrogenase (1.1.1.27)"],
     });
-    const resolved = await resolveQuery(
-      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
-    );
-    const km = resolved.parameterProvenance["km"]!;
-    expect(km.origin).toBe("default");
-    expect(km.citation).toBeUndefined();
-    expect(km.note).toMatch(/no locator/i);
-    expect(JSON.stringify(resolved)).not.toContain("(ref n/a)");
+    try {
+      await resolveQuery(`simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`);
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(RequiredParametersMissingError);
+      expect((err as RequiredParametersMissingError).missing).toContain("km");
+    }
   });
 
   it("the standard mock path still resolves (locatable citation)", async () => {
@@ -626,19 +625,25 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
 });
 
 describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5)", () => {
-  it("mm defaults beyond km state that no lookup exists for them", async () => {
-    // km is user-supplied here purely to satisfy the hard rule (this query
-    // has no recognisable EC entity, so km would otherwise default and the
-    // whole call would throw before vmax/s0 -- the actual parameters under
-    // test -- could be observed).
-    const resolved = await resolveQuery(
-      "simulate enzyme kinetics km=2 end=10 points=51",
-    );
-    for (const key of ["vmax", "s0"]) {
-      const prov = resolved.parameterProvenance[key]!;
-      expect(prov.origin).toBe("default");
-      expect(prov.note).toMatch(/no literature lookup exists for/i);
-      expect(prov.note).toMatch(/only km is resolved from literature/i);
+  it("mm defaults beyond km are blocked by the hard rule", async () => {
+    // Under the hard rule (no origin:"default" may reach the engine), a
+    // query that overrides km but not vmax/s0 cannot be observed as a
+    // result: vmax and s0 would default, so resolveQuery() throws before
+    // any result exists. This pins the hard rule itself.
+    await expect(
+      resolveQuery("simulate enzyme kinetics km=2 end=10 points=51"),
+    ).rejects.toMatchObject({
+      name: "RequiredParametersMissingError",
+      domain: "mm",
+    });
+    try {
+      await resolveQuery("simulate enzyme kinetics km=2 end=10 points=51");
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(RequiredParametersMissingError);
+      const missing = (err as RequiredParametersMissingError).missing;
+      expect(missing).toContain("vmax");
+      expect(missing).toContain("s0");
     }
   });
 
@@ -700,6 +705,97 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
     const km = resolved.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
     expect(km.note).toBeUndefined();
+  });
+});
+
+// =========================================================================
+// Array-valued query-string overrides (starting_frequencies)
+// Verification targets from the task spec.
+// =========================================================================
+
+describe("array-valued query-string overrides", () => {
+  // Verification target 1: Valid starting_frequencies + all other required overrides -> success
+  it("two_locus_wright_fisher with valid starting_frequencies resolves successfully", async () => {
+    const resolved = await resolveQuery(
+      "two locus linkage disequilibrium population_size=100 generations=20 " +
+        "starting_frequencies=0.5,0,0,0.5 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+    );
+    expect(resolved.domain).toBe("two_locus_wright_fisher");
+    expect(resolved.parameters.starting_frequencies).toEqual([0.5, 0, 0, 0.5]);
+    const prov = resolved.parameterProvenance.starting_frequencies!;
+    expect(prov.origin).toBe("user");
+  });
+
+  // Verification target 2: starting_frequencies sums to 0.9 -> rejected
+  it("rejects starting_frequencies that do not sum to 1", async () => {
+    await expect(
+      resolveQuery(
+        "two locus linkage disequilibrium population_size=100 generations=20 " +
+          "starting_frequencies=0.5,0,0,0.4 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+      ),
+    ).rejects.toThrow(ArrayOverrideValidationError);
+    try {
+      await resolveQuery(
+        "two locus linkage disequilibrium population_size=100 generations=20 " +
+          "starting_frequencies=0.5,0,0,0.4 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+      );
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(ArrayOverrideValidationError);
+      expect((err as ArrayOverrideValidationError).key).toBe("starting_frequencies");
+      expect((err as ArrayOverrideValidationError).message).toMatch(/sum to 1/);
+    }
+  });
+
+  // Verification target 3: starting_frequencies with only 3 values -> rejected
+  it("rejects starting_frequencies with wrong element count", async () => {
+    await expect(
+      resolveQuery(
+        "two locus linkage disequilibrium population_size=100 generations=20 " +
+          "starting_frequencies=0.5,0,0 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+      ),
+    ).rejects.toThrow(ArrayOverrideValidationError);
+    try {
+      await resolveQuery(
+        "two locus linkage disequilibrium population_size=100 generations=20 " +
+          "starting_frequencies=0.5,0,0 recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+      );
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(ArrayOverrideValidationError);
+      expect((err as ArrayOverrideValidationError).key).toBe("starting_frequencies");
+      expect((err as ArrayOverrideValidationError).message).toMatch(/exactly 4/);
+    }
+  });
+
+  // Verification target 4: No starting_frequencies override -> RequiredParametersMissingError
+  it("throws RequiredParametersMissingError naming starting_frequencies when absent", async () => {
+    await expect(
+      resolveQuery(
+        "two locus linkage disequilibrium population_size=100 generations=20 " +
+          "recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+      ),
+    ).rejects.toThrow();
+    try {
+      await resolveQuery(
+        "two locus linkage disequilibrium population_size=100 generations=20 " +
+          "recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+      );
+      expect.unreachable();
+    } catch (err: unknown) {
+      // The error should name starting_frequencies among the missing keys
+      expect(err).toBeInstanceOf(Error);
+      expect((err as Error).message).toContain("starting_frequencies");
+    }
+  });
+
+  // Verification target 5: existing mm scalar override still works (regression)
+  it("existing mm scalar override (km=0.5) is not regressed", async () => {
+    const resolved = await resolveQuery("simulate enzyme kinetics km=0.5 vmax=5 s0=10 end=10 points=51");
+    expect(resolved.domain).toBe("mm");
+    expect(resolved.parameters.km).toBe(0.5);
+    const km = resolved.parameterProvenance["km"]!;
+    expect(km.origin).toBe("user");
   });
 });
 

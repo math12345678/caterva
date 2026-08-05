@@ -141,6 +141,75 @@ async function applyKineticResolution(
   return { parameters, parameterProvenance, flags };
 }
 
+/**
+ * Apply population genetics parameter resolution from literature.
+ * Currently supports mutation_rate for Wright-Fisher domains.
+ */
+async function applyPopgenResolution(
+  entities: EntityExtraction | undefined,
+  overrides: Record<string, number | number[]>,
+  domain: string,
+  parameters: Record<string, number | number[]>,
+  parameterProvenance: Record<string, ParameterProvenance>,
+  flags: string[],
+): Promise<{
+  parameters: Record<string, number | number[]>;
+  parameterProvenance: Record<string, ParameterProvenance>;
+  flags: string[];
+}> {
+  const resolvable = RESOLVABLE_FIELDS[domain] ?? [];
+  const popgenKeys = resolvable.filter((k) => !(k in overrides));
+  if (popgenKeys.length === 0) {
+    return { parameters, parameterProvenance, flags };
+  }
+
+  // For now, only mutation_rate is supported
+  if (popgenKeys.includes("mutation_rate") && entities?.organism) {
+    const agentResult = await resolveKineticValue({
+      ...entities,
+      parameterType: "mutation_rate",
+    });
+
+    if (agentResult.found && agentResult.km !== undefined) {
+      const value = agentResult.km;
+      const citation = formatResolvedCitation(agentResult.citation);
+      if (citation !== undefined) {
+        parameters = { ...parameters, mutation_rate: value };
+        parameterProvenance = {
+          ...parameterProvenance,
+          mutation_rate: buildResolvedKineticProvenance({
+            source: agentResult.source ?? "unknown",
+            citation,
+            organism: agentResult.organism,
+            citationStatus: "verified",
+          }),
+        };
+        flags.push(
+          `Resolved mutation_rate=${value} from ${agentResult.source ?? "literature"}.`,
+        );
+      } else {
+        parameterProvenance = {
+          ...parameterProvenance,
+          mutation_rate: {
+            origin: "default",
+            note: "Found a mutation_rate value but its citation carries no locator; using default.",
+          },
+        };
+      }
+    } else {
+      parameterProvenance = {
+        ...parameterProvenance,
+        mutation_rate: {
+          origin: "default",
+          note: "Could not resolve a real mutation_rate value from literature; using default.",
+        },
+      };
+    }
+  }
+
+  return { parameters, parameterProvenance, flags };
+}
+
 export interface ResolvedSimulation {
   runId: string;
   domain: SimulationDomain;
@@ -451,6 +520,12 @@ function parseArrayValue(raw: string): number[] | undefined {
  *  - `length`: exact number of elements required
  *  - `sumTo`: if set, the elements must sum to this value within tolerance
  *  - `tolerance`: float tolerance for the sum check (default 1e-6)
+ *
+ * Mutation-test note (Rule 6): the sum tolerance is guarded by the array
+ * override suite. Mutating `1e-6` -> `1e6` is caught by 4 tests across
+ * arrayOverride.test.ts, provenance.test.ts, and queryOverrides.test.ts
+ * ("rejects ... that sum to 0.9" / "do not sum to 1" / "rejects array that
+ * doesn't sum to 1" / "rejects sum!=1"); the mutation was run and reverted.
  */
 const ARRAY_VALIDATORS: Record<
   string,
@@ -520,7 +595,7 @@ export function extractParameterOverrides(
   for (const [key, spec] of Object.entries(ARRAY_VALIDATORS)) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const arrayRe = new RegExp(
-      `${escapedKey}\\s*[=:]\\s*([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?(?:,\\s*[0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)+)`,
+      `${escapedKey}\\s*[=:]\\s*\\[?([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?(?:\\s*,\\s*[0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)+)\\]?`,
       "i",
     );
     const m = arrayRe.exec(query);
@@ -824,6 +899,21 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       flags = result.flags;
     }
 
+    // Population genetics parameter resolution for LLM path
+    if (llmResult.domain === "wright_fisher" || llmResult.domain === "two_locus_wright_fisher") {
+      const popgenResult = await applyPopgenResolution(
+        llmResult.entities,
+        overrides,
+        llmResult.domain,
+        parameters,
+        parameterProvenance,
+        flags,
+      );
+      parameters = popgenResult.parameters;
+      parameterProvenance = popgenResult.parameterProvenance;
+      flags = popgenResult.flags;
+    }
+
     if (
       Object.keys(overrides).length === 0 &&
       Object.keys(llmResult.parameters).length === 0
@@ -913,6 +1003,21 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     parameters = result.parameters;
     parameterProvenance = result.parameterProvenance;
     flags = result.flags;
+  }
+
+  // Population genetics parameter resolution (e.g., mutation_rate for Wright-Fisher)
+  if (best.domain === "wright_fisher" || best.domain === "two_locus_wright_fisher") {
+    const popgenResult = await applyPopgenResolution(
+      fallbackEntities,
+      overrides,
+      best.domain,
+      parameters,
+      parameterProvenance,
+      flags,
+    );
+    parameters = popgenResult.parameters;
+    parameterProvenance = popgenResult.parameterProvenance;
+    flags = popgenResult.flags;
   }
 
   if (Object.keys(overrides).length === 0) {

@@ -141,5 +141,54 @@ export const DEFAULT_SIR: SIRParams = {
   points: 61,
 };
 
+export interface MMCompetitiveParams {
+  km: number;
+  ki: number;
+  vmax: number;
+  s0: number;
+  i: number;
+  end: number;
+  points: number;
+}
+
+export interface MMCompetitiveResult {
+  trajectory: Point[];
+  // Residual of the exact implicit solution for competitive inhibition at
+  // the final point:
+  //   Km_app*ln(S0/S) + (S0 - S) = Vmax*t,   Km_app = Km*(1 + I/Ki)
+  // Same apparent-Km closed form Tellurium/tests/test_mm_competitive_inhibition.py
+  // checks against the Python engine; reduces exactly to plain MM at I=0.
+  finalResidual: number;
+}
+
+export function simulateMMCompetitiveInhibition(
+  p: MMCompetitiveParams,
+): MMCompetitiveResult {
+  // Competitive inhibition changes the effective Michaelis constant, not
+  // the catalytic step: v = Vmax*S / (Km*(1 + I/Ki) + S). The ODE is
+  // therefore plain MM with Km replaced by Km_app.
+  const kmApp = p.km * (1 + p.i / p.ki);
+  const derivs = ([S]: number[]) => [-(p.vmax * S) / (kmApp + S)];
+  const trajectory = integrate(derivs, [p.s0], p.end, p.points, ['S']);
+
+  const S_final = Math.max(trajectory[trajectory.length - 1].S, 1e-12);
+  const lhs = kmApp * Math.log(p.s0 / S_final) + (p.s0 - S_final);
+  const rhs = p.vmax * p.end;
+  const finalResidual = Math.abs(lhs - rhs);
+
+  return { trajectory, finalResidual };
+}
+
+/** Default parameters used by the terminal demo/verify commands. */
+export const DEFAULT_MM_COMPETITIVE: MMCompetitiveParams = {
+  km: 2,
+  ki: 1,
+  vmax: 5,
+  s0: 10,
+  i: 1,
+  end: 10,
+  points: 51,
+};
+
 export const MM_TOLERANCE = 1e-6;
 export const SIR_TOLERANCE = 1e-6;

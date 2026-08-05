@@ -90,7 +90,7 @@ def check_entry(line: int, citation: str) -> list[str]:
     if re.search(r"https?://", citation):
         return problems
 
-    pre_year = citation.split("(")[0] if citation.find("(") != -1 else citation
+    pre_year = citation.split("(", maxsplit=1)[0] if citation.find("(") != -1 else citation
     if not YEAR_RE.search(citation):
         problems.append(
             f"line {line}: missing a year in parentheses, e.g. (1930): {citation}")

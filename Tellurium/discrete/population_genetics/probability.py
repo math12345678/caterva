@@ -135,7 +135,8 @@ def wright_fisher_transition_matrix(
             for m1 in range(k + 1):
                 if pm1[m1] > 0.0:
                     M[k, k - m1 + target] += pm1[m1] * pm2
-        Q = Q @ M
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            Q = Q @ M
     return Q
 
 def _wf_chain_setup(
@@ -281,7 +282,9 @@ def wright_fisher_expected_fixation_time(
     f = _wf_fixation_vector(Q)
     # w[j]: E[T * 1_{fixation}], solving (I - Q_t) w = Q_t f + p_top
     # with boundaries w_0 = w_top = 0; then E[T | fixation] = w / f.
-    w = np.linalg.solve(np.eye(Q_t.shape[0]) - Q_t, Q_t @ f + p_top)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        rhs = Q_t @ f + p_top
+    w = np.linalg.solve(np.eye(Q_t.shape[0]) - Q_t, rhs)
     f_val = f[i0 - 1]
     if f_val <= 1e-15:
         raise ValueError(
@@ -346,8 +349,9 @@ def wright_fisher_expected_loss_time(
     f = _wf_fixation_vector(Q)
     # v[j]: E[T * 1_{loss}], solving (I - Q_t) v = Q_t (1 - f) + p_bottom
     # with boundaries v_0 = v_top = 0; then E[T | loss] = v / (1 - f).
-    v = np.linalg.solve(np.eye(Q_t.shape[0]) - Q_t,
-                        Q_t @ (1.0 - f) + p_bottom)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        rhs = Q_t @ (1.0 - f) + p_bottom
+    v = np.linalg.solve(np.eye(Q_t.shape[0]) - Q_t, rhs)
     f_val = f[i0 - 1]
     if 1.0 - f_val <= 1e-15:
         raise ValueError(

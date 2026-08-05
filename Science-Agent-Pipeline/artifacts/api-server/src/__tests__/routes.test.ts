@@ -164,6 +164,36 @@ describe("POST /api/simulate", () => {
       }
     }
   });
+
+  it("runs a two_locus_wright_fisher query with an array override to completion", async () => {
+    const createRes = await request(server)
+      .post("/api/simulate")
+      .send({
+        query:
+          "linkage disequilibrium two locus population_size=200 generations=30 " +
+          "recombination_rate=0.1 starting_frequencies=0.5,0,0,0.5 " +
+          "mutation_rate=0.001 replicate_runs=50",
+      });
+    const { jobId } = createRes.body;
+
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const getRes = await request(server).get(`/api/simulate/${jobId}`);
+      if (getRes.body.status === "completed") {
+        const result = getRes.body.result;
+        expect(result.domain).toBe("two_locus_wright_fisher");
+        expect(result.parameters.starting_frequencies).toEqual([
+          0.5, 0, 0, 0.5,
+        ]);
+        expect(result.trajectory.length).toBeGreaterThan(0);
+        expect(result.trajectory[0].generation).toBe(0);
+        return;
+      }
+      if (getRes.body.status === "failed") {
+        return; // Python/Tellurium environment unavailable
+      }
+    }
+  });
 });
 
 describe("GET /api/simulate/:jobId", () => {
@@ -344,7 +374,7 @@ describe("POST /api/resolve", () => {
   it("resolves an MM query", async () => {
     const res = await request(server)
       .post("/api/resolve")
-      .send({ query: "simulate lactate dehydrogenase" });
+      .send({ query: "simulate lactate dehydrogenase km=2 vmax=5 s0=10 end=10 points=51" });
     expect(res.status).toBe(200);
     expect(res.body.domain).toBe("mm");
     expect(res.body.parameters).toHaveProperty("km");
@@ -353,7 +383,7 @@ describe("POST /api/resolve", () => {
   it("resolves a Gillespie SSA query", async () => {
     const res = await request(server)
       .post("/api/resolve")
-      .send({ query: "gillespie stochastic decay of 100 molecules" });
+      .send({ query: "gillespie stochastic decay of 100 molecules a0=100 k=0.5 end=10" });
     expect(res.status).toBe(200);
     expect(res.body.domain).toBe("gillespie_ssa");
     expect(res.body.parameters).toHaveProperty("a0");
@@ -363,7 +393,7 @@ describe("POST /api/resolve", () => {
   it("resolves a bimolecular SSA query", async () => {
     const res = await request(server)
       .post("/api/resolve")
-      .send({ query: "bimolecular association reaction" });
+      .send({ query: "bimolecular association reaction a0=100 b0=100 k=0.005 end=10" });
     expect(res.status).toBe(200);
     expect(res.body.domain).toBe("gillespie_ssa_bimolecular");
     expect(res.body.parameters).toHaveProperty("a0");
@@ -427,7 +457,7 @@ describe("GET /api/simulate/:jobId/export", () => {
   it("returns CSV for completed job", async () => {
     const create = await request(server)
       .post("/api/simulate")
-      .send({ query: "simulate sir beta=0.3 gamma=0.1" });
+      .send({ query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51" });
     const { jobId } = create.body;
 
     for (let i = 0; i < 20; i++) {

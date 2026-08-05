@@ -287,7 +287,7 @@ which is the difference between a review habit and a build guard.
 | Engine Contract | 1-2s | Multiple imports |
 | Dependencies | <1s | File system scan |
 | Plausibility Constants | <1s | AST parsing |
-| Python Tests | 120–300s | Full test suite (881 engine + 214 literature) |
+| Python Tests | 120–300s | Full test suite (883 engine + 223 literature) |
 | TypeScript Tests | 15–30s | vitest (220 tests across 15 files) |
 
 Use `--quick` for development workflows where you want immediate feedback.

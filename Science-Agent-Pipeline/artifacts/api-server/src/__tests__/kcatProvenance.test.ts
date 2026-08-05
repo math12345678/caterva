@@ -65,7 +65,7 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
      * something is inventing an assay.
      */
     const resolved = await resolveQuery(
-      "simulate lactate dehydrogenase enzyme_conc=0.00001 vmax=5 s0=10 end=10 points=51",
+      "simulate lactate dehydrogenase km=2 enzyme_conc=0.00001 vmax=5 s0=10 end=10 points=51",
     );
     const provenance = resolved.parameterProvenance["enzyme_conc"];
     if (provenance) {
@@ -81,8 +81,8 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
      * not produce a simulable parameter on its own -- it needs an [E]0 the
      * caller supplies. The narrowness note must therefore stay true.
      */
-    const resolved = await resolveQuery(
-      "simulate lactate dehydrogenase vmax=5 s0=10 end=10 points=51",
+const resolved = await resolveQuery(
+      "simulate lactate dehydrogenase km=2 vmax=5 s0=10 end=10 points=51",
     );
     for (const key of ["kcat", "enzyme_conc"]) {
       const provenance = resolved.parameterProvenance[key];

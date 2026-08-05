@@ -285,6 +285,7 @@ __all__ = [
     "_normalise_stationary_vector",
     "antimony_to_sbml",
     "build_michaelis_menten_antimony",
+    "build_mm_competitive_antimony",
     "build_seir_antimony",
     "build_sir_antimony",
     "effective_size_harmonic_mean",
@@ -302,6 +303,7 @@ __all__ = [
     "simulate_gillespie_ssa_bimolecular",
     "simulate_gillespie_ssa_replicates",
     "simulate_michaelis_menten",
+    "simulate_mm_competitive_inhibition",
     "simulate_molecular_dynamics",
     "simulate_monte_carlo_pi",
     "simulate_pcr",
@@ -315,6 +317,8 @@ __all__ = [
     "theoretical_ld_decay",
     "validate_md_params",
     "validate_michaelis_menten_params",
+    # Competitive inhibition Michaelis-Menten
+    "validate_mm_competitive_params",
     "validate_monte_carlo_params",
     "validate_pcr_params",
     "validate_sbml",
@@ -334,8 +338,4 @@ __all__ = [
     "wright_fisher_sweep",
     "wright_fisher_transition_matrix",
     "wright_stationary_distribution",
-    # Competitive inhibition Michaelis-Menten
-    "validate_mm_competitive_params",
-    "build_mm_competitive_antimony",
-    "simulate_mm_competitive_inhibition",
 ]

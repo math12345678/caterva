@@ -23,7 +23,7 @@ def scipy_sir(beta, gamma, s0, i0, r0, t_eval):
     n = s0 + i0 + r0
 
     def rhs(t, y):
-        s, i, r = y
+        s, i, _r = y
         infection = beta * s * i / n
         recovery = gamma * i
         return [-infection, infection - recovery, recovery]
@@ -38,7 +38,7 @@ def scipy_seir(beta, sigma, gamma, s0, e0, i0, r0, t_eval):
     n = s0 + e0 + i0 + r0
 
     def rhs(t, y):
-        s, e, i, r = y
+        s, e, i, _r = y
         infection = beta * s * i / n
         progression = sigma * e
         recovery = gamma * i

@@ -302,7 +302,7 @@ def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatc
         "source": "ec_not_resolved",
         "literatureCandidates": [],
         "logs": [
-            "Could not resolve an EC number for 'not a real enzyme name' via "
-            "UniProt; no BRENDA/KEGG/PubMed lookup is possible without one."
+            ("Could not resolve an EC number for 'not a real enzyme name' via "
+             "UniProt; no BRENDA/KEGG/PubMed lookup is possible without one.")
         ],
     }

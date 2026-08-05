@@ -3271,7 +3271,8 @@ def test_stationary_vector_is_fixed_point() -> None:
     n, u = 50, 0.02
     v = wright_fisher_stationary_vector(n, u)
     q = wright_fisher_transition_matrix(n, mutation_rate=u)
-    drift = np.asarray(v) @ q
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        drift = np.asarray(v) @ q
     assert abs(sum(v) - 1.0) < 1e-12
     assert np.all(np.asarray(v) >= 0.0)
     assert np.max(np.abs(drift - np.asarray(v))) < 1e-10, (
@@ -3404,7 +3405,8 @@ def test_stationary_vector_eigenvector_sign_regression() -> None:
 
     # Verify it's actually the stationary distribution: pi Q = pi
     q = wright_fisher_transition_matrix(n, mutation_rate=u)
-    drift = np.asarray(v) @ q
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        drift = np.asarray(v) @ q
     assert np.max(np.abs(drift - np.asarray(v))) < 1e-10, (
         f"max |pi Q - pi| = {np.max(np.abs(drift - np.asarray(v))):.2e}")
 
@@ -3688,9 +3690,11 @@ def test_transition_matrix_neutral_mean_and_variance() -> None:
     N = 100
     Q = wright_fisher_transition_matrix(N)
     copies = np.arange(2 * N + 1, dtype=np.float64)
-    mean = Q @ copies
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        mean = Q @ copies
     assert np.allclose(mean, copies, atol=1e-9)
-    second = Q @ (copies ** 2)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        second = Q @ (copies ** 2)
     var = second - mean ** 2
     expected_var = copies * (2 * N - copies) / (2 * N)
     assert np.allclose(var, expected_var, atol=1e-8)
@@ -3710,15 +3714,16 @@ def test_transition_matrix_matches_simulation_distribution() -> None:
     rng = np.random.default_rng(seed)
     freqs = np.full(reps, p0)
     for _ in range(t):
-        freqs = rng.binomial(2 * N, freqs) / (2 * N)
+        freqs = rng.binomial(2 * N, freqs) / (2 * N)  # type: ignore[assignment]
     sim_fix = np.mean(freqs >= 1.0 - 1e-12)
     sim_mean = float(np.mean(freqs))
 
-    Q = np.linalg.matrix_power(
-        wright_fisher_transition_matrix(N), t)
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        Q = np.linalg.matrix_power(wright_fisher_transition_matrix(N), t)  # type: ignore[assignment]
     i0 = round(p0 * 2 * N)
     chain_fix = Q[i0, 2 * N]
-    chain_mean = float((Q[i0] @ np.arange(2 * N + 1)) / (2 * N))
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        chain_mean = float((Q[i0] @ np.arange(2 * N + 1)) / (2 * N))
     assert abs(sim_fix - chain_fix) < 0.03
     assert abs(sim_mean - chain_mean) < 0.02
 

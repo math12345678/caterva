@@ -58,6 +58,8 @@ export interface EntityExtraction {
   substrate?: string;
   organism: string;
   ecNumber?: string;
+  /** For population genetics: parameter type to resolve (e.g., 'mutation_rate') */
+  parameterType?: string;
 }
 
 interface PythonError {
@@ -192,6 +194,7 @@ export async function resolveKineticValue(
         substrate: entities.substrate ?? "",
         organism: entities.organism,
         ecNumber: entities.ecNumber,
+        parameterType: entities.parameterType ?? "",
       }),
     );
     proc.stdin.end();

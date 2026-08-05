@@ -59,10 +59,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # a bare "forbidden" invites someone to delete the check.
 FORBIDDEN = {
     "tellurium": (
-        "the umbrella package pulls in python-libcombine and python-libnuml "
-        "(COMBINE archives / numerical markup), neither of which Terrium "
-        "uses; on platforms without wheels for them the install dies at the "
-        "cmake step",
+        ("the umbrella package pulls in python-libcombine and python-libnuml "
+         "(COMBINE archives / numerical markup), neither of which Terrium "
+         "uses; on platforms without wheels for them the install dies at the "
+         "cmake step"),
         "libroadrunner, antimony, python-libsbml -- see ADR 0001",
     ),
 }
@@ -102,10 +102,10 @@ def _strip_toml_comment(line: str) -> str:
 
 def _toml_string_values(line: str) -> List[str]:
     """Extract basic or literal TOML strings from one array line."""
-    values: List[str] = []
-    for match in re.finditer(r'"((?:\\.|[^"\\])*)"|\'([^\']*)\'', line):
-        values.append(match.group(1) if match.group(1) is not None else match.group(2))
-    return values
+    return [
+        match.group(1) if match.group(1) is not None else match.group(2)
+        for match in re.finditer(r'"((?:\\.|[^"\\])*)"|\'([^\']*)\'', line)
+    ]
 
 
 def _array_has_terminator(line: str) -> bool:
