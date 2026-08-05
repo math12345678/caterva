@@ -30,6 +30,7 @@ import re
 
 import enzyme_lookup
 from brenda_client import UNIPROT_CELL_PATTERN
+from http_retry import retry_get
 
 class BRENDAKmEntry(BaseModel):
     km_value: float
@@ -51,7 +52,7 @@ KM_PLAUSIBLE_MAX_MM = 1000
 def parse_brenda_km(ec_number: str, target_organism: str = "Homo sapiens",
                      target_substrates: list = None) -> list[BRENDAKmEntry]:
 
-    r = httpx.get(
+    r = retry_get(
         "https://www.brenda-enzymes.org/enzyme.php",
         params={"ecno": ec_number},
         timeout=15
