@@ -360,7 +360,8 @@ def expected_fst_after_split(
     i_vals = np.arange(two_n + 1) / two_n
     h = 2.0 * i_vals * (1.0 - i_vals)
     for _ in range(generations):
-        pi = pi @ q
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+            pi = pi @ q
     if generations == 0:
         return 0.0
     outer = pi[:, None] * pi[None, :]

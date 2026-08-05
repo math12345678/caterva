@@ -22,7 +22,6 @@ retained as-is beyond the hardcoding fix, per instruction not to delete.
 
 from __future__ import annotations
 
-from typing import Optional
 
 import httpx
 from bs4 import BeautifulSoup
@@ -37,11 +36,11 @@ class BRENDAKmEntry(BaseModel):
     unit: str = "mM"
     substrate: str
     organism: str
-    uniprot: Optional[str] = None
-    conditions: Optional[str] = None
-    reference_id: Optional[str] = None
+    uniprot: str | None = None
+    conditions: str | None = None
+    reference_id: str | None = None
     flagged: bool = False
-    flag_reason: Optional[str] = None
+    flag_reason: str | None = None
 
 # Plausible Km range in mM. Values outside this are almost always a
 # mislabeled Kcat, Ki, IC50, or a unit/OCR artifact from BRENDA's table,

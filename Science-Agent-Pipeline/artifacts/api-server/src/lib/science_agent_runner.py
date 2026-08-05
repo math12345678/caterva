@@ -62,6 +62,7 @@ from typing import Any, Dict
 import enzyme_lookup
 import fallback_logic
 from fallback_logic import KineticResult
+import popgen_resolver
 
 
 def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
@@ -133,6 +134,30 @@ def resolve_kinetic_value(
     )
 
 
+def resolve_popgen_parameter(param_type: str, organism: str) -> dict | None:
+    """Resolve a population genetics parameter from literature.
+    
+    Args:
+        param_type: Parameter type (e.g., 'mutation_rate')
+        organism: Organism name
+        
+    Returns:
+        Dict with value, unit, citation info, or None if not found.
+    """
+    if param_type == 'mutation_rate':
+        result = popgen_resolver.resolve_mutation_rate(organism)
+        if not result.found:
+            return None
+        return {
+            'value': result.value,
+            'unit': result.unit,
+            'source': result.source,
+            'citation': result.citation,
+            'organism': result.organism,
+        }
+    return None
+
+
 def _citation_to_dict(citation) -> Dict[str, Any] | None:
     if citation is None:
         return None
@@ -168,7 +193,51 @@ def main() -> None:
         substrate = payload.get("substrate", "")
         organism = payload.get("organism", "Homo sapiens")
         ec_number = payload.get("ecNumber", "")
+        parameter_type = payload.get("parameterType", "")
         resolution_log: list[str] = []
+
+        # Handle population genetics parameter resolution
+        if parameter_type == "mutation_rate":
+            popgen_result = resolve_popgen_parameter("mutation_rate", organism)
+            if popgen_result is None:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "popgen_not_found",
+                            "literatureCandidates": [],
+                            "logs": [
+                                f"No literature value found for mutation_rate in '{organism}'"
+                            ],
+                        }
+                    )
+                )
+                return
+            print(
+                json.dumps(
+                    {
+                        "ok": True,
+                        "found": True,
+                        "km": popgen_result["value"],  # Reuse km field for the value
+                        "ki": None,
+                        "unit": popgen_result["unit"],
+                        "organism": popgen_result["organism"],
+                        "source": "popgen_literature",
+                        "crossSpecies": False,
+                        "assayConditions": {},
+                        "citation": {
+                            "source": popgen_result["source"],
+                            "referenceId": popgen_result["doi"],
+                            "url": f"https://doi.org/{popgen_result['doi']}" if popgen_result['doi'] else None,
+                            "title": popgen_result["citation"],
+                        },
+                        "literatureCandidates": [],
+                        "logs": resolution_log + [f"Resolved mutation_rate from literature: {popgen_result['citation']}"],
+                    }
+                )
+            )
+            return
 
         if not ec_number:
             if not enzyme_name:

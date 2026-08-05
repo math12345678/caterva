@@ -19,7 +19,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,106 tests (883 engine + 223 literature)
+make test      # runs all 1,120 tests (883 engine + 237 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -211,7 +211,7 @@ them together.
 
 ```bash
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 1,106 tests
+make test        # run all 1,120 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (883 tests)
 make test-lit    # literature layer only (223 tests)

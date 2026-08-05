@@ -170,8 +170,8 @@ def vmax_from_kcat(
         return 0.0, ParameterValidation(
             ok=False,
             errors=[
-                f"kcat {kcat:g} 1/s x [E]0 {enzyme_conc:g} mM overflowed to a "
-                "non-finite Vmax"
+                (f"kcat {kcat:g} 1/s x [E]0 {enzyme_conc:g} mM overflowed to a "
+                 "non-finite Vmax")
             ],
         )
 

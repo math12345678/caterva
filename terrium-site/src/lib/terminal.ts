@@ -180,14 +180,17 @@ async function runLiteratureBacked(query: string, domainLabel: string): Promise<
   }
 }
 
-export const DOMAINS: Array<[string, string, string]> = [
-  ['kinetics', 'Michaelis-Menten enzyme kinetics', 'continuous'],
-  ['mm_competitive_inhibition', 'Competitive inhibition kinetics', 'continuous'],
-  ['epidemiology', 'SIR / SEIR compartment models', 'continuous'],
-  ['pcr', 'PCR amplification', 'discrete'],
-  ['monte_carlo', 'Monte Carlo pi estimation', 'stochastic'],
-  ['popgen', 'Wright-Fisher neutral drift', 'stochastic'],
-  ['md', 'Lennard-Jones molecular dynamics', 'discrete-time'],
+// [name, description, type, literature_backed]
+// literature_backed: true = parameters can be resolved from real databases
+//                    false = all parameters are user-specified by design
+export const DOMAINS: Array<[string, string, string, string]> = [
+  ['kinetics', 'Michaelis-Menten enzyme kinetics', 'continuous', 'km from BRENDA'],
+  ['mm_competitive_inhibition', 'Competitive inhibition kinetics', 'continuous', 'km from BRENDA'],
+  ['epidemiology', 'SIR / SEIR compartment models', 'continuous', 'user-specified (outbreak-fit)'],
+  ['pcr', 'PCR amplification', 'discrete', 'user-specified (assay-specific)'],
+  ['monte_carlo', 'Monte Carlo pi estimation', 'stochastic', 'no parameters needed'],
+  ['popgen', 'Wright-Fisher neutral drift', 'stochastic', 'mutation_rate from literature'],
+  ['md', 'Lennard-Jones molecular dynamics', 'discrete-time', 'user-specified (sim choice)'],
 ];
 
 export const COMMANDS: Command[] = [
@@ -211,12 +214,19 @@ export const COMMANDS: Command[] = [
     run: () => [
       head('DOMAINS'),
       rule(),
-      ...DOMAINS.map(([n, desc, kind]) =>
-        o(`  ${n.padEnd(16)}${(desc as string).padEnd(38)}${kind}`),
+      o('  DOMAIN           DESCRIPTION                              TYPE        LITERATURE'),
+      o('  ---------------  ---------------------------------------  ----------  -------------------'),
+      ...DOMAINS.map(([n, desc, kind, lit]) =>
+        o(`  ${n.padEnd(16)}${(desc as string).padEnd(38)}${kind.padEnd(11)}${lit}`),
       ),
       o(),
       d('  run <domain>     to simulate'),
       d('  verify <domain>  to check against exact mathematics'),
+      o(),
+      d('  LITERATURE column: what (if anything) is resolved from real databases.'),
+      d('  If marked "user-specified", ALL parameters for that domain must be typed'),
+      d('  manually — this is by design, not a gap (the parameters are assay-specific'),
+      d('  or fit-to-data, with no single "true" value in any database).'),
     ],
   },
 
@@ -290,6 +300,10 @@ export const COMMANDS: Command[] = [
         const lines: Line[] = [
           head('COMPETITIVE INHIBITION — MM WITH INHIBITOR'),
           rule(),
+          d('  illustrative constants demo -- Km/Vmax/Ki/[I] below are a'),
+          d("  textbook set, simulated client-side with RK4, not a literature"),
+          d("  resolved enzyme. the API's competitive-inhibition domain accepts"),
+          d('  these same parameters from you for a real resolved run.'),
           o(`  Km      ${p.km}   Vmax     ${p.vmax}   Ki      ${p.ki}`),
           o(`  S0      ${p.s0}   [I]      ${p.i}   points  ${p.points}`),
           o(`  Km_app  ${kmApp.toFixed(6)}   = Km·(1 + I/Ki)`),

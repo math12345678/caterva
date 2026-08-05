@@ -79,6 +79,10 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   // Same class of decision as ADR 0012 excluding kcat. Add it back only
   // once a real Ki lookup + golden tuple + contract test exist for it.
   mm_competitive_inhibition: ["km"],
+  // Population genetics: mutation_rate resolved from published literature
+  // (Rahbari et al., Nature Genetics, 2015 for human; other organisms
+  // in Tests/popgen_resolver.py with primary citations).
+  wright_fisher: ["mutation_rate"],
 };
 
 /**
@@ -430,29 +434,4 @@ export function defaultOriginKeys(
   return Object.entries(parameterProvenance)
     .filter(([, p]) => p.origin === "default")
     .map(([key]) => key);
-}
-
-/**
- * Thrown when a user-supplied array override in the query string is malformed.
- *
- * This is a user-input error, not a missing-parameter error: the key IS
- * present, but its value does not meet the structural requirements (wrong
- * number of elements, non-numeric entries, or failing a domain-specific
- * invariant such as summing to 1). The message names the key and states
- * exactly what is wrong so the caller can correct it.
- */
-export class InvalidParameterOverrideError extends Error {
-  readonly parameter: string;
-  readonly reason: string;
-
-  constructor(parameter: string, reason: string) {
-    super(
-      `Invalid override for '${parameter}': ${reason}. ` +
-        `Supply it as ${parameter}=<value1>,<value2>,<value3>,<value4> ` +
-        `with exactly 4 comma-separated numeric values that sum to 1.`,
-    );
-    this.name = "InvalidParameterOverrideError";
-    this.parameter = parameter;
-    this.reason = reason;
-  }
 }

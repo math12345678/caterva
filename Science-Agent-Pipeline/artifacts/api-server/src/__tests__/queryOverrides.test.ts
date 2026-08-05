@@ -3,8 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 import {
   extractParameterOverrides,
   ArrayOverrideValidationError,
+  resolveQuery,
 } from "../lib/queryResolver";
+import { resolveKineticValue } from "../lib/scienceAgent";
 import { RequiredParametersMissingError } from "../lib/provenance";
+
+vi.mock("../lib/scienceAgent", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../lib/scienceAgent")>();
+  return {
+    ...original,
+    resolveKineticValue: vi.fn(async () => ({ found: false })),
+  };
+});
 
 // ─── Unit tests: extractParameterOverrides ────────────────────────────────
 
@@ -78,6 +89,18 @@ describe("extractParameterOverrides", () => {
       ).toEqual({ starting_frequencies: [0.1, 0.2, 0.3, 0.4] });
     });
 
+    it("accepts spaces after commas", () => {
+      expect(
+        extractParameterOverrides("starting_frequencies=0.5, 0, 0, 0.5"),
+      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
+    });
+
+    it("accepts a bracket-enclosed array with spaces", () => {
+      expect(
+        extractParameterOverrides("starting_frequencies=[0.5, 0, 0, 0.5]"),
+      ).toEqual({ starting_frequencies: [0.5, 0, 0, 0.5] });
+    });
+
     it("rejects array with wrong length", () => {
       expect(() =>
         extractParameterOverrides("starting_frequencies=0.5,0,0"),
@@ -91,20 +114,9 @@ describe("extractParameterOverrides", () => {
     });
 
     it("rejects array with non-numeric elements", () => {
-      // Non-numeric elements cause parseArrayValue to return undefined,
-      // so the override is silently skipped (no error thrown at parse time).
-      // The parameter will then be origin: "default", triggering the hard-block.
-      const result = extractParameterOverrides(
-        "starting_frequencies=0.5,abc,0,0.5",
-      );
-      expect(result).toEqual({});
-    });
-
-    it("rejects bracket-enclosed array with spaces (token gets split)", () => {
-      const result = extractParameterOverrides(
-        "starting_frequencies=[0.5, 0, 0, 0.5]",
-      );
-      expect(result).toEqual({});
+      expect(() =>
+        extractParameterOverrides("starting_frequencies=0.5,abc,0,0.5"),
+      ).toThrow(ArrayOverrideValidationError);
     });
   });
 
@@ -139,21 +151,6 @@ describe("extractParameterOverrides", () => {
 
 // ─── Integration tests: resolveQuery with two_locus_wright_fisher ─────────
 
-// Import resolveQuery for the integration tests. The deterministic path is
-// used (no LLM configured), so we mock the science agent to avoid network.
-import { resolveQuery } from "../lib/queryResolver";
-import { resolveKineticValue } from "../lib/scienceAgent";
-
-vi.mock("../lib/scienceAgent", async (importOriginal) => {
-  const original = await importOriginal<
-    typeof import("../lib/scienceAgent")
-  >();
-  return {
-    ...original,
-    resolveKineticValue: vi.fn(async () => ({ found: false })),
-  };
-});
-
 // All overrides required for two_locus_wright_fisher (no literature-resolvable
 // fields exist for this domain, so every parameter must be user-supplied).
 const TWO_LOCUS_OVERRIDES =
@@ -166,9 +163,7 @@ describe("resolveQuery — two_locus_wright_fisher array overrides", () => {
       `linkage disequilibrium two locus ${TWO_LOCUS_OVERRIDES}`,
     );
     expect(result.domain).toBe("two_locus_wright_fisher");
-    expect(result.parameters.starting_frequencies).toEqual([
-      0.5, 0, 0, 0.5,
-    ]);
+    expect(result.parameters.starting_frequencies).toEqual([0.5, 0, 0, 0.5]);
     // starting_frequencies must be origin: "user"
     expect(result.parameterProvenance["starting_frequencies"]!.origin).toBe(
       "user",
@@ -228,10 +223,15 @@ describe("resolveQuery — two_locus_wright_fisher array overrides", () => {
 });
 
 // ─── Regression: existing mm golden query ──────────────────────────────────
+//
+// An existing mm query must not regress. This also proves that scalar
+// override behaviour and RESOLVABLE_FIELDS / provenance validation are
+// untouched by the array-override changes.
+//
+// Bare "simulate lactate dehydrogenase" resolves km from BRENDA (via the
+// mocked science agent) but vmax/s0/end/points are not literature-resolvable
+// and not supplied, so the hard-block rule throws RequiredParametersMissingError.
 
-// Test 5: An existing mm query must not regress. This also proves that
-// scalar override behaviour and RESOLVABLE_FIELDS / provenance validation
-// are untouched by the array-override changes.
 const GOLDEN_LDH_RESULT = {
   found: true,
   km: 10.73,
@@ -248,25 +248,27 @@ const GOLDEN_LDH_RESULT = {
   logs: ["Looked up Km for lactate dehydrogenase (1.1.1.27)"],
 };
 
-describe("resolveQuery — mm golden regression (test 5)", () => {
+const MM_EC_OVERRIDES = "vmax=5 s0=10 end=10 points=51";
+
+describe("resolveQuery — mm golden regression", () => {
+  // Test 5: mm + LDH with teaching defaults resolves km=10.73 from BRENDA
   it("mm + LDH resolves km=10.73 from BRENDA", async () => {
     vi.mocked(resolveKineticValue).mockResolvedValueOnce(GOLDEN_LDH_RESULT);
-    const result = await resolveQuery("simulate lactate dehydrogenase");
+    const result = await resolveQuery(
+      `simulate lactate dehydrogenase ${MM_EC_OVERRIDES}`,
+    );
     expect(result.domain).toBe("mm");
     expect(result.parameters["km"]).toBe(10.73);
     const km = result.parameterProvenance["km"]!;
     expect(km.origin).toBe("resolved");
     expect(km.citation).toContain("(ref 740253)");
-    // km must be resolved from literature (not default)
-    expect(result.parameterProvenance["km"]!.origin).toBe("resolved");
-    // Teaching defaults (vmax, s0, end, points) are legitimately origin: "default"
-    // — they are deliberately chosen by the project, not silently invented.
   });
 
+  // Test 6: mm + user override km=1.5 → origin 'user'
   it("mm + user override km=1.5 → origin 'user'", async () => {
     vi.mocked(resolveKineticValue).mockResolvedValueOnce(GOLDEN_LDH_RESULT);
     const result = await resolveQuery(
-      "simulate lactate dehydrogenase km=1.5",
+      `simulate lactate dehydrogenase km=1.5 ${MM_EC_OVERRIDES}`,
     );
     expect(result.parameters["km"]).toBe(1.5);
     expect(result.parameterProvenance["km"]!.origin).toBe("user");

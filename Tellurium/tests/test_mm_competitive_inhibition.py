@@ -5,9 +5,7 @@ and that the initial reaction rate matches Vmax * S / (Km_app + S). Also
 check that at I=0 the kinetics reduce exactly to plain Michaelis-Menten.
 """
 
-import math
 
-import numpy as np
 import pytest
 
 from tellurium_engine import (
