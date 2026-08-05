@@ -185,7 +185,15 @@ def run_mm(params: Dict[str, Any]) -> Dict[str, Any]:
             "(Vmax = kcat * [E]0)"
         )
     else:
-        vmax = 5.0
+        # No route to a Vmax at all. Unreachable from the API: resolveQuery()'s
+        # hard rule throws RequiredParametersMissingError on any default-origin
+        # vmax before the runner is spawned, and the zod schema (schemas.ts)
+        # requires vmax or kcat+enzyme_conc at validation. Fail loudly rather
+        # than simulate on an unverified 5.0 -- a number nobody chose.
+        raise ValueError(
+            "mm needs a Vmax: supply vmax directly, or supply BOTH kcat and "
+            "enzyme_conc (Vmax = kcat * [E]0)"
+        )
 
     result = tellurium_engine.simulate_michaelis_menten(
         km=km, vmax=vmax, s0=s0, end=end, points=points

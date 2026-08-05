@@ -238,6 +238,30 @@ class TestEndToEndAgainstTheClosedForm:
             with pytest.raises(ValueError, match="cannot be derived"):
                 tellurium_runner.run_mm({"km": 0.1, "s0": 1.0, **partial})
 
+    def test_a_request_with_no_route_to_a_vmax_is_rejected(self):
+        """No vmax, no kcat, no enzyme_conc: there is no route to a Vmax at
+        all. The runner used to silently fall back to vmax = 5.0 here -- a
+        number nobody chose and nothing verified. resolveQuery()'s hard rule
+        (RequiredParametersMissingError on any default-origin vmax) already
+        stops any such query before the runner is spawned, so the fallback
+        was dead code; it has been replaced by an explicit rejection so it
+        cannot quietly become live again.
+        """
+        runner_dir = (
+            _REPO / "Science-Agent-Pipeline" / "artifacts" / "api-server" / "src" / "lib"
+        )
+        if not runner_dir.is_dir():
+            pytest.skip("api-server runner not present in this checkout")
+        if str(runner_dir) not in sys.path:
+            sys.path.insert(0, str(runner_dir))
+
+        import tellurium_runner  # noqa: PLC0415
+
+        with pytest.raises(ValueError, match="needs a Vmax"):
+            tellurium_runner.run_mm(
+                {"km": 0.1, "s0": 1.0, "end": 1.0, "points": 3}
+            )
+
     def test_an_explicit_vmax_wins_over_a_derivable_one(self):
         """vmax is what the engine integrates. Honouring the derived value
         over a stated one would silently overwrite the caller's request."""
