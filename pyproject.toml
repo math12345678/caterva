@@ -5,7 +5,7 @@ description = "Scientific computing for teaching labs"
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "libroadrunner==2.8.0",
-    "antimony==2.14.0",
+    "antimony==3.1.3",
     "python-libsbml==5.21.1",
     "numpy==2.2.6",
     "scipy==1.15.3",

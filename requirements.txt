@@ -35,7 +35,7 @@
 # would break the Python 3.10 floor -- the exact failure that 2.9.0 caused
 # in CI ("No matching distribution found for libroadrunner==2.9.0").
 libroadrunner==2.8.0
-antimony==2.14.0
+antimony==3.1.3
 python-libsbml==5.21.1
 
 # --- Numerics --------------------------------------------------------------
