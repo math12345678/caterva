@@ -3,12 +3,19 @@
 Verify that the apparent Km under competitive inhibition is Km_app = Km*(1 + I/Ki)
 and that the initial reaction rate matches Vmax * S / (Km_app + S). Also
 check that at I=0 the kinetics reduce exactly to plain Michaelis-Menten.
+
+Rule 1/2 edge cases (Constitution):
+- Ki = 0 is physically impossible (division by zero in the inhibition term)
+  and must be rejected with ok=False.
+- Negative Km is physically impossible and must be rejected.
+- Km outside the plausible bounds [1e-7, 1e3] mM must be flagged, not rejected.
 """
 
 
 import pytest
 
 from tellurium_engine import (
+    ModelBuildError,
     simulate_mm_competitive_inhibition,
     simulate_michaelis_menten,
 )
@@ -41,3 +48,39 @@ def test_i_zero_reduces_to_plain_mm():
     rate_comp = approx_initial_rate(res_comp)
     rate_mm = approx_initial_rate(res_mm)
     assert rate_comp == pytest.approx(rate_mm, rel=1e-6)
+
+
+def test_ki_zero_is_rejected():
+    """Ki = 0 makes the inhibition term divide by zero; must be rejected."""
+    with pytest.raises(ModelBuildError, match="Ki"):
+        simulate_mm_competitive_inhibition(
+            km=2.0, vmax=5.0, ki=0.0, s0=7.0, i=0.5, end=1e-4, points=3
+        )
+
+
+def test_negative_km_is_rejected():
+    """Negative Km is physically impossible; must be rejected."""
+    with pytest.raises(ModelBuildError, match="Km"):
+        simulate_mm_competitive_inhibition(
+            km=-1.0, vmax=5.0, ki=2.0, s0=7.0, i=0.5, end=1e-4, points=3
+        )
+
+
+def test_km_below_plausible_bound_is_flagged():
+    """Km = 1e-8 mM is below the 1e-7 mM plausible floor; must be flagged."""
+    res = simulate_mm_competitive_inhibition(
+        km=1e-8, vmax=5.0, ki=2.0, s0=7.0, i=0.5, end=1e-4, points=3
+    )
+    assert res.flagged is True
+    reason = res.validation.flag_reason or ""
+    assert "below" in reason.lower() or "plausible" in reason.lower()
+
+
+def test_km_above_plausible_bound_is_flagged():
+    """Km = 2000 mM is above the 1000 mM plausible ceiling; must be flagged."""
+    res = simulate_mm_competitive_inhibition(
+        km=2000.0, vmax=5.0, ki=2.0, s0=7.0, i=0.5, end=1e-4, points=3
+    )
+    assert res.flagged is True
+    reason = res.validation.flag_reason or ""
+    assert "above" in reason.lower() or "plausible" in reason.lower()
