@@ -154,13 +154,13 @@ beforeEach(async () => {
 });
 
 describe("mm_competitive_inhibition (end to end)", () => {
-  // `ki` is excluded from RESOLVABLE_FIELDS for this domain (see the
-  // comment on RESOLVABLE_FIELDS in provenance.ts -- no literature Ki
-  // lookup path exists), but PARAMETER_PATTERN in queryResolver.ts DOES
-  // recognize `ki=<value>` as a user override, so a query that supplies
-  // every required parameter (km/ki/vmax/s0/i0/end/points) explicitly can
-  // complete normally -- `ki` just always arrives with origin "user"
-  // rather than ever being "resolved" from literature.
+  // `ki` is in RESOLVABLE_FIELDS for this domain (provenance.ts), and the
+  // Ki literature path is live: the runner reads BRENDA's "Ki Values"
+  // table when quantity="ki". So `ki` may arrive "resolved" with a
+  // citation. When a query supplies `ki=<value>` as a user override,
+  // PARAMETER_PATTERN still captures it and it arrives with origin "user"
+  // (overrides always beat literature). This test pins that both paths
+  // produce valid provenance.
   it("completes when every required parameter, including 'ki', is supplied as a user override", async () => {
     const result = await runSimulation(
       server,

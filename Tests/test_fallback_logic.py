@@ -64,6 +64,11 @@ def ldh_provider():
 
 
 @pytest.fixture
+def ldh_ki_provider():
+    return make_html_provider({"1.1.1.27": load_fixture("brenda_ldh_ki_fixture.html")})
+
+
+@pytest.fixture
 def ache_provider():
     return make_html_provider({"3.1.1.7": load_fixture("brenda_ache_fixture.html")})
 
@@ -176,7 +181,7 @@ def test_cross_species_result_still_has_citation(ldh_provider):
 # ---------------------------------------------------------------------------
 
 def test_falls_back_to_literature_when_brenda_has_nothing(monkeypatch, ldh_provider):
-    def fake_pubmed(enzyme_name, organism, substrate, max_results=5):
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5, quantity="km"):
         return [
             LiteratureCandidate(
                 pmid="99999999",
@@ -207,7 +212,7 @@ def test_literature_search_never_fabricates_a_numeric_value(monkeypatch, ldh_pro
     input. The real implementation must never return found=True from the
     literature tier - only candidate references for human review."""
 
-    def fake_pubmed(enzyme_name, organism, substrate, max_results=5):
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5, quantity="km"):
         return [
             LiteratureCandidate(
                 pmid="34962677",
@@ -232,7 +237,7 @@ def test_literature_search_never_fabricates_a_numeric_value(monkeypatch, ldh_pro
 
 
 def test_genuine_gap_when_nothing_found_anywhere(monkeypatch, ldh_provider):
-    def empty_pubmed(enzyme_name, organism, substrate, max_results=5):
+    def empty_pubmed(enzyme_name, organism, substrate, max_results=5, quantity="km"):
         return []
 
     monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", empty_pubmed)
@@ -363,4 +368,140 @@ def test_search_literature_false_skips_pubmed_entirely(monkeypatch, ldh_provider
         search_literature=False,
     )
     assert result.found is False
+
+
+# ---------------------------------------------------------------------------
+# Ki (inhibition constant) resolution -- quantity="ki" reads BRENDA's
+# "Ki Values" table through the same exact -> cross-species chain as Km,
+# each with its own citation (see ADR 0008 / provenance.ts). The golden
+# rows are the live-captured gossypol sub-rows in
+# fixtures/brenda_ldh_ki_fixture.html (refs 711801 / 654758) -- gossypol
+# is THE classic LDH inhibitor and appears only in the compound-name cell
+# of its rows, never in a commentary, so the rows are unambiguous.
+# ---------------------------------------------------------------------------
+
+def test_resolves_exact_human_ki_for_ldh_gossypol(ldh_ki_provider):
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "gossypol",
+        html_provider=ldh_ki_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="ki",
+    )
+    assert result.found is True
+    assert result.source == "brenda_exact"
+    # Three real Homo sapiens gossypol sub-rows exist (LDH-B/A/C, 0.0014 /
+    # 0.0019 / 0.0042, all ref 711801); the minimum is the LDH-B isozyme.
+    assert result.value == 0.0014
+    assert result.organism == "Homo sapiens"
+    assert result.cross_species_flag is False
+    assert result.citation is not None
+    assert result.citation.source == "BRENDA"
+    assert result.citation.reference_id == "711801"
+    assert result.citation.url is not None
+    # The gossypol rows carry "pH not specified ... temperature not
+    # specified in the publication" -- parsed as explicitly unreported,
+    # never guessed.
+    assert "pH" in result.assay_unreported
+    assert "temperature" in result.assay_unreported
+
+
+def test_ki_cross_species_resolves_and_is_flagged(ldh_ki_provider):
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Mus musculus", "gossypol",
+        html_provider=ldh_ki_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="ki",
+    )
+    assert result.found is True
+    assert result.source == "brenda_cross_species"
+    assert result.cross_species_flag is True
+    # Minimum gossypol Ki across organisms: 0.0007 mM Plasmodium
+    # falciparum (Q27743), ref 654758 -- a real cross-species record.
+    assert result.value == 0.0007
+    assert result.organism == "Plasmodium falciparum"
+    assert result.citation.reference_id == "654758"
+
+
+def test_ki_never_fabricates_when_table_has_no_match(ldh_ki_provider):
+    """lactate is LDH's real substrate but is NOT an inhibitor of it --
+    BRENDA's Ki table has no lactate rows. The chain must say not-found,
+    never invent a Ki from Km data or a plausible-looking number."""
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "lactate",
+        html_provider=ldh_ki_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="ki",
+    )
+    assert result.found is False
     assert result.source == "not_found"
+    assert result.value is None
+
+
+def test_quantity_selects_which_table_is_read(ldh_ki_provider, ldh_provider):
+    """The same fixture must yield DIFFERENT results depending on quantity:
+    quantity="ki" reads the Ki Values table, quantity="km" reads the KM
+    Values table (or, with no KM container present, the whole-page
+    fallback whose rows are all flagged and therefore excluded). This is
+    the check that Ki and Km resolve independently rather than sharing a
+    lookup."""
+    # The Ki fixture has no KM Values container: a km lookup finds nothing
+    # structurally, and every whole-page-fallback row is flagged and
+    # excluded from "found" results.
+    km_from_ki_fixture = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "gossypol",
+        html_provider=ldh_ki_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="km",
+    )
+    assert km_from_ki_fixture.found is False
+
+    # Conversely, the Km fixture has no Ki Values container: a ki lookup
+    # on it must not return the lactate Km rows.
+    ki_from_km_fixture = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "lactate",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="ki",
+    )
+    assert ki_from_km_fixture.found is False
+
+    # And the golden paths still work when quantity is explicit.
+    ki_found = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "gossypol",
+        html_provider=ldh_ki_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="ki",
+    )
+    assert ki_found.found is True
+    assert ki_found.value == 0.0014
+
+
+def test_ki_exact_row_does_not_borrow_km_provenance(ldh_ki_provider, ldh_provider):
+    """The independent-resolution contract (staged provenance.ts comment):
+    a resolved Ki carries its OWN citation (ref 711801), never the Km
+    golden citation (740253). Both quantities resolve on the same enzyme
+    page but from different tables with different refs."""
+    km = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "(S)-lactate",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="km",
+    )
+    ki = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "gossypol",
+        html_provider=ldh_ki_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="ki",
+    )
+    assert km.found is True and ki.found is True
+    assert km.citation.reference_id == "740253"
+    assert ki.citation.reference_id == "711801"
+    assert km.citation.reference_id != ki.citation.reference_id

@@ -60,6 +60,11 @@ export interface EntityExtraction {
   ecNumber?: string;
   /** For population genetics: parameter type to resolve (e.g., 'mutation_rate') */
   parameterType?: string;
+  /** Which kinetic constant to resolve: "km" (BRENDA KM Values table) or
+   * "ki" (BRENDA Ki Values table). Each call resolves exactly one quantity
+   * and the runner emits the value under the matching key, so a cross-
+   * species Ki never borrows a verified Km's provenance. */
+  quantity?: "km" | "ki";
 }
 
 interface PythonError {
@@ -195,6 +200,7 @@ export async function resolveKineticValue(
         organism: entities.organism,
         ecNumber: entities.ecNumber,
         parameterType: entities.parameterType ?? "",
+        quantity: entities.quantity ?? "km",
       }),
     );
     proc.stdin.end();

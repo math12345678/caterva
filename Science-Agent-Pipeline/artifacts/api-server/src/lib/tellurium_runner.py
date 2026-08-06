@@ -226,7 +226,16 @@ def run_mm(params: Dict[str, Any]) -> Dict[str, Any]:
 
 def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
     km = float(params.get("km", 2.0))
-    vmax = float(params.get("vmax", 5.0))
+    if "vmax" not in params or params["vmax"] is None:
+        # No Vmax at all. Unreachable from the API: resolveQuery()'s hard
+        # rule throws RequiredParametersMissingError on any default-origin
+        # vmax before the runner is spawned, and the zod schema (schemas.ts)
+        # requires vmax for this domain at validation. Fail loudly rather
+        # than simulate on an unverified 5.0 -- a number nobody chose.
+        raise ValueError(
+            "mm_competitive_inhibition needs a Vmax: supply vmax directly"
+        )
+    vmax = float(params["vmax"])
     ki = float(params.get("ki", 1.0))
     s0 = float(params.get("s0", 10.0))
     # Wire name is "i0" (inhibitor concentration at t=0), matching the

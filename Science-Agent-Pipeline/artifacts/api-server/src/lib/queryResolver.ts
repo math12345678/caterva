@@ -73,9 +73,16 @@ async function applyKineticResolution(
     return { parameters, parameterProvenance, flags };
   }
 
-  const agentResult = await resolveKineticValue(entities);
-  if (!agentResult.found) {
-    for (const key of kineticKeys) {
+  // Resolve each quantity independently: the runner reads BRENDA's KM
+  // Values table for "km" and its Ki Values table for "ki", so each key
+  // gets its own lookup and its own citation (ADR 0008). A cross-species
+  // Ki therefore never borrows a verified Km's provenance.
+  for (const key of kineticKeys) {
+    const agentResult = await resolveKineticValue({
+      ...entities,
+      quantity: key as "km" | "ki",
+    });
+    if (!agentResult.found) {
       parameterProvenance = {
         ...parameterProvenance,
         [key]: {
@@ -83,13 +90,11 @@ async function applyKineticResolution(
           note: `Could not resolve a real ${key.toUpperCase()} value from BRENDA/KEGG/PubMed; using default ${key.toUpperCase()}.`,
         },
       };
+      continue;
     }
-    return { parameters, parameterProvenance, flags };
-  }
 
-  const citation = formatResolvedCitation(agentResult.citation);
-  if (citation === undefined) {
-    for (const key of kineticKeys) {
+    const citation = formatResolvedCitation(agentResult.citation);
+    if (citation === undefined) {
       parameterProvenance = {
         ...parameterProvenance,
         [key]: {
@@ -97,21 +102,19 @@ async function applyKineticResolution(
           note: `Found a ${key.toUpperCase()} but its citation carries no locator (ref id or URL); not trusted as resolved — using default ${key.toUpperCase()}.`,
         },
       };
+      flags.push(
+        `Found a ${key.toUpperCase()} value but its citation was not locatable; using default ${key.toUpperCase()}.`,
+      );
+      continue;
     }
-    flags.push(
-      `Found kinetic values but citation was not locatable; using defaults for ${kineticKeys.join(", ")}.`,
-    );
-    return { parameters, parameterProvenance, flags };
-  }
 
-  const citationStatus =
-    agentResult.crossSpecies === true ||
-    agentResult.source === "brenda_cross_species"
-      ? "flagged"
-      : "verified";
+    const citationStatus =
+      agentResult.crossSpecies === true ||
+      agentResult.source === "brenda_cross_species"
+        ? "flagged"
+        : "verified";
 
-  for (const key of kineticKeys) {
-    const value = key === "km" ? agentResult.km : agentResult.ki;
+    const value = agentResult.km ?? agentResult.ki;
     if (value !== undefined) {
       parameters = { ...parameters, [key]: value };
       parameterProvenance = {

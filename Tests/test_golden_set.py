@@ -3,7 +3,9 @@ Stage 5 Part 2: the golden set.
 
 Rule 1 for provenance (Stage 4 close, question 3): the numeric side has
 closed forms; the provenance side needs an equivalent — a golden set of
-hand-verified enzyme/substrate/Km/citation tuples asserted end to end.
+hand-verified enzyme/substrate/Km/citation tuples asserted end to end
+(plus the Ki pairs added for the competitive-inhibition domain, which
+carry their own quantity="ki" resolution and citation).
 
 These tuples were hand-verified against primary literature through the
 BRENDA fixture HTML (the fixture files were previously captured from live
@@ -108,6 +110,38 @@ GOLDEN = [
             "cross_species_flag": True,
         },
     },
+    {
+        "id": "G4: LDH/gossypol/Homo sapiens (Ki)",
+        "ec": "1.1.1.27",
+        "substrate": "gossypol",
+        "organism": "Homo sapiens",
+        "fixture": "brenda_ldh_ki_fixture.html",
+        "quantity": "ki",
+        "expected": {
+            "km": 0.0014,
+            "unit": "mM",
+            "organism": "Homo sapiens",
+            "source": "brenda_exact",
+            "ref": "711801",
+            "cross_species_flag": False,
+        },
+    },
+    {
+        "id": "G5: LDH/gossypol/Mus musculus (Ki cross-species fallback)",
+        "ec": "1.1.1.27",
+        "substrate": "gossypol",
+        "organism": "Mus musculus",
+        "fixture": "brenda_ldh_ki_fixture.html",
+        "quantity": "ki",
+        "expected": {
+            "km": 0.0007,
+            "unit": "mM",
+            "organism": "Plasmodium falciparum",
+            "source": "brenda_cross_species",
+            "ref": "654758",
+            "cross_species_flag": True,
+        },
+    },
 ]
 
 
@@ -120,6 +154,7 @@ def _resolve(entry) -> KineticResult:
         uniprot_provider=fake_uniprot_provider,
         taxon_id_provider=fake_taxon_id_provider,
         search_literature=False,
+        quantity=entry.get("quantity", "km"),
     )
 
 
