@@ -423,15 +423,19 @@ export function isAllDefaults(
 }
 
 /**
- * The keys carrying a project-chosen default value rather than something
- * this specific query actually established (literature lookup or the
- * person typing the query). Used to enforce the hard rule: nothing may
- * reach the simulation engine on an unrequested, unsourced number.
+ * The keys carrying a value that this specific query never established:
+ * either a project-chosen default or a number invented by the LLM resolver.
+ * Used to enforce the hard rule: nothing may reach the simulation engine on
+ * an unrequested, unsourced number. A value is only trusted when it is a
+ * literature lookup ("resolved") or the person typing the query ("user");
+ * both "default" and "llm" are unverified and are blocked identically.
  */
-export function defaultOriginKeys(
+export function unverifiedOriginKeys(
   parameterProvenance: Record<string, ParameterProvenance>,
 ): string[] {
   return Object.entries(parameterProvenance)
-    .filter(([, p]) => p.origin === "default")
+    .filter(
+      ([, p]) => p.origin === "default" || p.origin === "llm",
+    )
     .map(([key]) => key);
 }
