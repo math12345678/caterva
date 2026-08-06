@@ -7,7 +7,7 @@ import {
   RESOLVABLE_FIELDS,
   RequiredParametersMissingError,
   buildResolvedKineticProvenance,
-  defaultOriginKeys,
+  unverifiedOriginKeys,
   isAllDefaults,
   validateParameterProvenance,
   type AssayConditions,
@@ -941,7 +941,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       );
     }
 
-    const missing = defaultOriginKeys(parameterProvenance);
+    const missing = unverifiedOriginKeys(parameterProvenance);
     if (missing.length > 0) {
       throw new RequiredParametersMissingError(llmResult.domain, missing);
     }
@@ -1042,8 +1042,8 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     );
   }
 
-  // Hard-block: no default-origin parameter may reach the simulation engine.
-  const missing = defaultOriginKeys(parameterProvenance);
+  // Hard-block: no default- or llm-origin parameter may reach the simulation engine.
+  const missing = unverifiedOriginKeys(parameterProvenance);
   if (missing.length > 0) {
     throw new RequiredParametersMissingError(best.domain, missing);
   }

@@ -38,7 +38,7 @@ Given a natural-language query, return a single JSON object (no markdown, no pro
 
 {
   "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" | "wright_fisher" | "two_locus_wright_fisher" | "molecular_dynamics" | "gillespie_ssa" | "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates",
-  "parameters": { ...numeric parameters... },
+  "parameters": { ...numeric parameters the query explicitly states; omit anything else ... },
   "reasoning": "short explanation of how you mapped the query",
   "modelCitations": ["optional literature reference"],
   "entities": {
@@ -63,7 +63,7 @@ Domain meanings:
 - "gillespie_ssa_replicates": Gillespie SSA ensemble view, parameters a0 (initial molecules), k (rate), end (simulation time), n_replicates (independent seeded runs; optional b0 for the bimolecular A + B -> C form).
 
 Rules:
-1. Infer sensible defaults for any missing numeric parameters.
+1. Return numeric values only for parameters the query explicitly states. The pipeline hard-blocks any value that is not user-supplied or literature-backed, so never invent numbers: omit a parameter entirely rather than guessing a value. Return an empty "parameters" object when the query states no numbers.
 2. Return only the JSON object. Do not wrap it in markdown code fences.
 3. If the query is ambiguous, choose the most likely domain and explain in "reasoning".
 4. Populate "entities" with any enzyme information you can extract from the query; omit or set to null if none is present.`;

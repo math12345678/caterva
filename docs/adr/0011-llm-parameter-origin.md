@@ -1,6 +1,6 @@
 # ADR 0011: An LLM-supplied parameter is its own origin, not a `default`
 
-**Status:** Accepted
+**Status:** Accepted (amended 2026-08-06 — resolver now hard-blocks `llm`)
 
 **Date:** 2026-08-02
 
@@ -100,6 +100,39 @@ Verified by direct assertion, not assumed.
 - A new suite (`src/__tests__/llmOrigin.test.ts`) covering the validator rules
   and the end-to-end resolver path — the first tests this path has ever had.
 - `tsc --strict` clean across the api-server after the enum widened.
+
+## Amendment (2026-08-06): the resolver now hard-blocks `llm`
+
+The project directive is that every value reaching the simulation engine must
+be literature-verified or explicitly supplied by the person running it —
+"nothing is hard coded; literally everything is api." Under that requirement,
+an `llm`-origin parameter is not a case to *surface honestly* and let the
+simulation run; it is a number with no warrant, and it must not execute. This
+amends the "Why not `rejected`" section below: the flag-and-run stance is
+retired for parameters (the `llm` origin, note rule, and no-citation rules are
+kept — they still describe and guard the API surface), but the resolver
+rejects the value before it can reach the engine.
+
+Concretely:
+
+- `defaultOriginKeys()` is renamed `unverifiedOriginKeys()` and now returns
+  every parameter whose origin is `default` **or** `llm`. Both hard-block
+  sites in `resolveQuery()` (the LLM path and the deterministic path) use it,
+  so an LLM-invented value throws `RequiredParametersMissingError` exactly as
+  a missing default does, naming the key for the user to supply.
+- The LLM still routes the domain, extracts entities (feeding BRENDA/KEGG/
+  UniProt lookups), and returns reasoning and model citations. Its system
+  prompt no longer says "Infer sensible defaults for any missing numeric
+  parameters"; it now returns numbers only when the query explicitly states
+  them, since anything else is rejected downstream.
+- A user override in the query text still wins over an LLM value (origin
+  `user`), and literature-resolved values still pass through the LLM path.
+
+**Verification (amendment):** `src/__tests__/llmOrigin.test.ts` updated to
+assert (a) an LLM-invented parameter throws `RequiredParametersMissingError`,
+(b) a user override beats an LLM value, and (c) a BRENDA-resolved value still
+passes through the LLM path. Full suite: 273 vitest tests (18 files) green;
+`scripts/verify_build.py` — all 11 checks pass.
 
 ## References
 
