@@ -71,6 +71,34 @@ def test_negative_km_is_rejected():
         )
 
 
+def test_negative_vmax_is_rejected():
+    """Negative Vmax is physically impossible; must be rejected."""
+    with pytest.raises(ModelBuildError, match="Vmax"):
+        simulate_mm_competitive_inhibition(
+            km=2.0, vmax=-5.0, ki=2.0, s0=7.0, i=0.5, end=1e-4, points=3
+        )
+
+
+def test_negative_ki_is_rejected():
+    """Negative Ki is physically impossible; must be rejected."""
+    with pytest.raises(ModelBuildError, match="Ki"):
+        simulate_mm_competitive_inhibition(
+            km=2.0, vmax=5.0, ki=-2.0, s0=7.0, i=0.5, end=1e-4, points=3
+        )
+
+
+def test_negative_s0_or_i_is_rejected():
+    """Negative concentrations are physically impossible; must be rejected."""
+    with pytest.raises(ModelBuildError, match="S0"):
+        simulate_mm_competitive_inhibition(
+            km=2.0, vmax=5.0, ki=2.0, s0=-7.0, i=0.5, end=1e-4, points=3
+        )
+    with pytest.raises(ModelBuildError, match="I"):
+        simulate_mm_competitive_inhibition(
+            km=2.0, vmax=5.0, ki=2.0, s0=7.0, i=-0.5, end=1e-4, points=3
+        )
+
+
 def test_km_below_plausible_bound_is_flagged():
     """Km = 1e-8 mM is below the 1e-7 mM plausible floor; must be flagged."""
     res = simulate_mm_competitive_inhibition(
