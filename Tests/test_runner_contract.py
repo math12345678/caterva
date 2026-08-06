@@ -162,6 +162,51 @@ def test_cross_species_flag_crosses_the_boundary(monkeypatch):
     assert result["organism"] == "Sus scrofa"
 
 
+def test_ki_quantity_emits_ki_key(monkeypatch):
+    """quantity="ki" must flow to the resolver and the value must be
+    emitted under the "ki" key (never "km"), so the TypeScript side can
+    never mistake a resolved Ki for a Km."""
+    captured = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        captured["quantity"] = kwargs.get("quantity")
+        result = golden_result()
+        result.value = 0.0014
+        return result
+
+    result = run_main(
+        monkeypatch,
+        fake_resolve,
+        {"enzymeName": "lactate dehydrogenase", "substrate": "gossypol",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27", "quantity": "ki"},
+    )
+    assert captured["quantity"] == "ki"
+    assert result["ok"] is True
+    assert result["found"] is True
+    assert result["ki"] == 0.0014
+    assert "km" not in result
+
+
+def test_quantity_defaults_to_km(monkeypatch):
+    """A payload with no quantity keeps the Km contract intact: the value
+    is emitted under "km" and the resolver is told quantity="km"."""
+    captured = {}
+
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
+        captured["quantity"] = kwargs.get("quantity", "km")
+        return golden_result()
+
+    result = run_main(
+        monkeypatch,
+        fake_resolve,
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+    )
+    assert captured["quantity"] == "km"
+    assert result["km"] == 10.73
+    assert "ki" not in result
+
+
 def test_not_found_output_shape(monkeypatch):
     def not_found(*a, **k):
         return KineticResult(
@@ -258,9 +303,10 @@ def test_missing_ec_number_also_resolves_substrate_via_kegg(monkeypatch):
 
     captured_args = {}
 
-    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None):
+    def fake_resolve(enzyme_ec, organism, substrate, enzyme_name=None, **kwargs):
         captured_args["substrate"] = substrate
         captured_args["enzyme_ec"] = enzyme_ec
+        captured_args["quantity"] = kwargs.get("quantity", "km")
         return golden_result()
 
     result = run_main(

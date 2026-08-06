@@ -71,14 +71,14 @@ export type CitationStatus = "verified" | "flagged";
  */
 export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   mm: ["km"],
-  // "ki" deliberately excluded: applyKineticResolution() (queryResolver.ts)
-  // reads agentResult.ki, but resolveKineticValue()/science_agent_runner.py
-  // never populate it -- Tests/brenda_client.py has no Ki lookup path.
-  // Listing "ki" here would silently always hit the "could not resolve"
-  // branch and report a real-looking flag for a lookup that never runs.
-  // Same class of decision as ADR 0012 excluding kcat. Add it back only
-  // once a real Ki lookup + golden tuple + contract test exist for it.
-  mm_competitive_inhibition: ["km"],
+  // Ki (inhibition constant) resolves from BRENDA's "Ki Values" table via
+  // the same exact-match / cross-species / literature chain as Km, selected
+  // by quantity="ki" (science_agent_runner.py -> fallback_logic's
+  // KI_TABLE_LABEL). The two constants for this domain resolve
+  // independently -- each with its own runner call, source, citation, and
+  // assay conditions -- so a cross-species Ki never borrows a verified Km's
+  // provenance (see applyKineticResolution in queryResolver.ts).
+  mm_competitive_inhibition: ["km", "ki"],
   // Population genetics: mutation_rate resolved from published literature
   // (Rahbari et al., Nature Genetics, 2015 for human; other organisms
   // in Tests/popgen_resolver.py with primary citations).

@@ -12,6 +12,9 @@ Rule 1/2 edge cases (Constitution):
 """
 
 
+import pathlib
+import sys
+
 import pytest
 
 from tellurium_engine import (
@@ -19,6 +22,8 @@ from tellurium_engine import (
     simulate_mm_competitive_inhibition,
     simulate_michaelis_menten,
 )
+
+_REPO = pathlib.Path(__file__).resolve().parents[2]
 
 
 def approx_initial_rate(res):
@@ -84,3 +89,33 @@ def test_km_above_plausible_bound_is_flagged():
     assert res.flagged is True
     reason = res.validation.flag_reason or ""
     assert "above" in reason.lower() or "plausible" in reason.lower()
+
+
+def test_runner_rejects_a_request_with_no_vmax():
+    """The API runner must not silently fall back to vmax = 5.0.
+
+    resolveQuery()'s hard rule (RequiredParametersMissingError on any
+    default-origin vmax) already stops any such request before the runner
+    is spawned, so the fallback was dead code through the API. This test
+    pins the runner-side rejection so the dead default cannot quietly
+    become live again if the runner ever receives a bare request.
+    """
+    runner_dir = (
+        _REPO
+        / "Science-Agent-Pipeline"
+        / "artifacts"
+        / "api-server"
+        / "src"
+        / "lib"
+    )
+    if not runner_dir.is_dir():
+        pytest.skip("api-server runner not present in this checkout")
+    if str(runner_dir) not in sys.path:
+        sys.path.insert(0, str(runner_dir))
+
+    import tellurium_runner  # noqa: PLC0415
+
+    with pytest.raises(ValueError, match="needs a Vmax"):
+        tellurium_runner.run_mm_competitive_inhibition(
+            {"km": 2.0, "ki": 1.0, "s0": 7.0, "i0": 0.5, "end": 1e-4, "points": 3}
+        )

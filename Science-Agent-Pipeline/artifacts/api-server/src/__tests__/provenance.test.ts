@@ -758,6 +758,43 @@ describe("regression — mm query with no route to a Vmax is hard-blocked", () =
 });
 
 // =========================================================================
+// Regression — mm_competitive_inhibition runner must not default vmax
+// (tellurium_runner.py run_mm_competitive_inhibition). The Python runner
+// used to silently fall back to vmax = 5.0 when a request supplied no vmax.
+// That branch is unreachable only because the hard rule below fires first;
+// if the hard rule is ever weakened so vmax can default, the fallback
+// becomes live and a simulation runs on a number nobody chose. These tests
+// pin the hard rule for exactly that case; the runner-side rejection is
+// pinned in Tellurium/tests/test_mm_competitive_inhibition.py.
+// =========================================================================
+
+describe("regression — competitive inhibition query with no vmax is hard-blocked", () => {
+  it("everything supplied except vmax -> vmax is the ONLY missing key", async () => {
+    await expect(
+      resolveQuery(
+        "simulate competitive inhibition km=2 ki=1 s0=10 i0=0 end=10 points=51",
+      ),
+    ).rejects.toMatchObject({
+      name: "RequiredParametersMissingError",
+      domain: "mm_competitive_inhibition",
+    });
+    try {
+      await resolveQuery(
+        "simulate competitive inhibition km=2 ki=1 s0=10 i0=0 end=10 points=51",
+      );
+      expect.unreachable();
+    } catch (err) {
+      expect(err).toBeInstanceOf(RequiredParametersMissingError);
+      // km/ki/s0/i0/end/points are all user-supplied here, so vmax is the
+      // exact key the runner's old fallback would have fabricated.
+      expect((err as RequiredParametersMissingError).missing).toEqual([
+        "vmax",
+      ]);
+    }
+  });
+});
+
+// =========================================================================
 // Array-valued query-string overrides (starting_frequencies)
 // Verification targets from the task spec.
 // =========================================================================

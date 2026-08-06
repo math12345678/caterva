@@ -151,8 +151,14 @@ KM_PLAUSIBLE_MAX_MM = 1000
 KCAT_PLAUSIBLE_MIN_PER_S = 0.000001
 KCAT_PLAUSIBLE_MAX_PER_S = 1000000000
 
+#: BRENDA's navigation label for the Michaelis constant table.
+KM_TABLE_LABEL = "KM Values"
+
 #: BRENDA's navigation label for the turnover-number table.
 TURNOVER_TABLE_LABEL = "Turnover Numbers"
+
+#: BRENDA's navigation label for the inhibition-constant table.
+KI_TABLE_LABEL = "Ki Values"
 
 BRENDA_ENZYME_URL = "https://www.brenda-enzymes.org/enzyme.php"
 
@@ -249,7 +255,7 @@ def parse_brenda_km_html(
     target_organism: str | None = "Homo sapiens",
     fallback_uniprot: str | None = None,
     require_substrate_match: bool = True,
-    table_label: str = "KM Values",
+    table_label: str = KM_TABLE_LABEL,
 ) -> list[BRENDAKmEntry]:
     """Pure parsing function: HTML string in, structured Km entries out.
     No network access, no built-in knowledge of any specific enzyme.
@@ -285,12 +291,16 @@ def parse_brenda_km_html(
     """
 
     # Plausibility bounds and labelling depend on which table is parsed.
-    # Km is in mM; kcat is a turnover number in s^-1, so the Km range is
-    # meaningless for it -- a kcat of 6500 is ordinary, a Km of 6500 mM is a
-    # unit error. Sharing the Km bounds would flag every fast enzyme.
+    # Km and Ki are both concentrations in mM; kcat is a turnover number in
+    # s^-1, so the Km range is meaningless for it -- a kcat of 6500 is
+    # ordinary, a Km of 6500 mM is a unit error. Sharing the Km bounds
+    # across all three would flag every fast enzyme.
     if table_label == TURNOVER_TABLE_LABEL:
         _quantity, _unit = "kcat", "1/s"
         _min_value, _max_value = KCAT_PLAUSIBLE_MIN_PER_S, KCAT_PLAUSIBLE_MAX_PER_S
+    elif table_label == KI_TABLE_LABEL:
+        _quantity, _unit = "Ki", "mM"
+        _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
     else:
         _quantity, _unit = "Km", "mM"
         _min_value, _max_value = KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM
@@ -474,11 +484,11 @@ def parse_brenda_km_html(
         flagged = False
         flag_reason = None
         scope_note = (
-            "row is inside BRENDA's actual KM Values table"
+            f"row is inside BRENDA's actual {table_label} table"
             if table_scoped
-            else "row-selection could not confirm this came from the KM "
-                 "Values table specifically (whole-page fallback scan) - "
-                 "this may genuinely be a Ki/Turnover Number/IC50 value"
+            else f"row-selection could not confirm this came from the {table_label} table "
+                 "specifically (whole-page fallback scan) - this may genuinely be a "
+                 "different kind of value (Km/Ki/Turnover Number/IC50)"
         )
         if km_value > _max_value or km_value < _min_value:
             flagged = True
@@ -577,6 +587,51 @@ def parse_brenda_turnover_html(
         fallback_uniprot=fallback_uniprot,
         require_substrate_match=require_substrate_match,
         table_label=TURNOVER_TABLE_LABEL,
+    )
+
+
+def parse_brenda_ki_html(
+    html: str,
+    ec_number: str,
+    target_substrates: list,
+    target_organism: str | None = "Homo sapiens",
+    fallback_uniprot: str | None = None,
+    require_substrate_match: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Parse BRENDA's "Ki Values" table into structured entries.
+
+    Ki (the inhibition constant) is a concentration in mM, and BRENDA
+    serves the Ki table with the same six-cell row layout as KM Values
+    (value, substrate, organism, uniprot, commentary, reference id) --
+    confirmed live 2026-08 against the LDH page (1.1.1.27, "Ki Values"
+    nav tab): the rows are identical in shape to Km rows, including the
+    same aggregate "N entries" summary rows (whose range in cell 1 the
+    numeric matcher already skips) and the same free-text commentary
+    carrying pH and temperature. The only structural difference is a
+    seventh icon cell on the aggregate rows, which the cell-position
+    logic ignores.
+
+    So this delegates to the Km parser with a different table label and
+    the same mM plausibility bounds, rather than duplicating ~250 lines
+    of row-scoping, aggregate expansion and assay-condition logic that
+    would then drift out of sync.
+
+    ``km_value`` on the returned entries carries the Ki in mM. The field
+    name is inherited from the shared row model; the quantity is Ki.
+
+    STRENDA governs Ki exactly as it governs Km (ADR 0010): an inhibition
+    constant measured at an unreported pH or temperature cannot be
+    reproduced or compared, so assay conditions are parsed here too and
+    travel with the value.
+    """
+    return parse_brenda_km_html(
+        html=html,
+        ec_number=ec_number,
+        target_substrates=target_substrates,
+        target_organism=target_organism,
+        fallback_uniprot=fallback_uniprot,
+        require_substrate_match=require_substrate_match,
+        table_label=KI_TABLE_LABEL,
     )
 
 
@@ -710,6 +765,48 @@ def fetch_and_parse_brenda_kcat(
         expand_synonyms=expand_synonyms,
         allow_unverified_fallback=allow_unverified_fallback,
         table_label=TURNOVER_TABLE_LABEL,
+    )
+
+
+def fetch_and_parse_brenda_ki(
+    ec_number: str,
+    target_organism: str | None = "Homo sapiens",
+    target_substrates: list | None = None,
+    taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
+    expand_synonyms: bool = True,
+    allow_unverified_fallback: bool = True,
+) -> list[BRENDAKmEntry]:
+    """Orchestrator for inhibition constants: EC number in, Ki entries out.
+
+    The Ki counterpart of ``fetch_and_parse_brenda_km``. Identical
+    strategy -- KEGG substrate resolution, UniProt fallback accession, then
+    the three-tier match (strict -> synonym-expanded -> unverified
+    fallback) -- pointed at BRENDA's "Ki Values" table instead of
+    "KM Values". Ki is the inhibition constant for the same enzyme, and
+    the substrate filter matters just as much here: BRENDA's Ki table
+    lists every compound anyone has ever tested as an inhibitor, most of
+    which are drug-screening noise rather than the enzyme's real
+    substrate. Filtering to the substrate name(s) keeps the "what does it
+    bind" signal.
+
+    ``km_value`` on the returned entries carries the Ki in **mM** -- the
+    field name is inherited from the shared row model. Assay conditions
+    travel with each entry, because STRENDA governs Ki exactly as it
+    governs Km (ADR 0010).
+
+    Unlike kcat (excluded per ADR 0012), Ki IS resolvable in the product:
+    competitive-inhibition simulations need a real inhibition constant,
+    so this feeds RESOLVABLE_FIELDS.mm_competitive_inhibition via
+    quantity="ki" (fallback_logic.py -> science_agent_runner.py).
+    """
+    return fetch_and_parse_brenda_km(
+        ec_number=ec_number,
+        target_organism=target_organism,
+        target_substrates=target_substrates,
+        taxon_id=taxon_id,
+        expand_synonyms=expand_synonyms,
+        allow_unverified_fallback=allow_unverified_fallback,
+        table_label=KI_TABLE_LABEL,
     )
 
 

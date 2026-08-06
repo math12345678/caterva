@@ -15,18 +15,26 @@ Expected input JSON shape:
       "enzymeName": "lactate dehydrogenase",
       "substrate": "pyruvate",
       "organism": "Homo sapiens",
-      "ecNumber": "1.1.1.27"
+      "ecNumber": "1.1.1.27",
+      "quantity": "km"
     }
+
+"quantity" selects which constant is resolved: "km" (default) reads
+BRENDA's "KM Values" table, "ki" reads the "Ki Values" table (the
+inhibition constant, same exact/cross-species/literature chain). Each
+call resolves exactly one quantity, and the output value is emitted under
+the matching key ("km" or "ki") -- so a cross-species Ki never borrows a
+verified Km's provenance (see provenance.ts / ADR 0008).
 
 "ecNumber" is optional. If omitted (or empty) and "enzymeName" is present,
 this script resolves an EC number live via UniProt's name search
 (enzyme_lookup.fetch_ec_number_by_name) before attempting BRENDA/KEGG/
 PubMed -- see resolve_ec_number() below. If UniProt has nothing indexed
 under that name, the result is an honest {"found": false}, never a
-fabricated EC number or Km. If BOTH "ecNumber" and "enzymeName" are
+fabricated EC number or Km/Ki. If BOTH "ecNumber" and "enzymeName" are
 missing, that's a hard error: there is nothing to search for at all.
 
-Output JSON shape (success):
+Output JSON shape (success, quantity="km"):
     {
       "ok": true,
       "found": true,
@@ -38,6 +46,8 @@ Output JSON shape (success):
       "literatureCandidates": [],
       "logs": []
     }
+
+With quantity="ki" the value is emitted under "ki" instead of "km".
 
 Output JSON shape (not found):
     {
@@ -120,8 +130,13 @@ def resolve_kinetic_value(
     substrate: str,
     organism: str,
     ec_number: str,
+    quantity: str = "km",
 ) -> KineticResult:
     """Thin wrapper around the real fallback logic in Tests/fallback_logic.py.
+
+    ``quantity`` selects which BRENDA table is read ("km" -> KM Values,
+    "ki" -> Ki Values). One call resolves exactly one quantity, so Km and
+    Ki get independent lookups and independent citations.
 
     We keep the orchestrator thin so that OpenCode can swap it out for a
     different resolver (e.g., a local model or another database) without
@@ -132,6 +147,7 @@ def resolve_kinetic_value(
         organism=organism,
         substrate=substrate,
         enzyme_name=enzyme_name,
+        quantity=quantity,
     )
 
 
@@ -195,6 +211,9 @@ def main() -> None:
         organism = payload.get("organism", "Homo sapiens")
         ec_number = payload.get("ecNumber", "")
         parameter_type = payload.get("parameterType", "")
+        quantity = payload.get("quantity", "km")
+        if quantity not in ("km", "ki"):
+            quantity = "km"
         resolution_log: list[str] = []
 
         # Handle population genetics parameter resolution
@@ -279,16 +298,20 @@ def main() -> None:
                 )
                 return
 
-        result = resolve_kinetic_value(enzyme_name, substrate, organism, ec_number)
+        result = resolve_kinetic_value(enzyme_name, substrate, organism, ec_number, quantity=quantity)
         result.search_log = resolution_log + result.search_log
 
         if result.found and result.value is not None:
+            # Emit the value under the key matching the requested quantity
+            # so the TypeScript side reads km from "km" and ki from "ki" --
+            # never the other way around.
+            value_key = "ki" if quantity == "ki" else "km"
             print(
                 json.dumps(
                     {
                         "ok": True,
                         "found": True,
-                        "km": result.value,
+                        value_key: result.value,
                         "unit": result.unit,
                         "organism": result.organism,
                         "source": result.source,

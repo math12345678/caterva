@@ -36,6 +36,8 @@ import enzyme_lookup
 from http_retry import retry_get
 from brenda_client import (
     BRENDAKmEntry,
+    KI_TABLE_LABEL,
+    KM_TABLE_LABEL,
     fetch_brenda_html,
     parse_brenda_km_html,
 )
@@ -43,6 +45,14 @@ from citation import Citation, citation_from_brenda_entry, pubmed_url
 
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_ESUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
+
+# Which BRENDA table a quantity resolves from. Km and Ki are both
+# concentrations in mM served by their own table ("KM Values" / "Ki
+# Values"); the mapping is what lets one resolution chain serve both.
+QUANTITY_TABLE_LABELS = {
+    "km": KM_TABLE_LABEL,
+    "ki": KI_TABLE_LABEL,
+}
 
 
 class LiteratureCandidate(BaseModel):
@@ -113,6 +123,7 @@ def _brenda_entries(
     html_provider: HtmlProvider,
     uniprot_provider: UniprotProvider,
     taxon_id_provider: TaxonIdProvider = enzyme_lookup.fetch_taxon_id,
+    table_label: str = KM_TABLE_LABEL,
 ) -> list[BRENDAKmEntry]:
     html = html_provider(ec_number)
     fallback_uniprot = _resolve_fallback_uniprot(
@@ -145,6 +156,7 @@ def _brenda_entries(
         target_organism=organism,
         fallback_uniprot=fallback_uniprot,
         require_substrate_match=require_substrate_match,
+        table_label=table_label,
     )
     # Never surface flagged (implausible) rows as a "found" result -
     # they're data-quality problems, not answers.
@@ -152,12 +164,17 @@ def _brenda_entries(
 
 
 def search_pubmed_candidates(
-    enzyme_name: str, organism: str, substrate: str, max_results: int = 5
+    enzyme_name: str,
+    organism: str,
+    substrate: str,
+    max_results: int = 5,
+    quantity: str = "km",
 ) -> list[LiteratureCandidate]:
     """Search PubMed for candidate papers. Returns titles/links only -
-    does not attempt to extract a numeric Km from abstract text, since
+    does not attempt to extract a numeric Km/Ki from abstract text, since
     that requires human judgment to do reliably and safely."""
-    query = f"{enzyme_name} {organism} {substrate} Km kinetics"
+    quantity_term = "inhibition constant" if quantity == "ki" else "Km kinetics"
+    query = f"{enzyme_name} {organism} {substrate} {quantity_term}"
     r = retry_get(
         PUBMED_ESEARCH_URL,
         params={"db": "pubmed", "term": query, "retmax": max_results, "retmode": "json"},
@@ -194,20 +211,31 @@ def resolve_kinetic_value(
     uniprot_provider: UniprotProvider = enzyme_lookup.fetch_uniprot_accession,
     taxon_id_provider: TaxonIdProvider = enzyme_lookup.fetch_taxon_id,
     search_literature: bool = True,
+    quantity: str = "km",
 ) -> KineticResult:
-    """Resolve a Km value for (enzyme, organism, substrate) by trying
+    """Resolve a kinetic value for (enzyme, organism, substrate) by trying
     BRENDA exact match, then BRENDA cross-species, then PubMed literature
     (candidates only, no fabricated numbers).
+
+    ``quantity`` selects which BRENDA table is read ("km" -> KM Values,
+    "ki" -> Ki Values) and which term the PubMed search uses. Km and Ki
+    resolve through the same chain, and a call resolves exactly one
+    quantity: a cross-species Ki must never borrow a verified Km's
+    provenance, which the runner enforces by calling this once per
+    quantity with its own citation (see ADR 0008 / provenance.ts).
 
     html_provider, uniprot_provider, and taxon_id_provider are injectable
     so this can be tested offline: pass functions that return fixture
     data instead of hitting the network.
     """
+    table_label = QUANTITY_TABLE_LABELS.get(quantity, KM_TABLE_LABEL)
+    quantity_upper = "Ki" if quantity == "ki" else "Km"
     log = []
 
-    log.append(f"BRENDA exact: {enzyme_ec}, {organism}, {substrate}")
+    log.append(f"BRENDA exact: {enzyme_ec}, {organism}, {substrate} ({quantity})")
     exact = _brenda_entries(
-        enzyme_ec, organism, substrate, html_provider, uniprot_provider, taxon_id_provider
+        enzyme_ec, organism, substrate, html_provider, uniprot_provider,
+        taxon_id_provider, table_label=table_label,
     )
     if exact:
         best = min(exact, key=lambda e: e.km_value)
@@ -225,9 +253,10 @@ def resolve_kinetic_value(
             search_log=log,
         )
 
-    log.append(f"BRENDA any organism: {enzyme_ec}, {substrate}")
+    log.append(f"BRENDA any organism: {enzyme_ec}, {substrate} ({quantity})")
     broad = _brenda_entries(
-        enzyme_ec, None, substrate, html_provider, uniprot_provider, taxon_id_provider
+        enzyme_ec, None, substrate, html_provider, uniprot_provider,
+        taxon_id_provider, table_label=table_label,
     )
     if broad:
         best = min(broad, key=lambda e: e.km_value)
@@ -251,10 +280,12 @@ def resolve_kinetic_value(
         return KineticResult(found=False, source="not_found", search_log=log)
 
     log.append(f"PubMed literature search: {enzyme_name or enzyme_ec}, {organism}, {substrate}")
-    candidates = search_pubmed_candidates(enzyme_name or enzyme_ec, organism, substrate)
+    candidates = search_pubmed_candidates(
+        enzyme_name or enzyme_ec, organism, substrate, quantity=quantity
+    )
     if candidates:
         log.append(
-            f"Found {len(candidates)} candidate paper(s); numeric Km NOT "
+            f"Found {len(candidates)} candidate paper(s); numeric {quantity_upper} NOT "
             f"auto-extracted, needs manual review"
         )
         return KineticResult(

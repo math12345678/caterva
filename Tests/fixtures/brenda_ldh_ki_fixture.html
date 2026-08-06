@@ -1,0 +1,180 @@
+<!--
+Fixture for EC 1.1.1.27 (LDH), "Ki Values" table (BRENDA nav tab id tab49),
+captured live 2026-08 from https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27
+(page saved to /tmp/brenda_ldh.html during live verification).
+
+The Ki table uses the SAME row/cell markup as Km/Turnover tables, so the
+shared parser handles it with a different table label. Real structural
+differences captured live:
+  - Aggregate summary rows (e.g. gossypol "0.0007 - 0.0126 | ... | 9 entries")
+    carry 7 cells (the extra cell 7 is a structure-icon cell); their first
+    cell is a RANGE, so the numeric matcher skips them. Their individual
+    measurements live in hidden sibling sub-rows (id "{rowId}sr{N}"), which
+    the parser pulls in -- no network request needed.
+  - Sub-rows are 6 cells exactly like Km rows: value | substrate | organism
+    | uniprot | commentary | reference id.
+
+Real captured Ki sub-rows used below (verbatim cells, incl. the gossypol
+LDH-A/B/C Homo sapiens rows and the pyruvate rows):
+  0.0007 | gossypol | Plasmodium falciparum | Q27743 | - | 654758
+  0.0014 | gossypol | Homo sapiens | - | LDH-B, pH not specified in the
+          publication, temperature not specified in the publication | 711801
+  0.0019 | gossypol | Homo sapiens | - | LDH-A, pH not specified in the
+          publication, temperature not specified in the publication | 711801
+  0.0042 | gossypol | Homo sapiens | - | LDH-C, pH not specified in the
+          publication, temperature not specified in the publication | 711801
+  0.0116 | gossypol | Cryptosporidium parvum | Q9GT92 | pH 5.5, 25°C,
+          recombinant enzyme, with NADH and pyruvate | 740541
+  0.14   | pyruvate | Plasmodium falciparum | - | pH 7.5 | 686655
+  1.64   | pyruvate | Gadus morhua | - | pH 7.0, 4°C | 655068
+  3.29   | pyruvate | Oryctolagus cuniculus | - | recombinant enzyme | 741355
+  66     | pyruvate | Plasmodium berghei | - | pH 7.5 | 656750
+
+Also included are real non-substrate inhibitor rows (e.g. the
+3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic
+acid compound with Homo sapiens / P00338 sub-rows, ref 739793) and an
+"additional information" row (first cell non-numeric): the substrate filter
+and the numeric matcher exclude these, which is exactly what separates real
+Ki data from drug-screening noise.
+
+Known parser limitation (documented, not designed-around here): substrate
+matching in brenda_client.py is intentionally permissive substring matching
+across the whole row text, so a search for "pyruvate" would FALSE-MATCH the
+compound sub-row above because its commentary says "noncompetitive versus
+pyruvate". That is why the golden/gossypol paths in the test suite are the
+canonical clean examples and why "pyruvate" is not used as a Ki golden
+tuple substrate -- gossypol appears only in the compound-name cell of its
+rows, never in a commentary.
+-->
+<html>
+<body>
+<a href="javascript:showTable('tab49')">Ki Values</a>
+<div id="tab49">
+<div class="row rgrey1" id="tab49r25">
+  <div class="cell">0.0007 - 0.0126</div>
+  <div class="cell">gossypol</div>
+  <div class="cell"><a href="javascript:showRows('tab49r25',0);">9 entries</a></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell"><a href="javascript:MolPicture('gossypol')">img</a></div>
+</div>
+<div class="hidden rgrey1" id="tab49r25sr0">
+  <div class="cell">0.0007</div>
+  <div class="cell">gossypol</div>
+  <div class="cell">Plasmodium falciparum</div>
+  <div class="cell">Q27743</div>
+  <div class="cell">-</div>
+  <div class="cell">654758</div>
+</div>
+<div class="hidden rgrey1" id="tab49r25sr3">
+  <div class="cell">0.0014</div>
+  <div class="cell">gossypol</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">LDH-B, pH not specified in the publication, temperature not specified in the publication</div>
+  <div class="cell">711801</div>
+</div>
+<div class="hidden rgrey1" id="tab49r25sr5">
+  <div class="cell">0.0019</div>
+  <div class="cell">gossypol</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">LDH-A, pH not specified in the publication, temperature not specified in the publication</div>
+  <div class="cell">711801</div>
+</div>
+<div class="hidden rgrey1" id="tab49r25sr6">
+  <div class="cell">0.0042</div>
+  <div class="cell">gossypol</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">-</div>
+  <div class="cell">LDH-C, pH not specified in the publication, temperature not specified in the publication</div>
+  <div class="cell">711801</div>
+</div>
+<div class="hidden rgrey1" id="tab49r25sr7">
+  <div class="cell">0.0116</div>
+  <div class="cell">gossypol</div>
+  <div class="cell">Cryptosporidium parvum</div>
+  <div class="cell">Q9GT92</div>
+  <div class="cell">pH 5.5, 25°C, recombinant enzyme, with NADH and pyruvate</div>
+  <div class="cell">740541</div>
+</div>
+<div class="row rgrey2" id="tab49r31">
+  <div class="cell">0.14 - 66</div>
+  <div class="cell">pyruvate</div>
+  <div class="cell"><a href="javascript:showRows('tab49r31',0);">5 entries</a></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell"></div>
+</div>
+<div class="hidden rgrey2" id="tab49r31sr0">
+  <div class="cell">0.14</div>
+  <div class="cell">pyruvate</div>
+  <div class="cell">Plasmodium falciparum</div>
+  <div class="cell">-</div>
+  <div class="cell">pH 7.5</div>
+  <div class="cell">686655</div>
+</div>
+<div class="hidden rgrey2" id="tab49r31sr1">
+  <div class="cell">1.64</div>
+  <div class="cell">pyruvate</div>
+  <div class="cell">Gadus morhua</div>
+  <div class="cell">-</div>
+  <div class="cell">pH 7.0, 4°C</div>
+  <div class="cell">655068</div>
+</div>
+<div class="hidden rgrey2" id="tab49r31sr2">
+  <div class="cell">3.29</div>
+  <div class="cell">pyruvate</div>
+  <div class="cell">Oryctolagus cuniculus</div>
+  <div class="cell">-</div>
+  <div class="cell">recombinant enzyme</div>
+  <div class="cell">741355</div>
+</div>
+<div class="hidden rgrey2" id="tab49r31sr3">
+  <div class="cell">66</div>
+  <div class="cell">pyruvate</div>
+  <div class="cell">Plasmodium berghei</div>
+  <div class="cell">-</div>
+  <div class="cell">pH 7.5</div>
+  <div class="cell">656750</div>
+</div>
+<!-- real drug-screening-noise row: substrate filter must exclude it -->
+<div class="row rgrey1" id="tab49r30">
+  <div class="cell">0.00059 - 0.00252</div>
+  <div class="cell">3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid</div>
+  <div class="cell"><a href="javascript:showRows('tab49r30',0);">2 entries</a></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell noleftborder"></div>
+  <div class="cell"></div>
+</div>
+<div class="hidden rgrey1" id="tab49r30sr0">
+  <div class="cell">0.00059</div>
+  <div class="cell">3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P00338</div>
+  <div class="cell">competitive versus NADH, pH 7.5, 37°C, recombinant His-tagged enzyme</div>
+  <div class="cell">739793</div>
+</div>
+<div class="hidden rgrey1" id="tab49r30sr1">
+  <div class="cell">0.00252</div>
+  <div class="cell">3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid</div>
+  <div class="cell">Homo sapiens</div>
+  <div class="cell">P00338</div>
+  <div class="cell">noncompetitive versus pyruvate, pH 7.5, 37°C, recombinant His-tagged enzyme</div>
+  <div class="cell">739793</div>
+</div>
+<!-- non-numeric first cell: excluded by the numeric matcher, not by the substrate filter -->
+<div class="row rgrey2">
+  <div class="cell">additional information</div>
+  <div class="cell">gossypol</div>
+  <div class="cell">-</div>
+  <div class="cell">-</div>
+  <div class="cell">inhibition of Plasmodium falciparum lactate dehydrogenase</div>
+  <div class="cell">654758</div>
+</div>
+</div>
+</body>
+</html>
