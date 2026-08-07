@@ -178,3 +178,36 @@ branch (tau = u/prop instead of -log(u)/prop); both new tests failed (mean at
 **Next:** Backlog (c) remaining unverified domains: wright_fisher,
 two_locus_wright_fisher, gillespie_ssa_replicates. (Replicates shares the
 first-order core just verified, so popgen is the highest-value next target.)
+
+## Cycle 16 - gillespie_ssa_replicates interior-grid closed-form coverage (item c)
+
+**Date:** 2026-08-06
+
+**Item worked on:** Backlog (c) - gillespie_ssa_replicates, the final unverified
+SSA domain. (wright_fisher and two_locus were examined first; both already have
+deep closed-form coverage - 19 documented mutation records, heterozygosity/
+fixation/variance/Fst/LD closed forms - so no gap needed filling there.)
+
+**Gap found:** the ensemble's defining claim - mean trajectory converges to the
+deterministic reference a0 * exp(-k*t) - was only asserted at the horizon
+(t=end). No test exercised interior grid points.
+
+**Change made:** test_mean_trajectory_tracks_closed_form_on_interior_grid in
+test_gillespie_ssa_replicates.py - checks mean_a at 4 interior grid points
+against a0 * exp(-k*t), each within 3 sigma (SE = sqrt(a0 p (1-p)/N)).
+
+**Mutation test (Rule 6):** replaced grid with a sin**2(pi/2) grid keeping
+t=0 and t=end fixed - new test failed (96 sigma at t=0.4) while endpoint
+assertions stayed green; reverted to HEAD (no diff remains).
+
+**Verification:**
+- `make test`: 897 engine + 251 literature = **1,148 passed**
+- README counts updated 1,147 -> 1,148 (896 -> 897 engine);
+  `scripts/check_documented_counts.py` OK
+- `scripts/check_rng_convention.py`: OK
+- Commit da8c234
+
+**Backlog status:** with cycles 14-16, all three SSA domains now carry at least
+one distributional closed-form invariant. wright_fisher + two_locus were
+inspected (not modified - no gap found). Backlog item (c) is effectively
+complete.
