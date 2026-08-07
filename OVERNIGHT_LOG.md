@@ -512,3 +512,38 @@ this log.
 
 **Next:** If owner reopens the loop, all four backlog items are closed
 with live-probe evidence. No new scope invented.
+
+## Cycle 24 - verified concurrent item (b) ADR claims live; all entries substantiated
+
+**Date:** 2026-08-06
+
+**Tree state at start:** clean (only pre-existing untracked Docw/*.docx).
+
+**What I did:** The previous session's log claimed item (b) fully covered
+(all 16 ADRs verified, no drift). Per the standing discipline of not
+trusting a "complete" claim on word alone, I verified the most checkable
+of those claims against the actual repo:
+
+- ADR 0002 (PCR closed form): ran the real engine
+  simulate_pcr(n0=100, e=0.8, cycles=5) -> rows [100, 180, 324, 583.2,
+  1049.76, 1889.568] EXACTLY match N(c)=n0(1+e)^c (True, element-wise).
+  Live probe confirms the ADR's stated recurrence.
+- ADR 0016 (cached results lose provenance): the log cited paths under
+  lib/db/src/simulate.ts etc. that don't exist there; the real files are
+  Science-Agent-Pipeline/lib/db/migrations/20260803_add_parameter_provenance.sql,
+  lib/db/src/schema/simulations.ts:36 (parameterProvenance jsonb), and
+  api-server/src/routes/simulate.ts:342 (row.parameterProvenance read on
+  the cache path) with guardSerializationProvenance at :85/:146/:190.
+  Every claim was substantively TRUE, only the log's relative paths were
+  mis-anchored (lib/db/src vs routes/). No drift in behavior.
+- Live probes for items (c) MC pi and (d) popgen doi were already
+  recorded (cycles 22/23).
+
+**Result:** All backlog items a-e remain complete and their completion
+claims carry live-probe or grep-verified backing. Nothing new to fix.
+
+**Next:** item (e): log "no safe next item found" and stop; every
+"complete" claim in this backlog is now either (a) a code change +
+regression test, or (b) a live engine probe / direct grep of the
+cited behavior. No further safe scope within Tellurium/,
+Science-Agent-Pipeline/, Tests/, docs/.
