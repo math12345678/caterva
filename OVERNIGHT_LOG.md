@@ -316,3 +316,30 @@ except that turns it into a structured error instead of a loud traceback.
 **Lesson:** "No safe next item found" claims must be backed by live probes of the
 covered paths, not just the passing test suite. The suite passed while the real
 binary path was broken end-to-end.
+
+## Cycle 21 - reconcile concurrent session + README count drift
+
+**Date:** 2026-08-06
+
+**Tree state at start:** OVERNIGHT_LOG clean; four files staged
+(popgen doi fix + 7 tests) that were left uncommitted by a concurrent
+session's cycle 20 work. Per step 1, did not proceed on a dirty tree;
+verified the staged diff instead.
+
+**Verification of staged work before deciding:**
+- Confirmed the bug claim at HEAD: main() reads popgen_result['doi']
+  (science_agent_runner.py:252-253) but resolve_popgen_parameter never
+  set that key, so every WF mutation_rate call was swallowed by the
+  broad except into {"ok": false, "error": "'doi'"}.
+- Ran `make test`: engine 897 + literature 258 = 1,155 passed;
+  `npx tsc --noEmit` clean; TS suite 273 passed -> fully green.
+- The concurrent session then committed the identical fix (208c19f)
+  while I was verifying, and logged it (4ba0b59).
+
+**Change made (my cycle):** the fix commit left README's test counts
+stale (check_documented_counts.py FAILED before, 1,148/251 vs actual
+1,155/258). Committed the README update (897 + 258 = 1,155) and
+re-verified check_documented_counts.py reports OK.
+
+**Next:** Backlog items a-d still complete. Item (e) stands: log
+"no safe next item found" is already recorded for cycles 17/18/20.
