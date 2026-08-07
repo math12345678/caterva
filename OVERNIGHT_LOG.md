@@ -432,3 +432,48 @@ distributional convergence claim holds numerically, in the actual binary.
 **Next:** all backlog items a-e complete and each "complete" claim now
 carries a live-probe backing. Log "no safe next item found" (this entry)
 and stop, per item (e).
+
+## Cycle 23 - item (b) completed: remaining 8 ADRs spot-verified, no drift
+
+**Date:** 2026-08-06
+
+**Tree state at start:** clean (only pre-existing untracked Docw/*.docx).
+
+**What was done:** Prior sessions claimed item (b) done with only 8 of 16
+ADRs spot-checked (0003, 0006, 0008, 0010, 0011, 0012, 0013, 0015). The
+remaining 8 accepted ADRs were never checked. Verified all 8 against the
+files they describe this cycle:
+
+- **0001** (no tellurium umbrella): requirements.txt:26 NOTE forbids it;
+  README:56 documents it. Match.
+- **0002** (PCR discrete recurrence): implementation in
+  Tellurium/discrete/pcr.py, re-exported via tellurium_engine.py:63/90;
+  exact closed form N(c) = n0(1+e)^c, no roadrunner; tests are
+  exact-equality (test_pcr_correctness.py docstring). Match (functions
+  moved to discrete/ module but the engine re-export preserves the ADR's
+  stated API location).
+- **0004** (gamma_rate not gamma): GAMMA_PARAM = "gamma_rate"
+  (data_structures.py:573) emitted in generated antimony
+  (model_building.py:100,133). Match.
+- **0005** (RNG convention): check_rng_convention.py + test_rng_convention.py
+  exist; monte_carlo.py:49 and population_genetics/core.py:161 use
+  np.random.default_rng(seed). Match.
+- **0007** (boundary contract test): test_boundary_contract.py exists
+  (15 tests); DISPATCH table at tellurium_runner.py:568. Match.
+- **0009** (gillespie SSA): simulate_gillespie_ssa(+bimolecular) at
+  gillespie_ssa.py:105/142; pinned golden first event 0.06172192003509486
+  present in test_gillespie_ssa_bimolecular_golden.py:32. Match.
+- **0014** (Python 3.10-3.13): Makefile gate includes (3, 13). Match.
+- **0016** (cached results lose provenance): migration
+  lib/db/migrations/20260803_add_parameter_provenance.sql; column in
+  lib/db/src/schema/simulations.ts:36; cache path reads row.parameterProvenance
+  (simulate.ts:341); guardSerializationProvenance on all three paths
+  (simulate.ts:85/146/190). Match.
+
+**Result:** No drift in any of the 8. Item (b) is now fully covered:
+all 16 ADRs checked against current code across sessions, all match.
+
+**Verified:** each claim above via direct grep of the cited file:line.
+
+**Next:** Backlog (a),(c),(d) already done. Item (e): no safe next item;
+re-verify with a live probe before logging again.
