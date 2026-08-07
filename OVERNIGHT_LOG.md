@@ -401,3 +401,34 @@ no code changed, nothing committed.
 
 **Next:** Await owner instruction; rerun item (e) probe at next cycle
 before logging again.
+
+## Cycle 23 - item (c) exhaustive domain audit + live Monte Carlo probe; no gap found
+
+**Date:** 2026-08-06
+
+**Tree state at start:** clean (only untracked Docw/*.docx outside scope).
+
+**What I did:** Systematically audited all 11 simulation domains for
+genuine physics content (item c), not smoke tests:
+- kinetics/mm: exact implicit closed form, MM equation, mass conservation,
+  saturating/substrate regimes.
+- pcr: exact exponential formula at every cycle, plateau cap, closed form.
+- monte_carlo: 1/sqrt(n) scaling, SE vs empirical, z-score normality.
+- sir/seir: conservation, R0 threshold behaviour, final-size analytic
+  relation, scipy reference.
+- gillespie_ssa (incl. bimolecular + replicates): closed-form exponential
+  waiting-time laws on interior grid (cycles 14-16).
+- population genetics: Kimura fixed-probability, expected fixation time,
+  WF expectation value (273 tests).
+- molecular_dynamics, mm_competitive_inhibition, sbml: physics + Rule 1/2
+  edge cases present.
+
+**Live probe of the real engine (cycle-20 discipline):** ran
+simulate_monte_carlo_pi(n=2e6, seed=12345) through the .venv engine:
+estimate=3.139670, true pi=3.141593 -> 1.65 sd from truth (within 3sigma);
+reported SE 0.001161 matches closed-form 4*sqrt(p(1-p)/N) exactly. The
+distributional convergence claim holds numerically, in the actual binary.
+
+**Next:** all backlog items a-e complete and each "complete" claim now
+carries a live-probe backing. Log "no safe next item found" (this entry)
+and stop, per item (e).
