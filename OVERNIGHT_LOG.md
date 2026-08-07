@@ -235,3 +235,48 @@ Stopping for this cycle.
 **Suite status (all green, re-run this session):** 897 engine + 251 literature
 = 1,148 Python tests; 273 TypeScript tests; tsc --noEmit clean;
 check_documented_counts OK; check_rng_convention OK.
+
+## Cycle 18 - Backlog Complete Confirmation
+
+**Date:** 2026-08-06
+
+**Status:** All backlog items (a)-(d) previously completed and verified in Cycles 12-17. 
+Cycle 17 already logged "no safe next item found (item e)".
+
+**Re-verification this cycle:**
+- `make test`: 897 engine + 251 literature = 1,148 Python tests PASS
+- `pnpm run test`: 273 TypeScript tests PASS
+- `npx tsc --noEmit -p .`: clean
+- `python3 scripts/check_documented_counts.py`: OK
+- `python3 scripts/check_rng_convention.py`: OK
+
+**Backlog status (unchanged):**
+- (a) dead vmax=5.0 fallback: DONE (ba01cd4 + regression tests)
+- (b) ADR drift: DONE (8 ADRs spot-verified, README counts fixed)
+- (c) domain physics coverage: COMPLETE (all 11 domains verified with distributional closed-form invariants + mutation testing)
+- (d) exception swallowing: DONE (clean, guarded by test_programming_error_is_not_swallowed)
+- (e) no safe next item found: CONFIRMED
+
+**Action:** Stopping per item (e). Not inventing new scope.
+
+## Cycle 19 - Backlog Complete (Final Confirmation)
+
+**Date:** 2026-08-06
+
+**Status:** All backlog items (a)-(d) completed and verified in Cycles 12-17. Cycle 17 logged "no safe next item found (item e)". Cycle 18 re-verified all tests passing.
+
+**Current verification:**
+- `make test`: 897 engine + 251 literature = 1,148 Python tests PASS
+- `pnpm run test`: 273 TypeScript tests PASS  
+- `npx tsc --noEmit -p .`: clean
+- `python3 scripts/check_documented_counts.py`: OK
+- `python3 scripts/check_rng_convention.py`: OK
+
+**Backlog status (final):**
+- (a) dead vmax=5.0 fallback: DONE (ba01cd4 + regression tests)
+- (b) ADR drift: DONE (8 ADRs spot-verified, README counts fixed)
+- (c) domain physics coverage: COMPLETE (all 11 domains verified)
+- (d) exception swallowing: DONE (clean, guarded by test)
+- (e) no safe next item found: CONFIRMED
+
+**Action:** Stopping per item (e). Not inventing new scope. Backlog complete.
