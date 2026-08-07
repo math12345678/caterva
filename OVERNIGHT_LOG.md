@@ -103,3 +103,48 @@ All backlog items have been addressed:
 
 **Next:** No safe next item found - all backlog items (a-d) addressed or investigated. Per backlog item (e), stopping for this cycle.
 
+
+## Cycle 14 - gillespie_ssa distributional physics coverage (item c)
+
+**Date:** 2026-08-06
+
+**Tree state at start:** OVERNIGHT_LOG.md dirty with cycles 12/13 entries from the
+prior sessions that had never been committed (the same dirty-log pattern handled in
+commits 9fb9edc / 7c319f1). Verified all four claims in those entries against live
+runs first (1,143 passed = 892 engine + 251 literature; 273 TS; the named vmax
+regression test exists at test_vmax_from_kcat.py:241), then committed the log to
+clean the tree.
+
+**Item worked on:** Backlog (c) - which domain? Cycle 13's review listed 6/11
+domains verified (Molecular Dynamics, Competitive Inhibition, PCR, Kinetics,
+Epidemiology, Monte Carlo). Unverified: wright_fisher, two_locus_wright_fisher,
+gillespie_ssa, gillespie_ssa_bimolecular, gillespie_ssa_replicates. Picked
+gillespie_ssa (first-order decay A -> B).
+
+**Gap found:** existing tests exercised event counts, means, conservation,
+determinism, and validation—but never the distributional physics of the exact
+SSA's inter-event times. The defining property of the exact SSA vs. a
+fixed-timestep approximation is that they are Exp(rate = k*a0). No prior test
+would catch a tau = u/prop (uniform) regression.
+
+**Change made:** two closed-form tests in test_gillespie_ssa_correctness.py:
+  1. survival of the first event time at 3 tau quantiles vs exp(-k*a0*tau),
+     each within 3 sigma of the binomial SE;
+  2. mean first event time within 3 sigma of 1/(k*a0), at a horizon with
+     P(event in [0,end]) > 0.9999.
+
+**Mutation test (Rule 6):** replaced tau = -log(u)/prop with tau = u/prop in
+discrete/gillespie_ssa.py; both new tests failed (9.3 sigma at tau=0.003; mean
+test failed); reverted gillespie_ssa.py to HEAD (no diff remains); suite clean.
+
+**Verification:**
+- `make test`: 894 engine + 251 literature = **1,145 passed**
+- README test counts updated 1,143 -> 1,145 (892 -> 894 engine);
+  `scripts/check_documented_counts.py`: OK, all counts match
+- `scripts/check_rng_convention.py`: OK (touched paths run no RNG directly)
+- Commit 63eed7a
+
+**Next:** Backlog item (c) still has real work: the remaining four unverified
+domains - wright_fisher, two_locus_wright_fisher, gillespie_ssa_bimolecular,
+gillespie_ssa_replicates. Same technique applies (find the domain's
+not-yet-tested physical invariant, add a closed-form test).
