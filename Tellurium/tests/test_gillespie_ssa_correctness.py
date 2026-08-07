@@ -3,7 +3,10 @@
 Covers the exact Gillespie Direct Method implementation for the single
 reversible-decay reaction A -> B:
 
-  * closed-form agreement in expectation (E[a(t)] = a0 * exp(-k t)),
+  * closed-form agreement in expectation (mean[a(t)] = a0 * exp(-k t)),
+  * exponential inter-event-time law (tau ~ Exp(k * a0); the defining
+    property that distinguishes the exact SSA from a fixed-timestep
+    approximation),
   * stoichiometric conservation (a + b = a0) on every row,
   * seed determinism (identical RNG sequence -> identical trajectory),
   * parameter edge cases (k = 0, flag thresholds),
@@ -62,6 +65,62 @@ class TestClosedFormAgreement:
         assert res.data[0][1] == 100
         assert res.data[0][2] == 0
         assert res.data[-1][0] == 5.0
+
+
+class TestExponentialWaitingTimeLaw:
+    """The exact-SSA defining property: inter-event times are Exp(k*a0).
+
+    For first-order decay (single reaction, propensity = k*a), the first
+    event time T_1 has survival P(T_1 > tau) = exp(-k*a0*tau). This is a
+    closed-form distributional claim (Constitution Rule 1) and it is the
+    property that makes the SSA *exact* rather than a fixed-timestep
+    approximation. A tau drawn uniformly (or with any non-exponential
+    distribution) passes every mean/conservation/determinism test while
+    failing this one.
+    """
+
+    def test_first_event_survival_matches_exponential(self):
+        a0, k, end = 1000, 0.5, 0.05
+        rate = k * a0
+        # end >> 1/rate so (almost) every trajectory has an event.
+        assert 1 - math.exp(-rate * end) > 0.9999
+        first_times = [
+            row[1][0] for row in (_run(a0, k, end, seed=s).data
+                                  for s in range(300))
+            if len(row) > 1
+        ]
+        assert len(first_times) >= 280
+        for tau in (0.001, 0.003, 0.006):
+            p_exact = math.exp(-rate * tau)
+            p_obs = sum(1 for t in first_times if t > tau) / len(first_times)
+            se = math.sqrt(p_exact * (1 - p_exact) / len(first_times))
+            stat = abs(p_obs - p_exact) / se
+            assert stat < 3.0, (
+                f"tau={tau}: P(T1>{tau}) observed {p_obs:.4f} vs "
+                f"closed form {p_exact:.4f} ({stat:.1f} sigma)")
+
+    def test_tau_sampling_consumes_one_uniform_per_unit_propensity(self):
+        """Gillespie's Direct Method: tau = -log(u)/propensity per event.
+
+        The empirical mean of the *first* inter-event time must approach
+        1/(k*a0); a uniform draw in place of -log(u) would give a mean
+        near 1/(2*k*a0) instead and fail this check.
+        """
+        a0, k, end = 2000, 1.0, 0.05
+        rate = k * a0
+        first_times = [
+            row[1][0] for row in (_run(a0, k, end, seed=s).data
+                                  for s in range(200))
+            if len(row) > 1
+        ]
+        theory_mean = 1.0 / rate
+        obs_mean = sum(first_times) / len(first_times)
+        # Exponential mean 1/rate has std 1/rate, so the sampling error
+        # of the mean over N draws is 1/rate/sqrt(N); allow ~3 sigma.
+        se = theory_mean / math.sqrt(len(first_times))
+        assert abs(obs_mean - theory_mean) < 3.0 * se, (
+            f"mean first event time {obs_mean:.5f} vs Exp mean "
+            f"{theory_mean:.5f}")
 
 
 class TestSeedDeterminism:
