@@ -377,3 +377,27 @@ a-d all complete.
 
 **Next:** item (e). Log "no safe next item found" (with the live-probe
 evidence above) and stop rather than inventing new scope.
+
+## Cycle 22 - item (e) confirmed with live probe (no new scope)
+
+**Date:** 2026-08-06
+
+**Tree state at start:** clean (branch ahead of origin by 18 commits;
+only pre-existing untracked Docw/*.docx present).
+
+**Live verification before declaring item (e):**
+- `make test`: engine 897 + literature 258 = 1,155 passed, green.
+- Live E2E probe of the previously-broken popgen path (the Cycle 20 bug):
+  `{"parameterType":"mutation_rate","organism":"Homo sapiens"}` →
+  exit 0, `referenceId` 10.1038/35057062, url https://doi.org/10.1038/35057062,
+  km 1.2899999999999998e-08. `PopgenResult.doi` populated; `_normalise_doi`
+  confirmed vaccine against double-prefixed malformed URLs; citation string
+  is the designed ";-joined" DOI list, not a defect.
+
+**Decision:** Backlog items (a)-(d) all verified complete in current tree.
+No safe next item exists. Logging "no safe next item found" (item e),
+backed by the live probe the Cycle 20 lesson demands. No new scope invented,
+no code changed, nothing committed.
+
+**Next:** Await owner instruction; rerun item (e) probe at next cycle
+before logging again.
