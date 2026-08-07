@@ -51,6 +51,31 @@ class TestMeanTrajectory:
         mean_final = sum(x[0] for x in r.replicate_data) / 100
         assert abs(r.data[-1][1] - mean_final) < 1e-9
 
+    def test_mean_trajectory_tracks_closed_form_on_interior_grid(self):
+        """Sample mean of intermediate grid points matches a0 e^{-kt}.
+
+        Per replicate the count at time t is Binomial(A0, e^{-kt}), so the
+        ensemble mean is a0 e^{-kt} for every t on the grid, not just the
+        horizon. With N replicates the SE of the sample mean at t is
+        sqrt(a0 p (1-p) / N) with p = e^{-kt}; each interior checkpoint is
+        checked within 3 sigma. A bug that only shifted mid-trajectory
+        mean_a (e.g. an interpolation or drift error between the endpoints)
+        would fail here while all end-to-end mean tests still pass.
+        """
+        a0, k, end, n_reps = 200, 0.5, 4.0, 400
+        r = te.simulate_gillespie_ssa_replicates(
+            a0=a0, k=k, end=end, n_replicates=n_reps, seed=12345)
+        grid = np.linspace(0.0, float(end), len(r.data))
+        for idx in (10, 50, 75, 100):
+            t = grid[idx]
+            p = math.exp(-k * t)
+            theory = a0 * p
+            se = math.sqrt(a0 * p * (1.0 - p) / n_reps)
+            stat = abs(r.data[idx][1] - theory) / se
+            assert stat < 3.0, (
+                f"t={t:.2f}: mean_a={r.data[idx][1]:.3f} vs closed form "
+                f"{theory:.3f} ({stat:.1f} sigma)")
+
 
 class TestSpread:
     def test_sample_sd_approaches_binomial_sd(self):
