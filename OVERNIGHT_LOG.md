@@ -477,3 +477,38 @@ all 16 ADRs checked against current code across sessions, all match.
 
 **Next:** Backlog (a),(c),(d) already done. Item (e): no safe next item;
 re-verify with a live probe before logging again.
+
+## Cycle 24 - item (e) backed by live hard-block/MM probes (item a path)
+
+**Date:** 2026-08-06
+
+**Tree state at start:** clean (only pre-existing untracked Docw/*.docx).
+
+**What was done:** Items (a)-(d) closed. Before logging item (e) again,
+live-probed the item-(a) hard-block path end to end (the one path not yet
+probed live; prior live probes covered the popgen and MC pi paths):
+
+1. **Dead-code claim re-traced:** queryResolver.ts:1046-1049 hard-blocks
+   every default/llm-origin parameter (throws RequiredParametersMissingError)
+   before the runner is spawned; zod schema (schemas.ts:67-82) requires
+   `vmax` OR `kcat+enzyme_conc` at request validation. The old `vmax=5.0`
+   fallback is structurally unreachable from the API.
+2. **Hard-block fires for the exact former-fallback case (live):** spawning
+   tellurium_runner.py with `{"domain":"mm","parameters":{"km":2,"s0":10,...}}`
+   (no vmax, no kcat+enzyme_conc) → `{"ok": false, "error": "mm needs a
+   Vmax: ..."}`, exit 1. No silent 5.0 reachable. (Python-side guard alone
+   rejects it even if a caller bypassed both TS layers.)
+3. **Derivation path still sound (live):** vmax from kcat = 1.5e6, enzyme_conc
+   = 1e-6 → `derivedNote "Vmax 1.5 mM/s"`, exit 0. Checked against closed
+   form V = kcat * [E]0 = 1.5e6 * 1e-6 = 1.5. Match.
+4. **Trajectory numerical check:** final point [S]=0.60621414092 at t=10
+   satisfies the integrated MM law t = (s0-S)/vmax + (km/vmax)*ln(s0/S)
+   → 10.000000013 s, residual 1.3e-8 s. Consistent with the engine.
+
+**Result:** No gap found. Item (e) stands: "no safe next item found",
+now backed by live probes of the (a) hard-block path and the derived-vmax
+path, per the Cycle 20 lesson. No code changed, nothing committed beyond
+this log.
+
+**Next:** If owner reopens the loop, all four backlog items are closed
+with live-probe evidence. No new scope invented.
