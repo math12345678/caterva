@@ -14,7 +14,7 @@ This test suite follows the Constitution's Section 6 verification procedure:
 
 import pytest
 
-from popgen_resolver import resolve_mutation_rate, PopgenResult
+from popgen_resolver import resolve_mutation_rate, PopgenResult, _normalise_doi
 
 
 class TestMutationRateGoldenTuple:
@@ -112,6 +112,29 @@ class TestMutationRateEdgeCases:
         # Should be JSON-serializable
         json_str = result.model_dump_json()
         assert len(json_str) > 0
+
+
+class TestNormaliseDoi:
+    """stdpopsim bundles its reference DOIs in inconsistent shapes; the
+    normaliser must strip every URL prefix so the emitted locator is a
+    single resolvable DOI -- never a double-prefixed
+    ``https://doi.org/http://dx.doi.org/...`` string (literature locators
+    must be verifiable, Constitution Rule 2)."""
+
+    def test_bare_doi_passes_through(self):
+        assert _normalise_doi("10.1038/35057062") == "10.1038/35057062"
+
+    def test_https_doi_org_prefix_is_stripped(self):
+        assert _normalise_doi("https://doi.org/10.1016/j.ajhg.2019.09.012") == "10.1016/j.ajhg.2019.09.012"
+
+    def test_http_dx_doi_org_prefix_is_stripped(self):
+        assert _normalise_doi("http://dx.doi.org/10.1038/nature06258") == "10.1038/nature06258"
+
+    def test_non_doi_string_returns_none(self):
+        assert _normalise_doi("Smith, J. (2020) Some paper") is None
+
+    def test_empty_string_returns_none(self):
+        assert _normalise_doi("") is None
 
 
 class TestMutationRateMutationTest:

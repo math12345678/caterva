@@ -39,6 +39,7 @@ class PopgenResult(BaseModel):
     source: str = "stdpopsim"
     citation: Optional[str] = None
     search_log: List[str] = []
+    doi: Optional[str] = None
 
 
 # Map common organism names (as they appear in Terrium queries) to
@@ -65,6 +66,28 @@ _ORGANISM_TO_STDPSIM: dict[str, str] = {
     "sus scrofa": "SusScr",
     "pig": "SusScr",
 }
+
+
+def _normalise_doi(value: str) -> Optional[str]:
+    """Return the bare DOI from a stdpopsim citation record.
+
+    stdpopsim bundles its reference DOIs in inconsistent shapes --
+    sometimes a bare ``10.xxxx/...``, sometimes ``http://dx.doi.org/<doi>``,
+    sometimes ``https://doi.org/<doi>``. This strips every prefix so the
+    locator we emit is a real, resolvable DOI, never a double-prefixed
+    ``https://doi.org/http://dx.doi.org/...`` string.
+    """
+    doi = (value or "").strip()
+    for prefix in (
+        "https://doi.org/",
+        "http://doi.org/",
+        "https://dx.doi.org/",
+        "http://dx.doi.org/",
+    ):
+        if doi.startswith(prefix):
+            doi = doi[len(prefix):]
+            break
+    return doi if doi.startswith("10.") else None
 
 
 def resolve_mutation_rate(
@@ -130,11 +153,19 @@ def resolve_mutation_rate(
 
     rate = species.genome.mean_mutation_rate
 
-    # Build a citation from stdpopsim's bundled references.
+    # Build a citation from stdpopsim's bundled references. Each DOI is
+    # normalised to its bare form so the emitted URL is a single resolvable
+    # locator; the first real DOI is surfaced separately for structured
+    # citation handling downstream (science_agent_runner.py).
     citations = []
+    doi = None
     for c in species.genome.citations[:3]:
         if hasattr(c, "doi") and c.doi:
-            citations.append(f"https://doi.org/{c.doi}")
+            clean_doi = _normalise_doi(c.doi)
+            if clean_doi:
+                if doi is None:
+                    doi = clean_doi
+                citations.append(f"https://doi.org/{clean_doi}")
         elif hasattr(c, "author") and c.author:
             citations.append(c.author)
     citation_str = "; ".join(citations) if citations else "stdpopsim catalog"
@@ -152,4 +183,5 @@ def resolve_mutation_rate(
         source="stdpopsim",
         citation=citation_str,
         search_log=log,
+        doi=doi,
     )

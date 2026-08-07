@@ -171,6 +171,7 @@ def resolve_popgen_parameter(param_type: str, organism: str) -> dict | None:
             'source': result.source,
             'citation': result.citation,
             'organism': result.organism,
+            'doi': result.doi,
         }
     return None
 
