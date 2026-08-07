@@ -211,3 +211,27 @@ assertions stayed green; reverted to HEAD (no diff remains).
 one distributional closed-form invariant. wright_fisher + two_locus were
 inspected (not modified - no gap found). Backlog item (c) is effectively
 complete.
+
+## Cycle 17 - Backlog complete, no safe next item found (item e)
+
+**Date:** 2026-08-06
+
+**Backlog status:**
+- (a) dead vmax=5.0 fallback: DONE (ba01cd4 + regression tests,
+  re-confirmed this session at Tellurium/tests/test_vmax_from_kcat.py:241).
+- (b) ADR drift: DONE (spot-verified 8 ADRs across cycles; README count
+  drift fixed and re-confirmed).
+- (c) domain physics coverage: COMPLETE. Cycles 14 (gillespie_ssa),
+  15 (gillespie_ssa_bimolecular), 16 (gillespie_ssa_replicates) added
+  distributional closed-form invariants; wright_fisher + two_locus
+  inspected (no gap). Earlier cycles covered molecular dynamics,
+  competitive inhibition, PCR, kinetics, epidemiology, monte_carlo.
+- (d) exception swallowing: DONE (cycle 12 - clean, guarded by
+  test_programming_error_is_not_swallowed).
+
+**Per backlog item (e):** no safe next item found. Not inventing new scope.
+Stopping for this cycle.
+
+**Suite status (all green, re-run this session):** 897 engine + 251 literature
+= 1,148 Python tests; 273 TypeScript tests; tsc --noEmit clean;
+check_documented_counts OK; check_rng_convention OK.
