@@ -280,3 +280,39 @@ Cycle 17 already logged "no safe next item found (item e)".
 - (e) no safe next item found: CONFIRMED
 
 **Action:** Stopping per item (e). Not inventing new scope. Backlog complete.
+
+## Cycle 20 - Popgen DOI KeyError Fix (item d re-open)
+
+**Date:** 2026-08-06
+
+**Status:** Item (e) was premature. A live probe found a real silent-swallowing bug
+within item (d) scope: `main()` in science_agent_runner.py read
+`popgen_result["doi"]` but `resolve_popgen_parameter` never set that key
+(introduced by c709846). Every Wright-Fisher mutation_rate literature resolution
+(e.g. organism "Homo sapiens") returned `{"ok": false, "error": "'doi'"}` with
+exit 1, swallowed by the outer broad except.
+
+**Root cause:** Wrong-field access in the popgen dict, combined with the broad
+except that turns it into a structured error instead of a loud traceback.
+
+**Fix (commit 208c19f):**
+- `Tests/popgen_resolver.py`: PopgenResult carries a structured `doi`; add
+  `_normalise_doi` to strip URL prefixes (stdpopsim DOIs were rendering as
+  malformed `https://doi.org/http://dx.doi.org/...`); `resolve_mutation_rate`
+  populates `doi`.
+- `Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py`:
+  include `'doi': result.doi` so the citation locator reaches downstream
+  `formatResolvedCitation` (ADR 0008 provenance must surface, not be dropped).
+- `Tests/test_science_agent_runner.py`: cwd-safe path derivation from
+  `__file__`; offline success/not-found regression tests reproducing the crash.
+- `Tests/test_popgen_resolver.py`: `TestNormaliseDoi` (5 cases).
+
+**Verification:**
+- Live E2E: Homo sapiens -> km 1.2899999999999998e-08, referenceId
+  10.1038/35057062, url https://doi.org/10.1038/35057062, exit 0.
+- Regression test provably fails ("'doi'") against the pre-fix code path.
+- `make test`: engine 897 passed + literature 258 passed = green.
+
+**Lesson:** "No safe next item found" claims must be backed by live probes of the
+covered paths, not just the passing test suite. The suite passed while the real
+binary path was broken end-to-end.
