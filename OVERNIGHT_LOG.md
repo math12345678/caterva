@@ -148,3 +148,33 @@ test failed); reverted gillespie_ssa.py to HEAD (no diff remains); suite clean.
 domains - wright_fisher, two_locus_wright_fisher, gillespie_ssa_bimolecular,
 gillespie_ssa_replicates. Same technique applies (find the domain's
 not-yet-tested physical invariant, add a closed-form test).
+
+## Cycle 15 - gillespie_ssa_bimolecular distributional physics coverage (item c)
+
+**Date:** 2026-08-06
+
+**Item worked on:** Backlog (c) - gillespie_ssa_bimolecular (A + B -> C), the
+next unverified domain after cycle 14's gillespie_ssa.
+
+**Gap found:** same blind spot as the first-order chain - tests verified means
+vs the ODE closed form, conservation, determinism, and validation, but not
+the exact-SSA's defining probability law. Here the first inter-event time T1
+is Exp(rate = k*a0*b0), survival exp(-k*a0*b0*tau), mean 1/(k*a0*b0).
+
+**Change made:** two closed-form tests in test_gillespie_ssa_bimolecular_correctness.py:
+  survival at 3 tau quantiles (binomial SE, 3 sigma); mean T1 vs 1/(k*a0*b0).
+
+**Mutation test (Rule 6):** replayed the cycle-14 mutation on the bimolecular
+branch (tau = u/prop instead of -log(u)/prop); both new tests failed (mean at
+~1/2 the closed form); reverted gillespie_ssa.py to HEAD (no diff remains).
+
+**Verification:**
+- `make test`: 896 engine + 251 literature = **1,147 passed**
+- README counts updated 1,145 -> 1,147 (894 -> 896 engine);
+  `scripts/check_documented_counts.py` OK
+- `scripts/check_rng_convention.py`: OK
+- Commit 67f4253
+
+**Next:** Backlog (c) remaining unverified domains: wright_fisher,
+two_locus_wright_fisher, gillespie_ssa_replicates. (Replicates shares the
+first-order core just verified, so popgen is the highest-value next target.)
