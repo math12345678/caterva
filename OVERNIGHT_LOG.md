@@ -547,3 +547,32 @@ claims carry live-probe or grep-verified backing. Nothing new to fix.
 regression test, or (b) a live engine probe / direct grep of the
 cited behavior. No further safe scope within Tellurium/,
 Science-Agent-Pipeline/, Tests/, docs/.
+
+## Cycle 25 - item (e) backed by live bimolecular SSA golden-trajectory probe
+
+**Date:** 2026-08-06
+
+**Tree state at start:** clean (only pre-existing untracked Docw/*.docx).
+
+**What was done:** Items (a)-(d) closed. Previous live probes covered the
+popgen path (c22), the item-(a) hard-block/derived-vmax path (c24), and MC
+pi (c23, concurrent session). The bimolecular SSA golden trajectory
+(ADR 0009: stage-7 pinned table) had never been live-run in this session,
+so it was probed as the item-(e) evidence for this cycle:
+
+1. **First inter-event time vs exact closed form (Direct Method, ADR 0009):**
+   u1 = 0.22733602246716966 from np.random.default_rng(12345).uniform(0,1);
+   tau1 = -ln(u1)/(k*a0*b0) = 0.06172192003509486. Engine's first event
+   time = 0.06172192003509486. Exact match (residual < 1e-15).
+2. **Conservation invariants (ADR 0009 requires a+c=a0, b+c=b0 every row):**
+   verified on all 38 rows; max A residual = 0.0.
+3. **Final row**: [5.0, 24.0, 4.0, 36.0] == pinned golden (38 rows).
+4. **Sanity invariants**: nonnegativity all rows, time monotone, final
+   time capped at end=5.0.
+
+**Result:** No gap found. Item (e) stands: "no safe next item found",
+now backed by live probes of the SSA golden trajectory in addition to the
+popgen, hard-block, and MC paths. No code changed.
+
+**Next:** All four backlog items remain closed with live-probe evidence;
+no new scope invented.
