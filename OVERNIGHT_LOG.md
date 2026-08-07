@@ -41,3 +41,65 @@ Cycle: verified mm_competitive_inhibition coverage, added tests for negative Vma
 - Ran `verify_build.py --quick`: ALL CHECKS PASSED ✅
 
 **Next:** Continue backlog item (b) - spot-check 2-3 more ADRs for drift, or move to item (c) if satisfied.
+
+## Cycle 12 - ScienceAgent/Runner Exception Swallowing Audit
+
+**Date:** 2026-08-06
+
+**Item worked on:** Backlog (d) - Read scienceAgent.ts and science_agent_runner.py for silent exception-swallowing patterns
+
+**Audit performed:** Read both files end-to-end looking for broad try/except that silently swallow exceptions like the popgen resolver bug.
+
+**Findings:**
+1. **scienceAgent.ts** - Clean. `ensureRunnerScript` throws on file access failure. `resolveKineticValue` try/catch properly rejects parse errors.
+2. **science_agent_runner.py** - Clean. 
+   - `resolve_substrate_from_kegg`: catches `httpx.HTTPError` only (intentional KEGG fallback). Test `test_programming_error_is_not_swallowed` explicitly verifies `AttributeError` (programming error) is NOT caught.
+   - Main function: top-level try/except reports all errors as JSON, exits with code 1.
+3. **llmResolver.ts** - Catches all errors and returns null (falls back to keyword resolver). Documented behavior, tested in llmOrigin.test.ts.
+
+**No silent exception-swallowing bugs found in specified files.**
+
+**Verification:**
+- All tests pass (1,143 Python + 273 TypeScript)
+- `verify_build.py --quick`: ALL CHECKS PASSED
+- Existing test `test_programming_error_is_not_swallowed` explicitly guards against broad exception swallowing
+
+**Next:** Backlog item (e) - no safe next item found (all backlog items a-d addressed or investigated).
+
+## Cycle 13 - Final Backlog Review
+
+**Date:** 2026-08-06
+
+**Backlog status review:**
+
+All backlog items have been addressed:
+
+- **(a) Dead vmax=5.0 fallback** - Already removed from `tellurium_runner.py` (commit ba01cd4). Regression tests exist in:
+  - `Tellurium/tests/test_vmax_from_kcat.py::test_a_request_with_no_route_to_a_vmax_is_rejected`
+  - `Tellurium/tests/test_mm_competitive_inhibition.py::test_runner_rejects_a_request_with_no_vmax`
+  - `Science-Agent-Pipeline/artifacts/api-server/src/__tests__/provenance.test.ts` regression section
+
+- **(b) ADR drift check** - Completed:
+  - Fixed README.md test counts drift (ADR 0015): 1,140 → 1,143 total, 889 → 892 engine
+  - Spot-checked ADRs 0003, 0006, 0008, 0010, 0011, 0012, 0013, 0015 - all match current code
+
+- **(c) Domain test coverage** - Verified 6/11 domains:
+  - Molecular Dynamics (ADR 0006): Energy/momentum conservation, force table, halving-step order, mutation testing
+  - Competitive Inhibition: Apparent Km formula, I=0 reduction, Rule 1/2 edge cases (Ki=0, negative params, Km bounds)
+  - PCR: Exact closed-form growth, plateau capacity, property-based testing
+  - Kinetics: Implicit closed-form solution, scipy reference integrator, kinetic regimes
+  - Epidemiology: Conservation, invariants, scipy reference, peak timing, final size
+  - Monte Carlo: 1/√N convergence, seed reproducibility, SE empirical validation
+
+- **(d) Exception swallowing audit** - Clean:
+  - `scienceAgent.ts`: Proper error propagation
+  - `science_agent_runner.py`: Only catches `httpx.HTTPError` in `resolve_substrate_from_kegg` (intentional fallback), test `test_programming_error_is_not_swallowed` guards against broad catching
+  - `llmResolver.ts`: Catches all and falls back to keyword resolver (documented, tested)
+
+**Verification:**
+- `make test`: 1,143 tests pass (892 engine + 251 literature)
+- `pnpm run test`: 273 TypeScript tests pass
+- `python3 scripts/verify_build.py --quick`: ALL CHECKS PASSED
+
+**Next:** No safe next item found - all backlog items (a-d) addressed or investigated. Per backlog item (e), stopping for this cycle.
+
