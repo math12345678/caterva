@@ -76,6 +76,55 @@ class TestConservation:
         assert last[1] == 30
 
 
+class TestExponentialWaitingTimeLaw:
+    """The exact-SSA defining property, bimolecular form.
+
+    The first reaction event in A + B -> C fires at rate k*a0*b0, so the
+    first inter-event time T1 has survival P(T1 > tau) = exp(-k*a0*b0*tau).
+    This closed-form distributional claim (Constitution Rule 1) is the
+    property that makes the SSA *exact*; a uniform draw in place of
+    -log(u) passes every mean/conservation/determinism test while
+    failing this one.
+    """
+
+    def test_first_event_survival_matches_exponential(self):
+        a0, b0, k, end = 200, 200, 0.05, 0.01
+        rate = k * a0 * b0
+        # end >> 1/rate so (almost) every trajectory has an event.
+        assert 1 - math.exp(-rate * end) > 0.9999
+        first_times = [
+            row[1][0] for row in (_run(a0, b0, k, end, seed=s).data
+                                  for s in range(200))
+            if len(row) > 1
+        ]
+        assert len(first_times) >= 190
+        for tau in (0.0002, 0.0007, 0.0015):
+            p_exact = math.exp(-rate * tau)
+            p_obs = sum(1 for t in first_times if t > tau) / len(first_times)
+            se = math.sqrt(p_exact * (1 - p_exact) / len(first_times))
+            stat = abs(p_obs - p_exact) / se
+            assert stat < 3.0, (
+                f"tau={tau}: P(T1>{tau}) observed {p_obs:.4f} vs "
+                f"closed form {p_exact:.4f} ({stat:.1f} sigma)")
+
+    def test_first_event_mean_is_inverse_propensity(self):
+        """Empirical mean of the first inter-event time approaches
+        1/(k*a0*b0); a uniform draw in place of -log(u) gives 1/(2k*a0*b0)."""
+        a0, b0, k, end = 300, 300, 0.05, 0.01
+        rate = k * a0 * b0
+        first_times = [
+            row[1][0] for row in (_run(a0, b0, k, end, seed=s).data
+                                  for s in range(200))
+            if len(row) > 1
+        ]
+        theory_mean = 1.0 / rate
+        obs_mean = sum(first_times) / len(first_times)
+        se = theory_mean / math.sqrt(len(first_times))
+        assert abs(obs_mean - theory_mean) < 3.0 * se, (
+            f"mean first event time {obs_mean:.5f} vs Exp mean "
+            f"{theory_mean:.5f}")
+
+
 class TestSeedDeterminism:
     def test_same_seed_same_trajectory(self):
         r1 = _run(100, 80, 0.005, 10, seed=99)
