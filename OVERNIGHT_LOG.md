@@ -343,3 +343,37 @@ re-verified check_documented_counts.py reports OK.
 
 **Next:** Backlog items a-d still complete. Item (e) stands: log
 "no safe next item found" is already recorded for cycles 17/18/20.
+
+## Cycle 22 - item (d) re-audit with live binary probes; no new gap found
+
+**Date:** 2026-08-06
+
+**Tree state at start:** clean (only untracked Docw/*.docx outside scope).
+
+**What I did:** Per the Cycle 20 lesson ("no safe next item found must be
+backed by live probes, not just a passing suite"), re-read
+science_agent_runner.py and scienceAgent.ts end to end and then drove the
+real runner as a subprocess -- the same spawn the TS side uses:
+
+- `{"parameterType":"mutation_rate","organism":"Homo sapiens"}` -> exit 0,
+  `{"ok":true,"found":true,"km":1.29e-8,...}` with citation
+  referenceId=10.1038/35057062 and url https://doi.org/<doi>, matching
+  stdpopsim's golden tuple for HomSap.
+- `{"...:mutation_rate","organism":"Unknownus"}` -> exit 0, honest
+  `found:false` (never a fabricated value).
+- no enzymeName/ecNumber -> exit 1 with `{"ok":false,"error":...}`; the
+  TS `close` handler rejects on code !== 0, so this surfaces (does not
+  silently become `found:false`).
+- PopgenResult.citation is a string and doi a string, so the runner's
+  json.dumps of popgen_result (df...['doi'] etc.) serializes cleanly.
+
+**Audit result:** every field main() reads on the popgen dict and on
+KineticResult exists on the model (fallback_logic.KineticResult has
+value/unit/organism/source/cross_species_flag/assay_ph/assay_temperature_c/
+assay_buffer/assay_unreported/citation/literature_candidates/search_log;
+Citation has source/reference_id/url/title/organism/notes). No other
+silent-swallow pattern resembles the fixed popgen doi bug. Backlog items
+a-d all complete.
+
+**Next:** item (e). Log "no safe next item found" (with the live-probe
+evidence above) and stop rather than inventing new scope.
