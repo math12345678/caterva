@@ -16,9 +16,17 @@ export interface Citation {
 }
 
 export interface LiteratureCandidate {
-  pmid: string;
   title: string;
   url: string;
+  /** "pubmed" or "core" (open-access full text, added to supplement
+   * PubMed's metadata-only search -- see ADR 0017 for the gap this
+   * closes). */
+  source: "pubmed" | "core";
+  /** Set for source "pubmed"; null for "core" (CORE has no PMID). */
+  pmid: string | null;
+  /** Set when known for either source; PubMed's esummary response never
+   * supplies one, so this is null there. */
+  doi: string | null;
 }
 
 export interface ScienceAgentResult {

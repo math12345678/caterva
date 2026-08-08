@@ -505,3 +505,154 @@ def test_ki_exact_row_does_not_borrow_km_provenance(ldh_ki_provider, ldh_provide
     assert km.citation.reference_id == "740253"
     assert ki.citation.reference_id == "711801"
     assert km.citation.reference_id != ki.citation.reference_id
+
+
+# ---------------------------------------------------------------------------
+# CORE open-access full text supplements the PubMed literature tier (not a
+# replacement -- see the comment above the call site in fallback_logic.py).
+# core_fulltext.resolve_open_access_fulltext is monkeypatched directly
+# rather than going through its own fetch layer, mirroring how
+# search_pubmed_candidates is monkeypatched above: this suite tests
+# fallback_logic's integration logic, not core_fulltext's own network
+# handling (that lives in test_core_fulltext.py).
+# ---------------------------------------------------------------------------
+
+from core_fulltext import CoreFullTextCandidate, CoreFullTextResult
+
+
+def test_core_candidates_are_appended_to_pubmed_candidates(monkeypatch, ldh_provider):
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5, quantity="km"):
+        return [
+            LiteratureCandidate(
+                pmid="11111111", title="A PubMed result", url="https://pubmed.ncbi.nlm.nih.gov/11111111/",
+            )
+        ]
+
+    def fake_core(query, max_results=5, fetch=None):
+        return CoreFullTextResult(
+            found=True,
+            candidates=[
+                CoreFullTextCandidate(
+                    core_id="99999999",
+                    title="An open-access CORE result",
+                    doi="10.1000/core.example",
+                    download_url="https://core.ac.uk/download/99999999.pdf",
+                )
+            ],
+            search_log=["CORE search returned 1 candidate(s)"],
+        )
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", fake_pubmed)
+    monkeypatch.setattr(fallback_logic.core_fulltext, "resolve_open_access_fulltext", fake_core)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.found is False
+    assert result.source == "literature_candidates"
+    assert len(result.literature_candidates) == 2
+
+    by_source = {c.source: c for c in result.literature_candidates}
+    assert by_source["pubmed"].pmid == "11111111"
+    assert by_source["pubmed"].doi is None
+    assert by_source["core"].pmid is None
+    assert by_source["core"].doi == "10.1000/core.example"
+    assert by_source["core"].url == "https://core.ac.uk/download/99999999.pdf"
+
+
+def test_core_result_without_download_url_falls_back_to_a_core_works_link(
+    monkeypatch, ldh_provider
+):
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5, quantity="km"):
+        return []
+
+    def fake_core(query, max_results=5, fetch=None):
+        return CoreFullTextResult(
+            found=True,
+            candidates=[
+                CoreFullTextCandidate(core_id="42", title="No download URL on this one")
+            ],
+            search_log=["CORE search returned 1 candidate(s)"],
+        )
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", fake_pubmed)
+    monkeypatch.setattr(fallback_logic.core_fulltext, "resolve_open_access_fulltext", fake_core)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.literature_candidates[0].url == "https://core.ac.uk/works/42"
+
+
+def test_core_finding_nothing_does_not_prevent_pubmed_results_from_surfacing(
+    monkeypatch, ldh_provider
+):
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5, quantity="km"):
+        return [
+            LiteratureCandidate(
+                pmid="22222222", title="Only a PubMed result", url="https://pubmed.ncbi.nlm.nih.gov/22222222/",
+            )
+        ]
+
+    def fake_core(query, max_results=5, fetch=None):
+        return CoreFullTextResult(found=False, search_log=["CORE_API_KEY is not set"])
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", fake_pubmed)
+    monkeypatch.setattr(fallback_logic.core_fulltext, "resolve_open_access_fulltext", fake_core)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.found is False
+    assert result.source == "literature_candidates"
+    assert len(result.literature_candidates) == 1
+    assert result.literature_candidates[0].source == "pubmed"
+
+
+def test_neither_pubmed_nor_core_finding_anything_is_a_genuine_gap(
+    monkeypatch, ldh_provider
+):
+    def fake_pubmed(enzyme_name, organism, substrate, max_results=5, quantity="km"):
+        return []
+
+    def fake_core(query, max_results=5, fetch=None):
+        return CoreFullTextResult(found=False, search_log=["no results"])
+
+    monkeypatch.setattr(fallback_logic, "search_pubmed_candidates", fake_pubmed)
+    monkeypatch.setattr(fallback_logic.core_fulltext, "resolve_open_access_fulltext", fake_core)
+
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+    )
+    assert result.found is False
+    assert result.source == "not_found"
+    assert "genuine gap" in result.search_log[-1]
+    assert "CORE" in result.search_log[-1]
+
+
+def test_search_literature_false_skips_core_too(monkeypatch, ldh_provider):
+    """search_literature=False must skip BOTH literature tiers, not just
+    PubMed -- a caller that opted out of literature search entirely
+    should never trigger a CORE network call either."""
+    def should_not_be_called(query, max_results=5, fetch=None):
+        raise AssertionError("CORE search should not be called")
+
+    monkeypatch.setattr(
+        fallback_logic.core_fulltext, "resolve_open_access_fulltext", should_not_be_called
+    )
+
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "a-substrate-not-in-any-fixture-row",
+        html_provider=ldh_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.found is False
