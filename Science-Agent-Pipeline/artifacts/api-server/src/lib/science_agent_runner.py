@@ -141,6 +141,12 @@ def resolve_kinetic_value(
     We keep the orchestrator thin so that OpenCode can swap it out for a
     different resolver (e.g., a local model or another database) without
     touching the Node/TypeScript side.
+
+    ``quantity`` ("km" or "ki") passes straight through to
+    fallback_logic.resolve_kinetic_value, which owns the mapping to a
+    BRENDA table label (QUANTITY_TABLE_LABELS in fallback_logic.py) and to
+    the PubMed query term. This wrapper does no translation of its own so
+    there's exactly one place that mapping can drift.
     """
     return fallback_logic.resolve_kinetic_value(
         enzyme_ec=ec_number,
