@@ -192,6 +192,71 @@ def vmax_from_kcat(
     return vmax, v
 
 
+def beta_gamma_from_r0(
+    r0: float, infectious_period_days: float
+) -> tuple[float, float, ParameterValidation]:
+    """Convert a disease's basic reproduction number and characteristic
+    infectious period into the SIR engine's own (beta, gamma) parameters.
+
+    ``simulate_sir`` takes beta and gamma directly, not R0 -- and R0 is
+    what epidemiological literature actually reports for a named disease.
+    The two-compartment SIR model defines R0 = beta / gamma itself
+    (validate_sir_params checks exactly this ratio), so the bridge is pure
+    arithmetic once both literature quantities are in hand:
+
+        gamma = 1 / infectious_period_days
+        beta  = r0 * gamma
+
+    This mirrors ``vmax_from_kcat``: a resolved literature quantity (R0)
+    needs one more number the source doesn't itself supply as a Terrium
+    parameter, and the conversion lives here rather than being folded into
+    the engine signature, so every existing SIR golden trajectory holds
+    unchanged. See docs/adr/0017-epidemiology-parameter-resolution.md.
+
+    A caveat worth stating plainly: ``infectious_period_days`` here is a
+    generation-time-style quantity (mean serial interval), not a strict
+    virological shedding-duration measurement. For a two-compartment SIR
+    model with no separate exposed/latent stage, the generation time *is*
+    what 1/gamma represents -- using a serial interval as its estimate is
+    the standard simplification this style of model has always made, not
+    a shortcut invented here. See the ADR for the specific literature
+    values this applies to.
+
+    Units: dimensionless R0, ``infectious_period_days`` in days, returned
+    gamma in 1/day, returned beta in 1/day (matching gamma's rate unit --
+    the SIR model's beta and gamma share units, unlike Vmax and kcat).
+
+    Returns ``(beta, gamma, validation)``. Non-finite or non-positive
+    inputs are rejected. The R0-implausibility check itself is left to
+    ``validate_sir_params``, which already re-derives R0 = beta/gamma from
+    whatever reaches it -- duplicating that bound here would be two
+    thresholds to keep in sync instead of one.
+    """
+    errors: List[str] = []
+
+    _finite_positive(r0, "r0", errors, allow_zero=False)
+    _finite_positive(
+        infectious_period_days, "infectious_period_days", errors, allow_zero=False
+    )
+
+    if errors:
+        return 0.0, 0.0, ParameterValidation(ok=False, errors=errors)
+
+    gamma = 1.0 / infectious_period_days
+    beta = r0 * gamma
+
+    if not (math.isfinite(gamma) and math.isfinite(beta)):
+        return 0.0, 0.0, ParameterValidation(
+            ok=False,
+            errors=[
+                (f"R0 {r0:g} / infectious period {infectious_period_days:g} days "
+                 "produced a non-finite beta or gamma")
+            ],
+        )
+
+    return beta, gamma, ParameterValidation()
+
+
 def validate_sir_params(beta: float, gamma: float, s0: float, i0: float,
                         r0_recovered: float = 0.0) -> ParameterValidation:
     """Check an SIR parameter set.
