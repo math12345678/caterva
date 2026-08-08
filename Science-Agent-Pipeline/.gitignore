@@ -54,6 +54,18 @@ dev.log
 __pycache__/
 *.pyc
 
+# Secrets. This directory had NO .env pattern at all until this line --
+# a real secrets file (67.env, containing live API keys) was sitting here
+# untracked-but-unignored, meaning a plain `git add .` would have staged
+# and committed it straight to a public GitHub repo. `.env*` covers every
+# naming variant (.env, .env.local, 67.env, etc.); the `!.env.example`
+# carve-out keeps a documented-but-empty template committable, matching
+# terrium-site's existing convention.
+.env
+.env.*
+*.env
+!.env.example
+
 # Runtime data written by the api-server (waitlist signups, job result
 # cache) -- these are generated on first run, not source.
 #

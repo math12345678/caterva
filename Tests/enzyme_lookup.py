@@ -25,12 +25,30 @@ what the test suite exercises against saved fixture text.
 
 from __future__ import annotations
 
+import os
 import re
 from urllib.parse import quote
 
 import httpx
 
 from http_retry import retry_get
+
+#: Optional NCBI API key (free, from https://www.ncbi.nlm.nih.gov/account/
+#: settings/ -> "API Key Management"). Without one, E-utilities caps
+#: requests at 3/sec per IP; with one, 10/sec. Read once at import time
+#: like the rest of this module's constants -- every NCBI call below
+#: attaches it when present and omits it when absent, so this remains
+#: fully functional (just more rate-limited) with no key configured at
+#: all, exactly like every other resolver in this project degrading
+#: gracefully rather than requiring configuration to run.
+NCBI_API_KEY = os.environ.get("NCBI_API_KEY")
+
+
+def _ncbi_params(**params: str | int) -> dict[str, str | int]:
+    """Merge caller params with the NCBI API key, when configured."""
+    if NCBI_API_KEY:
+        params["api_key"] = NCBI_API_KEY
+    return params
 
 UNIPROT_SEARCH_URL = "https://rest.uniprot.org/uniprotkb/search"
 KEGG_GET_URL = "https://rest.kegg.jp/get/ec:{ec_number}"
@@ -64,11 +82,11 @@ def fetch_taxon_id(organism_name: str, timeout: float = 15) -> str | None:
     organism string to the wrong taxon for ambiguous names. Restricting
     to Scientific Name is the precise, correct match for BRENDA's
     binomial-nomenclature organism strings (e.g. "Homo sapiens")."""
-    params = {
-        "db": "taxonomy",
-        "term": f"{organism_name}[Scientific Name]",
-        "retmode": "json",
-    }
+    params = _ncbi_params(
+        db="taxonomy",
+        term=f"{organism_name}[Scientific Name]",
+        retmode="json",
+    )
     r = retry_get(NCBI_TAXONOMY_ESEARCH_URL, params=params, timeout=timeout)
     r.raise_for_status()
     return parse_taxon_id(r.json())
