@@ -19,7 +19,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,165 tests (907 engine + 258 literature)
+make test      # runs all 1,191 tests (922 engine + 269 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -150,12 +150,12 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 ```
 Terrium/
 ├── Tellurium/                  simulation engine (ODE + discrete/stochastic)
-│   ├── tellurium_engine.py     public entry point (84 names)
-│   └── tests/                  907 tests
+│   ├── tellurium_engine.py     public entry point (88 names)
+│   └── tests/                  922 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                     258 tests
+│   └── ...                     269 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
@@ -212,10 +212,10 @@ them together.
 
 ```bash
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 1,165 tests
+make test        # run all 1,191 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (907 tests)
-make test-lit    # literature layer only (258 tests)
+make test-sim    # simulation engine only (922 tests)
+make test-lit    # literature layer only (269 tests)
 python3 scripts/verify_build.py --quick  # all 11 guard scripts (~8s)
 make clean       # remove caches
 ```

@@ -39,3 +39,4 @@ Each ADR has:
 | [0014](0014-python-version-support.md) | Python 3.10–3.13, and what actually constrains it |
 | [0015](0015-constitution-rules-must-be-executable.md) | A constitution rule that nothing executes is not enforced |
 | [0016](0016-cached-results-lose-parameter-provenance.md) | Cached results serve no per-parameter provenance |
+| [0017](0017-epidemiology-parameter-resolution.md) | Epidemiology parameters (R0, infectious period) are resolved from a hand-curated registry, not yet wired to RESOLVABLE_FIELDS |

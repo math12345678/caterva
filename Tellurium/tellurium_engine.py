@@ -66,6 +66,7 @@ try:
         validate_md_params,
         validate_ssa_bimolecular_params,
         vmax_from_kcat,
+        beta_gamma_from_r0,
         validate_ssa_params,
         validate_ssa_replicates_params,
     )  # type: ignore[no-redef]
@@ -177,6 +178,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         validate_md_params,
         validate_ssa_bimolecular_params,
         vmax_from_kcat,
+        beta_gamma_from_r0,
         validate_ssa_params,
         validate_ssa_replicates_params,
         validate_mm_competitive_params,
@@ -284,6 +286,7 @@ __all__ = [
     "_compute_lj_potential",
     "_normalise_stationary_vector",
     "antimony_to_sbml",
+    "beta_gamma_from_r0",
     "build_michaelis_menten_antimony",
     "build_mm_competitive_antimony",
     "build_seir_antimony",
