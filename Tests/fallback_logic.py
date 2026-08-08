@@ -33,6 +33,7 @@ from typing import Callable
 import httpx
 from pydantic import BaseModel
 
+import core_fulltext
 import enzyme_lookup
 from http_retry import retry_get
 
@@ -64,9 +65,20 @@ QUANTITY_TABLE_LABELS = {
 
 
 class LiteratureCandidate(BaseModel):
-    pmid: str
     title: str
     url: str
+    #: "pubmed" (default, unchanged from before CORE was added) or "core"
+    #: (open-access full text via Tests/core_fulltext.py). Kept explicit
+    #: rather than inferred from which ID field is set, since a CORE
+    #: result can itself carry a pmid-shaped-looking numeric ID that is
+    #: NOT a PMID -- collapsing the two would let a CORE result silently
+    #: masquerade as a PubMed one.
+    source: str = "pubmed"
+    #: Set for source="pubmed"; None for source="core".
+    pmid: str | None = None
+    #: Set when known for either source; CORE search results commonly
+    #: carry a DOI, PubMed's esummary response does not.
+    doi: str | None = None
 
 
 class KineticResult(BaseModel):
@@ -295,10 +307,46 @@ def resolve_kinetic_value(
     candidates = search_pubmed_candidates(
         enzyme_name or enzyme_ec, organism, substrate, quantity=quantity
     )
+
+    # CORE supplements PubMed rather than replacing it: PubMed indexes far
+    # more biomedical literature overall, but a fraction of what it finds
+    # has no open-access full text (see ADR 0017 -- Guerra et al. 2017's
+    # measles R0 review, PMID 28757186, is exactly this case: indexed by
+    # PubMed, but its full stratified R0 table was unreachable without a
+    # subscription). Appending CORE candidates rather than branching on
+    # "PubMed found nothing" means a query that DOES have PubMed hits
+    # still benefits if CORE surfaces an open-access source for the same
+    # topic that PubMed's metadata-only search didn't fully capture.
+    # core_fulltext.resolve_open_access_fulltext() already degrades to
+    # found=False with no exception when CORE_API_KEY is unset or the
+    # request fails, so this is safe to call unconditionally.
+    core_query = f"{enzyme_name or enzyme_ec} {organism} {substrate} {quantity_upper}"
+    core_result = core_fulltext.resolve_open_access_fulltext(core_query)
+    if core_result.found:
+        log.append(
+            f"CORE open-access search added {len(core_result.candidates)} "
+            f"candidate(s): {'; '.join(core_result.search_log)}"
+        )
+        for c in core_result.candidates:
+            candidates.append(
+                LiteratureCandidate(
+                    title=c.title,
+                    url=c.download_url or f"https://core.ac.uk/works/{c.core_id}",
+                    source="core",
+                    doi=c.doi,
+                )
+            )
+    elif core_fulltext.CORE_API_KEY:
+        # Only log a CORE miss when a key was actually configured -- an
+        # unconfigured key already has its own "skipped" log entry inside
+        # resolve_open_access_fulltext, and duplicating it here would be
+        # noise on every single call for anyone who never set CORE_API_KEY.
+        log.append(f"CORE open-access search: {'; '.join(core_result.search_log)}")
+
     if candidates:
         log.append(
-            f"Found {len(candidates)} candidate paper(s); numeric {quantity_upper} NOT "
-            f"auto-extracted, needs manual review"
+            f"Found {len(candidates)} candidate paper(s) total; numeric "
+            f"{quantity_upper} NOT auto-extracted, needs manual review"
         )
         return KineticResult(
             found=False,
@@ -307,7 +355,9 @@ def resolve_kinetic_value(
             search_log=log,
         )
 
-    log.append("Exhausted BRENDA (exact + cross-species) and PubMed - genuine gap")
+    log.append(
+        "Exhausted BRENDA (exact + cross-species), PubMed, and CORE - genuine gap"
+    )
     return KineticResult(found=False, source="not_found", search_log=log)
 
 

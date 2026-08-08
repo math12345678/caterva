@@ -71,6 +71,46 @@ describe("runner-boundary contract (Stage 5 Part 4)", () => {
     expect(result.source).toBe("brenda_cross_species");
   });
 
+  it("carries both PubMed and CORE literature candidates with their distinct null patterns", () => {
+    // CORE open-access search supplements PubMed (fallback_logic.py, see
+    // ADR 0017) -- a PubMed candidate has pmid set and doi null; a CORE
+    // candidate has the opposite. This is the TS-side half of
+    // test_runner_contract.py's test_core_candidate_output_shape /
+    // test_not_found_output_shape pair.
+    const result = parseAgentOutput(
+      JSON.stringify({
+        ok: true,
+        found: false,
+        source: "literature_candidates",
+        literatureCandidates: [
+          {
+            pmid: "34962677",
+            title: "A PubMed result",
+            url: "https://pubmed.ncbi.nlm.nih.gov/34962677/",
+            source: "pubmed",
+            doi: null,
+          },
+          {
+            pmid: null,
+            title: "An open-access CORE result",
+            url: "https://core.ac.uk/download/99999999.pdf",
+            source: "core",
+            doi: "10.1000/core.example",
+          },
+        ],
+        logs: [],
+      }),
+    );
+    expect(result.literatureCandidates).toHaveLength(2);
+    const [pubmed, core] = result.literatureCandidates;
+    expect(pubmed!.source).toBe("pubmed");
+    expect(pubmed!.pmid).toBe("34962677");
+    expect(pubmed!.doi).toBeNull();
+    expect(core!.source).toBe("core");
+    expect(core!.pmid).toBeNull();
+    expect(core!.doi).toBe("10.1000/core.example");
+  });
+
   it("a not-found result parses without a value", () => {
     const result = parseAgentOutput(
       JSON.stringify({ ok: true, found: false, source: "not_found", logs: [] }),

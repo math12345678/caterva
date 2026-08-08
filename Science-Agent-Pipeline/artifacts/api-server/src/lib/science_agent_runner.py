@@ -196,11 +196,17 @@ def _citation_to_dict(citation) -> Dict[str, Any] | None:
 
 
 def _candidates_to_dict(candidates) -> list:
+    # source/pmid/doi added when CORE open-access search started
+    # supplementing PubMed (fallback_logic.py) -- pmid and doi are each
+    # None on the source that doesn't provide them (CORE has no PMID;
+    # PubMed's esummary response has no DOI), never fabricated as "".
     return [
         {
             "pmid": c.pmid,
             "title": c.title,
             "url": c.url,
+            "source": c.source,
+            "doi": c.doi,
         }
         for c in candidates
     ]

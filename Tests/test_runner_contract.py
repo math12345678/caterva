@@ -234,7 +234,50 @@ def test_not_found_output_shape(monkeypatch):
         "source": "literature_candidates",
         "literatureCandidates": [
             {"pmid": "34962677", "title": "Some paper",
-             "url": "https://pubmed.ncbi.nlm.nih.gov/34962677/"}
+             "url": "https://pubmed.ncbi.nlm.nih.gov/34962677/",
+             "source": "pubmed", "doi": None}
+        ],
+        "logs": ["genuine gap"],
+    }
+
+
+def test_core_candidate_output_shape(monkeypatch):
+    """A CORE-sourced candidate (fallback_logic.py's open-access search,
+    added alongside PubMed -- see ADR 0017) must reach the JSON boundary
+    with pmid=null and doi populated -- the exact opposite null pattern
+    from a PubMed candidate. If scienceAgent.ts's LiteratureCandidate
+    interface (pmid: string | null, doi: string | null) ever drifted from
+    this shape, this is the test that would catch it, from the Python
+    side of the boundary."""
+    def not_found(*a, **k):
+        return KineticResult(
+            found=False,
+            source="literature_candidates",
+            literature_candidates=[
+                fallback_logic.LiteratureCandidate(
+                    title="An open-access CORE result",
+                    url="https://core.ac.uk/download/99999999.pdf",
+                    source="core",
+                    doi="10.1000/core.example",
+                )
+            ],
+            search_log=["genuine gap"],
+        )
+
+    result = run_main(
+        monkeypatch,
+        not_found,
+        {"enzymeName": "lactate dehydrogenase", "substrate": "x",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+    )
+    assert result == {
+        "ok": True,
+        "found": False,
+        "source": "literature_candidates",
+        "literatureCandidates": [
+            {"pmid": None, "title": "An open-access CORE result",
+             "url": "https://core.ac.uk/download/99999999.pdf",
+             "source": "core", "doi": "10.1000/core.example"}
         ],
         "logs": ["genuine gap"],
     }
