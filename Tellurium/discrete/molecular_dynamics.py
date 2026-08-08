@@ -220,9 +220,6 @@ def lj_cluster_positions(n_particles: int) -> np.ndarray:
         f"got {n_particles}")
 
 
-    return v
-
-
 def simulate_molecular_dynamics(
     n_particles: int,
     temperature: float,
