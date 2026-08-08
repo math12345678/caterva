@@ -68,31 +68,130 @@ Rules:
 3. If the query is ambiguous, choose the most likely domain and explain in "reasoning".
 4. Populate "entities" with any enzyme information you can extract from the query; omit or set to null if none is present.`;
 
+/**
+ * Known OpenAI-compatible providers, selected via LLM_PROVIDER. This is
+ * purely a convenience layer over the generic LLM_API_KEY/LLM_API_URL/
+ * LLM_MODEL override that already existed -- every entry here resolves to
+ * exactly the same request shape (POST {url}, Authorization: Bearer
+ * {key}, an OpenAI-style chat/completions body). Nothing about the
+ * resolver's *trust* semantics changes: every value this path returns is
+ * still origin "llm" (see ADR 0011), never "resolved" -- adding more
+ * providers is about which vendor answers the request, not about
+ * upgrading an LLM guess into a literature citation.
+ *
+ * Each provider's API key is read from its own PROVIDER_API_KEY variable
+ * (e.g. GROQ_API_KEY) rather than overloading LLM_API_KEY, so more than
+ * one can be configured at once without one silently shadowing another.
+ */
+interface LLMProviderConfig {
+  apiUrl: string;
+  apiKeyEnvVar: string;
+  defaultModel: string;
+  /** Whether this provider is known to support response_format:
+   * json_object. Unknown/unlisted providers default to false (see
+   * supportsJsonResponseFormat) -- forcing JSON mode on a provider that
+   * doesn't support it fails the request outright, so the safe default
+   * is to only opt in providers this has been checked against. */
+  supportsJsonMode: boolean;
+}
+
+const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
+  openai: {
+    apiUrl: "https://api.openai.com/v1/chat/completions",
+    apiKeyEnvVar: "OPENAI_API_KEY",
+    defaultModel: "gpt-4o-mini",
+    supportsJsonMode: true,
+  },
+  groq: {
+    apiUrl: "https://api.groq.com/openai/v1/chat/completions",
+    apiKeyEnvVar: "GROQ_API_KEY",
+    defaultModel: "llama-3.3-70b-versatile",
+    supportsJsonMode: true,
+  },
+  openrouter: {
+    apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+    apiKeyEnvVar: "OPENROUTER_API_KEY",
+    defaultModel: "openai/gpt-4o-mini",
+    supportsJsonMode: true,
+  },
+  mistral: {
+    apiUrl: "https://api.mistral.ai/v1/chat/completions",
+    apiKeyEnvVar: "MISTRAL_API_KEY",
+    defaultModel: "mistral-small-latest",
+    supportsJsonMode: true,
+  },
+  siliconflow: {
+    apiUrl: "https://api.siliconflow.com/v1/chat/completions",
+    apiKeyEnvVar: "SILICONFLOW_API_KEY",
+    defaultModel: "Qwen/Qwen2.5-7B-Instruct",
+    supportsJsonMode: false,
+  },
+  tokenrouter: {
+    apiUrl: "https://api.tokenrouter.io/v1/chat/completions",
+    apiKeyEnvVar: "TOKENROUTER_API_KEY",
+    defaultModel: "gpt-4o-mini",
+    supportsJsonMode: true,
+  },
+};
+
+/**
+ * Resolve which provider config is active. LLM_PROVIDER selects by name
+ * from LLM_PROVIDERS above; when unset (or set to an unrecognised name),
+ * this falls back to the original generic OPENAI_API_KEY/LLM_API_KEY /
+ * OPENAI_API_URL/LLM_API_URL override path -- so existing deployments
+ * that never set LLM_PROVIDER keep working unchanged.
+ */
+function activeProvider(): LLMProviderConfig | null {
+  const name = process.env.LLM_PROVIDER?.toLowerCase();
+  if (name && LLM_PROVIDERS[name]) {
+    return LLM_PROVIDERS[name];
+  }
+  return null;
+}
+
 function getApiKey(): string | undefined {
+  const provider = activeProvider();
+  if (provider) {
+    return process.env[provider.apiKeyEnvVar] || process.env.LLM_API_KEY;
+  }
   return process.env.OPENAI_API_KEY || process.env.LLM_API_KEY;
 }
 
 function getApiUrl(): string {
+  const provider = activeProvider();
   return (
     process.env.OPENAI_API_URL ||
     process.env.LLM_API_URL ||
+    provider?.apiUrl ||
     "https://api.openai.com/v1/chat/completions"
   );
 }
 
 function getModel(): string {
-  return process.env.OPENAI_MODEL || process.env.LLM_MODEL || "gpt-4o-mini";
+  const provider = activeProvider();
+  return (
+    process.env.OPENAI_MODEL ||
+    process.env.LLM_MODEL ||
+    provider?.defaultModel ||
+    "gpt-4o-mini"
+  );
 }
 
 /**
- * Not every OpenAI-compatible provider supports `response_format`. Only force
- * JSON mode when we are clearly talking to OpenAI, or when the operator has
- * explicitly opted in via LLM_FORCE_JSON=true.
+ * Not every OpenAI-compatible provider supports `response_format`. An
+ * explicit LLM_FORCE_JSON always wins; otherwise a recognised
+ * LLM_PROVIDER's own supportsJsonMode flag is authoritative (this is what
+ * lets SiliconFlow -- known not to support it -- correctly opt out even
+ * though its URL doesn't contain "api.openai.com"); falling back to the
+ * original OpenAI-URL heuristic only when no provider is selected at all,
+ * so the generic LLM_API_URL override path is unchanged.
  */
 function supportsJsonResponseFormat(url: string): boolean {
   const forced = process.env.LLM_FORCE_JSON;
   if (forced === "true") return true;
   if (forced === "false") return false;
+  const provider = activeProvider();
+  if (provider) return provider.supportsJsonMode;
   return url.includes("api.openai.com");
 }
 
