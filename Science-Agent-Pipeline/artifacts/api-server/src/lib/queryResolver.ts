@@ -114,7 +114,7 @@ async function applyKineticResolution(
         ? "flagged"
         : "verified";
 
-    const value = agentResult.km ?? agentResult.ki;
+    const value = key === "km" ? agentResult.km : agentResult.ki;
     if (value !== undefined) {
       parameters = { ...parameters, [key]: value };
       parameterProvenance = {
