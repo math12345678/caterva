@@ -27,6 +27,7 @@ was never wired to anything real - this version is.
 """
 from __future__ import annotations
 
+import os
 from typing import Callable
 
 import httpx
@@ -34,6 +35,13 @@ from pydantic import BaseModel
 
 import enzyme_lookup
 from http_retry import retry_get
+
+#: Optional NCBI API key -- see enzyme_lookup.py's NCBI_API_KEY for the
+#: full rationale (free key, raises E-utilities from 3 to 10 req/sec,
+#: fully optional). Read separately here rather than importing
+#: enzyme_lookup.NCBI_API_KEY so this module has no import-time
+#: dependency on enzyme_lookup just for a constant.
+NCBI_API_KEY = os.environ.get("NCBI_API_KEY")
 from brenda_client import (
     BRENDAKmEntry,
     KI_TABLE_LABEL,
@@ -175,19 +183,23 @@ def search_pubmed_candidates(
     that requires human judgment to do reliably and safely."""
     quantity_term = "inhibition constant" if quantity == "ki" else "Km kinetics"
     query = f"{enzyme_name} {organism} {substrate} {quantity_term}"
-    r = retry_get(
-        PUBMED_ESEARCH_URL,
-        params={"db": "pubmed", "term": query, "retmax": max_results, "retmode": "json"},
-        timeout=15,
-    )
+    esearch_params = {
+        "db": "pubmed", "term": query, "retmax": max_results, "retmode": "json",
+    }
+    if NCBI_API_KEY:
+        esearch_params["api_key"] = NCBI_API_KEY
+    r = retry_get(PUBMED_ESEARCH_URL, params=esearch_params, timeout=15)
     r.raise_for_status()
     ids = r.json()["esearchresult"]["idlist"]
     if not ids:
         return []
 
+    esummary_params = {"db": "pubmed", "id": ",".join(ids), "retmode": "json"}
+    if NCBI_API_KEY:
+        esummary_params["api_key"] = NCBI_API_KEY
     r2 = retry_get(
         PUBMED_ESUMMARY_URL,
-        params={"db": "pubmed", "id": ",".join(ids), "retmode": "json"},
+        params=esummary_params,
         timeout=15,
     )
     r2.raise_for_status()
