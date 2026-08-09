@@ -84,8 +84,18 @@ export const MM_CI_LITERATURE: DomainLiterature = {
     {
       authors: "Lineweaver, H., & Burk, D.",
       year: 1934,
-      title: "The determination of enzyme dissociation constants",
-      doi: "10.1021/ja01349a014",
+      // doi "10.1021/ja01349a014" was WRONG: CrossRef registers it as
+      // "THE RAMAN SPECTRUM OF GERMANIUM TETRACHLORIDE" -- a real paper on
+      // an unrelated subject. Caught by the CrossRef title check.
+      //
+      // No replacement DOI is asserted here. J. Am. Chem. Soc. 1934 predates
+      // PubMed's coverage, so it could not be verified against a primary
+      // source from this environment, and substituting a plausible-looking
+      // DOI is exactly the mistake being corrected. The journal, volume and
+      // pages below are sufficient to locate the paper.
+      title:
+        "The Determination of Enzyme Dissociation Constants. " +
+        "J. Am. Chem. Soc. 56(3), 658-666",
     },
   ],
   defaultJustification:
@@ -295,8 +305,12 @@ export const TWO_LOCUS_WRIGHT_FISHER_LITERATURE: DomainLiterature = {
     {
       authors: "Wright, S.",
       year: 1931,
-      title: "Evolution in Mendelian populations",
-      doi: "10.1038/127487a0",
+      // Previously doi "10.1038/127487a0" -- a real Nature DOI for
+      // "Oceanographical Expedition of the Dana, 1928-1930", an entirely
+      // unrelated paper. Caught by the CrossRef title check.
+      // Verified via PubMed 2026-08-09: PMID 17246615, PMC1201091.
+      title: "Evolution in Mendelian Populations. Genetics 16(2), 97-159",
+      doi: "10.1093/genetics/16.2.97",
     },
     {
       authors: "Fisher, R. A.",

@@ -66,7 +66,15 @@ PMIDS = ["740253", "34962677", "31520487"]
 # DOIs cited for resolved values (popgen_resolver.py via stdpopsim; ADR 0017
 # epidemiology registry). Kermack & McKendrick 1927 is the SIR model citation.
 DOIS = [
-    "10.1038/ng.3141",  # Rahbari et al. 2015, Nature Genetics (human mutation rate)
+    # "10.1038/ng.3141" was listed here as "Rahbari et al. 2015 (human
+    # mutation rate)" and removed 2026-08-09. It is a THIRD distinct
+    # Rahbari DOI, alongside ng.3285 (recombination -- was miscited for a
+    # mutation rate) and ng.3469 (the actual germline-mutation paper,
+    # verified via PubMed PMID 26656846). Nothing in the codebase cites
+    # ng.3141: popgen_resolver.py resolves from stdpopsim and carries
+    # stdpopsim's own citations (IHGSC 2001, Jonsson 2017), both of which
+    # the discovery pass below picks up. An unverified DOI in a checker's
+    # own allowlist is the checker asserting something it never checked.
     "10.1098/rspa.1927.0118",  # Kermack & McKendrick 1927, Proc. R. Soc. A
 ]
 
@@ -96,15 +104,37 @@ DOI_SOURCE_FILES = [
 DOI_PATTERN = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>,)\]}]+)")
 
 
+#: Lines that merely *discuss* a DOI rather than cite it. When a wrong DOI
+#: is corrected, the comment explaining what it used to be stays behind --
+#: and a naive scrape then re-checks the very DOI that was just removed,
+#: turning every documented mistake into a permanent failing check. Three
+#: corrected DOIs (the fabricated Michaelis-Menten one, the recombination
+#: paper, "Mitotic motors") reappeared this way immediately after being
+#: fixed.
+_COMMENT_PREFIXES = ("#", "//", "*", "/*")
+
+
+def _is_prose_line(line: str) -> bool:
+    return line.lstrip().startswith(_COMMENT_PREFIXES)
+
+
 def discovered_dois() -> dict[str, list[str]]:
-    """Every DOI appearing in DOI_SOURCE_FILES, mapped to where it appears."""
+    """Every DOI *cited* in DOI_SOURCE_FILES, mapped to where it appears.
+
+    Comment lines are skipped: a DOI named in prose is being discussed, not
+    asserted, and checking it reports failures for citations the code no
+    longer makes.
+    """
     found: dict[str, list[str]] = {}
     for path in DOI_SOURCE_FILES:
         if not path.is_file():
             continue
-        for match in DOI_PATTERN.finditer(path.read_text(encoding="utf-8")):
-            doi = match.group(1).rstrip(".;")
-            found.setdefault(doi, []).append(path.name)
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if _is_prose_line(line):
+                continue
+            for match in DOI_PATTERN.finditer(line):
+                doi = match.group(1).rstrip(".;")
+                found.setdefault(doi, []).append(path.name)
     return found
 
 QUERY_RESOLVER = ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts"
