@@ -29,11 +29,21 @@ actual progress instead of only living in a .pptx nobody re-opens.
 
 ## Phase 2 -- Expand domains
 
-- [ ] Remaining three domains: Monte Carlo simulation, population genetics,
-      molecular dynamics setup -- each needs the same treatment PCR just
-      got: real engine code, a real test suite, mutation-tested, not a
-      placeholder "planned" tag on the landing page
-- [ ] Multiple pilot courses/institutions, not just one
+- [x] Monte Carlo pi estimation -- real engine code, verified against the
+      CLT error rate, mutation-tested
+- [x] Population genetics -- Wright-Fisher (neutral drift, selection,
+      structured populations, two-locus with recombination), verified
+      against Kimura's fixation probability and the exact Markov-chain
+      layer, mutation-tested
+- [x] Molecular dynamics -- Lennard-Jones cluster (velocity Verlet),
+      verified against energy/momentum conservation and published
+      global-minimum energies (Hoare & Pal 1971), mutation-tested
+- [x] Two further domains beyond the original Phase 2 scope also shipped:
+      Gillespie SSA (first-order decay and bimolecular association),
+      verified against exact closed forms and hand-verified golden
+      trajectories
+- [ ] Multiple pilot courses/institutions, not just one -- unchanged from
+      Phase 1; expanding domains does not substitute for this
 
 ## Phase 3 -- Scale
 
@@ -43,8 +53,12 @@ actual progress instead of only living in a .pptx nobody re-opens.
 
 ## A note on scope discipline
 
-Phase 2's new domains are deliberately not started yet -- funding and the
-backend hire are still open, and building three more domains before either
-of those is resolved would be effort spent on the wrong bottleneck. This
-file exists so that's a visible, deliberate choice, not something that just
-quietly didn't happen.
+Phase 2's domains got built anyway, ahead of funding and the backend hire
+closing -- this file previously said that was a deliberate deferral, and by
+the time this line was corrected (2026-08-09) that was no longer true and
+had not been for a while. The actual bottleneck now is unchanged from
+Phase 1: no pilot course, no real student use, funding still open. Domain
+count was never the constraint; validation is. Building more domains
+without a pilot to put them in front of remains effort spent on the wrong
+bottleneck -- the correction here is to the *status*, not the underlying
+principle.

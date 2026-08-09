@@ -47,6 +47,7 @@ from brenda_client import (
     BRENDAKmEntry,
     KI_TABLE_LABEL,
     KM_TABLE_LABEL,
+    TURNOVER_TABLE_LABEL,
     fetch_brenda_html,
     parse_brenda_km_html,
 )
@@ -58,9 +59,22 @@ PUBMED_ESUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fc
 # Which BRENDA table a quantity resolves from. Km and Ki are both
 # concentrations in mM served by their own table ("KM Values" / "Ki
 # Values"); the mapping is what lets one resolution chain serve both.
+#
+# "kcat" resolves the same way (BRENDA "Turnover Numbers" table, same
+# three-tier match, same STRENDA assay-condition capture) but is
+# deliberately NOT reachable through RESOLVABLE_FIELDS / the simulation
+# engine -- ADR 0012 found Vmax = kcat * [E]0 needs a caller-supplied
+# enzyme concentration Terrium has no source for, and ADR 0013 declined to
+# default or infer it. Exposing quantity="kcat" here makes a real,
+# citable turnover number resolvable and displayable (e.g. for a student
+# comparing catalytic efficiency across enzymes) without pretending it can
+# feed a simulation on its own -- see ADR 0019 for the still-open question
+# of how a caller-supplied [E]0 combines with this into a provenance chain
+# a simulation could actually use.
 QUANTITY_TABLE_LABELS = {
     "km": KM_TABLE_LABEL,
     "ki": KI_TABLE_LABEL,
+    "kcat": TURNOVER_TABLE_LABEL,
 }
 
 
@@ -193,7 +207,12 @@ def search_pubmed_candidates(
     """Search PubMed for candidate papers. Returns titles/links only -
     does not attempt to extract a numeric Km/Ki from abstract text, since
     that requires human judgment to do reliably and safely."""
-    quantity_term = "inhibition constant" if quantity == "ki" else "Km kinetics"
+    if quantity == "ki":
+        quantity_term = "inhibition constant"
+    elif quantity == "kcat":
+        quantity_term = "turnover number kcat"
+    else:
+        quantity_term = "Km kinetics"
     query = f"{enzyme_name} {organism} {substrate} {quantity_term}"
     esearch_params = {
         "db": "pubmed", "term": query, "retmax": max_results, "retmode": "json",
@@ -253,7 +272,7 @@ def resolve_kinetic_value(
     data instead of hitting the network.
     """
     table_label = QUANTITY_TABLE_LABELS.get(quantity, KM_TABLE_LABEL)
-    quantity_upper = "Ki" if quantity == "ki" else "Km"
+    quantity_upper = {"ki": "Ki", "kcat": "kcat"}.get(quantity, "Km")
     log = []
 
     log.append(f"BRENDA exact: {enzyme_ec}, {organism}, {substrate} ({quantity})")

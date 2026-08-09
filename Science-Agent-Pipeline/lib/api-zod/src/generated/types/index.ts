@@ -6,10 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './assayConditions';
+export * from './citationLocator';
+export * from './citationLocatorKind';
 export * from './errorResponse';
 export * from './healthStatus';
 export * from './parameterProvenance';
+export * from './parameterProvenanceCitationStatus';
 export * from './parameterProvenanceOrigin';
+export * from './parameterProvenanceStrendaStatus';
 export * from './provenance';
 export * from './simulationJob';
 export * from './simulationJobStatus';

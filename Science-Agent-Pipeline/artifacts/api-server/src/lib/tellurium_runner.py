@@ -10,7 +10,7 @@ Usage:
 
 Expected input JSON shape:
     {
-      "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" |
+      "domain": "mm" | "mm_competitive_inhibition" | "sir" | "seir" | "pcr" | "monte_carlo_pi" |
                  "wright_fisher" | "two_locus_wright_fisher" |
                  "molecular_dynamics" | "gillespie_ssa" |
                  "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates" | "sbml",
