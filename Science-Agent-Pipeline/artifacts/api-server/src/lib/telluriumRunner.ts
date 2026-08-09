@@ -5,20 +5,28 @@ import { fileURLToPath } from "node:url";
 import { findRepositoryRoot } from "./repoRoot";
 import { resolvePythonExecutable } from "./python";
 
+// 12 core scientific domains + SBML escape hatch. This union must
+// match tellurium_runner.py's DISPATCH table exactly (ADR 0007);
+// Tellurium/tests/test_boundary_contract.py fails if they drift.
 export type SimulationDomain =
   | "mm"
+  | "mm_competitive_inhibition"
   | "sir"
   | "seir"
-  | "pcr"
-  | "monte_carlo_pi"
   | "wright_fisher"
-  | "two_locus_wright_fisher"
-  | "molecular_dynamics"
   | "gillespie_ssa"
+  | "pcr"
+  | "molecular_dynamics"
   | "gillespie_ssa_bimolecular"
+  | "two_locus_wright_fisher"
+  // Both are in the engine's __all__ and its DISPATCH table (ADR 0007: the
+  // engine's surface is the contract). They were briefly absent here,
+  // which led to them being deleted from DISPATCH to match -- breaking
+  // five boundary-contract tests. Listed here so the drift cannot recur in
+  // that direction.
+  | "monte_carlo_pi"
   | "gillespie_ssa_replicates"
-  | "sbml"
-  | "mm_competitive_inhibition";
+  | "sbml";
 
 export interface TelluriumPoint {
   [species: string]: number;

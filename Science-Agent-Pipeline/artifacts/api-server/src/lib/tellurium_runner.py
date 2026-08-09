@@ -564,19 +564,30 @@ def run_sbml(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # domain -> engine function name. This is the contract; see ADR 0007 and
-# Tellurium/tests/test_boundary_contract.py.
+# Tellurium/tests/test_boundary_contract.py. 15 API domains + SBML escape
+# hatch.
+#
+# monte_carlo_pi and gillespie_ssa_replicates were briefly deleted from this
+# table with the note "not part of the TypeScript API contract". That had it
+# backwards: both are in the engine's ``__all__``, both have run_* handlers
+# below, both are documented in the README's domain list, and ADR 0007's
+# whole point is that the ENGINE's surface is the contract -- the
+# TypeScript side follows it, not the other way round. Deleting them here
+# to satisfy a stale TS union broke five boundary-contract tests, which is
+# exactly the drift the contract test exists to catch. They are restored,
+# and SimulationDomain in telluriumRunner.ts now lists them.
 DISPATCH: Dict[str, str] = {
     "mm": "simulate_michaelis_menten",
     "mm_competitive_inhibition": "simulate_mm_competitive_inhibition",
     "sir": "simulate_sir",
     "seir": "simulate_seir",
-    "pcr": "simulate_pcr",
-    "monte_carlo_pi": "simulate_monte_carlo_pi",
     "wright_fisher": "simulate_wright_fisher",
-    "two_locus_wright_fisher": "simulate_two_locus_wright_fisher",
-    "molecular_dynamics": "simulate_molecular_dynamics",
     "gillespie_ssa": "simulate_gillespie_ssa",
+    "pcr": "simulate_pcr",
+    "molecular_dynamics": "simulate_molecular_dynamics",
     "gillespie_ssa_bimolecular": "simulate_gillespie_ssa_bimolecular",
+    "two_locus_wright_fisher": "simulate_two_locus_wright_fisher",
+    "monte_carlo_pi": "simulate_monte_carlo_pi",
     "gillespie_ssa_replicates": "simulate_gillespie_ssa_replicates",
     "sbml": "simulate_sbml",
 }
@@ -586,13 +597,13 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "mm_competitive_inhibition": run_mm_competitive_inhibition,
     "sir": run_sir,
     "seir": run_seir,
-    "pcr": run_pcr,
-    "monte_carlo_pi": run_monte_carlo_pi,
     "wright_fisher": run_wright_fisher,
-    "two_locus_wright_fisher": run_two_locus_wright_fisher,
-    "molecular_dynamics": run_molecular_dynamics,
     "gillespie_ssa": run_gillespie_ssa,
+    "pcr": run_pcr,
+    "molecular_dynamics": run_molecular_dynamics,
     "gillespie_ssa_bimolecular": run_gillespie_ssa_bimolecular,
+    "two_locus_wright_fisher": run_two_locus_wright_fisher,
+    "monte_carlo_pi": run_monte_carlo_pi,
     "gillespie_ssa_replicates": run_gillespie_ssa_replicates,
     "sbml": run_sbml,
 }

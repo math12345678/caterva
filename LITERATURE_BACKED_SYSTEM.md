@@ -8,7 +8,7 @@ Terrium is a production-ready simulation engine where:
 - ✅ **365+ peer-reviewed citations** back all default parameters
 - ✅ **42+ fundamental science papers** ground all metrics and validation
 - ✅ **13 scientific domains** each have primary literature references
-- ✅ **388+ integration tests** verify literature traceability end-to-end
+- ✅ **399 integration tests** verify literature traceability end-to-end
 - ✅ **0 unverified parameters** reach simulation without explicit user consent
 - ✅ **Publication-ready audit trails** for every result
 
@@ -134,7 +134,7 @@ Applicable domains: `mm`, `mm_competitive_inhibition`
 
 ## Test Suite
 
-**Total: 395 tests, 100% passing**
+**Total: 399 tests, 100% passing** (28 test files)
 
 ### Test Coverage by Component
 
@@ -339,7 +339,7 @@ curl http://localhost:3000/api/simulate/metrics/pipeline | jq '.metrics'
 
 ## Key Achievements
 
-✅ **388+ tests, 100% passing**
+✅ **399 tests, 100% passing**
 ✅ **42 peer-reviewed sources** backing all code
 ✅ **5-stage pipeline** with comprehensive metrics
 ✅ **Zero unverified parameters** reaching simulation

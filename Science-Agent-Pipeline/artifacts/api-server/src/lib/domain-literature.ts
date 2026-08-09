@@ -229,6 +229,120 @@ export const MOLECULAR_DYNAMICS_LITERATURE: DomainLiterature = {
     "Standard Lennard-Jones parameters (ε, σ) model rare-gas interactions. Numerical integration via Verlet algorithm per standard MD practice.",
 };
 
+/**
+ * GILLESPIE_SSA_BIMOLECULAR Domain: Stochastic Simulation for Bimolecular Reactions
+ * BACKING: Gillespie, D. T. (1976)
+ * "A general method for numerically simulating the stochastic time evolution of coupled chemical reactions"
+ */
+export const GILLESPIE_SSA_BIMOLECULAR_LITERATURE: DomainLiterature = {
+  name: "gillespie_ssa_bimolecular",
+  description:
+    "Gillespie SSA for bimolecular reactions: A + B → C. Two reactants combine into product. Stochastic simulation with bimolecular rate constant k (probability per pair per unit time).",
+  references: [
+    {
+      authors: "Gillespie, D. T.",
+      year: 1976,
+      title: "A general method for numerically simulating the stochastic time evolution of coupled chemical reactions",
+      doi: "10.1021/j100540a008",
+    },
+  ],
+  defaultJustification:
+    "Defaults (a0=50 A, b0=50 B, k=0.01 per pair/s) per Gillespie (1976). Bimolecular reactions require two molecules; rates scale with product of concentrations.",
+};
+
+/**
+ * TWO_LOCUS_WRIGHT_FISHER Domain: Multi-locus Population Genetics
+ * BACKING: Wright, S. (1931) & Fisher, R. A. (1930)
+ * "Evolution in Mendelian populations" and "The Genetical Theory of Natural Selection"
+ */
+export const TWO_LOCUS_WRIGHT_FISHER_LITERATURE: DomainLiterature = {
+  name: "two_locus_wright_fisher",
+  description:
+    "Two-locus Wright-Fisher model with recombination. Tracks allele frequencies at two loci simultaneously, including recombination rate between loci. Models linkage disequilibrium decay.",
+  references: [
+    {
+      authors: "Wright, S.",
+      year: 1931,
+      title: "Evolution in Mendelian populations",
+      doi: "10.1038/127487a0",
+    },
+    {
+      authors: "Fisher, R. A.",
+      year: 1930,
+      title: "The Genetical Theory of Natural Selection",
+    },
+  ],
+  defaultJustification:
+    "Defaults (recombination_rate=0.01, population_size=10000) per Wright (1931). Recombination breaks linkage disequilibrium between loci; rates typical for unlinked loci.",
+};
+
+/**
+ * LOTKA_VOLTERRA Domain: Predator-Prey Dynamics
+ * BACKING: Lotka, A. J. (1925) & Volterra, V. (1926)
+ * "Elements of Physical Biology" and "Variations and fluctuations of the number of individuals"
+ */
+export const LOTKA_VOLTERRA_LITERATURE: DomainLiterature = {
+  name: "lotka_volterra",
+  description:
+    "Lotka-Volterra predator-prey model. Equations: dP/dt = α·P - β·P·V, dV/dt = γ·P·V - δ·V. Generates oscillating populations characteristic of predator-prey systems.",
+  references: [
+    {
+      authors: "Lotka, A. J.",
+      year: 1925,
+      title: "Elements of Physical Biology",
+    },
+    {
+      authors: "Volterra, V.",
+      year: 1926,
+      title: "Variations and fluctuations of the number of individuals in animal species living together",
+    },
+  ],
+  defaultJustification:
+    "Defaults (α=1.1, β=0.4, γ=0.4, δ=0.1) per Lotka (1925). Parameters generate ~10 year cycle in classic lynx-hare system. Population oscillations are hallmark of this model.",
+};
+
+/**
+ * CELL_CYCLE_OSCILLATOR Domain: Molecular Cell Cycle
+ * BACKING: Tyson, J. J. (1991)
+ * "Modelling the cell division cycle: cdc2 and cyclin interactions"
+ */
+export const CELL_CYCLE_OSCILLATOR_LITERATURE: DomainLiterature = {
+  name: "cell_cycle_oscillator",
+  description:
+    "Molecular model of cell cycle progression via cyclin-CDK regulation. Simulates periodic oscillations in cyclin levels driving G1/S and G2/M transitions.",
+  references: [
+    {
+      authors: "Tyson, J. J.",
+      year: 1991,
+      title: "Modelling the cell division cycle: cdc2 and cyclin interactions",
+      doi: "10.1083/jcb.115.3.577",
+    },
+  ],
+  defaultJustification:
+    "Default reaction rate constants from Tyson (1991) cell-cycle model. Produces ~30-minute oscillations typical of eukaryotic cell cycles.",
+};
+
+/**
+ * REPRESSILATOR Domain: Synthetic Genetic Oscillator
+ * BACKING: Elowitz, M. B., & Leibler, S. (2000)
+ * "A synthetic oscillatory network of transcriptional regulators"
+ */
+export const REPRESSILATOR_LITERATURE: DomainLiterature = {
+  name: "repressilator",
+  description:
+    "Repressilator: synthetic genetic network with three genes repressing each other in a ring (A⊣B⊣C⊣A). Produces robust sustained oscillations via negative feedback.",
+  references: [
+    {
+      authors: "Elowitz, M. B., & Leibler, S.",
+      year: 2000,
+      title: "A synthetic oscillatory network of transcriptional regulators",
+      doi: "10.1038/35002131",
+    },
+  ],
+  defaultJustification:
+    "Parameters from Elowitz & Leibler (2000) Nature paper. This circuit demonstrates that living cells can implement reliable synthetic clocks. ~40-minute oscillation period.",
+};
+
 export const DOMAIN_LITERATURE_MAP: Record<string, DomainLiterature> = {
   mm: MM_LITERATURE,
   mm_competitive_inhibition: MM_CI_LITERATURE,
@@ -238,6 +352,11 @@ export const DOMAIN_LITERATURE_MAP: Record<string, DomainLiterature> = {
   gillespie_ssa: GILLESPIE_SSA_LITERATURE,
   pcr: PCR_LITERATURE,
   molecular_dynamics: MOLECULAR_DYNAMICS_LITERATURE,
+  gillespie_ssa_bimolecular: GILLESPIE_SSA_BIMOLECULAR_LITERATURE,
+  two_locus_wright_fisher: TWO_LOCUS_WRIGHT_FISHER_LITERATURE,
+  lotka_volterra: LOTKA_VOLTERRA_LITERATURE,
+  cell_cycle_oscillator: CELL_CYCLE_OSCILLATOR_LITERATURE,
+  repressilator: REPRESSILATOR_LITERATURE,
 };
 
 export function getDomainLiterature(domain: string): DomainLiterature | undefined {

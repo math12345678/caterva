@@ -116,14 +116,16 @@ export const SimulationParameterSchemas: Record<
     end: optionalNumeric,
     points: integer.nullish(),
   }),
+  gillespie_ssa: z.object({
+    a0: integer,
+    k: numeric,
+    end: numeric,
+    seed: integer.nullish(),
+  }),
   pcr: z.object({
     n0: numeric,
     efficiency: numeric,
     cycles: integer,
-  }),
-  monte_carlo_pi: z.object({
-    n_samples: integer,
-    seed: integer.nullish(),
   }),
   wright_fisher: z.object({
     population_size: integer,
@@ -152,17 +154,15 @@ export const SimulationParameterSchemas: Record<
     density: numeric.optional(),
     seed: integer.nullish(),
   }),
-  gillespie_ssa: z.object({
-    a0: integer,
-    k: numeric,
-    end: numeric,
-    seed: integer.nullish(),
-  }),
   gillespie_ssa_bimolecular: z.object({
     a0: integer,
     b0: integer,
     k: numeric,
     end: numeric,
+    seed: integer.nullish(),
+  }),
+  monte_carlo_pi: z.object({
+    n_samples: integer,
     seed: integer.nullish(),
   }),
   gillespie_ssa_replicates: z.object({

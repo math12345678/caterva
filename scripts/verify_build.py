@@ -144,6 +144,28 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     return guards
 
 
+def run_typescript_guards() -> List[Tuple[str, bool, str]]:
+    """TypeScript static analysis. Runs in EVERY mode, including --quick.
+
+    Deliberately a guard rather than a test: until this existed, nothing in
+    the aggregate verifier type-checked TypeScript at all, and the
+    TypeScript test run (`npm test`) was skipped by --quick. So --quick
+    could print "ALL CHECKS PASSED / deployable state" over a tree that did
+    not compile -- which it did, repeatedly, on 2026-08-09.
+
+    Type-checking is cheap, deterministic and offline, so there is no
+    reason for it to live behind the slow-test flag. See
+    check_typescript_compiles.py for the full rationale.
+    """
+    return [
+        run_guard(
+            "TypeScript Compile Guard",
+            f"python {SCRIPTS_DIR / 'check_typescript_compiles.py'}",
+            timeout=300,
+        )
+    ]
+
+
 def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
     """Run Python tests."""
     tests: List[Tuple[str, bool, str]] = []
@@ -288,6 +310,13 @@ def main() -> int:
     rng_results = run_rng_guard()
     if rng_results:
         total_failures += print_results("RNG Guard", rng_results)
+
+    # TypeScript compile guard. Honours --no-typescript, but is NOT gated
+    # on --quick: "deployable" has to mean the code compiles, and that
+    # claim was being made without checking it.
+    if not args.no_typescript:
+        ts_guards = run_typescript_guards()
+        total_failures += print_results("TypeScript Guards", ts_guards)
 
     # Live citation guard (network; opt-in so offline builds stay green)
     if args.live:
