@@ -708,10 +708,59 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "Gillespie D.T. (1977) Exact stochastic simulation of coupled chemical reactions. The Journal of Physical Chemistry 81(25), 2340-2361.",
     ],
   },
+  {
+    domain: "lotka_volterra",
+    parameters: { end: 20, points: 201 },
+    keywords: [
+      "lotka-volterra",
+      "lotka volterra",
+      "predator-prey",
+      "predator prey",
+      "population dynamics",
+    ],
+    reasoning:
+      "Keywords related to predator-prey dynamics were found; defaulting to a Lotka-Volterra simulation.",
+    modelCitations: [
+      "Lotka A.J. (1925) Elements of Physical Biology. Baltimore: Williams & Wilkins.",
+      "Volterra V. (1926) Fluctuations in the abundance of a species considered mathematically. Nature 118(2972), 558-560.",
+    ],
+  },
+  {
+    domain: "cell_cycle_oscillator",
+    parameters: { end: 100, points: 1001 },
+    keywords: [
+      "cell cycle",
+      "mitosis",
+      "cyclin",
+      "cdk",
+      "oscillator",
+    ],
+    reasoning:
+      "Keywords related to the cell cycle were found; defaulting to a cell cycle oscillator simulation.",
+    modelCitations: [
+      "Tyson J.J. (1991) Modeling the cell division cycle: cdc2 and cyclin interactions. Proceedings of the National Academy of Sciences USA 88(16), 7328-7332.",
+    ],
+  },
+  {
+    domain: "repressilator",
+    parameters: { end: 200, points: 2001 },
+    keywords: [
+      "repressilator",
+      "synthetic",
+      "genetic circuit",
+      "repressive",
+      "oscillation",
+    ],
+    reasoning:
+      "Keywords related to a synthetic genetic oscillator were found; defaulting to a repressilator simulation.",
+    modelCitations: [
+      "Elowitz M.B., Leibler S. (2000) A synthetic oscillatory network of transcriptional regulators. Nature 403(6767), 335-338.",
+    ],
+  },
 ];
 
 const PARAMETER_NAMES =
-  "km|ki|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|r0_recovered|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|starting_frequencies|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed";
+  "km|ki|vmax|kcat|enzyme_conc|s0|beta|gamma|sigma|e0|i0|r0|r0_recovered|end|points|n0|efficiency|cycles|n_samples|population_size|starting_frequency|starting_frequencies|generations|replicate_runs|mutation_rate|selection_coefficient|recombination_rate|n_particles|temperature|timestep|n_steps|density|a0|b0|k|n_replicates|seed|alpha|delta|p0|v0";
 
 /**
  * Matches a parameter token: the key name, an optional `=` or `:`

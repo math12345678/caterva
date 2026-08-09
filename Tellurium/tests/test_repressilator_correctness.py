@@ -155,6 +155,63 @@ class TestSustainedOscillationOutOfPhase:
             f"period {period:.2f}); expected a staggered cyclic pattern"
         )
 
+    def test_phase_offsets_are_exactly_one_and_two_thirds_of_a_period(self):
+        """The exact prediction, not merely "staggered".
+
+        The repressilator's three genes are wired as a symmetric ring: each
+        represses the next, with identical kinetic constants. The system is
+        therefore *equivariant* under the cyclic permutation
+        (1->2->3->1) combined with a time shift -- the only periodic
+        solution consistent with that symmetry has the three proteins
+        separated by exactly one third of a period.
+
+        This is a structural consequence of the ring's symmetry, derivable
+        without integrating anything, which is what makes it usable as a
+        check on the integrator. The looser test above (offset somewhere
+        between 0.15 and 0.85 of a period) is satisfied by almost any
+        non-degenerate waveform; this one is satisfied only by the correct
+        one, and it fails if any single gene's parameters drift away from
+        the others' -- the most likely way to break a symmetric ring by
+        accident.
+        """
+        result = simulate_repressilator(end=400.0, points=16001)
+        t, _, _, _, p1, p2, p3 = _columns(result)
+
+        # Discard the transient: the ring starts from an asymmetric initial
+        # condition and settles onto the limit cycle, where the symmetry
+        # argument applies.
+        settled = t > 100.0
+        t_s = t[settled]
+
+        def peak_times(series):
+            y = series[settled]
+            return np.array([
+                t_s[i]
+                for i in range(1, len(y) - 1)
+                if y[i] > y[i - 1] and y[i] >= y[i + 1] and y[i] > 0.5 * y.max()
+            ])
+
+        pk1, pk2, pk3 = peak_times(p1), peak_times(p2), peak_times(p3)
+        assert len(pk1) >= 3, "not enough settled cycles to measure phase"
+
+        period = float(np.mean(np.diff(pk1)))
+
+        def phase_of(peaks):
+            return float(((peaks[0] - pk1[0]) % period) / period)
+
+        # p2 and p3 sit at 1/3 and 2/3 of a period from p1 (in whichever
+        # order the ring's orientation produces -- the orientation is a
+        # labelling convention, the spacing is not).
+        observed = sorted([phase_of(pk2), phase_of(pk3)])
+        assert observed[0] == pytest.approx(1 / 3, abs=0.01), (
+            f"nearest phase offset {observed[0]:.4f} of a period, expected "
+            f"1/3 = {1/3:.4f}"
+        )
+        assert observed[1] == pytest.approx(2 / 3, abs=0.01), (
+            f"far phase offset {observed[1]:.4f} of a period, expected "
+            f"2/3 = {2/3:.4f}"
+        )
+
 
 class TestDeterministicReproducibility:
     def test_repeated_calls_are_bit_identical(self):
