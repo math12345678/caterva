@@ -178,26 +178,34 @@ result = client.wait_for_completion(job_id)
 
 Real-time updates as simulation progresses.
 
+The server (`routes/simulate.ts`) writes plain `data: <json>` messages with
+no `event:` field, so every message arrives as the default `'message'`
+event -- there are no separate `progress` / `completed` / `error` named
+events to subscribe to. Each payload is the full `Job` object
+(`jobId`, `query`, `status`, `progress`, `result?`, `error?`,
+`createdAt`, `updatedAt`); switch on its `status` field instead.
+
 **Python:**
 ```python
+import json
 import sseclient
 
 def stream_simulation(job_id):
     """Stream progress updates for a running job."""
     url = f'http://localhost:5000/api/simulate/{job_id}/stream'
-    
+
     client = sseclient.SSEClient(url)
     for event in client:
-        if event.event == 'progress':
-            progress = json.loads(event.data)
-            print(f"Progress: {progress['progress']}%")
-        elif event.event == 'completed':
-            result = json.loads(event.data)
-            print(f"Completed: {result}")
+        if not event.data:
+            continue
+        job = json.loads(event.data)
+        print(f"Status: {job['status']}, Progress: {job['progress']}%")
+
+        if job['status'] == 'completed':
+            print(f"Completed: {job['result']}")
             break
-        elif event.event == 'error':
-            error = json.loads(event.data)
-            print(f"Error: {error}")
+        elif job['status'] in ('failed', 'cancelled'):
+            print(f"Stopped ({job['status']}): {job.get('error')}")
             break
 
 # Usage
@@ -210,22 +218,27 @@ function streamSimulation(jobId) {
   const eventSource = new EventSource(
     `http://localhost:5000/api/simulate/${jobId}/stream`
   );
-  
-  eventSource.addEventListener('progress', (event) => {
-    const progress = JSON.parse(event.data);
-    console.log(`Progress: ${progress.progress}%`);
-  });
-  
-  eventSource.addEventListener('completed', (event) => {
-    const result = JSON.parse(event.data);
-    console.log('Completed:', result);
+
+  // The server sends unnamed `data: ...` messages, so they all land on
+  // the default 'message' event -- parse the JSON body and branch on
+  // job.status rather than listening for named events.
+  eventSource.onmessage = (event) => {
+    const job = JSON.parse(event.data);
+    console.log(`Status: ${job.status}, Progress: ${job.progress}%`);
+
+    if (job.status === 'completed') {
+      console.log('Completed:', job.result);
+      eventSource.close();
+    } else if (job.status === 'failed' || job.status === 'cancelled') {
+      console.error(`Stopped (${job.status}):`, job.error);
+      eventSource.close();
+    }
+  };
+
+  eventSource.onerror = (event) => {
+    console.error('Stream connection error:', event);
     eventSource.close();
-  });
-  
-  eventSource.addEventListener('error', (event) => {
-    console.error('Error:', event.data);
-    eventSource.close();
-  });
+  };
 }
 
 // Usage
@@ -741,6 +754,19 @@ def test_get_status(mock_get):
 
 ## API Rate Limiting
 
+There are two independent rate limiters (`src/lib/rateLimit.ts` and
+`src/app.ts`):
+
+- **`POST /api/simulate` blocking limiter** -- max **10 requests per 60
+  seconds**. Once exceeded it returns **HTTP 429** with body
+  `{"error": "TOO_MANY_REQUESTS", "message": "Simulation rate limit
+  exceeded. Max 10 requests per 60s."}`. This is the one your retry logic
+  needs to handle.
+- **Global request counter** -- a separate, non-blocking counter of
+  **1000 requests per 15 minutes** across all endpoints. It never returns
+  429; it only sets the `X-RateLimit-Limit` / `X-RateLimit-Remaining` /
+  `X-RateLimit-Reset` headers described below, purely as a usage signal.
+
 ### Respect Rate Limits
 
 **Python:**
@@ -852,7 +878,7 @@ if __name__ == '__main__':
 ## References
 
 - **API User Guide:** API_USER_GUIDE.md
-- **API Documentation:** lib/api-spec/openapi.yaml
+- **API Documentation:** ../../lib/api-spec/openapi.yaml
 - **Error Handling:** OPERATIONS_RUNBOOK.md
 - **Rate Limiting:** DEPLOYMENT_GUIDE.md
 

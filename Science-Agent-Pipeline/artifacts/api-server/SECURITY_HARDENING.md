@@ -54,7 +54,7 @@
 **Current Implementation:**
 
 ```typescript
-// src/lib/queryResolver.ts
+// src/lib/schemas.ts
 export const ResolveBody = z.object({
   query: z
     .string()
@@ -286,14 +286,31 @@ function applyUserQuota(req: Request, res: Response, next: NextFunction) {
 
 ### Metrics Admin Token
 
-**Current:** Protects `/api/metrics` endpoints
+**Current:** Protects only `POST /metrics/reset` (i.e. `POST /api/metrics/reset`). The other
+metrics routes — `GET /snapshot` and `GET /metrics/health` — are unauthenticated and readable
+by anyone; the token only gates the destructive reset action.
 
 ```typescript
-// src/routes/metrics.ts
-if (req.headers['authorization'] !== `Bearer ${METRICS_ADMIN_TOKEN}`) {
-  return res.status(403).json({ error: "FORBIDDEN" });
+// src/routes/metrics.ts (POST /metrics/reset, lines ~123-146)
+const adminToken = process.env.METRICS_ADMIN_TOKEN;
+if (!adminToken) {
+  // Token not configured in this environment: the endpoint is disabled, not open.
+  res.status(501).json({ status: "error", error: "Metrics reset not configured" });
+  return;
+}
+
+const authHeader = req.headers.authorization || "";
+const [scheme, token] = authHeader.split(" ");
+
+if (scheme !== "Bearer" || token !== adminToken) {
+  res.status(403).json({ status: "error", error: "Unauthorized" });
+  return;
 }
 ```
+
+Note the real response shape is `{ status: "error", error: "Unauthorized" }` on a 403, not
+`{ error: "FORBIDDEN" }`, and if `METRICS_ADMIN_TOKEN` is unset the endpoint returns `501`
+rather than allowing the reset.
 
 **Generate Secure Token:**
 ```bash
@@ -357,7 +374,31 @@ SET encrypted_query = pgp_sym_encrypt(query, 'secret_key');
 
 ### Secret Management
 
-**Environment Variables (Staging/Production)**
+**Current implementation: plain environment variables, no secrets manager.**
+
+There is no `src/lib/secrets.ts` file and `aws-sdk` is not a dependency (confirmed absent from
+`package.json`). Secrets are read directly from `process.env` wherever they're needed, e.g.:
+
+```typescript
+// src/lib/llmResolver.ts
+return process.env[provider.apiKeyEnvVar] || process.env.LLM_API_KEY;
+// ...
+return process.env.OPENAI_API_KEY || process.env.LLM_API_KEY;
+
+// src/routes/metrics.ts
+const adminToken = process.env.METRICS_ADMIN_TOKEN;
+```
+
+The full list of expected environment variables (`GROQ_API_KEY`, `OPENROUTER_API_KEY`,
+`MISTRAL_API_KEY`, `SILICONFLOW_API_KEY`, `TOKENROUTER_API_KEY`, `LLM_API_KEY`,
+`OPENAI_API_KEY`, `METRICS_ADMIN_TOKEN`, etc.) is documented in `.env.example`. In
+production these are set as plain process environment variables by whatever deploys the
+container/process (e.g. platform env config); nothing in this codebase fetches them from
+AWS Secrets Manager, Vault, or any other secrets store.
+
+**Proposed — not yet implemented:** if/when a secrets manager is adopted, the following
+is a reasonable shape for it. Treat this as forward guidance, not a description of the
+running server.
 
 ```bash
 # ❌ Never commit secrets
@@ -367,10 +408,9 @@ GROQ_API_KEY=gsk_...  # Git will find this!
 aws secretsmanager create-secret --name terrium/groq-api-key
 ```
 
-**Access Secrets in Deployment:**
-
 ```typescript
-// src/lib/secrets.ts
+// PROPOSED — src/lib/secrets.ts does not exist yet; this file and the
+// aws-sdk dependency it uses are not part of the codebase today.
 import AWS from 'aws-sdk';
 
 const secretsManager = new AWS.SecretsManager();
@@ -392,46 +432,56 @@ export async function loadEnv() {
 
 ## 5. Dependency Security
 
+**Note on package manager:** this workspace uses **pnpm** (`packageManager: "pnpm@11.20.0"`
+in the root `package.json`, `pnpm-lock.yaml` committed), not npm — there is no
+`package-lock.json` (the root `preinstall` script actively deletes one if it appears).
+Commands below are given as `pnpm` equivalents; the `npm audit`/`npm ci` spelling used in
+older drafts of this doc would not work correctly against this repo's lockfile.
+
 ### Vulnerability Scanning
 
-**Built-in (npm audit):**
+**Built-in (pnpm audit):**
 ```bash
-npm audit
+pnpm audit
 # Shows vulnerabilities and fixes
 
-npm audit fix
+pnpm audit --fix
 # Auto-fixes when possible
 
-npm audit --audit-level moderate --production
+pnpm audit --audit-level moderate --prod
 # Fail if moderate or higher severity found
 ```
 
-**CI/CD Integration:**
+**CI/CD Integration — not currently implemented.** There is no `.github/workflows/security.yml`
+in this repo; the only workflow that runs is `.github/workflows/tests.yml` (see
+`TESTING_AND_CI_CD.md`), which does not run a dependency audit step. Adding a dedicated
+audit step/workflow is a reasonable proposal, not a description of current CI:
+
 ```yaml
-# .github/workflows/security.yml
+# PROPOSED — .github/workflows/security.yml does not exist today
 - name: Dependency Audit
-  run: npm audit --audit-level moderate --production
+  run: pnpm audit --audit-level moderate --prod
 ```
 
 ### Dependency Pinning
 
-**Lock File (package-lock.json)**
+**Lock File (pnpm-lock.yaml)**
 ```bash
 # Commit to version control
-git add package-lock.json
+git add pnpm-lock.yaml
 ```
 
-**Patch Updates Only (in CI)**
+**Patch Updates Only (in CI) — proposed, not currently wired into any workflow:**
 ```yaml
 - name: Update Dependencies
-  run: npm update --save  # Only patch versions
+  run: pnpm update --latest=false  # Only patch/minor versions per pnpm's default range
 ```
 
 ### Supply Chain Security
 
 **Verify Package Integrity:**
 ```bash
-npm ci  # Clean install using lock file
+pnpm install --frozen-lockfile  # Clean install using lock file (used by the real CI's api-server job)
 ```
 
 **Signed Commits (Optional):**
@@ -489,8 +539,29 @@ app.use((err: Error, req: Request, res: Response) => {
 
 ### HTTP Header Security
 
+**Current: no header hardening is implemented in `src/app.ts`.** There is no `helmet`
+dependency (confirmed absent from `package.json`), and grepping `src/` finds no
+`X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Content-Security-Policy`,
+or `X-Powered-By` handling anywhere. Express's default `X-Powered-By: Express` header is
+still sent as-is.
+
+What `src/app.ts` actually does today, top to bottom:
+- `pinoHttp` structured request/response logging
+- `cors()` with default (permissive) settings
+- `express.json()` and `express.urlencoded({ extended: true })` body parsing
+- the global in-memory rate limiter (`REQUEST_COUNTS`, 1000 req / 15 min), which sets
+  `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` response headers
+- mounts the API router at `app.use("/api", router)`
+- a `GET /` landing page route that renders an inline HTML status page
+- a global Express error handler that logs the error and returns
+  `{ error: "INTERNAL_SERVER_ERROR", message }` with status 500
+
+**Proposed — not yet implemented.** The following is a reasonable hardening pattern to
+add (either by hand or via the `helmet` package), but it does not exist in the codebase
+today:
+
 ```typescript
-// src/app.ts
+// PROPOSED — not present in src/app.ts
 app.use((req, res, next) => {
   // Remove version info
   res.removeHeader('X-Powered-By');
@@ -616,10 +687,20 @@ openssl dgst -sha256 -verify pub.pem -signature sig message
 
 ## 9. Security Testing
 
-### Input Fuzzing
+**Current: none of the code below exists.** There is no `src/__tests__/security.fuzz.test.ts`,
+no `fast-check` dependency (confirmed absent from `package.json`), and no `validateQuery` or
+`resolveParameters` functions in `src/`. This whole section is **proposed test coverage**, not
+a description of tests that run today. The closest real equivalents are the Zod validation in
+`src/lib/schemas.ts` (`ResolveBody`) and the parameter-override extraction/validation in
+`src/lib/queryResolver.ts` (`extractParameterOverrides`, `ArrayOverrideValidationError`), which
+are exercised by `src/__tests__/schemas.test.ts`, `src/__tests__/queryOverrides.test.ts`, and
+`src/__tests__/arrayOverride.test.ts` — but none of those tests use fuzzing (`fast-check`) or
+target SQL/command-injection payloads by name the way the examples below suggest.
+
+### Input Fuzzing (proposed)
 
 ```typescript
-// src/__tests__/security.fuzz.test.ts
+// PROPOSED — src/__tests__/security.fuzz.test.ts does not exist
 import { fc } from 'fast-check';
 
 it("rejects arbitrary input safely", () => {
@@ -632,7 +713,7 @@ it("rejects arbitrary input safely", () => {
 });
 ```
 
-### SQL Injection Testing
+### SQL Injection Testing (proposed)
 
 ```typescript
 it("prevents SQL injection", async () => {
@@ -648,7 +729,7 @@ it("prevents SQL injection", async () => {
 });
 ```
 
-### Command Injection Testing
+### Command Injection Testing (proposed)
 
 ```typescript
 it("prevents command injection", () => {
@@ -664,7 +745,7 @@ it("prevents command injection", () => {
 });
 ```
 
-### Parameter Pollution
+### Parameter Pollution (proposed)
 
 ```typescript
 it("handles duplicate parameters safely", () => {
@@ -815,8 +896,8 @@ docker run -t owasp/zap2docker-stable \
 | **Input Validation** | Zod schemas on all inputs | Prevents injection attacks |
 | **Rate Limiting** | 1000 req/15min global | Prevents DDoS and abuse |
 | **Encryption** | TLS in transit, at-rest optional | Protects data confidentiality |
-| **Secrets Management** | AWS Secrets Manager | Prevents credential exposure |
-| **Dependency Scanning** | npm audit in CI/CD | Catches known vulnerabilities |
+| **Secrets Management** | Plain `process.env` vars today; AWS Secrets Manager is a proposal, not yet implemented | Prevents credential exposure |
+| **Dependency Scanning** | Manual `pnpm audit`; not yet wired into CI/CD | Catches known vulnerabilities |
 | **Error Handling** | User-safe errors, detailed logs | Prevents information disclosure |
 | **Network Isolation** | Firewall and VPC rules | Limits attack surface |
 | **Audit Logging** | Structured logs, 14-day retention | Enables investigation |
