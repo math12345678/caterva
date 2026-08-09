@@ -21,6 +21,21 @@ import { validateSTREANDA } from "./strenda-validator";
 import { verifyParameterAgainstLiterature } from "./literature-verifier";
 import { getDomainCitation } from "./domain-literature";
 
+/**
+ * Type-safe validator for numeric assay conditions.
+ * Ensures finite numbers only; rejects NaN and Infinity.
+ */
+function isValidFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Type-safe validator for non-empty string assay conditions.
+ */
+function isValidNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
 /** Convert the Python runner's assay-conditions payload into the provenance
  * shape. The runner emits JSON `null` for values the source did not report;
  * `AssayConditions` uses absence for the same thing, so nulls are dropped
@@ -33,20 +48,46 @@ function toAssayConditions(
   raw: ScienceAgentResult["assayConditions"],
 ): AssayConditions | undefined {
   if (!raw) return undefined;
+
   const conditions: AssayConditions = {};
-  if (typeof raw.ph === "number" && Number.isFinite(raw.ph)) {
+
+  if (isValidFiniteNumber(raw.ph)) {
     conditions.ph = raw.ph;
   }
-  if (
-    typeof raw.temperatureC === "number" &&
-    Number.isFinite(raw.temperatureC)
-  ) {
+  if (isValidFiniteNumber(raw.temperatureC)) {
     conditions.temperatureC = raw.temperatureC;
   }
-  if (typeof raw.buffer === "string" && raw.buffer.trim() !== "") {
+  if (isValidNonEmptyString(raw.buffer)) {
     conditions.buffer = raw.buffer;
   }
-  return conditions;
+
+  return Object.keys(conditions).length > 0 ? conditions : undefined;
+}
+
+/**
+ * Map kinetic result fields to their output parameter names.
+ * Supports scalability: adding new kinetic parameters only requires updating this map.
+ */
+const KINETIC_VALUE_MAP: Record<"km" | "ki", keyof ScienceAgentResult> = {
+  km: "km",
+  ki: "ki",
+};
+
+/**
+ * Helper to build unresolved kinetic provenance (consistent format).
+ */
+function buildUnresolvedKineticProvenance(
+  key: string,
+  reason: "not_found" | "no_locator",
+): ParameterProvenance {
+  const messages = {
+    not_found: `Could not resolve a real ${key.toUpperCase()} value from BRENDA/KEGG/PubMed; using default ${key.toUpperCase()}.`,
+    no_locator: `Found a ${key.toUpperCase()} but its citation carries no locator (ref id or URL); not trusted as resolved — using default ${key.toUpperCase()}.`,
+  };
+  return {
+    origin: "default",
+    note: messages[reason],
+  };
 }
 
 /**
@@ -79,6 +120,10 @@ async function applyKineticResolution(
     return { parameters, parameterProvenance, flags };
   }
 
+  // Accumulate parameter changes to avoid repeated object spreading
+  const parameterUpdates: Record<string, number | number[]> = {};
+  const provenanceUpdates: Record<string, ParameterProvenance> = {};
+
   // Resolve each quantity independently: the runner reads BRENDA's KM
   // Values table for "km" and its Ki Values table for "ki", so each key
   // gets its own lookup and its own citation (ADR 0008). A cross-species
@@ -88,26 +133,15 @@ async function applyKineticResolution(
       ...entities,
       quantity: key as "km" | "ki",
     });
+
     if (!agentResult.found) {
-      parameterProvenance = {
-        ...parameterProvenance,
-        [key]: {
-          origin: "default",
-          note: `Could not resolve a real ${key.toUpperCase()} value from BRENDA/KEGG/PubMed; using default ${key.toUpperCase()}.`,
-        },
-      };
+      provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
       continue;
     }
 
     const citation = formatResolvedCitation(agentResult.citation);
     if (citation === undefined) {
-      parameterProvenance = {
-        ...parameterProvenance,
-        [key]: {
-          origin: "default",
-          note: `Found a ${key.toUpperCase()} but its citation carries no locator (ref id or URL); not trusted as resolved — using default ${key.toUpperCase()}.`,
-        },
-      };
+      provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "no_locator");
       flags.push(
         `Found a ${key.toUpperCase()} value but its citation was not locatable; using default ${key.toUpperCase()}.`,
       );
@@ -120,36 +154,34 @@ async function applyKineticResolution(
         ? "flagged"
         : "verified";
 
-    const value = key === "km" ? agentResult.km : agentResult.ki;
+    const valueKey = KINETIC_VALUE_MAP[key as keyof typeof KINETIC_VALUE_MAP];
+    const value = agentResult[valueKey] as number | undefined;
+
     if (value !== undefined) {
-      parameters = { ...parameters, [key]: value };
-      parameterProvenance = {
-        ...parameterProvenance,
-        [key]: buildResolvedKineticProvenance({
-          parameterKey: key,
-          source: agentResult.source ?? "unknown",
-          citation,
-          organism: agentResult.organism,
-          citationStatus,
-          assayConditions: toAssayConditions(agentResult.assayConditions),
-          citationLocators: buildCitationLocators(agentResult.citation),
-        }),
-      };
+      parameterUpdates[key] = value;
+      provenanceUpdates[key] = buildResolvedKineticProvenance({
+        parameterKey: key,
+        source: agentResult.source ?? "unknown",
+        citation,
+        organism: agentResult.organism,
+        citationStatus,
+        assayConditions: toAssayConditions(agentResult.assayConditions),
+        citationLocators: buildCitationLocators(agentResult.citation),
+      });
       flags.push(
         `Resolved ${key.toUpperCase()}=${value} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`,
       );
     } else {
-      parameterProvenance = {
-        ...parameterProvenance,
-        [key]: {
-          origin: "default",
-          note: `Could not resolve a real ${key.toUpperCase()} value from BRENDA/KEGG/PubMed; using default ${key.toUpperCase()}.`,
-        },
-      };
+      provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
     }
   }
 
-  return { parameters, parameterProvenance, flags };
+  // Apply accumulated changes
+  return {
+    parameters: { ...parameters, ...parameterUpdates },
+    parameterProvenance: { ...parameterProvenance, ...provenanceUpdates },
+    flags,
+  };
 }
 
 /**
@@ -395,6 +427,10 @@ async function applyPopgenResolution(
     return { parameters, parameterProvenance, flags };
   }
 
+  // Accumulate updates to avoid repeated object spreading
+  const parameterUpdates: Record<string, number | number[]> = {};
+  const provenanceUpdates: Record<string, ParameterProvenance> = {};
+
   // For now, only mutation_rate is supported
   if (popgenKeys.includes("mutation_rate") && entities?.organism) {
     const agentResult = await resolveKineticValue({
@@ -405,8 +441,9 @@ async function applyPopgenResolution(
     if (agentResult.found && agentResult.km !== undefined) {
       const value = agentResult.km;
       const citation = formatResolvedCitation(agentResult.citation);
+
       if (citation !== undefined) {
-        parameters = { ...parameters, mutation_rate: value };
+        parameterUpdates["mutation_rate"] = value;
         // mutation_rate is a per-generation per-base-pair substitution
         // rate, not an enzyme kinetic constant: STRENDA does not govern it
         // and it has no assay pH or temperature. buildResolvedKineticProvenance
@@ -420,41 +457,37 @@ async function applyPopgenResolution(
         // CI because stdpopsim is absent from the test sandbox, so the
         // popgen resolver always returned found=false and this branch never
         // executed. See ADR 0021.
-        parameterProvenance = {
-          ...parameterProvenance,
-          mutation_rate: buildResolvedKineticProvenance({
-            parameterKey: "mutation_rate",
-            source: agentResult.source ?? "unknown",
-            citation,
-            organism: agentResult.organism,
-            citationStatus: "verified",
-            citationLocators: buildCitationLocators(agentResult.citation),
-          }),
-        };
+        provenanceUpdates["mutation_rate"] = buildResolvedKineticProvenance({
+          parameterKey: "mutation_rate",
+          source: agentResult.source ?? "unknown",
+          citation,
+          organism: agentResult.organism,
+          citationStatus: "verified",
+          citationLocators: buildCitationLocators(agentResult.citation),
+        });
         flags.push(
           `Resolved mutation_rate=${value} from ${agentResult.source ?? "literature"}.`,
         );
       } else {
-        parameterProvenance = {
-          ...parameterProvenance,
-          mutation_rate: {
-            origin: "default",
-            note: "Found a mutation_rate value but its citation carries no locator; using default.",
-          },
+        provenanceUpdates["mutation_rate"] = {
+          origin: "default",
+          note: "Found a mutation_rate value but its citation carries no locator; using default.",
         };
       }
     } else {
-      parameterProvenance = {
-        ...parameterProvenance,
-        mutation_rate: {
-          origin: "default",
-          note: "Could not resolve a real mutation_rate value from literature; using default.",
-        },
+      provenanceUpdates["mutation_rate"] = {
+        origin: "default",
+        note: "Could not resolve a real mutation_rate value from literature; using default.",
       };
     }
   }
 
-  return { parameters, parameterProvenance, flags };
+  // Apply accumulated changes
+  return {
+    parameters: { ...parameters, ...parameterUpdates },
+    parameterProvenance: { ...parameterProvenance, ...provenanceUpdates },
+    flags,
+  };
 }
 
 export interface ResolvedSimulation {
@@ -1112,6 +1145,21 @@ function provenanceViolations(
 }
 
 /**
+ * Generate flags about parameter extraction from query overrides.
+ * Consolidated pattern used in both LLM and fallback resolution paths.
+ */
+function buildParameterExtractionFlags(overrides: Record<string, number | number[]>): string[] {
+  const extractionFlags: string[] = [];
+  if (Object.keys(overrides).length === 0) {
+    extractionFlags.push("No parameters were extracted from the query; using defaults.");
+  }
+  if (Object.keys(overrides).length > 0) {
+    extractionFlags.push("Applied parameter overrides found in the query string.");
+  }
+  return extractionFlags;
+}
+
+/**
  * Resolve a natural-language query to a simulation domain and parameters.
  *
  * The resolver tries an LLM first (if an API key is configured). If the LLM
@@ -1265,8 +1313,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       flags.push(
         "No parameters were extracted from the query; using defaults.",
       );
-    }
-    if (Object.keys(overrides).length > 0) {
+    } else if (Object.keys(overrides).length > 0) {
       flags.push("Applied parameter overrides found in the query string.");
     }
     const violations = provenanceViolations(parameters, parameterProvenance);
@@ -1438,12 +1485,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     flags = popgenResult.flags;
   }
 
-  if (Object.keys(overrides).length === 0) {
-    flags.push("No parameters were extracted from the query; using defaults.");
-  }
-  if (Object.keys(overrides).length > 0) {
-    flags.push("Applied parameter overrides found in the query string.");
-  }
+  flags.push(...buildParameterExtractionFlags(overrides));
   const violations = provenanceViolations(parameters, parameterProvenance);
   if (violations.length > 0) {
     throw new Error(

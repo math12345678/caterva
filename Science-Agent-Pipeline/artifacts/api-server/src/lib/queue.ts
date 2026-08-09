@@ -84,6 +84,9 @@ export function releaseRunnerSlot(): void {
 // demo guard; a production deployment would use Redis or a database.
 const MAX_JOBS = 1000;
 
+/**
+ * Progress percentage for each job status.
+ */
 const progressForStatus: Record<JobStatus, number> = {
   pending: 0,
   resolving: 15,
@@ -94,8 +97,32 @@ const progressForStatus: Record<JobStatus, number> = {
   cancelled: 100,
 };
 
+/**
+ * Terminal job statuses that cannot transition further.
+ */
+const TERMINAL_STATUSES = new Set<JobStatus>(["completed", "failed", "cancelled"]);
+
 function now(): string {
   return new Date().toISOString();
+}
+
+/**
+ * Check if a job status is terminal (no further transitions possible).
+ */
+function isTerminal(status: JobStatus): boolean {
+  return TERMINAL_STATUSES.has(status);
+}
+
+/**
+ * Get the oldest job matching a predicate, for pruning.
+ */
+function getOldestJob(predicate: (job: Job) => boolean): Job | undefined {
+  return Array.from(jobs.values())
+    .filter(predicate)
+    .sort(
+      (a, b) =>
+        new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
+    )[0];
 }
 
 export function createJob(query: string): Job {
@@ -111,14 +138,9 @@ export function createJob(query: string): Job {
   };
   jobs.set(jobId, job);
 
-  // Prune oldest completed/failed jobs if we exceed the in-memory limit.
+  // Prune oldest terminal job if we exceed the in-memory limit.
   if (jobs.size > MAX_JOBS) {
-    const oldest = Array.from(jobs.values())
-      .filter((j) => j.status === "completed" || j.status === "failed")
-      .sort(
-        (a, b) =>
-          new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime(),
-      )[0];
+    const oldest = getOldestJob((j) => isTerminal(j.status));
     if (oldest) {
       jobs.delete(oldest.jobId);
       listeners.delete(oldest.jobId);
@@ -148,13 +170,14 @@ export function updateJob(jobId: string, update: JobUpdate): Job | undefined {
 
   jobs.set(jobId, next);
 
+  // Notify listeners, catching and logging errors so one listener's failure
+  // doesn't prevent others from running.
   const subs = listeners.get(jobId);
   if (subs) {
     for (const listener of subs) {
       try {
         listener(next);
       } catch (err) {
-        // Listeners must not throw into the publisher - log and continue.
         logger.error(
           { err, jobId, status: next.status },
           "Job listener threw error; continuing",

@@ -97,6 +97,27 @@ interface LLMProviderConfig {
   supportsJsonMode: boolean;
 }
 
+/**
+ * List of simulation domains exposed to the LLM resolver.
+ * Engine-internal domains (monte_carlo_pi, gillespie_ssa_replicates) are excluded.
+ * Must match SYSTEM_PROMPT's domain enum.
+ */
+const SUPPORTED_DOMAINS = [
+  "mm",
+  "mm_competitive_inhibition",
+  "sir",
+  "seir",
+  "wright_fisher",
+  "gillespie_ssa",
+  "pcr",
+  "molecular_dynamics",
+  "gillespie_ssa_bimolecular",
+  "two_locus_wright_fisher",
+  "lotka_volterra",
+  "cell_cycle_oscillator",
+  "repressilator",
+] as const;
+
 const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
   openai: {
     apiUrl: "https://api.openai.com/v1/chat/completions",
@@ -137,6 +158,12 @@ const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
 };
 
 /**
+ * LLM API request timeout in milliseconds. Prevents hanging on
+ * unresponsive endpoints.
+ */
+const LLM_REQUEST_TIMEOUT_MS = 30_000;
+
+/**
  * Resolve which provider config is active. LLM_PROVIDER selects by name
  * from LLM_PROVIDERS above; when unset (or set to an unrecognised name),
  * this falls back to the original generic OPENAI_API_KEY/LLM_API_KEY /
@@ -151,31 +178,53 @@ function activeProvider(): LLMProviderConfig | null {
   return null;
 }
 
+/**
+ * Helper to resolve configuration values with fallback chain.
+ * Checks env vars in order: override1, override2, provider-specific, fallback.
+ */
+function resolveConfigValue<T>(
+  overrides: Array<T | undefined>,
+  providerValue?: T,
+  fallback?: T,
+): T | undefined {
+  for (const override of overrides) {
+    if (override !== undefined) return override;
+  }
+  if (providerValue !== undefined) return providerValue;
+  return fallback;
+}
+
 function getApiKey(): string | undefined {
   const provider = activeProvider();
-  if (provider) {
-    return process.env[provider.apiKeyEnvVar] || process.env.LLM_API_KEY;
-  }
-  return process.env.OPENAI_API_KEY || process.env.LLM_API_KEY;
+  return resolveConfigValue(
+    [
+      provider ? process.env[provider.apiKeyEnvVar] : undefined,
+      process.env.LLM_API_KEY,
+      process.env.OPENAI_API_KEY,
+    ],
+    undefined,
+  );
 }
 
 function getApiUrl(): string {
   const provider = activeProvider();
   return (
-    process.env.OPENAI_API_URL ||
-    process.env.LLM_API_URL ||
-    provider?.apiUrl ||
-    "https://api.openai.com/v1/chat/completions"
+    resolveConfigValue(
+      [process.env.OPENAI_API_URL, process.env.LLM_API_URL],
+      provider?.apiUrl,
+      "https://api.openai.com/v1/chat/completions",
+    ) || "https://api.openai.com/v1/chat/completions"
   );
 }
 
 function getModel(): string {
   const provider = activeProvider();
   return (
-    process.env.OPENAI_MODEL ||
-    process.env.LLM_MODEL ||
-    provider?.defaultModel ||
-    "gpt-4o-mini"
+    resolveConfigValue(
+      [process.env.OPENAI_MODEL, process.env.LLM_MODEL],
+      provider?.defaultModel,
+      "gpt-4o-mini",
+    ) || "gpt-4o-mini"
   );
 }
 
@@ -231,9 +280,9 @@ export async function resolveQueryWithLLM(
       requestBody.response_format = { type: "json_object" };
     }
 
-    // Abort after 30 seconds to prevent hanging on unresponsive API endpoints
+    // Abort after timeout to prevent hanging on unresponsive API endpoints
     const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 30_000);
+    const timeoutId = setTimeout(() => abortController.abort(), LLM_REQUEST_TIMEOUT_MS);
 
     let response;
     try {
@@ -268,24 +317,7 @@ export async function resolveQueryWithLLM(
 
     const parsed = JSON.parse(content) as Partial<LLMResolvedSimulation>;
 
-    // Validate domain matches SYSTEM_PROMPT's supported list (14 primary API domains).
-    // monte_carlo_pi and gillespie_ssa_replicates are engine-internal; not exposed to LLM.
-    const SUPPORTED_DOMAINS = [
-      "mm",
-      "mm_competitive_inhibition",
-      "sir",
-      "seir",
-      "wright_fisher",
-      "gillespie_ssa",
-      "pcr",
-      "molecular_dynamics",
-      "gillespie_ssa_bimolecular",
-      "two_locus_wright_fisher",
-      "lotka_volterra",
-      "cell_cycle_oscillator",
-      "repressilator",
-    ] as const;
-
+    // Validate domain is in the supported list
     if (
       !parsed.domain ||
       !SUPPORTED_DOMAINS.includes(parsed.domain as (typeof SUPPORTED_DOMAINS)[number])
@@ -337,13 +369,21 @@ function normalizeParameters(
   return out;
 }
 
+/**
+ * Helper to extract optional string fields from an object.
+ * Returns the value if it's a string, otherwise undefined.
+ */
+function extractString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function normalizeEntities(input: unknown): EntityExtraction | undefined {
   if (!input || typeof input !== "object") return undefined;
   const raw = input as Record<string, unknown>;
   return {
-    enzymeName: typeof raw.enzymeName === "string" ? raw.enzymeName : undefined,
-    substrate: typeof raw.substrate === "string" ? raw.substrate : undefined,
-    organism: typeof raw.organism === "string" ? raw.organism : "Homo sapiens",
-    ecNumber: typeof raw.ecNumber === "string" ? raw.ecNumber : undefined,
+    enzymeName: extractString(raw.enzymeName),
+    substrate: extractString(raw.substrate),
+    organism: extractString(raw.organism) || "Homo sapiens",
+    ecNumber: extractString(raw.ecNumber),
   };
 }

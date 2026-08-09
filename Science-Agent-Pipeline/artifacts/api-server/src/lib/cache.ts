@@ -33,6 +33,18 @@ function normalizeQuery(query: string): string {
   return query.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+/**
+ * Ensure store is loaded into memory before operations.
+ * Idempotent: safe to call multiple times.
+ */
+async function ensureStoreLoaded(): Promise<CacheStore> {
+  if (store !== null) {
+    return store;
+  }
+  store = await loadStore();
+  return store;
+}
+
 let store: CacheStore | null = null;
 // Persist operations are serialized so concurrent jobs cannot load the same
 // snapshot and overwrite one another's entries.
@@ -83,29 +95,32 @@ export async function restoreCache(): Promise<number> {
 }
 
 /**
+ * Terminal job statuses that are safe to persist.
+ */
+const TERMINAL_STATUSES = new Set(["completed", "failed", "cancelled"]);
+
+/**
+ * Check if a job is in a persistable state (terminal status with result or error).
+ */
+function isPersistable(job: Job): boolean {
+  return TERMINAL_STATUSES.has(job.status) && (!!job.result || !!job.error);
+}
+
+/**
  * Persist a completed/cancelled/failed job to disk.
  */
 export function persistJob(job: Job | undefined): Promise<void> {
-  if (!job || (!job.result && !job.error)) return Promise.resolve();
-  if (
-    job.status !== "completed" &&
-    job.status !== "failed" &&
-    job.status !== "cancelled"
-  ) {
-    return Promise.resolve();
-  }
+  if (!job || !isPersistable(job)) return Promise.resolve();
 
   const operation = mutationQueue.then(async () => {
     try {
-      if (!store) {
-        store = await loadStore();
-      }
-      store.entries.push({
+      const s = await ensureStoreLoaded();
+      s.entries.push({
         schemaVersion: SCHEMA_VERSION,
         createdAt: new Date().toISOString(),
         job,
       });
-      await saveStore(store);
+      await saveStore(s);
     } catch (err) {
       logger.warn(
         { err, jobId: job.jobId },

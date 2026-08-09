@@ -191,6 +191,14 @@ export interface ParameterProvenance {
 }
 
 /**
+ * Helper to check if a value is a valid finite number.
+ * Used to validate STRENDA-required assay conditions.
+ */
+function isValidFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
  * STRENDA completeness for a single parameter.
  *
  * Both pH and temperature must be present and finite. A `null` pH is not the
@@ -201,11 +209,8 @@ export function strendaStatusFor(
   conditions: AssayConditions | undefined,
 ): StrendaStatus {
   if (!conditions) return "incomplete";
-  const hasPh =
-    typeof conditions.ph === "number" && Number.isFinite(conditions.ph);
-  const hasTemp =
-    typeof conditions.temperatureC === "number" &&
-    Number.isFinite(conditions.temperatureC);
+  const hasPh = isValidFiniteNumber(conditions.ph);
+  const hasTemp = isValidFiniteNumber(conditions.temperatureC);
   return hasPh && hasTemp ? "complete" : "incomplete";
 }
 
@@ -214,18 +219,10 @@ export function missingStrendaFields(
   conditions: AssayConditions | undefined,
 ): string[] {
   const missing: string[] = [];
-  if (
-    !conditions ||
-    typeof conditions.ph !== "number" ||
-    !Number.isFinite(conditions.ph)
-  ) {
+  if (!conditions || !isValidFiniteNumber(conditions.ph)) {
     missing.push("pH");
   }
-  if (
-    !conditions ||
-    typeof conditions.temperatureC !== "number" ||
-    !Number.isFinite(conditions.temperatureC)
-  ) {
+  if (!conditions || !isValidFiniteNumber(conditions.temperatureC)) {
     missing.push("temperature");
   }
   return missing;

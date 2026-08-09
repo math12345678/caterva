@@ -34,6 +34,28 @@ import { getDomainCitation } from "../lib/domain-literature";
 import { verifiableMetricsCollector } from "../lib/verifiable-metrics";
 
 /**
+ * Extract the value from the first locator matching a kind.
+ */
+function findLocatorValue(
+  locators: Array<{ kind: string; value: string }>,
+  kind: string,
+): string | undefined {
+  return locators.find((l) => l.kind === kind)?.value;
+}
+
+/**
+ * Extract a URL from locators, preferring deep links over generic URLs.
+ */
+function findLocatorUrl(
+  locators: Array<{ kind: string; value: string; deepLink?: string }>,
+): string | undefined {
+  return (
+    locators.find((l) => l.deepLink !== undefined)?.deepLink ??
+    findLocatorValue(locators, "url")
+  );
+}
+
+/**
  * Derive a structured LiteratureReference from a ParameterProvenance entry
  * for the audit report. `prov.citation` is a formatted DISPLAY string (ADR
  * 0008 — "citations" -> "modelCitations" rename made this explicit), not a
@@ -47,11 +69,9 @@ function literatureReferenceFromProvenance(
 ): LiteratureReference | undefined {
   if (prov.origin !== "resolved") return undefined;
   const locators = prov.citationLocators ?? [];
-  const doi = locators.find((l) => l.kind === "doi")?.value;
-  const pmid = locators.find((l) => l.kind === "pubmed")?.value;
-  const url =
-    locators.find((l) => l.deepLink !== undefined)?.deepLink ??
-    locators.find((l) => l.kind === "url")?.value;
+  const doi = findLocatorValue(locators, "doi");
+  const pmid = findLocatorValue(locators, "pubmed");
+  const url = findLocatorUrl(locators);
   if (!doi && !pmid && !url && !prov.source) return undefined;
   return {
     doi,
@@ -59,6 +79,20 @@ function literatureReferenceFromProvenance(
     url,
     source: prov.source,
   };
+}
+
+/**
+ * Type guard to check if a value is a valid finite number.
+ */
+function isValidFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Type guard to check if a value is an array of valid finite numbers.
+ */
+function isValidNumberArray(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every(isValidFiniteNumber);
 }
 
 /**
@@ -78,13 +112,10 @@ function numericParameters(
 ): Record<string, number | number[]> {
   const out: Record<string, number | number[]> = {};
   for (const [key, value] of Object.entries(parameters)) {
-    if (typeof value === "number" && Number.isFinite(value)) {
+    if (isValidFiniteNumber(value)) {
       out[key] = value;
-    } else if (
-      Array.isArray(value) &&
-      value.every((v) => typeof v === "number" && Number.isFinite(v))
-    ) {
-      out[key] = value as number[];
+    } else if (isValidNumberArray(value)) {
+      out[key] = value;
     }
   }
   return out;

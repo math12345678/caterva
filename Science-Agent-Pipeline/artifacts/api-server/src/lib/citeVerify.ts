@@ -69,6 +69,23 @@ function doiFromUrl(url: string): string | undefined {
 }
 
 /**
+ * Helper to add a locator to a set, deduplicating on (kind, value).
+ */
+function addLocator(
+  locators: CitationLocator[],
+  locator: CitationLocator,
+): void {
+  if (
+    !locators.some(
+      (existing) =>
+        existing.kind === locator.kind && existing.value === locator.value,
+    )
+  ) {
+    locators.push(locator);
+  }
+}
+
+/**
  * Build the machine-checkable locators for a structured citation.
  *
  * Order of preference when a URL carries several signals: a BRENDA enzyme
@@ -84,32 +101,34 @@ export function buildCitationLocators(
   if (!citation) return [];
 
   const locators: CitationLocator[] = [];
-  const add = (locator: CitationLocator): void => {
-    if (
-      !locators.some(
-        (existing) =>
-          existing.kind === locator.kind && existing.value === locator.value,
-      )
-    ) {
-      locators.push(locator);
-    }
-  };
 
   const url = citation.url ?? undefined;
   if (url) {
+    // Try BRENDA enzyme page first (highest precedence)
     const ecMatch = url.match(BRENDA_ENZYME_URL_RE);
     if (ecMatch) {
-      add({ kind: "brenda_ec", value: ecMatch[1]!, deepLink: url });
+      addLocator(locators, {
+        kind: "brenda_ec",
+        value: ecMatch[1]!,
+        deepLink: url,
+      });
     } else {
+      // Then PubMed
       const pmidMatch = url.match(PUBMED_URL_RE);
       if (pmidMatch) {
-        add({ kind: "pubmed", value: pmidMatch[1]!, deepLink: url });
+        addLocator(locators, {
+          kind: "pubmed",
+          value: pmidMatch[1]!,
+          deepLink: url,
+        });
       } else {
+        // Then DOI
         const doi = doiFromUrl(url);
         if (doi) {
-          add({ kind: "doi", value: doi, deepLink: url });
+          addLocator(locators, { kind: "doi", value: doi, deepLink: url });
         } else if (/^https?:\/\//.test(url)) {
-          add({ kind: "url", value: url, deepLink: url });
+          // Finally generic URL
+          addLocator(locators, { kind: "url", value: url, deepLink: url });
         }
       }
     }
@@ -118,12 +137,17 @@ export function buildCitationLocators(
   const refId = citation.referenceId ?? undefined;
   if (refId !== undefined && refId !== "" && refId !== "n/a") {
     if (DOI_RE.test(refId)) {
-      add({ kind: "doi", value: refId, deepLink: `https://doi.org/${refId}` });
+      addLocator(locators, {
+        kind: "doi",
+        value: refId,
+        deepLink: `https://doi.org/${refId}`,
+      });
     } else if (NUMERIC_RE.test(refId)) {
-      if ((citation.source ?? "").toLowerCase().includes("brenda")) {
-        add({ kind: "brenda_ref", value: refId });
+      const isBrenda = (citation.source ?? "").toLowerCase().includes("brenda");
+      if (isBrenda) {
+        addLocator(locators, { kind: "brenda_ref", value: refId });
       } else {
-        add({
+        addLocator(locators, {
           kind: "pubmed",
           value: refId,
           deepLink: `https://pubmed.ncbi.nlm.nih.gov/${refId}/`,
