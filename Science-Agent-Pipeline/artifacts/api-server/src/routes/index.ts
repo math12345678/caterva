@@ -4,6 +4,7 @@ import simulateRouter from "./simulate";
 import pipelineRouter from "./pipeline";
 import enzymesRouter from "./enzymes";
 import waitlistRouter from "./waitlist";
+import dashboardRouter from "./dashboard";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use(simulateRouter);
 router.use(pipelineRouter);
 router.use(enzymesRouter);
 router.use(waitlistRouter);
+router.use(dashboardRouter);
 
 export default router;

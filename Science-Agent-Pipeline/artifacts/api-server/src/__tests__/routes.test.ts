@@ -588,3 +588,73 @@ describe("GET /api/simulate/metrics/pipeline", () => {
     expect(JSON.stringify(res.body.literature)).toContain("1974");
   });
 });
+
+describe("GET /api/dashboard/overview", () => {
+  it("returns complete system state overview", async () => {
+    const res = await request(server).get("/api/dashboard/overview");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("timestamp");
+    expect(res.body).toHaveProperty("system");
+    expect(res.body.system).toHaveProperty("status");
+    expect(res.body.system).toHaveProperty("version");
+  });
+
+  it("includes queue metrics and status", async () => {
+    const res = await request(server).get("/api/dashboard/overview");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("queue");
+    expect(res.body.queue).toHaveProperty("total");
+    expect(res.body.queue).toHaveProperty("byStatus");
+    expect(res.body.queue).toHaveProperty("publicationReady");
+    expect(res.body.queue).toHaveProperty("publicationBlocked");
+  });
+
+  it("includes literature backing for all domains", async () => {
+    const res = await request(server).get("/api/dashboard/overview");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("domains");
+    expect(res.body.domains).toHaveProperty("total");
+    expect(res.body.domains).toHaveProperty("covered");
+    expect(res.body.domains.covered.length).toBe(13);
+    expect(res.body.domains).toHaveProperty("citations");
+    expect(Array.isArray(res.body.domains.citations)).toBe(true);
+  });
+
+  it("shows STRENDA compliance information", async () => {
+    const res = await request(server).get("/api/dashboard/overview");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("compliance");
+    expect(res.body.compliance).toHaveProperty("strenda");
+    expect(res.body.compliance.strenda).toHaveProperty("standard");
+    expect(res.body.compliance.strenda.standard).toContain("Gelperin");
+  });
+
+  it("exposes all available API endpoints", async () => {
+    const res = await request(server).get("/api/dashboard/overview");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("api");
+    expect(res.body.api).toHaveProperty("endpoints");
+    expect(res.body.api.endpoints).toHaveProperty("jobs");
+    expect(res.body.api.endpoints).toHaveProperty("literature");
+    expect(res.body.api.endpoints.jobs.length).toBeGreaterThan(0);
+    expect(res.body.api.endpoints.literature.length).toBeGreaterThan(0);
+  });
+});
+
+describe("GET /api/dashboard/health", () => {
+  it("returns health status", async () => {
+    const res = await request(server).get("/api/dashboard/health");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("status");
+    expect(res.body).toHaveProperty("timestamp");
+    expect(res.body).toHaveProperty("checks");
+  });
+
+  it("verifies all subsystems are operational", async () => {
+    const res = await request(server).get("/api/dashboard/health");
+    expect(res.status).toBe(200);
+    expect(res.body.checks).toHaveProperty("metrics");
+    expect(res.body.checks).toHaveProperty("queue");
+    expect(res.body.checks).toHaveProperty("literature");
+  });
+});
