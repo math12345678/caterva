@@ -24,6 +24,71 @@ import {
   validateParameterProvenance,
   type ParameterProvenance,
 } from "../lib/provenance";
+import {
+  verifyParameterAgainstLiterature,
+  type LiteratureReference,
+  type VerificationResult,
+} from "../lib/literature-verifier";
+import { validateSTREANDA } from "../lib/strenda-validator";
+import { getDomainCitation } from "../lib/domain-literature";
+import { verifiableMetricsCollector } from "../lib/verifiable-metrics";
+
+/**
+ * Derive a structured LiteratureReference from a ParameterProvenance entry
+ * for the audit report. `prov.citation` is a formatted DISPLAY string (ADR
+ * 0008 — "citations" -> "modelCitations" rename made this explicit), not a
+ * structured object with its own .doi/.pmid/.source fields; the structured
+ * data already exists separately as `citationLocators` (citeVerify.ts) and
+ * is reassembled here rather than parsed back out of the display string a
+ * second time.
+ */
+function literatureReferenceFromProvenance(
+  prov: ParameterProvenance,
+): LiteratureReference | undefined {
+  if (prov.origin !== "resolved") return undefined;
+  const locators = prov.citationLocators ?? [];
+  const doi = locators.find((l) => l.kind === "doi")?.value;
+  const pmid = locators.find((l) => l.kind === "pubmed")?.value;
+  const url =
+    locators.find((l) => l.deepLink !== undefined)?.deepLink ??
+    locators.find((l) => l.kind === "url")?.value;
+  if (!doi && !pmid && !url && !prov.source) return undefined;
+  return {
+    doi,
+    pmid,
+    url,
+    source: prov.source,
+  };
+}
+
+/**
+ * Narrow a job's stored parameters to the numeric ones the audit and
+ * confidence reports can actually say something about.
+ *
+ * `SimulationResponse.parameters` is `Record<string, unknown>` because it
+ * round-trips through the job store as opaque JSON. Rather than casting it
+ * (which would let a string or null reach code that assumes a number and
+ * produce a nonsense confidence score for it), this drops anything that is
+ * not a number or an array of numbers. A parameter that isn't numeric has
+ * no literature-comparable value to audit, so omitting it is the honest
+ * reading -- not a silent data loss.
+ */
+function numericParameters(
+  parameters: Record<string, unknown>,
+): Record<string, number | number[]> {
+  const out: Record<string, number | number[]> = {};
+  for (const [key, value] of Object.entries(parameters)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      out[key] = value;
+    } else if (
+      Array.isArray(value) &&
+      value.every((v) => typeof v === "number" && Number.isFinite(v))
+    ) {
+      out[key] = value as number[];
+    }
+  }
+  return out;
+}
 
 const router: IRouter = Router();
 
@@ -43,6 +108,48 @@ router.get(
     try {
       const jobs = queue.listJobs();
       res.json(jobs);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/simulate/metrics/pipeline
+ *
+ * Returns comprehensive pipeline metrics with literature backing:
+ * - Little's Law queue theory (Little 1961)
+ * - Wilson confidence intervals (Wilson 1927)
+ * - Harter percentiles (Harter 1974)
+ * - Domain-specific usage
+ * - LLM classification rates
+ */
+router.get(
+  "/simulate/metrics/pipeline",
+  async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const snapshot = verifiableMetricsCollector.getSnapshot();
+
+      // Add success rate with confidence interval
+      const successRate = verifiableMetricsCollector.getSuccessRateWithConfidence();
+
+      // Add latency percentiles
+      const latencyPercentiles = verifiableMetricsCollector.getLatencyPercentiles();
+
+      res.json({
+        timestamp: new Date().toISOString(),
+        literature: {
+          queueTheory: "Little (1961) - L = λW",
+          confidenceIntervals: "Wilson (1927) - Binomial proportion CI",
+          percentiles: "Harter (1974) - P95 and P99 latency analysis",
+          responseTime: "Nielsen (1993) - User perception thresholds",
+        },
+        metrics: {
+          ...snapshot,
+          successRate,
+          latencyPercentiles,
+        },
+      });
     } catch (err) {
       next(err);
     }
@@ -297,6 +404,273 @@ router.get(
     }
   },
 );
+
+/**
+ * GET /api/simulate/:jobId/confidence
+ *
+ * Per-parameter confidence scores and explanations.
+ * Shows why each parameter has its value and how confident we are in it.
+ */
+router.get(
+  "/simulate/:jobId/confidence",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const jobId = req.params.jobId as string;
+      const job = queue.getJob(jobId);
+      if (!job) {
+        res
+          .status(404)
+          .json({ error: "NOT_FOUND", message: "Simulation job not found" });
+        return;
+      }
+
+      if (!job.result || !job.result.parameterProvenance) {
+        res.status(409).json({
+          error: "NO_PROVENANCE",
+          message: "Job has no parameter provenance",
+        });
+        return;
+      }
+
+      const confidenceBreakdown = buildConfidenceBreakdown(
+        numericParameters(job.result.parameters),
+        job.result.parameterProvenance,
+      );
+
+      res.json(confidenceBreakdown);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * GET /api/simulate/:jobId/audit
+ *
+ * Publication-ready audit of parameter provenance. Shows:
+ * - Verification level (verified/flagged/pending/unverifiable)
+ * - DOI/source for each parameter
+ * - STRENDA compliance
+ * - Confidence score
+ * - Whether publication is blocked
+ */
+router.get(
+  "/simulate/:jobId/audit",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const jobId = req.params.jobId as string;
+      const job = queue.getJob(jobId);
+      if (!job) {
+        res
+          .status(404)
+          .json({ error: "NOT_FOUND", message: "Simulation job not found" });
+        return;
+      }
+
+      if (!job.result || !job.result.parameterProvenance) {
+        res.status(409).json({
+          error: "NO_PROVENANCE",
+          message: "Job has no parameter provenance to audit",
+        });
+        return;
+      }
+
+      const auditReport = buildAuditReport(
+        job.result.domain,
+        numericParameters(job.result.parameters),
+        job.result.parameterProvenance,
+      );
+
+      res.json(auditReport);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * Build comprehensive audit report for publication
+ */
+interface ParameterAudit {
+  name: string;
+  value: number;
+  origin: string;
+  verificationLevel: string;
+  confidence: number;
+  doi?: string;
+  pmid?: string;
+  source?: string;
+  strendaCompliant?: boolean;
+  requiresReview: boolean;
+  message: string;
+}
+
+interface AuditReport {
+  jobId: string;
+  domain: string;
+  publicationReady: boolean;
+  blockedParameters: string[];
+  overallConfidence: number;
+  parameterAudits: ParameterAudit[];
+  domainCitation: string;
+  timestamp: string;
+}
+
+/**
+ * Confidence breakdown per-parameter
+ */
+interface ConfidenceScore {
+  name: string;
+  value: number;
+  origin: string;
+  confidence: number;
+  explanation: string;
+  source?: string;
+  doi?: string;
+}
+
+interface ConfidenceBreakdown {
+  timestamp: string;
+  overallConfidence: number;
+  parameters: ConfidenceScore[];
+}
+
+function buildConfidenceBreakdown(
+  parameters: Record<string, number | number[]>,
+  provenance: Record<string, ParameterProvenance>,
+): ConfidenceBreakdown {
+  const scores: ConfidenceScore[] = [];
+  let confidenceSum = 0;
+  let confidenceCount = 0;
+
+  for (const [name, value] of Object.entries(parameters)) {
+    const prov = provenance[name];
+    if (!prov || Array.isArray(value)) continue;
+
+    const reference = literatureReferenceFromProvenance(prov);
+    const verification = verifyParameterAgainstLiterature(
+      name,
+      value,
+      prov.origin as "resolved" | "keyword" | "llm" | "user" | "default",
+      reference,
+    );
+
+    scores.push({
+      name,
+      value,
+      origin: prov.origin,
+      confidence: verification.confidence,
+      explanation: verification.message,
+      source: reference?.source,
+      doi: reference?.doi,
+    });
+
+    confidenceSum += verification.confidence;
+    confidenceCount++;
+  }
+
+  const overallConfidence =
+    confidenceCount > 0 ? confidenceSum / confidenceCount : 0;
+
+  return {
+    timestamp: new Date().toISOString(),
+    overallConfidence,
+    parameters: scores,
+  };
+}
+
+function buildAuditReport(
+  domain: string,
+  parameters: Record<string, number | number[]>,
+  provenance: Record<string, ParameterProvenance>,
+): AuditReport {
+  const parameterAudits: ParameterAudit[] = [];
+  const blockedParameters: string[] = [];
+  let confidenceSum = 0;
+  let confidenceCount = 0;
+
+  for (const [name, value] of Object.entries(parameters)) {
+    const prov = provenance[name];
+    if (!prov) continue;
+    // Array-valued parameters (e.g. starting_frequencies for two-locus
+    // Wright-Fisher) have no single scalar to run through the
+    // literature/STRENDA numeric checks below, which are built around one
+    // kinetic-style value. Audited by presence/origin only.
+    if (typeof value !== "number") {
+      parameterAudits.push({
+        name,
+        value: NaN,
+        origin: prov.origin,
+        verificationLevel: "unverifiable",
+        confidence: prov.origin === "user" ? 1.0 : 0,
+        requiresReview: false,
+        message: Array.isArray(value)
+          ? "Array-valued parameter; not individually verified against literature."
+          : "Non-numeric parameter; not individually verified against literature.",
+      });
+      continue;
+    }
+
+    const reference = literatureReferenceFromProvenance(prov);
+    const verification = verifyParameterAgainstLiterature(
+      name,
+      value,
+      prov.origin as "resolved" | "keyword" | "llm" | "user" | "default",
+      reference,
+    );
+
+    const audit: ParameterAudit = {
+      name,
+      value,
+      origin: prov.origin,
+      verificationLevel: verification.level,
+      confidence: verification.confidence,
+      doi: reference?.doi,
+      pmid: reference?.pmid,
+      source: reference?.source,
+      requiresReview: verification.requiresManualReview,
+      message: verification.message,
+    };
+
+    // Check STRENDA compliance if applicable
+    if (
+      domain.includes("mm") ||
+      domain.includes("competitive") ||
+      domain.includes("inhibit")
+    ) {
+      const strendaResult = validateSTREANDA(
+        value,
+        prov.assayConditions,
+        undefined,
+        undefined,
+      );
+      audit.strendaCompliant = strendaResult.compliant;
+    }
+
+    parameterAudits.push(audit);
+    confidenceSum += verification.confidence;
+    confidenceCount++;
+
+    if (verification.level === "pending") {
+      blockedParameters.push(name);
+    }
+  }
+
+  const overallConfidence =
+    confidenceCount > 0 ? confidenceSum / confidenceCount : 0;
+  const publicationReady = blockedParameters.length === 0;
+
+  return {
+    jobId: "", // Will be set by caller if needed
+    domain,
+    publicationReady,
+    blockedParameters,
+    overallConfidence,
+    parameterAudits,
+    domainCitation: getDomainCitation(domain),
+    timestamp: new Date().toISOString(),
+  };
+}
 
 /**
  * Look up a previously-completed simulation with the same query. This is a

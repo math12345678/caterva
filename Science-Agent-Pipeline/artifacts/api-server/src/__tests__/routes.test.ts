@@ -474,3 +474,117 @@ describe("GET /api/simulate/:jobId/export", () => {
     expect(res.text.split("\n").length).toBeGreaterThan(2);
   });
 });
+
+describe("GET /api/simulate/:jobId/confidence", () => {
+  it("returns 404 for unknown job", async () => {
+    const res = await request(server).get("/api/simulate/unknown/confidence");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 for job without provenance", async () => {
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "something" });
+    const res = await request(server).get(
+      `/api/simulate/${create.body.jobId}/confidence`,
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("NO_PROVENANCE");
+  });
+
+  it("returns per-parameter confidence scores", async () => {
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51" });
+    const { jobId } = create.body;
+
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const get = await request(server).get(`/api/simulate/${jobId}`);
+      if (get.body.status === "completed") break;
+    }
+
+    const res = await request(server).get(`/api/simulate/${jobId}/confidence`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("timestamp");
+    expect(res.body).toHaveProperty("overallConfidence");
+    expect(res.body).toHaveProperty("parameters");
+    expect(Array.isArray(res.body.parameters)).toBe(true);
+    expect(res.body.parameters.length).toBeGreaterThan(0);
+    expect(res.body.parameters[0]).toHaveProperty("name");
+    expect(res.body.parameters[0]).toHaveProperty("value");
+    expect(res.body.parameters[0]).toHaveProperty("confidence");
+    expect(res.body.parameters[0]).toHaveProperty("explanation");
+  });
+});
+
+describe("GET /api/simulate/:jobId/audit", () => {
+  it("returns 404 for unknown job", async () => {
+    const res = await request(server).get("/api/simulate/unknown/audit");
+    expect(res.status).toBe(404);
+  });
+
+  it("returns 409 for job without provenance", async () => {
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "something" });
+    const res = await request(server).get(
+      `/api/simulate/${create.body.jobId}/audit`,
+    );
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe("NO_PROVENANCE");
+  });
+
+  it("returns publication-ready audit for completed job", async () => {
+    const create = await request(server)
+      .post("/api/simulate")
+      .send({ query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51" });
+    const { jobId } = create.body;
+
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const get = await request(server).get(`/api/simulate/${jobId}`);
+      if (get.body.status === "completed") break;
+    }
+
+    const res = await request(server).get(`/api/simulate/${jobId}/audit`);
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("domain");
+    expect(res.body).toHaveProperty("publicationReady");
+    expect(res.body).toHaveProperty("blockedParameters");
+    expect(res.body).toHaveProperty("overallConfidence");
+    expect(res.body).toHaveProperty("parameterAudits");
+    expect(Array.isArray(res.body.parameterAudits)).toBe(true);
+    expect(res.body).toHaveProperty("domainCitation");
+    expect(res.body.domainCitation).toContain("Lehninger");
+  });
+});
+
+describe("GET /api/simulate/metrics/pipeline", () => {
+  it("returns pipeline metrics with literature backing", async () => {
+    const res = await request(server).get("/api/simulate/metrics/pipeline");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty("timestamp");
+    expect(res.body).toHaveProperty("literature");
+    expect(res.body.literature).toHaveProperty("queueTheory");
+    expect(res.body.literature.queueTheory).toContain("Little");
+    expect(res.body.literature.queueTheory).toContain("1961");
+    expect(res.body).toHaveProperty("metrics");
+    expect(res.body.metrics).toHaveProperty("completedJobs");
+    expect(res.body.metrics).toHaveProperty("avgLatencyMs");
+  });
+
+  it("includes Wilson confidence intervals in metrics", async () => {
+    const res = await request(server).get("/api/simulate/metrics/pipeline");
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body.literature)).toContain("Wilson");
+    expect(JSON.stringify(res.body.literature)).toContain("1927");
+  });
+
+  it("includes Harter percentiles in metrics", async () => {
+    const res = await request(server).get("/api/simulate/metrics/pipeline");
+    expect(res.status).toBe(200);
+    expect(JSON.stringify(res.body.literature)).toContain("Harter");
+    expect(JSON.stringify(res.body.literature)).toContain("1974");
+  });
+});
