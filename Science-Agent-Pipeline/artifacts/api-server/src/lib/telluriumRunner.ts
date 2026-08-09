@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { findRepositoryRoot } from "./repoRoot";
 import { resolvePythonExecutable } from "./python";
 
-// 12 core scientific domains + SBML escape hatch. This union must
+// 15 core scientific domains + SBML escape hatch. This union must
 // match tellurium_runner.py's DISPATCH table exactly (ADR 0007);
 // Tellurium/tests/test_boundary_contract.py fails if they drift.
 export type SimulationDomain =
@@ -26,6 +26,13 @@ export type SimulationDomain =
   // that direction.
   | "monte_carlo_pi"
   | "gillespie_ssa_replicates"
+  // Three ODE oscillator domains (ADR 0022): predator-prey (Lotka 1925 /
+  // Volterra 1926), the cdc2-cyclin cell cycle relaxation oscillator
+  // (Tyson 1991), and the synthetic three-gene repressilator (Elowitz &
+  // Leibler 2000).
+  | "lotka_volterra"
+  | "cell_cycle_oscillator"
+  | "repressilator"
   | "sbml";
 
 export interface TelluriumPoint {

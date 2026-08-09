@@ -298,7 +298,7 @@ export const LOTKA_VOLTERRA_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (α=1.1, β=0.4, γ=0.4, δ=0.1) per Lotka (1925). Parameters generate ~10 year cycle in classic lynx-hare system. Population oscillations are hallmark of this model.",
+    "Defaults (α=1.1, β=0.4, γ=0.1, δ=0.4) per Lotka (1925); γ < δ is the biologically ordinary case (predators convert prey to offspring slower than they die). Small-oscillation period 2π/√(αδ) ≈ 9.5 time units, comparable to the classic lynx-hare cycle. Population oscillations are the hallmark of this model; see tests/test_lotka_volterra_correctness.py for the conserved-quantity and fixed-point verification (a transposed γ/δ pairing here previously drove the prey population negative).",
 };
 
 /**

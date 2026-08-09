@@ -173,6 +173,31 @@ export const SimulationParameterSchemas: Record<
     n_replicates: z.number().int().min(1).max(1000),
     seed: integer.nullish(),
   }),
+  // Three literature-fixed ODE oscillators (ADR 0022). All rate constants
+  // are the source papers' own standard parameter sets, not caller inputs
+  // -- see Tellurium/continuous/model_building.py -- so only the
+  // integration window is a request-time parameter.
+  lotka_volterra: z
+    .object({
+      alpha: optionalNumeric,
+      beta: optionalNumeric,
+      gamma: optionalNumeric,
+      delta: optionalNumeric,
+      p0: optionalNumeric,
+      v0: optionalNumeric,
+      end: optionalNumeric,
+      points: integer.nullish(),
+    }),
+  cell_cycle_oscillator: z.object({
+    end: optionalNumeric,
+    points: integer.nullish(),
+    seed: integer.nullish(),
+  }),
+  repressilator: z.object({
+    end: optionalNumeric,
+    points: integer.nullish(),
+    seed: integer.nullish(),
+  }),
   sbml: z.object({
     sbml_string: z.string(),
     start: optionalNumeric,

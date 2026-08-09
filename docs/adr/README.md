@@ -44,3 +44,5 @@ Each ADR has:
 | [0019](0019-kcat-resolution-exposed-not-yet-wired-to-vmax.md) | kcat is now literature-resolvable via BRENDA's Turnover Numbers table, and bridges to a simulable Vmax when the caller supplies enzyme_conc |
 | [0020](0020-epidemiology-parameters-wired-to-resolvable-fields.md) | Epidemiology (R0, infectious period) is wired end-to-end into the SIR domain via a beta/gamma bridge |
 | [0021](0021-strenda-applies-only-to-governed-parameters.md) | The STRENDA rule applies only to STRENDA-governed parameters, enforced by a mandatory `parameterKey` |
+| [0022](0022-three-oscillator-domains.md) | Three ODE oscillator domains: Lotka-Volterra, Tyson cell cycle, Elowitz-Leibler repressilator |
+| [0023](0023-lotka-volterra-default-parameters-were-transposed.md) | Lotka-Volterra's default gamma/delta were transposed, producing a negative population and destroying the conserved quantity |

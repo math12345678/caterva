@@ -215,7 +215,7 @@ def simulate_seir(beta: float, sigma: float, gamma: float, s0: float,
 
 
 def simulate_lotka_volterra(alpha: float = 1.1, beta: float = 0.4,
-                            gamma: float = 0.4, delta: float = 0.1,
+                            gamma: float = 0.1, delta: float = 0.4,
                             p0: float = 10.0, v0: float = 5.0,
                             start: float = 0.0, end: float = 20.0,
                             points: int = 201) -> SimulationResult:
@@ -223,7 +223,22 @@ def simulate_lotka_volterra(alpha: float = 1.1, beta: float = 0.4,
     predator-prey model (Lotka 1925; Volterra 1926).
 
     Defaults reproduce the classic ~10-year lynx-hare oscillation cycle
-    on an annual-cycle time axis. See docs/adr/0022.
+    on an annual-cycle time axis: the small-oscillation period is
+    ``2*pi/sqrt(alpha*delta) = 9.47``. See docs/adr/0022.
+
+    `gamma` and `delta` were transposed here until 2026-08-09
+    (gamma=0.4, delta=0.1). That put the coexistence fixed point
+    ``(delta/gamma, alpha/beta)`` at (0.25, 2.75) while the prey starts at
+    10 -- a 40x excursion that drove the prey population to -5.9e-11 and
+    drifted the system's exactly-conserved first integral by 49%, so the
+    integrated trajectory was not the modelled system at all. It also made
+    the docstring's own ~10-year claim false: the transposed pair gives a
+    period of 18.9, not 9.47.
+
+    Biologically the transposition described predators converting prey into
+    offspring (gamma) four times faster than they die (delta); the ordinary
+    case, and the one Volterra's own figures use, is gamma < delta. Pinned
+    by tests/test_lotka_volterra_correctness.py.
     """
     validation = validate_lotka_volterra_params(alpha, beta, gamma, delta, p0, v0)
     validation.raise_if_invalid()

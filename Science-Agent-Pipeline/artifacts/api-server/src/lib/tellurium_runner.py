@@ -13,7 +13,8 @@ Expected input JSON shape:
       "domain": "mm" | "mm_competitive_inhibition" | "sir" | "seir" | "pcr" | "monte_carlo_pi" |
                  "wright_fisher" | "two_locus_wright_fisher" |
                  "molecular_dynamics" | "gillespie_ssa" |
-                 "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates" | "sbml",
+                 "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates" |
+                 "lotka_volterra" | "cell_cycle_oscillator" | "repressilator" | "sbml",
       "parameters": { ...domain-specific params... }
     }
 
@@ -542,6 +543,70 @@ def run_molecular_dynamics(params: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+def run_lotka_volterra(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Lotka-Volterra predator-prey dynamics (Lotka 1925, Volterra 1926).
+
+    gamma/delta defaults are 0.1/0.4, matching
+    ``simulate_lotka_volterra``'s own defaults -- NOT 0.4/0.1. That
+    transposed pairing put the coexistence fixed point at (0.25, 2.75)
+    against a p0=10 start (a 40x excursion), drove the prey population
+    negative, and drifted the system's exactly-conserved first integral
+    by 49%. See the docstring on ``simulate_lotka_volterra`` and
+    tests/test_lotka_volterra_correctness.py.
+    """
+    alpha = float(params.get("alpha", 1.1))
+    beta = float(params.get("beta", 0.4))
+    gamma = float(params.get("gamma", 0.1))
+    delta = float(params.get("delta", 0.4))
+    p0 = float(params.get("p0", 10.0))  # Prey population
+    v0 = float(params.get("v0", 5.0))   # Predator population
+    end = float(params.get("end", 20.0))
+    points = int(params.get("points", 201))
+
+    result = tellurium_engine.simulate_lotka_volterra(
+        alpha=alpha, beta=beta, gamma=gamma, delta=delta,
+        p0=p0, v0=v0, end=end, points=points
+    )
+
+    return _serialise_result(
+        result, "lotka_volterra",
+        {"alpha": alpha, "beta": beta, "gamma": gamma, "delta": delta,
+         "p0": p0, "v0": v0, "end": end, "points": points},
+    )
+
+
+def run_cell_cycle_oscillator(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Cell cycle oscillator (Tyson 1991): cyclin-CDK regulation driving mitosis."""
+    end = float(params.get("end", 100.0))
+    points = int(params.get("points", 1001))
+    seed = params.get("seed")
+
+    result = tellurium_engine.simulate_cell_cycle_oscillator(
+        end=end, points=points, seed=seed
+    )
+
+    return _serialise_result(
+        result, "cell_cycle_oscillator",
+        {"end": end, "points": points, "seed": seed},
+    )
+
+
+def run_repressilator(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Repressilator (Elowitz & Leibler 2000): three-gene synthetic oscillator."""
+    end = float(params.get("end", 200.0))
+    points = int(params.get("points", 2001))
+    seed = params.get("seed")
+
+    result = tellurium_engine.simulate_repressilator(
+        end=end, points=points, seed=seed
+    )
+
+    return _serialise_result(
+        result, "repressilator",
+        {"end": end, "points": points, "seed": seed},
+    )
+
+
 def run_sbml(params: Dict[str, Any]) -> Dict[str, Any]:
     """Dispatch for ``simulate_sbml`` -- the raw-SBML escape hatch.
 
@@ -564,7 +629,7 @@ def run_sbml(params: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # domain -> engine function name. This is the contract; see ADR 0007 and
-# Tellurium/tests/test_boundary_contract.py. 15 API domains + SBML escape
+# Tellurium/tests/test_boundary_contract.py. 16 API domains + SBML escape
 # hatch.
 #
 # monte_carlo_pi and gillespie_ssa_replicates were briefly deleted from this
@@ -576,6 +641,8 @@ def run_sbml(params: Dict[str, Any]) -> Dict[str, Any]:
 # to satisfy a stale TS union broke five boundary-contract tests, which is
 # exactly the drift the contract test exists to catch. They are restored,
 # and SimulationDomain in telluriumRunner.ts now lists them.
+#
+# lotka_volterra, cell_cycle_oscillator, repressilator: see ADR 0022.
 DISPATCH: Dict[str, str] = {
     "mm": "simulate_michaelis_menten",
     "mm_competitive_inhibition": "simulate_mm_competitive_inhibition",
@@ -589,6 +656,13 @@ DISPATCH: Dict[str, str] = {
     "two_locus_wright_fisher": "simulate_two_locus_wright_fisher",
     "monte_carlo_pi": "simulate_monte_carlo_pi",
     "gillespie_ssa_replicates": "simulate_gillespie_ssa_replicates",
+    # Three ODE oscillator domains (ADR 0022). Removed earlier the same day
+    # when the engine did not yet implement them; restored now that
+    # simulate_lotka_volterra / _cell_cycle_oscillator / _repressilator are
+    # real and in the engine's __all__.
+    "lotka_volterra": "simulate_lotka_volterra",
+    "cell_cycle_oscillator": "simulate_cell_cycle_oscillator",
+    "repressilator": "simulate_repressilator",
     "sbml": "simulate_sbml",
 }
 
@@ -605,6 +679,9 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "two_locus_wright_fisher": run_two_locus_wright_fisher,
     "monte_carlo_pi": run_monte_carlo_pi,
     "gillespie_ssa_replicates": run_gillespie_ssa_replicates,
+    "lotka_volterra": run_lotka_volterra,
+    "cell_cycle_oscillator": run_cell_cycle_oscillator,
+    "repressilator": run_repressilator,
     "sbml": run_sbml,
 }
 

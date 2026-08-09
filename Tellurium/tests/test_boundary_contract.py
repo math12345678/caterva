@@ -122,6 +122,9 @@ class TestBoundaryContract:
             "simulate_gillespie_ssa",
             "simulate_gillespie_ssa_bimolecular",
             "simulate_gillespie_ssa_replicates",
+            "simulate_lotka_volterra",
+            "simulate_cell_cycle_oscillator",
+            "simulate_repressilator",
             "simulate_sbml",
         }
         assert expected == ENGINE_SIMULATE_FUNCTIONS
@@ -140,6 +143,9 @@ class TestBoundaryContract:
             "gillespie_ssa",
             "gillespie_ssa_bimolecular",
             "gillespie_ssa_replicates",
+            "lotka_volterra",
+            "cell_cycle_oscillator",
+            "repressilator",
             "sbml",
         }
 

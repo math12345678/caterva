@@ -12,10 +12,10 @@ import { logger } from "../lib/logger";
 const router = Router();
 
 /**
- * GET /api/metrics
+ * GET /api/metrics/snapshot
  * Returns current snapshot of all pipeline metrics
  */
-router.get("/", (req: Request, res: Response) => {
+router.get("/snapshot", (req: Request, res: Response) => {
   try {
     const snapshot = metricsCollector.getSnapshot();
 
@@ -86,7 +86,7 @@ router.get("/", (req: Request, res: Response) => {
  * Minimal health check for monitoring systems
  * Returns 200 if pipeline is operational
  */
-router.get("/health", (req: Request, res: Response) => {
+router.get("/metrics/health", (req: Request, res: Response) => {
   try {
     const snapshot = metricsCollector.getSnapshot();
 
@@ -120,7 +120,7 @@ router.get("/health", (req: Request, res: Response) => {
  * Reset all metrics (admin endpoint - requires authorization token)
  * Authorization: Bearer <METRICS_ADMIN_TOKEN>
  */
-router.post("/reset", (req: Request, res: Response) => {
+router.post("/metrics/reset", (req: Request, res: Response) => {
   try {
     // Require authorization token for metrics reset (prevents accidental/malicious resets)
     const adminToken = process.env.METRICS_ADMIN_TOKEN;
