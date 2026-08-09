@@ -117,18 +117,36 @@ router.get("/health", (req: Request, res: Response) => {
 
 /**
  * POST /api/metrics/reset
- * Reset all metrics (admin endpoint - should be protected in production)
+ * Reset all metrics (admin endpoint - requires authorization token)
+ * Authorization: Bearer <METRICS_ADMIN_TOKEN>
  */
 router.post("/reset", (req: Request, res: Response) => {
   try {
-    // TODO: Add authentication/authorization check here
-    // if (!isAdmin(req)) {
-    //   res.status(403).json({ error: "Unauthorized" });
-    //   return;
-    // }
+    // Require authorization token for metrics reset (prevents accidental/malicious resets)
+    const adminToken = process.env.METRICS_ADMIN_TOKEN;
+    if (!adminToken) {
+      logger.warn("METRICS_ADMIN_TOKEN not configured; metrics reset disabled");
+      res.status(501).json({
+        status: "error",
+        error: "Metrics reset not configured",
+      });
+      return;
+    }
+
+    const authHeader = req.headers.authorization || "";
+    const [scheme, token] = authHeader.split(" ");
+
+    if (scheme !== "Bearer" || token !== adminToken) {
+      logger.warn({ authHeader: authHeader.split(" ")[0] }, "Metrics reset authorization failed");
+      res.status(403).json({
+        status: "error",
+        error: "Unauthorized",
+      });
+      return;
+    }
 
     metricsCollector.reset();
-    logger.info("Metrics reset via API");
+    logger.info("Metrics reset via API by authorized request");
 
     res.status(200).json({
       status: "ok",

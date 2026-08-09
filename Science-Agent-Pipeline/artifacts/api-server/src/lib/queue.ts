@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./telluriumRunner";
 import type { ParameterProvenance } from "./provenance";
+import { logger } from "./logger";
 
 export type JobStatus =
   | "pending"
@@ -153,8 +154,11 @@ export function updateJob(jobId: string, update: JobUpdate): Job | undefined {
       try {
         listener(next);
       } catch (err) {
-        // Listeners must not throw into the publisher.
-        console.error("Job listener threw:", err);
+        // Listeners must not throw into the publisher - log and continue.
+        logger.error(
+          { err, jobId, status: next.status },
+          "Job listener threw error; continuing",
+        );
       }
     }
   }

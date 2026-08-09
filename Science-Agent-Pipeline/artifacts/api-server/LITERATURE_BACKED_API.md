@@ -259,11 +259,7 @@ curl -X GET /api/simulate/metrics/pipeline | jq '.metrics'
 
 ## Testing
 
-All 388 tests passing:
-- 25+ metrics collection tests
-- 19+ STRENDA compliance tests
-- 14+ literature verification tests
-- 44+ integration tests
+All 399 tests passing across 28 test files.
 
 **Run tests:**
 ```bash
