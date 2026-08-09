@@ -122,6 +122,46 @@ Awaiting a decision before deleting anything.
 - `claimed_titles()` re-checked after the regex fix: 12 DOI-title pairs,
   all correctly aligned.
 
+## 6b. The title check found two MORE fabricated DOIs on its first run
+
+Both resolve. Both are real papers. Neither is the paper being cited:
+
+| cited as | DOI | what CrossRef actually registers |
+|---|---|---|
+| Lineweaver & Burk (1934), "The determination of enzyme dissociation constants" | `10.1021/ja01349a014` | **"THE RAMAN SPECTRUM OF GERMANIUM TETRACHLORIDE"** |
+| Wright (1931), "Evolution in Mendelian populations" | `10.1038/127487a0` | **"Oceanographical Expedition of the Dana, 1928-1930"** |
+
+That brings the total to **five wrong citations in `domain-literature.ts`**,
+of which four resolved cleanly and would have survived any existence-only
+check indefinitely.
+
+- **Wright (1931)** corrected to `10.1093/genetics/16.2.97`, verified via
+  PubMed (PMID 17246615, PMC1201091), *Genetics* 16(2), 97-159.
+- **Lineweaver & Burk (1934)**: the wrong DOI was **removed and not
+  replaced**. J. Am. Chem. Soc. 1934 predates PubMed's coverage, so no
+  replacement could be verified from a primary source here, and
+  substituting a plausible-looking DOI is precisely the failure being
+  corrected. Journal, volume and pages are given instead — enough to locate
+  the paper, and honest about what was confirmed.
+
+## 6c. The scraper was re-checking its own corrections
+
+Immediately after the fixes, three corrected DOIs reappeared in the
+checker's output. The scrape was reading the comment lines that explain
+*why* a DOI was wrong, so every documented mistake became a permanent
+failing check — and worse, a permanently red report trains people to ignore
+it.
+
+`discovered_dois()` now skips comment lines. A DOI named in prose is being
+discussed, not asserted. Discovered count went from 18 (including five
+already-removed DOIs) to **13 genuinely cited**.
+
+`10.1038/ng.3141` was also dropped from the hardcoded `DOIS` allowlist. It
+was labelled "human mutation rate" but is a *third* distinct Rahbari DOI
+alongside ng.3285 and ng.3469, and nothing in the codebase cites it. An
+unverified DOI sitting in a checker's own allowlist is the checker
+asserting something it never checked.
+
 ## 7. Carried forward
 
 1. **Re-run `python3 scripts/verify_citations_live.py`** — it should now be
