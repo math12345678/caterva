@@ -141,6 +141,18 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_guard_wiring.py'}"
     ))
 
+    # Every simulation domain must be declared in all three API layers
+    # (DISPATCH, SimulationDomain, SimulationParameterSchemas). ADR 0007's
+    # contract test pins DISPATCH against the engine; nothing pinned the
+    # TypeScript side, and on 2026-08-09 three domains were declared with
+    # no engine implementation behind them while two real ones were
+    # deleted from DISPATCH. Pure text parsing, so it still works when the
+    # Node toolchain is what is broken.
+    guards.append(run_guard(
+        "Domain Parity Guard",
+        f"python {SCRIPTS_DIR / 'check_domain_parity.py'}"
+    ))
+
     return guards
 
 

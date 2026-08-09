@@ -69,6 +69,7 @@ try:
         beta_gamma_from_r0,
         validate_ssa_params,
         validate_ssa_replicates_params,
+        validate_lotka_volterra_params,
     )  # type: ignore[no-redef]
     from Tellurium.continuous.model_building import (
         build_michaelis_menten_antimony,
@@ -85,6 +86,9 @@ try:
         simulate_mm_competitive_inhibition,
         simulate_sir,
         simulate_seir,
+        simulate_lotka_volterra,
+        simulate_cell_cycle_oscillator,
+        simulate_repressilator,
         steady_state,
         parameter_scan,
     )  # type: ignore[no-redef]
@@ -182,6 +186,7 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         validate_ssa_params,
         validate_ssa_replicates_params,
         validate_mm_competitive_params,
+        validate_lotka_volterra_params,
     )  # type: ignore[no-redef]
     from continuous.model_building import (
         build_michaelis_menten_antimony,
@@ -200,6 +205,9 @@ except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
         steady_state,
         parameter_scan,
         simulate_mm_competitive_inhibition,
+        simulate_lotka_volterra,
+        simulate_cell_cycle_oscillator,
+        simulate_repressilator,
     )  # type: ignore[no-redef]
     from discrete.pcr import simulate_pcr  # type: ignore[no-redef]
     from discrete.monte_carlo import simulate_monte_carlo_pi  # type: ignore[no-redef]
@@ -302,14 +310,17 @@ __all__ = [
     "lj_cluster_positions",
     "parameter_scan",
     "sbml_to_antimony",
+    "simulate_cell_cycle_oscillator",
     "simulate_gillespie_ssa",
     "simulate_gillespie_ssa_bimolecular",
     "simulate_gillespie_ssa_replicates",
+    "simulate_lotka_volterra",
     "simulate_michaelis_menten",
     "simulate_mm_competitive_inhibition",
     "simulate_molecular_dynamics",
     "simulate_monte_carlo_pi",
     "simulate_pcr",
+    "simulate_repressilator",
     "simulate_sbml",
     "simulate_seir",
     "simulate_sir",
@@ -318,6 +329,7 @@ __all__ = [
     "steady_state",
     "theoretical_fst",
     "theoretical_ld_decay",
+    "validate_lotka_volterra_params",
     "validate_md_params",
     "validate_michaelis_menten_params",
     # Competitive inhibition Michaelis-Menten

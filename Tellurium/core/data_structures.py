@@ -668,3 +668,25 @@ SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE = 0.1
 # meaningfully against the deterministic reference; flagged, not
 # rejected -- a student may deliberately be exploring single-seed noise.
 SSA_PLAUSIBLE_MIN_REPLICATES = 10
+
+# ---------------------------------------------------------------------------
+# Lotka-Volterra predator-prey (Lotka 1925, "Elements of Physical Biology";
+# Volterra 1926, "Variations and fluctuations of the number of individuals in
+# animal species living together").
+#
+#   dP/dt = alpha*P - beta*P*V     (prey: exponential growth, predation loss)
+#   dV/dt = gamma*P*V - delta*V    (predator: conversion gain, natural death)
+#
+# There is no single universal magnitude for these four rate constants --
+# unlike Km or kcat, Lotka-Volterra is a structural model applied across
+# systems from annual-cycle vertebrate populations (the classic lynx-hare
+# data Lotka and Volterra themselves used) to microbial predator-prey pairs
+# on hour timescales. The bounds below are therefore not a claim about what
+# is biologically possible in general, but a "does this look like the
+# intended classic-scale teaching scenario" flag, anchored to the
+# order-of-magnitude range (~0.1-10) that produces the textbook oscillation
+# on an annual-cycle system -- the same role SSA_PLAUSIBLE_MAX_RATE plays
+# for the Gillespie domain. Flagged, never rejected: a student modeling a
+# genuinely different timescale is not blocked.
+LV_PLAUSIBLE_MIN_RATE = 1e-4
+LV_PLAUSIBLE_MAX_RATE = 100.0

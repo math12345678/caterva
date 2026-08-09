@@ -7,9 +7,9 @@ from typing import Any, List, Sequence
 
 import numpy as np
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE)
+    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE)  # type: ignore[no-redef]
+    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE)  # type: ignore[no-redef]
 
 def _finite_positive(value: Any, label: str, errors: List[str],
                      allow_zero: bool = False) -> bool:
@@ -861,6 +861,61 @@ def validate_wright_fisher_params(
     if flag_reasons:
         v.flag_reason = "; ".join(flag_reasons)
     return v
+
+def validate_lotka_volterra_params(
+    alpha: float, beta: float, gamma: float, delta: float,
+    p0: float, v0: float,
+) -> ParameterValidation:
+    """Check a Lotka-Volterra predator-prey parameter set.
+
+    alpha (prey growth), beta (predation), gamma (predator growth from
+    predation), and delta (predator death) are the four structural rate
+    constants of the model (Lotka 1925; Volterra 1926); a zero value
+    collapses the defining predator-prey feedback (e.g. beta=0 removes
+    predation entirely), so all four are rejected at zero or below, the
+    same rule ``validate_michaelis_menten_params`` applies to Km/Vmax.
+
+    p0 and v0 (initial prey/predator populations) may legitimately be
+    zero -- a trivial but valid edge case (no predator ever appears, or
+    no prey for a predator to eat) -- so they are flagged rather than
+    rejected.
+    """
+    errors: List[str] = []
+
+    _finite_positive(alpha, "alpha", errors, allow_zero=False)
+    _finite_positive(beta, "beta", errors, allow_zero=False)
+    _finite_positive(gamma, "gamma", errors, allow_zero=False)
+    _finite_positive(delta, "delta", errors, allow_zero=False)
+    _finite_positive(p0, "p0", errors, allow_zero=True)
+    _finite_positive(v0, "v0", errors, allow_zero=True)
+
+    if errors:
+        return ParameterValidation(ok=False, errors=errors)
+
+    v = ParameterValidation()
+    flag_reasons: List[str] = []
+
+    for label, value in (("alpha", alpha), ("beta", beta),
+                         ("gamma", gamma), ("delta", delta)):
+        if value < LV_PLAUSIBLE_MIN_RATE or value > LV_PLAUSIBLE_MAX_RATE:
+            flag_reasons.append(
+                f"{label}={value:g} is outside the classic-scale range "
+                f"[{LV_PLAUSIBLE_MIN_RATE:g}, {LV_PLAUSIBLE_MAX_RATE:g}]")
+
+    if p0 == 0.0:
+        flag_reasons.append(
+            "p0 is zero: no prey ever exists, so no predator growth can "
+            "occur -- the predator population can only decay")
+    if v0 == 0.0:
+        flag_reasons.append(
+            "v0 is zero: no predator ever exists, so prey grows "
+            "unchecked -- no oscillation, pure exponential growth")
+
+    if flag_reasons:
+        v.flagged = True
+        v.flag_reason = "; ".join(flag_reasons)
+    return v
+
 
 def validate_md_params(
     n_particles: int,
