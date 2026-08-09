@@ -54,6 +54,18 @@ const VALID: Record<
     starting_frequencies: [0.5, 0, 0, 0.5],
     replicate_runs: 50,
   },
+  lotka_volterra: {
+    alpha: 1.1,
+    beta: 0.4,
+    gamma: 0.1,
+    delta: 0.4,
+    p0: 10,
+    v0: 5,
+    end: 20,
+    points: 201,
+  },
+  cell_cycle_oscillator: { end: 100, points: 1001 },
+  repressilator: { end: 200, points: 2001 },
   sbml: {
     sbml_string: "model M()\n  A = 1\nend",
     start: 0,

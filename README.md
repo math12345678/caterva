@@ -5,12 +5,14 @@ language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
 been independently checked.
 
-Eleven simulation domains built so far: enzyme kinetics (plain and
+Fourteen simulation domains built so far: enzyme kinetics (plain and
 competitively-inhibited Michaelis-Menten), SIR/SEIR epidemiological modeling,
 PCR amplification, Monte Carlo simulation, population genetics
 (Wright-Fisher, single- and two-locus), molecular dynamics (Lennard-Jones
-cluster), and Gillespie SSA stochastic chemical kinetics (first-order decay
-and bimolecular association).
+cluster), Gillespie SSA stochastic chemical kinetics (first-order decay
+and bimolecular association), and three ODE oscillators: Lotka-Volterra
+predator-prey, the Tyson (1991) cdc2-cyclin cell-cycle oscillator, and the
+Elowitz & Leibler (2000) repressilator.
 
 ## Quick start
 
@@ -19,7 +21,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,211 tests (922 engine + 289 literature)
+make test      # runs all 1,246 tests (957 engine + 289 literature)
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -69,7 +71,7 @@ in `requirements.txt`:
 
 ## Domains
 
-Eleven simulation domains, two pipelines:
+Fourteen simulation domains, two pipelines:
 
 **Continuous (antimony → SBML → roadrunner):**
 - **Michaelis-Menten** — irreversible single-substrate enzyme kinetics.
@@ -80,6 +82,15 @@ Eleven simulation domains, two pipelines:
 - **SIR** — frequency-dependent epidemic model. Verified against conserved
   population, final-size relation, and peak condition `S = N/R₀`.
 - **SEIR** — SIR with an explicit latent (exposed) compartment.
+- **Lotka-Volterra** — predator-prey (Lotka 1925; Volterra 1926).
+  `dP/dt = αP − βPV`, `dV/dt = γPV − δV`. Verified against the exact first
+  integral `H = γP − δ·ln P + βV − α·ln V` (conserved to <1e-5 over the
+  orbit), the coexistence fixed point `(δ/γ, α/β)`, the linearised
+  small-oscillation period `2π/√(αδ)`, and scipy's `solve_ivp`. The default
+  parameters give the classic ~10-year lynx-hare period (9.47).
+- **Cell-cycle oscillator** — Tyson (1991) 2-variable cdc2-cyclin
+  relaxation oscillator, DOI 10.1073/pnas.88.16.7328.
+- **Repressilator** — Elowitz & Leibler (2000) synthetic three-gene ring.
 
 **Discrete/stochastic (direct Python, no ODE solver):**
 - **PCR amplification** — exact closed-form recurrence `N(c) = n₀ · (1+E)ᶜ`,
@@ -151,7 +162,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Tellurium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── tellurium_engine.py     public entry point (88 names)
-│   └── tests/                  922 tests
+│   └── tests/                  957 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -212,9 +223,9 @@ them together.
 
 ```bash
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 1,211 tests
+make test        # run all 1,246 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (922 tests)
+make test-sim    # simulation engine only (957 tests)
 make test-lit    # literature layer only (289 tests)
 python3 scripts/verify_build.py --quick  # all 13 guard scripts, incl. TypeScript compile (~30s)
 make clean       # remove caches

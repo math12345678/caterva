@@ -72,7 +72,7 @@ const VALID_LLM_RESPONSE = {
   ],
 };
 
-// Every domain the resolver prompt offers (11 primary API domains).
+// Every domain the resolver prompt offers (14 primary API domains).
 // `sbml` is intentionally excluded (it is the internal raw-SBML escape hatch).
 // `monte_carlo_pi` and `gillespie_ssa_replicates` are engine-internal only.
 // This list must match the SUPPORTED_DOMAINS in resolveQueryWithLLM exactly;
@@ -88,6 +88,9 @@ const RESOLVABLE_DOMAINS = [
   "molecular_dynamics",
   "gillespie_ssa_bimolecular",
   "two_locus_wright_fisher",
+  "lotka_volterra",
+  "cell_cycle_oscillator",
+  "repressilator",
 ] as const;
 
 

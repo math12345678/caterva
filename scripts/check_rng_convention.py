@@ -42,6 +42,12 @@ EXCLUDED_FNS: set[str] = {
     "simulate_sir",
     "simulate_seir",
     "simulate_pcr",  # deterministic recurrence, no RNG involved
+    # Three deterministic ODE oscillator domains (ADR 0022), integrated
+    # through antimony/roadrunner exactly like SIR above -- no sampling
+    # anywhere, so ADR 0005's RNG convention has nothing to apply to.
+    "simulate_lotka_volterra",
+    "simulate_cell_cycle_oscillator",
+    "simulate_repressilator",
 }
 
 
