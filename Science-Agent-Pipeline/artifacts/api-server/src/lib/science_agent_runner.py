@@ -166,6 +166,21 @@ def resolve_kinetic_value(
     )
 
 
+def _ensure_tellurium_path() -> str:
+    """Ensure Tellurium/ directory is in sys.path for validation imports.
+
+    Returns the Tellurium directory path. This is shared by vmax and beta_gamma bridges
+    to avoid duplicating the import setup logic.
+    """
+    import pathlib
+    import sys
+
+    tellurium_dir = str(pathlib.Path(__file__).resolve().parents[5] / "Tellurium")
+    if tellurium_dir not in sys.path:
+        sys.path.insert(0, tellurium_dir)
+    return tellurium_dir
+
+
 def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool, bool, str | None]:
     """Compute Vmax = kcat * [E]0 via the SAME implementation the engine
     itself uses (Tellurium.core.validation.vmax_from_kcat), rather than a
@@ -187,12 +202,7 @@ def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool,
     the inputs were rejected (non-finite/non-positive); the caller must
     not treat the returned vmax as usable in that case.
     """
-    import pathlib
-    import sys
-
-    tellurium_dir = str(pathlib.Path(__file__).resolve().parents[5] / "Tellurium")
-    if tellurium_dir not in sys.path:
-        sys.path.insert(0, tellurium_dir)
+    _ensure_tellurium_path()
     from core import validation as tellurium_validation  # noqa: PLC0415
 
     vmax, result = tellurium_validation.vmax_from_kcat(kcat, enzyme_conc)
@@ -214,12 +224,7 @@ def bridge_beta_gamma_from_r0(
 
     Returns (beta, gamma, ok, flagged, flag_reason_or_error).
     """
-    import pathlib
-    import sys
-
-    tellurium_dir = str(pathlib.Path(__file__).resolve().parents[5] / "Tellurium")
-    if tellurium_dir not in sys.path:
-        sys.path.insert(0, tellurium_dir)
+    _ensure_tellurium_path()
     from core import validation as tellurium_validation  # noqa: PLC0415
 
     beta, gamma, result = tellurium_validation.beta_gamma_from_r0(

@@ -70,6 +70,43 @@ DOIS = [
     "10.1098/rspa.1927.0118",  # Kermack & McKendrick 1927, Proc. R. Soc. A
 ]
 
+#: Files whose DOIs are DISCOVERED rather than listed above.
+#:
+#: A hardcoded DOI list only checks the DOIs someone remembered to add to
+#: it. On 2026-08-09 `domain-literature.ts` -- which serves citations to
+#: users -- carried `10.1038/35002131` for Elowitz & Leibler (2000), whose
+#: real DOI is `10.1038/35002125` (PubMed, PMID 10659856). The wrong value
+#: had propagated to five files. This checker did not catch it because the
+#: file was not in the list and the DOI was not in DOIS.
+#:
+#: So the DOIs are now scraped out of the sources that actually publish
+#: them. Adding a citation to any of these files enrols it automatically.
+DOI_SOURCE_FILES = [
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts",
+    ROOT / "Tellurium/core/data_structures.py",
+    ROOT / "Tellurium/continuous/model_building.py",
+    ROOT / "Tests/epidemiology_resolver.py",
+    ROOT / "Tests/popgen_resolver.py",
+]
+
+#: A DOI is `10.<registrant>/<suffix>`. The suffix is deliberately not
+#: allowed to swallow trailing punctuation, quotes or markdown syntax,
+#: which would otherwise produce DOIs that fail lookup for cosmetic
+#: reasons and bury the real failures.
+DOI_PATTERN = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>,)\]}]+)")
+
+
+def discovered_dois() -> dict[str, list[str]]:
+    """Every DOI appearing in DOI_SOURCE_FILES, mapped to where it appears."""
+    found: dict[str, list[str]] = {}
+    for path in DOI_SOURCE_FILES:
+        if not path.is_file():
+            continue
+        for match in DOI_PATTERN.finditer(path.read_text(encoding="utf-8")):
+            doi = match.group(1).rstrip(".;")
+            found.setdefault(doi, []).append(path.name)
+    return found
+
 QUERY_RESOLVER = ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts"
 
 PASS = "\033[32m✓\033[0m"
@@ -130,17 +167,28 @@ def main() -> int:
         "\nDOIs (CrossRef registry = the DOI exists; publishers bot-gate doi.org"
         " redirects, so registry is the reliable probe):"
     )
-    for doi in DOIS:
+    # The explicit list, plus every DOI scraped out of the files that
+    # actually publish citations -- see DOI_SOURCE_FILES for why.
+    scraped = discovered_dois()
+    all_dois: dict[str, list[str]] = {doi: ["DOIS"] for doi in DOIS}
+    for doi, sources in scraped.items():
+        all_dois.setdefault(doi, []).extend(sources)
+
+    print(f"  ({len(all_dois)} DOIs: {len(DOIS)} listed, "
+          f"{len(scraped)} discovered in source)")
+
+    for doi in sorted(all_dois):
+        where = ", ".join(sorted(set(all_dois[doi])))
         url = f"https://api.crossref.org/works/{doi}"
         try:
             r = retry_get(url, timeout=20)
             ok = r.status_code == 200
-            check(doi, ok, f"{url} -> HTTP {r.status_code}")
+            check(f"{doi}  [{where}]", ok, f"{url} -> HTTP {r.status_code}")
             if not ok:
                 failures += 1
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
             failures += 1
-            check(doi, False, f"{url} -> {exc!r}")
+            check(f"{doi}  [{where}]", False, f"{url} -> {exc!r}")
 
     print("\nStatic modelCitations URLs in queryResolver.ts (must resolve):")
     urls = set()

@@ -206,6 +206,55 @@ removed rather than updated — they had already gone stale against the
 corrected constants, which is the predicted failure mode of pinning code
 against itself. One source of truth now.
 
+## 6. The live citation checker was checking 2 DOIs out of 16
+
+The wrong Elowitz DOI lived in `domain-literature.ts` — the file that
+serves citations to users — and `verify_citations_live.py` never looked at
+it. Its `DOIS` list was hardcoded with two entries, so it only ever checked
+the DOIs someone had remembered to add.
+
+That is the same failure shape as the hardcoded workspace list in Part 4:
+a list maintained by memory checks exactly the things nobody forgot.
+
+`verify_citations_live.py` now **discovers** DOIs by scraping them out of
+the files that publish citations (`domain-literature.ts`,
+`data_structures.py`, `model_building.py`, `epidemiology_resolver.py`,
+`popgen_resolver.py`) and checks every one against the CrossRef registry,
+reporting which file each came from. Coverage went from 2 to **16**, and a
+citation added to any of those files is enrolled automatically.
+
+### One discovered DOI looks wrong
+
+`10.1111/j.1432-1033.1913.tb07745.x`, cited in `domain-literature.ts` for
+Michaelis & Menten (1913). The `1432-1033` prefix belongs to the *European
+Journal of Biochemistry*, founded 1967; the original paper appeared in
+*Biochemische Zeitschrift* **49**, 333-369, which predates DOI assignment
+entirely. The DOI may resolve to a later translation or reprint rather than
+the work being cited, or it may be fabricated in the same way the Elowitz
+one was.
+
+This could not be settled from the review sandbox (CrossRef is behind the
+same blocked proxy). The next live run will answer it:
+
+```bash
+python3 scripts/verify_citations_live.py
+```
+
+## 7. Enzyme plausibility bounds: verified, no change needed
+
+`KCAT_PLAUSIBLE_MIN/MAX` and the Km bounds cite Bar-Even et al. (2011).
+Checked against PubMed (PMID 21506553): DOI `10.1021/bi2002289`, journal,
+volume, issue and pages all match what the code claims, and the abstract's
+reported `kcat/KM ~1e5 s^-1 M^-1` is consistent with the ~10 s^-1 median
+the comment quotes. Recorded in the source so the check is not repeated
+from scratch.
+
+Also checked: the molecular-dynamics LJ13 global minimum is already
+verified against the published -44.326801 (Hoare & Pal 1971, via the
+Cambridge Cluster Database), and `test_citation_format.py` already guards
+against a *fabricated* variant of that citation. No action needed on
+either.
+
 ## 5. Carried forward
 
 1. **Run the BioModels capture** (§4) and add a fixture-backed comparison.

@@ -31,6 +31,25 @@ export interface STREANDAValidation {
 }
 
 /**
+ * Helper to check if a value is valid and finite.
+ * Used for validating numeric STRENDA requirements (pH, temperature).
+ */
+function isValidFiniteNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * Helper to create a STRENDA violation object.
+ */
+function createViolation(
+  requirement: number,
+  field: string,
+  message: string,
+): STREANDAViolation {
+  return { requirement, field, message };
+}
+
+/**
  * Validate assay conditions against STRENDA requirements
  * BACKING: Gelperin et al. (2010) - STRENDA Requirements 1-3
  */
@@ -42,57 +61,58 @@ export function validateAssayConditions(
 
   if (!conditions) {
     violations.push(
-      {
-        requirement: 1,
-        field: "pH",
-        message: "pH of assay not reported (STRENDA Req 1)",
-      },
-      {
-        requirement: 2,
-        field: "temperature",
-        message: "Temperature of assay not reported (STRENDA Req 2)",
-      },
-      {
-        requirement: 3,
-        field: "buffer",
-        message: "Buffer system not reported (STRENDA Req 3)",
-      },
+      createViolation(1, "pH", "pH of assay not reported (STRENDA Req 1)"),
+      createViolation(
+        2,
+        "temperature",
+        "Temperature of assay not reported (STRENDA Req 2)",
+      ),
+      createViolation(
+        3,
+        "buffer",
+        "Buffer system not reported (STRENDA Req 3)",
+      ),
     );
     return { score, violations };
   }
 
   // Requirement 1: pH (±0.1)
-  if (conditions.ph && Number.isFinite(conditions.ph)) {
+  if (isValidFiniteNumber(conditions.ph)) {
     score++;
   } else {
-    violations.push({
-      requirement: 1,
-      field: "pH",
-      message: "pH not provided; expected numeric value (STRENDA Req 1)",
-    });
+    violations.push(
+      createViolation(
+        1,
+        "pH",
+        "pH not provided; expected numeric value (STRENDA Req 1)",
+      ),
+    );
   }
 
   // Requirement 2: Temperature (±1°C)
-  if (conditions.temperatureC && Number.isFinite(conditions.temperatureC)) {
+  if (isValidFiniteNumber(conditions.temperatureC)) {
     score++;
   } else {
-    violations.push({
-      requirement: 2,
-      field: "temperature",
-      message:
+    violations.push(
+      createViolation(
+        2,
+        "temperature",
         "Temperature not provided; expected numeric value in °C (STRENDA Req 2)",
-    });
+      ),
+    );
   }
 
   // Requirement 3: Buffer system
   if (conditions.buffer && conditions.buffer.trim().length > 0) {
     score++;
   } else {
-    violations.push({
-      requirement: 3,
-      field: "buffer",
-      message: "Buffer system not specified (STRENDA Req 3)",
-    });
+    violations.push(
+      createViolation(
+        3,
+        "buffer",
+        "Buffer system not specified (STRENDA Req 3)",
+      ),
+    );
   }
 
   return { score, violations };
@@ -109,20 +129,14 @@ export function validateConfidenceInterval(
   lower?: number,
   upper?: number,
 ): { hasInterval: boolean; violation?: STREANDAViolation } {
-  if (
-    lower === undefined ||
-    upper === undefined ||
-    !Number.isFinite(lower) ||
-    !Number.isFinite(upper)
-  ) {
+  if (!isValidFiniteNumber(lower) || !isValidFiniteNumber(upper)) {
     return {
       hasInterval: false,
-      violation: {
-        requirement: 7,
-        field: "confidenceInterval",
-        message:
-          "Confidence interval not provided (STRENDA Req 7); use Wilson (1927) method",
-      },
+      violation: createViolation(
+        7,
+        "confidenceInterval",
+        "Confidence interval not provided (STRENDA Req 7); use Wilson (1927) method",
+      ),
     };
   }
 
@@ -130,22 +144,22 @@ export function validateConfidenceInterval(
   if (lower >= upper) {
     return {
       hasInterval: false,
-      violation: {
-        requirement: 7,
-        field: "confidenceInterval",
-        message: "Confidence interval invalid: lower bound >= upper bound",
-      },
+      violation: createViolation(
+        7,
+        "confidenceInterval",
+        "Confidence interval invalid: lower bound >= upper bound",
+      ),
     };
   }
 
   if (value < lower || value > upper) {
     return {
       hasInterval: false,
-      violation: {
-        requirement: 7,
-        field: "confidenceInterval",
-        message: "Point estimate outside confidence interval",
-      },
+      violation: createViolation(
+        7,
+        "confidenceInterval",
+        "Point estimate outside confidence interval",
+      ),
     };
   }
 

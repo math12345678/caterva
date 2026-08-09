@@ -41,6 +41,14 @@ KM_PLAUSIBLE_MAX_MM = 1e3  # 1000 mM - above this gets flagged
 #   median kcat ~10 s^-1 across several thousand enzymes
 #       -- Bar-Even et al. (2011), Biochemistry 50(21), 4402-4410,
 #          "The Moderately Efficient Enzyme". DOI 10.1021/bi2002289
+#
+#   Citation checked against PubMed 2026-08-09 (PMID 21506553): DOI,
+#   journal, volume, issue and pages all match, and the abstract's
+#   reported kcat/KM of ~1e5 s^-1 M^-1 is consistent with the ~10 s^-1
+#   median quoted above. This check was run because an Elowitz & Leibler
+#   DOI elsewhere in the repo turned out to be wrong and had propagated to
+#   five files (see Stage 9 Part 5) -- a cited DOI is not a verified one
+#   until someone resolves it.
 #   catalase, the fastest known enzyme, ~4e7 s^-1
 #   diffusion-limited ceiling ~1e8-1e9 s^-1
 #

@@ -167,23 +167,17 @@ async function ensureRunnerScript(): Promise<void> {
 }
 
 /**
- * Resolve real kinetic parameters for an enzyme/substrate pair.
- *
- * This function spawns a Python bridge that uses the existing BRENDA/KEGG/PubMed
- * lookup code in Tests/fallback_logic.py. If an EC number isn't already known,
- * the Python side resolves one live via UniProt's name search
- * (Tests/enzyme_lookup.py::fetch_ec_number_by_name) before attempting BRENDA --
- * this is what lets an enzyme name outside the small hardcoded pattern list in
- * enzymes.ts still reach a real literature lookup. Only skips the Python
- * bridge entirely, returning `found: false`, when there is truly nothing to
- * search for (no EC number AND no enzyme name).
- */
-/**
  * Spawn the Python science-agent runner with an arbitrary JSON payload and
  * parse its stdout. Shared by resolveKineticValue() (enzyme kinetics) and
  * resolveEpidemiologyParameters() (ADR 0017 / ADR 0020) so there is exactly
  * one place that owns the spawn/PYTHONPATH/stdout-parsing contract, rather
  * than two copies that could drift.
+ *
+ * This function uses BRENDA/KEGG/PubMed lookups in Tests/fallback_logic.py.
+ * If an EC number isn't known, the Python side resolves one live via UniProt's
+ * name search (Tests/enzyme_lookup.py::fetch_ec_number_by_name) before
+ * attempting BRENDA -- this lets enzyme names outside the hardcoded pattern
+ * list in enzymes.ts still reach real literature lookups.
  */
 async function spawnScienceAgent(
   payload: Record<string, unknown>,
@@ -223,9 +217,11 @@ async function spawnScienceAgent(
 
     proc.on("close", (code) => {
       const trimmed = stdout.trim();
-      if (code !== 0 || !trimmed) {
-        const message =
-          stderr || `Science agent runner exited with code ${code}`;
+      const hadNonZeroExit = code !== 0;
+      const hadNoOutput = !trimmed;
+
+      if (hadNonZeroExit || hadNoOutput) {
+        const message = stderr || `Science agent runner exited with code ${code}`;
         reject(new Error(message));
         return;
       }
@@ -244,6 +240,17 @@ async function spawnScienceAgent(
 }
 
 /**
+ * Build a not-found result with an explanatory log message.
+ */
+function notFoundResult(reason: string): ScienceAgentResult {
+  return {
+    found: false,
+    literatureCandidates: [],
+    logs: [reason],
+  };
+}
+
+/**
  * Resolve a disease's (R0, infectious period) golden tuple and bridge it to
  * the SIR engine's own (beta, gamma) — see Tests/epidemiology_resolver.py
  * and Tellurium.core.validation.beta_gamma_from_r0. Returns found=false for
@@ -253,11 +260,7 @@ export async function resolveEpidemiologyParameters(
   disease: string,
 ): Promise<ScienceAgentResult> {
   if (!disease) {
-    return {
-      found: false,
-      literatureCandidates: [],
-      logs: ["No disease name provided; skipping real parameter lookup."],
-    };
+    return notFoundResult("No disease name provided; skipping real parameter lookup.");
   }
   return spawnScienceAgent({ parameterType: "disease_parameters", disease });
 }
@@ -266,11 +269,9 @@ export async function resolveKineticValue(
   entities: EntityExtraction,
 ): Promise<ScienceAgentResult> {
   if (!entities.ecNumber && !entities.enzymeName) {
-    return {
-      found: false,
-      literatureCandidates: [],
-      logs: ["No enzyme name or EC number provided; skipping real parameter lookup."],
-    };
+    return notFoundResult(
+      "No enzyme name or EC number provided; skipping real parameter lookup.",
+    );
   }
 
   return spawnScienceAgent({
