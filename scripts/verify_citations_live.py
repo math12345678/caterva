@@ -122,6 +122,63 @@ def check(label: str, ok: bool, detail: str) -> bool:
     return ok
 
 
+_STOPWORDS = {
+    "a", "an", "and", "of", "the", "in", "on", "for", "to", "with", "by",
+    "its", "их", "der", "die", "das", "und", "et", "al",
+}
+
+
+def _words(title: str) -> set[str]:
+    return {
+        w for w in re.findall(r"[a-z]{4,}", title.lower())
+        if w not in _STOPWORDS
+    }
+
+
+def _titles_overlap(claimed: str, registered: str) -> bool:
+    """Whether two titles plausibly name the same work.
+
+    Deliberately lenient: our stored titles often append journal/volume
+    text or bracket a translated original, so an exact match would be
+    noise. Two content words in common is enough to say "same paper";
+    zero in common is what a swapped DOI looks like.
+    """
+    claimed_words, registered_words = _words(claimed), _words(registered)
+    if not claimed_words or not registered_words:
+        return True  # nothing to compare -- do not manufacture a failure
+    return len(claimed_words & registered_words) >= 2
+
+
+def claimed_titles() -> dict[str, str]:
+    """DOI -> the title our own source claims for it, where discoverable.
+
+    Only domain-literature.ts is parsed: it is the file that pairs a DOI
+    with a title in a machine-readable object literal, and it is the file
+    that serves citations to users.
+    """
+    path = ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts"
+    if not path.is_file():
+        return {}
+    text = path.read_text(encoding="utf-8")
+    titles: dict[str, str] = {}
+    # title: "..." (possibly concatenated across lines with +) then doi: "..."
+    for block in re.finditer(
+        # `[^{}]*?` keeps the match inside ONE object literal. Without it,
+        # an entry that has a title but no doi (Lehninger, Fisher 1930)
+        # lets the scan run on and pair that title with the NEXT entry's
+        # doi -- which produced a map claiming bi201284u was "Lehninger
+        # Principles of Biochemistry". A mis-paired map would report false
+        # title mismatches, which is worse than not checking at all.
+        r"title:\s*((?:\s*\"[^\"]*\"\s*\+?)+),[^{}]*?doi:\s*\"([^\"]+)\"",
+        text,
+        re.DOTALL,
+    ):
+        joined = "".join(re.findall(r'\"([^\"]*)\"', block.group(1)))
+        titles[block.group(2)] = joined
+    return titles
+
+
+
 def brenda_url(ec: str) -> str:
     return f"https://www.brenda-enzymes.org/enzyme.php?ecno={ec}"
 
@@ -183,7 +240,34 @@ def main() -> int:
         try:
             r = retry_get(url, timeout=20)
             ok = r.status_code == 200
-            check(f"{doi}  [{where}]", ok, f"{url} -> HTTP {r.status_code}")
+            detail = f"{url} -> HTTP {r.status_code}"
+
+            # A DOI that RESOLVES is not a DOI that supports the claim.
+            # domain-literature.ts cited 10.1038/ng.3285 ("Variation and
+            # heritability of RECOMBINATION rate in humans") to justify a
+            # MUTATION rate: it resolved cleanly and this checker passed
+            # it, because existence was all it tested. So the registered
+            # title is printed alongside, and flagged when it shares no
+            # meaningful words with the title claimed in our source.
+            if ok:
+                try:
+                    titles = r.json()["message"].get("title") or []
+                    registered = titles[0] if titles else ""
+                except (ValueError, KeyError, IndexError):
+                    registered = ""
+                if registered:
+                    detail = f"{url} -> {registered!r}"
+                    claimed = claimed_titles().get(doi, "")
+                    if claimed and not _titles_overlap(claimed, registered):
+                        ok = False
+                        detail = (
+                            f"TITLE MISMATCH\n"
+                            f"        we cite : {claimed!r}\n"
+                            f"        CrossRef: {registered!r}\n"
+                            f"        The DOI exists but may be a different "
+                            f"paper than the one being cited."
+                        )
+            check(f"{doi}  [{where}]", ok, detail)
             if not ok:
                 failures += 1
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
