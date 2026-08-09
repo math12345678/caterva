@@ -253,25 +253,27 @@ def build_cell_cycle_oscillator_antimony(
 # p_i: scaled protein concentration (units of K_M, the repressor's
 # Hill-function half-max).
 #
-# Parameter values (alpha=216, beta=5, alpha0/alpha=0.001, n=2) are the
-# point in parameter space the paper's own Figure 2b identifies as
-# producing spontaneous oscillation ("X" in that figure) -- source
-# transcribed from a course exercise built directly around this paper
-# (Cornell Physics 7682, Myers/Sethna/Mueller, citing p.337 and Fig 2b
-# explicitly). See docs/adr/0022.
-#
-# Initial conditions are deliberately asymmetric: the fully symmetric
-# state (m1=m2=m3, p1=p2=p3) is an unstable fixed point of this system,
-# not part of the reported oscillatory dynamics, so simulating from it
-# would not show the sustained oscillation the model is built to
-# demonstrate. Small distinct starting protein counts break the symmetry
-# immediately, the same role stochastic initial numbers played in the
-# original experimental system.
+# Parameter values below are transcribed directly from the curated SBML's
+# own <parameter value=...> attributes for BIOMD0000000012 (fetched from
+# the BioModels GitHub mirror -- see docs/adr/0024), not reconstructed:
+# alpha=216.404, alpha0=0.2164, beta=0.2, n=2. Corrects an earlier value
+# of beta=5 (ADR 0024): a first pass took beta=5 from a course exercise's
+# Fig-2b-axis convention without noticing that exercise's own footnote --
+# "beta as defined on the y-axis of Fig. 2(b) is the inverse of that
+# described on p.337 of the paper" -- meant 5 was the WRONG convention for
+# this file's dp_i/dt = -beta*(p_i - m_i) equation, which is written in
+# the p.337 form. The curated model's own derivation confirms the p.337
+# value directly: beta = tau_mRNA/tau_prot = 2min/10min = 0.2 (the ratio
+# of the mRNA to protein half-lives, in time units where mRNA decay is
+# rescaled to 1). Both values happen to produce sustained oscillation
+# (verified for both, see tests/test_repressilator_correctness.py), so the
+# earlier value shipped without an exception or a visibly broken plot --
+# only a wrong parameter, the same failure shape as ADR 0023.
 # ---------------------------------------------------------------------------
 
-REPRESSILATOR_ALPHA = 216.0
-REPRESSILATOR_ALPHA0 = 0.216  # alpha0/alpha = 0.001, per Fig 2b "X" point
-REPRESSILATOR_BETA = 5.0
+REPRESSILATOR_ALPHA = 216.404
+REPRESSILATOR_ALPHA0 = 0.2164
+REPRESSILATOR_BETA = 0.2
 REPRESSILATOR_N = 2.0
 
 

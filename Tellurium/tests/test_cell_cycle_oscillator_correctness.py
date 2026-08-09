@@ -66,7 +66,30 @@ class TestLiteratureParameterValues:
     rather than silently changing the trajectory shape.
     """
 
-    def test_standard_parameter_set_matches_curated_biomodels_encoding(self):
+    def test_standard_parameter_set_is_pinned_against_accidental_edits(self):
+        """Pins the constants against drift. NOT literature verification.
+
+        This test was originally named
+        `..._matches_curated_biomodels_encoding`, which claimed something it
+        does not do: it never reads the curated BioModels encoding, or any
+        other external source. It compares the constants to literals, i.e.
+        the code to itself. If a value had been transcribed wrongly from
+        Tyson's table on the day it was typed in, this assertion would have
+        been wrong in exactly the same way and would have passed forever.
+
+        That failure mode is not hypothetical here. The Lotka-Volterra
+        domain shipped in this same batch with its `gamma` and `delta`
+        defaults transposed (ADR 0023); nothing caught it until the values
+        were checked against a property outside the code.
+
+        The test is kept because pinning has real value -- it fails loudly
+        on a later typo or unit slip -- but it is named for what it does.
+        Actual verification against the curated SBML needs
+        `scripts/capture_biomodels_fixture.py` to be run somewhere with
+        outbound network access (BIOMD0000000006 for this model); the
+        review sandbox's proxy blocks it. Until that fixture exists, these
+        four numbers rest on transcription alone.
+        """
         assert TYSON_KAPPA == 0.015
         assert TYSON_K6 == 1.0
         assert TYSON_K4 == 180.0

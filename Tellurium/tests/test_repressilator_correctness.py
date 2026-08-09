@@ -58,7 +58,33 @@ def _columns(result):
 
 
 class TestLiteratureParameterValues:
-    def test_standard_oscillatory_parameter_set(self):
+    """Pins the published constants against drift.
+
+    Read the docstring on the first test before trusting the class name:
+    these compare the code to literals, not to Elowitz & Leibler's paper.
+    """
+
+    def test_standard_oscillatory_parameter_set_is_pinned_against_edits(self):
+        """Pinning, NOT literature verification.
+
+        Comparing a constant to a literal copy of itself cannot detect a
+        value that was mistranscribed when it was first written down --
+        the assertion would carry the same error. The Lotka-Volterra
+        domain in this same batch shipped with transposed defaults for
+        exactly that reason (ADR 0023).
+
+        Verified externally so far (PubMed, 2026-08-09): the paper exists
+        and is Nature 403(6767):335-8, DOI 10.1038/35002125, PMID 10659856.
+        Its abstract reports oscillation periods "of hours", slower than
+        the cell-division cycle -- which does NOT pin a dimensionless
+        period for this model, so no such assertion is made here rather
+        than inventing a conversion.
+
+        Real verification of these four constants needs the curated SBML
+        (BIOMD0000000012) via `scripts/capture_biomodels_fixture.py`, run
+        somewhere with outbound network access; the review sandbox's proxy
+        blocks it.
+        """
         assert REPRESSILATOR_ALPHA == 216.0
         assert REPRESSILATOR_BETA == 5.0
         assert REPRESSILATOR_N == 2.0
@@ -169,10 +195,25 @@ class TestSustainedOscillationOutOfPhase:
         without integrating anything, which is what makes it usable as a
         check on the integrator. The looser test above (offset somewhere
         between 0.15 and 0.85 of a period) is satisfied by almost any
-        non-degenerate waveform; this one is satisfied only by the correct
-        one, and it fails if any single gene's parameters drift away from
-        the others' -- the most likely way to break a symmetric ring by
-        accident.
+        non-degenerate waveform.
+
+        What this test does and does not catch, measured rather than
+        assumed (2026-08-09):
+
+          * Miswiring the ring -- e.g. making m1 repressed by p2 instead of
+            p3, so the feedback is no longer a 3-cycle -- destroys the
+            oscillation and fails this test. CONFIRMED by mutation.
+          * Making one gene's `alpha` asymmetric does NOT fail it: the
+            offsets stay within 0.002 of 1/3 and 2/3 even at a 40%
+            asymmetry. The spacing is a consequence of the ring's
+            *topology*, which is far more robust than its parameter
+            symmetry. An earlier draft of this docstring claimed the
+            opposite; it was wrong, and the measurement is recorded here so
+            nobody re-derives the wrong expectation from the code.
+
+        Parameter asymmetry is caught instead by the scipy cross-check in
+        TestAgainstIndependentIntegrator, which compares the actual
+        trajectory rather than its symmetry.
         """
         result = simulate_repressilator(end=400.0, points=16001)
         t, _, _, _, p1, p2, p3 = _columns(result)

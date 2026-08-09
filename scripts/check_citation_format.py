@@ -64,6 +64,16 @@ VOLUME_PAGES_RE = re.compile(
 )
 # A book citation names a publisher ("Oxford: Clarendon Press.").
 PUBLISHER_RE = re.compile(r"\b(Press|University|Institute|Publications?)\b", re.IGNORECASE)
+# Not every publisher's name contains one of those words (Williams & Wilkins,
+# Wiley, Springer, Elsevier, W.H. Freeman, ...). The standard bibliographic
+# "Place: Publisher." form is a general enough signal on its own: a
+# capitalized place name, a colon, then a capitalized publisher name ending
+# the sentence. Found missing when "Baltimore: Williams & Wilkins." (Lotka
+# 1925, a real citation, not fabricated) failed this guard for lacking
+# "Press/University/Institute/Publications" -- the guard's own rule 3c
+# already calls this shape out as sufficient ("or a publisher"); the regex
+# had just not been widened to recognize it in this form.
+PLACE_PUBLISHER_RE = re.compile(r"\b[A-Z][A-Za-z.]+:\s+[A-Z][A-Za-z.,&'\s]+\.")
 YEAR_RE = re.compile(r"\(((?:18|19|20)\d{2})\)")
 NAME_TOKEN_RE = re.compile(r"[A-Z][A-Za-z.\-']*")
 ARRAY_RE = re.compile(r'modelCitations:\s*\[(.*?)\]', re.DOTALL)
@@ -98,7 +108,8 @@ def check_entry(line: int, citation: str) -> list[str]:
         problems.append(
             f"line {line}: fewer than two author-name tokens before the year: {citation}")
 
-    if not (VOLUME_PAGES_RE.search(citation) or PUBLISHER_RE.search(citation)):
+    if not (VOLUME_PAGES_RE.search(citation) or PUBLISHER_RE.search(citation)
+            or PLACE_PUBLISHER_RE.search(citation)):
         problems.append(
             f"line {line}: no volume/page range and no publisher; "
             f"an entry with a bare title cannot be looked up: {citation}")
