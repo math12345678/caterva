@@ -78,14 +78,14 @@ curl http://localhost:5000/api/simulate/a1b2c3d4-e5f6-7890-abcd-ef1234567890
       "beta": 0.5,
       "gamma": 0.1,
       "s0": 900,
-      "i0": 1,
+      "i0": 10,
       "r0_recovered": 0,
       "end": 100,
-      "points": 1001
+      "points": 101
     },
     "trajectory": [
-      { "time": 0, "S": 900, "I": 1, "R": 0 },
-      { "time": 0.1, "S": 898.5, "I": 2.3, "R": 0.2 },
+      { "time": 0, "S": 900, "I": 10, "R": 0 },
+      { "time": 0.1, "S": 898.5, "I": 12.3, "R": 0.2 },
       ...
     ],
     "parameterProvenance": { ... },
@@ -210,10 +210,10 @@ The `parameters` field shows the exact values used for the simulation.
 - `beta` - Transmission rate
 - `gamma` - Recovery rate
 - `s0` - Initial susceptible
-- `i0` - Initial infected (default 1)
+- `i0` - Initial infected (default 10)
 - `r0_recovered` - Initial recovered (default 0)
 - `end` - Simulation end time (default 100)
-- `points` - Number of time points (default 1001)
+- `points` - Number of time points (default 101)
 
 #### Michaelis-Menten (Enzyme Kinetics)
 
@@ -239,12 +239,12 @@ The `parameters` field shows the exact values used for the simulation.
 ```
 
 **Parameters:**
-- `alpha` - Prey growth rate (default 0.5)
-- `beta` - Predation rate (default 0.02)
-- `gamma` - Predation efficiency (default 0.02)
-- `delta` - Predator death rate (default 0.5)
-- `p0` - Initial prey (default 100)
-- `v0` - Initial predator (default 10)
+- `alpha` - Prey growth rate (default 1.1)
+- `beta` - Predation rate (default 0.4)
+- `gamma` - Predation efficiency (default 0.1)
+- `delta` - Predator death rate (default 0.4)
+- `p0` - Initial prey (default 10)
+- `v0` - Initial predator (default 5)
 - `end` - Simulation end time (default 20)
 
 #### Population Genetics (Wright-Fisher)
@@ -262,6 +262,7 @@ The `parameters` field shows the exact values used for the simulation.
 - `mutation_rate` - Mutation rate (optional)
 - `selection_coefficient` - Selection strength (optional)
 - `dominance` - Dominance parameter (optional)
+- `seed` - Random seed (optional; for reproducibility)
 
 #### Gillespie Stochastic Simulation
 
@@ -462,7 +463,7 @@ Allele frequency:   Random walk toward 0 or 1
 | Error | Cause | Fix |
 |-------|-------|-----|
 | `MISSING_REQUIRED_INPUT` | Missing required parameter | Add parameter: `beta=0.5` |
-| `RATE_LIMITED` | Too many requests | Wait 15 minutes |
+| `TOO_MANY_REQUESTS` | More than 10 `POST /api/simulate` requests in 60 seconds | Wait up to 60 seconds and retry |
 | `PIPELINE_ERROR` | Unexpected failure | Contact support with jobId |
 
 ### "What if I don't specify a parameter?"
@@ -636,7 +637,7 @@ curl -X POST http://localhost:5000/api/simulate/{jobId}/cancel
 **List recent jobs:**
 ```bash
 curl http://localhost:5000/api/simulate
-# Returns last 50 jobs with status
+# Returns all in-memory jobs (no limit), sorted most-recently-updated first
 ```
 
 ---
@@ -702,4 +703,4 @@ curl http://localhost:5000/api/simulate
 
 **Version:** 1.0  
 **Last Updated:** August 9, 2026  
-**All domains:** 16 (14 primary + 2 engine internal + 1 escape hatch)
+**All domains:** 16 (15 core scientific domains + 1 SBML escape hatch)

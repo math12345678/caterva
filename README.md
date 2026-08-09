@@ -181,6 +181,38 @@ Terrium/
 └── Docw/                       original specs (Word documents)
 ```
 
+## API server documentation
+
+`Science-Agent-Pipeline/artifacts/api-server/` has its own docs, covering the
+parts of the stack the ADRs and this README don't (day-to-day usage of the
+running server, not the science behind it):
+
+- [`API_USER_GUIDE.md`](Science-Agent-Pipeline/artifacts/api-server/API_USER_GUIDE.md)
+  — natural-language query syntax, every domain's parameters and real
+  current defaults, response shapes, error codes.
+- [`INTEGRATION_EXAMPLES.md`](Science-Agent-Pipeline/artifacts/api-server/INTEGRATION_EXAMPLES.md)
+  — working Python/JS client code, including SSE job-progress streaming.
+- [`DEPLOYMENT_GUIDE.md`](Science-Agent-Pipeline/artifacts/api-server/DEPLOYMENT_GUIDE.md)
+  and [`OPERATIONS_RUNBOOK.md`](Science-Agent-Pipeline/artifacts/api-server/OPERATIONS_RUNBOOK.md)
+  — running and operating the server.
+- [`SECURITY_HARDENING.md`](Science-Agent-Pipeline/artifacts/api-server/SECURITY_HARDENING.md)
+  — current security posture and hardening options.
+- [`TESTING_AND_CI_CD.md`](Science-Agent-Pipeline/artifacts/api-server/TESTING_AND_CI_CD.md)
+  — the api-server's own vitest suite and the real `.github/workflows/tests.yml`
+  pipeline.
+
+These were first drafted ahead of the code they described and, on audit,
+contained fabricated infrastructure (Kubernetes manifests, Prometheus/Grafana,
+AWS Secrets Manager, invented test counts and coverage percentages) presented
+as if already built. They've since been corrected against a live read of the
+actual source: implemented behavior is described as implemented, and anything
+without corresponding code — mostly in the deployment/ops/security docs — is
+marked **"Proposed — not yet implemented"** rather than removed, so the
+guidance isn't lost but also isn't mistaken for the current state of the
+running server. Same discipline as the ADRs: a claim these docs make about the
+API should be checkable against `Science-Agent-Pipeline/artifacts/api-server/src`,
+not taken on faith.
+
 ## How the tests are built
 
 The suites deliberately avoid checking the solver against itself. Numerical

@@ -6,6 +6,10 @@
 
 ---
 
+> **Note on infrastructure assumptions in this runbook.** This runbook was written assuming a systemd-managed deployment (`systemctl`/`journalctl` against a `terrium-api` service) and PagerDuty/Slack alerting. **None of that exists in this repository** — there is no systemd unit file, install script, or `terrium-api` service reference anywhere in the codebase, and no PagerDuty/Slack integration or webhook config either. Treat every `systemctl`/`journalctl -u terrium-api` command below as a **proposed** convention for operators who choose to run the built server under systemd, not as something this repo ships or configures today. If you're running the server directly (`pnpm run start`) or under Docker, substitute your process manager's equivalent commands (e.g. `docker logs`, `docker restart`, or your own process supervisor). Endpoint paths below have been corrected to match the real router in `src/app.ts` (`app.use("/api", router)`), where `/healthz` is mounted at `/api/healthz`, not `/healthz`.
+
+---
+
 ## Incident Severity Levels
 
 | Level | Impact | Response |
@@ -22,12 +26,13 @@
 ### Step 1: Check If Service Is Running
 
 ```bash
-curl http://localhost:5000/healthz
+curl http://localhost:5000/api/healthz
 # Expected: {"status":"ok"}
 ```
 
 **If timeout or refused:**
 - Service is down → Go to "Service Down" section
+
 
 **If 5xx error:**
 - Service is running but unhealthy → Check logs
@@ -54,8 +59,8 @@ tail -f /var/log/terrium/app.log
 ### Step 3: Check Resource Usage
 
 ```bash
-# CPU & Memory
-ps aux | grep "node dist/index.js"
+# CPU & Memory (real entry point is dist/index.mjs, see package.json "start" script)
+ps aux | grep "node dist/index.mjs"
 
 # Disk space
 df -h
@@ -80,8 +85,12 @@ netstat -an | grep ESTABLISHED | grep 5000 | wc -l
 # Check queue
 curl http://localhost:5000/api/simulate | jq '.[] | .status' | sort | uniq -c
 
-# Check LLM latency
-curl http://localhost:5000/api/metrics | jq '.llmLatency'
+# Check LLM/resolution latency — there is no `.llmLatency` field anywhere
+# in the real responses. The closest real signal is the "Parameter
+# Resolution" stage duration (which includes LLM calls) from the detailed
+# snapshot endpoint (src/routes/metrics.ts, real path /api/snapshot):
+curl http://localhost:5000/api/snapshot | \
+  jq '.data.stages[] | select(.name == "Parameter Resolution")'
 ```
 
 **Probable Causes & Fixes:**
@@ -116,8 +125,8 @@ docker run -d --name terrium-api-2 -p 5001:5000 ... terrium-api
 ### Incident: "Service Down" (P1)
 
 **Symptoms:**
-- `curl http://localhost:5000/healthz` → Connection refused
-- `systemctl status terrium-api` → Inactive (dead)
+- `curl http://localhost:5000/api/healthz` → Connection refused
+- `systemctl status terrium-api` → Inactive (dead) — assumes the proposed systemd setup; substitute your process manager's status command otherwise
 
 **Immediate Actions:**
 ```bash
@@ -128,7 +137,7 @@ sudo systemctl restart terrium-api
 sleep 5 && systemctl status terrium-api
 
 # 3. Verify health
-curl http://localhost:5000/healthz
+curl http://localhost:5000/api/healthz
 ```
 
 **If still down, check logs:**
@@ -206,12 +215,16 @@ sudo journalctl -u terrium-api -n 100
 
 **Symptoms:**
 - Error rate >1% (normally <0.1%)
-- `curl http://localhost:5000/api/metrics` shows error spike
+- Elevated `failedSimulations` in `curl http://localhost:5000/api/metrics`, or elevated `failureCount` per stage in `curl http://localhost:5000/api/snapshot`
 
 **Diagnosis:**
 ```bash
-# Check error types
-curl http://localhost:5000/api/metrics | jq '.errorsByType'
+# Check error types — note: there is no `.errorsByType` field in any real
+# response. Job-level failure counts are in `failedSimulations`
+# (GET /api/metrics) and per-stage failure counts are in
+# `data.stages[].failureCount` (GET /api/snapshot). For actual error
+# messages/types you need to grep the logs (see below), not the metrics API.
+curl http://localhost:5000/api/snapshot | jq '.data.stages'
 
 # Sample errors from logs
 sudo journalctl -u terrium-api -n 50 | grep ERROR
@@ -223,9 +236,9 @@ sudo journalctl -u terrium-api -n 50 | grep ERROR
 |-------|-------|-----|
 | `MISSING_REQUIRED_INPUT` | User didn't provide parameters | User education, improve defaults |
 | `PIPELINE_ERROR` | Engine failure | Check Python logs, restart Python |
-| `DATABASE_ERROR` | DB connection failed | Check PostgreSQL, restart if needed |
+| *(no distinct error code)* | DB connection failed | There is no `DATABASE_ERROR` code in the source — DB unavailability is handled silently: the service falls back to in-memory/file storage rather than surfacing a request-level error (see "Fallback Mode" below and `isDbAvailable()` used in `src/routes/pipeline.ts`). Check PostgreSQL and restart it if persistence is expected. |
 | `INTERNAL_SERVER_ERROR` | Unexpected exception | Check logs for stack trace, report bug |
-| `RATE_LIMITED` | Too many requests | Inform user, upgrade rate limit if needed |
+| `TOO_MANY_REQUESTS` (HTTP 429) | Too many `POST /api/simulate` requests — the only endpoint with real, enforced rate limiting (hardcoded 10 req/60s via `src/lib/rateLimit.ts`; the global per-app limit in `src/app.ts` is headers-only and never actually rejects requests) | Inform user; changing the limit requires editing `rateLimit.ts` and redeploying, it is not env-configurable |
 
 **Recovery:**
 ```bash
@@ -497,8 +510,10 @@ dmesg | tail -20
 ### Daily (Automated)
 
 ```bash
-# Health check (every 5 min)
-curl -s http://localhost:5000/healthz || \
+# Health check (every 5 min) — the systemctl restart line below assumes
+# the proposed systemd setup from DEPLOYMENT_GUIDE.md; substitute your
+# actual process manager's restart command if you're not using systemd.
+curl -s http://localhost:5000/api/healthz || \
   systemctl restart terrium-api
 
 # Log rotation (daily)
@@ -546,9 +561,9 @@ sudo -u postgres reindexdb terrium
 # Monitor LLM vs. keyword resolution ratio
 # Review error logs for patterns
 
-# Dependency updates
-npm audit
-npm update
+# Dependency updates (this is a pnpm workspace — see note at top of this doc)
+pnpm audit
+pnpm update
 
 # Load testing
 # Verify system can handle expected peak load
@@ -643,9 +658,11 @@ After resolving any P1 or P2 incident:
 
 ## Contact Information
 
-**On-Call Phone:** [Configured in PagerDuty]
+> **Proposed — not implemented in this repo yet.** There is no PagerDuty or Slack integration anywhere in this repository (no webhook config, no `#incidents` reference outside this doc). The fields below are placeholders for a team to fill in if/when such tooling is adopted.
 
-**Slack Channel:** #incidents
+**On-Call Phone:** [Configured in PagerDuty — once PagerDuty is actually set up]
+
+**Slack Channel:** #incidents (proposed — no Slack integration exists in this repo today)
 
 **Escalation:**
 - Backend Lead: [Contact info]
@@ -657,21 +674,27 @@ After resolving any P1 or P2 incident:
 ## Useful Commands Reference
 
 ```bash
-# Service management
+# Service management — proposed; assumes the systemd unit from
+# DEPLOYMENT_GUIDE.md, which is not installed by anything in this repo.
+# If you're not running under systemd, use your process manager's
+# equivalents (e.g. `docker start/stop/restart terrium-api`, or `pnpm run start`).
 sudo systemctl start terrium-api
 sudo systemctl stop terrium-api
 sudo systemctl restart terrium-api
 sudo systemctl status terrium-api
 sudo systemctl enable terrium-api
 
-# Logging
+# Logging — same caveat; the app itself logs to stdout via pino, it does
+# not write to the systemd journal unless run under a systemd unit.
 sudo journalctl -u terrium-api -f
 sudo journalctl -u terrium-api -S "1 hour ago"
 sudo journalctl -u terrium-api -u postgresql -f
 
-# Monitoring
-curl http://localhost:5000/healthz
+# Monitoring — real, verified paths (src/app.ts mounts the router at /api;
+# src/routes/health.ts, src/routes/pipeline.ts, src/routes/metrics.ts)
+curl http://localhost:5000/api/healthz
 curl http://localhost:5000/api/metrics
+curl http://localhost:5000/api/snapshot
 curl http://localhost:5000/api/simulate | jq '.[] | .status'
 
 # Database
