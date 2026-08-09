@@ -155,6 +155,57 @@ parameters parsed) since the review sandbox cannot reach the network.
 
 Re-run the command above to produce usable fixtures.
 
+## 5. The capture succeeded, and found two real errors
+
+With valid fixtures, `Tellurium/tests/test_biomodels_parameter_parity.py`
+(new, 14 tests) compares the engine's constants against the curated SBML
+instead of against themselves.
+
+**Tyson (BIOMD0000000006): all four constants match exactly.**
+kappa=0.015, k6=1.0, k4=180.0, k4prime=0.018. Now verified rather than
+assumed — which matters most here, because Tyson (1991) is a scan with no
+machine-readable text in PMC, so the curated encoding is the only
+programmatically checkable source.
+
+**Repressilator (BIOMD0000000012): `beta` was the reciprocal of the
+correct value.** The engine had `beta = 5.0`; the curated encoding gives
+`0.2`, and annotates the parameter in the model file itself:
+
+```xml
+<parameter id="beta" value="0.2">
+  <notes>ratio of protein to mRNA decay rates</notes>
+```
+
+with `tau_prot = 10` and `tau_mRNA = 2` in the same file. The protein
+decays five times *slower* than the mRNA, so the ratio is 0.2. In the
+dimensionless form this engine integrates, `p' = -beta*(p - m)`, a beta of
+5 would have the protein equilibrating five times *faster* than the mRNA —
+contradicting those half-lives. 1/0.2 = 5 is the signature of a
+convention inversion, not a rounding difference. `alpha` was also 216.0
+against the curated 216.404.
+
+The test suite now derives beta from the encoding's own `tau_mRNA/tau_prot`
+rather than trusting the stored number, so the reciprocal is dimensionally
+impossible to reintroduce.
+
+### Where the wrong value came from
+
+The test file's own header said it: the parameters were "transcribed from
+a course exercise built directly around this paper (Cornell Physics 7682)"
+— a secondary source. That is how a reciprocal survives: the exercise's
+convention differed, and nothing downstream ever compared against a primary
+source. The header now records this.
+
+**A wrong DOI had propagated to five files**, including
+`domain-literature.ts`, which serves citations to users:
+`10.1038/35002131`. PubMed gives `10.1038/35002125` for PMID 10659856.
+All five corrected.
+
+The self-referential assertions in `test_repressilator_correctness.py` were
+removed rather than updated — they had already gone stale against the
+corrected constants, which is the predicted failure mode of pinning code
+against itself. One source of truth now.
+
 ## 5. Carried forward
 
 1. **Run the BioModels capture** (§4) and add a fixture-backed comparison.

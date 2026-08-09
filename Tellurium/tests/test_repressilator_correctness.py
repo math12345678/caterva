@@ -1,17 +1,28 @@
 """Scientific verification for the repressilator domain.
 
 Elowitz MB, Leibler S, "A synthetic oscillatory network of transcriptional
-regulators", Nature 403:335-338, 2000, DOI 10.1038/35002131. The
+regulators", Nature 403:335-338, 2000, DOI 10.1038/35002125. The
 dimensionless "deterministic, continuous approximation" (p.337):
 
     dm_i/dt = -m_i + alpha/(1 + p_j^n) + alpha0    (j represses i)
     dp_i/dt = -beta*(p_i - m_i)
 
-for the cyclic repression lacI -| tetR -| cI -| lacI. Parameter values
-(alpha=216, alpha0/alpha=0.001, beta=5, n=2) are the point the paper's own
-Figure 2b identifies as producing spontaneous oscillation, transcribed from
-a course exercise built directly around this paper (Cornell Physics 7682)
--- see docs/adr/0022.
+for the cyclic repression lacI -| tetR -| cI -| lacI.
+
+Parameter provenance, corrected 2026-08-09. These values were originally
+transcribed from a course exercise built around the paper rather than from
+a primary source, and one of them was wrong: `beta` was recorded as 5,
+the RECIPROCAL of the correct 0.2. BioModels' curated encoding
+(BIOMD0000000012) annotates beta as the "ratio of protein to mRNA decay
+rates" and carries tau_prot=10, tau_mRNA=2 -- the protein decays five times
+slower, so the ratio is 0.2, and a beta of 5 would have the protein
+equilibrating five times faster than the mRNA instead.
+
+All four constants are now checked against that curated encoding by
+tests/test_biomodels_parameter_parity.py, which also re-derives beta from
+the encoding's own half-lives. Transcribing from a secondary source is what
+made the error possible; verifying against a curated primary source is what
+found it.
 
 As with the cell cycle oscillator, this domain takes no caller-supplied
 kinetic parameters, so verification is against independently derivable
@@ -25,7 +36,8 @@ properties of the fixed system rather than a swept parameter space:
    each other -- the repressilator's defining qualitative signature,
    distinguishing it from three independent copies of the same
    oscillator running in sync.
-4. The literature parameter values are pinned.
+4. Parameter values are verified against curated BioModels SBML in
+   tests/test_biomodels_parameter_parity.py (not asserted here).
 """
 
 from __future__ import annotations
@@ -58,40 +70,23 @@ def _columns(result):
 
 
 class TestLiteratureParameterValues:
-    """Pins the published constants against drift.
+    """Superseded by tests/test_biomodels_parameter_parity.py.
 
-    Read the docstring on the first test before trusting the class name:
-    these compare the code to literals, not to Elowitz & Leibler's paper.
+    This class used to assert the four constants against literal copies of
+    themselves (`assert REPRESSILATOR_ALPHA == 216.0`). That is not
+    verification: a value mistranscribed when first written down produces
+    an assertion carrying the same error, which then passes forever.
+
+    It also went stale exactly as predicted. The constants were corrected
+    to the curated BioModels values (alpha 216.0 -> 216.404, and beta
+    5.0 -> 0.2, which was a reciprocal rather than a rounding difference)
+    and these assertions still demanded the old numbers.
+
+    The constants are now checked against the curated SBML for
+    BIOMD0000000012 in test_biomodels_parameter_parity.py, including a
+    derivation of beta from the encoding's own tau_mRNA/tau_prot half-lives.
+    Nothing is asserted here so there is one source of truth.
     """
-
-    def test_standard_oscillatory_parameter_set_is_pinned_against_edits(self):
-        """Pinning, NOT literature verification.
-
-        Comparing a constant to a literal copy of itself cannot detect a
-        value that was mistranscribed when it was first written down --
-        the assertion would carry the same error. The Lotka-Volterra
-        domain in this same batch shipped with transposed defaults for
-        exactly that reason (ADR 0023).
-
-        Verified externally so far (PubMed, 2026-08-09): the paper exists
-        and is Nature 403(6767):335-8, DOI 10.1038/35002125, PMID 10659856.
-        Its abstract reports oscillation periods "of hours", slower than
-        the cell-division cycle -- which does NOT pin a dimensionless
-        period for this model, so no such assertion is made here rather
-        than inventing a conversion.
-
-        Real verification of these four constants needs the curated SBML
-        (BIOMD0000000012) via `scripts/capture_biomodels_fixture.py`, run
-        somewhere with outbound network access; the review sandbox's proxy
-        blocks it.
-        """
-        assert REPRESSILATOR_ALPHA == 216.0
-        assert REPRESSILATOR_BETA == 5.0
-        assert REPRESSILATOR_N == 2.0
-
-    def test_alpha0_is_the_papers_leakiness_ratio(self):
-        # Fig 2b's "X" point: alpha0/alpha = 0.001.
-        assert REPRESSILATOR_ALPHA0 / REPRESSILATOR_ALPHA == pytest.approx(0.001)
 
 
 class TestAgainstIndependentIntegrator:

@@ -240,7 +240,7 @@ def build_cell_cycle_oscillator_antimony(
 #
 # Elowitz MB, Leibler S, "A synthetic oscillatory network of
 # transcriptional regulators", Nature 403:335-338, 2000,
-# DOI 10.1038/35002131.
+# DOI 10.1038/35002125.
 #
 # Dimensionless "deterministic, continuous approximation" equations from
 # p.337 of the paper (three genes cyclically repressing: lacI -| tetR -|

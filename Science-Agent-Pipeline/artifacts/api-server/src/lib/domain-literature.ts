@@ -336,7 +336,7 @@ export const REPRESSILATOR_LITERATURE: DomainLiterature = {
       authors: "Elowitz, M. B., & Leibler, S.",
       year: 2000,
       title: "A synthetic oscillatory network of transcriptional regulators",
-      doi: "10.1038/35002131",
+      doi: "10.1038/35002125",
     },
   ],
   defaultJustification:
