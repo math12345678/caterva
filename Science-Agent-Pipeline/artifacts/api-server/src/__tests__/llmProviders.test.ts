@@ -72,23 +72,22 @@ const VALID_LLM_RESPONSE = {
   ],
 };
 
-// Every domain the resolver prompt offers. `sbml` is intentionally excluded
-// (it is the internal raw-SBML escape hatch, not a natural-language domain).
-// This list must match the LLM allowlist inside resolveQueryWithLLM exactly;
+// Every domain the resolver prompt offers (11 primary API domains).
+// `sbml` is intentionally excluded (it is the internal raw-SBML escape hatch).
+// `monte_carlo_pi` and `gillespie_ssa_replicates` are engine-internal only.
+// This list must match the SUPPORTED_DOMAINS in resolveQueryWithLLM exactly;
 // the test below fails if a resolvable domain is rejected there.
 const RESOLVABLE_DOMAINS = [
   "mm",
   "mm_competitive_inhibition",
   "sir",
   "seir",
-  "pcr",
-  "monte_carlo_pi",
   "wright_fisher",
-  "two_locus_wright_fisher",
-  "molecular_dynamics",
   "gillespie_ssa",
+  "pcr",
+  "molecular_dynamics",
   "gillespie_ssa_bimolecular",
-  "gillespie_ssa_replicates",
+  "two_locus_wright_fisher",
 ] as const;
 
 

@@ -37,7 +37,7 @@ const SYSTEM_PROMPT = `You are the "science agent" resolver for a computational 
 Given a natural-language query, return a single JSON object (no markdown, no prose) with this exact shape:
 
 {
-  "domain": "mm" | "mm_competitive_inhibition" | "sir" | "seir" | "wright_fisher" | "gillespie_ssa" | "pcr" | "molecular_dynamics" | "gillespie_ssa_bimolecular" | "two_locus_wright_fisher" | "lotka_volterra" | "cell_cycle_oscillator" | "repressilator",
+  "domain": "mm" | "mm_competitive_inhibition" | "sir" | "seir" | "wright_fisher" | "gillespie_ssa" | "pcr" | "molecular_dynamics" | "gillespie_ssa_bimolecular" | "two_locus_wright_fisher",
   "parameters": { ...numeric parameters the query explicitly states; omit anything else ... },
   "reasoning": "short explanation of how you mapped the query",
   "modelCitations": ["optional literature reference"],
@@ -60,9 +60,6 @@ Domain meanings:
 - "molecular_dynamics": Lennard-Jones molecular dynamics.
 - "gillespie_ssa_bimolecular": Gillespie SSA for bimolecular reactions (A + B -> C).
 - "two_locus_wright_fisher": two-locus Wright-Fisher with recombination and linkage disequilibrium.
-- "lotka_volterra": predator-prey population dynamics (Lotka 1925, Volterra 1926).
-- "cell_cycle_oscillator": molecular cell cycle via cyclin-CDK regulation (Tyson 1991).
-- "repressilator": synthetic genetic oscillator with three repressive genes (Elowitz & Leibler 2000).
 
 Rules:
 1. Return numeric values only for parameters the query explicitly states. The pipeline hard-blocks any value that is not user-supplied or literature-backed, so never invent numbers: omit a parameter entirely rather than guessing a value. Return an empty "parameters" object when the query states no numbers.
@@ -231,14 +228,24 @@ export async function resolveQueryWithLLM(
       requestBody.response_format = { type: "json_object" };
     }
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    // Abort after 30 seconds to prevent hanging on unresponsive API endpoints
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), 30_000);
+
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: abortController.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!response.ok) {
       const text = await response.text();
@@ -258,7 +265,8 @@ export async function resolveQueryWithLLM(
 
     const parsed = JSON.parse(content) as Partial<LLMResolvedSimulation>;
 
-    // Validate domain matches SYSTEM_PROMPT's supported list (13 primary API domains)
+    // Validate domain matches SYSTEM_PROMPT's supported list (11 primary API domains).
+    // monte_carlo_pi and gillespie_ssa_replicates are engine-internal; not exposed to LLM.
     const SUPPORTED_DOMAINS = [
       "mm",
       "mm_competitive_inhibition",
@@ -270,9 +278,6 @@ export async function resolveQueryWithLLM(
       "molecular_dynamics",
       "gillespie_ssa_bimolecular",
       "two_locus_wright_fisher",
-      "lotka_volterra",
-      "cell_cycle_oscillator",
-      "repressilator",
     ] as const;
 
     if (

@@ -13,19 +13,25 @@ try:
     from Tellurium.core.utils import _load_runner  # type: ignore[no-redef]
     from Tellurium.core.validation import (
         validate_michaelis_menten_params, validate_mm_competitive_params,
-        validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+        validate_sir_params, validate_seir_params,
+        validate_lotka_volterra_params)  # type: ignore[no-redef]
     from Tellurium.continuous.model_building import (
         build_michaelis_menten_antimony, build_mm_competitive_antimony,
         build_sir_antimony, build_seir_antimony,
+        build_lotka_volterra_antimony, build_cell_cycle_oscillator_antimony,
+        build_repressilator_antimony,
         antimony_to_sbml)  # type: ignore[no-redef]
 except ModuleNotFoundError:
     from core.utils import _load_runner  # type: ignore[no-redef]
     from core.validation import (
         validate_michaelis_menten_params, validate_mm_competitive_params,
-        validate_sir_params, validate_seir_params)  # type: ignore[no-redef]
+        validate_sir_params, validate_seir_params,
+        validate_lotka_volterra_params)  # type: ignore[no-redef]
     from continuous.model_building import (
         build_michaelis_menten_antimony, build_mm_competitive_antimony,
         build_sir_antimony, build_seir_antimony,
+        build_lotka_volterra_antimony, build_cell_cycle_oscillator_antimony,
+        build_repressilator_antimony,
         antimony_to_sbml)  # type: ignore[no-redef]
 
 def simulate_sbml(sbml_string: str, start: float = 0.0, end: float = 10.0,
@@ -206,6 +212,60 @@ def simulate_seir(beta: float, sigma: float, gamma: float, s0: float,
     sbml = antimony_to_sbml(model, "seir")
     return simulate_sbml(sbml, start, end, points, model_name="seir",
                          validation=validation)
+
+
+def simulate_lotka_volterra(alpha: float = 1.1, beta: float = 0.4,
+                            gamma: float = 0.4, delta: float = 0.1,
+                            p0: float = 10.0, v0: float = 5.0,
+                            start: float = 0.0, end: float = 20.0,
+                            points: int = 201) -> SimulationResult:
+    """Validate, build, translate and integrate a Lotka-Volterra
+    predator-prey model (Lotka 1925; Volterra 1926).
+
+    Defaults reproduce the classic ~10-year lynx-hare oscillation cycle
+    on an annual-cycle time axis. See docs/adr/0022.
+    """
+    validation = validate_lotka_volterra_params(alpha, beta, gamma, delta, p0, v0)
+    validation.raise_if_invalid()
+    model = build_lotka_volterra_antimony(alpha, beta, gamma, delta, p0, v0)
+    sbml = antimony_to_sbml(model, "lotka_volterra")
+    return simulate_sbml(sbml, start, end, points, model_name="lotka_volterra",
+                         validation=validation)
+
+
+def simulate_cell_cycle_oscillator(start: float = 0.0, end: float = 100.0,
+                                   points: int = 1001,
+                                   seed: int | None = None) -> SimulationResult:
+    """Integrate Tyson's (1991) 2-variable cdc2-cyclin relaxation
+    oscillator using the paper's own standard oscillatory parameter set.
+
+    ``seed`` is accepted for call-signature symmetry with the stochastic
+    domains but is unused: this is a deterministic ODE system with no
+    randomness anywhere in it. See docs/adr/0022.
+    """
+    del seed  # deterministic model; kept for API symmetry only
+    model = build_cell_cycle_oscillator_antimony()
+    sbml = antimony_to_sbml(model, "cell_cycle_oscillator")
+    return simulate_sbml(sbml, start, end, points,
+                         model_name="cell_cycle_oscillator",
+                         validation=ParameterValidation())
+
+
+def simulate_repressilator(start: float = 0.0, end: float = 200.0,
+                           points: int = 2001,
+                           seed: int | None = None) -> SimulationResult:
+    """Integrate the Elowitz & Leibler (2000) repressilator using the
+    paper's own standard oscillatory parameter set.
+
+    ``seed`` is accepted for call-signature symmetry with the stochastic
+    domains but is unused: this is a deterministic ODE system with no
+    randomness anywhere in it. See docs/adr/0022.
+    """
+    del seed  # deterministic model; kept for API symmetry only
+    model = build_repressilator_antimony()
+    sbml = antimony_to_sbml(model, "repressilator")
+    return simulate_sbml(sbml, start, end, points, model_name="repressilator",
+                         validation=ParameterValidation())
 
 
 def steady_state(sbml_string: str) -> Dict[str, float]:
