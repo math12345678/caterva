@@ -118,7 +118,7 @@ constant is the literature's own standard set, the same treatment
 
 **3. Repressilator** (Elowitz & Leibler 2000, "A synthetic oscillatory
 network of transcriptional regulators", Nature 403:335-338, DOI
-10.1038/35002131), the "deterministic, continuous approximation" from
+10.1038/35002125), the "deterministic, continuous approximation" from
 p.337 (three genes cyclically repressing, lacI -| tetR -| cI -| lacI):
 
     dm_i/dt = -m_i + alpha/(1 + p_j^n) + alpha0     (j represses i)
@@ -223,7 +223,7 @@ values were individually well within range, just transposed.
   BIOMD0000000006 (2-variable reduction used here).
 - Elowitz, M.B., Leibler, S. (2000). "A synthetic oscillatory network of
   transcriptional regulators." *Nature* 403, 335-338. DOI
-  10.1038/35002131. Curated model: BioModels BIOMD0000000012. Parameter
+  10.1038/35002125. Curated model: BioModels BIOMD0000000012. Parameter
   point cross-checked against Cornell Physics 7682 (Myers/Sethna/Mueller),
   "Simple Repressilator" exercise, built directly around this paper.
 - ADR 0004 -- the same Antimony `gamma` keyword collision this ADR's
