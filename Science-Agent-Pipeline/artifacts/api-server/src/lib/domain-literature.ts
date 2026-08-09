@@ -34,10 +34,30 @@ export const MM_LITERATURE: DomainLiterature = {
       chapter: "Chapter 6: Enzymes",
     },
     {
-      authors: "Michaelis, L., & Menten, M. L.",
-      year: 1913,
-      title: "Die Kinetik der Invertinwirkung",
-      doi: "10.1111/j.1432-1033.1913.tb07745.x",
+      // The 1913 original has NO DOI: Biochemische Zeitschrift 49, 333-369
+      // predates DOI assignment entirely, and the journal itself ceased
+      // publication in 1967.
+      //
+      // This entry previously carried doi "10.1111/j.1432-1033.1913.tb07745.x",
+      // which does not exist -- CrossRef returns 404 for it. The prefix
+      // 1432-1033 belongs to the European Journal of Biochemistry, founded
+      // in 1967, so no 1913 article could ever have borne it. It was
+      // fabricated, and it was served to users as a citation until
+      // verify_citations_live.py began discovering DOIs from source
+      // (Stage 9 Part 5).
+      //
+      // The citable modern source is Johnson & Goody's complete English
+      // translation, which reproduces the original in full and is the
+      // reference English-speaking authors are directed to. Verified
+      // against PubMed 2026-08-09: PMID 21888353, PMC3381512.
+      authors: "Michaelis, L., Menten, M. L., Johnson, K. A., & Goody, R. S.",
+      year: 2011,
+      title:
+        "The original Michaelis constant: translation of the 1913 " +
+        "Michaelis-Menten paper [Michaelis & Menten (1913) Die Kinetik der " +
+        "Invertinwirkung, Biochem. Z. 49, 333-369]. Biochemistry 50(39), " +
+        "8264-8269",
+      doi: "10.1021/bi201284u",
     },
   ],
   defaultJustification:
@@ -129,8 +149,8 @@ export const SEIR_LITERATURE: DomainLiterature = {
 /**
  * WRIGHT_FISHER Domain: Population Genetics
  * BACKING: Rahbari, R., et al. (2016)
- * "Variation and heritability of recombination rate in humans"
- * Nature Genetics
+ * "Timing, rates and spectra of human germline mutation"
+ * Nature Genetics 48(2), 126-133. DOI 10.1038/ng.3469, PMID 26656846.
  */
 export const WRIGHT_FISHER_LITERATURE: DomainLiterature = {
   name: "wright_fisher",
@@ -138,10 +158,22 @@ export const WRIGHT_FISHER_LITERATURE: DomainLiterature = {
     "Wright-Fisher population genetics model. Simulates allele frequency change under mutation and drift in finite population. Mutation probability per locus per generation.",
   references: [
     {
-      authors: "Rahbari, R., et al.",
+      // This entry previously cited doi 10.1038/ng.3285, "Variation and
+      // heritability of RECOMBINATION rate in humans", to justify a
+      // MUTATION rate. That DOI resolves perfectly well -- which is why
+      // the live citation checker passed it -- but the paper is about a
+      // different quantity than the one being claimed. A citation that
+      // exists is not a citation that supports the statement.
+      //
+      // Corrected to Rahbari et al.'s germline-mutation paper, verified
+      // against PubMed 2026-08-09: PMID 26656846, PMC4731925,
+      // Nat Genet 48(2), 126-133.
+      authors: "Rahbari, R., Wuster, A., Lindsay, S. J., et al.",
       year: 2016,
-      title: "Variation and heritability of recombination rate in humans",
-      doi: "10.1038/ng.3285",
+      title:
+        "Timing, rates and spectra of human germline mutation. " +
+        "Nature Genetics 48(2), 126-133",
+      doi: "10.1038/ng.3469",
     },
     {
       authors: "Fisher, R. A.",
@@ -155,7 +187,7 @@ export const WRIGHT_FISHER_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Human mutation rate: ~10⁻⁸ per base pair per generation per Rahbari et al. (2016). Average human: 60-100 new mutations per generation. Population size 10,000 (typical for modeling).",
+    "Human mutation rate: ~1.29e-8 per base pair per generation. The value actually resolved at runtime comes from stdpopsim's HomSap mean_mutation_rate (see Tests/popgen_resolver.py), which carries its own bundled citations (International Human Genome Sequencing Consortium 2001; Jonsson et al. 2017); Rahbari et al. (2016) is the pedigree-based germline mutation study backing the order of magnitude. Population size 10,000 (typical for modeling).",
 };
 
 /**
@@ -312,10 +344,25 @@ export const CELL_CYCLE_OSCILLATOR_LITERATURE: DomainLiterature = {
     "Molecular model of cell cycle progression via cyclin-CDK regulation. Simulates periodic oscillations in cyclin levels driving G1/S and G2/M transitions.",
   references: [
     {
+      // This entry previously carried doi "10.1083/jcb.115.3.577", which is
+      // a REAL, resolving DOI for an entirely different paper: McIntosh &
+      // Pfarr, "Mitotic motors", J Cell Biol 115(3), 577-585, 1991 -- a
+      // review of kinesins and the mitotic spindle, with no connection to
+      // Tyson's cdc2/cyclin ODE model. Verified against PubMed 2026-08-09
+      // (PMID 1918154).
+      //
+      // Existence checks cannot catch this: the DOI resolved cleanly. It
+      // was found by comparing the registered CrossRef title against the
+      // title claimed here, which verify_citations_live.py now does.
+      //
+      // Correct source, already used by Tellurium/continuous/model_building.py:
+      // PNAS 88(16), 7328-7332. PMID 1831270, PMC52288.
       authors: "Tyson, J. J.",
       year: 1991,
-      title: "Modelling the cell division cycle: cdc2 and cyclin interactions",
-      doi: "10.1083/jcb.115.3.577",
+      title:
+        "Modeling the cell division cycle: cdc2 and cyclin interactions. " +
+        "PNAS 88(16), 7328-7332",
+      doi: "10.1073/pnas.88.16.7328",
     },
   ],
   defaultJustification:
