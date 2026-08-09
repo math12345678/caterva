@@ -408,15 +408,32 @@ export function validateParameterProvenance(
 }
 
 /**
- * Build the provenance entry for a resolved kinetic constant, applying the
- * STRENDA rule in one place so no caller can forget it.
+ * Build the provenance entry for a resolved parameter, applying the STRENDA
+ * rule in one place so no caller can forget it.
  *
  * Callers pass the citation tier they believe applies; this function may
  * degrade `verified` to `flagged` when the assay conditions are incomplete.
  * It never upgrades — a cross-species match with perfect conditions is still
  * cross-species.
+ *
+ * `parameterKey` is REQUIRED, and is what decides whether the STRENDA rule
+ * applies at all. It was added after this helper silently corrupted every
+ * resolved `mutation_rate`: STRENDA governs enzyme kinetic constants
+ * (`STRENDA_GOVERNED_FIELDS`), and unconditionally stamping `strendaStatus`
+ * onto a field outside that set is a hard `validateParameterProvenance`
+ * violation ("carries a STRENDA status but is not a resolved kinetic
+ * constant") that `provenanceViolations` then throws on — turning a
+ * successful literature resolution into an internal error. It also
+ * downgraded the citation to `flagged` and attached a note about
+ * unreported assay pH to a quantity (a per-generation substitution rate)
+ * that has no assay pH.
+ *
+ * Making the key mandatory rather than optional is deliberate: an optional
+ * parameter would have defaulted to the old, wrong behaviour and let the
+ * same bug reappear at the next call site that forgot it. See ADR 0021.
  */
 export function buildResolvedKineticProvenance(args: {
+  parameterKey: string;
   source: string;
   citation: string;
   organism?: string;
@@ -425,6 +442,22 @@ export function buildResolvedKineticProvenance(args: {
   citationLocators?: CitationLocator[];
   note?: string;
 }): ParameterProvenance {
+  // A parameter STRENDA does not govern gets no strendaStatus, no
+  // conditions-based downgrade, and no assay-conditions note.
+  if (!STRENDA_GOVERNED_FIELDS.has(args.parameterKey.toLowerCase())) {
+    return {
+      origin: "resolved",
+      source: args.source,
+      citation: args.citation,
+      ...(args.organism !== undefined ? { organism: args.organism } : {}),
+      citationStatus: args.citationStatus,
+      ...(args.citationLocators !== undefined && args.citationLocators.length > 0
+        ? { citationLocators: args.citationLocators }
+        : {}),
+      ...(args.note ? { note: args.note } : {}),
+    };
+  }
+
   const strendaStatus = strendaStatusFor(args.assayConditions);
   const missing = missingStrendaFields(args.assayConditions);
 

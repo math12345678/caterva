@@ -126,6 +126,7 @@ async function applyKineticResolution(
       parameterProvenance = {
         ...parameterProvenance,
         [key]: buildResolvedKineticProvenance({
+          parameterKey: key,
           source: agentResult.source ?? "unknown",
           citation,
           organism: agentResult.organism,
@@ -243,6 +244,7 @@ async function applyVmaxFromKcatResolution(
   parameterProvenance = {
     ...parameterProvenance,
     vmax: buildResolvedKineticProvenance({
+      parameterKey: "vmax",
       source: agentResult.source ?? "unknown",
       citation,
       organism: agentResult.organism,
@@ -343,25 +345,21 @@ async function applyBetaGammaFromR0Resolution(
       ? ` ${agentResult.betaGammaValidation.reason ?? ""}`
       : "");
 
-  // Built directly rather than via buildResolvedKineticProvenance: that
-  // helper always runs the STRENDA pH/temperature check
-  // (strendaStatusFor(undefined) === "incomplete") and silently downgrades
-  // citationStatus from "verified" to "flagged" whenever assayConditions is
-  // absent — correct for kinetic constants (ADR 0010), meaningless for an
-  // epidemiological R0/infectious-period pair, which has no assay
-  // conditions at all. citationStatus is always "verified" here, not
+  // beta/gamma are not STRENDA-governed (a disease has no assay pH), which
+  // buildResolvedKineticProvenance now handles itself via parameterKey —
+  // see ADR 0021. citationStatus is always "verified" here, never
   // conditionally cross-species like BRENDA lookups: the registry has no
   // cross-species concept (a disease's R0 does not have an "organism"), so
   // there is no flagged tier to select between — see ADR 0017.
   parameters = { ...parameters, beta: agentResult.beta, gamma: agentResult.gamma };
-  const provenanceEntry: ParameterProvenance = {
-    origin: "resolved",
+  const provenanceEntry = buildResolvedKineticProvenance({
+    parameterKey: "beta",
     source: agentResult.source ?? "PubMed",
     citation,
     citationStatus: "verified",
     citationLocators: buildCitationLocators(agentResult.citation),
     note: bridgeNote,
-  };
+  });
   parameterProvenance = {
     ...parameterProvenance,
     beta: provenanceEntry,
@@ -409,9 +407,23 @@ async function applyPopgenResolution(
       const citation = formatResolvedCitation(agentResult.citation);
       if (citation !== undefined) {
         parameters = { ...parameters, mutation_rate: value };
+        // mutation_rate is a per-generation per-base-pair substitution
+        // rate, not an enzyme kinetic constant: STRENDA does not govern it
+        // and it has no assay pH or temperature. buildResolvedKineticProvenance
+        // now enforces that itself via the mandatory parameterKey.
+        //
+        // Before that fix, this call unconditionally stamped a strendaStatus
+        // here, which validateParameterProvenance rejects as a hard
+        // violation and provenanceViolations THROWS on -- so every
+        // successfully-resolved mutation_rate crashed resolveQuery() with
+        // "Internal error: invalid parameter provenance". Never caught by
+        // CI because stdpopsim is absent from the test sandbox, so the
+        // popgen resolver always returned found=false and this branch never
+        // executed. See ADR 0021.
         parameterProvenance = {
           ...parameterProvenance,
           mutation_rate: buildResolvedKineticProvenance({
+            parameterKey: "mutation_rate",
             source: agentResult.source ?? "unknown",
             citation,
             organism: agentResult.organism,
