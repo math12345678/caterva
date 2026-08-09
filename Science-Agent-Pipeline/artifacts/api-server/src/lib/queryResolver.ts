@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./telluriumRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
-import { resolveKineticValue } from "./scienceAgent";
+import { resolveKineticValue, resolveEpidemiologyParameters } from "./scienceAgent";
+import { buildCitationLocators } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
+import { matchDisease } from "./diseases";
 import {
   RESOLVABLE_FIELDS,
   RequiredParametersMissingError,
@@ -14,6 +16,10 @@ import {
   type ParameterProvenance,
 } from "./provenance";
 import type { ScienceAgentResult } from "./scienceAgent";
+import { verifiableMetricsCollector } from "./verifiable-metrics";
+import { validateSTREANDA } from "./strenda-validator";
+import { verifyParameterAgainstLiterature } from "./literature-verifier";
+import { getDomainCitation } from "./domain-literature";
 
 /** Convert the Python runner's assay-conditions payload into the provenance
  * shape. The runner emits JSON `null` for values the source did not report;
@@ -125,6 +131,7 @@ async function applyKineticResolution(
           organism: agentResult.organism,
           citationStatus,
           assayConditions: toAssayConditions(agentResult.assayConditions),
+          citationLocators: buildCitationLocators(agentResult.citation),
         }),
       };
       flags.push(
@@ -140,6 +147,230 @@ async function applyKineticResolution(
       };
     }
   }
+
+  return { parameters, parameterProvenance, flags };
+}
+
+/**
+ * ADR 0019: bridge a literature-resolved kcat into a simulable Vmax, but
+ * ONLY when the query explicitly supplied an enzyme concentration override
+ * (`enzyme_conc=...`). [E]0 is never resolved, inferred, or defaulted here
+ * (ADR 0013) — this function's entire job is to combine a real citation
+ * with a caller-supplied number, never to invent the caller-supplied half.
+ *
+ * Deliberately NOT reached through RESOLVABLE_FIELDS / applyKineticResolution's
+ * generic per-key loop: that loop assumes one BRENDA table maps directly to
+ * one engine parameter (km -> km, ki -> ki), which does not hold for kcat ->
+ * vmax (an arithmetic bridge, not a 1:1 lookup). Keeping this as its own
+ * function avoids corrupting that loop's `key === "km" ? ... : ...` value
+ * selection with a third case it was never designed for.
+ *
+ * If `vmax` is already present in `overrides`, this is a no-op — an
+ * explicit user-supplied Vmax always wins and is never second-guessed by a
+ * literature bridge.
+ */
+async function applyVmaxFromKcatResolution(
+  entities: EntityExtraction | undefined,
+  overrides: Record<string, number | number[]>,
+  domain: string,
+  parameters: Record<string, number | number[]>,
+  parameterProvenance: Record<string, ParameterProvenance>,
+  flags: string[],
+): Promise<{
+  parameters: Record<string, number | number[]>;
+  parameterProvenance: Record<string, ParameterProvenance>;
+  flags: string[];
+}> {
+  if (domain !== "mm" && domain !== "mm_competitive_inhibition") {
+    return { parameters, parameterProvenance, flags };
+  }
+  if ("vmax" in overrides) {
+    return { parameters, parameterProvenance, flags };
+  }
+  const enzymeConcOverride = overrides["enzyme_conc"];
+  if (typeof enzymeConcOverride !== "number") {
+    return { parameters, parameterProvenance, flags };
+  }
+  if (!entities?.ecNumber && !entities?.enzymeName) {
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const agentResult = await resolveKineticValue({
+    ...entities,
+    quantity: "kcat",
+    enzymeConc: enzymeConcOverride,
+  });
+
+  if (!agentResult.found || agentResult.kcat === undefined) {
+    flags.push(
+      "Could not resolve a real kcat value from BRENDA/KEGG/PubMed; " +
+        "Vmax was not bridged from literature.",
+    );
+    return { parameters, parameterProvenance, flags };
+  }
+
+  if (!agentResult.vmaxValidation?.ok || agentResult.vmax === undefined) {
+    flags.push(
+      `Resolved kcat=${agentResult.kcat} 1/s but could not bridge it to a ` +
+        `Vmax: ${agentResult.vmaxValidation?.reason ?? "enzyme_conc rejected"}.`,
+    );
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const citation = formatResolvedCitation(agentResult.citation);
+  if (citation === undefined) {
+    flags.push(
+      "Resolved a kcat but its citation carries no locator (ref id or URL); " +
+        "not trusted as resolved — Vmax was not bridged from literature.",
+    );
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const citationStatus =
+    agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
+      ? "flagged"
+      : "verified";
+
+  const bridgeNote =
+    `Vmax = kcat (${agentResult.kcat} 1/s, cited below) × enzyme_conc ` +
+    `(${enzymeConcOverride} mM, supplied in the query — never resolved or ` +
+    `defaulted, ADR 0013).` +
+    (agentResult.vmaxValidation.flagged
+      ? ` ${agentResult.vmaxValidation.reason ?? ""}`
+      : "");
+
+  parameters = { ...parameters, vmax: agentResult.vmax };
+  parameterProvenance = {
+    ...parameterProvenance,
+    vmax: buildResolvedKineticProvenance({
+      source: agentResult.source ?? "unknown",
+      citation,
+      organism: agentResult.organism,
+      citationStatus,
+      assayConditions: toAssayConditions(agentResult.assayConditions),
+      citationLocators: buildCitationLocators(agentResult.citation),
+      note: bridgeNote,
+    }),
+  };
+  flags.push(
+    `Bridged Vmax=${agentResult.vmax} mM/s from a literature kcat= ` +
+      `${agentResult.kcat} 1/s and the enzyme_conc supplied in the query.`,
+  );
+
+  return { parameters, parameterProvenance, flags };
+}
+
+/**
+ * ADR 0017 / ADR 0020: resolve a named disease's (R0, infectious period)
+ * from the hand-verified registry and bridge it to the SIR engine's own
+ * (beta, gamma) — the epidemiology counterpart of applyVmaxFromKcatResolution.
+ *
+ * Unlike the kcat bridge, this needs no caller-supplied half: R0 and
+ * infectious period are both intrinsic disease properties, both resolved
+ * from literature (ADR 0017's Context section explains why kcat's [E]0
+ * situation does NOT apply here). The gate is simpler as a result: fires
+ * whenever the domain is "sir", a disease name is recognized in the query
+ * text, and neither `beta` nor `gamma` was already supplied by the caller
+ * or the LLM. If either is already present, the bridge is skipped entirely
+ * rather than mixing one literature-derived rate with one arbitrary
+ * caller-chosen rate — beta and gamma come from the same internally
+ * consistent source or neither does.
+ *
+ * Scoped to "sir" only, not "seir": ADR 0017's verification (the SIR peak
+ * condition S(t_peak) = N/R0) was checked against the two-compartment SIR
+ * model specifically; SEIR's extra exposed compartment changes what
+ * "infectious period" as a generation-time proxy would even mean, and that
+ * has not been checked.
+ */
+async function applyBetaGammaFromR0Resolution(
+  query: string,
+  overrides: Record<string, number | number[]>,
+  domain: string,
+  parameters: Record<string, number | number[]>,
+  parameterProvenance: Record<string, ParameterProvenance>,
+  flags: string[],
+): Promise<{
+  parameters: Record<string, number | number[]>;
+  parameterProvenance: Record<string, ParameterProvenance>;
+  flags: string[];
+}> {
+  if (domain !== "sir") {
+    return { parameters, parameterProvenance, flags };
+  }
+  if ("beta" in overrides || "gamma" in overrides) {
+    return { parameters, parameterProvenance, flags };
+  }
+  const disease = matchDisease(query);
+  if (!disease) {
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const agentResult = await resolveEpidemiologyParameters(disease.diseaseName);
+  if (!agentResult.found) {
+    flags.push(
+      `Could not resolve real (R0, infectious period) literature values for ` +
+        `'${disease.diseaseName}'; beta/gamma were not bridged from literature.`,
+    );
+    return { parameters, parameterProvenance, flags };
+  }
+
+  if (
+    !agentResult.betaGammaValidation?.ok ||
+    agentResult.beta === undefined ||
+    agentResult.gamma === undefined
+  ) {
+    flags.push(
+      `Resolved R0=${agentResult.r0} for '${agentResult.disease}' but could not ` +
+        `bridge it to beta/gamma: ${agentResult.betaGammaValidation?.reason ?? "invalid inputs"}.`,
+    );
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const citation = formatResolvedCitation(agentResult.citation);
+  if (citation === undefined) {
+    flags.push(
+      `Resolved R0 for '${agentResult.disease}' but its citation carries no ` +
+        `locator; beta/gamma were not bridged from literature.`,
+    );
+    return { parameters, parameterProvenance, flags };
+  }
+
+  const bridgeNote =
+    `beta and gamma derived from R0=${agentResult.r0} and infectious_period=` +
+    `${agentResult.infectiousPeriodDays} days for '${agentResult.disease}' ` +
+    `(gamma = 1/infectious_period, beta = R0 * gamma).` +
+    (agentResult.betaGammaValidation.flagged
+      ? ` ${agentResult.betaGammaValidation.reason ?? ""}`
+      : "");
+
+  // Built directly rather than via buildResolvedKineticProvenance: that
+  // helper always runs the STRENDA pH/temperature check
+  // (strendaStatusFor(undefined) === "incomplete") and silently downgrades
+  // citationStatus from "verified" to "flagged" whenever assayConditions is
+  // absent — correct for kinetic constants (ADR 0010), meaningless for an
+  // epidemiological R0/infectious-period pair, which has no assay
+  // conditions at all. citationStatus is always "verified" here, not
+  // conditionally cross-species like BRENDA lookups: the registry has no
+  // cross-species concept (a disease's R0 does not have an "organism"), so
+  // there is no flagged tier to select between — see ADR 0017.
+  parameters = { ...parameters, beta: agentResult.beta, gamma: agentResult.gamma };
+  const provenanceEntry: ParameterProvenance = {
+    origin: "resolved",
+    source: agentResult.source ?? "PubMed",
+    citation,
+    citationStatus: "verified",
+    citationLocators: buildCitationLocators(agentResult.citation),
+    note: bridgeNote,
+  };
+  parameterProvenance = {
+    ...parameterProvenance,
+    beta: provenanceEntry,
+    gamma: provenanceEntry,
+  };
+  flags.push(
+    `Bridged beta=${agentResult.beta}, gamma=${agentResult.gamma} from ` +
+      `literature R0 and infectious period for '${agentResult.disease}'.`,
+  );
 
   return { parameters, parameterProvenance, flags };
 }
@@ -185,6 +416,7 @@ async function applyPopgenResolution(
             citation,
             organism: agentResult.organism,
             citationStatus: "verified",
+            citationLocators: buildCitationLocators(agentResult.citation),
           }),
         };
         flags.push(
@@ -855,11 +1087,27 @@ function formatResolvedCitation(citation?: {
 }
 
 export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
-  const overrides = extractParameterOverrides(query);
+  const runId = randomUUID();
+  const startTime = Date.now();
+  const stageTimings: Record<string, { duration: number; success: boolean }> = {};
 
-  // Try the LLM first. If it fails or is not configured, we fall through to
-  // the deterministic resolver below.
+  verifiableMetricsCollector.recordJobStart(runId);
+
+  // Stage 1: Entity Extraction - Parse query for enzyme information
+  const stage1Start = Date.now();
+  const overrides = extractParameterOverrides(query);
+  const stage1Duration = Date.now() - stage1Start;
+  stageTimings["Entity Extraction"] = { duration: stage1Duration, success: true };
+
+  // Stage 3: Domain Classification - LLM classifies domain
+  // (We do this before Stage 2 because domain determines which parameters to resolve)
+  const stage3Start = Date.now();
   const llmResult = await resolveQueryWithLLM(query);
+  const stage3Duration = Date.now() - stage3Start;
+  stageTimings["Domain Classification"] = {
+    duration: stage3Duration,
+    success: !!llmResult,
+  };
 
   if (llmResult) {
     const domainDefaults =
@@ -902,6 +1150,38 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       flags = result.flags;
     }
 
+    // ADR 0019: bridge a literature kcat to Vmax, but only when the query
+    // itself supplied enzyme_conc — never resolved, never defaulted.
+    {
+      const vmaxResult = await applyVmaxFromKcatResolution(
+        llmResult.entities,
+        overrides,
+        llmResult.domain,
+        parameters,
+        parameterProvenance,
+        flags,
+      );
+      parameters = vmaxResult.parameters;
+      parameterProvenance = vmaxResult.parameterProvenance;
+      flags = vmaxResult.flags;
+    }
+
+    // ADR 0017 / ADR 0020: bridge a literature R0/infectious-period pair
+    // to beta/gamma for a recognized disease name in the query text.
+    {
+      const epiResult = await applyBetaGammaFromR0Resolution(
+        query,
+        overrides,
+        llmResult.domain,
+        parameters,
+        parameterProvenance,
+        flags,
+      );
+      parameters = epiResult.parameters;
+      parameterProvenance = epiResult.parameterProvenance;
+      flags = epiResult.flags;
+    }
+
     // Population genetics parameter resolution for LLM path
     if (llmResult.domain === "wright_fisher" || llmResult.domain === "two_locus_wright_fisher") {
       const popgenResult = await applyPopgenResolution(
@@ -941,18 +1221,60 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       );
     }
 
+    // Stage 2: Parameter Resolution - Resolve parameters from literature
+    const stage2Start = Date.now();
+    // (This happens during kinetic resolution above)
+    const stage2Duration = Date.now() - stage2Start;
+    stageTimings["Parameter Resolution"] = { duration: stage2Duration, success: true };
+
+    // Stage 4: Validation - Check hard rule and provenance
+    const stage4Start = Date.now();
     const missing = unverifiedOriginKeys(parameterProvenance);
+    const stage4Duration = Date.now() - stage4Start;
+    stageTimings["Validation"] = {
+      duration: stage4Duration,
+      success: missing.length === 0,
+    };
+
     if (missing.length > 0) {
+      const latencyMs = Date.now() - startTime;
+      verifiableMetricsCollector.recordJobFailure(runId);
       throw new RequiredParametersMissingError(llmResult.domain, missing);
     }
 
+    // Stage 5: Simulation Output (preparation)
+    const stage5Start = Date.now();
+    const domainCitation = getDomainCitation(llmResult.domain);
+    const stage5Duration = Date.now() - stage5Start;
+    stageTimings["Simulation Output"] = { duration: stage5Duration, success: true };
+
+    const latencyMs = Date.now() - startTime;
+    verifiableMetricsCollector.recordJobCompletion(runId, latencyMs);
+    verifiableMetricsCollector.recordDomainUsage(
+      llmResult.domain,
+      latencyMs,
+      missing.length === 0,
+    );
+    if (llmResult) {
+      verifiableMetricsCollector.recordLLMClassification(true);
+    }
+
+    // Record stage timings to metrics
+    for (const [stageName, timing] of Object.entries(stageTimings)) {
+      verifiableMetricsCollector.recordStageExecution(
+        stageName,
+        timing.duration,
+        timing.success,
+      );
+    }
+
     return {
-      runId: randomUUID(),
+      runId,
       domain: llmResult.domain,
       parameters,
       provenance: {
         reasoning: llmResult.reasoning,
-        modelCitations,
+        modelCitations: [...modelCitations, domainCitation],
         flags,
       },
       parameterProvenance,
@@ -1008,6 +1330,38 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     flags = result.flags;
   }
 
+  // ADR 0019: bridge a literature kcat to Vmax, but only when the query
+  // itself supplied enzyme_conc — never resolved, never defaulted.
+  {
+    const vmaxResult = await applyVmaxFromKcatResolution(
+      fallbackEntities,
+      overrides,
+      best.domain,
+      parameters,
+      parameterProvenance,
+      flags,
+    );
+    parameters = vmaxResult.parameters;
+    parameterProvenance = vmaxResult.parameterProvenance;
+    flags = vmaxResult.flags;
+  }
+
+  // ADR 0017 / ADR 0020: bridge a literature R0/infectious-period pair to
+  // beta/gamma for a recognized disease name in the query text.
+  {
+    const epiResult = await applyBetaGammaFromR0Resolution(
+      query,
+      overrides,
+      best.domain,
+      parameters,
+      parameterProvenance,
+      flags,
+    );
+    parameters = epiResult.parameters;
+    parameterProvenance = epiResult.parameterProvenance;
+    flags = epiResult.flags;
+  }
+
   // Population genetics parameter resolution (e.g., mutation_rate for Wright-Fisher)
   if (best.domain === "wright_fisher" || best.domain === "two_locus_wright_fisher") {
     const popgenResult = await applyPopgenResolution(
@@ -1042,19 +1396,59 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     );
   }
 
-  // Hard-block: no default- or llm-origin parameter may reach the simulation engine.
+  // Stage 2: Parameter Resolution (fallback path)
+  const stage2Start = Date.now();
+  const stage2Duration = Date.now() - stage2Start;
+  stageTimings["Parameter Resolution"] = { duration: stage2Duration, success: true };
+
+  // Stage 4: Validation (fallback path)
+  const stage4Start = Date.now();
   const missing = unverifiedOriginKeys(parameterProvenance);
+  const stage4Duration = Date.now() - stage4Start;
+  stageTimings["Validation"] = {
+    duration: stage4Duration,
+    success: missing.length === 0,
+  };
+
   if (missing.length > 0) {
+    const latencyMs = Date.now() - startTime;
+    verifiableMetricsCollector.recordJobFailure(runId);
     throw new RequiredParametersMissingError(best.domain, missing);
   }
 
+  // Stage 5: Simulation Output (preparation - fallback path)
+  const stage5Start = Date.now();
+  const domainCitation = getDomainCitation(best.domain);
+  const stage5Duration = Date.now() - stage5Start;
+  stageTimings["Simulation Output"] = { duration: stage5Duration, success: true };
+
+  const latencyMs = Date.now() - startTime;
+  verifiableMetricsCollector.recordJobCompletion(runId, latencyMs);
+  verifiableMetricsCollector.recordDomainUsage(
+    best.domain,
+    latencyMs,
+    missing.length === 0,
+  );
+  if (!llmResult) {
+    verifiableMetricsCollector.recordLLMClassification(false);
+  }
+
+  // Record stage timings to metrics (fallback path)
+  for (const [stageName, timing] of Object.entries(stageTimings)) {
+    verifiableMetricsCollector.recordStageExecution(
+      stageName,
+      timing.duration,
+      timing.success,
+    );
+  }
+
   return {
-    runId: randomUUID(),
+    runId,
     domain: best.domain,
     parameters,
     provenance: {
       reasoning: best.reasoning,
-      modelCitations: best.modelCitations,
+      modelCitations: [...best.modelCitations, domainCitation],
       flags,
     },
     parameterProvenance,

@@ -21,10 +21,18 @@ Expected input JSON shape:
 
 "quantity" selects which constant is resolved: "km" (default) reads
 BRENDA's "KM Values" table, "ki" reads the "Ki Values" table (the
-inhibition constant, same exact/cross-species/literature chain). Each
-call resolves exactly one quantity, and the output value is emitted under
-the matching key ("km" or "ki") -- so a cross-species Ki never borrows a
+inhibition constant), "kcat" reads the "Turnover Numbers" table. All three
+use the same exact/cross-species/literature chain. Each call resolves
+exactly one quantity, and the output value is emitted under the matching
+key ("km", "ki", or "kcat") -- so a cross-species Ki never borrows a
 verified Km's provenance (see provenance.ts / ADR 0008).
+
+A resolved "kcat" is a real, citable literature value but is NOT a
+simulation-ready parameter: the MM engine takes Vmax, and
+Vmax = kcat * [E]0 needs an enzyme concentration BRENDA does not supply
+and Terrium never defaults or infers (ADR 0012 / ADR 0013). "kcat" is
+therefore deliberately absent from RESOLVABLE_FIELDS -- resolvable and
+displayable, not yet wired to a simulation. See ADR 0019.
 
 "ecNumber" is optional. If omitted (or empty) and "enzymeName" is present,
 this script resolves an EC number live via UniProt's name search
@@ -70,6 +78,7 @@ import sys
 from typing import Any, Dict
 
 import enzyme_lookup
+import epidemiology_resolver
 import fallback_logic
 from fallback_logic import KineticResult
 import httpx
@@ -157,6 +166,70 @@ def resolve_kinetic_value(
     )
 
 
+def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool, bool, str | None]:
+    """Compute Vmax = kcat * [E]0 via the SAME implementation the engine
+    itself uses (Tellurium.core.validation.vmax_from_kcat), rather than a
+    second copy of the arithmetic and its Rule 2 bounds in TypeScript. See
+    ADR 0019.
+
+    Imported lazily as ``core.validation`` with the Tellurium/ directory
+    (not the Tellurium package root) added to sys.path -- this reaches
+    Tellurium/core/validation.py directly as validation.py's own module
+    docstring anticipates (its imports already try
+    ``Tellurium.core.data_structures`` first, falling back to
+    ``core.data_structures``) WITHOUT executing Tellurium/__init__.py's
+    full antimony-dependent import chain, which the public
+    ``tellurium_engine`` entry point requires just to expose one
+    pure-arithmetic function. This keeps every non-kcat lookup (km, ki,
+    mutation_rate) free of an antimony dependency it never needed.
+
+    Returns (vmax, ok, flagged, flag_reason_or_error). ``ok=False`` means
+    the inputs were rejected (non-finite/non-positive); the caller must
+    not treat the returned vmax as usable in that case.
+    """
+    import pathlib
+    import sys
+
+    tellurium_dir = str(pathlib.Path(__file__).resolve().parents[5] / "Tellurium")
+    if tellurium_dir not in sys.path:
+        sys.path.insert(0, tellurium_dir)
+    from core import validation as tellurium_validation  # noqa: PLC0415
+
+    vmax, result = tellurium_validation.vmax_from_kcat(kcat, enzyme_conc)
+    if not result.ok:
+        return 0.0, False, False, "; ".join(result.errors)
+    return vmax, True, result.flagged, result.flag_reason
+
+
+def bridge_beta_gamma_from_r0(
+    r0: float, infectious_period_days: float
+) -> tuple[float, float, bool, bool, str | None]:
+    """Compute (beta, gamma) = R0/infectious-period bridge via the SAME
+    implementation the SIR engine itself uses
+    (Tellurium.core.validation.beta_gamma_from_r0), imported the same
+    lightweight way bridge_vmax_from_kcat() reaches vmax_from_kcat -- as
+    ``core.validation`` with Tellurium/ (not the Tellurium package root) on
+    sys.path, never executing Tellurium/__init__.py's antimony-dependent
+    chain. See ADR 0017 for the resolver, ADR 0020 for this bridge.
+
+    Returns (beta, gamma, ok, flagged, flag_reason_or_error).
+    """
+    import pathlib
+    import sys
+
+    tellurium_dir = str(pathlib.Path(__file__).resolve().parents[5] / "Tellurium")
+    if tellurium_dir not in sys.path:
+        sys.path.insert(0, tellurium_dir)
+    from core import validation as tellurium_validation  # noqa: PLC0415
+
+    beta, gamma, result = tellurium_validation.beta_gamma_from_r0(
+        r0, infectious_period_days
+    )
+    if not result.ok:
+        return 0.0, 0.0, False, False, "; ".join(result.errors)
+    return beta, gamma, True, result.flagged, result.flag_reason
+
+
 def resolve_popgen_parameter(param_type: str, organism: str) -> dict | None:
     """Resolve a population genetics parameter from literature.
     
@@ -225,8 +298,9 @@ def main() -> None:
         ec_number = payload.get("ecNumber", "")
         parameter_type = payload.get("parameterType", "")
         quantity = payload.get("quantity", "km")
-        if quantity not in ("km", "ki"):
+        if quantity not in ("km", "ki", "kcat"):
             quantity = "km"
+        enzyme_conc = payload.get("enzymeConc")
         resolution_log: list[str] = []
 
         # Handle population genetics parameter resolution
@@ -270,6 +344,70 @@ def main() -> None:
                     }
                 )
             )
+            return
+
+        # Handle epidemiology parameter resolution (ADR 0017 / ADR 0020):
+        # a disease name resolves to a hand-curated (R0, infectious period)
+        # golden tuple, then bridges to the SIR engine's own (beta, gamma)
+        # via the exact same beta_gamma_from_r0() the engine uses. Only
+        # diseases in the registry resolve; everything else is an honest
+        # found=False, never a fabricated R0.
+        if parameter_type == "disease_parameters":
+            disease = payload.get("disease", "")
+            epi_result = epidemiology_resolver.resolve_disease_parameters(disease)
+            if not epi_result.found:
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "epidemiology_not_found",
+                            "literatureCandidates": [],
+                            "logs": epi_result.search_log,
+                        }
+                    )
+                )
+                return
+
+            beta, gamma, bg_ok, bg_flagged, bg_reason = bridge_beta_gamma_from_r0(
+                epi_result.r0, epi_result.infectious_period_days
+            )
+            output = {
+                "ok": True,
+                "found": True,
+                "disease": epi_result.disease,
+                "r0": epi_result.r0,
+                "infectiousPeriodDays": epi_result.infectious_period_days,
+                "organism": None,
+                "source": epi_result.source,
+                "crossSpecies": False,
+                "assayConditions": {},
+                "citation": {
+                    "source": epi_result.source,
+                    "referenceId": epi_result.pmid,
+                    "url": f"https://doi.org/{epi_result.doi}" if epi_result.doi else None,
+                    "title": epi_result.citation,
+                },
+                "betaGammaValidation": {
+                    "ok": bg_ok,
+                    "flagged": bg_flagged,
+                    "reason": bg_reason,
+                },
+                "literatureCandidates": [],
+                "logs": epi_result.search_log,
+            }
+            if bg_ok:
+                output["beta"] = beta
+                # "gamma" here, NOT "gamma_rate" -- gamma_rate is only the
+                # Antimony-emitted model-string name (ADR 0004); the
+                # Python/TS API surface takes "gamma".
+                output["gamma"] = gamma
+                output["logs"] = output["logs"] + [
+                    f"Bridged beta={beta:g}, gamma={gamma:g} from R0="
+                    f"{epi_result.r0:g} and infectious_period="
+                    f"{epi_result.infectious_period_days:g} days."
+                ]
+            print(json.dumps(output))
             return
 
         if not ec_number:
@@ -318,33 +456,61 @@ def main() -> None:
             # Emit the value under the key matching the requested quantity
             # so the TypeScript side reads km from "km" and ki from "ki" --
             # never the other way around.
-            value_key = "ki" if quantity == "ki" else "km"
-            print(
-                json.dumps(
-                    {
-                        "ok": True,
-                        "found": True,
-                        value_key: result.value,
-                        "unit": result.unit,
-                        "organism": result.organism,
-                        "source": result.source,
-                        "crossSpecies": result.cross_species_flag,
-                        # STRENDA-mandated assay conditions (ADR 0010). Keys are
-                        # omitted-as-null rather than defaulted: the TypeScript
-                        # side treats absence as "incomplete", which is the
-                        # honest reading when the source never reported them.
-                        "assayConditions": {
-                            "ph": result.assay_ph,
-                            "temperatureC": result.assay_temperature_c,
-                            "buffer": result.assay_buffer,
-                            "unreported": result.assay_unreported,
-                        },
-                        "citation": _citation_to_dict(result.citation),
-                        "literatureCandidates": _candidates_to_dict(result.literature_candidates),
-                        "logs": result.search_log,
+            value_key = {"ki": "ki", "kcat": "kcat"}.get(quantity, "km")
+            output = {
+                "ok": True,
+                "found": True,
+                value_key: result.value,
+                "unit": result.unit,
+                "organism": result.organism,
+                "source": result.source,
+                "crossSpecies": result.cross_species_flag,
+                # STRENDA-mandated assay conditions (ADR 0010). Keys are
+                # omitted-as-null rather than defaulted: the TypeScript
+                # side treats absence as "incomplete", which is the
+                # honest reading when the source never reported them.
+                "assayConditions": {
+                    "ph": result.assay_ph,
+                    "temperatureC": result.assay_temperature_c,
+                    "buffer": result.assay_buffer,
+                    "unreported": result.assay_unreported,
+                },
+                "citation": _citation_to_dict(result.citation),
+                "literatureCandidates": _candidates_to_dict(result.literature_candidates),
+                "logs": result.search_log,
+            }
+
+            # ADR 0019: a resolved kcat plus a caller-supplied enzyme
+            # concentration bridges to a simulable Vmax. enzyme_conc is
+            # NEVER resolved or defaulted here (ADR 0013) -- it only
+            # reaches this branch if queryResolver.ts found it as an
+            # explicit user override on the query.
+            if quantity == "kcat" and enzyme_conc is not None:
+                try:
+                    enzyme_conc_f = float(enzyme_conc)
+                except (TypeError, ValueError):
+                    output["vmaxValidation"] = {
+                        "ok": False,
+                        "flagged": False,
+                        "reason": f"enzyme_conc {enzyme_conc!r} is not a number",
                     }
-                )
-            )
+                else:
+                    vmax, ok, flagged, reason = bridge_vmax_from_kcat(
+                        result.value, enzyme_conc_f
+                    )
+                    output["vmaxValidation"] = {
+                        "ok": ok,
+                        "flagged": flagged,
+                        "reason": reason,
+                    }
+                    if ok:
+                        output["vmax"] = vmax
+                        output["logs"] = output["logs"] + [
+                            f"Bridged Vmax={vmax:g} mM/s from kcat={result.value:g} "
+                            f"1/s x enzyme_conc={enzyme_conc_f:g} mM."
+                        ]
+
+            print(json.dumps(output))
         else:
             print(
                 json.dumps(

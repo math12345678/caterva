@@ -33,6 +33,39 @@ export interface ScienceAgentResult {
   found: boolean;
   km?: number;
   ki?: number;
+  /** Turnover number (s^-1), quantity="kcat". A resolved kcat is NOT a
+   * simulation-ready parameter on its own -- Vmax = kcat * [E]0 needs a
+   * caller-supplied enzyme concentration Terrium never defaults or infers
+   * (ADR 0012 / 0013). See ADR 0019 for how a resolved kcat combines with
+   * a user-supplied enzyme_conc override into a Vmax provenance entry. */
+  kcat?: number;
+  /** Only present when quantity="kcat" and enzymeConc was supplied: the
+   * bridged Vmax = kcat * enzymeConc, computed in Python by the same
+   * Tellurium.core.validation.vmax_from_kcat() the engine itself uses --
+   * one implementation of the arithmetic and its Rule 2 bounds, not a
+   * second copy in TypeScript. See ADR 0019. */
+  vmax?: number;
+  vmaxValidation?: {
+    ok: boolean;
+    flagged: boolean;
+    reason?: string;
+  };
+  /** ADR 0017 / ADR 0020: a resolved disease's canonical name, basic
+   * reproduction number, and infectious period (from
+   * Tests/epidemiology_resolver.py's hand-verified registry), plus the
+   * bridged (beta, gamma) the SIR engine takes directly, computed by the
+   * same Tellurium.core.validation.beta_gamma_from_r0() the engine uses.
+   * Only present when parameterType="disease_parameters" was requested. */
+  disease?: string;
+  r0?: number;
+  infectiousPeriodDays?: number;
+  beta?: number;
+  gamma?: number;
+  betaGammaValidation?: {
+    ok: boolean;
+    flagged: boolean;
+    reason?: string;
+  };
   unit?: string;
   organism?: string;
   source?: string;
@@ -72,7 +105,12 @@ export interface EntityExtraction {
    * "ki" (BRENDA Ki Values table). Each call resolves exactly one quantity
    * and the runner emits the value under the matching key, so a cross-
    * species Ki never borrows a verified Km's provenance. */
-  quantity?: "km" | "ki";
+  quantity?: "km" | "ki" | "kcat";
+  /** Caller-supplied enzyme concentration (mM), only meaningful with
+   * quantity="kcat". Never resolved or defaulted -- ADR 0013 -- so this is
+   * always a value that traced back to a user override in queryResolver.ts,
+   * never something this layer invents. */
+  enzymeConc?: number;
 }
 
 interface PythonError {
@@ -140,17 +178,16 @@ async function ensureRunnerScript(): Promise<void> {
  * bridge entirely, returning `found: false`, when there is truly nothing to
  * search for (no EC number AND no enzyme name).
  */
-export async function resolveKineticValue(
-  entities: EntityExtraction,
+/**
+ * Spawn the Python science-agent runner with an arbitrary JSON payload and
+ * parse its stdout. Shared by resolveKineticValue() (enzyme kinetics) and
+ * resolveEpidemiologyParameters() (ADR 0017 / ADR 0020) so there is exactly
+ * one place that owns the spawn/PYTHONPATH/stdout-parsing contract, rather
+ * than two copies that could drift.
+ */
+async function spawnScienceAgent(
+  payload: Record<string, unknown>,
 ): Promise<ScienceAgentResult> {
-  if (!entities.ecNumber && !entities.enzymeName) {
-    return {
-      found: false,
-      literatureCandidates: [],
-      logs: ["No enzyme name or EC number provided; skipping real parameter lookup."],
-    };
-  }
-
   await ensureRunnerScript();
   const pythonExecutable = resolvePythonExecutable(REPO_ROOT);
 
@@ -201,16 +238,49 @@ export async function resolveKineticValue(
       }
     });
 
-    proc.stdin.write(
-      JSON.stringify({
-        enzymeName: entities.enzymeName ?? "",
-        substrate: entities.substrate ?? "",
-        organism: entities.organism,
-        ecNumber: entities.ecNumber,
-        parameterType: entities.parameterType ?? "",
-        quantity: entities.quantity ?? "km",
-      }),
-    );
+    proc.stdin.write(JSON.stringify(payload));
     proc.stdin.end();
   });
 }
+
+/**
+ * Resolve a disease's (R0, infectious period) golden tuple and bridge it to
+ * the SIR engine's own (beta, gamma) — see Tests/epidemiology_resolver.py
+ * and Tellurium.core.validation.beta_gamma_from_r0. Returns found=false for
+ * any disease outside the hand-verified registry; never fabricates a value.
+ */
+export async function resolveEpidemiologyParameters(
+  disease: string,
+): Promise<ScienceAgentResult> {
+  if (!disease) {
+    return {
+      found: false,
+      literatureCandidates: [],
+      logs: ["No disease name provided; skipping real parameter lookup."],
+    };
+  }
+  return spawnScienceAgent({ parameterType: "disease_parameters", disease });
+}
+
+export async function resolveKineticValue(
+  entities: EntityExtraction,
+): Promise<ScienceAgentResult> {
+  if (!entities.ecNumber && !entities.enzymeName) {
+    return {
+      found: false,
+      literatureCandidates: [],
+      logs: ["No enzyme name or EC number provided; skipping real parameter lookup."],
+    };
+  }
+
+  return spawnScienceAgent({
+    enzymeName: entities.enzymeName ?? "",
+    substrate: entities.substrate ?? "",
+    organism: entities.organism,
+    ecNumber: entities.ecNumber,
+    parameterType: entities.parameterType ?? "",
+    quantity: entities.quantity ?? "km",
+    enzymeConc: entities.enzymeConc,
+  });
+}
+

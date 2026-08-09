@@ -48,6 +48,7 @@ export const SimulationResponseDomain = {
   gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
   gillespie_ssa_replicates: 'gillespie_ssa_replicates',
   sbml: 'sbml',
+  mm_competitive_inhibition: 'mm_competitive_inhibition',
 } as const;
 
 export interface Provenance {
@@ -72,6 +73,60 @@ export const ParameterProvenanceOrigin = {
   default: 'default',
 } as const;
 
+/**
+ * Whether the resolved citation is an exact organism/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).
+ */
+export type ParameterProvenanceCitationStatus = typeof ParameterProvenanceCitationStatus[keyof typeof ParameterProvenanceCitationStatus];
+
+
+export const ParameterProvenanceCitationStatus = {
+  verified: 'verified',
+  flagged: 'flagged',
+} as const;
+
+export interface AssayConditions {
+  /** Assay pH (STRENDA-mandatory when reported) */
+  ph?: number;
+  /** Assay temperature in degrees Celsius (STRENDA-mandatory) */
+  temperatureC?: number;
+  /** Buffer system, when reported */
+  buffer?: string;
+}
+
+/**
+ * Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).
+ */
+export type ParameterProvenanceStrendaStatus = typeof ParameterProvenanceStrendaStatus[keyof typeof ParameterProvenanceStrendaStatus];
+
+
+export const ParameterProvenanceStrendaStatus = {
+  complete: 'complete',
+  incomplete: 'incomplete',
+} as const;
+
+/**
+ * What kind of locator this is
+ */
+export type CitationLocatorKind = typeof CitationLocatorKind[keyof typeof CitationLocatorKind];
+
+
+export const CitationLocatorKind = {
+  brenda_ref: 'brenda_ref',
+  brenda_ec: 'brenda_ec',
+  pubmed: 'pubmed',
+  doi: 'doi',
+  url: 'url',
+} as const;
+
+export interface CitationLocator {
+  /** What kind of locator this is */
+  kind: CitationLocatorKind;
+  /** The locator's value (BRENDA ref id, EC number, PMID, DOI, or URL) */
+  value: string;
+  /** Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07). */
+  deepLink?: string;
+}
+
 export interface ParameterProvenance {
   /** How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation. */
   origin: ParameterProvenanceOrigin;
@@ -81,6 +136,13 @@ export interface ParameterProvenance {
   citation?: string;
   /** Organism for this value; present only when origin is resolved */
   organism?: string;
+  /** Whether the resolved citation is an exact organism/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3). */
+  citationStatus?: ParameterProvenanceCitationStatus;
+  assayConditions?: AssayConditions;
+  /** Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010). */
+  strendaStatus?: ParameterProvenanceStrendaStatus;
+  /** Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved. */
+  citationLocators?: CitationLocator[];
   /** Why a lookup was attempted and failed, if so */
   note?: string;
 }

@@ -72,6 +72,26 @@ const VALID_LLM_RESPONSE = {
   ],
 };
 
+// Every domain the resolver prompt offers. `sbml` is intentionally excluded
+// (it is the internal raw-SBML escape hatch, not a natural-language domain).
+// This list must match the LLM allowlist inside resolveQueryWithLLM exactly;
+// the test below fails if a resolvable domain is rejected there.
+const RESOLVABLE_DOMAINS = [
+  "mm",
+  "mm_competitive_inhibition",
+  "sir",
+  "seir",
+  "pcr",
+  "monte_carlo_pi",
+  "wright_fisher",
+  "two_locus_wright_fisher",
+  "molecular_dynamics",
+  "gillespie_ssa",
+  "gillespie_ssa_bimolecular",
+  "gillespie_ssa_replicates",
+] as const;
+
+
 describe("LLM_PROVIDER selection reaches the actual HTTP request", () => {
   it("with no provider or key configured, returns null without calling fetch", async () => {
     const fetchSpy = vi.spyOn(global, "fetch");
@@ -210,5 +230,39 @@ describe("LLM_PROVIDER selection reaches the actual HTTP request", () => {
     expect((init!.headers as Record<string, string>).Authorization).toBe(
       "Bearer fake-openai-key",
     );
+  });
+});
+
+describe("the LLM resolver accepts every resolvable domain it advertises", () => {
+  it("returns a non-null result for each RESOLVABLE_DOMAINS entry, including mm_competitive_inhibition", async () => {
+    // The allowlist inside resolveQueryWithLLM and the prompt listing a
+    // domain must never drift apart: a domain advertised in the prompt but
+    // missing from the allowlist would be silently rejected (null) every
+    // time the model names it. This pins that list to the full resolvable
+    // set. Regression for the mm_competitive_inhibition allowlist gap.
+    process.env.OPENAI_API_KEY = "fake-openai-key";
+    for (const domain of RESOLVABLE_DOMAINS) {
+      vi.spyOn(global, "fetch").mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  domain,
+                  parameters: {},
+                  reasoning: "test",
+                  modelCitations: [],
+                }),
+              },
+            },
+          ],
+        }),
+      } as Response);
+
+      const result = await resolveQueryWithLLM("simulate something");
+      expect(result, `domain "${domain}" must not be rejected`).not.toBeNull();
+      expect(result!.domain).toBe(domain);
+    }
   });
 });

@@ -37,7 +37,7 @@ const SYSTEM_PROMPT = `You are the "science agent" resolver for a computational 
 Given a natural-language query, return a single JSON object (no markdown, no prose) with this exact shape:
 
 {
-  "domain": "mm" | "sir" | "seir" | "pcr" | "monte_carlo_pi" | "wright_fisher" | "two_locus_wright_fisher" | "molecular_dynamics" | "gillespie_ssa" | "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates",
+  "domain": "mm" | "mm_competitive_inhibition" | "sir" | "seir" | "pcr" | "monte_carlo_pi" | "wright_fisher" | "two_locus_wright_fisher" | "molecular_dynamics" | "gillespie_ssa" | "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates",
   "parameters": { ...numeric parameters the query explicitly states; omit anything else ... },
   "reasoning": "short explanation of how you mapped the query",
   "modelCitations": ["optional literature reference"],
@@ -50,7 +50,8 @@ Given a natural-language query, return a single JSON object (no markdown, no pro
 }
 
 Domain meanings:
-- "mm": Michaelis-Menten enzyme kinetics.
+- "mm": Michaelis-Menten enzyme kinetics (no inhibitor).
+- "mm_competitive_inhibition": Michaelis-Menten with competitive inhibitor (requires ki parameter).
 - "sir": SIR epidemiology.
 - "seir": SEIR epidemiology.
 - "pcr": discrete PCR amplification.
@@ -260,6 +261,7 @@ export async function resolveQueryWithLLM(
       !parsed.domain ||
       ![
         "mm",
+        "mm_competitive_inhibition",
         "sir",
         "seir",
         "pcr",

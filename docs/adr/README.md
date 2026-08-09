@@ -40,3 +40,6 @@ Each ADR has:
 | [0015](0015-constitution-rules-must-be-executable.md) | A constitution rule that nothing executes is not enforced |
 | [0016](0016-cached-results-lose-parameter-provenance.md) | Cached results serve no per-parameter provenance |
 | [0017](0017-epidemiology-parameter-resolution.md) | Epidemiology parameters (R0, infectious period) are resolved from a hand-curated registry, not yet wired to RESOLVABLE_FIELDS |
+| [0018](0018-ki-inhibition-constant-resolution.md) | Ki (inhibition constant) resolved via per-quantity BRENDA table lookup, wired end-to-end into RESOLVABLE_FIELDS |
+| [0019](0019-kcat-resolution-exposed-not-yet-wired-to-vmax.md) | kcat is now literature-resolvable via BRENDA's Turnover Numbers table, and bridges to a simulable Vmax when the caller supplies enzyme_conc |
+| [0020](0020-epidemiology-parameters-wired-to-resolvable-fields.md) | Epidemiology (R0, infectious period) is wired end-to-end into the SIR domain via a beta/gamma bridge |

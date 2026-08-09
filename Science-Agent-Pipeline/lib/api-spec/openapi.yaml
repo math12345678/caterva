@@ -295,11 +295,68 @@ components:
         organism:
           type: string
           description: Organism for this value; present only when origin is resolved
+        citationStatus:
+          type: string
+          enum: [verified, flagged]
+          description: >-
+            Whether the resolved citation is an exact organism/substrate match
+            (verified) or a cross-species fallback (flagged). Present only
+            when origin is resolved (Stage 5 Part 3).
+        assayConditions:
+          $ref: "#/components/schemas/AssayConditions"
+        strendaStatus:
+          type: string
+          enum: [complete, incomplete]
+          description: >-
+            Whether the assay conditions meet STRENDA's minimum reporting
+            requirement (pH + temperature). Present only for resolved kinetic
+            constants (ADR 0010).
+        citationLocators:
+          type: array
+          description: >-
+            Machine-checkable locators for the citation (citeVerify.ts):
+            `(kind, value, deepLink)` triples so a human or tool can re-find
+            the exact source of this number. Present only when origin is
+            resolved.
+          items:
+            $ref: "#/components/schemas/CitationLocator"
         note:
           type: string
           description: Why a lookup was attempted and failed, if so
       required:
         - origin
+    CitationLocator:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum: [brenda_ref, brenda_ec, pubmed, doi, url]
+          description: What kind of locator this is
+        value:
+          type: string
+          description: The locator's value (BRENDA ref id, EC number, PMID, DOI, or URL)
+        deepLink:
+          type: string
+          description: >-
+            Canonical URL that re-finds this locator, when one exists. Absent
+            for brenda_ref because BRENDA has no working per-reference deep
+            link (live-checked 2026-07).
+      required:
+        - kind
+        - value
+    AssayConditions:
+      type: object
+      properties:
+        ph:
+          type: number
+          description: Assay pH (STRENDA-mandatory when reported)
+        temperatureC:
+          type: number
+          description: Assay temperature in degrees Celsius (STRENDA-mandatory)
+        buffer:
+          type: string
+          description: Buffer system, when reported
+      required: []
     ErrorResponse:
       type: object
       properties:

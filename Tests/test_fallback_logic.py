@@ -73,6 +73,11 @@ def ache_provider():
     return make_html_provider({"3.1.1.7": load_fixture("brenda_ache_fixture.html")})
 
 
+@pytest.fixture
+def ache_kcat_provider():
+    return make_html_provider({"3.1.1.7": load_fixture("brenda_ache_kcat_fixture.html")})
+
+
 # ---------------------------------------------------------------------------
 # Tier 1: exact match
 # ---------------------------------------------------------------------------
@@ -505,6 +510,73 @@ def test_ki_exact_row_does_not_borrow_km_provenance(ldh_ki_provider, ldh_provide
     assert km.citation.reference_id == "740253"
     assert ki.citation.reference_id == "711801"
     assert km.citation.reference_id != ki.citation.reference_id
+
+
+# ---------------------------------------------------------------------------
+# kcat (turnover number) resolution -- quantity="kcat" reads BRENDA's
+# "Turnover Numbers" table through the same exact -> cross-species chain.
+# Golden row: acetylcholinesterase (EC 3.1.1.7) + acetyl thiocholine (its
+# standard synthetic assay substrate) + Homo sapiens, live-captured in
+# fixtures/brenda_ache_kcat_fixture.html, kcat = 6500 s^-1, ref 649716,
+# pH 8, 27C. A resolved kcat is real and citable but is NOT wired to
+# RESOLVABLE_FIELDS / the simulation engine -- see ADR 0012 / 0013 / 0019.
+# ---------------------------------------------------------------------------
+
+def test_resolves_exact_human_kcat_for_ache(ache_kcat_provider):
+    result = resolve_kinetic_value(
+        "3.1.1.7", "Homo sapiens", "acetyl thiocholine",
+        html_provider=ache_kcat_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="kcat",
+    )
+    assert result.found is True
+    assert result.source == "brenda_exact"
+    assert result.value == 6500
+    assert result.organism == "Homo sapiens"
+    assert result.cross_species_flag is False
+    assert result.citation is not None
+    assert result.citation.source == "BRENDA"
+    assert result.citation.reference_id == "649716"
+
+
+def test_kcat_never_fabricates_when_table_has_no_match(ache_kcat_provider):
+    """BRENDA's Turnover Numbers table for AChE has no rows for a
+    substrate it does not act on. Must say not-found, never invent a kcat
+    from Km data or a plausible-looking number."""
+    result = resolve_kinetic_value(
+        "3.1.1.7", "Homo sapiens", "a-substrate-not-in-any-fixture-row",
+        html_provider=ache_kcat_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="kcat",
+    )
+    assert result.found is False
+    assert result.source == "not_found"
+    assert result.value is None
+
+
+def test_kcat_resolves_independently_of_km_and_ki(ache_kcat_provider, ache_provider):
+    """The same independent-resolution contract Ki has: a resolved kcat
+    carries its own citation, never Km's (or Ki's)."""
+    kcat = resolve_kinetic_value(
+        "3.1.1.7", "Homo sapiens", "acetyl thiocholine",
+        html_provider=ache_kcat_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="kcat",
+    )
+    km_from_kcat_fixture = resolve_kinetic_value(
+        "3.1.1.7", "Homo sapiens", "acetyl thiocholine",
+        html_provider=ache_kcat_provider, uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="km",
+    )
+    assert kcat.found is True
+    # The kcat fixture has no KM Values container, so a km lookup on it
+    # must not silently return the turnover-number rows as if they were Km.
+    assert km_from_kcat_fixture.found is False
 
 
 # ---------------------------------------------------------------------------

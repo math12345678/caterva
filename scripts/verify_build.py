@@ -6,12 +6,13 @@ Comprehensive build verification that runs all static analysis guards
 and test suites to ensure the codebase is in a deployable state.
 
 Usage:
-    python scripts/verify_build.py [--quick] [--no-python] [--no-typescript]
+    python scripts/verify_build.py [--quick] [--no-python] [--no-typescript] [--live]
 
 Options:
     --quick      Run only the fast guards (skip long-running tests)
     --no-python  Skip Python tests
     --no-typescript Skip TypeScript tests
+    --live       Also run network-dependent guards (live citation checks).
 
 Exit codes:
     0: All checks passed
@@ -189,6 +190,23 @@ def run_typescript_tests() -> List[Tuple[str, bool, str]]:
     return tests
 
 
+def run_live_citation_guard() -> List[Tuple[str, bool, str]]:
+    """Run the live citation-verification guard (network required).
+
+    verify_citations_live.py re-fetches every golden-set BRENDA page, PMID,
+    and DOI the resolvers cite, plus every static modelCitations URL. It is
+    a report, not a gate -- literature pages get restructured -- so it is
+    opt-in via --live rather than part of the always-run guard set.
+    """
+    return [
+        run_guard(
+            "Live Citation Verification",
+            f"python {SCRIPTS_DIR / 'verify_citations_live.py'}",
+            timeout=180,
+        )
+    ]
+
+
 def run_rng_guard() -> List[Tuple[str, bool, str]]:
     """Run RNG convention guard."""
     guards = []
@@ -244,6 +262,11 @@ def main() -> int:
         action="store_true",
         help="Skip TypeScript tests"
     )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Also run network-dependent guards (live citation checks)"
+    )
     
     args = parser.parse_args()
     
@@ -265,6 +288,12 @@ def main() -> int:
     rng_results = run_rng_guard()
     if rng_results:
         total_failures += print_results("RNG Guard", rng_results)
+
+    # Live citation guard (network; opt-in so offline builds stay green)
+    if args.live:
+        print("\n🛡️  LIVE LITERATURE GUARD")
+        live_results = run_live_citation_guard()
+        total_failures += print_results("Live Citation Guard", live_results)
     
     # Run tests if not quick mode or explicitly requested
     if not args.quick:

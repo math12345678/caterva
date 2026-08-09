@@ -5,7 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { AssayConditions } from './assayConditions';
+import type { CitationLocator } from './citationLocator';
+import type { ParameterProvenanceCitationStatus } from './parameterProvenanceCitationStatus';
 import type { ParameterProvenanceOrigin } from './parameterProvenanceOrigin';
+import type { ParameterProvenanceStrendaStatus } from './parameterProvenanceStrendaStatus';
 
 export interface ParameterProvenance {
   /** How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation. */
@@ -16,6 +20,13 @@ export interface ParameterProvenance {
   citation?: string;
   /** Organism for this value; present only when origin is resolved */
   organism?: string;
+  /** Whether the resolved citation is an exact organism/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3). */
+  citationStatus?: ParameterProvenanceCitationStatus;
+  assayConditions?: AssayConditions;
+  /** Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010). */
+  strendaStatus?: ParameterProvenanceStrendaStatus;
+  /** Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved. */
+  citationLocators?: CitationLocator[];
   /** Why a lookup was attempted and failed, if so */
   note?: string;
 }

@@ -398,6 +398,90 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
   });
 });
 
+describe("citation locator invariants (citeVerify)", () => {
+  const parameters = { km: 2, vmax: 5, s0: 10 };
+  const COMPLETE_CONDITIONS = { ph: 7.4, temperatureC: 25 };
+
+  const base: Record<string, ParameterProvenance> = {
+    km: {
+      origin: "resolved",
+      citation:
+        "BRENDA (ref 740253) — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+      citationStatus: "verified",
+      assayConditions: COMPLETE_CONDITIONS,
+      strendaStatus: "complete",
+      citationLocators: [
+        { kind: "brenda_ref", value: "740253" },
+        {
+          kind: "brenda_ec",
+          value: "1.1.1.27",
+          deepLink: "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+        },
+      ],
+    },
+    vmax: { origin: "default" },
+    s0: { origin: "default" },
+  };
+
+  it("accepts locators consistent with the citation", () => {
+    expect(validateParameterProvenance(parameters, base)).toEqual([]);
+  });
+
+  it("rejects locators on a non-resolved entry", () => {
+    expect(
+      validateParameterProvenance(parameters, {
+        ...base,
+        vmax: {
+          origin: "default",
+          citationLocators: [{ kind: "brenda_ref", value: "740253" }],
+        },
+      }),
+    ).toEqual(["vmax carries citation locators but origin is 'default'"]);
+  });
+
+  it("rejects an empty locator list on a resolved entry", () => {
+    expect(
+      validateParameterProvenance(parameters, {
+        ...base,
+        km: { ...base.km, citationLocators: [] },
+      }),
+    ).toContain("km carries an empty citation locator list");
+  });
+
+  it("rejects locators that do not match the citation string", () => {
+    expect(
+      validateParameterProvenance(parameters, {
+        ...base,
+        km: {
+          ...base.km,
+          citation: "BRENDA (ref 740253)",
+          citationLocators: [
+            { kind: "brenda_ref", value: "740253" },
+            { kind: "brenda_ref", value: "999999" },
+          ],
+        },
+      }),
+    ).toContain(
+      "km has citation locators that do not match its citation string",
+    );
+  });
+
+  it("rejects a malformed locator (non-http deep link)", () => {
+    expect(
+      validateParameterProvenance(parameters, {
+        ...base,
+        km: {
+          ...base.km,
+          citationLocators: [
+            { kind: "brenda_ref", value: "740253" },
+            { kind: "brenda_ec", value: "1.1.1.27", deepLink: "ftp://x" },
+          ],
+        },
+      }),
+    ).toContain("km carries a malformed citation locator");
+  });
+});
+
 describe("Target F — the resolved path degrades honestly when the citation has no locator", () => {
   it("a found Km with no ref id and no URL is blocked by the hard rule", async () => {
     vi.mocked(resolveKineticValue).mockResolvedValueOnce({
@@ -441,6 +525,15 @@ describe("Target G — the golden set flows through the API (Stage 5 Part 2)", (
     expect(km.organism).toBe("Homo sapiens");
     expect(km.citation).toContain("(ref 740253)");
     expect(km.citation).toContain("https://www.brenda-enzymes.org/");
+    expect(km.citationLocators).toContainEqual({
+      kind: "brenda_ref",
+      value: "740253",
+    });
+    expect(km.citationLocators).toContainEqual({
+      kind: "brenda_ec",
+      value: "1.1.1.27",
+      deepLink: "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+    });
     const flag = resolved.provenance.flags.find((f) => /resolved km/i.test(f));
     expect(flag).toMatch(/10\.73/);
   });

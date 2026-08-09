@@ -66,6 +66,15 @@ describe("Ki resolution — per-key lookup", () => {
     expect(ki.organism).toBe("Homo sapiens");
     expect(ki.citation).toContain("(ref 760123)");
     expect(ki.citationStatus).toBe("verified");
+    expect(ki.citationLocators).toContainEqual({
+      kind: "brenda_ref",
+      value: "760123",
+    });
+    expect(ki.citationLocators).toContainEqual({
+      kind: "brenda_ec",
+      value: "1.1.1.27",
+      deepLink: "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+    });
     const flag = resolved.provenance.flags.find((f) => /resolved ki/i.test(f));
     expect(flag).toMatch(/1\.2/);
   });

@@ -6,6 +6,12 @@
  * built to be directly actionable -- copy-pasteable key=value syntax for
  * exactly what's missing, not just a list of names.
  */
+import {
+  citationConsistentWithLocators,
+  isValidLocator,
+  type CitationLocator,
+} from "./citeVerify";
+
 export class RequiredParametersMissingError extends Error {
   readonly domain: string;
   readonly missing: string[];
@@ -173,6 +179,13 @@ export interface ParameterProvenance {
    * conditions meet the standard's minimum.
    */
   strendaStatus?: StrendaStatus;
+  /**
+   * Only when `origin === "resolved"`. Machine-checkable locators for the
+   * citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human
+   * or a tool can re-find the exact source of this number. Kept in lockstep
+   * with the display `citation` string by validateParameterProvenance.
+   */
+  citationLocators?: CitationLocator[];
   /** Why a lookup was attempted and failed, if so. */
   note?: string;
 }
@@ -297,6 +310,37 @@ export function validateParameterProvenance(
       );
     }
 
+    // --- Citation locators travel with the citation ----------------------
+    //
+    // A `resolved` entry's machine-checkable locators (citeVerify.ts) must
+    // agree with the display citation string and be well-formed. Non-resolved
+    // entries must not carry locators at all -- locators would be another
+    // locator-shaped claim that locates nothing, the exact failure Stage 5
+    // Part 1 removed.
+    if (prov.origin !== "resolved" && prov.citationLocators !== undefined) {
+      violations.push(
+        `${key} carries citation locators but origin is '${prov.origin}'`,
+      );
+    }
+    if (prov.origin === "resolved" && prov.citationLocators !== undefined) {
+      if (prov.citationLocators.length === 0) {
+        violations.push(`${key} carries an empty citation locator list`);
+      }
+      for (const locator of prov.citationLocators) {
+        if (!isValidLocator(locator)) {
+          violations.push(`${key} carries a malformed citation locator`);
+        }
+      }
+      if (
+        prov.citation &&
+        !citationConsistentWithLocators(prov.citation, prov.citationLocators)
+      ) {
+        violations.push(
+          `${key} has citation locators that do not match its citation string`,
+        );
+      }
+    }
+
     // --- LLM-supplied values must say so --------------------------------
     //
     // An `llm` value has no citation by construction (the rule above already
@@ -378,6 +422,7 @@ export function buildResolvedKineticProvenance(args: {
   organism?: string;
   citationStatus: CitationStatus;
   assayConditions?: AssayConditions;
+  citationLocators?: CitationLocator[];
   note?: string;
 }): ParameterProvenance {
   const strendaStatus = strendaStatusFor(args.assayConditions);
@@ -406,6 +451,9 @@ export function buildResolvedKineticProvenance(args: {
     citationStatus,
     ...(args.assayConditions !== undefined
       ? { assayConditions: args.assayConditions }
+      : {}),
+    ...(args.citationLocators !== undefined && args.citationLocators.length > 0
+      ? { citationLocators: args.citationLocators }
       : {}),
     strendaStatus,
     ...(notes.length > 0 ? { note: notes.join(" ") } : {}),

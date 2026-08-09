@@ -25,4 +25,5 @@ export const SimulationResponseDomain = {
   gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
   gillespie_ssa_replicates: 'gillespie_ssa_replicates',
   sbml: 'sbml',
+  mm_competitive_inhibition: 'mm_competitive_inhibition',
 } as const;

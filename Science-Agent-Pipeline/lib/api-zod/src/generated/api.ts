@@ -35,7 +35,7 @@ export const ListSimulationJobsResponseItem = zod.object({
   "progress": zod.number().min(listSimulationJobsResponseProgressMin).max(listSimulationJobsResponseProgressMax).describe('Completion percentage based on pipeline stage'),
   "result": zod.object({
   "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml']).describe('Resolved simulation domain'),
+  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml', 'mm_competitive_inhibition']).describe('Resolved simulation domain'),
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
@@ -48,6 +48,18 @@ export const ListSimulationJobsResponseItem = zod.object({
   "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
   "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
   "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
+  "citationStatus": zod.enum(['verified', 'flagged']).optional().describe('Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).'),
+  "assayConditions": zod.object({
+  "ph": zod.number().optional().describe('Assay pH (STRENDA-mandatory when reported)'),
+  "temperatureC": zod.number().optional().describe('Assay temperature in degrees Celsius (STRENDA-mandatory)'),
+  "buffer": zod.string().optional().describe('Buffer system, when reported')
+}).optional(),
+  "strendaStatus": zod.enum(['complete', 'incomplete']).optional().describe('Whether the assay conditions meet STRENDA\'s minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).'),
+  "citationLocators": zod.array(zod.object({
+  "kind": zod.enum(['brenda_ref', 'brenda_ec', 'pubmed', 'doi', 'url']).describe('What kind of locator this is'),
+  "value": zod.string().describe('The locator\'s value (BRENDA ref id, EC number, PMID, DOI, or URL)'),
+  "deepLink": zod.string().optional().describe('Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).')
+})).optional().describe('Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.'),
   "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
 })).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
   "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
@@ -84,7 +96,7 @@ export const RunSimulationResponse = zod.object({
   "progress": zod.number().min(runSimulationResponseProgressMin).max(runSimulationResponseProgressMax).describe('Completion percentage based on pipeline stage'),
   "result": zod.object({
   "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml']).describe('Resolved simulation domain'),
+  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml', 'mm_competitive_inhibition']).describe('Resolved simulation domain'),
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
@@ -97,6 +109,18 @@ export const RunSimulationResponse = zod.object({
   "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
   "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
   "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
+  "citationStatus": zod.enum(['verified', 'flagged']).optional().describe('Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).'),
+  "assayConditions": zod.object({
+  "ph": zod.number().optional().describe('Assay pH (STRENDA-mandatory when reported)'),
+  "temperatureC": zod.number().optional().describe('Assay temperature in degrees Celsius (STRENDA-mandatory)'),
+  "buffer": zod.string().optional().describe('Buffer system, when reported')
+}).optional(),
+  "strendaStatus": zod.enum(['complete', 'incomplete']).optional().describe('Whether the assay conditions meet STRENDA\'s minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).'),
+  "citationLocators": zod.array(zod.object({
+  "kind": zod.enum(['brenda_ref', 'brenda_ec', 'pubmed', 'doi', 'url']).describe('What kind of locator this is'),
+  "value": zod.string().describe('The locator\'s value (BRENDA ref id, EC number, PMID, DOI, or URL)'),
+  "deepLink": zod.string().optional().describe('Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).')
+})).optional().describe('Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.'),
   "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
 })).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
   "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
@@ -131,7 +155,7 @@ export const GetSimulationJobResponse = zod.object({
   "progress": zod.number().min(getSimulationJobResponseProgressMin).max(getSimulationJobResponseProgressMax).describe('Completion percentage based on pipeline stage'),
   "result": zod.object({
   "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml']).describe('Resolved simulation domain'),
+  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml', 'mm_competitive_inhibition']).describe('Resolved simulation domain'),
   "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
   "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
   "provenance": zod.object({
@@ -144,6 +168,18 @@ export const GetSimulationJobResponse = zod.object({
   "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
   "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
   "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
+  "citationStatus": zod.enum(['verified', 'flagged']).optional().describe('Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).'),
+  "assayConditions": zod.object({
+  "ph": zod.number().optional().describe('Assay pH (STRENDA-mandatory when reported)'),
+  "temperatureC": zod.number().optional().describe('Assay temperature in degrees Celsius (STRENDA-mandatory)'),
+  "buffer": zod.string().optional().describe('Buffer system, when reported')
+}).optional(),
+  "strendaStatus": zod.enum(['complete', 'incomplete']).optional().describe('Whether the assay conditions meet STRENDA\'s minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).'),
+  "citationLocators": zod.array(zod.object({
+  "kind": zod.enum(['brenda_ref', 'brenda_ec', 'pubmed', 'doi', 'url']).describe('What kind of locator this is'),
+  "value": zod.string().describe('The locator\'s value (BRENDA ref id, EC number, PMID, DOI, or URL)'),
+  "deepLink": zod.string().optional().describe('Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).')
+})).optional().describe('Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.'),
   "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
 })).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
   "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
