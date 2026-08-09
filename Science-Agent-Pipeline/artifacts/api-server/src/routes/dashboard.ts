@@ -152,12 +152,11 @@ router.get(
               "GET /api/dashboard/health - Health check",
             ],
           },
-          testCoverage: {
-            totalTests: 388,
-            passingTests: 388,
-            passPercentage: 100,
-            testFiles: 27,
-          },
+          // No testCoverage block: a test count baked into a runtime API
+          // response goes stale the moment a test is added or removed
+          // (it already had -- 395/27 here vs. the actual 399/28 at time
+          // of writing). Run `npx vitest run` or `make test` for the real,
+          // current number instead of trusting one frozen into a response.
         },
       });
     } catch (err) {
