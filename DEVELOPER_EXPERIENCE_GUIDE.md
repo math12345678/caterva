@@ -248,9 +248,14 @@ describe('helperName', () => {
 
 ### Before Submitting a PR
 
-- [ ] No TypeScript errors: `npm run type-check`
-- [ ] Tests pass: `npm test`
-- [ ] Linting passes: `npm run lint`
+- [ ] No TypeScript errors: `pnpm run typecheck` (repo is pnpm-only; the
+      real `api-server/package.json` script is `typecheck`, no dash -- there
+      is no `type-check` script)
+- [ ] Tests pass: `pnpm test`
+- [ ] Linting: **not currently set up** -- no ESLint config and no `lint`
+      script exist anywhere in this repo, so there is nothing to run yet.
+      An earlier version of this checklist told readers to run `npm run
+      lint`, which fails with "missing script" every time.
 - [ ] No duplicated code (check for 3+ instance rule)
 - [ ] All helpers are testable and tested
 - [ ] Error messages are specific and helpful
@@ -428,8 +433,8 @@ if (validator) { ... }
 
 ### Step 1: Understand Current State
 ```bash
-npm run type-check  # Verify no TS errors
-npm test           # Run existing tests
+pnpm run typecheck  # Verify no TS errors (real script name is "typecheck", no dash)
+pnpm test           # Run existing tests
 ```
 
 ### Step 2: Implement Changes
@@ -448,9 +453,10 @@ describe('newFunction', () => {
 
 ### Step 4: Verify Quality
 ```bash
-npm run lint       # Fix style issues
-npm run type-check # Verify types
-npm test          # Run all tests
+pnpm run typecheck # Verify types (real script name; there is no "type-check")
+pnpm test          # Run all tests
+# There is no lint script or ESLint config in this repo yet -- skip this
+# step until one exists rather than run a command that doesn't exist.
 ```
 
 ### Step 5: Document
