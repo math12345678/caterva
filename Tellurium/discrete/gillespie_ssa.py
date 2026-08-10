@@ -194,6 +194,41 @@ def _merge_validations(
     return ParameterValidation()
 
 
+def _step_sample(times: np.ndarray, values: np.ndarray,
+                 grid: np.ndarray) -> np.ndarray:
+    """Sample a right-continuous STEP function onto a uniform grid.
+
+    An SSA trajectory is piecewise constant: the molecule count set by an
+    event holds until the next event fires. The value at grid time t is
+    therefore the value at the most recent event at or before t -- a
+    zero-order hold.
+
+    This replaced ``np.interp``, which draws a straight line between event
+    values and so reports counts the system never held. For a monotonically
+    decreasing species the error is one-sided, making it a systematic BIAS
+    rather than noise, and averaging more replicates cannot remove it.
+
+    Measured against the exact closed form E[a(t)] = a0*exp(-k*t)
+    (a0=100, k=0.5, end=10, seed=7), interpolated vs. true mean over
+    0.5 < t < 6:
+
+        replicates    mean bias        worst deviation
+               500    -0.66 molecules  -6.6 sigma
+              2000    -0.53 molecules  -10.9 sigma
+              8000    -0.48 molecules  -18.2 sigma
+
+    The bias plateaus while the standard error keeps shrinking, so the
+    result got *more* conclusively wrong as the ensemble grew -- the
+    opposite of what an ensemble average is for.
+    """
+    # side="right" gives the first index strictly after t; -1 steps back to
+    # the last event at or before t. Clipped at 0 so a grid point at t=0
+    # (before or at the first recorded time) takes the initial state.
+    indices = np.searchsorted(times, grid, side="right") - 1
+    np.clip(indices, 0, len(values) - 1, out=indices)
+    return values[indices]
+
+
 def simulate_gillespie_ssa_replicates(
     a0: float,
     k: float,
@@ -271,8 +306,8 @@ def simulate_gillespie_ssa_replicates(
             times = np.array([row[0] for row in rows])
             a_col = np.array([row[1] for row in rows])
             b_col = np.array([row[2] for row in rows])
-            mean_a += np.interp(grid, times, a_col)
-            mean_b += np.interp(grid, times, b_col)
+            mean_a += _step_sample(times, a_col, grid)
+            mean_b += _step_sample(times, b_col, grid)
         else:
             rows = _run_bimolecular_once(int(a0), int(b0), k, end, rep_rng)
             replicate_data.append([rows[-1][1], rows[-1][2], rows[-1][3]])
@@ -280,9 +315,9 @@ def simulate_gillespie_ssa_replicates(
             a_col = np.array([row[1] for row in rows])
             b_col = np.array([row[2] for row in rows])
             c_col = np.array([row[3] for row in rows])
-            mean_a += np.interp(grid, times, a_col)
-            mean_b += np.interp(grid, times, b_col)
-            mean_c += np.interp(grid, times, c_col)
+            mean_a += _step_sample(times, a_col, grid)
+            mean_b += _step_sample(times, b_col, grid)
+            mean_c += _step_sample(times, c_col, grid)
 
     n = int(n_replicates)
     data: List[List[float]] = []

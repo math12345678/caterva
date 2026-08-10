@@ -6,6 +6,7 @@ import {
   type NextFunction,
 } from "express";
 import * as queue from "../lib/queue";
+import { unverifiedOriginKeys } from "../lib/provenance";
 import { verifiableMetricsCollector } from "../lib/verifiable-metrics";
 import { getDomainCitation } from "../lib/domain-literature";
 
@@ -45,9 +46,14 @@ router.get(
       let publicationBlocked = 0;
       for (const job of jobs) {
         if (!job.result?.parameterProvenance) continue;
-        const blocked = Object.values(job.result.parameterProvenance).some(
-          (p) => p.origin === "llm",
-        );
+        // `unverifiedOriginKeys` is the same predicate the hard rule uses
+        // (provenance.ts), so the dashboard and the engine cannot disagree
+        // about what "publication-ready" means. This previously tested
+        // `origin === "llm"` alone, ignoring `default` -- which the hard
+        // rule blocks identically -- so a job carrying an unverified
+        // default counted as ready to publish.
+        const blocked =
+          unverifiedOriginKeys(job.result.parameterProvenance).length > 0;
         if (blocked) {
           publicationBlocked++;
         } else {

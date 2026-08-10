@@ -696,5 +696,34 @@ SSA_PLAUSIBLE_MIN_REPLICATES = 10
 # on an annual-cycle system -- the same role SSA_PLAUSIBLE_MAX_RATE plays
 # for the Gillespie domain. Flagged, never rejected: a student modeling a
 # genuinely different timescale is not blocked.
+# Lotka-Volterra orbit conditioning. The system's first integral
+# H = gamma*P - delta*ln P + beta*V - alpha*ln V is EXACTLY conserved, so
+# any drift is integrator error. Drift grows with how far the initial state
+# sits from the coexistence fixed point (delta/gamma, alpha/beta), because a
+# large-amplitude orbit takes the prey exponentially close to zero on every
+# cycle.
+#
+# Measured 2026-08-09 (alpha=1.1, beta=0.4, gamma=0.4, delta=0.1; v0 at the
+# fixed point; end=20, points=2001), varying p0/(delta/gamma):
+#
+#     ratio    min prey        relative drift in H
+#         1    +2.50e-01       0
+#         5    +8.72e-03       6.8e-09
+#        10    +1.14e-04       7.7e-08
+#        20    +1.03e-08       5.5e-05
+#        40    -5.73e-12       2.4e-01     <- NEGATIVE prey, physics lost
+#        80    -5.16e-11       6.8e-01
+#
+# The threshold is set at 20: the last ratio whose drift is still small
+# enough that the trajectory is the modelled system. Beyond it the
+# integrator returns a curve that is no longer Lotka-Volterra -- ADR 0023's
+# defect, which was fixed only in the DEFAULT parameters and remained fully
+# reachable through the API for any caller supplying their own.
+#
+# Flagged, never rejected (Rule 2): the run still completes and still shows
+# a boom-bust cycle, the student is told the numbers are past what the
+# solver can carry faithfully.
+LV_EXCURSION_RATIO_FLAG_ABOVE = 20.0
+
 LV_PLAUSIBLE_MIN_RATE = 1e-4
 LV_PLAUSIBLE_MAX_RATE = 100.0

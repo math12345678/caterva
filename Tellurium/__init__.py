@@ -1,141 +1,56 @@
-"""Terrium simulation engine package."""
+"""Terrium simulation engine package.
 
-from .tellurium_engine import (
-    ModelBuildError,
-    SimulationError,
-    ParameterValidation,
-    SimulationResult,
-    DEFAULT_RELATIVE_TOLERANCE,
-    DEFAULT_ABSOLUTE_TOLERANCE,
-    GAMMA_PARAM,
-    KM_PLAUSIBLE_MIN_MM,
-    KM_PLAUSIBLE_MAX_MM,
-    validate_michaelis_menten_params,
-    validate_sir_params,
-    validate_seir_params,
-    build_michaelis_menten_antimony,
-    build_sir_antimony,
-    build_seir_antimony,
-    antimony_to_sbml,
-    sbml_to_antimony,
-    validate_sbml,
-    simulate_sbml,
-    simulate_michaelis_menten,
-    simulate_sir,
-    simulate_seir,
-    steady_state,
-    parameter_scan,
-    PCR_MIN_EFFICIENCY,
-    PCR_MAX_EFFICIENCY,
-    PCR_PLAUSIBLE_LOW_EFFICIENCY,
-    validate_pcr_params,
-    simulate_pcr,
-    MC_PLAUSIBLE_MIN_SAMPLES,
-    validate_monte_carlo_params,
-    simulate_monte_carlo_pi,
-    WF_PLAUSIBLE_MIN_POPULATION_SIZE,
-    WF_PLAUSIBLE_MAX_GENERATIONS,
-    WF_PLAUSIBLE_MIN_REPLICATE_RUNS,
-    WF_PLAUSIBLE_MAX_MUTATION_RATE,
-    WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT,
-    validate_wright_fisher_params,
-    simulate_wright_fisher,
-    list_scenarios,
-    wright_fisher_scenario,
-    kimura_fixation_probability,
-    expected_fixation_time,
-    expected_loss_time,
-    estimate_ne_from_heterozygosity,
-    theoretical_fst,
-    wright_fisher_sweep,
-    wright_fisher_transition_matrix,
-    wright_fisher_fixation_probability,
-    wright_fisher_expected_fixation_time,
-    wright_fisher_expected_loss_time,
-    wright_fisher_expected_absorption_time,
-    wright_fisher_stationary_vector,
-    wright_stationary_distribution,
-    effective_size_harmonic_mean,
-    TwoLocusResult,
-    simulate_two_locus_wright_fisher,
-    theoretical_ld_decay,
-    expected_fst_after_split,
-    MD_PLAUSIBLE_MIN_PARTICLES,
-    MD_PLAUSIBLE_MAX_TIMESTEP,
-    MD_PLAUSIBLE_TEMPERATURE_LOW,
-    MD_PLAUSIBLE_TEMPERATURE_HIGH,
-    validate_md_params,
-    simulate_molecular_dynamics,
-    lennard_jones_force,
-    lj_cluster_positions,
-)
+The package namespace is DERIVED from ``tellurium_engine.__all__`` rather
+than restated here.
 
-__all__ = [
-    "DEFAULT_ABSOLUTE_TOLERANCE",
-    "DEFAULT_RELATIVE_TOLERANCE",
-    "GAMMA_PARAM",
-    "KM_PLAUSIBLE_MAX_MM",
-    "KM_PLAUSIBLE_MIN_MM",
-    "MC_PLAUSIBLE_MIN_SAMPLES",
-    "MD_PLAUSIBLE_MAX_TIMESTEP",
-    "MD_PLAUSIBLE_MIN_PARTICLES",
-    "MD_PLAUSIBLE_TEMPERATURE_HIGH",
-    "MD_PLAUSIBLE_TEMPERATURE_LOW",
-    "PCR_MAX_EFFICIENCY",
-    "PCR_MIN_EFFICIENCY",
-    "PCR_PLAUSIBLE_LOW_EFFICIENCY",
-    "WF_PLAUSIBLE_MAX_GENERATIONS",
-    "WF_PLAUSIBLE_MAX_MUTATION_RATE",
-    "WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT",
-    "WF_PLAUSIBLE_MIN_POPULATION_SIZE",
-    "WF_PLAUSIBLE_MIN_REPLICATE_RUNS",
-    "ModelBuildError",
-    "ParameterValidation",
-    "SimulationError",
-    "SimulationResult",
-    "TwoLocusResult",
-    "antimony_to_sbml",
-    "build_michaelis_menten_antimony",
-    "build_seir_antimony",
-    "build_sir_antimony",
-    "effective_size_harmonic_mean",
-    "estimate_ne_from_heterozygosity",
-    "expected_fixation_time",
-    "expected_fst_after_split",
-    "expected_loss_time",
-    "kimura_fixation_probability",
-    "lennard_jones_force",
-    "list_scenarios",
-    "lj_cluster_positions",
-    "parameter_scan",
-    "sbml_to_antimony",
-    "simulate_michaelis_menten",
-    "simulate_molecular_dynamics",
-    "simulate_monte_carlo_pi",
-    "simulate_pcr",
-    "simulate_sbml",
-    "simulate_seir",
-    "simulate_sir",
-    "simulate_two_locus_wright_fisher",
-    "simulate_wright_fisher",
-    "steady_state",
-    "theoretical_fst",
-    "theoretical_ld_decay",
-    "validate_md_params",
-    "validate_michaelis_menten_params",
-    "validate_monte_carlo_params",
-    "validate_pcr_params",
-    "validate_sbml",
-    "validate_seir_params",
-    "validate_sir_params",
-    "validate_wright_fisher_params",
-    "wright_fisher_expected_absorption_time",
-    "wright_fisher_expected_fixation_time",
-    "wright_fisher_expected_loss_time",
-    "wright_fisher_fixation_probability",
-    "wright_fisher_scenario",
-    "wright_fisher_stationary_vector",
-    "wright_fisher_sweep",
-    "wright_fisher_transition_matrix",
-    "wright_stationary_distribution",
+It used to be a hand-written list of imports plus a hand-written
+``__all__``, i.e. a second copy of a list that already existed. By
+2026-08-09 that copy had fallen 25 names behind, including seven simulation
+domains:
+
+    simulate_lotka_volterra          simulate_gillespie_ssa
+    simulate_cell_cycle_oscillator   simulate_gillespie_ssa_bimolecular
+    simulate_repressilator           simulate_gillespie_ssa_replicates
+    simulate_mm_competitive_inhibition
+
+so ``import Tellurium; Tellurium.simulate_lotka_volterra`` raised
+AttributeError for functions the engine exports and the API dispatches.
+Nothing caught it: ``check_domain_parity.py`` compares the runner, the
+TypeScript union and the schemas, and ``test_boundary_contract.py`` compares
+DISPATCH against ``tellurium_engine.__all__`` — no check looked at this
+file, because a package's own re-export list is not somewhere anyone thinks
+to look for drift.
+
+Re-exporting programmatically removes the possibility rather than adding a
+fifteenth guard against it. ADR 0007's principle applied one level up: the
+engine's ``__all__`` is the contract, and every other layer follows it
+instead of maintaining a parallel truth.
+
+Kept explicit: ``tellurium_engine`` itself, which the API bridge imports as
+a module (``from Tellurium import tellurium_engine``).
+"""
+
+from __future__ import annotations
+
+from . import tellurium_engine
+from .tellurium_engine import *  # noqa: F401,F403
+
+#: Mirrors the engine exactly. `list(...)` copies so that a caller mutating
+#: `Tellurium.__all__` cannot reach through and corrupt the engine's own.
+__all__ = [*tellurium_engine.__all__, "tellurium_engine"]
+
+# A star-import only binds names the source module's __all__ advertises, so
+# the two agree by construction. This assertion states that dependency out
+# loud: if `tellurium_engine.__all__` ever names something it does not
+# actually define, the failure surfaces here at import time rather than as
+# an AttributeError in a student's simulation.
+_missing = [
+    _name for _name in tellurium_engine.__all__
+    if not hasattr(tellurium_engine, _name)
 ]
+if _missing:  # pragma: no cover - defensive; the contract guard also checks
+    raise ImportError(
+        "tellurium_engine.__all__ names symbols it does not define: "
+        f"{sorted(_missing)}"
+    )
+del _missing
