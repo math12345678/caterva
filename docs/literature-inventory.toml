@@ -1,0 +1,358 @@
+# Literature provenance inventory
+#
+# Every hardcoded number in DOMAIN_DEFAULTS (queryResolver.ts) declares here
+# where it came from. Enforced by scripts/check_literature_inventory.py: a
+# number in the code but not in this file fails the build.
+#
+# This file exists because the project claimed "everything is backed by
+# literature" while 64 numbers underneath were chosen by hand, and
+# domain-literature.ts attached justifications like "per Lehninger (2008)"
+# that nothing ever checked. Five of that file's DOIs turned out to be
+# wrong. An unfalsifiable claim of rigour is worth less than an honest
+# admission of its absence.
+#
+# status is exactly one of:
+#   RESOLVED       fetched live per query from a primary source, with a
+#                  citation attached to the value. Not really a default —
+#                  the listed value is only what sits in the table before
+#                  resolution replaces it.
+#   VERIFIED       a constant checked against a named primary source, with
+#                  the check automated.
+#   UNVERIFIED     a teaching default chosen for pedagogy. Legitimate, but
+#                  it must never be described as literature-backed.
+#   NOT_SCIENTIFIC a numerical or presentational parameter (grid points,
+#                  integration window, RNG seed). Carries no scientific
+#                  claim, so a citation would be a fabrication.
+#
+# RESOLVED and VERIFIED must name a `source`.
+
+# ---------------------------------------------------------------------------
+# Michaelis-Menten. km IS resolved live from BRENDA (RESOLVABLE_FIELDS.mm);
+# the hard rule blocks the query unless it resolves or the user supplies it.
+# vmax is reachable via the ADR 0019 kcat x [E]0 bridge, but only when the
+# caller supplies enzyme_conc — so its listed default is never simulated.
+# ---------------------------------------------------------------------------
+[mm.km]
+value = "2"
+status = "RESOLVED"
+source = "BRENDA KM Values table via Tests/fallback_logic.py; golden tuple G1 = LDH/lactate/Homo sapiens, ref 740253, re-verified live by scripts/verify_citations_live.py"
+
+[mm.vmax]
+value = "5"
+status = "UNVERIFIED"
+note = "Teaching default. Vmax is assay-specific (Vmax = kcat x [E]0) and no source can supply it without an enzyme concentration; ADR 0013 refuses to invent one. Resolvable only via the ADR 0019 bridge when the caller supplies enzyme_conc."
+
+[mm.s0]
+value = "10"
+status = "UNVERIFIED"
+note = "Teaching default: initial substrate concentration is a property of an experiment the user is designing, not of the enzyme."
+
+[mm.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+note = "Integration window."
+
+[mm.points]
+value = "51"
+status = "NOT_SCIENTIFIC"
+note = "Output grid resolution."
+
+# ---------------------------------------------------------------------------
+# Competitive inhibition. Both km and ki resolve live (ADR 0018).
+# ---------------------------------------------------------------------------
+[mm_competitive_inhibition.km]
+value = "2"
+status = "RESOLVED"
+source = "BRENDA KM Values table; see mm.km"
+
+[mm_competitive_inhibition.ki]
+value = "1.0"
+status = "RESOLVED"
+source = "BRENDA Ki Values table via quantity='ki' (ADR 0018); golden tuple G4 = LDH/gossypol/Homo sapiens, Ki 0.0014 mM, ref 711801"
+
+[mm_competitive_inhibition.vmax]
+value = "5"
+status = "UNVERIFIED"
+note = "See mm.vmax."
+
+[mm_competitive_inhibition.s0]
+value = "10"
+status = "UNVERIFIED"
+note = "See mm.s0."
+
+[mm_competitive_inhibition.i0]
+value = "0.1"
+status = "UNVERIFIED"
+note = "Teaching default: inhibitor concentration is an experimental choice, not a literature constant."
+
+[mm_competitive_inhibition.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[mm_competitive_inhibition.points]
+value = "51"
+status = "NOT_SCIENTIFIC"
+
+# ---------------------------------------------------------------------------
+# SIR / SEIR. beta and gamma ARE resolved live for a recognised disease
+# (ADR 0020), derived from a literature (R0, infectious period) pair. The
+# listed defaults apply only when no disease is named — and the hard rule
+# blocks the run in that case.
+# ---------------------------------------------------------------------------
+[sir.beta]
+value = "0.3"
+status = "RESOLVED"
+source = "Derived as beta = R0 * gamma from the ADR 0017 registry (COVID-19: R0 3.14, serial interval 5.45 d, Hussein et al. 2021, DOI 10.1097/SLA.0000000000004400, PMID 33214421)"
+
+[sir.gamma]
+value = "0.1"
+status = "RESOLVED"
+source = "Derived as gamma = 1/infectious_period from the same ADR 0017 registry entry"
+
+[sir.s0]
+value = "990"
+status = "UNVERIFIED"
+note = "Teaching default: a 1000-person population with 10 initial infections. A population size is a scenario choice, not a disease property."
+
+[sir.i0]
+value = "10"
+status = "UNVERIFIED"
+note = "See sir.s0."
+
+[sir.r0_recovered]
+value = "0"
+status = "UNVERIFIED"
+note = "Teaching default: no prior immunity at t=0."
+
+[sir.end]
+value = "100"
+status = "NOT_SCIENTIFIC"
+
+[sir.points]
+value = "101"
+status = "NOT_SCIENTIFIC"
+
+[seir.beta]
+value = "0.3"
+status = "RESOLVED"
+source = "See sir.beta"
+
+[seir.gamma]
+value = "0.1"
+status = "RESOLVED"
+source = "See sir.gamma"
+
+[seir.sigma]
+value = "0.2"
+status = "UNVERIFIED"
+note = "Teaching default (1/sigma = 5 d latent period). NOT resolved: ADR 0017's registry pairs R0 with a serial interval only, and no source in the registry reports a latent period, so sigma has no literature backing today. domain-literature.ts previously implied otherwise by attributing it to Anderson & May (1991)."
+
+[seir.s0]
+value = "990"
+status = "UNVERIFIED"
+note = "See sir.s0."
+
+[seir.e0]
+value = "10"
+status = "UNVERIFIED"
+note = "Teaching default: initial exposed cohort."
+
+[seir.i0]
+value = "0"
+status = "UNVERIFIED"
+note = "Teaching default. NOTE: i0=0 currently disables the R0 plausibility check entirely (validate_sir_params returns early) — see STAGE_10_PART_01 item 1."
+
+[seir.r0_recovered]
+value = "0"
+status = "UNVERIFIED"
+
+[seir.end]
+value = "100"
+status = "NOT_SCIENTIFIC"
+
+[seir.points]
+value = "101"
+status = "NOT_SCIENTIFIC"
+
+# ---------------------------------------------------------------------------
+# Population genetics. mutation_rate IS resolved live from stdpopsim.
+# ---------------------------------------------------------------------------
+[wright_fisher.mutation_rate]
+value = "0"
+status = "RESOLVED"
+source = "stdpopsim HomSap mean_mutation_rate (1.29e-8 /bp/generation), carrying stdpopsim's own citations (IHGSC 2001, DOI 10.1038/35057062; Jonsson et al. 2017)"
+
+[wright_fisher.population_size]
+value = "100"
+status = "UNVERIFIED"
+note = "Teaching default. A real effective population size is species- and epoch-specific; 100 is chosen so drift is visible in a classroom-length run."
+
+[wright_fisher.starting_frequency]
+value = "0.5"
+status = "UNVERIFIED"
+note = "Teaching default: maximum heterozygosity, the clearest starting point for demonstrating drift."
+
+[wright_fisher.generations]
+value = "100"
+status = "NOT_SCIENTIFIC"
+note = "Simulation length."
+
+[wright_fisher.replicate_runs]
+value = "100"
+status = "NOT_SCIENTIFIC"
+note = "Ensemble size for the stochastic average."
+
+[wright_fisher.selection_coefficient]
+value = "0"
+status = "UNVERIFIED"
+note = "Zero = the neutral case. A deliberate modelling choice, not a measured value."
+
+[two_locus_wright_fisher.mutation_rate]
+value = "0"
+status = "RESOLVED"
+source = "See wright_fisher.mutation_rate"
+
+[two_locus_wright_fisher.population_size]
+value = "100"
+status = "UNVERIFIED"
+note = "See wright_fisher.population_size."
+
+[two_locus_wright_fisher.recombination_rate]
+value = "0.1"
+status = "UNVERIFIED"
+note = "Teaching default. NOT literature-derived: a real recombination rate is locus-pair specific. 0.1 is chosen to make linkage disequilibrium decay visible over ~20 generations."
+
+[two_locus_wright_fisher.generations]
+value = "20"
+status = "NOT_SCIENTIFIC"
+
+[two_locus_wright_fisher.replicate_runs]
+value = "50"
+status = "NOT_SCIENTIFIC"
+
+# ---------------------------------------------------------------------------
+# PCR
+# ---------------------------------------------------------------------------
+[pcr.n0]
+value = "100"
+status = "UNVERIFIED"
+note = "Teaching default: initial template copy number is an experimental input."
+
+[pcr.efficiency]
+value = "0.95"
+status = "UNVERIFIED"
+note = "Teaching default. Real PCR efficiency is assay-specific and typically reported in the 0.9-1.0 band; 0.95 sits in that band but is not taken from any specific measurement."
+
+[pcr.cycles]
+value = "30"
+status = "NOT_SCIENTIFIC"
+note = "Protocol length."
+
+# ---------------------------------------------------------------------------
+# Molecular dynamics. Reduced Lennard-Jones units throughout (ADR 0006).
+# ---------------------------------------------------------------------------
+[molecular_dynamics.n_particles]
+value = "108"
+status = "VERIFIED"
+source = "4*k^3 fcc magic number (k=3). Verified by Tellurium/tests/test_molecular_dynamics_correctness.py against the fcc lattice construction; the LJ13 global minimum -44.326801 eps is separately pinned against Hoare & Pal (1971) via the Cambridge Cluster Database."
+
+[molecular_dynamics.density]
+value = "0.85"
+status = "UNVERIFIED"
+note = "Reduced density near the LJ triple point, a conventional choice for liquid-state MD demonstrations. Conventional is not the same as cited: no specific source is claimed."
+
+[molecular_dynamics.temperature]
+value = "0.4"
+status = "UNVERIFIED"
+note = "Reduced temperature. Teaching default chosen to stay inside MD_PLAUSIBLE_TEMPERATURE_LOW/HIGH."
+
+[molecular_dynamics.timestep]
+value = "0.005"
+status = "UNVERIFIED"
+note = "Reduced time step. Chosen for velocity-Verlet stability; the O(dt^2) error scaling IS verified in the test suite, but this specific value is not from a source."
+
+[molecular_dynamics.n_steps]
+value = "1000"
+status = "NOT_SCIENTIFIC"
+
+# ---------------------------------------------------------------------------
+# Gillespie SSA. Rate constants here are illustrative, not measured.
+# ---------------------------------------------------------------------------
+[gillespie_ssa.a0]
+value = "1000"
+status = "UNVERIFIED"
+note = "Teaching default: initial molecule count."
+
+[gillespie_ssa.k]
+value = "0.5"
+status = "UNVERIFIED"
+note = "Teaching default. An illustrative first-order decay rate, not a measured constant for any real species."
+
+[gillespie_ssa.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[gillespie_ssa_bimolecular.a0]
+value = "100"
+status = "UNVERIFIED"
+
+[gillespie_ssa_bimolecular.b0]
+value = "100"
+status = "UNVERIFIED"
+
+[gillespie_ssa_bimolecular.k]
+value = "0.005"
+status = "UNVERIFIED"
+note = "Illustrative second-order rate constant."
+
+[gillespie_ssa_bimolecular.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[gillespie_ssa_replicates.a0]
+value = "100"
+status = "UNVERIFIED"
+
+[gillespie_ssa_replicates.k]
+value = "0.5"
+status = "UNVERIFIED"
+note = "See gillespie_ssa.k."
+
+[gillespie_ssa_replicates.end]
+value = "10"
+status = "NOT_SCIENTIFIC"
+
+[gillespie_ssa_replicates.n_replicates]
+value = "100"
+status = "NOT_SCIENTIFIC"
+note = "Ensemble size."
+
+# ---------------------------------------------------------------------------
+# ODE oscillators. Their KINETIC constants are verified against curated
+# BioModels SBML (Tellurium/tests/test_biomodels_parameter_parity.py); the
+# only numbers exposed in DOMAIN_DEFAULTS are the time windows.
+# ---------------------------------------------------------------------------
+[lotka_volterra.end]
+value = "20"
+status = "NOT_SCIENTIFIC"
+note = "Integration window, ~2 periods at the default rates (period 9.47)."
+
+[lotka_volterra.points]
+value = "201"
+status = "NOT_SCIENTIFIC"
+
+[cell_cycle_oscillator.end]
+value = "100"
+status = "NOT_SCIENTIFIC"
+
+[cell_cycle_oscillator.points]
+value = "1001"
+status = "NOT_SCIENTIFIC"
+
+[repressilator.end]
+value = "200"
+status = "NOT_SCIENTIFIC"
+
+[repressilator.points]
+value = "2001"
+status = "NOT_SCIENTIFIC"
