@@ -6,7 +6,15 @@
  */
 
 import { Router, Request, Response } from "express";
-import { metricsCollector } from "../lib/metrics";
+// The pipeline records into `verifiableMetricsCollector`, not
+// `metricsCollector`. These routes read the latter, which has ZERO
+// production writers -- `recordJobExecution` is called only by its own
+// test. So /snapshot and /metrics/health reported permanent zeros for the
+// life of the process, with llmSuccessRate and literatureHitRate showing
+// 100% fabricated from an empty sample. An endpoint that always says
+// "healthy, 100%" is worse than no endpoint: it is a monitoring signal
+// that cannot fail.
+import { verifiableMetricsCollector as metricsCollector } from "../lib/verifiable-metrics";
 import { logger } from "../lib/logger";
 
 const router = Router();
@@ -38,8 +46,8 @@ router.get("/snapshot", (req: Request, res: Response) => {
         llmSuccessRate: Math.round(snapshot.llmSuccessRate),
         literatureHitRate: Math.round(snapshot.literatureHitRate),
 
-        stages: Object.values(snapshot.stageMetrics).map((stage) => ({
-          name: stage.name,
+        stages: Object.entries(snapshot.stageMetrics).map(([name, stage]) => ({
+          name,
           successCount: stage.successCount,
           failureCount: stage.failureCount,
           avgDurationMs: Math.round(stage.avgDurationMs),
@@ -53,14 +61,14 @@ router.get("/snapshot", (req: Request, res: Response) => {
               : "N/A",
         })),
 
-        domains: Object.values(snapshot.domainMetrics)
-          .filter((d) => d.count > 0) // Only include domains that have been used
-          .sort((a, b) => b.count - a.count)
-          .map((domain) => ({
-            name: domain.domain,
+        domains: Object.entries(snapshot.domainMetrics)
+          .filter(([, d]) => d.count > 0) // only domains actually used
+          .sort(([, a], [, b]) => b.count - a.count)
+          .map(([name, domain]) => ({
+            name,
             count: domain.count,
-            avgResolutionMs: Math.round(domain.avgResolutionMs),
-            parameterSuccessRate: Math.round(domain.parameterSuccessRate),
+            avgResolutionMs: Math.round(domain.avgLatencyMs),
+            parameterSuccessRate: Math.round(domain.successRate),
           })),
 
         resolution: {
@@ -91,17 +99,30 @@ router.get("/metrics/health", (req: Request, res: Response) => {
     const snapshot = metricsCollector.getSnapshot();
 
     // Define health thresholds
+    // With no jobs yet there is no success rate -- not a success rate of
+    // 1. Defaulting to 1 made this endpoint structurally incapable of
+    // reporting `degraded` on a fresh process, and reported "100.0" from
+    // zero observations. A rate computed from an empty sample is a
+    // fabricated measurement, which is the same failure this codebase
+    // corrects everywhere else.
+    const observed = snapshot.sampleCount;
     const successRate =
-      snapshot.completedJobs + snapshot.failedJobs > 0
-        ? snapshot.completedJobs / (snapshot.completedJobs + snapshot.failedJobs)
-        : 1;
+      observed > 0 ? snapshot.completedJobs / observed : null;
 
-    const isHealthy = successRate > 0.9; // 90% success rate threshold
-    const status = isHealthy ? "healthy" : "degraded";
+    // "no_data" is neither healthy nor degraded. It reports 200 because
+    // the process IS up and answering -- the distinction being drawn is
+    // between "up with no evidence" and "up and demonstrably fine".
+    const status =
+      successRate === null
+        ? "no_data"
+        : successRate > 0.9
+          ? "healthy"
+          : "degraded";
 
-    res.status(isHealthy ? 200 : 503).json({
+    res.status(status === "degraded" ? 503 : 200).json({
       status,
-      successRate: (successRate * 100).toFixed(1),
+      successRate: successRate === null ? null : (successRate * 100).toFixed(1),
+      sampleCount: observed,
       activeJobs: snapshot.activeJobs,
       avgLatencyMs: Math.round(snapshot.avgLatencyMs),
       uptime: process.uptime(),
