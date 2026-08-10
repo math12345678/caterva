@@ -7,9 +7,9 @@ from typing import Any, List, Sequence
 
 import numpy as np
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE)
+    from Tellurium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE, LV_EXCURSION_RATIO_FLAG_ABOVE)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE)  # type: ignore[no-redef]
+    from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE, LV_EXCURSION_RATIO_FLAG_ABOVE)  # type: ignore[no-redef]
 
 def _finite_positive(value: Any, label: str, errors: List[str],
                      allow_zero: bool = False) -> bool:
@@ -941,6 +941,33 @@ def validate_lotka_volterra_params(
         flag_reasons.append(
             "v0 is zero: no predator ever exists, so prey grows "
             "unchecked -- no oscillation, pure exponential growth")
+
+    # Orbit conditioning. The coexistence fixed point is
+    # (p*, v*) = (delta/gamma, alpha/beta); an initial state far from it
+    # traces a large-amplitude orbit that drives the prey exponentially
+    # close to zero each cycle, and the integrator loses the system's
+    # exactly-conserved first integral. Past the measured threshold the
+    # returned curve is no longer Lotka-Volterra: at 40x the prey goes
+    # NEGATIVE and H drifts 24%.
+    #
+    # ADR 0023 corrected the transposed gamma/delta DEFAULTS but left this
+    # entirely reachable -- any caller supplying their own rates through the
+    # API got a physically impossible trajectory with flagged=False.
+    for label, start, fixed_point in (
+        ("p0", p0, delta / gamma),
+        ("v0", v0, alpha / beta),
+    ):
+        if start > 0.0 and fixed_point > 0.0:
+            ratio = max(start / fixed_point, fixed_point / start)
+            if ratio > LV_EXCURSION_RATIO_FLAG_ABOVE:
+                flag_reasons.append(
+                    f"{label}={start:g} is {ratio:.3g}x from the coexistence "
+                    f"fixed point ({fixed_point:g}); beyond "
+                    f"{LV_EXCURSION_RATIO_FLAG_ABOVE:g}x the orbit takes the "
+                    "prey so close to extinction that the integrator loses "
+                    "the conserved quantity, and the trajectory is no longer "
+                    "the modelled system"
+                )
 
     if flag_reasons:
         v.flagged = True

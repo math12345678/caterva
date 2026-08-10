@@ -1403,7 +1403,13 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       parameters,
       provenance: {
         reasoning: llmResult.reasoning,
-        modelCitations: [...modelCitations, domainCitation],
+        // `domainCitation` is undefined for a domain with no literature
+        // entry (sbml, where the caller supplies the model). Omit it
+        // rather than pushing a placeholder into a citations list.
+        modelCitations: [
+          ...modelCitations,
+          ...(domainCitation ? [domainCitation] : []),
+        ],
         flags,
       },
       parameterProvenance,
@@ -1572,7 +1578,10 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     parameters,
     provenance: {
       reasoning: best.reasoning,
-      modelCitations: [...best.modelCitations, domainCitation],
+      modelCitations: [
+        ...best.modelCitations,
+        ...(domainCitation ? [domainCitation] : []),
+      ],
       flags,
     },
     parameterProvenance,

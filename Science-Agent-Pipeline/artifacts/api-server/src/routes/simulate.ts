@@ -21,6 +21,7 @@ import { findCachedResultByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
 import {
   RequiredParametersMissingError,
+  STRENDA_GOVERNED_FIELDS,
   validateParameterProvenance,
   type ParameterProvenance,
 } from "../lib/provenance";
@@ -507,6 +508,7 @@ router.get(
       }
 
       const auditReport = buildAuditReport(
+        jobId,
         job.result.domain,
         numericParameters(job.result.parameters),
         job.result.parameterProvenance,
@@ -532,6 +534,10 @@ interface ParameterAudit {
   pmid?: string;
   source?: string;
   strendaCompliant?: boolean;
+  /** STRENDA requirement numbers not met. Requirement 7 (confidence
+   * intervals) is expected here for every resolved value: no upstream
+   * source Terrium reads supplies per-value intervals. */
+  strendaUnmetRequirements?: number[];
   requiresReview: boolean;
   message: string;
 }
@@ -543,7 +549,9 @@ interface AuditReport {
   blockedParameters: string[];
   overallConfidence: number;
   parameterAudits: ParameterAudit[];
-  domainCitation: string;
+  /** Absent for a domain with no literature entry (sbml: the caller
+   * supplies the model, so there is nothing for Terrium to cite). */
+  domainCitation?: string;
   timestamp: string;
 }
 
@@ -611,6 +619,7 @@ function buildConfidenceBreakdown(
 }
 
 function buildAuditReport(
+  jobId: string,
   domain: string,
   parameters: Record<string, number | number[]>,
   provenance: Record<string, ParameterProvenance>,
@@ -664,11 +673,28 @@ function buildAuditReport(
     };
 
     // Check STRENDA compliance if applicable
-    if (
-      domain.includes("mm") ||
-      domain.includes("competitive") ||
-      domain.includes("inhibit")
-    ) {
+    // STRENDA governs ENZYME KINETIC CONSTANTS -- km, ki, kcat, vmax -- and
+    // nothing else. This previously gated on the DOMAIN name, so every
+    // numeric parameter of an mm run got a STRENDA verdict, including `end`
+    // and `points`. Reporting that an integration window is
+    // "STRENDA non-compliant" is the ADR 0021 error resurfacing at a route
+    // that bypassed the guard ADR 0021 installed.
+    //
+    // The bounds are also passed through now. Omitting them forced a
+    // Requirement-7 violation on every call, capping `score` at 3 when
+    // `compliant` needs >= 4 -- so `strendaCompliant` could never be true
+    // for any parameter, in any domain, ever. It was a field that only ever
+    // said "no".
+    if (STRENDA_GOVERNED_FIELDS.has(name.toLowerCase())) {
+      // Confidence bounds are genuinely absent: ParameterProvenance does
+      // not carry them, because neither BRENDA rows nor the ADR 0017
+      // registry report per-value intervals. So STRENDA Requirement 7 is
+      // legitimately unmet and `compliant` is legitimately false -- the
+      // defect was never the value, it was reporting a bare `false` with
+      // no way to tell "we failed the standard" from "we never checked".
+      //
+      // The unmet requirement numbers are surfaced so a reader can see
+      // which parts of the standard are outstanding and which are met.
       const strendaResult = validateSTREANDA(
         value,
         prov.assayConditions,
@@ -676,6 +702,9 @@ function buildAuditReport(
         undefined,
       );
       audit.strendaCompliant = strendaResult.compliant;
+      audit.strendaUnmetRequirements = strendaResult.violations.map(
+        (violation) => violation.requirement,
+      );
     }
 
     parameterAudits.push(audit);
@@ -692,13 +721,19 @@ function buildAuditReport(
   const publicationReady = blockedParameters.length === 0;
 
   return {
-    jobId: "", // Will be set by caller if needed
+    // Threaded from the caller. This was `""` with the comment "will be
+    // set by caller if needed" -- the caller never did, so every audit
+    // response identified itself as job "". The route test asserted the
+    // presence of five other fields and never looked at this one.
+    jobId,
     domain,
     publicationReady,
     blockedParameters,
     overallConfidence,
     parameterAudits,
-    domainCitation: getDomainCitation(domain),
+    ...(getDomainCitation(domain) !== undefined
+      ? { domainCitation: getDomainCitation(domain) as string }
+      : {}),
     timestamp: new Date().toISOString(),
   };
 }

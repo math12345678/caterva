@@ -404,6 +404,48 @@ export const REPRESSILATOR_LITERATURE: DomainLiterature = {
     "Parameters from Elowitz & Leibler (2000) Nature paper. This circuit demonstrates that living cells can implement reliable synthetic clocks. ~40-minute oscillation period.",
 };
 
+/**
+ * MONTE_CARLO_PI Domain
+ * BACKING: Metropolis, N., & Ulam, S. (1949) "The Monte Carlo Method",
+ * Journal of the American Statistical Association 44(247), 335-341.
+ *
+ * No DOI is asserted. JASA 1949 predates DOI assignment and the paper is
+ * outside PubMed's biomedical scope, so it could not be verified against a
+ * primary source from here -- and inventing a plausible-looking DOI is the
+ * exact failure five other citations in this file turned out to be
+ * (Stage 9 Part 6). Journal, volume, issue and pages locate it.
+ */
+export const MONTE_CARLO_PI_LITERATURE: DomainLiterature = {
+  name: "monte_carlo_pi",
+  description:
+    "Monte Carlo estimation of pi by uniform sampling in [-1,1]^2 and counting the fraction falling inside the unit circle. Convergence follows the CLT error rate 1/sqrt(N).",
+  references: [
+    {
+      authors: "Metropolis, N., & Ulam, S.",
+      year: 1949,
+      title:
+        "The Monte Carlo Method. Journal of the American Statistical " +
+        "Association 44(247), 335-341",
+    },
+  ],
+  defaultJustification:
+    "Metropolis & Ulam (1949) is the source of the METHOD, not of a sample count. n_samples is a precision/runtime tradeoff chosen by the caller, not a measured quantity. What IS verified is the convergence behaviour: the estimator's error is checked against the CLT rate 1/sqrt(N) in Tellurium/tests/test_monte_carlo_correctness.py. See docs/literature-inventory.toml.",
+};
+
+/**
+ * GILLESPIE_SSA_REPLICATES Domain
+ * BACKING: the same algorithm as gillespie_ssa -- Gillespie (1976). This
+ * domain is the ensemble view of it, not a different method.
+ */
+export const GILLESPIE_SSA_REPLICATES_LITERATURE: DomainLiterature = {
+  name: "gillespie_ssa_replicates",
+  description:
+    "Ensemble of independent Gillespie SSA trajectories, averaged onto a common time grid. The ensemble mean converges on the closed form E[a(t)] = a0*exp(-k*t).",
+  references: GILLESPIE_SSA_LITERATURE.references,
+  defaultJustification:
+    "Gillespie (1976) is the source of the ALGORITHM. n_replicates is an ensemble size — a precision/runtime tradeoff, not a measured value. The ensemble mean is verified against the exact closed form E[a(t)] = a0*exp(-k*t) in Tellurium/tests/test_ssa_ensemble_unbiased.py, which pins that the bias SHRINKS as replicates grow. See docs/literature-inventory.toml.",
+};
+
 export const DOMAIN_LITERATURE_MAP: Record<string, DomainLiterature> = {
   mm: MM_LITERATURE,
   mm_competitive_inhibition: MM_CI_LITERATURE,
@@ -418,18 +460,37 @@ export const DOMAIN_LITERATURE_MAP: Record<string, DomainLiterature> = {
   lotka_volterra: LOTKA_VOLTERRA_LITERATURE,
   cell_cycle_oscillator: CELL_CYCLE_OSCILLATOR_LITERATURE,
   repressilator: REPRESSILATOR_LITERATURE,
+  monte_carlo_pi: MONTE_CARLO_PI_LITERATURE,
+  gillespie_ssa_replicates: GILLESPIE_SSA_REPLICATES_LITERATURE,
+  // `sbml` is deliberately absent: it is the raw-SBML escape hatch, where
+  // the caller supplies the model. Terrium makes no scientific claim about
+  // a document it did not author, so it has no domain citation to give.
 };
 
 export function getDomainLiterature(domain: string): DomainLiterature | undefined {
   return DOMAIN_LITERATURE_MAP[domain];
 }
 
-export function getDomainCitation(domain: string): string {
+/**
+ * Returns undefined -- NOT a placeholder -- when a domain has no literature
+ * entry.
+ *
+ * This used to return the string `` `Domain: ${domain}` ``, which callers
+ * pushed straight into `provenance.modelCitations`. So a Monte Carlo run
+ * shipped "Domain: monte_carlo_pi" to the client in the list of citations
+ * backing its result. A label is not a citation, and a citations array is
+ * the one place a placeholder must never appear.
+ *
+ * `sbml` legitimately has no domain citation: the caller supplies the
+ * model, so there is nothing for Terrium to cite. Returning undefined lets
+ * the caller omit it rather than inventing one.
+ */
+export function getDomainCitation(domain: string): string | undefined {
   const lit = getDomainLiterature(domain);
-  if (!lit) return `Domain: ${domain}`;
+  if (!lit) return undefined;
 
   const primary = lit.references[0];
-  if (!primary) return `Domain: ${domain}`;
+  if (!primary) return undefined;
 
   return `${primary.authors} (${primary.year}). ${primary.title}${primary.doi ? `. DOI: ${primary.doi}` : ""}`;
 }

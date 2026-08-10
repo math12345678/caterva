@@ -8,9 +8,9 @@ from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
 try:
-    from Tellurium.core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS)
+    from Tellurium.core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MIN_REPLICATE_RUNS)
 except ModuleNotFoundError:  # flat mode: Tellurium/ on sys.path, no repo root
-    from core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS)  # type: ignore[no-redef]
+    from core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MIN_REPLICATE_RUNS)  # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------
 # Two-locus Wright-Fisher simulation (haploid, recombination)
@@ -136,7 +136,44 @@ def _tl_validate(
     elif abs(sum(f) - 1.0) > _TL_ABS_FREQ_TOL:
         errors.append(
             f"haplotype frequencies must sum to 1, got {sum(f):.8f}")
-    return ParameterValidation(ok=not errors, flagged=flagged, errors=errors)  # type: ignore[arg-type]
+    # Rule 2. Until 2026-08-09 this function passed `flagged` -- a
+    # List[str] that nothing ever appended to -- straight into the bool
+    # field, silenced with a `# type: ignore[arg-type]`. The empty list is
+    # falsy, and `_serialise_result` wraps it in `bool(...)`, so the API
+    # reported `flagged: false` unconditionally: the two-locus domain was
+    # the only one in the engine with NO implausible-but-valid tier at all.
+    #
+    # Thresholds are shared with the single-locus domain rather than
+    # reinvented, so the two cannot disagree about what counts as a small
+    # population or an implausible mutation rate.
+    if not errors:
+        if population_size < WF_PLAUSIBLE_MIN_POPULATION_SIZE:
+            flagged.append(
+                f"population_size={population_size} is below "
+                f"{WF_PLAUSIBLE_MIN_POPULATION_SIZE}: drift dominates so "
+                "strongly that linkage disequilibrium decay is hard to "
+                "distinguish from noise")
+        if generations > WF_PLAUSIBLE_MAX_GENERATIONS:
+            flagged.append(
+                f"generations={generations} exceeds "
+                f"{WF_PLAUSIBLE_MAX_GENERATIONS}: valid, but slow")
+        if replicate_runs < WF_PLAUSIBLE_MIN_REPLICATE_RUNS:
+            flagged.append(
+                f"replicate_runs={replicate_runs} is below "
+                f"{WF_PLAUSIBLE_MIN_REPLICATE_RUNS}: the ensemble mean D "
+                "carries a large standard error")
+        if mutation_rate > WF_PLAUSIBLE_MAX_MUTATION_RATE:
+            flagged.append(
+                f"mutation_rate={mutation_rate:g} exceeds "
+                f"{WF_PLAUSIBLE_MAX_MUTATION_RATE:g}: far above any "
+                "measured per-locus per-generation rate")
+
+    return ParameterValidation(
+        ok=not errors,
+        flagged=bool(flagged),
+        flag_reason="; ".join(flagged) if flagged else None,
+        errors=errors,
+    )
 
 
 def simulate_two_locus_wright_fisher(
