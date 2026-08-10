@@ -150,7 +150,10 @@ export class ScientificPipeline {
             executionTimeMs: Date.now() - startTime,
             literatureSourcesUsed: 0,
             confidenceScore: 0,
-            warnings: validationResult.errors.map(e => `${e.code}: ${e.message}`)
+            // `validate()` returns `errors: string[]`; this destructured `.code`
+            // and `.message` off a string, yielding "undefined: undefined"
+            // for every validation failure had it ever run.
+            warnings: [...validationResult.errors]
           }
         };
       }
@@ -254,9 +257,17 @@ export class ScientificPipeline {
   }> {
     logger.info({ jobId }, 'Verifying reproducibility');
 
+    // The verifier calls its reproducer with ONE object --
+    // `{ query, parameters, conditions, solver }` -- but `runSimulation`
+    // takes two positional arguments. Passing `this.runSimulation.bind(this)`
+    // directly meant `conditions` arrived as `undefined` on every replay,
+    // so the reproduction ran under different conditions than the original
+    // and any disagreement would have been blamed on non-determinism.
+    // The adapter unpacks the recorded inputs explicitly.
     const result = await this.reproducibilityService.verifyReproducibility(
       jobId,
-      this.runSimulation.bind(this)
+      (inputs: { parameters: Record<string, any>; conditions: any }) =>
+        this.runSimulation(inputs.parameters, inputs.conditions)
     );
 
     return {

@@ -7,7 +7,11 @@
 
 import ScientificPipeline from '../scientificPipeline';
 import { LiteratureService } from '../../literature/literatureService';
-import type { Literature, SimulationRequest } from '../../literature/literatureService';
+import type { Literature } from '../../literature/literatureService';
+// SimulationRequest is declared in scientificPipeline.ts; this file imported
+// it from literatureService, which does not export it. The suite could never
+// have compiled -- nothing type-checked this tree.
+import type { SimulationRequest } from '../scientificPipeline';
 
 // Sample literature for testing
 const SAMPLE_LITERATURE: Literature[] = [

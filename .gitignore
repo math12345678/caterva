@@ -40,6 +40,17 @@ Thumbs.db
 
 .gstack/
 
+# Installed dependencies, anywhere in the tree.
+#
+# The root package.json ("terrium-scientific-backend", which drives src/
+# and examples/) needs its own node_modules, and until 2026-08-10 nothing
+# ignored it: `git status` listed it as untracked, so a `git add -A` would
+# have committed tens of thousands of vendored files. The rule below is
+# unanchored deliberately -- it matches node_modules at any depth, so a new
+# workspace is covered the moment it exists rather than when someone
+# remembers to add a line here.
+node_modules/
+
 # Science-Agent-Pipeline is folded into this repo as regular files (it used
 # to be tracked as a gitlink to its own separate repo, which broke CI --
 # GitHub Actions checkout tried to resolve the gitlink and there was no
