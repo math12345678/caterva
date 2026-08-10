@@ -805,9 +805,30 @@ const PARAMETER_TOKEN_PATTERN = new RegExp(
   "i",
 );
 
-/** Scalar: km=5, vmax 10, beta = 0.4 */
+/** Scalar: km=5, vmax 10, beta = 0.4
+ *
+ * ANCHORED (`^...$`), and that is load-bearing. Unanchored, this matched a
+ * parameter name appearing ANYWHERE inside a whitespace-delimited token,
+ * so any word ending in a digit was harvested as a user-supplied override:
+ *
+ *     "...decay of CDK1 a0=100"   ->  { k: 1, ... }    // k from a protein name
+ *     "...decay of ERK2 a0=100"   ->  { k: 2, ... }
+ *     "simulate backend2 ..."     ->  { end: 2 }
+ *
+ * The overrides were then stamped `origin: "user"`, so `unverifiedOriginKeys`
+ * saw nothing to block and the simulation ran with a rate constant read off
+ * a protein's NAME. That defeats the entire hard rule (ADR 0008): the point
+ * is that no value nobody chose reaches the engine, and this minted values
+ * out of arbitrary text while reporting them as deliberate user input. It
+ * changed the scientific answer silently rather than failing loudly, which
+ * is the worst available failure mode.
+ *
+ * Anchoring costs nothing real: callers are already split on whitespace
+ * before this runs, so a delimiter-less pair ("km 5") could never reach it
+ * anyway -- queryOverrides.test.ts pins that it returns {}.
+ */
 const PARAMETER_PATTERN = new RegExp(
-  `(${PARAMETER_NAMES})\\s*[=:]?\\s*([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)`,
+  `^(${PARAMETER_NAMES})\\s*[=:]?\\s*([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)$`,
   "i",
 );
 
