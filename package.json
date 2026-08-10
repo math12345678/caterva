@@ -1,0 +1,70 @@
+{
+  "name": "terrium-scientific-backend",
+  "version": "1.0.0",
+  "description": "Production-ready scientific validation and reproducibility framework",
+  "main": "src/integration/scientificPipeline.ts",
+  "bin": {
+    "scientific": "src/cli/scientificCLI.ts"
+  },
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts",
+    "type-check": "tsc --noEmit",
+    "build": "tsc",
+    "cli": "ts-node src/cli/scientificCLI.ts",
+    "cli:help": "ts-node src/cli/scientificCLI.ts help",
+    "cli:validate": "ts-node src/cli/scientificCLI.ts validate",
+    "cli:simulate": "ts-node src/cli/scientificCLI.ts simulate",
+    "cli:literature": "ts-node src/cli/scientificCLI.ts literature",
+    "example": "ts-node examples/scientificPipelineExample.ts",
+    "dev": "ts-node --watch src/cli/scientificCLI.ts",
+    "verify-all": "npm run type-check && npm run lint && npm test"
+  },
+  "keywords": [
+    "science",
+    "validation",
+    "reproducibility",
+    "literature",
+    "enzyme-kinetics",
+    "michaelis-menten"
+  ],
+  "author": "Terrium Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.5.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {},
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.test.ts",
+      "!src/cli/**"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
+  }
+}
