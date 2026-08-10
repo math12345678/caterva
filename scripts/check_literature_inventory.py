@@ -7,9 +7,13 @@ same time:
 
   * `RESOLVABLE_FIELDS` resolves exactly five parameters live (km, ki,
     kcat/vmax, mutation_rate, beta/gamma-from-R0). Real, cited, verified.
-  * `DOMAIN_DEFAULTS` in queryResolver.ts contains 39 hardcoded numbers
-    across 15 domains — km=2, vmax=5, beta=0.3, gamma=0.1 — none of which
-    is checked against any source.
+  * `DOMAIN_DEFAULTS` in queryResolver.ts contains 64 hardcoded numbers
+    across 14 domains — km=2, vmax=5, beta=0.3, gamma=0.1 — none of which
+    is checked against any source. (The first count taken by hand said
+    "39 across 15"; both figures were wrong, because the hand-rolled regex
+    that produced them mis-parsed inline `parameters: { ... }` entries.
+    Recorded here because a guard against unchecked numbers reporting an
+    unchecked number of its own would be a poor joke.)
   * `domain-literature.ts` attaches a `defaultJustification` to those
     numbers reading "per Lehninger (2008)" and "per Kermack & McKendrick
     (1927)", which no test, guard, or human ever verified. Five of that
@@ -43,7 +47,7 @@ A number present in the code but absent from the inventory is a hard
 failure. That is the whole mechanism: you cannot add an unexplained
 constant without the build telling on you.
 
-The guard then prints the honest split. If the answer is "12 of 39 are
+The guard then prints the honest split. If the answer is "30 of 64 are
 teaching defaults", the project says that out loud instead of implying
 otherwise.
 

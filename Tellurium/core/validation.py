@@ -257,6 +257,27 @@ def beta_gamma_from_r0(
     return beta, gamma, ParameterValidation()
 
 
+def _flag_implausible_r0(v: ParameterValidation, beta: float,
+                         gamma: float) -> None:
+    """Flag (never reject) an R0 above any documented human pathogen.
+
+    Rule 2: implausible-but-arithmetically-valid values are flagged, not
+    rejected -- the model still runs and still teaches something, the
+    student is simply told the number is outside the observed range.
+
+    Shared by SIR and SEIR so the bound cannot drift between them, and so
+    neither can lose it to an early return on initial conditions.
+    """
+    basic_reproduction = beta / gamma
+    if basic_reproduction > R0_IMPLAUSIBLE_ABOVE:
+        v.flagged = True
+        v.flag_reason = (
+            f"R0 = beta/gamma = {basic_reproduction:g} exceeds "
+            f"{R0_IMPLAUSIBLE_ABOVE:g}, higher than any well-documented "
+            "human pathogen"
+        )
+
+
 def validate_sir_params(beta: float, gamma: float, s0: float, i0: float,
                         r0_recovered: float = 0.0) -> ParameterValidation:
     """Check an SIR parameter set.
@@ -283,18 +304,21 @@ def validate_sir_params(beta: float, gamma: float, s0: float, i0: float,
         v.errors.append("total population must be greater than zero")
         return v
 
+    # R0 = beta/gamma is a property of the DISEASE PARAMETERS alone. It does
+    # not depend on the initial conditions, so it must be evaluated before
+    # any early return on i0 -- otherwise an implausible R0 escapes unflagged
+    # whenever the caller starts with no infectives. That mattered: SEIR's
+    # API default is i0=0 (the epidemic is seeded by e0), so this check was
+    # disabled at the domain's normal operating point and an R0 of 1000 ran
+    # a full epidemic reporting flagged=False.
+    _flag_implausible_r0(v, beta, gamma)
+
     if i0 == 0:
         v.flagged = True
-        v.flag_reason = "I0 is zero: no outbreak can occur"
-        return v
-
-    basic_reproduction = beta / gamma
-    if basic_reproduction > R0_IMPLAUSIBLE_ABOVE:
-        v.flagged = True
+        no_outbreak = "I0 is zero: no outbreak can occur"
+        # Preserve an R0 flag raised above rather than overwriting it.
         v.flag_reason = (
-            f"R0 = beta/gamma = {basic_reproduction:g} exceeds "
-            f"{R0_IMPLAUSIBLE_ABOVE:g}, higher than any well-documented "
-            "human pathogen"
+            f"{v.flag_reason}; {no_outbreak}" if v.flag_reason else no_outbreak
         )
     return v
 
@@ -328,11 +352,18 @@ def validate_seir_params(beta: float, sigma: float, gamma: float, s0: float,
         v.flag_reason = "both E0 and I0 are zero: no outbreak can occur"
         return v
 
-    base_sir = validate_sir_params(beta, gamma, s0, i0, r0_recovered)
-    v.flagged = base_sir.flagged and not (base_sir.flag_reason or "").startswith("I0")
-    v.flag_reason = v.flag_reason or (base_sir.flag_reason if v.flagged else None)
-    if v.flagged and v.flag_reason is None:
-        v.flag_reason = base_sir.flag_reason
+    # SEIR checks R0 directly rather than inheriting it from
+    # validate_sir_params. The delegate returns early on i0 == 0 with an
+    # "I0 is zero" flag, which this wrapper then strips as inapplicable
+    # (correctly -- in SEIR e0 alone seeds an epidemic). The side effect was
+    # that the R0 bound was stripped along with it, at the exact default
+    # (i0=0) the API ships. Checking here makes the two independent.
+    #
+    # The former three-line flag-merge below it contained an unreachable
+    # branch (`if v.flagged and v.flag_reason is None`), which coverage
+    # confirmed the suite never executed; it is removed rather than kept as
+    # decoration.
+    _flag_implausible_r0(v, beta, gamma)
     return v
 
 def validate_pcr_params(n0: float, efficiency: float,
