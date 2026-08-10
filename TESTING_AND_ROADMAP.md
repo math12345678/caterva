@@ -528,7 +528,12 @@ interface QualityMetrics {
 ### Code Quality
 - [x] Zero TypeScript errors
 - [x] All helpers unit testable
-- [x] Type coverage >95%
+- [ ] Type coverage >95% -- **unmeasured, not checked off.** No type-coverage
+      tool (e.g. `type-coverage`) is installed or configured anywhere in this
+      repo, so this number was asserted with nothing behind it. Zero
+      TypeScript errors (the item above) is a real, checkable fact from
+      `tsc --noEmit`; type *coverage* is a different, unmeasured metric and
+      shouldn't be marked done until something actually measures it.
 - [ ] All routes have error handlers
 - [ ] All async operations have timeouts
 

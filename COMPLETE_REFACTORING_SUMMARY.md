@@ -283,9 +283,14 @@ All extracted helpers should have unit tests:
 ✅ app.ts
 ✅ simulate.ts
 ✅ literature-verifier.ts
-✅ telluriumRunner.ts (marked for future improvement)
 ✅ science_agent_runner.py
 ```
+
+`telluriumRunner.ts` was identified as a future-improvement candidate but was **not**
+actually modified in this pass -- an earlier version of this list checkmarked it as
+"Modified & Verified" anyway, which `git show --stat` on the underlying commit
+disproves (it isn't in the diff). Listed here separately rather than silently
+dropped, so the correction is visible rather than just quietly fixed.
 
 ---
 
@@ -390,7 +395,9 @@ Could create error hierarchy with consistent structure.
 ## Session Statistics
 
 ### Code Changes
-- **Total files touched:** 13 (12 TypeScript + 1 Python)
+- **Total files touched:** 12 (11 TypeScript + 1 Python) -- corrected from an
+  earlier "13 (12+1)" that counted `telluriumRunner.ts` as touched; it wasn't
+  (see "Files Modified & Verified" above)
 - **Total improvements:** 30+
 - **Lines modified:** 700+
 - **Functions extracted:** 20+

@@ -1,7 +1,8 @@
 # Code Quality Improvements — Comprehensive Backend Audit
 
 **Scope:** Complete review and improvement of key backend modules  
-**Files improved:** 5  
+**Files improved:** 6 (corrected from an earlier "5" that undercounted File 6,
+strenda-validator.ts, below)  
 **Total improvements:** 15+  
 **Verification:** All changes compile without TypeScript errors
 

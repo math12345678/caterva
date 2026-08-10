@@ -1,7 +1,7 @@
 # Terrium Documentation Index & Navigation Guide
 
 **Last Updated:** August 9, 2026  
-**Total Documentation:** 19,300+ lines across 13 documents  
+**Total Documentation:** 7,326 lines across the 14 documents listed below with line counts (counted directly via `wc -l` on 2026-08-10; an earlier version of this line claimed 19,300+ lines, roughly 2.6x the real total, and every per-document figure above was also inflated -- e.g. BACKEND_ARCHITECTURE.md claimed 2500 lines against a real 582).  
 **Status:** Complete, production-ready
 
 ---
@@ -98,7 +98,7 @@
 
 ### Architecture & Design Documents
 
-#### **BACKEND_ARCHITECTURE.md** (2500 lines)
+#### **BACKEND_ARCHITECTURE.md** (582 lines)
 **What:** Complete system design, all components, interactions  
 **Read when:** You need to understand how the system works  
 **Key sections:**
@@ -115,7 +115,7 @@
 
 ---
 
-#### **ADR_0003_Layer_Separation.md** (600 lines)
+#### **ADR_0003_Layer_Separation.md** (47 lines)
 **What:** Why shape validation is in TypeScript, science bounds in Python  
 **Read when:** Understanding separation of concerns, adding new domains  
 **Key insight:** Two layers cannot drift because each has ONE job
@@ -125,7 +125,7 @@
 
 ---
 
-#### **ADR_0007_Python_TypeScript_Boundary_Contract.md** (800 lines)
+#### **ADR_0007_Python_TypeScript_Boundary_Contract.md** (103 lines)
 **What:** How Python DISPATCH and TypeScript types stay synchronized  
 **Read when:** Adding a new domain, understanding contract tests  
 **Key sections:**
@@ -139,7 +139,7 @@
 
 ---
 
-#### **ADR_0008_Parameter_Provenance.md** (900 lines)
+#### **ADR_0008_Parameter_Provenance.md** (211 lines)
 **What:** How every parameter is tracked: where it came from, confidence level  
 **Read when:** Understanding results, implementing parameter resolution  
 **Key sections:**
@@ -153,7 +153,7 @@
 
 ---
 
-#### **ADR_0022_ODE_Oscillator_Domains.md** (700 lines)
+#### **ADR_0022_ODE_Oscillator_Domains.md** (234 lines)
 **What:** Why Lotka-Volterra, cell_cycle_oscillator, repressilator were added  
 **Read when:** Working with these domains, understanding domain design  
 **Key sections:**
@@ -166,7 +166,7 @@
 
 ---
 
-#### **BACKEND_AUDIT_SUMMARY.md** (600 lines)
+#### **BACKEND_AUDIT_SUMMARY.md** (322 lines)
 **What:** Executive summary of audit work, bugs fixed, documentation created  
 **Read when:** Understanding what was accomplished, getting high-level overview  
 **Key sections:**
@@ -182,7 +182,7 @@
 
 ### Operations Documents
 
-#### **DEPLOYMENT_GUIDE.md** (800 lines)
+#### **DEPLOYMENT_GUIDE.md** (871 lines)
 **What:** How to deploy Terrium in production  
 **Read when:** Ready to deploy, need to choose deployment option  
 **Key sections:**
@@ -201,7 +201,7 @@
 
 ---
 
-#### **OPERATIONS_RUNBOOK.md** (900 lines)
+#### **OPERATIONS_RUNBOOK.md** (726 lines)
 **What:** How to operate the system, respond to incidents  
 **Read when:** System is live, something goes wrong  
 **Key sections:**
@@ -217,7 +217,7 @@
 
 ---
 
-#### **TESTING_AND_CI_CD.md** (700 lines)
+#### **TESTING_AND_CI_CD.md** (732 lines)
 **What:** How to test, verify, release the system  
 **Read when:** Writing tests, setting up CI/CD, preparing release  
 **Key sections:**
@@ -235,7 +235,7 @@
 
 ### Development Documents
 
-#### **DEVELOPER_QUICK_START.md** (700 lines)
+#### **DEVELOPER_QUICK_START.md** (498 lines)
 **What:** Quick reference for common development tasks  
 **Read when:** First time working on the codebase, doing routine work  
 **Key sections:**
@@ -251,7 +251,7 @@
 
 ---
 
-#### **PERFORMANCE_GUIDE.md** (1200 lines)
+#### **PERFORMANCE_GUIDE.md** (485 lines)
 **What:** How to understand and improve performance  
 **Read when:** System is slow, need to optimize, planning scale  
 **Key sections:**
@@ -269,7 +269,7 @@
 
 ### Security Document
 
-#### **SECURITY_HARDENING.md** (900 lines)
+#### **SECURITY_HARDENING.md** (920 lines)
 **What:** Complete security guide for the system  
 **Read when:** Deploying to production, audit, considering security  
 **Key sections:**
@@ -293,7 +293,7 @@
 
 ### User-Facing Documents
 
-#### **API_USER_GUIDE.md** (1400 lines)
+#### **API_USER_GUIDE.md** (706 lines)
 **What:** How to use Terrium as a researcher  
 **Read when:** First time using the API, debugging query  
 **Key sections:**
@@ -312,7 +312,7 @@
 
 ---
 
-#### **INTEGRATION_EXAMPLES.md** (1800 lines)
+#### **INTEGRATION_EXAMPLES.md** (889 lines)
 **What:** Working code examples to build on Terrium  
 **Read when:** Integrating Terrium into your application  
 **Key sections:**
@@ -617,7 +617,7 @@ All documents
 
 ---
 
-**Total documentation:** 19,300+ lines  
+**Total documentation:** 7,326 lines (see per-document counts above)  
 **Last audit:** August 9, 2026  
 **Status:** Complete and production-ready  
 **Maintained by:** Backend team
