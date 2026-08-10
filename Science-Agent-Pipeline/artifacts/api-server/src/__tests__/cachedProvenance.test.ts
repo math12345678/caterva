@@ -56,9 +56,17 @@ describe("POST /api/simulate — parameterProvenance survives cache hit", () => 
     };
 
     const first = await poll();
-    if (!first) {
-      return;
-    }
+    // FAIL, do not return. `if (!first) return;` reported a PASS whenever
+    // the simulation failed or timed out -- i.e. in exactly the conditions
+    // where the ADR 0016 regression this file exists to guard (the cache
+    // path serving empty provenance) would be most likely to bite. A test
+    // that silently skips itself is worse than no test: it reports
+    // coverage it did not provide.
+    expect(
+      first,
+      "first simulation did not complete; the ADR 0016 cache-provenance " +
+        "regression was NOT exercised",
+    ).toBeTruthy();
 
     const again = await request(server).post("/api/simulate").send({ query });
     expect(again.status).toBe(202);
@@ -79,9 +87,11 @@ describe("POST /api/simulate — parameterProvenance survives cache hit", () => 
     };
 
     const second = await poll2();
-    if (!second) {
-      return;
-    }
+    expect(
+      second,
+      "second (cached) simulation did not complete; the cache path was " +
+        "NOT exercised",
+    ).toBeTruthy();
 
     expect(second.parameterProvenance).toEqual(first.parameterProvenance);
     expect(second.parameterProvenance).not.toEqual({});
