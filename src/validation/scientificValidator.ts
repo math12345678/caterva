@@ -179,6 +179,9 @@ export class ParameterValidator {
 // LAYER 2: LITERATURE VERIFICATION
 // ============================================================================
 
+/** Registry lookups must not hang a validation pass. */
+const LITERATURE_LOOKUP_TIMEOUT_MS = 15_000;
+
 export class LiteratureVerifier {
   private static verifiedCache = new Map<string, boolean>();
 
@@ -200,6 +203,11 @@ export class LiteratureVerifier {
         verified = await this.verifyDOI(ref.doi);
         if (!verified) {
           logger.warn({ doi: ref.doi }, 'DOI verification failed');
+          // Cached, like the success path. Previously every failure
+          // returned WITHOUT caching, so a fabricated DOI was re-fetched on
+          // every call -- and, more importantly, a transient network error
+          // was indistinguishable from a real rejection on the next pass.
+          this.verifiedCache.set(cacheKey, false);
           return false;
         }
       }
@@ -209,6 +217,7 @@ export class LiteratureVerifier {
         verified = await this.verifyPubMed(ref.pubmedId);
         if (!verified) {
           logger.warn({ pubmedId: ref.pubmedId }, 'PubMed verification failed');
+          this.verifiedCache.set(cacheKey, false);
           return false;
         }
       }
@@ -216,27 +225,124 @@ export class LiteratureVerifier {
       // Check 3: Peer review status
       if (!ref.peerReviewed) {
         logger.warn({ title: ref.title }, 'Non-peer-reviewed source');
+        this.verifiedCache.set(cacheKey, false);
         return false;
       }
 
       this.verifiedCache.set(cacheKey, true);
       return true;
     } catch (error) {
+      // NOT cached: an exception here is an infrastructure failure, not a
+      // verdict on the citation. Caching it would permanently mark a
+      // perfectly good reference as unverified because the network blipped
+      // once.
       logger.error({ error, reference: ref }, 'Literature verification error');
       return false;
     }
   }
 
+  /**
+   * Resolve a DOI against the CrossRef registry.
+   *
+   * This previously read:
+   *
+   *     // In production, call CrossRef API
+   *     // For now, basic validation
+   *     return /^10\.\d+\/\S+/.test(doi);
+   *
+   * i.e. a method named `verifyDOI`, marked `async` so it looked like it
+   * performed I/O, that returned `true` for ANY string shaped like a DOI.
+   * Measured against the five fabricated citations found in this repo on
+   * 2026-08-09:
+   *
+   *     10.1111/j.1432-1033.1913.tb07745.x  -> verified   (CrossRef: 404)
+   *     10.1038/35002131                    -> verified   (wrong paper)
+   *     10.9999/completely-made-up          -> verified
+   *     10.1/x                              -> verified
+   *
+   * Every fabricated DOI this project spent a day finding would have been
+   * stamped `verified: true` by a class called `ScientificValidator`. A
+   * validator that manufactures confidence is strictly worse than no
+   * validator, because it converts an unchecked claim into a checked-looking
+   * one.
+   *
+   * Now resolves against `api.crossref.org`, the same registry
+   * `scripts/verify_citations_live.py` uses. doi.org itself is deliberately
+   * avoided: publishers bot-gate its redirects, so a 403 there means
+   * nothing about whether the DOI exists.
+   *
+   * A network failure returns `false` rather than `true`: an unreachable
+   * registry means the citation is UNVERIFIED, and defaulting to verified
+   * on error is how a checker becomes decorative.
+   */
   private static async verifyDOI(doi: string): Promise<boolean> {
-    // In production, call CrossRef API
-    // For now, basic validation
-    return /^10\.\d+\/\S+/.test(doi);
+    if (!/^10\.\d{4,9}\/\S+$/.test(doi)) {
+      logger.warn({ doi }, 'DOI is not syntactically a DOI');
+      return false;
+    }
+    try {
+      const response = await fetch(
+        `https://api.crossref.org/works/${encodeURIComponent(doi)}`,
+        {
+          method: 'HEAD',
+          signal: AbortSignal.timeout(LITERATURE_LOOKUP_TIMEOUT_MS),
+        },
+      );
+      if (!response.ok) {
+        logger.warn(
+          { doi, status: response.status },
+          'DOI is not registered with CrossRef',
+        );
+      }
+      return response.ok;
+    } catch (error) {
+      logger.warn(
+        { doi, error },
+        'CrossRef unreachable; treating the DOI as UNVERIFIED rather than assuming it resolves',
+      );
+      return false;
+    }
   }
 
+  /**
+   * Resolve a PMID against PubMed's E-utilities.
+   *
+   * Previously `return /^\d+$/.test(id)` — so "1", "12345678" and
+   * "99999999" all verified. See verifyDOI above for why that shape of
+   * check is worse than none.
+   *
+   * `esummary` returns HTTP 200 with an `error` field for an unknown PMID
+   * rather than a 404, so the body is inspected instead of trusting the
+   * status code.
+   */
   private static async verifyPubMed(id: string): Promise<boolean> {
-    // In production, call PubMed API
-    // For now, basic validation
-    return /^\d+$/.test(id);
+    if (!/^\d+$/.test(id)) {
+      logger.warn({ pubmedId: id }, 'PMID is not numeric');
+      return false;
+    }
+    try {
+      const response = await fetch(
+        'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi' +
+          `?db=pubmed&retmode=json&id=${encodeURIComponent(id)}`,
+        { signal: AbortSignal.timeout(LITERATURE_LOOKUP_TIMEOUT_MS) },
+      );
+      if (!response.ok) return false;
+      const payload = (await response.json()) as {
+        result?: Record<string, { error?: string; uid?: string }>;
+      };
+      const record = payload.result?.[id];
+      const exists = record !== undefined && record.error === undefined;
+      if (!exists) {
+        logger.warn({ pubmedId: id }, 'PMID not found in PubMed');
+      }
+      return exists;
+    } catch (error) {
+      logger.warn(
+        { pubmedId: id, error },
+        'PubMed unreachable; treating the PMID as UNVERIFIED',
+      );
+      return false;
+    }
   }
 
   /**
