@@ -153,6 +153,16 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_domain_parity.py'}"
     ))
 
+    # Every hardcoded scientific number must declare its provenance. The
+    # project claimed "nothing is hardcoded, everything is literature-backed"
+    # while 64 numbers sat in DOMAIN_DEFAULTS unexamined, under
+    # justification strings nothing verified. This makes the claim
+    # falsifiable: UNVERIFIED is an allowed answer, silence is not.
+    guards.append(run_guard(
+        "Literature Inventory Guard",
+        f"python {SCRIPTS_DIR / 'check_literature_inventory.py'}"
+    ))
+
     return guards
 
 

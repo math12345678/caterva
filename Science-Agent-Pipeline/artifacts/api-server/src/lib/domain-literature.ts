@@ -61,7 +61,7 @@ export const MM_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (Km=2mM, Vmax=5 µM/s) represent typical values for soluble enzymes at physiological conditions per Lehninger (2008). Temperature 25°C, pH 7.0 assumed.",
+    "Lehninger (2008) is the source of the MICHAELIS-MENTEN MODEL, not of these numbers. Km=2mM and Vmax=5 are unverified teaching defaults chosen for legibility, and the hard rule (ADR 0008) blocks them from ever reaching a simulation: Km must resolve from BRENDA or be supplied explicitly. Vmax is reachable only via the ADR 0019 kcat x [E]0 bridge. An earlier version of this string read \'per Lehninger (2008)\', which asserted a citation for values no source supplies. See docs/literature-inventory.toml.",
 };
 
 /**
@@ -99,7 +99,7 @@ export const MM_CI_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (Km=2mM, Ki=1mM, Vmax=5 µM/s) from typical inhibitor-enzyme interactions per Copeland (2013). Requires both Km and Ki; missing either parameter triggers hard-rule rejection.",
+    "Copeland (2013) is the source of the COMPETITIVE-INHIBITION MODEL, not of these numbers. Km=2mM, Ki=1mM and Vmax=5 are unverified teaching defaults. Both Km and Ki resolve live from BRENDA (ADR 0018) and the hard rule rejects the query if either fails to resolve and is not supplied. See docs/literature-inventory.toml.",
 };
 
 /**
@@ -127,7 +127,7 @@ export const SIR_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (β=0.3 contacts/day, γ=0.1 day⁻¹) per Kermack & McKendrick (1927). S0=990, I0=10 represents small outbreak in population. Infectious period = 1/γ ≈ 10 days.",
+    "Kermack & McKendrick (1927) is the source of the SIR MODEL, not of these rates. β=0.3 and γ=0.1 are unverified placeholders; for a recognised disease both are DERIVED live from a literature (R0, infectious period) pair via ADR 0020 (COVID-19: Hussein et al. 2021, giving β=0.576, γ=0.183). S0=990/I0=10 is a scenario choice, not a measurement. See docs/literature-inventory.toml.",
 };
 
 /**
@@ -153,7 +153,7 @@ export const SEIR_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (β=0.3, σ=0.2 day⁻¹, γ=0.1 day⁻¹) per Anderson & May (1991). Incubation period = 1/σ ≈ 5 days (typical for COVID-19). Used for diseases with noticeable incubation period.",
+    "Anderson & May (1991) is the source of the SEIR MODEL, not of these rates. σ=0.2 (a 5-day latent period) is an UNVERIFIED teaching default: the ADR 0017 registry pairs R0 with a serial interval only, so no source in this system reports a latent period and σ has no literature backing today. β and γ derive from that registry for a recognised disease (ADR 0020). See docs/literature-inventory.toml.",
 };
 
 /**
@@ -225,7 +225,7 @@ export const GILLESPIE_SSA_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (a0=100 molecules, k=0.1 s⁻¹, end=10s) per Gillespie (1976). First-order decay with half-life = ln(2)/k ≈ 7s. Stochastic effects visible at small molecule counts.",
+    "Gillespie (1976) is the source of the STOCHASTIC SIMULATION ALGORITHM, not of these numbers. a0=1000 molecules and k=0.5 s⁻¹ are unverified illustrative values, not measured constants for any real species. (This string previously read \'a0=100 molecules, k=0.1 s⁻¹\' — both figures were also simply wrong against DOMAIN_DEFAULTS, which is what happens when a justification is prose nothing checks.) See docs/literature-inventory.toml.",
 };
 
 /**
@@ -247,7 +247,7 @@ export const PCR_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (n0=100 template copies, efficiency=0.95, cycles=30) per Mullis et al. (1986). Efficiency 0.95 represents typical PCR. After ~30 cycles, reagent depletion limits amplification.",
+    "Mullis et al. (1986) is the source of the PCR METHOD, not of these numbers. n0=100 template copies and efficiency=0.95 are unverified teaching defaults: template count is an experimental input, and real PCR efficiency is assay-specific (conventionally reported in the 0.9-1.0 band, which 0.95 sits in without being taken from any specific measurement). 30 cycles is a protocol length, not a scientific claim. See docs/literature-inventory.toml.",
 };
 
 /**
@@ -289,7 +289,7 @@ export const GILLESPIE_SSA_BIMOLECULAR_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (a0=50 A, b0=50 B, k=0.01 per pair/s) per Gillespie (1976). Bimolecular reactions require two molecules; rates scale with product of concentrations.",
+    "Gillespie (1976) is the source of the ALGORITHM, not of these numbers. a0=100, b0=100 and k=0.005 per pair/s are unverified illustrative values. (This string previously read \'a0=50, b0=50, k=0.01\', none of which matched DOMAIN_DEFAULTS.) See docs/literature-inventory.toml.",
 };
 
 /**
@@ -319,7 +319,7 @@ export const TWO_LOCUS_WRIGHT_FISHER_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (recombination_rate=0.01, population_size=10000) per Wright (1931). Recombination breaks linkage disequilibrium between loci; rates typical for unlinked loci.",
+    "Wright (1931) is the source of the TWO-LOCUS DRIFT MODEL, not of these numbers — and this string previously stated both of them wrongly (recombination_rate=0.01, population_size=10000; the actual defaults are 0.1 and 100, off by 10x and 100x). Both are unverified teaching defaults: a real recombination rate is locus-pair specific, and 0.1 is chosen so linkage disequilibrium decay is visible over ~20 generations. mutation_rate DOES resolve live from stdpopsim. See docs/literature-inventory.toml.",
 };
 
 /**
@@ -344,7 +344,7 @@ export const LOTKA_VOLTERRA_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Defaults (α=1.1, β=0.4, γ=0.1, δ=0.4) per Lotka (1925); γ < δ is the biologically ordinary case (predators convert prey to offspring slower than they die). Small-oscillation period 2π/√(αδ) ≈ 9.5 time units, comparable to the classic lynx-hare cycle. Population oscillations are the hallmark of this model; see tests/test_lotka_volterra_correctness.py for the conserved-quantity and fixed-point verification (a transposed γ/δ pairing here previously drove the prey population negative).",
+    "Lotka (1925) and Volterra (1926) are the source of the PREDATOR-PREY MODEL, not of these rates. α=1.1, β=0.4, γ=0.1, δ=0.4 are unverified teaching defaults; γ < δ is the biologically ordinary case (predators convert prey to offspring slower than they die), and the small-oscillation period 2π/√(αδ) ≈ 9.5 is comparable to the classic lynx-hare cycle, but no source supplies these four numbers. What IS verified is the model\'s behaviour under them: the exact first integral, the coexistence fixed point, the linearised period and agreement with an independent integrator — see tests/test_lotka_volterra_correctness.py. A transposed γ/δ pairing previously drove the prey population negative (ADR 0023). See docs/literature-inventory.toml.",
 };
 
 /**
