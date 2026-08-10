@@ -38,6 +38,7 @@ Run directly: python scripts/check_typescript_compiles.py
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -46,7 +47,24 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 PIPELINE_DIR = REPO_ROOT / "Science-Agent-Pipeline"
 
 #: Directories that never contain a workspace we should type-check.
-SKIP_PARTS = {"node_modules", "dist", ".next", "out-tsc", ".git", "__pycache__"}
+SKIP_PARTS = {
+    "node_modules",
+    "dist",
+    ".next",
+    "out-tsc",
+    ".git",
+    "__pycache__",
+    # Virtualenvs and caches hold no first-party TypeScript but are large
+    # enough to dominate the directory walk below -- .venv alone is tens of
+    # thousands of files.
+    ".venv",
+    "venv",
+    ".pytest_cache",
+    ".hypothesis",
+    ".mypy_cache",
+    "htmlcov",
+    ".freebuff",
+}
 
 #: How long a single workspace's type check may take before we call it
 #: hung. tsc on this repo's largest workspace runs in well under 30s; the
@@ -72,6 +90,143 @@ def _candidate_workspaces() -> list[pathlib.Path]:
             continue
         found.append(workspace)
     return sorted(found)
+
+
+
+def all_typescript_projects() -> list[pathlib.Path]:
+    """Every directory in the repository holding a tsconfig.json.
+
+    Unlike `_candidate_workspaces()` this is not scoped to
+    Science-Agent-Pipeline/ and does not require a `src/` subdirectory, so
+    a project anywhere in the tree is discovered.
+    """
+    projects: list[pathlib.Path] = []
+    for current, directories, files in os.walk(REPO_ROOT):
+        directories[:] = [d for d in directories if d not in SKIP_PARTS]
+        if "tsconfig.json" in files:
+            projects.append(pathlib.Path(current))
+    return sorted(projects)
+
+
+def first_party_typescript() -> set[pathlib.Path]:
+    """Every .ts/.tsx file in the repository that we wrote.
+
+    Declaration files are excluded: a stray .d.ts is a type declaration,
+    not code that needs compiling.
+    """
+    sources: set[pathlib.Path] = set()
+    for current, directories, files in os.walk(REPO_ROOT):
+        directories[:] = [d for d in directories if d not in SKIP_PARTS]
+        here = pathlib.Path(current)
+        for name in files:
+            if name.endswith(".d.ts"):
+                continue
+            if name.endswith(".ts") or name.endswith(".tsx"):
+                sources.add((here / name).resolve())
+    return sources
+
+
+def files_covered_by(project: pathlib.Path) -> set[pathlib.Path]:
+    """The set of files `tsc` actually pulls into this project.
+
+    Asks the compiler via `--listFiles` rather than reimplementing
+    tsconfig's include/exclude/extends resolution, which has enough corner
+    cases (globs, `references`, `files` vs `include`, implicit exclusions)
+    that a hand-rolled version would be wrong in ways nobody would notice.
+
+    `--listFiles` prints the file list even when the compile has errors, so
+    coverage is still known for a project that does not currently build.
+    """
+    try:
+        result = subprocess.run(
+            ["npx", "tsc", "--noEmit", "--listFiles", "-p", "."],
+            cwd=project,
+            capture_output=True,
+            text=True,
+            timeout=TSC_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return set()
+
+    covered: set[pathlib.Path] = set()
+    for line in result.stdout.splitlines():
+        candidate = line.strip()
+        if not candidate.endswith((".ts", ".tsx")):
+            continue
+        path = pathlib.Path(candidate)
+        if not path.is_absolute():
+            path = (project / path).resolve()
+        try:
+            resolved = path.resolve()
+        except OSError:
+            continue
+        if resolved.is_relative_to(REPO_ROOT):
+            covered.add(resolved)
+    return covered
+
+
+def unguarded_typescript_trees() -> list[pathlib.Path]:
+    """Top-level trees holding TypeScript that no tsconfig actually compiles.
+
+    A workspace without a tsconfig.json is invisible to the type check
+    above -- it discovers workspaces BY their tsconfig, so a TypeScript
+    tree that lacks one is silently not type-checked rather than reported.
+
+    That is not hypothetical. On 2026-08-09 a `src/` tree appeared at the
+    repository root: 3,300+ lines across literatureService.ts,
+    scientificValidator.ts, reproducibilityEngine.ts and a CLI, with a
+    package.json advertising `"type-check": "tsc --noEmit"` and
+    `"build": "tsc"` -- and no tsconfig.json for either script to use. It
+    could not be compiled by its own commands, was imported by nothing, and
+    no guard in this repository looked at it. It contained a `verifyDOI`
+    that returned true for any DOI-shaped string, and a reproducibility
+    verifier whose `maxRelativeError` was always exactly 0.
+
+    IMPLEMENTATION NOTE, and the reason this asks tsc instead of looking
+    for files: the first version of this function tested "does a
+    tsconfig.json exist at or above this directory". That test became
+    VACUOUS the moment a tsconfig.json was added at the repository root to
+    cover src/ -- every directory in the repo then found that root config
+    by walking up, so the function could never report anything again. It
+    returned "no unguarded trees" because it was structurally incapable of
+    returning anything else, which is precisely the class of defect this
+    guard exists to catch. Membership is now decided by the compiler's own
+    `--listFiles` output, so a file that no project actually pulls in is
+    reported however many tsconfigs happen to sit above it.
+    """
+    sources = first_party_typescript()
+    if not sources:
+        return []
+
+    covered: set[pathlib.Path] = set()
+    for project in all_typescript_projects():
+        covered |= files_covered_by(project)
+
+    return sorted(sources - covered)
+
+
+#: Build-tool configuration files -- `vite.config.ts`, `vitest.config.ts`,
+#: `drizzle.config.ts`, `orval.config.ts` and friends. Each is loaded and
+#: type-stripped by its own tool at runtime rather than compiled by the
+#: application's tsconfig, so they routinely sit outside every project's
+#: `include`. They are genuinely not type-checked, and the conventional
+#: remedy is a `tsconfig.node.json` per workspace that includes them.
+#:
+#: They are reported on every run but do not fail the build, because the
+#: blast radius differs in kind: a broken vite.config.ts stops the build
+#: immediately and loudly, whereas an unchecked application module ships.
+#: This distinction is written down rather than silently applied -- an
+#: exemption nobody can see is how a guard rots.
+def _is_tool_config(path: pathlib.Path) -> bool:
+    return path.name.endswith(".config.ts")
+
+
+def unguarded_source_files() -> tuple[list[pathlib.Path], list[pathlib.Path]]:
+    """Split uncovered TypeScript into (application source, tool configs)."""
+    uncovered = unguarded_typescript_trees()
+    configs = [f for f in uncovered if _is_tool_config(f)]
+    source = [f for f in uncovered if not _is_tool_config(f)]
+    return source, configs
 
 
 def _has_local_typescript(workspace: pathlib.Path) -> bool:
@@ -124,6 +279,33 @@ def check() -> list[str]:
             "type-checked. Install Node.js, or run with --no-typescript if "
             "this is deliberate."
         ]
+
+    # TypeScript that no project compiles is not "zero workspaces", it is
+    # unchecked code. Reported before the per-workspace loop so it cannot
+    # be lost among passing results.
+    unguarded_source, unguarded_configs = unguarded_source_files()
+
+    for source in unguarded_source:
+        violations.append(
+            f"{source.relative_to(REPO_ROOT)} is TypeScript that NO "
+            "tsconfig.json actually compiles, so nothing type-checks it. "
+            "Add it to a project's `include`, give its tree a "
+            "tsconfig.json, or delete it -- unguarded code is where "
+            "defects live unobserved."
+        )
+
+    if unguarded_configs:
+        print(
+            "NOTE: %d build-tool config file(s) are not type-checked by any "
+            "project. Not a build failure (see _is_tool_config), but real:"
+            % len(unguarded_configs)
+        )
+        for config in unguarded_configs:
+            print(f"  - {config.relative_to(REPO_ROOT)}")
+        print(
+            "  Remedy: add a tsconfig.node.json per workspace including "
+            "these files.\n"
+        )
 
     workspaces = _candidate_workspaces()
     if not workspaces:

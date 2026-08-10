@@ -1,0 +1,46 @@
+{
+  // The root TypeScript tree (src/ + examples/) shipped with a package.json
+  // advertising "type-check": "tsc --noEmit" and "build": "tsc" but NO
+  // tsconfig.json for either script to use. With no config and no file
+  // arguments, `tsc --noEmit` prints its own help text and exits 1 -- so
+  // `npm run verify-all` ("type-check && lint && test") died at step one
+  // having checked exactly zero files, and no guard in scripts/ looked at
+  // this tree at all. 3,300+ lines were unchecked by anything.
+  //
+  // Strictness mirrors Science-Agent-Pipeline/tsconfig.base.json so this
+  // tree is held to the same standard as the api-server rather than a
+  // softer one. It does not `extend` that file: this tree is standalone,
+  // uses CommonJS + node resolution for ts-node/jest, and must not inherit
+  // the pipeline's "customConditions": ["workspace"], which only resolves
+  // inside the pnpm workspace this tree is not a member of.
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "target": "es2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node", "jest"]
+  },
+  // examples/ is included deliberately: scientificPipelineExample.ts imports
+  // ../src/integration/scientificPipeline, so it is part of this tree's
+  // graph and was one of the unguarded regions the TypeScript guard found.
+  "include": ["src", "examples"],
+  "exclude": ["node_modules", "dist"]
+}
