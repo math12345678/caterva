@@ -443,11 +443,26 @@ class VerifiableMetricsCollector {
    * citation-attached version of the same numbers.
    */
   getSnapshot(): {
+    timestamp: string;
     activeJobs: number;
     completedJobs: number;
     failedJobs: number;
     avgLatencyMs: number;
     llmSuccessRate: number;
+    literatureHitRate: number;
+    /** Total resolution attempts behind llmSuccessRate / literatureHitRate.
+     * Exposed so a caller can tell "100% of zero" from "100% of 500" --
+     * /api/metrics/health previously reported a fabricated 100% success
+     * rate computed from an empty sample and could never return
+     * `degraded`. A rate without its denominator is not a measurement. */
+    sampleCount: number;
+    resolutionMetrics: {
+      llmClassificationSuccesses: number;
+      llmClassificationFailures: number;
+      keywordFallbackUsed: number;
+      literatureHitCount: number;
+      literatureMissCount: number;
+    };
     stageMetrics: Record<
       string,
       { successCount: number; failureCount: number; avgDurationMs: number }
@@ -499,12 +514,32 @@ class VerifiableMetricsCollector {
       };
     }
 
+    const literatureHitRate =
+      this.resolutionMetrics.literatureAttempts > 0
+        ? (this.resolutionMetrics.literatureHits /
+            this.resolutionMetrics.literatureAttempts) *
+          100
+        : 0;
+
     return {
+      timestamp: new Date().toISOString(),
       activeJobs: this.jobMetrics.activeJobs.size,
       completedJobs: this.jobMetrics.completedJobs,
       failedJobs: this.jobMetrics.failedJobs,
       avgLatencyMs,
       llmSuccessRate,
+      literatureHitRate,
+      sampleCount: this.jobMetrics.completedJobs + this.jobMetrics.failedJobs,
+      resolutionMetrics: {
+        llmClassificationSuccesses: this.resolutionMetrics.llmSuccesses,
+        llmClassificationFailures:
+          this.resolutionMetrics.llmAttempts - this.resolutionMetrics.llmSuccesses,
+        keywordFallbackUsed: this.resolutionMetrics.keywordFallbacks,
+        literatureHitCount: this.resolutionMetrics.literatureHits,
+        literatureMissCount:
+          this.resolutionMetrics.literatureAttempts -
+          this.resolutionMetrics.literatureHits,
+      },
       stageMetrics,
       domainMetrics,
     };
