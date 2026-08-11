@@ -1,5 +1,23 @@
 # Architecture Decision Records (ADRs)
 
+> **⚠️ Not the repo's real ADRs -- read before citing this document.**
+> This repo already has a real ADR set at `docs/adr/` (23 numbered records,
+> e.g. `docs/adr/0022-three-oscillator-domains.md`) and a second real set
+> under `Science-Agent-Pipeline/artifacts/api-server/ADR_*.md`. The seven
+> "ADR-0001" through "ADR-0007" below are a separate, self-contained
+> narrative that does not correspond to either set. Several of the code
+> patterns they describe (`isValidFiniteNumber`, `createVerificationResult`,
+> `isTerminal`, `GlobalRateLimiter`, `queryResolver.ts`, `cache.ts`,
+> `queue.ts`) do not exist anywhere in this repo's `src/` tree (confirmed by
+> grep, 2026-08-10) -- they describe the OTHER codebase
+> (`Science-Agent-Pipeline/artifacts/api-server/`), not this one. The
+> specific metrics ("25% code reduction," "47% reduction in allocations,"
+> "onboarding reduced from 15 hours to 3 hours") have no measurement
+> artifact behind them. Kept below as-is per repo convention (nothing
+> deleted, corrected in place elsewhere) -- treat every claim here as
+> unverified narrative, not a real decision record, until checked against
+> the actual `docs/adr/` files.
+
 **Purpose:** Document significant architectural decisions, rationale, and trade-offs  
 **Scope:** Terrium backend code quality refactoring  
 **Date:** 2026-08-09  

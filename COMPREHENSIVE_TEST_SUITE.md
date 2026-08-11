@@ -1,5 +1,22 @@
 # Comprehensive Test Suite Blueprint
 
+> **⚠️ Blueprint/design sketch -- does not describe the real test suite.**
+> Every import path below (`../validators`, `../factories`, `../predicates`,
+> `../lib/queryResolver`, `../lib/cache`, `../app`) points at files that
+> don't exist in this repo's `src/` tree (real directories are
+> `literature/`, `integration/`, `reproducibility/`, `engine/`,
+> `validation/`, `cli/`). The `supertest`-against-Express examples assume an
+> HTTP server this codebase doesn't have. The `coverageThreshold` block
+> shown (90/90/90/90 global, 100% for `./src/lib/validators.ts`) does not
+> match the real one in `package.json`, which sets 80/80/80/80 with no
+> per-file threshold. Real, current numbers (`npx jest --coverage`,
+> repo root, 2026-08-10): **150 tests pass across 10 suites**; coverage is
+> 79.08% statements / 62.2% branches / 79.04% functions / 80% lines --
+> below the real 80% global gate on three of four metrics, so
+> `npx jest --coverage` exits non-zero even though every individual test
+> passes. Kept below as a design sketch of a MORE extensive suite than
+> exists today, not a description of current behavior.
+
 ## Test Implementation Priority & Examples
 
 ### Tier 1: Critical Path (Implement First)

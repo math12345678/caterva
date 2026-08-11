@@ -1,5 +1,16 @@
 # Performance Benchmarking & Optimization Guide
 
+> **⚠️ No benchmark was ever run -- every number below is invented.**
+> There is no benchmarking tool anywhere in this repo (no Artillery, k6, or
+> autocannon config; no perf-test file under `src/`; confirmed 2026-08-10),
+> no `https://api.staging.terrium.dev` to target, and this codebase has no
+> HTTP server to load-test in the first place (`src/`, package
+> `terrium-scientific-backend`, is a library/CLI). The specific p50/p95/p99
+> latency figures, "3500 req/s," and "75% cache hit rate" below are
+> illustrative placeholders, not measurements. Kept below as a template for
+> what benchmarking this tree WOULD look like if it were ever exposed as a
+> service and instrumented, not as a report of real performance.
+
 **Purpose:** Establish baselines, measure improvements, and optimize critical paths  
 **Last Updated:** 2026-08-09  
 **Owner:** Performance Team  
