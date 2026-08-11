@@ -35,6 +35,22 @@ export interface SimulationRequest {
     pH?: number;
     buffer?: string;
   };
+  /**
+   * The enzyme system to resolve kinetic constants for, against BRENDA and
+   * PubMed via `LiteratureService.resolveFromLiterature`.
+   *
+   * Optional, and NOT inferred from `query` when absent. Guessing an
+   * enzyme, substrate or organism out of free text would attach a real
+   * citation to a system the user never named -- provenance for the wrong
+   * measurement, which is worse than no provenance. Without this the
+   * pipeline uses only literature the caller supplied directly.
+   */
+  system?: {
+    enzymeName?: string;
+    substrate: string;
+    organism: string;
+    ecNumber?: string;
+  };
 }
 
 export interface SimulationResponse {
@@ -110,7 +126,8 @@ export class ScientificPipeline {
 
       const resolvedParameters = await this.resolveParameters(
         request.query,
-        request.parameters
+        request.parameters,
+        request.system
       );
 
       // STEP 2: Get literature backing
@@ -388,7 +405,8 @@ ${integrityReport}
 
   private async resolveParameters(
     query: string,
-    userParameters?: Record<string, number>
+    userParameters?: Record<string, number>,
+    system?: SimulationRequest['system']
   ): Promise<Record<string, { value: number; unit: string; source: string }>> {
     // Parse query to extract domain and requirements
     const domain = query.toLowerCase().includes('michaelis') ? 'mm' : 'sir';
@@ -406,12 +424,36 @@ ${integrityReport}
       }
     }
 
-    // Get recommendations from literature for missing parameters
+    // Get recommendations from literature for missing parameters.
+    //
+    // `resolveFromLiterature` tries the in-memory database first, then --
+    // when the caller named a system -- the real BRENDA/PubMed chain via
+    // science_agent_runner.py. Previously this called the synchronous
+    // `getRecommendation`, which only ever saw literature the caller had
+    // already handed in, so a parameter absent from that handful was
+    // simply dropped and the run continued without it.
     const requiredParams = this.getRequiredParameters(domain);
     for (const param of requiredParams) {
       if (!resolved[param]) {
         try {
-          const recommendation = this.literatureService.getRecommendation(param, domain);
+          const recommendation = system
+            ? await this.literatureService.resolveFromLiterature(
+                param,
+                domain,
+                system
+              )
+            : this.literatureService.getRecommendation(param, domain);
+
+          if (!recommendation) {
+            // The literature genuinely has nothing. Left unresolved rather
+            // than defaulted; downstream validation reports the missing
+            // parameter and the engine bridge refuses to run without it.
+            logger.warn(
+              { parameter: param, domain },
+              'Literature has no value for this parameter; leaving it unresolved'
+            );
+            continue;
+          }
           resolved[param] = {
             value: recommendation.recommendedValue,
             // The unit the SOURCES reported, not one guessed from the
