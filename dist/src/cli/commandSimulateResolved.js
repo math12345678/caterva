@@ -1,0 +1,445 @@
+"use strict";
+/**
+ * `scientific simulate --resolve` — look up what the simulation needs, run
+ * it, and show where every number came from.
+ *
+ * This is the command that makes Terrium a tool rather than a validator.
+ * The old `simulate` path could not succeed through literature at all:
+ *
+ *   - `fetchRealLiterature('lactate dehydrogenase', 'lactate')` was called
+ *     with those two strings HARDCODED, so every simulation of every system
+ *     fetched papers about lactate dehydrogenase regardless of the query.
+ *   - It built `Literature` objects with `extractedParameters: []`, so the
+ *     recommender had no values to recommend and validation always failed
+ *     with NO_LITERATURE.
+ *   - It set `peerReviewed: true` with the comment "Papers in PubMed are
+ *     peer-reviewed by definition". That is false — PubMed indexes
+ *     preprints, editorials, letters and retracted papers — and the field
+ *     feeds a verifier that trusts it.
+ *
+ * This path uses the resolver that returns actual measurements: BRENDA
+ * exact, BRENDA cross-species, then PubMed candidates, each carrying a
+ * value, a unit, an organism and a citation.
+ *
+ * THE PROVENANCE TABLE IS THE POINT. A number on screen with no source is
+ * what every other tool gives you. Every parameter printed here says where
+ * it came from, and anything that could not be sourced stops the run rather
+ * than being defaulted.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.commandSimulateResolved = commandSimulateResolved;
+const scientificPipeline_1 = require("../integration/scientificPipeline");
+const literatureResolver_1 = require("../literature/literatureResolver");
+const units_1 = require("../units");
+const parseQuantity_1 = require("./parseQuantity");
+const commandSensitivity_1 = require("./commandSensitivity");
+const job_manager_1 = require("../execution/job-manager");
+const inhibitionModels_1 = require("./inhibitionModels");
+const BOLD = '\x1b[1m';
+const DIM = '\x1b[2m';
+const RED = '\x1b[31m';
+const GREEN = '\x1b[32m';
+const YELLOW = '\x1b[33m';
+const RESET = '\x1b[0m';
+const useColour = process.stdout.isTTY === true;
+const c = (code, text) => useColour ? `${code}${text}${RESET}` : text;
+/** Exit codes mirror `resolve`: 0 ran, 1 could not look up, 2 no data. */
+async function commandSimulateResolved(options) {
+    const provenance = [];
+    const unresolved = [];
+    // ---- user-supplied values first -------------------------------------
+    //
+    // A value the user typed is not a guess and must not be overwritten by a
+    // lookup. It is still recorded with its origin so the table is complete.
+    const userValues = {};
+    for (const [name, raw] of Object.entries(options.overrides)) {
+        const quantity = (0, parseQuantity_1.parseQuantity)(name, raw);
+        userValues[name] = { value: quantity.value, unit: quantity.unit };
+        provenance.push({
+            name,
+            value: quantity.value,
+            unit: quantity.unit,
+            origin: 'user',
+            unitAssumed: !quantity.unitDeclared,
+        });
+    }
+    let enzymeConcMM;
+    if (options.enzymeConc) {
+        const parsed = (0, parseQuantity_1.parseQuantity)('e0', options.enzymeConc);
+        // The Python bridge takes [E]0 in mM (ADR 0013). Converted rather than
+        // assumed, so `--enzyme-conc 1uM` is not read as 1 mM.
+        enzymeConcMM = (0, units_1.convertConcentration)(parsed.value, parsed.unit, 'mM');
+        provenance.push({
+            name: 'e0',
+            value: parsed.value,
+            unit: parsed.unit,
+            origin: 'user',
+            unitAssumed: !parsed.unitDeclared,
+        });
+    }
+    // ---- resolve what is missing ----------------------------------------
+    const needed = ['km', 'vmax'];
+    for (const name of needed) {
+        if (userValues[name])
+            continue;
+        try {
+            if (name === 'km') {
+                const result = await (0, literatureResolver_1.resolveKinetic)({
+                    enzymeName: options.enzyme,
+                    ecNumber: options.ec,
+                    substrate: options.substrate,
+                    organism: options.organism,
+                    quantity: 'km',
+                });
+                if (!result.found) {
+                    unresolved.push('km');
+                    continue;
+                }
+                userValues['km'] = { value: result.value, unit: result.unit };
+                provenance.push({
+                    name: 'km',
+                    value: result.value,
+                    unit: result.unit,
+                    origin: result.source,
+                    citation: result.citation
+                        ? `${result.citation.source} ref ${result.citation.reference_id ?? '?'}`
+                        : undefined,
+                    organism: result.organism ?? undefined,
+                    crossSpecies: result.crossSpecies,
+                });
+            }
+            else {
+                // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
+                // caller input BRENDA does not supply per row (ADR 0012/0013).
+                // Without it, a resolved kcat is a citable number that cannot
+                // reach a simulation -- said out loud rather than defaulted.
+                if (enzymeConcMM === undefined) {
+                    unresolved.push('vmax (needs --enzyme-conc: Vmax = kcat x [E]0, and BRENDA does ' +
+                        'not report [E]0)');
+                    continue;
+                }
+                const result = await (0, literatureResolver_1.resolveKinetic)({
+                    enzymeName: options.enzyme,
+                    ecNumber: options.ec,
+                    substrate: options.substrate,
+                    organism: options.organism,
+                    quantity: 'kcat',
+                    enzymeConc: enzymeConcMM,
+                });
+                if (!result.found || result.bridgedVmax === undefined) {
+                    unresolved.push('vmax (no kcat found to bridge)');
+                    continue;
+                }
+                userValues['vmax'] = { value: result.bridgedVmax, unit: 'mM/s' };
+                provenance.push({
+                    name: 'vmax',
+                    value: result.bridgedVmax,
+                    unit: 'mM/s',
+                    origin: `${result.source} → kcat x [E]0`,
+                    citation: result.citation
+                        ? `${result.citation.source} ref ${result.citation.reference_id ?? '?'}`
+                        : undefined,
+                    organism: result.organism ?? undefined,
+                    crossSpecies: result.crossSpecies,
+                });
+            }
+        }
+        catch (err) {
+            if (err instanceof literatureResolver_1.ResolverUnavailableError) {
+                if (options.json) {
+                    process.stdout.write(JSON.stringify({ ok: false, status: 'unavailable', parameter: name, reason: err.message }, null, 2) + '\n');
+                }
+                else {
+                    process.stderr.write(`${c(RED, '✗')} Could not look up ${name}: ${err.message}\n` +
+                        `${c(DIM, '  Nothing was learned about this system. This is not the same as')}\n` +
+                        `${c(DIM, '  the literature having no value.')}\n`);
+                }
+                return 1;
+            }
+            throw err;
+        }
+    }
+    // Ki, for inhibition models. A BRENDA table exactly like Km, resolved by
+    // its OWN call so a cross-species Ki can never inherit a verified Km's
+    // provenance (ADR 0008).
+    const model = options.model ?? 'mm';
+    if (model !== 'mm' && !userValues['ki']) {
+        try {
+            const result = await (0, literatureResolver_1.resolveKinetic)({
+                enzymeName: options.enzyme,
+                ecNumber: options.ec,
+                substrate: options.substrate,
+                organism: options.organism,
+                quantity: 'ki',
+            });
+            if (result.found) {
+                userValues['ki'] = { value: result.value, unit: result.unit };
+                provenance.push({
+                    name: 'ki',
+                    value: result.value,
+                    unit: result.unit,
+                    origin: result.source,
+                    citation: result.citation
+                        ? `${result.citation.source} ref ${result.citation.reference_id ?? '?'}`
+                        : undefined,
+                    organism: result.organism ?? undefined,
+                    crossSpecies: result.crossSpecies,
+                });
+            }
+            else {
+                unresolved.push('ki (no inhibition constant in the literature for this system)');
+            }
+        }
+        catch (err) {
+            if (err instanceof literatureResolver_1.ResolverUnavailableError) {
+                process.stderr.write(`${c(RED, '✗')} Could not look up ki: ${err.message}\n`);
+                return 1;
+            }
+            throw err;
+        }
+    }
+    // Requirements differ per model, so check the model's own list.
+    for (const required of inhibitionModels_1.INHIBITION_MODELS[model].requires) {
+        if (required === 'km' || required === 'vmax' || required === 'ki')
+            continue;
+        if (!userValues[required]) {
+            unresolved.push(`${required} (an experimental condition — supply it, e.g. --${required} 10mM)`);
+        }
+    }
+    // Supplying a Ki and then running plain `mm` silently discards the
+    // inhibitor: the run succeeds and the inhibition being studied is simply
+    // absent from the result.
+    if (model === 'mm') {
+        const suggestion = (0, inhibitionModels_1.suggestModel)({
+            ki: userValues['ki']?.value,
+            i0: userValues['i0']?.value,
+        });
+        if (suggestion) {
+            process.stdout.write(`\n${c(YELLOW, '•')} ${c(BOLD, `Did you mean --model ${suggestion.model}?`)} ` +
+                `${c(DIM, suggestion.why + '.')}\n`);
+        }
+    }
+    // s0 has no literature source: it is an experimental condition the user
+    // chooses, not a property of the enzyme.
+    if (!userValues['s0']) {
+        unresolved.push('s0 (an experimental condition — supply it, e.g. --s0 10mM)');
+    }
+    if (unresolved.length > 0) {
+        if (options.json) {
+            process.stdout.write(JSON.stringify({ ok: false, status: 'unresolved', unresolved, provenance }, null, 2) + '\n');
+        }
+        else {
+            printProvenance(provenance);
+            process.stdout.write(`\n${c(RED, '✗')} ${c(BOLD, 'Cannot run.')} These are unresolved:\n`);
+            for (const item of unresolved) {
+                process.stdout.write(`    ${item}\n`);
+            }
+            process.stdout.write(`\n${c(DIM, 'No value has been invented to fill the gap. A simulation on a')}\n` +
+                `${c(DIM, 'defaulted parameter produces a result that looks measured and is not.')}\n\n`);
+        }
+        return 2;
+    }
+    // ---- run it ----------------------------------------------------------
+    const pipeline = new scientificPipeline_1.ScientificPipeline();
+    const numeric = {};
+    for (const [name, v] of Object.entries(userValues)) {
+        numeric[name] = v.value;
+    }
+    // The pipeline resolves through the SAME resolver used above, and
+    // returns provenance for everything it touched. Passing `system` lets it
+    // attach citations to what it resolves; passing the values we already
+    // resolved as `parameters` keeps user overrides authoritative.
+    // Hand the pipeline the provenance for everything resolved above, so a
+    // BRENDA-sourced Km arrives as sourced rather than as a hand-typed number.
+    const providedProvenance = {};
+    for (const row of provenance) {
+        providedProvenance[row.name] = {
+            source: row.origin,
+            unit: row.unit,
+            ...(row.citation ? { citations: [row.citation] } : {}),
+        };
+    }
+    const response = await pipeline.execute({
+        query: `${options.enzyme ?? options.ec} / ${options.substrate}`,
+        parameters: numeric,
+        providedProvenance,
+        system: {
+            enzymeName: options.enzyme,
+            ecNumber: options.ec,
+            substrate: options.substrate,
+            organism: options.organism,
+        },
+        ...(options.enzymeConc
+            ? {
+                enzymeConcentration: {
+                    value: (0, parseQuantity_1.parseQuantity)('e0', options.enzymeConc).value,
+                    unit: (0, parseQuantity_1.parseQuantity)('e0', options.enzymeConc).unit,
+                },
+            }
+            : {}),
+    });
+    // The pipeline returns a fully-shaped response even when validation
+    // STOPS the run -- empty trajectory, finalValue 0, blank reproducibility
+    // key. Printing that as a result rendered "initial undefined, points 0"
+    // and exited 0, which is a success report for a simulation that never
+    // executed. Checked before anything is presented.
+    if (!response.validated) {
+        if (options.json) {
+            process.stdout.write(JSON.stringify({
+                ok: false,
+                status: 'validation_failed',
+                errors: response.validationErrors,
+                provenance,
+            }, null, 2) + '\n');
+        }
+        else {
+            printProvenance(provenance);
+            process.stdout.write(`\n${c(RED, '✗')} ${c(BOLD, 'Validation stopped the run.')} No simulation was executed.\n`);
+            for (const message of response.validationErrors) {
+                process.stdout.write(`    ${message}\n`);
+            }
+            process.stdout.write('\n');
+        }
+        return 2;
+    }
+    // Inhibition models run through the engine directly (competitive) or as
+    // SBML (non-competitive, product) -- the same solver either way, never a
+    // second simulator in TypeScript.
+    if (model !== 'mm') {
+        printProvenance(provenance);
+        if (model === 'product') {
+            process.stdout.write(`\n${c(YELLOW, '⚠')} ${inhibitionModels_1.PRODUCT_INHIBITION_CAVEAT}\n`);
+        }
+        try {
+            const run = await (0, inhibitionModels_1.runInhibitionModel)(model, {
+                km: userValues['km'].value,
+                vmax: userValues['vmax'].value,
+                s0: userValues['s0'].value,
+                ki: userValues['ki']?.value,
+                i0: userValues['i0']?.value,
+                end: 10,
+                points: 101,
+            });
+            const series = run.trajectory;
+            const first = series[0] ?? {};
+            const last = series[series.length - 1] ?? {};
+            const substrateKey = Object.keys(first).find((k) => k.includes('S')) ?? '';
+            process.stdout.write(`\n${c(BOLD, 'Result')}  ${c(DIM, inhibitionModels_1.INHIBITION_MODELS[model].description)}\n`);
+            process.stdout.write(`  ${c(DIM, 'engine    ')} ${run.domain}${run.viaSbml ? c(DIM, '  (via SBML — no first-class domain for this model)') : ''}\n`);
+            if (substrateKey) {
+                process.stdout.write(`  ${c(DIM, 'initial   ')} ${Number(first[substrateKey]).toFixed(4)}\n`);
+                process.stdout.write(`  ${c(DIM, 'final     ')} ${Number(last[substrateKey]).toFixed(4)}\n`);
+            }
+            process.stdout.write(`  ${c(DIM, 'points    ')} ${series.length}\n\n`);
+            return 0;
+        }
+        catch (err) {
+            process.stderr.write(`${c(RED, '✗')} ${err instanceof Error ? err.message : String(err)}\n`);
+            return 2;
+        }
+    }
+    // Sensitivity runs on the SAME resolved parameters, with the SAME
+    // provenance. That pairing is the point: it can then say which weakly
+    // sourced number the answer actually rides on.
+    if (options.sensitivity !== undefined) {
+        printProvenance(provenance);
+        return (0, commandSensitivity_1.commandSensitivity)({
+            query: `${options.enzyme ?? options.ec} / ${options.substrate}`,
+            parameters: numeric,
+            provenance,
+            perturbation: options.sensitivity,
+            request: {
+                providedProvenance,
+                system: {
+                    enzymeName: options.enzyme,
+                    ecNumber: options.ec,
+                    substrate: options.substrate,
+                    organism: options.organism,
+                },
+            },
+            json: options.json,
+        });
+    }
+    if (options.json) {
+        process.stdout.write(JSON.stringify({ ok: true, status: 'ran', provenance, response }, null, 2) + '\n');
+        return 0;
+    }
+    // Merge in what the pipeline reported. Anything it resolved carries the
+    // citations that our own pass could not (the CLI hands it plain numbers,
+    // so provenance has to come back rather than go in).
+    for (const [name, resolved] of Object.entries(response.parameterProvenance ?? {})) {
+        const existing = provenance.find((row) => row.name === name);
+        if (existing && !existing.citation && resolved.citations?.length) {
+            existing.citation = resolved.citations.join(', ');
+        }
+    }
+    // Persist the run so `verify` and `check-integrity` can find it in a
+    // LATER process. Without this the CLI printed a job id that no
+    // subsequent command could resolve, because the store was in memory and
+    // the process had exited.
+    const written = job_manager_1.JobManager.recordRun({
+        jobId: response.jobId,
+        at: new Date().toISOString(),
+        query: `${options.enzyme ?? options.ec} / ${options.substrate}`,
+        provenance,
+        reproducibilityKey: response.reproducibilityKey,
+        dataIntegrityHash: response.dataIntegrityHash,
+        finalValue: response.results.finalValue,
+        validated: response.validated,
+    });
+    printProvenance(provenance);
+    const substrateUnit = userValues['s0']?.unit ?? '';
+    const first = response.results.trajectory[0];
+    process.stdout.write(`\n${c(BOLD, 'Result')}\n`);
+    process.stdout.write(`  ${c(DIM, 'initial   ')} ${first?.value.toFixed(4)} ${substrateUnit}\n`);
+    process.stdout.write(`  ${c(DIM, 'final     ')} ${response.results.finalValue.toFixed(4)} ${substrateUnit}\n`);
+    process.stdout.write(`  ${c(DIM, 'consumed  ')} ${((first?.value ?? 0) - response.results.finalValue).toFixed(4)} ${substrateUnit}\n`);
+    process.stdout.write(`  ${c(DIM, 'points    ')} ${response.results.trajectory.length}\n`);
+    process.stdout.write(`\n  ${c(DIM, 'job       ')} ${response.jobId}\n`);
+    process.stdout.write(`  ${c(DIM, 'repro key ')} ${response.reproducibilityKey.slice(0, 32)}…\n`);
+    if (written.ok) {
+        process.stdout.write(`\n${c(DIM, `  Saved. Re-check it later with:  scientific check-integrity ${response.jobId}`)}\n\n`);
+    }
+    else {
+        // Reported rather than swallowed: a user who is told a job id, then
+        // finds `verify` cannot see it, has no way to know why.
+        process.stdout.write(`\n${c(YELLOW, '  ⚠ Run history could not be written')} ${c(DIM, '(' + (written.reason ?? '') + ')')}\n` +
+            `${c(DIM, '    The simulation is valid; it just will not appear in `history`.')}\n\n`);
+    }
+    return 0;
+}
+/**
+ * The provenance table.
+ *
+ * Units are printed from each parameter's own `unit` field, not from a
+ * hardcoded "mM" -- the previous output appended "mM" to every number
+ * regardless of what the parameter actually was, so a Vmax in mM/s and a
+ * Km in µM both rendered as millimolar.
+ */
+function printProvenance(rows) {
+    if (rows.length === 0)
+        return;
+    process.stdout.write(`\n${c(BOLD, 'Parameters and where they came from')}\n`);
+    const nameWidth = Math.max(...rows.map((r) => r.name.length), 4);
+    const valueStrings = rows.map((r) => `${r.value} ${r.unit}`);
+    const valueWidth = Math.max(...valueStrings.map((v) => v.length), 5);
+    rows.forEach((row, index) => {
+        const value = valueStrings[index].padEnd(valueWidth);
+        let line = `  ${row.name.padEnd(nameWidth)}  ${value}  ${c(DIM, row.origin)}`;
+        if (row.citation)
+            line += c(DIM, `  ${row.citation}`);
+        process.stdout.write(line + '\n');
+        if (row.crossSpecies) {
+            process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, '⚠ measured in ' + (row.organism ?? 'another organism') + ', not the organism requested')}\n`);
+        }
+        if (row.unitAssumed) {
+            process.stdout.write(`  ${' '.repeat(nameWidth)}  ${c(YELLOW, `⚠ unit not given; ${row.unit} assumed`)}\n`);
+        }
+    });
+    const sourced = rows.filter((r) => r.citation).length;
+    process.stdout.write(`\n  ${c(DIM, `${sourced} of ${rows.length} parameter(s) carry a literature citation.`)}\n`);
+    if (sourced < rows.length) {
+        process.stdout.write(`  ${c(DIM, 'The rest are user inputs or experimental conditions, which is fine —')}\n` +
+            `  ${c(DIM, 'but they are not literature-backed and must not be reported as such.')}\n`);
+    }
+}

@@ -35,6 +35,13 @@ import { convertConcentration } from '../units';
 import { parseQuantity } from './parseQuantity';
 import { commandSensitivity } from './commandSensitivity';
 import { JobManager } from '../execution/job-manager';
+import {
+  INHIBITION_MODELS,
+  runInhibitionModel,
+  suggestModel,
+  PRODUCT_INHIBITION_CAVEAT,
+  type InhibitionModel,
+} from './inhibitionModels';
 
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
@@ -75,6 +82,10 @@ export interface SimulateResolvedOptions {
    *  When set, reports sensitivity beside each parameter's provenance
    *  instead of running a single simulation. */
   sensitivity?: number;
+  /** Which kinetic model. Inhibition models resolve a Ki from BRENDA and
+   *  run through the engine (directly, or as SBML when the engine has no
+   *  first-class domain). */
+  model?: InhibitionModel;
 }
 
 /** Exit codes mirror `resolve`: 0 ran, 1 could not look up, 2 no data. */
@@ -207,6 +218,72 @@ export async function commandSimulateResolved(
     }
   }
 
+  // Ki, for inhibition models. A BRENDA table exactly like Km, resolved by
+  // its OWN call so a cross-species Ki can never inherit a verified Km's
+  // provenance (ADR 0008).
+  const model: InhibitionModel = options.model ?? 'mm';
+  if (model !== 'mm' && !userValues['ki']) {
+    try {
+      const result = await resolveKinetic({
+        enzymeName: options.enzyme,
+        ecNumber: options.ec,
+        substrate: options.substrate,
+        organism: options.organism,
+        quantity: 'ki',
+      });
+      if (result.found) {
+        userValues['ki'] = { value: result.value, unit: result.unit };
+        provenance.push({
+          name: 'ki',
+          value: result.value,
+          unit: result.unit,
+          origin: result.source,
+          citation: result.citation
+            ? `${result.citation.source} ref ${result.citation.reference_id ?? '?'}`
+            : undefined,
+          organism: result.organism ?? undefined,
+          crossSpecies: result.crossSpecies,
+        });
+      } else {
+        unresolved.push('ki (no inhibition constant in the literature for this system)');
+      }
+    } catch (err) {
+      if (err instanceof ResolverUnavailableError) {
+        process.stderr.write(
+          `${c(RED, '✗')} Could not look up ki: ${err.message}\n`,
+        );
+        return 1;
+      }
+      throw err;
+    }
+  }
+
+  // Requirements differ per model, so check the model's own list.
+  for (const required of INHIBITION_MODELS[model].requires) {
+    if (required === 'km' || required === 'vmax' || required === 'ki') continue;
+    if (!userValues[required]) {
+      unresolved.push(
+        `${required} (an experimental condition — supply it, e.g. --${required} 10mM)`,
+      );
+    }
+  }
+
+  // Supplying a Ki and then running plain `mm` silently discards the
+  // inhibitor: the run succeeds and the inhibition being studied is simply
+  // absent from the result.
+  if (model === 'mm') {
+    const suggestion = suggestModel({
+      ki: userValues['ki']?.value,
+      i0: userValues['i0']?.value,
+    });
+    if (suggestion) {
+      process.stdout.write(
+        `\n${c(YELLOW, '•')} ${c(BOLD, `Did you mean --model ${suggestion.model}?`)} ` +
+          `${c(DIM, suggestion.why + '.')}\n`,
+      );
+    }
+  }
+
   // s0 has no literature source: it is an experimental condition the user
   // chooses, not a property of the enzyme.
   if (!userValues['s0']) {
@@ -309,6 +386,56 @@ export async function commandSimulateResolved(
       process.stdout.write('\n');
     }
     return 2;
+  }
+
+  // Inhibition models run through the engine directly (competitive) or as
+  // SBML (non-competitive, product) -- the same solver either way, never a
+  // second simulator in TypeScript.
+  if (model !== 'mm') {
+    printProvenance(provenance);
+
+    if (model === 'product') {
+      process.stdout.write(`\n${c(YELLOW, '⚠')} ${PRODUCT_INHIBITION_CAVEAT}\n`);
+    }
+
+    try {
+      const run = await runInhibitionModel(model, {
+        km: userValues['km']!.value,
+        vmax: userValues['vmax']!.value,
+        s0: userValues['s0']!.value,
+        ki: userValues['ki']?.value,
+        i0: userValues['i0']?.value,
+        end: 10,
+        points: 101,
+      });
+
+      const series = run.trajectory;
+      const first = series[0] ?? {};
+      const last = series[series.length - 1] ?? {};
+      const substrateKey = Object.keys(first).find((k) => k.includes('S')) ?? '';
+
+      process.stdout.write(
+        `\n${c(BOLD, 'Result')}  ${c(DIM, INHIBITION_MODELS[model].description)}\n`,
+      );
+      process.stdout.write(
+        `  ${c(DIM, 'engine    ')} ${run.domain}${run.viaSbml ? c(DIM, '  (via SBML — no first-class domain for this model)') : ''}\n`,
+      );
+      if (substrateKey) {
+        process.stdout.write(
+          `  ${c(DIM, 'initial   ')} ${Number(first[substrateKey]).toFixed(4)}\n`,
+        );
+        process.stdout.write(
+          `  ${c(DIM, 'final     ')} ${Number(last[substrateKey]).toFixed(4)}\n`,
+        );
+      }
+      process.stdout.write(`  ${c(DIM, 'points    ')} ${series.length}\n\n`);
+      return 0;
+    } catch (err) {
+      process.stderr.write(
+        `${c(RED, '✗')} ${err instanceof Error ? err.message : String(err)}\n`,
+      );
+      return 2;
+    }
   }
 
   // Sensitivity runs on the SAME resolved parameters, with the SAME
