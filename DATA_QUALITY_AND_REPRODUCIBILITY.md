@@ -613,8 +613,19 @@ DO NOT MODIFY ORIGINAL RESULTS. Create new simulation with corrected inputs.
 
 ## Quality Metrics Dashboard
 
+**This is a mockup, not a live report.** An earlier version of this section
+presented the numbers below as if "Updated Daily" from a running system.
+Nothing in `ReproducibilityService` supports that: it holds `private records:
+Map<string, ExecutionRecord>` (`src/reproducibility/reproducibilityEngine.ts:641`)
+-- one process's in-memory job history, wiped on every restart -- with no
+24-hour rollup, no scheduled aggregation, and no persistence between runs.
+847 simulations, a 99.5% reproduction rate, 156 sourced parameters: none of
+these were ever measured. They illustrate the SHAPE a dashboard could report
+if this service were backed by persistent storage and a rollup job, which it
+currently is not.
+
 ```
-Reproducibility Metrics (Updated Daily):
+Illustrative example only -- not measured, not live:
 
 Overall System Reproducibility:
   ├─ Simulations run past 24h: 847
@@ -648,6 +659,13 @@ Confidence Scores (Aggregate):
   ├─ Low (<0.7): 7 (1%)
   └─ Trend: ✓ Excellent
 ```
+
+What's real today: `ReproducibilityService.checkIntegrity(jobId)` and
+`verifyReproducibility(jobId, reproducer)` report on ONE job at a time, on
+demand, against whatever is still in that process's memory (see
+`reproducibilityEngine.ts:640` onward). Building the dashboard above for
+real would mean persisting `ExecutionRecord`s past process restart and
+adding a rollup job -- neither exists yet.
 
 ---
 

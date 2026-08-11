@@ -37,9 +37,11 @@ Run directly: python scripts/check_typescript_compiles.py
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 
@@ -93,6 +95,69 @@ def _candidate_workspaces() -> list[pathlib.Path]:
 
 
 
+def _load_tsconfig(tsconfig: pathlib.Path) -> dict | None:
+    """Parse a tsconfig, tolerating the comments and trailing commas the
+    format permits but `json` does not.
+
+    Every tsconfig in this repository is commented -- that is deliberate,
+    the comments explain why each config exists -- so a plain
+    `json.loads` fails on all of them and any logic built on it silently
+    falls back to its default branch. Returns None when the file really
+    cannot be parsed.
+    """
+    try:
+        raw = tsconfig.read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+    # Strip // line comments and /* */ blocks, then trailing commas.
+    without_block = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+    without_line = re.sub(r"^\s*//.*$", "", without_block, flags=re.M)
+    without_trailing = re.sub(r",(\s*[}\]])", r"\1", without_line)
+
+    try:
+        parsed = json.loads(without_trailing)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _compiles_something(tsconfig: pathlib.Path) -> bool:
+    """Whether running tsc on this config can compile any files at all.
+
+    A pure base (`tsconfig.base.json`) exists to be `extends`-ed and names
+    no inputs of its own; a solution-style config only holds `references`.
+    Running tsc on either costs a full compiler startup and yields nothing
+    -- and on this repository each such run is measured in tens of seconds,
+    so skipping them is the difference between a guard that fits inside the
+    everyday command's budget and one that does not.
+
+    Unparseable configs return True: an unreadable file is not a reason to
+    skip checking, and the cost of one extra run is smaller than the cost
+    of silently ignoring a real project.
+    """
+    config = _load_tsconfig(tsconfig)
+    if config is None:
+        return True
+    if config.get("files") or config.get("include"):
+        return True
+
+    # No inputs named at all. Two cases, both skipped:
+    #
+    #   * `references` only -- a solution-style config that delegates to
+    #     other projects and compiles nothing itself (tsc reports TS6307).
+    #   * neither -- a pure base such as `tsconfig.base.json`, which exists
+    #     to be `extends`-ed. tsc given one of these defaults to including
+    #     EVERY .ts beneath its directory, so it is simultaneously the
+    #     slowest run in the sweep and the least meaningful: it would
+    #     report coverage for files no real project compiles, masking a
+    #     genuinely unguarded tree.
+    #
+    # This assumes every real project in this repository declares its
+    # inputs explicitly, which is true and is worth keeping true.
+    return False
+
+
 def all_typescript_projects() -> list[pathlib.Path]:
     """Every tsconfig in the repository, as a path to the config FILE.
 
@@ -112,7 +177,9 @@ def all_typescript_projects() -> list[pathlib.Path]:
         here = pathlib.Path(current)
         for name in files:
             if name.startswith("tsconfig") and name.endswith(".json"):
-                projects.append(here / name)
+                candidate = here / name
+                if _compiles_something(candidate):
+                    projects.append(candidate)
     return sorted(projects)
 
 
@@ -134,6 +201,43 @@ def first_party_typescript() -> set[pathlib.Path]:
     return sources
 
 
+#: Memoises the one tsc run per tsconfig. Coverage and the type-check both
+#: need `tsc -p <cfg>`, and running it twice per project doubled the guard's
+#: wall-clock -- which on a repo that now has 12 tsconfigs pushed the
+#: everyday `verify_build.py --quick` past its timeout. `--listFiles`
+#: returns the file list AND the diagnostics, so one run answers both.
+_TSC_CACHE: dict[pathlib.Path, tuple[int, str, str]] = {}
+
+
+def _run_tsc(tsconfig: pathlib.Path) -> tuple[int, str, str]:
+    """Run `tsc --noEmit --listFiles -p <tsconfig>` once, memoised.
+
+    Returns (returncode, stdout, stderr). A timeout or spawn failure is
+    reported as a non-zero code with an explanatory stderr rather than
+    raising, so one unbuildable project cannot abort the whole sweep.
+    """
+    cached = _TSC_CACHE.get(tsconfig)
+    if cached is not None:
+        return cached
+
+    try:
+        result = subprocess.run(
+            ["npx", "tsc", "--noEmit", "--listFiles", "-p", tsconfig.name],
+            cwd=tsconfig.parent,
+            capture_output=True,
+            text=True,
+            timeout=TSC_TIMEOUT_S,
+        )
+        outcome = (result.returncode, result.stdout, result.stderr)
+    except subprocess.TimeoutExpired:
+        outcome = (1, "", f"tsc timed out after {TSC_TIMEOUT_S}s")
+    except OSError as exc:
+        outcome = (1, "", f"could not run tsc: {exc}")
+
+    _TSC_CACHE[tsconfig] = outcome
+    return outcome
+
+
 def files_covered_by(tsconfig: pathlib.Path) -> set[pathlib.Path]:
     """The set of files `tsc` actually pulls into this project.
 
@@ -146,19 +250,10 @@ def files_covered_by(tsconfig: pathlib.Path) -> set[pathlib.Path]:
     coverage is still known for a project that does not currently build.
     """
     project = tsconfig.parent
-    try:
-        result = subprocess.run(
-            ["npx", "tsc", "--noEmit", "--listFiles", "-p", tsconfig.name],
-            cwd=project,
-            capture_output=True,
-            text=True,
-            timeout=TSC_TIMEOUT_S,
-        )
-    except (subprocess.TimeoutExpired, OSError):
-        return set()
+    _, stdout, _ = _run_tsc(tsconfig)
 
     covered: set[pathlib.Path] = set()
-    for line in result.stdout.splitlines():
+    for line in stdout.splitlines():
         candidate = line.strip()
         if not candidate.endswith((".ts", ".tsx")):
             continue
@@ -207,8 +302,22 @@ def unguarded_typescript_trees() -> list[pathlib.Path]:
     if not sources:
         return []
 
+    # Warm the tsc cache in PARALLEL. Each project is an independent
+    # subprocess, so they can run concurrently; serially, 12 tsconfigs at
+    # roughly 10s of npx-plus-tsc each pushed this guard past the timeout
+    # on `verify_build.py --quick`. Bounded rather than unbounded so a
+    # machine with few cores is not swamped by a dozen compilers.
+    projects = all_typescript_projects()
+    if projects:
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=min(8, len(projects))
+        ) as pool:
+            # _run_tsc memoises, so the sequential loop below is all cache
+            # hits. Exceptions are swallowed by _run_tsc itself.
+            list(pool.map(_run_tsc, projects))
+
     covered: set[pathlib.Path] = set()
-    for project in all_typescript_projects():
+    for project in projects:
         covered |= files_covered_by(project)
 
     return sorted(sources - covered)
@@ -338,22 +447,23 @@ def check() -> list[str]:
         if not _tsconfig_is_checkable(workspace):
             continue
 
-        try:
-            result = subprocess.run(
-                ["npx", "tsc", "--noEmit", "-p", "."],
-                cwd=workspace,
-                capture_output=True,
-                text=True,
-                timeout=TSC_TIMEOUT_S,
-            )
-        except subprocess.TimeoutExpired:
-            violations.append(
-                f"{rel}: tsc --noEmit timed out after {TSC_TIMEOUT_S}s"
-            )
-            continue
+        # Reuses the memoised run from the coverage sweep above rather
+        # than invoking tsc a second time on the same project. Compiling
+        # every workspace twice doubled this guard's wall-clock, and once
+        # the repo reached 12 tsconfigs that pushed `verify_build.py
+        # --quick` -- the everyday command -- past its timeout.
+        returncode, stdout, stderr = _run_tsc(workspace / "tsconfig.json")
 
-        if result.returncode != 0:
-            output = (result.stdout + result.stderr).strip()
+        if returncode != 0:
+            # `--listFiles` puts the file list on stdout alongside the
+            # diagnostics, so the paths are filtered out here; otherwise
+            # every error report would be buried under hundreds of lines
+            # naming every file in the program.
+            output = "\n".join(
+                line
+                for line in (stdout + stderr).splitlines()
+                if line.strip() and not line.strip().endswith((".ts", ".tsx"))
+            ).strip()
             lines = [line for line in output.splitlines() if line.strip()]
             # Name the count and show the first few: the full list can run
             # to dozens of lines and the point here is to fail loudly with

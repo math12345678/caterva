@@ -472,6 +472,16 @@ interface CitationLineage {
 
 ### Interactive Citation Explorer
 
+**Proposed -- not implemented.** `CitationExplorer`, `explainParameterOrigin`,
+and `findConflictingSources` do not exist anywhere in this repository
+(confirmed by grep across `src/`). The pseudocode below also references
+`literatureDB.findParameterLiterature`, `s.bibliographic.doi` and
+`s.keyFindings.parameters` -- field paths that don't match the real
+`Literature` interface (`src/literature/literatureService.ts:19-53`), which
+is flat (`doi`, `extractedParameters`), not nested under `bibliographic`/
+`keyFindings`. Kept as a design sketch of what an explorer could look like,
+not a description of shipped behavior.
+
 ```typescript
 class CitationExplorer {
   /**
@@ -545,7 +555,29 @@ Traceback complete: Value confirmed in 3 independent peer-reviewed sources
 
 ## Automated Literature Integration
 
-### Periodic Literature Review
+**Proposed -- not implemented, and not the direction this was actually
+built.** `performPeriiodicLiteratureReview`, `searchPubMed`, `searchArXiv`,
+`autoExtractParameters`, and `flagForManualReview` do not exist anywhere in
+this repository. `LiteratureService` is an in-memory `Map` with no network
+access of its own (`src/literature/literatureService.ts`) -- a caller must
+hand it `Literature` objects before it can recommend anything.
+
+What was actually built instead of the pseudocode below: `LiteratureResolver`
+(`src/literature/literatureResolver.ts`) bridges this tree to Terrium's real,
+already-verified literature layer -- `Tests/fallback_logic.py`'s
+`resolve_kinetic_value`, which walks BRENDA exact match -> BRENDA
+cross-species -> PubMed candidates and returns a value with its unit,
+organism, citation, and STRENDA assay conditions, or an honest
+`found: false`. It never fabricates a number. The production API server
+already reaches that same Python layer through `science_agent_runner.py`
+(spawned by `Science-Agent-Pipeline/artifacts/api-server/src/lib/scienceAgent.ts`);
+`LiteratureResolver` spawns the identical script over the identical JSON
+protocol rather than building a second, independent PubMed/arXiv client that
+could drift from it. See `src/literature/literatureResolver.ts`'s own
+module docstring and `src/literature/__tests__/literatureResolver.test.ts`
+for the real, tested behavior.
+
+### Periodic Literature Review (design sketch, not built)
 
 ```typescript
 async function performPeriiodicLiteratureReview() {
