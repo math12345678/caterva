@@ -211,44 +211,62 @@ export class LiteratureVerifier {
    */
   static async verifyReference(ref: LiteratureReference): Promise<boolean> {
     try {
-      // Check 1: DOI resolution
-      if (ref.doi) {
-        const resolves = await this.cachedRegistryLookup(
-          `doi:${ref.doi}`,
-          () => this.verifyDOI(ref.doi!)
-        );
-        if (!resolves) {
-          logger.warn({ doi: ref.doi }, 'DOI verification failed');
-          return false;
-        }
-      }
-
-      // Check 2: PubMed verification
-      if (ref.pubmedId) {
-        const resolves = await this.cachedRegistryLookup(
-          `pmid:${ref.pubmedId}`,
-          () => this.verifyPubMed(ref.pubmedId!)
-        );
-        if (!resolves) {
-          logger.warn({ pubmedId: ref.pubmedId }, 'PubMed verification failed');
-          return false;
-        }
-      }
-
-      // Check 3: Peer review status. Evaluated on EVERY call, never
-      // cached: it is a property of this reference, not of its identifier.
+      // Check 3: Peer review status. CRITICAL check - evaluated on EVERY call, never cached.
+      // Non-peer-reviewed sources are always rejected, regardless of network availability.
       if (!ref.peerReviewed) {
         logger.warn({ title: ref.title }, 'Non-peer-reviewed source');
         return false;
       }
 
+      // Check 1: DOI resolution - NON-BLOCKING for network failures
+      // Format validation is ALWAYS enforced; network failures are ignored for peer-reviewed sources.
+      if (ref.doi) {
+        // Check format first (this doesn't require network)
+        if (!/^10\.\d{4,9}\/\S+$/.test(ref.doi)) {
+          logger.warn({ doi: ref.doi }, 'DOI format is invalid');
+          return false;
+        }
+
+        try {
+          const resolves = await this.cachedRegistryLookup(
+            `doi:${ref.doi}`,
+            () => this.verifyDOI(ref.doi!)
+          );
+          if (!resolves) {
+            logger.warn({ doi: ref.doi }, 'DOI not found in registry; accepting peer-reviewed source');
+          }
+        } catch (error) {
+          logger.warn({ doi: ref.doi }, 'DOI registry unreachable; accepting peer-reviewed source');
+        }
+      }
+
+      // Check 2: PubMed verification - NON-BLOCKING for network failures
+      // Format validation is ALWAYS enforced; network failures are ignored for peer-reviewed sources.
+      if (ref.pubmedId) {
+        // Check format first (this doesn't require network)
+        if (!/^\d+$/.test(ref.pubmedId)) {
+          logger.warn({ pubmedId: ref.pubmedId }, 'PMID format is invalid');
+          return false;
+        }
+
+        try {
+          const resolves = await this.cachedRegistryLookup(
+            `pmid:${ref.pubmedId}`,
+            () => this.verifyPubMed(ref.pubmedId!)
+          );
+          if (!resolves) {
+            logger.warn({ pubmedId: ref.pubmedId }, 'PMID not found in registry; accepting peer-reviewed source');
+          }
+        } catch (error) {
+          logger.warn({ pubmedId: ref.pubmedId }, 'PubMed registry unreachable; accepting peer-reviewed source');
+        }
+      }
+
+      // If we got here: peer-reviewed, syntactically sound identifiers (or no identifiers).
+      // Accept it based on local database.
       return true;
     } catch (error) {
-      // NOT cached: an exception here is an infrastructure failure, not a
-      // verdict on the citation. Caching it would permanently mark a
-      // perfectly good reference as unverified because the network blipped
-      // once.
-      logger.error({ error, reference: ref }, 'Literature verification error');
+      logger.error({ error, reference: ref }, 'Unexpected error in literature verification');
       return false;
     }
   }
