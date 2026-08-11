@@ -553,12 +553,33 @@ class VerifiableMetricsCollector {
    * Confidence intervals account for small sample sizes
    */
   getSuccessRateWithConfidence(): {
-    rate: number;
+    /** null when nothing has been observed. See below. */
+    rate: number | null;
+    /** Observations behind `rate`, so a caller can tell 100%-of-zero from
+     *  100%-of-500. */
+    sampleCount: number;
     confidence95: { lower: number; upper: number };
   } {
     const total =
       this.jobMetrics.completedJobs + this.jobMetrics.failedJobs;
-    if (total === 0) return { rate: 1, confidence95: { lower: 0, upper: 1 } };
+
+    // `rate: 1` on an empty sample -- what this returned -- is a
+    // fabricated measurement, and it was published by
+    // /api/dashboard/overview with a Wilson (1927) citation attached, so
+    // a fresh process advertised a cited 100.00% success rate from zero
+    // observations. `exportWithCitations` rendered it as "100.00".
+    //
+    // `getSnapshot()` in this same file was fixed for exactly this and
+    // returns 0 with an explicit sampleCount; this method, which is the
+    // one the dashboard actually reads, was missed.
+    //
+    // null rather than 0: zero successes out of zero trials is not a 0%
+    // success rate either. The honest answer is that there is no rate,
+    // and the type now says so, which forces every caller to decide what
+    // to display instead of silently inheriting a number.
+    if (total === 0) {
+      return { rate: null, sampleCount: 0, confidence95: { lower: 0, upper: 1 } };
+    }
 
     const rate = this.jobMetrics.completedJobs / total;
     const confidence95 = wilsonConfidenceInterval(
@@ -566,7 +587,7 @@ class VerifiableMetricsCollector {
       total,
     );
 
-    return { rate, confidence95 };
+    return { rate, sampleCount: total, confidence95 };
   }
 
   /**
@@ -634,7 +655,15 @@ class VerifiableMetricsCollector {
         explanation: "Queue theory: L = λW (Little, 1961)",
       },
       successRate: {
-        value: (successMetric.rate * 100).toFixed(2),
+        // null, not "100.00", when nothing has been observed. This read
+        // `(successMetric.rate * 100).toFixed(2)` against a rate that
+        // defaulted to 1, so a fresh process exported a cited 100.00%
+        // success rate from zero jobs.
+        value:
+          successMetric.rate === null
+            ? null
+            : (successMetric.rate * 100).toFixed(2),
+        sampleCount: successMetric.sampleCount,
         confidence95: successMetric.confidence95,
         literature: LITERATURE_DB.WILSON_CONFIDENCE,
         explanation:

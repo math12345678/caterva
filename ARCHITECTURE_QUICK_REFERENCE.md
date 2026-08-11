@@ -1,5 +1,7 @@
 # Terrium Architecture Quick Reference
 
+> **⚠️ CORRECTION (2026-08-10):** line numbers throughout this doc were wrong even at the commit that introduced it (files have grown since, so treat every `:NNN` reference as approximate, not exact — always grep for the symbol). One structural (not just stale) error: the Python dispatch table (§5, "Python Dispatch") is named `DISPATCHER` with type `Dict[str, Callable]` below — the real object in `Science-Agent-Pipeline/artifacts/api-server/src/lib/tellurium_runner.py:646` is named `DISPATCH` with type `Dict[str, str]` (maps domain name → handler function *name*, not the callable itself — dispatch resolves the string via `getattr`/lookup, it doesn't store callables directly). `DOMAIN_DEFAULTS` in `queryResolver.ts` is currently at line 513, not 236-555 as shown below (file is now 1589 lines, was shorter when this doc was written).
+
 ## File Dependency Map
 
 ```

@@ -56,8 +56,9 @@ def test_mm_build_validates_by_default():
 
 
 def test_mm_build_can_skip_validation():
-    # The simulate_* helpers validate once and then build with validate=False;
-    # this path must genuinely bypass the check rather than re-run it.
+    # The simulate_* helpers validate once and then build with validate=False.
+    # This test verifies that the validate=False parameter skips validation
+    # and accepts out-of-range values (like negative km).
     src = build_michaelis_menten_antimony(km=-1.0, vmax=1.0, s0=1.0,
                                           validate=False)
     assert "Km = -1.0" in src

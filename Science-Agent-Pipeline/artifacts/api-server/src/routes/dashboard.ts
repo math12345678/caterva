@@ -183,18 +183,55 @@ router.get(
       const metrics = verifiableMetricsCollector.getSnapshot();
       const jobs = queue.listJobs();
 
-      const healthy =
-        metrics.completedJobs >= 0 &&
-        metrics.avgLatencyMs >= 0 &&
-        jobs.length >= 0;
+      // This endpoint could not report anything but "healthy". It was:
+      //
+      //   const healthy =
+      //     metrics.completedJobs >= 0 &&
+      //     metrics.avgLatencyMs >= 0 &&
+      //     jobs.length >= 0;
+      //
+      // `completedJobs` is a counter initialised to 0 and only ever
+      // incremented; `avgLatencyMs` is a mean of elapsed times or 0; and
+      // `Array.prototype.length` is a uint32. All three comparisons are
+      // tautologies on quantities that are non-negative by construction,
+      // so `healthy` was a compile-time `true` and the 503 branch was
+      // unreachable. `checks.literature` was the string literal "ok" --
+      // no literature was consulted at all.
+      //
+      // A monitoring signal that cannot fail is worse than none: it
+      // actively suppresses the alarm it exists to raise. This is the same
+      // defect `/api/metrics/health` had and had fixed (see routes/
+      // metrics.ts); only this copy was missed. It now follows that same
+      // three-tier shape.
+      const observed = metrics.sampleCount;
+      const successRate =
+        observed > 0 ? metrics.completedJobs / observed : null;
 
-      res.status(healthy ? 200 : 503).json({
-        status: healthy ? "healthy" : "degraded",
+      // "no_data" is neither healthy nor degraded, and returns 200: the
+      // process IS up and answering. The distinction being drawn is
+      // between "up with no evidence" and "up and demonstrably fine".
+      const status =
+        successRate === null
+          ? "no_data"
+          : successRate > 0.9
+            ? "healthy"
+            : "degraded";
+
+      res.status(status === "degraded" ? 503 : 200).json({
+        status,
         timestamp: new Date().toISOString(),
+        // Published alongside every rate so a caller can tell 100%-of-zero
+        // from 100%-of-500.
+        sampleCount: observed,
+        successRate: successRate === null ? null : Number(successRate.toFixed(4)),
         checks: {
-          metrics: metrics.completedJobs >= 0 ? "ok" : "failed",
-          queue: jobs.length >= 0 ? "ok" : "failed",
-          literature: "ok",
+          metrics: observed > 0 ? "ok" : "no_data",
+          queue: `${jobs.length} job(s) known`,
+          // Was hardcoded "ok". This endpoint performs no literature
+          // check, so it does not get to report on one; saying so is the
+          // honest answer. /api/simulate/metrics/pipeline is where
+          // literature resolution is actually measured.
+          literature: "not_checked_here",
         },
       });
     } catch (err) {

@@ -1,8 +1,17 @@
 # Live Architecture Dashboard — Build Summary
 
+> **⚠️ CORRECTION (2026-08-10) — the "PRODUCTION-READY" status and several figures below are false; not deleted, corrected here per project convention.**
+> - The "Metrics Collection System" described in Section 2 (`artifacts/api-server/src/lib/metrics.ts`, 350 lines) **does not exist under that name**. It was superseded by `src/lib/verifiable-metrics.ts`. The code comment left in the real `src/routes/metrics.ts` (lines 9-16) explains why the original design was broken: the collector this doc describes had **zero production writers**, so `/api/metrics` and `/api/metrics/health` reported permanent zeros with `llmSuccessRate`/`literatureHitRate` showing "100% fabricated from an empty sample" — exactly the kind of self-referential, non-literature-backed metric this project's rules forbid. See commits `de1febb`, `3a298a7`.
+> - "Comprehensive Test Suite (550 lines)" / `artifacts/api-server/src/__tests__/metrics.test.ts` **does not exist**. The real, current test file is `src/__tests__/verifiableMetrics.test.ts` (251 lines, **15** test cases, not "25+").
+> - Real line counts (verified via `wc -l`): `LiveArchitectureDashboard.tsx` is **571** lines (not 700); `src/routes/metrics.ts` is **185** lines (not 150).
+> - "GET /api/metrics" as a live route does not exist; the real registered path is `GET /api/snapshot` (see `DASHBOARD_INTEGRATION_GUIDE.md` correction banner for the full real endpoint list).
+> - The "✅ Success Criteria" checklist below (100% coverage, "tracks all relevant data," "production-ready quality") was true of neither the code at the time nor the current code — the metrics system it describes was dead/fabricating data until later fixed under a different design.
+>
+> Original content below is left intact per project convention; treat all ✅/COMPLETE/PRODUCTION-READY claims in it as aspirational, not factual.
+
 **Session**: Continuation after architecture verification  
 **Focus**: High-impact feature development  
-**Status**: ✅ **COMPLETE — PRODUCTION-READY**
+**Status**: ⚠️ **NOT PRODUCTION READY — see correction banner above**
 
 ---
 

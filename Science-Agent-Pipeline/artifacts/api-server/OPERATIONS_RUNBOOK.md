@@ -684,8 +684,8 @@ sudo systemctl restart terrium-api
 sudo systemctl status terrium-api
 sudo systemctl enable terrium-api
 
-# Logging — same caveat; the app itself logs to stdout via pino, it does
-# not write to the systemd journal unless run under a systemd unit.
+# Logging — Note: the app itself logs to stdout via pino. Systemd journal
+# entries appear only when the app is run under a systemd unit.
 sudo journalctl -u terrium-api -f
 sudo journalctl -u terrium-api -S "1 hour ago"
 sudo journalctl -u terrium-api -u postgresql -f

@@ -642,19 +642,52 @@ describe("GET /api/dashboard/overview", () => {
 });
 
 describe("GET /api/dashboard/health", () => {
-  it("returns health status", async () => {
+  // These asserted `status === 200` unconditionally, which passed only
+  // because the endpoint could not return anything else: its `healthy`
+  // flag was `completedJobs >= 0 && avgLatencyMs >= 0 && jobs.length >= 0`,
+  // three tautologies on quantities that are non-negative by construction.
+  // The 503 branch was unreachable.
+  //
+  // Now that the endpoint reports real state, a hardcoded 200 is also the
+  // wrong assertion for a second reason: `verifiableMetricsCollector` is a
+  // module singleton shared across this whole suite, so by the time these
+  // run, earlier tests have recorded failed jobs and `degraded` (503) is
+  // the CORRECT answer. Asserting the contract rather than one status code
+  // keeps these meaningful without depending on accumulated global state.
+  it("reports a real, well-formed health verdict", async () => {
     const res = await request(server).get("/api/dashboard/health");
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("status");
+
+    expect([200, 503]).toContain(res.status);
+    expect(["healthy", "degraded", "no_data"]).toContain(res.body.status);
     expect(res.body).toHaveProperty("timestamp");
     expect(res.body).toHaveProperty("checks");
+
+    // The status and the code must agree -- only `degraded` is a 503.
+    expect(res.status).toBe(res.body.status === "degraded" ? 503 : 200);
   });
 
-  it("verifies all subsystems are operational", async () => {
+  it("publishes the denominator behind its verdict", async () => {
     const res = await request(server).get("/api/dashboard/health");
-    expect(res.status).toBe(200);
+
+    expect(typeof res.body.sampleCount).toBe("number");
+    // A rate is either absent or backed by observations -- never a number
+    // computed from an empty sample.
+    if (res.body.successRate === null) {
+      expect(res.body.sampleCount).toBe(0);
+      expect(res.body.status).toBe("no_data");
+    } else {
+      expect(res.body.sampleCount).toBeGreaterThan(0);
+      expect(res.body.successRate).toBeGreaterThanOrEqual(0);
+      expect(res.body.successRate).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it("does not claim to have checked literature", async () => {
+    // `checks.literature` was the string literal "ok". This endpoint
+    // performs no literature check, so it does not get to report on one.
+    const res = await request(server).get("/api/dashboard/health");
     expect(res.body.checks).toHaveProperty("metrics");
     expect(res.body.checks).toHaveProperty("queue");
-    expect(res.body.checks).toHaveProperty("literature");
+    expect(res.body.checks.literature).not.toBe("ok");
   });
 });

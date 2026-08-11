@@ -136,3 +136,98 @@ describe('a reference with no identifier is unverified, not verified', () => {
     expect(await LiteratureVerifier.verifyReference(BASE)).toBe(true);
   });
 });
+
+describe('offline mode: TERRIUM_SKIP_DOI_VERIFICATION', () => {
+  // Skipping the registry lookup is a legitimate need -- an offline
+  // laptop, CI without egress, a sandbox that 403s CrossRef. What it must
+  // never do is call the result VERIFIED.
+  //
+  // The first version of this flag returned `{ status: 'verified' }` with
+  // the comment "Trust peer-reviewed assertion for identifiers that are
+  // well-formed", and shipped with a test asserting that a completely
+  // fabricated DOI came back verified. That is the same defect as Parts 6
+  // and 11, arriving a third time by a different route: a citation is
+  // stamped verified on nothing but its SHAPE and a self-declared
+  // `peerReviewed: true`.
+  //
+  // Skipping a check yields UNVERIFIED. That is the entire reason the
+  // third state exists.
+  const originalSkipDoi = process.env['TERRIUM_SKIP_DOI_VERIFICATION'];
+
+  beforeEach(() => {
+    process.env['TERRIUM_SKIP_DOI_VERIFICATION'] = '1';
+    LiteratureVerifier.resetRegistryCache();
+  });
+
+  afterEach(() => {
+    if (originalSkipDoi === undefined) {
+      delete process.env['TERRIUM_SKIP_DOI_VERIFICATION'];
+    } else {
+      process.env['TERRIUM_SKIP_DOI_VERIFICATION'] = originalSkipDoi;
+    }
+  });
+
+  it('reports UNVERIFIED, never verified, when the lookup is skipped', async () => {
+    const outcome = await LiteratureVerifier.verifyReferenceDetailed({
+      ...BASE,
+      doi: FABRICATED_DOI
+    });
+
+    expect(outcome.status).toBe('unverified');
+    expect(outcome.status).not.toBe('verified');
+    expect(outcome.reason).toMatch(/skipped/i);
+  });
+
+  it('says so for a well-formed PMID too', async () => {
+    const outcome = await LiteratureVerifier.verifyReferenceDetailed({
+      ...BASE,
+      pubmedId: '12345678'
+    });
+    expect(outcome.status).toBe('unverified');
+  });
+
+  it('still rejects a malformed DOI', async () => {
+    // Malformedness needs no network, so skipping the lookup cannot
+    // excuse it.
+    const outcome = await LiteratureVerifier.verifyReferenceDetailed({
+      ...BASE,
+      doi: 'not-a-real-doi'
+    });
+    expect(outcome.status).toBe('rejected');
+  });
+
+  it('still rejects a malformed PMID', async () => {
+    const outcome = await LiteratureVerifier.verifyReferenceDetailed({
+      ...BASE,
+      pubmedId: 'not-a-number'
+    });
+    expect(outcome.status).toBe('rejected');
+  });
+
+  it('still rejects a non-peer-reviewed source', async () => {
+    const outcome = await LiteratureVerifier.verifyReferenceDetailed({
+      ...BASE,
+      doi: FABRICATED_DOI,
+      peerReviewed: false
+    });
+    expect(outcome.status).toBe('rejected');
+  });
+
+  it('is not accepted by the boolean form without the separate opt-in', async () => {
+    // The two variables compose: skip the lookup, then decide separately
+    // what an unlooked-up citation is worth. Skipping alone does not make
+    // it acceptable.
+    delete process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'];
+    expect(
+      await LiteratureVerifier.verifyReference({ ...BASE, doi: FABRICATED_DOI })
+    ).toBe(false);
+  });
+
+  it('is accepted only when the caller also opts in to unverified citations', async () => {
+    process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'] = '1';
+    expect(
+      await LiteratureVerifier.verifyReference({ ...BASE, doi: FABRICATED_DOI })
+    ).toBe(true);
+    delete process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'];
+  });
+});

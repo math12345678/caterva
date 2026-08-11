@@ -1,5 +1,13 @@
 # Terrium Complete Build Session Summary
 
+> **⚠️ CORRECTION (2026-08-10) — several claims below are false; not deleted, corrected here per project convention.**
+> - Phase 2's "Metrics Collection System," "REST API endpoints," and "comprehensive test suite (25+ cases)" describe `artifacts/api-server/src/lib/metrics.ts` and `src/__tests__/metrics.test.ts`, which **do not exist**. The real, current system is `src/lib/verifiable-metrics.ts` (`verifiableMetricsCollector`) with `src/__tests__/verifiableMetrics.test.ts` (251 lines, **15** test cases, not 25+). See `LIVE_DASHBOARD_BUILD_SUMMARY.md`'s correction banner for the full history (the original design had zero production writers and fabricated a 100% success rate from empty data — commits `de1febb`, `3a298a7`).
+> - "42 peer-reviewed references" in `LITERATURE_BACKING_DATABASE.md` doesn't reconcile with that doc's own per-category counts, which sum to 40, not 42 (see that doc's correction banner). The real, current `domain-literature.ts` (`DOMAIN_LITERATURE_MAP`, 15 domains) contains 24 individual citation entries — a different, smaller, and independently-verifiable set from the "42" figure asserted here.
+> - Real line counts (`wc -l`): `LiveArchitectureDashboard.tsx` is 571 lines (not 700); `src/routes/metrics.ts` is 185 lines (not 150); `LITERATURE_BACKING_DATABASE.md` is 495 lines (not "800+").
+> - "PRODUCTION-READY, ZERO ERRORS" (Status section) does not hold: the metrics/dashboard system this session describes as complete was, per the codebase's own later fix commits, silently returning fabricated data.
+>
+> Content below is left intact per project convention; treat ✅/COMPLETE/PRODUCTION-READY claims as the original (partly inaccurate) self-report, not verified fact.
+
 **Date**: August 8, 2026  
 **Duration**: Full session covering architecture verification and feature development  
 **Philosophy**: "Every line of code is verifiable through peer-reviewed literature"

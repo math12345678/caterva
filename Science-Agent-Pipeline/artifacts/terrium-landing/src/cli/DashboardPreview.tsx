@@ -79,7 +79,10 @@ export default function DashboardPreview() {
       : false;
 
   return (
-    <div className="rounded-xl border border-white/[0.06] bg-black/50 backdrop-blur-sm overflow-hidden">
+    <div
+      className="rounded-xl border border-white/[0.06] bg-black/50 backdrop-blur-sm"
+      style={{ overflow: 'clip' }}
+    >
       {/* mock window controls */}
       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/[0.04]">
         <span className="w-2 h-2 rounded-full bg-white/10" />

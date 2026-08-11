@@ -1,5 +1,15 @@
 # Live Architecture Dashboard Integration Guide
 
+> **⚠️ CORRECTION (2026-08-10) — this guide describes an earlier, broken design; most of it does not match the current, real code.**
+> - `artifacts/api-server/src/lib/metrics.ts` (the "Metrics Collection System" in Step 1/Section 2 below) **does not exist**. It was replaced by `artifacts/api-server/src/lib/verifiable-metrics.ts` (`verifiableMetricsCollector` singleton), which the routes now actually import.
+> - The commit history for this is explicit about why: `src/routes/metrics.ts` originally imported the old `metricsCollector`, which had **zero production writers** — nothing ever called `recordJobExecution` outside its own test — so `/api/metrics` and `/api/metrics/health` reported permanent zeros, with `llmSuccessRate`/`literatureHitRate` showing **100% fabricated from an empty sample** (see commits `de1febb`, `3a298a7`). That is the exact anti-pattern this project's "nothing should be hardcoded, everything backed by literature/data" rule exists to prevent.
+> - Real, current endpoint paths (`Science-Agent-Pipeline/artifacts/api-server/src/routes/metrics.ts`, mounted via `src/routes/index.ts` under `app.use("/api", router)` in `src/app.ts:87`): `GET /api/snapshot` (not `/api/metrics`), `GET /api/metrics/health`, `POST /api/metrics/reset` (requires `Authorization: Bearer <METRICS_ADMIN_TOKEN>`, returns 501 if unset).
+> - When there's no data, `successRate` is now `null` and status is `"no_data"` — it no longer defaults to a fabricated 100%.
+> - Real test file: `src/__tests__/verifiableMetrics.test.ts` (251 lines, 15 test cases) — not `metrics.test.ts` (referenced below), which does not exist.
+> - `LiveArchitectureDashboard.tsx` does exist (571 lines, not 700) at the path below, but it renders demo/mock data — it is not wired to the live endpoints described in Step 3.
+>
+> The integration steps, code snippets, and file names below are the ORIGINAL (partly fictional) plan and are left as-is per project convention (nothing deleted), but should not be followed literally — use the real file/endpoint names above instead.
+
 ## Overview
 
 The **Live Architecture Dashboard** is a comprehensive real-time monitoring system for the Terrium science agent pipeline. It visualizes all 5 stages, 13 domains, and resolution metrics through interactive charts and status indicators.

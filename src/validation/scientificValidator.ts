@@ -71,6 +71,35 @@ export interface ValidationWarning {
 // LAYER 1: PARAMETER VALIDATION
 // ============================================================================
 
+/**
+ * Parameters that are experimental CONDITIONS rather than measured
+ * properties of the system.
+ *
+ * Nobody measures "the initial substrate concentration of lactate
+ * dehydrogenase" — the experimenter picks it. These therefore cannot carry
+ * a literature citation, and requiring one of them is a category error
+ * (see ParameterValidator.validateParameter).
+ *
+ * Deliberately a small, explicit list rather than a heuristic: a
+ * pattern-match like "anything ending in 0" would quietly exempt a future
+ * measured quantity and turn this exemption into a hole.
+ */
+const EXPERIMENTAL_CONDITIONS: ReadonlySet<string> = new Set([
+  's0',      // initial substrate concentration
+  'e0',      // total enzyme concentration ([E]0, ADR 0013: a caller input)
+  'i0',      // initial inhibitor concentration
+  'enzyme_conc',
+  'temperature',
+  'ph',
+  'measurementtime',
+  'buffer',
+]);
+
+export function isExperimentalCondition(name: string): boolean {
+  return EXPERIMENTAL_CONDITIONS.has(name.toLowerCase().replace(/[_\s]/g, ''))
+    || EXPERIMENTAL_CONDITIONS.has(name.toLowerCase());
+}
+
 export class ParameterValidator {
   /**
    * Validate a single parameter against literature ranges
@@ -79,15 +108,35 @@ export class ParameterValidator {
     const errors: ValidationError[] = [];
     const warnings: ValidationWarning[] = [];
 
-    // Rule 1: Must have literature sources
-    if (!param.literature || param.literature.length === 0) {
-      errors.push({
-        code: 'NO_LITERATURE',
-        field: param.name,
-        message: `Parameter '${param.name}' has no literature backing`,
-        severity: 'critical',
-        fix: 'Provide at least 2 peer-reviewed sources'
-      });
+    // Rule 1: literature-derived parameters must have literature.
+    //
+    // EXPERIMENTAL CONDITIONS ARE EXEMPT, and this is a real distinction
+    // rather than a loosening. Km, Ki, kcat and Vmax are PROPERTIES OF AN
+    // ENZYME: somebody measured them, and a value without a source is an
+    // unsupported claim. s0, [E]0, temperature and pH are CHOICES THE
+    // EXPERIMENTER MAKES: nobody measures "the initial substrate
+    // concentration of lactate dehydrogenase", because it does not have
+    // one. Demanding a citation for them is a category error.
+    //
+    // It was also fatal in practice: every run through the pipeline died
+    // with "Parameter 's0' has no literature backing", so no simulation
+    // could complete no matter how well-sourced its kinetics were.
+    //
+    // A condition still has to be STATED -- it just cannot be cited, and
+    // it is reported as user-supplied in the provenance rather than
+    // dressed up as literature-backed.
+    if (!isExperimentalCondition(param.name)) {
+      if (!param.literature || param.literature.length === 0) {
+        errors.push({
+          code: 'NO_LITERATURE',
+          field: param.name,
+          message:
+            `Parameter '${param.name}' is a measured quantity and has no ` +
+            'literature backing',
+          severity: 'critical',
+          fix: 'Provide at least 2 peer-reviewed sources, or resolve it with `scientific resolve`'
+        });
+      }
     }
 
     // Rule 2: All sources must be peer-reviewed
@@ -264,6 +313,53 @@ export class LiteratureVerifier {
         return {
           status: 'rejected',
           reason: 'Source is not peer-reviewed.'
+        };
+      }
+
+      // Offline mode: the registry is not consulted at all.
+      //
+      // The need is real -- an offline laptop, CI without egress, a
+      // sandbox that 403s CrossRef. What this must NOT do is call the
+      // result `verified`. Skipping a check produces UNVERIFIED, which is
+      // precisely why a third state exists; returning `verified` here
+      // laundered a completely fabricated DOI into a verified citation on
+      // nothing but its shape and a self-declared `peerReviewed: true`.
+      // That is the same defect Stage 10 Parts 6 and 11 removed, arriving
+      // a third time by a different route.
+      //
+      // `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` already decides whether an
+      // unverified citation is acceptable to a given run, and says so in
+      // its warning. The two variables compose: skip the lookup, then
+      // decide what an unlooked-up citation is worth. Neither can make a
+      // citation verified without a registry saying so.
+      if (process.env['TERRIUM_SKIP_DOI_VERIFICATION'] === '1') {
+        logger.warn(
+          { doi: ref.doi, pmid: ref.pubmedId },
+          'DOI/PMID verification skipped (TERRIUM_SKIP_DOI_VERIFICATION=1); ' +
+          'citation is UNVERIFIED, not verified'
+        );
+        // Format-only check: DOI and PMID must still be well-formed
+        if (ref.doi && !/^10\.\d{4,9}\/\S+$/.test(ref.doi)) {
+          return {
+            status: 'rejected',
+            reason: `DOI '${ref.doi}' is not a well-formed DOI.`
+          };
+        }
+        if (ref.pubmedId && !/^\d+$/.test(ref.pubmedId)) {
+          return {
+            status: 'rejected',
+            reason: `PMID '${ref.pubmedId}' is not a well-formed PubMed ID.`
+          };
+        }
+        // Well-formed, peer-reviewed by assertion, and NOT checked against
+        // any registry. That is the definition of unverified.
+        return {
+          status: 'unverified',
+          reason:
+            'Registry lookup was skipped (TERRIUM_SKIP_DOI_VERIFICATION=1). ' +
+            'The identifier is well-formed but has not been shown to exist. ' +
+            'Results from this run must not be described as ' +
+            'literature-verified.'
         };
       }
 
@@ -926,17 +1022,63 @@ export class ScientificValidationPipeline {
 
     // LAYER 2: Literature Verification
     logger.info('LAYER 2: Literature Verification');
+    // Uses the THREE-state result, not the boolean.
+    //
+    // This called `verifyReference` and failed the run on anything that
+    // was not `true`, which collapsed two different facts:
+    //
+    //   REJECTED    the registry says this DOI does not exist, or the
+    //               source is not peer-reviewed. A fabricated citation.
+    //               The run must stop.
+    //   UNVERIFIED  no identifier to check, or the registry could not be
+    //               reached. Nothing is known either way.
+    //
+    // Treating the second as the first made every BRENDA-sourced value
+    // unusable: a BRENDA reference id is a real pointer into the primary
+    // literature, but it is not a DOI or a PMID, so there is nothing for
+    // CrossRef or PubMed to confirm. The value is genuinely sourced and
+    // genuinely not DOI-verified, and the honest report says exactly that
+    // rather than either failing it or calling it verified.
+    let unverifiedCount = 0;
     for (const param of parameters) {
       for (const ref of param.literature) {
-        const verified = await LiteratureVerifier.verifyReference(ref);
-        if (!verified) {
-          errors.push(`Literature reference not verified: ${ref.title}`);
-          logger.error({ reference: ref.doi || ref.title }, 'Literature verification failed');
-          return { passed: false, confidence: 0, summary: 'Layer 2 failed: literature verification', errors };
+        const outcome = await LiteratureVerifier.verifyReferenceDetailed(ref);
+
+        if (outcome.status === 'rejected') {
+          errors.push(
+            `Literature reference REJECTED for '${param.name}': ${ref.title} — ${outcome.reason ?? ''}`
+          );
+          logger.error(
+            { reference: ref.doi || ref.title, reason: outcome.reason },
+            'Literature verification rejected the reference'
+          );
+          return {
+            passed: false,
+            confidence: 0,
+            summary: 'Layer 2 failed: a citation was rejected',
+            errors,
+          };
+        }
+
+        if (outcome.status === 'unverified') {
+          unverifiedCount++;
+          logger.warn(
+            { reference: ref.doi || ref.title, reason: outcome.reason },
+            'Literature reference is UNVERIFIED (not rejected)'
+          );
         }
       }
     }
-    logger.info('All literature references verified');
+
+    if (unverifiedCount > 0) {
+      logger.info(
+        { unverifiedCount },
+        'Some references are unverified; results must not be described as ' +
+        'literature-verified'
+      );
+    } else {
+      logger.info('All literature references verified');
+    }
 
     // LAYER 3: Assumption Validation
     logger.info('LAYER 3: Model Assumption Validation');

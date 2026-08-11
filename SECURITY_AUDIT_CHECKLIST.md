@@ -124,8 +124,8 @@ const apiKey = process.env.LLM_API_KEY;
 logger.info({ query });  // ✅ Safe
 logger.info({ apiKey });  // ❌ DANGER
 
-// ✅ IMPLEMENTED: Timeout for credentials
-const timeout = 30000;  // 30 seconds for LLM calls
+// ✅ IMPLEMENTED: Timeout for external API calls
+const timeout = 30000;  // 30 seconds maximum per request
 ```
 
 **Audit Items:**

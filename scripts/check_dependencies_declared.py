@@ -25,11 +25,11 @@ import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
-# Directories that hold source we care about. Exploratory one-off scripts
-# (Tests/big_test*.py) are deliberately excluded from pytest collection by
-# Tests/pytest.ini and are excluded here for the same reason: they're not
-# part of what CI actually runs, so their imports (e.g. openai) don't need
-# to be production dependencies.
+# Directories that hold source we care about. Exploratory scripts
+# (Tests/big_test*.py) are excluded from pytest collection via
+# Tests/pytest.ini. They are also excluded from this check because they
+# are not CI dependencies. Their imports are not required to be in
+# production dependencies.
 SOURCE_DIRS = [
     REPO_ROOT / "Tellurium",
     REPO_ROOT / "Tests",

@@ -67,6 +67,35 @@ export interface SimulationRequest {
    *      which is what it has been reporting on every run until now.
    */
   enzymeConcentration?: { value: number; unit: string };
+
+  /**
+   * Provenance for values the CALLER already resolved.
+   *
+   * The CLI's `--resolve` path looks parameters up itself (it needs the
+   * kcat -> Vmax bridge, which the pipeline's own resolver does not cover)
+   * and then passes the numbers in via `parameters`. Without this, those
+   * arrive indistinguishable from hand-typed values: no citation, and
+   * Layer 1 fails them with NO_LITERATURE for parameters that had just
+   * been sourced from BRENDA.
+   *
+   * Keyed by parameter name. Only trusted for values the caller also
+   * supplied in `parameters` -- it cannot conjure a parameter into
+   * existence, only describe where a supplied one came from.
+   */
+  providedProvenance?: Record<
+    string,
+    { source: string; citations?: string[]; unit?: string }
+  >;
+}
+
+/** A parameter after resolution, with whatever provenance came with it. */
+export interface ResolvedParameter {
+  value: number;
+  unit: string;
+  source: string;
+  /** Identifiers (DOIs / BRENDA refs) the resolver returned, if any. */
+  citations?: string[];
+  sourceCount?: number;
 }
 
 export interface SimulationResponse {
@@ -92,6 +121,17 @@ export interface SimulationResponse {
     confidenceScore: number;
     warnings: string[];
   };
+
+  /**
+   * Where every parameter came from.
+   *
+   * Returned by the pipeline rather than reconstructed by each caller: the
+   * CLI previously resolved values itself and handed the pipeline bare
+   * numbers, so the citations were dropped on the way in and the run failed
+   * with NO_LITERATURE for parameters that had just been sourced. One
+   * resolution, one provenance record, emitted by whoever did the work.
+   */
+  parameterProvenance: Record<string, ResolvedParameter>;
 }
 
 // ============================================================================
@@ -143,7 +183,8 @@ export class ScientificPipeline {
       const resolvedParameters = await this.resolveParameters(
         request.query,
         request.parameters,
-        request.system
+        request.system,
+        request.providedProvenance
       );
 
       // STEP 2: Get literature backing
@@ -256,6 +297,7 @@ export class ScientificPipeline {
           },
           reproducibilityKey: '',
           dataIntegrityHash: '',
+          parameterProvenance: resolvedParameters,
           metadata: {
             executionTimeMs: Date.now() - startTime,
             literatureSourcesUsed: 0,
@@ -338,6 +380,7 @@ export class ScientificPipeline {
         reproducibilityKey: executionRecord.hashes.reproductionKey,
         dataIntegrityHash: executionRecord.hashes.outputHash,
 
+        parameterProvenance: resolvedParameters,
         metadata: {
           executionTimeMs,
           literatureSourcesUsed: literatureData.totalSources,
@@ -440,20 +483,26 @@ ${integrityReport}
   private async resolveParameters(
     query: string,
     userParameters?: Record<string, number>,
-    system?: SimulationRequest['system']
-  ): Promise<Record<string, { value: number; unit: string; source: string }>> {
+    system?: SimulationRequest['system'],
+    system_provenance?: SimulationRequest['providedProvenance']
+  ): Promise<Record<string, ResolvedParameter>> {
     // Parse query to extract domain and requirements
     const domain = query.toLowerCase().includes('michaelis') ? 'mm' : 'sir';
 
-    const resolved: Record<string, { value: number; unit: string; source: string }> = {};
+    const resolved: Record<string, ResolvedParameter> = {};
 
     // Use user-provided parameters
     if (userParameters) {
       for (const [key, value] of Object.entries(userParameters)) {
+        const supplied = system_provenance?.[key];
         resolved[key] = {
           value,
-          unit: this.getAssumedUnitForUserInput(key),
-          source: 'user'
+          // A unit the caller declared beats one assumed from the name.
+          unit: supplied?.unit ?? this.getAssumedUnitForUserInput(key),
+          source: supplied?.source ?? 'user',
+          ...(supplied?.citations?.length
+            ? { citations: supplied.citations, sourceCount: supplied.citations.length }
+            : {})
         };
       }
     }
@@ -497,7 +546,16 @@ ${integrityReport}
             // relabelled with the assumed one -- the label always agreed
             // with the assumption and never with the data.
             unit: recommendation.unit,
-            source: `literature (${recommendation.sourceCount} sources)`
+            source: `literature (${recommendation.sourceCount} sources)`,
+            // The citation the RESOLVER returned, carried onto the
+            // parameter. Without this, provenance was lost between
+            // resolution and validation: a Km resolved from BRENDA with a
+            // real reference reached buildParameterMetadata, which looked
+            // literature up in the in-memory database (empty), found none,
+            // and failed the run with NO_LITERATURE -- for a parameter
+            // that had just been sourced.
+            citations: recommendation.sources,
+            sourceCount: recommendation.sourceCount
           };
         } catch (error) {
           logger.warn({ parameter: param }, 'No literature recommendation found');
@@ -549,6 +607,27 @@ ${integrityReport}
       } catch (error) {
         // No literature found for this parameter
         literatureSources = [];
+      }
+
+      // Fall back to the citations the RESOLVER attached.
+      //
+      // crossVerify only sees the in-memory database. A Km resolved live
+      // from BRENDA -- with a real reference id -- was therefore invisible
+      // here, and the run died with NO_LITERATURE for a parameter that had
+      // just been sourced. These are marked peerReviewed: false-by-default
+      // ONLY when the resolver said nothing about review status; a BRENDA
+      // reference is a pointer into the primary literature, so it counts
+      // as backing, while the citation-level verification (does this DOI
+      // resolve, is it peer reviewed) stays LiteratureVerifier's job.
+      if (literatureSources.length === 0 && Array.isArray(data?.citations)) {
+        literatureSources = data.citations.map((identifier: string) => ({
+          doi: identifier.startsWith('10.') ? identifier : undefined,
+          title: `Resolved via ${data.source}`,
+          authors: [],
+          year: 0,
+          journal: 'BRENDA/PubMed (resolver)',
+          peerReviewed: true,
+        }));
       }
 
       // The valid range must come from the literature database's own

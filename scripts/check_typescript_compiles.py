@@ -288,15 +288,14 @@ def unguarded_typescript_trees() -> list[pathlib.Path]:
 
     IMPLEMENTATION NOTE, and the reason this asks tsc instead of looking
     for files: the first version of this function tested "does a
-    tsconfig.json exist at or above this directory". That test became
-    VACUOUS the moment a tsconfig.json was added at the repository root to
-    cover src/ -- every directory in the repo then found that root config
-    by walking up, so the function could never report anything again. It
-    returned "no unguarded trees" because it was structurally incapable of
-    returning anything else, which is precisely the class of defect this
-    guard exists to catch. Membership is now decided by the compiler's own
-    `--listFiles` output, so a file that no project actually pulls in is
-    reported however many tsconfigs happen to sit above it.
+    tsconfig.json exist at or above this directory". When a tsconfig.json
+    was added at the repository root to cover src/, this test stopped being
+    effective -- every directory in the repo would find that root config
+    by walking up, making the function unable to identify unguarded files.
+    This is an example of a check that appears to pass due to structural
+    limitations rather than actual coverage. The current approach uses the
+    compiler's own `--listFiles` output, so files that no project actually
+    pulls in are identified correctly regardless of tsconfig hierarchy.
     """
     sources = first_party_typescript()
     if not sources:

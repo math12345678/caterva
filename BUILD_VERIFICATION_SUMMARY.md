@@ -1,5 +1,7 @@
 # Terrium Build Verification Summary
 
+> **⚠️ CORRECTION (2026-08-10):** the "220 TypeScript tests across 15 files, ALL PASSING" figure (originally dated Aug 3) is stale — the api-server test suite has grown since. Get the current count by running `pnpm test` (or `vitest run`) from `Science-Agent-Pipeline/artifacts/api-server/` rather than trusting the number below; this repo has multiple agents committing continuously, so any hardcoded test count in a doc should be treated as a snapshot, not a live fact. Citation fixes and refactoring claims elsewhere in this doc (Mullis/Lewontin/Hoare & Pal citation corrections in `queryResolver.ts`, the `Tellurium/` package split into core/continuous/discrete/scenarios, and the guard scripts listed) were independently verified as real.
+
 ## 🎯 Executive Summary
 
 This document summarizes the comprehensive improvements made to the Terrium codebase to achieve a **deployable, verifiable, and maintainable** state. All changes implement the project's core rules:
