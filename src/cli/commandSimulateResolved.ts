@@ -33,6 +33,8 @@ import {
 } from '../literature/literatureResolver';
 import { convertConcentration } from '../units';
 import { parseQuantity } from './parseQuantity';
+import { commandSensitivity } from './commandSensitivity';
+import { JobManager } from '../execution/job-manager';
 
 const BOLD = '\x1b[1m';
 const DIM = '\x1b[2m';
@@ -69,6 +71,10 @@ export interface SimulateResolvedOptions {
   /** [E]0 with its unit, if given. Bridges kcat to Vmax. */
   enzymeConc?: string;
   json: boolean;
+  /** Fractional perturbation for a sensitivity sweep (e.g. 0.1 = ±10%).
+   *  When set, reports sensitivity beside each parameter's provenance
+   *  instead of running a single simulation. */
+  sensitivity?: number;
 }
 
 /** Exit codes mirror `resolve`: 0 ran, 1 could not look up, 2 no data. */
@@ -305,6 +311,29 @@ export async function commandSimulateResolved(
     return 2;
   }
 
+  // Sensitivity runs on the SAME resolved parameters, with the SAME
+  // provenance. That pairing is the point: it can then say which weakly
+  // sourced number the answer actually rides on.
+  if (options.sensitivity !== undefined) {
+    printProvenance(provenance);
+    return commandSensitivity({
+      query: `${options.enzyme ?? options.ec} / ${options.substrate}`,
+      parameters: numeric,
+      provenance,
+      perturbation: options.sensitivity,
+      request: {
+        providedProvenance,
+        system: {
+          enzymeName: options.enzyme,
+          ecNumber: options.ec,
+          substrate: options.substrate,
+          organism: options.organism,
+        },
+      },
+      json: options.json,
+    });
+  }
+
   if (options.json) {
     process.stdout.write(
       JSON.stringify({ ok: true, status: 'ran', provenance, response }, null, 2) + '\n',
@@ -321,6 +350,21 @@ export async function commandSimulateResolved(
       existing.citation = resolved.citations.join(', ');
     }
   }
+
+  // Persist the run so `verify` and `check-integrity` can find it in a
+  // LATER process. Without this the CLI printed a job id that no
+  // subsequent command could resolve, because the store was in memory and
+  // the process had exited.
+  const written = JobManager.recordRun({
+    jobId: response.jobId,
+    at: new Date().toISOString(),
+    query: `${options.enzyme ?? options.ec} / ${options.substrate}`,
+    provenance,
+    reproducibilityKey: response.reproducibilityKey,
+    dataIntegrityHash: response.dataIntegrityHash,
+    finalValue: response.results.finalValue,
+    validated: response.validated,
+  });
 
   printProvenance(provenance);
 
@@ -339,8 +383,21 @@ export async function commandSimulateResolved(
   process.stdout.write(`  ${c(DIM, 'points    ')} ${response.results.trajectory.length}\n`);
   process.stdout.write(`\n  ${c(DIM, 'job       ')} ${response.jobId}\n`);
   process.stdout.write(
-    `  ${c(DIM, 'repro key ')} ${response.reproducibilityKey.slice(0, 32)}…\n\n`,
+    `  ${c(DIM, 'repro key ')} ${response.reproducibilityKey.slice(0, 32)}…\n`,
   );
+
+  if (written.ok) {
+    process.stdout.write(
+      `\n${c(DIM, `  Saved. Re-check it later with:  scientific check-integrity ${response.jobId}`)}\n\n`,
+    );
+  } else {
+    // Reported rather than swallowed: a user who is told a job id, then
+    // finds `verify` cannot see it, has no way to know why.
+    process.stdout.write(
+      `\n${c(YELLOW, '  ⚠ Run history could not be written')} ${c(DIM, '(' + (written.reason ?? '') + ')')}\n` +
+        `${c(DIM, '    The simulation is valid; it just will not appear in `history`.')}\n\n`,
+    );
+  }
 
   return 0;
 }

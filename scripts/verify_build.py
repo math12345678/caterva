@@ -188,6 +188,29 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
     ]
 
 
+def run_orphan_guard() -> List[Tuple[str, bool, str]]:
+    """Fail when a source module is imported by nothing.
+
+    This repository is written to by several AI agents concurrently, and
+    the incentive they all share is to ADD. Nothing punished code that was
+    never called, so a single commit landed 2,009 lines across seven
+    modules with zero importers -- and every guard passed, because
+    unreachable code compiles fine and cannot break a test.
+
+    The cost is not disk space. It is that the repo accumulated four
+    parallel implementations of Michaelis-Menten and three of BRENDA
+    lookup, with no way to tell which one the product uses. Every serious
+    defect this project has found lived in the copy nobody was watching.
+    """
+    return [
+        run_guard(
+            "Orphan Module Guard",
+            f"python {SCRIPTS_DIR / 'check_no_orphan_modules.py'}",
+            timeout=120,
+        )
+    ]
+
+
 def run_injection_guard() -> List[Tuple[str, bool, str]]:
     """Scan for prompt injections aimed at an AI agent.
 
@@ -368,6 +391,9 @@ def main() -> int:
         # every mode rather than behind the slow-test flag.
         injection_guards = run_injection_guard()
         total_failures += print_results("Prompt Injection Guard", injection_guards)
+
+        orphan_guards = run_orphan_guard()
+        total_failures += print_results("Orphan Module Guard", orphan_guards)
 
     # Live citation guard (network; opt-in so offline builds stay green)
     if args.live:
