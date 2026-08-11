@@ -1,5 +1,21 @@
 # Security Audit Checklist & Hardening Guide
 
+> **⚠️ No audit was performed -- every "✅ IMPLEMENTED" below needs to be
+> read as a specification, not a result.** This describes security controls
+> (Zod input validation, an Express rate limiter, CORS/security headers)
+> for an HTTP service that does not exist in this codebase: `src/` (package
+> `terrium-scientific-backend`) has no `dependencies` in `package.json` at
+> all (only `devDependencies` -- jest, ts-node, eslint, typescript), `zod`
+> is not installed, and no `express()`/`app.use()`/`createServer()` exists
+> anywhere in `src/` (confirmed by grep, 2026-08-10). A security checklist
+> marking controls "implemented" for a service that was never built is the
+> same failure mode this repo has already caught and corrected once, in
+> `Science-Agent-Pipeline/artifacts/api-server/SECURITY_HARDENING.md` (that
+> project's real security posture, since corrected, is genuinely worth
+> reading -- it documents an actual running server). Kept below as a
+> specification for security work that would be needed if/when this tree is
+> exposed as a network service, not an audit finding.
+
 ## Executive Summary
 
 This document provides a comprehensive security audit checklist for the Terrium backend. It covers:

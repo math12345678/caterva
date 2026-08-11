@@ -1,5 +1,24 @@
 # Terrium Backend API Documentation
 
+> **⚠️ This REST API does not exist -- read before treating this as real.**
+> The root `src/` tree this document claims to document (package
+> `terrium-scientific-backend`) is a TypeScript **library and CLI**
+> (`src/cli/scientificCLI.ts`), not an HTTP server: `package.json` has no
+> `dependencies` key at all (only `devDependencies` -- jest, ts-node,
+> eslint, typescript), and no `express`/`cors`/`createServer` call exists
+> anywhere in `src/` (confirmed by grep, 2026-08-10). There is no
+> `https://api.terrium.dev`, no `status.terrium.dev`, no `@terrium/sdk` npm
+> package, no `pip install terrium-sdk`, and no webhook system. Terrium's
+> REAL, deployed REST API lives in a different codebase entirely --
+> `Science-Agent-Pipeline/artifacts/api-server/` -- documented accurately in
+> that project's own `API_USER_GUIDE.md` and `INTEGRATION_EXAMPLES.md`
+> (which were themselves corrected earlier for similar issues; see that
+> project's real routes under `src/routes/`: `simulate.ts`, `health.ts`,
+> `metrics.ts`, `pipeline.ts`, `dashboard.ts`, `waitlist.ts`, `enzymes.ts`).
+> The 8 endpoints below do not match that real API either -- they are an
+> independent invention. Kept below as a design sketch, not documentation
+> of a running service.
+
 **Version:** 1.0  
 **Last Updated:** 2026-08-09  
 **Base URL:** `https://api.terrium.dev/api`  

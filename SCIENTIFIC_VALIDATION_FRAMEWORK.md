@@ -1,5 +1,18 @@
 # Scientific Validation Framework
 
+> **⚠️ Pseudocode, not verbatim shipped code.** The 4-layer validation
+> concept here is real and does have a working implementation --
+> `src/validation/scientificValidator.ts`'s `ScientificValidationPipeline`,
+> `ParameterValidator`, `AssumptionValidator`, and `ResultValidator` classes
+> (confirmed 2026-08-10). But the specific function shown below,
+> `validateMMParameters(params: MMParameters)`, does not exist verbatim --
+> the real entry point is `ParameterValidator.validateParameter(param:
+> ParameterMetadata)`, with different field names than this doc's `MMParameters`
+> interface. Treat code samples in this document as illustrating the
+> DESIGN, not as copy-pasteable descriptions of the real API -- check
+> `src/validation/scientificValidator.ts` and its test file directly for
+> the real signatures.
+
 **Purpose:** Ensure all simulations, parameters, and results are scientifically valid and literature-backed  
 **Status:** Framework Definition & Implementation Guide  
 **Last Updated:** 2026-08-09  

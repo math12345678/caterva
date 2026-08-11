@@ -1,5 +1,18 @@
 # Operational Excellence Guide
 
+> **⚠️ Nothing here is deployed -- read before treating this as real.**
+> This describes monitoring, Grafana dashboards, alert routing, on-call
+> escalation, and cost breakdowns for an Express HTTP service. No such
+> service exists: `src/` (package `terrium-scientific-backend`) is a
+> library/CLI with no `express()`/`app.listen()`/`createServer()` anywhere
+> (confirmed by grep, 2026-08-10), no Prometheus/Grafana/PagerDuty config
+> exists anywhere in this repo, and the repo's only `Dockerfile` builds a
+> Python dev/CI sandbox (`CMD ["bash"]`, no `EXPOSE`, no server start) --
+> unrelated to deploying this TS tree. There is nothing running to monitor,
+> no on-call rotation, and no real cost to report. Kept below as a
+> specification for operational work that would be needed if this tree were
+> ever exposed as a deployed service, not a description of current state.
+
 ## Production Deployment Checklist
 
 ### Pre-Deployment (48 hours before)
