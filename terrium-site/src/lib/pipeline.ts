@@ -156,4 +156,16 @@ export const LEDGER: LedgerRow[] = [
     method: 'symplectic order check',
     reference: 'Swope et al., J. Chem. Phys. 76, 637 (1982)',
   },
+  {
+    domain: 'gillespie_ssa',
+    claim: 'E[a(t)] = a₀·e^(−kt), a+b ≡ a₀',
+    method: 'exact SSA mean vs closed form (50 seeds)',
+    reference: 'Gillespie, J. Phys. Chem. 81, 2340 (1977)',
+  },
+  {
+    domain: 'gillespie_ssa_bimolecular',
+    claim: 'a(t) = (a₀−b₀)/(1−(b₀/a₀)e^(−k(a₀−b₀)t)), a+c ≡ a₀, b+c ≡ b₀',
+    method: 'exact SSA mean vs ODE closed form',
+    reference: 'Gillespie, J. Phys. Chem. 81, 2340 (1977)',
+  },
 ];

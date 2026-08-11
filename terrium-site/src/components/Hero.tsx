@@ -6,6 +6,16 @@
 
 import { useCountUp, useReducedMotion, useTypewriter } from '../lib/motion';
 import { useEffect, useState } from 'react';
+import { LEDGER } from '../lib/pipeline';
+
+// Derived from LEDGER, not hardcoded -- the terrium-site copy of the ledger
+// previously drifted from landing/'s canonical version (missing the two
+// gillespie_ssa rows), and these counters silently kept reporting the old
+// totals (8 claims / 6 domains) even after the ledger itself was fixed.
+// Deriving them here means a future ledger edit can't leave the hero
+// numbers stale again.
+const CLAIM_COUNT = LEDGER.length;
+const DOMAIN_COUNT = new Set(LEDGER.map((row) => row.domain)).size;
 
 const WORDS = ['exact mathematics.', 'a closed form.', 'a 1971 paper.', 'a second model.'];
 
@@ -27,8 +37,8 @@ export default function Hero() {
     return () => window.clearTimeout(t);
   }, [done, i, reduced]);
 
-  const claims = useCountUp(8, mounted, 1400);
-  const domains = useCountUp(6, mounted, 1100);
+  const claims = useCountUp(CLAIM_COUNT, mounted, 1400);
+  const domains = useCountUp(DOMAIN_COUNT, mounted, 1100);
 
   const rise = (delay: number) => ({
     opacity: mounted ? 1 : 0,
