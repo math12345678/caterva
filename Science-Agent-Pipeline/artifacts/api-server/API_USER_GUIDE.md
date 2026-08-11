@@ -14,11 +14,9 @@ Terrium is a science agent that runs simulations based on your natural language 
 
 **Example:**
 ```
-Query: "SIR model with beta=0.5 and gamma=0.1, starting with S0=900"
-↓
-System: Recognizes SIR (epidemiology), extracts parameters
-↓
-Result: Simulation output with time series data
+Input Query: "SIR model with beta=0.5 and gamma=0.1, starting with S0=900"
+Processing: Recognizes SIR (epidemiology), extracts parameters
+Output: Simulation output with time series data
 ```
 
 ### Quick Start (5 Minutes)

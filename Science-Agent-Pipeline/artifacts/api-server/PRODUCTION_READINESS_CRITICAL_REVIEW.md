@@ -457,13 +457,13 @@ Questions:
 
 **Gap:** We trust the LLM without verification
 
-**Example:**
+**Example Scenario:**
 ```
-Query: "enzyme kinetics for unknown enzyme"
-LLM: "I'll guess km=5"
-We mark: origin: "llm", note: "LLM suggested"
-User: "This is LLM guessed? I'll use it for publication then"
-Reality: km=5 is completely made up
+Input: "enzyme kinetics for unknown enzyme"
+LLM Output: "I'll guess km=5"
+Flagging: origin: "llm", note: "LLM suggested"
+Risk: User might not realize this is speculative and use it for publication
+Reality: km=5 was not verified against any database
 ```
 
 **Better:** Mark LLM values with "NOT VERIFIED" flag

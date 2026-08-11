@@ -11,13 +11,11 @@ touching the code.
 
 ## Roles
 
-**Claude (me) — orchestrator, not implementer.**
-I don't write the domain code in this setup. My job is the four things an
-LLM coding agent won't reliably do for itself: hold the standards across
-sessions, write the spec each implementer works from, review the diff
-against that spec before it's trusted, and run the actual verification
-(tests, mutation testing, dependency scan) rather than taking an agent's
-word that it works.
+**Orchestrator Role — Claude**
+The orchestrator does not write domain code. Responsibilities include: maintaining
+standards across sessions, writing specifications for implementers, reviewing diffs
+against specifications, and running verification (tests, mutation testing, dependency
+scans) rather than accepting unverified claims about code quality.
 
 **OpenCode / FreeBuff — implementers.**
 Both write code from a spec I give them. Treat them as replaceable and

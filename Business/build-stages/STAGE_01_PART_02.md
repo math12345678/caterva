@@ -2,10 +2,10 @@
 
 ## 0. Why this part is prompt-heavy on purpose
 
-Part 1 established the rules. This part exists to answer the actual
-operational question: what, precisely, gets typed into OpenCode and
-FreeBuff, in what order, so that the rules from Part 1 survive contact
-with a stateless coding agent that has never seen this project before.
+Part 1 established the rules. This part answers the operational question:
+what specifications are provided to implementers (OpenCode, FreeBuff) and
+in what order, so that project standards are preserved when working with
+implementers that lack prior project context.
 
 The pipeline diagram and the plan matter, but they are short, because they
 are simple. The prompts are what actually determines whether the next 99

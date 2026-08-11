@@ -127,9 +127,10 @@ def llm_supported_domains() -> set[str]:
 
     This is a deliberate SUBSET of DISPATCH, not an equal set: `sbml` is an
     internal escape hatch, and `monte_carlo_pi` / `gillespie_ssa_replicates`
-    are engine-internal and not offered to the LLM. So it is checked for
-    containment rather than parity -- but it must never name a domain that
-    does not exist, which is exactly how `lotka_volterra` reached it.
+    are engine-internal and excluded from the public API. This subset is
+    checked for containment rather than parity. However, all named domains
+    must exist in the dispatch table (a constraint that caught `lotka_volterra`
+    when it was added to allowlist but not implemented).
     """
     source = _read(LLM_RESOLVER_TS)
     match = re.search(

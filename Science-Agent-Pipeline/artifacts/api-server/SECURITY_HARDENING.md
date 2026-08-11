@@ -377,7 +377,7 @@ SET encrypted_query = pgp_sym_encrypt(query, 'secret_key');
 **Current implementation: plain environment variables, no secrets manager.**
 
 There is no `src/lib/secrets.ts` file and `aws-sdk` is not a dependency (confirmed absent from
-`package.json`). Secrets are read directly from `process.env` wherever they're needed, e.g.:
+`package.json`). Secrets are obtained from environment variables at the point of use, as seen in:
 
 ```typescript
 // src/lib/llmResolver.ts

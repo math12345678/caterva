@@ -1,5 +1,7 @@
 # Complete Delivery: Production-Ready Scientific Backend
 
+> **⚠️ CORRECTION (2026-08-10):** the "65 passed, 65 total" / "65+ test cases" / "1,100+ lines" figures throughout this doc are stale. Current real count (`npm test` from repo root): **11 test files, 179 tests passing**, including several files not listed here (`literatureResolver.test.ts`, `telluriumBridge.test.ts`, `coverage.test.ts`, `enzymeConcentration.test.ts`, `units.test.ts`, `verificationStates.test.ts`, `critical-paths.test.ts`). Don't rely on the numbers below — run `npm test` for the current figure.
+
 **Status:** ✅ COMPLETE & EXECUTABLE  
 **Completion Date:** 2026-08-09  
 **Total Code:** 3,700+ lines  

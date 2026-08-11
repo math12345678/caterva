@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import ast
+import re
 import sys
 from pathlib import Path
 from typing import Dict, List, Any
@@ -202,33 +203,131 @@ def check_missing_constants() -> List[str]:
 
 
 def check_constant_usage() -> List[str]:
-    """Check that constants are used in validation functions."""
-    errors = []
-    
-    repo_root = Path(__file__).parent.parent
-    validation_file = repo_root / 'Tellurium' / 'core' / 'validation.py'
-    
-    if not validation_file.exists():
-        return [f"Validation file not found: {validation_file}"]
-    
-    try:
-        content = validation_file.read_text(encoding='utf-8')
-        
-        # Check that validation functions use the constants
+    """Check that every expected constant is actually USED somewhere.
+
+    A plausibility bound that is defined but referenced by nothing bounds
+    nothing. `KM_PLAUSIBLE_MAX_MM` existing in data_structures.py says
+    only that a number was written down; the guard has to establish that
+    some validator reads it.
+
+    THIS FUNCTION USED TO CHECK NOTHING. Its loop body was:
+
         for const_name in EXPECTED_CONSTANTS:
             if const_name in content:
-                continue  # Constant is used somewhere in the file
-            
-            # Some constants might not be used in validation.py specifically
-            # but should be used elsewhere
-            if const_name.startswith('WF_') or const_name.startswith('MD_'):
-                # These are domain-specific and might be in domain modules
                 continue
-        
-    except Exception as e:
-        errors.append(f"Error checking constant usage: {e}")
-    
+            if const_name.startswith('WF_') or const_name.startswith('MD_'):
+                continue
+
+    -- two `continue`s and no `errors.append` anywhere inside. Every path
+    fell through, so `errors` could only become non-empty via the missing-
+    file guard or the `except` handler. For any readable validation.py it
+    returned [] no matter what that file contained: deleting every use of
+    every bound would still have printed the guard's OK line.
+
+    It also looked only at Tellurium/core/validation.py, while the WF_ and
+    MD_ constants legitimately live in their domain modules -- which is
+    what the second `continue` was papering over. The search now covers
+    the whole engine, so those constants can be held to the same standard
+    rather than exempted.
+    """
+    errors: List[str] = []
+
+    repo_root = Path(__file__).parent.parent
+
+    # BOTH layers, matching check_constants_consistency above. ADR 0003
+    # makes these bounds a contract between the literature layer
+    # (Tests/brenda_client.py) and the simulation layer (Tellurium/), and
+    # the kcat bounds are consumed by the BRENDA parser rather than by a
+    # Tellurium validator. Scanning only Tellurium/ reported them as
+    # defined-and-unused, which was wrong -- they are used, one layer over.
+    search_roots = [repo_root / 'Tellurium', repo_root / 'Tests']
+    missing_roots = [r for r in search_roots if not r.is_dir()]
+    if missing_roots:
+        return [
+            "Expected source directories not found: "
+            + ", ".join(str(r) for r in missing_roots)
+        ]
+
+    # Files that only DEFINE the constants. A constant appearing in these
+    # and nowhere else is defined and unused. Both are listed because the
+    # value is deliberately duplicated across the layer boundary (ADR 0003,
+    # with the agreement enforced by check_constants_consistency).
+    definition_files = {
+        repo_root / 'Tellurium' / 'core' / 'data_structures.py',
+        repo_root / 'Tests' / 'brenda_client.py',
+    }
+
+    sources: dict[Path, str] = {}
+    for root in search_roots:
+        for path in root.rglob('*.py'):
+            if '__pycache__' in path.parts:
+                continue
+            try:
+                sources[path] = path.read_text(encoding='utf-8')
+            except OSError as exc:
+                errors.append(f"Could not read {path}: {exc}")
+
+    if not sources:
+        return [
+            "No Python sources found under "
+            + ", ".join(r.name for r in search_roots)
+            + ". Refusing to report success -- an empty scan is not a "
+            "clean tree."
+        ]
+
+    for const_name in sorted(EXPECTED_CONSTANTS):
+        # A USE is any occurrence that is not the assignment itself.
+        #
+        # File-level exclusion was wrong: Tests/brenda_client.py both
+        # DEFINES the kcat bounds and is their only production reader, so
+        # treating it as a definition file hid its own use and the guard
+        # failed on a correctly-wired constant.
+        #
+        # Tests are still not users. A bound referenced only by a test
+        # asserting that it exists is not wired into anything: no validator
+        # applies it and no simulation is bounded by it. Counting tests let
+        # a mutation that inlined the kcat bounds -- removing their only
+        # production reader -- pass unnoticed.
+        assignment = re.compile(
+            rf'^\s*{re.escape(const_name)}\s*(?::[^=]+)?=', re.MULTILINE
+        )
+        users = []
+        for path, content in sources.items():
+            if const_name not in content:
+                continue
+            if path.name.startswith('test_') or path.name.endswith('_test.py'):
+                continue
+            if 'tests' in path.parts:
+                continue
+            occurrences = content.count(const_name)
+            definitions = len(assignment.findall(content))
+            if occurrences > definitions:
+                users.append(path)
+
+        if users:
+            continue
+
+        defined_in = [
+            path
+            for path in definition_files
+            if path in sources and const_name in sources[path]
+        ]
+        if defined_in:
+            where = ", ".join(sorted(p.name for p in defined_in))
+            errors.append(
+                f"{const_name} is defined in {where} but read by no other "
+                "module in Tellurium/ or Tests/. A plausibility bound that "
+                "nothing reads does not bound anything -- either wire it "
+                "into a validator or remove it."
+            )
+        else:
+            errors.append(
+                f"{const_name} is expected by this guard but appears in "
+                "neither Tellurium/ nor Tests/."
+            )
+
     return errors
+
 
 
 def main() -> int:

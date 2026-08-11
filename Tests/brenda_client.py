@@ -528,7 +528,19 @@ def parse_brenda_km_html(
         results.append(
             BRENDAKmEntry(
                 km_value=km_value,
-                unit="mM",
+                # `_unit`, not a hardcoded "mM". This read `unit="mM"`
+                # unconditionally, while `_unit` -- correctly derived above
+                # as "1/s" for the Turnover Numbers table and "mM" for
+                # Km/Ki -- reached only the plausibility-flag message.
+                #
+                # So every kcat parsed from BRENDA was labelled a
+                # millimolar concentration: the real AChE turnover number
+                # 6500 s^-1 was emitted as `6500 mM`. The wrong unit then
+                # travelled through KineticResult.unit and
+                # science_agent_runner.py into the API response, and any
+                # downstream unit check reading `.unit` was structurally
+                # incapable of failing because the field was a constant.
+                unit=_unit,
                 substrate=matched_substrate,
                 organism=row_organism,
                 uniprot=uniprot,

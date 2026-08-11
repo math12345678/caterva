@@ -888,7 +888,6 @@ export default function CliApp() {
             <div className="flex items-center gap-3">
               <span
                 className="inline-block w-1.5 h-1.5 rounded-full bg-[#1D8A72] animate-pulse-soft"
-                aria-hidden="true"
               />
               <span>
                 terrium &mdash; changing the future through AI, public health,

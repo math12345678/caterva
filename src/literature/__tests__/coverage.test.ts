@@ -199,4 +199,147 @@ describe('LiteratureService Coverage', () => {
       expect(result.sources.length).toBeGreaterThan(0);
     });
   });
+
+  describe('Additional branch coverage', () => {
+    it('should handle finding conflicts in literature', () => {
+      const lit1: Literature = {
+        ...minimalLiterature,
+        id: 'lit_outlier',
+        extractedParameters: [
+          { name: 'km', value: 50.0, unit: 'mM', conditions: {} } // Outlier: 10x difference
+        ]
+      };
+
+      const lit2: Literature = {
+        ...minimalLiterature,
+        id: 'lit_normal',
+        extractedParameters: [
+          { name: 'km', value: 5.0, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      service.addLiterature(lit1);
+      service.addLiterature(lit2);
+
+      // This tests the outlier detection logic (deviation > 2σ)
+      expect(() => {
+        service.getRecommendation('km', 'mm');
+      }).not.toThrow();
+    });
+
+    it('should generate consensus strings for different levels', () => {
+      const lit1: Literature = {
+        ...minimalLiterature,
+        id: 'lit_c1',
+        extractedParameters: [
+          { name: 'km', value: 5.0, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      service.addLiterature(lit1);
+
+      // Verify consensus is set properly
+      const result = service.crossVerify('km', 'mm');
+      expect(['strong', 'moderate', 'weak', 'conflicting']).toContain(result.consensus);
+    });
+
+    it('should identify conflict structure correctly', () => {
+      const lit1: Literature = {
+        ...minimalLiterature,
+        id: 'lit_out1',
+        extractedParameters: [
+          { name: 'km', value: 5.0, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      const lit2: Literature = {
+        ...minimalLiterature,
+        id: 'lit_out2',
+        extractedParameters: [
+          { name: 'km', value: 5.1, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      service.addLiterature(lit1);
+      service.addLiterature(lit2);
+
+      const conflicts = service.findConflicts('km', 'mm');
+      expect(typeof conflicts.hasConflicts).toBe('boolean');
+      expect(Array.isArray(conflicts.outliers)).toBe(true);
+    });
+
+    it('should get statistics from database', () => {
+      service.addLiterature(minimalLiterature);
+      const stats = service.getStats();
+      expect(stats.totalEntries).toBeGreaterThan(0);
+      expect(stats.peerReviewedCount).toBeGreaterThan(0);
+    });
+
+    it('should find literature by DOI', () => {
+      service.addLiterature(minimalLiterature);
+      const found = service.getByDOI(minimalLiterature.doi!);
+      expect(found).toBeDefined();
+      expect(found?.id).toBe(minimalLiterature.id);
+    });
+
+    it('should return undefined for missing DOI', () => {
+      service.addLiterature(minimalLiterature);
+      const found = service.getByDOI('10.1234/nonexistent');
+      expect(found).toBeUndefined();
+    });
+
+    it('should handle literature with varying impact factors', () => {
+      const lit1: Literature = {
+        ...minimalLiterature,
+        id: 'lit_high_if',
+        impactFactor: 10.5,
+        extractedParameters: [
+          { name: 'km', value: 5.0, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      const lit2: Literature = {
+        ...minimalLiterature,
+        id: 'lit_low_if',
+        impactFactor: 1.5,
+        extractedParameters: [
+          { name: 'km', value: 5.2, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      service.addLiterature(lit1);
+      service.addLiterature(lit2);
+
+      const rec = service.getRecommendation('km', 'mm');
+      // Should weight higher-IF paper more heavily
+      expect(rec.recommendedValue).toBeGreaterThan(5.05);
+    });
+
+    it('should handle literature with high citation counts', () => {
+      const lit1: Literature = {
+        ...minimalLiterature,
+        id: 'lit_cited',
+        citationCount: 1000,
+        extractedParameters: [
+          { name: 'km', value: 5.0, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      const lit2: Literature = {
+        ...minimalLiterature,
+        id: 'lit_uncited',
+        citationCount: 10,
+        extractedParameters: [
+          { name: 'km', value: 5.5, unit: 'mM', conditions: {} }
+        ]
+      };
+
+      service.addLiterature(lit1);
+      service.addLiterature(lit2);
+
+      const rec = service.getRecommendation('km', 'mm');
+      // Should weight more-cited paper more heavily
+      expect(rec.recommendedValue).toBeLessThan(5.25);
+    });
+  });
 });

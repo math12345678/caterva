@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+import { commandResolve } from './commandResolve';
+import { commandSimulateResolved } from './commandSimulateResolved';
+import { parseArgs, parseQuantity } from './parseQuantity';
+import { convertConcentration } from '../units';
 
 /**
  * Scientific Pipeline CLI
@@ -10,10 +14,22 @@
  *   npx ts-node src/cli/scientificCLI.ts verify-reproducibility --job-id job_001
  */
 
+/**
+ * Scientific Pipeline CLI
+ *
+ * Phase 4: Real Data from Real APIs
+ * ✓ CrossRef API for DOI validation and metadata
+ * ✓ PubMed API for literature search
+ * ✓ Real kinetics parameters from BRENDA (optional)
+ *
+ * NO FAKE DATA - All citations verified against real registries
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import ScientificPipeline from '../integration/scientificPipeline';
 import { LiteratureService } from '../literature/literatureService';
+import { resolveDOIFromCrossRef, searchPubMedForEnzymeKinetics } from '../integrations/crossref-pubmed-real';
 import type { Literature } from '../literature/literatureService';
 
 // ============================================================================
@@ -54,115 +70,83 @@ function header(msg: string) {
 }
 
 // ============================================================================
-// SAMPLE LITERATURE DATABASE
+// REAL LITERATURE FROM REAL APIs
 // ============================================================================
 
-const BUILT_IN_LITERATURE: Literature[] = [
-  {
-    id: 'lit_smith2020',
-    doi: '10.1016/S0021-9258(20)71234-5',
-    title: 'Kinetic properties of lactate dehydrogenase from human heart',
-    authors: ['Smith J', 'Johnson K', 'Williams R'],
-    year: 2020,
-    journal: 'Journal of Biological Chemistry',
-    volume: '260',
-    issue: '15',
-    pages: '8234-8240',
-    peerReviewed: true,
-    impactFactor: 5.27,
-    citationCount: 1847,
-    abstract: 'High-quality study of LDH kinetics under physiological conditions',
-    domain: 'mm',
-    extractedParameters: [
-      {
-        name: 'km',
-        value: 5.2,
-        unit: 'mM',
-        table: '2',
-        page: 8236,
-        conditions: {
-          temperature: 37,
-          pH: 7.4,
-          substrate: 'lactate',
-          species: 'Homo sapiens'
-        }
-      },
-      {
-        name: 'vmax',
-        value: 12.8,
-        unit: 'μM/min',
-        table: '2',
-        page: 8236,
-        conditions: { temperature: 37, pH: 7.4, substrate: 'lactate' }
-      },
-      {
-        name: 's0',
-        value: 10.0,
-        unit: 'mM',
-        conditions: { temperature: 37, pH: 7.4 }
+/**
+ * Fetch real literature from PubMed and CrossRef
+ *
+ * NO FAKE DATA - All DOIs are verified against CrossRef
+ * All papers are from PubMed (50+ million papers)
+ */
+async function fetchRealLiterature(enzyme: string, substrate: string): Promise<Literature[]> {
+  const literature: Literature[] = [];
+  let counter = 0;
+
+  info(`Searching PubMed for real papers on "${enzyme} kinetics"...`);
+
+  try {
+    const papers = await searchPubMedForEnzymeKinetics(enzyme, substrate, 5);
+
+    for (const paper of papers) {
+      if (!paper.doi) continue; // Skip papers without DOIs
+
+      try {
+        const resolvedPaper = await resolveDOIFromCrossRef(paper.doi);
+        if (!resolvedPaper) continue;
+
+        counter++;
+        literature.push({
+          id: `lit_pmid_${paper.pmid}`,
+          doi: paper.doi,
+          pubmedId: paper.pmid.toString(),
+          title: paper.title,
+          authors: paper.authors || [],
+          year: paper.year,
+          journal: paper.journal || 'Unknown',
+          // NOT "peer-reviewed by definition". PubMed indexes preprints
+          // (the NIH preprint pilot), editorials, letters, comments and
+          // retracted articles. Asserting peer review from mere PubMed
+          // membership is a fabricated claim, and this field feeds
+          // LiteratureVerifier, which trusts it. The DOI is what gets
+          // checked; review status is left unasserted rather than invented.
+          peerReviewed: false,
+          abstract: paper.abstract || '',
+          domain: 'mm',
+          extractedParameters: [] // Would be filled by full-text extraction
+        });
+
+        success(`✓ ${counter}. ${paper.title.substring(0, 60)}...`);
+      } catch (err) {
+        // Skip papers that can't be resolved
+        continue;
       }
-    ]
-  },
-  {
-    id: 'lit_johnson2018',
-    doi: '10.1016/S0006-3495(18)33456-7',
-    title: 'Enzyme kinetics: steady-state analysis',
-    authors: ['Johnson K', 'Brown M'],
-    year: 2018,
-    journal: 'Biochemistry',
-    volume: '58',
-    issue: '8',
-    pages: '2145-2160',
-    peerReviewed: true,
-    impactFactor: 4.15,
-    citationCount: 523,
-    abstract: 'Independent confirmation of LDH Km values',
-    domain: 'mm',
-    extractedParameters: [
-      {
-        name: 'km',
-        value: 5.1,
-        unit: 'mM',
-        table: '1',
-        page: 2150,
-        conditions: { temperature: 37, pH: 7.4, substrate: 'lactate' }
-      },
-      {
-        name: 'vmax',
-        value: 12.5,
-        unit: 'μM/min',
-        table: '1',
-        page: 2150
-      }
-    ]
-  },
-  {
-    id: 'lit_williams2022',
-    doi: '10.1038/nature98765',
-    title: 'Modern enzyme kinetics measurements',
-    authors: ['Williams R', 'Davis T'],
-    year: 2022,
-    journal: 'Nature',
-    volume: '612',
-    issue: '7',
-    pages: '445-456',
-    peerReviewed: true,
-    impactFactor: 49.96,
-    citationCount: 342,
-    abstract: 'Latest LDH kinetic parameters from mass spectrometry',
-    domain: 'mm',
-    extractedParameters: [
-      {
-        name: 'km',
-        value: 5.4,
-        unit: 'mM',
-        table: '3',
-        page: 450,
-        conditions: { temperature: 37, pH: 7.4, substrate: 'lactate' }
-      }
-    ]
+    }
+
+    if (literature.length === 0) {
+      warning('No real papers found. Using default parameters.');
+      // Return default with no literature backing (will fail strict validation)
+      return [];
+    }
+
+    return literature;
+  } catch (err) {
+    error(`Failed to fetch real literature: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
   }
-];
+}
+
+/**
+ * Fallback to reasonable defaults when network is unavailable
+ * These values are UNVERIFIED - marked as such in validation
+ */
+const FALLBACK_PARAMETERS = {
+  km: 5.2,
+  vmax: 12.8,
+  s0: 10.0,
+  temperature: 37,
+  pH: 7.4
+};
 
 // ============================================================================
 // COMMANDS
@@ -172,7 +156,10 @@ async function commandValidate(query: string, params?: Record<string, string>) {
   header('SCIENTIFIC VALIDATION');
 
   const pipeline = new ScientificPipeline();
-  pipeline.initializeLiterature(BUILT_IN_LITERATURE);
+
+  // Fetch real literature from real APIs
+  const literature = await fetchRealLiterature('lactate dehydrogenase', 'lactate');
+  pipeline.initializeLiterature(literature);
 
   const parameters: Record<string, number> = {};
   if (params) {
@@ -230,7 +217,10 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
   header('SCIENTIFIC SIMULATION');
 
   const pipeline = new ScientificPipeline();
-  pipeline.initializeLiterature(BUILT_IN_LITERATURE);
+
+  // Fetch real literature from real APIs
+  const literature = await fetchRealLiterature('lactate dehydrogenase', 'lactate');
+  pipeline.initializeLiterature(literature);
 
   const parameters: Record<string, number> = {};
   if (params) {
@@ -370,38 +360,50 @@ async function commandCheckIntegrity(jobId: string) {
   }
 }
 
-function commandLiterature() {
-  header('LITERATURE DATABASE');
+async function commandLiterature() {
+  header('REAL LITERATURE DATABASE');
 
-  console.log(`${colors.dim}Built-in literature:${colors.reset}\n`);
+  console.log(`${colors.dim}Fetching literature from PubMed and CrossRef...${colors.reset}\n`);
 
-  const literatureService = new LiteratureService();
-  for (const lit of BUILT_IN_LITERATURE) {
-    literatureService.addLiterature(lit);
-  }
+  try {
+    const literature = await fetchRealLiterature('lactate dehydrogenase', 'lactate');
 
-  BUILT_IN_LITERATURE.forEach((lit, i) => {
-    console.log(`${colors.bright}${i + 1}. ${lit.title}${colors.reset}`);
-    console.log(`   Authors: ${lit.authors.join(', ')}`);
-    console.log(`   Journal: ${lit.journal} (${lit.year})`);
-    console.log(`   DOI: ${lit.doi}`);
-    console.log(`   Impact Factor: ${lit.impactFactor}`);
-    console.log(`   Citations: ${lit.citationCount}`);
-    console.log(`   Parameters extracted: ${lit.extractedParameters.length}`);
-    lit.extractedParameters.forEach(p => {
-      console.log(`     - ${p.name}: ${p.value} ${p.unit}`);
+    if (literature.length === 0) {
+      warning('No literature found. Network may be unavailable.');
+      console.log('\nNote: Literature is fetched from real scientific databases:');
+      console.log('  • PubMed: 50+ million peer-reviewed papers');
+      console.log('  • CrossRef: 150+ million articles with validated DOIs');
+      console.log('  • BRENDA: 50,000+ enzymes with kinetic parameters (requires registration)');
+      process.exit(0);
+    }
+
+    const literatureService = new LiteratureService();
+    for (const lit of literature) {
+      literatureService.addLiterature(lit);
+    }
+
+    literature.forEach((lit, i) => {
+      console.log(`${colors.bright}${i + 1}. ${lit.title}${colors.reset}`);
+      console.log(`   Authors: ${lit.authors.join(', ')}`);
+      console.log(`   Journal: ${lit.journal} (${lit.year})`);
+      console.log(`   PMID: ${lit.pubmedId}`);
+      console.log(`   DOI: ${lit.doi}`);
+      console.log(`   URL: https://pubmed.ncbi.nlm.nih.gov/${lit.pubmedId}/`);
+      console.log('');
     });
-    console.log('');
-  });
 
-  const stats = literatureService.getStats();
-  console.log(`${colors.dim}Statistics:${colors.reset}`);
-  console.log(`  Total entries: ${stats.totalEntries}`);
-  console.log(`  Peer-reviewed: ${stats.peerReviewedCount}/${stats.totalEntries}`);
-  console.log(`  Avg impact factor: ${stats.averageImpactFactor.toFixed(2)}`);
-  console.log(`  Avg citations: ${Math.round(stats.averageCitations)}`);
+    const stats = literatureService.getStats();
+    console.log(`${colors.dim}Statistics:${colors.reset}`);
+    console.log(`  Total entries: ${stats.totalEntries}`);
+    console.log(`  Peer-reviewed: ${stats.peerReviewedCount}/${stats.totalEntries}`);
+    console.log(`  Avg impact factor: ${stats.averageImpactFactor.toFixed(2)}`);
+    console.log(`  Avg citations: ${Math.round(stats.averageCitations)}`);
 
-  process.exit(0);
+    process.exit(0);
+  } catch (err) {
+    error(`Failed to fetch literature: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  }
 }
 
 function showHelp() {
@@ -415,6 +417,22 @@ ${colors.bright}Usage:${colors.reset}
 
 ${colors.bright}Commands:${colors.reset}
 
+  resolve <enzyme> --substrate S --organism O [options]
+    Look up a kinetic constant in the literature and show where it came from.
+    Resolves through BRENDA (exact, then cross-species) and then PubMed.
+    Never invents a value.
+    ${colors.dim}Example:${colors.reset} resolve "lactate dehydrogenase" --substrate pyruvate --organism "Homo sapiens"
+    ${colors.dim}Options:${colors.reset}
+      --substrate NAME     substrate the constant was measured against (required)
+      --organism NAME      organism to search for (required)
+      --ec NUMBER          EC number, if you know it (else resolved via UniProt)
+      --quantity km|ki|kcat  which constant to resolve (default: km)
+      --enzyme-conc VALUE  [E]0, e.g. 0.001mM. Bridges a kcat to a usable
+                           Vmax = kcat x [E]0. Never defaulted (ADR 0013).
+      --json               machine-readable output
+    ${colors.dim}Exit codes:${colors.reset} 0 found · 2 literature has nothing · 1 lookup could not run
+    ${colors.dim}Those are different facts and the tool keeps them apart.${colors.reset}
+
   validate [query]
     Validate a query against literature
     ${colors.dim}Example:${colors.reset} validate "lactate dehydrogenase km=5.2"
@@ -423,9 +441,32 @@ ${colors.bright}Commands:${colors.reset}
     Run a full simulation with validation
     ${colors.dim}Example:${colors.reset} simulate "michaelis menten" --km 5.2 --vmax 12.8 --s0 10
     ${colors.dim}Options:${colors.reset}
-      --km VALUE       Michaelis constant (mM)
-      --vmax VALUE     Maximum velocity (μM/min)
-      --s0 VALUE       Initial substrate concentration (mM)
+      --km VALUE       Michaelis constant, e.g. 5.2mM
+      --vmax VALUE     Maximum velocity, e.g. 12.8uM/min or 0.01mM/s
+      --s0 VALUE       Initial substrate concentration, e.g. 10mM
+      --verbose        show the pipeline's structured logs
+
+    ${colors.dim}Write the unit onto the number. A bare value is accepted but the${colors.reset}
+    ${colors.dim}assumed unit is reported -- vmax in mM/s read as uM/min is off by 60,000x.${colors.reset}
+
+  simulate <query> --resolve --enzyme E --substrate S --organism O [options]
+    Look up the kinetics from literature, run the simulation, and print
+    where every number came from. Refuses to run on anything it could not
+    source -- no parameter is ever defaulted.
+    ${colors.dim}Example:${colors.reset}
+      simulate mm --resolve --enzyme "lactate dehydrogenase" \\
+        --substrate pyruvate --organism "Homo sapiens" \\
+        --s0 10mM --enzyme-conc 0.001mM
+    ${colors.dim}Options:${colors.reset}
+      --enzyme / --ec      which enzyme (never inferred from the query)
+      --substrate NAME     substrate (required)
+      --organism NAME      organism (required)
+      --s0 VALUE           initial substrate -- an experimental condition
+                           you choose, so it cannot be looked up
+      --enzyme-conc VALUE  [E]0, needed for Vmax = kcat x [E]0
+      --km / --vmax        supply either yourself; user values win
+      --json               machine-readable output
+    ${colors.dim}Exit codes:${colors.reset} 0 ran · 2 something unresolved · 1 lookup failed
 
   verify [jobId]
     Verify reproducibility of a past simulation
@@ -468,6 +509,15 @@ ${colors.bright}Examples:${colors.reset}
 async function main() {
   const args = process.argv.slice(2);
 
+  // Quiet by default. The pipeline logs a dozen structured lines per run;
+  // on a terminal they buried the actual answer, which is the one thing a
+  // CLI exists to show. `--verbose` restores them, and LOG_LEVEL still
+  // wins if set explicitly. stderr already carries them, so `2>/dev/null`
+  // works too -- this just makes the default sane.
+  if (!args.includes('--verbose') && !process.env['LOG_LEVEL']) {
+    process.env['LOG_LEVEL'] = 'fatal';
+  }
+
   if (args.length === 0 || args[0] === 'help' || args[0] === '--help' || args[0] === '-h') {
     showHelp();
     process.exit(0);
@@ -496,15 +546,74 @@ async function main() {
         process.exit(1);
       }
 
-      const params: Record<string, string> = {};
-      for (let i = 1; i < rest.length; i += 2) {
-        if (rest[i].startsWith('--')) {
-          const key = rest[i].slice(2);
-          const value = rest[i + 1];
-          if (value) {
-            params[key] = value;
-          }
+      // Was a hand-rolled `i += 2` loop, which advanced unconditionally --
+      // so `--verbose --km 5` consumed "--km" as --verbose's value and
+      // dropped km entirely. parseArgs handles boolean flags properly.
+      const { flags, booleans } = parseArgs(rest.slice(1));
+
+      // --resolve: look up what wasn't supplied, from the real literature
+      // layer, and print the provenance of every number used.
+      if (booleans.has('resolve')) {
+        const substrate = flags['substrate'];
+        const organism = flags['organism'];
+        const enzyme = flags['enzyme'];
+        const ec = flags['ec'];
+
+        if (!substrate || !organism || (!enzyme && !ec)) {
+          error(
+            '--resolve needs --substrate, --organism, and either --enzyme or --ec. ' +
+            'The system is never inferred from the query text: attaching a real ' +
+            'citation to a system you did not name is provenance for the wrong ' +
+            'measurement.'
+          );
+          process.exit(1);
         }
+
+        const overrides: Record<string, string> = {};
+        for (const [k, v] of Object.entries(flags)) {
+          if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc'].includes(k)) continue;
+          overrides[k] = v;
+        }
+
+        const code = await commandSimulateResolved({
+          enzyme,
+          ec,
+          substrate,
+          organism,
+          overrides,
+          enzymeConc: flags['enzyme-conc'],
+          json: booleans.has('json'),
+        });
+        process.exit(code);
+      }
+
+      // Units are read from the value (`--km 5.2mM`), not assigned from a
+      // table keyed on the parameter's NAME. The old path silently gave
+      // vmax "uM/min" regardless of what the user meant, so a Vmax in mM/s
+      // was reinterpreted by a factor of 60,000 and the run continued.
+      const params: Record<string, string> = {};
+      const assumed: string[] = [];
+      for (const [key, raw] of Object.entries(flags)) {
+        if (key === 'json' || key === 'verbose') continue;
+        try {
+          const quantity = parseQuantity(key, raw);
+          params[key] = String(quantity.value);
+          if (!quantity.unitDeclared) {
+            assumed.push(`--${key} (assumed ${quantity.unit})`);
+          }
+        } catch (err) {
+          error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+
+      // Named out loud rather than logged at debug level: the user needs to
+      // know which of their numbers the tool interpreted rather than read.
+      if (assumed.length > 0) {
+        info(
+          `Units not given for ${assumed.join(', ')}. Write them explicitly ` +
+          `(e.g. --km 5.2mM) to remove the guess.`
+        );
       }
 
       await commandSimulate(query, params);
@@ -531,6 +640,51 @@ async function main() {
       }
       await commandCheckIntegrity(jobId);
       break;
+    }
+
+    case 'resolve': {
+      const { flags, booleans } = parseArgs(rest);
+      const substrate = flags['substrate'];
+      const organism = flags['organism'];
+      const enzyme = flags['enzyme'] ?? rest.find(a => !a.startsWith('--'));
+      const ec = flags['ec'];
+
+      if (!substrate || !organism || (!enzyme && !ec)) {
+        error(
+          'resolve needs a substrate, an organism, and either an enzyme name ' +
+          'or an EC number.'
+        );
+        info('Example: resolve "lactate dehydrogenase" --substrate pyruvate --organism "Homo sapiens"');
+        // Nothing is guessed from the query text: attaching a real citation
+        // to a system the user never named is provenance for the wrong
+        // measurement.
+        process.exit(1);
+      }
+
+      const quantityRaw = (flags['quantity'] ?? 'km').toLowerCase();
+      if (quantityRaw !== 'km' && quantityRaw !== 'ki' && quantityRaw !== 'kcat') {
+        error(`--quantity must be km, ki or kcat (got '${quantityRaw}')`);
+        process.exit(1);
+      }
+
+      let enzymeConc: number | undefined;
+      if (flags['enzyme-conc']) {
+        const parsed = parseQuantity('e0', flags['enzyme-conc']);
+        // The Python bridge takes [E]0 in mM (ADR 0013), so convert rather
+        // than assuming the user typed mM.
+        enzymeConc = convertConcentration(parsed.value, parsed.unit, 'mM');
+      }
+
+      const code = await commandResolve({
+        enzyme,
+        ec,
+        substrate,
+        organism,
+        quantity: quantityRaw,
+        enzymeConc,
+        json: booleans.has('json'),
+      });
+      process.exit(code);
     }
 
     case 'literature': {

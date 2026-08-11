@@ -1,5 +1,7 @@
 # Terrium: Complete Literature Backing Database
 
+> **⚠️ CORRECTION (2026-08-10):** the "42 peer-reviewed sources" total asserted near the end of this doc doesn't reconcile with its own per-category counts (which sum to 40). The real, current `domain-literature.ts` (`DOMAIN_LITERATURE_MAP`, 15 domains) contains 24 individual citation entries — a smaller, independently-checkable set that doesn't match either 40 or 42. Core science citations in this doc (STRENDA/Gelperin, Kermack & McKendrick, Gillespie, Lennard-Jones, etc.) are real and correctly used. However, some general-software-engineering statistics cited here read as folklore-precision with no corresponding code tie-in — e.g. "15% reduction in bugs in typed codebases (Hanenberg et al., 2010)" and "40-80% reduction in defect density (Nagappan et al., 2008)" — this repo implements no coverage gate or TDD process that these specific figures could be checked against; treat them as unverified until someone confirms the actual Hanenberg/Nagappan findings support the stated numbers.
+
 **Purpose**: Every architectural decision, algorithm, parameter, and line of code is grounded in peer-reviewed scientific literature.
 
 ---

@@ -96,18 +96,59 @@ A reference carrying neither DOI nor PMID is now `unverified` rather than
 verified: accepting `peerReviewed: true` as proof is accepting the claim as
 its own evidence.
 
-## 4. Verification
+## 4. The TypeScript guard got slower, and why
+
+Part 9 added five `tsconfig.node.json` files to cover build-tool configs.
+That was right, but it made the guard run tsc on more projects — and the
+guard was already compiling each workspace **twice**, once for
+`--listFiles` coverage and once for the type check. On the everyday
+command, `verify_build.py --quick`, that started to bite.
+
+Three fixes, in order of how much they mattered:
+
+- **One tsc run per project, memoised.** `--listFiles` emits the file list
+  *and* the diagnostics, so a single invocation answers both questions.
+  19 invocations → 15.
+- **Pure bases are no longer compiled.** `Science-Agent-Pipeline/tsconfig.json`
+  is solution-style (`references` only, tsc reports TS6307), and
+  `tsconfig.base.json` names no inputs at all — which means tsc defaults to
+  including *every* `.ts` beneath it. That made it simultaneously the
+  slowest run in the sweep and the least meaningful: it reported coverage
+  for files no real project compiles, which would mask a genuinely
+  unguarded tree.
+- **Comment-tolerant tsconfig parsing.** Every tsconfig in this repository
+  is commented — deliberately, the comments explain why each config exists
+  — and `json.loads` fails on all of them. Any logic built on it silently
+  took its fallback branch. `_load_tsconfig` strips comments and trailing
+  commas, so `_compiles_something` and `_tsconfig_is_checkable` can now
+  actually read what they are inspecting.
+
+The parallel warm-up added alongside these helps on a real disk but not in
+the review sandbox, where the fuse mount serialises I/O (`user` 2m11s vs
+`real` 1m55s — almost no speedup from eight workers).
+
+**Honest limitation:** the full guard still exceeds the review sandbox's
+120s tool ceiling, so it could not be run end-to-end here. Individual tsc
+runs measured 2.9s–31.6s against this filesystem. It completed in 79.3s
+during Part 9 and the changes above strictly *reduce* its work, so it
+should be faster than that locally — but that is an inference, and the
+thing to do on a real machine is run `python scripts/verify_build.py
+--quick` and confirm. The changed logic was verified directly instead:
+commented configs parse, bases are skipped (17 projects → 15), and the
+root and landing trees' 23 sources are all covered by their own tsconfigs.
+
+## 5. Verification
 
 - `tsc --noEmit -p .`: **0 errors.**
-- Root tree: **139 of 139 passing**, 9 suites (was 113 at the end of Part
-  9, 123 at Part 10).
+- Root tree: **164 of 164 passing**, 11 suites (was 113 at the end of Part
+  9, 123 at Part 10; concurrent agents added suites alongside these).
 - Mutation-tested: restoring the "accept a DOI the registry says does not
   exist" behaviour fails two tests, including the one asserting no
   configuration can turn a rejection into a pass. Reverting restores green.
 - Python `vmax_from_kcat` exercised directly to confirm the bridged values
   and the [E]₀/Km flag.
 
-## 5. Still open
+## 6. Still open
 
 - **The live BRENDA path remains unproven from this sandbox** (403). The
   request shape and error surfacing are verified; an actual resolve is not.

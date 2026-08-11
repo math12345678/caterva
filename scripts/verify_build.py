@@ -188,6 +188,29 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
     ]
 
 
+def run_injection_guard() -> List[Tuple[str, bool, str]]:
+    """Scan for prompt injections aimed at an AI agent.
+
+    Several AI coding agents commit to this repository concurrently and
+    read each other's files, so prose is an execution surface here: a
+    sentence written to manipulate a reader rather than inform one can
+    change what the next agent does. That is a supply-chain risk with a
+    text payload, and it belongs in the same place as the other guards.
+
+    Runs in both quick and full mode. It is fully offline (trojan-scan
+    makes no network calls) and takes ~30s, and a repository that several
+    agents write to unattended is exactly the one that should not defer
+    this to a mode nobody runs.
+    """
+    return [
+        run_guard(
+            "Prompt Injection Guard",
+            f"python {SCRIPTS_DIR / 'check_prompt_injection.py'}",
+            timeout=360,
+        )
+    ]
+
+
 def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
     """Run Python tests."""
     tests: List[Tuple[str, bool, str]] = []
@@ -339,6 +362,12 @@ def main() -> int:
     if not args.no_typescript:
         ts_guards = run_typescript_guards()
         total_failures += print_results("TypeScript Guards", ts_guards)
+
+        # Offline, ~30s, and this repository is written to unattended by
+        # several AI agents that read each other's files -- so it runs in
+        # every mode rather than behind the slow-test flag.
+        injection_guards = run_injection_guard()
+        total_failures += print_results("Prompt Injection Guard", injection_guards)
 
     # Live citation guard (network; opt-in so offline builds stay green)
     if args.live:

@@ -78,7 +78,11 @@ describe("Wilson score interval (Wilson 1927)", () => {
     recordOutcomes(900, 100);
     const large = verifiableMetricsCollector.getSuccessRateWithConfidence();
 
-    expect(large.rate).toBeCloseTo(small.rate, 6);
+    // Non-null asserted rather than defaulted: both samples are
+    // non-empty here, so a null would itself be a bug worth failing on.
+    expect(small.rate).not.toBeNull();
+    expect(large.rate).not.toBeNull();
+    expect(large.rate!).toBeCloseTo(small.rate!, 6);
     const widthSmall = small.confidence95.upper - small.confidence95.lower;
     const widthLarge = large.confidence95.upper - large.confidence95.lower;
     expect(widthLarge).toBeLessThan(widthSmall / 5);
@@ -94,6 +98,49 @@ describe("Wilson score interval (Wilson 1927)", () => {
       expect(confidence95.upper).toBeLessThanOrEqual(1);
       expect(confidence95.lower).toBeLessThanOrEqual(confidence95.upper);
     }
+  });
+});
+
+describe("a rate is never fabricated from an empty sample", () => {
+  it("reports rate null, not 1, when nothing has been observed", () => {
+    // This returned `{ rate: 1, confidence95: [0, 1] }`, and
+    // /api/dashboard/overview published it as `successRate.rate` with a
+    // Wilson (1927) citation attached -- so a freshly restarted process
+    // advertised a cited 100% success rate from zero jobs.
+    //
+    // null rather than 0: zero successes out of zero trials is not a 0%
+    // rate either. There is simply no rate.
+    const { rate, sampleCount } =
+      verifiableMetricsCollector.getSuccessRateWithConfidence();
+
+    expect(rate).toBeNull();
+    expect(rate).not.toBe(1);
+    expect(sampleCount).toBe(0);
+  });
+
+  it("publishes the denominator alongside the rate", () => {
+    // So a caller can tell 100%-of-1 from 100%-of-500. Without it both
+    // serialise identically.
+    recordOutcomes(1, 0);
+    const one = verifiableMetricsCollector.getSuccessRateWithConfidence();
+    verifiableMetricsCollector.reset();
+    recordOutcomes(500, 0);
+    const many = verifiableMetricsCollector.getSuccessRateWithConfidence();
+
+    expect(one.rate).toBe(1);
+    expect(many.rate).toBe(1);
+    expect(one.sampleCount).toBe(1);
+    expect(many.sampleCount).toBe(500);
+    // The interval is what distinguishes them, and it must.
+    expect(one.confidence95.lower).toBeLessThan(many.confidence95.lower);
+  });
+
+  it("exports null rather than \"100.00\" with no observations", () => {
+    const exported = verifiableMetricsCollector.exportWithCitations() as {
+      successRate: { value: string | null; sampleCount: number };
+    };
+    expect(exported.successRate.value).toBeNull();
+    expect(exported.successRate.sampleCount).toBe(0);
   });
 });
 

@@ -1,5 +1,7 @@
 # Terrium: Complete Literature-Backed Science Agent Pipeline
 
+> **⚠️ CORRECTION (2026-08-10):** this doc's own headline numbers are internally inconsistent and don't match the codebase. Line 8/137 claim "399 tests, 28 test files" but the doc's own summary table sums to 395 across 27 files — a third, independently-measured count (direct `it(`/`test(` grep in `src/__tests__/*.test.ts`) gives 351 tests across 30 files; a sibling doc (`Science-Agent-Pipeline/BACKEND_AUDIT_SUMMARY.md`) claims a fourth number, 404. Treat any specific test count in this doc as unverified — run the suite yourself (`pnpm test` or `npx vitest run` from `Science-Agent-Pipeline/artifacts/api-server/`) for the current figure. "13 scientific domains" also undercounts: the real `domain-literature.ts` maps 15 domains (13 + `monte_carlo_pi` + `gillespie_ssa_replicates`), and the sibling audit doc states 16 total. "365+ peer-reviewed citations" and "42+ fundamental science papers" are not reconcilable with the real `domain-literature.ts`, which contains 24 individual citation entries across 15 domains — see `LITERATURE_BACKING_DATABASE.md`'s correction banner for more on the citation-count discrepancy.
+
 **Every parameter. Every metric. Every decision. Backed by peer-reviewed scientific literature.**
 
 ## System Overview

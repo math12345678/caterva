@@ -189,7 +189,7 @@ All changes have been verified to:
   - Helper functions
 
 ## Future Opportunities
-1. Extract common resolution function pattern into a higher-order function
-2. Consolidate LLM path and fallback path into a single resolution pipeline
-3. Create a parameter-source abstraction for better testability
-4. Add type-safe parameter registry to prevent key mismatches
+1. Could extract common resolution function pattern into a higher-order function
+2. Could consolidate LLM path and fallback path into a single resolution pipeline
+3. Could create a parameter-source abstraction for better testability
+4. Type-safe parameter registry could prevent key mismatches in future versions
