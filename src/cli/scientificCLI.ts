@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { commandResolve } from './commandResolve';
 import { commandSimulateResolved } from './commandSimulateResolved';
+import { JobManager, historyPath } from '../execution/job-manager';
 import { parseArgs, parseQuantity } from './parseQuantity';
 import { convertConcentration } from '../units';
 
@@ -571,8 +572,22 @@ async function main() {
 
         const overrides: Record<string, string> = {};
         for (const [k, v] of Object.entries(flags)) {
-          if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc'].includes(k)) continue;
+          if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc', 'sensitivity'].includes(k)) continue;
           overrides[k] = v;
+        }
+
+        // --sensitivity[=0.1]: perturb each parameter and report the
+        // effect beside where the parameter came from.
+        let sensitivity: number | undefined;
+        if (booleans.has('sensitivity')) {
+          sensitivity = 0.1;
+        } else if (flags['sensitivity']) {
+          const parsed = Number(flags['sensitivity']);
+          if (!Number.isFinite(parsed) || parsed <= 0 || parsed >= 1) {
+            error(`--sensitivity must be a fraction between 0 and 1 (got '${flags['sensitivity']}')`);
+            process.exit(1);
+          }
+          sensitivity = parsed;
         }
 
         const code = await commandSimulateResolved({
@@ -583,6 +598,7 @@ async function main() {
           overrides,
           enzymeConc: flags['enzyme-conc'],
           json: booleans.has('json'),
+          sensitivity,
         });
         process.exit(code);
       }
@@ -685,6 +701,34 @@ async function main() {
         json: booleans.has('json'),
       });
       process.exit(code);
+    }
+
+    case 'history': {
+      // Reads the on-disk store that `simulate --resolve` writes. Before
+      // this existed, the CLI printed a job id at the end of every run
+      // that no later command could resolve.
+      const runs = JobManager.readHistory();
+      if (runs.length === 0) {
+        info(`No runs recorded yet (${historyPath()}).`);
+        info('Run `simulate ... --resolve` and it will be saved here.');
+        process.exit(0);
+      }
+
+      console.log(`\n${colors.bright}Past runs${colors.reset}  ${colors.dim}${historyPath()}${colors.reset}\n`);
+      for (const run of runs.slice(-20).reverse()) {
+        const cited = Array.isArray(run.provenance)
+          ? run.provenance.filter((p: any) => p?.citation).length
+          : 0;
+        const total = Array.isArray(run.provenance) ? run.provenance.length : 0;
+        console.log(
+          `  ${run.jobId}  ${colors.dim}${run.at.slice(0, 19).replace('T', ' ')}${colors.reset}  ${run.query}`
+        );
+        console.log(
+          `  ${' '.repeat(run.jobId.length)}  ${colors.dim}final ${run.finalValue?.toFixed?.(4) ?? '?'} · ${cited}/${total} parameters cited${colors.reset}`
+        );
+      }
+      console.log('');
+      process.exit(0);
     }
 
     case 'literature': {

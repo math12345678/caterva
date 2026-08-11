@@ -107,20 +107,64 @@ export async function parameterSweep(
 // SENSITIVITY ANALYSIS
 // ============================================================================
 
+export interface SensitivityEntry {
+  /** Relative change in the final value for a +perturbation. */
+  increase: number;
+  /** ...and for a -perturbation. */
+  decrease: number;
+  /** The larger of the two: how much the answer rides on this parameter. */
+  worst: number;
+  /** Set when this parameter could NOT be analysed, with the reason. A
+   *  parameter that silently vanished from the results used to be
+   *  indistinguishable from one with zero influence. */
+  failed?: string;
+}
+
+/**
+ * How much does the answer depend on each parameter?
+ *
+ * Perturbs each one by ±`sensitivity` and measures the relative change in
+ * the final value. Paired with provenance this answers the question that
+ * actually matters to someone using a literature-sourced value: *my Km is
+ * a cross-species substitute — does that change my conclusion?* A 40%
+ * sensitivity on a cross-species parameter is a result that should not be
+ * reported; a 0.1% sensitivity means the substitution is harmless.
+ */
 export async function sensitivityAnalysis(
   query: string,
   baseParameters: Record<string, number>,
-  sensitivity: number = 0.1 // 10% perturbation
-): Promise<Record<string, { increase: number; decrease: number }>> {
-  const results: Record<string, { increase: number; decrease: number }> = {};
+  sensitivity: number = 0.1, // 10% perturbation
+  request: Partial<Parameters<ScientificPipeline['execute']>[0]> = {}
+): Promise<Record<string, SensitivityEntry>> {
+  const results: Record<string, SensitivityEntry> = {};
 
   // Get baseline
   const baselinePipeline = new ScientificPipeline();
   const baselineResponse = await baselinePipeline.execute({
+    ...request,
     query,
     parameters: baseParameters
   });
+
+  // A run that did not validate returns finalValue 0 and an empty
+  // trajectory. Dividing by that produced Infinity or NaN for every
+  // parameter, which then rendered as a confident-looking sensitivity
+  // table for a simulation that never executed.
+  if (!baselineResponse.validated) {
+    throw new Error(
+      'Baseline run did not validate, so there is nothing to perturb: ' +
+      baselineResponse.validationErrors.join('; ')
+    );
+  }
+
   const baselineFinal = baselineResponse.results.finalValue;
+  if (!Number.isFinite(baselineFinal) || baselineFinal === 0) {
+    throw new Error(
+      `Baseline final value is ${baselineFinal}; a relative sensitivity ` +
+      'cannot be computed against it. Choose a shorter window or a larger ' +
+      's0 so the substrate is not fully consumed.'
+    );
+  }
 
   // Test each parameter
   for (const [param, value] of Object.entries(baseParameters)) {
@@ -130,6 +174,7 @@ export async function sensitivityAnalysis(
       increaseParams[param] = value * (1 + sensitivity);
       const increasePipeline = new ScientificPipeline();
       const increaseResponse = await increasePipeline.execute({
+        ...request,
         query,
         parameters: increaseParams
       });
@@ -140,6 +185,7 @@ export async function sensitivityAnalysis(
       decreaseParams[param] = value * (1 - sensitivity);
       const decreasePipeline = new ScientificPipeline();
       const decreaseResponse = await decreasePipeline.execute({
+        ...request,
         query,
         parameters: decreaseParams
       });
@@ -147,11 +193,22 @@ export async function sensitivityAnalysis(
 
       results[param] = {
         increase: increaseEffect,
-        decrease: decreaseEffect
+        decrease: decreaseEffect,
+        worst: Math.max(increaseEffect, decreaseEffect)
       };
 
       logger.info({ parameter: param, increaseEffect, decreaseEffect }, 'Sensitivity analyzed');
     } catch (error) {
+      // RECORDED, not swallowed. This logged a warning and moved on, so a
+      // parameter whose analysis failed simply vanished from the table --
+      // indistinguishable from one measured to have no influence, which is
+      // the opposite conclusion.
+      results[param] = {
+        increase: Number.NaN,
+        decrease: Number.NaN,
+        worst: Number.NaN,
+        failed: error instanceof Error ? error.message : String(error)
+      };
       logger.warn({ parameter: param, error }, 'Sensitivity analysis failed for parameter');
     }
   }

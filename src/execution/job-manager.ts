@@ -9,6 +9,9 @@
  */
 
 import { logger } from '../logger';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 // Simple UUID generator
 function generateId(): string {
@@ -59,6 +62,35 @@ export interface Job {
 // JOB MANAGER
 // ============================================================================
 
+/**
+ * Where run history is kept between invocations.
+ *
+ * A CLI process exits after every command, so an in-memory job store is
+ * empty on the next run. That is why `scientific verify <jobId>` and
+ * `check-integrity <jobId>` could never work: they print a job id at the
+ * end of a simulation and then, in a new process, have no record of it.
+ *
+ * Overridable so tests do not write into a developer's real history.
+ */
+export function historyPath(): string {
+  const override = process.env['TERRIUM_HISTORY_FILE'];
+  if (override) return override;
+  return path.join(os.homedir(), '.terrium', 'history.json');
+}
+
+/** One completed run, in the form that survives a process boundary. */
+export interface RunRecord {
+  jobId: string;
+  at: string;
+  query: string;
+  /** Every parameter with its value, unit, origin and citation. */
+  provenance: unknown[];
+  reproducibilityKey: string;
+  dataIntegrityHash: string;
+  finalValue: number;
+  validated: boolean;
+}
+
 export class JobManager {
   private jobs: Map<string, Job> = new Map();
   private queue: string[] = [];
@@ -67,6 +99,56 @@ export class JobManager {
 
   constructor(maxConcurrent: number = 3) {
     this.maxConcurrent = maxConcurrent;
+  }
+
+  /**
+   * Append a completed run to the on-disk history.
+   *
+   * Best-effort by design: a CLI must not fail a successful simulation
+   * because it could not write a history file. But the failure is
+   * REPORTED, not swallowed -- silently losing history would make
+   * `verify` mysteriously not find a job the user just watched complete.
+   */
+  static recordRun(record: RunRecord): { ok: boolean; reason?: string } {
+    try {
+      const file = historyPath();
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+
+      const existing = JobManager.readHistory();
+      existing.push(record);
+
+      // Bounded: history is a convenience, not an archive, and an
+      // unbounded JSON file read on every invocation gets slow.
+      const trimmed = existing.slice(-200);
+      fs.writeFileSync(file, JSON.stringify(trimmed, null, 2), 'utf-8');
+      return { ok: true };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      logger.warn({ error: reason }, 'Could not write run history');
+      return { ok: false, reason };
+    }
+  }
+
+  /** Every recorded run, newest last. Returns [] when there is no history
+   *  file -- but throws nothing, so a corrupt file cannot break the CLI. */
+  static readHistory(): RunRecord[] {
+    const file = historyPath();
+    if (!fs.existsSync(file)) return [];
+    try {
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8'));
+      return Array.isArray(parsed) ? (parsed as RunRecord[]) : [];
+    } catch (error) {
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Run history file is unreadable; treating as empty',
+      );
+      return [];
+    }
+  }
+
+  /** One run by id, or undefined. */
+  static findRun(jobId: string): RunRecord | undefined {
+    return JobManager.readHistory().find((r) => r.jobId === jobId);
   }
 
   /**
