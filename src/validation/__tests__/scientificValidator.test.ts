@@ -146,6 +146,15 @@ describe('ParameterValidator', () => {
 });
 
 describe('LiteratureVerifier', () => {
+  // `registryCache` is static module state, so without this reset one
+  // test's registry answers leak into the next -- and into other test
+  // FILES when jest shares a worker (`--runInBand` made an
+  // order-dependent failure appear that the default parallel run hid).
+  // Tests whose outcome depends on execution order are not evidence.
+  beforeEach(() => {
+    LiteratureVerifier.resetRegistryCache();
+  });
+
   describe('verifyReference', () => {
     it('should verify valid DOI', async () => {
       const ref: LiteratureReference = {
@@ -173,6 +182,53 @@ describe('LiteratureVerifier', () => {
 
       const verified = await LiteratureVerifier.verifyReference(ref);
       expect(verified).toBe(false);
+    });
+
+    it('does not let a cached DOI lookup bypass the peer-review check', async () => {
+      // Order-independent regression for a cache that stored the whole
+      // verdict under `ref.doi`. `peerReviewed` is a property of the
+      // REFERENCE, not of the DOI, so caching by identifier meant the
+      // second reference below inherited the first one's `true` and never
+      // reached check 3 at all.
+      //
+      // The pre-existing 'should reject non-peer-reviewed sources' test did
+      // detect this, but only because an earlier test in the same file
+      // happened to use the same DOI first -- reordering the file would
+      // have hidden it again. This states the invariant directly.
+      const doi = '10.1073/pnas.88.16.7328';
+      // Seed the DOI as resolving, so check 1 passes without a network and
+      // the peer-review check is what actually decides the outcome.
+      // Without this the test is vacuous offline -- an unreachable CrossRef
+      // makes both calls false regardless of the bug.
+      LiteratureVerifier.resetRegistryCache();
+      LiteratureVerifier.primeRegistryCache(`doi:${doi}`, true);
+
+      const base = {
+        doi,
+        title: 'Same DOI, two references',
+        authors: ['Test'],
+        year: 2020,
+        journal: 'Journal'
+      };
+
+      const peerReviewed = await LiteratureVerifier.verifyReference({
+        ...base,
+        peerReviewed: true
+      });
+      const notPeerReviewed = await LiteratureVerifier.verifyReference({
+        ...base,
+        peerReviewed: false
+      });
+
+      // Whatever the registry says about the DOI, the two must not agree:
+      // the only difference between them is the peer-review flag, and that
+      // flag must be decisive. (If the DOI does not resolve -- e.g. no
+      // network -- both are false, which is also not a bypass.)
+      // Unconditional: the DOI is primed as resolving, so the ONLY
+      // difference between these two references is the peer-review flag,
+      // and it must be decisive.
+      expect(peerReviewed).toBe(true);
+      expect(notPeerReviewed).toBe(false);
     });
 
     it('should reject non-peer-reviewed sources', async () => {
@@ -229,6 +285,22 @@ describe('LiteratureVerifier', () => {
 });
 
 describe('AssumptionValidator', () => {
+  // These tests were rewritten when AssumptionValidator was grounded in
+  // Segel LA (1988), Bull Math Biol 50(6):579-93, DOI 10.1007/BF02460092.
+  // The previous versions asserted the OLD contract, which was wrong in
+  // three ways worth naming, since "the tests passed" was the reason the
+  // errors survived:
+  //
+  //   * "should PASS when assumptions hold" used km=5, vmax=10, s0=100,
+  //     t=10 -- at which Vmax*t = 100 = s0, i.e. the substrate is entirely
+  //     consumed. Those numbers are physically inconsistent with the
+  //     assumption they were asserted to satisfy.
+  //   * The steady-state check compared the measurement window against
+  //     (km/vmax)*5, a form of Segel's SLOW (substrate-consumption)
+  //     timescale, not the fast transient the assumption is about.
+  //   * The 5% depletion cutoff was asserted as a hard violation. It is a
+  //     textbook convention for initial-rate work with no primary source
+  //     behind the number, so it now warns; exhaustion still fails.
   const assumptions: ModelAssumptions = {
     steadyState: true,
     noSubstrateDepletion: true,
@@ -237,59 +309,134 @@ describe('AssumptionValidator', () => {
     singleEnzymeForm: true
   };
 
-  it('should PASS when assumptions hold', () => {
+  /** e0 << Km + s0, and a window short enough not to consume the substrate. */
+  const validConditions = {
+    km: 5.0,
+    vmax: 10.0,
+    s0: 100.0,
+    e0: 0.01,
+    measurementTime: 0.1,
+    temperature: 37,
+    pH: 7.4
+  };
+
+  it('PASSES when the QSSA criterion holds and substrate is not consumed', () => {
+    const result = AssumptionValidator.validateAssumptions(
+      assumptions,
+      validConditions
+    );
+
+    expect(result.violations).toEqual([]);
+    expect(result.valid).toBe(true);
+    expect(result.notEvaluated).toEqual([]);
+  });
+
+  it('reports steadyState as NOT EVALUATED when e0 is absent', () => {
+    // epsilon = e0/(Km + s0) cannot be computed without e0. The old code
+    // silently passed in this case, which reported an unevaluated
+    // assumption as satisfied -- the exact failure mode this file exists
+    // to prevent.
+    const { e0, ...withoutE0 } = validConditions;
+    void e0;
+
+    const result = AssumptionValidator.validateAssumptions(
+      assumptions,
+      withoutE0
+    );
+
+    expect(result.notEvaluated).toHaveLength(1);
+    expect(result.notEvaluated[0]).toContain('UNVERIFIED');
+    expect(result.notEvaluated[0]).toContain('10.1007/BF02460092');
+    // Not silently converted into a failure either.
+    expect(result.violations.some(v => v.includes('Steady-state'))).toBe(false);
+  });
+
+  it('FAILS when epsilon = e0/(Km + s0) is not << 1', () => {
     const result = AssumptionValidator.validateAssumptions(assumptions, {
-      km: 5.0,
-      vmax: 10.0,
-      s0: 100.0,
-      measurementTime: 10.0,
-      temperature: 37,
-      pH: 7.4
+      ...validConditions,
+      e0: 200.0 // epsilon = 200/105 = 1.9
+    });
+
+    expect(result.valid).toBe(false);
+    expect(result.violations.some(v => v.includes('epsilon'))).toBe(true);
+    // Points at the applicable alternative reduction rather than just
+    // rejecting: Borghans, de Boer & Segel (1996), tQSSA.
+    expect(result.violations.join(' ')).toContain('10.1007/BF02458281');
+  });
+
+  it('WARNS but does not fail when epsilon is marginal', () => {
+    const result = AssumptionValidator.validateAssumptions(assumptions, {
+      ...validConditions,
+      e0: 21.0 // epsilon = 21/105 = 0.2 -> ~20% error, valid but marginal
     });
 
     expect(result.valid).toBe(true);
-    expect(result.violations).toHaveLength(0);
+    expect(result.warnings.some(w => w.includes('marginal'))).toBe(true);
   });
 
-  it('should FAIL when measurement time too short for steady-state', () => {
+  it('FAILS when the substrate is exhausted within the window', () => {
+    // vmax*t = 100*10 = 1000, s0 = 1 -> 100000% of s0. No initial-rate
+    // reading survives this, so it is a violation rather than a warning.
     const result = AssumptionValidator.validateAssumptions(assumptions, {
-      km: 5.0,
-      vmax: 10.0,
-      s0: 100.0,
-      measurementTime: 0.01, // Too short
-      temperature: 37,
-      pH: 7.4
+      ...validConditions,
+      vmax: 100.0,
+      s0: 1.0,
+      measurementTime: 10.0
     });
 
     expect(result.valid).toBe(false);
-    expect(result.violations.some(v => v.includes('Steady-state'))).toBe(true);
+    expect(result.violations.some(v => v.includes('exhausted'))).toBe(true);
   });
 
-  it('should FAIL when substrate depleted > 5%', () => {
+  it('WARNS, without failing, on depletion above the 5% convention', () => {
+    // vmax*t/s0 = 10*0.2/100 = 2%... nudge to ~20%.
     const result = AssumptionValidator.validateAssumptions(assumptions, {
-      km: 5.0,
-      vmax: 100.0, // Very high
-      s0: 1.0, // Very low
-      measurementTime: 10.0,
-      temperature: 37,
-      pH: 7.4
+      ...validConditions,
+      measurementTime: 2.0 // 10*2/100 = 20%
     });
 
-    expect(result.valid).toBe(false);
-    expect(result.violations.some(v => v.includes('depletion'))).toBe(true);
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some(w => w.includes('depletion'))).toBe(true);
+    expect(result.violations).toEqual([]);
   });
 
-  it('should WARN for unusual temperature', () => {
+  it('applies NO unit conversion to vmax', () => {
+    // A previous revision divided vmax by 1000 ("convert uM/min to mM/min")
+    // to make a failing test pass, silently rescaling every depletion
+    // result by three orders of magnitude on the strength of units that
+    // nothing declares or enforces. s0 = vmax*time must read as exactly
+    // 100% consumed.
     const result = AssumptionValidator.validateAssumptions(assumptions, {
-      km: 5.0,
+      ...validConditions,
       vmax: 10.0,
       s0: 100.0,
-      measurementTime: 10.0,
-      temperature: 50, // Unusual
-      pH: 7.4
+      measurementTime: 10.0 // 10*10 = 100 = s0 exactly
     });
 
-    expect(result.violations.some(v => v.includes('temperature'))).toBe(true);
+    expect(result.violations.some(v => v.includes('100.0%'))).toBe(true);
+  });
+
+  it('WARNS rather than fails outside the mesophilic temperature range', () => {
+    // Taq polymerase is assayed near 72 C. Failing a run for that would
+    // reject correct science, so 4-45 C warns instead of blocking.
+    const result = AssumptionValidator.validateAssumptions(assumptions, {
+      ...validConditions,
+      temperature: 72
+    });
+
+    expect(result.warnings.some(w => w.includes('temperature') || w.includes('C is outside'))).toBe(true);
+    expect(result.violations.some(v => v.toLowerCase().includes('temperature'))).toBe(false);
+  });
+
+  it('WARNS rather than fails outside the pH 5-9 range', () => {
+    // Pepsin's optimum is near pH 2.
+    const result = AssumptionValidator.validateAssumptions(assumptions, {
+      ...validConditions,
+      pH: 2.0
+    });
+
+    expect(result.warnings.some(w => w.includes('pH'))).toBe(true);
+    expect(result.violations.some(v => v.includes('pH'))).toBe(false);
   });
 });
 

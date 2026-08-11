@@ -22,18 +22,15 @@
     "noEmit": true,
     "types": []
   },
-  // Only src/lib. `src/components/VerificationConsole.tsx` imports `react`,
-  // and neither `react` nor `@types/react` is installed anywhere in this
-  // repository -- landing/ has no package.json of its own and the root one
-  // does not depend on React. Including the component would therefore fail
-  // with TS2307 on every run, which would make this guard permanently red
-  // for a missing dependency rather than for a defect.
+  // Covers the whole tree, including src/components/VerificationConsole.tsx.
   //
-  // This is recorded rather than hidden: the component is NOT type-checked
-  // today. Closing that gap means giving landing/ a package.json with react
-  // and @types/react and adding "src" here. Until then the numerical core
-  // -- the part with correctness consequences -- is covered, and the JSX
-  // shell is not.
-  "include": ["src/lib"],
+  // This was `["src/lib"]` because the component imports `react` and
+  // neither react nor @types/react was installed anywhere in the
+  // repository, so including it would have failed with TS2307 on every run
+  // -- a guard permanently red for a missing dependency rather than for a
+  // defect. `@types/react` is now a devDependency of the root package.json
+  // (Node resolution walks up from landing/ and finds it), so the JSX
+  // shell is type-checked alongside the numerical core it wraps.
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }

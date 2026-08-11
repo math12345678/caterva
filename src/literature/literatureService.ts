@@ -11,6 +11,29 @@
  */
 
 import { logger } from '../logger';
+import { convertConcentration, convertRate, parseRateUnit } from '../units';
+
+/**
+ * Convert a value between units of the same kind, choosing concentration or
+ * rate handling by the shape of the unit string. Raises for anything it
+ * cannot interpret -- see src/units.ts for why guessing is forbidden here.
+ */
+function convertToUnit(value: number, from: string, to: string): number {
+  const fromIsRate = from.includes('/');
+  const toIsRate = to.includes('/');
+  if (fromIsRate !== toIsRate) {
+    throw new Error(
+      `'${from}' and '${to}' are different kinds of quantity (one is a rate, ` +
+      'one is not) and cannot be converted into each other.'
+    );
+  }
+  if (fromIsRate) {
+    parseRateUnit(from);
+    parseRateUnit(to);
+    return convertRate(value, from, to);
+  }
+  return convertConcentration(value, from, to);
+}
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -55,6 +78,9 @@ export interface Literature {
 export interface ParameterRecommendation {
   parameterName: string;
   recommendedValue: number;
+  /** The unit `recommendedValue` and `range` are expressed in, taken from
+   *  the sources rather than assumed from the parameter's name. */
+  unit: string;
   range: [number, number];
   sources: string[]; // DOIs
   sourceCount: number;
@@ -201,17 +227,49 @@ export class ParameterRecommender {
       throw new Error(`No literature found for parameter '${parameterName}' in domain '${domain}'`);
     }
 
-    // Extract all values
-    const values = literature
-      .flatMap(lit =>
-        lit.extractedParameters
-          .filter(p => p.name === parameterName)
-          .map(p => ({ value: p.value, literature: lit }))
-      );
+    // Extract all values WITH their declared units.
+    //
+    // This previously mapped `p => ({ value: p.value, literature: lit })`,
+    // dropping `p.unit` entirely, and then took a weighted mean across the
+    // raw numbers. If one source reported Km in mM and another in uM -- a
+    // completely routine occurrence, BRENDA carries both -- the "recommended
+    // value" was the average of quantities in different units, which is not
+    // a quantity at all. Nothing downstream could detect it, because the
+    // result was then labelled with a unit guessed from the parameter's
+    // NAME by `getDefaultUnit`, so it always looked self-consistent.
+    const rawValues = literature.flatMap(lit =>
+      lit.extractedParameters
+        .filter(p => p.name === parameterName)
+        .map(p => ({ value: p.value, unit: p.unit, literature: lit }))
+    );
 
-    if (values.length === 0) {
+    if (rawValues.length === 0) {
       throw new Error(`No values extracted for parameter '${parameterName}'`);
     }
+
+    // Everything is converted onto the first source's unit. Conversion is
+    // driven by the declared strings, and an unrecognised or incompatible
+    // unit raises rather than being averaged in as a bare number.
+    const targetUnit = rawValues[0]!.unit;
+    const values = rawValues.map(entry => {
+      if (entry.unit === targetUnit) {
+        return { value: entry.value, literature: entry.literature };
+      }
+      try {
+        return {
+          value: convertToUnit(entry.value, entry.unit, targetUnit),
+          literature: entry.literature
+        };
+      } catch (error) {
+        throw new Error(
+          `Cannot combine literature values for '${parameterName}': source ` +
+          `${entry.literature.doi || entry.literature.id} reports ` +
+          `${entry.value} ${entry.unit} but ${rawValues[0]!.literature.doi || rawValues[0]!.literature.id} ` +
+          `reports ${targetUnit}. ` +
+          (error instanceof Error ? error.message : String(error))
+        );
+      }
+    });
 
     // Calculate statistics
     const valueNumbers = values.map(v => v.value);
@@ -252,6 +310,7 @@ export class ParameterRecommender {
     return {
       parameterName,
       recommendedValue: weightedMean,
+      unit: targetUnit,
       range: [Math.min(...valueNumbers), Math.max(...valueNumbers)],
       sources: literature.map(l => l.doi || l.pubmedId || l.id),
       sourceCount: literature.length,
