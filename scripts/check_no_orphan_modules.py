@@ -167,17 +167,42 @@ def check() -> list[str]:
             continue
 
         stem = path.stem
-        referenced = False
+        pattern = re.compile(rf"(?<![\w-]){re.escape(stem)}(?![\w-])")
+
+        # A module referenced ONLY by its own test is still not wired to
+        # anything. It is arguably worse than a plain orphan, because the
+        # test makes it look covered: `sbml-builder.ts` shipped with 400
+        # lines and a full test file, and nothing in the product called it.
+        #
+        # Same lesson as check_plausibility_constants: tests are not users.
+        # A test proves a module WORKS; it says nothing about whether the
+        # product uses it.
+        referenced_by_product = False
+        referenced_by_test = False
         for other, text in contents.items():
             if other == path:
                 continue
-            # Word-boundary match so `metrics` does not satisfy
-            # `verifiable-metrics`.
-            if re.search(rf"(?<![\w-]){re.escape(stem)}(?![\w-])", text):
-                referenced = True
+            if not pattern.search(text):
+                continue
+            relative_other = other.relative_to(REPO_ROOT).as_posix()
+            if any(p.match(relative_other) for p in ENTRY_POINT_PATTERNS):
+                referenced_by_test = True
+            else:
+                referenced_by_product = True
                 break
 
-        if not referenced:
+        if not referenced_by_product and referenced_by_test:
+            line_count = contents.get(path, "").count("\n") + 1
+            violations.append(
+                f"{path.relative_to(REPO_ROOT)} ({line_count} lines) is "
+                "imported ONLY by its own test. The test proves it works; "
+                "nothing in the product calls it. Wire it to a command or a "
+                "code path, or retire it -- a tested orphan looks covered, "
+                "which makes it harder to notice than an untested one."
+            )
+            continue
+
+        if not referenced_by_product:
             line_count = contents.get(path, "").count("\n") + 1
             violations.append(
                 f"{path.relative_to(REPO_ROOT)} ({line_count} lines) is "

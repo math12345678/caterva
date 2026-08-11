@@ -253,10 +253,18 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
     console.log('');
 
     if (!response.validated) {
-      error('SIMULATION FAILED - Validation errors:');
+      error('SIMULATION FAILED - No real literature found');
+      console.log('\nValidation errors:');
       response.validationErrors.forEach((err, i) => {
         console.log(`  ${i + 1}. ${err}`);
       });
+      console.log('\n' + colors.dim + 'Diagnostics:' + colors.reset);
+      console.log('  The system could not find real papers on PubMed.');
+      console.log('  This means either:');
+      console.log('    1. The enzyme/substrate combination has no published kinetics');
+      console.log('    2. The PubMed API is not responding correctly');
+      console.log('    3. Network access to PubMed is blocked\n');
+      console.log('Check logs above for PubMed search attempts.\n');
       process.exit(1);
     }
 
@@ -572,7 +580,7 @@ async function main() {
 
         const overrides: Record<string, string> = {};
         for (const [k, v] of Object.entries(flags)) {
-          if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc', 'sensitivity'].includes(k)) continue;
+          if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc', 'sensitivity', 'model'].includes(k)) continue;
           overrides[k] = v;
         }
 
@@ -590,7 +598,14 @@ async function main() {
           sensitivity = parsed;
         }
 
+        const modelRaw = (flags['model'] ?? 'mm').toLowerCase();
+        if (!['mm', 'competitive', 'noncompetitive', 'product'].includes(modelRaw)) {
+          error(`--model must be mm, competitive, noncompetitive or product (got '${modelRaw}')`);
+          process.exit(1);
+        }
+
         const code = await commandSimulateResolved({
+          model: modelRaw as 'mm' | 'competitive' | 'noncompetitive' | 'product',
           enzyme,
           ec,
           substrate,

@@ -35,7 +35,7 @@
     "noUnusedLocals": false,
 
     "skipLibCheck": true,
-    "noEmit": true,
+    "outDir": "./dist",
     "types": ["node", "jest"]
   },
   // examples/ is included deliberately: scientificPipelineExample.ts imports

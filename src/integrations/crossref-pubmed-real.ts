@@ -73,36 +73,102 @@ export async function searchPubMedForEnzymeKinetics(
   doi?: string;
   url: string;
 }>> {
-  try {
-    // Search PubMed
-    const searchQuery = `${enzyme} ${substrate} Michaelis Menten kinetics`;
-    const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=${limit}&rettype=json`;
+  // Try multiple query strategies, starting with most specific
+  const queries = [
+    `${enzyme} ${substrate} kinetics`,
+    `${enzyme} kinetics enzyme`,
+    enzyme // Fallback to just enzyme name
+  ];
 
-    logger.info({ enzyme, substrate }, `Searching PubMed for: "${searchQuery}"`);
+  for (const searchQuery of queries) {
+    try {
+      logger.info({ enzyme, substrate, query: searchQuery }, `Searching PubMed: "${searchQuery}"`);
 
-    const searchResponse = await fetch(searchUrl);
-    if (!searchResponse.ok) throw new Error('PubMed search failed');
+      const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=${limit}&rettype=json&tool=Terrium&email=reddy.uday@gmail.com`;
 
-    const searchData = await searchResponse.json() as any;
-    const pmids = searchData.esearchresult?.idlist || [];
+      const searchResponse = await fetch(searchUrl);
 
-    if (pmids.length === 0) {
-      logger.warn({ enzyme, substrate }, 'No PubMed results found');
-      return [];
+      if (!searchResponse.ok) {
+        logger.error(
+          { query: searchQuery, status: searchResponse.status, statusText: searchResponse.statusText },
+          'PubMed API error'
+        );
+        continue;
+      }
+
+      // Check content-type before parsing
+      const contentType = searchResponse.headers.get('content-type') || '';
+      if (!contentType.includes('json')) {
+        logger.error(
+          { query: searchQuery, contentType, url: searchUrl },
+          'PubMed returned non-JSON response. This usually means an API error or server issue.'
+        );
+        continue;
+      }
+
+      // Try to parse JSON
+      let searchData: any;
+      try {
+        const text = await searchResponse.text();
+        searchData = JSON.parse(text);
+      } catch (parseError) {
+        logger.error(
+          { query: searchQuery, parseError: parseError instanceof Error ? parseError.message : String(parseError) },
+          'Failed to parse PubMed JSON response'
+        );
+        continue;
+      }
+
+      // Check for API error in response
+      if (searchData.error) {
+        logger.error({ query: searchQuery, apiError: searchData.error }, 'PubMed API returned error');
+        continue;
+      }
+
+      const pmids = searchData.esearchresult?.idlist || [];
+
+      if (pmids.length === 0) {
+        logger.warn({ query: searchQuery }, 'No PubMed results found for this query');
+        continue; // Try next query
+      }
+
+      logger.info(
+        { query: searchQuery, resultCount: pmids.length },
+        `Found ${pmids.length} PubMed results`
+      );
+
+      // Fetch details for each PMID
+      const results = await Promise.all(
+        pmids.slice(0, limit).map((pmid: string) => fetchPubMedDetails(pmid))
+      );
+
+      const validResults = results.filter((r: any): r is NonNullable<typeof r> => r !== null);
+      if (validResults.length > 0) {
+        logger.info(
+          { resultCount: validResults.length },
+          `Successfully retrieved details for ${validResults.length} articles`
+        );
+        return validResults;
+      } else {
+        logger.warn({ query: searchQuery }, 'Found PMIDs but could not fetch details');
+        continue;
+      }
+    } catch (queryError) {
+      logger.error(
+        { query: searchQuery, error: queryError instanceof Error ? queryError.message : String(queryError), stack: queryError instanceof Error ? queryError.stack : undefined },
+        'Query strategy failed'
+      );
+      continue;
     }
-
-    logger.info({ pmids: pmids.length }, `Found ${pmids.length} PubMed articles`);
-
-    // Fetch details for each PMID
-    const results = await Promise.all(
-      pmids.map((pmid: string) => fetchPubMedDetails(pmid))
-    );
-
-    return results.filter((r: any): r is NonNullable<typeof r> => r !== null);
-  } catch (error) {
-    logger.error({ enzyme, substrate, error }, 'PubMed search failed');
-    throw error;
   }
+
+  // All strategies exhausted
+  logger.error({ enzyme, substrate }, 'All PubMed search strategies failed - cannot find real literature');
+  throw new Error(
+    `No real literature found on PubMed for "${enzyme}" and "${substrate}". ` +
+    'The system requires verified papers from scientific databases. ' +
+    'Check your network access and verify this enzyme/substrate pair has published kinetics data.'
+  );
 }
 
 /**

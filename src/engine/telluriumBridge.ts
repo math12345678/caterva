@@ -180,7 +180,24 @@ const ENGINE_TIMEOUT_MS = 120_000;
 export async function runTellurium(
   domain: SimulationDomain,
   parameters: Record<string, EngineParameterValue>,
-  options: { required?: string[]; signal?: AbortSignal } = {}
+  options: {
+    required?: string[];
+    signal?: AbortSignal;
+    /**
+     * Parameters the runner deliberately does NOT echo back.
+     *
+     * The echo check below exists because `t_end`/`n_points` were silently
+     * dropped in favour of `end`/`points`, and nothing noticed. But the
+     * `sbml` domain takes an entire SBML document as `sbml_string` and
+     * echoes only `{start, end, points}` -- omitting a multi-kilobyte XML
+     * blob from its response is sensible, not a bug.
+     *
+     * Listed per call rather than hardcoded here, so an exemption is
+     * visible at the call site that needs it and cannot quietly cover a
+     * parameter that really was dropped.
+     */
+    notEchoed?: string[];
+  } = {}
 ): Promise<TelluriumResult> {
   const required = options.required ?? [];
   const missing = required.filter(
@@ -283,8 +300,10 @@ export async function runTellurium(
         // runner's `end`/`points`, leaving the caller believing it had set
         // a resolution it had not. A misspelled parameter must be loud.
         const echoed = parsed.parameters ?? {};
+        const exempt = new Set(options.notEchoed ?? []);
         const ignored = Object.keys(parameters).filter(
-          (key) => parameters[key] !== null && !(key in echoed)
+          (key) =>
+            parameters[key] !== null && !(key in echoed) && !exempt.has(key)
         );
         if (ignored.length > 0) {
           finish(() =>
