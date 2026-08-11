@@ -94,17 +94,25 @@ def _candidate_workspaces() -> list[pathlib.Path]:
 
 
 def all_typescript_projects() -> list[pathlib.Path]:
-    """Every directory in the repository holding a tsconfig.json.
+    """Every tsconfig in the repository, as a path to the config FILE.
 
     Unlike `_candidate_workspaces()` this is not scoped to
     Science-Agent-Pipeline/ and does not require a `src/` subdirectory, so
     a project anywhere in the tree is discovered.
+
+    Any `tsconfig*.json` counts, not just `tsconfig.json`. The convention
+    for build-tool configs (vite.config.ts, vitest.config.ts,
+    drizzle.config.ts) is a sibling `tsconfig.node.json`, and looking only
+    for the exact name `tsconfig.json` would leave those files reported as
+    uncovered no matter how correctly they were wired up.
     """
     projects: list[pathlib.Path] = []
     for current, directories, files in os.walk(REPO_ROOT):
         directories[:] = [d for d in directories if d not in SKIP_PARTS]
-        if "tsconfig.json" in files:
-            projects.append(pathlib.Path(current))
+        here = pathlib.Path(current)
+        for name in files:
+            if name.startswith("tsconfig") and name.endswith(".json"):
+                projects.append(here / name)
     return sorted(projects)
 
 
@@ -126,7 +134,7 @@ def first_party_typescript() -> set[pathlib.Path]:
     return sources
 
 
-def files_covered_by(project: pathlib.Path) -> set[pathlib.Path]:
+def files_covered_by(tsconfig: pathlib.Path) -> set[pathlib.Path]:
     """The set of files `tsc` actually pulls into this project.
 
     Asks the compiler via `--listFiles` rather than reimplementing
@@ -137,9 +145,10 @@ def files_covered_by(project: pathlib.Path) -> set[pathlib.Path]:
     `--listFiles` prints the file list even when the compile has errors, so
     coverage is still known for a project that does not currently build.
     """
+    project = tsconfig.parent
     try:
         result = subprocess.run(
-            ["npx", "tsc", "--noEmit", "--listFiles", "-p", "."],
+            ["npx", "tsc", "--noEmit", "--listFiles", "-p", tsconfig.name],
             cwd=project,
             capture_output=True,
             text=True,

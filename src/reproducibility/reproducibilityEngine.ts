@@ -157,7 +157,24 @@ export class ExecutionRecorder {
     };
     const inputHash = this.sha256(JSON.stringify(storedInputs));
     const outputHash = this.sha256(JSON.stringify(storedOutput));
-    const reproductionKey = this.sha256(`${inputHash}:${outputHash}:${Date.now()}`);
+    // `Date.now()` alone has millisecond resolution, so two records with
+    // identical inputs and outputs created inside the same millisecond
+    // produced the SAME "unique" reproduction key. That is not theoretical
+    // -- the repository's own test creates records in a tight loop and was
+    // intermittently failing on it, visibly under `jest --runInBand`.
+    //
+    // A colliding key silently merges two distinct executions in any store
+    // that treats it as an identifier.
+    //
+    // A process-local counter was tried first and is NOT sufficient: each
+    // process starts it at 0, so two workers (jest runs suites in parallel
+    // processes; so would any multi-process server) can emit the same
+    // counter value in the same millisecond for the same inputs.
+    // `crypto.randomUUID` is unique across processes. The timestamp is
+    // retained so keys remain roughly ordered by creation.
+    const reproductionKey = this.sha256(
+      `${inputHash}:${outputHash}:${Date.now()}:${crypto.randomUUID()}`
+    );
 
     return {
       jobId,

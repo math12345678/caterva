@@ -51,6 +51,9 @@ Thumbs.db
 # remembers to add a line here.
 node_modules/
 
+# Coverage output from `npm run test:coverage`.
+coverage/
+
 # Science-Agent-Pipeline is folded into this repo as regular files (it used
 # to be tracked as a gitlink to its own separate repo, which broke CI --
 # GitHub Actions checkout tried to resolve the gitlink and there was no

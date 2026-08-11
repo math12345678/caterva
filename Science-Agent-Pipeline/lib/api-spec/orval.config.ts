@@ -28,7 +28,13 @@ export default defineConfig({
       mode: "split",
       baseUrl: "/api",
       clean: true,
-      prettier: true,
+      // `prettier: true` -- the key orval used before v8 -- was silently
+      // ignored, because unknown keys in a config object are not errors at
+      // runtime. So the generated client was never formatted, despite the
+      // config saying it was. orval 8 spells it `formatter`
+      // (SupportedFormatter: "prettier" | "biome" | "oxfmt"). Caught the
+      // first time this file was ever type-checked.
+      formatter: "prettier",
       override: {
         fetch: {
           includeHttpResponseReturnType: false,
@@ -54,7 +60,13 @@ export default defineConfig({
       schemas: { path: "generated/types", type: "typescript" },
       mode: "split",
       clean: true,
-      prettier: true,
+      // `prettier: true` -- the key orval used before v8 -- was silently
+      // ignored, because unknown keys in a config object are not errors at
+      // runtime. So the generated client was never formatted, despite the
+      // config saying it was. orval 8 spells it `formatter`
+      // (SupportedFormatter: "prettier" | "biome" | "oxfmt"). Caught the
+      // first time this file was ever type-checked.
+      formatter: "prettier",
       override: {
         zod: {
           coerce: {
