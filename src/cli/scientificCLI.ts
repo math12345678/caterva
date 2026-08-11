@@ -220,7 +220,8 @@ async function commandValidate(query: string, params?: Record<string, string>) {
 
     process.exit(0);
   } catch (err) {
-    error(`Validation error: ${err}`);
+    const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+    error(`Validation error: ${errorMsg}`);
     process.exit(1);
   }
 }
@@ -302,7 +303,8 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
 
     process.exit(0);
   } catch (err) {
-    error(`Simulation error: ${err}`);
+    const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+    error(`Simulation error: ${errorMsg}`);
     process.exit(1);
   }
 }
@@ -331,7 +333,8 @@ async function commandVerifyReproducibility(jobId: string) {
 
     process.exit(0);
   } catch (err) {
-    error(`Verification failed: ${err}`);
+    const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+    error(`Verification failed: ${errorMsg}`);
     process.exit(1);
   }
 }
@@ -361,7 +364,8 @@ async function commandCheckIntegrity(jobId: string) {
 
     process.exit(result.intact ? 0 : 1);
   } catch (err) {
-    error(`Integrity check failed: ${err}`);
+    const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
+    error(`Integrity check failed: ${errorMsg}`);
     process.exit(1);
   }
 }
