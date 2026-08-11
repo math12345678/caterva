@@ -21,7 +21,7 @@ import {
   runTellurium,
   type EngineParameterValue
 } from '../engine/telluriumBridge';
-import { vmaxInSubstrateUnitsPerSecond } from '../units';
+import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -51,6 +51,22 @@ export interface SimulationRequest {
     organism: string;
     ecNumber?: string;
   };
+  /**
+   * Total enzyme concentration [E]0, with its unit.
+   *
+   * An explicit caller input, never defaulted, inferred, or resolved from
+   * literature -- BRENDA does not report it per row (ADR 0012 / ADR 0013).
+   * Supplying it does two things that are otherwise impossible:
+   *
+   *   1. Bridges a literature-resolved kcat to a simulable
+   *      Vmax = kcat * [E]0 (ADR 0019), computed in Python by the same
+   *      `vmax_from_kcat` the engine uses.
+   *   2. Makes the quasi-steady-state assumption CHECKABLE. Segel's
+   *      criterion is epsilon = e0/(Km + s0) << 1, so without [E]0 that
+   *      check cannot be evaluated at all and is reported UNVERIFIED --
+   *      which is what it has been reporting on every run until now.
+   */
+  enzymeConcentration?: { value: number; unit: string };
 }
 
 export interface SimulationResponse {
@@ -181,6 +197,20 @@ export class ScientificPipeline {
             )
           : undefined;
 
+      // [E]0 is expressed in the substrate's units so that
+      // epsilon = e0/(Km + s0) is a ratio of like quantities. Converting
+      // through the declared units rather than assuming they already
+      // match -- a caller working in uM against a Km in mM would otherwise
+      // compute an epsilon 1000x too large and see a spurious failure.
+      const e0InSubstrateUnits =
+        request.enzymeConcentration && resolvedParameters.s0
+          ? convertConcentration(
+              request.enzymeConcentration.value,
+              request.enzymeConcentration.unit,
+              resolvedParameters.s0.unit
+            )
+          : undefined;
+
       const conditions = {
         temperature: 37,
         pH: 7.4,
@@ -188,6 +218,10 @@ export class ScientificPipeline {
         km: resolvedParameters.km?.value,
         vmax: vmaxInSubstrateUnitsPerSec,
         s0: resolvedParameters.s0?.value,
+        // Without this the steady-state check reported `notEvaluated` on
+        // every single run: Segel's criterion needs e0 and nothing supplied
+        // it, so Layer 3's first check did no work at all.
+        ...(e0InSubstrateUnits !== undefined ? { e0: e0InSubstrateUnits } : {}),
         measurementTime: ScientificPipeline.SIMULATION_END_TIME_S
       };
 

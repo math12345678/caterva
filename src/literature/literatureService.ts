@@ -12,6 +12,7 @@
 
 import { logger } from '../logger';
 import { convertConcentration, convertRate, parseRateUnit } from '../units';
+import { resolveKinetic, type ResolverQuery } from './literatureResolver';
 
 /**
  * Convert a value between units of the same kind, choosing concentration or
@@ -474,10 +475,115 @@ export class LiteratureService {
   }
 
   /**
-   * Get parameter recommendation
+   * Get parameter recommendation from the in-memory database.
+   *
+   * Synchronous, and therefore limited to literature a caller has already
+   * added. `resolveFromLiterature` is the one that actually reaches
+   * BRENDA/PubMed.
    */
   getRecommendation(parameterName: string, domain: string): ParameterRecommendation {
     return this.recommender.recommend(parameterName, domain);
+  }
+
+  /**
+   * Resolve a kinetic constant against the REAL literature layer.
+   *
+   * Tries the in-memory database first -- a caller that supplied its own
+   * sources meant them to be used, and it avoids a network round trip --
+   * then falls back to `resolveKinetic`, which walks BRENDA exact match,
+   * BRENDA cross-species, then PubMed candidates via the same
+   * `science_agent_runner.py` bridge the production API server uses.
+   *
+   * Returns `null` when the literature genuinely has nothing. That is an
+   * answer, and it is distinct from ResolverUnavailableError, which means
+   * the lookup could not be performed -- "the registry says no" and "we
+   * never asked" must not collapse into one another.
+   */
+  async resolveFromLiterature(
+    parameterName: string,
+    domain: string,
+    query: ResolverQuery
+  ): Promise<ParameterRecommendation | null> {
+    try {
+      return this.recommender.recommend(parameterName, domain);
+    } catch {
+      // Nothing in the local database. Fall through to the real resolver
+      // rather than treating an empty cache as an empty literature.
+    }
+
+    const quantity = parameterName.toLowerCase();
+    if (quantity !== 'km' && quantity !== 'ki' && quantity !== 'kcat') {
+      // Only these three resolve through BRENDA. Saying so is better than
+      // issuing a lookup that cannot succeed and reporting its failure as
+      // "no literature".
+      logger.info(
+        { parameterName },
+        'Parameter is not a BRENDA-resolvable kinetic constant; no lookup attempted'
+      );
+      return null;
+    }
+
+    const result = await resolveKinetic({ ...query, quantity });
+    if (!result.found) {
+      return null;
+    }
+
+    // A resolved kcat is a real, citable turnover number but is NOT a
+    // simulation parameter: the MM engine takes Vmax, and
+    // Vmax = kcat * [E]0 (ADR 0012 / 0013 / 0019). When the caller supplied
+    // an enzyme concentration, the runner has already done that conversion
+    // in Python using the same vmax_from_kcat the engine uses, and returned
+    // it as `bridgedVmax`. Recomputing it here would be a second copy of
+    // the arithmetic AND of its [E]0/Km flag threshold.
+    if (quantity === 'kcat') {
+      if (result.vmaxValidation && result.vmaxValidation.ok === false) {
+        // The bridge REFUSED -- e.g. a non-positive [E]0. The runner omits
+        // `vmax` in that case, and a refused conversion must not be
+        // reported as a resolved parameter.
+        logger.warn(
+          { reason: result.vmaxValidation.reason },
+          'kcat resolved but the Vmax bridge refused the enzyme concentration'
+        );
+        return null;
+      }
+      if (result.bridgedVmax === undefined) {
+        logger.info(
+          { parameterName },
+          'kcat resolved but no enzyme concentration was supplied, so it ' +
+          'cannot become a simulable Vmax (ADR 0019). Reporting no value ' +
+          'rather than inventing [E]0.'
+        );
+        return null;
+      }
+    }
+
+    return {
+      parameterName,
+      recommendedValue: result.value,
+      // The unit BRENDA reported. This is the whole reason the resolver is
+      // worth calling rather than assuming: the value and its unit arrive
+      // together, from the same source.
+      unit: result.unit,
+      // A single resolved measurement, so the range is degenerate. Stated
+      // rather than widened by an invented tolerance.
+      range: [result.value, result.value],
+      sources: result.citation?.reference_id
+        ? [String(result.citation.reference_id)]
+        : [],
+      sourceCount: result.citation ? 1 : 0,
+      // A cross-species value is real and citable but was measured in a
+      // DIFFERENT organism than the one asked about, so it cannot carry the
+      // same confidence as an exact match. The reduction is a policy
+      // choice, and it is named as one rather than presented as a
+      // measurement.
+      confidence: result.crossSpecies ? 0.5 : 0.9,
+      warnings: result.crossSpecies
+        ? [
+            `Value measured in ${result.organism ?? 'a different organism'}, ` +
+            `not ${query.organism}. BRENDA cross-species match.`
+          ]
+        : []
+    };
   }
 
   /**

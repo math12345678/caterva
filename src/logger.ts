@@ -4,7 +4,15 @@
  * Structured logging
  */
 
-const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+/**
+ * Silent by default under test: a logger writing to stderr during a run
+ * buries the assertion output that actually matters. `LOG_LEVEL` still
+ * wins when set explicitly, so a failing test can be re-run verbosely with
+ * `LOG_LEVEL=debug npx jest ...`.
+ */
+const LOG_LEVEL =
+  process.env.LOG_LEVEL ||
+  (process.env.NODE_ENV === 'test' ? 'fatal' : 'info');
 
 const levels = { debug: 0, info: 1, warn: 2, error: 3, fatal: 4 };
 const currentLevel = levels[LOG_LEVEL as keyof typeof levels] ?? 1;
