@@ -50,6 +50,7 @@
     "roots": [
       "<rootDir>/src"
     ],
+    "testTimeout": 30000,
     "testMatch": [
       "**/__tests__/**/*.test.ts"
     ],

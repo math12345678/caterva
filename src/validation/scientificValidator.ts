@@ -182,6 +182,16 @@ export class ParameterValidator {
 /** Registry lookups must not hang a validation pass. */
 const LITERATURE_LOOKUP_TIMEOUT_MS = 15_000;
 
+/** The three answers a verification can produce. See
+ *  `LiteratureVerifier.verifyReferenceDetailed`. */
+export type VerificationStatus = 'verified' | 'unverified' | 'rejected';
+
+export interface VerificationOutcome {
+  status: VerificationStatus;
+  /** Why, for anything other than a clean pass. */
+  reason?: string;
+}
+
 export class LiteratureVerifier {
   /**
    * Caches REGISTRY LOOKUPS ONLY -- "does this DOI/PMID resolve" -- keyed
@@ -207,68 +217,186 @@ export class LiteratureVerifier {
   private static registryCache = new Map<string, boolean>();
 
   /**
-   * Verify literature reference is valid and accessible
+   * Verify a literature reference, in THREE states.
+   *
+   * The three-state result is the whole point of this method, and it
+   * exists because the two-state one kept regressing.
+   *
+   * `verifyReference` returned `boolean`, which cannot express "I could
+   * not check". So anyone hitting an unreachable registry -- a blocked
+   * sandbox, an offline laptop, a CI box without egress -- faced a choice
+   * between `false` (fails every run) and `true` (passes everything), and
+   * chose `true`. That has now happened twice, and the second time went
+   * further than network handling:
+   *
+   *     if (!resolves) {
+   *       logger.warn('DOI not found in registry; accepting peer-reviewed source');
+   *     }
+   *     // ...falls through, returns true
+   *
+   * which accepted a DOI that CrossRef AFFIRMATIVELY REPORTED DOES NOT
+   * EXIST. Combined with a format check, that is "true for any DOI-shaped
+   * string on an object whose own `peerReviewed` field says true" -- and
+   * `peerReviewed` is a self-declared boolean, not a verified fact. Every
+   * fabricated DOI this repository has ever contained
+   * (10.9999/completely-made-up, 10.1111/j.1432-1033.1913.tb07745.x, ...)
+   * passes that test. It is exactly the defect Stage 10 Part 6 removed.
+   *
+   * The distinction the boolean could not carry:
+   *
+   *   - REJECTED   the registry says this does not exist, or the format is
+   *                malformed, or the source is not peer-reviewed. Never
+   *                acceptable, under any configuration. A fabricated
+   *                citation is not a network problem.
+   *   - UNVERIFIED the registry could not be reached. NOT the same as
+   *                verified. Acceptable only under an explicit, logged
+   *                opt-in, and still reported as unverified.
+   *   - VERIFIED   the registry confirms the identifier resolves.
    */
-  static async verifyReference(ref: LiteratureReference): Promise<boolean> {
+  static async verifyReferenceDetailed(
+    ref: LiteratureReference
+  ): Promise<VerificationOutcome> {
     try {
-      // Check 3: Peer review status. CRITICAL check - evaluated on EVERY call, never cached.
-      // Non-peer-reviewed sources are always rejected, regardless of network availability.
+      // Peer review: a property of the reference, evaluated every call and
+      // never cached (see registryCache).
       if (!ref.peerReviewed) {
         logger.warn({ title: ref.title }, 'Non-peer-reviewed source');
-        return false;
+        return {
+          status: 'rejected',
+          reason: 'Source is not peer-reviewed.'
+        };
       }
 
-      // Check 1: DOI resolution - NON-BLOCKING for network failures
-      // Format validation is ALWAYS enforced; network failures are ignored for peer-reviewed sources.
       if (ref.doi) {
-        // Check format first (this doesn't require network)
+        // Format is checked first because it needs no network, and a
+        // malformed DOI is malformed whether or not CrossRef is reachable.
         if (!/^10\.\d{4,9}\/\S+$/.test(ref.doi)) {
-          logger.warn({ doi: ref.doi }, 'DOI format is invalid');
-          return false;
+          return {
+            status: 'rejected',
+            reason: `DOI '${ref.doi}' is not a well-formed DOI.`
+          };
         }
 
+        let resolves: boolean;
         try {
-          const resolves = await this.cachedRegistryLookup(
+          resolves = await this.cachedRegistryLookup(
             `doi:${ref.doi}`,
             () => this.verifyDOI(ref.doi!)
           );
-          if (!resolves) {
-            logger.warn({ doi: ref.doi }, 'DOI not found in registry; accepting peer-reviewed source');
-          }
         } catch (error) {
-          logger.warn({ doi: ref.doi }, 'DOI registry unreachable; accepting peer-reviewed source');
+          // Could not ask. Not an answer about the DOI.
+          return {
+            status: 'unverified',
+            reason:
+              `CrossRef could not be reached for DOI '${ref.doi}', so this ` +
+              'citation is UNVERIFIED. It has not been shown to be valid or invalid.'
+          };
+        }
+
+        if (!resolves) {
+          // CrossRef answered, and the answer was no.
+          return {
+            status: 'rejected',
+            reason:
+              `DOI '${ref.doi}' does not resolve in CrossRef. The registry ` +
+              'was reached and reported that this DOI does not exist -- this ' +
+              'is a fabricated or mistyped citation, not a network problem.'
+          };
         }
       }
 
-      // Check 2: PubMed verification - NON-BLOCKING for network failures
-      // Format validation is ALWAYS enforced; network failures are ignored for peer-reviewed sources.
       if (ref.pubmedId) {
-        // Check format first (this doesn't require network)
         if (!/^\d+$/.test(ref.pubmedId)) {
-          logger.warn({ pubmedId: ref.pubmedId }, 'PMID format is invalid');
-          return false;
+          return {
+            status: 'rejected',
+            reason: `PMID '${ref.pubmedId}' is not a well-formed PubMed ID.`
+          };
         }
 
+        let resolves: boolean;
         try {
-          const resolves = await this.cachedRegistryLookup(
+          resolves = await this.cachedRegistryLookup(
             `pmid:${ref.pubmedId}`,
             () => this.verifyPubMed(ref.pubmedId!)
           );
-          if (!resolves) {
-            logger.warn({ pubmedId: ref.pubmedId }, 'PMID not found in registry; accepting peer-reviewed source');
-          }
         } catch (error) {
-          logger.warn({ pubmedId: ref.pubmedId }, 'PubMed registry unreachable; accepting peer-reviewed source');
+          return {
+            status: 'unverified',
+            reason:
+              `PubMed could not be reached for PMID '${ref.pubmedId}', so ` +
+              'this citation is UNVERIFIED.'
+          };
+        }
+
+        if (!resolves) {
+          return {
+            status: 'rejected',
+            reason:
+              `PMID '${ref.pubmedId}' does not resolve in PubMed. The ` +
+              'registry was reached and reported no such record.'
+          };
         }
       }
 
-      // If we got here: peer-reviewed, syntactically sound identifiers (or no identifiers).
-      // Accept it based on local database.
-      return true;
+      if (!ref.doi && !ref.pubmedId) {
+        // Nothing to check against a registry. Peer-reviewed by assertion
+        // only, which is not verification.
+        return {
+          status: 'unverified',
+          reason:
+            'Reference carries neither a DOI nor a PMID, so there is no ' +
+            'identifier to resolve against any registry.'
+        };
+      }
+
+      return { status: 'verified' };
     } catch (error) {
       logger.error({ error, reference: ref }, 'Unexpected error in literature verification');
+      return {
+        status: 'unverified',
+        reason: 'Verification failed unexpectedly; treat as UNVERIFIED.'
+      };
+    }
+  }
+
+  /**
+   * Boolean form, kept for existing callers.
+   *
+   * `true` means VERIFIED. An UNVERIFIED citation is true only when
+   * `TERRIUM_ALLOW_UNVERIFIED_CITATIONS` is explicitly set -- which exists
+   * so that working offline does not require editing this file, the
+   * pressure that produced the regression described above. A REJECTED
+   * citation is never true, whatever that variable says.
+   */
+  static async verifyReference(ref: LiteratureReference): Promise<boolean> {
+    const outcome = await this.verifyReferenceDetailed(ref);
+
+    if (outcome.status === 'verified') {
+      return true;
+    }
+    if (outcome.status === 'rejected') {
+      logger.warn(
+        { title: ref.title, doi: ref.doi, reason: outcome.reason },
+        'Citation REJECTED'
+      );
       return false;
     }
+
+    if (process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'] === '1') {
+      logger.warn(
+        { title: ref.title, doi: ref.doi, reason: outcome.reason },
+        'Citation is UNVERIFIED but TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1 is ' +
+        'set, so it is being accepted. Results from this run must not be ' +
+        'described as literature-verified.'
+      );
+      return true;
+    }
+
+    logger.warn(
+      { title: ref.title, doi: ref.doi, reason: outcome.reason },
+      'Citation UNVERIFIED; refusing to report it as verified'
+    );
+    return false;
   }
 
   /**
