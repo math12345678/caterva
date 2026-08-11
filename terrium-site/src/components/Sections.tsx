@@ -55,7 +55,7 @@ export function Ledger() {
     <section className="relative z-10 mx-auto max-w-[1140px] px-6 py-24">
       <Reveal>
         <Eyebrow>EVIDENCE LEDGER</Eyebrow>
-        <Title>Eight claims, and where each one comes from.</Title>
+        <Title>{LEDGER.length} claims, and where each one comes from.</Title>
         <p className="mt-2 max-w-[66ch] font-sans text-[14px] leading-relaxed text-dim">
           The rightmost column is the product. It is the difference between
           “our simulation says” and “this reproduces a result published in

@@ -5,14 +5,14 @@ language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
 been independently checked.
 
-Fourteen simulation domains built so far: enzyme kinetics (plain and
+Fifteen simulation domains built so far: enzyme kinetics (plain and
 competitively-inhibited Michaelis-Menten), SIR/SEIR epidemiological modeling,
 PCR amplification, Monte Carlo simulation, population genetics
 (Wright-Fisher, single- and two-locus), molecular dynamics (Lennard-Jones
-cluster), Gillespie SSA stochastic chemical kinetics (first-order decay
-and bimolecular association), and three ODE oscillators: Lotka-Volterra
-predator-prey, the Tyson (1991) cdc2-cyclin cell-cycle oscillator, and the
-Elowitz & Leibler (2000) repressilator.
+cluster), Gillespie SSA stochastic chemical kinetics (first-order decay,
+bimolecular association, and a multi-replicate ensemble view), and three
+ODE oscillators: Lotka-Volterra predator-prey, the Tyson (1991) cdc2-cyclin
+cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
 ## Quick start
 
@@ -21,7 +21,13 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,308 tests (1,014 engine + 294 literature)
+make test      # runs all 1,289 tests (1,014 engine + 275 literature)
+
+`test_popgen_resolver.py` skips its 19 tests when `stdpopsim` is not
+installed — it needs `libgsl-dev` and is genuinely absent in some
+environments. `make check` reports that as a warning so the gap is visible;
+a silent skip would let the population-genetics literature path go untested
+and still read as green.
 ```
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
@@ -44,6 +50,160 @@ docker run -it --rm terrium-sandbox
 This is also wired up as a [Dev Container](https://containers.dev/) — open
 the repo in VS Code with the Dev Containers extension installed and it'll
 offer to build and attach automatically.
+
+## Using it
+
+Terrium is a command-line tool. The point of it is the provenance: every
+number it reports says where it came from, and anything it cannot source it
+refuses to invent.
+
+```bash
+npx ts-node src/cli/scientificCLI.ts help
+```
+
+### Look up a constant
+
+```bash
+scientific resolve "lactate dehydrogenase" \
+  --substrate pyruvate --organism "Homo sapiens"
+```
+
+```
+✓ KM = 2.5 mM
+
+  System    lactate dehydrogenase / pyruvate
+  Organism  Oryctolagus cuniculus
+  Source    brenda_cross_species
+  Citation  BRENDA ref 649716
+
+⚠ Cross-species match. This was measured in Oryctolagus cuniculus, not Homo sapiens.
+  Real and citable, but do not report it as a Homo sapiens measurement.
+```
+
+It resolves through BRENDA (exact match, then cross-species) and then
+PubMed, and reports **three outcomes with three exit codes**:
+
+| exit | meaning |
+|---|---|
+| 0 | found — a real measurement with its unit, organism and citation |
+| 2 | the literature genuinely has nothing for this system |
+| 1 | the lookup could not be performed at all |
+
+Most tools collapse the last two. They are different facts, and a tool that
+reports "no result" when it actually could not reach the registry teaches
+you to read an absence of evidence as evidence of absence.
+
+`--quantity km|ki|kcat` picks which constant. `--json` for scripting.
+
+### Run a simulation with everything sourced
+
+```bash
+scientific simulate mm --resolve \
+  --enzyme "lactate dehydrogenase" --substrate pyruvate \
+  --organism "Homo sapiens" --s0 10mM --enzyme-conc 0.001mM
+```
+
+```
+Parameters and where they came from
+  s0    10 mM      user
+  e0    0.001 mM   user
+  km    0.14 mM    brenda_exact  BRENDA ref 12345
+  vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 649716
+        ⚠ measured in Oryctolagus cuniculus, not the organism requested
+
+  2 of 4 parameter(s) carry a literature citation.
+
+Result
+  initial    10.0000 mM
+  final      7.5395 mM
+  points     101
+```
+
+Anything it cannot source stops the run rather than being defaulted. Vmax is
+not a BRENDA table — it is `kcat × [E]₀`, and BRENDA does not report an
+enzyme concentration, so `--enzyme-conc` is required to bridge it.
+
+**Write units onto the numbers.** `--km 5.2mM`, `--vmax 12.8uM/min`. A bare
+number is accepted, but the assumed unit is reported — a Vmax in mM/s read
+as μM/min is wrong by a factor of 60,000.
+
+### Ask whether a shaky number matters
+
+```bash
+scientific simulate mm --resolve ... --sensitivity
+```
+
+```
+Sensitivity  (±10% on each parameter)
+  s0      13.2%   user
+  vmax     3.3%   brenda_exact → kcat x [E]0
+  km       0.1%   brenda_cross_species
+```
+
+Sensitivity on its own is ordinary. Paired with provenance it answers the
+question you actually have: *my Km is a rabbit value — does that change my
+conclusion?* Here it does not (0.1%), while the substrate concentration you
+chose moves the answer 13.2%.
+
+The report separates two different problems: a **weakly sourced
+measurement** that is load-bearing means *measure it for your own system*;
+a **load-bearing choice you made** means *state it precisely in your
+methods*.
+
+### Inhibition models
+
+```bash
+scientific simulate x --resolve --model noncompetitive \
+  --enzyme ldh --substrate pyruvate --organism "Homo sapiens" \
+  --s0 10mM --i0 0.1mM --enzyme-conc 0.001mM
+```
+
+`--model mm|competitive|noncompetitive|product`. Ki resolves from BRENDA's
+Ki table with its own citation. Competitive inhibition uses the engine's
+first-class domain; non-competitive and product inhibition are emitted as
+SBML and run through the engine's `sbml` escape hatch — the same solver
+either way, never a second simulator.
+
+Supplying a Ki and running plain `mm` will prompt you: that combination
+silently discards the inhibitor.
+
+### Sweep a parameter
+
+```bash
+scientific sweep mm --parameter s0 --range 2:10:2 --km 0.5mM --vmax 0.1mM/s
+```
+
+```
+      2  1.2393
+      6  5.0829
+     10  9.0499
+
+  shape  ▁▃▄▆█
+  trend  increasing  (slope 1.96e+0)
+```
+
+Points that break the pattern are flagged separately — usually where the
+model stops behaving the way the rest of the range does.
+
+### Past runs
+
+```bash
+scientific history
+```
+
+Every `--resolve` run is recorded with its full provenance to
+`~/.terrium/history.json`, so a job id printed today still means something
+tomorrow.
+
+### Environment
+
+| variable | effect |
+|---|---|
+| `TERRIUM_CONTACT_EMAIL` | identifies you to CrossRef's polite pool (better rate limits) |
+| `TERRIUM_SKIP_DOI_VERIFICATION=1` | skip registry lookups offline. Results become **unverified**, never verified |
+| `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` | accept unverified citations. Cannot rescue a *rejected* one |
+| `TERRIUM_HISTORY_FILE` | where run history is kept |
+| `TERRIUM_PYTHON` | which interpreter runs the engine |
 
 ## Requirements
 
@@ -71,7 +231,7 @@ in `requirements.txt`:
 
 ## Domains
 
-Fourteen simulation domains, two pipelines:
+Fifteen simulation domains, two pipelines:
 
 **Continuous (antimony → SBML → roadrunner):**
 - **Michaelis-Menten** — irreversible single-substrate enzyme kinetics.
@@ -115,6 +275,13 @@ Fourteen simulation domains, two pipelines:
   `a(t) = a₀/(1 + k·a₀·t)`) and a hand-verified seeded golden trajectory
   pinned through the API (`test_gillespie_ssa_bimolecular_golden.py`,
   `gillespieBimolecularGolden.test.ts`).
+- **Gillespie SSA ensemble** (`simulate_gillespie_ssa_replicates`) — runs
+  `n_replicates` independent SSA trajectories (first-order or bimolecular)
+  and reports the sample mean trajectory on a fixed time grid alongside
+  each replicate's final counts, for comparing stochastic spread against
+  the deterministic reference. Replicate RNGs are derived deterministically
+  from a single master seed (ADR 0005), so a fixed seed reproduces the
+  whole ensemble bit-identically.
 - **Wright-Fisher neutral drift** — binomial sampling of 2N allele copies each
   generation. Verified against the exact heterozygosity decay
   `Hₜ = H₀ · (1 − 1/(2N))ᵗ` and Kimura's fixation probability `P(fix) = p₀`.
@@ -166,15 +333,15 @@ Terrium/
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                     294 tests
+│   └── ...                     275 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    16 decision records (and counting)
+│   └── adr/                    23 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
-├── scripts/                    14 guard scripts + build verification
+├── scripts/                    ~20 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -255,10 +422,10 @@ them together.
 
 ```bash
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 1,308 tests
+make test        # run all 1,289 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,014 tests)
-make test-lit    # literature layer only (294 tests)
+make test-lit    # literature layer only (275 tests)
 python3 scripts/verify_build.py --quick  # all 14 guard scripts, incl. TypeScript compile (~30s)
 make clean       # remove caches
 ```
