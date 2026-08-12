@@ -4,32 +4,35 @@
  *
  * Working examples of Terrium's REST API from Node.
  *
- * WHY THIS FILE WAS REWRITTEN (2026-08-11)
- * ----------------------------------------
- * The previous version documented eleven endpoints and ten did not exist —
- * the same eleven as the Python example, copied across:
+ * WHICH SERVER THIS TALKS TO
+ * --------------------------
+ * Terrium serves TWO HTTP APIs, and they are not interchangeable:
  *
- *     /api/health           the route is /api/healthz
- *     /api/jobs/<id>        the route is /api/simulate/<jobId>
- *     /api/export/jobs/csv  the route is /api/simulate/<jobId>/export
- *     /api/jobs/query, /api/batch, /api/batches/<id>, /api/sweep,
- *     /api/sweeps/<id>, /api/compare/jobs, /api/stats
- *                           no such routes, at all
+ *   * `Science-Agent-Pipeline/artifacts/api-server/` — the Express service,
+ *     reference at `docs/API.md`. THIS FILE TARGETS THAT ONE. Routes are
+ *     /api/healthz and /api/simulate/<jobId>/..., and parameters go INSIDE
+ *     the query string.
  *
- * It also posted `{ query, parameters }`, but Terrium takes parameters
- * INSIDE the query string:
+ *   * `src/web/server.ts` — the root tree's own server, started with
+ *     `npm run web`, which `examples/python_integration.py` targets.
+ *     Different routes (/api/health, /api/jobs/<id>, /api/sweep,
+ *     /api/batch) and a different request shape:
+ *     `{query, parameters, enzyme, substrate}`.
  *
+ * Pointing a client at the wrong one produces 404s that look like the
+ * product is broken. `scripts/check_example_endpoints.py` checks every
+ * endpoint here against the routes both servers actually register.
+ *
+ * WHY THE QUERY STRING CARRIES THE PARAMETERS (on this server)
+ * -----------------------------------------------------------
  *     { query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51" }
  *
- * That difference matters. Terrium refuses to invent a parameter it was not
- * given (ADR 0012/0013): experimental conditions like s0, end and points are
- * chosen by whoever runs the experiment and are never defaulted or resolved
- * from literature. Omit them and the job fails with MISSING_REQUIRED_INPUT
- * naming exactly what to add.
- *
- * `scripts/check_example_endpoints.py` now checks every endpoint here
- * against the routes the server actually registers, so this file cannot
- * drift back.
+ * There is no separate `parameters` field here. The resolver reads
+ * `km=2 vmax=5 s0=10` out of the text, and refuses to invent anything it
+ * cannot find: experimental conditions like s0, end and points are chosen
+ * by whoever runs the experiment and are never defaulted or resolved from
+ * literature (ADR 0012/0013). Omit them and the job fails with
+ * MISSING_REQUIRED_INPUT naming exactly what to add.
  *
  * No dependencies — uses the built-in fetch (Node 18+).
  */
