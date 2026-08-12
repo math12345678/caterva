@@ -15,6 +15,11 @@
 set -euo pipefail
 
 ORG="Terrium-sim"
+
+# Staging area for repos assembled from scattered files. Defined here,
+# beside the other config, because the terium replay below uses it and
+# `set -u` turns a late definition into a hard failure.
+STAGE="${TMPDIR:-/tmp}/terrium-split"
 PUSH="${1:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -122,7 +127,6 @@ fi
 # you are working in to produce a repo that has nothing to do with it.
 #
 # A staging directory cannot do that: the monorepo is only ever read.
-STAGE="${TMPDIR:-/tmp}/terrium-split"
 
 build_fileset() {
   local repo="$1"; shift
