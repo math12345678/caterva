@@ -333,6 +333,9 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
   // itself is exercised in strenda.test.ts.
   const COMPLETE_CONDITIONS = { ph: 7.4, temperatureC: 25 };
 
+  // Locators are now REQUIRED on every resolved entry, not optional. They
+  // were absent from these fixtures, which is precisely how the gap stayed
+  // invisible: the suite encoded "resolved with no locators" as valid.
   const resolved: Record<string, ParameterProvenance> = {
     km: {
       origin: "resolved",
@@ -340,6 +343,7 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
       citationStatus: "verified",
       assayConditions: COMPLETE_CONDITIONS,
       strendaStatus: "complete",
+      citationLocators: [{ kind: "brenda_ref", value: "12345" }],
     },
     vmax: { origin: "default" },
     s0: { origin: "default" },
@@ -375,10 +379,16 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
           citationStatus: "verified",
           assayConditions: COMPLETE_CONDITIONS,
           strendaStatus: "complete",
+          // 'n/a' is not a locator, so buildCitationLocators yields nothing
+          // for this citation. Both violations are asserted rather than one:
+          // the citation string is unlocatable AND there is no machine
+          // locator to fall back on, which is the honest description.
+          citationLocators: [],
         },
       }),
     ).toEqual([
       "km is marked resolved but its citation carries no locator (ref id or URL)",
+      "km is marked resolved but carries no citation locators -- its citation string cannot be machine-followed back to a source",
     ]);
   });
 
@@ -406,6 +416,14 @@ describe("strict resolved-citation format (Stage 5 Part 1)", () => {
           citationStatus: "verified",
           assayConditions: COMPLETE_CONDITIONS,
           strendaStatus: "complete",
+          citationLocators: [
+            {
+              kind: "brenda_ec",
+              value: "1.1.1.27",
+              deepLink:
+                "https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27",
+            },
+          ],
         },
       }),
     ).toEqual([]);
@@ -459,7 +477,28 @@ describe("citation locator invariants (citeVerify)", () => {
         ...base,
         km: { ...base.km, citationLocators: [] },
       }),
-    ).toContain("km carries an empty citation locator list");
+    ).toContain(
+      "km is marked resolved but carries no citation locators -- its " +
+        "citation string cannot be machine-followed back to a source",
+    );
+  });
+
+  it("rejects a resolved entry with no locator property at all", () => {
+    // The companion the suite was missing. An empty array was rejected;
+    // omitting the property entirely was not -- and omission is what
+    // buildResolvedKineticProvenance used to produce, because it stripped
+    // the key when the array came back empty. So the only reachable form of
+    // the defect was the one form nothing checked.
+    const { citationLocators: _omitted, ...withoutLocators } = base.km!;
+    expect(
+      validateParameterProvenance(parameters, {
+        ...base,
+        km: withoutLocators,
+      }),
+    ).toContain(
+      "km is marked resolved but carries no citation locators -- its " +
+        "citation string cannot be machine-followed back to a source",
+    );
   });
 
   it("rejects locators that do not match the citation string", () => {
@@ -681,6 +720,7 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
             citation: "BRENDA (ref 12345)",
             assayConditions: { ph: 7.4, temperatureC: 25 },
             strendaStatus: "complete",
+            citationLocators: [{ kind: "brenda_ref", value: "12345" }],
           },
           vmax: { origin: "default" },
           s0: { origin: "default" },
@@ -716,6 +756,7 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
             citationStatus: "verified",
             assayConditions: { ph: 7.4, temperatureC: 25 },
             strendaStatus: "complete",
+            citationLocators: [{ kind: "brenda_ref", value: "12345" }],
           },
           vmax: {
             origin: "resolved",
@@ -723,6 +764,7 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
             citationStatus: "flagged",
             assayConditions: { ph: 7.4, temperatureC: 25 },
             strendaStatus: "complete",
+            citationLocators: [{ kind: "brenda_ref", value: "67890" }],
           },
           s0: { origin: "default" },
         },

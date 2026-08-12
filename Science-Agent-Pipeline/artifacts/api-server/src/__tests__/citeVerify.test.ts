@@ -196,3 +196,51 @@ describe("citationConsistentWithLocators", () => {
     ).toBe(false);
   });
 });
+
+describe("the accession-shaped reference id that produces no locator", () => {
+  /**
+   * `isLocatableCitation` (provenance.ts) accepts ANY ref id that is not
+   * empty and not "n/a". `buildCitationLocators` only produces a locator
+   * when the ref id is a DOI or purely numeric (citeVerify.ts:139-156).
+   *
+   * The two disagree on accession-style identifiers, and the disagreement
+   * became load-bearing once locators were made mandatory on resolved
+   * provenance: a citation like `SABIO-RK (ref SABIO:1234)` would pass the
+   * admission gate, be recorded as `resolved`, carry zero locators, and be
+   * rejected by validateParameterProvenance -- which provenanceViolations
+   * THROWS on. A working literature answer would become "Internal error:
+   * invalid parameter provenance".
+   *
+   * That is the ADR 0021 failure shape exactly, and it would have arrived
+   * through a source nobody had added yet. queryResolver's `locatableCitation`
+   * now makes one computation decide and record, so such a citation degrades
+   * to a default instead.
+   *
+   * These tests pin the divergence so that widening either function without
+   * the other is visible.
+   */
+  const ACCESSION_SHAPED = ["SABIO:1234", "P00338", "EC-1.1.1.27", "abc123"];
+
+  for (const referenceId of ACCESSION_SHAPED) {
+    it(`'${referenceId}' yields no locator, so it must not be admitted as resolved`, () => {
+      expect(
+        buildCitationLocators({ source: "SomeRegistry", referenceId }),
+      ).toEqual([]);
+    });
+  }
+
+  it("a numeric id and a DOI both still yield locators", () => {
+    // The companion that keeps the test above honest: if buildCitationLocators
+    // returned [] for everything, the assertions above would pass for the
+    // wrong reason and every resolution would silently degrade.
+    expect(
+      buildCitationLocators({ source: "PubMed", referenceId: "33214421" }),
+    ).toHaveLength(1);
+    expect(
+      buildCitationLocators({
+        source: "stdpopsim",
+        referenceId: "10.1038/nature24018",
+      }),
+    ).toHaveLength(1);
+  });
+});

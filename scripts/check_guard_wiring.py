@@ -66,6 +66,51 @@ DELIBERATE_OMISSIONS = {
     ),
 }
 
+#: Where each guard runs TODAY. A snapshot of fact, not an aspiration.
+#:
+#: This dict is what the docstring above has always claimed existed. It did
+#: not. The loop meant to enforce it computed a key, tested it against
+#: DELIBERATE_OMISSIONS, and then fell off the end without appending
+#: anything -- an empty body under a docstring promising enforcement. So a
+#: guard dropping out of CI while staying in verify_build was reported as
+#: "all 19 guards run in at least one harness", which is the weaker claim
+#: the code actually made.
+#:
+#: That is the third appearance of this exact shape in the repository:
+#: `check_constant_usage` had a loop with two `continue`s and no
+#: `errors.append` (Part 12), and `check_citation_format` printed OK on a
+#: zero parse (Part 20). A loop that cannot append is a check that cannot
+#: fail.
+#:
+#: MAINTAINING IT: adding a harness to a guard is an improvement, and is
+#: accepted silently -- this records a FLOOR, not an exact match. Removing
+#: one fails, and the fix is either to put it back or to move the pair into
+#: DELIBERATE_OMISSIONS with a written reason. A new guard needs an entry
+#: here; the guard-wiring check will tell you so.
+EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
+    "check_citation_format": ("verify_build", "ci", "pytest"),
+    "check_dependencies_declared": ("verify_build", "pytest"),
+    "check_documented_counts": ("verify_build", "ci"),
+    "check_domain_parity": ("verify_build", "pytest"),
+    "check_engine_contract": ("verify_build", "pytest"),
+    "check_example_endpoints": ("verify_build",),
+    "check_env": ("ci",),
+    "check_forbidden_packages": ("verify_build", "ci", "pytest"),
+    "check_guard_wiring": ("verify_build", "ci"),
+    "check_literature_inventory": ("verify_build",),
+    "check_no_disabled_tests": ("verify_build",),
+    "check_no_generated_files_tracked": ("verify_build",),
+    "check_no_orphan_modules": ("verify_build",),
+    "check_no_silent_skips": ("ci",),
+    "check_no_vacuous_tests": ("verify_build",),
+    "check_plausibility_constants": ("verify_build", "pytest"),
+    "check_prompt_injection": ("verify_build",),
+    "check_python_support_claim": ("verify_build", "ci"),
+    "check_rng_convention": ("verify_build", "pytest"),
+    "check_typescript_compiles": ("verify_build",),
+    "check_typescript_suites_discovered": ("verify_build",),
+}
+
 
 def _guard_names() -> list[str]:
     """Every check_*.py in scripts/, by module name."""
@@ -183,12 +228,32 @@ def main() -> int:
 
         # A guard dropping out of a harness it used to be in is also a
         # regression, unless the omission is recorded as deliberate.
-        for harness, present in (("verify_build", b), ("ci", c), ("pytest", p)):
-            if present:
+        expected = EXPECTED_WIRING.get(guard)
+        if expected is None:
+            failures.append(
+                f"{guard}.py has no entry in EXPECTED_WIRING. Add one naming "
+                "the harnesses it runs in today, so that losing one later is "
+                "caught rather than silently accepted."
+            )
+            continue
+
+        present_in = {
+            name
+            for name, yes in (("verify_build", b), ("ci", c), ("pytest", p))
+            if yes
+        }
+        for harness in expected:
+            if harness in present_in:
                 continue
-            key = (guard, "verify_build" if harness == "verify_build" else harness)
-            if key in DELIBERATE_OMISSIONS:
+            if (guard, harness) in DELIBERATE_OMISSIONS:
                 continue
+            failures.append(
+                f"{guard}.py used to run in {harness} and no longer does. "
+                "It still runs somewhere, so the 'runs in at least one "
+                "harness' rule does not catch this -- which is exactly why "
+                "EXPECTED_WIRING exists. Put it back, or move the pair into "
+                "DELIBERATE_OMISSIONS with a written reason."
+            )
 
     failures.extend(check_tool_caches_are_ignored())
 
@@ -206,7 +271,10 @@ def main() -> int:
         return 1
 
     omitted = sorted({g for g, _ in DELIBERATE_OMISSIONS})
-    print(f"OK: all {len(guards)} guards run in at least one harness.")
+    print(
+        f"OK: all {len(guards)} guards run in at least one harness, and none "
+        "has lost one it used to run in."
+    )
     if omitted:
         print(f"    Deliberately narrow: {', '.join(omitted)} (see this script).")
     return 0

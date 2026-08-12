@@ -100,26 +100,60 @@ def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
 
 def main() -> int:
     total_skipped = 0
+    total_passed = 0
     all_reasons: List[str] = []
-    ran_any = False
+    ran: List[str] = []
+    unrun: List[str] = []
 
     print("Running suites to count skips...")
     for name, path in SUITES:
         result = run_suite(path)
         if result is None:
+            # A suite that could not run has an UNKNOWN skip count, which is
+            # not the same as zero.
+            #
+            # This used to be `continue`, with `ran_any` needing only one
+            # success. Stubbing the literature suite to fail reproduced the
+            # exact defect this guard exists to close:
+            #
+            #   engine        857 passed, 0 skipped
+            #   ! could not run Tests: simulated collection error
+            #   OK: 0 skipped (limit 0). Every collected test ran.
+            #   EXIT CODE: 0
+            #
+            # 275 tests did not run and the guard said every collected test
+            # ran. In CI the `!` line scrolls past inside a green step. That
+            # is this file's own docstring -- "a green suite cannot
+            # distinguish 'ran and passed' from 'declined to run'" --
+            # reproduced inside the guard written to close it.
+            #
+            # `run_suite` returns None on a timeout, an OSError, or output
+            # with no parseable counts, i.e. a collection error or an import
+            # failure at module scope. Every one of those is a reason to go
+            # red.
+            unrun.append(name)
             continue
-        ran_any = True
+        ran.append(name)
         passed, skipped, reasons = result
+        total_passed += passed
         total_skipped += skipped
         all_reasons.extend(reasons)
         flag = "" if skipped == 0 else f"   <-- {skipped} skipped"
         print(f"  {name:<12} {passed:>4} passed, {skipped} skipped{flag}")
 
-    if not ran_any:
-        print("\nFAIL: no suite could be run; cannot verify skip count.")
+    print()
+    if unrun:
+        print(
+            f"FAIL: {len(unrun)} of {len(SUITES)} suite(s) did not run: "
+            f"{', '.join(unrun)}."
+        )
+        print(
+            "\nA suite that did not run has an unknown skip count. Reporting\n"
+            "a skip total that omits it would be a number about the suites\n"
+            "that happened to work, presented as a number about all of them."
+        )
         return 1
 
-    print()
     if total_skipped > EXPECTED_MAX_SKIPS:
         print(f"FAIL: {total_skipped} skipped test(s), expected at most "
               f"{EXPECTED_MAX_SKIPS}.")
@@ -135,8 +169,12 @@ def main() -> int:
         )
         return 1
 
-    print(f"OK: {total_skipped} skipped (limit {EXPECTED_MAX_SKIPS}). "
-          "Every collected test ran.")
+    # The success line names its own denominator, so "every collected test
+    # ran" is a claim a reader can check rather than take on trust.
+    print(
+        f"OK: {len(ran)}/{len(SUITES)} suites ran, {total_passed} tests, "
+        f"{total_skipped} skipped (limit {EXPECTED_MAX_SKIPS})."
+    )
     return 0
 
 

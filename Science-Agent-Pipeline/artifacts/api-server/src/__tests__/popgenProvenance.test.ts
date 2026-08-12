@@ -33,6 +33,13 @@ describe("ADR 0021 — STRENDA applies only to STRENDA-governed parameters", () 
       citation: "Rahbari et al. (ref 12345)",
       organism: "Homo sapiens",
       citationStatus: "verified",
+      citationLocators: [
+        {
+          kind: "pubmed",
+          value: "12345",
+          deepLink: "https://pubmed.ncbi.nlm.nih.gov/12345/",
+        },
+      ],
     });
 
     expect(prov.origin).toBe("resolved");
@@ -53,6 +60,13 @@ describe("ADR 0021 — STRENDA applies only to STRENDA-governed parameters", () 
       citation: "Rahbari et al. (ref 12345)",
       organism: "Homo sapiens",
       citationStatus: "verified",
+      citationLocators: [
+        {
+          kind: "pubmed",
+          value: "12345",
+          deepLink: "https://pubmed.ncbi.nlm.nih.gov/12345/",
+        },
+      ],
     });
 
     const violations = validateParameterProvenance(
@@ -69,6 +83,13 @@ describe("ADR 0021 — STRENDA applies only to STRENDA-governed parameters", () 
       citation: "Hussein et al. (ref 33214421)",
       citationStatus: "verified",
       note: "beta = R0 * gamma",
+      citationLocators: [
+        {
+          kind: "pubmed",
+          value: "33214421",
+          deepLink: "https://pubmed.ncbi.nlm.nih.gov/33214421/",
+        },
+      ],
     });
 
     expect(prov.citationStatus).toBe("verified");
@@ -88,6 +109,7 @@ describe("ADR 0021 — STRENDA applies only to STRENDA-governed parameters", () 
       citation: "BRENDA (ref 740253)",
       organism: "Homo sapiens",
       citationStatus: "verified",
+      citationLocators: [{ kind: "brenda_ref", value: "740253" }],
     });
 
     expect(prov.strendaStatus).toBe("incomplete");
@@ -103,6 +125,7 @@ describe("ADR 0021 — STRENDA applies only to STRENDA-governed parameters", () 
       organism: "Homo sapiens",
       citationStatus: "verified",
       assayConditions: { ph: 7.4, temperatureC: 37 },
+      citationLocators: [{ kind: "brenda_ref", value: "740253" }],
     });
 
     expect(prov.strendaStatus).toBe("complete");

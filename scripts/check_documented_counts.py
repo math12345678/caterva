@@ -107,6 +107,33 @@ def documented_numbers(text: str) -> dict:
     return found
 
 
+def documented_guard_counts(text: str) -> List[Tuple[int, int]]:
+    """Every "<N> guard scripts" claim in the README, with its line number.
+
+    Added after the README was found claiming "all 14 guard scripts" and
+    "~20 guard scripts" on two different lines while `scripts/` held 21.
+    Both numbers had been true once. Neither was checked by anything, so
+    both rotted quietly — and a stale count in the one file newcomers read
+    is a small lie that makes every other number in it less trustworthy.
+
+    Constitution Rule 1: every factual claim is checked, not only numerical
+    ones about science. A count of files in this repository is about as
+    checkable as a claim gets.
+
+    "~20" is accepted as approximate: the tilde is a claim about the order
+    of magnitude, and holding it to exactness would push people toward
+    vaguer wording rather than truer wording.
+    """
+    claims: List[Tuple[int, int]] = []
+    pattern = re.compile(r"(~)?\s*(\d+)\s+guard scripts?\b", re.IGNORECASE)
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        for match in pattern.finditer(line):
+            approximate = match.group(1) is not None
+            value = int(match.group(2))
+            claims.append((lineno, -value if approximate else value))
+    return claims
+
+
 def documented_domain_counts(text: str) -> List[Tuple[int, int]]:
     """Every "<N> simulation domains" claim, with its line number.
 
@@ -182,6 +209,30 @@ def main() -> int:
             failures.append(f"README states conflicting domain counts ({detail})")
         else:
             print(f"  domains      {claims[0][1]} (consistent across {len(claims)} claims)")
+
+    actual_guards = len(list((REPO_ROOT / "scripts").glob("check_*.py")))
+    guard_claims = documented_guard_counts(text)
+    if not guard_claims:
+        failures.append(
+            "README no longer states a guard-script count. It stated two, "
+            "and both had gone stale; removing the claim rather than fixing "
+            "it is not the intended resolution."
+        )
+    else:
+        for lineno, claimed_guards in guard_claims:
+            approximate = claimed_guards < 0
+            value = abs(claimed_guards)
+            # An approximate claim is allowed to be off by a couple; an
+            # exact one is not allowed to be off at all.
+            tolerance = 3 if approximate else 0
+            if abs(value - actual_guards) > tolerance:
+                failures.append(
+                    f"README line {lineno} claims "
+                    f"{'~' if approximate else ''}{value} guard scripts; "
+                    f"scripts/ contains {actual_guards}"
+                )
+        if not any("guard scripts" in f for f in failures):
+            print(f"  guards       {actual_guards} (matches {len(guard_claims)} README claim(s))")
 
     print()
     if failures:

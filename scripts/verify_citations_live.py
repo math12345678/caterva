@@ -128,7 +128,18 @@ def discovered_dois() -> dict[str, list[str]]:
     found: dict[str, list[str]] = {}
     for path in DOI_SOURCE_FILES:
         if not path.is_file():
-            continue
+            # A configuration error, not an environmental one. Skipping it
+            # silently meant that moving domain-literature.ts -- which alone
+            # supplies 11 of the 13 discovered DOIs -- would drop the checked
+            # set to one hardcoded entry, print "(1 DOIs: 1 listed, 0
+            # discovered in source)", and still report "all literature checks
+            # passed live". The count is a signal, but nobody diffs a count.
+            raise FileNotFoundError(
+                f"DOI source file {path} does not exist, so its citations "
+                "were NOT checked. Update DOI_SOURCE_FILES if the file "
+                "moved; a missing source must not shrink the checked set in "
+                "silence."
+            )
         for line in path.read_text(encoding="utf-8").splitlines():
             if _is_prose_line(line):
                 continue
@@ -188,7 +199,18 @@ def claimed_titles() -> dict[str, str]:
     """
     path = ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts"
     if not path.is_file():
-        return {}
+        # Returning {} disabled the TITLE-MISMATCH check for every DOI while
+        # leaving every green tick in place. That check is the only part of
+        # the DOI section that verifies the citation rather than the
+        # identifier: it exists because 10.1038/ng.3285 (a RECOMBINATION-rate
+        # paper) was cited to justify a MUTATION rate, resolved cleanly, and
+        # passed. Degrading silently to "does this DOI exist" is the exact
+        # regression it was written to prevent.
+        raise FileNotFoundError(
+            f"{path} does not exist, so no DOI could be title-checked. "
+            "Every DOI would degrade to an existence check while still "
+            "printing a tick."
+        )
     text = path.read_text(encoding="utf-8")
     titles: dict[str, str] = {}
     # title: "..." (possibly concatenated across lines with +) then doi: "..."
@@ -264,6 +286,12 @@ def main() -> int:
     print(f"  ({len(all_dois)} DOIs: {len(DOIS)} listed, "
           f"{len(scraped)} discovered in source)")
 
+    # Hoisted out of the loop: this parses domain-literature.ts, and it was
+    # being re-read and re-regexed once per DOI.
+    claimed_by_doi = claimed_titles()
+    title_checked = 0
+    existence_only: list[str] = []
+
     for doi in sorted(all_dois):
         where = ", ".join(sorted(set(all_dois[doi])))
         url = f"https://api.crossref.org/works/{doi}"
@@ -285,10 +313,12 @@ def main() -> int:
                     registered = titles[0] if titles else ""
                 except (ValueError, KeyError, IndexError):
                     registered = ""
-                if registered:
+
+                claimed = claimed_by_doi.get(doi, "")
+                if registered and claimed:
+                    title_checked += 1
                     detail = f"{url} -> {registered!r}"
-                    claimed = claimed_titles().get(doi, "")
-                    if claimed and not _titles_overlap(claimed, registered):
+                    if not _titles_overlap(claimed, registered):
                         ok = False
                         detail = (
                             f"TITLE MISMATCH\n"
@@ -297,7 +327,26 @@ def main() -> int:
                             f"        The DOI exists but may be a different "
                             f"paper than the one being cited."
                         )
+                else:
+                    # This DOI got an EXISTENCE check only, and used to print
+                    # a tick identical to one that was fully verified. Two
+                    # different reasons land here -- our source claims no
+                    # title for it, or CrossRef returned none -- and neither
+                    # was visible in the output.
+                    reason = (
+                        "no title claimed in domain-literature.ts"
+                        if not claimed
+                        else "CrossRef returned no title"
+                    )
+                    existence_only.append(f"{doi} ({reason})")
+                    detail = f"{url} -> exists; NOT title-checked ({reason})"
+            # `check` prints detail only on failure, so a passing DOI's
+            # registered title was being computed and discarded. The
+            # existence-only marker is worth seeing on a pass, which is the
+            # only time it matters.
             check(f"{doi}  [{where}]", ok, detail)
+            if ok and doi in {e.split(" ", 1)[0] for e in existence_only}:
+                print(f"      {detail}")
             if not ok:
                 failures += 1
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
@@ -306,12 +355,43 @@ def main() -> int:
 
     print("\nStatic modelCitations URLs in queryResolver.ts (must resolve):")
     urls = set()
-    if QUERY_RESOLVER.exists():
+    if not QUERY_RESOLVER.exists():
+        failures += 1
+        check(
+            "queryResolver.ts",
+            False,
+            f"{QUERY_RESOLVER} does not exist, so NO static citation URL was "
+            "checked.",
+        )
+    else:
         text = QUERY_RESOLVER.read_text()
         for match in re.finditer(r"https?://[^\s'\"]+", text):
             url = match.group(0).rstrip(".,;)")
-            if url and not url.endswith("/") and url not in urls:
+            # The `not url.endswith("/")` filter used to live here, and it
+            # made this entire section vacuous. queryResolver.ts contains
+            # exactly two URLs, both `https://www.brenda-enzymes.org/`, and
+            # both end in a slash -- so `urls` was ALWAYS empty. The section
+            # printed a header saying "must resolve", iterated nothing, added
+            # zero to `failures`, and fed a summary reading "all literature
+            # checks passed live".
+            #
+            # A bare directory URL is exactly as worth checking as any other:
+            # if brenda-enzymes.org stops resolving, every BRENDA citation
+            # this project emits points at nothing.
+            if url:
                 urls.add(url)
+
+        if not urls:
+            failures += 1
+            check(
+                "URL extraction",
+                False,
+                "no URLs were extracted from queryResolver.ts, so this "
+                "section checked nothing. Either the citations stopped "
+                "carrying URLs or the pattern stopped matching; both are "
+                "worth knowing, and neither is a pass.",
+            )
+
     for url in sorted(urls):
         try:
             r = retry_get(url, timeout=20, follow_redirects=True)
@@ -323,9 +403,36 @@ def main() -> int:
             failures += 1
             check(url, False, f"-> {exc!r}")
 
+    # Coverage, printed whether or not anything failed. "All literature
+    # checks passed" was a conclusion about coverage the script never
+    # computed: it was true of whatever happened to get checked, and stayed
+    # true when that set shrank to nothing.
+    print(
+        f"\nCoverage: {len(all_dois)} DOI(s) checked, {title_checked} with "
+        f"title verification, {len(urls)} URL(s) checked."
+    )
+    if existence_only:
+        print(
+            f"  {WARN} {len(existence_only)} DOI(s) got an existence check "
+            "only -- the DOI resolves, but nothing confirmed it is the paper "
+            "being cited:"
+        )
+        for entry in existence_only:
+            print(f"      {entry}")
+    if not all_dois:
+        failures += 1
+        print(
+            f"  {FAIL} zero DOIs were checked. Refusing to report success: "
+            "an empty check set is not a clean one."
+        )
+
     print()
     if failures == 0:
-        print(f"{PASS} all literature checks passed live")
+        print(
+            f"{PASS} literature checks passed live "
+            f"({len(all_dois)} DOIs, {title_checked} title-verified, "
+            f"{len(urls)} URLs)"
+        )
     else:
         print(f"{FAIL} {failures} check(s) failed — re-verify by hand")
     return 1 if failures else 0

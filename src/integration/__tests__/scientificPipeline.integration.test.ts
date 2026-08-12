@@ -399,19 +399,63 @@ describe('ScientificPipeline Fail-Fast Behavior', () => {
     pipeline.initializeLiterature(SAMPLE_LITERATURE);
   });
 
-  it('should stop immediately on Layer 1 failure (no literature)', async () => {
-    const request: SimulationRequest = {
-      query: 'Unknown enzyme kinetics',
+  it('should stop immediately when the query names no known domain', async () => {
+    /**
+     * This test used to send 'Unknown enzyme kinetics' and pass -- but for
+     * the wrong reason, and the reason was a bug.
+     *
+     * The classifier was `query.includes('michaelis') ? 'mm' : 'sir'`, so
+     * 'Unknown enzyme kinetics' was classified SIR, the SAMPLE_LITERATURE
+     * loaded in beforeEach (which is all Michaelis-Menten) had no beta or
+     * gamma, and the run was blocked for missing SIR parameters. The test
+     * name said "no literature"; the literature was right there, and the
+     * query was an enzyme query. Fixing the classifier made this test fail,
+     * which is how the wrong premise surfaced.
+     *
+     * What it should assert is the case that now genuinely stops at Layer
+     * 1: a query the pipeline cannot place at all. That matters because
+     * runSimulation() builds km/vmax/s0 unconditionally, so an unplaced
+     * query would otherwise be silently simulated as Michaelis-Menten.
+     */
+    const response = await pipeline.execute({
+      query: 'quantum chromodynamics on a lattice',
       parameters: { unknown_param: 999.0 }
-    };
+    });
 
-    const response = await pipeline.execute(request);
-
-    // Should fail at layer 1
     expect(response.validated).toBe(false);
-    expect(response.validationErrors.length).toBeGreaterThan(0);
+    expect(response.validationErrors.join(' ')).toMatch(/does not name a domain/i);
     // Should not reach simulation
     expect(response.results.trajectory).toHaveLength(0);
+  });
+
+  it('classifies an enzyme query as mm even without the word "michaelis"', async () => {
+    // The companion, and the actual regression. 'enzyme kinetics' resolves
+    // km/vmax/s0 from the loaded literature; under the old classifier it
+    // was SIR and the run was blocked for having no beta.
+    const response = await pipeline.execute({
+      query: 'enzyme kinetics for lactate dehydrogenase',
+      parameters: { s0: 10.0 },
+      conditions: { temperature: 37, pH: 7.4 }
+    });
+
+    expect(response.validationErrors.join(' ')).not.toMatch(/beta|gamma|i0/);
+    expect(response.validated).toBe(true);
+  });
+
+  it('classifies an epidemic query as sir and names the SIR parameters it needs', async () => {
+    // The other half: the fix must not turn every query into mm. An SIR
+    // query with no SIR parameters must still be blocked, and must be
+    // blocked for the RIGHT parameters.
+    const response = await pipeline.execute({
+      query: 'sir epidemic outbreak',
+      parameters: {}
+    });
+
+    expect(response.validated).toBe(false);
+    const errors = response.validationErrors.join(' ');
+    expect(errors).toMatch(/beta/);
+    expect(errors).toMatch(/gamma/);
+    expect(errors).not.toMatch(/does not name a domain/i);
   });
 
   it('should stop on parameter out of range', async () => {

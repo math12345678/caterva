@@ -338,6 +338,15 @@ export async function commandSimulateResolved(
 
   const response = await pipeline.execute({
     query: `${options.enzyme ?? options.ec} / ${options.substrate}`,
+    // Stated, not inferred. `options.model` is what the caller asked for
+    // with --model; the query string here is "<enzyme> / <substrate>",
+    // which names a SYSTEM and not a MODEL. Leaving the pipeline to read a
+    // domain out of an enzyme name is asking it to re-derive something the
+    // caller already knew — and every inhibition model shares the same
+    // Michaelis-Menten parameter requirements (km, vmax, s0), so they map
+    // to the same required set here; the inhibition-specific terms (ki, i0)
+    // are validated by runInhibitionModel at dispatch.
+    domain: 'mm',
     parameters: numeric,
     providedProvenance,
     system: {
@@ -449,6 +458,10 @@ export async function commandSimulateResolved(
       provenance,
       perturbation: options.sensitivity,
       request: {
+        // Same reasoning as the execute() call above: the sensitivity run
+        // must be the SAME model as the run it is analysing, so the domain
+        // travels with it rather than being re-inferred from a system name.
+        domain: 'mm',
         providedProvenance,
         system: {
           enzymeName: options.enzyme,
