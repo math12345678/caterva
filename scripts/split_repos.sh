@@ -32,6 +32,25 @@ RENAME_COMMIT="$(git log --format=%H --grep='Rename Tellurium -> Terium' -n 1 ||
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 
+# HTTPS or SSH. HTTPS is the default because the monorepo's own `origin` is
+# HTTPS and pushes successfully, so those credentials are already cached --
+# whereas `git@github.com` needs a key that may not exist on this machine.
+# Choosing the protocol that is already known to work beats choosing the one
+# that is conventional.
+case "$PUSH" in
+  --push-https) PROTOCOL="https"; PUSH="--push" ;;
+  --push-ssh)   PROTOCOL="ssh";   PUSH="--push" ;;
+  *)            PROTOCOL="https" ;;
+esac
+
+remote_for() {
+  if [ "$PROTOCOL" = "ssh" ]; then
+    printf 'git@github.com:%s/%s.git' "$ORG" "$1"
+  else
+    printf 'https://github.com/%s/%s.git' "$ORG" "$1"
+  fi
+}
+
 if [ -n "$(git status --porcelain)" ]; then
   echo "FAIL: working tree is dirty. Commit or stash first — a split of a" >&2
   echo "      dirty tree silently omits the uncommitted files." >&2
@@ -216,18 +235,68 @@ for d in "$STAGE"/*/; do
 done
 
 if [ "$PUSH" = "--push" ]; then
-  say "Pushing to $ORG"
+  say "Pushing to $ORG over $PROTOCOL"
+
+  pushed=0
+  failed=()
+
+  push_one() {  # repo, then the git args to run
+    local repo="$1"; shift
+    if "$@" >/dev/null 2>&1; then
+      pushed=$((pushed+1)); ok "pushed $repo"
+    else
+      failed+=("$repo")
+      printf '  \033[31m✗\033[0m %s\n' "$repo"
+    fi
+  }
+
   for b in $(git branch --list 'split/*' --format='%(refname:short)'); do
     repo="${b#split/}"
-    git push -f "git@github.com:$ORG/$repo.git" "$b:main" && ok "pushed $repo"
+    push_one "$repo" git push -f "$(remote_for "$repo")" "$b:main"
   done
   for d in "$STAGE"/*/; do
+    [ -d "$d/.git" ] || continue
     repo="$(basename "$d")"
-    git -C "$d" push -f "git@github.com:$ORG/$repo.git" main && ok "pushed $repo"
+    push_one "$repo" git -C "$d" push -f "$(remote_for "$repo")" main
   done
-  say "All 16 repositories pushed. Add submodules to main next:"
-  echo "    see the 'Submodules' section of docs/REPO_MAP.md"
+
+  total=$((pushed + ${#failed[@]}))
+
+  # Report what HAPPENED, not what was attempted.
+  #
+  # The first version ran `git push ... && ok "pushed $repo"` in a loop and
+  # then printed "All 16 repositories pushed" unconditionally. On a machine
+  # with no SSH key every push failed and it still printed that line -- the
+  # exact success-on-failure this repository's guards exist to eliminate,
+  # in the script that publishes them. `set -e` does not help: a failing
+  # command on the left of `&&` is a tested condition, not an error.
+  if [ ${#failed[@]} -gt 0 ]; then
+    say "FAILED: $pushed of $total pushed; ${#failed[@]} failed"
+    printf '  %s\n' "${failed[@]}"
+    cat >&2 <<EOF
+
+Nothing about the split branches is wrong -- they are built and correct.
+This is an access problem.
+
+  Permission denied (publickey)  ->  no SSH key on this machine.
+                                     Re-run over HTTPS instead:
+
+                                       ./scripts/split_repos.sh --push-https
+
+                                     Your monorepo 'origin' is already HTTPS
+                                     and pushes fine, so those credentials
+                                     are cached and will be reused.
+
+  Repository not found           ->  the repo does not exist under $ORG,
+                                     or your account cannot write to it.
+EOF
+    exit 1
+  fi
+
+  say "All $pushed repositories pushed. Add submodules to main next:"
+  echo "    docs/PUBLISHING.md section 3"
 else
   say "Nothing was pushed (dry run). To push everything:"
-  echo "    ./scripts/split_repos.sh --push"
+  echo "    ./scripts/split_repos.sh --push         # SSH"
+  echo "    ./scripts/split_repos.sh --push-https   # HTTPS"
 fi
