@@ -91,7 +91,10 @@ if [ -n "$RENAME_COMMIT" ]; then
   git -C "$RTMP" checkout -q FETCH_HEAD
   git -C "$RTMP" rm -rq . >/dev/null 2>&1 || true
   cp -R "$ROOT/Terium/." "$RTMP/"
-  rm -rf "$RTMP/__pycache__" "$RTMP/.coverage"
+  # Untracked junk the monorepo's .gitignore hides but `cp -R` does not.
+  find "$RTMP" \( -name '__pycache__' -o -name '.DS_Store' -o -name '.coverage' \
+                  -o -name '*.pyc' -o -name '.pytest_cache' \) \
+       -not -path "$RTMP/.git/*" -prune -exec rm -rf {} + 2>/dev/null || true
   git -C "$RTMP" add -A
   git -C "$RTMP" -c user.name="$(git config user.name)" \
                  -c user.email="$(git config user.email)" \
