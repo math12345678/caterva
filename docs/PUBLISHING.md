@@ -8,8 +8,20 @@ pushed.
 
 ```bash
 cd ~/Desktop/Coding/Terrium
-git push origin main          # push the rename + split machinery first
+git pull origin main          # make sure you have the latest split script
+git push origin main          # push the rename + split machinery
 ```
+
+### If git says `index.lock: File exists`
+
+```bash
+rm -f .git/index.lock
+```
+
+A previous git process crashed and left the lock behind. Check nothing is
+actually running first (`ps aux | grep git`); if the answer is nothing, the
+file is stale and safe to delete. It contains no work of yours — git rebuilds
+it on the next command.
 
 ## 1. Build the split branches
 
@@ -46,19 +58,40 @@ plus `main` (23 files), `archive` (68), `miscellaneous` (8),
 ./scripts/split_repos.sh --push
 ```
 
-This force-pushes each branch to `main` on its repository. The 18 repos
-already exist, so nothing needs creating.
-
-If you prefer HTTPS over SSH, edit the `git push` lines in the script, or
-push individually:
+Pushes over **HTTPS** by default, because this repository's own `origin` is
+HTTPS and pushes successfully — so those credentials are already cached.
+`git@github.com` needs an SSH key that may not exist on the machine, and
+choosing the protocol already known to work beats choosing the conventional
+one.
 
 ```bash
-git push -f git@github.com:Terrium-sim/terium.git split/terium:main
-git push -f git@github.com:Terrium-sim/tests.git  split/tests:main
-# ...etc
-
-cd "$TMPDIR/terrium-split/main" && git push -f git@github.com:Terrium-sim/main.git main
+./scripts/split_repos.sh --push-ssh     # force SSH instead
 ```
+
+The 18 repositories already exist, so nothing needs creating.
+
+### If a push fails
+
+The script counts outcomes and reports them:
+
+```
+FAILED: 0 of 17 pushed; 17 failed
+```
+
+It does **not** print "all repositories pushed" and exit 0, which is what an
+earlier version did when every push failed with `Permission denied
+(publickey)`. A failing command on the left of `&&` is a tested condition,
+not an error, so `set -e` never fired. Fixed, and mutation-tested with
+deliberately failing pushes.
+
+| symptom | cause |
+|---|---|
+| `Permission denied (publickey)` | no SSH key — use the HTTPS default |
+| `Repository not found` | repo missing under the org, or no write access |
+| `Updates were rejected` | shouldn't happen; the script force-pushes |
+
+A failed push says nothing about the split branches. They are built and
+correct in your local repository either way — re-running is free.
 
 ## 3. Wire up the submodules
 
