@@ -1,0 +1,1208 @@
+/* ============================================================
+   terrium — the evidence cathedral
+   State is driven by data-attributes on the stage; every visual
+   change corresponds to a pipeline event.
+   ============================================================ */
+
+.cathedral {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-chrome);
+  opacity: 0;
+  transition: opacity var(--dur-camera) var(--ease-structural);
+}
+.cathedral[hidden] { display: none; }
+.cathedral.is-visible { opacity: 1; }
+
+.cathedral__viewport {
+  position: absolute;
+  /* Inset clear of every piece of chrome: the fixed masthead above, the
+     control row below, and the HUD instrument panel in the left gutter.
+     Reserving the space here means no camera frame can ever be drawn
+     underneath the panel, whatever region it targets. */
+  inset: 4rem var(--viewport-right, 0px) 5.4rem 22rem;
+  overflow: hidden;
+  transition: inset 520ms var(--ease-instrument);
+  /* An aperture, not a hard cut. The camera frames a continuous monument, so
+     its edge inevitably falls across annotation; a sliced line of type reads
+     as a defect, whereas structure fading out of the viewing field reads as
+     an instrument. Applies to every frame, so no frame needs hand-tuning. */
+  --aperture: 26px;
+  mask-image:
+    linear-gradient(to right, transparent, #000 var(--aperture),
+      #000 calc(100% - var(--aperture)), transparent),
+    linear-gradient(to bottom, transparent, #000 var(--aperture),
+      #000 calc(100% - var(--aperture)), transparent);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+.cathedral__viewport svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- viewbox camera ---------- */
+.cath-svg { --cam: 1; }
+.cath-svg .camera { transition: transform var(--dur-camera) var(--ease-instrument); }
+
+/* ============================================================
+   SHARED ARCHITECTURAL PRIMITIVES
+   ============================================================ */
+.cath-svg text {
+  font-family: var(--font-mono);
+  fill: var(--text-tertiary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.cath-svg .t-label { font-size: 9.5px; }
+.cath-svg .t-micro { font-size: 8px; letter-spacing: 0.14em; }
+.cath-svg .t-value {
+  font-size: 11px;
+  fill: var(--text-primary);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.cath-svg .t-display {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  fill: var(--text-primary);
+}
+.cath-svg .t-symbol {
+  font-size: 13px;
+  fill: var(--fog-teal);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- level of detail ----------
+   The cathedral is 1680 units tall. In the wide shot the 8px instrument
+   text renders below legibility, so the architecture names its own tiers
+   at monumental scale instead, and the fine data quiets down. When the
+   camera moves close the relationship inverts. Nothing is lost — the
+   detail is always reachable, and always in the accessibility tree. */
+.cath-svg .tier-title,
+.cath-svg .tier-title-index {
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-glide);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.cath-svg .tier-title {
+  font-family: var(--font-sans);
+  font-size: 30px;
+  font-weight: 300;
+  letter-spacing: 0.01em;
+  fill: var(--structural-slate);
+  text-transform: uppercase;
+}
+.cath-svg .tier-title-index {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  fill: var(--deep-teal);
+  text-transform: uppercase;
+}
+.cath-svg[data-lod="wide"] .tier-title,
+.cath-svg[data-lod="wide"] .tier-title-index { opacity: 1; }
+.cath-svg[data-lod="wide"] .tier-marks,
+.cath-svg[data-lod="wide"] .node-out,
+.cath-svg[data-lod="wide"] .ev-label,
+.cath-svg[data-lod="wide"] .sent-result,
+.cath-svg[data-lod="wide"] .plot-caption,
+.cath-svg[data-lod="wide"] .flag-note {
+  opacity: 0.001;
+  transition: opacity var(--dur-base) var(--ease-glide);
+}
+
+.cath-svg .hair { stroke: var(--line-hairline); stroke-width: 1; fill: none; vector-effect: non-scaling-stroke; }
+.cath-svg .struct { stroke: var(--line-structural); stroke-width: 1; fill: none; vector-effect: non-scaling-stroke; }
+.cath-svg .plate { fill: rgba(13, 20, 21, 0.62); }
+.cath-svg .plate-deep { fill: rgba(7, 11, 12, 0.86); }
+
+/* ============================================================
+   DISTANT STRUCTURE — the depth layer
+
+   A portrait monument cannot fill a landscape frame. Rather than
+   leave that lateral space empty, it holds structure that is
+   plainly behind the working architecture: dimmer, thinner, and
+   parallaxing at a fraction of the camera's travel. This is what
+   separates "a diagram centred on screen" from "a building
+   photographed inside a larger site".
+   ============================================================ */
+.distant { pointer-events: none; }
+.distant-line {
+  stroke: rgba(184, 222, 213, 0.14);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.distant-arcs .distant-line { stroke: rgba(184, 222, 213, 0.1); }
+.distant-datum .distant-line { stroke: rgba(184, 222, 213, 0.06); }
+
+/* Sheet annotation in the margins. The wide shot is an elevation drawing:
+   the monument is portrait and the screen is landscape, so the lateral space
+   is margin, and margin on a drawing carries setting-out information. */
+.sheet-note {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  fill: rgba(184, 222, 213, 0.26);
+  pointer-events: none;
+}
+.sheet-rule {
+  stroke: rgba(184, 222, 213, 0.16);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+/* Margin annotation belongs to the wide shot only — close in, the camera is
+   inside the building and the sheet border is no longer part of the view. */
+.sheet { opacity: 0; transition: opacity var(--dur-slow) var(--ease-glide); }
+.cath-svg[data-lod="wide"] .sheet { opacity: 1; }
+
+/* Depth on desktop only: the far layer lags the camera slightly. Driven by
+   a custom property the choreographer sets, so it costs no layout work. */
+@media (min-width: 68rem) and (prefers-reduced-motion: no-preference) {
+  .distant {
+    transform: translate3d(0, var(--parallax, 0px), 0);
+    will-change: transform;
+  }
+}
+
+/* ---------- the spine ---------- */
+/* The axis is assembled from walls and bracing, so it reads as structure
+   carrying load rather than a line connecting boxes. */
+.spine-wall {
+  stroke: rgba(184, 222, 213, 0.1);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.spine-brace {
+  stroke: var(--line-hairline);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.spine-line {
+  stroke: var(--line-structural);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+.spine-flow {
+  stroke: var(--signal-teal);
+  stroke-width: 1.4;
+  fill: none;
+  stroke-dasharray: 26 300;
+  opacity: 0;
+  vector-effect: non-scaling-stroke;
+}
+.is-flowing .spine-flow {
+  opacity: 0.9;
+  animation: spine-travel 2.9s linear infinite;
+}
+@keyframes spine-travel {
+  from { stroke-dashoffset: 326; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* ============================================================
+   MODULE STATES — dormant / active / locked
+   ============================================================ */
+.node { cursor: pointer; }
+.node .node-shell {
+  fill: rgba(23, 35, 36, 0.42);
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: fill var(--dur-slow) var(--ease-structural), stroke var(--dur-slow) var(--ease-structural);
+}
+.node .node-inner {
+  stroke: var(--line-hairline);
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-slow) var(--ease-structural), opacity var(--dur-slow) var(--ease-structural);
+}
+.node .node-label { transition: fill var(--dur-slow) var(--ease-structural); }
+.node .node-out { opacity: 0; transition: opacity var(--dur-slow) var(--ease-structural); }
+.node .node-mech { opacity: 0.28; transition: opacity var(--dur-slow) var(--ease-structural); }
+
+/* Recess and grating: the chamber is cut into mass, and its interior is
+   machined. Both sit under the shell edge so the edge stays the crispest
+   line in the object. */
+.node-recess { pointer-events: none; }
+.node-grate { opacity: 0.5; pointer-events: none; }
+.node-liner {
+  stroke: rgba(184, 222, 213, 0.07);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-slow) var(--ease-structural);
+}
+.node[data-state="active"] .node-liner,
+.node[data-state="locked"] .node-liner { stroke: rgba(114, 214, 193, 0.22); }
+
+/* Engraved metadata. Machine marks: coordinates, tier and datum references.
+   Held near-invisible until the camera is close, so the close scale is where
+   the detail lives and the wide scale stays monumental. */
+.engraving {
+  font-family: var(--font-mono);
+  font-size: 5.4px;
+  letter-spacing: 0.18em;
+  fill: rgba(184, 222, 213, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-slow) var(--ease-glide);
+}
+.cath-svg[data-lod="close"] .engraving { opacity: 1; }
+
+/* Concept isolation — quantities lifted out of the sentence. */
+.concept {
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-structural) var(--d, 0ms);
+}
+.concept-plate {
+  fill: rgba(29, 138, 114, 0.1);
+  stroke: rgba(114, 214, 193, 0.34);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.concept-text { fill: var(--mineral-teal); }
+.concept-riser { stroke: rgba(114, 214, 193, 0.3); }
+.cath-svg.is-parsed .concept { opacity: 1; }
+
+/* dormant state: quiet gray = waiting or unavailable */
+.node[data-state="dormant"] .node-shell { fill: rgba(23, 35, 36, 0.3); }
+
+/* active: teal activation */
+.node[data-state="active"] .node-shell,
+.node[data-state="locked"] .node-shell {
+  fill: rgba(29, 138, 114, 0.13);
+  stroke: var(--signal-teal);
+}
+.node[data-state="active"] .node-inner,
+.node[data-state="locked"] .node-inner { stroke: rgba(114, 214, 193, 0.4); }
+.node[data-state="active"] .node-label,
+.node[data-state="locked"] .node-label { fill: var(--mineral-teal); }
+.node[data-state="active"] .node-out,
+.node[data-state="locked"] .node-out { opacity: 1; }
+.node[data-state="active"] .node-mech { opacity: 1; }
+.node[data-state="locked"] .node-mech { opacity: 0.72; }
+
+/* locked: stage completed — corner locks engage */
+.node .node-lock {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.4);
+  transition: opacity var(--dur-base) var(--ease-structural), transform var(--dur-base) var(--ease-instrument);
+}
+.node[data-state="locked"] .node-lock { opacity: 1; transform: scale(1); }
+
+/* hover / focus affordance.
+   These must be global: every interactive kind (module, berth, evidence,
+   sentinel, core, record) carries a focus ring and a selection halo. */
+.cath-svg .focus-ring {
+  fill: none;
+  stroke: var(--signal-teal);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 3;
+  opacity: 0;
+  vector-effect: non-scaling-stroke;
+  transition: opacity var(--dur-fast) var(--ease-glide);
+  pointer-events: none;
+}
+.cath-svg .halo {
+  fill: none;
+  stroke: var(--signal-teal);
+  stroke-width: 1;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.9);
+  vector-effect: non-scaling-stroke;
+  transition: opacity var(--dur-base) var(--ease-glide), transform var(--dur-base) var(--ease-instrument);
+  pointer-events: none;
+}
+.cath-svg [data-node]:focus-visible { outline: none; }
+.cath-svg [data-node]:focus-visible > .focus-ring { opacity: 1; }
+.cath-svg [data-node].is-selected > .halo { opacity: 1; transform: scale(1); }
+
+.node:hover .node-shell { stroke: var(--mineral-teal); }
+.node.is-selected .node-shell { stroke: var(--signal-teal); }
+
+/* ============================================================
+   INSPECTION — the architecture answers alongside the panel
+
+   Three levels, never two: the selected object, the objects it is
+   related to, and the rest of the monument. The rest is quieted
+   to a third rather than hidden, because an inspection record with
+   no visible architecture behind it is just a modal, and the whole
+   claim of this interface is that a value has a position.
+   ============================================================ */
+.cath-svg.is-inspecting .tier {
+  opacity: 0.3;
+  transition: opacity var(--dur-base) var(--ease-glide);
+}
+.cath-svg.is-inspecting .tier.has-selection { opacity: 1; }
+/* The depth layer drops further back so it never competes with a lit path. */
+.cath-svg.is-inspecting .distant,
+.cath-svg.is-inspecting .sheet { opacity: 0.4; transition: opacity var(--dur-base) var(--ease-glide); }
+
+/* Inside a raised tier, objects that are not on the path recede again. This is
+   what keeps the path readable when the selection and its relations share a
+   tier with six other things. */
+.cath-svg.is-inspecting .tier.has-selection [data-node] {
+  opacity: 0.42;
+  transition: opacity var(--dur-base) var(--ease-glide);
+}
+.cath-svg.is-inspecting .tier.has-selection [data-node].is-selected,
+.cath-svg.is-inspecting .tier.has-selection [data-node].in-path { opacity: 1; }
+
+/* Path members are marked, but a step below the selection: the selected object
+   keeps the full halo, related objects get a quiet teal bracket. */
+.cath-svg [data-node].in-path > .halo { opacity: 0.5; transform: scale(1); }
+.cath-svg [data-node].in-path .node-shell,
+.cath-svg [data-node].in-path .sent-shell,
+.cath-svg [data-node].in-path .param-plate { stroke: var(--mineral-teal); }
+.cath-svg [data-node].in-path .ev-body { stroke: var(--mineral-teal); }
+
+/* Routes and traces stay drawn while inspecting, so a relationship that runs
+   along real geometry is still visible under the highlight. */
+.cath-svg.is-inspecting .evidence-route { opacity: 0.5; }
+
+/* ---------- module mechanisms (unique silhouettes) ---------- */
+.mech-lens { transform-box: fill-box; transform-origin: center; }
+.node[data-state="active"] .mech-lens,
+.node[data-state="locked"] .mech-lens { animation: mech-rotate 26s linear infinite; }
+@keyframes mech-rotate { to { transform: rotate(360deg); } }
+
+.mech-stack rect { transition: transform var(--dur-slow) var(--ease-instrument); transform-box: fill-box; }
+.node[data-state="active"] .mech-stack rect:nth-child(1) { transform: translateX(-5px); }
+.node[data-state="active"] .mech-stack rect:nth-child(3) { transform: translateX(5px); }
+
+.mech-lattice line { transition: opacity var(--dur-slow) var(--ease-glide); }
+.node[data-state="active"] .mech-lattice line,
+.node[data-state="locked"] .mech-lattice line { opacity: 1; }
+
+.mech-switch .switch-arm {
+  transform-box: fill-box;
+  transform-origin: 50% 0%;
+  transition: transform 1100ms var(--ease-instrument);
+}
+.node[data-state="active"] .mech-switch .switch-arm,
+.node[data-state="locked"] .mech-switch .switch-arm { transform: rotate(-26deg); }
+
+/* ============================================================
+   EVIDENCE OBJECTS — routed travel, not floating dots
+   ============================================================ */
+/* The route a source took to reach a parameter. It is drawn while the object is
+   in transit and it stays afterwards, faint: provenance is a permanent property
+   of the configuration, not an animation that finishes. */
+.evidence-route {
+  stroke: var(--line-hairline);
+  stroke-width: 1;
+  fill: none;
+  stroke-dasharray: 2 4;
+  opacity: 0;
+  vector-effect: non-scaling-stroke;
+  transition: opacity var(--dur-slow) var(--ease-glide);
+}
+.is-evidence-live .evidence-route { opacity: 1; }
+.is-configured .evidence-route { opacity: 0.42; }
+
+/* Empty cradle. Machined into the structure before anything arrives, so the
+   dock reads as a prepared position rather than wherever the artifact stopped.
+   This is what makes the landing feel like seating and not like drifting. */
+.ev-dock {
+  fill: none;
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0;
+  vector-effect: non-scaling-stroke;
+  transition: opacity var(--dur-base) var(--ease-glide);
+}
+.is-evidence-live .ev-dock { opacity: 0.75; }
+.evidence.is-docked .ev-dock { opacity: 0; }
+
+/* Bounce light at the dock: only after the object is seated, and only then. */
+.ev-bounce {
+  opacity: 0;
+  transition: opacity 1400ms var(--ease-glide);
+}
+.is-configured .ev-bounce { opacity: 1; }
+
+.evidence {
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 620ms var(--ease-structural);
+}
+.evidence.is-live { opacity: 1; }
+.evidence .ev-body {
+  fill: rgba(29, 138, 114, 0.16);
+  stroke: var(--mineral-teal);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: fill var(--dur-base) var(--ease-glide), stroke var(--dur-base) var(--ease-glide);
+}
+.evidence .ev-tag { fill: var(--fog-teal); }
+.evidence:hover .ev-body { fill: rgba(49, 184, 148, 0.34); }
+.evidence.is-docked .ev-body {
+  fill: rgba(29, 138, 114, 0.26);
+  stroke: var(--signal-teal);
+}
+
+/* Seating collar: contracts onto the artifact as it lands. One short movement,
+   at arrival only — the mechanical click that tells you it went in. */
+.evidence .ev-seat {
+  fill: none;
+  stroke: var(--signal-teal);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+.evidence.is-docked .ev-seat { animation: ev-seat 760ms var(--ease-instrument) forwards; }
+@keyframes ev-seat {
+  0%   { opacity: 0.9; transform: scale(2.1); }
+  70%  { opacity: 0.55; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* Retaining clamps on the cradle: closed once the object is held. */
+.evidence .ev-clamp {
+  stroke: var(--mineral-teal);
+  stroke-width: 1;
+  fill: none;
+  opacity: 0;
+  vector-effect: non-scaling-stroke;
+  transition: opacity var(--dur-base) var(--ease-glide) 420ms;
+}
+.evidence.is-docked .ev-clamp { opacity: 0.8; }
+
+.evidence .ev-label { opacity: 0; transition: opacity var(--dur-base) var(--ease-glide); }
+.evidence.is-docked .ev-label { opacity: 1; }
+.evidence .ev-scope { opacity: 0; transition: opacity var(--dur-base) var(--ease-glide) 300ms; }
+.evidence.is-docked .ev-scope { opacity: 1; }
+.cath-svg[data-lod="wide"] .ev-scope { opacity: 0 !important; }
+
+/* travelling motion driven by JS-set CSS variables */
+.evidence .ev-carrier {
+  transition: transform 1500ms var(--ease-instrument);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evidence.is-docked .ev-seat { animation: none; opacity: 0; }
+  .evidence .ev-carrier { transition: none; }
+}
+
+/* ============================================================
+   CONFIGURATION ASSEMBLY — parameter berths
+   ============================================================ */
+.berth { cursor: pointer; }
+.berth .berth-slot {
+  fill: none;
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  transition: opacity var(--dur-base) var(--ease-glide);
+}
+.berth.is-filled .berth-slot { opacity: 0; }
+
+.berth .param {
+  opacity: 0;
+  transition: opacity 520ms var(--ease-structural), transform 980ms var(--ease-instrument);
+  transform-box: fill-box;
+}
+.berth.is-filled .param { opacity: 1; transform: none !important; }
+
+.berth .param-plate {
+  fill: rgba(23, 35, 36, 0.82);
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-base) var(--ease-glide), fill var(--dur-base) var(--ease-glide);
+}
+.berth[data-status="supported"] .param-plate { stroke: rgba(49, 184, 148, 0.62); }
+.berth[data-status="review"] .param-plate { stroke: rgba(216, 167, 67, 0.72); }
+.berth[data-status="user"] .param-plate { stroke: rgba(184, 222, 213, 0.42); }
+.berth:hover .param-plate { fill: rgba(43, 58, 58, 0.9); }
+
+.berth .status-glyph { font-size: 8px; letter-spacing: 0; }
+.berth[data-status="supported"] .status-glyph { fill: var(--status-supported); }
+.berth[data-status="review"] .status-glyph { fill: var(--status-review); }
+.berth[data-status="user"] .status-glyph { fill: var(--fog-teal); }
+.berth[data-status="review"] .param-name { fill: var(--status-review); }
+
+
+/* assembly core mechanism */
+.assembly-core { opacity: 0.4; transition: opacity var(--dur-slow) var(--ease-glide); }
+.is-configured .assembly-core { opacity: 1; }
+.assembly-core .core-ring {
+  fill: none;
+  stroke: var(--line-structural);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.is-configured .assembly-core .core-ring--a { animation: mech-rotate 42s linear infinite; }
+.is-configured .assembly-core .core-ring--b { animation: mech-rotate 30s linear reverse infinite; }
+
+/* ============================================================
+   VERIFICATION VAULT
+   ============================================================ */
+.vault { cursor: pointer; }
+.vault-facet {
+  fill: none;
+  stroke: var(--line-hairline);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-slow) var(--ease-structural), opacity var(--dur-slow) var(--ease-glide);
+}
+.vault-ring {
+  fill: none;
+  stroke: var(--line-structural);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.is-verifying .vault-ring { stroke: rgba(114, 214, 193, 0.42); }
+.is-verified .vault-ring { stroke: rgba(49, 184, 148, 0.6); }
+.is-verified .vault-facet { stroke: rgba(114, 214, 193, 0.24); }
+
+.vault-shell {
+  fill: url(#vaultDepth);
+  opacity: 0.9;
+}
+
+/* rotating armature inside the vault */
+.vault-armature {
+  fill: none;
+  stroke: var(--line-hairline);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.is-verifying .vault-armature { animation: mech-rotate 58s linear infinite; }
+
+/* --- sentinels --- */
+.sentinel { cursor: pointer; }
+.sentinel .sent-shell {
+  fill: rgba(13, 20, 21, 0.78);
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-slow) var(--ease-structural), fill var(--dur-slow) var(--ease-structural);
+}
+.sentinel .sent-label { transition: fill var(--dur-slow) var(--ease-structural); }
+.sentinel .sent-result { opacity: 0; transition: opacity var(--dur-slow) var(--ease-glide); }
+.sentinel .sent-eye {
+  fill: var(--status-pending);
+  transition: fill var(--dur-slow) var(--ease-structural);
+}
+
+/* Sentinel illumination: the wall behind a sentinel only lights once that
+   sentinel has actually resolved something. Nothing here glows on arrival. */
+.sentinel .sent-bounce {
+  opacity: 0;
+  transition: opacity 1200ms var(--ease-glide);
+}
+.sentinel[data-state="resolved"] .sent-bounce,
+.sentinel[data-state="review"] .sent-bounce { opacity: 1; }
+
+.sentinel[data-state="scanning"] .sent-shell { stroke: var(--mineral-teal); fill: rgba(29, 138, 114, 0.1); }
+.sentinel[data-state="scanning"] .sent-eye { fill: var(--mineral-teal); animation: eye-pulse 1.1s var(--ease-glide) infinite; }
+.sentinel[data-state="resolved"] .sent-shell { stroke: var(--signal-teal); fill: rgba(29, 138, 114, 0.14); }
+.sentinel[data-state="resolved"] .sent-label { fill: var(--mineral-teal); }
+.sentinel[data-state="resolved"] .sent-eye { fill: var(--signal-teal); }
+.sentinel[data-state="resolved"] .sent-result { opacity: 1; }
+.sentinel[data-state="review"] .sent-shell { stroke: var(--status-review); fill: rgba(216, 167, 67, 0.09); }
+.sentinel[data-state="review"] .sent-label { fill: var(--status-review); }
+.sentinel[data-state="review"] .sent-eye { fill: var(--status-review); }
+.sentinel[data-state="review"] .sent-result { opacity: 1; }
+
+@keyframes eye-pulse { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) {
+  .sentinel[data-state="scanning"] .sent-eye { animation: none; }
+  .is-verifying .vault-armature,
+  .is-configured .assembly-core .core-ring--a,
+  .is-configured .assembly-core .core-ring--b,
+  .node[data-state="active"] .mech-lens,
+  .node[data-state="locked"] .mech-lens { animation: none; }
+  .is-flowing .spine-flow { animation: none; opacity: 0.5; stroke-dasharray: none; }
+}
+
+
+/* --- trace scan line (hallucination check) --- */
+.trace-line {
+  stroke: var(--signal-teal);
+  stroke-width: 1.2;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  opacity: 0;
+}
+.is-traced .trace-line {
+  opacity: 0.85;
+  animation: trace-draw 1200ms var(--ease-structural) forwards;
+}
+.is-traced .trace-line--unresolved {
+  stroke: var(--status-review);
+  opacity: 0.8;
+}
+@keyframes trace-draw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .is-traced .trace-line { animation: none; stroke-dashoffset: 0; }
+}
+
+/* --- amber critique fracture --- */
+.fracture {
+  stroke: var(--status-review);
+  stroke-width: 1.1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  opacity: 0;
+  transition: opacity 700ms var(--ease-glide);
+}
+.is-critiqued .fracture {
+  opacity: 0.9;
+  animation: trace-draw 1500ms var(--ease-instrument) forwards;
+}
+.fracture-flag { opacity: 0; transition: opacity 800ms var(--ease-glide) 600ms; }
+.is-critiqued .fracture-flag { opacity: 1; }
+.fracture-flag .flag-plate {
+  fill: rgba(7, 11, 12, 0.92);
+  stroke: var(--status-review);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.fracture-flag text { fill: var(--status-review); }
+.fracture-flag .flag-note { fill: var(--warm-gray); }
+
+/* ============================================================
+   SIMULATION CORE — illustrative curve
+   ============================================================ */
+.core-chamber .chamber-shell {
+  fill: rgba(7, 11, 12, 0.94);
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-slow) var(--ease-structural);
+}
+.is-executed .core-chamber .chamber-shell { stroke: rgba(49, 184, 148, 0.5); }
+.core-chamber { cursor: pointer; }
+
+.plot-axis {
+  fill: none;
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  transition: stroke-dashoffset 900ms var(--ease-structural);
+}
+.is-executed .plot-axis { stroke-dashoffset: 0; }
+
+.plot-grid { stroke: var(--line-grid); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0; transition: opacity var(--dur-slow) var(--ease-glide) 300ms; }
+.is-executed .plot-grid { opacity: 1; }
+
+/* SENTINEL 02 — CORRECTNESS VERIFICATION
+   The expected-behaviour envelope forms around the curve, then a check bar
+   sweeps the plot left to right. The sweep is what makes this read as an act
+   of checking rather than a band appearing: something is being passed over the
+   result and compared, and the structure only locks once it completes. */
+.plot-envelope {
+  fill: rgba(49, 184, 148, 0.09);
+  stroke: rgba(114, 214, 193, 0.34);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition: opacity 900ms var(--ease-glide);
+}
+.is-envelope-shown .plot-envelope { opacity: 1; }
+
+/* The lock the sweep earns. Held closed until Correctness resolves, and
+   delayed past the sweep's own duration so the order is legible: the check
+   passes over the result first, and only then does the structure close. This
+   is the one place where a lock is granted by a verification rather than by a
+   stage simply having happened. */
+.core-chamber .node-lock {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0.4);
+  transition: opacity var(--dur-base) var(--ease-structural),
+              transform var(--dur-base) var(--ease-instrument);
+}
+.is-envelope-shown .core-chamber .node-lock {
+  opacity: 1;
+  transform: scale(1);
+  transition-delay: 1500ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .is-envelope-shown .core-chamber .node-lock { transition-delay: 0ms; }
+}
+
+.plot-sweep {
+  stroke: var(--mineral-teal);
+  stroke-width: 1;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+}
+.is-envelope-shown .plot-sweep {
+  animation: plot-sweep 1500ms var(--ease-instrument) forwards;
+}
+@keyframes plot-sweep {
+  0% { opacity: 0; transform: translateX(0); }
+  12% { opacity: 0.85; }
+  88% { opacity: 0.85; }
+  100% { opacity: 0; transform: translateX(var(--sweep, 196px)); }
+}
+
+/* The envelope bound lines draw on, so the region is constructed, not stamped. */
+.plot-bound {
+  fill: none;
+  stroke: rgba(114, 214, 193, 0.42);
+  stroke-width: 1;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  vector-effect: non-scaling-stroke;
+  transition: stroke-dashoffset 1200ms var(--ease-structural);
+}
+.is-envelope-shown .plot-bound { stroke-dashoffset: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .is-envelope-shown .plot-sweep { animation: none; opacity: 0; }
+  .is-envelope-shown .plot-bound { transition: none; stroke-dashoffset: 0; }
+}
+
+.plot-curve {
+  fill: none;
+  stroke: var(--mineral-teal);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  transition: stroke-dashoffset 1700ms var(--ease-structural) 420ms, stroke var(--dur-slow) var(--ease-glide);
+}
+.is-executed .plot-curve { stroke-dashoffset: 0; }
+.is-verified .plot-curve { stroke: var(--signal-teal); }
+
+.plot-point {
+  fill: var(--fog-teal);
+  opacity: 0;
+  transition: opacity 420ms var(--ease-glide);
+  transition-delay: var(--d, 0ms);
+}
+.is-executed .plot-point { opacity: 0.9; }
+
+.plot-caption { fill: var(--warm-gray); }
+
+/* teal bloom at completion moments only */
+.bloom {
+  fill: var(--signal-teal);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.bloom.is-firing { animation: bloom-out 1500ms var(--ease-structural) forwards; }
+@keyframes bloom-out {
+  0% { opacity: 0.34; transform: scale(0.55); }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+@media (prefers-reduced-motion: reduce) { .bloom.is-firing { animation: none; } }
+
+/* ============================================================
+   VERIFIED RECORD — archival release
+   ============================================================ */
+.record {
+  opacity: 0;
+  transform: translateY(-26px);
+  transition: opacity 1000ms var(--ease-structural), transform 1300ms var(--ease-instrument);
+  cursor: pointer;
+}
+.is-released .record { opacity: 1; transform: none; }
+.record .rec-plate { fill: var(--archive-paper); }
+.record .rec-edge { fill: none; stroke: rgba(22, 32, 31, 0.24); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.record text { fill: var(--archive-ink-soft); }
+.record .rec-title { fill: var(--archive-ink); }
+.record .rec-num { fill: var(--archive-ink); font-size: 15px; letter-spacing: 0; }
+.record .rec-review { fill: #9a6f14; }
+.record .rec-seal { fill: none; stroke: var(--deep-teal); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.record .rec-seal-mark { fill: var(--deep-teal); }
+.record .halo { stroke: var(--deep-teal); }
+
+/* perforated tear edge where the record leaves the machine */
+.record .rec-perf { stroke: rgba(22, 32, 31, 0.3); stroke-width: 1; stroke-dasharray: 2 5; vector-effect: non-scaling-stroke; }
+
+/* SENTINEL 04's registration marks: the record squared to a grid as it is
+   composed. They appear with polish and fade once the plate is released,
+   because a finished record does not carry its own crop marks. */
+.rec-reg-mark {
+  fill: none;
+  stroke: rgba(114, 214, 193, 0.45);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition: opacity 600ms var(--ease-glide);
+}
+.is-verified .rec-reg-mark { opacity: 1; }
+.is-released .rec-reg-mark { opacity: 0.12; transition-delay: 700ms; }
+
+/* ============================================================
+   HUD — progress rail, log, controls
+   ============================================================ */
+.cathedral__hud {
+  position: absolute;
+  left: var(--gutter);
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 5;
+  display: grid;
+  gap: 1.6rem;
+  /* Instrument annotation in the drawing's margin, not a card floating over
+     it. A bordered opaque panel read as UI pasted onto the artwork; a single
+     rule with the readout hung off it belongs to the sheet. The panel sits in
+     reserved margin (see the viewport inset) so it never covers structure,
+     which is what let the background be dropped entirely. */
+  padding: 0 0 0 1.1rem;
+  border-left: 1px solid var(--line-structural);
+  pointer-events: none;
+}
+.hud__rail { display: grid; gap: 0; pointer-events: auto; }
+
+.rail-step {
+  display: grid;
+  grid-template-columns: 14px auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.42rem 0;
+  position: relative;
+}
+.rail-step::before {
+  content: "";
+  position: absolute;
+  left: 6.5px;
+  top: 0; bottom: 0;
+  width: 1px;
+  background: var(--line-hairline);
+}
+.rail-step:first-child::before { top: 50%; }
+.rail-step:last-child::before { bottom: 50%; }
+
+.rail-step__pip {
+  position: relative;
+  width: 14px; height: 14px;
+  display: grid;
+  place-items: center;
+}
+.rail-step__pip::after {
+  content: "";
+  width: 5px; height: 5px;
+  background: var(--status-pending);
+  transform: rotate(45deg);
+  transition: background var(--dur-base) var(--ease-glide), width var(--dur-base) var(--ease-instrument), height var(--dur-base) var(--ease-instrument);
+}
+.rail-step__label {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  transition: color var(--dur-base) var(--ease-glide);
+}
+.rail-step[data-state="done"] .rail-step__pip::after { background: var(--deep-teal); }
+.rail-step[data-state="done"] .rail-step__label { color: var(--text-secondary); }
+.rail-step[data-state="current"] .rail-step__pip::after {
+  background: var(--signal-teal);
+  width: 8px; height: 8px;
+}
+.rail-step[data-state="current"] .rail-step__label { color: var(--mineral-teal); }
+
+.hud__log {
+  display: grid;
+  gap: 0.3rem;
+  max-width: 15rem;
+}
+.hud__log-key { color: var(--text-tertiary); }
+.hud__log-line {
+  font-size: var(--step--2);
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  text-transform: uppercase;
+}
+
+.cathedral__controls {
+  position: absolute;
+  right: var(--gutter);
+  bottom: clamp(1.4rem, 4vh, 2.6rem);
+  z-index: 6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+.ctrl {
+  padding: 0.62em 1.05em;
+  border: 1px solid var(--line-hairline);
+  background: rgba(7, 11, 12, 0.7);
+  backdrop-filter: blur(6px);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  transition: color var(--dur-fast) var(--ease-glide), border-color var(--dur-fast) var(--ease-glide);
+}
+.ctrl:hover, .ctrl:focus-visible { color: var(--mineral-teal); border-color: var(--line-structural); }
+.ctrl--quiet { color: var(--text-tertiary); }
+
+/* An author `display` declaration outranks the UA [hidden] rule, so the
+   explorers must opt out of display explicitly or they render together. */
+.cathedral__tiers[hidden],
+.cathedral__journey[hidden] { display: none; }
+
+/* --- tier framing: the settled architecture stays explorable --- */
+.cathedral__tiers {
+  position: absolute;
+  left: var(--gutter);
+  bottom: clamp(1.4rem, 4vh, 2.6rem);
+  z-index: 6;
+  display: grid;
+  gap: 0.5rem;
+  animation: tiers-in 900ms var(--ease-structural) both;
+}
+@keyframes tiers-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+.tiers__key { color: var(--text-tertiary); }
+.tiers__set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  border: 1px solid var(--line-hairline);
+  background: rgba(7, 11, 12, 0.72);
+  backdrop-filter: blur(6px);
+}
+.tier-btn {
+  padding: 0.55em 0.85em;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-right: 1px solid var(--line-hairline);
+  transition: color var(--dur-fast) var(--ease-glide), background var(--dur-fast) var(--ease-glide);
+}
+.tier-btn:last-child { border-right: 0; }
+.tier-btn:hover { color: var(--text-primary); }
+.tier-btn[aria-pressed="true"] {
+  color: var(--void);
+  background: var(--mineral-teal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cathedral__tiers { animation: none; }
+}
+
+/* --- mobile journey control --- */
+.cathedral__journey {
+  position: absolute;
+  left: var(--gutter);
+  right: var(--gutter);
+  bottom: clamp(3.6rem, 11vh, 5.4rem);
+  z-index: 6;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--line-hairline);
+  background: rgba(7, 11, 12, 0.82);
+  backdrop-filter: blur(8px);
+}
+.journey__step {
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-hairline);
+  color: var(--mineral-teal);
+  font-size: 1rem;
+  transition: color var(--dur-fast) var(--ease-glide), border-color var(--dur-fast) var(--ease-glide);
+}
+.journey__step:disabled { color: var(--structural-slate); border-color: rgba(43, 58, 58, 0.4); }
+.journey__now { display: grid; gap: 0.2rem; justify-items: center; text-align: center; }
+.journey__label {
+  font-size: var(--step--1);
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+}
+
+/* vault statement */
+.cathedral__vault-line {
+  position: absolute;
+  right: var(--gutter);
+  top: 50%;
+  translate: 0 -50%;
+  z-index: 3;
+  max-width: 16rem;
+  font-size: var(--step-2);
+  text-align: right;
+  opacity: 0;
+  transform: translateX(14px);
+  transition: opacity 1100ms var(--ease-structural), transform 1100ms var(--ease-structural);
+  pointer-events: none;
+}
+.cathedral__vault-line.is-shown { opacity: 1; transform: none; }
+.display-teal { color: var(--mineral-teal); }
+
+/* ---------- inspection makes room ----------
+   The panel is fixed over the right of the screen, so a node on the right of
+   the monument was being described by a panel sitting on top of it. Reserving
+   the panel's width as viewport inset moves the drawing field left instead, and
+   because the camera fits every frame to the container's real aspect ratio the
+   composition re-centres itself in the space that remains. The selected object
+   stays visible next to its own record, which is the entire point. */
+@media (min-width: 68.001rem) {
+  .cathedral.is-inspecting .cathedral__viewport {
+    --viewport-right: min(28rem, 35.5vw);
+  }
+}
+
+/* hide HUD chrome while the inspector is open on narrow screens */
+@media (max-width: 68rem) {
+  /* the panel moves to the bottom here, so the left gutter is released */
+  .cathedral__viewport { inset: 3.8rem 0 13rem; }
+  .cathedral__hud {
+    top: auto;
+    bottom: clamp(4.6rem, 12vh, 7rem);
+    left: var(--gutter);
+    right: var(--gutter);
+    translate: 0;
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+  }
+  .hud__rail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.9rem;
+  }
+  .rail-step { padding: 0; }
+  .rail-step::before { display: none; }
+  .hud__log { max-width: none; }
+  .cathedral__vault-line {
+    position: static;
+    translate: 0;
+    max-width: none;
+    text-align: left;
+    padding: 0 var(--gutter);
+  }
+}
+
+@media (max-width: 48rem) {
+  /* The phone journey is a stacked layout, not an overlay one. Absolute
+     insets tuned in rem cannot stay clear of chrome whose height depends on
+     how the rail and log wrap, so the column lays out in flow and the
+     viewport simply takes the space that remains. Nothing can overlap. */
+  .cathedral {
+    display: flex;
+    flex-direction: column;
+    min-height: auto;
+    padding-top: 3.4rem;
+  }
+  .cathedral__viewport {
+    position: relative;
+    inset: auto;
+    order: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 0;
+  }
+  .cathedral__hud,
+  .cathedral__journey,
+  .cathedral__controls {
+    position: relative;
+    inset: auto;
+    flex: 0 0 auto;
+    translate: 0;
+    margin: 0 var(--gutter);
+  }
+  /* explicit order: the vault line reads between architecture and readout */
+  .cathedral__hud { order: 2; margin-bottom: 0.7rem; }
+  .cathedral__journey { order: 3; margin-bottom: 0.7rem; }
+  .cathedral__tiers { order: 4; }
+  .cathedral__controls {
+    order: 5;
+    margin-bottom: clamp(0.7rem, 2.4vh, 1.1rem);
+    justify-content: space-between;
+    gap: 0.35rem;
+  }
+  .ctrl {
+    flex: 1;
+    padding: 0.7em 0.4em;
+    text-align: center;
+    letter-spacing: var(--track-label-tight);
+  }
+  /* The camera moves underneath this line, so no overlay position stays clear
+     of the architecture's own labels. It takes a band in the column instead,
+     between the viewport and the instrument panel, and collapses when unshown
+     so it costs the architecture no height for most of the run. */
+  .cathedral__vault-line {
+    position: relative;
+    inset: auto;
+    order: 1;
+    flex: 0 0 auto;
+    translate: 0;
+    margin: 0 var(--gutter);
+    max-width: none;
+    text-align: center;
+    font-size: var(--step-1);
+    transform: none;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 700ms var(--ease-structural),
+                opacity 700ms var(--ease-structural);
+  }
+  .cathedral__vault-line.is-shown {
+    max-height: 6rem;
+    margin-bottom: 0.7rem;
+  }
+  /* The right-edge tier registration marks sit outside every station frame,
+     so on phones they only ever arrive half-cropped. The journey control
+     already names the station the visitor is looking at. */
+  .tier-marks { display: none; }
+
+  /* ---------- the band above the sheet ----------
+     The bottom sheet is fixed over the lower half of the screen, so while it
+     is open the drawing field is not the viewport's flow height — it is the
+     strip left above the sheet. Measured, that strip was 159px of a 561px
+     viewport, and the camera was still framing whatever the run had last
+     targeted, which put the inspected object off-screen entirely more often
+     than not. Capping the viewport to the real strip lets the camera fit its
+     frame to the space the reader can actually see, and `frameNode()` in the
+     choreographer puts the selected object inside it. --sheet-height is
+     published by the inspector because the sheet's height depends on how much
+     the record has to say. */
+  .cathedral.is-inspecting .cathedral__viewport {
+    max-height: calc(100svh - var(--sheet-height, 50svh) - 4.6rem);
+  }
+}

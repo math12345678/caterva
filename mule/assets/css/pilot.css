@@ -1,0 +1,303 @@
+/* ============================================================
+   terrium — pilot invitation + footer
+   The record leaves the machine: graphite becomes archive paper.
+   ============================================================ */
+
+.pilot {
+  position: relative;
+  padding: clamp(5rem, 14vh, 11rem) var(--gutter) clamp(4rem, 10vh, 8rem);
+  background: var(--archive-paper);
+  color: var(--archive-ink);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* The transition itself: graphite bleeding into paper at the seam. The gradient
+   is the atmosphere; the sheet below is the artifact. */
+.pilot::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: clamp(6rem, 18vh, 13rem);
+  z-index: -1;
+  background: linear-gradient(to bottom, var(--void), rgba(13, 20, 21, 0.72) 32%, rgba(241, 240, 234, 0) 100%);
+}
+
+/* ---------- the record becomes the sheet ----------
+   The last thing the cathedral produces is a pale archival record, and this
+   invitation is printed on it. So the record arrives here as an actual object:
+   a sheet rising out of the graphite with the run's own registration marks on
+   its corners, widening into the page it becomes. Without this the colour
+   inversion is just a change of section background; with it, the reader is
+   standing on the artifact the whole architecture was built to produce. */
+.pilot__sheet {
+  position: absolute;
+  top: calc(clamp(6rem, 18vh, 13rem) * -0.62);
+  left: 50%;
+  translate: -50% 0;
+  width: min(64rem, 86vw);
+  height: clamp(7rem, 16vh, 11rem);
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(to bottom, rgba(241, 240, 234, 0) 0%, rgba(241, 240, 234, 0.5) 55%, var(--archive-paper) 100%);
+  clip-path: polygon(9% 0, 91% 0, 100% 62%, 100% 100%, 0 100%, 0 62%);
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 1100ms var(--ease-structural), transform 1100ms var(--ease-structural);
+}
+.pilot__sheet.is-revealed { opacity: 1; transform: none; }
+
+/* Registration marks, carried over from the record plate in the vault. */
+.pilot__sheet::before,
+.pilot__sheet::after {
+  content: "";
+  position: absolute;
+  bottom: 12%;
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgba(22, 32, 31, 0.28);
+}
+.pilot__sheet::before { left: 2%; border-right: 0; border-top: 0; }
+.pilot__sheet::after { right: 2%; border-left: 0; border-top: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pilot__sheet { opacity: 1; transform: none; transition: none; }
+}
+@media (max-width: 40rem) {
+  .pilot__sheet { width: 94vw; height: 5rem; }
+}
+
+/* faint archival registration grid on the paper */
+.pilot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background-image:
+    linear-gradient(to right, rgba(22, 32, 31, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(22, 32, 31, 0.05) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 80%);
+}
+
+.pilot__inner {
+  max-width: 78rem;
+  margin: 0 auto;
+  display: grid;
+  gap: clamp(2.5rem, 6vw, 5rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  align-items: start;
+}
+
+.pilot__lede { display: grid; gap: 1.3rem; }
+/* Sits inside the seam gradient rather than on clean paper, so it takes the
+   ink-weight teal — see --deep-teal-ink. */
+.pilot__eyebrow { color: var(--deep-teal-ink); }
+.pilot__title {
+  font-size: var(--step-4);
+  color: var(--archive-ink);
+  max-width: 20ch;
+}
+.pilot__prose {
+  max-width: 42ch;
+  font-size: var(--step-1);
+  line-height: 1.6;
+  color: rgba(22, 32, 31, 0.78);
+}
+.pilot__secondary {
+  max-width: 44ch;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: 0.05em;
+  line-height: 1.7;
+  text-transform: uppercase;
+  /* Ink alphas on paper: 0.55 measured 3.64:1 against the sheet, so the quiet
+     tier of the invitation — who the pilot is for, what the demo is not, what
+     the form does with an address — was the least readable text in the
+     section. 0.66 lands above 5:1 on all three paper surfaces here (the sheet,
+     the lighter form plate, and white inputs) and still reads as secondary
+     next to the near-black prose. */
+  color: var(--archive-ink-soft);
+}
+.pilot__note {
+  max-width: 42ch;
+  padding-left: 0.9rem;
+  border-left: 1px solid rgba(22, 32, 31, 0.25);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: 0.06em;
+  line-height: 1.75;
+  text-transform: uppercase;
+  color: var(--archive-ink-soft);
+}
+
+/* --- form: an archival intake slip ----------------------- */
+.pilot__form {
+  display: grid;
+  gap: 1.15rem;
+  padding: clamp(1.4rem, 3vw, 2.4rem);
+  background: #fbfaf6;
+  border: 1px solid rgba(22, 32, 31, 0.2);
+  box-shadow: 0 1px 0 rgba(22, 32, 31, 0.06), 0 24px 48px -32px rgba(22, 32, 31, 0.35);
+  position: relative;
+}
+.pilot__form::before {
+  content: "";
+  position: absolute;
+  top: -1px; right: -1px;
+  width: 13px; height: 13px;
+  border: 1px solid var(--deep-teal);
+  border-left: 0;
+  border-bottom: 0;
+}
+.pilot__form-title { color: var(--archive-ink-soft); }
+
+.field { display: grid; gap: 0.35rem; }
+.field label {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--archive-ink-soft);
+}
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  background: #ffffff;
+  border: 1px solid rgba(22, 32, 31, 0.22);
+  color: var(--archive-ink);
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  font-weight: 350;
+  line-height: 1.4;
+  transition: border-color var(--dur-fast) var(--ease-glide), box-shadow var(--dur-fast) var(--ease-glide);
+}
+.field textarea { resize: vertical; min-height: 4.5rem; }
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--deep-teal);
+  box-shadow: inset 0 0 0 1px rgba(29, 138, 114, 0.35);
+}
+.field input:focus-visible,
+.field textarea:focus-visible { outline: 1px solid var(--deep-teal); outline-offset: 2px; }
+
+.field__hint {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: 0.05em;
+  /* This is the line that says an address is only used to reply about the
+     pilot. It is the most consequential small print on the page, and at 0.48
+     it was the faintest — 2.98:1 on white. */
+  color: var(--archive-ink-soft);
+}
+.field__error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #9c3b37;
+}
+/* An author `display` declaration outranks the UA [hidden] rule, so the
+   empty slot — and its ▲ marker — would otherwise render on a clean form. */
+.field__error[hidden] { display: none; }
+.field__error::before { content: "\25B2"; font-size: 0.7em; }
+.field.has-error input,
+.field.has-error textarea { border-color: #b85d59; }
+
+.pilot__submit {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.4rem;
+  padding: 1em 1.3em;
+  background: var(--archive-ink);
+  color: var(--archive-paper);
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  transition: background var(--dur-base) var(--ease-glide), color var(--dur-base) var(--ease-glide);
+}
+.pilot__submit-mark {
+  width: 8px; height: 8px;
+  background: var(--signal-teal);
+  transform: rotate(45deg);
+  transition: transform var(--dur-base) var(--ease-instrument);
+}
+.pilot__submit:hover:not(:disabled) { background: var(--deep-teal); }
+.pilot__submit:hover:not(:disabled) .pilot__submit-mark { transform: rotate(45deg) scale(1.4); background: var(--archive-paper); }
+.pilot__submit:disabled { background: rgba(22, 32, 31, 0.35); cursor: default; }
+.pilot__submit:focus-visible { outline: 1px solid var(--deep-teal); outline-offset: 3px; }
+
+.pilot__status {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  text-transform: uppercase;
+}
+.pilot__status[data-state="error"] { color: #9c3b37; }
+/* On the form plate, so ink weight: the success message is the only
+   confirmation the reader gets that the request went anywhere. */
+.pilot__status[data-state="ok"] { color: var(--deep-teal-ink); }
+
+@media (max-width: 62rem) {
+  .pilot__inner { grid-template-columns: 1fr; }
+  .pilot__title { max-width: none; }
+}
+
+/* ============================================================
+   FOOTER — back to the machine
+   ============================================================ */
+.footer {
+  background: var(--void);
+  padding: clamp(3.5rem, 8vh, 6rem) var(--gutter) clamp(2rem, 5vh, 3rem);
+  border-top: 1px solid var(--line-hairline);
+}
+.footer__inner {
+  max-width: 78rem;
+  margin: 0 auto;
+  display: grid;
+  gap: clamp(2rem, 5vw, 4rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  align-items: start;
+  padding-bottom: clamp(2rem, 5vh, 3rem);
+  border-bottom: 1px solid var(--line-hairline);
+}
+.footer__brand { display: grid; gap: 0.6rem; }
+.wordmark--footer { font-size: clamp(1.5rem, 4vw, 2.4rem); }
+.footer__tag {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--mineral-teal);
+}
+.footer__cols {
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 3rem);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+}
+.footer__cols > div { display: grid; gap: 0.7rem; align-content: start; }
+.footer__list { display: grid; gap: 0.35rem; }
+.footer__list li {
+  font-size: var(--step--1);
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+.footer__legal {
+  max-width: 78rem;
+  margin: clamp(1.5rem, 4vh, 2.5rem) auto 0;
+  max-inline-size: 80ch;
+}
+
+@media (max-width: 48rem) {
+  .footer__inner { grid-template-columns: 1fr; }
+}

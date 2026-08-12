@@ -287,6 +287,16 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # endpoints in the documented Python client did not exist -- a
         # reader following the quick start would have got a 404 on nearly
         # every call and concluded the product was broken.
+        # The MuleRun site loads ONE script from index.html; that module
+        # imports 27 more. An HTML-only check would report "13 assets, all
+        # present" on a page where 27 of 28 JS files could be deleted
+        # without complaint -- the reassuring number would be the problem.
+        run_guard(
+            "Static Asset Guard",
+            f"python {SCRIPTS_DIR / 'check_static_assets.py'} "
+            f"{SCRIPTS_DIR.parent / 'mule' / 'index.html'}",
+            timeout=60,
+        ),
         run_guard(
             "Example Endpoint Guard",
             f"python {SCRIPTS_DIR / 'check_example_endpoints.py'}",

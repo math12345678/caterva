@@ -1,0 +1,858 @@
+/* ============================================================
+   terrium — LIVE ORCHESTRATION CONSOLE
+
+   Three columns that read as one instrument: the question on the
+   left, the agents working down the centre, the record assembling
+   on the right. The centre column is the tallest thing on the page
+   on purpose — nine specialised jobs need nine visible rows, not a
+   summary of nine jobs.
+
+   Structure:
+     1. shell + head
+     2. deck grid
+     3. left: the scientific input
+     4. centre: the agent timeline
+     5. right: the output workspace + blocks
+     6. responsive
+     7. reduced motion
+   ============================================================ */
+
+/* --- 1. shell ---------------------------------------------- */
+.console {
+  position: relative;
+  padding: clamp(3.25rem, 6vh, 5.5rem) var(--gutter) clamp(3.5rem, 7vh, 6rem);
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(49, 184, 148, 0.05), transparent 60%),
+    linear-gradient(180deg, var(--void) 0%, #060a0b 46%, var(--void) 100%);
+  border-top: 1px solid var(--line-hairline);
+  overflow: hidden;
+}
+
+/* A faint survey grid, so the console reads as instrument housing
+   rather than a card sitting on a flat page. */
+.console::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, var(--line-grid) 1px, transparent 1px),
+    linear-gradient(180deg, var(--line-grid) 1px, transparent 1px);
+  background-size: 92px 92px;
+  mask-image: radial-gradient(110% 70% at 50% 20%, #000 0%, transparent 78%);
+  pointer-events: none;
+}
+
+/* The head is set as a wide band rather than a centred stack: the deck below
+   it is the subject, and a full-height centred title would push the working
+   instrument off a laptop screen entirely. */
+.console__head {
+  position: relative;
+  max-width: 104rem;
+  margin: 0 auto clamp(1.5rem, 3vh, 2.4rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: end;
+  gap: 0.6rem clamp(1.5rem, 4vw, 4rem);
+}
+
+.console__head .eyebrow { grid-column: 1 / -1; }
+
+.console__title {
+  font-size: clamp(1.75rem, 1.1rem + 2.6vw, 3.25rem);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  margin: 0.4rem 0 0;
+}
+
+.console__lede {
+  margin: 0 0 0.4rem;
+  color: var(--text-secondary);
+  max-width: 34rem;
+}
+
+@media (max-width: 60rem) {
+  .console__head { grid-template-columns: 1fr; align-items: start; }
+  .console__lede { margin-top: 0.9rem; }
+}
+
+/* --- 2. deck ----------------------------------------------- */
+.console__deck {
+  position: relative;
+  max-width: 104rem;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.86fr) minmax(24rem, 1.24fr) minmax(19rem, 1fr);
+  gap: clamp(0.75rem, 1.4vw, 1.4rem);
+  align-items: start;
+}
+
+.console__col { min-width: 0; }
+
+.con-col__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0 0.2rem 0.6rem;
+  border-bottom: 1px solid var(--line-hairline);
+  margin-bottom: 0.7rem;
+}
+
+.con-col__k { color: var(--text-tertiary); }
+
+/* --- 3. input ----------------------------------------------
+   The panel that holds the question and the run controls. It is
+   deliberately the quietest of the three: the reader's attention
+   belongs in the centre once the run starts. */
+.con-in {
+  position: relative;
+  padding: clamp(1.1rem, 1.8vw, 1.6rem);
+  background: linear-gradient(170deg, rgba(23, 35, 36, 0.72), rgba(13, 20, 21, 0.6));
+  border: 1px solid var(--line-hairline);
+  border-top: 1px solid var(--line-structural);
+}
+
+.con-in__k { color: var(--signal-teal); }
+
+.con-in__q {
+  font-size: var(--step-1);
+  line-height: 1.24;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  margin: 0.8rem 0 0.9rem;
+  /* The question is set as a quotation without quote marks: the mark
+     in the margin does the job and keeps the text edge clean. */
+  padding-left: 0.85rem;
+  border-left: 2px solid var(--deep-teal);
+}
+
+.con-in__note { margin: 0 0 1.2rem; }
+
+.con-in__meta {
+  margin: 0 0 1.25rem;
+  border-top: 1px solid var(--line-hairline);
+}
+
+.con-in__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line-hairline);
+}
+
+.con-in__row dd {
+  margin: 0;
+  font-size: var(--step--1);
+  color: var(--text-secondary);
+}
+
+.con-in__state {
+  color: var(--text-primary);
+  letter-spacing: 0.06em;
+}
+
+.is-playing .con-in__state { color: var(--signal-teal); }
+.is-done .con-in__state { color: var(--mineral-teal); }
+[data-con-case='failure'].is-done .con-in__state { color: var(--status-review); }
+
+.con-in__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.con-in__acts .ctrl { flex: 1 1 auto; }
+
+.ctrl--primary {
+  border-color: rgba(49, 184, 148, 0.5);
+  color: var(--mineral-teal);
+  background: rgba(49, 184, 148, 0.07);
+}
+
+.ctrl--primary:hover { background: rgba(49, 184, 148, 0.14); }
+
+/* Pause is disabled until a run is actually in flight. A disabled control is
+   exempt from the contrast minimum, but 0.34 drove it to 1.51:1 — not "clearly
+   unavailable", just gone, which reads as a rendering fault rather than a
+   state. At 0.8 it lands near 4.65:1: still visibly the dimmest thing in the
+   control row, and still plainly not the button to press, but legible enough
+   that the reader can see the demonstration HAS a pause before starting it.
+   The disabled state is also carried by the [disabled] attribute itself, so
+   assistive technology never depended on this opacity. */
+.con-in__acts .ctrl[disabled] {
+  opacity: 0.8;
+  cursor: default;
+}
+
+/* case switch */
+.con-cases {
+  display: flex;
+  border: 1px solid var(--line-hairline);
+}
+
+.con-cases__btn {
+  flex: 1;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-right: 1px solid var(--line-hairline);
+  padding: 0.6rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-glide), background var(--dur-fast) var(--ease-glide);
+}
+
+.con-cases__btn:last-child { border-right: 0; }
+.con-cases__btn:hover { color: var(--text-primary); background: rgba(184, 222, 213, 0.05); }
+
+.con-cases__btn.is-active {
+  color: var(--void);
+  background: var(--fog-teal);
+}
+
+/* The failure case is selected in amber, because that is the colour
+   this site reserves for a run that discloses rather than delivers. */
+.con-cases__btn[data-con-mode='failure'].is-active {
+  background: var(--status-review);
+  color: #241a04;
+}
+
+.con-in__foot {
+  margin: 1.1rem 0 0;
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  max-width: 24rem;
+}
+
+.con-in__back {
+  display: inline-block;
+  margin-top: 1rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-hairline);
+  padding-bottom: 0.15rem;
+}
+
+.con-in__back:hover { color: var(--signal-teal); border-color: var(--deep-teal); }
+
+/* --- 4. timeline -------------------------------------------
+   A continuous spine with nine nodes on it. The spine is drawn on
+   the container, not per row, so it reads as one instrument rather
+   than nine stacked cards. */
+.con-time {
+  position: relative;
+  max-height: min(74vh, 46rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.2rem 0.2rem 0.2rem 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--structural-slate) transparent;
+}
+
+.con-time::-webkit-scrollbar { width: 5px; }
+.con-time::-webkit-scrollbar-thumb { background: var(--structural-slate); }
+
+.con-agents {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+/* --- the agent row --- */
+.ag {
+  position: relative;
+  display: grid;
+  grid-template-columns: 3.1rem 1fr;
+  gap: 0 0.85rem;
+  padding: 0 0 0.55rem;
+}
+
+/* the spine */
+.ag__spine {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: 0.55rem;
+}
+
+.ag__spine::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: -0.55rem;
+  width: 1px;
+  transform: translateX(-0.5px);
+  background: var(--line-hairline);
+}
+
+.ag:last-child .ag__spine::before { bottom: auto; height: 2.2rem; }
+
+.ag__mark {
+  position: relative;
+  z-index: 1;
+  width: 2.6rem;
+  height: 2.6rem;
+  display: grid;
+  place-items: center;
+  background: var(--void);
+  border: 1px solid var(--line-hairline);
+  transition: border-color var(--dur-base) var(--ease-glide),
+              background var(--dur-base) var(--ease-glide);
+}
+
+.ag-glyph { width: 1.45rem; height: 1.45rem; overflow: visible; }
+
+.gl-line,
+.gl-accent {
+  fill: none;
+  stroke: var(--text-tertiary);
+  stroke-width: 1.35;
+  stroke-linecap: square;
+  transition: stroke var(--dur-base) var(--ease-glide);
+}
+
+.gl-accent { stroke: var(--structural-slate); }
+.gl-fill { fill: var(--text-tertiary); transition: fill var(--dur-base) var(--ease-glide); }
+
+/* --- row body --- */
+.ag__body {
+  padding: 0.5rem 0 0.9rem 0;
+  border-bottom: 1px solid var(--line-grid);
+}
+
+.ag__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.ag__i {
+  font-size: var(--step--2);
+  color: var(--text-tertiary);
+  letter-spacing: 0.06em;
+}
+
+.ag__n {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  transition: color var(--dur-base) var(--ease-glide);
+}
+
+.ag__t {
+  margin-left: auto;
+  font-size: var(--step--2);
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+/* --- status line: word plus glyph, never colour alone --- */
+.ag__status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0;
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label-tight);
+  color: var(--text-tertiary);
+}
+
+.ag__g { font-size: 0.7em; line-height: 1; }
+
+/* status tones */
+.ag[data-tone='active'] .ag__status,
+.ag[data-tone='active'] .ag__t { color: var(--signal-teal); }
+.ag[data-tone='supported'] .ag__status { color: var(--status-supported); }
+.ag[data-tone='review'] .ag__status { color: var(--status-review); }
+.ag[data-tone='blocked'] .ag__status { color: var(--status-blocked); }
+
+.ag[data-tone='active'] .ag__mark {
+  border-color: rgba(49, 184, 148, 0.55);
+  background: rgba(49, 184, 148, 0.08);
+}
+.ag[data-tone='active'] .gl-line { stroke: var(--signal-teal); }
+.ag[data-tone='active'] .gl-accent { stroke: var(--mineral-teal); }
+.ag[data-tone='active'] .gl-fill { fill: var(--signal-teal); }
+
+.ag[data-tone='supported'] .ag__mark { border-color: rgba(49, 184, 148, 0.34); }
+.ag[data-tone='supported'] .gl-line { stroke: var(--deep-teal); }
+.ag[data-tone='supported'] .gl-accent { stroke: var(--signal-teal); }
+.ag[data-tone='supported'] .gl-fill { fill: var(--signal-teal); }
+
+.ag[data-tone='review'] .ag__mark { border-color: rgba(216, 167, 67, 0.45); }
+.ag[data-tone='review'] .gl-line { stroke: #9a7a34; }
+.ag[data-tone='review'] .gl-accent { stroke: var(--status-review); }
+.ag[data-tone='review'] .gl-fill { fill: var(--status-review); }
+
+.ag[data-tone='blocked'] .ag__mark { border-color: rgba(184, 93, 89, 0.45); }
+.ag[data-tone='blocked'] .gl-line { stroke: #8a4b48; }
+.ag[data-tone='blocked'] .gl-accent { stroke: var(--status-blocked); }
+
+.ag.is-done .ag__n,
+.ag.is-current .ag__n { color: var(--text-primary); }
+
+/* The running agent gets the only motion in the column: a scanning
+   sweep across its own row. One thing moves, so the reader always
+   knows where the system is. */
+.ag.is-current .ag__body { position: relative; }
+
+.ag.is-current .ag__body::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--signal-teal), transparent);
+  animation: ag-sweep 1.5s var(--ease-glide) infinite;
+}
+
+@keyframes ag-sweep {
+  0% { transform: scaleX(0.06); transform-origin: left; opacity: 0.2; }
+  50% { transform: scaleX(1); opacity: 0.85; }
+  100% { transform: scaleX(0.06); transform-origin: right; opacity: 0.2; }
+}
+
+.ag.is-current .ag__mark::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 1px solid rgba(49, 184, 148, 0.3);
+  animation: ag-halo 1.9s var(--ease-glide) infinite;
+}
+
+@keyframes ag-halo {
+  0%, 100% { opacity: 0.15; transform: scale(0.94); }
+  50% { opacity: 0.7; transform: scale(1); }
+}
+
+/* --- IN / OUT --- */
+.ag__io {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.9rem;
+  margin-top: 0.6rem;
+}
+
+.ag__io-r { min-width: 0; }
+
+.ag__io-r .label { display: block; color: var(--text-tertiary); }
+
+.ag__io-r p {
+  margin: 0.2rem 0 0;
+  font-size: var(--step--1);
+  line-height: 1.42;
+  color: var(--text-secondary);
+}
+
+.ag__io-r--out {
+  padding-left: 0.75rem;
+  border-left: 1px solid var(--line-grid);
+}
+
+.ag__io-r--out p { color: var(--text-tertiary); }
+
+.ag.is-resolved .ag__io-r--out p { color: var(--text-primary); }
+.ag.is-resolved .ag__io-r--out { border-left-color: var(--deep-teal); }
+.ag.is-resolved[data-tone='review'] .ag__io-r--out { border-left-color: rgba(216, 167, 67, 0.5); }
+.ag.is-resolved[data-tone='blocked'] .ag__io-r--out { border-left-color: rgba(184, 93, 89, 0.5); }
+
+/* --- the disclosure, surfaced inline --- */
+.ag__disclosure {
+  display: none;
+  gap: 0.5rem;
+  margin: 0.7rem 0 0;
+  padding: 0.55rem 0.65rem;
+  font-size: var(--step--1);
+  line-height: 1.45;
+  color: #e8c887;
+  background: rgba(216, 167, 67, 0.07);
+  border-left: 2px solid var(--status-review);
+}
+
+.ag.is-resolved .ag__disclosure { display: flex; }
+
+.ag__disc-g { color: var(--status-review); font-size: 0.7em; padding-top: 0.35em; }
+
+/* --- inspect --- */
+.ag__inspect {
+  appearance: none;
+  margin-top: 0.7rem;
+  padding: 0.3rem 0.6rem;
+  background: none;
+  border: 1px solid var(--line-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-glide), border-color var(--dur-fast) var(--ease-glide);
+}
+
+.ag__inspect:hover { color: var(--signal-teal); border-color: var(--deep-teal); }
+
+.ag.is-open .ag__inspect { color: var(--void); background: var(--fog-teal); border-color: var(--fog-teal); }
+
+.ag__detail {
+  margin: 0.6rem 0 0;
+  padding: 0.65rem 0.75rem;
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: rgba(7, 11, 12, 0.6);
+  border: 1px solid var(--line-hairline);
+  border-left: 2px solid var(--structural-slate);
+}
+
+/* --- 5. workspace ------------------------------------------
+   The right column is the only warm surface in the console: it is
+   the record, and the record is archive paper everywhere else on
+   this site. It stays dark until something is in it, so an empty
+   workspace never looks like a finished document. */
+.con-ws {
+  position: relative;
+  min-height: 22rem;
+  max-height: min(74vh, 46rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.9rem;
+  background: linear-gradient(170deg, rgba(13, 20, 21, 0.7), rgba(7, 11, 12, 0.5));
+  border: 1px solid var(--line-hairline);
+  scrollbar-width: thin;
+  scrollbar-color: var(--structural-slate) transparent;
+  transition: background var(--dur-slow) var(--ease-glide),
+              border-color var(--dur-slow) var(--ease-glide);
+}
+
+.con-ws::-webkit-scrollbar { width: 5px; }
+.con-ws::-webkit-scrollbar-thumb { background: var(--structural-slate); }
+
+.is-built .con-ws { border-color: var(--line-structural); }
+
+/* Corner registration marks, matching the atlas plates. */
+.con-ws::before,
+.con-ws::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--line-structural);
+  pointer-events: none;
+}
+
+.con-ws::before { top: 5px; left: 5px; border-right: 0; border-bottom: 0; }
+.con-ws::after { bottom: 5px; right: 5px; border-left: 0; border-top: 0; }
+
+.con-ws__empty {
+  margin: 0;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  font-size: var(--step--1);
+  line-height: 1.55;
+  color: var(--text-tertiary);
+  max-width: 20rem;
+  margin-inline: auto;
+}
+
+.con-ws__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+/* --- a workspace block --- */
+.ws-block {
+  position: relative;
+  padding: 0.75rem 0.85rem 0.85rem;
+  background: rgba(23, 35, 36, 0.55);
+  border: 1px solid var(--line-hairline);
+  border-left: 2px solid var(--structural-slate);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity var(--dur-base) var(--ease-structural),
+              transform var(--dur-base) var(--ease-structural);
+}
+
+.ws-block.is-in { opacity: 1; transform: none; }
+
+.ws-block__t {
+  display: block;
+  margin: 0 0 0.6rem;
+  color: var(--text-tertiary);
+}
+
+.ws-block ul { list-style: none; margin: 0; padding: 0; }
+
+/* evidence trail */
+.ws-ev__i {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  gap: 0 0.6rem;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line-grid);
+  font-size: var(--step--1);
+}
+
+.ws-ev__i:first-child { border-top: 0; }
+.ws-ev__ref { color: var(--signal-teal); font-size: var(--step--2); letter-spacing: 0.05em; }
+.ws-ev__role { color: var(--text-secondary); }
+.ws-ev__scope { grid-column: 2; color: var(--text-tertiary); font-size: var(--step--2); }
+
+/* A missing source is drawn as a struck reference, not an absence: the
+   reader has to be able to see the gap that was found. */
+.ws-ev__i[data-st='blocked'] .ws-ev__ref {
+  color: var(--status-blocked);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+.ws-ev__i[data-st='blocked'] .ws-ev__scope { color: var(--status-blocked); }
+
+/* parameters */
+.ws-par__i {
+  display: grid;
+  grid-template-columns: 1fr auto 3.2rem;
+  gap: 0 0.6rem;
+  align-items: baseline;
+  padding: 0.4rem 0.4rem 0.4rem 0.55rem;
+  border-top: 1px solid var(--line-grid);
+  font-size: var(--step--1);
+  border-left: 2px solid transparent;
+}
+
+.ws-par__i:first-child { border-top: 0; }
+.ws-par__n { color: var(--text-secondary); }
+.ws-par__v { color: var(--text-primary); }
+.ws-par__u { color: var(--text-tertiary); font-size: var(--step--2); text-align: right; }
+
+.ws-par__i--supported { border-left-color: var(--deep-teal); }
+.ws-par__i--user { border-left-color: var(--structural-slate); }
+.ws-par__i--review {
+  border-left-color: var(--status-review);
+  background: rgba(216, 167, 67, 0.06);
+}
+.ws-par__i--review .ws-par__v { color: var(--status-review); }
+
+.ws-par__i--blocked {
+  border-left-color: var(--status-blocked);
+  background: rgba(184, 93, 89, 0.08);
+}
+.ws-par__i--blocked .ws-par__v { color: var(--status-blocked); letter-spacing: 0.08em; }
+.ws-par__i--blocked .ws-par__u { color: var(--status-blocked); }
+
+/* the plot */
+.ws-plot { display: block; width: 100%; height: auto; }
+.ws-plot__axis { fill: none; stroke: var(--line-structural); stroke-width: 1; }
+.ws-plot__datum {
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.ws-plot__tick {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-anchor: end;
+}
+.ws-plot__lab {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.14em;
+  text-anchor: middle;
+}
+.ws-plot__curve {
+  fill: none;
+  stroke: var(--signal-teal);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: ws-draw 1.5s var(--ease-instrument) forwards;
+}
+
+@keyframes ws-draw { to { stroke-dashoffset: 0; } }
+
+.ws-plot__pt {
+  fill: var(--void);
+  stroke: var(--mineral-teal);
+  stroke-width: 1.1;
+  opacity: 0;
+  animation: ws-pt var(--dur-base) var(--ease-glide) forwards;
+  animation-delay: calc(700ms + var(--i) * 90ms);
+}
+
+@keyframes ws-pt { to { opacity: 1; } }
+
+/* verification */
+.ws-ver__i {
+  display: grid;
+  grid-template-columns: 0.7rem 1fr auto;
+  gap: 0 0.5rem;
+  align-items: baseline;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--line-grid);
+  font-size: var(--step--1);
+}
+
+.ws-ver__i:first-child { border-top: 0; }
+.ws-ver__g { color: var(--status-supported); font-size: 0.62em; }
+.ws-ver__c { color: var(--text-secondary); }
+.ws-ver__r { color: var(--status-supported); font-size: var(--step--2); letter-spacing: 0.05em; }
+
+.ws-ver__i[data-st='blocked'] .ws-ver__g,
+.ws-ver__i[data-st='blocked'] .ws-ver__r { color: var(--status-blocked); }
+.ws-ver__i[data-st='pending'] .ws-ver__g,
+.ws-ver__i[data-st='pending'] .ws-ver__r { color: var(--status-pending); }
+.ws-ver__i[data-st='pending'] .ws-ver__c { color: var(--text-tertiary); }
+
+/* claim trace */
+.ws-tr__i {
+  display: grid;
+  grid-template-columns: 1fr 1rem 1fr;
+  gap: 0 0.4rem;
+  align-items: baseline;
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--line-grid);
+  font-size: var(--step--1);
+}
+
+.ws-tr__i:first-child { border-top: 0; }
+.ws-tr__c { color: var(--text-primary); }
+.ws-tr__arrow { color: var(--deep-teal); text-align: center; }
+.ws-tr__b { color: var(--text-tertiary); font-size: var(--step--2); }
+
+/* the disclosed assumption — the loudest thing in the workspace */
+.ws-block--assumption {
+  border-left-color: var(--status-review);
+  background: rgba(216, 167, 67, 0.08);
+}
+
+.ws-block--assumption .ws-block__t { color: var(--status-review); }
+
+.ws-as { display: flex; gap: 0.6rem; }
+.ws-as__g { color: var(--status-review); font-size: 0.72em; padding-top: 0.4em; }
+.ws-as__t {
+  margin: 0;
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: #edd3a0;
+}
+
+/* A blocking disclosure is not the same event as a disclosed assumption.
+   One says "here is a caveat", the other says "this run stops here". */
+.ws-block--assumption[data-tone='blocked'] {
+  border-left-color: var(--status-blocked);
+  background: rgba(184, 93, 89, 0.09);
+}
+.ws-block--assumption[data-tone='blocked'] .ws-block__t,
+.ws-block--assumption[data-tone='blocked'] .ws-as__g { color: var(--status-blocked); }
+.ws-block--assumption[data-tone='blocked'] .ws-as__t { color: #eaadaa; }
+
+/* the finished record — archive paper */
+.ws-block--record {
+  background: var(--archive-paper);
+  border-color: rgba(22, 32, 31, 0.2);
+  border-left-color: var(--archive-ink);
+  box-shadow: 0 18px 44px -22px rgba(0, 0, 0, 0.8);
+}
+
+.ws-block--record .ws-block__t { color: var(--archive-ink-soft); }
+
+.ws-rec__i {
+  position: relative;
+  padding: 0.35rem 0 0.35rem 1.1rem;
+  border-top: 1px solid rgba(22, 32, 31, 0.12);
+  font-size: var(--step--1);
+  color: var(--archive-ink);
+}
+
+.ws-rec__i:first-child { border-top: 0; }
+
+.ws-rec__i::before {
+  content: '\25C6';
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  font-size: 0.6em;
+  color: #12674f;
+}
+
+/* The clarification request is still printed on archive paper — a returned
+   run is a record too — but its marks are amber and its stock is tinted, so
+   it can never be mistaken for a completed result. */
+.ws-block--record[data-tone='review'] {
+  background: #f0ece1;
+  border-left-color: #8a6410;
+}
+.ws-block--record[data-tone='review'] .ws-rec__i::before {
+  content: '\25B2';
+  color: #8a6410;
+}
+
+/* --- 6. responsive -----------------------------------------
+   The three-column instrument collapses to a vertical journey:
+   question, then agents, then record — the same reading order the
+   desktop layout has, just stacked. */
+@media (max-width: 74rem) {
+  .console__deck { grid-template-columns: 1fr 1.1fr; }
+  .console__col--in { grid-column: 1 / -1; }
+  .con-in { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.5rem; align-items: start; }
+  .con-in__k, .con-in__q, .con-in__note { grid-column: 1; }
+  .con-in__meta { grid-column: 2; grid-row: 1 / 4; margin: 0; }
+  .con-in__acts, .con-cases, .con-in__foot, .con-in__back { grid-column: 1 / -1; }
+}
+
+@media (max-width: 52rem) {
+  .console__deck { grid-template-columns: 1fr; }
+  .con-in { grid-template-columns: 1fr; gap: 0; }
+  .con-in__meta { grid-column: 1; grid-row: auto; margin: 0 0 1.25rem; }
+  .con-time,
+  .con-ws { max-height: none; overflow: visible; }
+  .ag { grid-template-columns: 2.6rem 1fr; }
+  .ag__mark { width: 2.2rem; height: 2.2rem; }
+  .ag-glyph { width: 1.2rem; height: 1.2rem; }
+  .ag__io { grid-template-columns: 1fr; gap: 0.5rem; }
+  .ag__io-r--out { padding-left: 0.7rem; }
+  .ws-ev__i { grid-template-columns: 1fr; }
+  .ws-ev__scope { grid-column: 1; }
+  .ws-tr__i { grid-template-columns: 1fr; }
+  .ws-tr__arrow { display: none; }
+}
+
+@media (max-width: 34rem) {
+  .ag__head { flex-wrap: wrap; }
+  .ag__t { margin-left: 0; width: 100%; text-align: left; }
+}
+
+/* --- 7. reduced motion -------------------------------------
+   The run still happens and still produces the same record; only
+   the sweep, halo, and curve draw are removed. */
+@media (prefers-reduced-motion: reduce) {
+  .ag.is-current .ag__body::after,
+  .ag.is-current .ag__mark::after { animation: none; }
+  .ag.is-current .ag__body::after { opacity: 0.7; transform: none; }
+  .ws-block { transition: none; opacity: 1; transform: none; }
+  .ws-plot__curve { animation: none; stroke-dashoffset: 0; }
+  .ws-plot__pt { animation: none; opacity: 1; }
+}

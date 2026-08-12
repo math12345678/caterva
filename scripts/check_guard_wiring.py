@@ -107,6 +107,7 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_prompt_injection": ("verify_build",),
     "check_python_support_claim": ("verify_build", "ci"),
     "check_rng_convention": ("verify_build", "pytest"),
+    "check_static_assets": ("verify_build",),
     "check_typescript_compiles": ("verify_build",),
     "check_typescript_suites_discovered": ("verify_build",),
 }

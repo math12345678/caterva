@@ -1,0 +1,449 @@
+/* ============================================================
+   terrium — SYSTEM MODE dock
+
+   A fixed instrument in the lower-left corner. It has to read as part
+   of the machine rather than as a website widget, so it is drawn as a
+   panel with a registration bar and a beacon, not as a pill with a
+   drop shadow.
+
+   Collapsed it shows only which mode is in force. Expanded it shows
+   the four, what each one does, and — in failure mode — what is being
+   disclosed. It is deliberately in the corner opposite the masthead
+   inversion mark so the two never argue over the same pixels.
+
+     1. dock frame + collapsed face
+     2. the beacon (mode legible without reading)
+     3. expanded panel
+     4. the four options
+     5. failure legend
+     6. what each mode does to the rest of the page
+     7. responsive
+     8. reduced motion
+   ============================================================ */
+
+/* --- 1. dock frame -----------------------------------------
+   Sits above the sections but below the inspector drawer and the
+   masthead: it must never cover a record the reader has opened. */
+.mode {
+  position: fixed;
+  left: clamp(0.75rem, 2vw, 1.75rem);
+  bottom: clamp(0.75rem, 2vw, 1.75rem);
+  z-index: 55;
+  /* Sized to the collapsed face. A fixed corner control is going to sit on
+     top of the bottom-left of every section on the page, so at rest it has
+     to occupy as little of that corner as possible — at full panel width it
+     covered the manifest's return link. The panel gets its own width and
+     floats above the face instead (see .mode__panel). */
+  width: max-content;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--glass-strong);
+  border: 1px solid var(--line-structural);
+  backdrop-filter: blur(10px) saturate(120%);
+  transition: border-color var(--dur-fast) var(--ease-glide);
+}
+
+/* Registration ticks, so the dock reads as a fitted instrument rather
+   than a floating card. */
+.mode::before,
+.mode::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--signal-teal);
+  opacity: 0.5;
+  pointer-events: none;
+}
+.mode::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+.mode::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+
+.mode.is-open { border-color: rgba(49, 184, 148, 0.42); }
+
+.mode__face {
+  appearance: none;
+  background: none;
+  border: 0;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+}
+
+.mode__face:focus-visible {
+  outline: 1px solid var(--signal-teal);
+  outline-offset: 2px;
+}
+
+.mode__face-txt { display: grid; gap: 0.12rem; }
+
+.mode__lbl {
+  color: var(--text-tertiary);
+  font-size: var(--step--2);
+}
+
+.mode__now {
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label-tight);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.mode__chev {
+  font-size: var(--step-0);
+  color: var(--text-tertiary);
+  /* Points the way the panel will go — up, out of the corner — and turns
+     back down to mean "put it away". */
+  transform: rotate(-90deg);
+  transition: transform var(--dur-fast) var(--ease-glide), color var(--dur-fast) linear;
+}
+.mode.is-open .mode__chev { transform: rotate(90deg); color: var(--signal-teal); }
+.mode__face:hover .mode__chev { color: var(--mineral-teal); }
+
+/* --- 2. the beacon -----------------------------------------
+   The rhythm carries the mode: a slow breath at rest, a fast pulse
+   while running, a hard amber blink in failure. Shape and colour both
+   change, so the beacon is never the only carrier of the state and
+   never carries it by hue alone. */
+.mode__beacon {
+  position: relative;
+  width: 0.7rem;
+  height: 0.7rem;
+  border: 1px solid var(--signal-teal);
+  border-radius: 50%;
+  flex: none;
+}
+
+.mode__beacon::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--signal-teal);
+  opacity: 0.25;
+  transition: opacity var(--dur-fast) linear;
+}
+
+@keyframes mode-breathe {
+  0%, 100% { opacity: 0.14; transform: scale(0.7); }
+  50%      { opacity: 0.5;  transform: scale(1); }
+}
+@keyframes mode-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.3; transform: scale(0.6); }
+}
+
+[data-mode='observe'] .mode__beacon::after { animation: mode-breathe 4.6s var(--ease-glide) infinite; }
+[data-mode='trace'] .mode__beacon::after { opacity: 0.85; }
+[data-mode='run'] .mode__beacon::after { animation: mode-pulse 900ms var(--ease-glide) infinite; opacity: 1; }
+
+/* Failure squares the beacon off as well as recolouring it. */
+[data-mode='failure'] .mode__beacon {
+  border-color: var(--status-review);
+  border-radius: 0;
+}
+[data-mode='failure'] .mode__beacon::after {
+  background: var(--status-review);
+  border-radius: 0;
+  animation: mode-pulse 1.5s steps(2, end) infinite;
+  opacity: 1;
+}
+
+[data-mode='failure'] .mode__now { color: var(--status-review); }
+
+/* --- 3. expanded panel -------------------------------------
+   Height-animated from zero rather than toggled hidden, so opening the
+   dock reads as a drawer sliding out of the corner.
+
+   Positioned above the face rather than below it in flow, so the dock's
+   resting footprint is only the face: the panel is 17.5rem wide and would
+   otherwise force that width on the collapsed control too, permanently
+   covering the bottom-left corner of every section. */
+.mode__panel {
+  position: absolute;
+  left: -1px;
+  right: auto;
+  bottom: 100%;
+  width: min(17.5rem, calc(100vw - 2rem));
+  display: grid;
+  grid-template-rows: 0fr;
+  overflow: hidden;
+  background: var(--glass-strong);
+  border: 1px solid var(--line-structural);
+  border-bottom: 0;
+  backdrop-filter: blur(10px) saturate(120%);
+  transition: grid-template-rows var(--dur-base) var(--ease-instrument),
+              opacity var(--dur-fast) linear;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.mode.is-open .mode__panel { border-color: rgba(49, 184, 148, 0.42); }
+
+.mode.is-open .mode__panel {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* The single inner wrapper is what gets clipped; the grid row is the
+   animated quantity. It must be the panel's only child — see the note in
+   modes/index.js — and it must be able to shrink below its content, which
+   is what min-height: 0 buys. */
+.mode__panel-in { min-height: 0; }
+
+.mode__hint {
+  margin: 0;
+  padding: 0.55rem 0.75rem;
+  font-size: var(--step--2);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  border-top: 1px solid var(--line-grid);
+  border-bottom: 1px solid var(--line-grid);
+}
+
+.mode__where {
+  margin: 0;
+  padding: 0.5rem 0.75rem 0.65rem;
+  font-family: var(--font-sans);
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--line-grid);
+}
+
+/* --- 4. the four options -----------------------------------
+   Each option carries its index, a glyph, the word, and what it does.
+   The glyph is what keeps the active state off colour alone. */
+.mode__list { display: grid; }
+
+.mode__opt {
+  appearance: none;
+  background: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  grid-template-areas: 'i g w' '. . c';
+  align-items: baseline;
+  gap: 0.1rem 0.55rem;
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: background var(--dur-fast) linear, border-color var(--dur-fast) linear,
+              color var(--dur-fast) linear;
+}
+
+.mode__opt + .mode__opt { border-top: 1px solid var(--line-grid); }
+
+.mode__opt:hover {
+  background: rgba(49, 184, 148, 0.05);
+  color: var(--text-primary);
+}
+
+.mode__opt:focus-visible {
+  outline: 1px solid var(--signal-teal);
+  outline-offset: -2px;
+}
+
+.mode__i { grid-area: i; font-size: var(--step--2); color: var(--text-tertiary); }
+.mode__glyph { grid-area: g; font-size: var(--step--1); color: var(--text-tertiary); }
+.mode__w {
+  grid-area: w;
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.mode__cue {
+  grid-area: c;
+  font-family: var(--font-sans);
+  font-size: var(--step--2);
+  letter-spacing: 0;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+.mode__opt.is-active {
+  border-left-color: var(--signal-teal);
+  background: rgba(49, 184, 148, 0.07);
+  color: var(--text-primary);
+}
+.mode__opt.is-active .mode__i,
+.mode__opt.is-active .mode__glyph { color: var(--signal-teal); }
+.mode__opt.is-active .mode__cue { color: var(--text-secondary); }
+
+/* The failure option is amber when it is the one in force, matching the
+   review colour it puts the rest of the page into. */
+.mode__opt[data-mode-set='failure'].is-active {
+  border-left-color: var(--status-review);
+  background: rgba(216, 167, 67, 0.08);
+}
+.mode__opt[data-mode-set='failure'].is-active .mode__i,
+.mode__opt[data-mode-set='failure'].is-active .mode__glyph { color: var(--status-review); }
+
+/* --- 5. failure legend -------------------------------------
+   Only present in failure mode, because it is a list of things to go
+   and look for and in every other mode there is nothing to look for. */
+.mode__kinds {
+  display: none;
+  padding: 0.55rem 0.75rem;
+  border-top: 1px solid var(--line-grid);
+  background: rgba(216, 167, 67, 0.05);
+}
+
+[data-mode='failure'] .mode__kinds { display: block; }
+
+.mode__kinds-l { color: var(--status-review); font-size: var(--step--2); }
+
+.mode__kinds-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.mode__kind {
+  font-family: var(--font-sans);
+  font-size: var(--step--2);
+  line-height: 1.45;
+  color: var(--text-secondary);
+  padding-left: 0.85rem;
+  position: relative;
+}
+
+.mode__kind::before {
+  content: '\25B2';
+  position: absolute;
+  left: 0;
+  font-family: var(--font-mono);
+  font-size: 0.55em;
+  top: 0.35em;
+  color: var(--status-review);
+}
+
+/* --- 6. what a mode does to the rest of the page -----------
+   This is the part that makes SYSTEM MODE a mode and not a label. Each
+   selector below changes a section's behaviour, and each is written
+   against the document element so no section has to know the dock
+   exists. */
+
+/* OBSERVE: ambient only. Every decorative sweep, drift and shimmer in
+   the page is stopped, leaving the reader with a still document — which
+   is what "best for reading and inspecting" has to actually mean. */
+[data-mode='observe'] .atl-ring__sweep,
+[data-mode='observe'] .ag.is-current .ag__body::after,
+[data-mode='observe'] .ag.is-current .ag__mark::after,
+[data-mode='observe'] .mi-seed__ring--2 {
+  animation-play-state: paused;
+}
+
+/* TRACE: the page becomes a map you interrogate. Anything traceable
+   advertises itself with a crosshair cursor, and hovering commits —
+   the lit path stays lit (handled in the controller) so the reader can
+   look away from it. */
+[data-mode='trace'] .atl-node,
+[data-mode='trace'] .atl-lane__hit,
+[data-mode='trace'] .ag,
+[data-mode='trace'] .mi-gauge__stop {
+  cursor: crosshair;
+}
+
+/* Unhovered architecture recedes further in trace mode than it does at
+   rest, so a traced path is unmistakable rather than merely brighter. */
+[data-mode='trace'] .atl-svg.is-tracing .atl-node:not(.is-lit) { opacity: 0.16; }
+[data-mode='trace'] .atl-svg.is-tracing .atl-lane:not(.is-lit) { opacity: 0.07; }
+
+/* An agent row in trace mode exposes its input and output route without
+   being opened, because in trace mode the question is always "where did
+   this come from and where does it go". */
+[data-mode='trace'] .ag__io { opacity: 1; }
+
+/* RUN: the page is working. The signal system brightens by a notch and
+   the running row's sweep is allowed to be conspicuous. */
+[data-mode='run'] {
+  --line-hairline: rgba(184, 222, 213, 0.17);
+  --line-structural: rgba(184, 222, 213, 0.32);
+}
+
+/* FAILURE: the signal system itself turns to review amber. This is the
+   single most visible thing any mode does — the page stops being teal —
+   and it is honest, because in failure mode every route being shown is a
+   route that ends in a refusal. */
+[data-mode='failure'] {
+  --signal-teal: #d8a743;
+  --mineral-teal: #e6c37e;
+  --deep-teal: #9c7726;
+  --fog-teal: #efe0bd;
+  --line-hairline: rgba(239, 224, 189, 0.14);
+  --line-structural: rgba(239, 224, 189, 0.28);
+  --line-grid: rgba(239, 224, 189, 0.06);
+}
+
+/* Everything that reads as verified stays teal even in failure mode: a
+   check that passed did pass, and repainting it amber would be a lie
+   about the record. */
+[data-mode='failure'] [data-tone='supported'],
+[data-mode='failure'] [data-st='supported'],
+[data-mode='failure'] .mi-rec__v[data-tone='supported'] {
+  color: var(--status-supported);
+}
+
+/* A faint amber wash at the edges, so the mode is felt at the periphery
+   rather than announced in the middle of the reading column. */
+[data-mode='failure'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    linear-gradient(to right, rgba(216, 167, 67, 0.05), transparent 22%,
+                    transparent 78%, rgba(216, 167, 67, 0.05));
+}
+
+/* --- 7. responsive -----------------------------------------
+   On a phone the dock docks to the full width of the bottom edge: a
+   corner panel on a 390px screen would either cover the content or be
+   too small to read. */
+@media (max-width: 34rem) {
+  .mode {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-width: none;
+    width: auto;
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+  }
+  .mode::before,
+  .mode::after { display: none; }
+  /* Full width to match the docked face, and no side borders for the same
+     reason the face has none: it is an edge, not a card. */
+  .mode__panel {
+    left: 0;
+    right: 0;
+    width: auto;
+    border-left: 0;
+    border-right: 0;
+  }
+  .mode__panel-in { max-height: 62vh; overflow-y: auto; overscroll-behavior: contain; }
+  .mode__cue { display: none; }
+  .mode__opt { grid-template-areas: 'i g w'; padding: 0.7rem 0.75rem; }
+}
+
+/* --- 8. reduced motion -------------------------------------
+   The beacon keeps a static state per mode; only its animation goes.
+   The panel still opens, without the sliding. */
+@media (prefers-reduced-motion: reduce) {
+  .mode__beacon::after { animation: none !important; opacity: 0.8; }
+  .mode__panel { transition: opacity 1ms linear; }
+  .mode__chev { transition: none; }
+}

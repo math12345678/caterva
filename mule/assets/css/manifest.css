@@ -1,0 +1,204 @@
+/* ============================================================
+   terrium — SYSTEM MANIFEST
+
+   The quietest thing on the page and the only one set on paper.
+   Everything else in terrium is an instrument drawn in the dark;
+   this is a document. So it gets no glow, no gradient, no motion
+   beyond the reveal, and near-black type on archive stock.
+
+   The five statements are refusals, so they are numbered and set
+   large enough that each one is read on its own rather than
+   skimmed as a list. The coda is the only line allowed to be
+   larger than them.
+
+     1. the sheet
+     2. head + label
+     3. the five statements
+     4. coda + return
+     5. responsive
+     6. reduced motion / print
+   ============================================================ */
+
+/* --- 1. the sheet ------------------------------------------
+   Full-bleed dark surround with the paper inset, so the section reads
+   as a document laid on the machine rather than as a themed band. */
+.manifest {
+  position: relative;
+  padding: clamp(4rem, 12vh, 9rem) var(--gutter);
+  background: var(--void);
+}
+
+.manifest__sheet {
+  position: relative;
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: clamp(2rem, 5vw, 4.5rem) clamp(1.5rem, 5vw, 5rem) clamp(2rem, 4vw, 3.5rem);
+  background: var(--archive-paper);
+  color: var(--archive-ink);
+  /* A single hard edge and one soft lift. Paper sitting on a dark
+     surface, not a card floating in a UI. */
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 70px -40px rgba(0, 0, 0, 0.9);
+}
+
+/* Faint fibre, so the stock does not read as flat #f1f0ea. */
+.manifest__sheet::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    repeating-linear-gradient(0deg, rgba(22, 32, 31, 0.022) 0 1px, transparent 1px 3px);
+}
+
+/* --- 2. head -----------------------------------------------
+   The version stamp is the only place the manifest names itself; the
+   heading proper is for screen readers, because on paper the label
+   *is* the heading. */
+.manifest__head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: clamp(2rem, 5vw, 3.5rem);
+}
+
+.manifest__label {
+  margin: 0;
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  /* On paper the label IS the heading (the h2 is for screen readers), so it
+     cannot be the faintest thing on the sheet. 0.55 measured 3.64:1. */
+  color: var(--archive-ink-soft);
+}
+
+.manifest__rule {
+  height: 1px;
+  background: rgba(22, 32, 31, 0.22);
+}
+
+/* --- 3. the five statements --------------------------------
+   Numbered, hairline-separated, and set at reading size rather than
+   display size: these are commitments to be held to, and typographic
+   drama would make them read as marketing. */
+.manifest__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+
+.manifest__item {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr;
+  align-items: baseline;
+  gap: 0 1.25rem;
+  padding: clamp(1rem, 2.2vw, 1.5rem) 0;
+  border-top: 1px solid rgba(22, 32, 31, 0.12);
+}
+
+.manifest__item:last-child { border-bottom: 1px solid rgba(22, 32, 31, 0.12); }
+
+.manifest__i {
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label-tight);
+  /* The numeral is how each refusal is referred to, so it is content. */
+  color: var(--archive-ink-soft);
+}
+
+.manifest__stmt {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--step-1);
+  line-height: 1.4;
+  /* Nearly black, per the brief — not black. Ink on stock is never
+     #000, and the difference is the whole reason the section works. */
+  color: #101817;
+  text-wrap: pretty;
+}
+
+/* --- 4. coda + return --------------------------------------
+   The one line allowed to be larger than the statements, because it is
+   the thing the five of them add up to. */
+.manifest__close {
+  margin-top: clamp(2rem, 5vw, 3.5rem);
+  display: grid;
+  gap: clamp(1.5rem, 3vw, 2.25rem);
+  justify-items: start;
+}
+
+.manifest__coda {
+  margin: 0;
+  font-size: var(--step-2);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  color: var(--archive-ink);
+  max-width: 30ch;
+  text-wrap: balance;
+}
+
+/* Subtle by instruction: a bracketed monospace line, underlined only on
+   approach. It is a way back into the architecture, not a call to act. */
+.manifest__back {
+  display: inline-block;
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  text-decoration: none;
+  /* Subtle, but it is the only link out of the manifest. */
+  color: rgba(22, 32, 31, 0.7);
+  padding: 0.5rem 0;
+  border-bottom: 1px solid transparent;
+  transition: color var(--dur-fast) linear, border-color var(--dur-fast) linear;
+}
+
+.manifest__back:hover,
+.manifest__back:focus-visible {
+  color: #0f5c46;
+  border-bottom-color: rgba(15, 92, 70, 0.4);
+}
+
+.manifest__back:focus-visible {
+  outline: 1px solid #0f5c46;
+  outline-offset: 3px;
+}
+
+/* In failure mode the return link picks up the review colour like the
+   rest of the signal system, but the paper and the ink do not move: a
+   commitment does not change because the demo is showing a refusal. */
+[data-mode='failure'] .manifest__back:hover,
+[data-mode='failure'] .manifest__back:focus-visible {
+  color: #7c5a0d;
+  border-bottom-color: rgba(124, 90, 13, 0.4);
+}
+
+/* --- 5. responsive -----------------------------------------
+   The number column collapses above the statement rather than shrinking
+   into it: at phone widths a 3rem gutter would leave the statements
+   about twenty characters wide. */
+@media (max-width: 40rem) {
+  .manifest__item {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+  .manifest__stmt { font-size: var(--step-0); }
+  /* The dock is pinned across the bottom edge on a phone; the sheet must
+     not end underneath it. */
+  .manifest { padding-bottom: clamp(6rem, 18vh, 9rem); }
+}
+
+/* --- 6. reduced motion + print -----------------------------
+   The statements already arrive one at a time through the shared reveal
+   observer; with motion reduced they are simply present. */
+@media (prefers-reduced-motion: reduce) {
+  .manifest__back { transition: none; }
+}
+
+/* It is a document, so it should print like one. */
+@media print {
+  .manifest { padding: 0; background: none; }
+  .manifest__sheet { box-shadow: none; max-width: none; }
+  .manifest__sheet::before { display: none; }
+  .manifest__back { display: none; }
+}
