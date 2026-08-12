@@ -21,7 +21,7 @@ git clone https://github.com/math12345678/terrium.git
 cd terrium
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # runs all 1,289 tests (1,014 engine + 275 literature)
+make test      # runs all 1,291 tests (1,014 engine + 277 literature)
 
 `test_popgen_resolver.py` skips its 19 tests when `stdpopsim` is not
 installed — it needs `libgsl-dev` and is genuinely absent in some
@@ -333,7 +333,7 @@ Terrium/
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                     275 tests
+│   └── ...                     277 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
@@ -422,10 +422,10 @@ them together.
 
 ```bash
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 1,289 tests
+make test        # run all 1,291 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,014 tests)
-make test-lit    # literature layer only (275 tests)
+make test-lit    # literature layer only (277 tests)
 python3 scripts/verify_build.py --quick  # all 21 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```
