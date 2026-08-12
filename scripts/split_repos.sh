@@ -84,66 +84,106 @@ REQ
   # -- a silent skip is indistinguishable from a pass, which is the defect
   # `check_no_disabled_tests` exists to prevent. Under the umbrella checkout
   # `scripts/` is reachable, nothing skips, and the count stays 1,014.
-  cat > "$d/conftest.py" <<'PY'
+  cat >> "$d/Terium/conftest.py" <<'PY'
 """Standalone-clone support for the Terium engine.
 
-Eight test modules import guard scripts that live in the `wiring-main`
-repository (`scripts/check_*.py`). Cloned on its own, this repository has no
-such directory, and those modules cannot be collected at all -- pytest
-reports an ImportError and exits before running anything.
+Five test modules reach outside this repository:
 
-Rather than let a fresh clone look broken, they are skipped when `scripts/`
-is absent, and the skip says so out loud. A clean skip is invisible in a CI
-summary; an announced one is a fact a reader can act on.
+    four import guard scripts from `wiring-main` (scripts/check_*.py)
+    one reads the Python runner from `science-agent-pipeline-replit`
+
+Cloned on its own, this repository has neither, and those modules cannot be
+IMPORTED -- pytest reports an ImportError during collection and exits having
+run nothing at all.
+
+TWO THINGS THIS GOT WRONG FIRST, both found by actually running it:
+
+  * `pytest_collection_modifyitems` cannot help. It runs AFTER collection,
+    and a module that fails to import is never collected into items to be
+    marked. Verified: 5 collection errors, unchanged.
+
+  * `collect_ignore` resolves relative to its own conftest's directory and
+    was not applied when pytest was invoked with an explicit path argument.
+    `pytest_ignore_collect` is called for every candidate path before import,
+    which is the only hook both early enough and unambiguous.
+
+The list below is what actually fails, established by running a fresh clone
+-- not by reading imports and guessing. An earlier version named eight
+modules, four of which resolve fine on their own.
+
+Nothing is silently absent: the exclusion is ANNOUNCED on stderr. A clean
+skip is indistinguishable from a pass in a CI summary, which is the defect
+`check_no_disabled_tests` exists to prevent.
 
 Under the umbrella checkout (`Terrium-sim/main`, cloned --recursive) the
-directory IS reachable, nothing skips, and the engine reports its full
-1,014 tests.
+siblings ARE reachable, nothing is excluded, and the engine reports its
+full 1,014 tests.
 """
 import pathlib
 import sys
 
-import pytest
-
 _HERE = pathlib.Path(__file__).resolve().parent
 
-# The umbrella layout puts wiring-main beside this repository.
-_CANDIDATES = [_HERE / "scripts", _HERE.parent / "wiring-main", _HERE.parent / "scripts"]
-_SCRIPTS = next((p for p in _CANDIDATES if p.is_dir()), None)
+# The umbrella layout puts the sibling repositories beside this one.
+_GUARDS = next(
+    (p for p in (_HERE / "scripts",
+                 _HERE.parent / "wiring-main" / "scripts",
+                 _HERE.parent / "wiring-main",
+                 _HERE.parent / "scripts")
+     if (p / "check_forbidden_packages.py").is_file()),
+    None,
+)
 
-GUARD_BACKED_TESTS = {
+# Established by running a fresh clone and reading what broke -- three
+# times, because guessing was wrong twice. Two failure shapes, and the
+# second is invisible to the first method:
+#
+#   IMPORT the guard  -> ImportError at collection, loud and obvious
+#   SUBPROCESS it     -> collects fine, then fails at RUN time
+#
+# The subprocess group is the dangerous one: a reader watching collection
+# succeed would conclude the repo is standalone-clean.
+NEEDS_SIBLINGS = {
+    # import a guard module from wiring-main
     "test_citation_format.py",
     "test_dependencies_declared.py",
-    "test_engine_contract.py",
     "test_forbidden_packages.py",
-    "test_package_reexports.py",
-    "test_plausibility_constants.py",
-    "test_popgen_correctness.py",
     "test_rng_convention.py",
+    # subprocess out to a guard script in wiring-main
+    "test_engine_contract.py",
+    "test_plausibility_constants.py",
+    # read files from science-agent-pipeline-replit
+    "test_boundary_contract.py",
+    # fetches a curated model from the BioModels API; no sibling needed, but
+    # it cannot pass without network, and a standalone clone is exactly where
+    # someone runs the suite offline
+    "test_biomodels_parameter_parity.py",
 }
 
-if _SCRIPTS is not None and str(_SCRIPTS) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS))
-else:
-    print(
-        "\n[terium] The guard scripts (wiring-main) are not reachable from "
-        "this checkout, so %d test module(s) that exercise them are SKIPPED, "
-        "not passing. Clone the umbrella for the full suite:\n"
-        "    git clone --recursive https://github.com/Terrium-sim/main.git\n"
-        % len(GUARD_BACKED_TESTS)
-    )
+if _GUARDS is not None and str(_GUARDS) not in sys.path:
+    sys.path.insert(0, str(_GUARDS))
+
+_ANNOUNCED = False
 
 
-def pytest_collection_modifyitems(config, items):
-    if _SCRIPTS is not None:
-        return
-    skip = pytest.mark.skip(
-        reason="needs the guard scripts from Terrium-sim/wiring-main; "
-               "clone Terrium-sim/main --recursive to run these"
-    )
-    for item in items:
-        if pathlib.Path(str(item.fspath)).name in GUARD_BACKED_TESTS:
-            item.add_marker(skip)
+def pytest_ignore_collect(collection_path, config):
+    """Exclude the cross-repo modules when the siblings are not present."""
+    global _ANNOUNCED
+    if _GUARDS is not None:
+        return None
+    if pathlib.Path(str(collection_path)).name not in NEEDS_SIBLINGS:
+        return None
+    if not _ANNOUNCED:
+        _ANNOUNCED = True
+        sys.stderr.write(
+            "\n[terium] %d test module(s) need sibling repositories that are "
+            "not in this checkout, so they were NOT COLLECTED -- they did not "
+            "run, and did not pass.\n"
+            "         For the full suite:\n"
+            "         git clone --recursive https://github.com/Terrium-sim/main.git\n\n"
+            % len(NEEDS_SIBLINGS)
+        )
+    return True
 PY
 
   cat > "$d/.gitignore" <<'IGN'
