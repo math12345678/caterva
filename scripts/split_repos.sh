@@ -516,7 +516,8 @@ build_fileset miscellaneous docs/readmes/miscellaneous.md \
 # The dashboard the web server serves. Split from server.ts, which stays in
 # backend-main -- see docs/REPO_MAP.md for why, and for the guard that keeps
 # the two from drifting apart.
-build_fileset frontend-main docs/readmes/frontend-main.md src/web/dashboard.html
+build_fileset frontend-main docs/readmes/frontend-main.md \
+  src/web/dashboard.html src/web/dev-server.mjs src/web/frontend-package.json
 
 # The umbrella: top-level docs, container/compose, licence, and the
 # submodule wiring. No source file, so nothing here can drift from a repo
@@ -529,7 +530,7 @@ build_fileset main docs/readmes/main.md "${KEEP_DOCS[@]}" \
   LICENSE CITATION.cff Dockerfile docker-compose.yml .dockerignore \
   .editorconfig .gitignore docs/REPO_MAP.md docs/ARCHIVE_TRIAGE.md
 
-build_fileset worktrees docs/readmes/worktrees.md
+build_fileset worktrees docs/readmes/worktrees.md Terrium.worktrees/worktree.sh
 build_fileset mule docs/readmes/mule.md
 
 # ---------------------------------------------------------------------------
