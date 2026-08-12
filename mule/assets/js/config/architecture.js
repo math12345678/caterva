@@ -290,8 +290,16 @@ export const EVIDENCE = [
     kind: 'evidence',
     label: 'METHOD RECORD',
     sub: 'ODE SOLUTION',
-    tag: 'BROWSER ODE',
-    scope: 'BROWSER NUMERICAL INTEGRATION',
+    /* Was BROWSER ODE / BROWSER NUMERICAL INTEGRATION. The run this object
+       belongs to has already routed away from the browser — the compute
+       router's declared output four fields up is "Local ODE runtime" and its
+       inspector record says heavier methods were routed away from the browser
+       — so the evidence backing the solver tolerance cannot be browser
+       integration. Terrium's ODE path is libroadrunner, which is not a
+       browser. Same fact, two densities: `tag` fits the 106px channel,
+       `scope` is what the inspector reads. */
+    tag: 'ODE SOLVER',
+    scope: 'LOCAL ODE RUNTIME / NUMERICAL INTEGRATION',
     form: 'capsule',
     origin: { x: 412, y: 470 },
     dock: { x: 614, y: 630 },

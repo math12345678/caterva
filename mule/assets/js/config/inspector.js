@@ -140,7 +140,9 @@ export const INSPECTOR = {
     outputs: 'Basis for solver tolerance',
     event: 'Docked on the right of the assembly core, tied to the tolerance berth.',
     trail: 'Supports the numerical method rather than the biology.',
-    scope: 'Browser numerical integration',
+    /* Not "browser numerical integration": this run routed away from the
+       browser, and Terrium's ODE path is libroadrunner. See architecture.js. */
+    scope: 'Local ODE runtime / numerical integration',
     path: ['literature-retrieval', 'ev-ode', 'p-tol', 'compute-router'],
     note: 'Describes how the system is solved, not what the result means.'
   },
@@ -338,7 +340,9 @@ export const PARAM_INSPECTOR = {
     outputs: 'Applied by the compute router at execution',
     event: 'Traced to its method record by sentinel 01.',
     trail: 'Value \u2192 method record \u2014 ODE solution.',
-    scope: 'Browser numerical integration',
+    /* Not "browser numerical integration": this run routed away from the
+       browser, and Terrium's ODE path is libroadrunner. See architecture.js. */
+    scope: 'Local ODE runtime / numerical integration',
     path: ['p-tol', 'ev-ode', 'compute-router', 's-hallucination'],
     note: DEMO_NOTE
   }

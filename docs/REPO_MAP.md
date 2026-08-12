@@ -21,7 +21,7 @@ git clone --recursive https://github.com/Terrium-sim/main.git
 | `main` | umbrella: README, LICENSE, CITATION.cff, CONTRIBUTING, SECURITY, CHANGELOG, Docker/compose, submodules | root files (14 current docs) | new |
 | `backend-main` | TypeScript library, CLI, engine bridge, web server, storage, validation, literature layer | `src/`, `examples/` | preserved |
 | `frontend-main` | the dashboard UI served by the web server | `src/web/dashboard.html` | preserved |
-| `wiring-main` | the 21 guards, CI workflow, Makefile, build/lint/type config | `scripts/`, `.github/`, `Makefile`, `pyproject.toml`, `tsconfig.json`, `requirements*.txt` | preserved |
+| `wiring-main` | the 22 guards, CI workflow, Makefile, build/lint/type config | `scripts/`, `.github/`, `Makefile`, `pyproject.toml`, `tsconfig.json`, `requirements*.txt` | preserved |
 | `terium` | the simulation engine (15 domains) and its 1,014 tests | `Terium/` (was `Tellurium/`) | preserved, see below |
 | `tests` | the literature layer and its 277 tests — resolvers, BRENDA/PubMed clients | `Tests/` | preserved |
 | `business` | strategy, pitch material, and the build-stage record | `Business/` | preserved |
