@@ -9,7 +9,7 @@ A **production-ready scientific enzyme kinetics simulation system** with:
 - ✅ REST API for programmatic access
 - ✅ Real literature integration from PubMed/CrossRef
 - ✅ SBML model generation
-- ✅ Tellurium kinetics simulation engine
+- ✅ Terium kinetics simulation engine
 - ✅ Comprehensive CLI tool
 - ✅ Full TypeScript codebase with 178/178 tests passing
 - ✅ 84% code coverage
@@ -80,7 +80,7 @@ curl http://localhost:3000/api/jobs/job_...
 │  │  1. Parameter Resolution                        │  │
 │  │  2. Literature Verification (PubMed + CrossRef) │  │
 │  │  3. Model Generation (4 SBML kinetic models)    │  │
-│  │  4. Simulation Execution (Tellurium + libroadrunner) │
+│  │  4. Simulation Execution (Terium + libroadrunner) │
 │  └──────────────────────────────────────────────────┘  │
 │                          ↓                               │
 │  ┌──────────────────────────────────────────────────┐  │
@@ -211,7 +211,7 @@ User Input: enzyme, substrate, kinetic model
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
-│  Tellurium Simulation                   │
+│  Terium Simulation                   │
 │  - Execute kinetic equations            │
 │  - Generate time-series trajectory      │
 │  - Calculate final substrate value      │
@@ -265,7 +265,7 @@ src/
 **Test Categories:**
 - Parameter validation (20 tests)
 - SBML model generation (18 tests)
-- Tellurium integration (22 tests)
+- Terium integration (22 tests)
 - Literature validation (16 tests)
 - Job management (14 tests)
 - Reproducibility (12 tests)
@@ -400,7 +400,7 @@ PORT=3001 npm run web
 ## 📚 Additional Resources
 
 - **SBML Specification:** http://sbml.org/
-- **Tellurium Documentation:** http://tellurium.readthedocs.io/
+- **Terium Documentation:** http://terium.readthedocs.io/
 - **PubMed API Guide:** https://www.ncbi.nlm.nih.gov/books/NBK25497/
 - **CrossRef API:** https://github.com/CrossRef/rest-api-doc
 
@@ -419,7 +419,7 @@ You now have a **complete, production-ready scientific simulation system** that:
 
 ✅ Integrates with real scientific databases (PubMed, CrossRef)
 ✅ Generates valid SBML models for enzyme kinetics
-✅ Runs kinetics simulations via Tellurium
+✅ Runs kinetics simulations via Terium
 ✅ Validates results against literature
 ✅ Provides web, CLI, and REST API interfaces
 ✅ Tracks reproducibility & job history

@@ -33,7 +33,7 @@ programs like Kickstart) before making any of these decisions for real.
 - [ ] Open a business bank account (separate from personal -- do this even
       before full incorporation if any real money starts moving)
 - [ ] Founder equity split and vesting schedule -- see `CAP_TABLE.md`
-- [ ] IP assignment agreement -- make sure the actual codebase (Tellurium
+- [ ] IP assignment agreement -- make sure the actual codebase (Terium
       engine, BRENDA/KEGG scraper, landing page) is assigned to the company,
       not left ambiguously owned by whoever committed it
 - [ ] Basic founder agreement covering what happens if someone leaves

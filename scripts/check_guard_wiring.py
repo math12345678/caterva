@@ -20,7 +20,7 @@ A guard is wired if it appears in at least one of:
 
   - `scripts/verify_build.py`      (the local aggregate)
   - `.github/workflows/tests.yml`  (CI)
-  - a pytest wrapper under `Tellurium/tests/`
+  - a pytest wrapper under `Terium/tests/`
 
 Any one is sufficient. The point is that *something* runs it without being
 asked, not that everything does.
@@ -43,7 +43,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 VERIFY_BUILD = SCRIPTS_DIR / "verify_build.py"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"
-PYTEST_DIRS = [REPO_ROOT / "Tellurium" / "tests", REPO_ROOT / "Tests"]
+PYTEST_DIRS = [REPO_ROOT / "Terium" / "tests", REPO_ROOT / "Tests"]
 
 # Guards that are deliberately NOT in every harness, with the reason. A
 # guard listed here is exempt from the harness named, not from the

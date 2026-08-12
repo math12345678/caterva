@@ -27,7 +27,7 @@ const PLANS = [
     desc: "Early access for teaching labs and research groups. Full pipeline access.",
     features: [
       "Unlimited simulations",
-      "Full pipeline (LLM + BRENDA + Tellurium)",
+      "Full pipeline (LLM + BRENDA + Terium)",
       "SSE streaming results",
       "Literature provenance trail",
       "Priority support & onboarding",

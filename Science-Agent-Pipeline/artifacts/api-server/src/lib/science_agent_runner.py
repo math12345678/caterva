@@ -166,35 +166,35 @@ def resolve_kinetic_value(
     )
 
 
-def _ensure_tellurium_path() -> str:
-    """Ensure Tellurium/ directory is in sys.path for validation imports.
+def _ensure_terium_path() -> str:
+    """Ensure Terium/ directory is in sys.path for validation imports.
 
-    Returns the Tellurium directory path. This is shared by vmax and beta_gamma bridges
+    Returns the Terium directory path. This is shared by vmax and beta_gamma bridges
     to avoid duplicating the import setup logic.
     """
     import pathlib
     import sys
 
-    tellurium_dir = str(pathlib.Path(__file__).resolve().parents[5] / "Tellurium")
-    if tellurium_dir not in sys.path:
-        sys.path.insert(0, tellurium_dir)
-    return tellurium_dir
+    terium_dir = str(pathlib.Path(__file__).resolve().parents[5] / "Terium")
+    if terium_dir not in sys.path:
+        sys.path.insert(0, terium_dir)
+    return terium_dir
 
 
 def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool, bool, str | None]:
     """Compute Vmax = kcat * [E]0 via the SAME implementation the engine
-    itself uses (Tellurium.core.validation.vmax_from_kcat), rather than a
+    itself uses (Terium.core.validation.vmax_from_kcat), rather than a
     second copy of the arithmetic and its Rule 2 bounds in TypeScript. See
     ADR 0019.
 
-    Imported lazily as ``core.validation`` with the Tellurium/ directory
-    (not the Tellurium package root) added to sys.path -- this reaches
-    Tellurium/core/validation.py directly as validation.py's own module
+    Imported lazily as ``core.validation`` with the Terium/ directory
+    (not the Terium package root) added to sys.path -- this reaches
+    Terium/core/validation.py directly as validation.py's own module
     docstring anticipates (its imports already try
-    ``Tellurium.core.data_structures`` first, falling back to
-    ``core.data_structures``) WITHOUT executing Tellurium/__init__.py's
+    ``Terium.core.data_structures`` first, falling back to
+    ``core.data_structures``) WITHOUT executing Terium/__init__.py's
     full antimony-dependent import chain, which the public
-    ``tellurium_engine`` entry point requires just to expose one
+    ``terium_engine`` entry point requires just to expose one
     pure-arithmetic function. This keeps every non-kcat lookup (km, ki,
     mutation_rate) free of an antimony dependency it never needed.
 
@@ -202,10 +202,10 @@ def bridge_vmax_from_kcat(kcat: float, enzyme_conc: float) -> tuple[float, bool,
     the inputs were rejected (non-finite/non-positive); the caller must
     not treat the returned vmax as usable in that case.
     """
-    _ensure_tellurium_path()
-    from core import validation as tellurium_validation  # noqa: PLC0415
+    _ensure_terium_path()
+    from core import validation as terium_validation  # noqa: PLC0415
 
-    vmax, result = tellurium_validation.vmax_from_kcat(kcat, enzyme_conc)
+    vmax, result = terium_validation.vmax_from_kcat(kcat, enzyme_conc)
     if not result.ok:
         return 0.0, False, False, "; ".join(result.errors)
     return vmax, True, result.flagged, result.flag_reason
@@ -216,18 +216,18 @@ def bridge_beta_gamma_from_r0(
 ) -> tuple[float, float, bool, bool, str | None]:
     """Compute (beta, gamma) = R0/infectious-period bridge via the SAME
     implementation the SIR engine itself uses
-    (Tellurium.core.validation.beta_gamma_from_r0), imported the same
+    (Terium.core.validation.beta_gamma_from_r0), imported the same
     lightweight way bridge_vmax_from_kcat() reaches vmax_from_kcat -- as
-    ``core.validation`` with Tellurium/ (not the Tellurium package root) on
-    sys.path, never executing Tellurium/__init__.py's antimony-dependent
+    ``core.validation`` with Terium/ (not the Terium package root) on
+    sys.path, never executing Terium/__init__.py's antimony-dependent
     chain. See ADR 0017 for the resolver, ADR 0020 for this bridge.
 
     Returns (beta, gamma, ok, flagged, flag_reason_or_error).
     """
-    _ensure_tellurium_path()
-    from core import validation as tellurium_validation  # noqa: PLC0415
+    _ensure_terium_path()
+    from core import validation as terium_validation  # noqa: PLC0415
 
-    beta, gamma, result = tellurium_validation.beta_gamma_from_r0(
+    beta, gamma, result = terium_validation.beta_gamma_from_r0(
         r0, infectious_period_days
     )
     if not result.ok:

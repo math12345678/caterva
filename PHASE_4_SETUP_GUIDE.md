@@ -35,15 +35,15 @@ export BRENDA_EMAIL="your-email@example.com"
 # Now you can query 50,000+ enzymes with real kinetics
 ```
 
-### 3. ✅ Real Tellurium Engine
-**File:** `src/engine/tellurium-real.py`
+### 3. ✅ Real Terium Engine
+**File:** `src/engine/terium-real.py`
 
-Real Python-based kinetics simulation using Tellurium.
+Real Python-based kinetics simulation using Terium.
 
 **Setup required:** 1 minute
 ```bash
 # Install dependencies:
-pip install tellurium libroadrunner
+pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001
 
 # Now the simulation engine actually works
 ```
@@ -54,11 +54,11 @@ pip install tellurium libroadrunner
 
 ### Step 1: Install Python Dependencies
 ```bash
-# Install Tellurium for real simulations
-pip install tellurium libroadrunner
+# Install Terium for real simulations
+pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001
 
 # Verify installation:
-python3 -c "import tellurium; print('✓ Tellurium installed')"
+python3 -c "import terium; print('✓ Terium installed')"
 ```
 
 ### Step 2: Register with BRENDA (Optional but recommended)
@@ -87,7 +87,7 @@ npm run cli -- validate "lactate dehydrogenase kinetics"
 
 ### Step 4: Test Real Simulations
 ```bash
-# With real Tellurium engine
+# With real Terium engine
 npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
 
 # This will:
@@ -126,7 +126,7 @@ User → CLI → "Fake Literature" (made up)
 User → CLI → Real PubMed papers (50+ million available)
          → Real CrossRef DOIs (validated)
          → Real BRENDA kinetics (optional)
-         → Real Tellurium simulation
+         → Real Terium simulation
          → Real Results you can publish
 ```
 
@@ -145,7 +145,7 @@ npm run cli -- validate "lactate dehydrogenase"
 # - Real abstracts
 # - Links to real papers
 
-# Then simulate with REAL Tellurium:
+# Then simulate with REAL Terium:
 npm run cli -- simulate "michaelis-menten" \
   --km 5.2 --vmax 12.8 --s0 10
 
@@ -204,7 +204,7 @@ const article = await resolveDOIFromCrossRef('10.1038/nature12373');
 |------|---------|--------|
 | `src/integrations/crossref-pubmed-real.ts` | Real literature APIs | ✅ Ready |
 | `src/integrations/brenda-real.ts` | Real enzyme kinetics | ✅ Ready |
-| `src/engine/tellurium-real.py` | Real simulation engine | ✅ Ready |
+| `src/engine/terium-real.py` | Real simulation engine | ✅ Ready |
 | `PHASE_4_REAL_DATA.md` | Roadmap + examples | ✅ Complete |
 | `PHASE_4_SETUP_GUIDE.md` | This file | ✅ Complete |
 
@@ -215,7 +215,7 @@ const article = await resolveDOIFromCrossRef('10.1038/nature12373');
 ### Option A: Quick Test (5 minutes)
 ```bash
 # 1. Install Python deps
-pip install tellurium libroadrunner
+pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001
 
 # 2. Test real literature search
 npm run cli -- validate "enzyme kinetics"
@@ -245,7 +245,7 @@ export BRENDA_EMAIL="..."
 
 ✅ **Real CrossRef API** - DOI validation works NOW  
 ✅ **Real PubMed API** - Literature search works NOW  
-✅ **Real Tellurium** - Simulation engine works NOW  
+✅ **Real Terium** - Simulation engine works NOW  
 ✅ **Real BRENDA** - Kinetics database ready (5 min setup)  
 
 **No more fake data. Everything is from real scientific sources.**

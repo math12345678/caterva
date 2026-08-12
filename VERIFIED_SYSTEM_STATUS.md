@@ -112,7 +112,7 @@ Background Job Processing
 Scientific Pipeline
 ├─ Literature fetching (PubMed + CrossRef)
 ├─ SBML model generation
-├─ Tellurium kinetics simulation
+├─ Terium kinetics simulation
 └─ Result validation & confidence scoring
 
 Storage Layer

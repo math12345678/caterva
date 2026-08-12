@@ -1,0 +1,812 @@
+"""Tests for Stage 3: molecular dynamics (Lennard-Jones, velocity Verlet).
+
+Verification targets (per Stage 3 Part 2, Section 6):
+  Target A — energy conservation + halving-step order check (velocity Verlet)
+  Target B — momentum conservation (exact, machine precision)
+  Target C — closed-form force table (equilibrium, attractive, repulsive)
+  Target D — fixed-seed reproducibility + different-seed divergence
+
+Pre-specified mutations (5):
+  1. VV → Euler-Cromer — caught ONLY by halving-step scaling (Target A)
+  2. Force sign flip — caught ONLY by Target C
+  3. Missing pair direction (force not antisymmetric) — caught by Target B
+  4. COM velocity not subtracted — caught by Target B at t=0
+  5. r vs r^2 confusion — caught ONLY by Target C
+
+Mutation 2 independently reproduced, Stage 3 Part 3 (2026-07-31):
+negated lennard_jones_force's magnitude (`magnitude = 24.0 * (...)` ->
+`magnitude = -24.0 * (...)`), reverted after. Exactly 4 tests fail --
+test_force_attractive_at_r_1_5, test_force_repulsive_at_r_0_9 (Target
+C), test_force_signs_are_correct, and
+test_force_magnitude_matches_closed_form (the two mutation-detection
+tests) -- and, critically, all Target A and B tests still pass (50/54),
+confirming by direct reproduction, not just prediction, that a
+sign-flipped force is genuinely conservative and momentum-preserving:
+energy conservation and momentum conservation cannot see this bug at
+all. Reverted; suite confirmed clean (54/54) afterward.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+
+import numpy as np
+import pytest
+
+# Ensure the Terium package is on the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+from terium_engine import (  # noqa: E402
+    MD_PLAUSIBLE_TEMPERATURE_HIGH,
+    ModelBuildError,
+    SimulationResult,
+    _compute_lj_potential,
+    lennard_jones_force,
+    lj_cluster_positions,
+    simulate_molecular_dynamics,
+    validate_md_params,
+)
+
+
+# =========================================================================
+# helpers
+# =========================================================================
+
+
+def _target_a_result() -> SimulationResult:
+    """Cached Target A run: N=108, T=0.4, dt=0.005, 2000 steps, seed=42."""
+    return simulate_molecular_dynamics(108, 0.4, 0.005, 2000, seed=42)
+
+
+def _energy_conservation_metrics(
+    result: SimulationResult,
+) -> tuple[float, float]:
+    """Return (max_rel_dev, initial_total_energy)."""
+    te = result.column("total_energy")
+    te0 = te[0]
+    max_dev = max(abs(e - te0) for e in te)
+    return max_dev / abs(te0) if te0 != 0 else float("inf"), te0
+
+
+# =========================================================================
+# Target A — energy conservation + halving-step order check
+# =========================================================================
+
+
+class TestTargetAEnergyConservation:
+    """Energy must stay within a bounded oscillation band — no monotonic drift."""
+
+    def test_energy_bounded_oscillation(self) -> None:
+        """|Delta E| / E0 < 1e-3 over the full run."""
+        result = _target_a_result()
+        max_dev, _ = _energy_conservation_metrics(result)
+        assert max_dev < 1e-3, (
+            f"energy drift {max_dev:.2e} exceeds 1e-3 bound"
+        )
+
+    def test_halving_step_reduces_energy_error(self) -> None:
+        """Halving dt must shrink energy error by factor 3–5 (VV is O(dt^2))."""
+        r = _target_a_result()
+        r_half = simulate_molecular_dynamics(108, 0.4, 0.0025, 2000, seed=42)
+        dev, _ = _energy_conservation_metrics(r)
+        dev_half, _ = _energy_conservation_metrics(r_half)
+        ratio = dev / dev_half if dev_half > 0 else float("inf")
+        assert 3.0 <= ratio <= 5.0, (
+            f"halving-step ratio {ratio:.2f} outside [3, 5]; "
+            "integrator may not be velocity Verlet"
+        )
+
+    def test_energy_error_does_not_grow_with_time(self) -> None:
+        """Energy error should fluctuate, not grow monotonically after the first
+        few steps."""
+        result = _target_a_result()
+        te = result.column("total_energy")
+        te0 = te[0]
+        # Look at the second half – error should not be steadily increasing
+        mid = len(te) // 2
+        first_half_max = max(abs(e - te0) for e in te[:mid])
+        second_half_max = max(abs(e - te0) for e in te[mid:])
+        # Allow second half to be up to 3x worse (fluctuations, not drift)
+        assert second_half_max <= 3.0 * first_half_max, (
+            f"second-half error {second_half_max:.2e} is more than 3× "
+            f"first-half error {first_half_max:.2e} — possible drift"
+        )
+
+
+# =========================================================================
+# Target B — momentum conservation (exact, machine precision)
+# =========================================================================
+
+
+class TestTargetBMomentumConservation:
+    """Total momentum must be conserved to machine precision at every step."""
+
+    def test_momentum_near_zero_throughout(self) -> None:
+        """Momentum magnitude < 1e-10 at every recorded step."""
+        result = _target_a_result()
+        mom = result.column("total_momentum_magnitude")
+        max_mom = max(mom)
+        assert max_mom < 1e-10, (
+            f"maximum momentum magnitude {max_mom:.2e} exceeds 1e-10"
+        )
+
+    def test_momentum_zero_at_t0(self) -> None:
+        """COM velocity subtracted → momentum is ~0 at step 0."""
+        result = simulate_molecular_dynamics(32, 1.0, 0.001, 10, seed=99)
+        mom0 = result.data[0][5]
+        assert mom0 < 1e-14, (
+            f"momentum at t=0 is {mom0:.2e}; COM velocity may not be subtracted"
+        )
+
+    def test_momentum_stays_constant(self) -> None:
+        """The standard deviation of momentum across steps should be tiny."""
+        result = simulate_molecular_dynamics(32, 0.5, 0.002, 100, seed=42)
+        mom = result.column("total_momentum_magnitude")
+        assert float(np.std(mom)) < 1e-14, (
+            "momentum fluctuates beyond machine precision"
+        )
+
+
+# =========================================================================
+# Target C — closed-form force table
+# =========================================================================
+
+
+class TestTargetCForceTable:
+    """Lennard-Jones force at fixed separations, tested in isolation."""
+
+    R_EQ = 2.0 ** (1.0 / 6.0)  # ≈ 1.122462
+
+    def test_force_zero_at_equilibrium(self) -> None:
+        """Force magnitude < 1e-9 at the LJ minimum r = 2^(1/6)."""
+        rv = np.array([self.R_EQ, 0.0, 0.0], dtype=np.float64)
+        f = lennard_jones_force(rv)
+        assert np.linalg.norm(f) < 1e-9, (
+            f"force at equilibrium has magnitude {np.linalg.norm(f):.2e}"
+        )
+
+    def test_force_attractive_at_r_1_5(self) -> None:
+        """At r=1.5 (> equilibrium) force must point toward the other particle
+        (negative x if separation is +x)."""
+        rv = np.array([1.5, 0.0, 0.0], dtype=np.float64)
+        f = lennard_jones_force(rv)
+        # Attractive: points toward origin → x-component negative
+        assert f[0] < 0, f"expected attractive (negative Fx), got {f[0]}"
+        assert abs(f[1]) < 1e-14
+        assert abs(f[2]) < 1e-14
+        # Check magnitude against closed form
+        r = 1.5
+        expected_fx = 24.0 * (2.0 / r**14 - 1.0 / r**8) * r
+        assert abs(f[0] - expected_fx) < 1e-9, (
+            f"force magnitude {f[0]:.10f} vs closed-form {expected_fx:.10f}"
+        )
+
+    def test_force_repulsive_at_r_0_9(self) -> None:
+        """At r=0.9 (< equilibrium) force must point away (+x for +x separation)."""
+        rv = np.array([0.9, 0.0, 0.0], dtype=np.float64)
+        f = lennard_jones_force(rv)
+        # Repulsive: points away from origin → x-component positive
+        assert f[0] > 0, f"expected repulsive (positive Fx), got {f[0]}"
+        assert abs(f[1]) < 1e-14
+        assert abs(f[2]) < 1e-14
+        # Check magnitude against closed form
+        r = 0.9
+        expected_fx = 24.0 * (2.0 / r**14 - 1.0 / r**8) * r
+        assert abs(f[0] - expected_fx) < 1e-9, (
+            f"force magnitude {f[0]:.10f} vs closed-form {expected_fx:.10f}"
+        )
+
+    def test_force_antisymmetric(self) -> None:
+        """F_ij = -F_ji for an arbitrary test vector."""
+        rv = np.array([1.3, 0.7, -0.4], dtype=np.float64)
+        f_ij = lennard_jones_force(rv)
+        f_ji = lennard_jones_force(-rv)
+        assert np.linalg.norm(f_ij + f_ji) < 1e-14, (
+            f"force not antisymmetric: F_ij={f_ij}, F_ji={f_ji}"
+        )
+
+    def test_force_zero_at_large_separation(self) -> None:
+        """Force should be negligible at large r (decays as r^{-7})."""
+        rv = np.array([10.0, 0.0, 0.0], dtype=np.float64)
+        f = lennard_jones_force(rv)
+        assert np.linalg.norm(f) < 1e-5, (
+            f"force at r=10 should be tiny, got |F|={np.linalg.norm(f):.2e}"
+        )
+
+
+# =========================================================================
+# Target D — seed reproducibility
+# =========================================================================
+
+
+class TestTargetDSeedReproducibility:
+    """ADR 0005: fixed seed → bit-identical; different seeds → diverge."""
+
+    def test_fixed_seed_reproduces_bit_identical(self) -> None:
+        r1 = simulate_molecular_dynamics(32, 0.5, 0.001, 20, seed=42)
+        r2 = simulate_molecular_dynamics(32, 0.5, 0.001, 20, seed=42)
+        for i, (row1, row2) in enumerate(zip(r1.data, r2.data)):
+            for j, (v1, v2) in enumerate(zip(row1, row2)):
+                assert v1 == v2, (
+                    f"row {i} col {j}: {v1} vs {v2} — seed reproducibility broken"
+                )
+
+    def test_different_seeds_diverge(self) -> None:
+        r1 = simulate_molecular_dynamics(32, 0.5, 0.001, 20, seed=1)
+        r2 = simulate_molecular_dynamics(32, 0.5, 0.001, 20, seed=2)
+        # Total energies at step 5 should differ
+        assert r1.data[5][2] != r2.data[5][2], (
+            "different seeds produced identical energy — RNG may be ignored"
+        )
+
+    def test_no_seed_gives_different_results(self) -> None:
+        """Successive seedless calls must produce different trajectories."""
+        results = [
+            simulate_molecular_dynamics(32, 0.5, 0.001, 10)
+            for _ in range(5)
+        ]
+        energies = [r.data[3][2] for r in results]
+        # At least 4 of 5 should be unique
+        assert len(set(energies)) >= 4, (
+            f"only {len(set(energies))} unique energies across 5 seedless runs"
+        )
+
+
+# =========================================================================
+# Validation — hard rejections (ok=False)
+# =========================================================================
+
+
+class TestValidationHardRejections:
+    """All invalid parameters must give ok=False."""
+
+    def test_n_particles_bool_rejected(self) -> None:
+        v = validate_md_params(True, 0.4, 0.005, 1000)  # type: ignore[arg-type]
+        assert not v.ok
+
+    def test_n_particles_float_rejected(self) -> None:
+        v = validate_md_params(3.5, 0.4, 0.005, 1000)  # type: ignore[arg-type]
+        assert not v.ok
+
+    def test_n_particles_lt_2_rejected(self) -> None:
+        v = validate_md_params(1, 0.4, 0.005, 1000)
+        assert not v.ok
+
+    def test_n_particles_zero_rejected(self) -> None:
+        v = validate_md_params(0, 0.4, 0.005, 1000)
+        assert not v.ok
+
+    def test_n_particles_negative_rejected(self) -> None:
+        v = validate_md_params(-5, 0.4, 0.005, 1000)
+        assert not v.ok
+
+    def test_temperature_bool_rejected(self) -> None:
+        v = validate_md_params(108, True, 0.005, 1000)  # type: ignore[arg-type]
+        assert not v.ok
+
+    def test_temperature_nan_rejected(self) -> None:
+        v = validate_md_params(108, float("nan"), 0.005, 1000)
+        assert not v.ok
+
+    def test_temperature_zero_rejected(self) -> None:
+        v = validate_md_params(108, 0.0, 0.005, 1000)
+        assert not v.ok
+
+    def test_temperature_negative_rejected(self) -> None:
+        v = validate_md_params(108, -0.1, 0.005, 1000)
+        assert not v.ok
+
+    def test_timestep_bool_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, False, 1000)  # type: ignore[arg-type]
+        assert not v.ok
+
+    def test_timestep_nan_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, float("nan"), 1000)
+        assert not v.ok
+
+    def test_timestep_zero_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.0, 1000)
+        assert not v.ok
+
+    def test_timestep_negative_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, -0.001, 1000)
+        assert not v.ok
+
+    def test_n_steps_bool_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, True)  # type: ignore[arg-type]
+        assert not v.ok
+
+    def test_n_steps_float_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, 2.5)  # type: ignore[arg-type]
+        assert not v.ok
+
+    def test_n_steps_zero_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, 0)
+        assert not v.ok
+
+    def test_n_steps_negative_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, -10)
+        assert not v.ok
+
+    def test_density_bool_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, 1000, density=True)  # type: ignore[arg-type]
+        assert not v.ok
+
+    def test_density_nan_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, 1000, density=float("nan"))
+        assert not v.ok
+
+    def test_density_zero_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, 1000, density=0.0)
+        assert not v.ok
+
+    def test_density_negative_rejected(self) -> None:
+        v = validate_md_params(108, 0.4, 0.005, 1000, density=-0.1)
+        assert not v.ok
+
+    def test_raises_model_build_error(self) -> None:
+        """Hard-rejected params should raise ModelBuildError when simulated."""
+        with pytest.raises(ModelBuildError):
+            simulate_molecular_dynamics(1, 0.4, 0.005, 1000)
+
+
+# =========================================================================
+# Validation — flags (ok=True, flagged=True)
+# =========================================================================
+
+
+class TestValidationFlags:
+    """Plausible-but-concerning parameters must be flagged, not rejected."""
+
+    def test_timestep_above_max_is_flagged(self) -> None:
+        v = validate_md_params(108, 0.4, 0.05, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "timestep" in (v.flag_reason or "").lower()
+
+    def test_temperature_below_low_is_flagged(self) -> None:
+        v = validate_md_params(108, 0.05, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "frozen" in (v.flag_reason or "").lower()
+
+    def test_temperature_above_high_is_flagged(self) -> None:
+        v = validate_md_params(108, 3.0, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "evaporat" in (v.flag_reason or "").lower()
+
+    def test_temperature_at_high_bound_unflagged(self) -> None:
+        """0.8 is the highest unflagged initialization temperature per
+        Amendment 3 (measured: 0 escaped, Rg growth < 1x)."""
+        v = validate_md_params(108, 0.8, 0.005, 1000)
+        assert v.ok
+        assert not v.flagged, (
+            f"T_init=0.8 should be unflagged, got flag: {v.flag_reason}")
+
+    def test_temperature_above_high_bound_flagged(self) -> None:
+        """0.9 exceeds the new bound (0.8) and should be flagged for evaporation."""
+        v = validate_md_params(108, 0.9, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "evaporat" in (v.flag_reason or "").lower()
+
+    def test_n_particles_below_min_is_flagged(self) -> None:
+        v = validate_md_params(5, 0.4, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "too small" in (v.flag_reason or "").lower()
+
+    def test_non_fcc_count_is_flagged(self) -> None:
+        """13 is not an fcc-compatible count (nearest: 4*2^3=32)."""
+        v = validate_md_params(13, 0.4, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "fcc" in (v.flag_reason or "").lower()
+
+    def test_fcc_count_not_flagged(self) -> None:
+        """32 = 4 * 2^3 is an exact fcc count."""
+        v = validate_md_params(32, 0.4, 0.005, 1000)
+        assert v.ok
+        assert not v.flagged
+
+    def test_flagged_run_still_simulates(self) -> None:
+        """Flagged params should produce a valid result (not raise)."""
+        result = simulate_molecular_dynamics(5, 0.4, 0.005, 10)
+        assert result.flagged
+        assert len(result.data) == 11  # 10 steps + t=0
+        assert "total_energy" in result.colnames
+
+
+# =========================================================================
+# Structural invariants
+# =========================================================================
+
+
+class TestStructuralInvariants:
+    """Properties that must hold regardless of the random seed."""
+
+    def test_result_colnames(self) -> None:
+        result = simulate_molecular_dynamics(32, 0.4, 0.001, 5, seed=42)
+        assert result.colnames == [
+            "step", "time", "total_energy", "kinetic_energy",
+            "potential_energy", "total_momentum_magnitude"
+        ]
+
+    def test_model_name(self) -> None:
+        result = simulate_molecular_dynamics(32, 0.4, 0.001, 5, seed=42)
+        assert result.model_name == "molecular_dynamics"
+
+    def test_row_count(self) -> None:
+        """n_steps + 1 rows (step 0 through step n_steps)."""
+        result = simulate_molecular_dynamics(32, 0.4, 0.001, 15, seed=42)
+        assert len(result.data) == 16
+
+    def test_time_increases_quadratically(self) -> None:
+        """Time column = step * dt."""
+        result = simulate_molecular_dynamics(32, 0.4, 0.003, 10, seed=42)
+        times = result.column("time")
+        for step, t in enumerate(times):
+            assert abs(t - step * 0.003) < 1e-15
+
+    def test_kinetic_plus_potential_equals_total(self) -> None:
+        """KE + PE == TE at every step."""
+        result = simulate_molecular_dynamics(32, 0.4, 0.001, 10, seed=42)
+        for row in result.data:
+            ke, pe, te = row[3], row[4], row[2]
+            assert abs(ke + pe - te) < 1e-12, (
+                f"KE={ke} + PE={pe} ≠ TE={te} (diff={ke+pe-te:.2e})"
+            )
+
+    def test_fcc_lattice_no_overlap(self) -> None:
+        """At t=0, no two particles should be within a hard-core distance.
+        The fcc lattice at density 0.85 gives nearest-neighbour distance > 0.7."""
+        # Run with large n for a meaningful check
+        result = simulate_molecular_dynamics(32, 0.4, 0.001, 1, seed=42)
+        # We can check via the initial PE — it shouldn't be catastrophically
+        # positive (which would indicate particles overlapping inside the
+        # repulsive wall)
+        pe0 = result.data[0][4]
+        assert pe0 < 0, (
+            f"initial PE is positive ({pe0}); particles likely overlap"
+        )
+
+
+# =========================================================================
+# Pre-specified mutations
+# =========================================================================
+
+
+class TestMutationVelocityVerletVsEulerCromer:
+    """Mutation 1: swap velocity Verlet for Euler-Cromer.
+
+    Euler-Cromer is also symplectic (bounded energy oscillation), but only
+    first-order. The halving-step ratio drops below 3 — only the order check
+    in Target A can catch this.
+    """
+
+    def test_euler_cromer_would_fail_order_check(self) -> None:
+        """Documented mutation: VV→EC, caught by halving-step ratio."""
+        # We can't mutate in-process trivially, but we verify that the real
+        # velocity Verlet implementation passes the order check (Target A),
+        # and the mutation is documented here for the reviewer to manually
+        # reproduce per the verification procedure.
+        result = simulate_molecular_dynamics(32, 0.4, 0.004, 300, seed=42)
+        result_half = simulate_molecular_dynamics(32, 0.4, 0.002, 300, seed=42)
+        dev, _ = _energy_conservation_metrics(result)
+        dev_half, _ = _energy_conservation_metrics(result_half)
+        ratio = dev / dev_half if dev_half > 0 else float("inf")
+        assert ratio > 3.0, (
+            f"halving-step ratio {ratio:.2f} — VV order check failed; "
+            "integrator may not be velocity Verlet"
+        )
+
+
+class TestMutationForceSignFlip:
+    """Mutation 2: flip the sign of the LJ force.
+
+    Still conservative (antisymmetry preserved), still momentum-conserving.
+    Caught ONLY by Target C (force table shows wrong sign at r=0.9 and r=1.5).
+    """
+
+    def test_force_signs_are_correct(self) -> None:
+        """The real implementation has correct signs — Target C tests verify this
+        directly (attractive at 1.5, repulsive at 0.9)."""
+        # Redundant with Target C tests; exists so the mutation is explicitly
+        # named in its own test class for the reviewer to find.
+        rv_att = np.array([1.5, 0.0, 0.0])
+        rv_rep = np.array([0.9, 0.0, 0.0])
+        f_att = lennard_jones_force(rv_att)
+        f_rep = lennard_jones_force(rv_rep)
+        assert f_att[0] < 0, "attractive force sign wrong"
+        assert f_rep[0] > 0, "repulsive force sign wrong"
+
+
+class TestMutationMissingPairDirection:
+    """Mutation 3: add force to particle i but not the negative to particle j.
+
+    Breaks Newton's third law → momentum not conserved. Caught by Target B.
+    """
+
+    def test_momentum_is_conserved(self) -> None:
+        """The real implementation conserves momentum — Target B tests verify
+        this directly."""
+        result = simulate_molecular_dynamics(32, 0.5, 0.002, 50, seed=42)
+        mom = result.column("total_momentum_magnitude")
+        assert max(mom) < 1e-10, "momentum not conserved — pair direction bug?"
+
+
+class TestMutationComVelocityNotSubtracted:
+    """Mutation 4: skip COM velocity subtraction at initialization.
+
+    Even if the Maxwell-Boltzmann distribution sums to zero in expectation,
+    a finite sample won't. Target B catches this at t=0.
+    """
+
+    def test_momentum_zero_at_t0(self) -> None:
+        """Already tested in Target B — repeated here for mutation naming."""
+        result = simulate_molecular_dynamics(32, 1.0, 0.001, 10, seed=99)
+        assert result.data[0][5] < 1e-14, (
+            "momentum non-zero at t=0 — COM velocity may not be subtracted"
+        )
+
+
+class TestMutationRVSR2Confusion:
+    """Mutation 5: use r instead of r^2 in the force denominator.
+
+    Still conservative, still antisymmetric. Passes Target A and B.
+    Caught ONLY by Target C (closed-form magnitude is wrong).
+    """
+
+    def test_force_magnitude_matches_closed_form(self) -> None:
+        """Target C tests verify exact closed-form magnitudes."""
+        rv = np.array([1.5, 0.0, 0.0])
+        f = lennard_jones_force(rv)
+        r = 1.5
+        expected = 24.0 * (2.0 / r**14 - 1.0 / r**8) * r
+        assert abs(f[0] - expected) < 1e-9, (
+            f"force {f[0]:.10f} vs closed-form {expected:.10f} — "
+            "possible r vs r^2 confusion"
+        )
+
+
+# =========================================================================
+# Mutation-test record
+# =========================================================================
+#
+# MUTATION 1 (VV → Euler-Cromer):
+#   Replace velocity Verlet steps with Euler-Cromer (x → v, then v → a).
+#   Energy still bounded-oscillating (both are symplectic), but the
+#   halving-step ratio drops from ~4 to ~2 (EC is only first order).
+#   Caught by: test_halving_step_reduces_energy_error (Target A).
+#
+# MUTATION 2 (force sign flip):
+#   Negate the magnitude in lennard_jones_force().
+#   Still conservative, still antisymmetric. Target A and B pass.
+#   Caught ONLY by: test_force_attractive_at_r_1_5 and
+#   test_force_repulsive_at_r_0_9 (Target C).
+#
+# MUTATION 3 (missing pair direction):
+#   Change _compute_pairwise_forces to add F to particle i without
+#   subtracting from particle j (or: use np.sum(magnitudes * dr, axis=1)
+#   without properly computing the antisymmetric contribution).
+#   Caught by: test_momentum_near_zero_throughout (Target B) — momentum
+#   immediately departs from zero.
+#
+# MUTATION 4 (COM velocity not subtracted):
+#   Comment out the `velocities -= com_velocity` line.
+#   Caught by: test_momentum_zero_at_t0 (Target B) — momentum non-zero at
+#   step 0.
+#
+# MUTATION 5 (r vs r^2 confusion):
+#   Use r (sqrt(r^2)) instead of r^2 in the r^-14 and r^-8 denominators,
+#   e.g., `r1 = math.sqrt(r_sq)` then `r8_inv = 1.0 / (r1 ** 8)`.
+#   Still conservative, antisymmetric. Target A and B pass.
+#   Caught ONLY by: test_force_magnitude_matches_closed_form (Target C).
+#
+# MUTATION 6 (broken icosahedron — only 2 of 3 cyclic-permutation
+#   families, giving 8 shell particles instead of 12):
+#   Predicted catches: test_n13_has_12_shell_particles (shell count 8
+#   vs 12) AND test_n13_energy_matches_published (energy -20.836780 vs
+#   published -44.326801, diff 23.49 >> 1e-6 tolerance).
+#   Independently reproduced 2026-07-31: both tests fired exactly as
+#   predicted. The structural frustration test also caught it (the
+#   qualitative pattern centre-to-shell < r_min < shell-to-shell holds
+#   under the mutation, but the numeric values shift by ~8e-06, exceeding
+#   the 1e-5 tolerance — the test's name promises the physics but the
+#   assertion only checks the numbers; see Part 4 recommendation to add a
+#   qualitative assertion alongside the numeric ones).
+
+
+# =========================================================================
+# Work Item 1 — temperature bound pinning
+# =========================================================================
+
+
+class TestTemperatureBoundAmendment:
+    """MD_PLAUSIBLE_TEMPERATURE_HIGH = 0.8 (measured: highest T keeping
+    the LJ108 cluster fully intact). 0.8 is unflagged; 0.9 is flagged
+    with an evaporation message."""
+
+    def test_temperature_0_8_is_unflagged(self) -> None:
+        v = validate_md_params(108, 0.8, 0.005, 1000)
+        assert v.ok
+        assert not v.flagged, (
+            f"temperature 0.8 should be unflagged; "
+            f"flag_reason={v.flag_reason}"
+        )
+
+    def test_temperature_0_9_is_flagged(self) -> None:
+        v = validate_md_params(108, 0.9, 0.005, 1000)
+        assert v.ok
+        assert v.flagged
+        assert "evaporat" in (v.flag_reason or "").lower(), (
+            f"flag_reason should mention evaporation; got {v.flag_reason}"
+        )
+
+    def test_temperature_high_constant_equals_0_8(self) -> None:
+        assert MD_PLAUSIBLE_TEMPERATURE_HIGH == 0.8, (
+            f"MD_PLAUSIBLE_TEMPERATURE_HIGH = {MD_PLAUSIBLE_TEMPERATURE_HIGH}; "
+            "expected 0.8"
+        )
+
+    def test_flag_message_mentions_initialization(self) -> None:
+        """The flag message must explicitly say 'initialization temperature'
+        — not let the reader confuse T*_init with T*_equil."""
+        v = validate_md_params(108, 3.0, 0.005, 1000)
+        assert "initialization temperature" in (v.flag_reason or "").lower(), (
+            f"expected 'initialization temperature' in flag message; "
+            f"got {v.flag_reason}"
+        )
+
+
+# =========================================================================
+# Target E — published cluster global-minimum energies
+# =========================================================================
+
+
+class TestTargetEClusterGlobalMinima:
+    """lj_cluster_positions(n) generates known global-minimum geometries
+    whose total LJ potential energy matches published values.
+
+    N=2,3,4 are exact by construction (all pairs at r_min == 2^(1/6)).
+    N=5 is the first frustrated size (published -9.103852, not -10)
+    — worth noting, not testing.
+    N=13 uses a golden-section search for the Mackay icosahedron scale,
+    compared to Hoare & Pal (1971) via the Cambridge Cluster Database.
+    """
+
+    def test_n2_energy(self) -> None:
+        pos = lj_cluster_positions(2)
+        assert pos.shape == (2, 3)
+        # One pair at r_min: eps = -1.0
+        r = np.linalg.norm(pos[0] - pos[1])
+        assert abs(r - 2.0 ** (1.0 / 6.0)) < 1e-12
+        # Energy: -1 per pair -> -1.000000
+        pe = _compute_lj_potential(pos, 2)
+        assert abs(pe - (-1.0)) < 1e-12, f"N=2 PE = {pe:.12f}, expected -1"
+
+    def test_n3_energy(self) -> None:
+        pos = lj_cluster_positions(3)
+        assert pos.shape == (3, 3)
+        # Three pairs at r_min: -3.000000
+        pe = _compute_lj_potential(pos, 3)
+        assert abs(pe - (-3.0)) < 1e-12, f"N=3 PE = {pe:.12f}, expected -3"
+
+    def test_n4_energy(self) -> None:
+        pos = lj_cluster_positions(4)
+        assert pos.shape == (4, 3)
+        # Six pairs at r_min: -6.000000
+        pe = _compute_lj_potential(pos, 4)
+        assert abs(pe - (-6.0)) < 1e-12, f"N=4 PE = {pe:.12f}, expected -6"
+
+    def test_n13_energy_matches_published(self) -> None:
+        pos = lj_cluster_positions(13)
+        assert pos.shape == (13, 3)
+        pe = _compute_lj_potential(pos, 13)
+        published = -44.326801
+        assert abs(pe - published) < 1e-6, (
+            f"LJ13 PE = {pe:.12f}, published {published}; "
+            f"diff = {abs(pe - published):.2e}"
+        )
+
+    def test_n13_scale_search_converges(self) -> None:
+        """The golden-section scale search should converge to the known
+        value within 1e-10."""
+        pos = lj_cluster_positions(13)
+        # Centre-to-shell distance
+        shell_dists = np.linalg.norm(pos[1:], axis=1)
+        centre_to_shell = float(np.mean(shell_dists))
+        # Expected: ~1.081838 (compressed below r_min = 1.122462)
+        r_min = 2.0 ** (1.0 / 6.0)
+        assert centre_to_shell < r_min, (
+            f"centre-to-shell {centre_to_shell:.6f} not below r_min {r_min:.6f}"
+        )
+        assert abs(centre_to_shell - 1.081838) < 1e-5, (
+            f"centre-to-shell {centre_to_shell:.6f} vs expected ~1.081838"
+        )
+
+    def test_n13_shell_structure(self) -> None:
+        """The relaxed icosahedron is frustrated: centre-to-shell
+        compressed below r_min, nearest shell-to-shell stretched above."""
+        pos = lj_cluster_positions(13)
+        r_min = 2.0 ** (1.0 / 6.0)
+        # Centre-to-shell distance (needed for qualitative assertion)
+        shell = pos[1:]  # 12 shell particles
+        centre_to_shell = float(np.mean(np.linalg.norm(shell, axis=1)))
+        # Nearest shell-to-shell distance
+        min_dist = float("inf")
+        for i in range(12):
+            for j in range(i + 1, 12):
+                d = float(np.linalg.norm(shell[i] - shell[j]))
+                min_dist = min(min_dist, d)
+        # Expected: ~1.137512 (stretched above r_min)
+        assert min_dist > r_min, (
+            f"shell-to-shell {min_dist:.6f} not above r_min {r_min:.6f}"
+        )
+        assert abs(min_dist - 1.137512) < 1e-5, (
+            f"shell-to-shell {min_dist:.6f} vs expected ~1.137512"
+        )
+        # Qualitative frustration signature: the physics this test is named for.
+        # The relaxed icosahedron MUST have centre-to-shell compressed below r_min
+        # AND shell-to-shell stretched above it — this is the geometric
+        # frustration that distinguishes a true Mackay icosahedron from a mere
+        # vertex subset that happens to share the qualitative pattern.
+        assert centre_to_shell < r_min < min_dist, (
+            f"qualitative frustration failed: "
+            f"centre-to-shell={centre_to_shell:.6f}, r_min={r_min:.6f}, "
+            f"shell-to-shell={min_dist:.6f}"
+        )
+
+
+# =========================================================================
+# lj_cluster_positions — validation
+# =========================================================================
+
+
+class TestLjClusterPositionsValidation:
+    """Unsupported n_particles must raise ModelBuildError."""
+
+    def test_unsupported_n_raises(self) -> None:
+        for bad in (1, 5, 10, 14, 100):
+            with pytest.raises(ModelBuildError, match=r"\{2, 3, 4, 13\}"):
+                lj_cluster_positions(bad)
+
+    def test_supported_n_returns_correct_shape(self) -> None:
+        for n in (2, 3, 4, 13):
+            pos = lj_cluster_positions(n)
+            assert pos.shape == (n, 3), f"n={n}: shape {pos.shape}"
+            assert pos.dtype == np.float64
+
+
+# =========================================================================
+# Pre-specified mutation 6 — broken icosahedron
+# =========================================================================
+
+
+class TestMutationBrokenIcosahedron:
+    """Mutation 6: break the icosahedron construction — use only two of
+    the three cyclic-permutation families, giving 8 shell particles
+    instead of 12.  The energy drops far above the published minimum
+    and the shell-structure assertions fire.
+
+    This test verifies that the real implementation HAS 12 shell particles
+    — it checks the output shape, not mutating the code."""
+
+    def test_n13_has_12_shell_particles(self) -> None:
+        pos = lj_cluster_positions(13)
+        # One particle at origin, 12 on shell
+        assert pos.shape == (13, 3)
+        dists = np.linalg.norm(pos, axis=1)
+        at_origin = int(np.sum(dists < 1e-10))
+        assert at_origin == 1, (
+            f"expected 1 central particle, found {at_origin}"
+        )
+        shell_count = int(np.sum(dists > 1e-10))
+        assert shell_count == 12, (
+            f"expected 12 shell particles, found {shell_count} — "
+            "icosahedron may be missing cyclic-permutation families"
+        )
+
+

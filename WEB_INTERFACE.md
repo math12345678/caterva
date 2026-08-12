@@ -89,7 +89,7 @@ curl -X POST http://localhost:3000/api/simulate \
 2. **Queue** → Request goes to POST /api/simulate, gets a jobId
 3. **Process** → Background job:
    - Searches PubMed for real literature (5-10s)
-   - Runs Tellurium kinetics simulation (2-3s)
+   - Runs Terium kinetics simulation (2-3s)
    - Stores results in-memory
 4. **Poll** → Dashboard calls GET /api/jobs/:jobId every 1 second (max 60s timeout)
 5. **Display** → Results rendered in table + trajectory chart
@@ -102,7 +102,7 @@ When you submit a simulation with enzyme/substrate:
 2. **Multi-Strategy Fallback** — Tries broad, then narrow, then enzyme-only queries
 3. **CrossRef Resolution** — Validates DOIs from papers
 4. **SBML Model Generation** — Creates valid Systems Biology Markup Language
-5. **Tellurium Execution** — Runs kinetic equations, returns time-series data
+5. **Terium Execution** — Runs kinetic equations, returns time-series data
 
 If literature is found: ✅ Results marked as "validated"
 If no literature: ⚠️ Results marked as "unverified" + clear warning
@@ -117,7 +117,7 @@ Node.js HTTP Server (dist/src/web/server.js)
     │   ├→ searchPubMedForEnzymeKinetics()
     │   ├→ resolveDOIFromCrossRef()
     │   ├→ ScientificPipeline.execute()
-    │   └→ Tellurium simulation
+    │   └→ Terium simulation
     │
     └→ GET /api/jobs/:jobId (polling)
         └→ Returns: status, progress, results, duration
@@ -183,7 +183,7 @@ PORT=3001 node dist/src/web/server.js
 
 **Simulations timing out?**
 - PubMed searches can take 5-10 seconds
-- Tellurium simulation adds 2-3 seconds
+- Terium simulation adds 2-3 seconds
 - Dashboard max timeout is 60 seconds
 - Check logs for "Simulation error" or "PubMed failed"
 

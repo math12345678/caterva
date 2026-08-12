@@ -1,8 +1,8 @@
-# Tellurium Engine Refactoring Proposal
+# Terium Engine Refactoring Proposal
 
 ## Overview
 
-The current `Tellurium/tellurium_engine.py` file is 4,283 lines with 64 top-level definitions. This proposal outlines a modular refactoring to improve maintainability while preserving all functionality.
+The current `Terium/terium_engine.py` file is 4,283 lines with 64 top-level definitions. This proposal outlines a modular refactoring to improve maintainability while preserving all functionality.
 
 ## Current Structure Analysis
 
@@ -86,9 +86,9 @@ The current `Tellurium/tellurium_engine.py` file is 4,283 lines with 64 top-leve
 This preserves the existing domain organization and creates clear separation:
 
 ```
-Tellurium/
+Terium/
 ├── __init__.py                    # Current exports preserved
-├── tellurium_engine.py           # Keep as main entry point with imports
+├── terium_engine.py           # Keep as main entry point with imports
 ├── core/
 │   ├── __init__.py               # Re-export everything
 │   ├── data_structures.py        # ModelBuildError, SimulationError, ParameterValidation, SimulationResult, constants
@@ -123,9 +123,9 @@ Tellurium/
 Alternative organization by function type:
 
 ```
-Tellurium/
+Terium/
 ├── __init__.py
-├── tellurium_engine.py           # Main entry point
+├── terium_engine.py           # Main entry point
 ├── core.py                      # Data structures and constants
 ├── validation.py                # All validation functions
 ├── model_building.py           # SBML/antimony functions
@@ -148,7 +148,7 @@ This aligns with the existing mental model of "domains" in the codebase and make
 ### Phase 1: Create Module Structure (No Breaking Changes)
 1. Create new module files
 2. Move functions to appropriate modules with proper imports
-3. Update `tellurium_engine.py` to import from new modules
+3. Update `terium_engine.py` to import from new modules
 4. Ensure all tests still pass
 
 ### Phase 2: Update __init__.py
@@ -195,12 +195,12 @@ Move SBML and continuous simulation functions
 ### Step 4: Create discrete/ directory with subdirectories
 Move all discrete domain functions with logical grouping
 
-### Step 5: Update tellurium_engine.py
+### Step 5: Update terium_engine.py
 Convert to import statements from the new modules
 
 ## Verification Strategy
 1. Run full test suite after each module extraction
-2. Use `python -c "import Tellurium; print('OK')"` to verify imports work
+2. Use `python -c "import Terium; print('OK')"` to verify imports work
 3. Check that all exported names are still available
 
 ## Benefits of This Refactoring
@@ -222,25 +222,25 @@ Convert to import statements from the new modules
 
 ## Files to Create
 
-1. `Tellurium/core/__init__.py`
-2. `Tellurium/core/data_structures.py`
-3. `Tellurium/core/validation.py`
-4. `Tellurium/core/utils.py`
-5. `Tellurium/continuous/__init__.py`
-6. `Tellurium/continuous/model_building.py`
-7. `Tellurium/continuous/simulations.py`
-8. `Tellurium/discrete/__init__.py`
-9. `Tellurium/discrete/pcr.py`
-10. `Tellurium/discrete/monte_carlo.py`
-11. `Tellurium/discrete/molecular_dynamics.py`
-12. `Tellurium/discrete/population_genetics/__init__.py`
-13. `Tellurium/discrete/population_genetics/core.py`
-14. `Tellurium/discrete/population_genetics/analysis.py`
-15. `Tellurium/discrete/population_genetics/probability.py`
-16. `Tellurium/discrete/population_genetics/theoretical.py`
-17. `Tellurium/discrete/population_genetics/two_locus.py`
-18. `Tellurium/scenarios/__init__.py`
-19. `Tellurium/scenarios/wf_scenarios.py`
+1. `Terium/core/__init__.py`
+2. `Terium/core/data_structures.py`
+3. `Terium/core/validation.py`
+4. `Terium/core/utils.py`
+5. `Terium/continuous/__init__.py`
+6. `Terium/continuous/model_building.py`
+7. `Terium/continuous/simulations.py`
+8. `Terium/discrete/__init__.py`
+9. `Terium/discrete/pcr.py`
+10. `Terium/discrete/monte_carlo.py`
+11. `Terium/discrete/molecular_dynamics.py`
+12. `Terium/discrete/population_genetics/__init__.py`
+13. `Terium/discrete/population_genetics/core.py`
+14. `Terium/discrete/population_genetics/analysis.py`
+15. `Terium/discrete/population_genetics/probability.py`
+16. `Terium/discrete/population_genetics/theoretical.py`
+17. `Terium/discrete/population_genetics/two_locus.py`
+18. `Terium/scenarios/__init__.py`
+19. `Terium/scenarios/wf_scenarios.py`
 
 ## Estimated Effort
 

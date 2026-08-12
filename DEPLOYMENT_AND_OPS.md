@@ -53,7 +53,7 @@ Job Dispatch Layer
 Scientific Pipeline
     ├─ Literature: PubMed + CrossRef
     ├─ Model: 4 kinetic types (SBML)
-    ├─ Engine: Tellurium + libroadrunner
+    ├─ Engine: Terium + libroadrunner
     └─ Validation: Confidence scoring
     ↓
 Persistence Layer

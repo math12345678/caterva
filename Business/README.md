@@ -1,7 +1,7 @@
 # Business
 
 Operational scaffolding for Terrium-the-company, kept separate from
-Terrium-the-product (which lives in `Tellurium/`, `Tests/`, and
+Terrium-the-product (which lives in `Terium/`, `Tests/`, and
 `Science-Agent-Pipeline/`).
 
 Nothing in this folder is legal, tax, or financial advice, and nothing here

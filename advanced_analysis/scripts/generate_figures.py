@@ -1,4 +1,4 @@
-"""Generate a publication-quality figure suite from the Tellurium engine.
+"""Generate a publication-quality figure suite from the Terium engine.
 
 Every figure runs the real engine (deterministic ODE via roadrunner, exact
 Gillespie SSA, discrete recurrences) and overlays the closed-form reference
@@ -31,7 +31,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib import rcParams  # noqa: E402
 
-from Tellurium import tellurium_engine as te  # noqa: E402
+from Terium import terium_engine as te  # noqa: E402
 
 FIGS = pathlib.Path(__file__).resolve().parents[1] / "figures"
 FIGS.mkdir(exist_ok=True)

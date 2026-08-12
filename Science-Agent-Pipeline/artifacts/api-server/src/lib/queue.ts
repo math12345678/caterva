@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { SimulationDomain } from "./telluriumRunner";
+import type { SimulationDomain } from "./teriumRunner";
 import type { ParameterProvenance } from "./provenance";
 import { logger } from "./logger";
 

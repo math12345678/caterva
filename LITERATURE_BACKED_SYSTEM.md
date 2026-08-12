@@ -25,7 +25,7 @@ Query Input
     ↓ (Record: resolution source, origin classification)
 [Stage 3] Hard-Rule Validation (ADR 0011: No unverified LLM-origin parameters)
     ↓ (Record: validation success/failure)
-[Stage 4] Simulation Execution (Tellurium runner with concurrency limits)
+[Stage 4] Simulation Execution (Terium runner with concurrency limits)
     ↓ (Record: execution latency, success/failure)
 [Stage 5] Publication Audit (STRENDA compliance, confidence intervals)
     ↓

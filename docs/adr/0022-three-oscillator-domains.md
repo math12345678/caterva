@@ -21,23 +21,23 @@ cross-check and the domain-specific qualitative signatures described below.
 
 Three domains -- `lotka_volterra`, `cell_cycle_oscillator`, `repressilator`
 -- appeared in `domain-literature.ts` (citations), `schemas.ts` (request
-shape), and `telluriumRunner.ts`/`tellurium_runner.py` (API glue calling
-`tellurium_engine.simulate_lotka_volterra` /
+shape), and `teriumRunner.ts`/`terium_runner.py` (API glue calling
+`terium_engine.simulate_lotka_volterra` /
 `simulate_cell_cycle_oscillator` / `simulate_repressilator`) before any of
 those three functions existed in the engine. The application layer had
 been built ahead of the science it was meant to call, in the middle of
 concurrent work from multiple agents on this codebase -- confirmed by
 `grep`, which found no `simulate_lotka_volterra` etc. anywhere under
-`Tellurium/`.
+`Terium/`.
 
 This ADR is the science layer those call sites needed, plus the closure of
 the API-layer wiring, which itself had partially regressed (the TypeScript
-`SimulationDomain` union and `tellurium_runner.py`'s `DISPATCH` table were
+`SimulationDomain` union and `terium_runner.py`'s `DISPATCH` table were
 each found, independently, in a state missing one or more of these three
 domains, requiring re-synchronization -- the same class of drift ADR 0007's
 boundary-contract test exists to catch, and does catch: adding these
 domains without updating both sides of the contract fails
-`Tellurium/tests/test_boundary_contract.py` immediately).
+`Terium/tests/test_boundary_contract.py` immediately).
 
 Two of the three domains needed literature verification before any code
 was written. Reconstructing "how these oscillators tend to work" from
@@ -146,7 +146,7 @@ systems with no sampling anywhere. `lotka_volterra` has no `seed`
 parameter at all, for the same reason. All three are listed in
 `scripts/check_rng_convention.py`'s `EXCLUDED_FNS` with that
 justification, rather than silently failing the AST-based compliance
-check `Tellurium/tests/test_rng_convention.py` runs in CI.
+check `Terium/tests/test_rng_convention.py` runs in CI.
 
 ## Verification
 
@@ -159,7 +159,7 @@ check `Tellurium/tests/test_rng_convention.py` runs in CI.
   with roadrunner) matched the engine's trajectory to `rtol=1e-4`;
   populations stay strictly positive over a 40-time-unit run; a
   zero-predator initial condition reproduces the closed-form
-  `P(t) = p0*exp(alpha*t)` exactly. `Tellurium/tests/test_lotka_volterra_correctness.py`.
+  `P(t) = p0*exp(alpha*t)` exactly. `Terium/tests/test_lotka_volterra_correctness.py`.
 - **Cell cycle oscillator:** matched an independent `scipy.integrate.solve_ivp`
   run of the literal two equations to `rtol=1e-3`; `u, v` stay
   non-negative; the trajectory shows repeated MPF spikes rather than
@@ -167,7 +167,7 @@ check `Tellurium/tests/test_rng_convention.py` runs in CI.
   standard parameter set and the `alpha = k4prime/k4` relationship are
   pinned directly; deterministic reproducibility confirmed (bit-identical
   output across different `seed` values, since none is used).
-  `Tellurium/tests/test_cell_cycle_oscillator_correctness.py`.
+  `Terium/tests/test_cell_cycle_oscillator_correctness.py`.
 - **Repressilator:** matched an independent `scipy.integrate.solve_ivp` run
   of the literal six equations to `rtol=1e-3`; all six species stay
   non-negative (provable directly from each RHS at its own zero boundary);
@@ -177,8 +177,8 @@ check `Tellurium/tests/test_rng_convention.py` runs in CI.
   distinct from three independent copies of the same oscillator running
   in sync) rather than near-zero or near-full-period offset; the standard
   parameter set is pinned directly; deterministic reproducibility
-  confirmed. `Tellurium/tests/test_repressilator_correctness.py`.
-- `Tellurium/tests/test_boundary_contract.py` updated (engine `__all__`
+  confirmed. `Terium/tests/test_repressilator_correctness.py`.
+- `Terium/tests/test_boundary_contract.py` updated (engine `__all__`
   and runner `DISPATCH` expected-set assertions) and passing: all three
   domains are dispatched, none are missing from either side.
 - Full suite: 1237/1246 Python passing (the 9 failures are the
@@ -197,7 +197,7 @@ independent integrator, or a qualitative signature specific to the model
 -- rather than only comparing the engine against itself.
 
 **Harder.** Nothing new; the three `run_*` functions and `DISPATCH`
-entries in `tellurium_runner.py` follow the same shape as every other
+entries in `terium_runner.py` follow the same shape as every other
 domain.
 
 **A pattern worth naming.** This is the second time in this project a

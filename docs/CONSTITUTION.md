@@ -120,7 +120,7 @@ If this is a discrete/stochastic domain, also read
 ``docs/adr/0005-rng-convention.md`` before starting — it formalizes the
 ``numpy.random.default_rng(seed)`` convention that all stochastic domains
 in Terrium share. Complying with this ADR is checked automatically by
-``scripts/check_rng_convention.py`` and ``Tellurium/tests/
+``scripts/check_rng_convention.py`` and ``Terium/tests/
 test_rng_convention.py``.
 
 [DOMAIN-SPEC GOES HERE]
@@ -157,7 +157,7 @@ Applied to every diff, in order, stop at first failure:
 
 ## 6. The verification procedure (mechanical steps)
 
-1. Run the full suite — both `Tellurium/` and `Tests/`, not just the new
+1. Run the full suite — both `Terium/` and `Tests/`, not just the new
    domain's tests.
 2. Run `python3 scripts/check_dependencies_declared.py`.
 2b. Run `python3 scripts/check_rng_convention.py` — checks all
@@ -256,7 +256,7 @@ they happen:
   appended a second, generic one on top), producing redundant text in
   `ModelBuildError`. Michaelis-Menten's validator never had this bug —
   the others now match its pattern. Fixed the module-level docstring in
-  `tellurium_engine.py`, stale since Stage 1 (still said "the two Tier-2
+  `terium_engine.py`, stale since Stage 1 (still said "the two Tier-2
   ODE domains" with three more domains since added). Found, via this
   audit, that a `mutation_rate` parameter had been added to Wright-Fisher
   after Stage 2 Part 2's spec explicitly listed mutation as out of scope
@@ -321,7 +321,7 @@ they happen:
   `verify_domain.sh` in the same change that creates it.
 
   **(c) A passing suite does not prove a change took effect.** During the
-  Stage 4 Part 3 audit, `tellurium_engine.py` imported all 67 public names
+  Stage 4 Part 3 audit, `terium_engine.py` imported all 67 public names
   from the new package and then redefined all 64 below. Python takes the
   later definition, so the package was imported and immediately shadowed —
   and every test passed, because the monolith was still doing the work.

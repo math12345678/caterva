@@ -16,7 +16,7 @@ identified.
 ## Decision
 
 Internally, generated antimony source emits the parameter as `gamma_rate`
-(the constant `GAMMA_PARAM` in `tellurium_engine.py`), with a comment in
+(the constant `GAMMA_PARAM` in `terium_engine.py`), with a comment in
 the generated model source explaining why, so a student inspecting the raw
 antimony/SBML sees an explanation, not just an unexplained rename. The
 Python API (`simulate_sir`, `simulate_seir`, `build_sir_antimony`,

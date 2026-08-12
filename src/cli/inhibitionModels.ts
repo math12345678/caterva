@@ -36,7 +36,7 @@ import {
   buildNonCompetitiveInhibition,
   buildProductInhibition,
 } from '../engine/sbml-builder';
-import { runTellurium } from '../engine/telluriumBridge';
+import { runTerium } from '../engine/teriumBridge';
 
 /**
  * BRENDA's Ki table records an inhibition constant for a NAMED inhibitor,
@@ -133,7 +133,7 @@ export async function runInhibitionModel(
   }
 
   if (spec.engineDomain !== 'sbml') {
-    const result = await runTellurium(
+    const result = await runTerium(
       spec.engineDomain as never,
       {
         km: parameters.km,
@@ -171,7 +171,7 @@ export async function runInhibitionModel(
           s0: parameters.s0,
         });
 
-  const result = await runTellurium(
+  const result = await runTerium(
     'sbml',
     {
       sbml_string: built.xml,

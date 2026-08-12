@@ -41,7 +41,7 @@ export interface ScienceAgentResult {
   kcat?: number;
   /** Only present when quantity="kcat" and enzymeConc was supplied: the
    * bridged Vmax = kcat * enzymeConc, computed in Python by the same
-   * Tellurium.core.validation.vmax_from_kcat() the engine itself uses --
+   * Terium.core.validation.vmax_from_kcat() the engine itself uses --
    * one implementation of the arithmetic and its Rule 2 bounds, not a
    * second copy in TypeScript. See ADR 0019. */
   vmax?: number;
@@ -54,7 +54,7 @@ export interface ScienceAgentResult {
    * reproduction number, and infectious period (from
    * Tests/epidemiology_resolver.py's hand-verified registry), plus the
    * bridged (beta, gamma) the SIR engine takes directly, computed by the
-   * same Tellurium.core.validation.beta_gamma_from_r0() the engine uses.
+   * same Terium.core.validation.beta_gamma_from_r0() the engine uses.
    * Only present when parameterType="disease_parameters" was requested. */
   disease?: string;
   r0?: number;
@@ -253,7 +253,7 @@ function notFoundResult(reason: string): ScienceAgentResult {
 /**
  * Resolve a disease's (R0, infectious period) golden tuple and bridge it to
  * the SIR engine's own (beta, gamma) — see Tests/epidemiology_resolver.py
- * and Tellurium.core.validation.beta_gamma_from_r0. Returns found=false for
+ * and Terium.core.validation.beta_gamma_from_r0. Returns found=false for
  * any disease outside the hand-verified registry; never fabricates a value.
  */
 export async function resolveEpidemiologyParameters(

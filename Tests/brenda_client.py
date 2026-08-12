@@ -140,7 +140,7 @@ def classify_substrate(substrate_name: str) -> str:
 KM_PLAUSIBLE_MIN_MM = 0.0000001
 KM_PLAUSIBLE_MAX_MM = 1000
 
-# kcat (turnover number), s^-1. Must match Tellurium/core/data_structures.py
+# kcat (turnover number), s^-1. Must match Terium/core/data_structures.py
 # exactly -- ADR 0003 makes these a cross-layer contract, and
 # scripts/check_plausibility_constants.py enforces the agreement.
 #

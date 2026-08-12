@@ -28,7 +28,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { logger } from '../logger';
-import { REPO_ROOT, resolvePythonExecutable } from '../engine/telluriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
 
 /** Which kinetic constant to resolve. Each call resolves exactly one, so a
  *  cross-species Ki can never borrow a verified Km's provenance (ADR 0008). */
@@ -77,7 +77,7 @@ export interface ResolvedKinetic {
    * Vmax = kcat * [E]0, present only for a kcat query with `enzymeConc`.
    *
    * Computed in PYTHON by the same
-   * `Tellurium.core.validation.vmax_from_kcat()` the engine itself uses --
+   * `Terium.core.validation.vmax_from_kcat()` the engine itself uses --
    * one implementation of the arithmetic and its Rule 2 bounds, not a
    * second copy in TypeScript. The [E]0/Km flag in particular carries a
    * threshold that must not be duplicated here and allowed to drift.

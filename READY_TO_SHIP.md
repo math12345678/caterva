@@ -45,7 +45,7 @@
 - Multi-strategy search fallback
 - DOI resolution via CrossRef
 - SBML model generation for 4 kinetic types
-- Tellurium-based kinetics simulation
+- Terium-based kinetics simulation
 - Validation with confidence scoring
 
 ### 5. **Build System Updates**
@@ -151,7 +151,7 @@ res.end(JSON.stringify({ jobId, status: 'queued' }));
 // Then processes in background async
 (async () => {
   // Fetch literature from PubMed (5-10s)
-  // Run Tellurium simulation (2-3s)
+  // Run Terium simulation (2-3s)
   // Store results in jobs Map
 })();
 ```
@@ -174,7 +174,7 @@ CrossRef DOI Resolution: Validate & get full metadata
   ↓
 SBML Model Generation: Create valid Systems Biology model
   ↓
-Tellurium Simulation: Run kinetics, get time-series data
+Terium Simulation: Run kinetics, get time-series data
   ↓
 Response: Validated results with literature citations
 ```
@@ -187,7 +187,7 @@ Response: Validated results with literature citations
 | PubMed search (with fallbacks) | 5-10s |
 | CrossRef DOI resolution | 1-2s each |
 | SBML model generation | <100ms |
-| Tellurium simulation | 2-3s |
+| Terium simulation | 2-3s |
 | **Total end-to-end** | **~10-15s** |
 
 Dashboard timeout: 60s (plenty of headroom)

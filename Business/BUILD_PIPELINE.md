@@ -124,12 +124,12 @@ Build the prompt by concatenating:
 
 ```
 You are implementing [DOMAIN NAME] for the Terrium simulation engine, in
-Tellurium/tellurium_engine.py, following the exact patterns already in that
+Terium/terium_engine.py, following the exact patterns already in that
 file for [closest existing domain — e.g. PCR or SIR].
 
 Read these first and match their conventions exactly:
-- Tellurium/tellurium_engine.py (existing domain implementations)
-- docs/adr/0001-no-tellurium-umbrella-package.md
+- Terium/terium_engine.py (existing domain implementations)
+- docs/adr/0001-no-terium-umbrella-package.md
 - docs/adr/0002-pcr-not-modeled-as-an-ode.md
 - docs/adr/0003-shared-plausibility-bounds.md
 - docs/adr/0004-gamma-reserved-keyword.md
@@ -146,7 +146,7 @@ Section 4, fully filled in for this domain]
 Requirements:
 - Match the ParameterValidation / SimulationResult contract exactly as used
   elsewhere in the file.
-- Write tests in Tellurium/tests/test_[domain]_correctness.py using
+- Write tests in Terium/tests/test_[domain]_correctness.py using
   Hypothesis property-based testing with max_examples=200, matching the
   style of test_pcr_correctness.py.
 - Every numerical claim must be checked against the closed-form/invariant
@@ -154,7 +154,7 @@ Requirements:
   known-correct value.
 - If you add any new import, add it to requirements.txt in the same change
   — do not leave that for CI to catch.
-- Do not modify any file outside Tellurium/ unless the spec says to.
+- Do not modify any file outside Terium/ unless the spec says to.
 - Document at least one mutation test in your report (what you broke, which
   test caught it).
 

@@ -52,7 +52,7 @@ curl http://localhost:5000/api/simulate/abc-123/stream
 
 If adding domain `new_domain`:
 
-1. **Python** (`src/lib/tellurium_runner.py`):
+1. **Python** (`src/lib/terium_runner.py`):
    ```python
    def run_new_domain(parameters):
        # Implementation
@@ -61,7 +61,7 @@ If adding domain `new_domain`:
    DISPATCH["new_domain"] = run_new_domain
    ```
 
-2. **TypeScript** (`src/lib/telluriumRunner.ts`):
+2. **TypeScript** (`src/lib/teriumRunner.ts`):
    ```typescript
    export type SimulationDomain = 
      | "mm" | "sir" | ... | "new_domain";
@@ -126,7 +126,7 @@ Example: `km` parameter is being accepted when it shouldn't
    })
    ```
 
-3. **Update Python** (if needed) (`src/lib/tellurium_runner.py`):
+3. **Update Python** (if needed) (`src/lib/terium_runner.py`):
    ```python
    def run_mm(parameters):
        if parameters["km"] <= 0:
@@ -263,7 +263,7 @@ HTTP Request (Express)
     ↓
 [Python Bridge] Spawn and communicate
     ↓
-[Simulation Engine] Tellurium/ODE solver
+[Simulation Engine] Terium/ODE solver
     ↓
 [Provenance Tracking] Record all origins
     ↓
@@ -278,7 +278,7 @@ HTTP Request (Express)
 |------|------|--------------|
 | `src/lib/schemas.ts` | Parameter validation | Adding domain or parameter |
 | `src/lib/queryResolver.ts` | Domain/param detection | Improving resolution logic |
-| `src/lib/tellurium_runner.py` | Simulation engine | Adding domain or fixing engine |
+| `src/lib/terium_runner.py` | Simulation engine | Adding domain or fixing engine |
 | `src/lib/llmResolver.ts` | LLM integration | Changing LLM behavior |
 | `src/routes/simulate.ts` | HTTP endpoints | Adding/changing API routes |
 | `src/__tests__/llmProviders.test.ts` | Python/TS contract | Verifying domain sync |

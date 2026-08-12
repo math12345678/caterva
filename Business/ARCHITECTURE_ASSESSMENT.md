@@ -7,8 +7,8 @@ actually in the repository.
 
 The diagram is not a proposal. **Every box in it is real code that already
 exists** in `Science-Agent-Pipeline/artifacts/api-server/`. It is wired to the
-real engine — `tellurium_runner.py` does
-`from Tellurium import tellurium_engine` and calls the same functions the
+real engine — `terium_runner.py` does
+`from Terium import terium_engine` and calls the same functions the
 100-stage build has been hardening.
 
 So the integration question is not "how do we build this." It is: *there are
@@ -28,14 +28,14 @@ half with less rigour is the half the product's central claim depends on.*
 | `science_agent_runner.py` | `src/lib/science_agent_runner.py` |
 | `fallback_logic.resolve_kinetic_value()` | `Tests/fallback_logic.py` |
 | BRENDA → cross-species → PubMed | `Tests/brenda_client.py` |
-| `tellurium_runner.py` (semaphore) | `src/lib/tellurium_runner.py`, `telluriumRunner.ts` |
+| `terium_runner.py` (semaphore) | `src/lib/terium_runner.py`, `teriumRunner.ts` |
 | `validateParameters()` | `src/lib/validate.ts`, `schemas.ts` |
 
 ## 2. Three findings, in order of how much they matter
 
 ### 2.1 The engine work is unreachable from the product
 
-`tellurium_runner.py` dispatches exactly three domains:
+`terium_runner.py` dispatches exactly three domains:
 
 ```
 run_mm(params)     -> simulate_michaelis_menten
@@ -72,14 +72,14 @@ This is the real finding.
 The engine's `SimulationResult` docstring reads: *"Simulation output plus the
 provenance needed for the trust trail."* But the engine has **no citation
 field, no source field, no organism field.** It carries validation state, not
-provenance. Grep for `citation` in `tellurium_engine.py` returns nothing.
+provenance. Grep for `citation` in `terium_engine.py` returns nothing.
 
 Provenance lives entirely in `queryResolver.ts`, which does return
 `citations: string[]`. So the chain looks like this:
 
 ```
 BRENDA row  ->  fallback_logic  ->  queryResolver (citations attached)
-            ->  tellurium_runner (citations DROPPED)
+            ->  terium_runner (citations DROPPED)
             ->  engine (simulates a bare number)
             ->  result (no provenance)
             ->  api-server (citations re-attached from the resolver)
@@ -107,7 +107,7 @@ been applied to.
 
 ### 2.4 CI does not test the application layer at all
 
-`.github/workflows/tests.yml` runs two steps: `Tellurium/` pytest and `Tests/`
+`.github/workflows/tests.yml` runs two steps: `Terium/` pytest and `Tests/`
 pytest. Zero mentions of `api-server`, `npm`, `pnpm` or `vitest`.
 
 The application layer *has* tests — `routes.test.ts`, `queue.test.ts`,
@@ -136,7 +136,7 @@ application layer held to the same standard.
 Mechanical, mostly small, high value.
 
 - Add `run_pcr`, `run_monte_carlo`, `run_wright_fisher`, `run_molecular_dynamics`
-  to `tellurium_runner.py`, following the existing `run_mm` pattern exactly,
+  to `terium_runner.py`, following the existing `run_mm` pattern exactly,
   including `ok` / `flagged` / `flagReason` propagation.
 - Extend `schemas.ts` and `validate.ts` for the new parameter sets.
 - Add a CI job: Node, `npm ci`, `vitest run` in the api-server directory.

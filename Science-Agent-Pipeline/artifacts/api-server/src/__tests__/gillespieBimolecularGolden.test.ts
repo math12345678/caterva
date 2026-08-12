@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { runTellurium } from "../lib/telluriumRunner";
+import { runTerium } from "../lib/teriumRunner";
 import { resolveQuery } from "../lib/queryResolver";
 
 // The bimolecular SSA golden (Stage 7): seed 12345, a0=60, b0=40, k=0.01,
 // end=5.0. Pinned in Python in
-// Tellurium/tests/test_gillespie_ssa_bimolecular_golden.py; this pins the
+// Terium/tests/test_gillespie_ssa_bimolecular_golden.py; this pins the
 // SAME trajectory through the real runner boundary.
 const GOLDEN = {
   rows: 38,
@@ -15,7 +15,7 @@ const GOLDEN = {
 
 describe("Bimolecular SSA golden through the runner boundary", () => {
   it("reproduces the pinned seeded trajectory", async () => {
-    const res = await runTellurium("gillespie_ssa_bimolecular", {
+    const res = await runTerium("gillespie_ssa_bimolecular", {
       a0: 60,
       b0: 40,
       k: 0.01,
@@ -41,8 +41,8 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
 
   it("rejects an over-budget initial population before simulating", async () => {
     await expect(
-      runTellurium("gillespie_ssa_bimolecular", { a0: 600_000, b0: 500_000 }),
-    ).rejects.toThrow(/Tellurium runner exited with code 1/);
+      runTerium("gillespie_ssa_bimolecular", { a0: 600_000, b0: 500_000 }),
+    ).rejects.toThrow(/Terium runner exited with code 1/);
   });
 });
 

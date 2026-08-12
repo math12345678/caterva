@@ -101,11 +101,11 @@ const kineticsFromBREND = await brenda.getKineticParameters(
 ✅ Cross-reference PubMed papers
 ```
 
-### Week 2: Real Tellurium Engine
+### Week 2: Real Terium Engine
 
 **Day 1-2: Python Environment Setup**
 ```bash
-✅ Install Tellurium
+✅ Install Terium
 ✅ Install libSBML
 ✅ Create SBML models for real enzymes
 ✅ Test simulation end-to-end
@@ -200,7 +200,7 @@ const kineticsFromBREND = await brenda.getKineticParameters(
 ✅ Confidence scored  
 
 ### Every Simulation Real
-✅ Tellurium actually running  
+✅ Terium actually running  
 ✅ SBML models from real enzymes  
 ✅ Parameters from actual experiments  
 ✅ Results reproducible and citable  

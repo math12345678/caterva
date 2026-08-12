@@ -187,7 +187,7 @@ export default function ExportFormats() {
           <div className="mt-4 pt-3 border-t border-white/[0.04] flex flex-wrap items-center gap-4 text-[10px]">
             <span className="text-white/25 font-mono">
               {format === "sbml" &&
-                "Systems Biology Markup Language — opens in COPASI, Tellurium, libSBML"}
+                "Systems Biology Markup Language — opens in COPASI, Terium, libSBML"}
               {format === "csv" &&
                 "Comma-Separated Values — opens in Excel, Python/Pandas, R, MATLAB"}
               {format === "json" &&

@@ -33,7 +33,7 @@ THE RULE
     "skipped" from "passed". The three current uses already do:
 
         console.warn(
-          '\\n[telluriumBridge.test] The Python engine could not be ' +
+          '\\n[teriumBridge.test] The Python engine could not be ' +
           'imported, so the tests that exercise the real simulation are ' +
           'SKIPPED, not passing.\\n'
         );
@@ -89,7 +89,7 @@ DISABLED = re.compile(
 #: "python3 unavailable; subprocess tests are SKIPPED" -- so the scan stopped
 #: before reaching the word it was looking for. A semicolon inside a string
 #: literal is not a statement boundary, and only a parser can tell the
-#: difference. `telluriumBridge.test.ts` passed purely because its wording
+#: difference. `teriumBridge.test.ts` passed purely because its wording
 #: happened not to need one.
 #:
 #: That is the failure mode this guard exists to avoid in its own right: a
@@ -156,7 +156,7 @@ def check() -> list[str]:
                 f"declaration(s) with nothing printed to say so. A clean skip "
                 "is indistinguishable from a pass in a CI summary. Add a "
                 "console.warn naming what was skipped and why -- see "
-                "src/engine/__tests__/telluriumBridge.test.ts for the shape."
+                "src/engine/__tests__/teriumBridge.test.ts for the shape."
             )
 
     return violations

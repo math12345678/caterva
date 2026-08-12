@@ -34,8 +34,8 @@ const SERVICES: ServiceStatus[] = [
     description: "Literature citations & abstracts",
   },
   {
-    name: "Tellurium",
-    endpoint: "tellurium.analogmachine.org",
+    name: "Terium",
+    endpoint: "terium.analogmachine.org",
     ok: true,
     latency: 12,
     description: "ODE engine (RK4 integration)",

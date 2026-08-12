@@ -130,7 +130,7 @@ npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
 **Expected Result**:
 - ⚠️ Warns about no literature
 - 🟡 Shows simulation is unverified
-- ✅ Generates actual kinetics results using Tellurium
+- ✅ Generates actual kinetics results using Terium
 - 📋 Shows instructions to get real papers
 
 This is **production quality** error handling.

@@ -1,7 +1,7 @@
 // Real, current results from running both test suites end to end.
 //
 // This is NOT a mock. These numbers come from actually running the suites:
-//   cd Tellurium && python -m pytest -v -rs
+//   cd Terium && python -m pytest -v -rs
 //   cd Tests      && python -m pytest -v -rs
 //
 // Whoever updates this file after adding/removing tests should re-run both
@@ -24,7 +24,7 @@ export interface TestSuite {
 export const TEST_SUITES: TestSuite[] = [
   {
     name: "simulation engine",
-    workingDirectory: "Tellurium/",
+    workingDirectory: "Terium/",
     files: [
       { file: "test_brenda_integration.py", passed: 19, skipped: 1, failed: 0 },
       {

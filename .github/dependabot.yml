@@ -1,7 +1,7 @@
 version: 2
 
 updates:
-  # Root Python dependencies (Tellurium/, Tests/) -- requirements.txt.
+  # Root Python dependencies (Terium/, Tests/) -- requirements.txt.
   # This is exactly the class of bug that broke CI earlier (libroadrunner
   # 2.9.0 with no cp310 wheels): dependabot won't catch a missing wheel by
   # itself, but it does catch drift before it accumulates into a surprise,

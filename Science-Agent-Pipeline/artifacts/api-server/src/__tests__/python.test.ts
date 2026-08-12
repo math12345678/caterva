@@ -1,7 +1,7 @@
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildTelluriumEnvironment } from "../lib/telluriumRunner";
+import { buildTeriumEnvironment } from "../lib/teriumRunner";
 import {
   canRunSupportedPython,
   isSupportedPythonMinor,
@@ -22,7 +22,7 @@ describe("Python bridge environment", () => {
       PYTHONPATH: ["/opt/science", "/opt/shared"].join(path.delimiter),
     };
 
-    const merged = buildTelluriumEnvironment(baseEnv, "/repo");
+    const merged = buildTeriumEnvironment(baseEnv, "/repo");
 
     expect(merged.PATH).toBe("/usr/bin");
     expect(merged.PYTHONPATH).toBe(

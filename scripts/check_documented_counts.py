@@ -10,7 +10,7 @@ Three README numbers had drifted silently and were found by hand during the
 Stage 7 audit:
 
     make test           claimed   524 tests   actual 1,040
-    Tellurium/tests/    claimed   833 tests   actual   858
+    Terium/tests/    claimed   833 tests   actual   858
     Tests/              claimed   124 tests   actual   182
 
 and the domain count was stated twice in the same file with two different
@@ -42,7 +42,7 @@ README = REPO_ROOT / "README.md"
 
 # Suites `make test` runs, in the order it runs them.
 SUITES = [
-    ("engine", REPO_ROOT / "Tellurium" / "tests"),
+    ("engine", REPO_ROOT / "Terium" / "tests"),
     ("literature", REPO_ROOT / "Tests"),
 ]
 

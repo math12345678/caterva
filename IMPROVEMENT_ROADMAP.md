@@ -224,7 +224,7 @@ docker-compose up
 **Impact:** More sophisticated simulations  
 **Complexity:** High
 
-**Current:** Tellurium (good for kinetics)  
+**Current:** Terium (good for kinetics)  
 **Add:** SciPy ODE solver for complex systems
 
 ### 5.3 Multi-Substrate Simulations ⭐⭐

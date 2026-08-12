@@ -139,7 +139,7 @@ function VersionOutput() {
         <span className="text-white/40">v2.0.0 (pre-launch)</span>
       </div>
       <div className="flex gap-3">
-        <span className="text-[#1D8A72] w-24 shrink-0">tellurium-engine</span>
+        <span className="text-[#1D8A72] w-24 shrink-0">terium-engine</span>
         <span className="text-white/40">v1.0.0</span>
       </div>
       <div className="flex gap-3">

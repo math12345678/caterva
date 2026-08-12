@@ -279,7 +279,7 @@ export default function SimulatorPanel({
 
       <div className="mt-5 pt-4 border-t border-white/[0.04] text-[11px] text-white/20 leading-relaxed">
         Runs RK4 integration in your browser using the same rate laws verified
-        in Tellurium/tellurium_engine.py. The production engine integrates via
+        in Terium/terium_engine.py. The production engine integrates via
         roadrunner against exact closed-form solutions to 1e-10; this demo
         checks itself against the same equations at a coarser tolerance so it
         stays instant on every keystroke.

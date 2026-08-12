@@ -23,13 +23,13 @@ Verified every file in the system:
 - ✅ `llmResolver.ts` — LLM domain classification (CRITICAL FIX APPLIED)
 - ✅ `queryResolver.ts` — Parameter resolution + hard rule enforcement
 - ✅ `provenance.ts` — Provenance tracking with origin validation
-- ✅ `telluriumRunner.ts` — Type definitions + simulator dispatch
+- ✅ `teriumRunner.ts` — Type definitions + simulator dispatch
 - ✅ `scienceAgent.ts` — Python bridge for literature lookups
 - ✅ `schemas.ts` — Zod validation schemas for all domains
 
 **Python Files**:
-- ✅ `tellurium_runner.py` — DISPATCHER table + domain handlers (CONSISTENCY UPDATE APPLIED)
-- ✅ `tellurium_engine` — Simulator implementations
+- ✅ `terium_runner.py` — DISPATCHER table + domain handlers (CONSISTENCY UPDATE APPLIED)
+- ✅ `terium_engine` — Simulator implementations
 
 **Test Files**:
 - ✅ `competitiveInhibitionDomain.test.ts` — End-to-end tests for mm_competitive_inhibition
@@ -65,7 +65,7 @@ Verified every file in the system:
 ```
 
 ### Fix #3: Python Docstring Consistency
-**File**: `tellurium_runner.py` lines 13-16  
+**File**: `terium_runner.py` lines 13-16  
 **Issue**: Python documentation inconsistent with TypeScript  
 **Fix**: Updated docstring to include mm_competitive_inhibition  
 **Impact**: Maintains single source of truth for domain list
@@ -91,7 +91,7 @@ Verified every file in the system:
 - [x] Provenance tracks origin (resolved/keyword/llm/user/default)
 
 ### Type Safety ✅
-- [x] SimulationDomain type exported from telluriumRunner.ts
+- [x] SimulationDomain type exported from teriumRunner.ts
 - [x] Same type used in schemas, queryResolver, llmResolver
 - [x] JSON validation includes all domains
 - [x] Python DISPATCHER keys match TS union
@@ -163,7 +163,7 @@ Verified every file in the system:
 All three critical fixes confirmed as applied:
 1. llmResolver.ts line 40 ✅
 2. llmResolver.ts lines 54-55 ✅
-3. tellurium_runner.py lines 13-16 ✅
+3. terium_runner.py lines 13-16 ✅
 
 ---
 
@@ -215,7 +215,7 @@ The system implements a **5-stage science agent pipeline**:
    - Hard rule: reject unverified parameters
    - Track provenance (origin, citation, assay conditions)
 
-5. **Simulation Output** (telluriumRunner.ts + tellurium_runner.py)
+5. **Simulation Output** (teriumRunner.ts + terium_runner.py)
    - Python DISPATCHER routes to correct handler
    - Handler extracts parameters, validates requirements
    - Calls engine simulator, returns trajectory

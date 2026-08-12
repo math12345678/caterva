@@ -35,7 +35,7 @@ This is the part that matters most, more than any specific style rule:
 
 **Every numerical claim gets checked against something that isn't the
 solver checking itself.** That means one of:
-- an exact closed-form solution (see `Tellurium/tests/test_kinetics_correctness.py`,
+- an exact closed-form solution (see `Terium/tests/test_kinetics_correctness.py`,
   `test_pcr_correctness.py`)
 - an independent integrator, e.g. scipy's `solve_ivp`, which shares no code
   with roadrunner (see `test_numerical_robustness.py`)
@@ -86,7 +86,7 @@ pip install -r requirements-dev.txt
 ```bash
 make test        # everything
 make test-fast    # skip the slow property/robustness suites
-make test-sim     # Tellurium/ only
+make test-sim     # Terium/ only
 make test-lit     # Tests/ (literature layer) only
 ```
 
@@ -100,7 +100,7 @@ lucky/unlucky data condition.
 
 ## Pull requests
 
-- Every PR that touches `tellurium_engine.py` or `Tests/brenda_client.py`
+- Every PR that touches `terium_engine.py` or `Tests/brenda_client.py`
   needs new or updated tests, not just a description that it was tested
   locally.
 - If you add a dependency, it must appear in `requirements.txt` or
@@ -115,7 +115,7 @@ No linter is currently enforced (this should probably change once the
 backend hire is confirmed and there's a second engineering opinion on
 tooling choice). Until then: match the style of the file you're editing.
 Docstrings that explain *why*, not just *what*, are valued highly in this
-codebase -- see the module docstring in `tellurium_engine.py` for the bar.
+codebase -- see the module docstring in `terium_engine.py` for the bar.
 
 ## Questions
 

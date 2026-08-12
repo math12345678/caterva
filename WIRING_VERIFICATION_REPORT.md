@@ -141,7 +141,7 @@ if ((best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
 ### Stage 5: Python Dispatch
 
 #### 5a. Type Definition
-✅ **File**: `telluriumRunner.ts` (lines 8-25)
+✅ **File**: `teriumRunner.ts` (lines 8-25)
 ```typescript
 export type SimulationDomain =
   | "mm"
@@ -152,7 +152,7 @@ export type SimulationDomain =
 ```
 
 #### 5b. Dispatcher Routing
-✅ **File**: `tellurium_runner.py` (lines 585-586)
+✅ **File**: `terium_runner.py` (lines 585-586)
 ```python
 DISPATCHER: Dict[str, Callable] = {
   "mm": run_mm,
@@ -162,7 +162,7 @@ DISPATCHER: Dict[str, Callable] = {
 ```
 
 #### 5c. Python Docstring Consistency ⚠️ **FIX APPLIED**
-✅ **File**: `tellurium_runner.py` (lines 13-16)
+✅ **File**: `terium_runner.py` (lines 13-16)
 
 **Fix #3 — Docstring Update**:
 ```python
@@ -175,7 +175,7 @@ DISPATCHER: Dict[str, Callable] = {
 **Impact**: Ensures Python and TypeScript documentation stay in sync for maintainability.
 
 #### 5d. Simulator Implementation
-✅ **File**: `tellurium_runner.py` (lines 227-257)
+✅ **File**: `terium_runner.py` (lines 227-257)
 ```python
 def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
     km = float(params.get("km", 2.0))
@@ -184,7 +184,7 @@ def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
     s0 = float(params.get("s0", 10.0))
     i0 = float(params.get("i0", 0.0))
     
-    result = tellurium_engine.simulate_mm_competitive_inhibition(
+    result = terium_engine.simulate_mm_competitive_inhibition(
         km=km, vmax=vmax, ki=ki, s0=s0, i=i0, end=end, points=points
     )
     return _serialise_result(result, "mm_competitive_inhibition", reported)
@@ -199,7 +199,7 @@ def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
 ## Cross-Boundary Type Contracts
 
 ### TypeScript ↔ JSON
-✅ **Verified**: `SimulationDomain` type exported from `telluriumRunner.ts` is used by:
+✅ **Verified**: `SimulationDomain` type exported from `teriumRunner.ts` is used by:
 - `schemas.ts` (Zod validation)
 - `queryResolver.ts` (domain routing)
 - `llmResolver.ts` (LLM response validation)
@@ -256,8 +256,8 @@ Each domain has its own:
 - **Default parameters** (queryResolver.ts:236-555)
 - **Resolvable fields** (provenance.ts:72-86)
 - **Keyword matchers** (queryResolver.ts:DOMAIN_DEFAULTS)
-- **Python handler** (tellurium_runner.py:DISPATCHER)
-- **Engine function** (tellurium_engine module)
+- **Python handler** (terium_runner.py:DISPATCHER)
+- **Engine function** (terium_engine module)
 
 **Status**: ✅ No cross-domain contamination
 
@@ -294,7 +294,7 @@ Three error classes:
 |------|---------|-------|-----|--------|
 | llmResolver.ts | 40 | LLM domain union missing mm_competitive_inhibition | Added to union type | Enables domain detection |
 | llmResolver.ts | 54-55 | Domain description missing | Added docs | Improves LLM classification |
-| tellurium_runner.py | 13-16 | Python docstring inconsistent | Updated to match TS | Maintainability |
+| terium_runner.py | 13-16 | Python docstring inconsistent | Updated to match TS | Maintainability |
 
 **Total changes**: 3 lines across 2 files  
 **Root cause**: Single-point failure in LLM system prompt domain list  
@@ -313,7 +313,7 @@ Three error classes:
 - ✅ Tests written and expected to pass
 
 ### Known Limitations
-1. **Python environment**: Tests requiring tellurium simulator need Python 3.12+ (environmental setup issue, not architectural)
+1. **Python environment**: Tests requiring terium simulator need Python 3.12+ (environmental setup issue, not architectural)
 2. **Rate limits**: Groq API 429 errors during concurrent test runs (expected under load)
 3. **LLM availability**: System degrades gracefully to keyword matching when no API key
 

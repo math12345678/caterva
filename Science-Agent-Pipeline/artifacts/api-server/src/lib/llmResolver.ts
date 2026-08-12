@@ -1,5 +1,5 @@
 import { logger } from "./logger";
-import type { SimulationDomain } from "./telluriumRunner";
+import type { SimulationDomain } from "./teriumRunner";
 
 export interface EntityExtraction {
   enzymeName?: string;

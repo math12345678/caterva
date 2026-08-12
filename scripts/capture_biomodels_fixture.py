@@ -49,7 +49,7 @@ Usage
 
 Writes Tests/fixtures/biomodels_<id>.xml for each model above, then prints
 the parameter values it found so they can be compared by eye against the
-constants in Tellurium/continuous/model_building.py before anything is
+constants in Terium/continuous/model_building.py before anything is
 committed.
 """
 
@@ -187,7 +187,7 @@ def main() -> int:
 
     print(
         "\nCompare the values above against the constants in "
-        "Tellurium/continuous/model_building.py\n"
+        "Terium/continuous/model_building.py\n"
         "(TYSON_KAPPA / TYSON_K6 / TYSON_K4 / TYSON_K4PRIME, "
         "REPRESSILATOR_ALPHA / _BETA / _N / _ALPHA0).\n"
         "Any disagreement is a real finding: the constants are currently "

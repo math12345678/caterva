@@ -91,8 +91,8 @@ DOIS = [
 #: them. Adding a citation to any of these files enrols it automatically.
 DOI_SOURCE_FILES = [
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts",
-    ROOT / "Tellurium/core/data_structures.py",
-    ROOT / "Tellurium/continuous/model_building.py",
+    ROOT / "Terium/core/data_structures.py",
+    ROOT / "Terium/continuous/model_building.py",
     ROOT / "Tests/epidemiology_resolver.py",
     ROOT / "Tests/popgen_resolver.py",
 ]

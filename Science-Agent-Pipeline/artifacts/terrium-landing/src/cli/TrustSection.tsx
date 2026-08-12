@@ -86,9 +86,9 @@ const TRUST_SOURCES = [
     url: "https://pubmed.ncbi.nlm.nih.gov",
   },
   {
-    name: "Tellurium",
+    name: "Terium",
     desc: "ODE simulation engine",
-    url: "https://tellurium.analogmachine.org",
+    url: "https://terium.analogmachine.org",
   },
   {
     name: "roadrunner",
@@ -189,7 +189,7 @@ export default function TrustSection() {
               {
                 step: "03",
                 title: "ODE Integration",
-                desc: "Tellurium + roadrunner solve the system to 1e-10 tolerance. Conserved quantities checked at every timestep.",
+                desc: "Terium + roadrunner solve the system to 1e-10 tolerance. Conserved quantities checked at every timestep.",
                 icon: "\u26A1",
               },
               {

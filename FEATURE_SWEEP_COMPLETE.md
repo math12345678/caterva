@@ -19,7 +19,7 @@
 - 19 test cases (all passing ✅)
 - Tests parsing, generation, counting, execution, analysis
 - Covers edge cases (fractions, large sweeps, empty results)
-- Real integration tests with Tellurium
+- Real integration tests with Terium
 
 ### 3. **REST API Endpoint** (in `src/web/server.ts`)
 - `POST /api/sweep` — Submit parameter sweep job

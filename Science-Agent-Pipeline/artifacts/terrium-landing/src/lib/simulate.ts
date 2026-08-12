@@ -1,6 +1,6 @@
 // Client-side ODE integration for the live "terrium simulate" terminal demo.
 //
-// This mirrors the physics actually verified in Tellurium/tellurium_engine.py
+// This mirrors the physics actually verified in Terium/terium_engine.py
 // and its test suite -- same rate laws, same conserved quantities used to
 // check correctness. It is a real RK4 integrator, not a canned animation:
 // change the parameters and the trajectory actually changes, and the panel
@@ -74,7 +74,7 @@ export interface MMResult {
   // Residual of the exact implicit MM solution at the final point:
   //   Km*ln(S0/S) + (S0 - S) = Vmax*t
   // This is the same closed-form check
-  // Tellurium/tests/test_kinetics_correctness.py runs against the Python
+  // Terium/tests/test_kinetics_correctness.py runs against the Python
   // engine. A small residual here is direct evidence the RK4 integration
   // above is actually solving the stated rate law, not just drawing a curve.
   finalResidual: number;
@@ -104,7 +104,7 @@ export interface SIRParams {
 export interface SIRResult {
   trajectory: Point[];
   // S + I + R must equal N at every point (population conservation) -- the
-  // same invariant Tellurium/tests/test_properties.py checks with Hypothesis
+  // same invariant Terium/tests/test_properties.py checks with Hypothesis
   // across the whole input space, spot-checked here at the final point.
   conservationError: number;
 }

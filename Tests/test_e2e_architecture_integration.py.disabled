@@ -22,7 +22,7 @@ import core_fulltext
 import enzyme_lookup
 import epidemiology_resolver
 import fallback_logic
-from Tellurium.core import validation
+from Terium.core import validation
 
 
 class TestE2EArchitectureStage1EntityExtraction:

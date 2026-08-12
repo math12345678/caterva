@@ -4,9 +4,9 @@
 
 ## Context
 
-The Tellurium engine (Python) exposes its simulation API through
-`tellurium_engine.__all__`. The application layer (TypeScript) reaches it
-through a single JSON bridge, `tellurium_runner.py`, which the API server
+The Terium engine (Python) exposes its simulation API through
+`terium_engine.__all__`. The application layer (TypeScript) reaches it
+through a single JSON bridge, `terium_runner.py`, which the API server
 spawns as a subprocess. Before Stage 4 Part 1, the runner dispatched only
 three domains (`mm`, `sir`, `seir`) while the engine exposed eight — every
 domain built under the constitution was unreachable from the product, and
@@ -28,10 +28,10 @@ Two mechanisms would close the gap "for real":
 
 ## Decision
 
-Enforce the boundary with a **contract test** (`Tellurium/tests/
+Enforce the boundary with a **contract test** (`Terium/tests/
 test_boundary_contract.py`), not a shared schema and not code generation.
 
-The test loads the actual `tellurium_runner.py` file the API server spawns
+The test loads the actual `terium_runner.py` file the API server spawns
 (not a copy), collects every `simulate_*` in the engine's `__all__`, and
 asserts that the runner's `DISPATCH` table dispatches exactly that set —
 and that every dispatched function still exists in the engine. Mutation
@@ -93,7 +93,7 @@ that knows it is serving a request.
 - A deleted dispatch entry fails CI with a message naming the orphaned
   engine function, pinning the fix to the boundary.
 - The serialisation logic remains hand-written in one file
-  (`tellurium_runner.py`), where its per-domain mapping is visible to
+  (`terium_runner.py`), where its per-domain mapping is visible to
   review. The contract test guards the *set* of domains; the runner's
   execution tests guard each domain's `ok`/`flagged`/`flagReason` shape.
 - No new build tooling, no published schema package, no code generation

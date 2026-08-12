@@ -2,7 +2,7 @@
 
 THE GAP THIS CLOSES
 
-`check_documented_counts.py` counts only `Tellurium/tests` and `Tests/` --
+`check_documented_counts.py` counts only `Terium/tests` and `Tests/` --
 Python. `check_no_silent_skips.py` counts pytest's "N skipped" line -- also
 Python. Roughly six hundred TypeScript tests across two runners were
 invisible to both, so a whole suite could stop being discovered and nothing

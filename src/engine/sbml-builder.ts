@@ -2,7 +2,7 @@
  * SBML Model Builder - Generates real SBML Level 3 Version 1 models
  *
  * SBML (Systems Biology Markup Language) is the standard for describing
- * biological models. This builder generates SBML that Tellurium/libroadrunner
+ * biological models. This builder generates SBML that Terium/libroadrunner
  * can execute.
  *
  * Each model represents a real biochemical system:

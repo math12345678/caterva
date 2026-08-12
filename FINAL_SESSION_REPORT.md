@@ -139,7 +139,7 @@ User Query
 └─────────────────────┘
     ↓
 ┌─────────────────────┐
-│ Tellurium Engine    │
+│ Terium Engine    │
 │ (Kinetics solver)   │
 └─────────────────────┘
     ↓
@@ -235,7 +235,7 @@ src/
 │   ├── sbml-builder.ts              ✅ SBML generation
 │   ├── parameter-sweep.ts           ✅ NEW - Sweep engine
 │   ├── batch-processor.ts           ✅ NEW - Batch processor
-│   └── kinetics-executor.ts         ✅ Tellurium integration
+│   └── kinetics-executor.ts         ✅ Terium integration
 ├── integration/
 │   └── scientificPipeline.ts        ✅ Main pipeline
 ├── integrations/

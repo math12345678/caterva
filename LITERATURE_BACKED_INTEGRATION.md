@@ -37,7 +37,7 @@ User Query (Natural Language)
     └─ Ensure Wilson (1927) confidence intervals
     ↓
 [Simulation Output] ← Domain-specific engine
-    └─ Tellurium for kinetics (Michaelis-Menten backend)
+    └─ Terium for kinetics (Michaelis-Menten backend)
     └─ NumPy for ODEs (SIR/SEIR)
     └─ Numpy random for stochastic (Gillespie)
     ↓

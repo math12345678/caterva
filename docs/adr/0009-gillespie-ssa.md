@@ -80,7 +80,7 @@ time), and optional `seed` (ADR 0005). Defaults in
 - RNG follows ADR 0005: `seed: int | None = None` +
   `np.random.default_rng(seed)`; compliance is enforced by
   `scripts/check_rng_convention.py`, which was upgraded in Stage 6
-  Part 1 to scan all Tellurium submodules (previously it only scanned
+  Part 1 to scan all Terium submodules (previously it only scanned
   the engine file, which contains no `simulate_*` definitions, so that
   check would not have caught violations in other modules).
 - Flag reasons surface through the standard `ok/flagged/flagReason`

@@ -385,7 +385,7 @@ export const CELL_CYCLE_OSCILLATOR_LITERATURE: DomainLiterature = {
       // was found by comparing the registered CrossRef title against the
       // title claimed here, which verify_citations_live.py now does.
       //
-      // Correct source, already used by Tellurium/continuous/model_building.py:
+      // Correct source, already used by Terium/continuous/model_building.py:
       // PNAS 88(16), 7328-7332. PMID 1831270, PMC52288.
       authors: "Tyson, J. J.",
       year: 1991,
@@ -445,7 +445,7 @@ export const MONTE_CARLO_PI_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Metropolis & Ulam (1949) is the source of the METHOD, not of a sample count. n_samples is a precision/runtime tradeoff chosen by the caller, not a measured quantity. What IS verified is the convergence behaviour: the estimator's error is checked against the CLT rate 1/sqrt(N) in Tellurium/tests/test_monte_carlo_correctness.py. See docs/literature-inventory.toml.",
+    "Metropolis & Ulam (1949) is the source of the METHOD, not of a sample count. n_samples is a precision/runtime tradeoff chosen by the caller, not a measured quantity. What IS verified is the convergence behaviour: the estimator's error is checked against the CLT rate 1/sqrt(N) in Terium/tests/test_monte_carlo_correctness.py. See docs/literature-inventory.toml.",
 };
 
 /**
@@ -459,7 +459,7 @@ export const GILLESPIE_SSA_REPLICATES_LITERATURE: DomainLiterature = {
     "Ensemble of independent Gillespie SSA trajectories, averaged onto a common time grid. The ensemble mean converges on the closed form E[a(t)] = a0*exp(-k*t).",
   references: GILLESPIE_SSA_LITERATURE.references,
   defaultJustification:
-    "Gillespie (1976) is the source of the ALGORITHM. n_replicates is an ensemble size — a precision/runtime tradeoff, not a measured value. The ensemble mean is verified against the exact closed form E[a(t)] = a0*exp(-k*t) in Tellurium/tests/test_ssa_ensemble_unbiased.py, which pins that the bias SHRINKS as replicates grow. See docs/literature-inventory.toml.",
+    "Gillespie (1976) is the source of the ALGORITHM. n_replicates is an ensemble size — a precision/runtime tradeoff, not a measured value. The ensemble mean is verified against the exact closed form E[a(t)] = a0*exp(-k*t) in Terium/tests/test_ssa_ensemble_unbiased.py, which pins that the bias SHRINKS as replicates grow. See docs/literature-inventory.toml.",
 };
 
 export const DOMAIN_LITERATURE_MAP: Record<string, DomainLiterature> = {

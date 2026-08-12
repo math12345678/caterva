@@ -10,7 +10,7 @@ const tempDirs: string[] = [];
 function makeFakeRepo(): string {
   const root = mkdtempSync(path.join(tmpdir(), "terrium-root-"));
   tempDirs.push(root);
-  mkdirSync(path.join(root, "Tellurium"));
+  mkdirSync(path.join(root, "Terium"));
   mkdirSync(path.join(root, "Science-Agent-Pipeline"));
   writeFileSync(
     path.join(root, "Science-Agent-Pipeline", "pnpm-workspace.yaml"),
@@ -85,7 +85,7 @@ describe("findRepositoryRoot", () => {
   it("does not accept a directory with only one of the two markers", () => {
     const root = mkdtempSync(path.join(tmpdir(), "terrium-half-"));
     tempDirs.push(root);
-    mkdirSync(path.join(root, "Tellurium"));
+    mkdirSync(path.join(root, "Terium"));
     expect(() => findRepositoryRoot(root)).toThrow(
       /Could not find Terrium repository root/,
     );

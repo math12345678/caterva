@@ -51,7 +51,7 @@ src/
 │   ├── literatureService.ts           (600+ lines)
 │   └── literatureResolver.ts          (300+ lines)
 ├── engine/
-│   └── telluriumBridge.ts             (500+ lines)
+│   └── teriumBridge.ts             (500+ lines)
 ├── reproducibility/
 │   └── reproducibilityEngine.ts       (400+ lines)
 ├── cli/
@@ -619,7 +619,7 @@ open src/web/dashboard.html
 
 ---
 
-**Built with:** TypeScript, Jest, Chart.js, Tellurium  
+**Built with:** TypeScript, Jest, Chart.js, Terium  
 **Quality:** Production Grade  
 **Capability:** Research Platform  
 **Status:** ✅ READY FOR DEPLOYMENT  
