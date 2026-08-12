@@ -105,8 +105,12 @@ name implied a relationship that does not exist.
 The $PRE commits before this one are the engine's real history, recovered
 from the pre-rename path -- 'git subtree split -P Terium' alone returns a
 single commit, because the path only exists from the rename forward."
-  git branch -f split/terium "$(git -C "$RTMP" rev-parse HEAD)" 2>/dev/null || \
-    git fetch -q "$RTMP" replay:split/terium --force
+  # `checkout FETCH_HEAD` detaches, so the commit above landed on a detached
+  # HEAD and the `replay` branch never pointed at it. Name it explicitly
+  # before fetching, and fetch by ref rather than by SHA -- the SHA is not an
+  # object this repository has yet.
+  git -C "$RTMP" branch -f replay HEAD
+  git fetch -q "$RTMP" replay:split/terium --force
   ok "terium                         $(git rev-list --count split/terium) commits  <- Tellurium/ + replayed rename"
 else
   git subtree split -P Terium -b split/terium >/dev/null 2>&1
