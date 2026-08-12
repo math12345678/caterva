@@ -73,9 +73,36 @@ if [ -n "$RENAME_COMMIT" ]; then
   git worktree add -f --detach "$TMPWT" "$RENAME_COMMIT^" >/dev/null 2>&1
   ( cd "$TMPWT" && git subtree split -P Tellurium -b split/terium >/dev/null 2>&1 )
   git worktree remove --force "$TMPWT" >/dev/null 2>&1
-  ok "terium                         $(git rev-list --count split/terium) commits  <- Tellurium/ (pre-rename)"
-  echo "    NOTE: replay the rename in the pushed repo, or push Terium/ as a"
-  echo "          follow-up commit — see docs/REPO_MAP.md."
+  PRE=$(git rev-list --count split/terium)
+
+  # The split ends in the PRE-rename state, because that is where the
+  # history lives. Replay the rename on top so the branch preserves the
+  # history AND lands in the state the engine is actually in -- otherwise
+  # the pushed repo would be correct about the past and wrong about now.
+  RTMP="$STAGE/_terium_head"
+  rm -rf "$RTMP"; mkdir -p "$RTMP"
+  git -C "$RTMP" init -q -b replay
+  git -C "$RTMP" fetch -q "$ROOT" split/terium
+  git -C "$RTMP" checkout -q FETCH_HEAD
+  git -C "$RTMP" rm -rq . >/dev/null 2>&1 || true
+  cp -R "$ROOT/Terium/." "$RTMP/"
+  rm -rf "$RTMP/__pycache__" "$RTMP/.coverage"
+  git -C "$RTMP" add -A
+  git -C "$RTMP" -c user.name="$(git config user.name)" \
+                 -c user.email="$(git config user.email)" \
+                 commit -q -m "Rename Tellurium -> Terium
+
+The upstream Tellurium project is unrelated to this engine: requirements.txt
+has always said 'do NOT pip install tellurium' (ADR 0001), and this code
+imports it nowhere, calling libroadrunner and antimony directly. The old
+name implied a relationship that does not exist.
+
+The $PRE commits before this one are the engine's real history, recovered
+from the pre-rename path -- 'git subtree split -P Terium' alone returns a
+single commit, because the path only exists from the rename forward."
+  git branch -f split/terium "$(git -C "$RTMP" rev-parse HEAD)" 2>/dev/null || \
+    git fetch -q "$RTMP" replay:split/terium --force
+  ok "terium                         $(git rev-list --count split/terium) commits  <- Tellurium/ + replayed rename"
 else
   git subtree split -P Terium -b split/terium >/dev/null 2>&1
   echo "  ! rename commit not found; split Terium/ directly ($(git rev-list --count split/terium) commits)"
