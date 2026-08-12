@@ -1,0 +1,160 @@
+/* ============================================================
+   terrium — the proof section
+
+   The one section on the page that quotes the real tool instead
+   of illustrating an intended architecture. It is styled as an
+   instrument reading rather than as another composed tier: no
+   camera, no reveal choreography beyond the shared [data-reveal],
+   nothing that would make a transcript look art-directed.
+
+   Every colour, type step and space value here is a token from
+   tokens.css. Nothing new is introduced locally.
+   ============================================================ */
+
+.proof {
+  position: relative;
+  padding: clamp(5rem, 12vh, 11rem) var(--gutter);
+  border-top: 1px solid var(--line-hairline);
+  background: var(--graphite);
+}
+
+.proof__inner {
+  max-width: 78rem;
+  margin: 0 auto;
+  display: grid;
+  gap: clamp(2rem, 5vw, 3.6rem);
+}
+
+.proof__head {
+  display: grid;
+  gap: clamp(1.1rem, 2vw, 1.8rem);
+}
+
+.proof__title { font-size: var(--step-3); }
+.proof__title .display-dim { color: var(--text-tertiary); }
+
+/* Side by side only once the transcript can hold its terminal shape without
+   the exit table squeezing it. Below that they stack in reading order:
+   transcript first, because the exit codes only mean something after you
+   have seen what a successful lookup returns. */
+.proof__body {
+  display: grid;
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  align-items: start;
+}
+@media (min-width: 64rem) {
+  .proof__body { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); }
+}
+
+/* --- the transcript --------------------------------------- */
+.transcript {
+  border: 1px solid var(--line-structural);
+  background: var(--void);
+  /* min-width:0 lets the pre inside shrink and scroll rather than forcing the
+     grid column wider than the viewport — the failure that would otherwise
+     put a horizontal scrollbar on the whole page. */
+  min-width: 0;
+}
+
+.transcript__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6rem 1.5rem;
+  padding: 0.9rem clamp(0.9rem, 2vw, 1.25rem);
+  border-bottom: 1px solid var(--line-hairline);
+}
+.transcript__exit { color: var(--status-supported); }
+
+.transcript__code {
+  margin: 0;
+  padding: clamp(1rem, 2.4vw, 1.5rem);
+  /* Terminal output is a fixed-width artifact. Re-wrapping it changes what it
+     says — the aligned System / Organism / Source / Citation block is the
+     whole point of the quote — so it scrolls inside its own card instead. */
+  overflow-x: auto;
+  white-space: pre;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  line-height: 1.7;
+  color: var(--text-secondary);
+  tab-size: 2;
+}
+.transcript__code b { font-weight: 500; color: var(--text-primary); }
+.transcript__code:focus-visible { outline: 1px solid var(--signal-teal); outline-offset: -1px; }
+
+.t-cmd  { color: var(--text-tertiary); }
+.t-ok   { color: var(--status-supported); }
+.t-key  { color: var(--text-tertiary); }
+/* Amber is reserved for disclosed uncertainty, and a cross-species match is
+   exactly that: real, citable, and not the thing you asked for. */
+.t-warn { color: var(--status-review); }
+.t-warn b { color: var(--status-review); }
+
+.transcript__foot {
+  padding: 0 clamp(0.9rem, 2vw, 1.25rem) clamp(0.9rem, 2vw, 1.25rem);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: var(--step--1);
+}
+
+/* --- the three exit codes --------------------------------- */
+.exits {
+  border: 1px solid var(--line-structural);
+  min-width: 0;
+}
+
+.exits__head {
+  padding: 0.9rem clamp(0.9rem, 2vw, 1.25rem);
+  border-bottom: 1px solid var(--line-hairline);
+}
+
+/* The numeral sits in its own column and spans both text rows, so the three
+   codes read as a table of outcomes rather than three stacked paragraphs. */
+.exits__row {
+  display: grid;
+  grid-template-columns: 2.5ch minmax(0, 1fr);
+  column-gap: clamp(0.9rem, 2vw, 1.4rem);
+  row-gap: 0.35rem;
+  padding: clamp(1rem, 2.2vw, 1.4rem) clamp(0.9rem, 2vw, 1.25rem);
+  border-bottom: 1px solid var(--line-hairline);
+}
+
+.exits__code {
+  grid-row: 1 / span 2;
+  font-size: var(--step-2);
+  font-weight: 400;
+  line-height: 1;
+  color: var(--status-supported);
+}
+.exits__row--review .exits__code  { color: var(--status-review); }
+.exits__row--blocked .exits__code { color: var(--status-blocked); }
+
+.exits__what {
+  font-size: var(--step-1);
+  font-weight: 350;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.exits__why {
+  font-size: var(--step-0);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.exits__foot {
+  padding: clamp(1rem, 2.2vw, 1.4rem) clamp(0.9rem, 2vw, 1.25rem);
+  font-size: var(--step-0);
+  line-height: 1.6;
+  color: var(--text-tertiary);
+}
+
+.proof__note { max-width: var(--measure); }
+
+@media (max-width: 40rem) {
+  /* The numeral column collapses on a phone: 2.5ch of gutter beside a
+     three-line explanation leaves the explanation at ~24 characters. */
+  .exits__row { grid-template-columns: minmax(0, 1fr); }
+  .exits__code { grid-row: auto; font-size: var(--step-1); }
+}

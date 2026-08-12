@@ -83,7 +83,16 @@ function mountWhenNear(sel, load, anchor) {
   let built = null;
   const build = () => {
     if (built) return built;
-    built = load();
+    /* A rejected dynamic import here would otherwise surface only as an
+       unhandled rejection while the section sat empty and looked intentional.
+       Named, so the console says which section is missing. */
+    built = Promise.resolve()
+      .then(load)
+      .catch((err) => {
+        console.error(`[terrium] deferred section "${sel}" failed to load; the rest of the page continues.`, err);
+        const root = document.documentElement;
+        root.dataset.bootFailed = root.dataset.bootFailed ? `${root.dataset.bootFailed} ${sel}` : sel;
+      });
     return built;
   };
   if (prefersReducedMotion() || !('IntersectionObserver' in window)) {
@@ -102,16 +111,47 @@ function mountWhenNear(sel, load, anchor) {
   if (anchor) qsa(`a[href="${anchor}"]`).forEach((a) => a.addEventListener('click', build));
 }
 
-function boot() {
-  installVisibilityGuard();
-  observeReveals();
-  initSystemMode();
-  initChapters();
-  initPilot();
-  mountWhenNear('[data-atlas]', () => import('./atlas/index.js').then((m) => m.initAtlas()), '#atlas');
-  mountWhenNear('[data-console]', () => import('./console/index.js').then((m) => m.initConsole()), '#orchestration');
-  mountWhenNear('[data-microscope]', () => import('./microscope/index.js').then((m) => m.initMicroscope()), '#microscope');
+/**
+ * Boot one subsystem without letting it take the others down.
+ *
+ * Every section on this page renders into an empty host element, and boot()
+ * was a single straight-line sequence: one null selector anywhere — a renamed
+ * hook, a section edited out — threw, and every subsystem after it never ran.
+ * The page still looked deliberate, because an unbuilt section is an empty
+ * div, so the failure mode was a quietly half-dead page with no symptom.
+ *
+ * That is the same shape as a guard that reports green on work it did not do.
+ * So: contain the blast radius to one subsystem, and make the failure
+ * *observable* — a console error naming the part that died, and a marker on
+ * <html> listing them, so this can never again be invisible to anyone
+ * inspecting the page.
+ */
+function safely(name, fn) {
+  try {
+    return fn();
+  } catch (err) {
+    console.error(`[terrium] "${name}" failed to initialise; the rest of the page continues.`, err);
+    const root = document.documentElement;
+    const failed = root.dataset.bootFailed ? `${root.dataset.bootFailed} ${name}` : name;
+    root.dataset.bootFailed = failed;
+    return null;
+  }
+}
 
+function boot() {
+  safely('visibility-guard', installVisibilityGuard);
+  safely('reveals', observeReveals);
+  safely('system-mode', initSystemMode);
+  safely('chapters', initChapters);
+  safely('pilot', initPilot);
+  safely('atlas', () => mountWhenNear('[data-atlas]', () => import('./atlas/index.js').then((m) => m.initAtlas()), '#atlas'));
+  safely('console', () => mountWhenNear('[data-console]', () => import('./console/index.js').then((m) => m.initConsole()), '#orchestration'));
+  safely('microscope', () => mountWhenNear('[data-microscope]', () => import('./microscope/index.js').then((m) => m.initMicroscope()), '#microscope'));
+
+  safely('cathedral', bootCathedral);
+}
+
+function bootCathedral() {
   const stageEl = qs('.stage');
   const cathedralEl = qs('[data-cathedral]');
   const viewport = qs('[data-viewport]');

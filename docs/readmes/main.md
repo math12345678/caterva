@@ -62,7 +62,7 @@ can drift out of sync.
 | [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 277 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
-| [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 21 guards, CI, build config |
+| [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
 | [`documents`](https://github.com/Terrium-sim/documents) | constitution, 23 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
@@ -74,7 +74,7 @@ Full reasoning: [`docs/REPO_MAP.md`](docs/REPO_MAP.md).
 
 ## How it keeps itself honest
 
-21 guards run on every build. They exist because the alternative was tried
+22 guards run on every build. They exist because the alternative was tried
 and failed — most were written *after* something claimed to be verified and
 was not.
 
