@@ -1,6 +1,6 @@
 # Terrium — Science Agent Pipeline
 
-Scientific computing for teaching labs. Students ask a question in plain language; Terrium resolves parameters from the literature (BRENDA/KEGG/PubMed), runs the Tellurium ODE engine, and returns a verified trajectory with citations.
+Scientific computing for teaching labs. Students ask a question in plain language; Terrium resolves parameters from the literature (BRENDA/KEGG/PubMed), runs the Terium ODE engine, and returns a verified trajectory with citations.
 
 ## Run & Operate
 
@@ -67,11 +67,11 @@ pnpm --filter @workspace/api-spec run codegen
 - Frontend: React 19, Vite 7, Tailwind CSS v4, shadcn/ui, Framer Motion, Recharts
 - API: Express 5, Zod, Pino
 - DB: PostgreSQL + Drizzle ORM (optional)
-- Python bridge: Tellurium engine (antimony + libroadrunner + libSBML)
+- Python bridge: Terium engine (antimony + libroadrunner + libSBML)
 - Literature: BRENDA / KEGG / UniProt / PubMed live APIs
 
 ## Pipeline flow
-User query → LLM or keyword resolver → Python science agent (BRENDA/KEGG/PubMed) → Python Tellurium engine (ODE simulation) → PostgreSQL persistence → SSE stream
+User query → LLM or keyword resolver → Python science agent (BRENDA/KEGG/PubMed) → Python Terium engine (ODE simulation) → PostgreSQL persistence → SSE stream
 
 ## Architecture
 ```
@@ -89,7 +89,7 @@ Science-Agent-Pipeline/
 └── attached_assets/         Design specs
 
 Terrium/
-├── Tellurium/               Python ODE engine (MM, SIR, SEIR)
+├── Terium/               Python ODE engine (MM, SIR, SEIR)
 ├── Tests/                   BRENDA/KEGG/PubMed literature layer
 └── scripts/                 Environment verification
 ```

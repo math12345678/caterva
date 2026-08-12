@@ -269,7 +269,7 @@ Performance
 - Reproducible equations
 
 ✅ **Simulation Accuracy**
-- Tellurium + libroadrunner (industry-standard)
+- Terium + libroadrunner (industry-standard)
 - Time-series trajectory
 - Final value calculation
 - Precision: floating-point

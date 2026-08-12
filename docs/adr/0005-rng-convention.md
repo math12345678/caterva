@@ -10,7 +10,7 @@ Both are implemented as direct Python/numpy without antimony or roadrunner,
 and both rely on numpy random number generation for their core computation.
 
 In Monte Carlo's implementation, the seed handling was documented as a
-judgment call (see `tellurium_engine.py`'s Monte Carlo module comment: "The
+judgment call (see `terium_engine.py`'s Monte Carlo module comment: "The
 seed convention uses `numpy.random.Generator` for reproducibility; future
 stochastic domains should reuse this same pattern rather than inventing a
 different RNG interface"). With a second stochastic domain now following
@@ -45,7 +45,7 @@ reproducibility — must state its reasons in its implementation report per
 the constitution's Rule 9 (judgment calls flagged explicitly, not silently
 made). Compliance with this ADR is checked automatically by
 `scripts/check_rng_convention.py` (AST-based static analysis) and
-`Tellurium/tests/test_rng_convention.py` (pytest wrapper that runs the
+`Terium/tests/test_rng_convention.py` (pytest wrapper that runs the
 script as a CI step). The check runs as Step 2b of the verification
 procedure (`docs/CONSTITUTION.md` Section 6) and is automated by
 `scripts/verify_domain.sh`.

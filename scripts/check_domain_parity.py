@@ -2,12 +2,12 @@
 
 A domain has to be declared in four places to actually work:
 
-  1. ``tellurium_runner.py``'s ``DISPATCH``      (domain -> engine function)
-  2. ``telluriumRunner.ts``'s ``SimulationDomain`` union
+  1. ``terium_runner.py``'s ``DISPATCH``      (domain -> engine function)
+  2. ``teriumRunner.ts``'s ``SimulationDomain`` union
   3. ``schemas.ts``'s ``SimulationParameterSchemas``
   4. the engine's ``__all__`` (checked by DISPATCH's own contract test)
 
-``Tellurium/tests/test_boundary_contract.py`` (ADR 0007) already pins 1
+``Terium/tests/test_boundary_contract.py`` (ADR 0007) already pins 1
 against 4. Nothing pinned 2 or 3 against anything, and on 2026-08-09 that
 cost real money in two opposite directions on the same day:
 
@@ -56,9 +56,9 @@ API_LIB = (
     / "src"
     / "lib"
 )
-RUNNER_PY = API_LIB / "tellurium_runner.py"
+RUNNER_PY = API_LIB / "terium_runner.py"
 LLM_RESOLVER_TS = API_LIB / "llmResolver.ts"
-RUNNER_TS = API_LIB / "telluriumRunner.ts"
+RUNNER_TS = API_LIB / "teriumRunner.ts"
 SCHEMAS_TS = API_LIB / "schemas.ts"
 
 #: `sbml` is the raw-SBML escape hatch, not a teaching domain. It is
@@ -72,7 +72,7 @@ def _read(path: pathlib.Path) -> str:
 
 
 def dispatch_domains() -> set[str]:
-    """Keys of DISPATCH in tellurium_runner.py."""
+    """Keys of DISPATCH in terium_runner.py."""
     source = _read(RUNNER_PY)
     match = re.search(
         r"^DISPATCH:\s*Dict\[str,\s*str\]\s*=\s*\{(.*?)^\}",
@@ -85,7 +85,7 @@ def dispatch_domains() -> set[str]:
 
 
 def simulation_domain_union() -> set[str]:
-    """Members of the SimulationDomain union in telluriumRunner.ts."""
+    """Members of the SimulationDomain union in teriumRunner.ts."""
     source = _read(RUNNER_TS)
     match = re.search(
         r"export type SimulationDomain\s*=(.*?);", source, re.DOTALL
@@ -145,8 +145,8 @@ def llm_supported_domains() -> set[str]:
 def _layers() -> dict[str, set[str]]:
     """The three declaration sites, by human-readable name."""
     return {
-        "DISPATCH (tellurium_runner.py)": dispatch_domains(),
-        "SimulationDomain (telluriumRunner.ts)": simulation_domain_union(),
+        "DISPATCH (terium_runner.py)": dispatch_domains(),
+        "SimulationDomain (teriumRunner.ts)": simulation_domain_union(),
         "SimulationParameterSchemas (schemas.ts)": schema_domains(),
     }
 
@@ -202,7 +202,7 @@ def check() -> list[str]:
             "Refusing to report success."
         )
     else:
-        dispatch = layers["DISPATCH (tellurium_runner.py)"]
+        dispatch = layers["DISPATCH (terium_runner.py)"]
         for domain in sorted(llm_domains - dispatch):
             violations.append(
                 f"{domain!r} is advertised to the LLM in SUPPORTED_DOMAINS "

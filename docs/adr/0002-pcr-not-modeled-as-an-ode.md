@@ -23,7 +23,7 @@ with no error at all.
 ## Decision
 
 Implement `simulate_pcr` as a direct Python recurrence relation
-(`validate_pcr_params` / `simulate_pcr` in `tellurium_engine.py`), not
+(`validate_pcr_params` / `simulate_pcr` in `terium_engine.py`), not
 routed through antimony or roadrunner. Unbounded growth follows the exact
 closed form `N(c) = n0 * (1 + efficiency) ** c`; the optional plateau mode
 uses a discrete logistic recurrence. Both are computed directly, with no

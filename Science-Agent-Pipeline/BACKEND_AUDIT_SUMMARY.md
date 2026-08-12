@@ -19,7 +19,7 @@ The Terrium Science-Agent Pipeline backend is **well-engineered and production-r
 |-------|----------|--------|-------|
 | OpenAPI spec missing 3 ODE oscillator domains | Medium | ✅ Fixed | openapi.yaml |
 | Metrics router not wired into main app | High | ✅ Fixed | src/routes/index.ts |
-| Python DISPATCH has duplicate entries (3 domains) | Medium | ✅ Fixed | tellurium_runner.py |
+| Python DISPATCH has duplicate entries (3 domains) | Medium | ✅ Fixed | terium_runner.py |
 | LLM domain list incomplete (11 vs 14) | High | ✅ Fixed | llmResolver.ts |
 | ODE oscillator defaults missing from queryResolver | Critical | ✅ Fixed | queryResolver.ts |
 | Parameter regex incomplete (missing alpha, delta, etc.) | Medium | ✅ Fixed | queryResolver.ts |

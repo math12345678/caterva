@@ -557,7 +557,7 @@ export function LiveArchitectureDashboard() {
             <div className="space-y-2">
               <h4 className="text-sm font-semibold text-purple-300">Simulators</h4>
               <p className="text-xs text-slate-300">
-                Tellurium engine dispatch for 13 domain types: MM kinetics,
+                Terium engine dispatch for 13 domain types: MM kinetics,
                 competitive inhibition, epidemiology, population genetics, etc.
               </p>
             </div>

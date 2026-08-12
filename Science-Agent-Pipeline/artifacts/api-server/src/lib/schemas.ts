@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { SimulationDomain } from "./telluriumRunner";
+import type { SimulationDomain } from "./teriumRunner";
 
 export const WaitlistBody = z.object({
   email: z.string().email("Invalid email address").trim().toLowerCase(),
@@ -175,7 +175,7 @@ export const SimulationParameterSchemas: Record<
   }),
   // Three literature-fixed ODE oscillators (ADR 0022). All rate constants
   // are the source papers' own standard parameter sets, not caller inputs
-  // -- see Tellurium/continuous/model_building.py -- so only the
+  // -- see Terium/continuous/model_building.py -- so only the
   // integration window is a request-time parameter.
   lotka_volterra: z
     .object({

@@ -82,7 +82,7 @@ Concretely:
    DOI [10.1097/SLA.0000000000004400](https://doi.org/10.1097/SLA.0000000000004400),
    PMID 33214421 — a single 39-study meta-analysis reporting both
    quantities together, so no cross-paper mismatch is possible.
-3. `Tellurium/core/validation.py::beta_gamma_from_r0(r0, infectious_period_days)`
+3. `Terium/core/validation.py::beta_gamma_from_r0(r0, infectious_period_days)`
    does the arithmetic bridge (`gamma = 1/infectious_period_days`,
    `beta = r0 * gamma`), returning `(beta, gamma, ParameterValidation)`.
    Impossible inputs (non-finite, non-positive) are rejected here; an
@@ -124,7 +124,7 @@ taken here.
 **Easier.** A resolved (R0, infectious period) pair can now produce a
 runnable SIR simulation via `beta_gamma_from_r0`, verified end-to-end
 against the independently-derivable peak condition
-`S(t_peak) = N / R0` (see `Tellurium/tests/test_beta_gamma_from_r0.py`),
+`S(t_peak) = N / R0` (see `Terium/tests/test_beta_gamma_from_r0.py`),
 not against the engine's own output. Registering a new disease later is
 additive — nothing built here needs revisiting.
 
@@ -139,7 +139,7 @@ trajectory, and `RESOLVABLE_FIELDS` itself.
 
 ## Verification
 
-- 15 tests in `Tellurium/tests/test_beta_gamma_from_r0.py`: arithmetic
+- 15 tests in `Terium/tests/test_beta_gamma_from_r0.py`: arithmetic
   correctness, Rule 2's impossible/implausible distinction (mirroring
   `vmax_from_kcat`'s), and an end-to-end check against the SIR peak
   condition `S(t_peak) = N/R0` using the real Hussein et al. values —

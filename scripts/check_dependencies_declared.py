@@ -31,7 +31,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # are not CI dependencies. Their imports are not required to be in
 # production dependencies.
 SOURCE_DIRS = [
-    REPO_ROOT / "Tellurium",
+    REPO_ROOT / "Terium",
     REPO_ROOT / "Tests",
 ]
 
@@ -106,9 +106,9 @@ def _local_module_stems() -> set[str]:
         if not src_dir.exists():
             continue
         # The directory itself is a local package root when something
-        # imports it by name (e.g. `from Tellurium.tellurium_engine import
-        # ...`, used by Tellurium/cli.py when run as `python -m
-        # Tellurium.cli` from the repo root) -- not just its file stems.
+        # imports it by name (e.g. `from Terium.terium_engine import
+        # ...`, used by Terium/cli.py when run as `python -m
+        # Terium.cli` from the repo root) -- not just its file stems.
         stems.add(src_dir.name.lower())
         for path in src_dir.rglob("*.py"):
             if any(part in EXCLUDE_DIR_NAMES for part in path.parts):
@@ -213,7 +213,7 @@ def main() -> int:
         if len(files) > 3:
             print(f"    ...and {len(files) - 3} more file(s)")
     print(
-        "\nThese modules are imported somewhere in Tellurium/ or Tests/ but "
+        "\nThese modules are imported somewhere in Terium/ or Tests/ but "
         "are not listed in requirements.txt or requirements-dev.txt. A fresh "
         "install (like CI does) will fail to collect the affected tests."
     )

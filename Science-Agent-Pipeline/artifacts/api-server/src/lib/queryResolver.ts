@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { SimulationDomain } from "./telluriumRunner";
+import type { SimulationDomain } from "./teriumRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
 import { resolveKineticValue, resolveEpidemiologyParameters } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";

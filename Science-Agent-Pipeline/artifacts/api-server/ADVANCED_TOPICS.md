@@ -629,7 +629,7 @@ This is the template for adding a new simulation domain to Terrium.
 
 ### Step 1: Write the Python Handler
 
-**File:** `src/lib/tellurium_runner.py`
+**File:** `src/lib/terium_runner.py`
 
 ```python
 def run_my_model(parameters):
@@ -686,7 +686,7 @@ DISPATCH['my_model'] = run_my_model
 
 ### Step 2: Add TypeScript Type and Schema
 
-**File:** `src/lib/telluriumRunner.ts`
+**File:** `src/lib/teriumRunner.ts`
 
 ```typescript
 export type SimulationDomain = 
@@ -785,7 +785,7 @@ it('exposes my_model to LLM', () => {
 ```typescript
 describe('my_model', () => {
   it('runs simulation with valid parameters', async () => {
-    const result = await runTellurium('my_model', {
+    const result = await runTerium('my_model', {
       param1: 0.5,
       param2: 1.0
     });

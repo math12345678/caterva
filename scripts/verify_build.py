@@ -30,7 +30,7 @@ from typing import List, Tuple
 
 REPO_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = REPO_ROOT / "scripts"
-TELLURIUM_DIR = REPO_ROOT / "Tellurium"
+TERIUM_DIR = REPO_ROOT / "Terium"
 API_SERVER_DIR = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-server"
 
 
@@ -125,7 +125,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
 
     # Rule 7 (never `pip install tellurium`) made executable. It was one of
     # the nine non-negotiable rules, had ADR 0001 behind it, and adding
-    # tellurium to requirements.txt passed every guard in the repo.
+    # terium to requirements.txt passed every guard in the repo.
     guards.append(run_guard(
         "Constitution Rules 7+8 Guard",
         f"python {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
@@ -344,7 +344,7 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
             run_guard(
                 f"Python Test: {test_file}",
                 f"python -m pytest {test_file} -v",
-                cwd=TELLURIUM_DIR
+                cwd=TERIUM_DIR
             )
             for test_file in test_files
         )
@@ -353,7 +353,7 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
         tests.append(run_guard(
             "Python All Tests",
             "python -m pytest tests/ -x --tb=short",
-            cwd=TELLURIUM_DIR,
+            cwd=TERIUM_DIR,
             timeout=600  # 10 minutes for full test suite
         ))
     

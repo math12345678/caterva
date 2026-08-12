@@ -17,7 +17,7 @@ Focused on the critical path for query resolution and literature lookup. Extract
 Consolidated rate limiting, improved caching logic, unified job lifecycle management, extracted type guards, created literature reference factories.
 
 ### Phase 3: Python Backend Integration
-Unified Tellurium import logic, consolidated bridge function patterns, improved error handling consistency.
+Unified Terium import logic, consolidated bridge function patterns, improved error handling consistency.
 
 ---
 
@@ -99,8 +99,8 @@ Unified Tellurium import logic, consolidated bridge function patterns, improved 
 
 #### ✅ science_agent_runner.py
 **1 major improvement:**
-- `_ensure_tellurium_path()` extracted function
-  - Eliminates duplicate Tellurium path setup in `bridge_vmax_from_kcat()` and `bridge_beta_gamma_from_r0()`
+- `_ensure_terium_path()` extracted function
+  - Eliminates duplicate Terium path setup in `bridge_vmax_from_kcat()` and `bridge_beta_gamma_from_r0()`
   - Centralizes import setup logic
   - Prevents sys.path duplication
 
@@ -208,7 +208,7 @@ function findLocatorUrl(locators): string | undefined { ... }
 |--------|-------|--------|
 | 8 scattered type checks | 1 validator | 87% less code |
 | 5 factory patterns | 1 factory function | 80% duplication removed |
-| 3 Tellurium imports | 1 helper | Shared logic |
+| 3 Terium imports | 1 helper | Shared logic |
 
 ---
 
@@ -286,7 +286,7 @@ All extracted helpers should have unit tests:
 ✅ science_agent_runner.py
 ```
 
-`telluriumRunner.ts` was identified as a future-improvement candidate but was **not**
+`teriumRunner.ts` was identified as a future-improvement candidate but was **not**
 actually modified in this pass -- an earlier version of this list checkmarked it as
 "Modified & Verified" anyway, which `git show --stat` on the underlying commit
 disproves (it isn't in the diff). Listed here separately rather than silently
@@ -319,7 +319,7 @@ dropped, so the correction is visible rather than just quietly fixed.
 ### 5. Error/Message Handling (7+ instances)
 - **Pattern:** Similar try/catch or error message patterns
 - **Solution:** Consolidated helpers
-- **Files:** app, simulate, telluriumRunner
+- **Files:** app, simulate, teriumRunner
 
 ### 6. Import Setup (2 instances)
 - **Pattern:** sys.path manipulation before imports
@@ -396,7 +396,7 @@ Could create error hierarchy with consistent structure.
 
 ### Code Changes
 - **Total files touched:** 12 (11 TypeScript + 1 Python) -- corrected from an
-  earlier "13 (12+1)" that counted `telluriumRunner.ts` as touched; it wasn't
+  earlier "13 (12+1)" that counted `teriumRunner.ts` as touched; it wasn't
   (see "Files Modified & Verified" above)
 - **Total improvements:** 30+
 - **Lines modified:** 700+

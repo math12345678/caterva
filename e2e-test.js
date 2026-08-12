@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * End-to-End Integration Test
- * Tests web server → PubMed → Tellurium → Results
+ * Tests web server → PubMed → Terium → Results
  */
 
 const http = require('http');

@@ -79,9 +79,9 @@ router.get(
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const scriptsDir = path.resolve(_dirname, "..", "src", "lib");
-      const [telluriumExists, scienceAgentExists, python, dbAvailable] =
+      const [teriumExists, scienceAgentExists, python, dbAvailable] =
         await Promise.all([
-          fileExists(path.join(scriptsDir, "tellurium_runner.py")),
+          fileExists(path.join(scriptsDir, "terium_runner.py")),
           fileExists(path.join(scriptsDir, "science_agent_runner.py")),
           checkPython3(),
           Promise.resolve(isDbAvailable()),
@@ -89,9 +89,9 @@ router.get(
 
       const subsystems: SubsystemStatus[] = [
         {
-          ok: telluriumExists,
-          label: "tellurium_runner.py",
-          detail: telluriumExists
+          ok: teriumExists,
+          label: "terium_runner.py",
+          detail: teriumExists
             ? "Script found"
             : "Missing — pipeline will fail at 'running' stage",
         },
@@ -107,7 +107,7 @@ router.get(
           label: "python3",
           detail: python.available
             ? `Found: ${python.version}`
-            : "Not found — pipeline cannot run Tellurium or science agent",
+            : "Not found — pipeline cannot run Terium or science agent",
         },
         {
           ok: dbAvailable,

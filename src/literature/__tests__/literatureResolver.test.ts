@@ -24,7 +24,7 @@ import {
   ResolverUnavailableError,
   resolveKinetic
 } from '../literatureResolver';
-import { REPO_ROOT, resolvePythonExecutable } from '../../engine/telluriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../../engine/teriumBridge';
 
 const PYTHON = resolvePythonExecutable(REPO_ROOT);
 
@@ -206,7 +206,7 @@ describeSubprocess('reading the runner', () => {
 
   it('returns the Python-computed bridged Vmax for kcat + enzymeConc', async () => {
     // Vmax = kcat * [E]0 is computed by the runner using the same
-    // Tellurium.core.validation.vmax_from_kcat the engine uses. This side
+    // Terium.core.validation.vmax_from_kcat the engine uses. This side
     // must read it, not recompute it -- a second copy of the arithmetic
     // would also be a second copy of the [E]0/Km flag threshold, free to
     // drift.

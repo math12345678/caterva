@@ -106,7 +106,7 @@ curl -X POST http://localhost:3000/api/batch \
 │  │  2. Literature Verification (PubMed + CrossRef)       │  │
 │  │  3. Model Selection (4 kinetic models)                │  │
 │  │  4. SBML Generation (complete MathML)                 │  │
-│  │  5. Tellurium Execution (libroadrunner)               │  │
+│  │  5. Terium Execution (libroadrunner)               │  │
 │  │  6. Result Validation (confidence scoring)            │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                          ↓                                    │
@@ -441,7 +441,7 @@ You have built a **complete, production-ready scientific simulation platform** t
 ✅ Persists history across restarts  
 ✅ Provides real-time progress tracking  
 ✅ Generates valid SBML models  
-✅ Runs industry-standard Tellurium kinetics  
+✅ Runs industry-standard Terium kinetics  
 ✅ Integrates real scientific literature  
 ✅ Has zero security vulnerabilities  
 ✅ Is fully tested and documented  

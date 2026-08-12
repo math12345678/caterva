@@ -7,7 +7,7 @@ On 2026-08-11 a single commit added 77 files and 10,448 lines. Among them:
     src/integrations/brenda-real.ts          234 lines   0 importers
     src/integrations/real-literature-service  329 lines   0 importers
     src/engine/kinetic-models.ts             217 lines   0 importers
-    src/engine/tellurium-real.py             254 lines   0 importers
+    src/engine/terium-real.py             254 lines   0 importers
     src/execution/job-manager.ts             369 lines   0 importers
     src/analysis/advanced-analytics.ts       362 lines   0 importers
     src/cli/advanced-features.ts             244 lines   0 importers

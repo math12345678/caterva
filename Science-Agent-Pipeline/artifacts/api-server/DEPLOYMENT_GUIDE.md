@@ -48,7 +48,7 @@ pnpm run start
 
 ### Option 2: Docker Container
 
-> **Proposed — not implemented in this repo yet.** The repo's one real `Dockerfile` lives at the git root (`/Dockerfile`). It is `FROM python:3.12-slim` and builds a sandbox/CI-parity image for the Tellurium simulation engine (installs `requirements-dev.txt`, runs `scripts/check_env.py`, and drops into `CMD ["bash"]`). It has no Node.js, no `EXPOSE`, and nothing to do with the Express API server. There is no Dockerfile anywhere under `Science-Agent-Pipeline/artifacts/api-server`. The Node Dockerfile below is a proposal for containerizing the API server, not something that exists or has been built/tested in this repo — treat it as a starting point, not a verified artifact.
+> **Proposed — not implemented in this repo yet.** The repo's one real `Dockerfile` lives at the git root (`/Dockerfile`). It is `FROM python:3.12-slim` and builds a sandbox/CI-parity image for the Terium simulation engine (installs `requirements-dev.txt`, runs `scripts/check_env.py`, and drops into `CMD ["bash"]`). It has no Node.js, no `EXPOSE`, and nothing to do with the Express API server. There is no Dockerfile anywhere under `Science-Agent-Pipeline/artifacts/api-server`. The Node Dockerfile below is a proposal for containerizing the API server, not something that exists or has been built/tested in this repo — treat it as a starting point, not a verified artifact.
 >
 > The earlier version of this section also used `npm ci` against a `package-lock.json`, which does not exist and would not work here: this is a pnpm workspace (`Science-Agent-Pipeline/package.json` declares `"packageManager": "pnpm@11.20.0"` and its `preinstall` script deletes `package-lock.json`/`yarn.lock` if either appears), and the API server's own dependencies (`@workspace/api-zod`, `@workspace/db`) use the `workspace:*` protocol that plain `npm`/`npm ci` cannot resolve at all. The Dockerfile below has been corrected to use `pnpm` and to build from the workspace root so the `workspace:*` deps resolve.
 
@@ -859,7 +859,7 @@ top -b -n 1 | head -n 15
 ## References
 
 - Environment setup: See `.env.example` (in this directory)
-- Docker: the repo's root `Dockerfile` builds a Python/Tellurium sandbox & CI-parity image — it is not a Docker build for this API server. See "Option 2: Docker Container" above for a proposed (not implemented) Node/pnpm Dockerfile for the API server itself.
+- Docker: the repo's root `Dockerfile` builds a Python/Terium sandbox & CI-parity image — it is not a Docker build for this API server. See "Option 2: Docker Container" above for a proposed (not implemented) Node/pnpm Dockerfile for the API server itself.
 - Database schema: See `Science-Agent-Pipeline/lib/db/src/schema/`
 - Monitoring: `PERFORMANCE_GUIDE.md`
 - Architecture: `BACKEND_ARCHITECTURE.md`

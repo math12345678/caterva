@@ -97,15 +97,15 @@ echo "=========================================="
 echo ""
 
 # ------------------------------------------------------------------
-# Step 1: Full test suites (both Tellurium/ and Tests/)
+# Step 1: Full test suites (both Terium/ and Tests/)
 # ------------------------------------------------------------------
 echo "=== Step 1: full test suite ==="
 
-cd "$REPO_DIR/Tellurium"
-TELLURIUM_OUT=$("$PYTHON" -m pytest tests/ -q 2>&1) && TELLURIUM_OK=0 || TELLURIUM_OK=1
-check "Tellurium/ tests pass" "$TELLURIUM_OK"
-if [ "$TELLURIUM_OK" -ne 0 ]; then
-    echo "$TELLURIUM_OUT" | tail -10
+cd "$REPO_DIR/Terium"
+TERIUM_OUT=$("$PYTHON" -m pytest tests/ -q 2>&1) && TERIUM_OK=0 || TERIUM_OK=1
+check "Terium/ tests pass" "$TERIUM_OK"
+if [ "$TERIUM_OK" -ne 0 ]; then
+    echo "$TERIUM_OUT" | tail -10
 fi
 
 cd "$REPO_DIR/Tests"
@@ -224,12 +224,12 @@ if [ $# -ge 2 ]; then
     TEST_BASENAME="$2"
 else
     TEST_BASENAME="test_${DOMAIN}_correctness.py"
-    TEST_FILE="$REPO_DIR/Tellurium/tests/$TEST_BASENAME"
+    TEST_FILE="$REPO_DIR/Terium/tests/$TEST_BASENAME"
     if [ ! -f "$TEST_FILE" ]; then
         # Fall back: search for test files that import simulate_<domain>.
         # This handles naming mismatches like wright_fisher ->
         # test_popgen_correctness.py (named after the domain category).
-        CANDIDATE=$(grep -rl "simulate_${DOMAIN}" "$REPO_DIR/Tellurium/tests/" \
+        CANDIDATE=$(grep -rl "simulate_${DOMAIN}" "$REPO_DIR/Terium/tests/" \
             --include='*.py' 2>/dev/null | head -1)
         if [ -n "$CANDIDATE" ]; then
             TEST_BASENAME=$(basename "$CANDIDATE")
@@ -237,14 +237,14 @@ else
     fi
 fi
 
-TEST_FILE="$REPO_DIR/Tellurium/tests/$TEST_BASENAME"
+TEST_FILE="$REPO_DIR/Terium/tests/$TEST_BASENAME"
 if [ ! -f "$TEST_FILE" ]; then
     echo "  [FAIL] test file not found: $TEST_FILE"
     echo "         (pass the actual filename as a 2nd arg if auto-detect fails)"
     FAIL=$((FAIL + 1))
 else
     echo "  test file: $TEST_BASENAME"
-    COLLECT_OUT=$(cd "$REPO_DIR/Tellurium" && "$PYTHON" -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
+    COLLECT_OUT=$(cd "$REPO_DIR/Terium" && "$PYTHON" -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
     check "test file collects" "$COLLECT_OK"
     if [ "$COLLECT_OK" -ne 0 ]; then
         echo "$COLLECT_OUT" | tail -10
@@ -263,13 +263,13 @@ echo "  at least one claimed mutation per the procedure in"
 echo "  docs/CONSTITUTION.md Section 6 Step 4."
 echo ""
 echo "  Procedure (run all from repo root):"
-echo "    1. Backup: cp Tellurium/tellurium_engine.py /tmp/tellurium_engine.py.bak"
+echo "    1. Backup: cp Terium/terium_engine.py /tmp/terium_engine.py.bak"
 echo "    2. Apply the exact mutation described in the report"
-echo "    3. Run the specific test(s): cd Tellurium && $PYTHON -m pytest \\"
+echo "    3. Run the specific test(s): cd Terium && $PYTHON -m pytest \\"
 echo "       tests/test_popgen_correctness.py::<test_name> -q"
 echo "    4. Confirm failure matches the claimed cause"
-echo "    5. Revert: cp /tmp/tellurium_engine.py.bak Tellurium/tellurium_engine.py"
-echo "    6. Confirm suite clean: cd Tellurium && $PYTHON -m pytest tests/ -q"
+echo "    5. Revert: cp /tmp/terium_engine.py.bak Terium/terium_engine.py"
+echo "    6. Confirm suite clean: cd Terium && $PYTHON -m pytest tests/ -q"
 echo ""
 echo "  IMPORTANT: Do NOT chain steps 3-5 with && — the mutated test"
 echo "  is *supposed* to fail (nonzero exit), which would short-circuit"

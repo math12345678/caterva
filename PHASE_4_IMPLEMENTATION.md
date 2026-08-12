@@ -89,8 +89,8 @@ npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
 ### Full Setup (10 minutes)
 
 ```bash
-# 1. Install Python dependencies (optional, for Tellurium)
-pip install tellurium libroadrunner
+# 1. Install Python dependencies (optional, for Terium)
+pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001
 
 # 2. Register BRENDA (optional, free academic access)
 # Visit: https://www.brenda-enzyme.org/
@@ -107,7 +107,7 @@ npm run cli -- validate "lactate dehydrogenase kinetics"
 ✅ Literature sources - From 50 million PubMed papers  
 ✅ DOI verification - Against CrossRef registry  
 ✅ Kinetic parameters - From real peer-reviewed papers  
-✅ Simulation engine - Tellurium (libroadrunner)  
+✅ Simulation engine - Terium (libroadrunner)  
 ✅ Validation confidence - Based on actual citation counts  
 
 ## What's NOT Real

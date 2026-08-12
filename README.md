@@ -327,8 +327,8 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 
 ```
 Terrium/
-├── Tellurium/                  simulation engine (ODE + discrete/stochastic)
-│   ├── tellurium_engine.py     public entry point (88 names)
+├── Terium/                  simulation engine (ODE + discrete/stochastic)
+│   ├── terium_engine.py     public entry point (88 names)
 │   └── tests/                1,014 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
@@ -413,7 +413,7 @@ models carry a comment explaining the rename.
 
 **Plausibility bounds are shared.** `KM_PLAUSIBLE_MIN_MM` and
 `KM_PLAUSIBLE_MAX_MM` must stay identical between `brenda_client.py` and
-`tellurium_engine.py`. They drifted once (1e3 vs 1e4), which meant a Km of
+`terium_engine.py`. They drifted once (1e3 vs 1e4), which meant a Km of
 5000 mM was flagged by the literature layer and then silently accepted as
 confirmed by the simulation layer. `tests/test_brenda_integration.py` now pins
 them together.

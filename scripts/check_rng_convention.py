@@ -5,7 +5,7 @@ ADR 0005 requires every discrete/stochastic domain to use
 ``seed: int | None = None`` as the parameter signature.
 
 This script scans every ``simulate_*`` function defined anywhere under
-Tellurium/ (the engine re-exports them through ``__all__``; the scan goes
+Terium/ (the engine re-exports them through ``__all__``; the scan goes
 to the real definitions, which all live in submodules) and checks two
 things:
 
@@ -25,7 +25,7 @@ import ast
 import pathlib
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-TELLURIUM_DIR = REPO_ROOT / "Tellurium"
+TERIUM_DIR = REPO_ROOT / "Terium"
 
 # Functions whose names match this pattern are expected to comply with
 # ADR 0005. The prefix 'simulate_' is broad enough to catch Monte Carlo,
@@ -53,9 +53,9 @@ EXCLUDED_FNS: set[str] = {
 
 def _simulate_functions() -> list[tuple[ast.FunctionDef, pathlib.Path]]:
     """Yield (node, file) for every non-excluded simulate_* definition
-    under Tellurium/, in the module that actually defines it."""
+    under Terium/, in the module that actually defines it."""
     found: list[tuple[ast.FunctionDef, pathlib.Path]] = []
-    for path in TELLURIUM_DIR.rglob("*.py"):
+    for path in TERIUM_DIR.rglob("*.py"):
         if any(part in {"__pycache__", ".pytest_cache", ".hypothesis"}
                for part in path.parts):
             continue

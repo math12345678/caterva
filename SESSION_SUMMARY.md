@@ -152,7 +152,7 @@ npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
 | Health check | <1ms | Immediate |
 | PubMed search | 5-10s | With fallbacks |
 | SBML generation | <100ms | Instant |
-| Tellurium simulation | 2-3s | Fast |
+| Terium simulation | 2-3s | Fast |
 | **End-to-end** | **10-15s** | Acceptable |
 | Dashboard timeout | 60s | Plenty of headroom |
 
@@ -306,7 +306,7 @@ npm run verify-all  # Full verification
 ✅ REST API (5 endpoints)  
 ✅ Real literature integration  
 ✅ SBML model generation  
-✅ Tellurium simulations  
+✅ Terium simulations  
 ✅ Job management  
 ✅ Error handling  
 ✅ Full test coverage  

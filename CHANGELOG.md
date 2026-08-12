@@ -18,7 +18,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 - **ADR 0014**: Python 3.10-3.12 support window documented with the correct
   constraint (libroadrunner + numpy, not libSBML).
 - **ADR 0015**: A constitution rule that nothing executes is not enforced —
-  adding tellurium to requirements.txt passed every guard.
+  adding terium to requirements.txt passed every guard.
 - **ADR 0016**: Cached results lose per-parameter provenance — schema column,
   persistence, cache read, and serialisation guard all implemented.
 - 11 guard scripts with automated wiring check (`check_guard_wiring.py`).
@@ -81,7 +81,7 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 ## 2026-07-23
 
 ### Added
-- Tellurium simulation engine (`tellurium_engine.py`): Michaelis-Menten
+- Terium simulation engine (`terium_engine.py`): Michaelis-Menten
   enzyme kinetics and SIR/SEIR epidemiology, built on antimony/roadrunner
   rather than the full `tellurium` umbrella package.
 - 258-test simulation-engine suite, verified against exact closed-form

@@ -254,7 +254,7 @@ note = "Protocol length."
 [molecular_dynamics.n_particles]
 value = "108"
 status = "VERIFIED"
-source = "4*k^3 fcc magic number (k=3). Verified by Tellurium/tests/test_molecular_dynamics_correctness.py against the fcc lattice construction; the LJ13 global minimum -44.326801 eps is separately pinned against Hoare & Pal (1971) via the Cambridge Cluster Database."
+source = "4*k^3 fcc magic number (k=3). Verified by Terium/tests/test_molecular_dynamics_correctness.py against the fcc lattice construction; the LJ13 global minimum -44.326801 eps is separately pinned against Hoare & Pal (1971) via the Cambridge Cluster Database."
 
 [molecular_dynamics.density]
 value = "0.85"
@@ -329,7 +329,7 @@ note = "Ensemble size."
 
 # ---------------------------------------------------------------------------
 # ODE oscillators. Their KINETIC constants are verified against curated
-# BioModels SBML (Tellurium/tests/test_biomodels_parameter_parity.py); the
+# BioModels SBML (Terium/tests/test_biomodels_parameter_parity.py); the
 # only numbers exposed in DOMAIN_DEFAULTS are the time windows.
 # ---------------------------------------------------------------------------
 [lotka_volterra.end]

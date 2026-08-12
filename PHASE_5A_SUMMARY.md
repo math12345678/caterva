@@ -1,11 +1,11 @@
-# Phase 5A: Real Tellurium Simulation Engine - COMPLETE
+# Phase 5A: Real Terium Simulation Engine - COMPLETE
 
 **Completed**: August 11, 2026  
 **Status**: ✅ PRODUCTION READY
 
 ## What This Phase Does
 
-Converts Terrium from **simulating kinetics with hand-rolled math** to **executing real kinetics with the real Tellurium/libroadrunner engine**.
+Converts Terrium from **simulating kinetics with hand-rolled math** to **executing real kinetics with the real Terium/libroadrunner engine**.
 
 ## What Was Delivered
 
@@ -32,7 +32,7 @@ Verifies:
 
 ### 3. Integration Documentation
 **Files**:
-- `PHASE_5A_TELLURIUM_ENGINE.md` - Architecture and how it works
+- `PHASE_5A_TERIUM_ENGINE.md` - Architecture and how it works
 - `PHASE_5A_INTEGRATION_GUIDE.md` - API reference and usage examples
 
 ### 4. Code Quality
@@ -59,7 +59,7 @@ User Query
     ↓
     → Generate SBML Level 3 model
     ↓
-    → runTellurium() [EXISTING - verified]
+    → runTerium() [EXISTING - verified]
     ↓
     → Spawn Python process
     ↓
@@ -101,7 +101,7 @@ npm run build && npm test -- sbml-builder
 TypeScript in strict mode
 ✅ Zero errors
 
-# 3. Real simulation (with Tellurium installed)
+# 3. Real simulation (with Terium installed)
 npm run cli -- simulate "lactate dehydrogenase" \
   --km 5.2 --vmax 12.8 --s0 10
 ✅ Runs real libroadrunner
@@ -148,13 +148,13 @@ Literature (Phase 4) → Simulation (Phase 5A)
 ### New Files
 - `src/engine/sbml-builder.ts` (500 lines)
 - `src/engine/__tests__/sbml-builder.test.ts` (200 lines)
-- `PHASE_5A_TELLURIUM_ENGINE.md` (documentation)
+- `PHASE_5A_TERIUM_ENGINE.md` (documentation)
 - `PHASE_5A_INTEGRATION_GUIDE.md` (usage guide)
 - `PHASE_5A_SUMMARY.md` (this file)
 
 ### Verified (No Changes)
-- `src/engine/telluriumBridge.ts` (already excellent)
-- `Science-Agent-Pipeline/.../tellurium_runner.py` (already excellent)
+- `src/engine/teriumBridge.ts` (already excellent)
+- `Science-Agent-Pipeline/.../terium_runner.py` (already excellent)
 - `src/cli/scientificCLI.ts` (already uses real APIs from Phase 4)
 
 ### Build Status
@@ -187,7 +187,7 @@ But Phase 5A is complete and ready to use.
 
 ### Phase 5A: Real Simulation
 - ✅ SBML model generation
-- ✅ Tellurium/libroadrunner integration
+- ✅ Terium/libroadrunner integration
 - ✅ Real kinetics execution
 - ✅ Complete scientific pipeline
 
@@ -199,7 +199,7 @@ But Phase 5A is complete and ready to use.
 
 ```bash
 # 1. Install Python dependencies
-pip install tellurium libroadrunner
+pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001
 
 # 2. Build and run
 npm run build

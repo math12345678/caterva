@@ -215,7 +215,7 @@ curl -X POST http://localhost:3000/api/compare \
 
 🌟 **Scientific Rigor**
 - Real SBML models
-- Real Tellurium engine
+- Real Terium engine
 - Real PubMed integration
 - Literature validation
 

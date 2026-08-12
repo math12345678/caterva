@@ -40,7 +40,7 @@ python scripts/check_citation_format.py
 ### 🏗️ `check_engine_contract.py`
 
 **Purpose**: Verifies that the modular Python engine maintains the same public API
-and behavior as the original monolithic `tellurium_engine.py`.
+and behavior as the original monolithic `terium_engine.py`.
 
 **Checks**:
 1. Shim import structure (dual try/except pattern)
@@ -61,7 +61,7 @@ python scripts/check_engine_contract.py
 **Purpose**: Ensures every third-party import is declared in `requirements.txt`
 or `requirements-dev.txt`.
 
-**Scope**: All Python files in the Tellurium package.
+**Scope**: All Python files in the Terium package.
 
 **Usage**:
 ```bash

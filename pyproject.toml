@@ -35,7 +35,7 @@ ignore = ["D100", "D101", "D102", "D103", "D105", "D202", "D205", "D208", "D209"
 
 [tool.ruff.lint.per-file-ignores]
 "Tests/*.py" = ["S101", "T201"]
-"Tellurium/tests/*.py" = ["S101", "T201"]
+"Terium/tests/*.py" = ["S101", "T201"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -58,36 +58,36 @@ module = [
     "roadrunner",
     "check_dependencies_declared",
     "check_rng_convention",
-    "tellurium_engine",
+    "terium_engine",
 ]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-module = "Tellurium.tellurium_engine"
+module = "Terium.terium_engine"
 ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = [
-    "Tellurium.core.data_structures",
-    "Tellurium.core.validation",
-    "Tellurium.core.utils",
-    "Tellurium.continuous.model_building",
-    "Tellurium.continuous.simulations",
-    "Tellurium.discrete.pcr",
-    "Tellurium.discrete.monte_carlo",
-    "Tellurium.discrete.molecular_dynamics",
-    "Tellurium.discrete.gillespie_ssa",
-    "Tellurium.discrete.population_genetics.core",
-    "Tellurium.discrete.population_genetics.analysis",
-    "Tellurium.discrete.population_genetics.probability",
-    "Tellurium.discrete.population_genetics.theoretical",
-    "Tellurium.discrete.population_genetics.two_locus",
-    "Tellurium.scenarios.wf_scenarios",
+    "Terium.core.data_structures",
+    "Terium.core.validation",
+    "Terium.core.utils",
+    "Terium.continuous.model_building",
+    "Terium.continuous.simulations",
+    "Terium.discrete.pcr",
+    "Terium.discrete.monte_carlo",
+    "Terium.discrete.molecular_dynamics",
+    "Terium.discrete.gillespie_ssa",
+    "Terium.discrete.population_genetics.core",
+    "Terium.discrete.population_genetics.analysis",
+    "Terium.discrete.population_genetics.probability",
+    "Terium.discrete.population_genetics.theoretical",
+    "Terium.discrete.population_genetics.two_locus",
+    "Terium.scenarios.wf_scenarios",
 ]
 ignore_errors = true
 
 [tool.pytest.ini_options]
-testpaths = ["Tellurium/tests", "Tests"]
+testpaths = ["Terium/tests", "Tests"]
 timeout = 300
 addopts = "-v --tb=short"
 

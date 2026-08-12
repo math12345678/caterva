@@ -17,9 +17,9 @@ help:
 	@echo "  make check      verify the environment actually works"
 	@echo "  make test       run every test suite"
 	@echo "  make test-fast  skip the slow property/robustness suites"
-	@echo "  make test-sim   simulation engine only (Tellurium/)"
+	@echo "  make test-sim   simulation engine only (Terium/)"
 	@echo "  make test-lit   literature layer only (Tests/)"
-	@echo "  make cli        Tellurium CLI help (python -m Tellurium.cli)"
+	@echo "  make cli        Terium CLI help (python -m Terium.cli)"
 	@echo "  make clean      remove caches and build artifacts"
 	@echo ""
 	@echo "First time here? Run: make setup && make check && make test"
@@ -127,34 +127,34 @@ check: check-python
 
 test: require-pytest
 	@echo ">> simulation engine"
-	@cd Tellurium && "$(PY)" -m pytest
+	@cd Terium && "$(PY)" -m pytest
 	@echo ""
 	@echo ">> literature layer"
 	@cd Tests && "$(PY)" -m pytest
 
 test-fast: require-pytest
-	@cd Tellurium && "$(PY)" -m pytest \
+	@cd Terium && "$(PY)" -m pytest \
 		--ignore=tests/test_properties.py \
 		--ignore=tests/test_numerical_robustness.py
 	@cd Tests && "$(PY)" -m pytest
 
 test-sim: require-pytest
-	@cd Tellurium && "$(PY)" -m pytest
+	@cd Terium && "$(PY)" -m pytest
 
 test-lit: require-pytest
 	@cd Tests && "$(PY)" -m pytest
 
 test-slow: require-pytest
-	@cd Tellurium && "$(PY)" -m pytest tests/test_properties.py \
+	@cd Terium && "$(PY)" -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
 
 cli: check-python
-	@"$(PY)" -m Tellurium.cli --help
+	@"$(PY)" -m Terium.cli --help
 	@echo ""
 	@echo "Examples:"
-	@echo "  python -m Tellurium.cli wf --population-size 100 --generations 200 --seed 42"
-	@echo "  python -m Tellurium.cli wf --scenario bottleneck --out results.csv"
-	@echo "  python -m Tellurium.cli kimura --p0 0.3 --s 0.03 --population-size 50"
+	@echo "  python -m Terium.cli wf --population-size 100 --generations 200 --seed 42"
+	@echo "  python -m Terium.cli wf --scenario bottleneck --out results.csv"
+	@echo "  python -m Terium.cli kimura --p0 0.3 --s 0.03 --population-size 50"
 
 clean:
 	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true

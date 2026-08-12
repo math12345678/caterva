@@ -244,7 +244,7 @@ if (jobs.size > MAX_JOBS) {
 **Scenario:** Python bridge crashes mid-simulation.
 
 ```python
-# src/lib/tellurium_runner.py
+# src/lib/terium_runner.py
 def run_sir(parameters):
     # Simulation running
     # ...

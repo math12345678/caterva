@@ -14,7 +14,7 @@ import {
 import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { resolveQuery } from "../lib/queryResolver";
-import { runTellurium, type SimulationDomain } from "../lib/telluriumRunner";
+import { runTerium, type SimulationDomain } from "../lib/teriumRunner";
 import { SimulationParameterSchemas } from "../lib/schemas";
 import * as queue from "../lib/queue";
 import { findCachedResultByQuery, persistJob } from "../lib/cache";
@@ -795,7 +795,7 @@ async function findCachedSimulation(
  * Stages:
  *   1. Resolve domain and parameters (keyword/regex or LLM fallback).
  *   2. Validate parameters.
- *   3. Run the Tellurium engine (with concurrency limit).
+ *   3. Run the Terium engine (with concurrency limit).
  *   4. Persist to PostgreSQL for provenance.
  *   5. Mark job completed (or failed).
  *
@@ -827,7 +827,7 @@ async function runPipeline(jobId: string, query: string): Promise<void> {
 
     let engineResult;
     try {
-      engineResult = await runTellurium(
+      engineResult = await runTerium(
         resolved.domain,
         resolved.parameters,
         abort.signal,

@@ -115,7 +115,7 @@ const TERMS: Term[] = [
     term: "Systems Biology Markup Language",
     symbol: "SBML",
     definition:
-      "An XML-based standard format for representing computational models in systems biology. Terrium exports SBML Level 3 Version 2, compatible with COPASI, Tellurium, and libSBML.",
+      "An XML-based standard format for representing computational models in systems biology. Terrium exports SBML Level 3 Version 2, compatible with COPASI, Terium, and libSBML.",
     category: "engine",
   },
 ];

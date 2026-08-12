@@ -18,9 +18,9 @@ import { LiteratureService } from '../literature/literatureService';
 import { ReproducibilityService } from '../reproducibility/reproducibilityEngine';
 import {
   extractSeries,
-  runTellurium,
+  runTerium,
   type EngineParameterValue
-} from '../engine/telluriumBridge';
+} from '../engine/teriumBridge';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 
 // ============================================================================
@@ -797,7 +797,7 @@ ${integrityReport}
   }
 
   /**
-   * Run the simulation in the real Tellurium engine.
+   * Run the simulation in the real Terium engine.
    *
    * This used to be a hand-rolled forward-Euler Michaelis-Menten loop with
    * `parameters.km?.value || 5.0`, `|| 10.0` and `|| 1.0` fallbacks. Those
@@ -808,7 +808,7 @@ ${integrityReport}
    * integrator and a `Math.max(0, ...)` clamp that hid step-size error
    * behind a plausible-looking curve.
    *
-   * It now spawns the same `tellurium_runner.py` the production api-server
+   * It now spawns the same `terium_runner.py` the production api-server
    * uses. Missing parameters raise MissingParameterError rather than being
    * defaulted, and physical validity is decided by the engine.
    */
@@ -820,7 +820,7 @@ ${integrityReport}
 
     // Unwrap the {value, unit, source, ...} envelope this tree carries.
     // No `||` fallbacks: an absent parameter stays absent so that
-    // runTellurium's `required` check can refuse the run.
+    // runTerium's `required` check can refuse the run.
     const numeric = (name: string): number | undefined => {
       const raw = parameters[name];
       if (raw === undefined || raw === null) return undefined;
@@ -834,17 +834,17 @@ ${integrityReport}
       km: numeric('km') ?? null,
       vmax: numeric('vmax') ?? null,
       s0: numeric('s0') ?? null,
-      // `end` and `points` are the names tellurium_runner.py actually
+      // `end` and `points` are the names terium_runner.py actually
       // reads. This first sent `t_end`/`n_points`, which the runner
       // ignores -- and the mistake was nearly invisible, because the
       // runner's default `end` is also 10.0, so the window looked correct
       // while the resolution silently stayed at the default 51. See the
-      // echo check in runTellurium, which now catches this class of error.
+      // echo check in runTerium, which now catches this class of error.
       end: ScientificPipeline.SIMULATION_END_TIME_S,
       points: ScientificPipeline.SIMULATION_POINTS
     };
 
-    const result = await runTellurium('mm', engineParameters, {
+    const result = await runTerium('mm', engineParameters, {
       required: ['km', 'vmax', 's0']
     });
 

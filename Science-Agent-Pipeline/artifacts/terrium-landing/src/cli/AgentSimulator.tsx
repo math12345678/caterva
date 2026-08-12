@@ -25,7 +25,7 @@ const STAGE_LABEL: Record<PipelineStage, string> = {
   pending: "Queued",
   resolving: "Resolving query",
   validating: "Validating parameters",
-  running: "Running Tellurium engine",
+  running: "Running Terium engine",
   completed: "Done",
   failed: "Failed",
 };
@@ -404,7 +404,7 @@ export default function AgentSimulator({
         <p className="text-white/30 text-[12px] mb-5 leading-relaxed">
           Ask a scientific question in plain language. The agent resolves
           parameters from literature via LLM + keyword matching, then runs the
-          Tellurium ODE engine.
+          Terium ODE engine.
         </p>
       )}
 

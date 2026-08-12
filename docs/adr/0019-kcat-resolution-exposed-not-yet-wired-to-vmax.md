@@ -84,12 +84,12 @@ Answering the three questions left open above:
    check `validateParameterProvenance` already runs.
 2. **Where the arithmetic happens.** In Python, once:
    `science_agent_runner.py`'s `bridge_vmax_from_kcat()` calls
-   `Tellurium.core.validation.vmax_from_kcat()` — the exact function the
+   `Terium.core.validation.vmax_from_kcat()` — the exact function the
    engine itself uses — imported as `core.validation` with only
-   `Tellurium/` (not the `Tellurium` package root) added to `sys.path`.
+   `Terium/` (not the `Terium` package root) added to `sys.path`.
    This reaches the pure-arithmetic module directly without executing
-   `Tellurium/__init__.py`'s full antimony-dependent import chain, which the
-   public `tellurium_engine` entry point would otherwise require just to
+   `Terium/__init__.py`'s full antimony-dependent import chain, which the
+   public `terium_engine` entry point would otherwise require just to
    expose one function. No second implementation exists in TypeScript.
 3. **What happens when `[E]₀` is absent.** `applyVmaxFromKcatResolution()`
    in `queryResolver.ts` returns immediately, without calling the science

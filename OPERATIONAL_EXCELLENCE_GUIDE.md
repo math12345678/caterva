@@ -254,7 +254,7 @@ Case 1: Errors in specific domain
 Case 2: Errors in Python bridge
   → Check Python process status
   → Review python logs
-  → Check Tellurium availability
+  → Check Terium availability
   
 Case 3: Widespread errors
   → Check cache health

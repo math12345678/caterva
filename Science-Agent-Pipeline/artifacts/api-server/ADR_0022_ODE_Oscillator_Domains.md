@@ -79,7 +79,7 @@ This split is intentional and reflects the models' scientific role.
 
 ## Implementation
 
-### In Python (tellurium_runner.py)
+### In Python (terium_runner.py)
 
 Three new handlers:
 

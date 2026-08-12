@@ -32,7 +32,7 @@ one.
 ## Decision
 
 Implement the Stage 3 MD domain as direct Python in
-`tellurium_engine.py` (validation contract, particle initialization,
+`terium_engine.py` (validation contract, particle initialization,
 Lennard-Jones force calculation, velocity Verlet integration step, full
 run) using numpy only. No antimony, no SBML, no roadrunner, no external
 MD engine (OpenMM, LAMMPS, etc.). Fixed step size, no adaptive stepping.

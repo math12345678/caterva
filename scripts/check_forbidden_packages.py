@@ -38,8 +38,11 @@ What is checked
 Every dependency manifest, for any requirement whose distribution name is on
 the forbidden list. Matching is on the normalised project name (PEP 503), so
 `Tellurium`, `tellurium`, and `tellurium==2.2.10` are all caught, while
-`tellurium_engine` (this project's own module) and the `Tellurium/` package
-directory are not.
+`terium_engine` (this project's own module, renamed from the upstream-
+echoing `tellurium_engine`) and the `Terium/` package directory are not.
+That distinction is now load-bearing: the 2026-08-11 rename briefly
+rewrote this entry to `terium`, which forbade this project's OWN name
+and permitted the upstream package the guard exists to block.
 
 Usage:
     python scripts/check_forbidden_packages.py
@@ -133,13 +136,13 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
     Two things this deliberately does NOT do:
 
     - **Match inside comments.** `requirements.txt` explains at length why
-      tellurium must not be installed. A substring search would flag that
+      terium must not be installed. A substring search would flag that
       explanation as a violation, punishing the file for documenting the
       rule it obeys.
     - **Scan all of pyproject.toml.** Only `[project] dependencies` and
       `[project.optional-dependencies]` declare packages. The first version
       of this function scanned the whole file and reported
-      `"Tellurium/tests/*.py"` -- a ruff per-file-ignore key -- as a
+      `"Terium/tests/*.py"` -- a ruff per-file-ignore key -- as a
       forbidden dependency. A guard that cries wolf gets deleted.
     """
     found: List[Tuple[int, str]] = []
@@ -265,6 +268,72 @@ def check_adrs_are_indexed() -> List[str]:
     return errors
 
 
+#: An INSTRUCTION to install a forbidden package: `pip install tellurium`.
+#:
+#: Rule 7 was policed by prose, and this guard was written to make it
+#: executable -- but only for dependency manifests. The 2026-08-11 rename
+#: surfaced what that left uncovered: SIX documents told the reader to run
+#: `pip install tellurium libroadrunner` in a copy-pasteable code fence.
+#:
+#: A manifest is what CI installs; a setup guide is what a HUMAN installs
+#: from, and it is the more likely route by which the umbrella package
+#: actually lands on someone's machine. The guard was checking the path
+#: nobody was taking.
+#:
+#: Matched only in an imperative form (`pip install <pkg>`), so prose that
+#: NAMES the package to forbid it -- "Never `pip install tellurium`" in the
+#: constitution, ADR 0001's title, this docstring -- is not itself a
+#: violation. That distinction is the same one check_example_endpoints
+#: needed: a document warning against a thing must not be punished for
+#: naming it.
+INSTALL_INSTRUCTION = re.compile(
+    r"(?<!`)\bpip3?\s+install\s+(?!.*#)([A-Za-z0-9._-][^\n`]*)"
+)
+
+#: Wording that turns a mention into a prohibition rather than an
+#: instruction. Checked on the same line.
+PROHIBITION = re.compile(
+    r"\b(never|not|do not|don't|forbidden|banned|avoid|instead of)\b", re.I
+)
+
+DOC_GLOBS = ("*.md", "docs/**/*.md")
+
+
+def _check_docs_do_not_instruct() -> Tuple[List[str], int]:
+    """Documents must not tell a reader to install a forbidden package."""
+    violations: List[str] = []
+    seen: set[Path] = set()
+
+    for pattern in DOC_GLOBS:
+        for path in REPO_ROOT.glob(pattern):
+            if not path.is_file() or path in seen:
+                continue
+            # Historical records describe what was true on a date; rewriting
+            # them to satisfy a rule destroys their value.
+            if "build-stages" in path.parts:
+                continue
+            seen.add(path)
+
+            for lineno, line in enumerate(
+                path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
+            ):
+                match = INSTALL_INSTRUCTION.search(line)
+                if not match or PROHIBITION.search(line):
+                    continue
+                for token in match.group(1).split():
+                    if _normalise(token.strip("`'\",")) in FORBIDDEN:
+                        violations.append(
+                            f"{path.relative_to(REPO_ROOT)}:{lineno} tells the "
+                            f"reader to run `pip install {token}`\n"
+                            f"      A setup guide is what a human installs "
+                            f"from, so this is the likelier route by which "
+                            f"the package reaches a machine than any manifest."
+                        )
+                        break
+
+    return violations, len(seen)
+
+
 def main() -> int:
     violations: List[str] = []
     checked = 0
@@ -287,7 +356,13 @@ def main() -> int:
         print("FAIL: no dependency manifests found; nothing was checked.")
         return 1
 
-    print(f"Rule 7: checked {checked} dependency manifest(s).")
+    doc_violations, docs_checked = _check_docs_do_not_instruct()
+    violations.extend(doc_violations)
+
+    print(
+        f"Rule 7: checked {checked} dependency manifest(s) and "
+        f"{docs_checked} document(s)."
+    )
 
     if violations:
         print("\nFAIL: a forbidden package is declared")

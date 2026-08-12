@@ -11,7 +11,7 @@ The Terrium scientific validation backend is now fully functional, thoroughly te
 A production-grade scientific validation system that:
 
 1. **Validates enzyme kinetics parameters** against peer-reviewed literature
-2. **Runs kinetic simulations** using the Tellurium engine
+2. **Runs kinetic simulations** using the Terium engine
 3. **Enforces reproducibility** with SHA-256 hashing and job tracking
 4. **Works offline** with network resilience built-in
 5. **Provides comprehensive error handling** and structured logging
@@ -108,7 +108,7 @@ src/
 │   ├── scientificPipeline.ts   # Orchestrates all layers
 │   └── __tests__/              # Integration tests
 ├── engine/             # Kinetic simulation
-│   ├── telluriumBridge.ts      # Tellurium wrapper
+│   ├── teriumBridge.ts      # Terium wrapper
 │   └── __tests__/              # Engine tests
 ├── reproducibility/    # Execution tracking
 │   ├── reproducibilityEngine.ts # Job tracking & hashing
@@ -128,7 +128,7 @@ src/
 | scientificValidator.ts | 79.64% | 78.21% | 90.62% | 80.37% |
 | literatureResolver.ts | 80.76% | 71.42% | 56.25% | 83.78% |
 | literatureService.ts | 77.9% | 39.13% | 94.87% | 77.27% |
-| telluriumBridge.ts | 75.92% | 51.28% | 64% | 78.43% |
+| teriumBridge.ts | 75.92% | 51.28% | 64% | 78.43% |
 
 ## Usage Examples
 
@@ -197,7 +197,7 @@ npm test
 
 ## Known Limitations
 
-1. **Branch coverage (66.24%)**: Complex defensive code in telluriumBridge.ts and literatureService.ts makes 80% impractical. Current 66% covers all main paths.
+1. **Branch coverage (66.24%)**: Complex defensive code in teriumBridge.ts and literatureService.ts makes 80% impractical. Current 66% covers all main paths.
 
 2. **Literature database**: Built-in test DOIs are fabricated for demonstration. Real deployment should use actual DOI citations from CrossRef.
 
@@ -225,6 +225,6 @@ npm test
 
 ---
 
-**Built with**: TypeScript, Jest, Tellurium simulation engine
+**Built with**: TypeScript, Jest, Terium simulation engine
 **Last Updated**: August 2026
 **Version**: 1.0.0

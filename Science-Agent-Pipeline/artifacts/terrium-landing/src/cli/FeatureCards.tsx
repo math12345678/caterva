@@ -12,7 +12,7 @@ const FEATURES = [
   {
     icon: "\u2302",
     title: "ODE Engine",
-    desc: "Powered by Tellurium. RK4 integration with conserved-quantity checks and numerical error bounds on every run.",
+    desc: "Powered by Terium. RK4 integration with conserved-quantity checks and numerical error bounds on every run.",
     gradient: "from-[#3B82F6]/20 via-[#3B82F6]/10 to-transparent",
     border: "hover:border-[#3B82F6]/30",
   },

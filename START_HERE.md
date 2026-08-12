@@ -297,7 +297,7 @@ Fetch real literature (PubMed + CrossRef)
   ↓
 Generate SBML Level 3 model
   ↓
-Run Tellurium kinetics solver
+Run Terium kinetics solver
   ↓
 Validate results & calculate confidence
   ↓
@@ -434,7 +434,7 @@ A: See "API Reference" section above. Use curl or any HTTP client.
 A: Yes! All jobs are saved to `terrium-jobs.jsonl`. Use `/api/jobs/history` to retrieve.
 
 **Q: How accurate are the results?**  
-A: Uses Tellurium + libroadrunner (industry-standard). Validation checks against literature.
+A: Uses Terium + libroadrunner (industry-standard). Validation checks against literature.
 
 **Q: Can I run this in production?**  
 A: Yes! See READY_TO_SHIP.md for deployment guide.

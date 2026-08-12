@@ -22,9 +22,9 @@ seriously regardless of team size.
 
 Given the current state of the project:
 
-- **Tellurium/** (simulation engine): the main risk surface here is
+- **Terium/** (simulation engine): the main risk surface here is
   something that causes incorrect scientific output to be presented as
-  correct without being flagged -- see `tellurium_engine.py`'s
+  correct without being flagged -- see `terium_engine.py`'s
   `ParameterValidation` / flagging system. A bug that lets an implausible
   or dangerous parameter slip through unflagged is a real security-relevant
   bug for this project, even though it's not a classic memory-safety or

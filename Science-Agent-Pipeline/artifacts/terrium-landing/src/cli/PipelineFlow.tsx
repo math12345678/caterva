@@ -5,7 +5,7 @@ const STEPS = [
   { label: "Natural Language Query", icon: "A" },
   { label: "LLM + Literature Resolver", icon: "\u2318" },
   { label: "Parameter Validation", icon: "\u2713" },
-  { label: "Tellurium ODE Engine", icon: "\u26A1" },
+  { label: "Terium ODE Engine", icon: "\u26A1" },
   { label: "Trajectory + Provenance", icon: "\u2261" },
 ];
 

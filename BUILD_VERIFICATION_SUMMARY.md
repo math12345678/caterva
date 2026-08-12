@@ -1,6 +1,6 @@
 # Terrium Build Verification Summary
 
-> **⚠️ CORRECTION (2026-08-10):** the "220 TypeScript tests across 15 files, ALL PASSING" figure (originally dated Aug 3) is stale — the api-server test suite has grown since. Get the current count by running `pnpm test` (or `vitest run`) from `Science-Agent-Pipeline/artifacts/api-server/` rather than trusting the number below; this repo has multiple agents committing continuously, so any hardcoded test count in a doc should be treated as a snapshot, not a live fact. Citation fixes and refactoring claims elsewhere in this doc (Mullis/Lewontin/Hoare & Pal citation corrections in `queryResolver.ts`, the `Tellurium/` package split into core/continuous/discrete/scenarios, and the guard scripts listed) were independently verified as real.
+> **⚠️ CORRECTION (2026-08-10):** the "220 TypeScript tests across 15 files, ALL PASSING" figure (originally dated Aug 3) is stale — the api-server test suite has grown since. Get the current count by running `pnpm test` (or `vitest run`) from `Science-Agent-Pipeline/artifacts/api-server/` rather than trusting the number below; this repo has multiple agents committing continuously, so any hardcoded test count in a doc should be treated as a snapshot, not a live fact. Citation fixes and refactoring claims elsewhere in this doc (Mullis/Lewontin/Hoare & Pal citation corrections in `queryResolver.ts`, the `Terium/` package split into core/continuous/discrete/scenarios, and the guard scripts listed) were independently verified as real.
 
 ## 🎯 Executive Summary
 
@@ -124,9 +124,9 @@ Stage 4 Part 4 recommended a citation-format guard. Implemented as:
 
 #### 🏗️ New Structure
 ```
-Tellurium/
+Terium/
 ├── __init__.py                    # Re-exports for backward compatibility
-├── tellurium_engine.py            # Shim (imports from modular structure)
+├── terium_engine.py            # Shim (imports from modular structure)
 ├── core/
 │   ├── __init__.py               # Re-exports data_structures, validation, utils
 │   ├── data_structures.py        # Exceptions, dataclasses, constants
@@ -158,18 +158,18 @@ Tellurium/
 **Dual-mode compatibility**:
 
 ```python
-# Package mode (Tellurium package on PYTHONPATH)
+# Package mode (Terium package on PYTHONPATH)
 try:
-    from Tellurium.core.data_structures import ModelBuildError
+    from Terium.core.data_structures import ModelBuildError
 except (ModuleNotFoundError, ImportError):
-    # Flat mode (Tellurium/ on sys.path)
+    # Flat mode (Terium/ on sys.path)
     from core.data_structures import ModelBuildError
 ```
 
-- **Package mode**: `PYTHONPATH=/repo/root` → `from Tellurium.core.xxx`
-- **Flat mode**: `cd Tellurium` → `from core.xxx`
+- **Package mode**: `PYTHONPATH=/repo/root` → `from Terium.core.xxx`
+- **Flat mode**: `cd Terium` → `from core.xxx`
 - All modules use relative imports within the package
-- Core modules never import from `Tellurium.*` (avoids circular imports)
+- Core modules never import from `Terium.*` (avoids circular imports)
 
 #### ✅ Verification
 
@@ -285,26 +285,26 @@ MOD:  docs/adr/README.md (index entry)
 
 ### Python (Refactoring + Stage 4 Part 4)
 ```
-NEW:  Tellurium/core/__init__.py
-NEW:  Tellurium/core/data_structures.py
-NEW:  Tellurium/core/validation.py
-NEW:  Tellurium/core/utils.py
-NEW:  Tellurium/continuous/__init__.py
-NEW:  Tellurium/continuous/model_building.py
-NEW:  Tellurium/continuous/simulations.py
-NEW:  Tellurium/discrete/__init__.py
-NEW:  Tellurium/discrete/pcr.py
-NEW:  Tellurium/discrete/monte_carlo.py
-NEW:  Tellurium/discrete/molecular_dynamics.py
-NEW:  Tellurium/discrete/population_genetics/__init__.py
-NEW:  Tellurium/discrete/population_genetics/core.py
-NEW:  Tellurium/discrete/population_genetics/analysis.py
-NEW:  Tellurium/discrete/population_genetics/theoretical.py
-NEW:  Tellurium/discrete/population_genetics/probability.py
-NEW:  Tellurium/discrete/population_genetics/two_locus.py
-NEW:  Tellurium/scenarios/__init__.py
-NEW:  Tellurium/scenarios/wf_scenarios.py
-MOD:  Tellurium/tellurium_engine.py (shim conversion)
+NEW:  Terium/core/__init__.py
+NEW:  Terium/core/data_structures.py
+NEW:  Terium/core/validation.py
+NEW:  Terium/core/utils.py
+NEW:  Terium/continuous/__init__.py
+NEW:  Terium/continuous/model_building.py
+NEW:  Terium/continuous/simulations.py
+NEW:  Terium/discrete/__init__.py
+NEW:  Terium/discrete/pcr.py
+NEW:  Terium/discrete/monte_carlo.py
+NEW:  Terium/discrete/molecular_dynamics.py
+NEW:  Terium/discrete/population_genetics/__init__.py
+NEW:  Terium/discrete/population_genetics/core.py
+NEW:  Terium/discrete/population_genetics/analysis.py
+NEW:  Terium/discrete/population_genetics/theoretical.py
+NEW:  Terium/discrete/population_genetics/probability.py
+NEW:  Terium/discrete/population_genetics/two_locus.py
+NEW:  Terium/scenarios/__init__.py
+NEW:  Terium/scenarios/wf_scenarios.py
+MOD:  Terium/terium_engine.py (shim conversion)
 MOD:  Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts
 NEW:  scripts/check_citation_format.py
 NEW:  scripts/check_engine_contract.py

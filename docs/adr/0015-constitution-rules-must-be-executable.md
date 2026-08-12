@@ -11,7 +11,7 @@ unrelated places:
 
 | where | the stated rule | what the code did |
 |---|---|---|
-| `README.md`, `Tellurium/tests/` | test counts | drifted by 500+ |
+| `README.md`, `Terium/tests/` | test counts | drifted by 500+ |
 | `requirements.txt` ×3 | "SBML extensions stop at cp312" | wrong package entirely |
 | `schemas.ts` | "exactly one route must be available" | accepted zero routes |
 
@@ -91,10 +91,10 @@ Every check mutation-tested, several against reproductions of defects that
 actually occurred:
 
 ```
-tellurium pinned in requirements.txt        -> caught
-tellurium bare / range-specified            -> caught (PEP 503 normalised)
-tellurium in pyproject [project]            -> caught
-tellurium in [project.optional-dependencies]-> caught
+terium pinned in requirements.txt        -> caught
+terium bare / range-specified            -> caught (PEP 503 normalised)
+terium in pyproject [project]            -> caught
+terium in [project.optional-dependencies]-> caught
 ADR on disk but unindexed                   -> caught  (the real 0009 case)
 index links a nonexistent ADR               -> caught
 two files claiming one ADR number           -> caught  (the real 0007 case)
@@ -106,7 +106,7 @@ manifests after each scoping fix, so tightening never blinded it.
 ### Two false alarms worth recording
 
 **A guard that cried wolf.** The first version scanned all of
-`pyproject.toml` and reported `"Tellurium/tests/*.py"` — a ruff
+`pyproject.toml` and reported `"Terium/tests/*.py"` — a ruff
 per-file-ignore key — as a forbidden dependency. That is a real defect, not
 cosmetic: a guard producing false positives gets ignored, then deleted, and
 the next true positive rides along with it.

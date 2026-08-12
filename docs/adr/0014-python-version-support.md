@@ -74,7 +74,7 @@ whole job and is not.
 
 ### Preliminary compatibility survey (not a substitute for step 2)
 
-A scan of `Tellurium/` and `Tests/` for NumPy 2.x removals found **none**:
+A scan of `Terium/` and `Tests/` for NumPy 2.x removals found **none**:
 no `np.float_`, `np.int_`, `np.bool8`, `np.NaN`, `np.Inf`, `np.alltrue`,
 `np.product`, `np.in1d`, `np.trapz`, or any other removed alias. The single
 `copy=False` occurrence is `ndarray.astype(..., copy=False)`, whose semantics

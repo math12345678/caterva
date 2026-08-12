@@ -277,7 +277,7 @@ catch (err) {
 // ✅ IMPLEMENTED: Python process isolation
 const proc = spawn(pythonExecutable, [SCRIPT_PATH], {
   cwd: REPO_ROOT,
-  env: buildTelluriumEnvironment(process.env, REPO_ROOT)
+  env: buildTeriumEnvironment(process.env, REPO_ROOT)
 });
 
 // Timeout prevents hanging processes

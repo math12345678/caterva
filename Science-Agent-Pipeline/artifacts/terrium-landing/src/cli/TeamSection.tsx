@@ -53,9 +53,9 @@ const ECOSYSTEM = [
     emoji: "\u{1F4DA}",
   },
   {
-    name: "Tellurium",
+    name: "Terium",
     desc: "Python-based systems biology modeling environment powering our ODE engine.",
-    url: "https://tellurium.analogmachine.org",
+    url: "https://terium.analogmachine.org",
     color: "#8B5CF6",
     emoji: "\u2699",
   },

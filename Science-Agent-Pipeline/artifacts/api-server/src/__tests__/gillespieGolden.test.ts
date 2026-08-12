@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { runTellurium } from "../lib/telluriumRunner";
+import { runTerium } from "../lib/teriumRunner";
 import { resolveQuery } from "../lib/queryResolver";
 
 // The SSA golden (Stage 6 Part 2): seed 12345, a0=100, k=0.5, end=3.0.
-// Pinned in Python in Tellurium/tests/test_gillespie_ssa_golden.py; this
+// Pinned in Python in Terium/tests/test_gillespie_ssa_golden.py; this
 // file pins the SAME trajectory through the real runner boundary so a
 // drift between engine and bridge (or a changed engine) breaks here too.
 const GOLDEN = {
@@ -16,7 +16,7 @@ const GOLDEN = {
 
 describe("Gillespie SSA golden through the runner boundary", () => {
   it("reproduces the pinned seeded trajectory", async () => {
-    const res = await runTellurium("gillespie_ssa", {
+    const res = await runTerium("gillespie_ssa", {
       a0: 100,
       k: 0.5,
       end: 3,
@@ -36,7 +36,7 @@ describe("Gillespie SSA golden through the runner boundary", () => {
   });
 
   it("reports the seeded parameters back", async () => {
-    const res = await runTellurium("gillespie_ssa", {
+    const res = await runTerium("gillespie_ssa", {
       a0: 50,
       k: 1,
       end: 2,

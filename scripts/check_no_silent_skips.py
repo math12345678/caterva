@@ -49,7 +49,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Skips are counted per suite, in the order `make test` runs them.
 SUITES = [
-    ("engine", REPO_ROOT / "Tellurium" / "tests"),
+    ("engine", REPO_ROOT / "Terium" / "tests"),
     ("literature", REPO_ROOT / "Tests"),
 ]
 

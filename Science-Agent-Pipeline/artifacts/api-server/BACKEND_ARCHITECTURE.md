@@ -25,7 +25,7 @@ User Query
     ↓
 [Parameter Validation] → Shape check (TypeScript) + Science check (Python)
     ↓
-[Simulation Engine] → Python Tellurium with ODE solver
+[Simulation Engine] → Python Terium with ODE solver
     ↓
 [Response] → Parameters, trajectory, full provenance
     ↓
@@ -201,10 +201,10 @@ try {
 
 ### 5. Python Bridge
 
-**File:** `src/lib/tellurium_runner.ts` (TypeScript wrapper), `src/lib/tellurium_runner.py` (Python implementation)
+**File:** `src/lib/terium_runner.ts` (TypeScript wrapper), `src/lib/terium_runner.py` (Python implementation)
 
 **Responsibility:**
-- Execute simulation in Python/Tellurium
+- Execute simulation in Python/Terium
 - Populate any engine-generated parameters (e.g., seed)
 - Return trajectory and domain
 
@@ -467,8 +467,8 @@ src/
 │   ├── python.ts              # Python interpreter resolution
 │   ├── queue.ts               # Job queue & concurrency
 │   ├── schemas.ts             # Zod parameter schemas (16 domains)
-│   ├── telluriumRunner.ts      # Python bridge wrapper
-│   ├── tellurium_runner.py     # Python simulation engine
+│   ├── teriumRunner.ts      # Python bridge wrapper
+│   ├── terium_runner.py     # Python simulation engine
 │   ├── queryResolver.ts        # Domain + parameter resolution
 │   ├── llmResolver.ts          # LLM provider integration
 │   ├── literature-verifier.ts  # Citation verification

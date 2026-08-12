@@ -6,7 +6,7 @@
 // Science-Agent-Pipeline/artifacts/terrium-landing/src/lib/simulate.ts,
 // reused here rather than re-derived, per the project's own rule against
 // leaving working code stranded instead of wiring it in. It mirrors the
-// rate laws verified in Tellurium/tellurium_engine.py and its test suite,
+// rate laws verified in Terium/terium_engine.py and its test suite,
 // and is checked here against the same closed-form residuals that suite
 // uses -- a real RK4 integrator, not a canned animation.
 
@@ -77,7 +77,7 @@ export interface MMResult {
   trajectory: Point[];
   // Residual of the exact implicit MM solution at the final point:
   //   Km*ln(S0/S) + (S0 - S) = Vmax*t
-  // Same closed-form check Tellurium/tests/test_kinetics_correctness.py runs
+  // Same closed-form check Terium/tests/test_kinetics_correctness.py runs
   // against the Python engine.
   finalResidual: number;
 }
@@ -106,7 +106,7 @@ export interface SIRParams {
 export interface SIRResult {
   trajectory: Point[];
   // S + I + R must equal N at every point (population conservation) -- the
-  // same invariant Tellurium/tests/test_properties.py checks with
+  // same invariant Terium/tests/test_properties.py checks with
   // Hypothesis, spot-checked here at the final point.
   conservationError: number;
 }
@@ -156,7 +156,7 @@ export interface MMCompetitiveResult {
   // Residual of the exact implicit solution for competitive inhibition at
   // the final point:
   //   Km_app*ln(S0/S) + (S0 - S) = Vmax*t,   Km_app = Km*(1 + I/Ki)
-  // Same apparent-Km closed form Tellurium/tests/test_mm_competitive_inhibition.py
+  // Same apparent-Km closed form Terium/tests/test_mm_competitive_inhibition.py
   // checks against the Python engine; reduces exactly to plain MM at I=0.
   finalResidual: number;
 }

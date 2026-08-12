@@ -23,13 +23,13 @@ import {
   runInhibitionModel,
   suggestModel,
 } from '../inhibitionModels';
-import { REPO_ROOT, resolvePythonExecutable } from '../../engine/telluriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../../engine/teriumBridge';
 
 function engineIsAvailable(): boolean {
   try {
     execFileSync(
       resolvePythonExecutable(REPO_ROOT),
-      ['-c', 'import Tellurium.tellurium_engine'],
+      ['-c', 'import Terium.terium_engine'],
       { cwd: REPO_ROOT, env: { ...process.env, PYTHONPATH: REPO_ROOT }, stdio: 'pipe' },
     );
     return true;

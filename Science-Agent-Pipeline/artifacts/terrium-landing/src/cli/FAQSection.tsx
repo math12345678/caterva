@@ -41,12 +41,12 @@ const FAQS = [
   {
     id: "self-host",
     q: "Can I run Terrium on my own infrastructure?",
-    a: "Yes. The Tellurium engine and literature layer are open-source and runnable locally. The landing page simulator even runs RK4 integration directly in your browser — no server required for basic exploration. The full pipeline (agent + SSE streaming) requires the API server.",
+    a: "Yes. The Terium engine and literature layer are open-source and runnable locally. The landing page simulator even runs RK4 integration directly in your browser — no server required for basic exploration. The full pipeline (agent + SSE streaming) requires the API server.",
   },
   {
     id: "compare",
     q: "How does this compare to other simulation tools?",
-    a: "Unlike general-purpose ODE tools (Copasi, Tellurium standalone), Terrium removes the parameter-hunting step. Unlike LLM-only science tools, every number is validated against real databases and closed-form solutions. The result: simulations you can cite in a lab report, not just interesting animations.",
+    a: "Unlike general-purpose ODE tools (Copasi, Terium standalone), Terrium removes the parameter-hunting step. Unlike LLM-only science tools, every number is validated against real databases and closed-form solutions. The result: simulations you can cite in a lab report, not just interesting animations.",
   },
 ];
 
