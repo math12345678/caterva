@@ -2,44 +2,33 @@
 """
 Terrium Python Integration Examples
 
-Working examples of Terrium's REST API from Python.
+Working examples of the Terrium web API from Python.
 
-WHY THIS FILE WAS REWRITTEN (2026-08-11)
-----------------------------------------
-The previous version documented eleven endpoints, and ten of them did not
-exist:
+WHICH SERVER THIS TALKS TO
+--------------------------
+Terrium serves TWO HTTP APIs, and they are not interchangeable:
 
-    /api/health           the route is /api/healthz
-    /api/jobs/<id>        the route is /api/simulate/<jobId>
-    /api/export/jobs/csv  the route is /api/simulate/<jobId>/export
-    /api/jobs/query, /api/batch, /api/batches/<id>, /api/sweep,
-    /api/sweeps/<id>, /api/compare/jobs, /api/stats
-                          no such routes, at all
+  * `src/web/server.ts` — the root tree's own server, started with
+    `npm run web`. THIS FILE TARGETS THAT ONE. It exposes /api/simulate,
+    /api/jobs/<id>, /api/sweep, /api/batch, /api/compare, /api/stats and the
+    CSV export routes, and accepts `{query, parameters, enzyme, substrate}`.
 
-It also taught a parameter-passing model the product does not have. It sent
+  * `Science-Agent-Pipeline/artifacts/api-server/` — the Express service,
+    documented in `docs/API.md`. Different routes (/api/healthz,
+    /api/simulate/<jobId>) and a different request shape: parameters go
+    INSIDE the query string there, because that resolver refuses to invent
+    an experimental condition it was not given.
 
-    {"query": "michaelis-menten", "parameters": {"km": 5.2, ...}}
-
-but Terrium takes parameters INSIDE the query string:
-
-    {"query": "simulate michaelis menten km=5.2 vmax=12.8 s0=10 end=10 points=51"}
-
-That difference is not cosmetic. Terrium refuses to invent a parameter it
-was not given (ADR 0012/0013): experimental conditions like s0, end and
-points are chosen by whoever runs the experiment and are never defaulted or
-resolved from literature. A request that omits them comes back
-MISSING_REQUIRED_INPUT naming exactly what to add — which is the product
-working, and which the old example gave no way to discover.
-
-`scripts/check_example_endpoints.py` now checks every endpoint here against
-the routes the server actually registers, so this file cannot drift back.
+Pointing a client at the wrong one produces 404s that look like the product
+is broken. `scripts/check_example_endpoints.py` checks every endpoint below
+against the routes both servers actually register.
 
 Requires: pip install requests
 """
 
 import sys
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import requests
 
@@ -48,141 +37,158 @@ API_TIMEOUT = 30
 
 
 class TerriumClient:
-    """Python client for the Terrium API."""
+    """Python client for the Terrium web API (`src/web/server.ts`)."""
 
     def __init__(self, base_url: str = TERRIUM_URL):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
 
-    # -- health ---------------------------------------------------------
+    def _get(self, path: str, **kwargs: Any) -> Any:
+        response = self.session.get(
+            f"{self.base_url}{path}", timeout=API_TIMEOUT, **kwargs
+        )
+        response.raise_for_status()
+        return response.json()
+
+    # -- health and stats -------------------------------------------------
 
     def health_check(self) -> Dict[str, Any]:
-        """Liveness. Returns {"status": "ok"}."""
-        response = self.session.get(
-            f"{self.base_url}/api/healthz", timeout=API_TIMEOUT
-        )
-        response.raise_for_status()
-        return response.json()
+        return self._get("/api/health")
 
-    def pipeline_status(self) -> Dict[str, Any]:
-        """Per-subsystem status and queue depth."""
-        response = self.session.get(
-            f"{self.base_url}/api/pipeline/status", timeout=API_TIMEOUT
-        )
-        response.raise_for_status()
-        return response.json()
+    def statistics(self) -> Dict[str, Any]:
+        """Aggregate job statistics."""
+        return self._get("/api/stats")
 
-    # -- running a simulation -------------------------------------------
+    # -- running a simulation ---------------------------------------------
 
-    def simulate(self, query: str) -> str:
+    def simulate(
+        self,
+        query: str,
+        parameters: Dict[str, float],
+        enzyme: Optional[str] = None,
+        substrate: Optional[str] = None,
+    ) -> str:
         """Enqueue a simulation, return its job id.
 
-        `query` carries the parameters. There is no separate `parameters`
-        field: the resolver reads `km=2 vmax=5 s0=10` out of the text, and
-        anything it cannot find there and cannot resolve from literature is
-        reported as missing rather than guessed.
+        Supplying `enzyme` and `substrate` makes the server search PubMed
+        for kinetics before running, so the result carries literature
+        backing. Omit them and the run uses exactly the parameters given.
         """
+        payload: Dict[str, Any] = {"query": query, "parameters": parameters}
+        if enzyme:
+            payload["enzyme"] = enzyme
+        if substrate:
+            payload["substrate"] = substrate
+
         response = self.session.post(
-            f"{self.base_url}/api/simulate",
-            json={"query": query},
-            timeout=API_TIMEOUT,
+            f"{self.base_url}/api/simulate", json=payload, timeout=API_TIMEOUT
         )
         if response.status_code == 400:
-            raise ValueError(f"Rejected: {response.json().get('message')}")
+            raise ValueError(f"Rejected: {response.text}")
         response.raise_for_status()
         return response.json()["jobId"]
 
     def get_job(self, job_id: str) -> Dict[str, Any]:
-        """Current state of a job: pending, running, completed or failed."""
-        response = self.session.get(
-            f"{self.base_url}/api/simulate/{job_id}", timeout=API_TIMEOUT
-        )
-        response.raise_for_status()
-        return response.json()
+        return self._get(f"/api/jobs/{job_id}")
 
     def wait_for(
         self, job_id: str, attempts: int = 60, interval: float = 0.5
     ) -> Dict[str, Any]:
-        """Poll to completion. Raises on failure rather than returning None.
+        """Poll to completion.
 
-        A failed job is a result, not an absence of one -- its error names
-        what was missing, which is usually the thing the caller needs to
-        read.
+        Raises on failure rather than returning None. A failed job is a
+        result, not the absence of one — its error names what went wrong,
+        which is usually the thing the caller needs to read.
         """
         for _ in range(attempts):
             job = self.get_job(job_id)
-            if job["status"] == "completed":
-                return job["result"]
-            if job["status"] == "failed":
+            status = job.get("status")
+            if status in ("complete", "completed"):
+                return job
+            if status in ("error", "failed"):
                 raise RuntimeError(f"Job {job_id} failed: {job.get('error')}")
             time.sleep(interval)
         raise TimeoutError(
             f"Job {job_id} did not finish in {attempts * interval:.0f}s"
         )
 
-    def cancel(self, job_id: str) -> Dict[str, Any]:
-        """Cancel a pending or running job."""
-        response = self.session.post(
-            f"{self.base_url}/api/simulate/{job_id}/cancel", timeout=API_TIMEOUT
-        )
-        response.raise_for_status()
-        return response.json()
+    # -- history ----------------------------------------------------------
 
-    # -- what backs the numbers ------------------------------------------
+    def job_history(self) -> Dict[str, Any]:
+        """The 50 most recent jobs."""
+        return self._get("/api/jobs/history")
 
-    def confidence(self, job_id: str) -> Dict[str, Any]:
-        """Per-parameter confidence, derived from provenance."""
-        response = self.session.get(
-            f"{self.base_url}/api/simulate/{job_id}/confidence",
-            timeout=API_TIMEOUT,
-        )
-        response.raise_for_status()
-        return response.json()
+    def query_jobs(self, filters: str) -> Dict[str, Any]:
+        """Filtered job query, e.g. `status=complete&minConfidence=0.9`.
 
-    def audit(self, job_id: str) -> Dict[str, Any]:
-        """Publication audit: which parameters can be cited, and which cannot.
-
-        Measured quantities (km, ki, kcat, vmax) need a citation.
-        Experimental conditions (s0, i0, temperature, pH) are chosen by the
-        experimenter and are reported, not cited -- so they never block
-        publication readiness.
+        Date filters bound `startTime` at both ends, so a job that errored
+        or is still running still appears in its window — those are usually
+        the ones worth looking at.
         """
-        response = self.session.get(
-            f"{self.base_url}/api/simulate/{job_id}/audit", timeout=API_TIMEOUT
-        )
-        response.raise_for_status()
-        return response.json()
+        return self._get(f"/api/jobs/query?{filters}")
 
-    def export_csv(self, job_id: str) -> str:
-        """The trajectory as CSV text."""
+    def export_jobs_csv(self) -> str:
         response = self.session.get(
-            f"{self.base_url}/api/simulate/{job_id}/export", timeout=API_TIMEOUT
+            f"{self.base_url}/api/export/jobs/csv", timeout=API_TIMEOUT
         )
         response.raise_for_status()
         return response.text
 
-    # -- catalogue and metrics -------------------------------------------
+    # -- sweeps, batches, comparison --------------------------------------
 
-    def enzymes(self) -> Dict[str, Any]:
-        """Enzymes the resolver recognises by name."""
-        response = self.session.get(
-            f"{self.base_url}/api/enzymes", timeout=API_TIMEOUT
+    def sweep(
+        self,
+        query: str,
+        base_parameters: Dict[str, float],
+        sweep_parameters: List[Dict[str, str]],
+    ) -> str:
+        """Run one parameter across a range. Returns a sweep id."""
+        response = self.session.post(
+            f"{self.base_url}/api/sweep",
+            json={
+                "query": query,
+                "baseParameters": base_parameters,
+                "sweepParameters": sweep_parameters,
+            },
+            timeout=API_TIMEOUT,
         )
         response.raise_for_status()
-        return response.json()
+        return response.json().get("sweepId")
 
-    def pipeline_metrics(self) -> Dict[str, Any]:
-        """Stage-level metrics with Wilson confidence intervals."""
-        response = self.session.get(
-            f"{self.base_url}/api/simulate/metrics/pipeline", timeout=API_TIMEOUT
+    def get_sweep(self, sweep_id: str) -> Dict[str, Any]:
+        return self._get(f"/api/sweeps/{sweep_id}")
+
+    def batch(
+        self,
+        query: str,
+        parameter_sets: List[Dict[str, float]],
+        base_parameters: Optional[Dict[str, float]] = None,
+    ) -> str:
+        """Run many parameter sets. Returns a batch id.
+
+        `base_parameters` are merged UNDER each set, so a value common to
+        every run is stated once. The validator checks the merged result,
+        which is what the engine runs.
+        """
+        payload: Dict[str, Any] = {"query": query, "parameterSets": parameter_sets}
+        if base_parameters:
+            payload["baseParameters"] = base_parameters
+
+        response = self.session.post(
+            f"{self.base_url}/api/batch", json=payload, timeout=API_TIMEOUT
         )
         response.raise_for_status()
-        return response.json()
+        return response.json().get("batchId")
 
-    def dashboard_overview(self) -> Dict[str, Any]:
-        """System state: queue, literature backing, STRENDA compliance."""
-        response = self.session.get(
-            f"{self.base_url}/api/dashboard/overview", timeout=API_TIMEOUT
+    def get_batch(self, batch_id: str) -> Dict[str, Any]:
+        return self._get(f"/api/batches/{batch_id}")
+
+    def compare_jobs(self, job_ids: List[str]) -> Dict[str, Any]:
+        """Compare finished jobs against each other."""
+        response = self.session.post(
+            f"{self.base_url}/api/compare/jobs",
+            json={"jobIds": job_ids},
+            timeout=API_TIMEOUT,
         )
         response.raise_for_status()
         return response.json()
@@ -193,44 +199,45 @@ class TerriumClient:
 # ---------------------------------------------------------------------------
 
 
-def example_michaelis_menten(client: TerriumClient) -> None:
-    """A simulation with every parameter supplied in the query."""
+def example_simulation(client: TerriumClient) -> Optional[str]:
     job_id = client.simulate(
-        "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51"
+        query="michaelis-menten",
+        parameters={"km": 5.2, "vmax": 12.8, "s0": 10.0},
     )
-    result = client.wait_for(job_id)
-    print(f"  domain     : {result['domain']}")
-    print(f"  points     : {len(result['trajectory'])}")
-    print(f"  parameters : {result['parameters']}")
+    job = client.wait_for(job_id)
+    result = job.get("result", {})
+    print(f"  final value : {result.get('finalValue')}")
+    print(f"  confidence  : {result.get('confidence')}")
+    print(f"  validated   : {result.get('validated')}")
+    return job_id
 
 
-def example_missing_condition(client: TerriumClient) -> None:
-    """What happens when a required condition is omitted.
-
-    This is the behaviour most worth understanding: Terrium does not fill in
-    s0/i0/end/points with plausible-looking numbers. It names them.
-    """
-    job_id = client.simulate("simulate sir beta=0.3 gamma=0.1")
-    try:
-        client.wait_for(job_id, attempts=30)
-    except RuntimeError as exc:
-        print(f"  refused, as designed: {exc}")
-
-
-def example_provenance(client: TerriumClient) -> None:
-    """Where each number came from, and whether it can be cited."""
+def example_literature_backed(client: TerriumClient) -> None:
+    """With enzyme and substrate, the server looks up real kinetics first."""
     job_id = client.simulate(
-        "simulate lactate dehydrogenase vmax=5 s0=10 end=10 points=51"
+        query="michaelis-menten",
+        parameters={"km": 5.2, "vmax": 12.8, "s0": 10.0},
+        enzyme="lactate dehydrogenase",
+        substrate="pyruvate",
     )
-    result = client.wait_for(job_id)
+    job = client.wait_for(job_id, attempts=120)
+    result = job.get("result", {})
+    print(f"  validated against literature: {result.get('validated')}")
 
-    for key, prov in sorted(result.get("parameterProvenance", {}).items()):
-        origin = prov.get("origin")
-        citation = prov.get("citation", "-")
-        print(f"  {key:<8} {origin:<10} {citation}")
 
-    audit = client.audit(job_id)
-    print(f"  publication ready: {audit.get('readyToPublish')}")
+def example_sweep(client: TerriumClient) -> None:
+    sweep_id = client.sweep(
+        query="michaelis-menten",
+        base_parameters={"vmax": 12.8, "s0": 10.0},
+        sweep_parameters=[{"name": "km", "spec": "1:10:1"}],
+    )
+    print(f"  sweep id: {sweep_id}")
+
+
+def example_statistics(client: TerriumClient) -> None:
+    stats = client.statistics()
+    for key in ("totalJobs", "successful", "failed"):
+        print(f"  {key:<12} {stats.get(key)}")
 
 
 def main() -> int:
@@ -239,13 +246,14 @@ def main() -> int:
     try:
         client.health_check()
     except requests.RequestException:
-        print(f"No Terrium server at {TERRIUM_URL}. Start it with `npm start`.")
+        print(f"No Terrium web server at {TERRIUM_URL}. Start it with `npm run web`.")
         return 1
 
     for name, example in [
-        ("Michaelis-Menten", example_michaelis_menten),
-        ("A missing experimental condition", example_missing_condition),
-        ("Provenance and publication audit", example_provenance),
+        ("A simulation", example_simulation),
+        ("Literature-backed kinetics", example_literature_backed),
+        ("A parameter sweep", example_sweep),
+        ("Statistics", example_statistics),
     ]:
         print(f"\n{name}")
         print("-" * len(name))

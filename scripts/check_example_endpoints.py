@@ -58,6 +58,39 @@ EXAMPLE_FILES = [
     REPO_ROOT / "examples" / "nodejs_integration.js",
 ]
 
+#: Markdown that documents the HTTP API, and must therefore describe the
+#: API that exists.
+#:
+#: Added after a sweep of the repository root found **242 of 294 endpoint
+#: mentions wrong across 23 documents — 82%**. Whole families of endpoints
+#: were described in detail and had never existed: `/api/batch`,
+#: `/api/sweep`, `/api/compare/jobs`, `/api/analyze/sweep/<id>`,
+#: `/api/jobs/<id>`, `/api/stats`, `/api/literature/search`.
+#:
+#: Eighteen of those documents open with a hand-written "CORRECTION" banner
+#: admitting their own claims are unverified. That is the wrong repair:
+#: a reader who has been told the document is unreliable still reads the
+#: endpoint table, and a disclaimer does not make a wrong URL right. The
+#: fix for a false claim is to make it true or remove it, and then to make
+#: it checkable so it cannot rot again.
+#:
+#: Only documents that are meant to be FOLLOWED belong here. Narrative
+#: records (Business/build-stages/**) are deliberately excluded: they
+#: describe what was true on a date, and rewriting history to satisfy a
+#: guard would destroy the thing that makes them worth keeping.
+#: Each entry is (path, must_document_endpoints).
+#:
+#: `docs/API.md` is the reference: if it stops naming any endpoint, the
+#: reference has been gutted and that is a failure. `API_DOCUMENTATION.md`
+#: is now a signpost pointing at it, and legitimately names none — but if
+#: fabricated endpoints reappear there, they must still be caught. So the
+#: two questions are separated: "does this file describe the API" and "is
+#: what it describes true".
+DOC_FILES: list[tuple[pathlib.Path, bool]] = [
+    (REPO_ROOT / "API_DOCUMENTATION.md", False),
+    (REPO_ROOT / "docs" / "API.md", True),
+]
+
 #: `router.get("/simulate/:jobId", ...)` across several formatting styles,
 #: including the multi-line form Prettier produces:
 #:     router.get(
@@ -66,6 +99,36 @@ ROUTE_RE = re.compile(
     r"""(?:router|app)\.(get|post|put|patch|delete)\(\s*['"`]([^'"`]+)['"`]""",
     re.MULTILINE,
 )
+
+#: THIS PROJECT SERVES TWO HTTP APIS, and the first version of this guard
+#: knew about only one.
+#:
+#: `Science-Agent-Pipeline/artifacts/api-server/` is Express and matched
+#: ROUTE_RE. `src/web/server.ts` is a raw `http.createServer` that
+#: dispatches on `pathname === '/api/...'` and `pathname.match(/^\/api\/...`,
+#: so ROUTE_RE never saw a single one of its routes.
+#:
+#: The consequence was not a missed check but a WRONG one: measured against
+#: half the route table, this guard reported 242 of 294 endpoint mentions
+#: across the documentation as nonexistent. Many of them were real. A
+#: checker whose source of truth is incomplete does not fail quietly — it
+#: produces confident false accusations, and I acted on several before
+#: noticing.
+#:
+#: Recorded rather than tidied away, because the shape recurs: it is the
+#: same defect as `check_typescript_compiles` deciding membership by walking
+#: up to a tsconfig that matched everything (Part 14), and as a citation
+#: guard parsing zero entries and printing OK (Part 20). The lesson is that
+#: a guard must be able to say how much of the world it looked at.
+WEB_SERVER = REPO_ROOT / "src" / "web" / "server.ts"
+
+#: `pathname === '/api/stats'`
+PATHNAME_EQ_RE = re.compile(r"""pathname\s*===\s*['"`]([^'"`]+)['"`]""")
+
+#: `pathname.match(/^\/api\/jobs\/[a-z0-9_]+$/i)` -- the parameterised
+#: routes. The regex body is converted to a route pattern by replacing each
+#: character-class or wildcard segment with `:param`.
+PATHNAME_MATCH_RE = re.compile(r"""pathname\.match\(\s*/\^(.+?)/[gimsuy]*\s*\)""")
 
 #: Where the router is mounted: `app.use("/api", router)`.
 MOUNT_RE = re.compile(r"""app\.use\(\s*['"`](/[^'"`]*)['"`]\s*,\s*router""")
@@ -116,6 +179,48 @@ def registered_routes() -> set[str]:
                 continue
             full = route if path == APP_FILE else f"{prefix}{route}"
             routes.add(full.rstrip("/") or "/")
+
+    routes |= _web_server_routes()
+    return routes
+
+
+def _web_server_routes() -> set[str]:
+    """Routes served by the raw-http server in `src/web/server.ts`."""
+    if not WEB_SERVER.is_file():
+        # Not a silent skip: this file is half the route table, and
+        # pretending it is empty is what produced the false accusations
+        # documented above.
+        raise FileNotFoundError(
+            f"{WEB_SERVER} does not exist, so half the API's routes could "
+            "not be read. Refusing to check documentation against a route "
+            "table known to be incomplete."
+        )
+
+    text = WEB_SERVER.read_text(encoding="utf-8")
+    routes = {match.group(1).rstrip("/") or "/" for match in PATHNAME_EQ_RE.finditer(text)}
+
+    for match in PATHNAME_MATCH_RE.finditer(text):
+        # `\/api\/jobs\/[a-z0-9_]+$` -> `/api/jobs/:param`
+        raw = match.group(1).replace("\\/", "/")
+        anchored = raw.endswith("$")
+        body = raw.rstrip("$")
+
+        segments = [s for s in body.split("/") if s]
+        cleaned = [
+            ":param" if re.search(r"[\[\].*+]", segment) else segment
+            for segment in segments
+        ]
+
+        # An UNANCHORED pattern ending in `/` is a prefix match:
+        # `/^\/api\/batches\//` accepts `/api/batches/<anything>`. Without
+        # this the route was recorded as `/api/batches`, which is not a path
+        # the server serves -- so a document correctly citing
+        # `/api/batches/<id>` would have been reported as wrong.
+        if not anchored and body.endswith("/"):
+            cleaned.append(":param")
+
+        if cleaned:
+            routes.add("/" + "/".join(cleaned))
 
     return routes
 
@@ -192,7 +297,11 @@ def check() -> list[str]:
     violations: list[str] = []
     checked = 0
 
-    for path in EXAMPLE_FILES:
+    targets: list[tuple[pathlib.Path, bool]] = [
+        (path, True) for path in EXAMPLE_FILES
+    ] + DOC_FILES
+
+    for path, must_document in targets:
         if not path.is_file():
             violations.append(
                 f"{path.relative_to(REPO_ROOT)} is listed in EXAMPLE_FILES "
@@ -203,11 +312,13 @@ def check() -> list[str]:
 
         calls = example_calls(path)
         if not calls:
-            violations.append(
-                f"{path.relative_to(REPO_ROOT)} yielded no API calls. Either "
-                "it stopped calling the API or CALL_RE stopped matching it; "
-                "both are worth knowing, and neither is a pass."
-            )
+            if must_document:
+                violations.append(
+                    f"{path.relative_to(REPO_ROOT)} yielded no API calls. "
+                    "Either it stopped describing the API or CALL_RE stopped "
+                    "matching it; both are worth knowing, and neither is a "
+                    "pass."
+                )
             continue
 
         relative = path.relative_to(REPO_ROOT)
@@ -226,8 +337,9 @@ def check() -> list[str]:
     if not violations:
         print(
             f"OK: {checked} documented endpoint(s) across "
-            f"{len(EXAMPLE_FILES)} example file(s) all exist among the "
-            f"{len(routes)} routes the API registers."
+            f"{len(EXAMPLE_FILES)} example file(s) and {len(DOC_FILES)} "
+            f"doc(s) all exist among the {len(routes)} routes the API "
+            "registers."
         )
     return violations
 
