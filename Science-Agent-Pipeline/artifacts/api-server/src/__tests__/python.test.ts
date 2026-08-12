@@ -41,14 +41,34 @@ describe("Python bridge interpreter selection", () => {
     expect(isSupportedPythonMinor(14)).toBe(false);
   });
 
-  it("accepts a configured supported interpreter path", () => {
-    delete process.env["TERRIUM_PYTHON"];
-    const repoRoot = process.cwd();
-    // Mirror resolvePythonExecutable's own fallback order exactly (python.ts).
-    // A shorter candidate list here was the bug: it predicted "nothing will
-    // be found" by checking fewer paths than the function itself falls back
-    // to, so adding python3.13 to the source's list made this test's
-    // prediction wrong without changing anything test-visible until then.
+  /**
+   * Finds an interpreter this environment can actually run Terrium on, or
+   * throws saying so.
+   *
+   * Both tests below used to branch on the result -- asserting the happy
+   * path when one was found and the error path when one was not. That
+   * accommodates both outcomes and therefore cannot fail: on a machine with
+   * no usable Python the "accepts a configured interpreter" tests passed
+   * without ever configuring an interpreter.
+   *
+   * The engine is not optional (`scripts/check_env.py` treats roadrunner,
+   * antimony and libsbml as required, and the route suites run real
+   * simulations), so "no usable interpreter" is a broken environment. It is
+   * reported here, once, with the candidates that were tried -- rather than
+   * silently converting every test in this describe block into a no-op.
+   *
+   * The absent-interpreter error message is not left untested: "does not
+   * silently fall back when TERRIUM_PYTHON is invalid" below asserts it
+   * directly, by pointing TERRIUM_PYTHON at a path that cannot exist.
+   */
+  function requireSupportedPython(repoRoot: string): string {
+    // Deliberately NOT a mirror of resolvePythonExecutable's fallback order.
+    // The old copy of that list was itself a defect: it predicted "nothing
+    // will be found" by checking fewer paths than the function falls back to,
+    // so adding python3.13 to the source made the test's prediction wrong
+    // while nothing test-visible changed. This list only has to find SOME
+    // usable interpreter to configure; which one the source would have
+    // preferred is not this test's claim.
     const candidates = [
       process.env["VIRTUAL_ENV"]
         ? `${process.env["VIRTUAL_ENV"]}/bin/python`
@@ -59,36 +79,55 @@ describe("Python bridge interpreter selection", () => {
       "python3.11",
       "python3.10",
     ].filter((candidate): candidate is string => Boolean(candidate));
+
     const discovered = candidates.find((candidate) =>
       canRunSupportedPython(candidate, repoRoot),
     );
-    if (discovered) {
-      process.env["TERRIUM_PYTHON"] = discovered;
-      expect(resolvePythonExecutable(repoRoot)).toBe(discovered);
-    } else {
-      expect(() => resolvePythonExecutable(repoRoot)).toThrow(
-        /No supported Python 3\.10–3\.13 interpreter with Terrium dependencies found/,
+
+    if (!discovered) {
+      throw new Error(
+        "no Python 3.10-3.13 interpreter with Terrium dependencies is " +
+          `available, so the interpreter-selection tests cannot run. Tried: ${candidates.join(
+            ", ",
+          )}. Install the dependencies in requirements.txt, or set ` +
+          "TERRIUM_PYTHON to an interpreter that has them.",
       );
     }
+
+    return discovered;
+  }
+
+  it("honours TERRIUM_PYTHON when set to a supported interpreter path", () => {
+    delete process.env["TERRIUM_PYTHON"];
+    const repoRoot = process.cwd();
+
+    const discovered = requireSupportedPython(repoRoot);
+    process.env["TERRIUM_PYTHON"] = discovered;
+
+    // Unconditional: an explicitly configured, working interpreter must be
+    // the one used. Silently preferring a different one is the failure this
+    // test exists to catch.
+    expect(resolvePythonExecutable(repoRoot)).toBe(discovered);
   });
 
-  it("accepts a configured executable name when one is available", () => {
-    const executableName = [
-      "python3.13",
-      "python3.12",
-      "python3.11",
-      "python3.10",
-    ].find(
-      (candidate) => canRunSupportedPython(candidate, process.cwd()),
+  it("honours TERRIUM_PYTHON when set to a bare executable name", () => {
+    delete process.env["TERRIUM_PYTHON"];
+    const repoRoot = process.cwd();
+
+    // A bare name (resolved via PATH) rather than an absolute path -- the
+    // distinction this test adds over the one above.
+    const executableName = ["python3.13", "python3.12", "python3.11", "python3.10"].find(
+      (candidate) => canRunSupportedPython(candidate, repoRoot),
     );
-    if (executableName) {
-      process.env["TERRIUM_PYTHON"] = executableName;
-      expect(resolvePythonExecutable(process.cwd())).toBe(executableName);
-    } else {
-      expect(() => resolvePythonExecutable(process.cwd())).toThrow(
-        /No supported Python 3\.10–3\.13 interpreter with Terrium dependencies found/,
-      );
-    }
+
+    expect(
+      executableName,
+      "no supported python3.1x is on PATH, so the bare-name case cannot be " +
+        "exercised; install one or set TERRIUM_PYTHON",
+    ).toBeDefined();
+
+    process.env["TERRIUM_PYTHON"] = executableName!;
+    expect(resolvePythonExecutable(repoRoot)).toBe(executableName);
   });
 
   it("does not silently fall back when TERRIUM_PYTHON is invalid", () => {

@@ -1,3 +1,5 @@
+> **⚠️ CORRECTION (2026-08-10):** the "178 tests" figure and per-module coverage table below are a stale snapshot (suite has grown to 17 test files at last count) — run `npm test` for the current number. The "Core Modules" listing also omits real, existing files: `commandResolve.ts`, `commandSensitivity.ts`, `commandSimulateResolved.ts`. "PRODUCTION READY" doesn't hold — root `src/` is a library/CLI with no HTTP server or deployment. This doc is a near-duplicate of `BUILD_COMPLETE_SUMMARY.md`, `COMPLETE_BUILD_REPORT.md`, `COMPREHENSIVE_GUIDE.md`, and `FINAL_STATUS.txt`.
+
 # Terrium Scientific Validation Framework - Implementation Complete
 
 ## Status: ✓ PRODUCTION READY

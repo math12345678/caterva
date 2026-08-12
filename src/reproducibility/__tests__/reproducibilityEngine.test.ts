@@ -177,11 +177,18 @@ describe('ReproducibilityVerifier', () => {
 
     const result = await ReproducibilityVerifier.verify(record, reproducer);
 
-    if (result.differences) {
-      expect(result.differences.possibleCauses).toContain(
-        'Different floating-point implementations'
-      );
-    }
+    // `if (result.differences)` made this pass whenever no differences were
+    // reported -- which is the one outcome that would mean the diagnosis code
+    // never ran. A 1e-6 relative discrepancy is exactly the case it exists to
+    // explain, so the presence of `differences` is part of the claim.
+    // jest's expect() takes one argument -- no chai/node:assert-style
+    // custom-message parameter -- so state the expectation in a comment
+    // instead of passing it to toBeDefined().
+    // A 100 vs 100.0001 discrepancy must produce a differences report.
+    expect(result.differences).toBeDefined();
+    expect(result.differences!.possibleCauses).toContain(
+      'Different floating-point implementations'
+    );
   });
 });
 

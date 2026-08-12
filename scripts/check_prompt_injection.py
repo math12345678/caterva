@@ -41,12 +41,45 @@ guard being written. That is worth knowing, because it means a clean scan
 today is not evidence that the earlier findings were ever real -- the
 verdicts above are, and they were reached by reading each site.
 
-A baseline file is supported (`trojan-baseline.json`) and deliberately NOT
-pre-populated: an unreviewed baseline is a suppression list nobody read,
-and this codebase has spent eleven stages removing checks that could not
-fail. If a future finding is genuinely benign, add it to the baseline WITH
-a justification in this docstring, so the next reader can tell a reviewed
-exemption from a silenced one.
+A baseline file is supported (`scripts/trojan-baseline.json`). An
+unreviewed baseline is a suppression list nobody read, and this codebase
+has spent eleven stages removing checks that could not fail -- so the
+mechanism is built to resist becoming one:
+
+  * Every entry must carry a `reason` of real length. An exemption without
+    a written verdict fails the build rather than silently exempting.
+  * Entries are keyed on trojan-scan's `fingerprint`, and the recorded
+    `file` is re-checked at match time. A verdict reached about one file
+    cannot drift onto another.
+  * Every applied exemption is PRINTED on every run. A suppression list
+    that vanishes from the output stops being read.
+
+THE MECHANISM DID NOT EXIST UNTIL 2026-08-11 (Part 22)
+
+The paragraph above, and the failure message below, both told readers to
+record benign findings in `trojan-baseline.json`. Nothing read that file.
+Following the instruction did nothing: the entry landed, the build stayed
+red, and the reader believed they had recorded an exemption.
+
+Found alongside it: the finding printer looked for `rule` and `id`, but
+trojan-scan 0.2.0 emits `ruleId`. Every finding this guard has ever printed
+said `[?]` where the rule name belongs.
+
+A documented mechanism that does not exist is worse than an undocumented
+gap, for the same reason a guard that reports OK on a failed parse is worse
+than no guard: it is trusted.
+
+CURRENT EXEMPTIONS (3, all one sentence)
+
+The CLI prints a cross-species warning when a resolved parameter was
+measured in a different organism than the one asked about, cautioning the
+reader against attributing it to the queried species. `trust-assertion`
+fires on it because the rule looks for instructions to stay quiet -- and
+this is the opposite: it surfaces a caveat that would otherwise be buried.
+The sentence appears three times: once in `src/cli/commandResolve.ts` and
+twice quoted (README example output, and the Part 14 stage record). The
+quotes are verbatim on purpose; rewording them to satisfy the scanner would
+make the documentation describe output the tool does not produce.
 
 CANNOT-RUN IS NOT CLEAN
 
@@ -79,6 +112,82 @@ FAIL_SEVERITY = "high"
 SCAN_TIMEOUT_S = 300
 
 SKIP_ENV = "TERRIUM_SKIP_INJECTION_SCAN"
+
+#: Reviewed exemptions. Both this file's docstring and the failure message
+#: told readers to record benign findings here -- and until now NOTHING READ
+#: IT. Following the instruction did nothing: the entry landed, the build
+#: stayed red, and the reader believed they had recorded an exemption.
+#:
+#: A documented mechanism that does not exist is worse than an undocumented
+#: gap, for the same reason a guard that reports OK on a failed parse is
+#: worse than no guard: it is trusted.
+BASELINE_PATH = REPO_ROOT / "scripts" / "trojan-baseline.json"
+
+
+def _load_baseline() -> tuple[dict[str, dict[str, str]], list[str]]:
+    """Returns ({fingerprint: entry}, problems).
+
+    Keyed on trojan-scan's own `fingerprint`, which is stable across
+    reformatting in a way that a line number is not. But a bare hash is
+    unreadable, and an exemption list nobody can read is the thing this
+    guard exists to prevent -- so `file` and `reason` are required too, and
+    the file is re-checked at match time.
+
+    Every entry must carry a real `reason`. An exemption without a written
+    verdict is exactly the "suppression list nobody read" the docstring
+    warns about, so an unreasoned entry FAILS the build rather than quietly
+    exempting anything.
+    """
+    if not BASELINE_PATH.is_file():
+        return {}, []
+
+    try:
+        raw = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return {}, [
+            f"{BASELINE_PATH.name} could not be read ({exc}). Refusing to "
+            "scan with an unreadable exemption list -- it would silently "
+            "exempt nothing, or everything, depending on the bug."
+        ]
+
+    entries = raw.get("exemptions", raw) if isinstance(raw, dict) else raw
+    if not isinstance(entries, list):
+        return {}, [
+            f"{BASELINE_PATH.name} must contain a list of exemptions (or an "
+            "object with an 'exemptions' list)."
+        ]
+
+    baseline: dict[str, dict[str, str]] = {}
+    problems: list[str] = []
+
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            problems.append(f"{BASELINE_PATH.name}[{index}] is not an object.")
+            continue
+
+        fingerprint = str(entry.get("fingerprint", "")).strip()
+        file_ = str(entry.get("file", "")).strip()
+        reason = str(entry.get("reason", "")).strip()
+
+        if not fingerprint or not file_:
+            problems.append(
+                f"{BASELINE_PATH.name}[{index}] needs both 'fingerprint' "
+                "(from the scan's JSON output) and 'file' (so a human can "
+                "tell what is being exempted)."
+            )
+            continue
+        if len(reason) < 20:
+            problems.append(
+                f"{BASELINE_PATH.name}[{index}] ({file_}) has no usable "
+                "'reason'. An exemption without a written verdict is a "
+                "suppression list nobody read -- say why the finding is "
+                "benign, in a sentence the next reader can check."
+            )
+            continue
+
+        baseline[fingerprint] = {"file": file_, "reason": reason}
+
+    return baseline, problems
 
 
 def check() -> list[str]:
@@ -152,22 +261,62 @@ def check() -> list[str]:
             "output shape may have changed. Refusing to report success."
         ]
 
+    baseline, baseline_problems = _load_baseline()
+    if baseline_problems:
+        return baseline_problems
+
     violations: list[str] = []
+    exempted: list[str] = []
+
     for finding in findings:
         if not isinstance(finding, dict):
             continue
         if str(finding.get("severity", "")).lower() != FAIL_SEVERITY:
             continue
-        location = finding.get("file") or finding.get("path") or "?"
+        location = str(finding.get("file") or finding.get("path") or "?")
         line = finding.get("line", "?")
-        rule = finding.get("rule") or finding.get("id") or "?"
+        # trojan-scan 0.2.0 emits `ruleId`. The original code looked for
+        # `rule` and `id`, so EVERY finding this guard has ever printed said
+        # `[?]` where the rule name belongs -- and a baseline keyed on that
+        # name could never have matched anything.
+        rule = str(
+            finding.get("ruleId")
+            or finding.get("rule")
+            or finding.get("id")
+            or "?"
+        )
+        fingerprint = str(finding.get("fingerprint", ""))
         message = finding.get("message") or finding.get("title") or ""
+
+        entry = baseline.get(fingerprint)
+        if entry is not None:
+            if entry["file"] != location.lstrip("./"):
+                # The verdict was reached about a different file. Exempting
+                # on a stale record would silence a finding nobody reviewed.
+                violations.append(
+                    f"{location}:{line} [{rule}] is exempted by a baseline "
+                    f"entry recorded against {entry['file']}. Re-review it "
+                    "and update the entry, or remove it."
+                )
+                continue
+            exempted.append(f"{location}:{line} [{rule}] -- {entry['reason']}")
+            continue
+
         violations.append(
             f"{location}:{line} [{rule}] {message} -- text aimed at an AI "
             "reader rather than a human one. Several agents commit to this "
             "repository and read each other's files, so prose is an "
             "execution surface here."
         )
+
+    # Printed every run, never silently dropped. A baseline that disappears
+    # from the output is indistinguishable from no findings at all, which
+    # is how an exemption list stops being read.
+    if exempted:
+        print(f"Reviewed exemptions applied ({len(exempted)}):")
+        for entry in exempted:
+            print(f"  {entry}")
+        print()
 
     return violations
 
@@ -176,9 +325,9 @@ def main() -> int:
     violations = check()
     if not violations:
         print(
-            "OK: no high-severity prompt-injection indicators. "
-            "(Baseline is deliberately empty -- see this file's docstring "
-            "for why, and for the 2026-08-11 triage.)"
+            "OK: no unexempted high-severity prompt-injection indicators. "
+            "Any reviewed exemptions are listed above with their verdicts; "
+            "see this file's docstring for the triage history."
         )
         return 0
 

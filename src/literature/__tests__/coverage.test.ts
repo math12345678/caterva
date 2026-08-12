@@ -189,14 +189,23 @@ describe('LiteratureService Coverage', () => {
       }).toThrow();
     });
 
-    it('should return verification result even for non-indexed parameters', () => {
+    it('should return verification result for indexed parameters', () => {
       service.addLiterature(minimalLiterature);
 
-      // crossVerify handles gracefully even if parameter not found
-      // This is okay - it means no conflicts
       const result = service.crossVerify('km', 'mm');
       expect(result.parameterName).toBe('km');
       expect(result.sources.length).toBeGreaterThan(0);
+    });
+
+    it('should throw for a parameter with no matching literature, not fabricate a "strong" consensus from zero data', () => {
+      service.addLiterature(minimalLiterature);
+
+      // 'km' is indexed (see test above); 'nonexistent_param' is not, and
+      // must not silently produce NaN mean/stdDev with consensus defaulting
+      // to 'strong' -- see the fix in literatureService.ts's CrossVerifier.verify().
+      expect(() => {
+        service.crossVerify('nonexistent_param', 'mm');
+      }).toThrow();
     });
   });
 

@@ -1,0 +1,34 @@
+{
+  "_comment": [
+    "Reviewed exemptions for scripts/check_prompt_injection.py.",
+    "Every entry needs a 'reason' the next reader can check against the",
+    "actual line. Entries are keyed on trojan-scan's 'fingerprint' (stable",
+    "across reformatting, unlike a line number) and re-checked against",
+    "'file' at match time. The guard PRINTS every exemption it applies on",
+    "every run -- a suppression list that disappears from the output stops",
+    "being read, which is the failure this file is meant to avoid."
+  ],
+  "exemptions": [
+    {
+      "fingerprint": "c1cbf7633bc9a4d4",
+      "file": "src/cli/commandResolve.ts",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-08-11",
+      "reason": "The flagged text is the CLI's cross-species warning, printed to a human scientist when a resolved parameter was measured in a DIFFERENT organism than the one asked about. It cautions the reader against attributing the value to the queried species. The scanner's rule looks for instructions to stay quiet; this is the opposite -- it surfaces a caveat that would otherwise be buried, and the clause immediately before it affirms the value is real and citable. The warning exists because a cross-species Km presented as an exact match is how a number ends up in a paper credited to the wrong organism. (Worded here without quoting the line verbatim: reproducing it would make this exemption file trip the same rule, which it did on the first attempt.)"
+    },
+    {
+      "fingerprint": "c3e8b4b182334560",
+      "file": "README.md",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-08-11",
+      "reason": "The same cross-species CLI warning, quoted verbatim in the README's example output so readers can see what the tool actually prints. Documenting real output is not an instruction to an AI reader; changing the quote to satisfy the scanner would make the documentation wrong."
+    },
+    {
+      "fingerprint": "a3362a8da806c301",
+      "file": "Business/build-stages/STAGE_10_PART_14.md",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-08-11",
+      "reason": "The same cross-species CLI warning, quoted in the build-stage record that describes why it was added. A historical record of what the code printed on a given date; rewording it would falsify the record."
+    }
+  ]
+}
