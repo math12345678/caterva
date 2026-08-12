@@ -86,65 +86,110 @@ fi
 #    single path to split. Built as orphan branches with one commit, and
 #    their README says where the history lives.
 # ---------------------------------------------------------------------------
+# Built in a staging directory, NOT as an orphan branch in this worktree.
+#
+# The first version used `git checkout --orphan` here. That leaves every
+# tracked file staged in the live working tree, and switching back to main
+# then aborts on "untracked files would be overwritten" -- leaving the
+# checkout parked on a half-built branch. Recoverable, but it edits the tree
+# you are working in to produce a repo that has nothing to do with it.
+#
+# A staging directory cannot do that: the monorepo is only ever read.
+STAGE="${TMPDIR:-/tmp}/terrium-split"
+
 build_fileset() {
   local repo="$1"; shift
-  local readme="$1"; shift
-  git branch -D "split/$repo" >/dev/null 2>&1 || true
-  git checkout --orphan "split/$repo" >/dev/null 2>&1
-  git rm -rq --cached . >/dev/null 2>&1 || true
+  local readme_file="$1"; shift
+  local dest="$STAGE/$repo"
+
+  rm -rf "$dest"; mkdir -p "$dest"
 
   local staged=0
   for f in "$@"; do
-    if [ -e "$f" ]; then git add -f "$f" >/dev/null 2>&1 && staged=$((staged+1)); fi
+    if [ -e "$ROOT/$f" ]; then
+      mkdir -p "$dest/$(dirname "$f")"
+      cp -R "$ROOT/$f" "$dest/$f"
+      staged=$((staged+1))
+    fi
   done
 
-  printf '%s\n' "$readme" > README.md
-  git add -f README.md >/dev/null 2>&1
+  cp "$ROOT/$readme_file" "$dest/README.md"
 
-  git -c user.name="$(git config user.name)" \
-      -c user.email="$(git config user.email)" \
-      commit -q -m "Initial import: $repo
+  git -C "$dest" init -q -b main
+  git -C "$dest" add -A
+  git -C "$dest" -c user.name="$(git config user.name)" \
+                 -c user.email="$(git config user.email)" \
+                 commit -q -m "Initial import: $repo
 
-Assembled from files at the monorepo root, which have no single directory
-to split, so this repository starts with one commit. Their history is in
-the monorepo and in Terrium-sim/main."
-  ok "$(printf '%-30s' "$repo") $staged file(s)"
-  git checkout -q main
-  git clean -fdq
+Assembled from files at the monorepo root, which have no single directory to
+split, so this repository starts with one commit rather than a partial
+history. The full history is in Terrium-sim/main."
+  ok "$(printf '%-30s' "$repo") $staged file(s)  -> $dest"
 }
 
 say "Building file-set repos (no single path to split; history noted in README)"
-mapfile -t ARCHIVE_DOCS < <(
-  git ls-files | grep -v / | grep '\.md$' |
-  grep -vE '^(README|CHANGELOG|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT|API_DOCUMENTATION|API_QUICK_REFERENCE|COMPREHENSIVE_GUIDE|EXPORT_AND_ANALYSIS_GUIDE|FEATURE_MODEL_COMPARISON|PHASE_5A_INTEGRATION_GUIDE|REFACTOR_STATUS|START_HERE|WEB_INTERFACE)\.md$'
+rm -rf "$STAGE"; mkdir -p "$STAGE"
+
+# The 14 documents that are current stay in `main`; everything else at the
+# root is a superseded status report. Classification in docs/ARCHIVE_TRIAGE.md.
+KEEP_AT_ROOT='^(README|CHANGELOG|CONTRIBUTING|SECURITY|CODE_OF_CONDUCT|API_DOCUMENTATION|API_QUICK_REFERENCE|COMPREHENSIVE_GUIDE|EXPORT_AND_ANALYSIS_GUIDE|FEATURE_MODEL_COMPARISON|PHASE_5A_INTEGRATION_GUIDE|REFACTOR_STATUS|START_HERE|WEB_INTERFACE)\.md$'
+
+ARCHIVE_DOCS=()
+while IFS= read -r f; do ARCHIVE_DOCS+=("$f"); done < <(
+  git ls-files | grep -v / | grep '\.md$' | grep -vE "$KEEP_AT_ROOT"
 )
-build_fileset archive "$(cat docs/readmes/archive.md)" "${ARCHIVE_DOCS[@]}"
+build_fileset archive docs/readmes/archive.md "${ARCHIVE_DOCS[@]}"
 
-build_fileset miscellaneous "$(cat docs/readmes/miscellaneous.md)" \
+build_fileset miscellaneous docs/readmes/miscellaneous.md \
   Logo.png terrium_ai_architecture.png terrium_pitch_deck.pptx \
-  FINAL_STATUS.txt lr_probe.js test-real-data.js e2e-test.js \
-  "Screenshot 2026-07-22 at 11.04.46 AM.png"
+  FINAL_STATUS.txt lr_probe.js test-real-data.js e2e-test.js
 
-build_fileset worktrees "$(cat docs/readmes/worktrees.md)"
-build_fileset mule "$(cat docs/readmes/mule.md)"
+# The dashboard the web server serves. Split from server.ts, which stays in
+# backend-main -- see docs/REPO_MAP.md for why, and for the guard that keeps
+# the two from drifting apart.
+build_fileset frontend-main docs/readmes/frontend-main.md src/web/dashboard.html
 
-say "Done. Local branches:"
-git branch --list 'split/*' | sed 's/^/  /'
+# The umbrella: top-level docs, container/compose, licence, and the
+# submodule wiring. No source file, so nothing here can drift from a repo
+# that also holds it.
+KEEP_DOCS=()
+while IFS= read -r f; do KEEP_DOCS+=("$f"); done < <(
+  git ls-files | grep -v / | grep -E "$KEEP_AT_ROOT"
+)
+build_fileset main docs/readmes/main.md "${KEEP_DOCS[@]}" \
+  LICENSE CITATION.cff Dockerfile docker-compose.yml .dockerignore \
+  .editorconfig .gitignore docs/REPO_MAP.md docs/ARCHIVE_TRIAGE.md
+
+build_fileset worktrees docs/readmes/worktrees.md
+build_fileset mule docs/readmes/mule.md
+
+# ---------------------------------------------------------------------------
+# 4. Report.
+# ---------------------------------------------------------------------------
+say "Split branches in this repo (history preserved)"
+for b in $(git branch --list 'split/*' --format='%(refname:short)'); do
+  printf "  %-34s %4s commits\n" "${b#split/}" "$(git rev-list --count "$b")"
+done
+
+say "Staged repos in $STAGE (single initial commit)"
+for d in "$STAGE"/*/; do
+  [ -d "$d" ] || continue
+  printf "  %-34s %4s file(s)\n" "$(basename "$d")" "$(git -C "$d" ls-files | wc -l | tr -d ' ')"
+done
 
 if [ "$PUSH" = "--push" ]; then
   say "Pushing to $ORG"
   for b in $(git branch --list 'split/*' --format='%(refname:short)'); do
     repo="${b#split/}"
-    git push -f "git@github.com:$ORG/$repo.git" "$b:main"
-    ok "pushed $repo"
+    git push -f "git@github.com:$ORG/$repo.git" "$b:main" && ok "pushed $repo"
   done
+  for d in "$STAGE"/*/; do
+    repo="$(basename "$d")"
+    git -C "$d" push -f "git@github.com:$ORG/$repo.git" main && ok "pushed $repo"
+  done
+  say "All 16 repositories pushed. Add submodules to main next:"
+  echo "    see the 'Submodules' section of docs/REPO_MAP.md"
 else
-  say "Nothing was pushed. To push everything:"
+  say "Nothing was pushed (dry run). To push everything:"
   echo "    ./scripts/split_repos.sh --push"
-  echo
-  echo "  Or one at a time:"
-  for b in $(git branch --list 'split/*' --format='%(refname:short)'); do
-    repo="${b#split/}"
-    echo "    git push -f git@github.com:$ORG/$repo.git $b:main"
-  done
 fi
