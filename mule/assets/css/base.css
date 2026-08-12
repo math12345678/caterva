@@ -1,0 +1,276 @@
+/* ============================================================
+   terrium — base, chrome, masthead, utilities
+   ============================================================ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  /* The masthead is fixed, so an anchor jump would otherwise put the top of
+     the target section underneath it. Most sections have enough top padding
+     to survive that by accident; #atlas lands exactly on the boundary, and
+     "by accident" is not a property worth relying on when the padding is
+     fluid. Declared once here rather than per-section so any anchor added
+     later inherits the clearance. */
+  scroll-padding-top: clamp(4rem, 9vh, 6rem);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--step-0);
+  font-weight: 350;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+body.is-locked { overflow: hidden; }
+
+h1, h2, h3, h4, p, figure, blockquote { margin: 0; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+svg { display: block; }
+::selection { background: var(--deep-teal); color: #f4fffb; }
+
+/* --- typography primitives -------------------------------- */
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  font-weight: 400;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.label--micro { font-size: var(--step--2); }
+.label--teal { color: var(--mineral-teal); }
+.mono { font-family: var(--font-mono); font-variant-ligatures: none; }
+
+.display {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  letter-spacing: -0.025em;
+  line-height: 0.98;
+  color: var(--text-primary);
+  text-wrap: balance;
+}
+
+.prose {
+  max-width: var(--measure);
+  color: var(--text-secondary);
+  font-size: var(--step-1);
+  font-weight: 350;
+  line-height: 1.62;
+}
+
+/* --- accessibility ---------------------------------------- */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 200;
+  transform: translateY(-200%);
+  background: var(--archive-paper);
+  color: var(--archive-ink);
+  padding: 0.6rem 1rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.skip-link:focus-visible { transform: translateY(0); }
+
+:where(a, button, [tabindex], input, textarea, select):focus-visible {
+  outline: 1px solid var(--signal-teal);
+  outline-offset: 3px;
+}
+
+/* --- masthead --------------------------------------------- */
+.masthead {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: var(--z-masthead);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: clamp(0.9rem, 2vw, 1.6rem) var(--gutter);
+  mix-blend-mode: normal;
+  pointer-events: none;
+}
+.masthead > * { pointer-events: auto; }
+
+/* Over the pale archival sheet of the pilot section the chrome inverts, so the
+   record keeps its paper and the navigation stays readable. Colour only — no
+   plate, no blur: a bar drawn across the sheet would cover the artifact the
+   whole page exists to produce. */
+.masthead.is-on-paper .wordmark { color: var(--void); }
+.masthead.is-on-paper .nav a { color: rgba(7, 11, 12, 0.74); }
+.masthead.is-on-paper .nav a:hover,
+.masthead.is-on-paper .nav a:focus-visible { color: var(--void); }
+
+/* The scrim gives the chrome a known backdrop. It was originally introduced
+   only for the seam crossing — the few hundred pixels where the gradient is
+   mid-grey and no type colour can hold 4.5:1 — but the problem it solves is
+   not specific to the seam. The masthead is fixed and unpainted, so every
+   section scrolls its own type underneath it, and the page is full of pale
+   text on dark ground: measured at glyph precision, forty-eight scroll
+   positions on a phone and twenty-two on a laptop had the wordmark or the
+   navigation sitting directly on top of another light glyph run — section
+   headings, the atlas zoom buttons, region labels, the console's own prose.
+   Two legible things overlapping make two illegible things.
+
+   So the scrim is the resting state on dark ground rather than a special case.
+   It costs nothing to look at: it is the same void the dark sections are
+   already drawn on, so across the hero and every graphite section it is
+   invisible, and it only becomes apparent as a soft darkening exactly where
+   something pale would otherwise collide with the chrome. */
+.masthead::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  /* Solid behind the type, feathering only below it. An earlier version faded
+     from 62% down, which put the fade across the navigation itself and let the
+     measured ratio fall to 3.8:1 at the end of the crossing. The scrim has to
+     be opaque wherever there is type, and may only soften past it. */
+  background: linear-gradient(to bottom, var(--void) 0%, var(--void) 86%, rgba(7, 11, 12, 0) 100%);
+  opacity: 1;
+  transition: opacity var(--dur-base) var(--ease-glide);
+  pointer-events: none;
+}
+
+/* Except on the archive paper, where it must not appear at all: the pilot and
+   the manifest are pale sheets, the chrome inverts to graphite type against
+   them, and a void bar drawn across the top of the sheet would cover the
+   record the whole page exists to produce. */
+.masthead.is-on-paper::before { opacity: 0; }
+.masthead .wordmark,
+.masthead .nav a { transition: color var(--dur-base) var(--ease-glide); }
+
+.wordmark {
+  font-family: var(--font-sans);
+  font-size: clamp(1rem, 1.6vw, 1.3rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-transform: lowercase;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.55em;
+}
+.wordmark::after {
+  content: "";
+  width: 5px; height: 5px;
+  background: var(--signal-teal);
+  transform: rotate(45deg) translateY(-0.15em);
+  opacity: 0.9;
+}
+
+.nav { display: flex; align-items: center; gap: clamp(0.85rem, 2vw, 2rem); }
+.nav a {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  transition: color var(--dur-fast) var(--ease-glide);
+  position: relative;
+}
+.nav a::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 100%; bottom: -6px;
+  height: 1px;
+  background: var(--signal-teal);
+  transition: right var(--dur-base) var(--ease-structural);
+}
+.nav a:hover, .nav a:focus-visible { color: var(--text-primary); }
+.nav a:hover::after, .nav a:focus-visible::after { right: 0; }
+
+@media (max-width: 33.75rem) {
+  .nav { gap: 0.7rem; }
+  .nav a { font-size: var(--step--2); letter-spacing: 0.08em; }
+}
+
+/* --- shared section furniture ----------------------------- */
+.chapter {
+  position: relative;
+  padding: clamp(5rem, 12vh, 11rem) var(--gutter);
+  border-top: 1px solid var(--line-hairline);
+  background: var(--void);
+}
+
+.chapter__head {
+  display: grid;
+  gap: clamp(1.1rem, 2vw, 1.8rem);
+  max-width: 78rem;
+  margin: 0 auto;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--mineral-teal);
+}
+.eyebrow::before {
+  content: "";
+  width: clamp(1.5rem, 4vw, 3.5rem);
+  height: 1px;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.chapter__title { font-size: var(--step-3); }
+.chapter__title .display-dim { color: var(--text-tertiary); }
+
+.hairline { height: 1px; background: var(--line-hairline); border: 0; margin: 0; }
+
+.disclaimer {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  line-height: 1.7;
+}
+
+/* --- reveal on scroll ------------------------------------- */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 900ms var(--ease-structural), transform 900ms var(--ease-structural);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+[data-reveal].is-revealed { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1; transform: none; transition: none; }
+}

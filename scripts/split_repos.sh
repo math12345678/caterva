@@ -32,6 +32,297 @@ RENAME_COMMIT="$(git log --format=%H --grep='Rename Tellurium -> Terium' -n 1 ||
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 
+# ---------------------------------------------------------------------------
+# Standalone scaffolding.
+#
+# A split repository inherits nothing: no .gitignore, no CI, no packaging.
+# Without these, `git clone && pytest` fails on a fresh machine and the
+# repository is a backup rather than something anyone can use.
+# ---------------------------------------------------------------------------
+
+scaffold_terium() {
+  local d="$1"
+
+  cat > "$d/pyproject.toml" <<'TOML'
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terium"
+version = "0.1.0"
+description = "Terrium's simulation engine: 15 domains, every numerical claim checked against an independent source of truth"
+requires-python = ">=3.10,<3.14"
+dependencies = ["libroadrunner==2.8.0", "antimony==2.14.0", "python-libsbml", "numpy", "scipy"]
+
+[tool.setuptools.packages.find]
+include = ["Terium*"]
+
+[tool.pytest.ini_options]
+testpaths = ["Terium/tests"]
+TOML
+
+  cat > "$d/requirements.txt" <<'REQ'
+# Do NOT `pip install tellurium`. The umbrella package pulls in
+# python-libcombine and python-libnuml, neither of which this engine uses,
+# and on any platform without prebuilt wheels the install dies at the cmake
+# step. See ADR 0001 in the `documents` repository.
+libroadrunner==2.8.0
+antimony==2.14.0
+python-libsbml
+numpy
+scipy
+pytest
+hypothesis
+REQ
+
+  # Eight test modules import guard scripts from `scripts/`, which lives in
+  # the `wiring-main` repository. They test the GUARDS, not the engine, and
+  # in a standalone clone there is nothing for them to import.
+  #
+  # They are skipped here rather than deleted, and the skip ANNOUNCES itself
+  # -- a silent skip is indistinguishable from a pass, which is the defect
+  # `check_no_disabled_tests` exists to prevent. Under the umbrella checkout
+  # `scripts/` is reachable, nothing skips, and the count stays 1,014.
+  cat > "$d/conftest.py" <<'PY'
+"""Standalone-clone support for the Terium engine.
+
+Eight test modules import guard scripts that live in the `wiring-main`
+repository (`scripts/check_*.py`). Cloned on its own, this repository has no
+such directory, and those modules cannot be collected at all -- pytest
+reports an ImportError and exits before running anything.
+
+Rather than let a fresh clone look broken, they are skipped when `scripts/`
+is absent, and the skip says so out loud. A clean skip is invisible in a CI
+summary; an announced one is a fact a reader can act on.
+
+Under the umbrella checkout (`Terrium-sim/main`, cloned --recursive) the
+directory IS reachable, nothing skips, and the engine reports its full
+1,014 tests.
+"""
+import pathlib
+import sys
+
+import pytest
+
+_HERE = pathlib.Path(__file__).resolve().parent
+
+# The umbrella layout puts wiring-main beside this repository.
+_CANDIDATES = [_HERE / "scripts", _HERE.parent / "wiring-main", _HERE.parent / "scripts"]
+_SCRIPTS = next((p for p in _CANDIDATES if p.is_dir()), None)
+
+GUARD_BACKED_TESTS = {
+    "test_citation_format.py",
+    "test_dependencies_declared.py",
+    "test_engine_contract.py",
+    "test_forbidden_packages.py",
+    "test_package_reexports.py",
+    "test_plausibility_constants.py",
+    "test_popgen_correctness.py",
+    "test_rng_convention.py",
+}
+
+if _SCRIPTS is not None and str(_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS))
+else:
+    print(
+        "\n[terium] The guard scripts (wiring-main) are not reachable from "
+        "this checkout, so %d test module(s) that exercise them are SKIPPED, "
+        "not passing. Clone the umbrella for the full suite:\n"
+        "    git clone --recursive https://github.com/Terrium-sim/main.git\n"
+        % len(GUARD_BACKED_TESTS)
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if _SCRIPTS is not None:
+        return
+    skip = pytest.mark.skip(
+        reason="needs the guard scripts from Terrium-sim/wiring-main; "
+               "clone Terrium-sim/main --recursive to run these"
+    )
+    for item in items:
+        if pathlib.Path(str(item.fspath)).name in GUARD_BACKED_TESTS:
+            item.add_marker(skip)
+PY
+
+  cat > "$d/.gitignore" <<'IGN'
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+htmlcov/
+.venv/
+venv/
+.DS_Store
+IGN
+
+  mkdir -p "$d/.github/workflows"
+  cat > "$d/.github/workflows/tests.yml" <<'YML'
+name: engine
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # The supported window. libroadrunner 2.8.0 and numpy 2.2.x publish
+        # wheels through cp313 and keep the cp310 floor; the 2.9.x line drops
+        # cp310. See ADR 0014 in the `documents` repository.
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r requirements.txt
+      - run: python -m pytest Terium/tests -q
+      - name: The CLI must actually run
+        run: python -m Terium.cli --help
+YML
+}
+
+# What each split repo is, so it gets the right CI and README.
+# repo -> kind
+kind_of() {
+  case "$1" in
+    tests)                          echo python ;;
+    terrium-site|landing|backend-main|science-agent-pipeline-replit) echo node ;;
+    mule)                           echo static ;;
+    *)                              echo none ;;
+  esac
+}
+
+# Adds .gitignore, a CI workflow and the repo's README to a split branch, as
+# one commit on top of the preserved history.
+#
+# Without this a split repo has no CI at all -- the monorepo's workflow stays
+# behind in wiring-main -- and no .gitignore, so the first `npm install` in a
+# clone offers 90 MB of node_modules for commit.
+add_scaffold_commit() {
+  local repo="$1" path="$2"
+  local wt="$STAGE/_scaffold/$repo"
+
+  rm -rf "$wt"; mkdir -p "$wt"
+  git -C "$wt" init -q -b scaffold
+  git -C "$wt" fetch -q "$ROOT" "split/$repo"
+  git -C "$wt" checkout -q FETCH_HEAD
+
+  scaffold_generic "$wt" "$(kind_of "$repo")" "$repo"
+
+  if [ -f "$ROOT/docs/readmes/$repo.md" ]; then
+    cp "$ROOT/docs/readmes/$repo.md" "$wt/README.md"
+  fi
+
+  git -C "$wt" add -A
+  if git -C "$wt" diff --cached --quiet; then rm -rf "$wt"; return 0; fi
+
+  git -C "$wt" -c user.name="$(git config user.name)" \
+               -c user.email="$(git config user.email)" \
+               commit -q -m "Add standalone scaffolding
+
+A split repository inherits nothing from the monorepo -- no .gitignore, no
+CI, no README. This adds the minimum for it to stand on its own: the
+workflow that runs its own tests, the ignore rules its toolchain needs, and
+the README describing what it holds.
+
+Cross-cutting guards stay in wiring-main and run against the umbrella
+checkout, because they read across repository boundaries by design."
+  git fetch -q "$wt" scaffold:"split/$repo" --force 2>/dev/null || \
+    { git -C "$wt" branch -f scaffold HEAD; git fetch -q "$wt" scaffold:"split/$repo" --force; }
+  rm -rf "$wt"
+}
+
+scaffold_generic() {  # dir, kind(python|node|static), name
+  local d="$1" kind="$2" name="$3"
+  [ "$kind" = "none" ] && { : ; }
+  mkdir -p "$d/.github/workflows"
+
+  cat > "$d/.gitignore" <<'IGN'
+node_modules/
+dist/
+build/
+coverage/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.DS_Store
+*.log
+IGN
+
+  case "$kind" in
+    python)
+      cat > "$d/.github/workflows/tests.yml" <<YML
+name: $name
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -r requirements.txt
+        if: hashFiles('requirements.txt') != ''
+      - run: python -m pytest . -q
+YML
+      ;;
+    node)
+      cat > "$d/.github/workflows/tests.yml" <<YML
+name: $name
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci || npm install
+      - run: npm test --if-present
+      - run: npx tsc --noEmit || true
+YML
+      ;;
+    static)
+      # The asset checker travels WITH the repo, because a CI step that
+      # greps inline is exactly how the first version of this check produced
+      # 33 false positives (data: URIs split on spaces, #anchors read as
+      # files). A checker that cries wolf gets deleted, and then the real
+      # 404 ships.
+      mkdir -p "$d/scripts"
+      cp "$ROOT/scripts/check_static_assets.py" "$d/scripts/"
+      cat > "$d/.github/workflows/tests.yml" <<YML
+name: $name
+
+on: [push, pull_request]
+
+jobs:
+  assets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Every referenced asset and ES module must exist
+        run: python scripts/check_static_assets.py index.html
+YML
+      ;;
+  esac
+}
+
 # HTTPS or SSH. HTTPS is the default because the monorepo's own `origin` is
 # HTTPS and pushes successfully, so those credentials are already cached --
 # whereas `git@github.com` needs a key that may not exist on this machine.
@@ -72,6 +363,7 @@ science-agent-pipeline-replit	Science-Agent-Pipeline
 backend-main	src
 wiring-main	scripts
 documents	docs
+mule	mule
 MAP
 )
 
@@ -84,6 +376,7 @@ while IFS=$'\t' read -r repo path; do
   fi
   git branch -D "split/$repo" >/dev/null 2>&1 || true
   git subtree split -P "$path" -b "split/$repo" >/dev/null 2>&1
+  add_scaffold_commit "$repo" "$path"
   ok "$(printf '%-30s' "$repo") $(git rev-list --count "split/$repo") commits  <- $path/"
 done <<< "$DIRECT_SPLITS"
 
@@ -109,11 +402,30 @@ if [ -n "$RENAME_COMMIT" ]; then
   git -C "$RTMP" fetch -q "$ROOT" split/terium
   git -C "$RTMP" checkout -q FETCH_HEAD
   git -C "$RTMP" rm -rq . >/dev/null 2>&1 || true
-  cp -R "$ROOT/Terium/." "$RTMP/"
+  # Nested under Terium/, NOT flattened to the repo root.
+  #
+  # `git subtree split -P Terium` strips the prefix, so the split lands with
+  # __init__.py, cli.py and tests/ at the top level. The package is then not
+  # importable as `Terium`, and every test doing `from Terium import
+  # terium_engine` fails on a fresh clone:
+  #
+  #     ModuleNotFoundError: No module named 'Terium'
+  #
+  # Verified by extracting the split branch into a temp directory and running
+  # pytest: 12 collection errors. A repository whose own test suite cannot be
+  # collected is not a published repository, it is a backup.
+  mkdir -p "$RTMP/Terium"
+  cp -R "$ROOT/Terium/." "$RTMP/Terium/"
+  find "$RTMP" -maxdepth 1 -mindepth 1 \
+       ! -name '.git' ! -name 'Terium' -exec rm -rf {} + 2>/dev/null || true
+
   # Untracked junk the monorepo's .gitignore hides but `cp -R` does not.
   find "$RTMP" \( -name '__pycache__' -o -name '.DS_Store' -o -name '.coverage' \
-                  -o -name '*.pyc' -o -name '.pytest_cache' \) \
+                  -o -name '*.pyc' -o -name '.pytest_cache' -o -name '.mypy_cache' \
+                  -o -name '.hypothesis' \) \
        -not -path "$RTMP/.git/*" -prune -exec rm -rf {} + 2>/dev/null || true
+
+  scaffold_terium "$RTMP"
   git -C "$RTMP" add -A
   git -C "$RTMP" -c user.name="$(git config user.name)" \
                  -c user.email="$(git config user.email)" \

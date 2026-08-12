@@ -1,0 +1,667 @@
+/* ============================================================
+   terrium — text alternative + three chapters
+   ============================================================ */
+
+/* ---------- text alternative / architecture summary -------- */
+.summary {
+  position: relative;
+  padding: clamp(5rem, 14vh, 10rem) var(--gutter);
+  border-top: 1px solid var(--line-hairline);
+  background:
+    linear-gradient(to bottom, var(--void), var(--graphite) 60%, var(--void));
+}
+.summary__inner {
+  max-width: 78rem;
+  margin: 0 auto;
+  display: grid;
+  gap: clamp(2.5rem, 6vw, 5rem);
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  align-items: start;
+}
+.summary__lede { display: grid; gap: 1.4rem; }
+.summary__title { font-size: var(--step-3); }
+
+.summary__pipeline {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1.2rem, 2.4vw, 2rem);
+  border: 1px solid var(--line-hairline);
+  background: rgba(7, 11, 12, 0.5);
+}
+.pipeline-list { display: grid; }
+.pipeline-step {
+  display: grid;
+  grid-template-columns: 2.2rem 1fr;
+  gap: 0.75rem;
+  align-items: baseline;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line-hairline);
+}
+.pipeline-step:last-child { border-bottom: 0; }
+.pipeline-step__n { color: var(--text-tertiary); }
+.pipeline-step__l {
+  font-family: var(--font-mono);
+  font-size: var(--step-0);
+  letter-spacing: 0.02em;
+  color: var(--text-primary);
+}
+.pipeline-step:nth-child(n+6) .pipeline-step__l { color: var(--mineral-teal); }
+.summary__note { padding-top: 0.4rem; }
+
+@media (max-width: 60rem) {
+  .summary__inner { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   CHAPTER 01 — EVIDENCE RAIL
+   ============================================================ */
+.rail-shell {
+  max-width: 78rem;
+  margin: clamp(2.5rem, 6vh, 4.5rem) auto 0;
+  border: 1px solid var(--line-hairline);
+  background: rgba(13, 20, 21, 0.45);
+}
+.rail-shell__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem clamp(1rem, 2vw, 1.6rem);
+  border-bottom: 1px solid var(--line-hairline);
+}
+/* An instruction, not an ornament — it is the only place the rail says how to
+   operate it — so it takes the legible slate rather than the surface one. */
+.rail-shell__hint { color: var(--slate-text); }
+
+.evidence-rail {
+  display: grid;
+  grid-auto-flow: column;
+  align-items: stretch;
+  padding: clamp(1.4rem, 3vw, 2.6rem) clamp(1rem, 2vw, 1.6rem);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+/* A conduit, not an arrow. The brief forbids the rectangles-and-arrows
+   idiom, so provenance is carried by a line with a lock joint and a
+   travelling pulse — the same vocabulary as the cathedral's routes. */
+.rail-joint {
+  align-self: center;
+  width: clamp(1rem, 3vw, 3rem);
+  height: 9px;
+  position: relative;
+  overflow: hidden;
+}
+.rail-joint::before {
+  content: "";
+  position: absolute;
+  inset: 4px 0 auto 0;
+  height: 1px;
+  background: var(--line-structural);
+}
+/* The lock joint where one link seats into the next: a registration
+   bar, deliberately not an arrowhead. */
+.rail-joint::after {
+  content: "";
+  position: absolute;
+  right: 0; top: 0;
+  width: 1px; height: 9px;
+  background: var(--structural-slate);
+}
+.rail-joint .rail-pulse {
+  position: absolute;
+  inset: 3px auto auto 0;
+  width: 14px; height: 3px;
+  background: linear-gradient(90deg, transparent, var(--signal-teal));
+  opacity: 0;
+}
+.evidence-rail:hover .rail-pulse,
+.evidence-rail:focus-within .rail-pulse {
+  animation: rail-flow 2.6s var(--ease-glide) infinite;
+  animation-delay: var(--flow-delay, 0ms);
+}
+@keyframes rail-flow {
+  0% { transform: translateX(-14px); opacity: 0; }
+  35% { opacity: 0.95; }
+  100% { transform: translateX(clamp(1rem, 3vw, 3rem)); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rail-joint .rail-pulse { animation: none !important; }
+}
+
+/* Faceted station, not a rounded card: chamfered corners echo the
+   cathedral's own plate geometry. */
+.rail-link {
+  display: grid;
+  justify-items: start;
+  gap: 0.65rem;
+  min-width: clamp(6.5rem, 10vw, 9rem);
+  padding: 0.9rem;
+  text-align: left;
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+  background: transparent;
+  box-shadow: inset 0 0 0 1px transparent;
+  transition: box-shadow var(--dur-base) var(--ease-glide), background var(--dur-base) var(--ease-glide);
+}
+.rail-link:hover { box-shadow: inset 0 0 0 1px var(--line-hairline); }
+.rail-link.is-active {
+  box-shadow: inset 0 0 0 1px rgba(49, 184, 148, 0.55);
+  background: rgba(29, 138, 114, 0.09);
+}
+.rail-link__index { color: var(--text-tertiary); }
+.rail-link.is-active .rail-link__index { color: var(--mineral-teal); }
+.rail-link__label {
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+.rail-link.is-active .rail-link__label { color: var(--text-primary); }
+
+.rail-mark { width: 34px; height: 34px; }
+.rail-mark path, .rail-mark circle {
+  fill: none;
+  stroke: var(--structural-slate);
+  stroke-width: 1.2;
+  transition: stroke var(--dur-base) var(--ease-glide);
+}
+.rail-mark .thin { stroke-width: 1; opacity: 0.7; }
+.rail-mark .fill { fill: var(--structural-slate); stroke: none; }
+.rail-link.is-active .rail-mark path,
+.rail-link.is-active .rail-mark circle { stroke: var(--mineral-teal); }
+.rail-link.is-active .rail-mark .fill { fill: var(--signal-teal); }
+
+.rail-detail {
+  display: grid;
+  gap: 0.7rem;
+  padding: clamp(1.2rem, 2.4vw, 2rem);
+  border-top: 1px solid var(--line-hairline);
+  background: rgba(7, 11, 12, 0.5);
+}
+.rail-detail__title {
+  font-family: var(--font-sans);
+  font-size: var(--step-1);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+.rail-detail__body {
+  max-width: 52ch;
+  font-size: var(--step-0);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.rail-detail__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.rail-detail__status[data-status="supported"] { color: var(--status-supported); }
+.rail-detail__status[data-status="user"] { color: var(--fog-teal); }
+.rail-detail__status[data-status="review"] { color: var(--status-review); }
+
+/* ============================================================
+   CHAPTER 02 — EXPLODED VAULT
+   ============================================================ */
+.chapter--trust {
+  background:
+    radial-gradient(ellipse 70% 50% at 50% 45%, rgba(29, 138, 114, 0.07), transparent 70%),
+    var(--void);
+}
+.exploded {
+  max-width: 82rem;
+  margin: clamp(2rem, 5vh, 3.5rem) auto 0;
+  display: grid;
+  gap: clamp(1.2rem, 3vw, 2rem);
+}
+.exploded__stage { width: 100%; }
+.exp-svg { width: 100%; height: auto; }
+
+/* The default for text in the vault, deliberately written at ZERO specificity
+   for `fill`.
+
+   `.exp-svg text` scores (0,1,1), which outranks every single-class colour in
+   this file — .exp-rec-t, .exp-rec-l, .exp-rec-num, .exp-rec-warn-t,
+   .exp-flag-t, .exp-flag-note, .exp-ev-label. All seven were dead: the
+   archival record that the Trust Layer exists to produce was rendering its
+   ink-on-paper type in the same grey as the dark-ground labels around it, and
+   the disclosed temperature assumption — the amber flag that is the entire
+   point of the critique stage — was not amber. It read as a slightly different
+   shade of grey on a pale plate, at 2.25:1.
+
+   This was invisible while --text-tertiary happened to be dim enough to look
+   deliberate. :where() drops the selector's weight to zero, so the base
+   font/tracking still applies to every text node while any class that names a
+   colour now wins on merit. The `text-transform` and `font-size` overrides
+   below keep their explicit .exp-svg prefix, because there the higher
+   specificity is doing real work (see the note on scientific casing). */
+:where(.exp-svg) text {
+  font-family: var(--font-mono);
+  fill: var(--text-tertiary);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.exp-svg .exp-t-micro { font-size: 8px; }
+/* Must outrank `.exp-svg text`, or uppercasing collapses the parameter
+   symbols: T (temperature) and t (time) would render identically, and
+   Km / Vmax / ε would lose their scientific casing. */
+.exp-svg .exp-t-value {
+  font-size: 11px;
+  fill: var(--fog-teal);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* vault silhouette */
+.exp-ring-path {
+  fill: none;
+  stroke: var(--line-hairline);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-slow) var(--ease-glide);
+}
+.exp-ring-path--inner { stroke: var(--line-grid); }
+.is-polish .exp-ring-path { stroke: rgba(49, 184, 148, 0.4); }
+
+/* layers appear as their stage engages */
+.exp-layer { opacity: 0; transition: opacity 800ms var(--ease-structural); }
+.is-generate .exp-config { opacity: 1; }
+.is-trace .exp-evidence { opacity: 1; }
+.is-envelope .exp-curve-layer { opacity: 1; }
+.is-critique .exp-critique { opacity: 1; }
+.is-polish .exp-record { opacity: 1; }
+
+/* generation: unchecked configuration */
+.exp-plate {
+  fill: rgba(23, 35, 36, 0.8);
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  transition: stroke var(--dur-slow) var(--ease-glide);
+}
+.exp-status { fill: var(--status-pending); transition: fill var(--dur-slow) var(--ease-glide); }
+.is-trace .exp-param:not(.is-review) .exp-plate { stroke: rgba(49, 184, 148, 0.5); }
+.is-trace .exp-param:not(.is-review) .exp-status { fill: var(--signal-teal); }
+.is-critique .exp-param.is-review .exp-plate { stroke: var(--status-review); }
+.is-critique .exp-param.is-review .exp-status { fill: var(--status-review); }
+
+/* evidence column */
+.exp-ev-plate {
+  fill: rgba(29, 138, 114, 0.14);
+  stroke: var(--mineral-teal);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.exp-ev-label { fill: var(--fog-teal); }
+
+/* traces */
+.exp-trace {
+  fill: none;
+  stroke: var(--signal-teal);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  opacity: 0;
+}
+.is-trace .exp-trace {
+  opacity: 0.85;
+  animation: exp-draw 1000ms var(--ease-structural) forwards;
+}
+.exp-trace--unresolved { stroke: var(--status-review); }
+@keyframes exp-draw { to { stroke-dashoffset: 0; } }
+
+/* curve + envelope */
+.exp-axis {
+  fill: none;
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  transition: stroke-dashoffset 900ms var(--ease-structural);
+}
+.is-envelope .exp-axis { stroke-dashoffset: 0; }
+.exp-envelope {
+  fill: rgba(49, 184, 148, 0.1);
+  stroke: rgba(114, 214, 193, 0.36);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition: opacity 900ms var(--ease-glide) 500ms;
+}
+.is-envelope .exp-envelope { opacity: 1; }
+.exp-curve {
+  fill: none;
+  stroke: var(--mineral-teal);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+  transition: stroke-dashoffset 1500ms var(--ease-structural) 200ms;
+}
+.is-envelope .exp-curve { stroke-dashoffset: 0; }
+
+/* critique */
+.exp-fracture {
+  fill: none;
+  stroke: var(--status-review);
+  stroke-width: 1.1;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: var(--len) var(--len);
+  stroke-dashoffset: var(--len);
+}
+.is-critique .exp-fracture { animation: exp-draw 1300ms var(--ease-instrument) forwards; }
+.exp-flag {
+  fill: rgba(7, 11, 12, 0.94);
+  stroke: var(--status-review);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.exp-flag-t { fill: var(--status-review); }
+.exp-flag-note { fill: var(--warm-gray); }
+
+/* polished record retains the flag */
+.exp-rec-plate { fill: var(--archive-paper); }
+.exp-rec-t { fill: var(--archive-ink); }
+.exp-rec-l { fill: var(--archive-ink-soft); }
+.exp-rec-num {
+  font-size: 13px;
+  fill: var(--archive-ink);
+  letter-spacing: 0;
+}
+.exp-rec-warn {
+  fill: rgba(216, 167, 67, 0.16);
+  stroke: #9a6f14;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.exp-rec-warn-t { fill: #7d5906; }
+
+/* step controls */
+.exploded__controls {
+  display: grid;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line-hairline);
+}
+.exploded__steps { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.exp-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--line-hairline);
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  transition: color var(--dur-fast) var(--ease-glide), border-color var(--dur-fast) var(--ease-glide), background var(--dur-fast) var(--ease-glide);
+}
+.exp-step:hover { color: var(--text-secondary); border-color: var(--line-structural); }
+.exp-step.is-done { color: var(--text-secondary); }
+.exp-step.is-active {
+  color: #041110;
+  background: var(--signal-teal);
+  border-color: var(--signal-teal);
+}
+.exp-step__n { color: inherit; }
+
+.exploded__readout {
+  font-size: var(--step--1);
+  letter-spacing: 0.06em;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  max-width: 74ch;
+}
+
+.trust-statement {
+  max-width: 78rem;
+  margin: clamp(3rem, 8vh, 6rem) auto 0;
+  font-size: var(--step-3);
+  text-align: center;
+}
+
+@media (max-width: 48rem) {
+  .exploded__stage {
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .exp-svg { min-width: 40rem; }
+  .trust-statement { text-align: left; }
+}
+
+/* ============================================================
+   CHAPTER 03 — EXECUTION STRATA
+   ============================================================ */
+.strata {
+  position: relative;
+  max-width: 78rem;
+  margin: clamp(2.5rem, 6vh, 4.5rem) auto 0;
+  display: grid;
+  gap: 0;
+}
+.strata__spine {
+  position: absolute;
+  left: clamp(1.2rem, 4vw, 3.5rem);
+  top: 0; bottom: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, var(--line-structural), var(--line-hairline) 70%, transparent);
+}
+
+.stratum {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 0.7fr) minmax(0, 1.1fr);
+  gap: clamp(1.2rem, 3vw, 3rem);
+  align-items: center;
+  padding: clamp(1.8rem, 4vw, 3rem) 0 clamp(1.8rem, 4vw, 3rem) clamp(3rem, 8vw, 7rem);
+  border-top: 1px solid var(--line-hairline);
+}
+.stratum:last-child { border-bottom: 1px solid var(--line-hairline); }
+
+/* substrate depth: each stratum sits visually lower/darker */
+.stratum:nth-child(2) { background: linear-gradient(to bottom, rgba(13, 20, 21, 0.3), transparent); }
+.stratum:nth-child(3) { background: linear-gradient(to bottom, rgba(13, 20, 21, 0.5), rgba(13, 20, 21, 0.2)); }
+.stratum:nth-child(4) { background: linear-gradient(to bottom, rgba(23, 35, 36, 0.55), rgba(13, 20, 21, 0.3)); }
+
+.stratum::before {
+  content: "";
+  position: absolute;
+  left: clamp(1.2rem, 4vw, 3.5rem);
+  top: 50%;
+  width: 6px; height: 6px;
+  translate: -50% -50%;
+  background: var(--deep-teal);
+  transform: rotate(45deg);
+}
+.stratum[data-status="review"]::before { background: var(--status-review); }
+
+.stratum__head { display: grid; gap: 0.6rem; }
+.stratum__depth { color: var(--text-tertiary); }
+.stratum__name {
+  font-family: var(--font-sans);
+  font-size: var(--step-2);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.stratum__mark { display: grid; place-items: center; }
+.strata-mark { width: 100%; max-width: 15rem; height: auto; }
+.strata-mark text {
+  font-family: var(--font-mono);
+  font-size: 7px;
+  letter-spacing: 0.14em;
+  fill: var(--text-tertiary);
+}
+.strata-slab {
+  fill: rgba(23, 35, 36, 0.6);
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.strata-slab--external { fill: rgba(23, 35, 36, 0.35); stroke-dasharray: 5 4; }
+.strata-feed { fill: none; stroke: var(--line-structural); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.strata-feed--out { stroke: var(--status-review); opacity: 0.7; stroke-dasharray: 3 3; }
+.strata-gap { fill: none; stroke: var(--status-review); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.6; vector-effect: non-scaling-stroke; }
+.strata-cell {
+  fill: rgba(49, 184, 148, 0.22);
+  stroke: var(--mineral-teal);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.strata-solve { fill: none; stroke: var(--mineral-teal); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.strata-tick { fill: none; stroke: var(--structural-slate); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.strata-ring { fill: none; stroke: var(--status-review); stroke-width: 1; opacity: 0.75; vector-effect: non-scaling-stroke; }
+.strata-depth { opacity: 0.7; }
+
+.stratum__body { display: grid; gap: 0.85rem; }
+.stratum__label {
+  font-size: var(--step-1);
+  font-weight: 350;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  max-width: 30ch;
+}
+.stratum__methods { display: grid; gap: 0.3rem; }
+.stratum__methods li {
+  font-size: var(--step--1);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding-left: 0.9rem;
+  position: relative;
+}
+.stratum__methods li::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0.55em;
+  width: 5px; height: 1px;
+  background: var(--structural-slate);
+}
+.stratum__avail {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  padding: 0.32rem 0.6rem;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.stratum__avail[data-status="supported"] { color: var(--status-supported); }
+.stratum__avail[data-status="review"] { color: var(--status-review); }
+
+@media (max-width: 62rem) {
+  .stratum {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+    padding-left: clamp(2.4rem, 8vw, 4rem);
+  }
+  .stratum__mark { justify-items: start; place-items: start; }
+  .stratum::before { top: clamp(2.2rem, 5vw, 3.4rem); }
+}
+
+/* ============================================================
+   CHAPTER SEAMS — the journey between chapters
+
+   Each chapter is the previous one continuing, so the boundary is
+   drawn rather than ruled. A hairline border between two large
+   pads made four unrelated sections; structure that leaves one
+   chapter and becomes the next makes one descent.
+   ============================================================ */
+/* The seam overlaps both neighbours. Sitting between two full chapter pads it
+   read as a third thing floating in dead space; pulled up into the section above
+   and down into the one below, it becomes the join it is meant to be. */
+/* Height matters more than it looks: the seam scales uniformly and its frame is
+   8:1, so in a wide short band the height is what binds and the drawing's width
+   follows from it. Too short and the structure shrinks to a thin doodle floating
+   in the middle of the page instead of spanning the join. */
+.seam {
+  position: relative;
+  height: clamp(8rem, 19vh, 13rem);
+  margin-top: calc(clamp(5rem, 12vh, 11rem) * -0.55);
+  margin-bottom: calc(clamp(5rem, 12vh, 11rem) * -0.75);
+  background: var(--void);
+  pointer-events: none;
+  z-index: 1;
+}
+.seam-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Seamed chapters drop their own top rule: the seam carries the transition,
+   and a border under it would reinstate exactly the division being removed. */
+.chapter--seamed { border-top: 0; }
+
+.seam-line {
+  fill: none;
+  stroke: var(--structural-slate);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.seam-line--spine { stroke: var(--line-structural); }
+.seam-line--curve { stroke: var(--deep-teal); opacity: 0.75; }
+.seam-line--lane { stroke: var(--line-structural); }
+.seam-hair { fill: none; stroke: var(--fog-teal); stroke-width: 1; opacity: 0.4; vector-effect: non-scaling-stroke; }
+.seam-solid {
+  fill: rgba(29, 138, 114, 0.18);
+  stroke: var(--mineral-teal);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.seam-node { fill: var(--deep-teal); }
+.seam-ring .seam-line { stroke: var(--line-structural); }
+
+/* Drawn on approach, staggered along the branch order so the structure reads
+   as being traced out rather than switched on. */
+.seam-line, .seam-node, .seam-artifact {
+  opacity: 0;
+  transition:
+    opacity 900ms var(--ease-structural),
+    transform 900ms var(--ease-structural);
+  transition-delay: calc(var(--seam-i, 0) * 110ms);
+}
+.seam-artifact { transform: translateY(-14px); }
+.seam.is-drawn .seam-line,
+.seam.is-drawn .seam-node,
+.seam.is-drawn .seam-artifact { opacity: 1; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .seam-line, .seam-node, .seam-artifact { opacity: 1; transform: none; transition: none; }
+}
+
+/* Below the phone breakpoint the lanes are wider than the screen and the seam
+   becomes an unreadable smear, so it collapses to a short vertical continuation:
+   the one thing it must still say is that the journey has not stopped. */
+@media (max-width: 40rem) {
+  .seam { height: 4.5rem; }
+  .seam-svg { display: none; }
+  .seam::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 0.75rem;
+    bottom: 0.75rem;
+    width: 1px;
+    background: linear-gradient(to bottom, transparent, var(--structural-slate), transparent);
+  }
+}

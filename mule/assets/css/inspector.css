@@ -1,0 +1,250 @@
+/* ============================================================
+   terrium — inspection mode
+   Desktop: right-hand instrument panel. Mobile: bottom sheet.
+   ============================================================ */
+
+.inspector {
+  position: fixed;
+  z-index: var(--z-inspector);
+  right: clamp(0.75rem, 1.6vw, 1.5rem);
+  top: 50%;
+  translate: 0 -50%;
+  width: min(26.5rem, 34vw);
+  max-height: min(78vh, 46rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  padding: clamp(1.2rem, 2vw, 1.9rem);
+  background: var(--glass-strong);
+  border: 1px solid var(--line-structural);
+  backdrop-filter: blur(16px) saturate(1.1);
+  opacity: 0;
+  transform: translateX(20px);
+  transition:
+    opacity 420ms var(--ease-structural),
+    transform 520ms var(--ease-instrument);
+  scrollbar-width: thin;
+  scrollbar-color: var(--structural-slate) transparent;
+}
+.inspector[hidden] { display: none; }
+.inspector.is-open { opacity: 1; transform: none; }
+
+/* registration corner, echoing the terminal */
+.inspector::before {
+  content: "";
+  position: absolute;
+  top: -1px; left: -1px;
+  width: 11px; height: 11px;
+  border: 1px solid var(--signal-teal);
+  border-right: 0;
+  border-bottom: 0;
+}
+
+.inspector__grip { display: none; }
+
+.inspector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.inspector__head .label { color: var(--mineral-teal); }
+
+.inspector__close {
+  width: 26px; height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line-hairline);
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+  transition: color var(--dur-fast) var(--ease-glide), border-color var(--dur-fast) var(--ease-glide);
+}
+.inspector__close:hover, .inspector__close:focus-visible { color: var(--text-primary); border-color: var(--line-structural); }
+
+.inspector__title {
+  font-family: var(--font-sans);
+  font-size: var(--step-2);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  color: var(--text-primary);
+  text-wrap: balance;
+  margin-bottom: -0.55rem;
+}
+
+/* Object category, set immediately under the title as its classification. */
+.inspector__category {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.inspector__purpose {
+  font-size: var(--step-1);
+  font-weight: 300;
+  line-height: 1.45;
+  color: var(--text-primary);
+  text-wrap: pretty;
+}
+
+/* ---------- flow block: what passes through this object ----------
+   Set as a passage with a rule between in and out, rather than as two
+   more rows of a definition list, so an object reads as apparatus. */
+.inspector__flow {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--line-hairline);
+  border-bottom: 1px solid var(--line-hairline);
+}
+.ins-flow__row {
+  display: grid;
+  grid-template-columns: 2.4rem 1fr;
+  gap: 0.7rem;
+  align-items: baseline;
+}
+.ins-flow__row .label { color: var(--text-tertiary); padding-top: 0.1rem; }
+.ins-flow__row p {
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+/* The passage mark: a short descending rule in the label column. */
+.ins-flow__rule {
+  width: 1px;
+  height: 12px;
+  margin-left: 0.55rem;
+  background: linear-gradient(to bottom, var(--structural-slate), var(--mineral-teal));
+}
+
+/* ---------- this run: the illustrated event ---------- */
+.inspector__event {
+  display: grid;
+  gap: 0.3rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid var(--mineral-teal);
+}
+.inspector__event .label { color: var(--mineral-teal); }
+.inspector__event p {
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+/* A disclosed assumption is the one event that must not read as agreement. */
+.inspector__status[data-status="review"] ~ .inspector__event {
+  border-left-color: var(--status-review);
+}
+.inspector__status[data-status="review"] ~ .inspector__event .label { color: var(--status-review); }
+
+/* ---------- chain of custody ---------- */
+.inspector__trail {
+  display: grid;
+  gap: 0.3rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line-hairline);
+}
+.inspector__trail .label { color: var(--text-tertiary); }
+.inspector__trail p {
+  font-size: var(--step-0);
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.inspector__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: fit-content;
+  padding: 0.32rem 0.6rem;
+  border: 1px solid currentColor;
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+.inspector__status[data-status="supported"] { color: var(--status-supported); }
+.inspector__status[data-status="review"] { color: var(--status-review); }
+.inspector__status[data-status="user"] { color: var(--fog-teal); }
+.inspector__status[data-status="blocked"] { color: var(--status-blocked); }
+.inspector__status[data-status="pending"] { color: var(--status-pending); }
+.inspector__glyph { font-size: 0.72em; }
+
+/* Scope, when the object has one. Author display must be declared rather than
+   relying on [hidden], because a grid display here outranks the UA rule. */
+.inspector__fields {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+.inspector__fields[hidden] { display: none; }
+.inspector__fields dt { color: var(--text-tertiary); }
+.inspector__fields dd {
+  margin: 0.28rem 0 0;
+  font-size: var(--step-0);
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.inspector__note {
+  font-size: var(--step-0);
+  line-height: 1.55;
+  color: var(--text-secondary);
+  padding-left: 0.85rem;
+  border-left: 1px solid var(--structural-slate);
+}
+
+/* The disclaimer is pinned, not appended. A full record can be taller than the
+   panel, and the first thing to scroll out of sight was the line stating that
+   none of this is an experimental result. For a product positioned on honesty
+   that is the one element that must never depend on the reader scrolling. */
+.inspector__foot {
+  position: sticky;
+  bottom: calc(clamp(1.2rem, 2vw, 1.9rem) * -1);
+  margin: 0 calc(clamp(1.2rem, 2vw, 1.9rem) * -1) calc(clamp(1.2rem, 2vw, 1.9rem) * -1);
+  padding: 0.7rem clamp(1.2rem, 2vw, 1.9rem);
+  /* Opaque enough to keep type off the content scrolling beneath it, tinted to
+     the panel rather than to the void so it does not read as a separate bar. */
+  background: linear-gradient(to bottom, rgba(9, 14, 15, 0.86), rgba(9, 14, 15, 0.97));
+  backdrop-filter: blur(6px);
+  border-top: 1px solid var(--line-hairline);
+}
+
+/* --- bottom sheet on narrow screens ----------------------- */
+@media (max-width: 68rem) {
+  .inspector {
+    right: 0; left: 0; top: auto; bottom: 0;
+    translate: 0;
+    width: auto;
+    /* A sheet is a sheet, not a takeover. At 76svh the record covered all but
+       a 159px strip of a 561px drawing field, and the architecture behind it
+       was reduced to a couple of hairlines — which loses exactly the thing the
+       sheet is supposed to be attached to. 58svh keeps a band deep enough for
+       the camera to frame the selected object inside real structure, and the
+       panel scrolls for the rest, with the disclaimer pinned. */
+    max-height: 58svh;
+    border-inline: 0;
+    border-bottom: 0;
+    padding: 1rem var(--gutter) calc(1.4rem + env(safe-area-inset-bottom, 0px));
+    transform: translateY(24px);
+    background: var(--glass-strong);
+  }
+  .inspector::before { display: none; }
+  .inspector.is-open { transform: none; }
+  .inspector__grip {
+    display: block;
+    justify-self: center;
+    width: 42px;
+    height: 3px;
+    background: var(--structural-slate);
+    margin-bottom: 0.3rem;
+  }
+  .inspector__close { width: 34px; height: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inspector { transition: none; }
+}

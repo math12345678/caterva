@@ -1,0 +1,704 @@
+/* ============================================================
+   terrium — EVIDENCE MICROSCOPE
+
+   A deep zoom, not an accordion. Exactly one level occupies the
+   stage; the outgoing level scales past the reader while the
+   incoming one grows out of its centre. The two overlap, which is
+   why the stage is a positioning context and the levels are
+   absolutely placed within it.
+
+   Sections:
+     1. shell + head
+     2. depth gauge
+     3. the floating parameter
+     4. the level stage + transitions
+     5. shared level furniture
+     6. the six figures
+     7. responsive
+     8. reduced motion
+   ============================================================ */
+
+/* --- 1. shell ---------------------------------------------- */
+.micro {
+  position: relative;
+  padding: clamp(3.5rem, 7vh, 6.5rem) var(--gutter) clamp(4rem, 8vh, 7rem);
+  background:
+    radial-gradient(90% 60% at 50% 40%, rgba(49, 184, 148, 0.045), transparent 68%),
+    var(--void);
+  border-top: 1px solid var(--line-hairline);
+  overflow: hidden;
+}
+
+.micro__head {
+  position: relative;
+  max-width: 68rem;
+  margin: 0 auto clamp(2rem, 4vh, 3.25rem);
+  text-align: center;
+}
+
+.micro__title {
+  font-size: clamp(1.75rem, 1.1rem + 2.6vw, 3.25rem);
+  line-height: 1.03;
+  letter-spacing: -0.02em;
+  margin: 0.55rem 0 0;
+}
+
+.micro__lede {
+  max-width: 36rem;
+  margin: 1rem auto 0;
+  color: var(--text-secondary);
+}
+
+.micro__body {
+  position: relative;
+  max-width: 74rem;
+  margin: 0 auto;
+}
+
+.micro__note {
+  margin: 1.5rem auto 0;
+  max-width: 34rem;
+  text-align: center;
+}
+
+/* --- 2. gauge ----------------------------------------------
+   The six depths, read as a descending scale. It is a gauge rather
+   than a tab strip: the reader is at a depth, not on a page. */
+.mi-gauge {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0;
+  margin-bottom: 1.4rem;
+  border-top: 1px solid var(--line-hairline);
+}
+
+.mi-gauge__stop {
+  position: relative;
+  appearance: none;
+  background: none;
+  border: 0;
+  border-right: 1px solid var(--line-grid);
+  padding: 0.65rem 0.55rem 1.1rem;
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 0.25rem;
+  transition: background var(--dur-fast) var(--ease-glide);
+}
+
+.mi-gauge__stop:last-child { border-right: 0; }
+.mi-gauge__stop:hover { background: rgba(184, 222, 213, 0.04); }
+
+.mi-gauge__i {
+  font-size: var(--step--2);
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  transition: color var(--dur-base) var(--ease-glide);
+}
+
+.mi-gauge__k {
+  font-family: var(--font-mono);
+  font-size: var(--step--2);
+  line-height: 1.3;
+  letter-spacing: var(--track-label-tight);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  transition: color var(--dur-base) var(--ease-glide);
+}
+
+/* The tick is the gauge's needle: it fills as the reader descends. */
+.mi-gauge__tick {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  background: var(--signal-teal);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--dur-base) var(--ease-instrument), opacity var(--dur-base) var(--ease-glide);
+  opacity: 0;
+}
+
+.mi-gauge__stop.is-passed .mi-gauge__tick { transform: scaleX(1); opacity: 0.4; }
+.mi-gauge__stop.is-passed .mi-gauge__i { color: var(--deep-teal); }
+
+.mi-gauge__stop.is-active .mi-gauge__tick { transform: scaleX(1); opacity: 1; }
+.mi-gauge__stop.is-active .mi-gauge__i { color: var(--signal-teal); }
+.mi-gauge__stop.is-active .mi-gauge__k { color: var(--text-primary); }
+
+/* --- 3. seed -----------------------------------------------
+   One parameter alone in dark space. It has to look like an object
+   worth opening, so it is drawn with instrument rings rather than
+   set as a button with a border. */
+/* The field holds both the seed and the absolutely-placed levels, so it has
+   no content of its own to grow against. --mi-h is published by the
+   controller after each level mounts: without it the deepest levels — the
+   verification gate and the eight-field record — are taller than the field
+   and their controls get clipped off the bottom edge. */
+.micro__field {
+  --mi-h: 0px;
+  position: relative;
+  min-height: max(clamp(22rem, 52vh, 30rem), var(--mi-h));
+  transition: min-height 420ms var(--ease-instrument);
+}
+
+.mi-seed {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  transition: opacity var(--dur-base) var(--ease-glide),
+              transform var(--dur-slow) var(--ease-instrument),
+              filter var(--dur-base) var(--ease-glide);
+}
+
+/* Passing through: the parameter recedes rather than vanishing, so the
+   first level reads as the inside of this object. */
+.is-open .mi-seed {
+  opacity: 0;
+  transform: scale(2.4);
+  filter: blur(6px);
+  pointer-events: none;
+}
+
+.mi-seed__btn {
+  position: relative;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: clamp(2.5rem, 6vw, 4rem);
+  display: grid;
+  justify-items: center;
+  gap: 0.1rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.mi-seed__ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: clamp(13rem, 26vw, 17rem);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) rotate(45deg);
+  border: 1px solid var(--line-hairline);
+  transition: border-color var(--dur-base) var(--ease-glide),
+              transform var(--dur-slow) var(--ease-instrument);
+}
+
+.mi-seed__ring--2 {
+  width: clamp(9.5rem, 19vw, 12.5rem);
+  border-color: var(--line-structural);
+  animation: mi-breathe 7s var(--ease-glide) infinite;
+}
+
+@keyframes mi-breathe {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) rotate(45deg) scale(1); }
+  50% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1.045); }
+}
+
+.mi-seed__btn:hover .mi-seed__ring { border-color: rgba(49, 184, 148, 0.4); }
+.mi-seed__btn:hover .mi-seed__ring--2 { transform: translate(-50%, -50%) rotate(45deg) scale(1.07); }
+
+.mi-seed__n {
+  font-size: var(--step-0);
+  letter-spacing: 0.14em;
+  color: var(--signal-teal);
+}
+
+.mi-seed__v {
+  font-size: clamp(3rem, 7vw, 5rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+  font-weight: 300;
+}
+
+.mi-seed__u {
+  font-size: var(--step-0);
+  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+}
+
+.mi-seed__badge {
+  margin-top: 0.9rem;
+  padding: 0.25rem 0.6rem;
+  color: var(--status-review);
+  border: 1px solid rgba(216, 167, 67, 0.35);
+}
+
+.mi-seed__cue {
+  margin-top: 1.1rem;
+  color: var(--text-tertiary);
+  transition: color var(--dur-fast) var(--ease-glide);
+}
+
+.mi-seed__cue::after {
+  content: ' \2192';
+  color: var(--signal-teal);
+}
+
+.mi-seed__btn:hover .mi-seed__cue { color: var(--text-primary); }
+
+/* --- 4. stage ----------------------------------------------
+   Levels are absolutely placed so the outgoing and incoming panels
+   occupy the same space during the crossing. That overlap is the
+   whole effect: one level is seen through the other. */
+.micro__stage {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mi-level {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  display: grid;
+  align-content: center;
+  gap: 1.1rem;
+  padding: clamp(1.2rem, 2.4vw, 2rem);
+  background: linear-gradient(165deg, rgba(23, 35, 36, 0.86), rgba(7, 11, 12, 0.9));
+  border: 1px solid var(--line-hairline);
+  border-top-color: var(--line-structural);
+  backdrop-filter: blur(3px);
+  opacity: 0;
+  transition: opacity 480ms var(--ease-glide), transform 520ms var(--ease-instrument),
+              filter 480ms var(--ease-glide);
+  will-change: transform, opacity;
+}
+
+/* Corner registration, so a level reads as a plate on an instrument. */
+.mi-level::before,
+.mi-level::after {
+  content: '';
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 1px solid var(--line-structural);
+  pointer-events: none;
+}
+
+.mi-level::before { top: 6px; left: 6px; border-right: 0; border-bottom: 0; }
+.mi-level::after { bottom: 6px; right: 6px; border-left: 0; border-top: 0; }
+
+/* Entering from above (descending): grow out of the centre. */
+.mi-level[data-enter='in'] { transform: scale(0.82); filter: blur(4px); }
+/* Entering from below (ascending): fall back in from outside. */
+.mi-level[data-enter='out'] { transform: scale(1.16); filter: blur(4px); }
+
+.mi-level.is-in { opacity: 1; transform: scale(1); filter: none; }
+
+/* Leaving while descending: the reader passes through it. */
+.mi-level[data-exit='in'] { opacity: 0; transform: scale(1.5); filter: blur(9px); }
+/* Leaving while ascending: it shrinks back into the depth. */
+.mi-level[data-exit='out'] { opacity: 0; transform: scale(0.7); filter: blur(9px); }
+
+/* --- 5. level furniture ------------------------------------ */
+.mi-level__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid var(--line-hairline);
+}
+
+.mi-level__i { font-size: var(--step--2); letter-spacing: 0.1em; color: var(--signal-teal); }
+.mi-level__k { color: var(--text-tertiary); }
+
+.mi-level__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: clamp(1rem, 2.5vw, 2.2rem);
+  align-items: center;
+}
+
+.mi-level__fig { min-width: 0; }
+
+.mi-level__t {
+  margin: 0;
+  font-size: var(--step-2);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
+}
+
+.mi-level__lede {
+  margin: 0.6rem 0 0;
+  font-size: var(--step-0);
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* fact rows */
+.mi-rows {
+  margin: 1.1rem 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0;
+  border-top: 1px solid var(--line-hairline);
+}
+
+.mi-rows__k {
+  padding: 0.45rem 0.9rem 0.45rem 0;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--line-grid);
+  white-space: nowrap;
+}
+
+.mi-rows__v {
+  margin: 0;
+  padding: 0.45rem 0;
+  font-size: var(--step--1);
+  line-height: 1.45;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--line-grid);
+}
+
+.mi-rows__v[data-tone='supported'] { color: var(--status-supported); }
+.mi-rows__v[data-tone='review'] { color: var(--status-review); }
+
+.mi-level__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.3rem;
+}
+
+.mi-level__end {
+  margin: 0;
+  font-size: var(--step--2);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--deep-teal);
+  padding: 0.4rem 0;
+}
+
+/* --- 6. figures --------------------------------------------
+   Six drawings for six kinds of fact. They deliberately share no
+   layout: a value, a model form, a source object, an interval, a
+   comparison and a printed page are not the same shape of thing. */
+.mi-fig { display: block; width: 100%; height: auto; }
+
+.mi-fig__cap {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.16em;
+  text-anchor: middle;
+}
+
+/* 01 the bare value */
+.mi-ret { fill: none; stroke: var(--line-structural); stroke-width: 1; }
+.mi-ret--in { stroke: var(--line-hairline); stroke-dasharray: 2 5; }
+
+.mi-val {
+  fill: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 46px;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  text-anchor: middle;
+}
+
+.mi-val__u,
+.mi-val__n {
+  fill: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-anchor: middle;
+}
+
+.mi-val__n { fill: var(--signal-teal); }
+
+/* 02 the model form */
+.mi-eq { padding: 0.5rem 0; }
+
+.mi-eq__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(1.05rem, 2.1vw, 1.5rem);
+}
+
+.mi-eq__t--sym { color: var(--text-primary); }
+.mi-eq__t--op { color: var(--text-tertiary); }
+
+/* The term under inspection is boxed in place rather than merely
+   coloured, so the figure survives being read in greyscale. */
+.mi-eq__t--focus {
+  position: relative;
+  color: var(--signal-teal);
+  padding: 0.1em 0.3em;
+  border: 1px solid rgba(49, 184, 148, 0.5);
+  background: rgba(49, 184, 148, 0.09);
+}
+
+.mi-eq__note {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1.1rem 0 0;
+  font-size: var(--step--1);
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  max-width: 26rem;
+}
+
+.mi-eq__brace { color: var(--deep-teal); font-family: var(--font-mono); }
+
+/* 03 the source object */
+.mi-src { display: grid; gap: 0; }
+
+.mi-src__card {
+  padding: 0.9rem 1rem 1rem;
+  background: rgba(241, 240, 234, 0.055);
+  border: 1px solid var(--line-structural);
+  border-left: 2px solid var(--deep-teal);
+}
+
+.mi-src__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--line-hairline);
+}
+
+.mi-src__ref { font-size: var(--step--1); letter-spacing: 0.1em; color: var(--signal-teal); }
+.mi-src__k { color: var(--text-tertiary); }
+
+.mi-src__role {
+  margin: 0.65rem 0 0.8rem;
+  font-size: var(--step-0);
+  color: var(--text-primary);
+}
+
+/* Redaction bars, not fake text: there is no invented title or author
+   here, and the drawing states that absence rather than filling it. */
+.mi-src__lines { display: grid; gap: 0.4rem; }
+
+.mi-src__l {
+  display: block;
+  width: var(--w);
+  height: 5px;
+  background: repeating-linear-gradient(90deg,
+    var(--structural-slate) 0 6px, transparent 6px 10px);
+  opacity: 0.6;
+}
+
+.mi-src__foot {
+  margin: 0.9rem 0 0;
+  font-size: var(--step--2);
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+}
+
+.mi-src__tie {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-left: 1.4rem;
+}
+
+.mi-src__tie-l {
+  width: 1px;
+  height: 1.6rem;
+  background: var(--deep-teal);
+}
+
+.mi-src__tie-t {
+  font-size: var(--step--2);
+  letter-spacing: 0.12em;
+  color: var(--deep-teal);
+  align-self: flex-end;
+  padding-bottom: 0.1rem;
+}
+
+/* 04 the scope interval */
+.mi-sc__band { fill: rgba(49, 184, 148, 0.1); stroke: rgba(49, 184, 148, 0.34); stroke-width: 1; }
+.mi-sc__axis { fill: none; stroke: var(--line-structural); stroke-width: 1; }
+.mi-sc__stop { fill: none; stroke: var(--signal-teal); stroke-width: 1.4; }
+.mi-sc__km { fill: none; stroke: var(--mineral-teal); stroke-width: 1.6; }
+
+.mi-sc__t,
+.mi-sc__km-t,
+.mi-sc__in,
+.mi-sc__gap-t {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+}
+
+.mi-sc__t { fill: var(--text-tertiary); text-anchor: start; }
+.mi-sc__t--end { text-anchor: end; }
+.mi-sc__km-t { fill: var(--mineral-teal); text-anchor: middle; }
+.mi-sc__in { fill: var(--deep-teal); text-anchor: middle; letter-spacing: 0.16em; }
+
+/* The undeclared axis is drawn as an absence: a dashed line with no band
+   under it, marked in the colour this site reserves for review. */
+.mi-sc__gap { fill: none; stroke: var(--status-review); stroke-width: 1; stroke-dasharray: 4 5; opacity: 0.6; }
+.mi-sc__gap-t { fill: var(--status-review); text-anchor: start; }
+
+/* 05 the check */
+.mi-ck__pair {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.6rem;
+  align-items: center;
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--line-hairline);
+}
+
+.mi-ck__side .label { color: var(--text-tertiary); }
+
+.mi-ck__t {
+  margin: 0.3rem 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--step--1);
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.mi-ck__side--r { text-align: right; }
+
+.mi-ck__gate {
+  display: grid;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0 0.2rem;
+}
+
+.mi-ck__glyph {
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  font-size: 0.85rem;
+  color: var(--signal-teal);
+  border: 1px solid rgba(49, 184, 148, 0.45);
+  background: rgba(49, 184, 148, 0.08);
+}
+
+.mi-ck__gate-t {
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.mi-ck__out { list-style: none; margin: 0.8rem 0 0; padding: 0; display: grid; gap: 0.45rem; }
+
+.mi-ck__o {
+  display: grid;
+  grid-template-columns: 1rem 1fr;
+  gap: 0.45rem;
+  font-size: var(--step--1);
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.mi-ck__o-g { font-size: 0.62em; padding-top: 0.4em; }
+.mi-ck__o[data-st='supported'] .mi-ck__o-g { color: var(--status-supported); }
+.mi-ck__o[data-st='review'] .mi-ck__o-g { color: var(--status-review); }
+.mi-ck__o[data-st='review'] { color: #e8c887; }
+
+/* 06 the printed record — archive paper, nearly black type */
+.mi-rec {
+  background: var(--archive-paper);
+  padding: 0.9rem 1rem 1.1rem;
+  box-shadow: 0 22px 50px -26px rgba(0, 0, 0, 0.85);
+}
+
+.mi-rec__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(22, 32, 31, 0.22);
+}
+
+.mi-rec__head .label { color: var(--archive-ink-soft); }
+.mi-rec__id { font-size: var(--step--2); letter-spacing: 0.14em; color: #8a6410; }
+
+.mi-rec__body {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+}
+
+.mi-rec__k {
+  padding: 0.35rem 0.9rem 0.35rem 0;
+  font-size: var(--step--2);
+  letter-spacing: 0.1em;
+  color: var(--archive-ink-soft);
+  border-bottom: 1px solid rgba(22, 32, 31, 0.1);
+  white-space: nowrap;
+}
+
+.mi-rec__v {
+  margin: 0;
+  padding: 0.35rem 0;
+  font-size: var(--step--1);
+  line-height: 1.4;
+  color: var(--archive-ink);
+  border-bottom: 1px solid rgba(22, 32, 31, 0.1);
+}
+
+.mi-rec__v[data-tone='supported'] { color: #0f5c46; }
+.mi-rec__v[data-tone='review'] { color: #7c5a0d; }
+
+/* --- 7. responsive -----------------------------------------
+   Below the two-column breakpoint the levels stop being absolutely
+   placed: on a phone a fixed-height stage would clip the record, and
+   a clipped chain of custody is the one thing this section cannot do.
+   The deep-zoom crossing is kept, the fixed frame is not. */
+@media (max-width: 62rem) {
+  .mi-level__grid { grid-template-columns: 1fr; gap: 1.2rem; }
+  .mi-ck__pair { grid-template-columns: 1fr; gap: 0.8rem; text-align: left; }
+  .mi-ck__side--r { text-align: left; }
+  .mi-ck__gate { justify-items: start; grid-auto-flow: column; align-items: center; gap: 0.5rem; }
+}
+
+@media (max-width: 52rem) {
+  .mi-gauge {
+    grid-template-columns: repeat(3, 1fr);
+    border-left: 1px solid var(--line-grid);
+  }
+  .mi-gauge__stop { border-bottom: 1px solid var(--line-grid); }
+
+  .micro__field { min-height: 0; }
+  .mi-seed { position: relative; inset: auto; }
+  .is-open .mi-seed { display: none; }
+
+  .micro__stage { position: relative; inset: auto; }
+  .mi-level { position: relative; inset: auto; }
+
+  .mi-rows { grid-template-columns: 1fr; }
+  .mi-rows__k { padding-bottom: 0.1rem; border-bottom: 0; }
+  .mi-rows__v { padding-top: 0; }
+  .mi-rec__body { grid-template-columns: 1fr; }
+  .mi-rec__k { padding-bottom: 0.1rem; border-bottom: 0; }
+  .mi-rec__v { padding-top: 0; }
+}
+
+/* --- 8. reduced motion -------------------------------------
+   All six levels remain reachable and identical in content; only the
+   scale-through crossing is dropped. */
+@media (prefers-reduced-motion: reduce) {
+  .mi-seed__ring--2 { animation: none; }
+  .is-open .mi-seed { transform: none; filter: none; }
+  .mi-level,
+  .mi-level[data-enter='in'],
+  .mi-level[data-enter='out'] { transition: opacity 1ms linear; transform: none; filter: none; }
+  .mi-level[data-exit='in'],
+  .mi-level[data-exit='out'] { transform: none; filter: none; }
+  .mi-gauge__tick { transition: none; }
+}
