@@ -29,6 +29,27 @@
       "rule": "injection/trust-assertion",
       "reviewed": "2026-08-11",
       "reason": "The same cross-species CLI warning, quoted in the build-stage record that describes why it was added. A historical record of what the code printed on a given date; rewording it would falsify the record."
+    },
+    {
+      "fingerprint": "40b5576c50401a01",
+      "file": "mule/index.html",
+      "rule": "concealment/hidden-markup",
+      "reviewed": "2026-08-12",
+      "reason": "A `visually-hidden` paragraph carrying the terminal's keyboard hint. This is text FOR a human -- specifically a screen-reader user -- rendered invisibly to sighted users because the same information is conveyed visually by the caret and button. That is the standard accessible-name pattern, not concealment. The scanner's rule cannot distinguish assistive-technology text from steganography, and the tell is the direction of the audience: this is aimed at a person who cannot see the page, not at a model reading the source."
+    },
+    {
+      "fingerprint": "d435c5a9c3ab9f10",
+      "file": "mule/index.html",
+      "rule": "concealment/hidden-markup",
+      "reviewed": "2026-08-12",
+      "reason": "`aria-hidden=\"true\"` on the decorative square brackets flanking a button label. Hiding purely ornamental characters from assistive technology is correct practice -- without it a screen reader announces 'left bracket Construct verified run right bracket'. The hidden content is two punctuation marks and carries no instruction of any kind."
+    },
+    {
+      "fingerprint": "08ef103710a9fbbb",
+      "file": "mule/index.html",
+      "rule": "concealment/hidden-markup",
+      "reviewed": "2026-08-12",
+      "reason": "`aria-hidden=\"true\"` on an EMPTY span used as a CSS-drawn rule in the manifest section. There is no text at all, hidden or otherwise; the element exists so a border can be painted on it. Same reasoning as the decorative brackets above."
     }
   ]
 }
