@@ -426,6 +426,6 @@ make test        # run all 1,289 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,014 tests)
 make test-lit    # literature layer only (275 tests)
-python3 scripts/verify_build.py --quick  # all 14 guard scripts, incl. TypeScript compile (~30s)
+python3 scripts/verify_build.py --quick  # all 21 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

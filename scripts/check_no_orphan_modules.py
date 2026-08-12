@@ -79,6 +79,18 @@ ENTRY_POINT_PATTERNS = (
     re.compile(r".*\.test\.(ts|tsx)$"),
     re.compile(r".*\.spec\.(ts|tsx)$"),
     re.compile(r".*/test_[^/]+\.py$"),
+    # Runnable examples. An example is MEANT to be read and run rather than
+    # imported, so "imported by nothing" is the wrong diagnosis for it --
+    # and it was a diagnosis nobody could act on, which is why
+    # examples/python_integration.py sat here for stages while ten of its
+    # eleven documented endpoints did not exist.
+    #
+    # Exempt here, and checked instead by
+    # `scripts/check_example_endpoints.py`, which verifies every endpoint an
+    # example documents against the routes the server actually registers.
+    # The exemption buys a stronger check than the one it replaces: an
+    # importer would only have proven the file parses.
+    re.compile(r"examples/.*\.(py|ts)$"),
 )
 
 

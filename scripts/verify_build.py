@@ -281,6 +281,28 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             f"python {SCRIPTS_DIR / 'check_no_disabled_tests.py'}",
             timeout=120,
         ),
+        # And the same idea aimed at documentation. An example is a promise
+        # about how the product behaves; nothing was checking that the
+        # promises were true. The first run found that ten of the eleven
+        # endpoints in the documented Python client did not exist -- a
+        # reader following the quick start would have got a 404 on nearly
+        # every call and concluded the product was broken.
+        run_guard(
+            "Example Endpoint Guard",
+            f"python {SCRIPTS_DIR / 'check_example_endpoints.py'}",
+            timeout=120,
+        ),
+        # The TypeScript half of check_no_silent_skips. That guard counts
+        # pytest's "N skipped" line, so ~600 TypeScript tests across two
+        # runners were invisible to it AND to check_documented_counts: a
+        # whole suite could stop being collected and no number anywhere
+        # would move. Asks each runner which FILES it will run (~2s each,
+        # no imports) and compares against what is on disk.
+        run_guard(
+            "TypeScript Suite Discovery Guard",
+            f"python {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
+            timeout=240,
+        ),
     ]
 
 

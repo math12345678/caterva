@@ -150,6 +150,32 @@ export type StrendaStatus = "complete" | "incomplete";
  * moment a lookup path exists for them — the list states the rule, not the
  * current implementation, so extending RESOLVABLE_FIELDS cannot silently
  * bypass the requirement.
+ *
+ * WHAT THIS RULE EXISTS TO PREVENT, in the words of a client that did it
+ * ---------------------------------------------------------------------
+ * A second, unreachable BRENDA client (`src/integrations/brenda-real.ts`,
+ * retired 2026-08-11 — see STAGE_10_PART_19/23 and git history) parsed
+ * responses like this:
+ *
+ *     km:          entry.km,
+ *     kmUnit:      entry.kmUnit  || 'mM',
+ *     vmaxUnit:    entry.vmaxUnit || 'μM/min',
+ *     organism:    entry.organism || 'Unknown',
+ *     temperature: entry.temperature || 25,
+ *     pH:          entry.pH || 7.0,
+ *     dataQuality: this.scoreDataQuality(entry)
+ *
+ * Every `||` on that list is a STRENDA-governed fact being invented when
+ * the source did not report it. A value measured at an unknown pH became a
+ * value measured at pH 7.0; an unknown temperature became 25 °C. Then
+ * `scoreDataQuality` read back the fields the same function had just
+ * fabricated two lines earlier and rated the record `'excellent'`.
+ *
+ * That is the precise inversion this module exists to forbid: a missing
+ * condition is a reason to FLAG a value, never a reason to fill one in. The
+ * quote is kept here rather than in the file, because the lesson should
+ * outlive the code — and because a defect preserved in a live module is a
+ * defect waiting for someone to import it.
  */
 export const STRENDA_GOVERNED_FIELDS: ReadonlySet<string> = new Set([
   "km",
@@ -319,22 +345,40 @@ export function validateParameterProvenance(
         `${key} carries citation locators but origin is '${prov.origin}'`,
       );
     }
-    if (prov.origin === "resolved" && prov.citationLocators !== undefined) {
-      if (prov.citationLocators.length === 0) {
-        violations.push(`${key} carries an empty citation locator list`);
-      }
-      for (const locator of prov.citationLocators) {
-        if (!isValidLocator(locator)) {
-          violations.push(`${key} carries a malformed citation locator`);
-        }
-      }
+    // Required, not optional. Every rule below used to sit inside
+    // `citationLocators !== undefined`, and `buildResolvedKineticProvenance`
+    // strips the property when the array is empty -- so the one violation
+    // that catches "resolved, but nothing can re-find the source" was
+    // unreachable from any production path, and reachable only from a
+    // hand-written test literal, which is what made it look enforced.
+    //
+    // The net rule was: produce zero locators and you are exempt from every
+    // locator check; produce a wrong one and you are caught. That inverts
+    // the incentive. A citation a reader cannot follow is the failure this
+    // whole subsystem exists to prevent.
+    if (prov.origin === "resolved") {
       if (
-        prov.citation &&
-        !citationConsistentWithLocators(prov.citation, prov.citationLocators)
+        prov.citationLocators === undefined ||
+        prov.citationLocators.length === 0
       ) {
         violations.push(
-          `${key} has citation locators that do not match its citation string`,
+          `${key} is marked resolved but carries no citation locators -- ` +
+            `its citation string cannot be machine-followed back to a source`,
         );
+      } else {
+        for (const locator of prov.citationLocators) {
+          if (!isValidLocator(locator)) {
+            violations.push(`${key} carries a malformed citation locator`);
+          }
+        }
+        if (
+          prov.citation &&
+          !citationConsistentWithLocators(prov.citation, prov.citationLocators)
+        ) {
+          violations.push(
+            `${key} has citation locators that do not match its citation string`,
+          );
+        }
       }
     }
 
@@ -428,6 +472,21 @@ export function validateParameterProvenance(
  * Making the key mandatory rather than optional is deliberate: an optional
  * parameter would have defaulted to the old, wrong behaviour and let the
  * same bug reappear at the next call site that forgot it. See ADR 0021.
+ *
+ * `citationLocators` is REQUIRED for the same reason, and was made so after
+ * the same failure in a different place. It was optional; the body then
+ * dropped the property whenever the array came back empty; and
+ * `validateParameterProvenance` gated every locator rule behind "was this
+ * property present". The three together meant: produce zero locators and
+ * you are exempt from every locator check, produce a wrong one and you are
+ * caught. All four production call sites already passed it, so the only
+ * thing an optional parameter bought was the chance for the fifth to
+ * forget.
+ *
+ * Pass the array even when it is empty. An empty array is a fact about the
+ * citation — it says nothing could be machine-extracted from it — and the
+ * validator is the right place to have an opinion about that, not this
+ * constructor.
  */
 export function buildResolvedKineticProvenance(args: {
   parameterKey: string;
@@ -436,7 +495,7 @@ export function buildResolvedKineticProvenance(args: {
   organism?: string;
   citationStatus: CitationStatus;
   assayConditions?: AssayConditions;
-  citationLocators?: CitationLocator[];
+  citationLocators: CitationLocator[];
   note?: string;
 }): ParameterProvenance {
   // A parameter STRENDA does not govern gets no strendaStatus, no
@@ -448,7 +507,11 @@ export function buildResolvedKineticProvenance(args: {
       citation: args.citation,
       ...(args.organism !== undefined ? { organism: args.organism } : {}),
       citationStatus: args.citationStatus,
-      ...(args.citationLocators !== undefined && args.citationLocators.length > 0
+      // Carried through even when empty. Stripping an empty array hid the
+      // input from the validator, which then had nothing to complain about
+      // -- the constructor was quietly deciding that "no locators" is not
+      // worth reporting. Let the validator speak.
+      ...(args.citationLocators !== undefined
         ? { citationLocators: args.citationLocators }
         : {}),
       ...(args.note ? { note: args.note } : {}),

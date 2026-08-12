@@ -29,6 +29,20 @@ import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 
 export interface SimulationRequest {
   query: string;
+  /**
+   * Which model to run, when the caller already knows.
+   *
+   * Same principle as `system` below, and for the same reason: a caller
+   * that knows the answer should say it rather than encode it in prose for
+   * the pipeline to guess back out. The CLI's `--model mm` knows exactly
+   * which model was asked for, then built the query string
+   * `"lactate dehydrogenase / pyruvate"` — which names no domain at all,
+   * so the pipeline had to infer one from an enzyme name.
+   *
+   * When absent, `classifyDomain` reads the query, and a query it cannot
+   * place is a validation failure rather than a default.
+   */
+  domain?: string;
   parameters?: Record<string, number>;
   conditions?: {
     temperature?: number;
@@ -184,8 +198,88 @@ export class ScientificPipeline {
         request.query,
         request.parameters,
         request.system,
-        request.providedProvenance
+        request.providedProvenance,
+        request.domain
       );
+
+      // A required parameter that resolveParameters() could not source
+      // (no user value, no literature match) is simply absent from
+      // resolvedParameters -- resolveParameters() logs a warning and moves
+      // on rather than inventing a default. Nothing downstream checked for
+      // that absence: buildParameterMetadata() only iterates the
+      // parameters that DID resolve, so a missing required parameter was
+      // invisible to Layer 1-3 validation and the pipeline proceeded
+      // straight to STEP 4, where the engine bridge's own hard-block threw
+      // an uncaught "required parameter(s) ... were not supplied" error --
+      // turning what should be a clean, reported validation failure into a
+      // raw SIMULATION_ERROR crash. Checking here restores the intended
+      // fail-fast contract: missing required parameters stop the run at
+      // Layer 1 with a normal response, not an exception.
+      // An explicit domain is honoured as given; only an unnamed one is
+      // inferred. A caller that names a domain the pipeline does not know
+      // still fails below, which is the honest outcome — better than
+      // quietly falling back to reading the prose.
+      const domain = request.domain ?? this.classifyDomain(request.query);
+
+      // A query naming no known domain stops here.
+      //
+      // Before the classifier was fixed this could not arise -- everything
+      // unrecognised was called SIR. Now that "I cannot tell" is
+      // expressible, it has to be answered, and the answer cannot be "carry
+      // on": `runSimulation` builds km/vmax/s0 unconditionally, so an
+      // unplaced query would have been simulated as Michaelis-Menten
+      // whatever it actually asked for. Running a model nobody requested is
+      // worse than running none.
+      const domainErrors = domain
+        ? []
+        : [
+            `Query '${request.query}' does not name a domain this pipeline ` +
+              `knows (${Object.keys(ScientificPipeline.DOMAINS).join(', ')}). ` +
+              'Name the model explicitly rather than leaving it to be ' +
+              'inferred: a simulation of the wrong system is not a partial ' +
+              'answer, it is a different answer.',
+          ];
+
+      const missingRequired = domain
+        ? this.getRequiredParameters(domain).filter(
+            param => !resolvedParameters[param]
+          )
+        : [];
+
+      if (missingRequired.length > 0 || domainErrors.length > 0) {
+        logger.error(
+          { jobId, domain, missingRequired, domainErrors },
+          'Validation failed - unrecognised domain or unresolved required parameters'
+        );
+
+        return {
+          jobId,
+          query: request.query,
+          validated: false,
+          validationConfidence: 0,
+          validationErrors: [
+            ...domainErrors,
+            ...missingRequired.map(param =>
+              `Parameter '${param}': Required parameter '${param}' for domain '${domain}' has no ` +
+              'user-supplied value and no literature match; the run cannot proceed without either.'
+            ),
+          ],
+          results: {
+            trajectory: [],
+            finalValue: 0,
+            computedMetrics: {}
+          },
+          reproducibilityKey: '',
+          dataIntegrityHash: '',
+          parameterProvenance: resolvedParameters,
+          metadata: {
+            executionTimeMs: Date.now() - startTime,
+            literatureSourcesUsed: 0,
+            confidenceScore: 0,
+            warnings: []
+          }
+        };
+      }
 
       // STEP 2: Get literature backing
       logger.info({ jobId }, 'STEP 2: Literature verification');
@@ -484,10 +578,19 @@ ${integrityReport}
     query: string,
     userParameters?: Record<string, number>,
     system?: SimulationRequest['system'],
-    system_provenance?: SimulationRequest['providedProvenance']
+    system_provenance?: SimulationRequest['providedProvenance'],
+    explicitDomain?: string
   ): Promise<Record<string, ResolvedParameter>> {
-    // Parse query to extract domain and requirements
-    const domain = query.toLowerCase().includes('michaelis') ? 'mm' : 'sir';
+    // One classifier, used by both call sites. This was a second, separate
+    // copy of the same `includes('michaelis') ? 'mm' : 'sir'` expression --
+    // and duplicated classification means the two halves of a request can
+    // disagree about what is being simulated without anything noticing.
+    // Constitution Rule 4: shared constraints across layers are enforced by
+    // a test, not by two comments hoping to stay in sync.
+    //
+    // Undefined means "not recognised", and resolution below then attempts
+    // nothing rather than resolving SIR parameters for an enzyme query.
+    const domain = explicitDomain ?? this.classifyDomain(query);
 
     const resolved: Record<string, ResolvedParameter> = {};
 
@@ -515,8 +618,14 @@ ${integrityReport}
     // `getRecommendation`, which only ever saw literature the caller had
     // already handed in, so a parameter absent from that handful was
     // simply dropped and the run continued without it.
-    const requiredParams = this.getRequiredParameters(domain);
+    // An unrecognised domain has no required-parameter list, so there is
+    // nothing to look up. Resolving the SIR list for a query the classifier
+    // could not place is how an enzyme run ended up demanding beta and
+    // gamma; `getRequiredParameters` returns [] for undefined, and the loop
+    // below simply does not run.
+    const requiredParams = domain ? this.getRequiredParameters(domain) : [];
     for (const param of requiredParams) {
+      if (domain === undefined) break;
       if (!resolved[param]) {
         try {
           const recommendation = system
@@ -675,6 +784,11 @@ ${integrityReport}
         unit: data.unit,
         min,
         max,
+        // Carried so Layer 1 can tell a value the user typed from one that
+        // claims to be resolved. Without it, every unsourced parameter
+        // looked identical to the validator and an honest hand-entered Km
+        // was rejected as harshly as a fabricated citation.
+        origin: data.source,
         literature: literatureSources,
         // Higher confidence for parameters with multiple literature sources
         confidence: literatureSources.length > 1 ? 0.95 : (literatureSources.length > 0 ? 0.92 : 0)
@@ -741,11 +855,31 @@ ${integrityReport}
     // Velocity is derived from the engine's own trajectory rather than
     // recomputed from a rate law here -- recomputing would reintroduce a
     // second implementation of the model, which is what went wrong before.
+    // Velocity by finite difference on the engine's own trajectory.
+    //
+    // The FIRST point used a backward difference against a non-existent
+    // predecessor and so reported velocity 0 -- but for Michaelis-Menten
+    // t=0 is where the rate is HIGHEST (v0 = Vmax*s0/(Km+s0)). Reporting
+    // it as zero made `maxVelocity` miss the true maximum and biased any
+    // average downward. A forward difference is used for that one point.
+    //
+    // Negative velocities are NOT clamped. A negative value here would mean
+    // substrate increasing in an irreversible reaction, i.e. an integration
+    // problem; clamping it to zero would guarantee the reader never sees
+    // the one signal that something is wrong.
     const trajectory = points.map((point, index) => {
       const previous = points[index - 1];
-      const dt = previous ? point.time - previous.time : 0;
-      const velocity =
-        previous && dt > 0 ? (previous.value - point.value) / dt : 0;
+      const next = points[index + 1];
+
+      let velocity = 0;
+      if (previous) {
+        const dt = point.time - previous.time;
+        if (dt > 0) velocity = (previous.value - point.value) / dt;
+      } else if (next) {
+        const dt = next.time - point.time;
+        if (dt > 0) velocity = (point.value - next.value) / dt;
+      }
+
       return { time: point.time, value: point.value, velocity };
     });
 
@@ -759,7 +893,27 @@ ${integrityReport}
         finalValue,
         finalVelocity:
           trajectory.length > 0 ? trajectory[trajectory.length - 1]!.velocity : 0,
-        totalSubstrateConsumed: initialValue - finalValue
+        totalSubstrateConsumed: initialValue - finalValue,
+        // Derived quantities a bench scientist actually reports. The
+        // pipeline declared `computedMetrics` and returned only three
+        // fields; conversion and the velocity envelope had to be computed
+        // by hand from the trajectory every time.
+        //
+        // conversionPercentage is guarded against s0 = 0 rather than
+        // dividing blind: 0/0 would render as NaN in a results table.
+        conversionPercentage:
+          initialValue > 0
+            ? ((initialValue - finalValue) / initialValue) * 100
+            : 0,
+        maxVelocity: trajectory.reduce(
+          (highest, point) => Math.max(highest, point.velocity),
+          Number.NEGATIVE_INFINITY
+        ),
+        avgVelocity:
+          trajectory.length > 0
+            ? trajectory.reduce((sum, p) => sum + p.velocity, 0) /
+              trajectory.length
+            : 0
       },
       // Preserved so a caller can see the engine's Rule 2 verdict rather
       // than only this tree's opinion.
@@ -798,11 +952,85 @@ ${integrityReport}
   }
 
   private getRequiredParameters(domain: string): string[] {
-    const params: Record<string, string[]> = {
-      mm: ['km', 'vmax', 's0'],
-      sir: ['beta', 'gamma', 's0', 'i0']
-    };
-    return params[domain] || [];
+    return ScientificPipeline.DOMAINS[domain]?.required ?? [];
+  }
+
+  /**
+   * The domains this pipeline knows, and how to recognise one.
+   *
+   * Replaces this, which appeared TWICE (execute() and resolveParameters()):
+   *
+   *     const domain = query.toLowerCase().includes('michaelis') ? 'mm' : 'sir';
+   *
+   * Every query not containing the literal string "michaelis" was
+   * classified as SIR — an epidemic model. `simulate mm`, `enzyme
+   * kinetics`, `lactate dehydrogenase`, a Gillespie decay: all SIR. The CLI
+   * end-to-end test caught it in the most legible possible way — the run
+   * resolved km and Vmax from BRENDA, printed a correct enzyme provenance
+   * table, and was then blocked for having no `beta`, `gamma` or `i0`.
+   *
+   * Two things made it survive: the classifier was duplicated, so the two
+   * copies could never disagree in a way anyone would notice; and its
+   * fallback was a SPECIFIC domain rather than "unknown", so a failure to
+   * recognise the query was indistinguishable from a confident answer.
+   *
+   * Defaulting to a domain is the same defect as defaulting a parameter,
+   * one level up. `classifyDomain` returns undefined when it cannot tell,
+   * and the caller reports that rather than guessing.
+   */
+  private static readonly DOMAINS: Record<
+    string,
+    { required: string[]; aliases: string[] }
+  > = {
+    mm: {
+      required: ['km', 'vmax', 's0'],
+      // Ordered longest-first at match time, so "michaelis menten" cannot
+      // be beaten to the answer by a shorter alias of another domain.
+      aliases: [
+        'michaelis',
+        'michaelis-menten',
+        'michaelis menten',
+        'enzyme kinetics',
+        'enzyme',
+        'mm',
+      ],
+    },
+    sir: {
+      required: ['beta', 'gamma', 's0', 'i0'],
+      aliases: ['sir', 'epidemic', 'infection', 'outbreak', 'susceptible'],
+    },
+  };
+
+  /**
+   * Which domain a query names, or undefined when it names none.
+   *
+   * Undefined is a real answer here, and the reason this returns it rather
+   * than a default: a query the pipeline cannot place is a query it must
+   * not silently run as something else.
+   */
+  private classifyDomain(query: string): string | undefined {
+    const text = query.toLowerCase();
+
+    const candidates: Array<{ domain: string; alias: string }> = [];
+    for (const [domain, spec] of Object.entries(ScientificPipeline.DOMAINS)) {
+      for (const alias of spec.aliases) {
+        // Word-boundary matched, so "mm" does not fire on "summary" and
+        // "sir" does not fire on "desire".
+        const pattern = new RegExp(
+          `\\b${alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`,
+          'i'
+        );
+        if (pattern.test(text)) candidates.push({ domain, alias });
+      }
+    }
+
+    if (candidates.length === 0) return undefined;
+
+    // Longest alias wins: "michaelis menten" beats a stray "mm", and a
+    // query naming both domains resolves to the more specific mention
+    // rather than to whichever was declared first.
+    candidates.sort((a, b) => b.alias.length - a.alias.length);
+    return candidates[0]!.domain;
   }
 
   private generateJobId(): string {

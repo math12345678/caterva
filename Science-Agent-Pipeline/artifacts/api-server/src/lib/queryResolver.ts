@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./telluriumRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
 import { resolveKineticValue, resolveEpidemiologyParameters } from "./scienceAgent";
-import { buildCitationLocators } from "./citeVerify";
+import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
 import { matchDisease } from "./diseases";
 import {
@@ -139,14 +139,15 @@ async function applyKineticResolution(
       continue;
     }
 
-    const citation = formatResolvedCitation(agentResult.citation);
-    if (citation === undefined) {
+    const located = locatableCitation(agentResult.citation);
+    if (located === undefined) {
       provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "no_locator");
       flags.push(
         `Found a ${key.toUpperCase()} value but its citation was not locatable; using default ${key.toUpperCase()}.`,
       );
       continue;
     }
+    const citation = located.display;
 
     const citationStatus =
       agentResult.crossSpecies === true ||
@@ -250,14 +251,15 @@ async function applyVmaxFromKcatResolution(
     return { parameters, parameterProvenance, flags };
   }
 
-  const citation = formatResolvedCitation(agentResult.citation);
-  if (citation === undefined) {
+  const located = locatableCitation(agentResult.citation);
+  if (located === undefined) {
     flags.push(
       "Resolved a kcat but its citation carries no locator (ref id or URL); " +
         "not trusted as resolved — Vmax was not bridged from literature.",
     );
     return { parameters, parameterProvenance, flags };
   }
+  const citation = located.display;
 
   const citationStatus =
     agentResult.crossSpecies === true || agentResult.source === "brenda_cross_species"
@@ -360,14 +362,15 @@ async function applyBetaGammaFromR0Resolution(
     return { parameters, parameterProvenance, flags };
   }
 
-  const citation = formatResolvedCitation(agentResult.citation);
-  if (citation === undefined) {
+  const located = locatableCitation(agentResult.citation);
+  if (located === undefined) {
     flags.push(
       `Resolved R0 for '${agentResult.disease}' but its citation carries no ` +
         `locator; beta/gamma were not bridged from literature.`,
     );
     return { parameters, parameterProvenance, flags };
   }
+  const citation = located.display;
 
   const bridgeNote =
     `beta and gamma derived from R0=${agentResult.r0} and infectious_period=` +
@@ -440,9 +443,10 @@ async function applyPopgenResolution(
 
     if (agentResult.found && agentResult.km !== undefined) {
       const value = agentResult.km;
-      const citation = formatResolvedCitation(agentResult.citation);
+      const located = locatableCitation(agentResult.citation);
 
-      if (citation !== undefined) {
+      if (located !== undefined) {
+        const citation = located.display;
         parameterUpdates["mutation_rate"] = value;
         // mutation_rate is a per-generation per-base-pair substitution
         // rate, not an enzyme kinetic constant: STRENDA does not govern it
@@ -1214,6 +1218,46 @@ function formatResolvedCitation(citation?: {
   const refPart = hasRef ? ` (ref ${citation.referenceId})` : "";
   const urlPart = hasUrl ? ` — ${citation.url}` : "";
   return `${citation.source}${refPart}${urlPart}`;
+}
+
+/**
+ * The single gate for "is this citation good enough to call resolved".
+ *
+ * TWO DEFINITIONS OF "LOCATABLE" USED TO DISAGREE, and the disagreement was
+ * load-bearing:
+ *
+ *   - `formatResolvedCitation` (above) returns a string whenever the
+ *     citation has a source and EITHER a ref id or a URL. Any ref id.
+ *   - `buildCitationLocators` (citeVerify.ts:137-157) only produces a
+ *     locator when the ref id is a DOI or purely numeric.
+ *
+ * A source supplying an accession-style reference — `SABIO:1234`,
+ * `P00338`, anything not a DOI and not digits — satisfies the first and
+ * fails the second. It would be admitted as `resolved` with an empty
+ * locator array, and now that locators are mandatory
+ * (`validateParameterProvenance`), `provenanceViolations` would throw:
+ * "Internal error: invalid parameter provenance" in place of a working
+ * literature answer.
+ *
+ * That is precisely the ADR 0021 failure — a helper stamping a field the
+ * validator then rejects, turning a successful resolution into a 500 —
+ * and it would have arrived the same way, via a source nobody had added
+ * yet.
+ *
+ * So the decision and the record are now the same computation. If nothing
+ * can be extracted that re-finds the source, the value degrades honestly
+ * to a default instead of being published as literature-backed.
+ */
+function locatableCitation(citation?: {
+  source?: string;
+  referenceId?: string | null;
+  url?: string | null;
+}): { display: string; locators: CitationLocator[] } | undefined {
+  const display = formatResolvedCitation(citation);
+  if (display === undefined) return undefined;
+  const locators = buildCitationLocators(citation);
+  if (locators.length === 0) return undefined;
+  return { display, locators };
 }
 
 export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
