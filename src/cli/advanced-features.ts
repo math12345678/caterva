@@ -59,53 +59,95 @@ export async function batchSimulate(
 // PARAMETER SEARCH (SIMPLE SWEEP)
 // ============================================================================
 
+export interface SweepPoint {
+  paramValue: number;
+  finalValue: number;
+  confidence: number;
+  /** Set when this point could not be computed, with the reason. */
+  failed?: string;
+}
+
+/**
+ * Run the same model across a range of one parameter.
+ *
+ * Three defects were fixed here before this was wired to a command:
+ *
+ *   1. It passed ONLY the swept parameter — `parameters[parameter] = value`
+ *      on an otherwise empty object — so km, vmax and s0 were absent from
+ *      every run. Validation therefore failed at every point, the `catch`
+ *      below swallowed it, and the function returned an empty array that
+ *      read as "the sweep found nothing" rather than "the sweep never ran".
+ *   2. Failures were logged and skipped, so a point that could not be
+ *      computed vanished from the series — indistinguishable from a point
+ *      that was computed and happened to sit on the trend line.
+ *   3. `for (let v = min; v <= max; v += step)` accumulates floating-point
+ *      error, so a sweep from 0 to 1 by 0.1 could stop at 0.9. The loop is
+ *      now over an integer index.
+ */
 export async function parameterSweep(
   query: string,
   parameter: string,
   min: number,
   max: number,
-  step: number
-): Promise<Array<{ paramValue: number; finalValue: number; confidence: number }>> {
-  const results: Array<{ paramValue: number; finalValue: number; confidence: number }> = [];
+  step: number,
+  baseParameters: Record<string, number> = {},
+  request: Record<string, unknown> = {}
+): Promise<SweepPoint[]> {
+  const results: SweepPoint[] = [];
 
-  for (let value = min; value <= max; value += step) {
+  if (!(step > 0)) {
+    throw new Error(`sweep step must be positive (got ${step})`);
+  }
+  const steps = Math.floor((max - min) / step + 1e-9);
+
+  for (let i = 0; i <= steps; i++) {
+    // Multiply rather than accumulate: repeated += loses the endpoint.
+    const value = min + i * step;
+
     try {
       const pipeline = new ScientificPipeline();
-      const parameters: Record<string, number> = {};
-      parameters[parameter] = value;
-
       const response = await pipeline.execute({
+        ...(request as object),
         query,
-        parameters
-      });
+        // The swept value OVERRIDES the base, but everything else the model
+        // needs is still present.
+        parameters: { ...baseParameters, [parameter]: value }
+      } as never);
 
-      if (response.results && response.results.trajectory) {
-        const finalValue = response.results.trajectory[response.results.trajectory.length - 1]?.value || 0;
+      if (!response.validated) {
         results.push({
           paramValue: value,
-          finalValue,
-          confidence: response.validationConfidence
+          finalValue: Number.NaN,
+          confidence: 0,
+          failed: response.validationErrors.join('; ') || 'validation failed'
         });
+        continue;
       }
+
+      results.push({
+        paramValue: value,
+        finalValue: response.results.finalValue,
+        confidence: response.validationConfidence
+      });
 
       logger.info(
         { parameter, value, finalValue: response.results.finalValue },
         'Sweep point completed'
       );
     } catch (error) {
-      logger.warn(
-        { parameter, value, error },
-        'Sweep point failed'
-      );
+      // Recorded, not swallowed.
+      results.push({
+        paramValue: value,
+        finalValue: Number.NaN,
+        confidence: 0,
+        failed: error instanceof Error ? error.message : String(error)
+      });
+      logger.warn({ parameter, value, error }, 'Sweep point failed');
     }
   }
 
   return results;
 }
-
-// ============================================================================
-// SENSITIVITY ANALYSIS
-// ============================================================================
 
 export interface SensitivityEntry {
   /** Relative change in the final value for a +perturbation. */
@@ -120,16 +162,6 @@ export interface SensitivityEntry {
   failed?: string;
 }
 
-/**
- * How much does the answer depend on each parameter?
- *
- * Perturbs each one by ±`sensitivity` and measures the relative change in
- * the final value. Paired with provenance this answers the question that
- * actually matters to someone using a literature-sourced value: *my Km is
- * a cross-species substitute — does that change my conclusion?* A 40%
- * sensitivity on a cross-species parameter is a result that should not be
- * reported; a 0.1% sensitivity means the substitution is harmless.
- */
 export async function sensitivityAnalysis(
   query: string,
   baseParameters: Record<string, number>,

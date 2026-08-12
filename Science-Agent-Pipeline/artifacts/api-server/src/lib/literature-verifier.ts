@@ -151,6 +151,38 @@ export function getPublicationVerification(result: VerificationResult): string {
 /**
  * Check if parameter can be safely published
  */
+/**
+ * Parameters that are experimental CONDITIONS, not measured properties.
+ *
+ * A paper states its substrate concentration; it does not cite one.
+ * Nobody measures "the initial substrate concentration of this enzyme",
+ * so requiring a citation for s0, [E]0 or pH before calling a parameter
+ * set publication-ready is a category error -- the same one that made
+ * Layer 1 of the validation pipeline reject every run with "Parameter
+ * 's0' has no literature backing".
+ *
+ * What publication readiness means here is: every MEASURED quantity can
+ * be cited. Conditions still have to be reported, and they appear in the
+ * parameter table with `origin: "user"` so a reader can see they were
+ * chosen rather than looked up.
+ *
+ * Kept as an explicit list rather than a heuristic, so a future measured
+ * quantity cannot be exempted by accident.
+ */
+const EXPERIMENTAL_CONDITIONS: ReadonlySet<string> = new Set([
+  "s0",
+  "e0",
+  "i0",
+  "enzyme_conc",
+  "temperature",
+  "ph",
+  "buffer",
+]);
+
+function isExperimentalCondition(name: string): boolean {
+  return EXPERIMENTAL_CONDITIONS.has(name.toLowerCase());
+}
+
 export function canPublish(result: VerificationResult): boolean {
   // Can publish if: verified OR flagged with literature + assay conditions
   if (result.level === "verified") return true;
@@ -193,7 +225,46 @@ export function auditForPublication(
     }
   }
 
-  const readyToPublish = counts.pending === 0 && (counts.verified + counts.flagged > 0);
+  // Publication readiness is decided PER PARAMETER by `canPublish`, the
+  // gate immediately above this function that requires a `flagged` value to
+  // carry a DOI.
+  //
+  // This read `counts.pending === 0 && (counts.verified + counts.flagged > 0)`,
+  // which was wrong in two ways and never called `canPublish` at all:
+  //
+  //   * `unverifiable` -- what `origin: "default"` and `origin: "user"`
+  //     produce -- was counted, named in the summary string, and then
+  //     ignored by the boolean. A set containing a system default reported
+  //     ready.
+  //   * `flagged` counted as equivalent to `verified`, but `flagged` is
+  //     what verification returns for a KEYWORD-MATCHED value ("use as
+  //     estimate only") and for a literature value with no DOI, PMID or
+  //     URL. Those are exactly the values that must not appear in a paper
+  //     uncited.
+  //
+  // So `{km: keyword-matched, vmax: keyword-matched, s0: default}` returned
+  // readyToPublish: true with the summary "Publication ready: 0 verified,
+  // 2 with literature backing" -- while `canPublish` was false for every
+  // single one.
+  //
+  // Publication is a stricter bar than simulation, deliberately. A run may
+  // proceed on a value you typed yourself (it is your bench data); a paper
+  // may not present that value as literature-backed.
+  const unpublishable = Object.entries(results).filter(
+    ([param, result]) => !isExperimentalCondition(param) && !canPublish(result),
+  );
+
+  for (const [param, result] of unpublishable) {
+    if (result.level !== "flagged" && result.level !== "pending") {
+      issues.push(
+        `${param}: not publishable -- ${result.level}` +
+          (result.message ? ` (${result.message})` : ""),
+      );
+    }
+  }
+
+  const readyToPublish =
+    unpublishable.length === 0 && Object.keys(results).length > 0;
 
   return {
     readyToPublish,
@@ -202,8 +273,11 @@ export function auditForPublication(
     pendingCount: counts.pending,
     unverifiableCount: counts.unverifiable,
     summary: readyToPublish
-      ? `Publication ready: ${counts.verified} verified, ${counts.flagged} with literature backing`
-      : `Not ready: ${counts.pending} pending, ${counts.unverifiable} unverifiable`,
+      ? `Publication ready: ${counts.verified} verified, ${counts.flagged} flagged but citable`
+      : `Not ready: ${unpublishable.length} of ${Object.keys(results).length} ` +
+        `parameter(s) cannot be cited ` +
+        `(${counts.pending} pending, ${counts.unverifiable} unverifiable, ` +
+        `${counts.flagged} flagged without a DOI)`,
     issues,
   };
 }

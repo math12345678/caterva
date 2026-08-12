@@ -122,8 +122,39 @@ def check(path: pathlib.Path = RESOLVER_FILE) -> list[str]:
         return [f"resolver file not found: {path}"]
 
     source = path.read_text(encoding="utf-8")
+    entries = extract_entries(source)
+
+    # A ZERO PARSE IS NOT A CLEAN TREE.
+    #
+    # `extract_entries` finds citations with `ARRAY_RE` -- a regex for
+    # `modelCitations: [ "..." ]`. If that stops matching, it returns [],
+    # the loop below never runs, `violations` stays empty, and main()
+    # prints "OK: all modelCitations entries carry authors, a year, and
+    # volume/pages, a publisher, or a URL."
+    #
+    # Nothing has to break for that to happen. Renaming the field,
+    # extracting the entries to a `const MODEL_CITATIONS = [...]` and
+    # spreading it in, or switching the strings to template literals
+    # (STRING_RE only matches "...") would each silence this guard
+    # completely -- and every fabricated citation in queryResolver.ts would
+    # pass in silence.
+    #
+    # Two sibling guards already refuse this: check_domain_parity.py and
+    # check_literature_inventory.py both emit "parsed ZERO ... Refusing to
+    # report success." This one had not been given the same treatment.
+    if not entries:
+        return [
+            f"parsed ZERO citation entries from {path.name}. Refusing to "
+            "report success: this guard finds citations with a regex for "
+            "`modelCitations: [...]`, so an empty parse means either that "
+            "every citation was deleted or -- far more likely -- that the "
+            "pattern no longer matches how they are written. A guard that "
+            "reports OK on a failed parse is worse than no guard, because "
+            "it is trusted."
+        ]
+
     violations: list[str] = []
-    for line, citation in extract_entries(source):
+    for line, citation in entries:
         violations.extend(check_entry(line, citation))
     return violations
 

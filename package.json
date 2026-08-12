@@ -20,6 +20,9 @@
     "cli:literature": "ts-node src/cli/scientificCLI.ts literature",
     "example": "ts-node examples/scientificPipelineExample.ts",
     "dev": "ts-node --watch src/cli/scientificCLI.ts",
+    "web": "node dist/src/web/server.js",
+    "web:dev": "ts-node src/web/server.ts",
+    "web:start": "npm run build && npm run web",
     "verify-all": "npm run type-check && npm run lint && npm test"
   },
   "keywords": [

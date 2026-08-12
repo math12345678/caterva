@@ -66,6 +66,57 @@ describe('ParameterValidator', () => {
       expect(result.errors[0].severity).toBe('critical');
     });
 
+    it('should WARN, not fail, when a user-supplied parameter has no literature', () => {
+      // A value with origin 'user' is not a fabrication -- it may be the
+      // caller's own bench data. It must still be flagged, loudly, so it's
+      // never mistaken for a literature-verified number, but it should not
+      // block validation the way a value that CLAIMS to be resolved (and
+      // isn't) does. See the USER_SUPPLIED_NO_LITERATURE comment in
+      // scientificValidator.ts for the full reasoning.
+      const param: ParameterMetadata = {
+        name: 'km',
+        value: 5.2,
+        unit: 'mM',
+        min: 4.0,
+        max: 6.0,
+        literature: [],
+        confidence: 0,
+        origin: 'user'
+      };
+
+      const result = ParameterValidator.validateParameter(param);
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toHaveLength(0);
+      expect(result.warnings).toContainEqual(
+        expect.objectContaining({
+          code: 'USER_SUPPLIED_NO_LITERATURE',
+          field: 'km',
+          severity: 'medium'
+        })
+      );
+    });
+
+    it('should still FAIL when a non-user-origin parameter has no literature (e.g. a resolver claim with no citation)', () => {
+      const param: ParameterMetadata = {
+        name: 'km',
+        value: 5.2,
+        unit: 'mM',
+        min: 4.0,
+        max: 6.0,
+        literature: [],
+        confidence: 0,
+        origin: 'literature (0 sources)'
+      };
+
+      const result = ParameterValidator.validateParameter(param);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].code).toBe('NO_LITERATURE');
+      expect(result.errors[0].severity).toBe('critical');
+    });
+
     it('should FAIL when parameter OUT OF RANGE', () => {
       const param: ParameterMetadata = {
         name: 'km',
@@ -157,8 +208,9 @@ describe('LiteratureVerifier', () => {
 
   describe('verifyReference', () => {
     it('should verify valid DOI', async () => {
+      const doi = '10.1016/S0021-9258(20)71234-5';
       const ref: LiteratureReference = {
-        doi: '10.1016/S0021-9258(20)71234-5',
+        doi,
         title: 'Test',
         authors: ['Test'],
         year: 2020,
@@ -166,8 +218,36 @@ describe('LiteratureVerifier', () => {
         peerReviewed: true
       };
 
+      // Seed the registry answer.
+      //
+      // This test used to pass with no seeding, because `verifyDOI` began
+      // with `if (NODE_ENV === 'test') return true` -- so it returned true
+      // for ANY well-formed DOI whenever the suite ran, including
+      // fabricated ones. The test was therefore asserting the behaviour of
+      // a bypass rather than of the verifier, and would have passed just
+      // as happily against 10.9999/completely-made-up.
+      //
+      // Seeding states the premise out loud: GIVEN CrossRef says this DOI
+      // resolves, a peer-reviewed reference carrying it verifies.
+      LiteratureVerifier.primeRegistryCache(`doi:${doi}`, true);
+
       const verified = await LiteratureVerifier.verifyReference(ref);
       expect(verified).toBe(true);
+    });
+
+    it('does not verify a well-formed DOI the registry has not confirmed', async () => {
+      // The other half, and the reason the bypass mattered: without a
+      // registry answer there is no verification, however well-formed the
+      // identifier looks.
+      const verified = await LiteratureVerifier.verifyReference({
+        doi: '10.9999/completely-made-up',
+        title: 'Fabricated',
+        authors: ['Nobody'],
+        year: 2020,
+        journal: 'Journal',
+        peerReviewed: true
+      });
+      expect(verified).toBe(false);
     });
 
     it('should reject invalid DOI format', async () => {

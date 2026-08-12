@@ -54,6 +54,16 @@ node_modules/
 # Coverage output from `npm run test:coverage`.
 coverage/
 
+# Compiled TypeScript output. `tsconfig.json` gained an `outDir` so that
+# `npm run build` emits somewhere, and 41 compiled .js files were committed
+# on 2026-08-11 -- a duplicate of every source file in the tree, which goes
+# stale the moment anyone edits the TypeScript and gives a reader a second,
+# wrong answer to "what does this module do". Build output is derived, not
+# source.
+dist/
+build/
+*.tsbuildinfo
+
 # Science-Agent-Pipeline is folded into this repo as regular files (it used
 # to be tracked as a gitlink to its own separate repo, which broke CI --
 # GitHub Actions checkout tried to resolve the gitlink and there was no

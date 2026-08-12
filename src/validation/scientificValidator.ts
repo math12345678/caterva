@@ -42,6 +42,12 @@ export interface ParameterMetadata {
     pH?: number;
     substrate?: string;
   };
+  /**
+   * Where the value came from: 'user', 'brenda_exact', 'literature (…)',
+   * and so on. Absent means unknown, which is treated as strictly as a
+   * resolved value with no citation.
+   */
+  origin?: string;
 }
 
 export interface ValidationResult {
@@ -127,15 +133,39 @@ export class ParameterValidator {
     // dressed up as literature-backed.
     if (!isExperimentalCondition(param.name)) {
       if (!param.literature || param.literature.length === 0) {
-        errors.push({
-          code: 'NO_LITERATURE',
-          field: param.name,
-          message:
-            `Parameter '${param.name}' is a measured quantity and has no ` +
-            'literature backing',
-          severity: 'critical',
-          fix: 'Provide at least 2 peer-reviewed sources, or resolve it with `scientific resolve`'
-        });
+        // A value the USER typed is not a fabrication. They may have
+        // measured it themselves, or be exploring a range deliberately --
+        // both are legitimate, and refusing to run made the tool unusable
+        // for exactly the person it is for: someone with their own bench
+        // data. Terrium's rule is that an unsourced number must never be
+        // PRESENTED as sourced, not that it may never be used.
+        //
+        // So it warns, loudly, and the provenance table already reports it
+        // as user-supplied with no citation. What stays a hard failure is
+        // a value that arrived claiming to be resolved and carries no
+        // citation to show for it -- that is a claim without evidence
+        // rather than an honest input.
+        if (param.origin === 'user') {
+          warnings.push({
+            code: 'USER_SUPPLIED_NO_LITERATURE',
+            field: param.name,
+            message:
+              `'${param.name}' was supplied directly and has no literature ` +
+              'backing. Results using it must not be described as ' +
+              'literature-verified.',
+            severity: 'medium'
+          });
+        } else {
+          errors.push({
+            code: 'NO_LITERATURE',
+            field: param.name,
+            message:
+              `Parameter '${param.name}' is a measured quantity and has no ` +
+              'literature backing',
+            severity: 'critical',
+            fix: 'Provide at least 2 peer-reviewed sources, or resolve it with `scientific resolve`'
+          });
+        }
       }
     }
 
@@ -227,6 +257,22 @@ export class ParameterValidator {
 // ============================================================================
 // LAYER 2: LITERATURE VERIFICATION
 // ============================================================================
+
+/**
+ * Identify this tool to CrossRef.
+ *
+ * CrossRef operates a "polite pool" with better rate limits for clients
+ * that identify themselves with a contact address. `TERRIUM_CONTACT_EMAIL`
+ * supplies it; without one the request still works, just in the anonymous
+ * pool. The address is NOT hardcoded -- a fork should not silently
+ * identify itself as this project's author.
+ */
+function crossRefUserAgent(): string {
+  const contact = process.env['TERRIUM_CONTACT_EMAIL'];
+  return contact
+    ? `Terrium/1.0 (mailto:${contact})`
+    : 'Terrium/1.0 (https://github.com/terrium)';
+}
 
 /** Registry lookups must not hang a validation pass. */
 const LITERATURE_LOOKUP_TIMEOUT_MS = 15_000;
@@ -587,9 +633,27 @@ export class LiteratureVerifier {
       return false;
     }
 
-    // In test environments, skip network verification
-    if (process.env.NODE_ENV === 'test') {
-      return true; // Accept syntactically valid DOIs in tests
+    // Under test, DO NOT fabricate a registry answer.
+    //
+    // This read `if (NODE_ENV === 'test') return true;` -- "accept
+    // syntactically valid DOIs in tests" -- which makes this function
+    // return TRUE for 10.9999/completely-made-up whenever the suite runs.
+    // That is the fourth appearance of the defect this file spends most of
+    // its comments on: a check whose verdict does not depend on what it is
+    // checking. A test suite that runs against a verifier which cannot say
+    // "no" is testing nothing about verification.
+    //
+    // Throwing puts the caller on its `unverified` path, which is the
+    // truthful state: no registry was consulted. Tests that need a
+    // deterministic answer seed one with `primeRegistryCache`, which is
+    // what that seam exists for.
+    if (process.env['NODE_ENV'] === 'test') {
+      throw new Error(
+        'CrossRef is not called under NODE_ENV=test. Seed the answer with ' +
+        'LiteratureVerifier.primeRegistryCache(`doi:${doi}`, true|false) ' +
+        'rather than relying on a bypass that returns true for any ' +
+        'well-formed DOI.',
+      );
     }
 
     try {
@@ -598,6 +662,13 @@ export class LiteratureVerifier {
         {
           method: 'HEAD',
           signal: AbortSignal.timeout(LITERATURE_LOOKUP_TIMEOUT_MS),
+          // CrossRef's "polite pool" keys off a mailto: in the User-Agent
+          // and gives materially better rate limits for it. Read from the
+          // environment rather than hardcoding a personal address, so a
+          // fork does not silently identify itself as someone else.
+          headers: {
+            'User-Agent': crossRefUserAgent(),
+          },
         },
       );
       if (!response.ok) {
