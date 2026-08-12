@@ -55,6 +55,7 @@ APP_FILE = API_SERVER / "src" / "app.ts"
 #: repository should be checkable.
 EXAMPLE_FILES = [
     REPO_ROOT / "examples" / "python_integration.py",
+    REPO_ROOT / "examples" / "nodejs_integration.js",
 ]
 
 #: `router.get("/simulate/:jobId", ...)` across several formatting styles,
@@ -69,8 +70,20 @@ ROUTE_RE = re.compile(
 #: Where the router is mounted: `app.use("/api", router)`.
 MOUNT_RE = re.compile(r"""app\.use\(\s*['"`](/[^'"`]*)['"`]\s*,\s*router""")
 
-#: `f"{self.base_url}/api/simulate/{job_id}"` and friends.
-CALL_RE = re.compile(r"""\{(?:self\.)?base_url\}(/[A-Za-z0-9_/:{}.-]*)""")
+#: Any `/api/...` path in a string or template literal, in any language.
+#:
+#: The first version matched only Python's `f"{self.base_url}/api/..."`.
+#: `examples/nodejs_integration.js` writes `axios.get('/api/health')` and
+#: `` `/api/jobs/${jobId}` ``, so it matched NOTHING — and the guard would
+#: have reported "no API calls" rather than the eleven wrong endpoints it
+#: actually contained. A checker that only understands one of the two
+#: example files it is pointed at is a checker with a blind spot the size of
+#: the thing it missed.
+#:
+#: Anchoring on `/api/` rather than on how the base URL is spelled keeps it
+#: language-agnostic; `${...}` and `{...}` placeholders are normalised to a
+#: wildcard below.
+CALL_RE = re.compile(r"""['"`]?(/api/[A-Za-z0-9_/:${}.-]*)""")
 
 
 def _mount_prefix() -> str:
@@ -116,15 +129,50 @@ def _to_pattern(route: str) -> re.Pattern[str]:
     return re.compile("^/" + "/".join(parts) + "$")
 
 
+def _is_prose(line: str, state: dict) -> bool:
+    """Whether this line is a comment or docstring rather than code.
+
+    Needed because the guard's own fix notes list the endpoints that USED to
+    be wrong. Flagging a comment that documents a past defect would make the
+    only honest way to record the history a build failure — which is a good
+    way to teach people to delete the history.
+
+    Tracks Python `\"\"\"` docstrings and JS `/* */` blocks, and skips `#`,
+    `//` and `*` line comments. Deliberately simple: it only has to be right
+    about the two example files, and being wrong in the safe direction
+    (treating code as prose) costs a missed check, not a false alarm.
+    """
+    stripped = line.strip()
+
+    if state.get("in_block"):
+        if state["in_block"] in stripped:
+            state["in_block"] = None
+        return True
+
+    for opener, closer in (('"""', '"""'), ("'''", "'''"), ("/*", "*/")):
+        if stripped.startswith(opener):
+            # A docstring opened and closed on one line is wholly prose.
+            if stripped.count(opener) < 2 and closer not in stripped[len(opener):]:
+                state["in_block"] = closer
+            return True
+
+    return stripped.startswith(("#", "//", "*"))
+
+
 def example_calls(path: pathlib.Path) -> list[tuple[int, str]]:
     """(line number, endpoint) for each API call in an example file."""
     calls: list[tuple[int, str]] = []
+    state: dict = {"in_block": None}
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if _is_prose(line, state):
+            continue
         for match in CALL_RE.finditer(line):
             endpoint = match.group(1).rstrip("/") or "/"
-            # `{job_id}` in an f-string is a value the caller supplies --
-            # the same role `:jobId` plays on the server side.
-            calls.append((number, re.sub(r"\{[^}]+\}", ":param", endpoint)))
+            # `{job_id}` (Python) and `${jobId}` (JS template literal) are
+            # both values the caller supplies -- the same role `:jobId`
+            # plays on the server side.
+            endpoint = re.sub(r"\$?\{[^}]*\}", ":param", endpoint)
+            calls.append((number, endpoint))
     return calls
 
 

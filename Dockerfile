@@ -1,40 +1,42 @@
-# Terrium sandbox image.
-#
-# Gives anyone -- a new contributor, a Kickstart mentor, the backend hire
-# once that role is filled -- a single command to get an environment that
-# genuinely matches CI, instead of relying on `make setup` working
-# identically on every laptop.
-#
-# Build:  docker build -t terrium-sandbox .
-# Run:    docker run -it --rm terrium-sandbox
-# (drops into a shell with the environment already verified by check_env.py)
-#
-# NOTE: this could not be built or tested inside the agent sandbox that
-# authored it (no docker binary there) -- verify with the build command
-# above before relying on it.
+FROM node:22-alpine AS builder
 
-FROM python:3.12-slim
+WORKDIR /build
 
-# Python 3.10-3.13 is the supported range (see README.md); 3.12 is used here
-# as a supported option (libroadrunner 2.8.0 / numpy 2.2.6 also ship cp313 wheels).
+COPY package*.json ./
+RUN npm ci --only=production
 
-WORKDIR /terrium
+COPY tsconfig.json ./
+COPY src ./src
 
-# System deps: none should be required -- that's the entire point of using
-# libroadrunner/antimony/python-libsbml instead of the tellurium umbrella
-# package (see README.md "Do not pip install tellurium"). If a future
-# dependency needs build tools, add them here rather than silently letting
-# `pip install` fall back to compiling from source.
+RUN npx tsc
 
-COPY requirements.txt requirements-dev.txt ./
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements-dev.txt
+# Production image
+FROM node:22-alpine
 
-COPY . .
+WORKDIR /app
 
-# Fail the build immediately if the environment doesn't actually work --
-# this is the same script CI runs, so an image that builds successfully has
-# already proven it can run a real Michaelis-Menten model end to end.
-RUN python scripts/check_env.py
+ENV NODE_ENV=production \
+    PORT=3000
 
-CMD ["bash"]
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# Copy from builder
+COPY --from=builder --chown=nodejs:nodejs /build/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /build/dist ./dist
+
+# Copy static assets
+COPY --chown=nodejs:nodejs src/web/dashboard.html ./dist/src/web/
+
+# Create data directory
+RUN mkdir -p /app/data && chown -R nodejs:nodejs /app/data
+
+USER nodejs
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+
+CMD ["node", "dist/src/web/server.js"]

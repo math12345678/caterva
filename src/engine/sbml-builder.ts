@@ -112,6 +112,10 @@ export function buildMichaelisMenten(params: {
  *
  * Where Ki is the inhibition constant.
  *
+ * Reference: Copeland, R. A. (2013). Enzymes: A Practical Introduction to
+ * Structure, Mechanism, and Data Analysis (2nd ed.), Ch. 3 "Reversible
+ * Modes of Inhibitor Interaction," competitive inhibition rate equation.
+ *
  * Parameters:
  *   - km: Michaelis constant
  *   - vmax: Maximum velocity
@@ -211,6 +215,11 @@ export function buildCompetitiveInhibition(params: {
  *
  * Rate = (Vmax * [S]) / ((Km + [S]) * (1 + [I] / Ki))
  *
+ * Reference: Copeland, R. A. (2013). Enzymes: A Practical Introduction to
+ * Structure, Mechanism, and Data Analysis (2nd ed.), Ch. 3, pure
+ * non-competitive inhibition rate equation (inhibitor binds E and ES with
+ * equal affinity, reducing Vmax without changing apparent Km).
+ *
  * Parameters:
  *   - km: Michaelis constant
  *   - vmax: Maximum velocity
@@ -309,6 +318,14 @@ export function buildNonCompetitiveInhibition(params: {
  * Product P inhibits the enzyme, reducing activity over time.
  *
  * Rate = (Vmax * [S]) / ((Km + [S]) * (1 + [P] / Kp))
+ *
+ * Reference: Segel, I. H. (1975). Enzyme Kinetics: Behavior and Analysis
+ * of Rapid Equilibrium and Steady-State Enzyme Systems, Wiley, Ch. 3-4
+ * (product inhibition). This is the simplified mixed-type form (product
+ * treated as a non-competitive-style inhibitor of Vmax); it does not model
+ * product recompetition for the Km term, which Segel treats as a distinct,
+ * more complex case (competitive product inhibition) -- use only where the
+ * simplification is appropriate.
  *
  * Parameters:
  *   - km: Michaelis constant

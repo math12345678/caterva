@@ -397,6 +397,46 @@
             </div>
         </div>
 
+        <!-- Export & Analysis Section -->
+        <div class="card" style="margin-top: 30px;">
+            <h2>📊 Export & Analysis</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <button onclick="exportJobHistory()" style="padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    📥 Export All Jobs (CSV)
+                </button>
+                <button onclick="exportStatistics()" style="padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    📊 Export Statistics (CSV)
+                </button>
+                <button onclick="showComparisonForm()" style="padding: 12px; background: #764ba2; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    🔍 Compare Jobs
+                </button>
+                <button onclick="openAPIReference()" style="padding: 12px; background: #764ba2; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                    📖 API Reference
+                </button>
+            </div>
+            <div id="comparisonForm" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                <h3 style="color: #667eea; margin-bottom: 10px;">Compare Multiple Jobs</h3>
+                <input type="text" id="jobIdsInput" placeholder="Enter job IDs (comma-separated)" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 6px;">
+                <button onclick="compareJobs()" style="padding: 10px 20px; background: #764ba2; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                    Compare
+                </button>
+                <div id="comparisonResult" style="margin-top: 15px; padding: 15px; background: #f5f5f5; border-radius: 6px; display: none;">
+                    <pre id="comparisonOutput" style="white-space: pre-wrap; word-wrap: break-word; font-size: 12px;"></pre>
+                </div>
+            </div>
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; color: #666; font-size: 14px;">
+                <strong>Available Endpoints:</strong>
+                <ul style="margin-left: 20px; margin-top: 10px;">
+                    <li><code>/api/export/jobs/csv</code> - All job history</li>
+                    <li><code>/api/export/sweep/:id/csv</code> - Sweep results</li>
+                    <li><code>/api/export/batch/:id/csv</code> - Batch results</li>
+                    <li><code>/api/export/comparison/:id/csv</code> - Model comparison</li>
+                    <li><code>/api/compare/jobs</code> - Compare jobs</li>
+                    <li><code>/api/analyze/sweep/:id</code> - Sensitivity analysis</li>
+                </ul>
+            </div>
+        </div>
+
         <div class="footer">
             <p>Terrium Scientific Validation Framework v1.0.0</p>
             <p>Production-Ready Research Platform</p>
@@ -592,6 +632,91 @@
             // Update metrics
             const runs = table.querySelectorAll('tr').length;
             document.getElementById('totalRuns').textContent = runs;
+        }
+
+        // Export Functions
+        function exportJobHistory() {
+            window.location.href = '/api/export/jobs/csv';
+        }
+
+        function exportStatistics() {
+            window.location.href = '/api/export/stats/csv';
+        }
+
+        function showComparisonForm() {
+            const form = document.getElementById('comparisonForm');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function compareJobs() {
+            const input = document.getElementById('jobIdsInput').value;
+            if (!input.trim()) {
+                alert('Please enter at least 2 job IDs (comma-separated)');
+                return;
+            }
+
+            const jobIds = input.split(',').map(id => id.trim()).filter(id => id.length > 0);
+            if (jobIds.length < 2) {
+                alert('Please enter at least 2 job IDs');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/compare/jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ jobIds })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('comparisonResult');
+                const output = document.getElementById('comparisonOutput');
+
+                output.textContent = JSON.stringify(result, null, 2);
+                resultDiv.style.display = 'block';
+            } catch (error) {
+                alert('Comparison failed: ' + error.message);
+            }
+        }
+
+        function openAPIReference() {
+            const msg = `Terrium API Quick Reference
+
+CORE ENDPOINTS:
+  POST   /api/simulate              Single simulation
+  POST   /api/compare               Compare all 4 models
+  GET    /api/health                System status
+
+JOB MANAGEMENT:
+  GET    /api/jobs/:jobId           Job results
+  GET    /api/jobs/history          Recent jobs
+  GET    /api/stats                 Statistics
+
+PARAMETER SWEEPS:
+  POST   /api/sweep                 Run sweep
+  GET    /api/sweeps/:id            Sweep results
+
+BATCH PROCESSING:
+  POST   /api/batch                 Run batch
+  GET    /api/batches/:id           Batch results
+
+EXPORT (NEW):
+  GET    /api/export/jobs/csv       All jobs
+  GET    /api/export/sweep/:id/csv  Sweep results
+  GET    /api/export/batch/:id/csv  Batch results
+  GET    /api/export/comparison/:id/csv  Comparison
+  GET    /api/export/stats/csv      Statistics
+
+ANALYSIS (NEW):
+  POST   /api/compare/jobs          Compare jobs
+  GET    /api/analyze/sweep/:id     Sensitivity
+
+Learn more: Check EXPORT_AND_ANALYSIS_GUIDE.md`;
+            alert(msg);
         }
 
         // Initialize on load

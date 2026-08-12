@@ -2,6 +2,7 @@
 import { commandResolve } from './commandResolve';
 import { commandSimulateResolved } from './commandSimulateResolved';
 import { JobManager, historyPath } from '../execution/job-manager';
+import { commandSweep } from './commandSweep';
 import { parseArgs, parseQuantity } from './parseQuantity';
 import { convertConcentration } from '../units';
 
@@ -79,15 +80,25 @@ function header(msg: string) {
  *
  * NO FAKE DATA - All DOIs are verified against CrossRef
  * All papers are from PubMed (50+ million papers)
+ *
+ * Timeout: 10 seconds max (to avoid hanging)
  */
 async function fetchRealLiterature(enzyme: string, substrate: string): Promise<Literature[]> {
   const literature: Literature[] = [];
   let counter = 0;
 
-  info(`Searching PubMed for real papers on "${enzyme} kinetics"...`);
+  info(`Searching PubMed for real papers on "${enzyme} kinetics" (timeout: 10s)...`);
 
   try {
-    const papers = await searchPubMedForEnzymeKinetics(enzyme, substrate, 5);
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('PubMed search timeout (10s)')), 10000)
+    );
+
+    const papers = await Promise.race([
+      searchPubMedForEnzymeKinetics(enzyme, substrate, 5),
+      timeoutPromise
+    ]);
 
     for (const paper of papers) {
       if (!paper.doi) continue; // Skip papers without DOIs
@@ -132,7 +143,8 @@ async function fetchRealLiterature(enzyme: string, substrate: string): Promise<L
 
     return literature;
   } catch (err) {
-    error(`Failed to fetch real literature: ${err instanceof Error ? err.message : String(err)}`);
+    warning(`PubMed search failed or timed out: ${err instanceof Error ? err.message : String(err)}`);
+    warning('Continuing with user-provided parameters (unverified)');
     return [];
   }
 }
@@ -252,23 +264,57 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
 
     console.log('');
 
+    // `validated: false` means NO SIMULATION RAN.
+    //
+    // A previous edit turned this branch into a warning and let the code
+    // fall through to the results block. But the pipeline returns
+    // `trajectory: []` on a validation failure, so falling through printed:
+    //
+    //     Results:
+    //       Trajectory points: 0
+    //       Initial value: undefined
+    //       Final value: 0.000
+    //
+    // and exited 0. That is success-on-failure -- the same defect this CLI
+    // was corrected for once already -- and it is worse than the strictness
+    // it was trying to relax, because it reports a run that did not happen.
+    //
+    // The instinct behind that edit was right and is preserved below.
+    // Refusing to run merely because a value is unbacked WAS wrong: an
+    // experimental condition (s0, temperature, pH) is chosen by the
+    // experimenter and cannot be cited, so blocking on it is a category
+    // error (Stage 10 Part 16). But that was fixed where it belonged, in
+    // Layer 1. `validated: false` no longer means "unbacked" -- a run on
+    // entirely user-supplied values validates fine and simply scores zero
+    // confidence. It now means the run could not be performed at all.
+    //
+    // So the honest split is: cannot run -> stop; ran but nothing backs it
+    // -> report loudly, in the success path, where there are real numbers
+    // to caveat.
     if (!response.validated) {
-      error('SIMULATION FAILED - No real literature found');
+      error('SIMULATION DID NOT RUN');
       console.log('\nValidation errors:');
       response.validationErrors.forEach((err, i) => {
         console.log(`  ${i + 1}. ${err}`);
       });
-      console.log('\n' + colors.dim + 'Diagnostics:' + colors.reset);
-      console.log('  The system could not find real papers on PubMed.');
-      console.log('  This means either:');
-      console.log('    1. The enzyme/substrate combination has no published kinetics');
-      console.log('    2. The PubMed API is not responding correctly');
-      console.log('    3. Network access to PubMed is blocked\n');
-      console.log('Check logs above for PubMed search attempts.\n');
+      console.log(
+        '\n' + colors.dim +
+        'No trajectory was produced, so there are no results to show.\n' +
+        'Supply the missing values in the query, or name a system to resolve\n' +
+        'them from literature with --resolve.' + colors.reset + '\n'
+      );
       process.exit(1);
     }
 
-    success('SIMULATION COMPLETE');
+    if (response.validationConfidence === 0 || response.metadata.literatureSourcesUsed === 0) {
+      // Ran, and is real, but nothing in the literature backs the numbers.
+      // This is the state the earlier edit was reaching for.
+      warning('SIMULATION COMPLETE — NO LITERATURE BACKING');
+      console.log('  The run used your values. They are not literature-backed,');
+      console.log('  and must not be reported as such.\n');
+    } else {
+      success('SIMULATION COMPLETE — LITERATURE BACKED');
+    }
 
     console.log('\n' + colors.dim + 'Results:' + colors.reset);
     console.log(`  Trajectory points: ${response.results.trajectory.length}`);
@@ -713,6 +759,64 @@ async function main() {
         organism,
         quantity: quantityRaw,
         enzymeConc,
+        json: booleans.has('json'),
+      });
+      process.exit(code);
+    }
+
+    case 'sweep': {
+      // Runs the model across a range of one parameter and interprets the
+      // curve, rather than printing a column of numbers.
+      const { flags, booleans } = parseArgs(rest);
+      const parameter = flags['parameter'];
+      const range = flags['range'];
+
+      if (!parameter || !range) {
+        error('sweep needs --parameter NAME and --range MIN:MAX:STEP');
+        info('Example: sweep --parameter s0 --range 1:20:1 --km 0.5mM --vmax 0.1mM/s');
+        process.exit(1);
+      }
+
+      const bounds = range.split(':').map(Number);
+      if (bounds.length !== 3 || bounds.some(n => !Number.isFinite(n))) {
+        error(`--range must be MIN:MAX:STEP with three numbers (got '${range}')`);
+        process.exit(1);
+      }
+      const [min, max, step] = bounds as [number, number, number];
+      if (step <= 0 || max <= min) {
+        error(`--range needs a positive step and max > min (got '${range}')`);
+        process.exit(1);
+      }
+
+      const baseParameters: Record<string, number> = {};
+      const provenance: Array<{ name: string; value: number; unit: string; origin: string; unitAssumed?: boolean }> = [];
+      for (const [key, raw] of Object.entries(flags)) {
+        if (['parameter', 'range'].includes(key)) continue;
+        try {
+          const quantity = parseQuantity(key, raw);
+          baseParameters[key] = quantity.value;
+          provenance.push({
+            name: key,
+            value: quantity.value,
+            unit: quantity.unit,
+            origin: 'user',
+            unitAssumed: !quantity.unitDeclared,
+          });
+        } catch (err) {
+          error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+
+      const code = await commandSweep({
+        query: rest[0] && !rest[0].startsWith('--') ? rest[0] : 'sweep',
+        parameter,
+        min,
+        max,
+        step,
+        baseParameters,
+        provenance,
+        request: {},
         json: booleans.has('json'),
       });
       process.exit(code);
