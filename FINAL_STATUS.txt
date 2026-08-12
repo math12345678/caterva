@@ -1,4 +1,16 @@
 ================================================================================
+CORRECTION (2026-08-10): "178 tests passing" and the coverage percentages
+below are a stale snapshot, not a live fact -- the suite has grown since
+(17 test files at last count, up from 11). Run `npm test` /
+`npm run test:coverage` from repo root for the current numbers. The test
+file list further below omits newer files (e.g. critical-paths.test.ts,
+telluriumBridge.test.ts, literatureResolver.test.ts, sbml-builder.test.ts,
+jobHistory.test.ts, reproducibilityRegressions.test.ts,
+enzymeConcentration.test.ts, cliEndToEnd.test.ts, verificationStates.test.ts,
+parameter-sweep.test.ts). This file is a near-duplicate of
+BUILD_COMPLETE_SUMMARY.md, COMPLETE_BUILD_REPORT.md, COMPREHENSIVE_GUIDE.md,
+and IMPLEMENTATION_COMPLETE.md.
+================================================================================
 TERRIUM SCIENTIFIC VALIDATION FRAMEWORK - FINAL STATUS
 ================================================================================
 

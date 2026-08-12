@@ -1,3 +1,5 @@
+> **⚠️ CORRECTION (2026-08-10):** several specific figures here are inflated beyond normal staleness — verified via `wc -l`/`grep`: `kinetic-models.ts` is 217 lines (claimed "400+"), `advanced-analytics.ts` is 362 lines with 7 exported functions (claimed "450+ lines, 20+ functions"), `dashboard.html` is 522 lines (claimed "600+"), and there are 21 non-test `.ts` source files (claimed "40+", "12,000+ total lines" vs. an actual ≈9,600). "178 tests" is also stale — the suite has grown since (17 test files at last count). Run `wc -l`/`npm test` yourself rather than trusting the numbers below. This doc is a near-duplicate of `BUILD_COMPLETE_SUMMARY.md`, `COMPREHENSIVE_GUIDE.md`, `FINAL_STATUS.txt`, and `IMPLEMENTATION_COMPLETE.md`.
+
 # 🎉 TERRIUM - Complete Build Report
 ## Three Phases of Excellence
 

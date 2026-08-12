@@ -358,6 +358,21 @@ export class CrossVerifier {
   verify(parameterName: string, domain: string): CrossVerificationResult {
     const literature = this.db.findByParameter(parameterName, domain);
 
+    // With zero sources, `values` below is empty and `mean`/`stdDev` become
+    // NaN (0/0). Every comparison against NaN (`relativeDeviation > 20`,
+    // etc.) is false, so `consensus` silently defaulted to its initial
+    // value 'strong' -- reporting confident agreement from zero data. This
+    // is the same fabricated-confidence pattern already fixed elsewhere in
+    // this codebase (ParameterRecommender.recommend() throws for the same
+    // condition below; this mirrors that, rather than inventing a new
+    // silent-failure path). Callers (scientificPipeline.ts) already wrap
+    // crossVerify() in try/catch and treat a throw as "0 sources", so this
+    // doesn't change their behavior -- it removes a latent trap for any
+    // caller that reads .consensus or .mean directly.
+    if (literature.length === 0) {
+      throw new Error(`No literature found for parameter '${parameterName}' in domain '${domain}'`);
+    }
+
     if (literature.length < 2) {
       logger.warn(
         { parameterName, domain },
@@ -371,6 +386,10 @@ export class CrossVerifier {
           .filter(p => p.name === parameterName)
           .map(p => p.value)
       );
+
+    if (values.length === 0) {
+      throw new Error(`No values extracted for parameter '${parameterName}' in domain '${domain}'`);
+    }
 
     const mean = values.reduce((a, b) => a + b, 0) / values.length;
     const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;

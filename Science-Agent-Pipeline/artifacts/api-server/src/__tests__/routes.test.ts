@@ -15,6 +15,51 @@ process.env.WAITLIST_FILE = join(tmpDir, "waitlist.json");
 
 let server: Server;
 
+/**
+ * Polls a job to completion and returns its result.
+ *
+ * Throws -- loudly, with the job's own error text -- if the job fails or does
+ * not finish. The three tests below used to do this inline and `return` on
+ * `status === "failed"`, with the comment *"acceptable if the Python
+ * environment isn't configured"*. That made them pass in exactly two cases:
+ * when the simulation worked, and when it didn't.
+ *
+ * The engine is not optional. `scripts/check_env.py` treats roadrunner,
+ * antimony and libsbml as required, and a job that fails because they are
+ * missing is a broken environment -- which is a thing to report, not a thing
+ * to swallow. Compare the stdpopsim skip (Part 21): an explicit skip with a
+ * stated reason is legible in a CI summary; a green test is not.
+ */
+async function awaitJob(
+  jobId: string,
+  { attempts = 30, intervalMs = 500 } = {},
+): Promise<Record<string, unknown>> {
+  let last: Record<string, unknown> = {};
+
+  for (let i = 0; i < attempts; i++) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    const res = await request(server).get(`/api/simulate/${jobId}`);
+    last = res.body;
+
+    if (last.status === "completed") {
+      return last.result as Record<string, unknown>;
+    }
+    if (last.status === "failed") {
+      throw new Error(
+        `job ${jobId} failed: ${
+          JSON.stringify(last.error ?? last) || "no error reported"
+        }`,
+      );
+    }
+  }
+
+  throw new Error(
+    `job ${jobId} did not finish within ${
+      (attempts * intervalMs) / 1000
+    }s (last status: ${String(last.status)})`,
+  );
+}
+
 beforeAll(() => {
   server = app.listen(0);
 });
@@ -99,70 +144,61 @@ describe("POST /api/simulate", () => {
     );
   });
 
-  it("pipeline runs asynchronously to completion when Python bridge is available", async () => {
+  it("pipeline runs asynchronously to completion", async () => {
     const createRes = await request(server)
       .post("/api/simulate")
-      .send({ query: "simulate sir beta=0.5 gamma=0.1" });
-    const { jobId } = createRes.body;
+      .send({
+        // s0, i0, r0_recovered, end and points are experimental CONDITIONS:
+        // chosen by whoever runs the simulation, never resolvable from
+        // literature, and therefore never defaulted (ADR 0012/0013).
+        //
+        // This query used to omit all five. The job failed every time with
+        // MISSING_REQUIRED_INPUT, and the test returned on `status ===
+        // "failed"` and passed -- so the assertions below, including the two
+        // that check beta and gamma survive the round trip, had never once
+        // executed. Making the helper throw surfaced it on the first run.
+        query:
+          "simulate sir beta=0.5 gamma=0.1 s0=100 i0=10 r0_recovered=0 " +
+          "end=10 points=51",
+      });
 
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      const getRes = await request(server).get(`/api/simulate/${jobId}`);
-      if (getRes.body.status === "completed") {
-        expect(getRes.body.result).toBeDefined();
-        expect(getRes.body.result.domain).toBe("sir");
-        expect(Array.isArray(getRes.body.result.trajectory)).toBe(true);
-        expect(getRes.body.result.trajectory.length).toBeGreaterThan(0);
-        expect(getRes.body.result.parameters.beta).toBe(0.5);
-        expect(getRes.body.result.parameters.gamma).toBe(0.1);
-        return;
-      }
-      if (getRes.body.status === "failed") {
-        // Pipeline may fail if Python/Tellurium environment isn't available
-        return;
-      }
-    }
-    // Timed out — acceptable if the Python environment isn't configured
+    const result = (await awaitJob(createRes.body.jobId)) as any;
+
+    expect(result).toBeDefined();
+    expect(result.domain).toBe("sir");
+    expect(Array.isArray(result.trajectory)).toBe(true);
+    expect(result.trajectory.length).toBeGreaterThan(0);
+    expect(result.parameters.beta).toBe(0.5);
+    expect(result.parameters.gamma).toBe(0.1);
   });
 
   it("runs a Gillespie SSA query to completion with seeded trajectory", async () => {
     const createRes = await request(server)
       .post("/api/simulate")
       .send({ query: "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9" });
-    const { jobId } = createRes.body;
+    const result = (await awaitJob(createRes.body.jobId)) as any;
 
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      const getRes = await request(server).get(`/api/simulate/${jobId}`);
-      if (getRes.body.status === "completed") {
-        const result = getRes.body.result;
-        expect(result.domain).toBe("gillespie_ssa");
-        expect(result.parameters.a0).toBe(200);
-        expect(result.parameters.k).toBe(0.5);
-        expect(result.trajectory.length).toBeGreaterThan(0);
-        expect(result.trajectory[0]).toMatchObject({ a: 200, b: 0 });
-        // The final row snaps to `end` exactly.
-        expect(result.trajectory[result.trajectory.length - 1].time).toBe(5);
-        // Seeded run: reproducible; run the same query again and compare.
-        const again = await request(server).post("/api/simulate").send({
-          query: "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9",
-        });
-        for (let j = 0; j < 30; j++) {
-          await new Promise((r) => setTimeout(r, 500));
-          const getAgain = await request(server).get(
-            `/api/simulate/${again.body.jobId}`,
-          );
-          if (getAgain.body.status === "completed") {
-            expect(getAgain.body.result.trajectory).toEqual(result.trajectory);
-            return;
-          }
-        }
-        return;
-      }
-      if (getRes.body.status === "failed") {
-        return; // Python/Tellurium environment unavailable
-      }
-    }
+    expect(result.domain).toBe("gillespie_ssa");
+    expect(result.parameters.a0).toBe(200);
+    expect(result.parameters.k).toBe(0.5);
+    expect(result.trajectory.length).toBeGreaterThan(0);
+    expect(result.trajectory[0]).toMatchObject({ a: 200, b: 0 });
+    // The final row snaps to `end` exactly.
+    expect(result.trajectory[result.trajectory.length - 1].time).toBe(5);
+
+    // Seeded run: reproducible. The second run is the whole point of the
+    // test, and the old nested-poll version skipped it entirely whenever the
+    // inner loop timed out.
+    const again = await request(server).post("/api/simulate").send({
+      query: "gillespie stochastic decay a0=200 k=0.5 end=5 seed=9",
+    });
+    const repeat = (await awaitJob(again.body.jobId)) as any;
+
+    expect(
+      repeat.trajectory,
+      "same seed, same trajectory: a seeded SSA run that does not reproduce " +
+        "is not reproducible",
+    ).toEqual(result.trajectory);
   });
 
   it("runs a two_locus_wright_fisher query with an array override to completion", async () => {
@@ -174,25 +210,12 @@ describe("POST /api/simulate", () => {
           "recombination_rate=0.1 starting_frequencies=0.5,0,0,0.5 " +
           "mutation_rate=0.001 replicate_runs=50",
       });
-    const { jobId } = createRes.body;
+    const result = (await awaitJob(createRes.body.jobId)) as any;
 
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 500));
-      const getRes = await request(server).get(`/api/simulate/${jobId}`);
-      if (getRes.body.status === "completed") {
-        const result = getRes.body.result;
-        expect(result.domain).toBe("two_locus_wright_fisher");
-        expect(result.parameters.starting_frequencies).toEqual([
-          0.5, 0, 0, 0.5,
-        ]);
-        expect(result.trajectory.length).toBeGreaterThan(0);
-        expect(result.trajectory[0].generation).toBe(0);
-        return;
-      }
-      if (getRes.body.status === "failed") {
-        return; // Python/Tellurium environment unavailable
-      }
-    }
+    expect(result.domain).toBe("two_locus_wright_fisher");
+    expect(result.parameters.starting_frequencies).toEqual([0.5, 0, 0, 0.5]);
+    expect(result.trajectory.length).toBeGreaterThan(0);
+    expect(result.trajectory[0].generation).toBe(0);
   });
 });
 

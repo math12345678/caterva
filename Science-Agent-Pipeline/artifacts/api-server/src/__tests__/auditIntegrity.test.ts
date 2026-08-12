@@ -37,17 +37,27 @@ describe("domain citations are citations, not labels", () => {
 
   it("never returns a string beginning 'Domain:'", () => {
     // The exact placeholder that reached modelCitations.
-    for (const domain of [
+    const domains = [
       "sbml",
       "monte_carlo_pi",
       "gillespie_ssa_replicates",
       "unknown_domain",
-    ]) {
-      const citation = getDomainCitation(domain);
-      if (citation !== undefined) {
-        expect(citation.startsWith("Domain:")).toBe(false);
-      }
-    }
+    ];
+
+    // Collected, then asserted in one shot. Per-domain
+    // `if (citation !== undefined)` would skip every check the day
+    // getDomainCitation started returning undefined for everything -- the
+    // regression the test exists to catch would make it pass.
+    const placeholders = domains
+      .map((domain) => [domain, getDomainCitation(domain)] as const)
+      .filter(([, citation]) => citation?.startsWith("Domain:"))
+      .map(([domain]) => domain);
+
+    expect(
+      placeholders,
+      "these domains returned the 'Domain: <name>' placeholder, which is a " +
+        "label rather than a citation and must never reach modelCitations",
+    ).toEqual([]);
   });
 
   it("the two domains that were missing now have real literature", () => {

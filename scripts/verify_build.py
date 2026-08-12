@@ -188,6 +188,26 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
     ]
 
 
+def run_hygiene_guard() -> List[Tuple[str, bool, str]]:
+    """Fail when build output or vendored dependencies are committed.
+
+    Three times in one session derived files entered or nearly entered git:
+    node_modules/ (unignored), coverage/ (unignored), and dist/ -- 41
+    compiled .js files that WERE committed after tsconfig gained an outDir.
+
+    A compiled mirror of the source tree is the largest possible instance
+    of the duplicate-source-of-truth problem this codebase has spent
+    seventeen parts removing.
+    """
+    return [
+        run_guard(
+            "Generated Files Guard",
+            f"python {SCRIPTS_DIR / 'check_no_generated_files_tracked.py'}",
+            timeout=180,
+        )
+    ]
+
+
 def run_orphan_guard() -> List[Tuple[str, bool, str]]:
     """Fail when a source module is imported by nothing.
 
@@ -208,6 +228,59 @@ def run_orphan_guard() -> List[Tuple[str, bool, str]]:
             f"python {SCRIPTS_DIR / 'check_no_orphan_modules.py'}",
             timeout=120,
         )
+    ]
+
+
+def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
+    """Fail when a test's only assertions sit inside a conditional.
+
+    Sibling of the orphan guard, and the same blind spot from the other
+    side. The orphan guard catches code nothing runs; this one catches
+    tests that run but cannot fail:
+
+        if (provenance) {
+          expect(provenance.origin).not.toBe("resolved");
+        }
+
+    -- where `provenance` is `undefined` by design, so the assertion never
+    executes. And its twin, which accommodates instead of skipping:
+
+        if (empty) expect(validated).toBe(false);
+        else       expect(validated).toBe(true);
+
+    -- which has an answer ready for both outcomes and so claims nothing.
+
+    Neither can go red, and both count toward the test total, so they read
+    as coverage. The first sweep found twelve, including three route tests
+    that returned on `status === "failed"` with the comment "acceptable if
+    the Python environment isn't configured" -- passing both when the
+    simulation worked and when it didn't. Making one of them honest
+    revealed that its query had been failing on every run since it was
+    written.
+    """
+    return [
+        run_guard(
+            "Vacuous Test Guard",
+            f"python {SCRIPTS_DIR / 'check_no_vacuous_tests.py'}",
+            timeout=120,
+        ),
+        # Third member of the same family. The orphan guard catches code
+        # nothing runs; the vacuous guard catches tests that run but cannot
+        # fail; this one catches tests that do not run at all and say
+        # nothing about it.
+        #
+        # `.only` is the acute case: one committed `describe.only` disables
+        # every sibling in its file and the suite still reports green.
+        # `.skip` is the chronic one -- legitimate when the engine is
+        # genuinely absent, but silent, which is how nineteen popgen tests
+        # went dark for a whole stage (Part 21) before a count guard
+        # noticed. The rule is not "never skip"; it is "never skip
+        # quietly".
+        run_guard(
+            "Disabled Test Guard",
+            f"python {SCRIPTS_DIR / 'check_no_disabled_tests.py'}",
+            timeout=120,
+        ),
     ]
 
 
@@ -394,6 +467,16 @@ def main() -> int:
 
         orphan_guards = run_orphan_guard()
         total_failures += print_results("Orphan Module Guard", orphan_guards)
+
+        # Runs in quick mode too: it is a syntactic scan of the test files,
+        # costs under a second, and the thing it catches is invisible in a
+        # test summary by construction. A guard against tests that cannot
+        # fail is worth little if it only runs in the slow path.
+        vacuous_guards = run_vacuous_test_guard()
+        total_failures += print_results("Test Honesty Guards", vacuous_guards)
+
+        hygiene_guards = run_hygiene_guard()
+        total_failures += print_results("Generated Files Guard", hygiene_guards)
 
     # Live citation guard (network; opt-in so offline builds stay green)
     if args.live:

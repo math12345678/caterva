@@ -1,3 +1,5 @@
+> **⚠️ CORRECTION (2026-08-10):** the "178 tests passing" and specific coverage percentages (84.04%/86.25%/85.01%/66.24%) cited in this guide are a stale snapshot — the suite has grown since (17 test files at last count, up from 11) and coverage moves with it. Run `npm test` / `npm run test:coverage` from repo root for the current numbers rather than citing these. CLI command names and class names (`ScientificPipeline`, `LiteratureService`, etc.) were verified as real. This doc is a near-duplicate of `BUILD_COMPLETE_SUMMARY.md`, `COMPLETE_BUILD_REPORT.md`, `FINAL_STATUS.txt`, and `IMPLEMENTATION_COMPLETE.md`.
+
 # TERRIUM Scientific Validation Framework
 ## Complete User Manual & API Documentation
 

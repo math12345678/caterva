@@ -89,11 +89,15 @@ describe("Literature-Backed End-to-End Pipeline", () => {
 
       const result = await resolveQuery(query);
 
-      if (result.domain === "mm") {
-        const citation = getDomainCitation("mm");
-        expect(citation).toContain("Lehninger");
-        expect(citation).toContain("2008");
-      }
+      // Asserted, not assumed. Guarding the citation check behind
+      // `if (result.domain === "mm")` means a classifier regression that sent
+      // this query somewhere else would make the test pass silently -- while
+      // deleting the citation entirely.
+      expect(result.domain).toBe("mm");
+
+      const citation = getDomainCitation("mm");
+      expect(citation).toContain("Lehninger");
+      expect(citation).toContain("2008");
     });
 
     it("mm_competitive_inhibition domain backed by Copeland (2013)", async () => {
@@ -101,11 +105,11 @@ describe("Literature-Backed End-to-End Pipeline", () => {
 
       const result = await resolveQuery(query);
 
-      if (result.domain === "mm_competitive_inhibition") {
-        const citation = getDomainCitation("mm_competitive_inhibition");
-        expect(citation).toContain("Copeland");
-        expect(citation).toContain("2013");
-      }
+      expect(result.domain).toBe("mm_competitive_inhibition");
+
+      const citation = getDomainCitation("mm_competitive_inhibition");
+      expect(citation).toContain("Copeland");
+      expect(citation).toContain("2013");
     });
 
     it("sir domain backed by Kermack & McKendrick (1927)", async () => {
@@ -113,11 +117,11 @@ describe("Literature-Backed End-to-End Pipeline", () => {
 
       const result = await resolveQuery(query);
 
-      if (result.domain === "sir") {
-        const citation = getDomainCitation("sir");
-        expect(citation).toContain("Kermack");
-        expect(citation).toContain("1927");
-      }
+      expect(result.domain).toBe("sir");
+
+      const citation = getDomainCitation("sir");
+      expect(citation).toContain("Kermack");
+      expect(citation).toContain("1927");
     });
 
     it("wright_fisher domain backed by Rahbari et al. (2016)", async () => {

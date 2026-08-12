@@ -196,20 +196,49 @@ describe('ScientificPipeline Integration', () => {
     expect(response.validationErrors.length).toBeGreaterThan(0);
   });
 
-  it('should reject simulation with no trajectory points', async () => {
-    // This would happen if simulation fails to generate output
-    const request: SimulationRequest = {
-      query: 'Michaelis-Menten kinetics',
-      parameters: { km: 5.2, vmax: 12.8, s0: 10.0 }
-    };
+  it('never reports validated without a trajectory, or a trajectory without validation', async () => {
+    /**
+     * This was written as
+     *
+     *   if (trajectory.length === 0) expect(validated).toBe(false);
+     *   else                         expect(validated).toBe(true);
+     *
+     * which has an answer ready for both outcomes and therefore states no
+     * expectation about which should occur -- it could not fail. Worse, its
+     * name promised the empty-trajectory case while its input (km 5.2, well
+     * inside the literature range) guaranteed the opposite one, so the
+     * branch it was named for never ran.
+     *
+     * The invariant underneath is real and worth stating: validation and a
+     * trajectory travel together. A validated run with nothing to show is a
+     * silent simulation failure; a trajectory from an unvalidated run is a
+     * simulation that outran its own checks. Both inputs are exercised and
+     * compared in one shot, so the test says which input produces which
+     * outcome.
+     */
+    const cases: Array<[string, Record<string, number>]> = [
+      ['in-range km', { km: 5.2, vmax: 12.8, s0: 10.0 }],
+      ['km far outside the literature range', { km: 999.0, vmax: 12.8, s0: 10.0 }]
+    ];
 
-    const response = await pipeline.execute(request);
-
-    if (response.results.trajectory.length === 0) {
-      expect(response.validated).toBe(false);
-    } else {
-      expect(response.validated).toBe(true);
+    const observed: Array<[string, boolean, boolean]> = [];
+    for (const [label, parameters] of cases) {
+      const response = await pipeline.execute({
+        query: 'Michaelis-Menten kinetics',
+        parameters
+      });
+      observed.push([
+        label,
+        response.validated,
+        response.results.trajectory.length > 0
+      ]);
     }
+
+    // [label, validated, hasTrajectory]
+    expect(observed).toEqual([
+      ['in-range km', true, true],
+      ['km far outside the literature range', false, false]
+    ]);
   });
 
   // ========================================================================
@@ -351,8 +380,14 @@ describe('ScientificPipeline Integration', () => {
 
     const response = await pipeline2.execute(request);
 
-    // Without literature backing, should fail
-    expect(response.validated).toBe(false);
+    // A value the user typed directly is not treated as a fabrication --
+    // ParameterValidator now WARNS (not errors) on an unsourced value with
+    // origin 'user', so validation is not blocked outright. But nothing
+    // backs it, so confidence must reflect exactly that: zero, not a
+    // passing-but-unremarked score. See scientificValidator.ts's
+    // USER_SUPPLIED_NO_LITERATURE comment for the reasoning.
+    expect(response.validated).toBe(true);
+    expect(response.validationConfidence).toBe(0);
   });
 });
 
@@ -403,11 +438,21 @@ describe('ScientificPipeline Fail-Fast Behavior', () => {
 
     const response = await pipeline.execute(request);
 
-    // All 4 layers must complete
-    if (response.validated) {
-      expect(response.validationConfidence).toBeGreaterThan(0);
-      expect(response.metadata.literatureSourcesUsed).toBeGreaterThan(0);
-      expect(response.results.trajectory.length).toBeGreaterThan(0);
+    // All 4 layers must complete. Stated unconditionally: an
+    // `if (response.validated)` guard here turned the test into "if the
+    // pipeline worked, the pipeline worked" -- a Layer 1 regression that
+    // rejected every request would have made it pass.
+    // jest's expect() takes one argument -- it has no chai/node:assert-style
+    // custom-message parameter -- so the diagnostic has to be surfaced
+    // explicitly rather than passed to toBe().
+    if (!response.validated) {
+      throw new Error(
+        `validation failed, so layers 2-4 never ran: ${JSON.stringify(response.validationErrors)}`
+      );
     }
+    expect(response.validated).toBe(true);
+    expect(response.validationConfidence).toBeGreaterThan(0);
+    expect(response.metadata.literatureSourcesUsed).toBeGreaterThan(0);
+    expect(response.results.trajectory.length).toBeGreaterThan(0);
   });
 });

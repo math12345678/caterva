@@ -68,10 +68,17 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
       "simulate lactate dehydrogenase km=2 enzyme_conc=0.00001 vmax=5 s0=10 end=10 points=51",
     );
     const provenance = resolved.parameterProvenance["enzyme_conc"];
-    if (provenance) {
-      expect(provenance.origin).not.toBe("resolved");
-      expect(provenance.citation).toBeUndefined();
-    }
+
+    // Stated unconditionally. `enzyme_conc` is absent from RESOLVABLE_FIELDS,
+    // so the entry is `undefined` BY DESIGN -- which is exactly why an
+    // `if (provenance)` guard here would never run its body, and the test
+    // would pass without checking anything.
+    expect(
+      provenance === undefined || provenance.origin !== "resolved",
+      "enzyme_conc must never arrive as origin 'resolved': [E]0 is a property " +
+        "of an experiment, not of an enzyme (ADR 0013)",
+    ).toBe(true);
+    expect(provenance?.citation).toBeUndefined();
   });
 
   it("kcat and enzyme_conc are not resolvable fields", async () => {
@@ -84,12 +91,19 @@ describe("kcat/enzyme_conc provenance (ADR 0008 x ADR 0013)", () => {
 const resolved = await resolveQuery(
       "simulate lactate dehydrogenase km=2 vmax=5 s0=10 end=10 points=51",
     );
-    for (const key of ["kcat", "enzyme_conc"]) {
-      const provenance = resolved.parameterProvenance[key];
-      if (provenance) {
-        expect(provenance.origin).not.toBe("resolved");
-      }
-    }
+    const origins = ["kcat", "enzyme_conc"].map(
+      (key) => resolved.parameterProvenance[key]?.origin,
+    );
+
+    // Compared as a whole, so the assertion runs whether the entries exist or
+    // not. `undefined` (never populated) and any non-"resolved" origin both
+    // satisfy the narrowness note; only "resolved" violates it.
+    expect(
+      origins.filter((origin) => origin === "resolved"),
+      "kcat/enzyme_conc are outside RESOLVABLE_FIELDS: resolving a turnover " +
+        "number does not yield a simulable parameter without an [E]0 the " +
+        "caller supplies (ADR 0012/0013)",
+    ).toEqual([]);
   });
 
   it("a plain mm query carries neither key", async () => {

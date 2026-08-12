@@ -166,18 +166,32 @@ describe("parameter provenance", () => {
     for (const [domain, query] of DOMAIN_QUERIES) {
       it(`${domain}: no citation on non-resolved entries`, async () => {
         const resolved = await resolveQuery(query);
-        for (const [key, prov] of entries(resolved)) {
-          if (prov.origin !== "resolved") {
-            expect(
-              prov.citation,
-              `${key} must not carry a citation`,
-            ).toBeUndefined();
-            expect(
-              prov.source,
-              `${key} must not carry a source`,
-            ).toBeUndefined();
-          }
-        }
+        const all = entries(resolved);
+
+        // An empty provenance map would make the loop below iterate zero
+        // times and the test pass having checked nothing -- the same shape as
+        // a guard that is never true. Assert there is something to check
+        // first.
+        expect(
+          all.length,
+          `${domain} produced no provenance entries at all, so this test ` +
+            "would pass without examining a single parameter",
+        ).toBeGreaterThan(0);
+
+        const leaked = all
+          .filter(
+            ([, prov]) =>
+              prov.origin !== "resolved" &&
+              (prov.citation !== undefined || prov.source !== undefined),
+          )
+          .map(([key, prov]) => `${key} (origin ${prov.origin})`);
+
+        expect(
+          leaked,
+          "only entries with origin 'resolved' may carry a citation or a " +
+            "source: a citation on a user-supplied or default value claims a " +
+            "provenance the value does not have",
+        ).toEqual([]);
       });
     }
 
