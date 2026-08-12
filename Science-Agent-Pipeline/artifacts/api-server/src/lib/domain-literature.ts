@@ -153,7 +153,23 @@ export const SEIR_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Anderson & May (1991) is the source of the SEIR MODEL, not of these rates. σ=0.2 (a 5-day latent period) is an UNVERIFIED teaching default: the ADR 0017 registry pairs R0 with a serial interval only, so no source in this system reports a latent period and σ has no literature backing today. β and γ derive from that registry for a recognised disease (ADR 0020). See docs/literature-inventory.toml.",
+    "Anderson & May (1991) is the source of the SEIR MODEL, not of these rates. " +
+    "σ=0.2 (a 5-day latent period) is an UNVERIFIED teaching default and cannot " +
+    "currently be resolved: the ADR 0017 registry pairs R0 with a SERIAL INTERVAL, " +
+    "while σ needs a LATENT period (infection → infectiousness). Substituting the " +
+    "widely-published INCUBATION period (infection → symptoms) is directionally " +
+    "wrong, not merely imprecise — pooled serial interval (5.2 d) is SHORTER than " +
+    "pooled incubation (6.5 d) [Alene et al. 2021, BMC Infect Dis 21:257, PMID " +
+    "33706702], the signature of presymptomatic transmission, so the latent period " +
+    "is strictly shorter than the incubation period and an incubation-derived σ " +
+    "would under-predict early epidemic speed. A measured latent period exists for " +
+    "Delta (3.9 d, Kang et al. 2022) but this entry is the ancestral strain, whose " +
+    "serial interval differs materially (5.45 d vs Delta's 3.9 d), so pairing them " +
+    "would stitch together two incompatible parameter sets. β and γ derive from the " +
+    "registry for a recognised disease (ADR 0020). See docs/literature-inventory.toml " +
+    "[seir.sigma] for the full search record, and Tests/test_epidemiology_resolver.py " +
+    "TestNoLatentPeriodIsOffered for the guard that keeps σ from acquiring a source " +
+    "by accident.",
 };
 
 /**

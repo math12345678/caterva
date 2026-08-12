@@ -88,3 +88,69 @@ class TestUnknownDiseaseNeverFabricates:
         result = resolve_disease_parameters("measles")
         assert result.found is False
         assert any("covid-19" in entry for entry in result.search_log)
+
+
+class TestNoLatentPeriodIsOffered:
+    """SEIR's sigma must not be quietly sourced from an incubation period.
+
+    sigma = 1 / LATENT period (infection -> infectiousness). The registry
+    carries a SERIAL INTERVAL, and the wider literature overwhelmingly
+    reports INCUBATION (infection -> symptoms). All three are routinely
+    conflated, and substituting one for another here is not a rounding
+    error -- it is directionally wrong:
+
+      pooled serial interval  5.2 d   (Alene 2021, PMID 33706702)
+      pooled incubation       6.5 d   (same meta-analysis)
+
+    A serial interval SHORTER than the incubation period is the signature
+    of presymptomatic transmission: infectiousness starts before symptoms,
+    so the latent period is strictly shorter than the incubation period.
+    Feeding an incubation figure into sigma would overstate the latent
+    period and systematically under-predict how fast an epidemic takes off
+    -- the error would make the model look reassuring, which is the worst
+    direction for it to fail in.
+
+    A directly MEASURED latent period does exist (Kang et al. 2022,
+    Eurosurveillance 27(10): 3.9 d) but for the Delta variant, whereas this
+    registry entry is the ancestral strain. Delta's serial interval is
+    3.9 d against ancestral 5.45 d, so the two parameter sets are not
+    interchangeable, and pairing them would be exactly the cross-study
+    stitching the registry's same-source rule forbids.
+
+    So: the resolver must offer NO latent period at all, rather than
+    offering something latent-shaped. See docs/literature-inventory.toml
+    [seir.sigma] for the full search record.
+    """
+
+    def test_result_exposes_no_latent_or_incubation_field(self):
+        result = resolve_disease_parameters("covid-19")
+        assert result.found is True
+
+        fields = set(result.model_dump().keys())
+        for forbidden in (
+            "latent_period_days",
+            "incubation_period_days",
+            "sigma",
+        ):
+            assert forbidden not in fields, (
+                f"EpidemiologyResult grew a '{forbidden}' field. If a "
+                "measured latent period has genuinely been found for this "
+                "disease AND variant, update "
+                "docs/literature-inventory.toml [seir.sigma] and delete "
+                "this assertion deliberately -- do not let sigma acquire a "
+                "source by accident."
+            )
+
+    def test_infectious_period_says_what_it_measures(self):
+        """The one field that could be mistaken for a latent period names
+        itself. This is the guard against a future reader assuming that
+        `infectious_period_days` is a shedding duration or a latent
+        period; it is a serial interval used as a generation-time proxy."""
+        result = resolve_disease_parameters("covid-19")
+        measure = (result.infectious_period_measure or "").lower()
+        assert "serial interval" in measure, (
+            "infectious_period_measure must state that the figure is a "
+            "serial interval, because 'infectious period' is used loosely "
+            "in the literature and the distinction changes the model."
+        )
+        assert "latent" not in measure or "not" in measure
