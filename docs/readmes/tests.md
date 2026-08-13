@@ -5,7 +5,7 @@ Part of [**Terrium**](https://github.com/Terrium-sim/main) — scientific comput
 The literature layer and its 90 files — 277 tests.
 
 This is what makes Terrium more than a solver: the resolvers that fetch real
-kinetic constants from BRENDA and PubMed, the citation verifier, and the
+measured kinetic parameters from BRENDA and PubMed, the citation verifier, and the
 tests that keep them honest.
 
 ```bash

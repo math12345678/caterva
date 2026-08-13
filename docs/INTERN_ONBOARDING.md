@@ -38,18 +38,34 @@ category error. It has broken this codebase twice.
 ```bash
 git clone --recursive https://github.com/Terrium-sim/main.git
 cd main
-make setup     # creates .venv, installs everything
+make setup     # creates .venv, installs everything -- 2-5 min, ~120 MB
 make check     # verifies the stack genuinely works
 make test      # 1,291 tests
 ```
+
+`make setup` is the slow one. It downloads prebuilt wheels rather than
+compiling anything (libroadrunner alone is 50 MB), and pip prints nothing
+while it resolves. Two to five minutes is normal; a silent terminal is not
+a hang.
 
 `make check` is not a version check. It builds a real Michaelis-Menten
 model, integrates it, and compares the result to the exact closed-form
 solution. If it passes, the numerics can be trusted.
 
+If a step fails, run `make doctor`. It lists everything it looked at —
+interpreters, the venv and which Python built it, each required package's
+version against its pin, stdpopsim, Node — and what to do about each one.
+It is written to run on a bare interpreter, so it still works when the venv
+is what is broken.
+
 If any of this fails on your machine, **that is a bug and we want to know**
 — a setup that only works for the person who wrote it is a real defect, and
-you are the best-placed person in the project to find it.
+you are the best-placed person in the project to find it. Paste the
+`make doctor` output into the report; it is the whole environment in one
+block.
+
+On Windows, use WSL2 or the Dev Container — the Makefile is POSIX shell.
+See CONTRIBUTING.md "Windows".
 
 ## Where to commit
 

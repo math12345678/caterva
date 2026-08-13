@@ -5,15 +5,23 @@ PYTHON  ?= python3
 TERRIUM_PYTHON ?=
 TERRIUM_PYTHON_ABS := $(if $(TERRIUM_PYTHON),$(if $(filter /%,$(TERRIUM_PYTHON)),$(TERRIUM_PYTHON),$(CURDIR)/$(TERRIUM_PYTHON)),)
 VENV    := .venv
-BIN     := $(VENV)/bin
+
+# A Windows virtualenv puts its entry points in Scripts\, not bin/. This is
+# recursively expanded on purpose: `setup` creates the venv inside a recipe,
+# long after this line is parsed, so a simply-expanded := would have decided
+# the answer before the directory existed. The rest of this file is still
+# POSIX shell, so WSL2 or the Dev Container remains the supported Windows
+# route -- see CONTRIBUTING.md "Windows".
+BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup check check-python require-pytest test test-fast test-sim test-lit test-slow cli clean
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow cli clean
 
 help:
 	@echo "Terrium"
 	@echo ""
 	@echo "  make setup      create .venv and install everything"
+	@echo "  make doctor     diagnose a setup that will not work"
 	@echo "  make check      verify the environment actually works"
 	@echo "  make test       run every test suite"
 	@echo "  make test-fast  skip the slow property/robustness suites"
@@ -23,15 +31,53 @@ help:
 	@echo "  make clean      remove caches and build artifacts"
 	@echo ""
 	@echo "First time here? Run: make setup && make check && make test"
+	@echo "Something not working? Run: make doctor"
 
 setup: check-python
 	@echo ">> creating virtualenv in $(VENV) with $(PY)"
 	"$(PY)" -m venv $(VENV)
 	$(BIN)/pip install --upgrade pip --quiet
-	@echo ">> installing dependencies (this builds C extensions; give it a minute)"
-	$(BIN)/pip install -r requirements-dev.txt
+	@echo ">> installing dependencies"
+	@echo "   About 120 MB of prebuilt wheels for the direct pins alone"
+	@echo "   (libroadrunner 50 MB, scipy 35 MB, numpy 14 MB), plus their"
+	@echo "   transitive dependencies. Two to five minutes on a normal"
+	@echo "   connection. pip prints nothing while it resolves; that is"
+	@echo "   normal and not a hang."
+	@echo ""
+	@$(BIN)/pip install -r requirements-dev.txt || { \
+		echo ""; \
+		echo "Dependency install FAILED. Read pip's last error above -- the"; \
+		echo "line that matters is usually 20 lines up, not the last one."; \
+		echo ""; \
+		echo "Then run:"; \
+		echo ""; \
+		echo "    make doctor"; \
+		echo ""; \
+		echo "which names the interpreter it found, what is already"; \
+		echo "installed, and the two causes that account for nearly every"; \
+		echo "failure here: a Python outside 3.10-3.13, and stdpopsim on"; \
+		echo "linux/arm64, where msprime has no wheel and needs libgsl-dev"; \
+		echo "plus a C compiler to build from source."; \
+		exit 1; }
 	@echo ""
 	@echo ">> done. Verify with: make check"
+
+# Deliberately does NOT depend on check-python. check-python exits 2 when it
+# cannot find a supported interpreter, which is precisely the situation
+# doctor exists to explain -- gating the diagnosis on the thing being
+# diagnosed is how you get a tool nobody can reach when they need it.
+doctor:
+	@if command -v "$(PYTHON)" >/dev/null 2>&1; then \
+		"$(PYTHON)" scripts/doctor.py; \
+	else \
+		echo "No '$(PYTHON)' on PATH, so nothing here can run."; \
+		echo ""; \
+		echo "Install Python 3.10-3.13 and try again:"; \
+		echo "  macOS          brew install python@3.13"; \
+		echo "  Debian/Ubuntu  apt install python3.13 python3.13-venv"; \
+		echo "  Windows        use WSL2 or the Dev Container (see CONTRIBUTING.md)"; \
+		exit 2; \
+	fi
 
 # Resolve one supported interpreter for every recipe. An incomplete/stale
 # repository venv must not shadow a supported interpreter, and an unsupported
@@ -88,6 +134,8 @@ check-python:
 		echo "python3.12, python3.11 or python3.10, then:"; \
 		echo ""; \
 		echo "    make setup"; \
+		echo ""; \
+		echo "To see every interpreter this looked at: make doctor"; \
 		exit 2; \
 	fi
 	@if [ -n "$(VENV_BROKEN)" ]; then \

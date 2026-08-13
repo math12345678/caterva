@@ -59,6 +59,14 @@ CLAIM_FILES = [
     REPO_ROOT / "requirements.txt",
     REPO_ROOT / "README.md",
     REPO_ROOT / "CONTRIBUTING.md",
+    # Added after this guard was found to have missed the one place the
+    # claim is EXECUTABLE rather than prose. check_env.py's check_python()
+    # still gated on 3.10-3.12 and warned "SBML wheels may not exist yet"
+    # on 3.13 -- the discredited reason, aimed at the interpreter the
+    # Makefile resolver prefers first and CI tests. Three documents agreed
+    # with each other while the program disagreed with all three, which is
+    # the failure this guard exists to make impossible.
+    REPO_ROOT / "scripts" / "check_env.py",
 ]
 
 # Runtime dependencies whose wheel coverage defines the window.

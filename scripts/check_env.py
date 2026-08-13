@@ -37,20 +37,29 @@ def warn(msg: str) -> None:
 
 
 def check_python() -> None:
+    """Gate on the supported window: Python 3.10-3.13.
+
+    This function used to stop at 3.12 and WARN on anything above it, with
+    the reason "python-libsbml and friends publish wheels up to cp312".
+    That reason is the exact false claim `check_python_support_claim.py`
+    was written to kill -- python-libsbml 5.21.1 ships cp314 and antimony
+    2.14.0 is version-agnostic; the real ceiling comes from libroadrunner
+    2.8.0 and numpy 2.2.6 (ADR 0014). The guard survived here because its
+    CLAIM_FILES list covered requirements.txt, README.md and
+    CONTRIBUTING.md but not this file, so `make check` on Python 3.13 --
+    the version the Makefile's resolver prefers first and CI tests --
+    printed a warning telling the contributor their supported interpreter
+    might not work. That file list now includes this one.
+    """
     print("\nPython")
     major, minor = sys.version_info[:2]
     version = f"{major}.{minor}.{sys.version_info[2]}"
-    if major == 3 and 10 <= minor <= 12:
+    if major == 3 and 10 <= minor <= 13:
         ok(f"Python {version} on {platform.machine()}")
-    elif major == 3 and minor > 12:
-        # Real constraint, not a style preference: python-libsbml and friends
-        # publish wheels up to cp312. Past that, pip builds from source and
-        # needs cmake + swig present.
-        warn(f"Python {version}: SBML wheels may not exist yet; "
-             "if install fails, use 3.12")
     else:
-        bad(f"Python {version} is too old",
-            "install Python 3.12 and recreate the venv")
+        bad(f"Python {version} is outside the supported window 3.10-3.13",
+            "install python3.13 (or 3.10-3.12), then: "
+            "rm -rf .venv && make setup")
 
 
 def check_imports() -> None:

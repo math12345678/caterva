@@ -1,10 +1,30 @@
 {
   "name": "Terrium (simulation engine + literature layer)",
+
+  // ".devcontainer/Dockerfile", not "../Dockerfile". The root Dockerfile is
+  // the Node API-server image; it has no Python, so the postCreateCommand
+  // below could never have run there. See .devcontainer/Dockerfile.
   "build": {
     "context": "..",
-    "dockerfile": "../Dockerfile"
+    "dockerfile": "Dockerfile"
   },
-  "postCreateCommand": "python scripts/check_env.py",
+
+  // The documented pre-PR command, `python scripts/verify_build.py
+  // --quick`, shells out to `npx tsc` via check_typescript_compiles.py and
+  // exits non-zero when npx is absent. A Python-only container therefore
+  // could not run the repository's own verification. 22 matches the Node
+  // version CI uses in .github/workflows/tests.yml.
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
+
+  // doctor.py reports every part of the environment it looked at, including
+  // the Node side the image build cannot check (the feature is installed
+  // after the build) and node_modules, which is not vendored into the image.
+  "postCreateCommand": "python scripts/doctor.py",
+
   "customizations": {
     "vscode": {
       "extensions": [
@@ -17,5 +37,9 @@
       }
     }
   },
+
+  // The image installs into the system interpreter as root and does not
+  // create an unprivileged user; running as anything else would leave pip's
+  // packages unwritable and the workspace owned by the wrong uid.
   "remoteUser": "root"
 }
