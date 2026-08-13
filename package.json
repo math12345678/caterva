@@ -23,7 +23,12 @@
     "web": "node dist/src/web/server.js",
     "web:dev": "ts-node src/web/server.ts",
     "web:start": "npm run build && npm run web",
-    "verify-all": "npm run type-check && npm run lint && npm test"
+    "verify-all": "npm run type-check && npm run lint && npm test",
+    "generate:client:ts": "bash scripts/generate-client.sh typescript",
+    "generate:client:python": "bash scripts/generate-client.sh python",
+    "generate:client:go": "bash scripts/generate-client.sh go",
+    "generate:client:rust": "bash scripts/generate-client.sh rust",
+    "generate:client": "bash scripts/generate-client.sh"
   },
   "keywords": [
     "science",
@@ -40,11 +45,13 @@
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "@types/react": "^19.2.18",
+    "@types/js-yaml": "^4.0.9",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
     "express": "^4.22.2",
     "jest": "^29.5.0",
+    "js-yaml": "^4.3.1",
     "ts-jest": "^29.1.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"

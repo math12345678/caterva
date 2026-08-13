@@ -9,6 +9,7 @@
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as yaml from 'js-yaml';
 import { URL } from 'url';
 import { logger } from '../logger';
 import ScientificPipeline from '../integration/scientificPipeline';
@@ -44,6 +45,15 @@ import {
   FilterPresets
 } from '../storage/job-query-builder';
 import { getMetricsCollector } from '../storage/metrics-collector';
+import { generatePrometheusMetrics } from './metrics-exporter';
+import {
+  getAllSweepMetrics,
+  getSweepMetrics,
+  getSweepMetricsByQuery,
+  getAllBatchMetrics,
+  getBatchMetrics,
+  getBatchMetricsByQuery
+} from '../storage/sweep-batch-metrics';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const db = getDefaultDatabase();
@@ -149,12 +159,14 @@ const server = http.createServer(async (req, res) => {
                 conditions: { temperature: 37, pH: 7.4 }
               });
 
-              const duration = Date.now() - (jobs.get(jobId)?.startTime || 0);
+              const jobStartTime = jobs.get(jobId)?.startTime || Date.now();
+              const jobEndTime = Date.now();
+              const duration = jobEndTime - jobStartTime;
               jobs.set(jobId, {
                 status: 'complete',
                 progress: 100,
                 result: response,
-                endTime: Date.now(),
+                endTime: jobEndTime,
                 duration
               });
 
@@ -165,18 +177,48 @@ const server = http.createServer(async (req, res) => {
                 parameters,
                 status: 'complete',
                 result: response,
-                startTime: jobs.get(jobId)?.startTime || Date.now(),
-                endTime: Date.now(),
+                startTime: jobStartTime,
+                endTime: jobEndTime,
                 duration
+              });
+
+              // Feed the real metrics collector -- previously nothing in
+              // production ever called recordExecution(), so every
+              // /api/metrics/* endpoint reported "no data" forever
+              // regardless of how many simulations actually ran. This is
+              // the only writer for the /api/simulate path; /api/sweep
+              // and /api/batch do not yet call recordExecution() and are
+              // not reflected in these metrics.
+              metrics.recordExecution({
+                jobId,
+                query,
+                startTime: jobStartTime,
+                endTime: jobEndTime,
+                executionTimeMs: duration,
+                convergenceSteps: response.results?.trajectory?.length ?? 0,
+                success: response.validated === true,
+                errorMessage: response.validated ? undefined : response.validationErrors?.join('; ')
               });
 
               logger.info({ jobId, validated: response.validated }, 'Simulation complete');
             } catch (error) {
+              const jobStartTime = jobs.get(jobId)?.startTime || Date.now();
+              const jobEndTime = Date.now();
               jobs.set(jobId, {
                 status: 'error',
                 error: error instanceof Error ? error.message : String(error),
-                endTime: Date.now(),
-                duration: Date.now() - (jobs.get(jobId)?.startTime || 0)
+                endTime: jobEndTime,
+                duration: jobEndTime - jobStartTime
+              });
+              metrics.recordExecution({
+                jobId,
+                query,
+                startTime: jobStartTime,
+                endTime: jobEndTime,
+                executionTimeMs: jobEndTime - jobStartTime,
+                convergenceSteps: 0,
+                success: false,
+                errorMessage: error instanceof Error ? error.message : String(error)
               });
               logger.error({ jobId, error }, 'Simulation error');
             }
@@ -514,11 +556,25 @@ const server = http.createServer(async (req, res) => {
 
     // GET /api/openapi.json (OpenAPI 3.0 specification)
     if (pathname === '/api/openapi.json' && req.method === 'GET') {
-      const openapi = fs.readFileSync(path.join(__dirname, '../../openapi.yaml'), 'utf-8');
-      // Convert YAML to JSON (simple regex replacement for basic YAML)
-      // For production, use a proper YAML parser
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(openapi);
+      try {
+        // This used to send the raw YAML bytes with a
+        // 'Content-Type: application/json' header, with a comment
+        // admitting the "conversion" was a no-op ("simple regex
+        // replacement" that was never written). Swagger UI, ReDoc, and
+        // the OpenAPI client generators this repo ships all fetch this
+        // exact endpoint and JSON.parse() the body -- every one of them
+        // would fail on YAML. Reproduced by actually calling this route
+        // and attempting JSON.parse() on the response before writing
+        // this fix.
+        const openapiYaml = fs.readFileSync(path.join(__dirname, '../../openapi.yaml'), 'utf-8');
+        const openapiJson = yaml.load(openapiYaml);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(openapiJson));
+      } catch (error) {
+        logger.error({ error }, 'Failed to load/parse openapi.yaml');
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'OpenAPI specification unavailable' }));
+      }
       return;
     }
 
@@ -806,6 +862,88 @@ const server = http.createServer(async (req, res) => {
       const value = metrics.getPercentile(percentile);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ percentile, executionTimeMs: value }));
+      return;
+    }
+
+    // GET /api/metrics/sweeps (All sweep metrics)
+    if (pathname === '/api/metrics/sweeps' && req.method === 'GET') {
+      const sweepMetrics = getAllSweepMetrics();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        sweeps: sweepMetrics,
+        count: sweepMetrics.length
+      }));
+      return;
+    }
+
+    // GET /api/metrics/sweeps/:id (Specific sweep metrics)
+    if (pathname.match(/^\/api\/metrics\/sweeps\/[^\/]+$/) && req.method === 'GET') {
+      const sweepId = pathname.split('/').pop() || '';
+      const sweepMetrics = getSweepMetrics(sweepId);
+      if (!sweepMetrics) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Sweep not found' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(sweepMetrics));
+      return;
+    }
+
+    // GET /api/metrics/sweeps-by-query (Sweep metrics grouped by query)
+    if (pathname === '/api/metrics/sweeps-by-query' && req.method === 'GET') {
+      const byQuery = getSweepMetricsByQuery();
+      const result: Record<string, any> = {};
+      for (const [query, metrics] of byQuery.entries()) {
+        result[query] = metrics;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    // GET /api/metrics/batches (All batch metrics)
+    if (pathname === '/api/metrics/batches' && req.method === 'GET') {
+      const batchMetrics = getAllBatchMetrics();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        batches: batchMetrics,
+        count: batchMetrics.length
+      }));
+      return;
+    }
+
+    // GET /api/metrics/batches/:id (Specific batch metrics)
+    if (pathname.match(/^\/api\/metrics\/batches\/[^\/]+$/) && req.method === 'GET') {
+      const batchId = pathname.split('/').pop() || '';
+      const batchMetrics = getBatchMetrics(batchId);
+      if (!batchMetrics) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Batch not found' }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(batchMetrics));
+      return;
+    }
+
+    // GET /api/metrics/batches-by-query (Batch metrics grouped by query)
+    if (pathname === '/api/metrics/batches-by-query' && req.method === 'GET') {
+      const byQuery = getBatchMetricsByQuery();
+      const result: Record<string, any> = {};
+      for (const [query, metrics] of byQuery.entries()) {
+        result[query] = metrics;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+      return;
+    }
+
+    // GET /metrics (Prometheus metrics format for Grafana/Prometheus scraping)
+    if (pathname === '/metrics' && req.method === 'GET') {
+      const prometheusMetrics = generatePrometheusMetrics();
+      res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4' });
+      res.end(prometheusMetrics);
       return;
     }
 
