@@ -43,9 +43,11 @@ import {
   filterJobs,
   FilterPresets
 } from '../storage/job-query-builder';
+import { getMetricsCollector } from '../storage/metrics-collector';
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 const db = getDefaultDatabase();
+const metrics = getMetricsCollector();
 
 // In-memory job storage
 const jobs = new Map<string, any>();
@@ -510,6 +512,82 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // GET /api/openapi.json (OpenAPI 3.0 specification)
+    if (pathname === '/api/openapi.json' && req.method === 'GET') {
+      const openapi = fs.readFileSync(path.join(__dirname, '../../openapi.yaml'), 'utf-8');
+      // Convert YAML to JSON (simple regex replacement for basic YAML)
+      // For production, use a proper YAML parser
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(openapi);
+      return;
+    }
+
+    // GET /api/docs (Swagger UI)
+    if (pathname === '/api/docs' && req.method === 'GET') {
+      const swaggerUI = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Terrium API Documentation</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css">
+  <style>
+    html { box-sizing: border-box; overflow: -moz-scrollbars-vertical; overflow-y: scroll; }
+    *, *:before, *:after { box-sizing: inherit; }
+    body { margin:0; padding:0; }
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.js"></script>
+  <script>
+    SwaggerUIBundle({
+      url: "/api/openapi.json",
+      dom_id: "#swagger-ui",
+      presets: [
+        SwaggerUIBundle.presets.apis,
+        SwaggerUIBundle.SwaggerUIStandalonePreset
+      ],
+      layout: "StandaloneLayout"
+    })
+  </script>
+</body>
+</html>
+      `;
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(swaggerUI);
+      return;
+    }
+
+    // GET /api/docs/redoc (ReDoc alternative)
+    if (pathname === '/api/docs/redoc' && req.method === 'GET') {
+      const redoc = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Terrium API Documentation (ReDoc)</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+  <redoc spec-url="/api/openapi.json"></redoc>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"></script>
+</body>
+</html>
+      `;
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(redoc);
+      return;
+    }
+
     // GET /api/export/jobs/csv (Export job history as CSV)
     if (pathname === '/api/export/jobs/csv' && req.method === 'GET') {
       const jobs = db.getRecentJobs(1000);
@@ -523,8 +601,22 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // GET /api/export/sweep/:sweepId/csv (Export sweep results as CSV)
-    if (pathname.match(/^\/api\/export\/sweep\/.*\/csv$/) && req.method === 'GET') {
+    // GET /api/export/sweep(s)/:sweepId/csv (Export sweep results as CSV)
+    // Accepts BOTH the singular and plural spelling of the resource.
+    //
+    // The reads are plural (/api/sweeps/:id, /api/batches/:id); the exports
+    // were singular. A user who has just fetched /api/sweeps/abc naturally
+    // reaches for /api/export/sweeps/abc/csv and gets a 404 with no hint
+    // that one letter is the problem.
+    //
+    // That is not hypothetical: it caught the person writing
+    // API_QUICK_REFERENCE.md, who documented the plural form throughout.
+    // check_example_endpoints.py flagged the doc, but the doc was the
+    // reasonable guess and the API was the inconsistent thing.
+    //
+    // Both spellings work rather than renaming the route, because renaming
+    // would break any existing caller using the singular form.
+    if (pathname.match(/^\/api\/export\/sweeps?\/.*\/csv$/) && req.method === 'GET') {
       const sweepId = pathname.split('/')[4];
       const sweep = sweeps.get(sweepId || '');
 
@@ -543,8 +635,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // GET /api/export/batch/:batchId/csv (Export batch results as CSV)
-    if (pathname.match(/^\/api\/export\/batch\/.*\/csv$/) && req.method === 'GET') {
+    // GET /api/export/batch(es)/:batchId/csv (Export batch results as CSV)
+    // Both spellings accepted -- see the sweep export above.
+    if (pathname.match(/^\/api\/export\/batch(?:es)?\/.*\/csv$/) && req.method === 'GET') {
       const batchId = pathname.split('/')[4];
       const batch = batches.get(batchId || '');
 
@@ -563,8 +656,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // GET /api/export/comparison/:compareId/csv (Export model comparison as CSV)
-    if (pathname.match(/^\/api\/export\/comparison\/.*\/csv$/) && req.method === 'GET') {
+    // GET /api/export/comparison(s)/:compareId/csv (Export comparison as CSV)
+    // Both spellings accepted -- see the sweep export above.
+    if (pathname.match(/^\/api\/export\/comparisons?\/.*\/csv$/) && req.method === 'GET') {
       const compareId = pathname.split('/')[4];
       const comparison = batches.get(compareId || '');
 
@@ -645,8 +739,9 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // GET /api/analyze/sweep/:sweepId (Analyze sweep sensitivity)
-    if (pathname.match(/^\/api\/analyze\/sweep\//) && req.method === 'GET') {
+    // GET /api/analyze/sweep(s)/:sweepId (Analyze sweep sensitivity)
+    // Both spellings accepted -- see the sweep export above.
+    if (pathname.match(/^\/api\/analyze\/sweeps?\//) && req.method === 'GET') {
       const sweepId = pathname.split('/').pop();
       const sweep = sweeps.get(sweepId || '');
 
@@ -659,6 +754,58 @@ const server = http.createServer(async (req, res) => {
       const analysis = analyzeSensitivity(sweep.result);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(analysis));
+      return;
+    }
+
+    // GET /api/metrics (Overall performance metrics)
+    if (pathname === '/api/metrics' && req.method === 'GET') {
+      const aggregated = metrics.getAggregatedMetrics();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(aggregated));
+      return;
+    }
+
+    // GET /api/metrics/by-model (Metrics grouped by kinetic model)
+    if (pathname === '/api/metrics/by-model' && req.method === 'GET') {
+      const byModel = metrics.getMetricsByModel();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(byModel));
+      return;
+    }
+
+    // GET /api/metrics/reproducibility (Track reproducibility across runs)
+    if (pathname === '/api/metrics/reproducibility' && req.method === 'GET') {
+      const all = metrics.getAllReproducibilityMetrics();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(all));
+      return;
+    }
+
+    // GET /api/metrics/slow-queries (Queries slower than threshold)
+    if (pathname.match(/^\/api\/metrics\/slow-queries/) && req.method === 'GET') {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const threshold = parseInt(url.searchParams.get('threshold') || '1000', 10);
+      const slow = metrics.getSlowQueries(threshold);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ threshold, queries: slow, count: slow.length }));
+      return;
+    }
+
+    // GET /api/metrics/failed-queries (Failed queries for debugging)
+    if (pathname === '/api/metrics/failed-queries' && req.method === 'GET') {
+      const failed = metrics.getFailedQueries();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ queries: failed, count: failed.length }));
+      return;
+    }
+
+    // GET /api/metrics/percentile (Percentile execution time)
+    if (pathname.match(/^\/api\/metrics\/percentile/) && req.method === 'GET') {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const percentile = parseInt(url.searchParams.get('percentile') || '50', 10);
+      const value = metrics.getPercentile(percentile);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ percentile, executionTimeMs: value }));
       return;
     }
 

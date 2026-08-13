@@ -138,7 +138,7 @@ PubMed for real kinetics before running.
 | `GET` | `/api/stats` | Aggregate statistics. |
 | `POST` | `/api/sweep` | Sweep one parameter across a range. |
 | `GET` | `/api/sweeps/:sweepId` | Sweep results. |
-| `GET` | `/api/analyze/sweep/:sweepId` | Sensitivity analysis of a sweep. |
+| `GET` | `/api/analyze/sweep/:sweepId` | Sensitivity analysis of a sweep. Also `/analyze/sweeps/:sweepId`. |
 | `POST` | `/api/batch` | Run many parameter sets. |
 | `GET` | `/api/batches/:batchId` | Batch results. |
 | `POST` | `/api/compare` | Compare models. |
@@ -146,9 +146,24 @@ PubMed for real kinetics before running.
 | `GET` | `/api/health` | Liveness. |
 | `GET` | `/api/export/jobs/csv` | Job history as CSV. |
 | `GET` | `/api/export/stats/csv` | Statistics as CSV. |
-| `GET` | `/api/export/sweep/:sweepId/csv` | Sweep results as CSV. |
-| `GET` | `/api/export/batch/:batchId/csv` | Batch results as CSV. |
-| `GET` | `/api/export/comparison/:compareId/csv` | Comparison as CSV. |
+| `GET` | `/api/export/sweep/:sweepId/csv` | Sweep results as CSV. Also `/api/export/sweeps/:sweepId/csv`. |
+| `GET` | `/api/export/batch/:batchId/csv` | Batch results as CSV. Also `/api/export/batches/:batchId/csv`. |
+| `GET` | `/api/export/comparison/:compareId/csv` | Comparison as CSV. Also `/api/export/comparisons/:compareId/csv`. |
+
+### Singular and plural both work
+
+The reads are plural (`/api/sweeps/:id`, `/api/batches/:id`) and the exports
+were singular (`/api/export/sweep/:id/csv`). Anyone who has just fetched a
+sweep reaches for the plural export and gets a 404 with no hint that one
+letter is the problem.
+
+That is not hypothetical — it caught the author of
+`API_QUICK_REFERENCE.md`, who documented the plural forms throughout because
+they were the reasonable guess. The document was right about what the API
+*should* serve; the API was the inconsistent thing.
+
+Both spellings now route, rather than one being renamed, so any existing
+caller using the singular form keeps working.
 
 ## Clients
 
