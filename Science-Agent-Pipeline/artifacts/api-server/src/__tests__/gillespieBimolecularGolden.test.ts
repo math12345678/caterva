@@ -39,10 +39,23 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
     expect(res.flagReason).toBeNull();
   });
 
-  it("rejects an over-budget initial population before simulating", async () => {
+  // This asserted /Terium runner exited with code 1/ and passed for as long
+  // as the boundary threw the engine's explanation away. The engine has
+  // always written "a0+b0=1100000 exceeds API runtime ceiling
+  // (MAX_API_SSA_POPULATION) 1000000" to stdout; runTerium checked the exit
+  // status first and rejected with the status instead. Pinning the exit code
+  // made the information loss look like the specification.
+  //
+  // The assertion is on the ceiling's name and the offending total, because
+  // those are what a user needs to act: which limit, and by how much.
+  it("rejects an over-budget initial population before simulating, and says why", async () => {
     await expect(
       runTerium("gillespie_ssa_bimolecular", { a0: 600_000, b0: 500_000 }),
-    ).rejects.toThrow(/Terium runner exited with code 1/);
+    ).rejects.toThrow(/MAX_API_SSA_POPULATION/);
+
+    await expect(
+      runTerium("gillespie_ssa_bimolecular", { a0: 600_000, b0: 500_000 }),
+    ).rejects.toThrow(/1100000/);
   });
 });
 

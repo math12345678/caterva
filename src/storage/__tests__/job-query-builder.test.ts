@@ -149,6 +149,87 @@ describe('Job Query Builder', () => {
       expect(result.filtered).toBe(3);
     });
 
+    // `(job.result?.confidence || 0) <= max` scored a job with no result as
+    // zero confidence, so every unfinished and every errored job satisfied
+    // any upper bound. job_3 (status 'error', no result) came back as the
+    // whole answer to "show me the low-confidence results".
+    it('excludes jobs with no result from an upper-bound confidence filter', () => {
+      const result = filterJobs(sampleJobs, { maxConfidence: 0.5 });
+
+      expect(result.filtered).toBe(0);
+      expect(result.jobs.map(j => j.jobId)).not.toContain('job_3');
+    });
+
+    // Same defect on duration: a job that has not finished has no duration,
+    // and scoring it as 0 ms listed it among the fastest runs.
+    it('excludes jobs with no duration from an upper-bound duration filter', () => {
+      const running = {
+        jobId: 'job_running',
+        query: 'michaelis-menten',
+        status: 'running',
+        startTime: new Date('2026-08-11T13:00:00Z').getTime(),
+        duration: undefined,
+        result: undefined
+      };
+
+      const result = filterJobs([...sampleJobs, running], { maxDuration: 1200 });
+      const ids = result.jobs.map(j => j.jobId);
+
+      // job_3 errored but DID record a 500 ms duration, so it belongs here;
+      // job_running has no duration at all and must not be reported as the
+      // fastest run in the set.
+      expect(ids).not.toContain('job_running');
+      expect(ids.sort()).toEqual(['job_1', 'job_3']);
+    });
+
+    // The fix must not throw out genuine zeros with the absent values: a
+    // simulation legitimately reporting confidence 0, or completing in under
+    // a millisecond, is data, not a missing field.
+    it('keeps a genuine zero confidence and a genuine zero duration', () => {
+      const zeroJob = {
+        jobId: 'job_zero',
+        query: 'michaelis-menten',
+        status: 'complete',
+        startTime: new Date('2026-08-11T14:00:00Z').getTime(),
+        duration: 0,
+        result: { finalValue: 0, confidence: 0, validated: false }
+      };
+
+      expect(filterJobs([zeroJob], { maxConfidence: 0.5 }).jobs.map(j => j.jobId))
+        .toEqual(['job_zero']);
+      expect(filterJobs([zeroJob], { minConfidence: 0 }).jobs.map(j => j.jobId))
+        .toEqual(['job_zero']);
+      expect(filterJobs([zeroJob], { maxDuration: 1200 }).jobs.map(j => j.jobId))
+        .toEqual(['job_zero']);
+      expect(filterJobs([zeroJob], { minDuration: 0 }).jobs.map(j => j.jobId))
+        .toEqual(['job_zero']);
+    });
+
+    // `slice()` reads a negative argument as an offset from the END of the
+    // array, so `?limit=-1` returned every job except the last one while
+    // reporting limit=-1 back to the caller.
+    it('serves an empty page for a negative limit rather than dropping the tail', () => {
+      const result = filterJobs(sampleJobs, parseQueryString('limit=-1'));
+
+      expect(result.jobs).toEqual([]);
+      expect(result.limit).toBe(0);
+    });
+
+    it('serves an empty page for limit=0 instead of falling back to 50', () => {
+      const result = filterJobs(sampleJobs, parseQueryString('limit=0'));
+
+      expect(result.jobs).toEqual([]);
+      expect(result.filtered).toBe(4);
+    });
+
+    it('treats a negative offset as the first page, not the last', () => {
+      const negative = filterJobs(sampleJobs, parseQueryString('offset=-2'));
+      const first = filterJobs(sampleJobs, parseQueryString('offset=0'));
+
+      expect(negative.offset).toBe(0);
+      expect(negative.jobs.map(j => j.jobId)).toEqual(first.jobs.map(j => j.jobId));
+    });
+
     it('applies multiple filters', () => {
       const result = filterJobs(sampleJobs, {
         status: 'complete',

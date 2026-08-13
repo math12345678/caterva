@@ -136,11 +136,14 @@ export async function commandSweep(options: SweepOptions): Promise<number> {
   ).find((t) => t.variable === 'y');
 
   if (trend) {
-    process.stdout.write(
-      `  ${c(DIM, 'trend')}  ${trend.direction}${
-        typeof trend.slope === 'number' ? c(DIM, `  (slope ${trend.slope.toExponential(2)})`) : ''
-      }\n`,
-    );
+    // `typeof NaN === 'number'`, so the old guard happily printed
+    // "(slope NaN)" next to a fabricated direction whenever fewer than two
+    // points survived. Say what is missing instead of naming a direction
+    // nobody can support from one observation.
+    const slopeSuffix = Number.isFinite(trend.slope)
+      ? c(DIM, `  (slope ${trend.slope.toExponential(2)})`)
+      : c(DIM, `  (needs at least 2 computed points; ${computed.length} available)`);
+    process.stdout.write(`  ${c(DIM, 'trend')}  ${trend.direction}${slopeSuffix}\n`);
   }
 
   process.stdout.write(
@@ -148,14 +151,25 @@ export async function commandSweep(options: SweepOptions): Promise<number> {
       `${c(DIM, `   mean ${stats.mean.toFixed(4)}  sd ${stats.stdDev.toFixed(4)}`)}\n`,
   );
 
-  const outliers = detectOutliers(values);
-  const flagged = outliers.filter((o) => o.isOutlier);
+  // `detectOutliers` returns ONLY the outlying points -- it filters
+  // internally. This used `computed[outliers.indexOf(outlier)]`, an index
+  // into the outlier list, to look up a point in the full sweep. With one
+  // outlier at the end of a ten-point sweep it printed the parameter value
+  // of point 0: a sweep of km from 0.1 to 1.0 whose anomaly is at km=1.0
+  // reported "km=0.1: 50.0000". The number was right and the parameter it
+  // was attributed to was wrong, which is worse than not reporting it --
+  // the whole purpose of this block is to say WHERE the model stops
+  // behaving, and it pointed at the wrong end of the range.
+  //
+  // `OutlierResult.index` is the index into `values`, and `values` is
+  // `computed.map(...)`, so it indexes `computed` directly.
+  const flagged = detectOutliers(values);
   if (flagged.length > 0) {
     process.stdout.write(
       `\n${c(YELLOW, '•')} ${c(BOLD, 'Points that break the pattern:')}\n`,
     );
     for (const outlier of flagged) {
-      const point = computed[outliers.indexOf(outlier)];
+      const point = computed[outlier.index];
       process.stdout.write(
         `    ${options.parameter}=${point?.paramValue}: ${outlier.value.toFixed(4)} ` +
           `${c(DIM, `(${outlier.zscore.toFixed(1)}σ from the mean)`)}\n`,

@@ -12,6 +12,7 @@
 
 import { logger } from '../logger';
 import ScientificPipeline from '../integration/scientificPipeline';
+import { recordBatchMetrics } from '../storage/sweep-batch-metrics';
 
 export interface BatchJob {
   id: string;
@@ -39,6 +40,7 @@ export interface BatchProcessResult {
   results: BatchJobResult[];
   totalTimeMs: number;
   successRate: number;
+  batchId?: string;
 }
 
 /**
@@ -153,6 +155,18 @@ export async function processBatch(
     'Batch processing complete'
   );
 
+  // Record metrics for the batch operation
+  // Map results to validation status for metrics recording
+  const metricsResults = batchResults.map(result => ({
+    executionTimeMs: result.executionTimeMs,
+    validated: !result.error
+  }));
+
+  const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  recordBatchMetrics(batchId, query, metricsResults);
+
+  logger.info({ batchId }, 'Batch metrics recorded');
+
   return {
     query,
     totalJobs: jobs.length,
@@ -161,7 +175,8 @@ export async function processBatch(
     failedJobs,
     results: batchResults,
     totalTimeMs,
-    successRate
+    successRate,
+    batchId
   };
 }
 

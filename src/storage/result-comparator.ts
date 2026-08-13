@@ -102,8 +102,34 @@ export function compareJobs(job1: any, job2: any): JobComparison {
     insights.push('Job 2 has literature validation, Job 1 does not');
   }
 
-  if (Math.abs(job1.result?.confidence || 0) - (job2.result?.confidence || 0) > 0.1) {
-    insights.push(`Confidence difference: ${(job1.result?.confidence || 0).toFixed(3)} vs ${(job2.result?.confidence || 0).toFixed(3)}`);
+  // The closing paren of Math.abs() used to sit after the FIRST term:
+  //
+  //     Math.abs(job1.confidence || 0) - (job2.confidence || 0) > 0.1
+  //
+  // so this tested `c1 - c2 > 0.1`, not `|c1 - c2| > 0.1`. Confidences are
+  // already non-negative, which is why it looked right. The consequence is
+  // that the insight only ever fired when job 1 was the more confident of
+  // the two: comparing a 0.20 job against a 0.90 job reported NO confidence
+  // difference, and swapping the two arguments changed the answer for the
+  // same pair of jobs. A comparison tool whose output depends on argument
+  // order is telling two users different things about identical data --
+  // and the direction it stayed silent in is the one that matters, because
+  // "the job I am asking about is the less trustworthy one" is the fact a
+  // reader most needs.
+  //
+  // The `|| 0` went with it: a job that has no result yet has no confidence,
+  // not a confidence of zero, and printing "0.950 vs 0.000" for a job that
+  // has not finished asserts a measurement nobody made.
+  const conf1 = job1.result?.confidence;
+  const conf2 = job2.result?.confidence;
+  if (
+    typeof conf1 === 'number' &&
+    typeof conf2 === 'number' &&
+    Math.abs(conf1 - conf2) > 0.1
+  ) {
+    insights.push(
+      `Confidence difference: ${conf1.toFixed(3)} vs ${conf2.toFixed(3)}`
+    );
   }
 
   return {

@@ -28,7 +28,12 @@ export interface CorrelationResult {
 
 export interface TrendAnalysis {
   variable: string;
-  direction: 'increasing' | 'decreasing' | 'stable';
+  /**
+   * `indeterminate` when there is not enough data to fit a line at all --
+   * see `getTrendDirection`. It is a distinct outcome from `stable`, which
+   * is a measured slope of approximately zero.
+   */
+  direction: 'increasing' | 'decreasing' | 'stable' | 'indeterminate';
   slope: number;
   r_squared: number;
   predictedValue: number;
@@ -153,7 +158,20 @@ function linearRegression(y: number[]): { slope: number; intercept: number; r_sq
   return { slope, intercept, r_squared };
 }
 
-function getTrendDirection(slope: number): 'increasing' | 'decreasing' | 'stable' {
+function getTrendDirection(
+  slope: number
+): 'increasing' | 'decreasing' | 'stable' | 'indeterminate' {
+  // A single data point gives `linearRegression` a zero denominator, so the
+  // slope is NaN. Every comparison against NaN is false, which used to fall
+  // through both branches to `slope > 0 ? ... : 'decreasing'` -- so one
+  // point produced the confident claim "direction: decreasing". `scientific
+  // sweep` printed "trend  decreasing  (slope NaN)" whenever exactly one
+  // point in the sweep was computable, which is the ordinary outcome when
+  // validation rejects the rest of the range. Stating a direction from one
+  // observation is not a weaker answer than the truth, it is a different
+  // one, and it pointed downward every time by accident of operator
+  // precedence.
+  if (!Number.isFinite(slope)) return 'indeterminate';
   if (Math.abs(slope) < 0.001) return 'stable';
   return slope > 0 ? 'increasing' : 'decreasing';
 }
@@ -225,8 +243,29 @@ export function compareGroups(group1: number[], group2: number[]): ComparisonRes
   };
 }
 
+/**
+ * Standard normal CDF, via the Abramowitz & Stegun 7.1.26 rational
+ * approximation to erf (|error| < 1.5e-7).
+ *
+ * The `/ Math.sqrt(2)` on the next line was missing. The identity is
+ *
+ *     Phi(z) = 0.5 * (1 + erf(z / sqrt(2)))
+ *
+ * and the old code fed `z` straight into erf, so it returned Phi(z*sqrt(2))
+ * -- a distribution far too narrow. `compareGroups` uses this for its
+ * two-sided p-value, so the effect was that p came out several times too
+ * small and `significant` flipped true well below the threshold it claims:
+ *
+ *     |t| = 1.96  ->  reported p = 0.0056   (correct: 0.0500)
+ *     |t| = 1.91  ->  reported p = 0.0069, "significant"  (correct: 0.0562,
+ *                     NOT significant at 0.05)
+ *
+ * The real 0.05 cutoff is |t| = 1.96; the broken one was |t| = 1.386. Every
+ * difference between those two was announced as statistically significant
+ * when it was not. Checked against the closed-form values (Phi(1.96) =
+ * 0.975002, Phi(2.5758) = 0.995) in the tests, not against itself.
+ */
 function normalCDF(z: number): number {
-  // Approximation of standard normal CDF
   const a1 = 0.254829592;
   const a2 = -0.284496736;
   const a3 = 1.421413741;
@@ -235,16 +274,17 @@ function normalCDF(z: number): number {
   const p = 0.3275911;
 
   const sign = z < 0 ? -1 : 1;
-  const absZ = Math.abs(z);
+  const x = Math.abs(z) / Math.SQRT2;
 
-  const t = 1 / (1 + p * absZ);
+  const t = 1 / (1 + p * x);
   const t2 = t * t;
   const t3 = t2 * t;
   const t4 = t3 * t;
   const t5 = t4 * t;
 
+  // erf(x)
   const y = 1 - (((((a5 * t5) + (a4 * t4)) + (a3 * t3)) + (a2 * t2)) + (a1 * t)) *
-    Math.exp(-absZ * absZ);
+    Math.exp(-x * x);
 
   return 0.5 * (1 + sign * y);
 }
