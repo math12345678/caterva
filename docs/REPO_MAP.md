@@ -98,7 +98,7 @@ Full per-file classification is in
 
 ## Keeping it honest
 
-The split does not weaken any guard. `wiring-main` holds all 21, and they
+The split does not weaken any guard. `wiring-main` holds all 22, and they
 run against the recursive checkout, so:
 
 - `check_example_endpoints.py` still resolves every documented endpoint
