@@ -119,6 +119,68 @@ describe('Result Comparator', () => {
       expect(comparison.metrics.difference).toBe(5);
     });
 
+    // Regression: the closing paren of Math.abs() sat after the first term,
+    // so the test was `c1 - c2 > 0.1` rather than `|c1 - c2| > 0.1`. The
+    // insight fired only when job 1 was the more confident of the two, which
+    // made the whole comparison depend on which job the caller happened to
+    // pass first.
+    it('reports a confidence gap regardless of which job is passed first', () => {
+      const lowConfidence = {
+        jobId: 'job_low',
+        query: 'michaelis-menten',
+        result: { finalValue: 2.0, confidence: 0.2, validated: true }
+      };
+      const highConfidence = {
+        jobId: 'job_high',
+        query: 'michaelis-menten',
+        result: { finalValue: 2.0, confidence: 0.9, validated: true }
+      };
+
+      const lowFirst = compareJobs(lowConfidence, highConfidence).insights;
+      const highFirst = compareJobs(highConfidence, lowConfidence).insights;
+
+      expect(lowFirst).toContainEqual(expect.stringContaining('Confidence difference'));
+      expect(highFirst).toContainEqual(expect.stringContaining('Confidence difference'));
+      expect(lowFirst).toContainEqual('Confidence difference: 0.200 vs 0.900');
+      expect(highFirst).toContainEqual('Confidence difference: 0.900 vs 0.200');
+    });
+
+    it('stays silent when the confidences are within 0.1 of each other', () => {
+      const job1 = {
+        jobId: 'job_1',
+        query: 'michaelis-menten',
+        result: { finalValue: 2.0, confidence: 0.9, validated: true }
+      };
+      const job2 = {
+        jobId: 'job_2',
+        query: 'michaelis-menten',
+        result: { finalValue: 2.0, confidence: 0.85, validated: true }
+      };
+
+      expect(compareJobs(job1, job2).insights).not.toContainEqual(
+        expect.stringContaining('Confidence difference')
+      );
+      expect(compareJobs(job2, job1).insights).not.toContainEqual(
+        expect.stringContaining('Confidence difference')
+      );
+    });
+
+    // A job with no result has no confidence. Coalescing it to 0 printed
+    // "0.950 vs 0.000", asserting a measurement that was never made.
+    it('does not report a confidence of zero for a job that has no result', () => {
+      const finished = {
+        jobId: 'job_1',
+        query: 'michaelis-menten',
+        result: { finalValue: 2.0, confidence: 0.95, validated: true }
+      };
+      const unfinished = { jobId: 'job_2', query: 'michaelis-menten', result: undefined };
+
+      const insights = compareJobs(finished, unfinished).insights;
+
+      expect(insights).not.toContainEqual(expect.stringContaining('Confidence difference'));
+      expect(insights.join(' ')).not.toContain('0.000');
+    });
+
     it('handles missing result fields', () => {
       const job1 = {
         jobId: 'job_1',

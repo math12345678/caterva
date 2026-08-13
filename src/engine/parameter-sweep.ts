@@ -11,6 +11,7 @@
 
 import { logger } from '../logger';
 import ScientificPipeline from '../integration/scientificPipeline';
+import { recordSweepMetrics, recordSweepJobMetrics } from '../storage/sweep-batch-metrics';
 
 export interface SweepParameter {
   name: string;
@@ -36,6 +37,7 @@ export interface SweepResults {
   completedSimulations: number;
   totalTimeMs: number;
   successRate: number;
+  sweepId?: string;
 }
 
 /**
@@ -207,6 +209,12 @@ export async function runSweep(
     'Parameter sweep complete'
   );
 
+  // Record metrics for the sweep operation
+  const sweepId = `sweep_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  recordSweepMetrics(sweepId, query, results);
+
+  logger.info({ sweepId }, 'Sweep metrics recorded');
+
   return {
     query,
     sweptParameters,
@@ -215,7 +223,8 @@ export async function runSweep(
     totalSimulations: results.length,
     completedSimulations: results.length,
     totalTimeMs,
-    successRate
+    successRate,
+    sweepId
   };
 }
 

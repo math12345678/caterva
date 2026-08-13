@@ -85,16 +85,22 @@ export function parseQueryString(queryStr: string): JobFilter {
     if (!isNaN(val)) filter.maxDuration = val;
   }
 
+  // Both bounds are clamped, not just the upper one. `Math.min(val, 10000)`
+  // alone let `?limit=-1` and `?offset=-2` through as negative numbers,
+  // which `Array.prototype.slice` interprets as counting back from the end
+  // of the array -- so the page returned was silently not the page asked
+  // for. Clamping here as well as at the slice keeps the echoed-back filter
+  // honest about which page was actually served.
   if (params.has('limit')) {
     const val = parseInt(params.get('limit')!);
-    if (!isNaN(val)) filter.limit = Math.min(val, 10000); // Max 10k
+    if (!isNaN(val)) filter.limit = Math.min(Math.max(val, 0), 10000); // Max 10k
   } else {
     filter.limit = 50; // Default
   }
 
   if (params.has('offset')) {
     const val = parseInt(params.get('offset')!);
-    if (!isNaN(val)) filter.offset = val;
+    if (!isNaN(val)) filter.offset = Math.max(val, 0);
   } else {
     filter.offset = 0;
   }
@@ -166,26 +172,51 @@ export function filterJobs(jobs: any[], filter: JobFilter): QueryResult {
     );
   }
 
-  // Confidence filter
+  // Confidence and duration filters.
+  //
+  // Both used to coalesce a missing value to 0 -- `(job.result?.confidence
+  // || 0) <= filter.maxConfidence`. A job that is still running, or that
+  // errored before producing a result, has NO confidence and NO duration;
+  // scoring it as zero makes it satisfy every upper-bound query. Asking for
+  // "results I should not trust" (maxConfidence=0.5) returned the crashed
+  // and in-flight jobs and nothing else, and "the fastest runs"
+  // (maxDuration=1200) listed a job that had not finished as faster than
+  // every job that had.
+  //
+  // A job with no measurement is not evidence for or against a claim about
+  // that measurement, so it is excluded from both directions of the filter
+  // rather than being given a made-up value that happens to pass one of
+  // them. A genuine 0 still compares as 0 -- that is why the test is
+  // `typeof === 'number'` and not truthiness.
+  const numericOr = (value: unknown): number | undefined =>
+    typeof value === 'number' && !Number.isNaN(value) ? value : undefined;
+
   if (filter.minConfidence !== undefined) {
-    filtered = filtered.filter(job =>
-      (job.result?.confidence || 0) >= filter.minConfidence!
-    );
+    filtered = filtered.filter(job => {
+      const confidence = numericOr(job.result?.confidence);
+      return confidence !== undefined && confidence >= filter.minConfidence!;
+    });
   }
 
   if (filter.maxConfidence !== undefined) {
-    filtered = filtered.filter(job =>
-      (job.result?.confidence || 0) <= filter.maxConfidence!
-    );
+    filtered = filtered.filter(job => {
+      const confidence = numericOr(job.result?.confidence);
+      return confidence !== undefined && confidence <= filter.maxConfidence!;
+    });
   }
 
-  // Duration filter
   if (filter.minDuration !== undefined) {
-    filtered = filtered.filter(job => (job.duration || 0) >= filter.minDuration!);
+    filtered = filtered.filter(job => {
+      const duration = numericOr(job.duration);
+      return duration !== undefined && duration >= filter.minDuration!;
+    });
   }
 
   if (filter.maxDuration !== undefined) {
-    filtered = filtered.filter(job => (job.duration || 0) <= filter.maxDuration!);
+    filtered = filtered.filter(job => {
+      const duration = numericOr(job.duration);
+      return duration !== undefined && duration <= filter.maxDuration!;
+    });
   }
 
   const totalFiltered = filtered.length;
@@ -220,9 +251,22 @@ export function filterJobs(jobs: any[], filter: JobFilter): QueryResult {
     return sortOrder === 'desc' ? -comparison : comparison;
   });
 
-  // Pagination
-  const offset = filter.offset || 0;
-  const limit = filter.limit || 50;
+  // Pagination.
+  //
+  // `filter.limit || 50` turned an explicit `limit=0` into 50: a caller who
+  // asked for the count and no rows got fifty rows back. `??` keeps 0
+  // meaning 0.
+  //
+  // The clamp matters more. `slice()` reads a negative argument as an offset
+  // from the END of the array, so `?limit=-1` silently returned every job
+  // except the last one and `?offset=-2` returned only the last two -- both
+  // while echoing the negative number back in the response, so a client
+  // paginating on those fields could not tell it had been handed a
+  // different page than it asked for. Nothing rejected the value upstream
+  // either (parseQueryString only rejected NaN), so this was reachable
+  // straight from a query string.
+  const offset = Math.max(0, filter.offset ?? 0);
+  const limit = Math.max(0, filter.limit ?? 50);
   const paginatedJobs = filtered.slice(offset, offset + limit);
 
   return {

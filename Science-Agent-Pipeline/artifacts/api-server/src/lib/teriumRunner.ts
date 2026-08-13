@@ -95,6 +95,29 @@ async function ensureRunnerScript(): Promise<void> {
 }
 
 /**
+ * Read the runner's stdout as its result envelope, or `undefined` if it is
+ * not JSON at all.
+ *
+ * Separate from the reject/resolve logic so the engine's own explanation can
+ * be consulted BEFORE the exit status is interpreted -- a rejected run has
+ * both a nonzero status and a perfectly good reason, and only one of them is
+ * worth telling a user.
+ */
+function parsePayload(
+  stdout: string,
+): TeriumResult | PythonError | undefined {
+  if (!stdout) return undefined;
+  try {
+    const parsed = JSON.parse(stdout) as unknown;
+    if (typeof parsed !== "object" || parsed === null) return undefined;
+    if (typeof (parsed as { ok?: unknown }).ok !== "boolean") return undefined;
+    return parsed as TeriumResult | PythonError;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Run the Python Terium engine for a given domain and parameters.
  *
  * Physical validation remains authoritative in the Python engine. This bridge
@@ -129,6 +152,7 @@ export async function runTerium(
 
     let stdout = "";
     let stderr = "";
+    let stdinError: Error | undefined;
 
     proc.stdout.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf-8");
@@ -142,30 +166,117 @@ export async function runTerium(
       reject(new Error(`Failed to spawn Terium runner: ${err.message}`));
     });
 
-    proc.on("close", (code) => {
+    // A child that dies before reading its input makes the stdin write below
+    // fail with EPIPE. An 'error' event on a stream with no listener is an
+    // uncaughtException in Node, so without this handler a Python process
+    // that exits early did not fail the job -- it took the API server down
+    // with it. Recorded rather than rejected: the 'close' handler always
+    // runs afterwards and knows the exit status and signal, so it can say
+    // something considerably more useful than "write EPIPE".
+    proc.stdin.on("error", (err: Error) => {
+      stdinError = err;
+    });
+
+    // `killedBySignal`, not `signal` -- the AbortSignal parameter of this
+    // function is also called `signal` and is still needed on the next line.
+    proc.on("close", (code, killedBySignal) => {
       if (signal) signal.removeEventListener("abort", onAbort);
       const trimmed = stdout.trim();
-      if (code !== 0 || !trimmed) {
+      const detail = stderr.trim();
+
+      // THE REASON COMES FIRST.
+      //
+      // The engine reports a rejected run as `{"ok": false, "error": ...}`
+      // on STDOUT and exits 1. This handler used to test `code !== 0`
+      // before parsing anything, so it rejected with `stderr ||
+      // "exited with code 1"` -- and stderr is empty, because the engine put
+      // the explanation on stdout. The `if (!parsed.ok) reject(parsed.error)`
+      // branch that came after was therefore unreachable for every
+      // structured rejection the engine has ever produced: it could only
+      // have run for a rejection reported with exit status 0, which the
+      // engine never does.
+      //
+      // Concretely, an over-budget population returns
+      //
+      //   {"ok": false, "error": "a0+b0=1100000 exceeds API runtime ceiling
+      //    (MAX_API_SSA_POPULATION) 1000000"}
+      //
+      // and the API user was told "Terium runner exited with code 1". Rule 2
+      // of the constitution -- reject the impossible WITH a reason -- was
+      // being honoured by the engine and thrown away one layer above it.
+      // A user cannot act on an exit status; they can act on "lower a0+b0
+      // below 1000000".
+      const structured = parsePayload(trimmed);
+
+      if (structured && structured.ok === false) {
+        reject(new Error(structured.error));
+        return;
+      }
+
+      // Three further facts used to collapse into that same message:
+      //
+      //   * killed by a signal        -> "exited with code null"
+      //   * exited nonzero, no reason -> the only case the message fitted
+      //   * exited 0 but wrote nothing-> "exited with code 0"
+      //
+      // The last one tells a user that a *successful* exit status is the
+      // reason their simulation failed, and the first one is what an
+      // out-of-memory kill on a long run looks like -- the single most
+      // useful thing to know about a large simulation that vanished, and
+      // the code had it in hand and threw it away.
+      if (killedBySignal) {
         reject(
-          new Error(stderr || `Terium runner exited with code ${code}`),
+          new Error(
+            `Terium runner was killed by ${killedBySignal} before it ` +
+              "produced a result. On a long or large run this is usually the " +
+              "operating system reclaiming memory." +
+              (detail ? ` Runner stderr: ${detail}` : ""),
+          ),
         );
         return;
       }
 
-      try {
-        const parsed = JSON.parse(trimmed) as TeriumResult | PythonError;
-        if (!parsed.ok) {
-          reject(new Error(parsed.error));
-          return;
-        }
-        resolve(parsed);
-      } catch (err) {
+      if (code !== 0) {
         reject(
           new Error(
-            `Terium runner returned invalid JSON: ${err instanceof Error ? err.message : String(err)}`,
+            detail ||
+              `Terium runner exited with status ${code} and wrote nothing ` +
+                "to stderr.",
           ),
         );
+        return;
       }
+
+      if (!trimmed) {
+        reject(
+          new Error(
+            "Terium runner exited successfully but produced no result on " +
+              "stdout." +
+              (detail ? ` Runner stderr: ${detail}` : "") +
+              (stdinError
+                ? ` It also closed its input before the request was written (${stdinError.message}).`
+                : ""),
+          ),
+        );
+        return;
+      }
+
+      if (!structured) {
+        // The output itself is the evidence, and it used to be withheld:
+        // the message quoted only the parser's complaint ("Unexpected token
+        // at position 0"), which cannot distinguish a traceback from an
+        // empty string from a stray print().
+        const excerpt =
+          trimmed.length > 400 ? `${trimmed.slice(0, 400)}...` : trimmed;
+        reject(
+          new Error(
+            `Terium runner returned output that is not JSON. It said: ${excerpt}`,
+          ),
+        );
+        return;
+      }
+
+      resolve(structured);
     });
 
     proc.stdin.write(JSON.stringify({ domain, parameters }));
