@@ -250,23 +250,59 @@ def _web_server_routes() -> set[str]:
         body = raw.rstrip("$")
 
         segments = [s for s in body.split("/") if s]
-        cleaned = [
-            ":param" if re.search(r"[\[\].*+]", segment) else segment
-            for segment in segments
-        ]
 
-        # An UNANCHORED pattern ending in `/` is a prefix match:
-        # `/^\/api\/batches\//` accepts `/api/batches/<anything>`. Without
-        # this the route was recorded as `/api/batches`, which is not a path
-        # the server serves -- so a document correctly citing
-        # `/api/batches/<id>` would have been reported as wrong.
-        if not anchored and body.endswith("/"):
-            cleaned.append(":param")
+        # A segment may be OPTIONAL-SUFFIXED rather than a wildcard:
+        # `sweeps?` serves both /sweep and /sweeps; `batch(?:es)?` serves both
+        # /batch and /batches. Those spellings exist because the reads are
+        # plural and the exports were singular, so a user who had just called
+        # /api/sweeps/:id would guess /api/export/sweeps/:id/csv and 404.
+        #
+        # Recorded as SEPARATE routes, one per spelling. The first version of
+        # this parser copied the regex text through verbatim and produced a
+        # route literally named `/api/export/batch(?:es)?/:param/csv`, which
+        # matched no document -- so adding the alias made the guard report the
+        # correctly-documented singular form as nonexistent. A route table
+        # that cannot express the routes being served is the same
+        # half-a-route-table failure as STAGE_10_PART_24.
+        variants: list[list[str]] = [[]]
+        for segment in segments:
+            options = _segment_spellings(segment)
+            variants = [prefix + [option] for prefix in variants for option in options]
 
-        if cleaned:
-            routes.add("/" + "/".join(cleaned))
+        for cleaned in variants:
+            # An UNANCHORED pattern ending in `/` is a prefix match:
+            # `/^\/api\/batches\//` accepts `/api/batches/<anything>`.
+            # Without this the route was recorded as `/api/batches`, which is
+            # not a path the server serves -- so a document correctly citing
+            # `/api/batches/<id>` would have been reported as wrong.
+            tail = cleaned + ([":param"] if (not anchored and body.endswith("/")) else [])
+            if tail:
+                routes.add("/" + "/".join(tail))
 
     return routes
+
+
+#: `sweeps?` -> sweep, sweeps.  `batch(?:es)?` -> batch, batches.
+_OPTIONAL_GROUP = re.compile(r"^([A-Za-z0-9_-]+)\(\?:([A-Za-z0-9_-]+)\)\?$")
+_OPTIONAL_CHAR = re.compile(r"^([A-Za-z0-9_-]+)([A-Za-z0-9_-])\?$")
+
+
+def _segment_spellings(segment: str) -> list[str]:
+    """Every literal spelling one regex path segment accepts."""
+    match = _OPTIONAL_GROUP.match(segment)
+    if match:
+        return [match.group(1), match.group(1) + match.group(2)]
+
+    match = _OPTIONAL_CHAR.match(segment)
+    if match:
+        return [match.group(1), match.group(1) + match.group(2)]
+
+    # Anything else containing regex metacharacters is a value the caller
+    # supplies, not a spelling of a fixed segment.
+    if re.search(r"[\[\].*+()?]", segment):
+        return [":param"]
+
+    return [segment]
 
 
 def _to_pattern(route: str) -> re.Pattern[str]:
