@@ -21,13 +21,47 @@ comfortable with:
 make setup && make check && make test
 
 # Option 2: container (no local Python needed)
-docker build -t terrium-sandbox . && docker run -it --rm terrium-sandbox
+docker build -f .devcontainer/Dockerfile -t terrium-sandbox . \
+  && docker run -it --rm terrium-sandbox
 ```
+
+The `-f` is not optional. The Dockerfile at the repository root builds the
+Node API server that `docker-compose.yml` runs and has no Python in it; the
+Python sandbox is `.devcontainer/Dockerfile`, which is also what the Dev
+Container builds.
 
 `make check` / the Docker build both run `scripts/check_env.py`, which
 builds a real Michaelis-Menten model end to end and checks it against the
 exact closed-form solution. If that fails, something about the environment
 is actually broken -- not just a version mismatch warning.
+
+**When setup fails, run `make doctor` before anything else.** It runs on a
+bare interpreter and imports nothing outside the standard library, so it
+still works when the venv is the broken thing -- which check_env.py, by
+construction, cannot do. It prints every interpreter it found, the venv's
+state and which Python built it, each required package's installed version
+next to its pin, whether stdpopsim is available and why not, and whether
+Node is present for the TypeScript guards.
+
+## Windows
+
+The Makefile is POSIX shell: the interpreter resolver uses `command -v` and
+shell functions, and every recipe calls `.venv/bin/...`, which a Windows
+venv spells `.venv\Scripts\`. Use **WSL2** or the Dev Container -- those are
+the two routes anyone here has actually run.
+
+The underlying steps are plain pip and pytest and carry no POSIX dependency,
+so the native equivalents below should work. Nobody has run them on a
+Windows machine, so treat that as untested rather than promised; if they
+fail, report it -- a setup that only works for the person who wrote it is a
+defect.
+
+```powershell
+py -3.13 -m venv .venv
+.venv\Scripts\pip install -r requirements-dev.txt
+.venv\Scripts\python scripts\check_env.py
+.venv\Scripts\python -m pytest Terium/tests Tests -q
+```
 
 ## The standard this codebase holds itself to
 

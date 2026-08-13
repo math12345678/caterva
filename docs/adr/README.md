@@ -46,3 +46,4 @@ Each ADR has:
 | [0021](0021-strenda-applies-only-to-governed-parameters.md) | The STRENDA rule applies only to STRENDA-governed parameters, enforced by a mandatory `parameterKey` |
 | [0022](0022-three-oscillator-domains.md) | Three ODE oscillator domains: Lotka-Volterra, Tyson cell cycle, Elowitz-Leibler repressilator |
 | [0023](0023-lotka-volterra-default-parameters-were-transposed.md) | Lotka-Volterra's default gamma/delta were transposed, producing a negative population and destroying the conserved quantity |
+| [0024](0024-refusing-versus-defaulting-an-unsourced-parameter.md) | **Under review.** Herbert Sauro (libRoadRunner author, NIH reproducibility centre) argues an unsourced Km should be defaulted with a warning rather than refused — the opposite of ADR 0012/0013 |

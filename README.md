@@ -19,37 +19,72 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 ```bash
 git clone https://github.com/math12345678/terrium.git
 cd terrium
-make setup     # creates .venv, installs everything
+make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
 make test      # runs all 1,291 tests (1,014 engine + 277 literature)
+```
+
+`make setup` needs an interpreter in the supported window and downloads
+about 120 MB of prebuilt wheels for the direct pins alone — libroadrunner is
+50 MB of it. Every direct pin in `requirements.txt` publishes a wheel, so
+nothing in that set compiles from source on x86_64 Linux, macOS or Windows.
+Expect two to five minutes, and expect pip to print nothing at all while it
+resolves.
+
+**If anything above fails, run `make doctor`.** It reports every interpreter
+it found and their versions, whether `.venv` exists and runs, which of the
+seven required packages import and at what version against the pin, whether
+`stdpopsim` is available, and whether Node is present for the TypeScript
+guards — then lists what to do about each. It prints what it checked, not
+just a verdict.
 
 `test_popgen_resolver.py` skips its 19 tests when `stdpopsim` is not
-installed — it needs `libgsl-dev` and is genuinely absent in some
-environments. `make check` reports that as a warning so the gap is visible;
-a silent skip would let the population-genetics literature path go untested
-and still read as green.
-```
+installed. `make check` reports that as a warning so the gap is visible; a
+silent skip would let the population-genetics literature path go untested
+and still read as green. The one platform where it reliably will not install
+is Linux on arm64: `msprime`, stdpopsim's C-extension dependency, publishes
+wheels for manylinux x86_64, macOS and Windows only, so pip builds it from
+source there and needs `libgsl-dev` plus a compiler.
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
 model, translates it to SBML, integrates it, and compares the result to the
 exact closed-form solution. If it passes, the numerics are trustworthy.
 
+### Windows
+
+The Makefile is POSIX shell — the interpreter resolver uses `command -v` and
+shell functions, and every recipe calls `.venv/bin/...`, which a Windows
+venv spells `.venv\Scripts\`. Use **WSL2** or the Dev Container below; both
+are ordinary Linux from that point on, and both are what this project
+actually exercises.
+
+Nothing under the Makefile is Windows-specific — the steps are plain pip and
+pytest — so the native equivalents are in CONTRIBUTING.md under "Windows".
+They have not been run on a Windows machine by anyone here; if they fail,
+that is a bug worth reporting rather than something you are doing wrong.
+
 ### Sandbox (Docker / Dev Containers)
 
-If you'd rather not touch your local Python at all -- reviewing this for
-Kickstart, onboarding as the backend hire, or just don't want a `.venv`
-lying around -- there's a container that gives you the exact same verified
-environment:
+If you'd rather not touch your local Python at all, there's a container that
+gives you the same verified environment:
 
 ```bash
-docker build -t terrium-sandbox .
+docker build -f .devcontainer/Dockerfile -t terrium-sandbox .
 docker run -it --rm terrium-sandbox
 # you're now in a shell where check_env.py has already passed
 ```
 
+The `-f` matters. The Dockerfile at the repository root is a different
+image: it builds the Node API server that `docker-compose.yml` runs and
+contains no Python interpreter. The Python sandbox lives in
+`.devcontainer/Dockerfile`.
+
 This is also wired up as a [Dev Container](https://containers.dev/) — open
 the repo in VS Code with the Dev Containers extension installed and it'll
-offer to build and attach automatically.
+offer to build and attach automatically. It adds Node 22 on top of the
+Python image, because `scripts/verify_build.py --quick` type-checks
+TypeScript and needs `npx`. Run `npm install` once inside it before using
+that command; `node_modules` is not baked into the image.
 
 ## Using it
 
@@ -421,6 +456,7 @@ them together.
 ## Common commands
 
 ```bash
+make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
 make test        # run all 1,291 tests
 make test-fast   # skip the slow property/robustness suites

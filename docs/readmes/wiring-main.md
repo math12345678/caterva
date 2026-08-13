@@ -24,7 +24,7 @@ A sample of what they refuse:
 | `check_typescript_suites_discovered` | a test file on disk its runner never collects |
 | `check_no_silent_skips` | a suite that did not run reported as zero skips |
 | `check_forbidden_packages` | `tellurium` in a manifest — or a doc telling you to install it |
-| `check_literature_inventory` | a hardcoded scientific constant with no declared provenance |
+| `check_literature_inventory` | a hardcoded measured quantity with no declared provenance |
 | `check_guard_wiring` | a guard that runs in no harness, or lost one it used to |
 
 ## The rule they all serve

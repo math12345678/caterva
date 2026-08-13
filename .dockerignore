@@ -1,9 +1,22 @@
-# This image is the Python simulation/literature stack only. The frontend
-# (Science-Agent-Pipeline) is a separate project with its own tooling and
-# has no business inside this container -- excluding it keeps the image
-# small and the build fast.
+# Shared by both images built from this context:
+#   Dockerfile                 the Node API server (docker-compose.yml)
+#   .devcontainer/Dockerfile   the Python sandbox / Dev Container
+#
+# This file used to open by describing the root Dockerfile as "the Python
+# simulation/literature stack only", which stopped being true when that
+# Dockerfile was replaced in place by the Node build. A comment describing
+# the wrong file is how the devcontainer went unnoticed for a month.
+#
+# Science-Agent-Pipeline is a separate project with its own tooling and
+# belongs in neither image.
 Science-Agent-Pipeline/
 node_modules/
+
+# 93 MB of marketing site, plus build output that either image would only
+# rebuild. Nothing here is importable by the engine or the API server.
+terrium-site/
+dist/
+coverage/
 
 .git/
 __pycache__/
