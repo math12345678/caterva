@@ -90,6 +90,20 @@ ignore_errors = true
 testpaths = ["Terium/tests", "Tests"]
 timeout = 300
 addopts = "-v --tb=short"
+# Tests/ also holds one-off exploratory scripts (pubmed_test.py,
+# brenda_test.py) that match pytest's default *_test.py collection pattern
+# and run live network calls at import time -- not inside a test function,
+# so they execute unconditionally the moment pytest imports the module.
+# Tests/pytest.ini already restricts this locally, with a comment naming
+# these two files, but that only takes effect when pytest resolves config
+# from Tests/pytest.ini directly. The documented, sanctioned invocation
+# (`pytest Terium/tests Tests` from repo root -- see docs/CONSTITUTION.md
+# and the testpaths above) resolves config from THIS file instead, where
+# the restriction was absent, so the local fix never covered the real
+# command: `python -m pytest Terium/tests Tests -q` hit a live 403 from an
+# outbound-network-restricted environment during collection, not even
+# inside a test. Reproduced directly, not from a report.
+python_files = ["test_*.py"]
 
 [build-system]
 requires = ["setuptools>=61.0"]
