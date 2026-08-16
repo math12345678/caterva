@@ -1,7 +1,14 @@
 # What Terrium collects
 
-Short version: an email address, only if you type one into the waitlist form,
-and nothing else. No cookies, no analytics, no trackers, no accounts.
+Short version: Terrium itself stores an email address, only if you type one
+into the waitlist form. No cookies, no analytics, no trackers, no accounts.
+
+But "nothing else" would be wrong, and this line used to say it. Every public
+page loads fonts and scripts from third-party CDNs, so a visitor's IP address
+reaches Google and Cloudflare on page load, whether or not they type anything.
+That is described in
+[Fonts and scripts the pages load from other people's servers](#fonts-and-scripts-the-pages-load-from-other-peoples-servers),
+and it is not yet fixed.
 
 This is a statement of what the code does, written by reading it. **It is not
 a privacy policy and it is not legal advice.** A privacy policy names a data
@@ -33,6 +40,63 @@ somebody removes it by hand.
 **How to get yours removed:** email mathlete.world@gmail.com. There is no
 automated unsubscribe and no self-service deletion.
 
+## Fonts and scripts the pages load from other people's servers
+
+This section is the one thing here that affects **every visitor**, including
+someone who reads a page and leaves without typing anything.
+
+Each public page asks the visitor's browser to fetch files from a CDN. The
+browser cannot do that without telling the CDN who is asking, so the visitor's
+IP address, their browser's `User-Agent`, and the address of the Terrium page
+they were on reach a third party before the page has finished rendering. No
+click, no form, no consent.
+
+| page | goes to | for |
+|---|---|---|
+| `mule/index.html` | `fonts.googleapis.com`, `fonts.gstatic.com` | Inter Tight, IBM Plex Mono |
+| `terrium-site/index.html` | `fonts.googleapis.com`, `fonts.gstatic.com` | Inter, JetBrains Mono |
+| `src/web/dashboard.html` | `cdnjs.cloudflare.com` | Chart.js 3.9.1 |
+| `src/web/server.ts` (API docs) | `cdnjs.cloudflare.com`, `fonts.googleapis.com`, `cdn.jsdelivr.net` | Swagger UI, Montserrat/Roboto, Redoc |
+
+**Why this is a legal question and not a performance one.** A visitor's IP
+address is personal data under GDPR Article 4 — settled by the CJEU in
+*Breyer* (C-582/14, 2016). On 20 January 2022 the Landgericht München I
+(Az. 3 O 17493/20) held that embedding Google Fonts this way, so that a
+visitor's IP reaches Google without consent, breaches GDPR Article 6, and
+awarded the visitor €100 with penalties of up to €250,000 for continuing.
+Sending that address to a US server also engages Chapter V (Articles 44–46),
+which wants an adequacy decision or Standard Contractual Clauses first.
+
+Terrium is aimed at students, including students in the EU.
+
+**The fix is to self-host.** The fonts are licensed for it — Inter, IBM Plex
+Mono and JetBrains Mono are SIL Open Font License 1.1, Montserrat and Roboto
+likewise or Apache-2.0 — so downloading the files into the repository and
+serving them from the same origin removes the third-party request entirely
+and changes nothing a visitor sees. That has **not been done yet**; this
+section records the exposure rather than claiming it is closed.
+
+### The same tags are a supply-chain risk
+
+None of the three `<script>` tags above carries an `integrity=` attribute, so
+the browser runs whatever those CDNs return without checking it against a
+known hash. One of them is worse:
+
+```
+https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js
+```
+
+`@next` is not a version. It resolves to whatever was most recently published
+under that tag, so the code served changes without anyone here deciding it
+should. Combined with a server that has no authentication (see
+[`SECURITY.md`](../SECURITY.md)), a bad publish or a compromised CDN executes
+arbitrary JavaScript in the operator's browser.
+
+Remedies, in order of how much they fix: self-host these too; or pin `@next`
+to an exact version and add Subresource Integrity hashes to all three. The
+hashes are deliberately not written here, because a hash that was guessed
+rather than computed from the exact bytes is worse than none.
+
 ## The simulation tool
 
 Different surface, different answer. `src/web/server.ts` stores the query
@@ -54,6 +118,14 @@ No cookies, no `localStorage`, no analytics, no telemetry.
 > does — and a user's query text reaching OpenAI is a third-party disclosure
 > regardless of which machine initiates it. Written by me, one pass earlier,
 > in the document whose entire job is to describe this accurately.
+>
+> **Correction to that correction (2026-08-16).** "The page does not call
+> anyone" is false, and was false when written. Every public page loads fonts
+> and scripts from third-party CDNs on page load. See
+> [Fonts and scripts the pages load from other people's servers](#fonts-and-scripts-the-pages-load-from-other-peoples-servers)
+> below. Two passes in a row, this document described the third-party
+> question and got the client half wrong both times — the second time while
+> in the act of correcting the first.
 
 `Science-Agent-Pipeline/artifacts/api-server/src/lib/llmResolver.ts` can send
 the query somebody typed to an external language-model provider. It supports
