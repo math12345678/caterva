@@ -21,6 +21,8 @@ Exit codes:
 
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
 import sys
 import time
@@ -30,7 +32,6 @@ from typing import List, Tuple
 
 REPO_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = REPO_ROOT / "scripts"
-TERIUM_DIR = REPO_ROOT / "Terium"
 API_SERVER_DIR = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-server"
 
 
@@ -40,24 +41,47 @@ def run_command(
     timeout: int = 300,
     capture_output: bool = False
 ) -> Tuple[bool, str, str]:
-    """Run a command and return (success, stdout, stderr)."""
+    """Run a command and return (success, stdout, stderr).
+
+    The child runs in its own process group (start_new_session). On
+    timeout we SIGKILL that group: killing only the shell wrapper used to
+    orphan the real command, which then kept the stdout/stderr pipe open
+    forever and made every waiting `tail`/caller appear to hang.
+    """
+    proc = None
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             shell=True,
             cwd=str(cwd) if cwd else None,
-            timeout=timeout,
-            capture_output=capture_output,
-            text=True
+            text=True,
+            stdout=subprocess.PIPE if capture_output else None,
+            stderr=subprocess.PIPE if capture_output else None,
+            start_new_session=True,
         )
+        stdout, stderr = proc.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
+        if proc is not None and proc.pid:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
         return False, "", f"Command timed out after {timeout}s: {cmd}"
     except Exception as e:
+        if proc is not None and proc.pid:
+            try:
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
         return False, "", f"Command failed with exception: {e}"
     else:
-        success = result.returncode == 0
-        stdout = result.stdout or ""
-        stderr = result.stderr or ""
+        success = proc.returncode == 0
+        stdout = stdout or ""
+        stderr = stderr or ""
         return success, stdout, stderr
 
 
@@ -107,8 +131,212 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_plausibility_constants.py'}"
     ))
 
-    # Documented counts guard -- README test/domain counts vs reality.
-    # Added Stage 7 Part 3 after three counts were found stale by hand.
+    # No user input may reach a shell. The server spawns Python with the
+    # argv form and passes data over stdin as JSON -- correct, and one
+    # twelve-character edit (`shell: true`) from being RCE on a server that
+    # has no authentication. A correct thing nobody watches is a coincidence.
+    guards.append(run_guard(
+        "Subprocess Safety Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_subprocess_safety.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Subprocess Safety Guard",
+        f"python {SCRIPTS_DIR / 'check_subprocess_safety.py'}",
+        timeout=180,
+    ))
+
+    # llmResolver.ts can send the query somebody typed to one of six
+    # external providers. PRIVACY.md said "no third-party requests FROM THE
+    # PAGE ITSELF" -- a qualifier that made a misleading sentence technically
+    # true, written by the same author one pass earlier.
+    # Goes quiet if the LLM path is ever removed.
+    guards.append(run_guard(
+        "LLM Disclosure Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_llm_disclosure.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "LLM Disclosure Guard",
+        f"python {SCRIPTS_DIR / 'check_llm_disclosure.py'}"
+    ))
+
+    # The waitlist form collects an email address -- personal data -- and
+    # said nothing about what happens to it. Twelve passes of audit covered
+    # licences, dependencies and attribution and never looked at the one
+    # place the project asks a stranger for their details.
+    # Goes quiet if email collection is ever removed.
+    guards.append(run_guard(
+        "Privacy Notice Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_privacy_notice.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Privacy Notice Guard",
+        f"python {SCRIPTS_DIR / 'check_privacy_notice.py'}"
+    ))
+
+    # A server with no authentication must not be published to every
+    # interface. docker-compose.yml shipped "3000:3000" -- which Docker binds
+    # to 0.0.0.0 -- beside NODE_ENV=production and restart: unless-stopped.
+    # Goes quiet if authentication is added, same as the guard below.
+    guards.append(run_guard(
+        "Port Binding Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_port_binding.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Port Binding Guard",
+        f"python {SCRIPTS_DIR / 'check_port_binding.py'}"
+    ))
+
+    # The web server has no authentication and /api/jobs/history returns
+    # every user's queries to any caller. Defensible for a localhost tool;
+    # what was not defensible is that nothing said so for seven passes of
+    # audit. Goes quiet if authentication is ever added.
+    guards.append(run_guard(
+        "Deployment Warning Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_deployment_warning.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Deployment Warning Guard",
+        f"python {SCRIPTS_DIR / 'check_deployment_warning.py'}"
+    ))
+
+    # Business material makes claims to people deciding whether to fund or
+    # join. A number in a pitch deck is as checkable as one in the product,
+    # and is read by someone with less ability to verify it.
+    guards.append(run_guard(
+        "Investor Claims Guard",
+        f"python {SCRIPTS_DIR / 'check_investor_claims.py'}"
+    ))
+
+    # No public page may claim an endorsement that is not on record.
+    # Reviewers replied with criticism, not approval, and a landing page that
+    # turned "Lisa Jeske of BRENDA reviewed this" into an implied blessing
+    # would be fabricating a credential from a real correspondence.
+    guards.append(run_guard(
+        "Fabricated Endorsement Guard",
+        f"python {SCRIPTS_DIR / 'check_no_fabricated_endorsements.py'}"
+    ))
+
+    # The seventeen split-repo READMEs are what a stranger arriving from a
+    # search result actually lands on. An audit found 2 of 17 stating the
+    # licence, 3 of 17 carrying the non-affiliation notice, and 0 of 17
+    # routing anyone to contributing.
+    guards.append(run_guard(
+        "Published Repo README Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_published_repo_readmes.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Published Repo README Guard",
+        f"python {SCRIPTS_DIR / 'check_published_repo_readmes.py'}"
+    ))
+
+    # The guard above checks what those seventeen READMEs *say*. This one
+    # checks that the repositories carrying them ship a LICENSE and NOTICE at
+    # all. Until 2026-08-16 they did not: `LICENSE` appeared once in
+    # split_repos.sh, in the `main` umbrella's file list, and `NOTICE` never.
+    # Seventeen repositories of Apache-2.0 source published with no licence
+    # file read as all-rights-reserved -- nobody who found them could legally
+    # use what they found.
+    guards.append(run_guard(
+        "Split-Repo Legal Files Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_split_repo_legal_files.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Split-Repo Legal Files Guard",
+        f"python {SCRIPTS_DIR / 'check_split_repo_legal_files.py'}"
+    ))
+
+    # Every shipping surface says Terrium is not affiliated with Tellurium.
+    # Not a licensing problem -- libRoadRunner is Apache 2.0 and Terrium is a
+    # legitimate consumer of it -- but a naming one. Matthias König (HU
+    # Berlin) read a cold outreach email as a false claim of credit for the
+    # Sauro lab's work, and a disclaimer that exists on one surface while the
+    # product is read on seven is a disclaimer nobody sees.
+    guards.append(run_guard(
+        "Non-Affiliation Notice Guard",
+        f"python {SCRIPTS_DIR / 'check_non_affiliation_notice.py'}"
+    ))
+
+    # The importable package is `Terium` (one r); the product is `Terrium`
+    # (two). `import Terrium` is always a ModuleNotFoundError, and a newcomer
+    # who hits it concludes their environment is broken -- then runs
+    # `make doctor`, which reports a healthy install.
+    guards.append(run_guard(
+        "Package Spelling Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_package_spelling.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Package Spelling Guard",
+        f"python {SCRIPTS_DIR / 'check_package_spelling.py'}"
+    ))
+
+    # Data-source attribution: every licence fact in the source table also
+    # appears in NOTICE and reaches a model. BRENDA is CC BY 4.0 and the
+    # attribution obligation travels downstream via Apache 2.0 4(d).
+    guards.append(run_guard(
+        "Data Source Attribution Guard",
+        f"python {SCRIPTS_DIR / 'check_data_source_attribution.py'}"
+    ))
+
+    # ADR 0008: modelCitations describes the MODEL. Two domains cited a
+    # database instead, so the Michaelis-Menten models were the only ones
+    # in the table with no reference to the work defining them.
+    guards.append(run_guard(
+        "Model Citation Guard",
+        f"python {SCRIPTS_DIR / 'check_model_citations_cite_models.py'}"
+    ))
+
+    # Every dependency carries a recorded grant of permission to use it.
+    # Defaults to FAIL for an unrecorded dependency: "you must look it up",
+    # not "assume it is fine". Found @replit/connectors-sdk, which ships no
+    # licence at all.
+    guards.append(run_guard(
+        "Dependency Licence Guard",
+        f"python {SCRIPTS_DIR / 'check_dependency_licenses.py'}",
+        timeout=180,
+    ))
+
+    # Publishing a build artifact changes Terrium's licence obligations.
+    # The compliance position today rests on a fact nobody was watching:
+    # nothing in CI publishes anything, so the LGPL (python-libsbml) and GPL
+    # (stdpopsim, opt-in) terms impose nothing. A legal position that depends
+    # on an unwatched fact is a coincidence, not a position.
+    guards.append(run_guard(
+        "Release Artifact Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_release_artifacts.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Release Artifact Guard",
+        f"python {SCRIPTS_DIR / 'check_release_artifacts.py'}"
+    ))
+
+    # Every relative link in a contributor doc resolves. START_HERE.md is
+    # the first thing a newcomer reads and is almost entirely links; a dead
+    # one tells them the project's claims about checking things are
+    # decoration. Written after Terium/README.md shipped a confident,
+    # plausible, wrong path to ADR 0001.
+    guards.append(run_guard(
+        "Doc Links Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_doc_links.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Doc Links Guard",
+        f"python {SCRIPTS_DIR / 'check_doc_links.py'}"
+    ))
+
+    # Documented counts guard -- test/domain counts vs reality, across every
+    # present-tense contributor doc. Added Stage 7 Part 3 after three counts
+    # were found stale by hand; scope widened beyond README.md on 2026-08-15
+    # after three onboarding documents were found claiming "22 guards" and
+    # "1,291 tests" against a real 36 and 1,735.
+    #
+    # The self-check runs first and separately. On a clean tree the guard
+    # reports zero findings forever, so a matcher that matched nothing would
+    # look identical to a matcher that worked -- which is how the narrow
+    # scope survived as long as it did.
+    guards.append(run_guard(
+        "Documented Counts Guard (self-check)",
+        f"python {SCRIPTS_DIR / 'check_documented_counts.py'} --selftest"
+    ))
     guards.append(run_guard(
         "Documented Counts Guard",
         f"python {SCRIPTS_DIR / 'check_documented_counts.py'}"
@@ -141,6 +369,61 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_guard_wiring.py'}"
     ))
 
+    # The Python/TypeScript process boundary, both directions. Six ADRs
+    # (0027, 0038, 0039, 0041) record one defect: a field computed correctly
+    # on one side and never received on the other, invisible because every
+    # test sat on one side of the boundary and none on the boundary itself.
+    #
+    # Adding a field to KineticResult now FAILS until someone records
+    # whether it crosses. That is the point -- four fields defaulted to
+    # "does not cross" silently and none of their tests noticed.
+    guards.append(run_guard(
+        "Runner Boundary Guard",
+        f"python {SCRIPTS_DIR / 'check_runner_boundary.py'}"
+    ))
+
+    # The generated API contract must use syntax the installed zod actually
+    # has. orval's `version: "auto"` read zod 3.25's `zod/v4` SUBPATH as
+    # "v4 is available" and emitted `zod.iso.datetime(...)` while importing
+    # from plain "zod", where `iso` is undefined -- a contract that threw on
+    # import, produced by the documented codegen command.
+    #
+    # `tsc --noEmit` is structurally blind to it: zod 3.25 DECLARES `iso` in
+    # its types and does not export it at runtime. That is why this is a
+    # separate guard and not a compile step. See ADR 0030.
+    guards.append(run_guard(
+        "Generated Client Loads Guard",
+        f"python {SCRIPTS_DIR / 'check_generated_client_loads.py'}"
+    ))
+
+    # How much of BRENDA's commentary Terrium can actually read.
+    #
+    # Not a correctness check -- a coverage measurement. It exists because a
+    # parser that ignores text does not report how much it ignored, and two
+    # real defects lived in that silence: the mutant rows of ADR 0029, and a
+    # buffer molarity dropped so quietly that the field added to disclose it
+    # was empty for the exact strings that motivated it.
+    #
+    # Wired here rather than left standalone. `check_guard_wiring.py` calls
+    # an unrun guard one that "passes only when someone thinks to run it,
+    # which is how check_rng_convention sat dead for a whole stage". See
+    # ADR 0031.
+    # Does everything the resolver computes reach a reader?
+    #
+    # ADR 0027 and ADR 0039 are the same defect: a field computed correctly
+    # and dropped at the process boundary. Wired here rather than left
+    # standalone, because check_guard_wiring.py is right that an unrun guard
+    # "passes only when someone thinks to run it". See ADR 0045.
+    guards.append(run_guard(
+        "Findings Reach A Surface Guard",
+        f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}"
+    ))
+
+    guards.append(run_guard(
+        "Commentary Coverage Guard",
+        f"python {SCRIPTS_DIR / 'check_commentary_coverage.py'}"
+    ))
+
     # Every simulation domain must be declared in all three API layers
     # (DISPATCH, SimulationDomain, SimulationParameterSchemas). ADR 0007's
     # contract test pins DISPATCH against the engine; nothing pinned the
@@ -161,6 +444,29 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     guards.append(run_guard(
         "Literature Inventory Guard",
         f"python {SCRIPTS_DIR / 'check_literature_inventory.py'}"
+    ))
+
+    # Two guards were written and left unwired; check_guard_wiring reports
+    # them and the build stayed green, which is exactly the failure the
+    # Stage 4 amendment exists for. Wired here:
+    #
+    # check_license_consistency.py: LICENSE, CITATION.cff and package.json
+    #   drifted to three different licences (LICENSE said "all rights
+    #   reserved", CITATION.cff said LicenseRef-Terrium-Proprietary,
+    #   package.json said MIT) and nothing read more than one of them at
+    #   once. A project about provenance must agree about its own terms.
+    guards.append(run_guard(
+        "License Consistency Guard",
+        f"python {SCRIPTS_DIR / 'check_license_consistency.py'}"
+    ))
+
+    # check_scripts_reachable.py: four times a feature was built, tested,
+    # and callable from nowhere (unregistered routes, an uncalled CLI
+    # write, export scripts nothing spawned). Every runner script under
+    # scripts/ must be named by something that can spawn it.
+    guards.append(run_guard(
+        "Scripts Reachable Guard",
+        f"python {SCRIPTS_DIR / 'check_scripts_reachable.py'}"
     ))
 
     return guards
@@ -312,6 +618,156 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             "TypeScript Suite Discovery Guard",
             f"python {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
             timeout=240,
+        ),
+        # ------------------------------------------------------------------
+        # Six guards below were written, correct, and wired to NOTHING.
+        # `check_guard_wiring.py` named all six on the same run. That is the
+        # exact failure the Stage 4 amendment was written for -- a guard that
+        # runs nowhere passes trivially whenever someone runs it by hand, so
+        # the only symptom is silence -- and it had recurred six times over.
+        #
+        # Two of them (`check_commands_runnable`, `check_scripts_reachable`)
+        # were added in this same effort. Writing a guard and not wiring it
+        # is the defect the guard-wiring guard exists to catch, committed by
+        # the person who had just been reading its output.
+        # ------------------------------------------------------------------
+        # Documentation promises a command; this runs it.
+        run_guard(
+            "Documented Command Guard",
+            f"python {SCRIPTS_DIR / 'check_commands_runnable.py'}",
+            timeout=120,
+        ),
+        # The other direction: a command or flag that works and is in no
+        # help text. It found `sweep` and `history` -- two whole working
+        # commands -- plus seven flags of `simulate --resolve`.
+        run_guard(
+            "CLI Surface Documentation Guard",
+            f"python {SCRIPTS_DIR / 'check_cli_surface_documented.py'}",
+            timeout=60,
+        ),
+        # A script nothing invokes. Dead code is not merely unused, it is
+        # unexercised, and unexercised code is where confidently wrong
+        # numbers live.
+        run_guard(
+            "Script Reachability Guard",
+            f"python {SCRIPTS_DIR / 'check_scripts_reachable.py'}",
+            timeout=180,
+        ),
+        # An ADR that exists and is in no index is an ADR nobody reads.
+        run_guard(
+            "ADR Index Guard",
+            f"python {SCRIPTS_DIR / 'check_adr_index.py'}",
+            timeout=60,
+        ),
+        # One licence claim in one place, everywhere. The relicensing to
+        # Apache 2.0 touched enough files that a stale "MIT" is a legal
+        # statement, not a typo.
+        run_guard(
+            "Licence Consistency Guard",
+            f"python {SCRIPTS_DIR / 'check_license_consistency.py'}",
+            timeout=60,
+        ),
+        # CITATION.cff is how a result cites the tool that produced it, and
+        # it now travels inside every exported COMBINE archive. An invalid
+        # one fails SILENTLY -- GitHub just stops showing the citation
+        # button -- so nothing else would report it.
+        run_guard(
+            "Citation Metadata Guard",
+            f"python {SCRIPTS_DIR / 'check_citation_cff.py'}",
+            timeout=60,
+        ),
+        # A computed finding that reaches no surface has not been reported.
+        run_guard(
+            "Finding Reachability Guard",
+            f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}",
+            timeout=120,
+        ),
+        # Another agent's guard, arrived unwired during this same pass and
+        # wired here rather than left for them: a number hardcoded into a
+        # page reads exactly like a measured one. Verified passing (exit 0,
+        # 5 metrics across 1 page) before wiring -- adding a red guard to a
+        # shared harness makes it everyone's problem and nobody's.
+        run_guard(
+            "Unsourced UI Number Guard",
+            f"python {SCRIPTS_DIR / 'check_no_unsourced_ui_numbers.py'}",
+            timeout=120,
+        ),
+        # A thrown object literal is not an Error, so every consumer using
+        # `e instanceof Error ? e.message : String(e)` records the literal
+        # text "[object Object]" -- which is what users saw for every failed
+        # simulation. TypeScript permits the throw and the hardened readers
+        # make it behaviourally invisible, so no unit test can fail on it.
+        # See ADR 0065.
+        # The mutation harness itself. Its self-test asserts that a mutation
+        # which does not apply, or a suite that does not run, is reported
+        # INDETERMINATE rather than "not caught" -- the three ways the
+        # hand-run harness produced a wrong answer. See ADR 0069.
+        run_guard(
+            "Mutation Harness Self-Check",
+            f"python {SCRIPTS_DIR / 'mutate.py'} --selftest",
+            timeout=120,
+        ),
+        # A mutation table is the evidence a reader is asked to accept, and
+        # the harness that produced every table before ADR 0069 had been
+        # wrong three separate ways. New records must ship theirs as a
+        # re-runnable set file; the 34 that predate the harness are itemised
+        # in docs/mutations/NOT-YET-REPRODUCIBLE.txt, which this guard forces
+        # to shrink rather than merely exist.
+        run_guard(
+            "Mutation Table Reproducibility Guard",
+            f"python {SCRIPTS_DIR / 'check_mutation_tables_reproducible.py'}",
+            timeout=120,
+        ),
+        # The self-check carries ADR 0079's failing input: a sibling guard's
+        # comment-stripper deleted from the `//` in `https://` onward,
+        # removing the licence URI from the text being searched for it. This
+        # guard strips `//` too and is safe only because it blanks
+        # WHOLE-LINE comments -- a distinction that was defended in a
+        # comment and never tested until now.
+        # An exported function nothing calls was computed for nobody --
+        # ADR 0039's defect at the scale of a capability. Found by hand three
+        # times (sbml-builder, rankModelsByFit, compareModelPair) before
+        # anything checked for it. See ADR 0089.
+        # Another agent's, arrived unwired. Verified green (exit 0, four
+        # disclosed CDN hosts) BEFORE wiring -- that is the part of the
+        # precedent that matters. Wiring a guard nobody has confirmed turns
+        # an unknown into everyone's red build, which is what the precedent
+        # exists to prevent.
+        run_guard(
+            "Third-Party Request Disclosure Guard",
+            f"python {SCRIPTS_DIR / 'check_third_party_requests_disclosed.py'}",
+            timeout=120,
+        ),
+        run_guard(
+            "Unwired Export Guard (self-check)",
+            f"python {SCRIPTS_DIR / 'check_exports_reach_a_caller.py'} --selftest",
+            timeout=120,
+        ),
+        run_guard(
+            "Unwired Export Guard",
+            f"python {SCRIPTS_DIR / 'check_exports_reach_a_caller.py'}",
+            timeout=120,
+        ),
+        run_guard(
+            "Thrown Value Guard (self-check)",
+            f"python {SCRIPTS_DIR / 'check_thrown_values_are_errors.py'} --selftest",
+            timeout=120,
+        ),
+        run_guard(
+            "Thrown Value Guard",
+            f"python {SCRIPTS_DIR / 'check_thrown_values_are_errors.py'}",
+            timeout=120,
+        ),
+        # Also another agent's, also arrived unwired, also verified green
+        # (exit 0) before wiring. A source file stating an assay pH or
+        # temperature it did not measure is the hardcoding rule at its
+        # sharpest -- those two numbers are exactly what STRENDA asks a
+        # measurement to carry, so inventing them forges the provenance
+        # rather than merely omitting it.
+        run_guard(
+            "Hardcoded Assay Condition Guard",
+            f"python {SCRIPTS_DIR / 'check_no_hardcoded_assay_conditions.py'}",
+            timeout=120,
         ),
     ]
 
