@@ -243,6 +243,37 @@ kind_of() {
 # Without this a split repo has no CI at all -- the monorepo's workflow stays
 # behind in wiring-main -- and no .gitignore, so the first `npm install` in a
 # clone offers 90 MB of node_modules for commit.
+# Apache-2.0 4(a) requires that every recipient of the Work be given a copy of
+# the License; 4(d) requires the NOTICE file to travel with it. A split
+# repository inherits nothing from the monorepo, and until 2026-08-16 LICENSE
+# was named exactly once in this script -- in the `main` umbrella's file list,
+# on its own -- and NOTICE was named nowhere at all.
+#
+# So seventeen of the eighteen published repositories carried Apache-2.0 source
+# with no licence file. That is not a missing formality: a repository with no
+# LICENSE is all-rights-reserved by default, and GitHub displays it that way.
+# Somebody who found `Terrium-sim/backend-main` and wanted to help was looking
+# at code they had no stated permission to use, copy or modify -- the precise
+# opposite of what publishing seventeen repositories was for.
+#
+# Both build paths must call this, and they share no code: history repos go
+# through add_scaffold_commit, file-set repos through build_fileset. That is
+# exactly how LICENSE came to be handled in one of them and neither.
+#
+# Defined here, above both callers, because add_scaffold_commit runs long
+# before build_fileset is defined; a definition next to build_fileset would be
+# a "command not found" at the first history repo.
+add_legal_files() {
+  local d="$1"
+  cp "$ROOT/LICENSE" "$d/LICENSE"
+  if [ -f "$ROOT/NOTICE" ]; then
+    cp "$ROOT/NOTICE" "$d/NOTICE"
+  else
+    printf 'split_repos.sh: NOTICE missing from %s -- Apache-2.0 4(d)\n' "$ROOT" >&2
+    return 1
+  fi
+}
+
 add_scaffold_commit() {
   local repo="$1" path="$2"
   local wt="$STAGE/_scaffold/$repo"
@@ -257,6 +288,7 @@ add_scaffold_commit() {
   if [ -f "$ROOT/docs/readmes/$repo.md" ]; then
     cp "$ROOT/docs/readmes/$repo.md" "$wt/README.md"
   fi
+  add_legal_files "$wt"
 
   git -C "$wt" add -A
   if git -C "$wt" diff --cached --quiet; then rm -rf "$wt"; return 0; fi
@@ -523,6 +555,7 @@ build_fileset() {
   done
 
   cp "$ROOT/$readme_file" "$dest/README.md"
+  add_legal_files "$dest"
 
   git -C "$dest" init -q -b main
   git -C "$dest" add -A
