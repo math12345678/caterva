@@ -1,0 +1,49 @@
+# Routing for the "New issue" page.
+#
+# Without this file GitHub shows the four templates and a bare "Open a blank
+# issue" link, with nothing pointing at SUPPORT.md, SECURITY.md or the
+# first-task list. Somebody with a question rather than a bug had no route
+# except filing a bug report, which is the wrong shape for them and the
+# wrong shape for whoever reads it.
+#
+# blank_issues_enabled stays TRUE on purpose. Turning it off funnels
+# everything into a template, and the most valuable reports this project has
+# had did not fit one -- "your document says X and the code does Y" existed
+# as a template only after somebody filed it as a blank issue. A newcomer
+# who cannot find the right template should be able to just write.
+blank_issues_enabled: true
+
+contact_links:
+  - name: I have a question, not a bug
+    url: https://github.com/Terrium-sim/main/blob/main/SUPPORT.md
+    about: >-
+      Where to ask, what a good question looks like, and two failures that
+      are not your fault (`No module named 'Terrium'` is one). Run
+      `make doctor` first and paste its output.
+
+  - name: I want to contribute — where do I start?
+    url: https://github.com/Terrium-sim/main/blob/main/START_HERE.md
+    about: >-
+      One page to a working environment and a real first task. Read this
+      before opening a feature request; several things that look missing are
+      deliberate refusals.
+
+  - name: Pick something to work on
+    url: https://github.com/Terrium-sim/main/blob/main/docs/FIRST_TASKS.md
+    about: >-
+      Verified open gaps, each with a file to open, a command that shows it
+      failing, and a way to know when you are done. Open an issue saying
+      which one you are taking.
+
+  - name: Security issue — do not open a public issue
+    url: https://github.com/Terrium-sim/main/blob/main/SECURITY.md
+    about: >-
+      Report privately. Also read the deployment warning there first: the web
+      server has no authentication and /api/jobs/history returns every user's
+      queries, which is known and documented rather than a vulnerability.
+
+  - name: What happens to my contribution?
+    url: https://github.com/Terrium-sim/main/blob/main/docs/INBOUND_LICENSE.md
+    about: >-
+      Apache-2.0, you keep your copyright, no CLA. If you are a student, read
+      the university section before your first substantial contribution.

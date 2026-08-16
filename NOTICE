@@ -1,0 +1,438 @@
+Terrium
+Copyright 2026 Smyan Reddy and Terrium contributors
+
+This product includes software developed as part of the Terrium project,
+licensed under the Apache License, Version 2.0 (see LICENSE).
+
+
+THIRD-PARTY SOFTWARE
+====================
+
+Terrium does not bundle, vendor or redistribute any of its dependencies.
+`requirements.txt` names them; pip fetches them from PyPI onto the user's
+own machine. That fact does most of the work below, because almost every
+obligation in an open-source licence attaches on DISTRIBUTION, and
+distributing source that NAMES a dependency is not distributing the
+dependency.
+
+Verified 2026-08-15 by reading the licence metadata and licence files of the
+installed distributions, not from memory. Where the installed version
+differed from the pin, that is noted.
+
+  package          licence                       notes
+  ---------------  ----------------------------  --------------------------
+  libroadrunner    Apache-2.0                    University of Washington,
+                                                 Seattle. The engine.
+  antimony         MIT                           model definition language
+  python-libsbml   LGPL-2.1-or-later             see below
+  python-libsedml  BSD-3-Clause                  SED-ML / COMBINE export;
+                                                 see the note below
+  numpy            BSD-3-Clause
+  scipy            BSD-3-Clause
+  requests         Apache-2.0
+  beautifulsoup4   MIT
+  lxml             BSD-3-Clause
+  httpx            BSD-3-Clause
+  pydantic         MIT
+  pytest           MIT                           dev only
+  hypothesis       MPL-2.0                       dev only
+  stdpopsim        GPL-3.0-or-later              NOT in the default install
+
+All of these are compatible with redistributing Terrium's own code under
+Apache-2.0. Three need saying out loud.
+
+
+python-libsedml — BSD-3-Clause, and one honest caveat
+-----------------------------------------------------
+
+Added as a hard dependency for the COMBINE archive export. BSD-3-Clause
+grants use, modification and redistribution with the notice retained, so it
+sits under Apache-2.0 without the separation stdpopsim needed.
+
+**This is the one entry in this file not read from a shipped licence file.**
+The package is not installed in the environment where this audit was run, so
+its licence was taken from the package index rather than from the document
+that travels with the code. Every other entry here was read from the
+distribution itself, which is the rule this project set for exactly this
+reason: an index summary and a shipped LICENSE do not always agree.
+
+Re-verify on a machine where it is installed and delete this paragraph.
+Recording the weaker basis is the point — a compliance record that does not
+distinguish "checked" from "looked up" is not a record.
+
+Also worth knowing: libSEDML depends on **libnuml**, one of the two packages
+the `tellurium` umbrella pulls in and that ADR 0001 names as a reason to
+avoid it. Depending on it directly and deliberately is a different thing
+from inheriting it unexamined — but it is the same package, and anyone
+reading ADR 0001 should know it arrived by another door.
+
+
+python-libsbml — LGPL-2.1-or-later
+----------------------------------
+
+libSBML is copyrighted jointly by the California Institute of Technology,
+the EMBL European Bioinformatics Institute, the University of Heidelberg and
+others, and licensed under the GNU Lesser General Public License, version
+2.1 or any later version.
+
+The LGPL permits a work to USE the library without that work becoming LGPL,
+which is the whole point of the "Lesser" in its name. Its obligations —
+notice, and the ability for a recipient to relink against a modified
+libSBML — attach when you convey the library itself.
+
+Terrium does not convey it. Nothing here bundles libSBML, and no build
+artifact containing it is published: as of 2026-08-15 this repository has
+exactly one CI workflow, `tests.yml`, and it publishes nothing. No Docker
+image is pushed, no wheel is uploaded, no release artifact is produced.
+
+THE TRIGGER THAT CHANGES THIS
+
+  `.devcontainer/Dockerfile` runs `pip install -r requirements-dev.txt`, so
+  an image built from it CONTAINS libSBML. Building that image locally is
+  private use and unrestricted. **Publishing it — to Docker Hub, GHCR, or
+  anywhere a third party can pull it — is conveying an LGPL library**, and
+  the notice and relinking obligations attach at that moment.
+
+  The same applies to any wheel, installer or bundle that vendors it.
+
+  `scripts/check_release_artifacts.py` fails the build if a workflow that
+  publishes is added while this NOTICE lacks the LGPL conveyance section.
+  That guard exists so the obligation is not discovered after the fact.
+
+
+stdpopsim — GPL-3.0-or-later, and why it is not installed by default
+--------------------------------------------------------------------
+
+stdpopsim (PopSim Consortium) is GPL-3.0-or-later. It was pinned in
+`requirements.txt` until 2026-08-15, which meant `make setup` placed GPLv3
+code into the default environment of a project whose LICENSE says
+Apache-2.0.
+
+Those licences are compatible in one direction only. Apache-2.0 code may be
+taken into a GPLv3 work; GPLv3 code cannot be folded into a work
+distributed under Apache-2.0 without the combination becoming GPLv3.
+
+Nothing was being violated — Terrium never bundled stdpopsim, and running
+two separately-installed packages together on your own machine is use, not
+distribution. But a reader would have had to compare two licence files and
+reason about their interaction to work out what they had, and this project's
+central claim is that nothing should require that.
+
+It now lives in `requirements-popgen.txt` and is opt-in. The code already
+worked this way: `Tests/popgen_resolver.py` wraps `import stdpopsim` in
+try/except ImportError and returns `found=False` with a search log saying
+so. The manifest was the only thing claiming it was required.
+
+See docs/adr/0061-gpl-out-of-the-default-install.md.
+
+
+Per-library attribution
+-----------------------
+
+The table above records the compliance position. This part records the
+attribution those licences ask for, library by library.
+
+(Two separate sections were written here on 2026-08-15 by people working in
+parallel, with overlapping package lists and confusingly similar headings.
+They are merged rather than left side by side: two statements of the same
+terms in one licence file is the defect this project spends most of its
+effort eliminating in code, and a reader who cannot tell which of two
+sections is authoritative has been given less than one section would.)
+
+Terrium does not vendor, copy or modify any of the software below. It
+imports each as a separately-installed package through its public API. No
+file in this repository carries a third-party copyright header, and there
+is no vendor/ or third_party/ tree.
+
+libRoadRunner  --  Apache License 2.0
+-------------------------------------
+
+  Copyright (C) 2012-2018 University of Washington, Seattle, WA, USA
+
+libRoadRunner is the ODE integrator underneath every continuous simulation
+Terrium runs. It comes from the Sauro lab at the University of Washington
+and collaborators. Licensed under the Apache License, Version 2.0:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Its own licence file states the permission in plain English: the software
+may be freely downloaded and used in whole or in part for personal, company
+internal, or commercial purposes, and may be used in packages or
+distributions that you create, on condition that a copy of the licence
+accompanies redistribution.
+
+Antimony  --  MIT
+-----------------
+
+The model-definition language Terrium generates before handing off to
+libRoadRunner. Also from that ecosystem. MIT grants use, copying,
+modification, distribution and sale, provided the copyright and permission
+notice are retained.
+
+libSBML  --  LGPL 2.1
+---------------------
+
+  Copyright (C) 2013-2017 jointly by the California Institute of Technology,
+  the EMBL European Bioinformatics Institute, and the University of
+  Heidelberg, with earlier copyrights held by those organisations and the
+  Japan Science and Technology Agency.
+
+SBML validation. The LGPL condition is that a recipient be able to replace
+the library; Terrium installs it as an ordinary Python package and neither
+vendors nor statically links it, so replacement is a `pip install` away.
+
+TERRIUM IS NOT TELLURIUM
+
+Tellurium is a separate, established systems-biology environment from the
+same lab. Terrium is unaffiliated with it, is not a fork of it, and does not
+depend on the `tellurium` package -- a prohibition made executable by
+Constitution Rule 7 and scripts/check_forbidden_packages.py.
+
+Terrium is a consumer of libRoadRunner and Antimony, in the ordinary way
+those libraries are meant to be consumed. The similar name is a mistake and
+is addressed in README.md and docs/RENAME_PLAN.md.
+
+Other software
+--------------
+
+numpy and scipy (BSD-3-Clause), requests (Apache-2.0), httpx and lxml
+(BSD-3-Clause), Beautiful Soup and pydantic (MIT), pytest (MIT), Hypothesis
+(MPL-2.0). The JavaScript workspace depends on 494 packages, all under
+MIT, ISC, BSD, Apache-2.0 or equivalent permissive terms.
+
+stdpopsim (GPL-3.0) is OPTIONAL and is not redistributed with Terrium. It is
+imported at runtime only when a user has installed it themselves; the
+population-genetics tests skip when it is absent. No stdpopsim code ships
+with Terrium, so no GPL obligation attaches to Terrium's own distribution.
+
+Every direct dependency and the grant it rests on is recorded in
+scripts/check_dependency_licenses.py, which fails the build when a
+dependency has no recorded permission. See docs/LICENSING.md for the
+reasoning and the open items.
+
+
+THIRD-PARTY DATA IN THIS REPOSITORY
+===================================
+
+This file exists because Terrium redistributes data it did not create, and
+that data carries obligations. It is separate from LICENSE, which covers
+Terrium's own code.
+
+Apache 2.0 §4(d) requires that this file travel with any redistribution, so
+the attributions below reach downstream users by construction rather than by
+someone remembering to copy them. That is a large part of why Apache 2.0 was
+chosen over MIT — see the note at the end of LICENSE.
+
+
+BRENDA — the enzyme database
+----------------------------
+
+Data obtained from BRENDA (https://www.brenda-enzymes.org/) is licensed
+under the Creative Commons Attribution 4.0 International License (CC BY
+4.0):
+
+    https://creativecommons.org/licenses/by/4.0/
+    https://www.brenda-enzymes.org/license.php
+
+Copyright of the BRENDA content belongs to the BRENDA team at the Leibniz
+Institute DSMZ — German Collection of Microorganisms and Cell Cultures
+GmbH, Braunschweig, Germany.
+
+WHERE BRENDA DATA APPEARS IN THIS REPOSITORY
+
+  Tests/fixtures/brenda_*.html
+      Eleven HTML fixtures containing rows captured live from BRENDA enzyme
+      pages, used to test the parser without hitting the network.
+
+  docs/literature-inventory.toml
+      Golden-tuple entries recording BRENDA values and reference ids, e.g.
+      the LDH/lactate Km (ref 740253) and the LDH/gossypol Ki (ref 711801).
+
+  Tests/, Science-Agent-Pipeline/artifacts/api-server/src/
+      BRENDA reference ids used as test expectations and citation fixtures.
+
+MODIFICATIONS
+
+CC BY 4.0 §3(a)(1)(B) requires that modifications be indicated. Terrium
+does modify the data it extracts:
+
+  * rows are filtered by organism and substrate
+  * units are normalised and re-labelled
+  * values whose source does not report assay pH and temperature are
+    FLAGGED as incomplete under the STRENDA Guidelines rather than
+    presented as verified
+  * the HTML fixtures are trimmed excerpts of full BRENDA pages, not
+    complete copies
+
+The underlying measurements are unaltered. Terrium never edits a value.
+
+NO WARRANTY
+
+CC BY 4.0 §5: the Licensed Material is offered as-is and as-available, and
+the licensor makes no representations or warranties of any kind concerning
+it. Terrium restates that disclaimer here and extends it: a value resolved
+through Terrium carries whatever uncertainty the original measurement
+carried, and Terrium's provenance reporting does not make a measurement
+more reliable than it was.
+
+CITATION
+
+If you use BRENDA data in scientific work, cite BRENDA's current
+publication — see https://www.brenda-enzymes.org/references.php. Citing
+Terrium is not a substitute for citing BRENDA.
+
+
+CORE — queried live, and UNRESOLVED
+----------------------------------
+
+`Tests/core_fulltext.py` calls `https://api.core.ac.uk/v3/search/works` to
+find open-access full text (ADR 0017). No CORE data is stored in this
+repository.
+
+CORE's Terms & Conditions (https://core.ac.uk/terms) distinguish their
+ODC-By datasets, which may be used commercially with acknowledgement, from
+**the CORE API**, which is not covered by that grant:
+
+    While you need to obtain a licence to use other CORE datasets as well as
+    the CORE API, many of our users are eligible for a free licence.
+
+    However, you should contact us [...] if you are developing or intending
+    to develop a product, service or software using CORE data which:
+    might be monetised now or in the future OR is expected to serve only a
+    restricted group of beneficiaries OR is intended for the benefit of
+    everyone but related to the functionality provided by one of CORE's
+    existing services, such as but not limited to an API, a recommender
+    system, search, discovery system or analytical dashboard.
+
+**Terrium meets all three conditions**, not one: it may be monetised (this
+repository holds an incorporation checklist and a fundraising tracker), and
+it uses the CORE API to provide literature search and discovery, which is
+CORE's own listed example.
+
+CORE say many such users are eligible for a **free** licence and ask to be
+contacted regardless. That is a form to fill in, not a bill. The action is
+to contact them, and CORE must be acknowledged in any case -- which this
+paragraph does, and which the resolver should do in its provenance output
+once a licence position is settled.
+
+
+PubChem — queried live
+----------------------
+
+`Tests/enzyme_lookup.py` calls
+`https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/<name>/synonyms/JSON`
+to resolve compound identity, used by `buffer_identity.py` and
+`form_mixture.py` to tell one substance from another (ADR 0028, 0035).
+
+PubChem is produced by the National Center for Biotechnology Information,
+U.S. National Library of Medicine. Like other NCBI databases it is in the
+public domain within the United States and carries no licence condition.
+NCBI asks that PUG REST clients stay under 5 requests per second and
+identify themselves; that is a usage policy rather than a licence term, and
+it is recorded here because exceeding it gets a client blocked.
+
+
+KEGG — queried live, and UNRESOLVED
+----------------------------------
+
+Terrium makes live calls to `https://rest.kegg.jp/get/ec:<ec_number>` from
+the server, in `resolve_substrate_from_kegg()`
+(Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py),
+to fill in a substrate name when the caller did not supply one. No KEGG data
+is stored in this repository; the value used is a substrate NAME, which is
+then passed to BRENDA as a filter.
+
+KEGG's own terms (https://www.kegg.jp/kegg/legal.html, last updated
+1 October 2024) say:
+
+    KEGG is an original database product, copyright Kanehisa Laboratories.
+
+    Academic users may freely use the KEGG website [...] Academic users who
+    utilize KEGG for providing services are requested to obtain an academic
+    service provider license, which is included in the KEGG FTP academic
+    subscription.
+
+    Non-academic users must understand that KEGG is not a public database,
+    nor is it a publicly funded database. Non-academic use of KEGG requires
+    a commercial license.
+
+**This is an open question, not a settled position.** Terrium calls KEGG
+server-side while providing a service to its users, and this repository
+contains an incorporation checklist, a cap table and a fundraising tracker.
+On KEGG's stated terms that reads as either the academic service-provider
+case or the commercial case, and both require a licence from Pathway
+Solutions (https://www.pathway.jp/).
+
+The inconsistency is worth naming plainly: SABIO-RK is recorded below as
+deliberately NOT integrated because its terms are non-commercial only.
+KEGG's terms are comparable, and KEGG was integrated anyway -- not by a
+decision that weighed them, but because nobody read them. See
+docs/LICENSING.md for the action item.
+
+Nothing about this affects data already produced: KEGG contributes a
+substrate name, not a number, and no KEGG content is redistributed here.
+
+
+SABIO-RK — not currently used
+-----------------------------
+
+SABIO-RK (https://sabiork.h-its.org/) has been evaluated as a second
+source and is NOT integrated. Its terms are non-commercial only, which is a
+materially different obligation from BRENDA's CC BY 4.0. If it is ever
+added, it must be behind an explicit opt-in and must not be committed as
+fixtures.
+
+
+NCBI Taxonomy
+-------------
+
+Organism lineages under `Tests/fixtures/taxonomy/` are captured from the
+NCBI Taxonomy database, produced by the National Center for Biotechnology
+Information, U.S. National Library of Medicine. NCBI databases are in the
+public domain within the United States and carry no copyright restriction;
+NCBI asks to be cited but does not require it as a licence condition.
+
+Terrium uses these lineages at runtime to decide whether a kinetic value
+measured in one organism may stand in for another (ADR 0024). The XML
+wrapper around each fixture is reconstructed to match NCBI's eFetch shape;
+the lineage content is captured. Each fixture says which is which in its
+own header.
+
+
+PubMed / NCBI
+-------------
+
+Terrium queries PubMed via NCBI E-utilities. PubMed records are largely US
+Government works or publisher abstracts; Terrium stores reference
+identifiers (PMIDs, DOIs) rather than article text.
+
+
+Why this file exists at all
+---------------------------
+
+It was written on 2026-08-13, after Lisa Jeske of the BRENDA team replied
+to a question about querying the database and pointed at the licence page.
+Reading it revealed that Terrium was in breach on two counts:
+
+  1. No CC BY attribution appeared anywhere in the repository, though
+     BRENDA-derived material was committed and redistributed.
+
+  2. LICENSE read "all rights reserved, no permission granted to copy,
+     modify, or distribute" — which applied to the BRENDA fixtures too, and
+     therefore told downstream recipients they may not copy material BRENDA
+     had licensed them to copy. CC BY 4.0 §2(a)(5)(B) forbids exactly that.
+
+The second point has since been resolved twice over: first by a carve-out
+exempting BRENDA material, and then on 2026-08-13 by relicensing Terrium
+itself to Apache 2.0, which imposes no restriction for the carve-out to
+except. The carve-out remains in LICENSE anyway, because a reader who finds
+BRENDA HTML in this repository should not have to reason about licence
+interaction to learn which terms govern it.
+
+CC BY 4.0 §6(b)(1) reinstates the licence automatically where a violation
+is cured within 30 days of discovery. This file, the LICENSE carve-out, and
+the per-fixture headers are that cure.
+
+Recording the breach rather than quietly fixing it is deliberate: a project
+whose central claim is that every number can be traced should not have an
+untraceable moment in its own compliance history.

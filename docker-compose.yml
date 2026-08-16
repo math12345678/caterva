@@ -6,7 +6,25 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      # Bound to the LOOPBACK interface, not every interface.
+      #
+      # This said "3000:3000", which Docker binds to 0.0.0.0 -- every network
+      # interface on the host. Combined with NODE_ENV=production and
+      # restart: unless-stopped, the shipped configuration published a server
+      # with NO AUTHENTICATION to the whole local network, and on a cloud
+      # host to the internet.
+      #
+      # `GET /api/jobs/history` returns the last 50 jobs, including the query
+      # text somebody typed, to any caller. See SECURITY.md.
+      #
+      # The rest of this file is carefully hardened -- cap_drop: ALL,
+      # read_only, non-root USER, tmpfs. That hardening is about what a
+      # compromised container can do. None of it addresses who can reach the
+      # port, which for this server is the risk that actually matters.
+      #
+      # To expose it deliberately, change this line AND put authentication in
+      # front of it. Changing this line alone is the state that existed here.
+      - "127.0.0.1:3000:3000"
     environment:
       PORT: 3000
       NODE_ENV: production

@@ -37,6 +37,16 @@
 libroadrunner==2.8.0
 antimony==2.14.0
 python-libsbml==5.21.1
+# SED-ML, for the COMBINE archive export. BSD (Frank Bergmann, Heidelberg),
+# so it sits under Apache-2.0 without the separation stdpopsim needed --
+# see requirements-popgen.txt for the GPL case and docs/LICENSING.md.
+#
+# A hard dependency rather than optional: the archive is built THROUGH
+# libSEDML rather than string-formatted, so the document is correct by
+# construction and validated before it is written. Hand-writing the XML
+# would remove the dependency and replace it with an unverifiable claim
+# that the output is valid SED-ML.
+python-libsedml==2.0.33
 
 # --- Numerics --------------------------------------------------------------
 numpy==2.2.6
@@ -49,5 +59,30 @@ lxml==6.1.1
 httpx==0.28.1
 pydantic==2.13.4
 
-# --- Population genetics (Wright-Fisher / stdpopsim) -----------------------
-stdpopsim==0.3.0
+# --- Population genetics -----------------------------------------------
+#
+# stdpopsim MOVED to requirements-popgen.txt on 2026-08-15. It is NOT
+# installed by default, and that is a licence decision rather than a
+# packaging preference.
+#
+# stdpopsim is GPL-3.0-or-later. Terrium is Apache-2.0. Those licences are
+# compatible in one direction only: Apache-2.0 code may be taken into a
+# GPLv3 work, but GPLv3 code cannot be folded into a work distributed under
+# Apache-2.0 without the combination becoming GPLv3. Listing it here made
+# `make setup` place GPL code into the default environment of a project that
+# declares Apache-2.0 — a tension a reader would have had to discover by
+# reading two licence files and inferring the interaction.
+#
+# The code has always treated it as optional. `Tests/popgen_resolver.py`
+# wraps `import stdpopsim` in try/except ImportError and returns
+# `found=False` with a search log saying so; the 19 popgen tests skip
+# cleanly and `make check` already reports the absence as a warning. So the
+# manifest was the only place claiming it was required, and it was the only
+# place that was wrong.
+#
+# To use the population-genetics resolver:
+#
+#     pip install -r requirements-popgen.txt
+#
+# See NOTICE, "Third-party software", and
+# docs/adr/0061-gpl-out-of-the-default-install.md.
