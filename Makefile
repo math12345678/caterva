@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow cli clean
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr cli clean
 
 help:
 	@echo "Terrium"
@@ -27,10 +27,13 @@ help:
 	@echo "  make test-fast  skip the slow property/robustness suites"
 	@echo "  make test-sim   simulation engine only (Terium/)"
 	@echo "  make test-lit   literature layer only (Tests/)"
+	@echo "  make guards     the guards CI runs (no test suites)"
+	@echo "  make pr         everything CI runs -- do this before opening a PR"
 	@echo "  make cli        Terium CLI help (python -m Terium.cli)"
 	@echo "  make clean      remove caches and build artifacts"
 	@echo ""
 	@echo "First time here? Run: make setup && make check && make test"
+	@echo "About to open a PR? Run: make pr"
 	@echo "Something not working? Run: make doctor"
 
 setup: check-python
@@ -195,6 +198,97 @@ test-lit: require-pytest
 test-slow: require-pytest
 	@cd Terium && "$(PY)" -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
+
+# The guards CI runs, in CI's order, minus the test suites -- plus the
+# two that keep this target and the docs honest, which run under pytest
+# rather than in the workflow.
+#
+# These existed and ran in CI long before this target did. Nothing local
+# invoked them, so `make test` -- the command CONTRIBUTING tells you to run
+# before opening a PR -- reproduced two of the eleven steps in the `test`
+# job. The other nine arrived as a red X.
+#
+# Kept honest by scripts/check_ci_reproducible_locally.py, which fails when
+# a CI step has neither a local route nor a written reason it cannot have
+# one. Add a step to CI, and that guard tells you to add it here too.
+#
+# Not included, and deliberately: check_codegen_loads.py and the api-server
+# suite, both of which need a completed pnpm install. `make pr` names them
+# at the end rather than pretending they ran.
+guards: require-pytest
+	@echo ">> environment"
+	@"$(PY)" scripts/check_env.py
+	@echo ">> citation format"
+	@"$(PY)" scripts/check_citation_format.py
+	@echo ">> documented counts"
+	@"$(PY)" scripts/check_documented_counts.py
+	@echo ">> python support claim"
+	@"$(PY)" scripts/check_python_support_claim.py
+	@echo ">> forbidden packages (constitution rules 7 and 8)"
+	@"$(PY)" scripts/check_forbidden_packages.py
+	@echo ">> guard wiring"
+	@"$(PY)" scripts/check_guard_wiring.py
+	@echo ">> LLM disclosure"
+	@"$(PY)" scripts/check_llm_disclosure.py --selftest
+	@"$(PY)" scripts/check_llm_disclosure.py
+	@echo ">> privacy notice"
+	@"$(PY)" scripts/check_privacy_notice.py --selftest
+	@"$(PY)" scripts/check_privacy_notice.py
+	@echo ">> deployment warning"
+	@"$(PY)" scripts/check_deployment_warning.py --selftest
+	@"$(PY)" scripts/check_deployment_warning.py
+	@echo ">> published repo READMEs"
+	@"$(PY)" scripts/check_published_repo_readmes.py --selftest
+	@"$(PY)" scripts/check_published_repo_readmes.py
+	@echo ">> split repos ship LICENSE and NOTICE (Apache-2.0 4(a), 4(d))"
+	@"$(PY)" scripts/check_split_repo_legal_files.py --selftest
+	@"$(PY)" scripts/check_split_repo_legal_files.py
+	@echo ">> model citations cite models"
+	@"$(PY)" scripts/check_model_citations_cite_models.py
+	@echo ">> release artifacts (LGPL/GPL conveyance)"
+	@"$(PY)" scripts/check_release_artifacts.py --selftest
+	@"$(PY)" scripts/check_release_artifacts.py
+	@echo ">> CI reproducible locally"
+	@"$(PY)" scripts/check_ci_reproducible_locally.py
+	@echo ">> documented paths resolve"
+	@"$(PY)" scripts/check_doc_paths_resolve.py
+	@echo ">> data source attribution"
+	@"$(PY)" scripts/check_data_source_attribution.py
+	@echo ">> package spelling"
+	@"$(PY)" scripts/check_package_spelling.py --selftest
+	@"$(PY)" scripts/check_package_spelling.py
+	@echo ">> port binding"
+	@"$(PY)" scripts/check_port_binding.py --selftest
+	@"$(PY)" scripts/check_port_binding.py
+	@echo ">> subprocess safety"
+	@"$(PY)" scripts/check_subprocess_safety.py --selftest
+	@"$(PY)" scripts/check_subprocess_safety.py
+	@echo ">> public images reviewed"
+	@"$(PY)" scripts/check_public_images_reviewed.py
+	@echo ">> no fabricated endorsements"
+	@"$(PY)" scripts/check_no_fabricated_endorsements.py
+	@echo ">> non-affiliation notice"
+	@"$(PY)" scripts/check_non_affiliation_notice.py
+	@echo ">> dependency licences"
+	@"$(PY)" scripts/check_dependency_licenses.py
+	@echo ">> documented links resolve"
+	@"$(PY)" scripts/check_doc_links.py --selftest
+	@"$(PY)" scripts/check_doc_links.py
+	@echo ">> build guards (this is the slow one -- several minutes)"
+	@"$(PY)" scripts/verify_build.py --quick
+	@echo ">> silent skips"
+	@"$(PY)" scripts/check_no_silent_skips.py
+
+# What CI will run, in CI's order, as far as a laptop can go.
+pr: guards test
+	@echo ""
+	@echo "Local checks passed. Two things CI runs that this did not:"
+	@echo ""
+	@echo "  - scripts/check_codegen_loads.py   (needs Node + pnpm install)"
+	@echo "  - the api-server TypeScript suite  (see RUN_TESTS.md)"
+	@echo ""
+	@echo "Both need a pnpm install in Science-Agent-Pipeline. If you touched"
+	@echo "the API server or the OpenAPI spec, run them; see RUN_TESTS.md."
 
 cli: check-python
 	@"$(PY)" -m Terium.cli --help

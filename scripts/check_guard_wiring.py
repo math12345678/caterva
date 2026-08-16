@@ -64,6 +64,22 @@ DELIBERATE_OMISSIONS = {
     ("check_env", "pytest"): (
         "same reason: it is an environment probe, not a repository check."
     ),
+    ("check_codegen_loads", "verify_build"): (
+        "runs orval against a real node_modules; verify_build --quick is the "
+        "fast path and would stop being run if it shelled out to codegen. "
+        "CI has the toolchain and covers it."
+    ),
+    ("check_identifier_patterns_fresh", "verify_build"): (
+        "consults the live identifiers.org registry; verify_build --quick is "
+        "the offline fast path. Its comparison logic IS exercised offline by "
+        "Tests/test_identifier_pattern_freshness.py, which drives all three "
+        "verdicts with a stubbed fetch -- this sandbox can only ever produce "
+        "'unreachable', so the other two branches would otherwise never run."
+    ),
+    ("check_codegen_loads", "pytest"): (
+        "same reason: it needs an installed Node toolchain, which a Python "
+        "test run cannot assume."
+    ),
 }
 
 #: Where each guard runs TODAY. A snapshot of fact, not an aspiration.
@@ -89,15 +105,76 @@ DELIBERATE_OMISSIONS = {
 #: here; the guard-wiring check will tell you so.
 EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_citation_format": ("verify_build", "ci", "pytest"),
+    # Wired 2026-08-15. `make guards` is a fourth harness this script does
+    # not model -- it reads verify_build, CI and pytest. The pytest wrapper
+    # is what makes it enforcing; the make target is what makes it usable.
+    "check_ci_reproducible_locally": ("pytest",),
+    "check_doc_paths_resolve": ("pytest",),
+    "check_dependency_licenses": ("ci", "pytest", "verify_build"),
+    "check_non_affiliation_notice": ("ci", "pytest", "verify_build"),
+    "check_no_fabricated_endorsements": ("ci", "pytest", "verify_build"),
+    "check_public_images_reviewed": ("pytest",),
+    "check_public_claims": ("pytest",),
+    "check_investor_claims": ("pytest", "verify_build"),
+    # Wired 2026-08-15. Markdown links, as distinct from the backticked
+    # prose paths check_doc_paths_resolve covers -- verified by appending a
+    # broken `[text](target)` to START_HERE.md and confirming that guard
+    # passed it while this one failed it. Both harnesses on purpose: CI is
+    # what gates a contributor's PR, verify_build is what a maintainer runs.
+    "check_doc_links": ("verify_build", "ci"),
+    # Wired 2026-08-15. Both harnesses on purpose: this one watches a fact
+    # the licence position depends on (that nothing publishes), and losing
+    # it from CI would remove the check from the place a contributor's PR
+    # is actually gated.
+    "check_release_artifacts": ("verify_build", "ci"),
+    # Wired 2026-08-15, same pass that widened its manifest scan.
+    # Wired 2026-08-15, same pass as check_dependency_licenses.
+    "check_data_source_attribution": ("verify_build", "ci"),
+    "check_model_citations_cite_models": ("verify_build", "ci"),
+    # Wired 2026-08-15. Both harnesses: CI gates the PR, verify_build is
+    # what a maintainer runs locally.
+    "check_package_spelling": ("verify_build", "ci"),
+    # Wired 2026-08-15, alongside check_package_spelling.
+    # Wired 2026-08-15. Covers the seventeen published front pages that
+    # check_non_affiliation_notice's seven monorepo surfaces do not.
+    "check_published_repo_readmes": ("verify_build", "ci"),
+    # Wired 2026-08-16. The sibling above checks what the seventeen split
+    # READMEs say; this checks that their repositories carry LICENSE and
+    # NOTICE at all. Unconditional: there is no state in which publishing
+    # Apache-2.0 source with no licence file is acceptable.
+    "check_split_repo_legal_files": ("verify_build", "ci"),
+    # Wired 2026-08-15. Conditional guard: it stops demanding the
+    # warning if authentication is ever added to src/web/server.ts.
+    "check_deployment_warning": ("ci", "verify_build"),
+    # Wired 2026-08-15. Conditional, and paired with
+    # check_deployment_warning: both read the same auth signal from the
+    # same file so they cannot disagree about whether auth exists.
+    "check_port_binding": ("ci", "verify_build"),
+    # Wired 2026-08-15. Conditional on collection actually happening,
+    # like the two guards above are conditional on auth.
+    "check_privacy_notice": ("ci", "verify_build"),
+    # Wired 2026-08-15. Third of the conditional privacy/security trio:
+    # auth, collection, third-party disclosure. Each goes quiet when the
+    # thing it watches for stops being true.
+    "check_llm_disclosure": ("ci", "verify_build"),
+    # Wired 2026-08-15. Unconditional, unlike its three neighbours:
+    # there is no state in which user input reaching a shell is fine.
+    "check_subprocess_safety": ("ci", "verify_build"),
+    # Wired 2026-08-15, same pass.
+    # Wired 2026-08-15, same pass.
     "check_dependencies_declared": ("verify_build", "pytest"),
     "check_documented_counts": ("verify_build", "ci"),
     "check_domain_parity": ("verify_build", "pytest"),
     "check_engine_contract": ("verify_build", "pytest"),
+    "check_runner_boundary": ("verify_build",),
+    "check_generated_client_loads": ("verify_build",),
+    "check_golden_freshness": ("pytest",),
     "check_example_endpoints": ("verify_build",),
     "check_env": ("ci",),
     "check_forbidden_packages": ("verify_build", "ci", "pytest"),
     "check_guard_wiring": ("verify_build", "ci"),
     "check_literature_inventory": ("verify_build",),
+    "check_license_consistency": ("verify_build",),
     "check_no_disabled_tests": ("verify_build",),
     "check_no_generated_files_tracked": ("verify_build",),
     "check_no_orphan_modules": ("verify_build",),
@@ -107,9 +184,29 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_prompt_injection": ("verify_build",),
     "check_python_support_claim": ("verify_build", "ci"),
     "check_rng_convention": ("verify_build", "pytest"),
+    "check_scripts_reachable": ("verify_build",),
     "check_static_assets": ("verify_build",),
     "check_typescript_compiles": ("verify_build",),
     "check_typescript_suites_discovered": ("verify_build",),
+    # Wired 2026-08-14. All seven ran in NO harness until this date --
+    # written, correct, and invisible. check_guard_wiring named them
+    # together on one run, which is the Stage 4 amendment catching its own
+    # failure mode seven times over rather than once.
+    "check_adr_index": ("verify_build",),
+    "check_cli_surface_documented": ("verify_build",),
+    "check_codegen_loads": ("ci",),
+    "check_commands_runnable": ("verify_build",),
+    "check_commentary_coverage": ("verify_build",),
+    "check_findings_reach_a_surface": ("verify_build",),
+    "check_citation_cff": ("verify_build", "pytest"),
+    "check_identifier_patterns_fresh": ("ci", "pytest"),
+    "check_no_hardcoded_assay_conditions": ("verify_build",),
+    "check_no_unsourced_ui_numbers": ("verify_build",),
+    "check_thrown_values_are_errors": ("verify_build",),
+    "check_exports_reach_a_caller": ("verify_build",),
+    "check_third_party_requests_disclosed": ("verify_build",),
+    "check_mutation_tables_reproducible": ("verify_build",),
+    "mutate": ("verify_build",),
 }
 
 
@@ -198,6 +295,39 @@ def check_tool_caches_are_ignored() -> list[str]:
     return errors
 
 
+def _duplicate_expected_wiring_keys() -> list[str]:
+    """Keys written more than once in EXPECTED_WIRING.
+
+    A Python dict literal silently keeps the LAST value for a repeated key,
+    so `{"x": ("pytest",), ... "x": ("ci",)}` loses the pytest expectation
+    entirely -- and losing the pytest wrapper would then not be caught,
+    which is the one thing this table exists to catch.
+
+    It happened. On 2026-08-15 five keys were written twice, by agents
+    working in parallel who each added an entry without seeing the other's:
+    check_dependency_licenses, check_non_affiliation_notice,
+    check_no_fabricated_endorsements, check_license_consistency and
+    check_scripts_reachable. Fifty-five entries written, fifty surviving.
+
+    The dict cannot report this about itself once parsed, so the source is
+    read with `ast`. A ratchet that can silently drop a notch is not a
+    ratchet.
+    """
+    import ast
+    import collections
+
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        is_table = (
+            isinstance(node, ast.AnnAssign)
+            and getattr(node.target, "id", "") == "EXPECTED_WIRING"
+        )
+        if is_table and isinstance(node.value, ast.Dict):
+            keys = [k.value for k in node.value.keys if isinstance(k, ast.Constant)]
+            return sorted(k for k, n in collections.Counter(keys).items() if n > 1)
+    return []
+
+
 def main() -> int:
     guards = _guard_names()
     if not guards:
@@ -209,6 +339,15 @@ def main() -> int:
     in_pytest = _wired_in_pytest()
 
     failures: list[str] = []
+
+    # The table's own integrity, before it is trusted to judge anything.
+    for duplicate in _duplicate_expected_wiring_keys():
+        failures.append(
+            f"EXPECTED_WIRING names {duplicate!r} more than once. Python keeps "
+            "only the last value,\n      so the earlier expectation is gone "
+            "and losing that harness would not be caught.\n"
+            "      Merge them into one entry with the union of harnesses."
+        )
 
     print(f"{'guard':<34}{'build':<8}{'ci':<6}{'pytest':<8}")
     for guard in guards:

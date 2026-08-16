@@ -39,10 +39,122 @@ jobs:
       - name: Citation-format guard
         run: python scripts/check_citation_format.py
 
-      # Documented test/domain counts in README.md. Runs after the suites
-      # would have changed them, and catches the silent drift found in the
-      # Stage 7 audit (three stale counts, plus two conflicting domain
-      # counts in the same file).
+      # No user input may reach a shell (no shell:true, no execSync).
+      - name: Subprocess-safety guard (self-check)
+        run: python scripts/check_subprocess_safety.py --selftest
+
+      - name: Subprocess-safety guard
+        run: python scripts/check_subprocess_safety.py
+
+      # Code that can send user text to a third party must disclose it.
+      - name: LLM-disclosure guard (self-check)
+        run: python scripts/check_llm_disclosure.py --selftest
+
+      - name: LLM-disclosure guard
+        run: python scripts/check_llm_disclosure.py
+
+      # A form collecting an email must say what happens to it.
+      - name: Privacy-notice guard (self-check)
+        run: python scripts/check_privacy_notice.py --selftest
+
+      - name: Privacy-notice guard
+        run: python scripts/check_privacy_notice.py
+
+      # No auth -> the compose file must bind to loopback.
+      - name: Port-binding guard (self-check)
+        run: python scripts/check_port_binding.py --selftest
+
+      - name: Port-binding guard
+        run: python scripts/check_port_binding.py
+
+      # No auth on the web server -> SECURITY.md must say so.
+      - name: Deployment-warning guard (self-check)
+        run: python scripts/check_deployment_warning.py --selftest
+
+      - name: Deployment-warning guard
+        run: python scripts/check_deployment_warning.py
+
+      # No public page claims an endorsement that is not on record.
+      - name: Fabricated-endorsement guard
+        run: python scripts/check_no_fabricated_endorsements.py
+
+      # The seventeen split-repo READMEs -- what a stranger lands on.
+      - name: Published-repo README guard (self-check)
+        run: python scripts/check_published_repo_readmes.py --selftest
+
+      - name: Published-repo README guard
+        run: python scripts/check_published_repo_readmes.py
+
+      # Apache-2.0 4(a) and 4(d): every published repo ships LICENSE and
+      # NOTICE, not just the umbrella. Seventeen of eighteen shipped neither.
+      - name: Split-repo legal files guard (self-check)
+        run: python scripts/check_split_repo_legal_files.py --selftest
+
+      - name: Split-repo legal files guard
+        run: python scripts/check_split_repo_legal_files.py
+
+      # Every shipping surface carries the Tellurium non-affiliation
+      # notice. A naming question, not a licensing one -- see ADR 0001.
+      - name: Non-affiliation notice guard
+        run: python scripts/check_non_affiliation_notice.py
+
+      # `import Terrium` is always wrong -- the package is `Terium`.
+      - name: Package-spelling guard (self-check)
+        run: python scripts/check_package_spelling.py --selftest
+
+      - name: Package-spelling guard
+        run: python scripts/check_package_spelling.py
+
+      # Data-source attribution: BRENDA's CC BY 4.0 obligations, checked.
+      - name: Data-source attribution guard
+        run: python scripts/check_data_source_attribution.py
+
+      # A modelCitation must cite the model, not the database (ADR 0008).
+      - name: Model-citation guard
+        run: python scripts/check_model_citations_cite_models.py
+
+      # Every dependency carries a recorded grant of permission to use
+      # it. Unrecorded fails, deliberately.
+      - name: Dependency-licence guard
+        run: python scripts/check_dependency_licenses.py
+
+      # Publishing a build artifact changes Terrium's licence
+      # obligations. Nothing publishes today, which is the whole reason the
+      # LGPL/GPL terms of the dependencies impose nothing -- so the day that
+      # changes must not be silent.
+      - name: Release-artifact guard (self-check)
+        run: python scripts/check_release_artifacts.py --selftest
+
+      - name: Release-artifact guard
+        run: python scripts/check_release_artifacts.py
+
+      # Every relative link in a contributor doc resolves. START_HERE.md is
+      # the first thing a newcomer reads and is almost entirely links; a dead
+      # one tells them, before they have written a line, that this project's
+      # claims about checking things are decoration. Written after
+      # Terium/README.md shipped a confident, plausible, wrong path to
+      # ADR 0001.
+      - name: Doc-links guard (self-check)
+        run: python scripts/check_doc_links.py --selftest
+
+      - name: Doc-links guard
+        run: python scripts/check_doc_links.py
+
+      # Documented test/domain counts, across every present-tense
+      # contributor doc. Runs after the suites would have changed them, and
+      # catches the silent drift found in the Stage 7 audit (three stale
+      # counts, plus two conflicting domain counts in the same file).
+      #
+      # The scope was README.md alone until 2026-08-15, and it worked -- while
+      # three onboarding documents beside it drifted to "22 guards" and
+      # "1,291 tests" against a real 36 and 1,735. A correct guard on too
+      # narrow a scope, which is the third time this project has shipped one.
+      #
+      # --selftest first on both: on a clean tree these report zero findings
+      # forever, and a matcher that matched nothing would report zero too.
+      - name: Documented-counts guard (self-check)
+        run: python scripts/check_documented_counts.py --selftest
+
       - name: Documented-counts guard
         run: python scripts/check_documented_counts.py
 
@@ -86,6 +198,31 @@ jobs:
       # skip count rises, and names what stopped running.
       - name: Silent-skip guard
         run: python scripts/check_no_silent_skips.py
+
+      # The generated zod contract every request is parsed against. Two
+      # halves, both of which had failed: the freshly generated module did
+      # not import at all (orval's `zod.version: "auto"` detected v4 against
+      # a v3 install), and the committed files had drifted from the spec.
+      # It runs orval, so it needs the Node toolchain and a real install --
+      # which is why it belongs in CI rather than in `verify_build --quick`,
+      # the fast path that stops getting run the moment it stops being fast.
+      - name: Codegen guard
+        run: python scripts/check_codegen_loads.py
+
+      # The identifiers.org accession patterns are a DATED COPY, and they are
+      # the only thing standing between a resolvable citation and a
+      # fabricated one -- BRENDA's namespace covers EC numbers, so a BRENDA
+      # reference id has no URI form and minting one would point at nothing.
+      # A copy is right on the day it is taken and drifts silently after.
+      #
+      # `continue-on-error` because it consults a third-party registry: an
+      # outage there is not a defect here, and a guard that reddens the build
+      # on someone else's downtime gets muted, which costs more than it saves.
+      # It exits 1 for "unreachable" and 2 for "drifted" precisely so the two
+      # are distinguishable in the log.
+      - name: Identifier pattern freshness
+        continue-on-error: true
+        run: python scripts/check_identifier_patterns_fresh.py
 
   api-server:
     runs-on: ubuntu-latest
