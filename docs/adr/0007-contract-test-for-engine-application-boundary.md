@@ -101,3 +101,69 @@ that knows it is serving a request.
   application layer's vitest suite gains a job of its own).
 - The runner's dispatch table becomes the place where "is this domain
   reachable from the product?" is answered, reviewable in a diff.
+
+## Amendment (2026-08-16): the contract had a second axis, and it was unproven
+
+The decision above is written entirely in terms of one axis: the engine's
+`__all__` against the runner's `DISPATCH` table. That axis was mutation-tested
+and has held.
+
+But `terium_runner.py` has **two** tables, not one. `DISPATCH` maps a domain to
+an engine function *name* (a string, used by this contract test). `_RUNNERS`
+maps the same domain to the actual `run_*` callable. `main()` was written as:
+
+```python
+if domain not in DISPATCH:
+    raise ValueError(f"unknown domain: {domain!r}")
+...
+result = _RUNNERS[domain](params)
+```
+
+The membership test is against one table; the lookup it guards is in the other.
+That is the same defect this repository has now found in seven places — a
+correct check on too narrow a scope — and here the scope was not narrow, it was
+simply *a different object*.
+
+`_contract_violations` did already compare the two tables in both directions
+(`unhandled_domains` and `stray_handlers`). Those two branches were correct.
+They had also **never been shown to fire**: the only deletion mutation removed
+the entry from `DISPATCH` *and* `_RUNNERS`, keeping them consistent with each
+other, so what caught it was the engine axis. Two live branches, no proof.
+
+What a drift actually produced, confirmed by running it: deleting `pcr` from
+`_RUNNERS` alone made a valid request return
+
+```json
+{"ok": false, "error": "'pcr'"}
+```
+
+— the entire error message being the repr of a `KeyError`. Two things are wrong
+with that. It is unreadable, and it is *misattributed*: the request was
+perfectly valid and the build was broken, but the student is the one shown an
+error naming what they asked for. `teriumRunnerFailures.test.ts` already exists
+to stop precisely this ("gives the engine's own reason for a rejected run, not
+its exit status"); the same principle had not reached the dispatch itself.
+
+### Changes
+
+- `main()` resolves the handler once, via `_RUNNERS.get(domain)`, so the check
+  guards the lookup it precedes. An unknown domain still reports
+  `unknown domain: 'x'`. A domain that is dispatchable but unhandled now reports
+  a **build defect**, in those words, and does not imply the request was bad.
+  The two cases are distinguishable, because they have different culprits.
+- Three tests added to `test_boundary_contract.py`. Two mutate exactly one table
+  each, proving `unhandled_domains` and `stray_handlers` fire. The third drives
+  `main()` end to end under a drifted `_RUNNERS` and asserts the message names a
+  build defect, is not `unknown domain`, and is not the bare `'pcr'` this
+  replaced.
+
+Verified by mutation, each against the real files: reverting `main()` to
+`_RUNNERS[domain]` fails with `assert 'build defect' in "'pcr'"`; neutering
+either comparison branch fails its own new test. 121 tests green across the
+runner-facing Python suites, 79 in `provenance.test.ts`, 13 across the three
+runner-facing vitest files.
+
+The design itself is unchanged and still the one this ADR chose: two tables,
+kept in lockstep by a contract test rather than by generation. What changed is
+that the lockstep is now proven in both directions, and a break in it can no
+longer be mistaken for the student's error.
