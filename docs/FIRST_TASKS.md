@@ -1,0 +1,191 @@
+# First tasks
+
+Real open gaps, not exercises. Every one was verified against the tree on
+2026-08-15 by running the command listed under it.
+
+Each task gives you three things: **the file to open**, **a command that
+shows the gap**, and **how you know you are done**. If a task turns out to
+be already fixed when you get to it, that is a finding — say so and take
+another.
+
+Before starting anything here, get through
+[`START_HERE.md`](../START_HERE.md) as far as a passing `make check`.
+
+---
+
+## Warm-up — an hour or two
+
+### 1. Try to break the resolver, and report it precisely
+
+No file to open. The most valuable thing a new person does is find something
+everyone else stopped seeing.
+
+```bash
+npx ts-node src/cli/scientificCLI.ts resolve "made up enzyme" \
+  --substrate nonsense --organism "Homo sapiens"
+```
+
+Then try: nonsense units, a negative concentration, an enzyme with a Unicode
+name, a substrate with an apostrophe, an organism that is a typo of a real
+one, and the whole thing with no network.
+
+**Done when:** you have filed at least one report with *what you ran*, *what
+happened*, *what you expected*. You do not need to know the fix. A crash
+with a stack trace is a finding. So is a refusal that does not say why.
+
+### 2. Read a document against the code
+
+Pick any file in `docs/` and check its claims against the source. If it says
+a command exists, run it. If it quotes output, produce that output and
+compare.
+
+This is not busywork. A sweep like this found a 725-line API reference
+describing endpoints that had never existed, and — while this list was being
+written — three onboarding documents claiming 22 guards and 1,291 tests when
+the real figures were 35 and 1,684.
+
+```bash
+python scripts/check_documented_counts.py
+```
+
+**Done when:** either you have filed a mismatch, or you can say which
+document you checked and which specific claims you verified. "Looked fine"
+is not a result.
+
+---
+
+## Real work — a day or two
+
+### 3. Nothing renders the conditions a simulation ran at
+
+**This is the highest-value task on the list.** It is the gap
+[ADR 0055](adr/0055-a-simulation-has-no-temperature-of-its-own.md) names in
+its own "what it does not do" section.
+
+The pipeline computes `runConditions` — the temperature and pH the
+parameters were *measured* at, with a verdict of `agreed` / `conflicting` /
+`not_reported`. The response carries it. `examples/scientificPipelineExample.ts`
+prints it. **The dashboard does not, and neither does the CLI.**
+
+```bash
+# computed and returned:
+grep -n "runConditions" src/integration/scientificPipeline.ts
+# never rendered:
+grep -n "runConditions" src/web/dashboard.html src/cli/commandResolve.ts
+```
+
+Files: `src/web/dashboard.html` (`renderProvenance`), and/or
+`src/cli/commandSimulateResolved.ts`.
+
+**Done when:** a run whose parameters disagree about temperature says so on
+screen, and a run whose parameters never reported one says *that* instead —
+distinctly. Those are different facts and the display must not collapse them.
+Add a test to `src/web/__tests__/dashboardParameterGate.test.ts`, then
+**mutation-test it**: make the `conflicting` branch render the
+`not_reported` text and confirm your test goes red.
+
+Read `src/validation/runConditions.ts` first. Its module docstring explains
+why a conflict deliberately carries no value.
+
+### 4. The assumption checks that could not be evaluated reach nobody
+
+`AssumptionValidator` returns three lists: `violations`, `warnings`, and
+`notEvaluated` — checks it could not run, for example the steady-state
+criterion when no enzyme concentration was supplied.
+
+```bash
+grep -rn "notEvaluated" src/validation/scientificValidator.ts | head
+grep -rn "notEvaluated" src/cli/ src/web/dashboard.html   # nothing
+```
+
+`notEvaluated` exists precisely so an unevaluated assumption is not reported
+as a satisfied one. Then nothing shows it to anyone, which restores the
+problem it was built to solve.
+
+**Done when:** a user can see which assumptions were not checked and why.
+Same shape as task 3, and the same warning applies: an unevaluated check
+must not look like a passed one.
+
+### 5. Three fields the resolver returns and the dashboard drops
+
+`/api/resolve` returns `assayConditions` and `poolFindings`; the dashboard's
+provenance panel renders neither.
+
+```bash
+grep -oE "^  (assayConditions|poolFindings|selectionTie)" src/literature/literatureResolver.ts
+grep -c "poolFindings" src/web/dashboard.html    # 0
+```
+
+`poolFindings` are facts about the *candidate pool* rather than the winning
+value — including whether the evidence ranked several rows equal, and whether
+the pool mixed named forms of one enzyme. On the LDH turnover table six
+non-dominated rows span 21.1 to 6467.
+
+**Done when:** a student can see that the number they were given was one of
+six the evidence rated equally. Start with `renderProvenance` in
+`src/web/dashboard.html`.
+
+---
+
+## Harder — a week, and worth it
+
+### 6. Nobody has ever run this on Windows
+
+`CONTRIBUTING.md` says so in as many words:
+
+> Nobody has run them on a Windows machine, so treat that as untested rather
+> than promised; if they fail, report it — a setup that only works for the
+> person who wrote it is a defect.
+
+The Makefile is POSIX shell — `command -v`, shell functions, `.venv/bin/...`
+where Windows spells it `.venv\Scripts\`. The documented PowerShell fallback
+is a guess.
+
+**Done when:** either the PowerShell path in `CONTRIBUTING.md` is confirmed
+working and marked as verified with the date and Python version, or it is
+corrected to what actually works. Both outcomes are equally valuable. If you
+have a Windows machine, this is the single most useful thing you can do for
+every contributor after you.
+
+### 7. Write a test for something already true, and prove it can fail
+
+Find behaviour that works and is untested, and pin it.
+
+The rule, and it is the whole point: **break it deliberately and confirm
+your test goes red.** A test that passes before and after your change tested
+nothing.
+
+```bash
+python scripts/check_no_vacuous_tests.py    # catches assertions that can never run
+```
+
+That guard found twelve on its first pass. It cannot find every kind — the
+ones that hurt most in this codebase were assertions matching explanatory
+prose instead of the clause under test, which reads fine and passes forever.
+
+**Done when:** you can state the mutation you made, and paste the failure it
+produced. Not "I tested it" — the actual red output.
+
+---
+
+## Before you open the PR
+
+```bash
+make pr
+```
+
+The guards CI runs, in CI's order, then the suites. A green `make pr` means
+a green PR.
+
+## What makes a task finished here
+
+Not "the code works". The bar is:
+
+1. You reproduced the problem before fixing it.
+2. You broke your own fix on purpose and watched your test go red.
+3. Your PR says what you verified and how.
+
+If step 2 is uncomfortable, that is the correct reaction and you should do
+it anyway. It has caught more real defects in this project than any other
+practice, including several inside checks that were themselves written to
+catch defects.

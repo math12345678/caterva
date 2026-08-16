@@ -1,0 +1,51 @@
+# Optional: the population-genetics mutation-rate resolver.
+#
+# NOT installed by `make setup`. Installing this file puts GPL-3.0-or-later
+# code into your environment. That is a choice you are making, which is
+# exactly why it is a separate file rather than a line in requirements.txt.
+#
+#     pip install -r requirements-popgen.txt
+#
+# WHY THIS IS SEPARATE
+# --------------------
+# Terrium is Apache-2.0. stdpopsim is GPL-3.0-or-later. The two are
+# compatible in one direction only: Apache-2.0 code may be incorporated into
+# a GPLv3 work, but GPLv3 code cannot be incorporated into a work
+# distributed under Apache-2.0 without the combination becoming GPLv3.
+#
+# Nothing in Terrium bundles or redistributes stdpopsim — pip fetches it
+# from PyPI on your machine, and `Tests/popgen_resolver.py` imports it at
+# runtime behind a try/except. Running the two together locally is your own
+# use, which the GPL does not restrict. The obligations attach on
+# DISTRIBUTION, and Terrium distributes source that names a dependency
+# rather than the dependency itself.
+#
+# The reason to split it anyway is that a default install should not quietly
+# put copyleft code into the environment of a project whose LICENSE says
+# Apache-2.0. A reader should not have to work out the interaction to know
+# what they have.
+#
+# IF YOU PACKAGE TERRIUM FOR REDISTRIBUTION
+# -----------------------------------------
+# A wheel, container image or installer that CONTAINS stdpopsim is a
+# distribution of GPLv3 code, and the combined work's terms change
+# accordingly. Ship it without this file, or take advice before shipping it
+# with.
+#
+# WHAT YOU LOSE BY NOT INSTALLING IT
+# ----------------------------------
+# One resolver: germline mutation rate by organism. It degrades honestly —
+# `found=False` with a search log reading "stdpopsim is not installed;
+# mutation rate cannot be resolved", never a substituted value. The 19 tests
+# in test_popgen_resolver.py skip, and `make check` reports the skip as a
+# warning rather than passing silently.
+#
+# This is not legal advice. See docs/adr/0061-gpl-out-of-the-default-install.md
+# for the full reasoning, and Business/INCORPORATION_CHECKLIST.md for the
+# items that need actual counsel.
+
+-r requirements.txt
+
+# stdpopsim (PopSim Consortium) — GPL-3.0-or-later.
+# https://github.com/popsim-consortium/stdpopsim
+stdpopsim==0.3.0
