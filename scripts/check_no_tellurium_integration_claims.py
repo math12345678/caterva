@@ -73,6 +73,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 import zipfile
 from pathlib import Path
@@ -135,7 +136,17 @@ DISCUSSES: dict[str, str] = {
     ),
 }
 
-DOC_GLOBS = ("*.md", "docs/**/*.md", "Business/**/*.md", "Docw/*.docx", "*.pptx")
+#: `**/*.docx`, not `Docw/*.docx`. The first version of this guard named the
+#: one directory where the claims had been found, which is the defect it was
+#: written to catch, committed one pass after warning about it. There were
+#: copies: Science-Agent-Pipeline/attached_assets/terrium_spec_*.docx and
+#: terrium_full_*.docx hold the same four claims and the same "Confidential"
+#: marking, tracked, and were never scanned. Removing Docw/ alone would have
+#: removed nothing.
+SUFFIXES = (".md", ".docx", ".pptx")
+
+#: Directories that are not ours to police.
+_SKIP_PARTS = {"node_modules", ".venv", "venv", "dist", "build", ".git"}
 
 #: A scan that reads no Office file is not reading the place this was found.
 _MIN_DOCS = 30
@@ -175,11 +186,38 @@ def _office_text(path: Path) -> str:
 
 
 def _documents() -> list[Path]:
+    """Every *tracked* document. `git ls-files`, not a filesystem walk.
+
+    Two reasons, and the second is the point. A `**/*.docx` glob walks
+    node_modules and everything else before any filter applies, which made this
+    guard take minutes. And "published" is exactly what git tracks: an
+    untracked file on somebody's disk is not a document the world can read, and
+    a tracked one is, wherever it happens to live. Asking git removes the need
+    to guess which directories to police.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return []
+    if out.returncode != 0:
+        return []
+
     found: list[Path] = []
-    for pattern in DOC_GLOBS:
-        for path in REPO_ROOT.glob(pattern):
-            if path.is_file() and "build-stages" not in path.parts:
-                found.append(path)
+    for rel in out.stdout.split("\0"):
+        if not rel or not rel.endswith(SUFFIXES):
+            continue
+        parts = Path(rel).parts
+        if "build-stages" in parts or _SKIP_PARTS & set(parts):
+            continue
+        path = REPO_ROOT / rel
+        if path.is_file():
+            found.append(path)
     return sorted(set(found))
 
 
@@ -236,13 +274,36 @@ def _selftest() -> int:
     if CLAIM.search(notice) and not DENIAL.search(notice):
         failures.append("would have flagged NOTICE's own denial")
 
-    # The historical entry must be the only thing keeping the tree green.
-    without = {k: v for k, v in HISTORICAL.items() if k != "Docw/terrium_spec.docx"}
-    saved = dict(HISTORICAL)
-    HISTORICAL.clear(); HISTORICAL.update(without)
-    if not any("terrium_spec" in p for p in check()):
-        failures.append("the spec is not actually caught when unexempted")
-    HISTORICAL.clear(); HISTORICAL.update(saved)
+    # A document carrying the claim must be caught. This used to assert that
+    # removing Docw/terrium_spec.docx from HISTORICAL made the tree fail --
+    # a real test until 2026-08-16, when those files were removed from the
+    # repository. `_documents()` reads `git ls-files`, so an untracked file is
+    # not scanned at all and the exemption stopped being load-bearing. Keeping
+    # the old assertion would have meant a selftest that passed for a reason
+    # unrelated to what it claimed to check. It is replaced, not deleted.
+    # The probe lives inside REPO_ROOT: check() reports paths via
+    # `relative_to(REPO_ROOT)`, so a file in /tmp raises ValueError rather
+    # than being scanned. Caught by this selftest failing.
+    probe = REPO_ROOT / ".selftest_probe.md"
+    try:
+        probe.write_text("Plots render using the Tellurium toolkit for ODE domains.\n")
+        # The floor runs before the scan, so the probe list must satisfy BOTH
+        # halves of it or check() returns "blind" and never looks at the
+        # probe -- which is what this selftest did on its first two attempts.
+        office = [p for p in _documents() if p.suffix in {".docx", ".pptx"}]
+        padding = [probe] * _MIN_DOCS + office[:1]
+        if not any(".selftest_probe.md" in p for p in check(docs=padding)):
+            failures.append("a document carrying the claim was not caught")
+    finally:
+        probe.unlink(missing_ok=True)
+
+    # The HISTORICAL entries are now inert: the files they name are no longer
+    # tracked. That is recorded rather than removed, because the reasons are
+    # the record of why those documents were withdrawn.
+    if any((REPO_ROOT / rel).exists() and rel in {
+        p.relative_to(REPO_ROOT).as_posix() for p in _documents()
+    } for rel in HISTORICAL):
+        failures.append("a HISTORICAL file is tracked again; re-check its entry")
 
     if not any("blind" in p for p in check(docs=[])):
         failures.append("the floor did not fire on an empty document list")
