@@ -143,6 +143,12 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # NOTICE at all. Unconditional: there is no state in which publishing
     # Apache-2.0 source with no licence file is acceptable.
     "check_split_repo_legal_files": ("verify_build", "ci"),
+    # Wired 2026-08-16, CI only. check_non_affiliation_notice checks that
+    # surfaces CARRY the disclaimer; this checks that no document CONTRADICTS
+    # it, which is a different question and the one nothing was asking. CI
+    # alone on purpose for now: verify_build.py and the Makefile both hold
+    # uncommitted work, and one harness is what "runs unasked" requires.
+    "check_no_tellurium_integration_claims": ("ci",),
     # Wired 2026-08-15. Conditional guard: it stops demanding the
     # warning if authentication is ever added to src/web/server.ts.
     "check_deployment_warning": ("ci", "verify_build"),
@@ -204,6 +210,7 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_no_unsourced_ui_numbers": ("verify_build",),
     "check_thrown_values_are_errors": ("verify_build",),
     "check_exports_reach_a_caller": ("verify_build",),
+    "check_python_bug_lints": ("verify_build",),
     "check_third_party_requests_disclosed": ("verify_build",),
     "check_mutation_tables_reproducible": ("verify_build",),
     "mutate": ("verify_build",),
