@@ -1,0 +1,79 @@
+# Commentary text Terrium cannot read.
+#
+# Regenerate:  python3 scripts/check_commentary_coverage.py --update-baseline
+#              (regeneration writes a FLAT list -- re-apply this grouping, or
+#               the reasoning is lost and the file reads as an ignore-list)
+#
+# A line here means the fragment has been LOOKED AT, not that it is harmless.
+# One of the two groups below is an OPEN FINDING.
+#
+# Coverage: 92% of 263 commentaries fully understood.
+#   73%  ADR 0031, when the guard was introduced
+#   79%  ADR 0032's cofactor extractors registered
+#   85%  ADR 0035's positional form names registered
+#   92%  ADR 0037's biological-source patterns registered
+#
+# The isoform and tissue groups that dominated this file are gone -- not
+# accepted, but READ. What remains is one group of chemical modifications
+# and a tail of substrate names.
+
+# ========================================================================
+# CHEMICAL MODIFICATION, TAGGING AND PREPARATION -- OPEN FINDING
+# ========================================================================
+#
+# The last substantive group. Covalent modification, affinity tags and
+# immobilisation change kinetics and are not sequence changes, so ADR 0029
+# does not see them.
+# 
+# "attachment of polyethylene glycol side chains ... does not alter the Kcat
+# value" is the curator explicitly stating the modification had NO effect --
+# information Terrium discards along with the rest of the clause. Reading it
+# would be the one case where the commentary tells us a difference does not
+# matter.
+#
+acrylodan  # x2
+attachment polyethylene glycol side chains lysine residues does not alter Kcat  # x2
+attachment polyethylene glycol side chains lysine residues does not alter Km  # x1
+benzyl  # x4
+competitive versus His tagged  # x1
+immobiized  # x1
+noncompetitive versus pyruvate His tagged  # x1
+soluble  # x1
+
+# ========================================================================
+# ACCEPTED -- substrate names, inhibition modes and assay descriptors
+# ========================================================================
+#
+# These name the substrate, the inhibition mode, or a chemical group inside
+# a substrate name. They do not change what the measured value is a
+# measurement OF, and the fields carrying that information (substrate,
+# quantity) are parsed separately.
+# 
+# "muscle" survives here as a bare token in a row whose phrasing ADR 0037's
+# `from` pattern does not reach; the same word is read on the rows that say
+# "enzyme from muscle".
+#
+Glu Gly Arg 4 nitroanilide  # x1
+N Ch3 3+  # x2
+benzoyl DL Arg p nitroanilide  # x1
+inhibition  # x1
+muscle  # x1
+presence 20 30% glycerol pH  # x1
+protease activity  # x1
+
+# A UniProt route was proposed here -- "an isozyme name resolves to a
+# distinct accession" -- and it was CHECKED AND DOES NOT WORK. In this
+# corpus:
+#
+#   LDH-1 and "wild-type LDH-2" (Enterococcus mundtii) share one accession,
+#     A0A1A6GB48 -- one gene product, two labels the paper used
+#   the LDHB rows carry no accession at all
+#   the "isozyme H4" row carries two, P00339,P00336
+#
+# So the accession neither distinguishes the named isozymes nor is reliably
+# present. The suggestion is withdrawn rather than left standing as a
+# plausible-sounding lead for whoever picks this up next; a wrong lead in a
+# reviewed file is worse than an open question, because it looks like
+# progress. See ADR 0041.
+#
+# No proposed fix. The finding stays open.

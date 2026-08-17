@@ -1,0 +1,39 @@
+{
+  "_why": [
+    "ADR 0027's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "This is Barbara Bakker's feedback, and the record of how it was being",
+    "served wrong. She said a parameter's reliability should drive which",
+    "value gets used. Terrium implemented her three axes twice -- once in",
+    "Python, once in TypeScript -- with a parity test asserting the two",
+    "agreed on a shared fixture. They did agree. The API server called the",
+    "TypeScript grader with no PhysiologicalReference, because none was",
+    "reachable from an HTTP request, so `conditionProximity` returned",
+    "`not_assessed` on every response it ever produced.",
+    "",
+    "Both graders return `not_assessed` with no reference. They agreed",
+    "perfectly, on a question neither was being asked.",
+    "",
+    "The interesting row is R1. The duplicate grader was DELETED rather than",
+    "bypassed, and a deletion cannot be mutation-tested by removing something",
+    "-- there is nothing left to remove. It is tested by putting one BACK,",
+    "under a different name, which is exactly how a deleted duplicate returns",
+    "in practice: somebody needs a grade in TypeScript and writes a helper",
+    "instead of an ADR.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0027-one-reliability-score.json"
+  ],
+  "covers": ["0027"],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/reliabilityScore.test.ts src/__tests__/reliabilityFromRunner.test.ts",
+  "mutations": [
+    {
+      "id": "R1",
+      "description": "reintroduce a grader under a different name",
+      "_claimed": "1 failed",
+      "_note": "The deletion guard. `reliabilityScore.ts` is types only; the test asserts the module exports NO callable at all, rather than asserting the absence of one particular name -- which a rename would defeat.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/reliabilityScore.ts",
+      "find": "export type AssayCompleteness = \"complete\" | \"partial\" | \"absent\";",
+      "replace": "export type AssayCompleteness = \"complete\" | \"partial\" | \"absent\";\n\n/** Reintroduced by a mutation, under a name the original test never knew. */\nexport function gradeConditions(): string {\n  return \"not_assessed\";\n}"
+    }
+  ]
+}

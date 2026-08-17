@@ -1,0 +1,66 @@
+{
+  "_why": [
+    "ADR 0075's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "Four claims on the landing page contradicted the code, and only one of",
+    "the four flattered the product. That is the finding: this is not a",
+    "check against exaggeration but against UNVERIFIED claims, which drift",
+    "in whichever direction the last edit went.",
+    "",
+    "P5 is the row that escaped the original hand-run table. Every replay",
+    "used the exact casing found in the source, so making the match",
+    "case-sensitive was invisible to all twelve tests -- and 'RK4",
+    "(Adaptive)' in a heading would have sailed through. Headings are",
+    "precisely where marketing copy gets title-cased.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0075-public-claims.json"
+  ],
+  "test": "python3 -m pytest Tests/test_public_claims.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "P1",
+      "description": "a contradicted claim is found but never reported",
+      "_claimed": "4 failed",
+      "_note": "Everything is examined, nothing is said, the run is green.",
+      "file": "scripts/check_public_claims.py",
+      "find": "                    problems.append(f\"{rel}:{line_no} says {phrase!r} -- {why}\")",
+      "replace": "                    pass"
+    },
+    {
+      "id": "P2",
+      "description": "the CLAIMS table is emptied",
+      "_claimed": "4 failed",
+      "_note": "A forbidden-phrase list with no phrases forbids nothing.",
+      "file": "scripts/check_public_claims.py",
+      "find": "    \"rk4 (adaptive)\": (",
+      "replace": "    \"__removed__\": ("
+    },
+    {
+      "id": "P3",
+      "description": "a stale predicate no longer fails the guard",
+      "_claimed": "1 failed",
+      "_note": "Each forbidden phrase carries a predicate that re-derives its reason from the code. If the code gains real step adaptation, 'adaptive' becomes accurate and the rule must be revisited -- continuing to forbid a true statement is how guards get deleted.",
+      "file": "scripts/check_public_claims.py",
+      "find": "        if not holds:\n            stale.append(f\"{phrase!r}: {detail}\")",
+      "replace": "        if False:\n            stale.append(f\"{phrase!r}: {detail}\")"
+    },
+    {
+      "id": "P4",
+      "description": "the fixed-step predicate stops reading the file and just says yes",
+      "_claimed": "1 failed",
+      "_note": "A check whose evidence has vanished has not passed.",
+      "file": "scripts/check_public_claims.py",
+      "find": "    if not SIMULATE_TS.exists():\n        return False",
+      "replace": "    if not SIMULATE_TS.exists():\n        return True"
+    },
+    {
+      "id": "P5",
+      "description": "matching becomes case-sensitive",
+      "_claimed": "1 failed (after a differently-cased replay was added; NOT caught before)",
+      "_note": "The escape from the original table. The fix was not to the guard but to the tests: they had only ever been given the casing that already existed in the source.",
+      "file": "scripts/check_public_claims.py",
+      "find": "                if re.search(re.escape(phrase), line, re.I):",
+      "replace": "                if re.search(re.escape(phrase), line):"
+    }
+  ]
+}

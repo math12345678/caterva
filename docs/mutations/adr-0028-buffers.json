@@ -1,0 +1,31 @@
+{
+  "_why": [
+    "ADR 0028's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The 'buffers' clause of Jeske's sentence. See adr-0032-cofactors.json",
+    "for why the four checks she named were re-derived as one unit.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0028-buffers.json"
+  ],
+  "test": "python3 -m pytest Tests/test_buffer_identity.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "B1",
+      "description": "is_same becomes the negative test (status != different)",
+      "_claimed": "3 failed",
+      "_note": "The inversion the three states exist to prevent: `unknown` and `not_reported` must never read as agreement. Same shape as ADR 0029's is_wild_type, in a different module -- which is why both were written the positive way and both are mutated here.",
+      "file": "Tests/buffer_identity.py",
+      "find": "        return self.status == \"same\"",
+      "replace": "        return self.status != \"different\""
+    },
+    {
+      "id": "B2",
+      "description": "compare on cid rather than PubChem parent (the salt case)",
+      "_claimed": "1 failed",
+      "_note": "Tris and Tris-HCl are different CIDs and the same buffer. Comparing raw cid reports two rows as using different buffers when they do not.",
+      "file": "Tests/buffer_identity.py",
+      "find": "    if left.parent_cid == right.parent_cid:",
+      "replace": "    if left.cid == right.cid:"
+    }
+  ]
+}

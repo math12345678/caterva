@@ -1,0 +1,85 @@
+# Prometheus Alert Rules for Terrium
+
+groups:
+  - name: terrium_alerts
+    interval: 30s
+    rules:
+      # Alert when success rate drops below 90%
+      - alert: LowSuccessRate
+        expr: terrium_success_rate < 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Terrium success rate is low"
+          description: "Success rate is {{ $value }}%. Consider investigating failed queries."
+
+      # Alert when success rate drops below 75%
+      - alert: CriticalSuccessRateLow
+        expr: terrium_success_rate < 75
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Terrium success rate is critically low"
+          description: "Success rate is {{ $value }}%. Immediate attention required."
+
+      # Alert when average execution time exceeds 1 second
+      - alert: SlowExecutionTime
+        expr: terrium_execution_time_avg_ms > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Terrium execution time is slow"
+          description: "Average execution time is {{ $value }}ms (>1s threshold)."
+
+      # Alert when too many slow queries
+      - alert: TooManySlowQueries
+        expr: terrium_slow_queries_total > 20
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too many slow queries detected"
+          description: "{{ $value }} queries exceeded 1 second threshold."
+
+      # Alert when failures exceed 10
+      - alert: MultipleFailedQueries
+        expr: terrium_failed_queries_total > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Multiple query failures detected"
+          description: "{{ $value }} queries have failed."
+
+      # Alert when standard deviation is high (inconsistent performance)
+      - alert: HighPerformanceVariance
+        expr: terrium_execution_time_stddev_ms > (terrium_execution_time_avg_ms * 0.5)
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "High variance in execution time"
+          description: "Standard deviation ({{ $value }}ms) indicates inconsistent performance."
+
+      # Alert when a model's success rate is low
+      - alert: ModelLowSuccessRate
+        expr: terrium_model_success_rate < 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Model {{ $labels.model }} has low success rate"
+          description: "Success rate is {{ $value }}% for model {{ $labels.model }}."
+
+      # Alert when median execution time exceeds threshold
+      - alert: HighMedianExecutionTime
+        expr: terrium_execution_time_median_ms > 500
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "Median execution time is high"
+          description: "Median execution time is {{ $value }}ms. Consider optimization."

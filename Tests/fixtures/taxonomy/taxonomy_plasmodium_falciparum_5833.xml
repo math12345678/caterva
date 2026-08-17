@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SOURCE
+  Lineage captured 2026-08-13 from the NCBI Taxonomy browser
+  (https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id=5833).
+  Taxon ids, scientific names and ranks are reproduced exactly as NCBI
+  served them, including ranks that look unusual ("cellular root",
+  "domain" where older records said "superkingdom", and the kingdom-level
+  bacterial names NCBI introduced in its recent revisions).
+
+  STRUCTURE
+  Wrapped in NCBI's eFetch taxonomy XML shape (TaxaSet/Taxon/LineageEx)
+  so that taxonomy.parse_taxon_lineage is exercised against the format it
+  will actually receive at runtime. The wrapper is reconstructed; the
+  lineage content is captured. That distinction is stated here rather than
+  left to be discovered, because a fixture that quietly mixes captured and
+  invented data is exactly the failure this project is about.
+
+  NCBI Taxonomy data is produced by the National Center for Biotechnology
+  Information, U.S. National Library of Medicine, and is in the public
+  domain. See NOTICE at the repository root.
+
+  DO NOT hand-edit. Regenerate from the capture if NCBI's taxonomy changes.
+-->
+<TaxaSet>
+  <Taxon>
+    <TaxId>5833</TaxId>
+    <ScientificName>Plasmodium falciparum</ScientificName>
+    <ParentTaxId>418107</ParentTaxId>
+    <Rank>species</Rank>
+    <Lineage>cellular organisms; Eukaryota; Sar; Alveolata; Apicomplexa; Aconoidasida; Haemosporida; Plasmodiidae; Plasmodium; Laverania</Lineage>
+    <LineageEx>
+      <Taxon><TaxId>131567</TaxId><ScientificName>cellular organisms</ScientificName><Rank>cellular root</Rank></Taxon>
+      <Taxon><TaxId>2759</TaxId><ScientificName>Eukaryota</ScientificName><Rank>domain</Rank></Taxon>
+      <Taxon><TaxId>2698737</TaxId><ScientificName>Sar</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>33630</TaxId><ScientificName>Alveolata</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>5794</TaxId><ScientificName>Apicomplexa</ScientificName><Rank>phylum</Rank></Taxon>
+      <Taxon><TaxId>422676</TaxId><ScientificName>Aconoidasida</ScientificName><Rank>class</Rank></Taxon>
+      <Taxon><TaxId>5819</TaxId><ScientificName>Haemosporida</ScientificName><Rank>order</Rank></Taxon>
+      <Taxon><TaxId>1639119</TaxId><ScientificName>Plasmodiidae</ScientificName><Rank>family</Rank></Taxon>
+      <Taxon><TaxId>5820</TaxId><ScientificName>Plasmodium</ScientificName><Rank>genus</Rank></Taxon>
+      <Taxon><TaxId>418107</TaxId><ScientificName>Laverania</ScientificName><Rank>subgenus</Rank></Taxon>
+    </LineageEx>
+  </Taxon>
+</TaxaSet>

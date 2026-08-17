@@ -1,0 +1,29 @@
+# Fields that travel under a different name than they are declared with.
+#
+#   python_field  ->  wire_name   # why
+#
+# An alias REDIRECTS check_findings_reach_a_surface.py, it does not excuse
+# the field. The aliased name must still appear at every hop -- point one at
+# a name nothing emits and the guard fails exactly as it would have.
+#
+# This file exists because the guard's first run reported six delivered
+# fields as undelivered. Baselining them would have recorded a true thing
+# under a false heading ("internal, does not need to reach anyone"), which is
+# how a decision file stops being read.
+
+assay_ph              -> ph            # inside assayConditions
+assay_temperature_c   -> temperatureC  # inside assayConditions
+assay_buffer          -> buffer        # inside assayConditions
+assay_unreported      -> unreported    # inside assayConditions
+cross_species_flag    -> crossSpecies  # the wire drops "flag"
+search_log            -> logs          # the wire calls it logs
+value                 -> km            # emitted under the quantity's own name (km/ki/kcat)
+
+# Dotted paths pin the CONTAINER as well as the key. Renaming poolFindings
+# leaves every inner key present, and a guard matching bare names passes on
+# the exact defect ADR 0039 records.
+effector_contrasts       -> poolFindings.effectorContrasts
+form_mixtures            -> poolFindings.formMixtures
+organism_discrepancies   -> poolFindings.organismDiscrepancies
+source_mixtures          -> poolFindings.sourceMixtures
+source_check_unavailable -> poolFindings.sourceCheckUnavailable

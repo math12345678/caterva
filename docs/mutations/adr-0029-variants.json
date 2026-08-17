@@ -1,0 +1,40 @@
+{
+  "_why": [
+    "ADR 0029's mutation table, re-derived under scripts/mutate.py. This is",
+    "Jeske's finding -- she pointed at 'Y124C mutant' sitting in the",
+    "commentary of a row Terrium was treating as the enzyme -- so it is the",
+    "table whose correctness matters most to the people who gave feedback.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0029-variants.json",
+    "",
+    "The ADR reports eleven mutations. This set carries the three that bear",
+    "on the SCIENCE rather than on plumbing: the negative-test inversion, the",
+    "unstated-reads-as-wild-type inversion, and the exact-tier filter that was",
+    "originally NOT CAUGHT. The remaining eight are wiring (forwarding a flag,",
+    "naming what was withheld) and are covered by the same suite; they are",
+    "listed in the ADR and are not re-derived here because each additional",
+    "mutation is another full pytest run and the set has to stay under the",
+    "per-call ceiling that killed the first run in ADR 0069."
+  ],
+  "test": "python3 -m pytest Tests/test_fallback_logic.py Tests/test_protein_variant.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "V1",
+      "description": "is_wild_type becomes the negative test (status != variant)",
+      "_claimed": "8 failed",
+      "_note": "The inversion the module exists to prevent: with the negative form every unlabelled row certifies itself wild-type, and `unstated` is the majority case in BRENDA.",
+      "file": "Tests/protein_variant.py",
+      "find": "        return self.status == \"wild_type\"",
+      "replace": "        return self.status != \"variant\""
+    },
+    {
+      "id": "V2",
+      "description": "the exact-match tier stops filtering variants",
+      "_claimed": "0 failed originally -- the golden case only exercised the cross-species tier. test_exact_tier_excludes_variant_rows_from_selection closed it.",
+      "_note": "The finding worth keeping from ADR 0029. A filter no test can break is one somebody removes as dead code, and the day after that a mutant's constant is the enzyme's again.",
+      "file": "Tests/fallback_logic.py",
+      "find": "        if not allow_variants:\n            usable, withheld = _partition_variants(exact)",
+      "replace": "        if False:\n            usable, withheld = _partition_variants(exact)"
+    }
+  ]
+}

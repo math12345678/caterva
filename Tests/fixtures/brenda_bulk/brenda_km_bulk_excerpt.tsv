@@ -1,0 +1,37 @@
+# SOURCE AND LICENCE
+# Rows captured 2026-08-13 from BRENDA's bulk KM download
+# (https://www.brenda-enzymes.org/result_download.php?a=12 ... &nolimit=1),
+# the endpoint Lisa Jeske of the BRENDA team recommended in place of SOAP.
+# (c) the BRENDA team, Leibniz Institute DSMZ, licensed CC BY 4.0:
+# https://creativecommons.org/licenses/by/4.0/
+#
+# MODIFIED: this is a trimmed excerpt, not the full download. Rows were
+# selected for parser coverage -- the "additional information" form, plain
+# numeric rows, commentary carrying pH and temperature in both orders, the
+# "not specified in the publication" idiom, multi-reference lists, and the
+# bare "-" commentary. Field VALUES are reproduced verbatim; the row layout
+# follows the 9-column schema verified against all 623 rows of the capture.
+#
+# The degree sign appears here as U+FFFD because the capture was decoded as
+# UTF-8. See brenda_bulk.py: the live download is served as Latin-1 and the
+# parser decodes it correctly; this fixture deliberately preserves the
+# corrupted form so the recovery path is exercised.
+#
+# Cite BRENDA's current publication if you use these values in scientific
+# work: https://www.brenda-enzymes.org/references.php
+# See NOTICE at the repository root.
+
+1.1.1.1	alcohol dehydrogenase	additional information	-	additional information	-	2	285577, 285578, 285630, 285638	
+1.1.1.1	alcohol dehydrogenase	additional information	-	additional information	Michaelis-Menten kinetics	2	654140, 721911, 742936, 763253	
+1.1.1.1	alcohol dehydrogenase	0.000035	-	1-formyl-8-methylpyrene	isozyme ADH4, at 21-23�C	6971	701322	
+1.1.1.1	alcohol dehydrogenase	0.0004	-	NADH	pH 8.0, 60�C	8	728012	
+1.1.1.1	alcohol dehydrogenase	0.0007	-	Hexanol	-	1412	285656	
+1.1.1.1	alcohol dehydrogenase	0.021	-	ethanol	0.1 M glycine-NaOH buffer, pH 10.0, 25�C	20	285571, 285572	
+1.1.1.1	alcohol dehydrogenase	0.033	-	2,3-butanediol	45�C, pH 8.8, cosubstrate: 2,3-butanediol, wild-type enzyme	1573	700001	
+1.1.1.1	alcohol dehydrogenase	0.09	-	ethanol	70�C, pH 9.0, 50 mM Tris-HCl, 4 M NaCl	20	700002	
+1.1.1.1	alcohol dehydrogenase	0.12	-	ethanol	pH 6.0, temperature not specified in the publication	20	700003	
+1.1.1.1	alcohol dehydrogenase	0.15	-	ethanol	pH and temperature not specified in the publication	20	700004	
+1.1.1.1	alcohol dehydrogenase	0.18	-	ethanol	mutant Y25A/W49F/W167Y, 30�C, pH not specified in the publication	20	700005	
+1.1.1.1	alcohol dehydrogenase	0.24	-	ethanol	pH 6.0, 37�C, recombinant enzyme expressed from Saccharomyces cerevisiae	20	700006	
+1.1.1.1	alcohol dehydrogenase	1.5	-	ethanol	wild type enzyme, in 0.1 M glycine-NaOH buffer (pH 10.5), at 65�C	20	700007	
+1.1.1.1	alcoho

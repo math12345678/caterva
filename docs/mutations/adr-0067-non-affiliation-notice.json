@@ -1,0 +1,65 @@
+{
+  "_why": [
+    "ADR 0067's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The notice that Terrium is not Tellurium lived in two files that both",
+    "stay in the repository. Someone who runs `pip install terrium` never",
+    "saw either. These five rows are the ways that could silently become",
+    "true again.",
+    "",
+    "N4 is the one worth reading twice. Disclaiming ('not Tellurium') and",
+    "attributing ('runs on libRoadRunner') are different obligations -- the",
+    "first is Terrium's own problem, the second is what the licences ask",
+    "for. A surface that does only the first looks compliant and is not.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0067-non-affiliation-notice.json"
+  ],
+  "test": "python3 -m pytest Tests/test_non_affiliation_notice.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "N1",
+      "description": "the notice is edited out of CITATION.cff",
+      "_claimed": "1 failed",
+      "_note": "Citation metadata is what a reference manager ingests, and citation is exactly where credit confusion does its damage.",
+      "file": "CITATION.cff",
+      "find": "  Terrium is NOT Tellurium.",
+      "replace": "  Terrium is a simulation engine."
+    },
+    {
+      "id": "N2",
+      "description": "the package docstring loses it",
+      "_claimed": "2 failed",
+      "_note": "README and NOTICE stay in the repository; a docstring travels with the installed package. This is the surface that reaches someone who never opens GitHub.",
+      "file": "Terium/__init__.py",
+      "find": "NOT TELLURIUM. Tellurium is a separate, established systems-biology",
+      "replace": "Tellurium is a separate, established systems-biology"
+    },
+    {
+      "id": "N3",
+      "description": "a missing surface is skipped instead of failing",
+      "_claimed": "1 failed",
+      "_note": "Deleting the file is the easiest way to pass a checklist. A guard that shrugs at a missing surface rewards exactly that.",
+      "file": "scripts/check_non_affiliation_notice.py",
+      "find": "        if not path.exists():\n            problems.append(",
+      "replace": "        if not path.exists():\n            continue\n        if False:\n            problems.append("
+    },
+    {
+      "id": "N4",
+      "description": "the credit requirement is dropped, so a denial without an attribution passes",
+      "_claimed": "1 failed",
+      "_note": "The distinction the ADR is named for. Saying 'we are not them' while staying silent on 'we are built on their software' satisfies nobody's licence.",
+      "file": "scripts/check_non_affiliation_notice.py",
+      "find": "        if rel in MUST_CREDIT and not _CREDIT_RE.search(text):",
+      "replace": "        if False:"
+    },
+    {
+      "id": "N5",
+      "description": "the checklist is gutted to a single surface",
+      "_claimed": "1 failed",
+      "_note": "The floor exists because shortening the list is indistinguishable from passing it.",
+      "file": "scripts/check_non_affiliation_notice.py",
+      "find": "_MIN_SURFACES = 6",
+      "replace": "_MIN_SURFACES = 0"
+    }
+  ]
+}

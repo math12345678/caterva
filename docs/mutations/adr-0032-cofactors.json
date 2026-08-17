@@ -1,0 +1,32 @@
+{
+  "_why": [
+    "ADR 0032's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "Together with adr-0026 (pH, temperature) and adr-0028 (buffers), this",
+    "completes the re-derivation of Lisa Jeske's sentence:",
+    "",
+    "    pH value, temperature, cofactors, and buffers play a huge role [...]",
+    "    If you simply mix these together, the simulation will end up",
+    "    calculating with 'fantasy numbers'.",
+    "",
+    "Four things named; four checks; four tables now re-runnable rather than",
+    "asserted. That felt like the right unit to finish in one pass.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0032-cofactors.json",
+    "",
+    "Both suites the ADR touches are run, per the rule ADR 0026's set file",
+    "taught: a narrower command than the record cites fabricates a NOT CAUGHT."
+  ],
+  "test": "python3 -m pytest Tests/test_effector.py Tests/test_effector_presence.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "C1",
+      "description": "comparison_key ignores presence -- the motivating pair collapses",
+      "_claimed": "3 failed",
+      "_note": "THE defect this module exists for. 'in the presence of FBP' and 'in the absence of FBP' are two arms of one designed experiment; a key that drops presence makes them the same condition and Terrium silently returns one arm.",
+      "file": "Tests/effector.py",
+      "find": "            return (self.identity.parent_cid, self.presence)\n        return (self.compound_text.strip().lower(), self.presence)",
+      "replace": "            return (self.identity.parent_cid, \"\")\n        return (self.compound_text.strip().lower(), \"\")"
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "_why": [
+    "The 'zero then one' rows from ADR 0033 and ADR 0035, re-derived under",
+    "scripts/mutate.py.",
+    "",
+    "These are the highest-risk entries in the whole debt list. Each was",
+    "originally recorded NOT CAUGHT, then closed by a test written for it --",
+    "so each is a claim that a gap was fixed, made by a harness now known to",
+    "have been wrong three separate ways. If any table in this project is",
+    "going to disagree on re-derivation, it is one of these.",
+    "",
+    "One set spanning two ADRs because they share a suite and the same",
+    "finding: a defensive branch the fixtures could not reach, tested at the",
+    "level where it CAN fail rather than deleted (ADR 0033/0045's rule).",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0033-0035-pool-level.json"
+  ],
+  "covers": [
+    "0033",
+    "0035"
+  ],
+  "test": "python3 -m pytest Tests/test_effector_presence.py Tests/test_form_mixture.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "P1",
+      "description": "`unstated` counted as `absent` (ADR 0033)",
+      "_claimed": "0 -> 1",
+      "_note": "Originally unreachable: `effector._presence_of` returns only 'present' or 'absent', so the third state its own docstring promises is never produced today. Reading silence as absence would manufacture a contrast against every unlabelled row in the pool -- the warning would fire constantly and be ignored.",
+      "file": "Tests/effector_presence.py",
+      "find": "            if effector.presence not in (\"present\", \"absent\"):\n                continue",
+      "replace": "            if False:\n                continue"
+    },
+    {
+      "id": "P2",
+      "description": "only the base is checked, not the full tokens (ADR 0035)",
+      "_claimed": "0 -> 1",
+      "_note": "The base of 'NADH' is the truncated 'NAD'. PubChem happens to know NAD, so the base check alone worked here -- and would have failed silently for the next acronym whose stem is not itself a catalogued compound.",
+      "file": "Tests/form_mixture.py",
+      "find": "        candidates = [base] + [f\"{base}{d}\" for d in forms]",
+      "replace": "        candidates = [base]"
+    },
+    {
+      "id": "P3",
+      "description": "a resolver exception counts as \"is a compound\" (ADR 0035)",
+      "_claimed": "0 -> 1",
+      "_note": "The direction matters: returning True on failure suppresses the mixture warning, so a network blip silently turns a real finding off. Returning False keeps the warning and risks a false positive, which is the survivable direction.",
+      "file": "Tests/form_mixture.py",
+      "find": "    except Exception:  # noqa: BLE001\n        return False",
+      "replace": "    except Exception:  # noqa: BLE001\n        return True"
+    }
+  ]
+}
