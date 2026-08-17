@@ -93,6 +93,15 @@ jobs:
       - name: Split-repo legal files guard
         run: python scripts/check_split_repo_legal_files.py
 
+      # No published document may claim Terrium is built on Tellurium while
+      # NOTICE says it is not. Reads .docx/.pptx, because that is where two
+      # such claims sat unread through twenty-five audits.
+      - name: Tellurium integration-claim guard (self-check)
+        run: python scripts/check_no_tellurium_integration_claims.py --selftest
+
+      - name: Tellurium integration-claim guard
+        run: python scripts/check_no_tellurium_integration_claims.py
+
       # Every shipping surface carries the Tellurium non-affiliation
       # notice. A naming question, not a licensing one -- see ADR 0001.
       - name: Non-affiliation notice guard
