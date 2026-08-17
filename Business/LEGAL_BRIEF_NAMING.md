@@ -47,6 +47,68 @@ founder and gave substantive technical feedback on the product, which is
 recorded in `docs/EXPERT_FEEDBACK.md`. He has not, on the record, raised the
 name. That is a fact, not a waiver, and it should not be read as one.
 
+## 3a. IMPORTANT — a published document contradicts §5, and it was found late
+
+**Read this before relying on anything below.** It was discovered on
+2026-08-16, after the rest of this brief was written, and it changes the
+picture.
+
+`Docw/terrium_spec.docx` — "Brand and Product Spec, Version 1.0, July 2026",
+tracked in git and published in the public repository — says the product is
+built on Tellurium:
+
+> "real plots and interactive visualizations (**built with the Tellurium
+> systems-biology toolkit** for kinetics and ODE-based domains)"
+>
+> "**Rich visualization via Tellurium:** For kinetics, ODE-based and
+> systems-biology domains, plots and dynamic simulations render using the
+> Tellurium toolkit rather than static matplotlib images."
+>
+> Deliverables list: "Browser-based notebook execution environment,
+> **Tellurium integration**, file handling, backend for orchestrator"
+
+NOTICE, also published, says Terrium "is unaffiliated with it, is not a fork
+of it, and does not depend on the `tellurium` package".
+
+**Both statements are public and they contradict each other.** The code agrees
+with NOTICE — there is no Tellurium anywhere in the software, and
+`check_forbidden_packages.py` proves it on every push. The spec describes a
+product plan that was not built. But a reader, or an opposing lawyer, sees two
+published documents from the same project giving different answers.
+
+Why it went unnoticed through many audits: that guard's document scan is
+`DOC_GLOBS = ("*.md", "docs/**/*.md")`. It reports checking 232 documents and
+every one is markdown. `.docx` is a zip archive, so the string "Tellurium"
+inside one is invisible to a grep-based check. The prohibition was enforced
+against the code and against markdown, and never against the Word files sitting
+tracked in `Docw/`.
+
+**What this does to §4 below.** §4 says the separation is "documented
+contemporaneously, not constructed afterwards as a defence". That is true of
+ADR 0001 and remains true. It is no longer the whole record: a document from
+the same period describes Tellurium integration as intended. Please weigh both.
+
+**One point that may help.** The same spec records how the name was chosen,
+and it does not mention Tellurium:
+
+> "Name: Terrium. Coined in the register of real element names (Terbium,
+> Tritium, Yttrium) — sounds like it belongs on the periodic table, signals
+> hard science without being literal or overused."
+
+That is contemporaneous evidence of independent derivation from the
+periodic-table register rather than from "Tellurium", which may be worth more
+to the trademark question than NOTICE's "the similar name is a mistake".
+
+**Two things for the founder to decide**, flagged rather than actioned because
+they are editorial:
+
+1. Whether that spec should be superseded, corrected, or withdrawn from
+   publication. It describes a plan that was not built, and it is being read
+   as a current claim.
+2. It is marked **"Internal Use Only"** and **"Confidential | July 2026"** on
+   its own pages, and it is published in a public repository. One of those two
+   facts is wrong.
+
 ## 4. Why Tellurium is not a dependency — the decision predates the concern
 
 ADR `docs/adr/0001-no-tellurium-umbrella-package.md` records the decision not
