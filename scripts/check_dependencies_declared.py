@@ -54,6 +54,10 @@ EXCLUDE_DIR_NAMES = {"__pycache__", ".pytest_cache", ".hypothesis", "node_module
 IMPORT_TO_DISTRIBUTION = {
     "roadrunner": "libroadrunner",
     "libsbml": "python-libsbml",
+    # Same shape: the distribution is `python-libsedml`, the module is
+    # `libsedml`. Without this the guard reports a declared dependency as
+    # undeclared, which is a false accusation and trains people to ignore it.
+    "libsedml": "python-libsedml",
     "bs4": "beautifulsoup4",
     "yaml": "pyyaml",
 }
@@ -172,10 +176,19 @@ def collect_third_party_imports() -> dict[str, list[str]]:
 
 def declared_distributions() -> set[str]:
     declared: set[str] = set()
-    for req_file in ("requirements.txt", "requirements-dev.txt"):
-        req_path = REPO_ROOT / req_file
-        if not req_path.exists():
-            continue
+    # Every requirements file in the repository root, not a fixed pair.
+    #
+    # `requirements-popgen.txt` was added when stdpopsim was split out on
+    # licence grounds (GPL-3.0-or-later against Terrium's Apache-2.0). It is
+    # a real declaration -- it names the package, pins it, and explains the
+    # obligation -- but this guard only read two filenames, so it reported a
+    # DECLARED dependency as undeclared for two days.
+    #
+    # A false accusation is worse than a missed one: it trains people to
+    # ignore the guard, and this one sits in `make guards`. Globbing means
+    # the next optional-extras file is covered on the day it is created
+    # rather than on the day someone remembers this list exists.
+    for req_path in sorted(REPO_ROOT.glob("requirements*.txt")):
         for line in req_path.read_text().splitlines():
             line = line.strip()
             if not line or line.startswith("#") or line.startswith("-r"):
@@ -201,8 +214,7 @@ def find_undeclared() -> dict[str, list[str]]:
 def main() -> int:
     undeclared = find_undeclared()
     if not undeclared:
-        print("OK: every third-party import is declared in requirements.txt "
-              "or requirements-dev.txt.")
+        print("OK: every third-party import is declared in a requirements file.")
         return 0
 
     print("Undeclared dependencies found:\n")
@@ -214,7 +226,7 @@ def main() -> int:
             print(f"    ...and {len(files) - 3} more file(s)")
     print(
         "\nThese modules are imported somewhere in Terium/ or Tests/ but "
-        "are not listed in requirements.txt or requirements-dev.txt. A fresh "
+        "are not listed in any requirements*.txt file. A fresh "
         "install (like CI does) will fail to collect the affected tests."
     )
     return 1
