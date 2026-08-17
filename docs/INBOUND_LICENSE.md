@@ -68,6 +68,18 @@ That line is you asserting the four points of the DCO — in plain terms, that
 you wrote the contribution or have the right to submit it, and that you
 understand it is public and recorded.
 
+**One open question, stated rather than hidden.** This document describes
+grants running in both directions — Terrium's outbound Apache-2.0 licence, and
+your inbound contribution. Terrium's founder and copyright holder is currently
+a minor. A minor can unambiguously *own* copyright, but a licence grant is
+contract-like, and in most US states a minor's contract is voidable by that
+minor. Nobody involved here is a lawyer and this is not advice; the question
+is recorded, with what is and is not uncertain, in
+[`Business/INCORPORATION_CHECKLIST.md`](../Business/INCORPORATION_CHECKLIST.md).
+It changes nothing about contributing today. It is written down because a
+contributor deserves to know the shape of what they are relying on, and
+because finding it in someone else's diligence review is worse.
+
 **Why a DCO and not a CLA.** A CLA is a contract that has to be read,
 signed, tracked and stored, and it deters exactly the drive-by contribution
 a small project most wants. The DCO is a statement you make in the commit
