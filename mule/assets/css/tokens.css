@@ -82,8 +82,25 @@
   --glass-strong: rgba(7, 11, 12, 0.93);
 
   /* --- type ----------------------------------------------- */
-  --font-sans: "Inter Tight", "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", "SFMono-Regular", ui-monospace, monospace;
+  /* No webfont is fetched for these. The named faces are kept first on
+     purpose: a visitor who already has Inter Tight or IBM Plex Mono installed
+     locally still gets them, at no network cost and with nothing disclosed to
+     anyone. Everyone else falls through to their own system's UI font.
+
+     index.html used to load both from fonts.googleapis.com. A browser cannot
+     make that request without telling Google who is asking, so every visitor's
+     IP address reached Google before the page rendered -- no click, no
+     consent. An IP address is personal data under GDPR Article 4 (CJEU,
+     Breyer, C-582/14), and LG Muenchen I, 20 Jan 2022 (Az. 3 O 17493/20)
+     awarded damages for precisely this arrangement.
+
+     The old fallbacks were "Helvetica Neue", Arial. Those still work, but they
+     skip the modern system UI faces, so a visitor without the webfont landed
+     on Arial rather than on what their OS actually uses. */
+  --font-sans: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo,
+    Consolas, "Liberation Mono", monospace;
 
   --step--2: clamp(0.5625rem, 0.55rem + 0.06vw, 0.625rem);
   --step--1: clamp(0.625rem, 0.6rem + 0.1vw, 0.6875rem);
