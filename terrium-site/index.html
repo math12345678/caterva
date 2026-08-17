@@ -5,9 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Terrium — scientific verification engine</title>
     <meta name="description" content="Simulations checked against exact mathematics. Every number traceable to a citation that has been independently reproduced." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+    <!--
+      No webfont is loaded from a CDN, deliberately.
+
+      This page used to fetch Inter and JetBrains Mono from fonts.googleapis.com
+      and fonts.gstatic.com. A browser cannot make that request without telling
+      Google who is asking, so every visitor's IP address, User-Agent and
+      referring page reached Google before the page finished rendering -- with
+      no click and no consent.
+
+      An IP address is personal data under GDPR Article 4 (CJEU, Breyer,
+      C-582/14). On 20 January 2022 the Landgericht Muenchen I (Az. 3 O
+      17493/20) held that embedding Google Fonts this way breaches Article 6,
+      awarded the visitor EUR 100, and attached penalties of up to EUR 250,000
+      for continuing. Terrium is aimed at students, including students in the
+      EU.
+
+      The stack below is resolved by the visitor's own operating system, so it
+      costs no request, no round trip and no disclosure. Self-hosting the
+      original files is the alternative and the licences permit it (SIL OFL
+      1.1); it was not chosen here because it is a larger change for a
+      difference most readers will not see.
+    -->
   </head>
   <body>
     <div id="root"></div>

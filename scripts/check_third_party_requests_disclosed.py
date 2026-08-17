@@ -104,6 +104,31 @@ def _external_hosts(text: str) -> set[str]:
     return hosts
 
 
+def _disclosure_table(privacy_text: str) -> str:
+    """The markdown table rows only -- the document's statement of *current* fact.
+
+    Not the whole document, and the difference is the whole point. PRIVACY.md
+    carries correction banners describing hosts the pages have *stopped*
+    contacting, because this project corrects in place rather than deleting the
+    record. Matching against the full text meant every host ever named stayed
+    "disclosed" forever: after the Google Fonts links were removed on
+    2026-08-16, re-adding one was accepted by this guard, because
+    `fonts.googleapis.com` still appeared in the paragraph explaining that it
+    had been taken out.
+
+    So the guard had been made permanently unable to fail by the very
+    corrections documenting the fix -- the same mention-versus-action defect
+    caught in check_split_repo_legal_files, and caught here by mutating the
+    real file rather than trusting the selftest.
+
+    The table is the right scope because it is the document's claim about what
+    happens *now*; prose around it is history and argument.
+    """
+    return "\n".join(
+        line for line in privacy_text.splitlines() if line.lstrip().startswith("|")
+    ).lower()
+
+
 def _pages() -> list[Path]:
     found: list[Path] = []
     for pattern in PAGE_GLOBS:
@@ -129,7 +154,7 @@ def check(
             return [f"{PRIVACY_DOC.relative_to(REPO_ROOT)} does not exist"]
         privacy_text = PRIVACY_DOC.read_text()
 
-    disclosed = privacy_text.lower()
+    disclosed = _disclosure_table(privacy_text)
 
     for page in pages:
         for host in sorted(_external_hosts(page.read_text(errors="replace"))):

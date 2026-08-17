@@ -3,12 +3,16 @@
 Short version: Terrium itself stores an email address, only if you type one
 into the waitlist form. No cookies, no analytics, no trackers, no accounts.
 
-But "nothing else" would be wrong, and this line used to say it. Every public
-page loads fonts and scripts from third-party CDNs, so a visitor's IP address
-reaches Google and Cloudflare on page load, whether or not they type anything.
-That is described in
-[Fonts and scripts the pages load from other people's servers](#fonts-and-scripts-the-pages-load-from-other-peoples-servers),
-and it is not yet fixed.
+The two marketing pages — `mule/index.html` and `terrium-site/index.html` —
+make no third-party request at all as of 2026-08-16. The Google Fonts links
+that used to hand every visitor's IP to Google on page load are gone.
+
+Two pages still do: the dashboard and the API docs load Chart.js, Swagger UI
+and Redoc from `cdnjs.cloudflare.com` and `cdn.jsdelivr.net`, so a visitor's
+IP reaches Cloudflare or Fastly there. Those are running code rather than
+typography, so removing them is a different job, and it is not done. Both are
+described in
+[Fonts and scripts the pages load from other people's servers](#fonts-and-scripts-the-pages-load-from-other-peoples-servers).
 
 This is a statement of what the code does, written by reading it. **It is not
 a privacy policy and it is not legal advice.** A privacy policy names a data
@@ -53,10 +57,24 @@ click, no form, no consent.
 
 | page | goes to | for |
 |---|---|---|
-| `mule/index.html` | `fonts.googleapis.com`, `fonts.gstatic.com` | Inter Tight, IBM Plex Mono |
-| `terrium-site/index.html` | `fonts.googleapis.com`, `fonts.gstatic.com` | Inter, JetBrains Mono |
+| `mule/index.html` | *nothing* | — |
+| `terrium-site/index.html` | *nothing* | — |
 | `src/web/dashboard.html` | `cdnjs.cloudflare.com` | Chart.js 3.9.1 |
-| `src/web/server.ts` (API docs) | `cdnjs.cloudflare.com`, `fonts.googleapis.com`, `cdn.jsdelivr.net` | Swagger UI, Montserrat/Roboto, Redoc |
+| `src/web/server.ts` (API docs) | `cdnjs.cloudflare.com`, `cdn.jsdelivr.net` | Swagger UI, Redoc |
+
+> **Update (2026-08-16).** The Google Fonts requests described below are gone.
+> All three pages that loaded `fonts.googleapis.com` and `fonts.gstatic.com`
+> now resolve their type locally: the named faces are kept first in the stack,
+> so a visitor who already has Inter Tight or JetBrains Mono installed still
+> gets them, and everyone else falls through to their own system UI font. No
+> file was downloaded and nothing was vendored — the webfont link was simply
+> removed and the fallback chains, which already existed, were widened to
+> include the modern system faces instead of stopping at Arial.
+>
+> **The two marketing pages now make no third-party request at all.** What
+> remains is the dashboard and the API docs page, which load Chart.js, Swagger
+> UI and Redoc as functioning code rather than decoration; those are described
+> under the supply-chain heading below and are not yet closed.
 
 **Why this is a legal question and not a performance one.** A visitor's IP
 address is personal data under GDPR Article 4 — settled by the CJEU in

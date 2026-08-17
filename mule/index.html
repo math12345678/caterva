@@ -24,9 +24,13 @@
 <meta name="twitter:description" content="Terrium resolves measured kinetic parameters from published literature, reports the organism and citation behind each one, and refuses to invent the values it cannot source." />
 <meta name="twitter:image" content="_shots/01-hero.png" />
 
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<!-- No webfont is fetched. These three lines used to preconnect to
+     fonts.googleapis.com and fonts.gstatic.com and pull Inter Tight and IBM
+     Plex Mono, which handed every visitor's IP address to Google before the
+     page rendered, with no click and no consent. An IP address is personal
+     data under GDPR Art. 4 (CJEU, Breyer, C-582/14); LG Muenchen I,
+     20 Jan 2022 (Az. 3 O 17493/20) awarded damages for exactly this.
+     The font stacks in assets/css/tokens.css resolve locally instead. -->
 
 <link rel="stylesheet" href="assets/css/tokens.css" />
 <link rel="stylesheet" href="assets/css/base.css" />
@@ -232,7 +236,7 @@
                misquoted one), and a scrollable region has to be reachable by
                keyboard as well as by touch. -->
           <pre class="transcript__code" tabindex="0" role="group"
-               aria-label="Recorded terminal session resolving a Michaelis constant"><span class="t-cmd">$ scientific resolve "lactate dehydrogenase" \
+               aria-label="Recorded terminal session resolving a Michaelis constant (Km)"><span class="t-cmd">$ scientific resolve "lactate dehydrogenase" \
       --substrate pyruvate --organism "Homo sapiens"</span>
 
 <span class="t-ok">&#10003;</span> <b>KM = 2.5 mM</b>
@@ -619,7 +623,7 @@
       <ol class="manifest__list">
         <li class="manifest__item" data-reveal>
           <span class="manifest__i mono" aria-hidden="true">01</span>
-          <p class="manifest__stmt">Terrium does not silently choose a constant.</p>
+          <p class="manifest__stmt">Terrium does not silently choose a measured parameter.</p>
         </li>
         <li class="manifest__item" data-reveal style="--reveal-delay:90ms">
           <span class="manifest__i mono" aria-hidden="true">02</span>
@@ -752,7 +756,7 @@
       <div>
         <p class="label label--micro">Status</p>
         <ul class="footer__list mono">
-          <li>1,291 tests / engine + literature</li>
+          <li>1,893 tests / engine + literature</li>
           <li>Verified against closed-form solutions</li>
           <li>Pre-validation</li>
           <li>Seeking course-pilot partners</li>
