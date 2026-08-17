@@ -124,7 +124,25 @@ https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js
 
 `@next` is not a version. It resolves to whatever was most recently published
 under that tag, so the code served changes without anyone here deciding it
-should. Combined with a server that has no authentication (see
+should.
+
+**Checked on 2026-08-16, and it is worse than "unpinned".** jsDelivr's own
+package API (`data.jsdelivr.com/v1/packages/npm/redoc`) reports:
+
+```
+"tags": { "latest": "2.5.3", "next": "3.0.0-rc.0" }
+```
+
+So this page has not merely been serving an unpinned version — it has been
+serving readers a **release candidate of the next major version**, 3.0.0-rc.0,
+while the `<redoc spec-url=...>` element it uses is written against the 2.x
+API. Nobody chose that. It happened when Redoc moved its `next` tag, and it
+will move again.
+
+A pin to `redoc@2.5.3` — the current `latest` — is written and sits in the
+working tree, uncommitted for the reason given in the correction above.
+
+Combined with a server that has no authentication (see
 [`SECURITY.md`](../SECURITY.md)), a bad publish or a compromised CDN executes
 arbitrary JavaScript in the operator's browser.
 
