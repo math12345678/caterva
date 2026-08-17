@@ -4,3 +4,14 @@
 pytest==9.1.1
 pytest-timeout==2.4.0
 hypothesis==6.160.0
+
+# Validates CITATION.cff against the CFF 1.2.0 schema
+# (scripts/check_citation_cff.py). Dev-only: the archive export embeds the
+# file verbatim and never needs to parse it, so nothing at runtime depends
+# on this.
+#
+# Apache-2.0 -- read from the LICENSE the wheel ships, not from the package
+# metadata, whose `License` field reads UNKNOWN. A licence field that says
+# UNKNOWN is not a licence fact, and "it's probably Apache like the rest of
+# that org" is not one either.
+cffconvert==2.0.0
