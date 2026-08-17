@@ -81,12 +81,19 @@ PUBLIC_MARKETING: tuple[str, ...] = (
     "mule/index.html",
 )
 
+#: The five Docw/*.docx files were removed from the repository on 2026-08-16.
+#: Every one is marked "Confidential" on its own pages and one is also
+#: "Internal Use Only", and all five were published in a public repository;
+#: two also claimed Tellurium integration, contradicting NOTICE.
+#:
+#: THIS IS A REAL LOSS AND IS RECORDED AS ONE. The numbers in those documents
+#: still go to investors -- they are just no longer in the repository, so this
+#: guard can no longer check them. What was an automated check is now a human
+#: one. The alternative was continuing to publish confidential documents in
+#: order to keep them checkable, which is a worse trade, but it is a trade and
+#: not a free win. If they ever return to the repository, re-add them here.
 INVESTOR_DOCS: tuple[str, ...] = (
     "terrium_pitch_deck.pptx",
-    "Docw/terrium_full.docx",
-    "Docw/terrium_mvp_timeline.docx",
-    "Docw/terrium_poc_results.docx",
-    "Docw/terrium_technical_implementation.docx",
     # A grant/programme application draft. Marked "ready to copy in", so it
     # is operational rather than historical: somebody will paste these
     # numbers into a real submission. It claimed 429 tests and 3 domains --

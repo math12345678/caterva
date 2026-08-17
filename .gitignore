@@ -86,3 +86,11 @@ site/
 .coverage
 .coverage.*
 htmlcov/
+.mutate-journal/
+
+# Confidential internal documents. Every file in Docw/ is marked
+# "Confidential" on its own pages and one is also "Internal Use Only";
+# they were published in a public repository until 2026-08-16. Kept on
+# disk, out of the repository. See the commit that removed them.
+Docw/
+Science-Agent-Pipeline/attached_assets/*.docx
