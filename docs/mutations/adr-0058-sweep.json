@@ -1,0 +1,47 @@
+{
+  "_why": [
+    "The mutation table in ADR 0058, as a re-runnable artifact rather than a",
+    "claim. Two of these were originally recorded as 'not caught' and were",
+    "real gaps; the tests written to close them are asserted here.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0058-sweep.json",
+    "",
+    "An INDETERMINATE result means the spec no longer matches the source --",
+    "the file was refactored and this record is stale. That is a finding",
+    "about the record, not about the tests, and the harness will not let it",
+    "be mistaken for either outcome."
+  ],
+  "test": "npx jest src/engine/__tests__/parameter-sweep.test.ts src/engine/__tests__/parameter-sweep-failure-record.test.ts",
+  "mutations": [
+    {
+      "id": "M1",
+      "description": "a crashed sweep point recorded as finalValue: 0 again",
+      "_note": "Originally NOT CAUGHT: all 23 tests built the results array by hand and none ran runSweep, so the line producing the record was never executed. parameter-sweep-failure-record.test.ts closed it.",
+      "file": "src/engine/parameter-sweep.ts",
+      "find": "          finalValue: null,\n          confidence: 0,",
+      "replace": "          finalValue: 0,\n          confidence: 0,"
+    },
+    {
+      "id": "M2",
+      "description": "parameterProvenance dropped at the sweep boundary again",
+      "file": "src/engine/parameter-sweep.ts",
+      "find": "          parameterProvenance: response.parameterProvenance,\n",
+      "replace": ""
+    },
+    {
+      "id": "M3",
+      "description": "analyzeSweep stops checking validated",
+      "_note": "Originally NOT CAUGHT: every fixture paired validated:false with finalValue:null, so the null check alone sufficed. In production a run that completes and fails validation carries a real 0 -- and 0 is the minimum, so it wins the sweep.",
+      "file": "src/engine/parameter-sweep.ts",
+      "find": "      r.validated && r.finalValue !== null && r.finalValue !== undefined",
+      "replace": "      r.finalValue !== null && r.finalValue !== undefined"
+    },
+    {
+      "id": "M4",
+      "description": "the success path uses || 0 again, erasing a genuine zero",
+      "file": "src/engine/parameter-sweep.ts",
+      "find": "finalValue: response.results?.finalValue ?? null,",
+      "replace": "finalValue: response.results?.finalValue || 0,"
+    }
+  ]
+}

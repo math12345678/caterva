@@ -1,0 +1,102 @@
+{
+  "_why": [
+    "RUN TO COMPLETION 2026-08-15: 8 of 8 caught, in two invocations of four",
+    "rows each using `--only L1,L2,L3,L4` then `--only L5,L6,L7,L8`.",
+    "",
+    "Parked as `.unverified` by its author because nine pytest invocations in",
+    "one command exceeded the per-call ceiling. `--only` splits the RUN",
+    "without splitting the record, which is what the flag was added for. The",
+    "same approach should un-park adr-0078-investor-claims.json.unverified,",
+    "whose suite is slower again.",
+    "",
+    "ADR 0062's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "'Take out all code related to Tellurium' would delete the engine:",
+    "libRoadRunner (Apache 2.0, University of Washington) and Antimony (MIT)",
+    "underpin all fifteen domains. A licence IS permission; silence is not.",
+    "The four `@replit/*` packages that grant nothing were the real finding.",
+    "",
+    "L5 is the row that escaped the original hand-run table. Reverting the",
+    "three-state licence detector passed all seven tests, because the only",
+    "assertion was `undeclared_now <= KNOWN_UNLICENSED` -- vacuously true",
+    "when the detector finds nothing. The fix was to assert the POSITIVE",
+    "direction first: the detector must actually see the four it knows about.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0062-dependency-licences.json"
+  ],
+  "test": "python3 -m pytest Tests/test_dependency_licenses.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "L1",
+      "description": "an unlicensed package is re-imported into a vite config",
+      "_claimed": "1 failed",
+      "_note": "A manifest entry is a paperwork problem; an import is a use. This is the row that would matter in a dispute, and it is why the call sites came out before the manifest entries could.",
+      "file": "Science-Agent-Pipeline/artifacts/terrium-landing/vite.config.ts",
+      "find": "import path from \"path\";",
+      "replace": "import path from \"path\";\nimport devBanner from \"@replit/vite-plugin-dev-banner\";"
+    },
+    {
+      "id": "L2",
+      "description": "a NO_GRANT entry loses its reason",
+      "_claimed": "2 failed",
+      "_note": "A prohibition nobody can evaluate gets removed by the next person who hits it.",
+      "file": "scripts/check_dependency_licenses.py",
+      "find": "    \"tellurium\": (\n        \"Constitution Rule 7 and ADR 0001.",
+      "replace": "    \"tellurium\": (\n        \"no. ADR 0001."
+    },
+    {
+      "id": "L3",
+      "description": "libroadrunner is moved out of PERMISSION",
+      "_claimed": "2 failed",
+      "_note": "Deleting this entry is a decision to delete the simulation engine. It should not be possible to make it by accident.",
+      "file": "scripts/check_dependency_licenses.py",
+      "find": "    \"libroadrunner\": (",
+      "replace": "    \"libroadrunner_removed\": ("
+    },
+    {
+      "id": "L4",
+      "description": "a PERMISSION entry names a licence but records no grant",
+      "_claimed": "1 failed",
+      "_note": "The licence name is not the grant. 'MIT' tells a reader nothing about what they may do.",
+      "file": "scripts/check_dependency_licenses.py",
+      "find": "    \"numpy\": (\"BSD-3-Clause\", \"Use, modify and redistribute with the notice retained.\"),",
+      "replace": "    \"numpy\": (\"BSD-3-Clause\", \"ok\"),"
+    },
+    {
+      "id": "L5",
+      "description": "'installed and declares nothing' is conflated with 'not installed'",
+      "_claimed": "1 failed (NOT caught before the positive assertion was added)",
+      "_note": "Three states, not two. Collapsing the last two accused autoprefixer -- plainly MIT, merely absent from this checkout -- of the same defect as the @replit packages. Reporting missing evidence as a finding is how a guard loses the credibility it needs on the day it is right.",
+      "file": "scripts/check_dependency_licenses.py",
+      "find": "    return \"DECLARES_NOTHING\" if found_any else None",
+      "replace": "    return None"
+    },
+    {
+      "id": "L6",
+      "description": "the detector reports everything as unlicensed",
+      "_claimed": "2 failed",
+      "_note": "The crying-wolf direction. A guard that flags 494 permissively-licensed packages gets switched off within the hour.",
+      "file": "scripts/check_dependency_licenses.py",
+      "find": "        if lic:\n            return str(lic)",
+      "replace": "        if False:\n            return str(lic)"
+    },
+    {
+      "id": "L7",
+      "description": "a recorded outstanding item goes back to blocking the whole suite",
+      "_claimed": "1 failed",
+      "_note": "Added after the original table. This guard sat in `make guards` -- the documented pre-PR command -- exiting 1 over four packages a contributor could not remove without a pnpm lockfile regeneration, and make stops at the first failure. Blocking the suite on someone else's recorded item is not visibility, it is obstruction.",
+      "file": "scripts/check_dependency_licenses.py",
+      "find": "    if blocking or unrecorded:\n        return 1",
+      "replace": "    if blocking or unrecorded or outstanding:\n        return 1"
+    },
+    {
+      "id": "L8",
+      "description": "Rule 7 stops blocking and merely warns",
+      "_claimed": "1 failed",
+      "_note": "Everything else in NO_GRANT is a removal someone has to schedule. `tellurium` is a prohibition, and a prohibition that only warns is a preference.",
+      "file": "scripts/check_dependency_licenses.py",
+      "find": "BLOCKING: frozenset[str] = frozenset({\"tellurium\"})",
+      "replace": "BLOCKING: frozenset[str] = frozenset()"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "_why": [
+    "ADR 0045's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "This one needed a new capability. Its 'suite' is not a test runner -- it",
+    "is the guard script `check_findings_reach_a_surface.py`, which walks",
+    "every KineticResult field from the resolver, through the runner, across",
+    "the Python/TypeScript boundary, to a rendering surface. The verdict is",
+    "the guard's exit status.",
+    "",
+    "The harness now supports `\"verdict\": \"exit_code\"` for exactly this",
+    "shape, and it is deliberately more careful than reading the exit code:",
+    "a mutation that makes a guard CRASH also exits non-zero, and calling",
+    "that 'caught' would certify a check that no longer runs at all. Crashes",
+    "are detected and reported INDETERMINATE. Verified by breaking the",
+    "guard's own syntax and confirming the harness refuses to call it caught.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0045-boundary-guard.json"
+  ],
+  "covers": ["0039", "0045"],
+  "verdict": "exit_code",
+  "test": "python3 scripts/check_findings_reach_a_surface.py",
+  "mutations": [
+    {
+      "id": "G1",
+      "description": "the runner stops emitting poolFindings (ADR 0039's original defect)",
+      "_claimed": "fails now; PASSED under guard v1 and v2",
+      "_note": "The defect the guard exists for: four pool-level detectors computed correctly and dropped at the Python/TypeScript boundary, invisible from both sides. Two earlier versions of the guard passed this mutation, which is why the third executes the runner rather than reading names.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py",
+      "find": "                \"poolFindings\": {",
+      "replace": "                \"poolFindingsDisabledByMutation\": {"
+    }
+  ]
+}

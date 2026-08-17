@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SOURCE
+  Lineage captured 2026-08-13 from the NCBI Taxonomy browser
+  (https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?mode=Info&id=10090).
+  Taxon ids, scientific names and ranks are reproduced exactly as NCBI
+  served them, including ranks that look unusual ("cellular root",
+  "domain" where older records said "superkingdom", and the kingdom-level
+  bacterial names NCBI introduced in its recent revisions).
+
+  STRUCTURE
+  Wrapped in NCBI's eFetch taxonomy XML shape (TaxaSet/Taxon/LineageEx)
+  so that taxonomy.parse_taxon_lineage is exercised against the format it
+  will actually receive at runtime. The wrapper is reconstructed; the
+  lineage content is captured. That distinction is stated here rather than
+  left to be discovered, because a fixture that quietly mixes captured and
+  invented data is exactly the failure this project is about.
+
+  NCBI Taxonomy data is produced by the National Center for Biotechnology
+  Information, U.S. National Library of Medicine, and is in the public
+  domain. See NOTICE at the repository root.
+
+  DO NOT hand-edit. Regenerate from the capture if NCBI's taxonomy changes.
+-->
+<TaxaSet>
+  <Taxon>
+    <TaxId>10090</TaxId>
+    <ScientificName>Mus musculus</ScientificName>
+    <ParentTaxId>862507</ParentTaxId>
+    <Rank>species</Rank>
+    <Lineage>cellular organisms; Eukaryota; Opisthokonta; Metazoa; Eumetazoa; Bilateria; Deuterostomia; Chordata; Craniata; Vertebrata; Gnathostomata; Teleostomi; Euteleostomi; Sarcopterygii; Dipnotetrapodomorpha; Tetrapoda; Amniota; Mammalia; Theria; Eutheria; Boreoeutheria; Euarchontoglires; Glires; Rodentia; Myomorpha; Muroidea; Muridae; Murinae; Mus; Mus</Lineage>
+    <LineageEx>
+      <Taxon><TaxId>131567</TaxId><ScientificName>cellular organisms</ScientificName><Rank>cellular root</Rank></Taxon>
+      <Taxon><TaxId>2759</TaxId><ScientificName>Eukaryota</ScientificName><Rank>domain</Rank></Taxon>
+      <Taxon><TaxId>33154</TaxId><ScientificName>Opisthokonta</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>33208</TaxId><ScientificName>Metazoa</ScientificName><Rank>kingdom</Rank></Taxon>
+      <Taxon><TaxId>6072</TaxId><ScientificName>Eumetazoa</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>33213</TaxId><ScientificName>Bilateria</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>33511</TaxId><ScientificName>Deuterostomia</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>7711</TaxId><ScientificName>Chordata</ScientificName><Rank>phylum</Rank></Taxon>
+      <Taxon><TaxId>89593</TaxId><ScientificName>Craniata</ScientificName><Rank>subphylum</Rank></Taxon>
+      <Taxon><TaxId>7742</TaxId><ScientificName>Vertebrata</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>7776</TaxId><ScientificName>Gnathostomata</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>117570</TaxId><ScientificName>Teleostomi</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>117571</TaxId><ScientificName>Euteleostomi</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>8287</TaxId><ScientificName>Sarcopterygii</ScientificName><Rank>superclass</Rank></Taxon>
+      <Taxon><TaxId>1338369</TaxId><ScientificName>Dipnotetrapodomorpha</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>32523</TaxId><ScientificName>Tetrapoda</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>32524</TaxId><ScientificName>Amniota</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>40674</TaxId><ScientificName>Mammalia</ScientificName><Rank>class</Rank></Taxon>
+      <Taxon><TaxId>32525</TaxId><ScientificName>Theria</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>9347</TaxId><ScientificName>Eutheria</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>1437010</TaxId><ScientificName>Boreoeutheria</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>314146</TaxId><ScientificName>Euarchontoglires</ScientificName><Rank>superorder</Rank></Taxon>
+      <Taxon><TaxId>314147</TaxId><ScientificName>Glires</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>9989</TaxId><ScientificName>Rodentia</ScientificName><Rank>order</Rank></Taxon>
+      <Taxon><TaxId>1963758</TaxId><ScientificName>Myomorpha</ScientificName><Rank>suborder</Rank></Taxon>
+      <Taxon><TaxId>337687</TaxId><ScientificName>Muroidea</ScientificName><Rank>no rank</Rank></Taxon>
+      <Taxon><TaxId>10066</TaxId><ScientificName>Muridae</ScientificName><Rank>family</Rank></Taxon>
+      <Taxon><TaxId>39107</TaxId><ScientificName>Murinae</ScientificName><Rank>subfamily</Rank></Taxon>
+      <Taxon><TaxId>10088</TaxId><ScientificName>Mus</ScientificName><Rank>genus</Rank></Taxon>
+      <Taxon><TaxId>862507</TaxId><ScientificName>Mus</ScientificName><Rank>subgenus</Rank></Taxon>
+    </LineageEx>
+  </Taxon>
+</TaxaSet>

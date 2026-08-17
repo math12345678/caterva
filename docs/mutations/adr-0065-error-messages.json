@@ -1,0 +1,44 @@
+{
+  "_why": [
+    "ADR 0065's table, re-derived under scripts/mutate.py. First entry cleared",
+    "from docs/mutations/NOT-YET-REPRODUCIBLE.txt.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0065-error-messages.json"
+  ],
+  "_p2_is_not_here_on_purpose": [
+    "ADR 0065's table has two rows. P2 -- 'pipeline throws a plain object",
+    "again' -- is NOT in this set, and its absence is the honest thing rather",
+    "than an omission.",
+    "",
+    "P2 is caught by scripts/check_thrown_values_are_errors.py, not by a test.",
+    "That is the whole argument of ADR 0065: the readers were hardened too,",
+    "so reverting the throw changes no observable behaviour and no suite can",
+    "fail on it. Putting P2 in a set file would make this harness report it",
+    "NOT CAUGHT, which is true of the tests and false of the codebase --",
+    "exactly the kind of technically-accurate, materially-misleading result",
+    "this project treats as a defect.",
+    "",
+    "P2 is verified by re-applying the defect verbatim and watching the guard",
+    "exit 1. That was done, and is recorded in ADR 0065."
+  ],
+  "test": "npx jest src/__tests__/errors.test.ts src/engine/__tests__/batch-success-accounting.test.ts",
+  "mutations": [
+    {
+      "id": "P1",
+      "description": "describeError stops reading .message off a thrown object",
+      "_claimed": "2 failed",
+      "_note": "The recovery path for a non-Error carrying a message. Without it, a plain object falls through to String(value) and renders as \"[object Object]\".",
+      "file": "src/errors.ts",
+      "find": "    if (typeof message === 'string' && message.trim() !== '') return message;",
+      "replace": "    if (typeof message === 'number') return String(message);"
+    },
+    {
+      "id": "P3",
+      "description": "describeError returns an empty string instead of a last-resort message",
+      "_note": "Not in the original table. An empty `error` field reads as 'no error' -- a failure rendering as success. Added while writing this set file, because the set is meant to be runnable evidence rather than a transcript.",
+      "file": "src/errors.ts",
+      "find": "  return stringified.trim() === '' ? 'An unknown error occurred (no details were recorded)' : stringified;",
+      "replace": "  return stringified;"
+    }
+  ]
+}

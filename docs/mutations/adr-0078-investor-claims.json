@@ -1,0 +1,84 @@
+{
+  "_why": [
+    "RUN TO COMPLETION 2026-08-15: 5 of 5 caught, in two invocations --",
+    "`--only I1,I2,I3` then `--only I4,I5`.",
+    "",
+    "Parked as `.unverified` by its author because six pytest invocations in",
+    "one command exceeded the per-call ceiling; this suite is the slowest in",
+    "the project because it shells out to check_documented_counts.py, which",
+    "collects the whole test suite. A concurrent agent added `--only` for",
+    "exactly this, un-parked adr-0062 with it, and left a note saying the",
+    "same approach should un-park this one. It did.",
+    "",
+    "ADR 0078's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0075 named Business/ as ungreppable because .pptx and .docx are",
+    "not text. They are zips of XML; it took ten lines of standard library.",
+    "The deck claimed '382 automated tests passing' on two slides while the",
+    "repository had 1,852 -- the third stale count found that week and the",
+    "third that UNDERSTATED.",
+    "",
+    "I3 is the row that escaped. Widening the CONFIGURED tolerance to 99.0 --",
+    "under which a claim of 5 tests passes against a suite of 1,852 -- was",
+    "invisible to all ten tests, because the tolerance test injects its own",
+    "value with monkeypatch. A test that supplies its own configuration",
+    "cannot check the configuration that ships.",
+    "",
+    "The original run of this table also exceeded the tool timeout partway",
+    "through and LEFT a mutation applied; it was found on the next check and",
+    "restored from a cmp-verified backup. That is the failure this harness",
+    "exists to make impossible, and it is the strongest argument for the set",
+    "file over a hand-run loop.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0078-investor-claims.json",
+    "      (or in parts with --only, if your shell has a time limit)"
+  ],
+  "test": "python3 -m pytest Tests/test_investor_claims.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "I1",
+      "description": "the Office reader returns nothing",
+      "_claimed": "2 failed",
+      "_note": "A zip parser that silently returns \"\" makes this guard report a clean deck it never opened.",
+      "file": "scripts/check_investor_claims.py",
+      "find": "    return \" \".join(parts)",
+      "replace": "    return \"\""
+    },
+    {
+      "id": "I2",
+      "description": "a mismatch is computed but never reported",
+      "_claimed": "1 failed",
+      "_note": "Everything is read, the numbers are compared, nothing is said.",
+      "file": "scripts/check_investor_claims.py",
+      "find": "                if abs(claimed - live) > live * tol:",
+      "replace": "                if False:"
+    },
+    {
+      "id": "I3",
+      "description": "the configured tolerance is widened to 99.0",
+      "_claimed": "1 failed (NOT caught before the shipped tolerance was checked)",
+      "_note": "A tolerance is a threshold, and a large enough threshold is an off switch. Anchored on the full claim line: the bare tolerance literal appears three times, and the harness requires exactly one match -- a find-string that hits several places would patch an arbitrary one of them.",
+      "file": "scripts/check_investor_claims.py",
+      "find": "r\"(\\d[\\d,]*)\\s*(?:\\|\\s*)?automated tests\", _live_test_total, 0.15",
+      "replace": "r\"(\\d[\\d,]*)\\s*(?:\\|\\s*)?automated tests\", _live_test_total, 99.0"
+    },
+    {
+      "id": "I4",
+      "description": "the timestamp window widens until one date excuses the whole document",
+      "_claimed": "1 failed",
+      "_note": "A number that says when it was true ages honestly -- but a window of 100,000 characters means one 'as of' anywhere in a file excuses every number in it. An off switch wearing a qualifier.",
+      "file": "scripts/check_investor_claims.py",
+      "find": "_TIMESTAMP_WINDOW = 120",
+      "replace": "_TIMESTAMP_WINDOW = 100000"
+    },
+    {
+      "id": "I5",
+      "description": "the timestamp regex matches anything",
+      "_claimed": "3 failed",
+      "_note": "The exemption that distinguishes a dated claim from a stale one must not become an exemption for everything.",
+      "file": "scripts/check_investor_claims.py",
+      "find": "_TIMESTAMP_RE = re.compile(\n    r\"as of (this session|[A-Z][a-z]+ \\d|\\d{4}-\\d{2}|\\w+ \\d{4})\", re.I\n)",
+      "replace": "_TIMESTAMP_RE = re.compile(r\"\", re.I)"
+    }
+  ]
+}

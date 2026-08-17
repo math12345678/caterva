@@ -1,0 +1,44 @@
+{
+  "_why": [
+    "ADR 0056's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The defect: a column named `literatureFound` whose value was",
+    "`job.result.validated`. A run on numbers a student typed in by hand",
+    "validates fine, so it exported as `literatureFound = yes` with no",
+    "citation anywhere behind it -- a manufactured provenance claim in the",
+    "tool whose whole premise is that every number traces to a source.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0056-column-claimed-a-source.json"
+  ],
+  "covers": ["0056"],
+  "test": "npx jest src/storage/__tests__/csv-exporter-production-shape.test.ts src/storage/__tests__/csv-exporter.test.ts",
+  "mutations": [
+    {
+      "id": "J1",
+      "description": "the literature column is derived from `validated` again",
+      "_claimed": "4 failed",
+      "_note": "The strongest guard is the test exporting two jobs identical in literature (both zero sources) and opposite in `validated`, then asserting the two literature cells are equal. Any re-derivation from `validated` fails it, including one written by someone who has not read the ADR.",
+      "file": "src/storage/csv-exporter.ts",
+      "find": "      row.push(escapeCsvField(literatureSourceCount(job.result)));",
+      "replace": "      row.push(escapeCsvField((job.result?.validated || false) ? 'yes' : 'no'));"
+    },
+    {
+      "id": "J2",
+      "description": "`unknown` rendered as `0`",
+      "_claimed": "1 failed",
+      "_note": "Three-state discipline. A record predating the field, or a job that errored before metadata was assembled, did not find zero sources -- nobody looked. 'Could not check' must never render as 'checked, and there was nothing'.",
+      "file": "src/storage/csv-exporter.ts",
+      "find": "  return typeof n === 'number' ? String(n) : 'unknown';",
+      "replace": "  return typeof n === 'number' ? String(n) : '0';"
+    },
+    {
+      "id": "J3",
+      "description": "`finalValue` read from the flat path only",
+      "_claimed": "2 failed",
+      "_note": "The exporter read `job.result.finalValue`; the pipeline returns it at `result.results.finalValue`. Every real job exported a blank finalValue for the life of the route, and nineteen tests agreed with the code because their fixtures were a shape production never emits.",
+      "file": "src/storage/csv-exporter.ts",
+      "find": "      cell(resultField(job.result, ['results', 'finalValue'], 'finalValue')),",
+      "replace": "      cell(job.result?.finalValue),"
+    }
+  ]
+}

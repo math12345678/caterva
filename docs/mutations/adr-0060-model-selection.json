@@ -1,0 +1,34 @@
+{
+  "_why": [
+    "ADR 0060's mutation table, re-derived under scripts/mutate.py rather than",
+    "by hand. ADR 0069 recorded that every table in this project was produced",
+    "by a harness that had been wrong three times, and that re-verifying them",
+    "was a debt rather than something already done. This pays part of it.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0060-model-selection.json",
+    "",
+    "N3 and N5 live in other files/suites and have their own set files, so",
+    "each set stays under the per-call ceiling that killed the first run."
+  ],
+  "test": "npx jest src/engine/__tests__/model-selection-excludes-failures.test.ts",
+  "mutations": [
+    {
+      "id": "N1",
+      "description": "usableResults back to `!r.error`, admitting a model that failed validation",
+      "_claimed": "3 failed",
+      "_note": "The headline defect: a model carrying a fabricated finalValue of 0 ranked first against an experimental value of 0.4.",
+      "file": "src/engine/model-comparison.ts",
+      "find": "      r.validated === true && r.finalValue !== null && r.finalValue !== undefined\n  );",
+      "replace": "      !r.error\n  );"
+    },
+    {
+      "id": "N4",
+      "description": "compareModels refusal branch made unreachable",
+      "_claimed": "0 failed, then 1 after adding the compareModels tests",
+      "_note": "Originally uncaught: the pure function was covered thoroughly and the one needing a mocked pipeline was not.",
+      "file": "src/engine/model-comparison.ts",
+      "find": "  if (validResults.length === 0) {",
+      "replace": "  if (validResults.length === -1) {"
+    }
+  ]
+}

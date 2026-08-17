@@ -1,0 +1,49 @@
+{
+  "_why": [
+    "ADR 0079's CSV mutations, re-derived under scripts/mutate.py.",
+    "",
+    "NOT MY RECORD. Written by a concurrent agent, and this file was added",
+    "instead of asking them for it -- three previous passes put a line in",
+    "NOT-YET-REPRODUCIBLE.txt asking, and the baseline itself now says that",
+    "if a fifth arrived the answer was not another document.",
+    "",
+    "Writing the set is additive: it creates one file under docs/mutations/",
+    "and touches nothing they wrote. If a result had disagreed with their",
+    "table, the disagreement would have been raised for them to resolve --",
+    "correcting somebody else's record on the strength of my own spec is",
+    "how ADR 0026's near-miss would have become a false accusation.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0079-attribution-in-the-csv.json"
+  ],
+  "covers": ["0079"],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/dataSources.test.ts src/__tests__/trajectoryCsv.test.ts",
+  "mutations": [
+    {
+      "id": "A1",
+      "description": "the attribution block never reaches the CSV",
+      "_claimed": "2 failed",
+      "_note": "The ADR 0039 defect class applied to a licence obligation: BRENDA is CC BY 4.0, and the attribution has to be inside the artifact that travels or it does not travel.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/trajectoryCsv.ts",
+      "find": "  const attribution = attributionLines(input.parameterProvenance);\n  if (attribution.length > 0) {",
+      "replace": "  const attribution = attributionLines(input.parameterProvenance);\n  if (false) {"
+    },
+    {
+      "id": "A2",
+      "description": "every source credited regardless of contribution",
+      "_claimed": "3 failed",
+      "_note": "Crediting a source that contributed nothing to THIS export is a false statement about where the numbers came from -- the same shape as the `literatureFound` column of ADR 0056, in the direction of over-claiming.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/dataSources.ts",
+      "find": "  const used = sourcesUsed(provenance, sources);\n  if (used.length === 0) return [];",
+      "replace": "  const used = sources.map((source) => ({ source, label: source.name }));\n  if (used.length === 0) return [];"
+    },
+    {
+      "id": "A3",
+      "description": "attribution lines lose their `#` prefix",
+      "_claimed": "2 failed",
+      "_note": "Without the prefix the licence notice becomes data rows, so `read_csv(comment=\"#\")` parses them as the trajectory. The notice would corrupt the file it exists to accompany.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/dataSources.ts",
+      "find": "  comment = \"#\",",
+      "replace": "  comment = \"\","
+    }
+  ]
+}

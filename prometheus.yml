@@ -1,0 +1,26 @@
+# Prometheus Configuration for Terrium
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'terrium-monitor'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - 'prometheus-rules.yml'
+
+# Scrape configurations
+scrape_configs:
+  - job_name: 'terrium'
+    static_configs:
+      - targets: ['terrium:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    scrape_timeout: 10s

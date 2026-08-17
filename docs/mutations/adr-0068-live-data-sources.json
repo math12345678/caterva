@@ -1,0 +1,77 @@
+{
+  "_why": [
+    "ADR 0068's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0062 audited every package Terrium depends on and none of the",
+    "databases it calls. Three are queried live from the server and none",
+    "was in NOTICE. KEGG says it 'is not a public database' and that",
+    "non-academic use 'requires a commercial license'; CORE excludes its",
+    "API from the ODC-By grant and Terrium meets all three of their",
+    "contact conditions.",
+    "",
+    "D6 is the row that escaped. The check asked whether NOTICE matched",
+    "/unresolved|open question/ ANYWHERE in the document -- and the word",
+    "still appeared, forty lines up in the CORE section. A keyword found",
+    "somewhere in a 300-line file is not evidence about the paragraph you",
+    "meant. The check is now scoped between the KEGG heading and the next.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0068-live-data-sources.json"
+  ],
+  "test": "python3 -m pytest Tests/test_live_data_sources_are_recorded.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "D1",
+      "description": "the KEGG section is deleted from NOTICE",
+      "_claimed": "2 failed",
+      "_note": "A source queried live is a source whose terms apply, whether or not anyone wrote them down.",
+      "file": "NOTICE",
+      "find": "KEGG \u2014 queried live, and UNRESOLVED",
+      "replace": "KEGG \u2014 nothing to see here"
+    },
+    {
+      "id": "D2",
+      "description": "NOTICE paraphrases KEGG instead of quoting it",
+      "_claimed": "1 failed",
+      "_note": "A paraphrase of a licence is a summary of a licence. The quoted words are what a reader can check against kegg.jp.",
+      "file": "NOTICE",
+      "find": "not a public database",
+      "replace": "freely available for research"
+    },
+    {
+      "id": "D3",
+      "description": "the CORE section is deleted",
+      "_claimed": "1 failed",
+      "_note": "The first version of this row only renamed the heading, which left the whole CORE record in place -- so NOT CAUGHT was the correct verdict on a mutation that did not mutate anything that mattered. A weak mutation produces a false accusation against a fine test. This version removes CORE's heading entirely, which is what the description always said it did.",
+      "file": "NOTICE",
+      "find": "CORE \u2014 queried live, and UNRESOLVED\n----------------------------------",
+      "replace": "PubChem again\n-------------"
+    },
+    {
+      "id": "D4",
+      "description": "the KEGG call site stops degrading and starts raising",
+      "_claimed": "1 failed",
+      "_note": "docs/LICENSING.md argues that dropping KEGG costs quality and not correctness, because the resolver already handles the lookup failing. That argument is only worth making while the fallback is real.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py",
+      "find": "    except httpx.HTTPError:\n        return None",
+      "replace": "    except ValueError:\n        raise"
+    },
+    {
+      "id": "D5",
+      "description": "the source-file scan silently finds nothing",
+      "_claimed": "1 failed",
+      "_note": "The guard starts from hostnames in code rather than a hand-kept list, precisely because the hand-kept list was the thing that was already wrong. A scan that reads no files reports a clean bill of health for a repository it never opened.",
+      "file": "Tests/test_live_data_sources_are_recorded.py",
+      "find": "    return [\n        ROOT / rel for rel in listing",
+      "replace": "    return [\n        ROOT / rel for rel in []"
+    },
+    {
+      "id": "D6",
+      "description": "KEGG is quietly reframed as settled",
+      "_claimed": "1 failed (NOT caught before the check was scoped to the KEGG section)",
+      "_note": "Renaming the heading and replacing 'an open question' with 'This is fine' passed all four tests, because 'UNRESOLVED' still appeared in the CORE section further up.",
+      "file": "NOTICE",
+      "find": "**This is an open question, not a settled position.**",
+      "replace": "**This is fine.**"
+    }
+  ]
+}

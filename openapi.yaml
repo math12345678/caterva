@@ -1,0 +1,1395 @@
+# NOTE (2026-08-12, added during audit, not deleting anything below):
+# GET /api/jobs/history and GET /api/jobs/query are documented below as
+# working endpoints, matching their handlers in src/web/server.ts. But in
+# that file, GET /api/jobs/{jobId} (pathname.match(/^\/api\/jobs\/[a-z0-9_]+$/i),
+# ~line 235) is registered BEFORE /api/jobs/history (~line 251) and
+# /api/jobs/query (~line 259), and its regex matches the literal strings
+# "history" and "query" as if they were job IDs. Reproduced live: both
+# routes currently return 404 {"error":"Job not found"} instead of their
+# documented behavior -- this is a route-ordering bug in server.ts itself
+# (out of scope for this spec file to fix), not an error in this spec.
+openapi: 3.0.0
+info:
+  title: Terrium Scientific Simulation API
+  description: |
+    REST API for enzyme kinetics simulations, parameter sweeps, batch processing, and comparative analysis.
+
+    **Two Servers:**
+    - This server (`src/web/server.ts`) uses Node.js built-ins, no external dependencies. Routes: `/api/simulate`, `/api/sweep`, `/api/batch`, `/api/compare`, `/api/export/*`, `/api/jobs/*`, `/api/health`, `/api/stats`.
+    - The Express API server (`Science-Agent-Pipeline/artifacts/api-server/`) provides `/api/healthz`, `/api/simulate/<jobId>/...` with a different request shape.
+
+    Check which server you're targeting — wrong choice produces 404s.
+  version: 1.0.0
+  contact:
+    name: Terrium Team
+    url: https://github.com/Terrium-sim
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://api.terrium.example.com
+    description: Production
+  - url: http://terrium:3000
+    description: Docker container
+
+tags:
+  - name: Health
+    description: System health and status
+  - name: Simulations
+    description: Single simulations
+  - name: Sweeps
+    description: Parameter sweep analysis
+  - name: Batch Processing
+    description: Batch job execution
+  - name: Comparison & Analysis
+    description: Compare jobs and analyze results
+  - name: Export
+    description: Export job data to CSV
+  - name: Queries
+    description: Advanced job querying
+  - name: Metrics
+    description: Performance metrics and monitoring
+
+paths:
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: System health check
+      description: Returns system status, uptime, and job queue information.
+      operationId: getHealth
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  uptime:
+                    type: number
+                    description: Server uptime in seconds
+                  jobs:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      running:
+                        type: integer
+                      completed:
+                        type: integer
+                      failed:
+                        type: integer
+                  sweeps:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      completed:
+                        type: integer
+                  batches:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      completed:
+                        type: integer
+              example:
+                status: ok
+                uptime: 3600.5
+                jobs:
+                  total: 42
+                  running: 2
+                  completed: 40
+                  failed: 0
+                sweeps:
+                  total: 5
+                  completed: 5
+                batches:
+                  total: 3
+                  completed: 3
+
+  /api/stats:
+    get:
+      tags:
+        - Health
+      summary: System statistics
+      description: Returns aggregate statistics across all jobs.
+      operationId: getStats
+      responses:
+        '200':
+          description: Statistics retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalJobs:
+                    type: integer
+                  successful:
+                    type: integer
+                  failed:
+                    type: integer
+                  averageExecutionTimeMs:
+                    type: number
+                  queryCounts:
+                    type: object
+                    additionalProperties:
+                      type: integer
+
+  /api/simulate:
+    post:
+      tags:
+        - Simulations
+      summary: Run a single simulation
+      description: |
+        Enqueue a single enzyme kinetics simulation.
+
+        Supported models: `michaelis-menten`, `competitive-inhibition`, `non-competitive-inhibition`, `product-inhibition`
+      operationId: simulate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - parameters
+              properties:
+                query:
+                  type: string
+                  enum:
+                    - michaelis-menten
+                    - competitive-inhibition
+                    - non-competitive-inhibition
+                    - product-inhibition
+                  description: Kinetic model
+                parameters:
+                  type: object
+                  required:
+                    - km
+                    - vmax
+                    - s0
+                  properties:
+                    km:
+                      type: number
+                      minimum: 0
+                      exclusiveMinimum: true
+                      description: Michaelis constant
+                    vmax:
+                      type: number
+                      minimum: 0
+                      exclusiveMinimum: true
+                      description: Maximum reaction velocity
+                    s0:
+                      type: number
+                      minimum: 0
+                      exclusiveMinimum: true
+                      description: Initial substrate concentration
+                    ki:
+                      type: number
+                      minimum: 0
+                      exclusiveMinimum: true
+                      description: Inhibitor constant (for inhibition models)
+                    i0:
+                      type: number
+                      minimum: 0
+                      exclusiveMinimum: true
+                      description: Initial inhibitor concentration
+                enzyme:
+                  type: string
+                  description: Enzyme name (optional, enables literature search)
+                substrate:
+                  type: string
+                  description: Substrate name (optional, enables literature search)
+            example:
+              query: michaelis-menten
+              parameters:
+                km: 5.2
+                vmax: 12.8
+                s0: 10.0
+              enzyme: lactate dehydrogenase
+              substrate: lactate
+      responses:
+        '200':
+          description: Simulation queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobId:
+                    type: string
+                    description: Unique job identifier
+                  status:
+                    type: string
+                    enum: [queued]
+        '400':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                  validationErrors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        field:
+                          type: string
+                        message:
+                          type: string
+                        value:
+                          type: any
+
+  /api/jobs/{jobId}:
+    get:
+      tags:
+        - Queries
+      summary: Get a single job by ID
+      description: |
+        Returns the job's current state (queued/running/complete/error) and, once
+        complete, its result. Checks in-memory job state first, then falls back to
+        the persistent job database (`src/storage/job-database.ts`).
+      operationId: getJob
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+  /api/jobs/history:
+    get:
+      tags:
+        - Queries
+      summary: Get recent job history
+      description: Returns the 50 most recent jobs with full results.
+      operationId: getJobHistory
+      responses:
+        '200':
+          description: Job history retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+
+  /api/jobs/query:
+    get:
+      tags:
+        - Queries
+      summary: Advanced job query
+      description: |
+        Query jobs with filtering, sorting, and pagination.
+
+        **Filter Examples:**
+        - `status=complete&minConfidence=0.9` — completed jobs with high confidence
+        - `status=error` — failed jobs only
+        - `model=michaelis-menten` — specific kinetic model
+        - `startTime=2026-08-01&endTime=2026-08-15` — date range
+        - `sortBy=confidence&sortOrder=desc` — sort by confidence descending
+      operationId: queryJobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, complete, completed, error, failed]
+          description: Job status filter
+        - name: model
+          in: query
+          schema:
+            type: string
+          description: Kinetic model filter
+        - name: minConfidence
+          in: query
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+          description: Minimum confidence threshold
+        - name: startTime
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: Start of date range (ISO 8601)
+        - name: endTime
+          in: query
+          schema:
+            type: string
+            format: date-time
+          description: End of date range (ISO 8601)
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [date, confidence, duration, finalValue]
+          description: Sort field
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+          description: Sort order
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 50
+          description: Results per page
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+          description: Pagination offset
+      responses:
+        '200':
+          description: Query results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Job'
+                  total:
+                    type: integer
+                    description: Total matching jobs
+                  filtered:
+                    type: integer
+                    description: Jobs returned in this page
+                  page:
+                    type: integer
+
+  /api/sweep:
+    post:
+      tags:
+        - Sweeps
+      summary: Run a parameter sweep
+      description: |
+        Sweep one or more parameters across a range.
+
+        Sweep spec format: `min:max:step` (e.g., `1:10:0.5`)
+      operationId: sweep
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - baseParameters
+                - sweepParameters
+              properties:
+                query:
+                  type: string
+                  enum:
+                    - michaelis-menten
+                    - competitive-inhibition
+                    - non-competitive-inhibition
+                    - product-inhibition
+                baseParameters:
+                  type: object
+                  description: Fixed parameters for all sweep points
+                sweepParameters:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - name
+                      - spec
+                    properties:
+                      name:
+                        type: string
+                        description: Parameter name
+                      spec:
+                        type: string
+                        pattern: '^\d+\.?\d*:\d+\.?\d*:\d+\.?\d*$'
+                        description: Range spec (min:max:step)
+            example:
+              query: michaelis-menten
+              baseParameters:
+                vmax: 12.8
+                s0: 10.0
+              sweepParameters:
+                - name: km
+                  spec: "1:10:0.5"
+      responses:
+        '200':
+          description: Sweep queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sweepId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [queued]
+
+  /api/sweeps/{sweepId}:
+    get:
+      tags:
+        - Sweeps
+      summary: Get sweep results
+      parameters:
+        - name: sweepId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sweep details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sweep'
+        '404':
+          description: Sweep not found
+
+  /api/batch:
+    post:
+      tags:
+        - Batch Processing
+      summary: Run batch processing
+      description: |
+        Execute multiple parameter sets in parallel or sequence.
+
+        `baseParameters` are merged UNDER each set, so common values are stated once.
+      operationId: batch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - parameterSets
+              properties:
+                query:
+                  type: string
+                  enum:
+                    - michaelis-menten
+                    - competitive-inhibition
+                    - non-competitive-inhibition
+                    - product-inhibition
+                baseParameters:
+                  type: object
+                  description: Default parameters (merged under each set)
+                parameterSets:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                concurrency:
+                  type: integer
+                  minimum: 1
+                  maximum: 100
+                  default: 4
+                  description: Parallel execution degree
+            example:
+              query: michaelis-menten
+              baseParameters:
+                s0: 10.0
+              parameterSets:
+                - km: 1.0
+                  vmax: 10.0
+                - km: 2.0
+                  vmax: 12.0
+                - km: 3.0
+                  vmax: 14.0
+              concurrency: 3
+      responses:
+        '200':
+          description: Batch queued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batchId:
+                    type: string
+                  jobCount:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [queued]
+
+  /api/batches/{batchId}:
+    get:
+      tags:
+        - Batch Processing
+      summary: Get batch results
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Batch'
+        '404':
+          description: Batch not found
+
+  /api/compare:
+    post:
+      tags:
+        - Comparison & Analysis
+      summary: Compare two parameter sets
+      description: Detailed metrics comparing two simulations.
+      operationId: compare
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+                - parameters
+              properties:
+                query:
+                  type: string
+                parameters:
+                  type: object
+      responses:
+        '200':
+          description: Comparison complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comparison'
+
+  /api/compare/jobs:
+    post:
+      tags:
+        - Comparison & Analysis
+      summary: Compare multiple completed jobs
+      description: |
+        Compare 2+ completed jobs with ranking, statistics, and insights.
+      operationId: compareJobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - jobIds
+              properties:
+                jobIds:
+                  type: array
+                  minItems: 2
+                  items:
+                    type: string
+                  description: Job IDs to compare
+            example:
+              jobIds:
+                - job_1722973200000_abc123
+                - job_1722973210000_def456
+                - job_1722973220000_ghi789
+      responses:
+        '200':
+          description: Comparison complete
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobComparison'
+        '400':
+          description: Invalid request
+        '404':
+          description: One or more jobs not found
+
+  /api/analyze/sweep/{sweepId}:
+    get:
+      tags:
+        - Comparison & Analysis
+      summary: Analyze parameter sensitivity
+      description: |
+        Analyze sensitivity of sweep results, detect inflection points.
+      parameters:
+        - name: sweepId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sensitivity analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensitivityAnalysis'
+
+  /api/export/jobs/csv:
+    get:
+      tags:
+        - Export
+      summary: Export jobs to CSV
+      description: Export job history with results, confidence, and metadata.
+      operationId: exportJobsCSV
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+              example: |
+                jobId,query,status,finalValue,confidence,validated,createdAt
+                job_1722973200000_abc123,michaelis-menten,completed,45.32,0.95,true,2026-08-12T10:00:00Z
+
+  /api/export/stats/csv:
+    get:
+      tags:
+        - Export
+      summary: Export statistics to CSV
+      operationId: exportStatsCSV
+      responses:
+        '200':
+          description: Statistics CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /api/export/sweeps/{sweepId}/csv:
+    get:
+      tags:
+        - Export
+      summary: Export sweep to CSV
+      parameters:
+        - name: sweepId
+          in: path
+          required: true
+          schema:
+            type: string
+      operationId: exportSweepCSV
+      responses:
+        '200':
+          description: Sweep CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /api/export/batches/{batchId}/csv:
+    get:
+      tags:
+        - Export
+      summary: Export batch to CSV
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+      operationId: exportBatchCSV
+      responses:
+        '200':
+          description: Batch CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /api/export/comparisons/{comparisonId}/csv:
+    get:
+      tags:
+        - Export
+      summary: Export comparison to CSV
+      parameters:
+        - name: comparisonId
+          in: path
+          required: true
+          schema:
+            type: string
+      operationId: exportComparisonCSV
+      responses:
+        '200':
+          description: Comparison CSV
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /api/metrics:
+    get:
+      tags:
+        - Metrics
+      summary: Overall performance metrics
+      description: |
+        Aggregated execution metrics across all recorded `/api/simulate` jobs
+        (`src/storage/metrics-collector.ts`, `getAggregatedMetrics()`).
+
+        Note: only `/api/simulate` calls `recordExecution()`. `/api/sweep` and
+        `/api/batch` do not feed this collector, so their runs are not reflected
+        here — use `/api/metrics/sweeps` and `/api/metrics/batches` instead.
+
+        Timing fields (`averageExecutionTimeMs`, `medianExecutionTimeMs`,
+        `minExecutionTimeMs`, `maxExecutionTimeMs`, `stdDevExecutionTimeMs`,
+        `averageConvergenceSteps`) and `successRate` are `null`, not `0`, when
+        there is no successful execution to compute them from — a `0` would be
+        indistinguishable from a real measured value of zero.
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Aggregated metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AggregatedMetrics'
+
+  /api/metrics/by-model:
+    get:
+      tags:
+        - Metrics
+      summary: Metrics grouped by kinetic model
+      description: Per-query (per kinetic model) breakdown of execution metrics.
+      operationId: getMetricsByModel
+      responses:
+        '200':
+          description: Metrics grouped by model
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ModelMetrics'
+
+  /api/metrics/reproducibility:
+    get:
+      tags:
+        - Metrics
+      summary: Reproducibility metrics across runs
+      description: |
+        Variance and reproducibility (`isReproducible`) of results for
+        repeated runs of the same query + parameter hash. `isReproducible`
+        is `null` until at least 2 runs have been recorded for that
+        query/parameter combination — reproducibility cannot be claimed
+        from a single observation.
+      operationId: getReproducibilityMetrics
+      responses:
+        '200':
+          description: All tracked reproducibility records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReproducibilityMetrics'
+
+  /api/metrics/slow-queries:
+    get:
+      tags:
+        - Metrics
+      summary: Queries slower than a threshold
+      operationId: getSlowQueries
+      parameters:
+        - name: threshold
+          in: query
+          schema:
+            type: integer
+            default: 1000
+          description: Threshold in milliseconds
+      responses:
+        '200':
+          description: Slow queries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  threshold:
+                    type: integer
+                  queries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExecutionMetrics'
+                  count:
+                    type: integer
+
+  /api/metrics/failed-queries:
+    get:
+      tags:
+        - Metrics
+      summary: Failed queries for debugging
+      operationId: getFailedQueries
+      responses:
+        '200':
+          description: Failed queries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ExecutionMetrics'
+                  count:
+                    type: integer
+
+  /api/metrics/percentile:
+    get:
+      tags:
+        - Metrics
+      summary: Percentile execution time
+      operationId: getMetricsPercentile
+      parameters:
+        - name: percentile
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Percentile to compute (e.g. 50, 90, 99)
+      responses:
+        '200':
+          description: Percentile execution time
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  percentile:
+                    type: integer
+                  executionTimeMs:
+                    type: number
+                    nullable: true
+                    description: null if there is no successful execution to compute a percentile from
+
+  /api/metrics/sweeps:
+    get:
+      tags:
+        - Metrics
+      summary: All sweep metrics
+      operationId: getAllSweepMetrics
+      responses:
+        '200':
+          description: Sweep metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sweeps:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SweepMetrics'
+                  count:
+                    type: integer
+
+  /api/metrics/sweeps/{sweepId}:
+    get:
+      tags:
+        - Metrics
+      summary: Metrics for a specific sweep
+      operationId: getSweepMetricsById
+      parameters:
+        - name: sweepId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Sweep metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SweepMetrics'
+        '404':
+          description: Sweep not found
+
+  /api/metrics/sweeps-by-query:
+    get:
+      tags:
+        - Metrics
+      summary: Sweep metrics grouped by query
+      operationId: getSweepMetricsByQuery
+      responses:
+        '200':
+          description: Sweep metrics keyed by query name
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SweepMetrics'
+
+  /api/metrics/batches:
+    get:
+      tags:
+        - Metrics
+      summary: All batch metrics
+      operationId: getAllBatchMetrics
+      responses:
+        '200':
+          description: Batch metrics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  batches:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/BatchMetrics'
+                  count:
+                    type: integer
+
+  /api/metrics/batches/{batchId}:
+    get:
+      tags:
+        - Metrics
+      summary: Metrics for a specific batch
+      operationId: getBatchMetricsById
+      parameters:
+        - name: batchId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchMetrics'
+        '404':
+          description: Batch not found
+
+  /api/metrics/batches-by-query:
+    get:
+      tags:
+        - Metrics
+      summary: Batch metrics grouped by query
+      operationId: getBatchMetricsByQuery
+      responses:
+        '200':
+          description: Batch metrics keyed by query name
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/BatchMetrics'
+
+components:
+  schemas:
+    Job:
+      type: object
+      properties:
+        jobId:
+          type: string
+        query:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, error, failed]
+        parameters:
+          type: object
+        result:
+          type: object
+          properties:
+            finalValue:
+              type: number
+            confidence:
+              type: number
+            validated:
+              type: boolean
+            trajectory:
+              type: array
+              items:
+                type: number
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+        error:
+          type: object
+          description: Error details if job failed
+
+    Sweep:
+      type: object
+      properties:
+        sweepId:
+          type: string
+        query:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, error, failed]
+        baseParameters:
+          type: object
+        sweepParameters:
+          type: array
+          items:
+            type: object
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              parameterValue:
+                type: number
+              finalValue:
+                type: number
+              confidence:
+                type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    Batch:
+      type: object
+      properties:
+        batchId:
+          type: string
+        query:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, partial, error, failed]
+        jobCount:
+          type: integer
+        completedCount:
+          type: integer
+        failedCount:
+          type: integer
+        jobs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+
+    Comparison:
+      type: object
+      properties:
+        difference:
+          type: number
+        percentDifference:
+          type: number
+        ratio:
+          type: number
+        isDifferenceSignificant:
+          type: boolean
+
+    JobComparison:
+      type: object
+      properties:
+        jobIds:
+          type: array
+          items:
+            type: string
+        queries:
+          type: array
+          items:
+            type: string
+        finalValues:
+          type: array
+          items:
+            type: number
+        mean:
+          type: number
+        median:
+          type: number
+        stdDev:
+          type: number
+        coefficientOfVariation:
+          type: number
+        min:
+          type: object
+          properties:
+            jobId:
+              type: string
+            value:
+              type: number
+        max:
+          type: object
+          properties:
+            jobId:
+              type: string
+            value:
+              type: number
+        range:
+          type: number
+        ranking:
+          type: array
+          items:
+            type: object
+            properties:
+              jobId:
+                type: string
+              query:
+                type: string
+              value:
+                type: number
+              rank:
+                type: integer
+        insights:
+          type: array
+          items:
+            type: string
+
+    SensitivityAnalysis:
+      type: object
+      properties:
+        sensitivity:
+          type: number
+          description: Sensitivity index (higher = more sensitive)
+        inflectionPoints:
+          type: array
+          items:
+            type: integer
+          description: Indices where response changes significantly
+        mean:
+          type: number
+        min:
+          type: number
+        max:
+          type: number
+        range:
+          type: number
+        stdDev:
+          type: number
+        totalPoints:
+          type: integer
+        optimalParameterIndex:
+          type: integer
+
+    AggregatedMetrics:
+      type: object
+      description: |
+        From `src/storage/metrics-collector.ts` `getAggregatedMetrics()`. Timing
+        fields and `successRate` are null (not 0) when there is no successful
+        execution to compute them from -- see field descriptions.
+      properties:
+        totalJobs:
+          type: integer
+        successfulJobs:
+          type: integer
+        failedJobs:
+          type: integer
+        averageExecutionTimeMs:
+          type: number
+          nullable: true
+        medianExecutionTimeMs:
+          type: number
+          nullable: true
+        minExecutionTimeMs:
+          type: number
+          nullable: true
+        maxExecutionTimeMs:
+          type: number
+          nullable: true
+        stdDevExecutionTimeMs:
+          type: number
+          nullable: true
+        averageConvergenceSteps:
+          type: number
+          nullable: true
+          description: Average trajectory point count of successful runs, not an iterative-solver convergence count (the engine is not an iterative solver)
+        successRate:
+          type: number
+          nullable: true
+          description: Percentage (0-100). Null only when totalJobs is 0 -- a query where every job failed reports a real, measured 0, not null.
+
+    ModelMetrics:
+      type: object
+      description: Per-query breakdown from `getMetricsByModel()`.
+      properties:
+        query:
+          type: string
+        jobCount:
+          type: integer
+        averageExecutionTimeMs:
+          type: number
+          nullable: true
+        medianExecutionTimeMs:
+          type: number
+          nullable: true
+        successRate:
+          type: number
+          description: Percentage (0-100). 0 when every job for this query failed.
+        averageConvergenceSteps:
+          type: number
+          nullable: true
+
+    ReproducibilityMetrics:
+      type: object
+      description: From `getAllReproducibilityMetrics()` / `getReproducibilityMetrics()`.
+      properties:
+        query:
+          type: string
+        parameterHash:
+          type: string
+        runCount:
+          type: integer
+        results:
+          type: array
+          items:
+            type: number
+        variance:
+          type: number
+        stdDev:
+          type: number
+        isReproducible:
+          type: boolean
+          nullable: true
+          description: Null until runCount >= 2 (reproducibility cannot be judged from a single run). Otherwise true if stdDev/|mean| < 1%.
+
+    ExecutionMetrics:
+      type: object
+      description: A single recorded `/api/simulate` execution, from `getSlowQueries()` / `getFailedQueries()`.
+      properties:
+        jobId:
+          type: string
+        query:
+          type: string
+        startTime:
+          type: integer
+          description: Unix ms timestamp
+        endTime:
+          type: integer
+          description: Unix ms timestamp
+        executionTimeMs:
+          type: number
+        convergenceSteps:
+          type: integer
+          description: Trajectory point count, not an iterative-solver convergence count
+        convergenceTime:
+          type: number
+        memoryUsageMB:
+          type: number
+        success:
+          type: boolean
+        errorMessage:
+          type: string
+
+    SweepMetrics:
+      type: object
+      description: |
+        From `src/storage/sweep-batch-metrics.ts`. `averageTimeMs`, `minTimeMs`,
+        `maxTimeMs`, and `successRate` are null only when zero simulations were
+        recorded (not reachable via the real `/api/sweep` path today, since
+        `validateSweepRequest()` requires a non-empty sweep, but honest for any
+        other caller of `recordSweepMetrics()`).
+      properties:
+        sweepId:
+          type: string
+        query:
+          type: string
+        totalSimulations:
+          type: integer
+        completedSimulations:
+          type: integer
+        successfulSimulations:
+          type: integer
+        failedSimulations:
+          type: integer
+        totalTimeMs:
+          type: number
+        averageTimeMs:
+          type: number
+          nullable: true
+        minTimeMs:
+          type: number
+          nullable: true
+        maxTimeMs:
+          type: number
+          nullable: true
+        successRate:
+          type: number
+          nullable: true
+          description: Percentage (0-100)
+
+    BatchMetrics:
+      type: object
+      description: |
+        From `src/storage/sweep-batch-metrics.ts`. `averageTimeMs`, `minTimeMs`,
+        `maxTimeMs`, and `successRate` are null only when zero jobs were
+        recorded (not reachable via the real `/api/batch` path today, since
+        `validateBatchRequest()` requires a non-empty parameter set, but honest
+        for any other caller of `recordBatchMetrics()`).
+      properties:
+        batchId:
+          type: string
+        query:
+          type: string
+        totalJobs:
+          type: integer
+        completedJobs:
+          type: integer
+        successfulJobs:
+          type: integer
+        failedJobs:
+          type: integer
+        totalTimeMs:
+          type: number
+        averageTimeMs:
+          type: number
+          nullable: true
+        minTimeMs:
+          type: number
+          nullable: true
+        maxTimeMs:
+          type: number
+          nullable: true
+        successRate:
+          type: number
+          nullable: true
+          description: Percentage (0-100)
