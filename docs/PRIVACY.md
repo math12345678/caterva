@@ -60,7 +60,25 @@ click, no form, no consent.
 | `mule/index.html` | *nothing* | — |
 | `terrium-site/index.html` | *nothing* | — |
 | `src/web/dashboard.html` | `cdnjs.cloudflare.com` | Chart.js 3.9.1 |
-| `src/web/server.ts` (API docs) | `cdnjs.cloudflare.com`, `cdn.jsdelivr.net` | Swagger UI, Redoc |
+| `src/web/server.ts` (API docs) | `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, **and still `fonts.googleapis.com` in the published tree** | Swagger UI, Redoc, Montserrat/Roboto |
+
+> **Correction (2026-08-16, hours after the update below).** That update, and
+> the commit message of ce91290, both said the Google Fonts link had been
+> removed from all three pages. Two of three. The removal in
+> `src/web/server.ts` was written but the file was never staged, so the
+> commit's message described work the commit did not contain, and the API
+> docs page in the published tree still fetches Montserrat and Roboto from
+> Google on every view.
+>
+> The fix is sitting in the working tree. It cannot be committed on its own:
+> `src/web/server.ts` currently carries ~260 further uncommitted lines wiring
+> up a refactor in progress elsewhere (`model-comparison.ts` renaming
+> `compareModelPair`/`rankModelsByFit`), and committing the file would drag
+> that half-finished work into the repository. It lands when that does.
+>
+> Recorded here rather than quietly corrected, because the whole subject of
+> this document is not making claims wider than the facts, and this was the
+> third unverified claim in three passes.
 
 > **Update (2026-08-16).** The Google Fonts requests described below are gone.
 > All three pages that loaded `fonts.googleapis.com` and `fonts.gstatic.com`
