@@ -242,9 +242,42 @@ identical to four decimals each time:
 `parameterSweep` in `src/cli/advanced-features.ts` does pass them on —
 `parameters: { ...baseParameters, [parameter]: value }` — so the pipeline
 receives km and vmax and `response.results.finalValue` is independent of both.
-`finalValue` is `points[points.length - 1].value`
-(`scientificPipeline.ts:1081`), so the trajectory itself is not responding to
-the rate law. Start there, not at the CLI.
+
+### The engine is not the problem — checked, so you do not have to
+
+Driving `terium_runner.py` directly, same inputs, stdin JSON:
+
+```bash
+echo '{"domain":"mm","parameters":{"km":0.5,"vmax":0.1,"s0":2,"end":10,"points":5}}' \
+  | PYTHONPATH=. python3 Science-Agent-Pipeline/artifacts/api-server/src/lib/terium_runner.py
+```
+
+| vmax | `[S]` at t=0 | `[S]` at t=10 |
+|---|---|---|
+| 0.1 | 2.0 | 1.2393 |
+| 6000 | 2.0 | 1.4e-27 (consumed) |
+
+The engine responds to vmax exactly as Michaelis-Menten should. **The defect is
+between the CLI and the engine**, in the layer that builds `engineParameters`
+and reads the result back — `scientificPipeline.ts` around lines 1058–1093,
+where km/vmax are unit-converted, sent via `runTerium('mm', ...)`, and the
+substrate series is pulled out with `extractSeries(result.trajectory, '[S]')`.
+
+Two concrete suspects, in order:
+
+1. **The unit conversion.** `vmaxInSubstrateUnitsPerSecond(0.1, 'μM/min', 'mM')`
+   is ~1.7e-6 mM/s. A vmax that small consumes almost nothing in 10 s, which
+   would make the output track s0 — the behaviour this entry originally
+   described. That is the units bug above, arriving at the engine as a real
+   but wrong number.
+2. **`extractSeries`.** The engine returns rows shaped
+   `{time, '[S]', '[P]'}`. If that lookup misses, whatever it falls back to is
+   what the student sees, and a fallback here would explain an output that
+   tracks neither engine result.
+
+Bisect it by logging `engineParameters` immediately before `runTerium` and
+comparing against the table above. If the numbers going in are right, the
+fault is in reading the result back; if they are wrong, it is the conversion.
 
 > **An earlier version of this entry described different numbers** — outputs
 > equal to their inputs, fixed by a 60,000x vmax. That reproduced at the time
