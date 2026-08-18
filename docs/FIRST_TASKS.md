@@ -219,25 +219,39 @@ npx ts-node src/cli/scientificCLI.ts sweep mm \
 You get:
 
 ```
-      2  2.0000
-      4  4.0000
-      6  6.0000
-      8  8.0000
-     10  10.0000
-  trend  increasing  (slope 2.00e+0)
+      2  0.1000
+      4  0.2000
+      6  0.3000
+      8  0.4000
+     10  0.5000
+  trend  increasing  (slope 1.00e-1)
 ```
 
-Every output equals its input to four decimals. No reaction occurred. The
-tool then interprets that flat identity line as "increasing", confidently.
+Exactly `s0 / 20`, a straight line. Michaelis-Menten saturates; this does not.
 
-Prove the cause by multiplying vmax by 60,000 — the ratio between `mM/s` and
-`μM/min`:
+**The kinetic parameters have no effect at all.** Verified on a settled tree
+(HEAD `4fadc2d`, every file in the sweep path clean), three runs, output
+identical to four decimals each time:
 
 ```bash
-npx ts-node src/cli/scientificCLI.ts sweep mm \
-  --parameter s0 --range 2:10:2 --km 0.5mM --vmax 6000mM/s
-# 2 -> 1.2393, 10 -> 9.0499 — substrate is actually consumed
+--km 0.5mM --vmax 0.1mM/s     # documented        -> 0.1 0.2 0.3 0.4 0.5
+--km 0.5mM --vmax 6000mM/s    # vmax x 60,000     -> 0.1 0.2 0.3 0.4 0.5
+--km 500mM --vmax 0.1mM/s     # km   x 1,000      -> 0.1 0.2 0.3 0.4 0.5
 ```
+
+`parameterSweep` in `src/cli/advanced-features.ts` does pass them on —
+`parameters: { ...baseParameters, [parameter]: value }` — so the pipeline
+receives km and vmax and `response.results.finalValue` is independent of both.
+`finalValue` is `points[points.length - 1].value`
+(`scientificPipeline.ts:1081`), so the trajectory itself is not responding to
+the rate law. Start there, not at the CLI.
+
+> **An earlier version of this entry described different numbers** — outputs
+> equal to their inputs, fixed by a 60,000x vmax. That reproduced at the time
+> and does not now; the file was being edited while it was written, and the
+> behaviour changed twice in ten minutes. If what you see matches neither,
+> re-measure before trusting any of this. The invariant worth testing is not a
+> specific number, it is: **changing km or vmax must change the output.**
 
 The declared `mM/s` is discarded and re-read as `μM/min` by
 `getAssumedUnitForUserInput()`, a table keyed on the parameter *name*:
