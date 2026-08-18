@@ -23,6 +23,22 @@ import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "Tests"))
+# The REPO ROOT as well, not only `Tests/`.
+#
+# `citation_export` imports `Terium.core.data_sources` (the shared source
+# table, ADR 0079) and `Terium` is a package at the root, so with only
+# `Tests/` on the path this script died on its import line:
+#
+#     ModuleNotFoundError: No module named 'Terium'
+#
+# It had been failing since that import landed, in HEAD, unnoticed —
+# because every test imports `citation_export` directly, where pytest's
+# rootdir is already on `sys.path`. The library was covered and the way a
+# user actually reaches it was not. This file's own docstring calls itself
+# "the reachable end of Tests/citation_export.py -- which was built and
+# then callable from nowhere", and it had quietly become unreachable
+# again. `test_the_script_runs_end_to_end` now enters through this door.
+sys.path.insert(0, str(REPO_ROOT))
 
 from citation import Citation  # noqa: E402
 from citation_export import CitedParameter, to_bibtex, to_ris  # noqa: E402

@@ -72,11 +72,78 @@ FORBIDDEN = {
 
 # Files that declare dependencies. A manifest not listed here is not checked,
 # so new ones must be added deliberately.
+#
+# "Added deliberately" was the intent and "not checked" was the effect. The
+# list was three files; nothing verified it was still the complete set, so a
+# new `requirements-*.txt` would have been silently unscanned from the moment
+# it was created. `_unlisted_manifests()` below closes that, and it fired on
+# its first run against `requirements-popgen.txt`, added the same day.
 MANIFESTS = [
     REPO_ROOT / "requirements.txt",
     REPO_ROOT / "requirements-dev.txt",
+    REPO_ROOT / "requirements-popgen.txt",
     REPO_ROOT / "pyproject.toml",
 ]
+
+# Dockerfiles install packages too, and none of them is a manifest.
+#
+# `RUN pip install tellurium` in a Dockerfile would have installed the
+# forbidden package into every image built from it while this guard reported
+# green, because the guard only ever read three .txt/.toml files. The rule is
+# "never install this package"; policing only the files that DECLARE
+# dependencies leaves the files that INSTALL them unpoliced.
+INSTALL_SCRIPTS = [
+    REPO_ROOT / "Dockerfile",
+    REPO_ROOT / ".devcontainer" / "Dockerfile",
+]
+
+#: `pip install foo`, `pip3 install --no-cache-dir foo bar`, `uv pip install foo`.
+#: Flags are skipped; `-r file.txt` is ignored because the file it names is a
+#: manifest and is checked as one.
+_PIP_INSTALL = re.compile(r"\bpip3?\s+install\b(?P<rest>[^\n&|;]*)")
+
+
+def _packages_installed_by(text: str) -> List[Tuple[int, str]]:
+    """`(line number, distribution name)` for each package a script installs."""
+    found: List[Tuple[int, str]] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            continue
+        for match in _PIP_INSTALL.finditer(line):
+            skip_next = False
+            for token in match.group("rest").split():
+                if skip_next:
+                    skip_next = False
+                    continue
+                if token in {"-r", "--requirement", "-c", "--constraint"}:
+                    skip_next = True
+                    continue
+                if token.startswith("-"):
+                    continue
+                if token in {"\\", "&&", "|"}:
+                    continue
+                # Strip a version specifier: `tellurium==2.2.10` -> `tellurium`
+                name = re.split(r"[<>=!~\[;]", token, maxsplit=1)[0].strip()
+                if name:
+                    found.append((lineno, name))
+    return found
+
+
+def _unlisted_manifests() -> List[str]:
+    """Dependency manifests on disk that MANIFESTS does not name.
+
+    Without this the explicit list fails open: a manifest that exists and is
+    not listed is simply unscanned, and looks identical to one that was
+    checked and passed. That is the defect shape this project has hit
+    repeatedly -- a correct check on too narrow a scope.
+    """
+    listed = {path.resolve() for path in MANIFESTS}
+    unlisted: List[str] = []
+    for path in sorted(REPO_ROOT.glob("requirements*.txt")):
+        if path.resolve() not in listed:
+            unlisted.append(str(path.relative_to(REPO_ROOT)))
+    return unlisted
 
 
 def _normalise(name: str) -> str:
@@ -356,12 +423,41 @@ def main() -> int:
         print("FAIL: no dependency manifests found; nothing was checked.")
         return 1
 
+    # Files that INSTALL packages, not just files that declare them.
+    scripts_checked = 0
+    for script in INSTALL_SCRIPTS:
+        if not script.exists():
+            continue
+        scripts_checked += 1
+        text = script.read_text(encoding="utf-8")
+        for lineno, name in _packages_installed_by(text):
+            key = _normalise(name)
+            if key in FORBIDDEN:
+                reason, instead = FORBIDDEN[key]
+                violations.append(
+                    f"{script.relative_to(REPO_ROOT)}:{lineno} installs '{name}'\n"
+                    f"      why not: {reason}\n"
+                    f"      use instead: {instead}"
+                )
+
+    # A manifest that exists and is not listed is unscanned, and an unscanned
+    # manifest looks exactly like a clean one.
+    for unlisted in _unlisted_manifests():
+        violations.append(
+            f"{unlisted} is a dependency manifest that MANIFESTS does not name, "
+            "so nothing checked it.\n"
+            "      Add it to MANIFESTS in this script. The explicit list is "
+            "deliberate -- but\n"
+            "      an omission from it must fail loudly rather than silently "
+            "skip a file."
+        )
+
     doc_violations, docs_checked = _check_docs_do_not_instruct()
     violations.extend(doc_violations)
 
     print(
-        f"Rule 7: checked {checked} dependency manifest(s) and "
-        f"{docs_checked} document(s)."
+        f"Rule 7: checked {checked} dependency manifest(s), "
+        f"{scripts_checked} install script(s) and {docs_checked} document(s)."
     )
 
     if violations:

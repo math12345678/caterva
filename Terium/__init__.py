@@ -1,5 +1,16 @@
 """Terrium simulation engine package.
 
+NOT TELLURIUM. Tellurium is a separate, established systems-biology
+environment from the Sauro lab at the University of Washington. Terrium is
+unaffiliated with it, is not a fork of it, and claims none of its work.
+Terrium *runs on* that group's libRoadRunner (Apache 2.0) and generates
+their Antimony (MIT), in the ordinary way those libraries are meant to be
+used -- see NOTICE. The similar name is a mistake of this project's own
+making, and saying so here is cheaper than letting the next person work it
+out. It is repeated in the package docstring rather than only in the README
+because a docstring travels with the installed software and a README does
+not.
+
 The package namespace is DERIVED from ``terium_engine.__all__`` rather
 than restated here.
 

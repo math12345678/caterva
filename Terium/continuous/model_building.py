@@ -6,6 +6,15 @@ domains never import them (ADR 0001, ADR 0002, ADR 0006).
 
 from __future__ import annotations
 
+
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """See Terium/core/import_mode.py. Inlined deliberately: this
+    guards the import machinery itself, so it cannot import a
+    helper to do its job."""
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
 import threading
 from typing import List
 
@@ -13,7 +22,12 @@ import antimony
 import libsbml
 try:
     from Terium.core.data_structures import (ModelBuildError, GAMMA_PARAM, _GAMMA_NOTE)  # type: ignore[no-redef]
-except ModuleNotFoundError:  # flat mode: Terium/ on sys.path, no repo root
+except ModuleNotFoundError as _exc:  # flat mode: Terium/ on sys.path, no repo root
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.data_structures import (ModelBuildError, GAMMA_PARAM, _GAMMA_NOTE)  # type: ignore[no-redef]
 
 try:
@@ -22,7 +36,12 @@ try:
         validate_sir_params, validate_seir_params,
         validate_lotka_volterra_params)  # type: ignore[no-redef]
     from Terium.core.utils import _fmt, _check_model_name  # type: ignore[no-redef]
-except ModuleNotFoundError:
+except ModuleNotFoundError as _exc:
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.validation import (
         validate_michaelis_menten_params, validate_mm_competitive_params,
         validate_sir_params, validate_seir_params,

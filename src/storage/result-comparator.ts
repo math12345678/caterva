@@ -6,10 +6,18 @@
  */
 
 export interface ComparisonMetrics {
-  difference: number;
-  percentDifference: number;
-  ratio: number;
-  isDifferenceSignificant: boolean;
+  /**
+   * All four are `null` when either job produced no final value.
+   *
+   * The difference between a number and an absence is not zero and is not
+   * that number -- it is undefined. Typing these as `number` forced the
+   * incomparable branch to cast, which is how a fabricated value gets back
+   * in: a cast is a promise the compiler stops checking.
+   */
+  difference: number | null;
+  percentDifference: number | null;
+  ratio: number | null;
+  isDifferenceSignificant: boolean | null;
 }
 
 export interface JobComparison {
@@ -17,10 +25,20 @@ export interface JobComparison {
   job2Id: string;
   job1Query: string;
   job2Query: string;
-  job1FinalValue: number;
-  job2FinalValue: number;
+  /** `null` when the job produced no final value. Never 0 for an absence. */
+  job1FinalValue: number | null;
+  job2FinalValue: number | null;
+  /** False when either job has no final value; the metrics are null then. */
+  comparable?: boolean;
+  /** Why the comparison could not be made, when it could not. */
+  incomparableReason?: string;
   metrics: ComparisonMetrics;
-  similarity: 'identical' | 'very_similar' | 'different' | 'significantly_different';
+  similarity:
+    | 'identical'
+    | 'very_similar'
+    | 'different'
+    | 'significantly_different'
+    | null;
   insights: string[];
 }
 
@@ -40,11 +58,93 @@ export interface MultiJobComparison {
 }
 
 /**
- * Compare two job results
+ * Read a job's final value, or `null` when it has none.
+ *
+ * `?? null`, not `|| 0`, and the distinction is the whole point:
+ *
+ * - a job that never finished, or failed, has NO final value;
+ * - a job that consumed all its substrate has a final value of **0**, which
+ *   is a real measurement and the normal end state of a Michaelis-Menten
+ *   run.
+ *
+ * `|| 0` collapses those into the same number. Reads the nested location
+ * first for the same reason as the CSV exporter (ADR 0056): the pipeline
+ * returns `results.finalValue`, and only some callers flatten it.
+ */
+function jobFinalValue(job: any): number | null {
+  const nested = job?.result?.results?.finalValue;
+  if (typeof nested === 'number') return nested;
+  const flat = job?.result?.finalValue;
+  return typeof flat === 'number' ? flat : null;
+}
+
+/**
+ * Compare two job results.
+ *
+ * THE DEFECT THIS WAS FIXED FOR
+ * -----------------------------
+ * `val1`/`val2` were `job.result?.finalValue || 0`, so a job with no result
+ * compared as a real zero. Measured before the change:
+ *
+ *     two jobs that produced nothing
+ *       job1FinalValue : 0
+ *       job2FinalValue : 0
+ *       similarity     : identical
+ *       percentDiff    : 0
+ *
+ * **Two failed runs were reported as identical results.** A student
+ * comparing them is told their results agree perfectly — a scientific claim
+ * manufactured out of two absences, at `POST /api/compare/jobs`, which is a
+ * live route.
+ *
+ * The other direction is no better: a failed job against a real one gives
+ * `ratio: 0` and `significantly_different`, which reads as a measured
+ * disagreement rather than a missing measurement.
+ *
+ * WHAT MAKES THIS WORTH A LONG COMMENT
+ * ------------------------------------
+ * The `confidence` half of this same function was already fixed, with this
+ * exact argument written out below: *"a job that has no result yet has no
+ * confidence, not a confidence of zero, and printing 0.950 vs 0.000 for a
+ * job that has not finished asserts a measurement nobody made."*
+ *
+ * That reasoning was applied to `confidence` and not to `finalValue`, two
+ * lines above it, in the same function, by the same author. A lesson applied
+ * only where it was first learned is a lesson half-taken — and this is the
+ * third time this project has recorded that shape.
  */
 export function compareJobs(job1: any, job2: any): JobComparison {
-  const val1 = job1.result?.finalValue || 0;
-  const val2 = job2.result?.finalValue || 0;
+  const v1 = jobFinalValue(job1);
+  const v2 = jobFinalValue(job2);
+
+  if (v1 === null || v2 === null) {
+    const missing = [v1 === null ? job1?.jobId : null, v2 === null ? job2?.jobId : null]
+      .filter(Boolean);
+    return {
+      job1Id: job1?.jobId,
+      job2Id: job2?.jobId,
+      job1Query: job1?.query,
+      job2Query: job2?.query,
+      job1FinalValue: v1,
+      job2FinalValue: v2,
+      comparable: false,
+      incomparableReason:
+        `${missing.join(' and ')} produced no final value, so there is nothing to ` +
+        'compare against. Both jobs are returned unchanged so the caller can see ' +
+        'which side is missing.',
+      metrics: {
+        difference: null,
+        percentDifference: null,
+        ratio: null,
+        isDifferenceSignificant: null,
+      },
+      similarity: null,
+      insights: [],
+    };
+  }
+
+  const val1 = v1;
+  const val2 = v2;
 
   const difference = Math.abs(val1 - val2);
   const avgValue = (Math.abs(val1) + Math.abs(val2)) / 2;
@@ -227,7 +327,32 @@ export function compareMultipleJobs(jobs: any[]): MultiJobComparison {
 }
 
 /**
- * Analyze parameter sensitivity from sweep results
+ * Analyze parameter sensitivity from sweep results.
+ *
+ * WHAT THIS DELIBERATELY NO LONGER RETURNS
+ * ----------------------------------------
+ * `optimalParameterIndex`. It was
+ * `values.indexOf(Math.max(...values))` — the **maximum** final value —
+ * while `analyzeSweep` in the engine defines the optimum as the
+ * **minimum** ("minimum substrate remaining = maximum conversion").
+ *
+ * Both reached users. `analyzeSweep`'s answer goes into the exported sweep
+ * CSV as `optimalParameters`; this one was served by
+ * `GET /api/analyze/sweep/:sweepId`. On the same three-point sweep with
+ * values 4.0, 2.5, 9.1 they named opposite ends of the range: 2.5 and 9.1.
+ *
+ * That is not a duplicate implementation, it is a contradiction — one tool
+ * giving two opposite answers to "which Km is best". ADR 0027 met the
+ * duplicate-implementation case and its ruling was to **delete the
+ * duplicate rather than bypass it**, because a bypassed duplicate returns
+ * the first time somebody needs the value and writes a helper instead of an
+ * ADR. The same applies here, with more force: this copy was also wrong.
+ *
+ * Naming an optimum is outside a sensitivity function's remit anyway. Its
+ * job is spread and inflection — how much the response moves — not which
+ * point a user should prefer. `analyzeSweep` owns the optimum.
+ *
+ * `result-comparator.test.ts` guards the deletion.
  */
 export function analyzeSensitivity(sweepResult: any): any {
   if (!sweepResult || !sweepResult.results || sweepResult.results.length < 2) {
@@ -235,7 +360,49 @@ export function analyzeSensitivity(sweepResult: any): any {
   }
 
   const results = sweepResult.results;
-  const values = results.map((r: any) => r.finalValue || 0);
+
+  /**
+   * Points that ran and produced a value.
+   *
+   * Was `results.map(r => r.finalValue || 0)`. Two failures in one line:
+   * `|| 0` turned a failed point into a zero, and a zero is a real reading
+   * (full substrate consumption), so the fabricated and the genuine were
+   * indistinguishable downstream. Every statistic below — mean, min, max,
+   * range, stdDev, and `sensitivity` which divides by the mean — was
+   * computed over those fabricated zeros.
+   *
+   * `validated === true` is required rather than `!== false`, so a point
+   * that does not say whether it ran is excluded rather than assumed fine.
+   * `runSweep` always sets the field; anything that does not is not a sweep
+   * result, and treating silence as success is the inversion this codebase
+   * keeps finding.
+   */
+  const analysable = results.filter(
+    (r: any) => r.validated === true && r.finalValue !== null && r.finalValue !== undefined
+  );
+
+  if (analysable.length < 2) {
+    // Fewer than two usable points cannot show a response to a parameter
+    // change. Refusing is the honest answer; a sensitivity computed over
+    // one point is a number with no meaning that a reader would still plot.
+    return {
+      sensitivity: null,
+      inflectionPoints: [],
+      mean: null,
+      min: null,
+      max: null,
+      range: null,
+      stdDev: null,
+      totalPoints: results.length,
+      pointsAnalyzed: analysable.length,
+      pointsExcluded: results.length - analysable.length,
+      unanalysableReason:
+        `Only ${analysable.length} of ${results.length} sweep point(s) both ran and ` +
+        'produced a final value. Sensitivity needs at least two.'
+    };
+  }
+
+  const values = analysable.map((r: any) => r.finalValue);
 
   // Calculate sensitivity metrics
   const mean = values.reduce((a: number, b: number) => a + b, 0) / values.length;
@@ -268,6 +435,12 @@ export function analyzeSensitivity(sweepResult: any): any {
     range,
     stdDev,
     totalPoints: results.length,
-    optimalParameterIndex: values.indexOf(Math.max(...values))
+    // How much of the grid these numbers actually rest on. Without this a
+    // sweep where half the points failed reports the same shape of answer
+    // as one where none did.
+    pointsAnalyzed: analysable.length,
+    pointsExcluded: results.length - analysable.length
+    // NO `optimalParameterIndex`. See the docstring: it contradicted
+    // analyzeSweep, and naming an optimum is not this function's job.
   };
 }

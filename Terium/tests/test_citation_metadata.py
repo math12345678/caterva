@@ -47,7 +47,7 @@ class TestTheCitationFileItself:
         assert "This is not a pass" in source
 
     def test_it_is_valid_cff(self):
-        cffconvert = pytest.importorskip("cffconvert")
+        pytest.importorskip("cffconvert")
         from cffconvert.cli.create_citation import create_citation
 
         create_citation(str(CFF), None).validate()

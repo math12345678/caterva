@@ -55,6 +55,17 @@ function makeRecord(
           ? { finalValue: trajectory[trajectory.length - 1]!.value }
           : {}
     }
+  ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
   );
 }
 
@@ -90,7 +101,18 @@ describe('the input hash covers what is actually stored', () => {
       },
       { temperature: 37, pH: 7.4 },
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const { intact, issues } = DataIntegrityChecker.verify(record);
     expect(issues).toEqual([]);
@@ -121,7 +143,18 @@ describe('the input hash covers what is actually stored', () => {
         computedMetrics: { r2: 0.99 }, // dropped by the projection
         solverSteps: 412               // dropped by the projection
       }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const { intact, issues } = DataIntegrityChecker.verify(record);
     expect(issues).toEqual([]);
@@ -265,11 +298,19 @@ describe('a genuine reproduction still passes', () => {
 
   it('accepts a difference inside the solver\'s declared tolerance', async () => {
     // Tolerance is `atol + rtol*|original|` read from the record's own
-    // solver block (atol 1e-8, rtol 1e-6), not a constant in the verifier.
-    // At value 100 that allows 1e-8 + 1e-4 = 1.0001e-4.
+    // solver block, not a constant in the verifier.
+    //
+    // The record now declares what Terrium actually integrates at --
+    // CVODE, rtol 1e-10, atol 1e-12 -- so at value 100 the allowance is
+    // 1e-12 + 1e-8 = 1.000001e-8.
+    //
+    // This test previously perturbed by 1e-4 and passed, because the
+    // record claimed rtol 1e-6. That is the bug this change removed: a
+    // reproduction differing by one part in a million was certified
+    // against a run accurate to one part in ten billion.
     const record = makeRecord([{ time: 0, value: 100 }]);
     const withinTolerance = async () => ({
-      trajectory: [{ time: 0, value: 100.0001 }], // 1e-4 absolute
+      trajectory: [{ time: 0, value: 100.000000005 }], // 5e-9 absolute
       metrics: {}
     });
 
@@ -301,17 +342,92 @@ describe('a genuine reproduction still passes', () => {
     // The threshold is read from the record, so tightening the solver
     // config must tighten the verdict. A constant in the verifier could
     // not do this.
+    // Both records now start from the engine's real settings (rtol 1e-10),
+    // so the LOOSE one is deliberately relaxed rather than the tight one
+    // being invented. The perturbation sits between the two thresholds.
     const loose = makeRecord([{ time: 0, value: 100 }]);
+    loose.solver.relativeTolerance = 1e-8;
+    loose.solver.absoluteTolerance = 1e-10;
     const tight = makeRecord([{ time: 0, value: 100 }]);
     tight.solver.relativeTolerance = 1e-12;
     tight.solver.absoluteTolerance = 1e-14;
 
     const reproducer = async () => ({
-      trajectory: [{ time: 0, value: 100.00005 }], // 5e-5 absolute
+      // 5e-7 absolute: inside 1e-8*100 = 1e-6, outside 1e-12*100 = 1e-10.
+      trajectory: [{ time: 0, value: 100.0000005 }],
       metrics: {}
     });
 
     expect((await ReproducibilityVerifier.verify(loose, reproducer)).verification.passed).toBe(true);
     expect((await ReproducibilityVerifier.verify(tight, reproducer)).verification.passed).toBe(false);
+  });
+});
+
+/**
+ * The record must describe the run, not a solver nobody uses.
+ *
+ * `createRecord` hardcoded `algorithm: 'RK45'` at rtol 1e-6 / atol 1e-8.
+ * Terrium integrates with **CVODE** at 1e-10 / 1e-12
+ * (`DEFAULT_RELATIVE_TOLERANCE` / `DEFAULT_ABSOLUTE_TOLERANCE`).
+ *
+ * That was not a cosmetic mislabel. `verifyReproducibility` calibrates its
+ * comparison from these numbers, so a reproduction differing by one part in
+ * a million was certified against a run accurate to one part in ten
+ * billion — the verifier was four orders of magnitude too generous, and the
+ * comment beside it claimed the opposite.
+ */
+describe('the execution record states how the run was integrated', () => {
+  it('records what the caller says, not an invented solver', () => {
+    const record = ExecutionRecorder.createRecord(
+      'job_solver', 'q', {}, {}, { trajectory: [], metrics: {} },
+      { algorithm: 'CVODE', relativeTolerance: 1e-10, absoluteTolerance: 1e-12 },
+    );
+
+    expect(record.solver.algorithm).toBe('CVODE');
+    expect(record.solver.relativeTolerance).toBe(1e-10);
+    expect(record.solver.absoluteTolerance).toBe(1e-12);
+  });
+
+  it('says "unrecorded" rather than naming a solver it was not told', () => {
+    // The old behaviour filled this in with RK45. A record that admits it
+    // does not know is useless in a visible way; one that says RK45 is
+    // useless in a way that looks like information.
+    const record = ExecutionRecorder.createRecord(
+      'job_unknown', 'q', {}, {}, { trajectory: [], metrics: {} },
+    );
+
+    expect(record.solver.algorithm).toBe('unrecorded');
+    expect(record.solver.relativeTolerance).toBeUndefined();
+    expect(record.solver.absoluteTolerance).toBeUndefined();
+    expect(record.solver.algorithm).not.toBe('RK45');
+  });
+
+  it('refuses to verify a run whose tolerances were never recorded', async () => {
+    // The alternative — the old `: 1e-6` fallback — certifies at a
+    // standard nobody chose, which is worse than declining.
+    const record = ExecutionRecorder.createRecord(
+      'job_uncalibrated', 'q', {}, {},
+      { trajectory: [{ time: 0, value: 1 }], metrics: {} },
+    );
+
+    await expect(
+      ReproducibilityVerifier.verify(record, async () => ({
+        trajectory: [{ time: 0, value: 1 }], metrics: {},
+      })),
+    ).rejects.toThrow(/does not state the solver tolerances/);
+  });
+
+  it('assesses no aggregate quality score', () => {
+    // ADR 0024 Decision 3 declines to combine Bakker's axes into a total,
+    // because the trade-off between them has not been measured. This
+    // emitted a constant 0.9, which a report rendered as "90.0%" — one
+    // layer refusing to produce a number while another invented one.
+    const record = ExecutionRecorder.createRecord(
+      'job_score', 'q', {}, {}, { trajectory: [], metrics: {} },
+    );
+
+    expect(record.validation.dataQualityScore).toBeUndefined();
+    expect(record.validation.biologicalPlausibility).toBe('not assessed');
+    expect(record.validation.comparisonToLiterature).toBe('not assessed');
   });
 });

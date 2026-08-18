@@ -21,7 +21,18 @@ describe('ExecutionRecorder', () => {
       { km: { value: 5.2, unit: 'mM', source: 'literature', confidence: 0.95 } },
       { temperature: 37, pH: 7.4 },
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     expect(record.jobId).toBe('job_001');
     expect(record.inputs.query).toBe('Test query');
@@ -42,7 +53,18 @@ describe('ExecutionRecorder', () => {
       input1,
       {},
       { trajectory: [], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const record2 = ExecutionRecorder.createRecord(
       'job_002',
@@ -50,7 +72,18 @@ describe('ExecutionRecorder', () => {
       input2,
       {},
       { trajectory: [], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     // Both records used same parameters, so input hashes should be equal
     // (even though job IDs and timestamps differ)
@@ -64,7 +97,18 @@ describe('ExecutionRecorder', () => {
       {},
       {},
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const record2 = ExecutionRecorder.createRecord(
       'job_002',
@@ -72,7 +116,18 @@ describe('ExecutionRecorder', () => {
       {},
       {},
       { trajectory: [{ time: 0, value: 200 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     expect(record1.hashes.outputHash).not.toBe(record2.hashes.outputHash);
   });
@@ -84,7 +139,18 @@ describe('ExecutionRecorder', () => {
       {},
       {},
       { trajectory: [], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     ExecutionRecorder.addPhase(record, 'validation', 100, undefined, []);
     ExecutionRecorder.addPhase(record, 'simulation', 500, 100);
@@ -121,7 +187,18 @@ describe('ReproducibilityVerifier', () => {
         ],
         metrics: { finalValue: 90 }
       }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const result = await ReproducibilityVerifier.verify(originalRecord, mockReproducer);
 
@@ -143,7 +220,18 @@ describe('ReproducibilityVerifier', () => {
         ],
         metrics: {}
       }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const differentReproducer = async () => ({
       trajectory: [
@@ -168,7 +256,18 @@ describe('ReproducibilityVerifier', () => {
       {},
       {},
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const reproducer = async () => ({
       trajectory: [{ time: 0, value: 100.0001 }],
@@ -186,8 +285,12 @@ describe('ReproducibilityVerifier', () => {
     // instead of passing it to toBeDefined().
     // A 100 vs 100.0001 discrepancy must produce a differences report.
     expect(result.differences).toBeDefined();
+    // Was 'Different floating-point implementations' -- the branch taken
+    // when the difference is INSIDE tolerance. At the record's real
+    // tolerance (rtol 1e-10) a 1e-4 discrepancy is not floating-point
+    // noise, and the verifier now says so.
     expect(result.differences!.possibleCauses).toContain(
-      'Different floating-point implementations'
+      'Unseeded randomness in the model or solver'
     );
   });
 });
@@ -200,7 +303,18 @@ describe('DataIntegrityChecker', () => {
       { param: 'value' },
       {},
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const result = DataIntegrityChecker.verify(record);
 
@@ -215,7 +329,18 @@ describe('DataIntegrityChecker', () => {
       { param: 'value' },
       {},
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     // Tamper with input
     (record.inputs as any).param = 'different_value';
@@ -233,7 +358,18 @@ describe('DataIntegrityChecker', () => {
       {},
       {},
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     // Tamper with output
     record.output.trajectory[0].value = 200;
@@ -251,7 +387,18 @@ describe('DataIntegrityChecker', () => {
       {},
       {},
       { trajectory: [{ time: 0, value: NaN }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const result = DataIntegrityChecker.verify(record);
 
@@ -266,7 +413,18 @@ describe('DataIntegrityChecker', () => {
       {},
       {},
       { trajectory: [{ time: 0, value: 100 }], metrics: {} }
-    );
+    ,
+    {
+      // The verifier calibrates its comparison from these. Supplied
+      // explicitly because `createRecord` no longer invents them: it used
+      // to claim RK45 at 1e-6/1e-8 while the engine runs CVODE at
+      // 1e-10/1e-12, so every reproduction was judged four orders of
+      // magnitude too loosely.
+      algorithm: 'CVODE',
+      relativeTolerance: 1e-10,
+      absoluteTolerance: 1e-12,
+    }
+  );
 
     const report = DataIntegrityChecker.generateReport(record);
 
@@ -287,6 +445,8 @@ describe('ReproducibilityService', () => {
       { param: 'value' },
       { condition: 'value' },
       { trajectory: [], metrics: {} }
+    ,
+      { algorithm: 'CVODE', relativeTolerance: 1e-10, absoluteTolerance: 1e-12 }
     );
 
     expect(record).toBeDefined();
@@ -321,7 +481,12 @@ describe('ReproducibilityService', () => {
           { time: 1, value: 95 }
         ],
         metrics: {}
-      }
+      },
+      // Without this the record says "unrecorded" and verification refuses
+      // -- which is the intended behaviour, and the reason this argument
+      // exists. A verifier that invented a tolerance would certify the run
+      // at a standard nobody chose.
+      { algorithm: 'CVODE', relativeTolerance: 1e-10, absoluteTolerance: 1e-12 }
     );
 
     const reproducer = async () => ({

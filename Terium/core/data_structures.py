@@ -6,6 +6,15 @@ Byte-exact extraction from the original monolithic `terium_engine.py`
 
 from __future__ import annotations
 
+
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """See Terium/core/import_mode.py. Inlined deliberately: this
+    guards the import machinery itself, so it cannot import a
+    helper to do its job."""
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
 from dataclasses import dataclass, field
 from typing import Any, Dict, List
 
@@ -433,7 +442,13 @@ class SimulationResult:
             from Terium.discrete.population_genetics.theoretical import (
                 estimate_ne_from_heterozygosity,
             )  # type: ignore[no-redef]
-        except ModuleNotFoundError:  # flat mode
+        except ModuleNotFoundError as _exc:  # flat mode
+            if not _package_path_missing(_exc):
+                # A missing THIRD-PARTY dependency. Flat mode cannot fix
+                # it, and retrying replaces the real reason with a
+                # confusing 'No module named core'. See
+                # Terium/core/import_mode.py.
+                raise
             from discrete.population_genetics.theoretical import (
                 estimate_ne_from_heterozygosity,
             )  # type: ignore[no-redef]

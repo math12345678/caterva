@@ -52,6 +52,30 @@ export interface ExportProvenance {
   /** NCBI Taxonomy id, only when something actually resolved it. Never
    *  inferred from `organism`, which is a name, not an identifier. */
   taxonId?: string;
+  /**
+   * The conditions the value was measured under, and the ones the source
+   * did not state.
+   *
+   * Lisa Jeske's answer on what makes a resolved value meaningless names
+   * these exactly: "pH value, temperature, cofactors, and buffers play a
+   * huge role [...] If you simply mix these together, the simulation will
+   * end up calculating with 'fantasy numbers'."
+   *
+   * Terrium parsed them and showed them on screen. The exported model —
+   * the artifact that outlives the terminal session — said only "assay
+   * completeness: complete — pH and temperature both reported", which
+   * tells a reader the conditions exist and not what they were.
+   *
+   * `unreported` travels beside the values on purpose: an absent `ph` is
+   * ambiguous between "the paper did not report it" and "this export did
+   * not carry it", and those are different facts about different people.
+   */
+  assayConditions?: {
+    ph?: number;
+    temperatureC?: number;
+    buffer?: string;
+    unreported?: string[];
+  };
 }
 
 export interface ModelExportRequest {
@@ -269,6 +293,101 @@ export function formatForPath(destination: string): 'bibtex' | 'ris' | null {
   if (extension === '.bib' || extension === '.bibtex') return 'bibtex';
   if (extension === '.ris') return 'ris';
   return null;
+}
+
+/** One literature value the evidence ranked equal to the others. */
+export interface SpreadCandidate {
+  value: number;
+  selected?: boolean;
+  unit?: string;
+  organism?: string;
+  referenceId?: string;
+  conditions?: string;
+}
+
+export interface SpreadRequest {
+  /** Which model parameter the candidates are values of. */
+  parameter: string;
+  candidates: SpreadCandidate[];
+  /** The experiment's settings. Passed through UNDEFINED when the caller
+   * does not have one — see `exportSpreadConsequence`. */
+  vmax?: number;
+  km?: number;
+  s0?: number;
+  end?: number;
+  points?: number;
+}
+
+/**
+ * Write what the tie among equally-evidenced values does to the model.
+ *
+ * ADR 0051 reports that the evidence ranked several values equal, and says
+ * outright that this is not an ensemble. It tells a reader that 170.7 was
+ * returned and 276.5 was judged equally credible, and stops there. Whether
+ * that matters to *their* experiment is a question about the model, and
+ * nothing answered it.
+ *
+ * Bakker's ensemble stays declined (ADR 0024 Decision 3): no distribution
+ * is sampled and no uncertainty is claimed. The model is run at the values
+ * the literature actually reports, and at no others.
+ *
+ * NOTHING IS DEFAULTED HERE.
+ * `vmax`, `km` and `s0` are forwarded exactly as given, `undefined`
+ * included. Filling one in on this side would defeat the refusal the Python
+ * module exists to make — and it would be the easier mistake, because the
+ * CLI usually does have plausible values lying around. The refusal has to
+ * survive the boundary or it is not a refusal.
+ */
+export async function exportSpreadConsequence(
+  request: SpreadRequest,
+  destination: string,
+): Promise<ExportOutcome> {
+  if (request.candidates.length < 2) {
+    return {
+      ok: false,
+      error:
+        `${request.candidates.length} candidate value(s) supplied. This report ` +
+        'says what a disagreement does to the model; with fewer than two ' +
+        'values there is no disagreement to report on.',
+    };
+  }
+
+  let raw: string;
+  try {
+    raw = await runPythonScript('report_spread_consequence.py', {
+      parameter: request.parameter,
+      candidates: request.candidates,
+      vmax: request.vmax,
+      km: request.km,
+      s0: request.s0,
+      end: request.end,
+      points: request.points,
+    });
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  let parsed: { ok?: boolean; consequence?: unknown; error?: string };
+  try {
+    parsed = JSON.parse(raw.trim());
+  } catch {
+    return {
+      ok: false,
+      error: `Spread reporter returned unparseable output: ${raw.slice(0, 200)}`,
+    };
+  }
+
+  if (!parsed.ok || parsed.consequence === undefined) {
+    return { ok: false, error: parsed.error ?? 'Spread reporter reported failure' };
+  }
+
+  try {
+    await writeFile(destination, JSON.stringify(parsed.consequence, null, 2), 'utf-8');
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  return { ok: true, path: destination };
 }
 
 export async function exportCitations(

@@ -9,10 +9,10 @@
 /**
  * Whether the resolved citation is an exact organism/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).
  */
-export type ParameterProvenanceCitationStatus = typeof ParameterProvenanceCitationStatus[keyof typeof ParameterProvenanceCitationStatus];
-
+export type ParameterProvenanceCitationStatus =
+  (typeof ParameterProvenanceCitationStatus)[keyof typeof ParameterProvenanceCitationStatus];
 
 export const ParameterProvenanceCitationStatus = {
-  verified: 'verified',
-  flagged: 'flagged',
+  verified: "verified",
+  flagged: "flagged",
 } as const;

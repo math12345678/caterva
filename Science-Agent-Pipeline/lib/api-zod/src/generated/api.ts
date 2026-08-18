@@ -5,17 +5,15 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import * as zod from 'zod';
-
+import * as zod from "zod";
 
 /**
  * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
-  "status": zod.string()
-})
-
+  status: zod.string(),
+});
 
 /**
  * Returns the most recent simulation jobs from the in-memory queue,
@@ -26,53 +24,177 @@ export const HealthCheckResponse = zod.object({
 export const listSimulationJobsResponseProgressMin = 0;
 export const listSimulationJobsResponseProgressMax = 100;
 
-
-
 export const ListSimulationJobsResponseItem = zod.object({
-  "jobId": zod.string().describe('Unique identifier for this pipeline run'),
-  "status": zod.enum(['pending', 'resolving', 'validating', 'running', 'completed', 'failed']).describe('Current pipeline stage for a submitted job'),
-  "query": zod.string().describe('Original natural-language query'),
-  "progress": zod.number().min(listSimulationJobsResponseProgressMin).max(listSimulationJobsResponseProgressMax).describe('Completion percentage based on pipeline stage'),
-  "result": zod.object({
-  "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml', 'mm_competitive_inhibition']).describe('Resolved simulation domain'),
-  "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
-  "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
-  "provenance": zod.object({
-  "modelCitations": zod.array(zod.string()).optional().describe('Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)'),
-  "flags": zod.array(zod.string()).optional().describe('Human-readable warnings about the parameters or result'),
-  "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
-}),
-  "parameterProvenance": zod.record(zod.string(), zod.object({
-  "origin": zod.enum(['resolved', 'user', 'llm', 'default']).describe('How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.'),
-  "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
-  "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
-  "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
-  "citationStatus": zod.enum(['verified', 'flagged']).optional().describe('Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).'),
-  "assayConditions": zod.object({
-  "ph": zod.number().optional().describe('Assay pH (STRENDA-mandatory when reported)'),
-  "temperatureC": zod.number().optional().describe('Assay temperature in degrees Celsius (STRENDA-mandatory)'),
-  "buffer": zod.string().optional().describe('Buffer system, when reported')
-}).optional(),
-  "strendaStatus": zod.enum(['complete', 'incomplete']).optional().describe('Whether the assay conditions meet STRENDA\'s minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).'),
-  "citationLocators": zod.array(zod.object({
-  "kind": zod.enum(['brenda_ref', 'brenda_ec', 'pubmed', 'doi', 'url']).describe('What kind of locator this is'),
-  "value": zod.string().describe('The locator\'s value (BRENDA ref id, EC number, PMID, DOI, or URL)'),
-  "deepLink": zod.string().optional().describe('Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).')
-})).optional().describe('Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.'),
-  "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
-})).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
-  "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
-}).optional(),
-  "error": zod.object({
-  "error": zod.string().describe('Short error code'),
-  "message": zod.string().describe('Human-readable error message')
-}).optional(),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
-})
-export const ListSimulationJobsResponse = zod.array(ListSimulationJobsResponseItem)
-
+  jobId: zod.string().describe("Unique identifier for this pipeline run"),
+  status: zod
+    .enum([
+      "pending",
+      "resolving",
+      "validating",
+      "running",
+      "completed",
+      "failed",
+    ])
+    .describe("Current pipeline stage for a submitted job"),
+  query: zod.string().describe("Original natural-language query"),
+  progress: zod
+    .number()
+    .min(listSimulationJobsResponseProgressMin)
+    .max(listSimulationJobsResponseProgressMax)
+    .describe("Completion percentage based on pipeline stage"),
+  result: zod
+    .object({
+      runId: zod.string().describe("Unique identifier for this pipeline run"),
+      domain: zod
+        .enum([
+          "mm",
+          "mm_competitive_inhibition",
+          "sir",
+          "seir",
+          "pcr",
+          "monte_carlo_pi",
+          "wright_fisher",
+          "two_locus_wright_fisher",
+          "molecular_dynamics",
+          "gillespie_ssa",
+          "gillespie_ssa_bimolecular",
+          "gillespie_ssa_replicates",
+          "lotka_volterra",
+          "cell_cycle_oscillator",
+          "repressilator",
+          "sbml",
+        ])
+        .describe("Resolved simulation domain"),
+      parameters: zod
+        .record(zod.string(), zod.unknown())
+        .describe("Resolved simulation parameters"),
+      trajectory: zod
+        .array(zod.record(zod.string(), zod.unknown()))
+        .describe("Time-series output from the simulation engine"),
+      provenance: zod.object({
+        modelCitations: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)",
+          ),
+        flags: zod
+          .array(zod.string())
+          .optional()
+          .describe("Human-readable warnings about the parameters or result"),
+        reasoning: zod
+          .string()
+          .optional()
+          .describe(
+            "Short explanation of how the query was mapped to a domain",
+          ),
+      }),
+      parameterProvenance: zod
+        .record(
+          zod.string(),
+          zod.object({
+            origin: zod
+              .enum(["resolved", "user", "llm", "default"])
+              .describe(
+                "How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.",
+              ),
+            source: zod
+              .string()
+              .optional()
+              .describe(
+                "What looked the value up; present only when origin is resolved",
+              ),
+            citation: zod
+              .string()
+              .optional()
+              .describe(
+                "Citation supporting THIS value; present only when origin is resolved",
+              ),
+            organism: zod
+              .string()
+              .optional()
+              .describe(
+                "Organism for this value; present only when origin is resolved",
+              ),
+            citationStatus: zod
+              .enum(["verified", "flagged"])
+              .optional()
+              .describe(
+                "Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).",
+              ),
+            assayConditions: zod
+              .object({
+                ph: zod
+                  .number()
+                  .optional()
+                  .describe("Assay pH (STRENDA-mandatory when reported)"),
+                temperatureC: zod
+                  .number()
+                  .optional()
+                  .describe(
+                    "Assay temperature in degrees Celsius (STRENDA-mandatory)",
+                  ),
+                buffer: zod
+                  .string()
+                  .optional()
+                  .describe("Buffer system, when reported"),
+              })
+              .optional(),
+            strendaStatus: zod
+              .enum(["complete", "incomplete"])
+              .optional()
+              .describe(
+                "Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).",
+              ),
+            citationLocators: zod
+              .array(
+                zod.object({
+                  kind: zod
+                    .enum(["brenda_ref", "brenda_ec", "pubmed", "doi", "url"])
+                    .describe("What kind of locator this is"),
+                  value: zod
+                    .string()
+                    .describe(
+                      "The locator's value (BRENDA ref id, EC number, PMID, DOI, or URL)",
+                    ),
+                  deepLink: zod
+                    .string()
+                    .optional()
+                    .describe(
+                      "Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).",
+                    ),
+                }),
+              )
+              .optional()
+              .describe(
+                "Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.",
+              ),
+            note: zod
+              .string()
+              .optional()
+              .describe("Why a lookup was attempted and failed, if so"),
+          }),
+        )
+        .describe(
+          "Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)",
+        ),
+      completedAt: zod.coerce
+        .date()
+        .describe("ISO 8601 timestamp when the run finished"),
+    })
+    .optional(),
+  error: zod
+    .object({
+      error: zod.string().describe("Short error code"),
+      message: zod.string().describe("Human-readable error message"),
+    })
+    .optional(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
+export const ListSimulationJobsResponse = zod.array(
+  ListSimulationJobsResponseItem,
+);
 
 /**
  * Accepts a natural-language request, enqueues an simulation job, and
@@ -80,59 +202,224 @@ export const ListSimulationJobsResponse = zod.array(ListSimulationJobsResponseIt
  * `GET /simulate/{jobId}/stream` for real-time progress.
  * @summary Submit a science-agent simulation job
  */
+export const runSimulationBodyAllowCrossSpeciesDefault = false;
+export const runSimulationBodyAllowVariantsDefault = false;
+
 export const RunSimulationBody = zod.object({
-  "query": zod.string().describe('Natural-language simulation request (e.g. \"simulate lactate dehydrogenase with pyruvate\")')
-})
+  query: zod
+    .string()
+    .describe(
+      'Natural-language simulation request (e.g. \"simulate lactate dehydrogenase with pyruvate\")',
+    ),
+  allowCrossSpecies: zod
+    .boolean()
+    .default(runSimulationBodyAllowCrossSpeciesDefault)
+    .describe(
+      "Permit a measured parameter from a different but sufficiently related organism when the requested organism has none. Off by default (ADR 0024). Even when enabled, candidates must pass an NCBI Taxonomy relatedness check -- enabling this permits a value from a related organism, not from any organism. A value obtained this way is still not a measurement of the organism you asked about.\n",
+    ),
+  allowVariants: zod
+    .boolean()
+    .default(runSimulationBodyAllowVariantsDefault)
+    .describe(
+      'Permit a measured parameter from a protein VARIANT -- a point mutant, or a named isozyme -- rather than the enzyme as found. Off by default (ADR 0029).\nBRENDA\'s commentary says things like \"Y124C mutant\" and \"isozyme H4\" in the same string that carries pH and temperature. Rows that say so are removed before selection, because selection takes the minimum and active-site substitutions are chosen precisely BECAUSE they change the kinetics -- in the acetylcholinesterase turnover table the lowest mutant kcat sits twelve times below the lowest wild-type one.\nEnabling this permits a value measured on a different protein. The result describes that variant, not the enzyme you named.\nNote the limit: a row whose commentary does not say either way is USABLE and uncertified. BRENDA does not require curators to write \"wild-type\", so an unlabelled mutant still passes regardless of this flag.\n',
+    ),
+  physiologicalReference: zod
+    .object({
+      ph: zod.number().describe("pH the model represents."),
+      temperatureC: zod
+        .number()
+        .describe("Temperature in degrees Celsius the model represents."),
+      basis: zod
+        .string()
+        .describe(
+          'Where these conditions came from -- a citation, a species, or the caller. Required so a reference can never be traced back to \"someone typed it\".\n',
+        ),
+      phTolerance: zod
+        .number()
+        .describe(
+          "How far a measured pH may sit from the reference before the value stops representing the modelled system. A property of the enzyme, so it is stated rather than assumed.\n",
+        ),
+      temperatureToleranceC: zod
+        .number()
+        .describe("As phTolerance, in degrees Celsius."),
+    })
+    .optional()
+    .describe(
+      'The pH and temperature the model is meant to represent, plus how far a measurement may drift from them before it stops representing the modelled system. Used to grade the `conditionProximity` axis of a resolved parameter\'s reliability (ADR 0024 Decision 3, ADR 0027).\nOptional, and never defaulted. \"Physiological\" has no organism-independent value: pH 7.4 and 37 C describe a mammal and misdescribe Thermus thermophilus, whose enzymes are measured near 70 C. Omit it and the axis reports `not_assessed` and says why, which is true; supplying a guess would report a confident `far` for a thermophile assay that was in fact ideal.\nALL FIVE FIELDS ARE REQUIRED IF THE OBJECT IS PRESENT. A partial reference is refused rather than completed -- half a reference plus an assumed 37 C is an assumed mammal.\n',
+    ),
+});
 
 export const runSimulationResponseProgressMin = 0;
 export const runSimulationResponseProgressMax = 100;
 
-
-
 export const RunSimulationResponse = zod.object({
-  "jobId": zod.string().describe('Unique identifier for this pipeline run'),
-  "status": zod.enum(['pending', 'resolving', 'validating', 'running', 'completed', 'failed']).describe('Current pipeline stage for a submitted job'),
-  "query": zod.string().describe('Original natural-language query'),
-  "progress": zod.number().min(runSimulationResponseProgressMin).max(runSimulationResponseProgressMax).describe('Completion percentage based on pipeline stage'),
-  "result": zod.object({
-  "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml', 'mm_competitive_inhibition']).describe('Resolved simulation domain'),
-  "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
-  "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
-  "provenance": zod.object({
-  "modelCitations": zod.array(zod.string()).optional().describe('Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)'),
-  "flags": zod.array(zod.string()).optional().describe('Human-readable warnings about the parameters or result'),
-  "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
-}),
-  "parameterProvenance": zod.record(zod.string(), zod.object({
-  "origin": zod.enum(['resolved', 'user', 'llm', 'default']).describe('How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.'),
-  "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
-  "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
-  "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
-  "citationStatus": zod.enum(['verified', 'flagged']).optional().describe('Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).'),
-  "assayConditions": zod.object({
-  "ph": zod.number().optional().describe('Assay pH (STRENDA-mandatory when reported)'),
-  "temperatureC": zod.number().optional().describe('Assay temperature in degrees Celsius (STRENDA-mandatory)'),
-  "buffer": zod.string().optional().describe('Buffer system, when reported')
-}).optional(),
-  "strendaStatus": zod.enum(['complete', 'incomplete']).optional().describe('Whether the assay conditions meet STRENDA\'s minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).'),
-  "citationLocators": zod.array(zod.object({
-  "kind": zod.enum(['brenda_ref', 'brenda_ec', 'pubmed', 'doi', 'url']).describe('What kind of locator this is'),
-  "value": zod.string().describe('The locator\'s value (BRENDA ref id, EC number, PMID, DOI, or URL)'),
-  "deepLink": zod.string().optional().describe('Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).')
-})).optional().describe('Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.'),
-  "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
-})).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
-  "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
-}).optional(),
-  "error": zod.object({
-  "error": zod.string().describe('Short error code'),
-  "message": zod.string().describe('Human-readable error message')
-}).optional(),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
-})
-
+  jobId: zod.string().describe("Unique identifier for this pipeline run"),
+  status: zod
+    .enum([
+      "pending",
+      "resolving",
+      "validating",
+      "running",
+      "completed",
+      "failed",
+    ])
+    .describe("Current pipeline stage for a submitted job"),
+  query: zod.string().describe("Original natural-language query"),
+  progress: zod
+    .number()
+    .min(runSimulationResponseProgressMin)
+    .max(runSimulationResponseProgressMax)
+    .describe("Completion percentage based on pipeline stage"),
+  result: zod
+    .object({
+      runId: zod.string().describe("Unique identifier for this pipeline run"),
+      domain: zod
+        .enum([
+          "mm",
+          "mm_competitive_inhibition",
+          "sir",
+          "seir",
+          "pcr",
+          "monte_carlo_pi",
+          "wright_fisher",
+          "two_locus_wright_fisher",
+          "molecular_dynamics",
+          "gillespie_ssa",
+          "gillespie_ssa_bimolecular",
+          "gillespie_ssa_replicates",
+          "lotka_volterra",
+          "cell_cycle_oscillator",
+          "repressilator",
+          "sbml",
+        ])
+        .describe("Resolved simulation domain"),
+      parameters: zod
+        .record(zod.string(), zod.unknown())
+        .describe("Resolved simulation parameters"),
+      trajectory: zod
+        .array(zod.record(zod.string(), zod.unknown()))
+        .describe("Time-series output from the simulation engine"),
+      provenance: zod.object({
+        modelCitations: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)",
+          ),
+        flags: zod
+          .array(zod.string())
+          .optional()
+          .describe("Human-readable warnings about the parameters or result"),
+        reasoning: zod
+          .string()
+          .optional()
+          .describe(
+            "Short explanation of how the query was mapped to a domain",
+          ),
+      }),
+      parameterProvenance: zod
+        .record(
+          zod.string(),
+          zod.object({
+            origin: zod
+              .enum(["resolved", "user", "llm", "default"])
+              .describe(
+                "How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.",
+              ),
+            source: zod
+              .string()
+              .optional()
+              .describe(
+                "What looked the value up; present only when origin is resolved",
+              ),
+            citation: zod
+              .string()
+              .optional()
+              .describe(
+                "Citation supporting THIS value; present only when origin is resolved",
+              ),
+            organism: zod
+              .string()
+              .optional()
+              .describe(
+                "Organism for this value; present only when origin is resolved",
+              ),
+            citationStatus: zod
+              .enum(["verified", "flagged"])
+              .optional()
+              .describe(
+                "Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).",
+              ),
+            assayConditions: zod
+              .object({
+                ph: zod
+                  .number()
+                  .optional()
+                  .describe("Assay pH (STRENDA-mandatory when reported)"),
+                temperatureC: zod
+                  .number()
+                  .optional()
+                  .describe(
+                    "Assay temperature in degrees Celsius (STRENDA-mandatory)",
+                  ),
+                buffer: zod
+                  .string()
+                  .optional()
+                  .describe("Buffer system, when reported"),
+              })
+              .optional(),
+            strendaStatus: zod
+              .enum(["complete", "incomplete"])
+              .optional()
+              .describe(
+                "Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).",
+              ),
+            citationLocators: zod
+              .array(
+                zod.object({
+                  kind: zod
+                    .enum(["brenda_ref", "brenda_ec", "pubmed", "doi", "url"])
+                    .describe("What kind of locator this is"),
+                  value: zod
+                    .string()
+                    .describe(
+                      "The locator's value (BRENDA ref id, EC number, PMID, DOI, or URL)",
+                    ),
+                  deepLink: zod
+                    .string()
+                    .optional()
+                    .describe(
+                      "Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).",
+                    ),
+                }),
+              )
+              .optional()
+              .describe(
+                "Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.",
+              ),
+            note: zod
+              .string()
+              .optional()
+              .describe("Why a lookup was attempted and failed, if so"),
+          }),
+        )
+        .describe(
+          "Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)",
+        ),
+      completedAt: zod.coerce
+        .date()
+        .describe("ISO 8601 timestamp when the run finished"),
+    })
+    .optional(),
+  error: zod
+    .object({
+      error: zod.string().describe("Short error code"),
+      message: zod.string().describe("Human-readable error message"),
+    })
+    .optional(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
 
 /**
  * Returns the current job status and, when completed, the full
@@ -140,58 +427,180 @@ export const RunSimulationResponse = zod.object({
  * @summary Get a simulation job by ID
  */
 export const GetSimulationJobParams = zod.object({
-  "jobId": zod.coerce.string()
-})
+  jobId: zod.coerce.string(),
+});
 
 export const getSimulationJobResponseProgressMin = 0;
 export const getSimulationJobResponseProgressMax = 100;
 
-
-
 export const GetSimulationJobResponse = zod.object({
-  "jobId": zod.string().describe('Unique identifier for this pipeline run'),
-  "status": zod.enum(['pending', 'resolving', 'validating', 'running', 'completed', 'failed']).describe('Current pipeline stage for a submitted job'),
-  "query": zod.string().describe('Original natural-language query'),
-  "progress": zod.number().min(getSimulationJobResponseProgressMin).max(getSimulationJobResponseProgressMax).describe('Completion percentage based on pipeline stage'),
-  "result": zod.object({
-  "runId": zod.string().describe('Unique identifier for this pipeline run'),
-  "domain": zod.enum(['mm', 'sir', 'seir', 'pcr', 'monte_carlo_pi', 'wright_fisher', 'two_locus_wright_fisher', 'molecular_dynamics', 'gillespie_ssa', 'gillespie_ssa_bimolecular', 'gillespie_ssa_replicates', 'sbml', 'mm_competitive_inhibition']).describe('Resolved simulation domain'),
-  "parameters": zod.record(zod.string(), zod.unknown()).describe('Resolved simulation parameters'),
-  "trajectory": zod.array(zod.record(zod.string(), zod.unknown())).describe('Time-series output from the simulation engine'),
-  "provenance": zod.object({
-  "modelCitations": zod.array(zod.string()).optional().describe('Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)'),
-  "flags": zod.array(zod.string()).optional().describe('Human-readable warnings about the parameters or result'),
-  "reasoning": zod.string().optional().describe('Short explanation of how the query was mapped to a domain')
-}),
-  "parameterProvenance": zod.record(zod.string(), zod.object({
-  "origin": zod.enum(['resolved', 'user', 'llm', 'default']).describe('How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.'),
-  "source": zod.string().optional().describe('What looked the value up; present only when origin is resolved'),
-  "citation": zod.string().optional().describe('Citation supporting THIS value; present only when origin is resolved'),
-  "organism": zod.string().optional().describe('Organism for this value; present only when origin is resolved'),
-  "citationStatus": zod.enum(['verified', 'flagged']).optional().describe('Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).'),
-  "assayConditions": zod.object({
-  "ph": zod.number().optional().describe('Assay pH (STRENDA-mandatory when reported)'),
-  "temperatureC": zod.number().optional().describe('Assay temperature in degrees Celsius (STRENDA-mandatory)'),
-  "buffer": zod.string().optional().describe('Buffer system, when reported')
-}).optional(),
-  "strendaStatus": zod.enum(['complete', 'incomplete']).optional().describe('Whether the assay conditions meet STRENDA\'s minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).'),
-  "citationLocators": zod.array(zod.object({
-  "kind": zod.enum(['brenda_ref', 'brenda_ec', 'pubmed', 'doi', 'url']).describe('What kind of locator this is'),
-  "value": zod.string().describe('The locator\'s value (BRENDA ref id, EC number, PMID, DOI, or URL)'),
-  "deepLink": zod.string().optional().describe('Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).')
-})).optional().describe('Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.'),
-  "note": zod.string().optional().describe('Why a lookup was attempted and failed, if so')
-})).describe('Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)'),
-  "completedAt": zod.coerce.date().describe('ISO 8601 timestamp when the run finished')
-}).optional(),
-  "error": zod.object({
-  "error": zod.string().describe('Short error code'),
-  "message": zod.string().describe('Human-readable error message')
-}).optional(),
-  "createdAt": zod.coerce.date(),
-  "updatedAt": zod.coerce.date()
-})
-
+  jobId: zod.string().describe("Unique identifier for this pipeline run"),
+  status: zod
+    .enum([
+      "pending",
+      "resolving",
+      "validating",
+      "running",
+      "completed",
+      "failed",
+    ])
+    .describe("Current pipeline stage for a submitted job"),
+  query: zod.string().describe("Original natural-language query"),
+  progress: zod
+    .number()
+    .min(getSimulationJobResponseProgressMin)
+    .max(getSimulationJobResponseProgressMax)
+    .describe("Completion percentage based on pipeline stage"),
+  result: zod
+    .object({
+      runId: zod.string().describe("Unique identifier for this pipeline run"),
+      domain: zod
+        .enum([
+          "mm",
+          "mm_competitive_inhibition",
+          "sir",
+          "seir",
+          "pcr",
+          "monte_carlo_pi",
+          "wright_fisher",
+          "two_locus_wright_fisher",
+          "molecular_dynamics",
+          "gillespie_ssa",
+          "gillespie_ssa_bimolecular",
+          "gillespie_ssa_replicates",
+          "lotka_volterra",
+          "cell_cycle_oscillator",
+          "repressilator",
+          "sbml",
+        ])
+        .describe("Resolved simulation domain"),
+      parameters: zod
+        .record(zod.string(), zod.unknown())
+        .describe("Resolved simulation parameters"),
+      trajectory: zod
+        .array(zod.record(zod.string(), zod.unknown()))
+        .describe("Time-series output from the simulation engine"),
+      provenance: zod.object({
+        modelCitations: zod
+          .array(zod.string())
+          .optional()
+          .describe(
+            "Literature references for the MODEL\/domain, never for individual parameter values (ADR 0008)",
+          ),
+        flags: zod
+          .array(zod.string())
+          .optional()
+          .describe("Human-readable warnings about the parameters or result"),
+        reasoning: zod
+          .string()
+          .optional()
+          .describe(
+            "Short explanation of how the query was mapped to a domain",
+          ),
+      }),
+      parameterProvenance: zod
+        .record(
+          zod.string(),
+          zod.object({
+            origin: zod
+              .enum(["resolved", "user", "llm", "default"])
+              .describe(
+                "How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.",
+              ),
+            source: zod
+              .string()
+              .optional()
+              .describe(
+                "What looked the value up; present only when origin is resolved",
+              ),
+            citation: zod
+              .string()
+              .optional()
+              .describe(
+                "Citation supporting THIS value; present only when origin is resolved",
+              ),
+            organism: zod
+              .string()
+              .optional()
+              .describe(
+                "Organism for this value; present only when origin is resolved",
+              ),
+            citationStatus: zod
+              .enum(["verified", "flagged"])
+              .optional()
+              .describe(
+                "Whether the resolved citation is an exact organism\/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).",
+              ),
+            assayConditions: zod
+              .object({
+                ph: zod
+                  .number()
+                  .optional()
+                  .describe("Assay pH (STRENDA-mandatory when reported)"),
+                temperatureC: zod
+                  .number()
+                  .optional()
+                  .describe(
+                    "Assay temperature in degrees Celsius (STRENDA-mandatory)",
+                  ),
+                buffer: zod
+                  .string()
+                  .optional()
+                  .describe("Buffer system, when reported"),
+              })
+              .optional(),
+            strendaStatus: zod
+              .enum(["complete", "incomplete"])
+              .optional()
+              .describe(
+                "Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).",
+              ),
+            citationLocators: zod
+              .array(
+                zod.object({
+                  kind: zod
+                    .enum(["brenda_ref", "brenda_ec", "pubmed", "doi", "url"])
+                    .describe("What kind of locator this is"),
+                  value: zod
+                    .string()
+                    .describe(
+                      "The locator's value (BRENDA ref id, EC number, PMID, DOI, or URL)",
+                    ),
+                  deepLink: zod
+                    .string()
+                    .optional()
+                    .describe(
+                      "Canonical URL that re-finds this locator, when one exists. Absent for brenda_ref because BRENDA has no working per-reference deep link (live-checked 2026-07).",
+                    ),
+                }),
+              )
+              .optional()
+              .describe(
+                "Machine-checkable locators for the citation (citeVerify.ts): `(kind, value, deepLink)` triples so a human or tool can re-find the exact source of this number. Present only when origin is resolved.",
+              ),
+            note: zod
+              .string()
+              .optional()
+              .describe("Why a lookup was attempted and failed, if so"),
+          }),
+        )
+        .describe(
+          "Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)",
+        ),
+      completedAt: zod.coerce
+        .date()
+        .describe("ISO 8601 timestamp when the run finished"),
+    })
+    .optional(),
+  error: zod
+    .object({
+      error: zod.string().describe("Short error code"),
+      message: zod.string().describe("Human-readable error message"),
+    })
+    .optional(),
+  createdAt: zod.coerce.date(),
+  updatedAt: zod.coerce.date(),
+});
 
 /**
  * Server-Sent Events endpoint that emits status updates and the final
@@ -199,9 +608,7 @@ export const GetSimulationJobResponse = zod.object({
  * @summary Stream simulation job progress
  */
 export const StreamSimulationJobParams = zod.object({
-  "jobId": zod.coerce.string()
-})
+  jobId: zod.coerce.string(),
+});
 
-export const StreamSimulationJobResponse = zod.unknown()
-
-
+export const StreamSimulationJobResponse = zod.unknown();

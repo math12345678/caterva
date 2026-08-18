@@ -81,6 +81,24 @@ export function resolvePythonExecutable(repoRoot: string): string {
           "python3.12",
           "python3.11",
           "python3.10",
+          // Bare `python3` LAST, and only as a fallback.
+          //
+          // The version-specific names come first because on a machine with
+          // several interpreters they are the ones that say which is which,
+          // and picking the newest supported one deliberately is better than
+          // taking whatever `python3` happens to point at.
+          //
+          // But refusing `python3` entirely rejects working environments over
+          // a filename. Many containers ship exactly one interpreter, at
+          // /usr/bin/python3, with every dependency installed and no
+          // python3.NN symlink anywhere — and Terrium told them to "install
+          // Python 3.12" when 3.12 was already there under a different name.
+          //
+          // This is safe because `canRunSupportedPython` checks
+          // `sys.version_info` and every required import before accepting a
+          // candidate. The name was never what made a candidate valid; it was
+          // only ever a hint about where to look.
+          "python3",
         ];
 
   for (const candidate of candidates) {

@@ -69,6 +69,28 @@ export default defineConfig({
       formatter: "prettier",
       override: {
         zod: {
+          // PINNED, not left to `auto`.
+          //
+          // orval's default is `version: "auto"`, which inspects the
+          // installed zod. zod 3.25 ships a `zod/v4` SUBPATH, so detection
+          // concludes v4 and emits v4 syntax -- `zod.iso.datetime(...)` --
+          // while still importing from plain `"zod"`, where `iso` is
+          // `undefined`. The generated schema then throws on load.
+          //
+          // That is not a cosmetic difference. Before this line, running the
+          // documented `pnpm --filter @workspace/api-spec run codegen`
+          // produced a contract that crashed at import, and the only reason
+          // nobody hit it is that the committed files predate the zod bump
+          // and nobody had regenerated. ADR 0027 recorded this as a
+          // formatting-level drift; it was worse than that.
+          //
+          // Verified rather than assumed:
+          //   node -e "const z=require('zod'); console.log(typeof z.iso)"
+          //   -> undefined      (zod 3.25.76)
+          //
+          // Raise this to 4 in the same commit that moves the workspace to
+          // zod@^4, and not before.
+          version: 3,
           coerce: {
             query: ["boolean", "number", "string"],
             param: ["boolean", "number", "string"],

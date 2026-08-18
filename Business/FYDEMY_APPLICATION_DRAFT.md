@@ -1,7 +1,9 @@
 # Fydemy application — draft answers
 
-Drafted from what's actually true in the repo and `Business/` docs as of
-2026-07-28. Fields marked **[YOUR INPUT]** are personal, financial, or
+Drafted from what's actually true in the repo and `Business/` docs.
+Counts last reconciled against the repository on 2026-08-15 and kept true
+by `scripts/check_investor_claims.py` -- this file is operational, not a
+record, because somebody will paste these numbers into a real submission. Fields marked **[YOUR INPUT]** are personal, financial, or
 judgment calls I'm not going to guess at — fill those in yourself. Everything
 else is ready to copy in, but skim it first; it's your application, not mine.
 
@@ -36,7 +38,7 @@ rather than list a placeholder person.
 |---|---|
 | Company name | Terrium |
 | Company website | **[YOUR INPUT]** — `ROADMAP.md` flags the domain check (terrium.ai/.dev/.io) as unconfirmed status; don't put a URL here unless you've actually secured one |
-| Product stage | **Prototype** (not "Idea") — you have a working simulation engine, 429 passing tests, a live interactive landing page with a real end-to-end simulator, not a mockup |
+| Product stage | **Prototype** (not "Idea") — you have a working simulation engine, 1,893 passing tests, a live interactive landing page with a real end-to-end simulator, not a mockup |
 | Sector | Education / EdTech (closest fit if "SaaS/B2B" is the only option, since the buyer is institutional) |
 | Subsector | Scientific computing / research tools |
 | Operating country | **[YOUR INPUT]** |
@@ -151,8 +153,8 @@ Being direct about where things actually stand, per `ROADMAP.md` — Phase 1
 
 | Field | Answer |
 |---|---|
-| Metric | Verified test coverage / engine correctness (429 passing tests, each simulation domain checked against an exact closed-form solution or independent solver) |
-| Value | 429 tests passing, 0 failing, across 3 live simulation domains |
+| Metric | Verified test coverage / engine correctness (1,893 passing tests, each simulation domain checked against an exact closed-form solution or independent solver) |
+| Value | 1,893 tests passing, 0 failing, across 15 live simulation domains |
 | Why this is the most important metric | Terrium is pre-pilot — there's no user or revenue metric yet that would honestly represent traction. The metric that actually matters right now is whether the product does what it claims (real, correct, citable simulations), because that's the entire value proposition. Everything else (pilots, revenue) is Phase 1, which hasn't started. |
 
 ## MRR

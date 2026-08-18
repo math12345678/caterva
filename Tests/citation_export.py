@@ -84,6 +84,25 @@ def _escape_bibtex(text: str) -> str:
     return "".join(_BIBTEX_SPECIALS.get(char, char) for char in text)
 
 
+def _disambiguator(index: int) -> str:
+    """0 -> 'a', 25 -> 'z', 26 -> 'aa', 27 -> 'ab'.
+
+    The spreadsheet-column sequence, and the convention BibTeX styles
+    already use for same-author-same-year keys, so the output looks like
+    what a reader expects rather than like an escape.
+
+    It replaces `chr(ord("a") + index)`, which ran off the end of the
+    alphabet on the 27th collision and produced `{`, `|`, `}`, `~` -- see
+    `bibtex_key` below.
+    """
+    out = ""
+    index += 1
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        out = chr(ord("a") + remainder) + out
+    return out
+
+
 def bibtex_key(cited: CitedParameter, seen: set[str] | None = None) -> str:
     """A stable, unique, valid BibTeX key.
 
@@ -92,6 +111,33 @@ def bibtex_key(cited: CitedParameter, seen: set[str] | None = None) -> str:
     two entries with the same key, and BibTeX silently keeps one of them.
     Silently keeping one is the failure that matters -- the bibliography
     would be short by an entry and nothing would say so.
+
+    THE ENFORCEMENT USED TO BREAK WORSE THAN THE THING IT PREVENTS
+    --------------------------------------------------------------
+    The suffix was `chr(ord("a") + n)`, walking the ASCII table. Past `z`
+    that is `{`, `|`, `}`, `~`. Measured, with 30 parameters sharing one
+    BRENDA reference:
+
+        @misc{brenda740253z,
+        @misc{brenda740253{,
+        @misc{brenda740253|,
+        @misc{brenda740253},
+
+    The third opens a group that never closes. The fourth **closes the
+    `@misc{` group early**, so BibTeX reads a complete empty entry and then
+    tries to parse the rest of the body at top level -- one duplicate key
+    costs one entry, whereas this corrupts the parse of everything after
+    it. The guard against silent loss was, past 26, a louder way to lose
+    more.
+
+    Reachable, not theoretical: `scripts/export_citations.py` builds this
+    list from a JSON payload of arbitrary length, and one BRENDA reference
+    routinely supplies several constants for the same enzyme.
+
+    `test_keys_are_valid_bibtex_identifiers` already asserted exactly the
+    right property -- `[A-Za-z0-9_:-]+` -- on three parameters, which
+    reaches at most one collision. The property was right and the input
+    could not exercise it.
     """
     source = _KEY_SAFE.sub("", (cited.citation.source or "source").lower())
     ident = _KEY_SAFE.sub("", cited.citation.reference_id or "")
@@ -100,13 +146,64 @@ def bibtex_key(cited: CitedParameter, seen: set[str] | None = None) -> str:
     if seen is None:
         return stem
 
-    key = stem
-    suffix = ord("a")
-    while key in seen:
-        key = f"{stem}{chr(suffix)}"
-        suffix += 1
-    seen.add(key)
-    return key
+    # BOUNDED, not `while key in seen`.
+    #
+    # The unbounded version was correct with a correct `_disambiguator` and
+    # hung with a broken one -- found by mutation: making the suffix cycle
+    # a..z..a instead of carrying to `aa` did not fail the suite, it stopped
+    # the test run dead, because every candidate past the 26th was already
+    # in `seen`. A hang in a path driven by a JSON payload is worse than a
+    # wrong key: nothing is reported at all.
+    #
+    # `len(seen) + 1` candidates are always enough when the suffixes are
+    # distinct -- one of them must be unused -- so exhausting the range
+    # means `_disambiguator` has stopped being injective, which is a bug in
+    # this module and says so.
+    for index in range(len(seen) + 1):
+        key = stem if index == 0 else f"{stem}{_disambiguator(index - 1)}"
+        if key not in seen:
+            seen.add(key)
+            return key
+
+    raise RuntimeError(
+        f"could not find an unused BibTeX key for {stem!r} in "
+        f"{len(seen) + 1} attempts. That is only possible if the "
+        "disambiguating suffixes have stopped being distinct, which would "
+        "silently merge two entries into one."
+    )
+
+
+#: The bibliographic fields a BibTeX entry wants, in the order a reader
+#: expects to see them named.
+#:
+#: Asked of the citation rather than assumed. The previous version built its
+#: "missing" list from a tuple of hardcoded `None`s:
+#:
+#:     [field for field, value in (("author", None), ("year", None),
+#:                                ("journal", None)) if value is None]
+#:
+#: which can only ever return all three. A constant wearing the costume of a
+#: computation -- and it produced two false notes, one in each direction.
+#: `title` IS sometimes known and IS emitted, so an entry carrying a title
+#: still said Terrium "records the source identifier only"; and an entry
+#: with NO title listed author, year and journal as absent while saying
+#: nothing about the field a reference manager displays first.
+_BIBTEX_WANTS = ("author", "year", "journal", "title")
+
+
+def _known_and_missing(citation: Citation) -> tuple[list[str], list[str]]:
+    """Which wanted fields this citation actually carries, and which it does not.
+
+    `getattr` rather than a literal list: `Citation` today has a `title`
+    field and no author, year or journal, so the answer is the same one the
+    old constant gave for three of the four. The difference is that this
+    asks. If `Citation` ever gains a `year`, the note starts telling the
+    truth about it instead of continuing to say it is unknown.
+    """
+    known, missing = [], []
+    for field in _BIBTEX_WANTS:
+        (known if getattr(citation, field, None) else missing).append(field)
+    return known, missing
 
 
 def _note_for(cited: CitedParameter) -> str:
@@ -117,17 +214,14 @@ def _note_for(cited: CitedParameter) -> str:
     if cited.organism:
         parts.append(f"measured in {cited.organism}")
 
-    missing = [
-        field
-        for field, value in (
-            ("author", None),
-            ("year", None),
-            ("journal", None),
-        )
-        if value is None
-    ]
+    known, missing = _known_and_missing(cited.citation)
+    records = (
+        f"Terrium records the source identifier and the {', '.join(known)}"
+        if known
+        else "Terrium records the source identifier only"
+    )
     parts.append(
-        "Terrium records the source identifier only; "
+        f"{records}; "
         f"{', '.join(missing)} are NOT known to it and have been omitted "
         "rather than guessed. Complete them from the source before citing"
     )

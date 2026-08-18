@@ -1,0 +1,117 @@
+# Findings the runner emits that only one front end reads.
+#
+# Checked by: python3 scripts/check_both_front_ends_read_it.py
+#
+# WHAT A LINE HERE MEANS, AND WHAT IT DOES NOT
+# --------------------------------------------
+# This file is NOT the same contract as docs/undelivered-fields-baseline.txt.
+# There, a line is a DECISION somebody checked. Here, a line is a DEBT
+# somebody counted.
+#
+# The distinction matters because pretending otherwise is the failure this
+# whole directory exists to prevent. Twenty-five entries were found in one
+# measurement. Two were verified by reading the renderers. Writing "reviewed"
+# beside the other twenty-three would make this a rubber stamp with better
+# formatting.
+#
+# So the guard's contract is the one ADR 0072 established for the mutation
+# tables: it STOPS THE DEBT GROWING. A key that becomes one-sided and is not
+# listed here fails the build. The rest are a number somebody can decide
+# about, not a claim that anybody has.
+#
+# Opened 2026-08-17 with 25 entries. 22 remain.
+#
+# ---------------------------------------------------------------------------
+# WHY THIS LIST EXISTS
+# ---------------------------------------------------------------------------
+# The runner emits ONE JSON document and two independent consumers read it --
+# the API/web pipe and the CLI pipe. A key read by one and not the other is a
+# finding that reaches half the users.
+#
+# Found by hand twice, one pass apart: ADR 0106 (candidate papers, API) and
+# ADR 0109 (the same field, CLI). The second was found by ACCIDENT, when an
+# unrelated fix made a leaf name collide. Nothing was looking.
+#
+# ---------------------------------------------------------------------------
+# VERIFIED BY READING THE RENDERERS
+# ---------------------------------------------------------------------------
+# Checked by reading the renderers, and real gaps rather than decisions.
+# One of the original two is now paid off.
+
+# `selectionTie` WAS HERE AND IS NOW PAID OFF (ADR 0114). It was the
+# highest-value entry on this list: a CLI user was handed the lowest of six
+# equally well-evidenced rows spanning 306-fold, with nothing saying the
+# evidence did not choose it. Bakker's finding, delivered to half the users.
+#
+# `fold_range` cleared with it -- it travels inside the same object, which is
+# a reminder that these entries are not independent and the count can drop by
+# more than one per fix.
+#
+# Removed rather than annotated. A baseline that only grows records a problem
+# instead of solving it.
+
+selectedForm      # DEBT. `selectedFormFlags` on the API path only. ADR 0052:
+                  # which named form the returned value actually IS, when the
+                  # pool mixed forms. The CLI prints the value and not which
+                  # enzyme it belongs to.
+
+# ---------------------------------------------------------------------------
+# COUNTED, NOT REVIEWED
+# ---------------------------------------------------------------------------
+# Everything below was produced by the measurement and has NOT been checked
+# one by one. Some will be structural -- the CLI has no HTTP response to
+# annotate -- and some will be gaps like the two above. Which is which is an
+# open question, and stating that is the point.
+#
+# The grouping is by the finding each belongs to, which is inference from the
+# name, not verification.
+
+# ADR 0032, cofactor and effector contrasts
+absent_values
+present_values
+
+# ADR 0024 / Jeske, organism relatedness and what was withheld
+candidate_organism
+query_organism
+shared_name
+shared_rank
+crossSpeciesOrganismsAvailable
+variantCandidatesAvailable
+requestedTaxonId
+taxonId
+
+# ADR 0037, the organism column that disagrees with its commentary.
+# Read by NEITHER front end -- the only two in this file with that status,
+# which makes them the first worth looking at.
+column_taxon
+commentary_taxon
+
+# ADR 0052, mixed enzyme forms
+designator
+sibling_designators
+values_by_form
+
+# ADR 0048/0051, the tie the evidence could not break
+# `selected` was listed here and the guard rejected it on the first run:
+# both sides "read" it, because `selected` is also an ordinary local
+# variable name. That is a FALSE NEGATIVE of the matcher, not a fact about
+# delivery, and it names this check's weakness: short generic keys --
+# `selected`, `raw`, `status`, `low`, `high`, `notes`, `tokens` -- collide
+# with incidental identifiers, so the guard UNDER-reports one-sided findings.
+#
+# The bias is the safe direction (a false accusation teaches people to
+# distrust the check, a missed one is the status quo), and it means the
+# count below is a floor rather than a total. Same leaf-collision problem
+# ADR 0104 found in the reachability guard, in a new guard, on day one.
+
+# ADR 0092, the preparation that is not the free enzyme
+preparation
+stated_not_to_affect
+
+# ADR 0033/0035, source mixtures and the check that could not run
+values_by_source
+sourceCheckUnavailable
+tokens
+
+# ADR 0026, assay coherence
+warrantsWarning

@@ -119,6 +119,10 @@ def _fcc_particle_count(requested: int) -> int:
 # The repo root must be on PYTHONPATH so we can import Terium.terium_engine.
 # The API server sets this when spawning the process.
 from Terium import terium_engine  # noqa: E402  # type: ignore
+from Terium.core.data_structures import (  # noqa: E402  # type: ignore
+    DEFAULT_ABSOLUTE_TOLERANCE,
+    DEFAULT_RELATIVE_TOLERANCE,
+)
 
 
 def _to_point(row: Sequence[float], colnames: Sequence[str]) -> Dict[str, float]:
@@ -138,6 +142,24 @@ def _serialise_result(result: Any, domain: str, parameters: Dict[str, Any]) -> D
         ],
         "flagged": flagged,
         "flagReason": getattr(validation, "flag_reason", None) if flagged else None,
+        # How the run was ACTUALLY integrated, read from the engine's own
+        # constants.
+        #
+        # The TypeScript execution record used to state `RK45` at rtol 1e-6
+        # / atol 1e-8 -- a solver Terrium does not use, at tolerances four
+        # orders of magnitude looser than it runs. `verifyReproducibility`
+        # calibrates from those numbers, so it certified reproductions that
+        # were nowhere near reproducing.
+        #
+        # Reported from here because this is the only side that knows. The
+        # alternative -- restating the constants in TypeScript -- is the
+        # duplicate-source-of-truth defect that put the wrong numbers there
+        # in the first place.
+        "solver": {
+            "algorithm": "CVODE",
+            "relativeTolerance": DEFAULT_RELATIVE_TOLERANCE,
+            "absoluteTolerance": DEFAULT_ABSOLUTE_TOLERANCE,
+        },
     }
     replicate_data = getattr(result, "replicate_data", None)
     if replicate_data is not None:
@@ -700,7 +722,24 @@ def main() -> None:
         if not isinstance(params, dict):
             raise ValueError(f"parameters must be an object, got {type(params).__name__}")  # noqa: TRY301
 
-        result = _RUNNERS[domain](params)
+        # The membership test above is against DISPATCH; the call below used to
+        # index _RUNNERS -- a guard on a different table from the one it was
+        # protecting. The two are kept equal by hand (they have diverged before:
+        # see the ADR 0022 removal-and-restoration in the comment above DISPATCH)
+        # and the boundary contract test now proves a one-sided edit is caught.
+        # But if one ever slipped through, `_RUNNERS[domain]` raised KeyError and
+        # the handler below stringified it, so the student was shown the whole
+        # error as `'pcr'` -- a bare quoted domain name. Worse, it reads as
+        # "you asked for something invalid" when the request was fine and the
+        # build is broken. Look the handler up once, and say which it is.
+        runner_fn = _RUNNERS.get(domain)
+        if runner_fn is None:
+            raise ValueError(  # noqa: TRY301
+                f"internal error: domain {domain!r} is listed in DISPATCH but has "
+                f"no handler in _RUNNERS. This is a build defect, not a bad request."
+            )
+
+        result = runner_fn(params)
         print(json.dumps(result))
     except Exception as exc:
         error_payload = {"ok": False, "error": str(exc)}

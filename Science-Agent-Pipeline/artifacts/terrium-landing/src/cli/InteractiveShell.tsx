@@ -148,7 +148,7 @@ function VersionOutput() {
       </div>
       <div className="flex gap-3">
         <span className="text-[#1D8A72] w-24 shrink-0">ode-solver</span>
-        <span className="text-white/40">rk4 (adaptive)</span>
+        <span className="text-white/40">rk4 (fixed step)</span>
       </div>
     </div>
   );

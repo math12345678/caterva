@@ -103,6 +103,61 @@ class ParameterProvenance:
     reliability: tuple[tuple[str, str], ...] = ()
     note: str | None = None
 
+    #: The conditions the measurement was made under, and the ones the
+    #: source did not state. Jeske's "fantasy numbers" sentence names pH,
+    #: temperature, cofactors and buffers as what decides whether mixing
+    #: values is legitimate.
+    #:
+    #: Carried in BOTH exports, deliberately. The Antimony file and the
+    #: SBML notes are two artifacts a reader may receive independently, and
+    #: a fact that survives in one and not the other is worse than one
+    #: absent from both: it makes the omission look like a property of the
+    #: measurement rather than of the export path.
+    assay_ph: float | None = None
+    assay_temperature_c: float | None = None
+    assay_buffer: str | None = None
+    assay_unreported: tuple[str, ...] = ()
+
+    def assay_line(self) -> str | None:
+        """`measured at: ...` for the footer, or None when nothing is known.
+
+        None rather than "conditions: unknown" when the payload carries
+        neither values nor a record of the source's silence: a line on
+        every parameter in a model whose conditions were never parsed is
+        noise, and noise is how the lines that matter stop being read
+        (ADR 0028).
+        """
+        measured = []
+        if self.assay_ph is not None:
+            measured.append(f"pH {self.assay_ph:g}")
+        if self.assay_temperature_c is not None:
+            measured.append(f"{self.assay_temperature_c:g} C")
+        if self.assay_buffer:
+            measured.append(f"in {self.assay_buffer}")
+
+        present = {
+            "ph": self.assay_ph is not None,
+            "temperature": self.assay_temperature_c is not None,
+            "buffer": bool(self.assay_buffer),
+        }
+        silent = [
+            item
+            for item in self.assay_unreported
+            if not present.get(str(item).strip().lower(), False)
+        ]
+
+        if not measured and not silent:
+            return None
+        parts = []
+        if measured:
+            parts.append("measured at " + ", ".join(measured))
+        if silent:
+            # Named, not omitted. An absent line reads as an oversight by
+            # whoever produced the file; this reads as a fact about the
+            # publication, which is what it is.
+            parts.append("NOT REPORTED by the source: " + ", ".join(silent))
+        return "; ".join(parts)
+
     def one_line(self) -> str:
         """The inline trailer for this parameter's assignment line."""
         if self.origin == "user_cited":
@@ -157,6 +212,9 @@ class ParameterProvenance:
             lines.append(f"organism: {self.organism}")
         if self.citation_status:
             lines.append(f"citation status: {self.citation_status}")
+        assay = self.assay_line()
+        if assay:
+            lines.append(assay)
         for axis, grade in self.reliability:
             lines.append(f"reliability / {axis}: {grade}")
         if self.note:

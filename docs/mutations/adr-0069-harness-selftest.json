@@ -1,0 +1,46 @@
+{
+  "_adr": "0069-the-harness-that-lied.md",
+
+  "_why_no_mutations": [
+    "Every other file in this directory is a set of mutations against product",
+    "source. This one cannot be, and the difference is the point.",
+    "",
+    "ADR 0069's table is not a claim about the product's tests. It is a claim",
+    "about the HARNESS -- that a patch which does not apply, a replacement",
+    "identical to the original, and a suite that reports no test count are each",
+    "reported INDETERMINATE rather than 'not caught'. Those three are the three",
+    "ways the hand-run harness produced a wrong answer, and the fifth row (a",
+    "real mutation against a passing suite must read NOT CAUGHT) is what keeps",
+    "the other four from being satisfied by a harness that returns INDETERMINATE",
+    "unconditionally.",
+    "",
+    "There is no set of mutations that reproduces that. `mutate.py --selftest`",
+    "reproduces it exactly, and verify_build.py runs it on every build -- which",
+    "is a stronger guarantee than a set file, because a set file is re-runnable",
+    "and this is actually re-run."
+  ],
+
+  "reproduced_by": "scripts/mutate.py --selftest",
+
+  "_verified": [
+    "2026-08-16: run, and its five lines compared against the ADR's five rows",
+    "label for label. They agree.",
+    "",
+    "  [ok] search string absent: INDETERMINATE",
+    "  [ok] replacement identical to the original: INDETERMINATE",
+    "  [ok] suite reports no test count: INDETERMINATE",
+    "  [ok] file restored after every case",
+    "  [ok] a real mutation against a passing suite: NOT CAUGHT"
+  ],
+
+  "_this_field_is_checked": [
+    "check_mutation_tables_reproducible.py requires that `reproduced_by` name a",
+    "command verify_build.py actually runs, and its --selftest drives the",
+    "refusal: a set file naming an unwired script, or a wired script with an",
+    "argument the build never passes, both fail.",
+    "",
+    "Without that, `reproduced_by` would be a way out of the guard rather than a",
+    "second way of satisfying it -- any future record could opt out by naming a",
+    "command, and the guard would be back to trusting a label."
+  ]
+}

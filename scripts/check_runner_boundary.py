@@ -119,6 +119,13 @@ EMITTED_AS: dict[str, str | None] = {
     "cross_species_organisms_available": "crossSpeciesOrganismsAvailable",
     "variant_candidates_available": "variantCandidatesAvailable",
     "variant": "variant",
+    # ADR 0092. Crosses as `preparation`, beside `variant`: the same
+    # question one category over -- ADR 0029 asks whether the row measured
+    # the enzyme's SEQUENCE, this asks whether it measured the FREE enzyme.
+    # A tag, a covalent modification and immobilisation are invisible to the
+    # variant filter, and the human LDH Ki was resolving to a His-tagged
+    # construct with nothing in the response saying so.
+    "preparation": "preparation",
     "relatedness": "relatedness",
     "effectors": "effectors",
     "selection_tie": "selectionTie",

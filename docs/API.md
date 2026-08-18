@@ -144,11 +144,36 @@ PubMed for real kinetics before running.
 | `POST` | `/api/compare` | Compare models. |
 | `POST` | `/api/compare/jobs` | Compare finished jobs. |
 | `GET` | `/api/health` | Liveness. |
-| `GET` | `/api/export/jobs/csv` | Job history as CSV. |
+| `GET` | `/api/export/jobs/csv` | Job history as CSV. See the column note below. |
 | `GET` | `/api/export/stats/csv` | Statistics as CSV. |
 | `GET` | `/api/export/sweep/:sweepId/csv` | Sweep results as CSV. Also `/api/export/sweeps/:sweepId/csv`. |
 | `GET` | `/api/export/batch/:batchId/csv` | Batch results as CSV. Also `/api/export/batches/:batchId/csv`. |
 | `GET` | `/api/export/comparison/:compareId/csv` | Comparison as CSV. Also `/api/export/comparisons/:compareId/csv`. |
+
+### `/api/export/jobs/csv` — two columns changed, and one is a breaking change
+
+**`literatureFound` is gone. `literatureSourcesUsed` replaces it.**
+
+The old column's value was `job.result.validated ? 'yes' : 'no'`, and
+`validated` does not mean what that name claimed — it means the simulation
+could be performed at all. A run on numbers a user typed in by hand
+validates fine, so it exported as `literatureFound = yes` with no citation
+anywhere behind it.
+
+The new column carries `metadata.literatureSourcesUsed`: a count, or the
+string `unknown` when the record does not say. `unknown` is never rendered
+as `0`, because a job nobody checked did not find zero sources.
+
+Any consumer reading `literatureFound` will break. That is intended: the
+column made a false claim about provenance, and preserving it for
+compatibility would preserve the claim.
+
+**`finalValue` and `confidence` now contain values.** They read
+`job.result.finalValue` and `job.result.confidence`, which the stored
+pipeline response does not have — the real fields are
+`result.results.finalValue` and `result.validationConfidence`. Both columns
+were blank on every real job for the life of the route. See
+[ADR 0056](adr/0056-a-column-that-claimed-a-source.md).
 
 ### Singular and plural both work
 

@@ -26,7 +26,7 @@
 #      mark it as a correction -- do not quietly restate it
 #   4. delete the line here
 #
-# Baseline opened 2026-08-15 with 34 entries. 22 remain.
+# Baseline opened 2026-08-15 with 34 entries. 17 remain.
 #
 # Cleared: 0026 (pH, temperature), 0028 (buffers), 0032 (cofactors),
 #          0029 (variants), 0065 (error messages),
@@ -34,17 +34,32 @@
 #          0037 (organism column),
 #          0039 + 0045 (the boundary guard, via exit-code verdicts),
 #          0027 (Bakker's score, and its deletion guard),
-#          0050 (the CSV header, including the re-pointed C5).
+#          0050 (the CSV header, including the re-pointed C5),
+#          0069 (the harness's own self-test -- see below).
 #
 # The first four are the four factors Jeske named in one sentence. Her
 # warning is now backed by evidence a reader can re-run rather than a
 # table they have to trust.
-
-# --- Written by this agent. Mine to clear. ---
-0069   # the harness that lied -- its own self-test IS reproducible
-       # (`mutate.py --selftest`, wired into verify_build); the table in
-       # that ADR reports the self-test, so this entry is close to
-       # discharged already and should be the first to go.
+#
+# ON 0069, WHICH WAS NEVER REALLY DEBT
+# ------------------------------------
+# It sat here for a reason recorded in this file as "close to discharged
+# already": its table IS `mutate.py --selftest`, which verify_build runs on
+# every build. So the evidence was not merely re-runnable, it was being
+# re-run -- and the guard still counted it as unchecked, because the guard
+# recognised exactly one shape of evidence: a set of mutations.
+#
+# The two honest ways out were to invent a set file that could not actually
+# reproduce that table, or to leave it here forever. Inventing evidence to
+# satisfy a check is the failure this whole directory exists to prevent, so
+# the guard learned the second shape instead: a set file may declare
+# `reproduced_by`, naming a command, and the guard FAILS unless
+# verify_build.py really runs it. See docs/adr/0098 and
+# docs/mutations/adr-0069-harness-selftest.json.
+#
+# The count at the top of this file was therefore overstating the debt. One
+# entry is a small error; the direction is not. A debt list that counts
+# discharged items keeps people working on things already done.
 
 # --- Written by concurrent agents. Not mine to re-derive without
 #     stepping on in-flight work; raised rather than claimed. ---
@@ -79,6 +94,10 @@
 0076   # the adjacent paper is the one you miscite
 0081   # the audit says ready and not what is owed -- concurrent agent's,
        # arrived this pass. Set file owed, per the standing policy.
+0113   # the conditions that stayed on the screen -- arrived 2026-08-17,
+       # another agent's, mid-pass. Asked, not claimed: re-deriving it
+       # means editing their record if a result disagrees, and the record
+       # was minutes old when this line was written.
 
 # --- Why `--only` exists: the numbers ---
 #

@@ -31,6 +31,12 @@ In each document under `DOCS`, every backticked token that looks like a
 repo-relative path *with a directory component* -- `Tests/foo.py`,
 `docs/adr/0012-x.md` -- must exist.
 
+**A token ending `.git` is a remote repository, not a file here.** Those are
+delegated to `Tests/test_clone_instructions_agree.py`, which checks the
+thing that is actually checkable about them: that every entry point names
+the same one. The delegation is verified, not assumed — if that test stops
+reading clone URLs, this guard fails rather than quietly exempting them.
+
 **Bare filenames are deliberately not checked.** These documents refer to
 `terium_engine.py` and `brenda_client.py` conversationally, the way you
 would in a sentence, and demanding a full path there would either fail
@@ -56,10 +62,16 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 #: The documents a newcomer is actually pointed at. Not every markdown file
-#: in the repository: 81 sit at the root, most of them archived session
+#: in the repository: dozens sit at the root, most of them archived session
 #: reports (see docs/ARCHIVE_TRIAGE.md), and holding a superseded 2026
 #: status report to this standard would bury the two live defects in
 #: hundreds of stale ones. These are the ones that must be right.
+#:
+#: The count is deliberately not written here. It was "81" for a pass after
+#: the archive move made it 41, in a comment nobody reads while running --
+#: the same drift `Tests/test_archive_counts_are_current.py` exists to stop.
+#: A number in a comment gets no guard, so the honest move is not to state
+#: one.
 DOCS: tuple[str, ...] = (
     "README.md",
     "CONTRIBUTING.md",
@@ -81,8 +93,24 @@ _MIN_REFS = 20
 #: A backticked token containing a directory separator and a file suffix.
 _PATH_RE = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*/[A-Za-z0-9_./-]+\.[a-zA-Z]{2,4})`")
 
+#: A remote repository, not a file in this tree. `Terrium-sim/terrium.git`
+#: has the shape of a repo-relative path -- one slash, a short suffix -- and
+#: is not one; it is the tail of a clone URL.
+#:
+#: This guard learned that by breaking. The pass that fixed the clone-URL
+#: disagreement wrote the explanation into `START_HERE.md`, backticking
+#: three repository slugs, and this guard read all three as missing files
+#: and failed `make guards`. A guard born from a wrong path typed while
+#: fixing paths was taken down by prose typed while fixing prose.
+_REMOTE_RE = re.compile(r"\.git$")
+
 #: Paths that name something deliberately absent. Each needs a reason.
 KNOWN_ABSENT: dict[str, str] = {}
+
+#: Where the delegation goes. `.git` tokens are not skipped, they are
+#: *handed off*: whether the entry points agree on one clone URL is checked
+#: by this file, and it must keep doing so for the handoff to be honest.
+HANDOFF = "Tests/test_clone_instructions_agree.py"
 
 
 def _tracked() -> set[str]:
@@ -97,10 +125,41 @@ def extract(text: str) -> set[str]:
     return set(_PATH_RE.findall(text))
 
 
+def classify(text: str) -> tuple[set[str], set[str]]:
+    """(paths in this tree, remote repository identifiers).
+
+    Three outcomes, not two: a token resolves, is delegated elsewhere, or is
+    broken. Collapsing "delegated" into "fine" is how a handoff becomes a
+    silent exemption.
+    """
+    found = extract(text)
+    remotes = {t for t in found if _REMOTE_RE.search(t)}
+    return found - remotes, remotes
+
+
+def handoff_is_live() -> str | None:
+    """Why the `.git` delegation is no longer honest, or None if it holds.
+
+    Returning a *reason* rather than a bool: a caller that only learns
+    "False" has to reconstruct which half broke, and would probably print
+    something vague.
+    """
+    path = ROOT / HANDOFF
+    if not path.exists():
+        return f"{HANDOFF} is gone"
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if "git clone" not in text:
+        return f"{HANDOFF} no longer reads clone commands"
+    if ".git" not in text:
+        return f"{HANDOFF} no longer matches `.git` URLs"
+    return None
+
+
 def unresolved(doc: str, text: str, tracked: set[str]) -> list[str]:
     """Paths named in `doc` that point at nothing. Order is stable."""
+    paths, _ = classify(text)
     bad = []
-    for ref in sorted(extract(text)):
+    for ref in sorted(paths):
         if ref in KNOWN_ABSENT:
             continue
         if ref in tracked or (ROOT / ref).exists():
@@ -112,6 +171,7 @@ def unresolved(doc: str, text: str, tracked: set[str]) -> list[str]:
 def main() -> int:
     tracked = _tracked()
     total = 0
+    delegated: set[str] = set()
     problems: list[tuple[str, str]] = []
     missing_docs: list[str] = []
 
@@ -121,7 +181,14 @@ def main() -> int:
             missing_docs.append(doc)
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        total += len(extract(text))
+        here, remote = classify(text)
+        # The floor counts what was VERIFIED, not what was seen. Counting
+        # `extract` would let a classifier that routes everything to
+        # `delegated` sail past a floor of 20 on 61 tokens while checking
+        # none of them -- a check that cannot fail, which is worse than no
+        # check because it is trusted.
+        total += len(here)
+        delegated |= remote
         for ref in unresolved(doc, text, tracked):
             problems.append((doc, ref))
 
@@ -138,15 +205,37 @@ def main() -> int:
 
     if total < _MIN_REFS:
         print(
-            f"FAIL: extracted only {total} path reference(s) across "
-            f"{len(DOCS)} documents, below the floor of {_MIN_REFS}.\n"
-            "      The extraction is broken, not the documentation. A scan "
-            "that finds nothing must not report success."
+            f"FAIL: verified only {total} in-tree path reference(s) across "
+            f"{len(DOCS)} documents,\n      below the floor of {_MIN_REFS} "
+            f"({len(delegated)} more were delegated as remote repos).\n"
+            "      The extraction or the classifier is broken, not the "
+            "documentation.\n      A scan that checks nothing must not "
+            "report success."
         )
         return 1
 
+    # Only assert the handoff when something actually relies on it. A
+    # delegation nobody is using is not a delegation, and failing on it
+    # would make this guard fail for a reason unrelated to any document it
+    # reads.
+    if delegated:
+        broken = handoff_is_live()
+        if broken is not None:
+            print(
+                f"FAIL: {len(delegated)} remote repository identifier(s) are "
+                f"exempted here\n      because {HANDOFF} checks them "
+                f"instead -- but {broken}.\n\n"
+                "      "
+                + ", ".join(sorted(delegated))
+                + "\n\n      Nothing now checks that the entry points agree "
+                "on one clone URL.\n      Restore the test, or stop "
+                "exempting these."
+            )
+            return 1
+
     print(f"Documents checked:       {len(DOCS)}")
     print(f"Path references found:   {total}")
+    print(f"Delegated (remote repo): {len(delegated)} -> {HANDOFF}")
     print(f"Pointing at nothing:     {len(problems)}")
 
     if problems:

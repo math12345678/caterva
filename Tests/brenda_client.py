@@ -50,6 +50,8 @@ from bs4 import BeautifulSoup
 from pydantic import BaseModel, Field
 
 import enzyme_lookup
+from effector import Effector, extract_effectors
+from protein_variant import VariantVerdict, classify as classify_variant
 from assay_conditions import parse_assay_conditions
 from http_retry import retry_get
 
@@ -78,6 +80,17 @@ class BRENDAKmEntry(BaseModel):
     #: Fields BRENDA explicitly states the original publication did not
     #: report -- a fact about the literature, distinct from a parse failure.
     assay_unreported: List[str] = Field(default_factory=list)
+    #: Cofactors and allosteric effectors named in the commentary, with
+    #: their presence state. The same string that yields pH, temperature and
+    #: buffer also says "in absence of fructose 1,6-bisphosphate", and that
+    #: clause was discarded until ADR 0032.
+    effectors: "list[Effector]" = Field(default_factory=list)
+    #: Which protein this row measured: the enzyme, or a variant of it.
+    #:
+    #: The same commentary cell that yields pH and temperature also says
+    #: "Y124C mutant" or "isozyme H4", and that half of it used to be
+    #: discarded. See protein_variant.py and ADR 0029.
+    variant: "VariantVerdict | None" = None
     reference_id: str | None = None
     ec_number: str | None = None
     flagged: bool = False
@@ -549,6 +562,10 @@ def parse_brenda_km_html(
                 assay_temperature_c=parsed_conditions.temperature_c,
                 assay_buffer=parsed_conditions.buffer,
                 assay_unreported=parsed_conditions.explicitly_unreported,
+                variant=classify_variant(conditions),
+                # Extraction only. Identity resolution needs PubChem and is
+                # done by the runner, so parsing a fixture stays offline.
+                effectors=extract_effectors(conditions),
                 reference_id=ref_id,
                 ec_number=ec_number,
                 flagged=flagged,
@@ -651,7 +668,7 @@ def fetch_and_parse_brenda_km(
     ec_number: str,
     target_organism: str | None = "Homo sapiens",
     target_substrates: list | None = None,
-    taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
+    taxon_id: str | None = None,
     expand_synonyms: bool = True,
     allow_unverified_fallback: bool = True,
     table_label: str = "KM Values",
@@ -704,7 +721,26 @@ def fetch_and_parse_brenda_km(
             # substrate_verified=False rather than hiding it entirely.
             target_substrates = []
 
-    fallback_uniprot = enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
+    # `taxon_id` used to default to 9606 (Homo sapiens) independently of
+    # `target_organism`. Two defaults for one fact, and they could disagree:
+    # a caller passing target_organism="Thermus aquaticus" and omitting
+    # taxon_id got a thermophile's rows stamped with the human accession.
+    #
+    # The organism is now the single source of truth and the taxon is
+    # derived from it. When it cannot be derived there is NO fallback
+    # accession -- rows carry uniprot=None, which is true, rather than a
+    # confident accession for a species nobody asked about.
+    if taxon_id is None and target_organism:
+        try:
+            taxon_id = enzyme_lookup.fetch_taxon_id(target_organism)
+        except Exception:
+            taxon_id = None
+
+    fallback_uniprot = (
+        enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
+        if taxon_id
+        else None
+    )
     html = fetch_brenda_html(ec_number)
 
     entries = parse_brenda_km_html(
@@ -743,7 +779,7 @@ def fetch_and_parse_brenda_kcat(
     ec_number: str,
     target_organism: str | None = "Homo sapiens",
     target_substrates: list | None = None,
-    taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
+    taxon_id: str | None = None,
     expand_synonyms: bool = True,
     allow_unverified_fallback: bool = True,
 ) -> list[BRENDAKmEntry]:
@@ -784,7 +820,7 @@ def fetch_and_parse_brenda_ki(
     ec_number: str,
     target_organism: str | None = "Homo sapiens",
     target_substrates: list | None = None,
-    taxon_id: str = enzyme_lookup.DEFAULT_TAXON_ID,
+    taxon_id: str | None = None,
     expand_synonyms: bool = True,
     allow_unverified_fallback: bool = True,
 ) -> list[BRENDAKmEntry]:

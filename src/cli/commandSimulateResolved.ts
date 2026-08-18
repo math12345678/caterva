@@ -32,6 +32,14 @@ import {
   resolveKinetic,
 } from '../literature/literatureResolver';
 import { convertConcentration } from '../units';
+import {
+  exportCitations,
+  exportModel,
+  type CitedValue,
+  type ExportProvenance,
+} from './exportArtifacts';
+import type { ReliabilityAxes } from '../literature/literatureResolver';
+import { USER_CITATION_CAVEAT } from './userCitations';
 import { parseQuantity } from './parseQuantity';
 import { commandSensitivity } from './commandSensitivity';
 import { JobManager } from '../execution/job-manager';
@@ -66,6 +74,63 @@ export interface ParameterProvenance {
   crossSpecies?: boolean;
   /** true when the CLI had to assume the unit rather than being told. */
   unitAssumed?: boolean;
+  /** Bakker's axes as (axis -> grade), for the exported model file. */
+  reliability?: Record<string, string>;
+  /** The same axes as (axis -> why). Carried separately from the grades
+   *  rather than folded into one string, because the exported model renders
+   *  them as a list and the terminal renders only the ones worth reading
+   *  aloud. */
+  reliabilityReasons?: Record<string, string>;
+  /** NCBI Taxonomy id of the organism this value was MEASURED in. Absent
+   *  when nothing resolved it; never inferred from `organism`, which is a
+   *  name rather than an identifier. */
+  taxonId?: string;
+  /** Taxon of the organism the user ASKED about. Differs from `taxonId`
+   *  exactly when the value is a cross-species substitution. */
+  requestedTaxonId?: string;
+  /** The conditions this value was measured under, for the exported model.
+   *  Jeske's "fantasy numbers" sentence names pH, temperature and buffers
+   *  as what decides whether mixing values is legitimate; the file a
+   *  student shares is where that has to survive. */
+  assayConditions?: {
+    ph?: number;
+    temperatureC?: number;
+    buffer?: string;
+    unreported?: string[];
+  };
+}
+
+/**
+ * A resolved result's conditions, normalised for the export payload.
+ *
+ * `null` becomes `undefined` rather than travelling as-is: the resolver
+ * uses `null` for "not reported" and the export payload is JSON, where a
+ * present `"ph": null` and an absent `ph` reach Python as the same thing
+ * but read very differently to anyone inspecting the payload.
+ *
+ * Returns undefined when there is nothing to say at all, so a parameter
+ * whose conditions were never parsed carries no key rather than an empty
+ * object that looks like a failed lookup.
+ */
+function assayConditionsFor(
+  result: { assayConditions?: {
+    ph?: number | null;
+    temperatureC?: number | null;
+    buffer?: string | null;
+    unreported?: string[];
+  } },
+): ParameterProvenance['assayConditions'] {
+  const conditions = result.assayConditions;
+  if (!conditions) return undefined;
+
+  const normalised = {
+    ph: conditions.ph ?? undefined,
+    temperatureC: conditions.temperatureC ?? undefined,
+    buffer: conditions.buffer ?? undefined,
+    unreported: conditions.unreported?.length ? conditions.unreported : undefined,
+  };
+  const anything = Object.values(normalised).some((v) => v !== undefined);
+  return anything ? normalised : undefined;
 }
 
 export interface SimulateResolvedOptions {
@@ -86,12 +151,401 @@ export interface SimulateResolvedOptions {
    *  run through the engine (directly, or as SBML when the engine has no
    *  first-class domain). */
   model?: InhibitionModel;
+  /** --export-model PATH: write the Antimony with provenance in comments. */
+  exportModel?: string;
+  /** --export-citations PATH: write every source as .bib or .ris. */
+  exportCitations?: string;
+  /**
+   * The conditions the model represents, for Bakker's proximity axis.
+   *
+   * `--physiological` reached only `scientific resolve` until now, so the
+   * PRIMARY workflow — the one that actually runs a simulation — could
+   * never state what it was modelling, and `conditionProximity` came back
+   * `not_assessed` on every run of it. An axis that cannot fire in the main
+   * command is decoration in the main command.
+   */
+  physiologicalReference?: {
+    ph: number;
+    temperatureC: number;
+    basis: string;
+    phTolerance: number;
+    temperatureToleranceC: number;
+  };
+  /**
+   * `--cite km="Smith 2019"` — sources for values the user supplied.
+   *
+   * Keyed by lower-case parameter name. Never verified by Terrium, and
+   * carried as `user_cited` rather than `resolved` so no surface can
+   * present it with the authority of a BRENDA reference.
+   */
+  userCitations?: Map<string, string>;
 }
 
 /** Exit codes mirror `resolve`: 0 ran, 1 could not look up, 2 no data. */
+/**
+ * Bakker's three axes, flattened to (axis -> grade) for the provenance row.
+ *
+ * WHY THIS FUNCTION EXISTS AT ALL
+ * -------------------------------
+ * `ParameterProvenance.reliability` was declared, and read when building the
+ * exported model, and never once written. The Python resolver graded every
+ * value, the score crossed the subprocess boundary, `literatureResolver`
+ * carried it into `ResolvedKinetic` — and this file, the last step, dropped
+ * it. Every exported model therefore carried an empty reliability block
+ * while the whole chain upstream worked.
+ *
+ * That is the fourth time in this repository that a value has been
+ * computed, transported, and discarded by a consumer with nowhere to put
+ * it, and the second time in this exact feature. It produces no error on
+ * either side: the producer sees a successful write, the consumer sees a
+ * complete object.
+ *
+ * Grades only, not reasons. The exported model annotates each parameter on
+ * one line, and three paragraphs of justification per parameter would bury
+ * the model in its own provenance. The reasons stay in `scientific resolve`
+ * and in the API response, where there is room to read them.
+ */
+/**
+ * "BRENDA ref 740253" -> { source: 'BRENDA', referenceId: '740253' }.
+ *
+ * Lifted out of the citations branch, where it was inline. The model
+ * export could not reach it, so the SBML annotator re-derived identifiers
+ * by regex from the display string — a string produced by this same file.
+ * Parsing your own output is the duplicate-source-of-truth defect with a
+ * formatting step in between: the first end-to-end run wrote **zero**
+ * MIRIAM annotations because "PubMed ref 12345678" has a five-character
+ * gap and the pattern allowed four.
+ *
+ * The structured value is now passed through instead of reconstructed.
+ */
+export function splitCitation(
+  citation: string,
+  origin: string,
+): { source: string; referenceId?: string } {
+  if (origin === 'user_cited') return { source: 'user-supplied' };
+  return {
+    source: citation.split(' ')[0] ?? 'unknown',
+    referenceId: citation.match(/ref\s+(\S+)/)?.[1],
+  };
+}
+
+/** The three axes as (label, grade, reason), in one order everywhere. */
+function reliabilityAxes(
+  result: { reliability?: ReliabilityAxes },
+): Array<{ label: string; grade: string; reason: string }> | undefined {
+  const axes = result.reliability;
+  if (!axes) return undefined;
+  return [
+    { label: 'assay completeness', ...axes.assayCompleteness },
+    { label: 'conditions vs model', ...axes.conditionProximity },
+    { label: 'organism match', ...axes.organismMatch },
+  ];
+}
+
+function reliabilityGrades(
+  result: { reliability?: ReliabilityAxes },
+): Record<string, string> | undefined {
+  const axes = reliabilityAxes(result);
+  if (!axes) return undefined;
+  return Object.fromEntries(axes.map((axis) => [axis.label, axis.grade]));
+}
+
+/**
+ * The reason behind each grade, for the parameters that have one.
+ *
+ * `scientific resolve` has printed these since the axes existed.
+ * `simulate --resolve` -- the command a student actually runs -- printed
+ * the bare grades and nothing else, so the screen said
+ * `assay completeness complete` and never what that meant.
+ *
+ * For a teaching tool the reason IS the teaching. "complete" is a token;
+ * "reports pH 7.4 and 25 C, meeting STRENDA's minimum, so the measurement
+ * can be compared against another lab's figure" is the sentence a student
+ * learns something from. Computing it and dropping it before it reaches
+ * anyone is the same defect this codebase has now found at five different
+ * layers.
+ */
+function reliabilityReasons(
+  result: { reliability?: ReliabilityAxes },
+): Record<string, string> | undefined {
+  const axes = reliabilityAxes(result);
+  if (!axes) return undefined;
+  return Object.fromEntries(axes.map((axis) => [axis.label, axis.reason]));
+}
+
+/**
+ * The artifacts a run can leave behind.
+ *
+ * Called AFTER the run reports, and its failures never change the exit code
+ * of the run itself: a simulation that succeeded did succeed, and reporting
+ * otherwise because a file could not be written would make the exit code
+ * mean two different things. The failure is printed loudly instead — a
+ * silently missing export is how someone submits a paper believing they
+ * attached a bibliography.
+ *
+ * `runnable: false` means the simulation was REFUSED — a parameter could not
+ * be resolved and nothing was invented to fill the gap. That is not a reason
+ * to ignore the flags the user typed, which is what happened before: the
+ * refusal path returned two screens earlier, so `--export-model` and
+ * `--export-citations` produced no file and no message. The user asked for
+ * an artifact, got silence, and had nothing to distinguish "refused to write
+ * it" from "wrote it somewhere I am not looking".
+ *
+ * The two exports are treated DIFFERENTLY on refusal, and the difference is
+ * the point:
+ *
+ * - **Citations are still written.** A resolved Km with a BRENDA reference is
+ *   a real finding, and it stays a real finding when a *different* parameter
+ *   is missing. The refusal message effectively tells the student to go read
+ *   the literature; withholding the bibliography at that exact moment is the
+ *   worst possible time to withhold it.
+ *
+ * - **The model is not written, and the refusal says so.** An Antimony file
+ *   missing `vmax` is not a model — it is a file shaped like one, which
+ *   loads into anything that reads Antimony and fails there instead of here.
+ *   Writing it would be the same error the tool refuses to make with numbers:
+ *   emitting something that looks complete because it looks generated.
+ *
+ * One function rather than two so there is one place that knows what exports
+ * exist. A separate refusal-path exporter would be a second list to keep in
+ * step, and it would be wrong the first time a third export is added.
+ */
+async function writeExports(
+  options: SimulateResolvedOptions,
+  domain: string,
+  parameters: Record<string, number>,
+  rows: ParameterProvenance[],
+  runnable = true,
+  /**
+   * The time course that ACTUALLY ran, for the SED-ML inside a COMBINE
+   * archive. Passed in rather than restated here: this function does not
+   * run the simulation and must not invent the experiment that produced
+   * the result it is describing.
+   *
+   * Absent on the refusal path, where no simulation happened — and an
+   * archive is then refused rather than written with a made-up time
+   * course.
+   */
+  experiment?: { endTime?: number; points: number },
+): Promise<void> {
+  /**
+   * Everything this function tells the user goes through here.
+   *
+   * Under `--json`, stdout carries ONE machine-readable document and nothing
+   * else. These messages are prose, and appending them after the JSON
+   * produced output no parser could read:
+   *
+   *     $ simulate ... --json --export-citations refs.bib
+   *     json.decoder.JSONDecodeError: Extra data: line 39 column 1
+   *
+   * The files are still written and the outcomes still reported — as
+   * `exports` inside the document (see the call sites), which is where a
+   * script can actually act on them. Suppressing the prose without reporting
+   * the outcome would trade a corrupt document for a silent one.
+   */
+  const say = (text: string): void => {
+    // `process.stdout.write`, NOT `say` — this is the one place in this
+    // function that must call the real sink. A blanket rewrite of
+    // `process.stdout.write` -> `say` across the body caught this line too
+    // and made it recurse: `RangeError: Maximum call stack size exceeded`,
+    // surfacing as `✗ Fatal error` with the refusal already printed, so the
+    // run looked like it had merely failed late.
+    if (!options.json) process.stdout.write(text);
+  };
+
+  if (options.exportModel && !runnable) {
+    say(
+      `\n${c(YELLOW, '⚠')} ${c(BOLD, 'Model not written')} ${c(DIM, options.exportModel)}\n` +
+        `${c(DIM, '  The run was refused above, so at least one parameter has no value.')}\n` +
+        `${c(DIM, '  An Antimony file with a hole in it is not a model — it would load')}\n` +
+        `${c(DIM, '  and fail in whatever opened it, instead of here where the reason is.')}\n` +
+        `${c(DIM, '  Supply the missing value and re-run, and the model will be written.')}\n`,
+    );
+  } else if (options.exportModel) {
+    const provenance: Record<string, ExportProvenance> = {};
+    for (const row of rows) {
+      provenance[row.name] = {
+        // Three origins, not two. Folding `user_cited` into `resolved`
+        // would let an unverified citation acquire the authority of a
+        // BRENDA reference by passing through a tool that promises
+        // provenance -- the most damaging thing this feature could do.
+        origin:
+          row.origin === 'user'
+            ? 'user'
+            : row.origin === 'user_cited'
+              ? 'user_cited'
+              : 'resolved',
+        citation: row.citation,
+        organism: row.organism,
+        taxonId: row.taxonId,
+        source: row.origin,
+        crossSpecies: row.crossSpecies,
+        reliability: row.reliability,
+        reliabilityReasons: row.reliabilityReasons,
+        // Forwarded, not re-derived. The row already holds what the
+        // resolver reported; deriving the conditions a second time here
+        // would be a second place the same fact is decided (ADR 0027).
+        assayConditions: row.assayConditions,
+        // Structured, so the SBML annotator can decide whether a
+        // resolvable URI exists without re-parsing prose.
+        ...(row.citation
+          ? (() => {
+              const split = splitCitation(row.citation, row.origin);
+              return {
+                citationSource: split.source,
+                referenceId: split.referenceId,
+              };
+            })()
+          : {}),
+      };
+    }
+
+    // The taxon the MODEL is about, as distinct from the taxon each value
+    // was measured in. Supplying it is what makes a cross-species
+    // substitution detectable by a consumer that never renders notes: the
+    // model carries one `bqbiol:hasTaxon`, each parameter carries its own,
+    // and the two disagree.
+    //
+    // Taken from a row that reports it rather than resolved again here.
+    // Re-resolving would be a second lookup of one fact, and the two could
+    // return different answers if the caller's organism string and the
+    // resolver's differed by a synonym.
+    const modelTaxonId = rows.find((row) => row.requestedTaxonId)?.requestedTaxonId;
+
+    // The experiment as it actually ran, for the SED-ML inside a COMBINE
+    // archive. Read off the trajectory rather than restated: a constant
+    // here would describe a time course nobody performed the moment the
+    // engine's defaults changed, and the archive's entire purpose is that
+    // someone else re-runs the SAME experiment.
+    const outcome = await exportModel(
+      {
+        domain,
+        parameters,
+        provenance,
+        query: options.substrate,
+        modelTaxonId,
+        endTime: experiment?.endTime,
+        points: experiment?.points,
+      },
+      options.exportModel,
+    );
+    if (outcome.ok) {
+      // Antimony carries provenance in comments, which translation to SBML
+      // deletes outright -- measured, not assumed. So the SBML export says
+      // something different, because it IS something different: standard
+      // MIRIAM annotations that other tools read without being told to.
+      const blurb =
+        outcome.format === 'omex'
+          ? `${c(DIM, `  A COMBINE archive: ${(outcome.entries ?? []).join(', ')}.`)}\n` +
+            `${c(DIM, '  The model, the experiment that produced this result, and the')}\n` +
+            `${c(DIM, '  sources behind every number — in one file somebody else can re-run.')}\n`
+          : outcome.format === 'sbml'
+          ? (outcome.cvterms ?? 0) > 0
+            ? `${c(DIM, `  ${outcome.cvterms} MIRIAM annotation(s) written. Readable by COPASI, JWS`)}\n` +
+              `${c(DIM, '  Online and anything else that reads SBML — the provenance is in the')}\n` +
+              `${c(DIM, '  file as data, not only as prose.')}\n`
+            // Saying "the provenance is in the file as data" over zero
+            // annotations is the kind of confident wrong sentence this
+            // project exists to not emit. The notes are still there; the
+            // machine-readable half is not, and the reason follows below.
+            : `${c(YELLOW, '  ⚠ no MIRIAM annotations were written.')}` +
+              `${c(DIM, ' The origins are in the notes,')}\n` +
+              `${c(DIM, '  which a person reads and a pipeline does not.')}\n`
+          : `${c(DIM, '  Loadable by anything that reads Antimony. Every parameter carries')}\n` +
+            `${c(DIM, '  its origin in a comment, so the provenance travels with the file.')}\n`;
+      say(`\n${c(BOLD, 'Model written')} ${outcome.path}\n` + blurb);
+
+      // An identifier Terrium declined to mint a URI for is NOT a missing
+      // annotation — the source is real, it just has no resolvable form.
+      // Saying so is the difference between "we had nothing" and "we had
+      // something and refused to dress it up as a link".
+      for (const refused of outcome.refusedUris ?? []) {
+        say(
+          `${c(DIM, `  no URI for ${refused.parameter}: ${refused.reason}`)}\n`,
+        );
+      }
+      if (outcome.unsourced && outcome.unsourced.length > 0) {
+        say(
+          `${c(YELLOW, '  ⚠ ' + outcome.unsourced.join(', '))}` +
+            `${c(DIM, ' carry no clean literature source in that file.')}\n`,
+        );
+      }
+    } else {
+      say(
+        `\n${c(RED, '✗')} Model not written: ${outcome.error}\n`,
+      );
+    }
+  }
+
+  if (options.exportCitations) {
+    const cited: CitedValue[] = rows
+      .filter((row) => row.citation)
+      .map((row) => ({
+        parameter: row.name,
+        // The display citation is "BRENDA ref 740253". The source and the
+        // identifier are split back out rather than passed as one string,
+        // because a bibliography entry needs them as separate fields.
+        // A user citation is free text, not "SOURCE ref ID". Marked as
+        // such so the exported entry cannot be mistaken for a database
+        // record.
+        citationSource: splitCitation(row.citation!, row.origin).source,
+        title: row.origin === 'user_cited' ? row.citation : undefined,
+        referenceId: splitCitation(row.citation!, row.origin).referenceId,
+        value: row.value,
+        unit: row.unit,
+        organism: row.organism,
+      }));
+
+    const outcome = await exportCitations(cited, options.exportCitations);
+    if (outcome.ok) {
+      say(
+        `\n${c(BOLD, 'Citations written')} ${outcome.path}\n` +
+          `${c(DIM, `  ${cited.length} source(s), importable into Zotero, Mendeley or EndNote.`)}\n` +
+          `${c(DIM, '  Author, year and journal are absent, not omitted — Terrium knows')}\n` +
+          `${c(DIM, '  the identifier and does not invent the rest.')}\n`,
+      );
+    } else {
+      say(
+        `\n${c(RED, '✗')} Citations not written: ${outcome.error}\n`,
+      );
+    }
+  }
+}
+
 export async function commandSimulateResolved(
   options: SimulateResolvedOptions,
 ): Promise<number> {
+  /**
+   * Every PROSE message this function prints goes through here. The JSON
+   * documents call `process.stdout.write` directly, because they are the
+   * thing `--json` promises.
+   *
+   * Eleven prose writes were reachable while `options.json` was true — the
+   * model suggestion, the product-inhibition caveat, the sensitivity table,
+   * the warnings list — each of which put a sentence on stdout ahead of the
+   * document:
+   *
+   *     $ simulate ... --resolve --ki 5mM --i0 1mM --json
+   *     • Did you mean --model competitive? ...
+   *     { "ok": true, ... }
+   *     -> Expecting value: line 2 column 1 (char 1)
+   *
+   * ADR 0077 fixed the same fault inside `writeExports` and stopped there.
+   * That fixed the instance and not the class: `--json` remained corruptible
+   * by any of eleven other branches, and the test written for it passed
+   * because the scenario it ran happened to trigger none of them.
+   *
+   * The sink is per-function rather than per-message so that a message added
+   * later is quiet by default. Getting this right by remembering to wrap
+   * each new `process.stdout.write` is the arrangement that just failed.
+   */
+  const say = (text: string): void => {
+    // `process.stdout.write`, NOT `say`. See ADR 0077 — a scripted rewrite
+    // of the calls in `writeExports` caught that function's own sink and
+    // made it recurse.
+    if (!options.json) process.stdout.write(text);
+  };
+
   const provenance: ParameterProvenance[] = [];
   const unresolved: string[] = [];
 
@@ -103,11 +557,19 @@ export async function commandSimulateResolved(
   for (const [name, raw] of Object.entries(options.overrides)) {
     const quantity = parseQuantity(name, raw);
     userValues[name] = { value: quantity.value, unit: quantity.unit };
+
+    // A value the user typed may still have a real source in the world.
+    // Sauro predicted that a refusing tool pushes people to "hardcode a
+    // number with no warning at all" -- and Terrium's own error message
+    // told them to. If they can say where it came from, that is recorded
+    // rather than discarded.
+    const cited = options.userCitations?.get(name.toLowerCase());
     provenance.push({
       name,
       value: quantity.value,
       unit: quantity.unit,
-      origin: 'user',
+      origin: cited ? 'user_cited' : 'user',
+      citation: cited,
       unitAssumed: !quantity.unitDeclared,
     });
   }
@@ -141,6 +603,7 @@ export async function commandSimulateResolved(
           substrate: options.substrate,
           organism: options.organism,
           quantity: 'km',
+          physiologicalReference: options.physiologicalReference,
         });
         if (!result.found) {
           unresolved.push('km');
@@ -157,6 +620,11 @@ export async function commandSimulateResolved(
             : undefined,
           organism: result.organism ?? undefined,
           crossSpecies: result.crossSpecies,
+          taxonId: result.taxonId ?? undefined,
+          requestedTaxonId: result.requestedTaxonId ?? undefined,
+          reliability: reliabilityGrades(result),
+          reliabilityReasons: reliabilityReasons(result),
+          assayConditions: assayConditionsFor(result),
         });
       } else {
         // Vmax is not a BRENDA table. It is kcat x [E]0, and [E]0 is a
@@ -177,6 +645,7 @@ export async function commandSimulateResolved(
           organism: options.organism,
           quantity: 'kcat',
           enzymeConc: enzymeConcMM,
+          physiologicalReference: options.physiologicalReference,
         });
         if (!result.found || result.bridgedVmax === undefined) {
           unresolved.push('vmax (no kcat found to bridge)');
@@ -193,6 +662,15 @@ export async function commandSimulateResolved(
             : undefined,
           organism: result.organism ?? undefined,
           crossSpecies: result.crossSpecies,
+          taxonId: result.taxonId ?? undefined,
+          requestedTaxonId: result.requestedTaxonId ?? undefined,
+          // The score describes the KCAT that was resolved. Vmax is that
+          // kcat times a caller-supplied [E]0, so the assay and organism
+          // axes still describe where the measured half came from -- and
+          // the [E]0 half has its own row, marked `user`.
+          reliability: reliabilityGrades(result),
+          reliabilityReasons: reliabilityReasons(result),
+          assayConditions: assayConditionsFor(result),
         });
       }
     } catch (err) {
@@ -243,6 +721,8 @@ export async function commandSimulateResolved(
             : undefined,
           organism: result.organism ?? undefined,
           crossSpecies: result.crossSpecies,
+          taxonId: result.taxonId ?? undefined,
+          requestedTaxonId: result.requestedTaxonId ?? undefined,
         });
       } else {
         unresolved.push('ki (no inhibition constant in the literature for this system)');
@@ -277,37 +757,96 @@ export async function commandSimulateResolved(
       i0: userValues['i0']?.value,
     });
     if (suggestion) {
-      process.stdout.write(
+      say(
         `\n${c(YELLOW, '•')} ${c(BOLD, `Did you mean --model ${suggestion.model}?`)} ` +
           `${c(DIM, suggestion.why + '.')}\n`,
       );
     }
   }
 
-  // s0 has no literature source: it is an experimental condition the user
-  // chooses, not a property of the enzyme.
-  if (!userValues['s0']) {
-    unresolved.push('s0 (an experimental condition — supply it, e.g. --s0 10mM)');
-  }
+  // s0 is NOT checked here. It is in every model's `requires` list, so the
+  // loop above already reports it — and this block used to report it a
+  // second time, with a byte-identical sentence, so every refusal that was
+  // missing s0 printed the same line twice:
+  //
+  //     s0 (an experimental condition — supply it, e.g. --s0 10mM)
+  //     s0 (an experimental condition — supply it, e.g. --s0 10mM)
+  //
+  // A reader has no way to tell that from two genuinely different missing
+  // things, and the obvious reading — that there are two s0s — is wrong.
+  // The block predates the generic loop and was left behind when the loop
+  // took over. Deleted rather than de-duplicated at the print site: the
+  // duplicate was a second source of truth, and suppressing its output
+  // would have kept the second source and hidden it.
 
   if (unresolved.length > 0) {
-    if (options.json) {
-      process.stdout.write(
-        JSON.stringify({ ok: false, status: 'unresolved', unresolved, provenance }, null, 2) + '\n',
-      );
-    } else {
+    // ORDER MATTERS, AND IT DIFFERS BY OUTPUT MODE.
+    //
+    // Human: the refusal is printed first, then the export messages — one of
+    // which says "the run was refused above", which has to be true.
+    // JSON: stdout must carry ONE document, so the exports (silent under
+    // --json, see `say`) happen first and are reported inside it. Appending
+    // their prose after the document produced output no parser could read:
+    //
+    //     json.decoder.JSONDecodeError: Extra data: line 39 column 1
+    //
+    // One `writeExports` call either way. Two calls would be two lists of
+    // which exports exist, and they would disagree the first time a third
+    // export is added — ADR 0025's two-collectors problem.
+    if (!options.json) {
       printProvenance(provenance);
-      process.stdout.write(
+      say(
         `\n${c(RED, '✗')} ${c(BOLD, 'Cannot run.')} These are unresolved:\n`,
       );
       for (const item of unresolved) {
-        process.stdout.write(`    ${item}\n`);
+        say(`    ${item}\n`);
       }
-      process.stdout.write(
+      say(
         `\n${c(DIM, 'No value has been invented to fill the gap. A simulation on a')}\n` +
           `${c(DIM, 'defaulted parameter produces a result that looks measured and is not.')}\n\n`,
       );
     }
+
+    // The flags the user typed are honoured even though the run was refused.
+    // Citations found are still citations found; the model is withheld with
+    // a reason rather than silently skipped. See writeExports.
+    //
+    // `parameters` is what WAS resolved, which is a subset — it is only used
+    // for the model, and the model is not written on this path.
+    await writeExports(
+      options,
+      options.model === 'competitive' ? 'mm_competitive_inhibition' : 'mm',
+      Object.fromEntries(provenance.map((row) => [row.name, row.value] as const)),
+      provenance,
+      false,
+    );
+
+    if (options.json) {
+      process.stdout.write(
+        JSON.stringify(
+          {
+            ok: false,
+            status: 'unresolved',
+            unresolved,
+            provenance,
+            // `model: null` whatever was requested: an incomplete model is
+            // not written on this path, so reporting the requested path
+            // would imply a file that does not exist. The reason is given
+            // separately rather than left for the caller to infer.
+            exports: {
+              model: null,
+              citations: options.exportCitations ?? null,
+              modelWithheld: options.exportModel
+                ? 'the run was refused, so at least one parameter has no value'
+                : null,
+            },
+          },
+          null,
+          2,
+        ) + '\n',
+      );
+    }
+
     return 2;
   }
 
@@ -386,13 +925,13 @@ export async function commandSimulateResolved(
       );
     } else {
       printProvenance(provenance);
-      process.stdout.write(
+      say(
         `\n${c(RED, '✗')} ${c(BOLD, 'Validation stopped the run.')} No simulation was executed.\n`,
       );
       for (const message of response.validationErrors) {
-        process.stdout.write(`    ${message}\n`);
+        say(`    ${message}\n`);
       }
-      process.stdout.write('\n');
+      say('\n');
     }
     return 2;
   }
@@ -404,7 +943,7 @@ export async function commandSimulateResolved(
     printProvenance(provenance);
 
     if (model === 'product') {
-      process.stdout.write(`\n${c(YELLOW, '⚠')} ${PRODUCT_INHIBITION_CAVEAT}\n`);
+      say(`\n${c(YELLOW, '⚠')} ${PRODUCT_INHIBITION_CAVEAT}\n`);
     }
 
     try {
@@ -423,21 +962,21 @@ export async function commandSimulateResolved(
       const last = series[series.length - 1] ?? {};
       const substrateKey = Object.keys(first).find((k) => k.includes('S')) ?? '';
 
-      process.stdout.write(
+      say(
         `\n${c(BOLD, 'Result')}  ${c(DIM, INHIBITION_MODELS[model].description)}\n`,
       );
-      process.stdout.write(
+      say(
         `  ${c(DIM, 'engine    ')} ${run.domain}${run.viaSbml ? c(DIM, '  (via SBML — no first-class domain for this model)') : ''}\n`,
       );
       if (substrateKey) {
-        process.stdout.write(
+        say(
           `  ${c(DIM, 'initial   ')} ${Number(first[substrateKey]).toFixed(4)}\n`,
         );
-        process.stdout.write(
+        say(
           `  ${c(DIM, 'final     ')} ${Number(last[substrateKey]).toFixed(4)}\n`,
         );
       }
-      process.stdout.write(`  ${c(DIM, 'points    ')} ${series.length}\n\n`);
+      say(`  ${c(DIM, 'points    ')} ${series.length}\n\n`);
       return 0;
     } catch (err) {
       process.stderr.write(
@@ -451,7 +990,13 @@ export async function commandSimulateResolved(
   // provenance. That pairing is the point: it can then say which weakly
   // sourced number the answer actually rides on.
   if (options.sensitivity !== undefined) {
-    printProvenance(provenance);
+    // `printProvenance` writes prose directly, and `commandSensitivity`
+    // emits its own JSON document — so unguarded, this put the whole
+    // provenance table on stdout ahead of it and `--sensitivity --json`
+    // parsed as nothing at all. The table is the human framing for the
+    // sensitivity figures; under --json the same rows are already inside
+    // the document as `provenance`.
+    if (!options.json) printProvenance(provenance);
     return commandSensitivity({
       query: `${options.enzyme ?? options.ec} / ${options.substrate}`,
       parameters: numeric,
@@ -475,8 +1020,44 @@ export async function commandSimulateResolved(
   }
 
   if (options.json) {
+    // THE EXPORTS ARE WRITTEN BEFORE THIS RETURNS, not after.
+    //
+    // `writeExports` is the last statement of this function, and this block
+    // `return`ed above it — so under `--json`, `--export-model` and
+    // `--export-citations` produced NO FILE AND NO MESSAGE. Exactly the
+    // defect ADR 0049 fixed for the human path, still live for anyone
+    // scripting the tool, and quieter there: a script does not notice a
+    // missing file the way a person reading a terminal does.
+    //
+    // Under `--json` these calls print nothing (see `say` in writeExports),
+    // so the document below stays the only thing on stdout. The outcome is
+    // reported inside it instead, which is where a script can act on it.
+    await writeExports(
+      options,
+      options.model === 'competitive' ? 'mm_competitive_inhibition' : 'mm',
+      Object.fromEntries(provenance.map((row) => [row.name, row.value] as const)),
+      provenance,
+      true,
+    );
     process.stdout.write(
-      JSON.stringify({ ok: true, status: 'ran', provenance, response }, null, 2) + '\n',
+      JSON.stringify(
+        {
+          ok: true,
+          status: 'ran',
+          provenance,
+          response,
+          // Paths REQUESTED. Whether each file now exists is checkable by
+          // the caller with one stat() — and stating "written: true" here
+          // would be this function asserting the success of a write it does
+          // not observe.
+          exports: {
+            model: options.exportModel ?? null,
+            citations: options.exportCitations ?? null,
+          },
+        },
+        null,
+        2,
+      ) + '\n',
     );
     return 0;
   }
@@ -510,34 +1091,73 @@ export async function commandSimulateResolved(
 
   const substrateUnit = userValues['s0']?.unit ?? '';
   const first = response.results.trajectory[0];
-  process.stdout.write(`\n${c(BOLD, 'Result')}\n`);
-  process.stdout.write(
+  say(`\n${c(BOLD, 'Result')}\n`);
+  say(
     `  ${c(DIM, 'initial   ')} ${first?.value.toFixed(4)} ${substrateUnit}\n`,
   );
-  process.stdout.write(
+  say(
     `  ${c(DIM, 'final     ')} ${response.results.finalValue.toFixed(4)} ${substrateUnit}\n`,
   );
-  process.stdout.write(
+  say(
     `  ${c(DIM, 'consumed  ')} ${((first?.value ?? 0) - response.results.finalValue).toFixed(4)} ${substrateUnit}\n`,
   );
-  process.stdout.write(`  ${c(DIM, 'points    ')} ${response.results.trajectory.length}\n`);
-  process.stdout.write(`\n  ${c(DIM, 'job       ')} ${response.jobId}\n`);
-  process.stdout.write(
-    `  ${c(DIM, 'repro key ')} ${response.reproducibilityKey.slice(0, 32)}…\n`,
+  say(`  ${c(DIM, 'points    ')} ${response.results.trajectory.length}\n`);
+  say(`\n  ${c(DIM, 'job       ')} ${response.jobId}\n`);
+  // The line below used to read `repro key`, showing a hash built from
+  // the inputs, the outputs, `Date.now()` and a random UUID. It is a
+  // correct unique run identifier and it CANNOT be reproduced -- two
+  // identical runs differ by construction. Printing it under that name
+  // invited a student to compare two runs' "repro keys" and conclude the
+  // tool was non-deterministic.
+  //
+  // `inputs` is the hash that does match: same query, same parameters,
+  // same conditions, same string, on any machine. It was computed and
+  // stored from the start and never shown.
+  say(
+    `  ${c(DIM, 'inputs    ')} ${response.inputsHash.slice(0, 32)}…` +
+      `${c(DIM, '  (same inputs give the same value)')}\n`,
+  );
+  say(
+    `  ${c(DIM, 'run id    ')} ${response.reproducibilityKey.slice(0, 32)}…` +
+      `${c(DIM, '  (unique per run, never repeats)')}\n`,
   );
 
   if (written.ok) {
-    process.stdout.write(
+    say(
       `\n${c(DIM, `  Saved. Re-check it later with:  scientific check-integrity ${response.jobId}`)}\n\n`,
     );
   } else {
     // Reported rather than swallowed: a user who is told a job id, then
     // finds `verify` cannot see it, has no way to know why.
-    process.stdout.write(
+    say(
       `\n${c(YELLOW, '  ⚠ Run history could not be written')} ${c(DIM, '(' + (written.reason ?? '') + ')')}\n` +
         `${c(DIM, '    The simulation is valid; it just will not appear in `history`.')}\n\n`,
     );
   }
+
+  // The artifacts a run should be able to leave behind. Written last, and
+  // their failure never changes this function's exit code -- a simulation
+  // that succeeded did succeed, and a file that could not be written is a
+  // different fact reported separately.
+  await writeExports(
+    options,
+    options.model === 'competitive' ? 'mm_competitive_inhibition' : 'mm',
+    Object.fromEntries(
+      provenance.map((row) => [row.name, row.value] as const),
+    ),
+    provenance,
+    true,
+    // The experiment that produced the numbers printed above, read off the
+    // trajectory that was actually integrated. Not a constant: a constant
+    // here would go on describing the old time course the moment the
+    // engine's defaults changed, and every archive after that would
+    // reproduce a curve nobody had run.
+    {
+      endTime:
+        response.results.trajectory[response.results.trajectory.length - 1]?.time,
+      points: response.results.trajectory.length,
+    },
+  );
 
   return 0;
 }
@@ -550,6 +1170,22 @@ export async function commandSimulateResolved(
  * regardless of what the parameter actually was, so a Vmax in mM/s and a
  * Km in µM both rendered as millimolar.
  */
+/** Break `text` into lines of at most `width`, on word boundaries. */
+function wrap(text: string, width: number): string[] {
+  const lines: string[] = [];
+  let current = '';
+  for (const word of text.split(/\s+/)) {
+    if (current && current.length + word.length + 1 > width) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = current ? `${current} ${word}` : word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
 function printProvenance(rows: ParameterProvenance[]): void {
   if (rows.length === 0) return;
 
@@ -565,6 +1201,11 @@ function printProvenance(rows: ParameterProvenance[]): void {
     if (row.citation) line += c(DIM, `  ${row.citation}`);
     process.stdout.write(line + '\n');
 
+    if (row.origin === 'user_cited') {
+      process.stdout.write(
+        `  ${' '.repeat(nameWidth)}  ${c(DIM, USER_CITATION_CAVEAT)}\n`,
+      );
+    }
     if (row.crossSpecies) {
       process.stdout.write(
         `  ${' '.repeat(nameWidth)}  ${c(YELLOW, '⚠ measured in ' + (row.organism ?? 'another organism') + ', not the organism requested')}\n`,
@@ -574,6 +1215,42 @@ function printProvenance(rows: ParameterProvenance[]): void {
       process.stdout.write(
         `  ${' '.repeat(nameWidth)}  ${c(YELLOW, `⚠ unit not given; ${row.unit} assumed`)}\n`,
       );
+    }
+    // The axes were computed, carried, and written into the exported model
+    // file -- and never shown to the person at the terminal, who is the
+    // one deciding whether to trust the number. A grade that only appears
+    // in a file you have to know to ask for is a grade most users never
+    // see. Printed for every resolved row, including the good ones: a
+    // caveat that only appears when something is wrong teaches readers
+    // that silence means "not assessed" rather than "assessed and fine".
+    if (row.reliability) {
+      const parts = Object.entries(row.reliability).map(
+        ([axis, grade]) => `${axis} ${grade}`,
+      );
+      process.stdout.write(
+        `  ${' '.repeat(nameWidth)}  ${c(DIM, `reliability: ${parts.join(' · ')}`)}\n`,
+      );
+
+      // ...and the REASON, for any axis that is reporting a limitation.
+      //
+      // All three grades are printed above whatever they say, so silence
+      // here never means "not assessed" -- the axis is on the line above
+      // either way. What varies is the explanation, and printing three
+      // paragraphs per parameter on every run would bury the answer the
+      // command exists to give (there is an output-hygiene test about
+      // exactly that).
+      //
+      // Nothing is lost: every reason, including the good ones, is written
+      // into the exported model's notes.
+      const settled = new Set(['complete', 'exact', 'near']);
+      for (const [axis, grade] of Object.entries(row.reliability)) {
+        if (settled.has(grade)) continue;
+        const reason = row.reliabilityReasons?.[axis];
+        if (!reason) continue;
+        for (const line of wrap(reason, 66)) {
+          process.stdout.write(`  ${' '.repeat(nameWidth)}    ${c(DIM, line)}\n`);
+        }
+      }
     }
   });
 

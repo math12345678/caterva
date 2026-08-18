@@ -56,7 +56,7 @@ work wrong if you don't know them. Read this before touching anything.
 
 3. THE GUARDS WILL FAIL YOU, AND THAT IS THE POINT
 
-   22 guards run on every build (`python scripts/verify_build.py --quick`).
+   The guards run on every build (`python scripts/verify_build.py --quick`).
    They exist because things that claimed to be verified were not. Several
    were themselves caught reporting green on work they had not done.
 
@@ -114,8 +114,8 @@ Concretely, when you fix something:
 
 BEFORE YOU SAY YOU ARE DONE
 
-    python scripts/verify_build.py --quick     # 22 guards
-    python -m pytest Terium/tests Tests -q     # 1,291 tests
+    python scripts/verify_build.py --quick     # the guards
+    python -m pytest Terium/tests Tests -q     # the Python suites
     npx tsc --noEmit -p .                      # both trees must compile
 
 State what you verified and how. "Should work" is not a result.
@@ -134,6 +134,7 @@ the present. They describe what was true on a date.
 
 ## For human contributors
 
-The same rules apply, minus the paste-ability. Start with
-[`CONTRIBUTING.md`](../CONTRIBUTING.md) and
-[`docs/CONSTITUTION.md`](CONSTITUTION.md).
+This file is for agents. **Human contributors should start with
+[`START_HERE.md`](../START_HERE.md)**, which is the single entry point and
+links everything else. The same engineering rules apply either way; they
+are stated in full in [`CONSTITUTION.md`](CONSTITUTION.md).

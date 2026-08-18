@@ -9,13 +9,13 @@
 /**
  * What kind of locator this is
  */
-export type CitationLocatorKind = typeof CitationLocatorKind[keyof typeof CitationLocatorKind];
-
+export type CitationLocatorKind =
+  (typeof CitationLocatorKind)[keyof typeof CitationLocatorKind];
 
 export const CitationLocatorKind = {
-  brenda_ref: 'brenda_ref',
-  brenda_ec: 'brenda_ec',
-  pubmed: 'pubmed',
-  doi: 'doi',
-  url: 'url',
+  brenda_ref: "brenda_ref",
+  brenda_ec: "brenda_ec",
+  pubmed: "pubmed",
+  doi: "doi",
+  url: "url",
 } as const;

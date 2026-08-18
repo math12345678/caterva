@@ -35,6 +35,7 @@ from pydantic import BaseModel
 
 import core_fulltext
 import enzyme_lookup
+import enzyme_preparation
 from http_retry import retry_get
 
 #: Optional NCBI API key -- see enzyme_lookup.py's NCBI_API_KEY for the
@@ -52,6 +53,33 @@ from brenda_client import (
     parse_brenda_km_html,
 )
 from citation import Citation, citation_from_brenda_entry, pubmed_url
+from effector import Effector
+from effector_presence import EffectorContrast, find_contrasts
+from form_mixture import (
+    FormMixture,
+    SelectedForm,
+    find_form_mixtures,
+    name_selected_form,
+)
+from source_context import (
+    OrganismDiscrepancy,
+    SourceCheckUnavailable,
+    SourceMixture,
+    find_organism_discrepancies,
+    find_source_mixtures,
+    source_check_status,
+)
+import evidence_rank
+from protein_variant import VariantVerdict
+from enzyme_preparation import PreparationVerdict
+from selection_tie import SelectionTie, find_tie
+from taxonomy import (
+    Lineage,
+    Relatedness,
+    assess_relatedness,
+    fetch_taxon_lineage_xml,
+    parse_taxon_lineage,
+)
 
 PUBMED_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 PUBMED_ESUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
@@ -100,9 +128,134 @@ class KineticResult(BaseModel):
     value: float | None = None
     unit: str | None = None
     organism: str | None = None
-    source: str  # "brenda_exact" | "brenda_cross_species" | "literature_candidates" | "not_found"
+    source: str  # "brenda_exact" | "brenda_cross_species" | "cross_species_withheld"
+                 # | "cross_species_too_distant" | "literature_candidates" | "not_found"
     citation: Citation | None = None
     cross_species_flag: bool = False
+
+    #: Per-organism relatedness verdicts, populated when cross-species use
+    #: was opted into. Every candidate organism appears here, whether it
+    #: passed or failed -- a filter that only reports what survived it is
+    #: unauditable, and the organisms it silently dropped are exactly the
+    #: ones a reader would want to argue with.
+    relatedness: list[Relatedness] = []
+
+    #: Organisms that DO have a value for this (enzyme, substrate, quantity)
+    #: when the requested organism does not, and cross-species use was not
+    #: opted into. Populated only for source="cross_species_withheld".
+    #:
+    #: This exists so a refusal can say what it refused. "Not found" and
+    #: "found, in a rabbit, and you did not ask for rabbit data" are
+    #: different facts, and collapsing them into one would make the miss
+    #: unactionable -- the student cannot opt in to something they were
+    #: never told existed.
+    cross_species_organisms_available: list[str] = []
+
+    #: Variant descriptors ("Y124C", "isozyme H4") for rows that WERE found
+    #: and were withheld because they measure a variant rather than the
+    #: enzyme. Populated only for source="variant_withheld".
+    #:
+    #: Same reasoning as cross_species_organisms_available: a refusal that
+    #: cannot say what it refused leaves the user unable to exercise the
+    #: opt-in it just demanded of them.
+    variant_candidates_available: list[str] = []
+
+    #: Cofactors and effectors reported for the row that WON selection,
+    #: with presence state and PubChem identity where resolvable.
+    #:
+    #: Carried on found results because "in absence of X" is a deliberate
+    #: experimental statement, and a reader who sees no effector field would
+    #: reasonably assume none was reported -- which is a different fact.
+    effectors: "list[Effector]" = []
+
+    #: Set when the evidence ranked several rows equal and a tie-break chose
+    #: among them (ADR 0048).
+    #:
+    #: On the LDH turnover table six non-dominated rows span 21.1 to 6467 --
+    #: a 306-fold range, every one wild-type with pH and temperature
+    #: reported. `min()` returns 21.1 and nothing else says that the
+    #: evidence found 6467 equally credible.
+    #:
+    #: None means no tie was found, which is different from an empty tie:
+    #: see `SelectionTie.is_tied`.
+    selection_tie: "SelectionTie | None" = None
+
+    #: Set when the value returned IS one of the named forms the pool mixed.
+    #:
+    #: `FormMixture.reason` warns that "returning the lowest would pick a
+    #: form rather than answer the question" -- conditionally, without saying
+    #: whether it did. This says whether it did.
+    #:
+    #: None in every fixture today: the pipeline selects rows carrying no
+    #: designator. That is luck rather than design, and it is pinned by
+    #: `test_no_named_form_is_selected_today_and_that_is_the_finding`.
+    selected_form: "SelectedForm | None" = None
+
+    #: The variant verdict for the row that WON selection.
+    #:
+    #: Carried on found results, not only withheld ones. `unstated` is the
+    #: majority case in BRENDA and it is not the same as wild-type -- a
+    #: reader who sees no variant field at all would reasonably assume the
+    #: row was the enzyme as found, which is the assumption this whole
+    #: mechanism exists to stop being made silently.
+    variant: "VariantVerdict | None" = None
+
+    #: How the enzyme was PREPARED for the row that won selection --
+    #: immobilised, affinity-tagged, covalently modified, native, or
+    #: unstated.
+    #:
+    #: ADR 0029 removes rows measuring a protein VARIANT. None of these is a
+    #: sequence change, so that filter cannot see them, and BRENDA records
+    #: all of them in the same commentary cell.
+    #:
+    #: Carried as a FIELD, not a log line. `provenance.flags` is what the
+    #: CLI and web UI render; the resolver's diagnostic log is not, and
+    #: queryResolver.ts records four ADRs whose findings "reached only the
+    #: logs, which is the same as reaching nobody". The first version of
+    #: this change appended to the log and would have been the fifth.
+    preparation: "PreparationVerdict | None" = None
+
+    #: Compounds the candidate pool measured BOTH with and without.
+    #:
+    #: Populated on FOUND results, not withheld ones -- the point is that a
+    #: value was returned while its counterpart existed unmentioned. In the
+    #: LDH turnover table one paper reports 21.1 with fructose
+    #: 1,6-bisphosphate and 327.2 without it, and `min()` takes the first.
+    #:
+    #: Reported rather than blocking: separating "allosteric effector someone
+    #: added" from "cosubstrate the reaction requires" is a claim about the
+    #: enzyme's mechanism that Terrium has no source for. See ADR 0032.
+    effector_contrasts: "list[EffectorContrast]" = []
+
+    #: Bases the candidate pool named with more than one form designator.
+    #:
+    #: The LDH turnover pool holds LDHB (142-350), LDH-1 (1500-1600) and
+    #: LDH-2 (1300-1800); `min()` returns 142 and calls it the turnover
+    #: number of lactate dehydrogenase. Detected without knowing what LDH
+    #: stands for -- see ADR 0035.
+    form_mixtures: "list[FormMixture]" = []
+
+    #: Rows whose commentary names a different organism than their column.
+    #:
+    #: Three AChE rows carry organism="Drosophila melanogaster" while the
+    #: commentary says the enzyme came from human and from eel. ADR 0024's
+    #: cross-species gate reads the column, so those rows pass it as
+    #: Drosophila measurements. See ADR 0037.
+    organism_discrepancies: "list[OrganismDiscrepancy]" = []
+
+    #: One organism measured from several biological sources in one pool.
+    #:
+    #: Gallus gallus LDH: heart 60.0, muscle 1.1-3.3. A factor of 54 that the
+    #: organism gate cannot see, because every row IS the organism asked for.
+    source_mixtures: "list[SourceMixture]" = []
+
+    #: Set when source tokens were extracted and NONE could be classified.
+    #:
+    #: Without it, `source_mixtures == []` means both "the pool was clean"
+    #: and "the classifier could not reach NCBI". Found by running the real
+    #: resolution path with the network blocked: a pool holding heart 60.0
+    #: and muscle 3.3 reported nothing at all. See ADR 0039.
+    source_check_unavailable: "SourceCheckUnavailable | None" = None
 
     #: Assay conditions the Km was measured under, parsed from the BRENDA
     #: commentary. STRENDA requires temperature and pH for all reported
@@ -124,6 +277,32 @@ class KineticResult(BaseModel):
 HtmlProvider = Callable[[str], str]
 UniprotProvider = Callable[[str, str], str | None]
 TaxonIdProvider = Callable[[str], str | None]
+
+#: organism name -> its NCBI lineage, or None when it cannot be resolved.
+#: Injectable for the same reason every other provider here is: the test
+#: suite must exercise the relatedness policy without a network.
+LineageProvider = Callable[[str], "Lineage | None"]
+
+
+def default_lineage_provider(
+    organism: str,
+    taxon_id_provider: TaxonIdProvider = enzyme_lookup.fetch_taxon_id,
+) -> Lineage | None:
+    """Resolve an organism name to an NCBI lineage. None on any failure.
+
+    Returning None rather than raising is deliberate, and it is safe here
+    only because None means "unknown", and taxonomy.assess_relatedness
+    treats "unknown" as a refusal rather than a pass. If that ever changed,
+    swallowing the error here would silently convert every network blip
+    into permission to substitute a thermophile's enzyme for a human one.
+    """
+    try:
+        taxon_id = taxon_id_provider(organism)
+        if not taxon_id:
+            return None
+        return parse_taxon_lineage(fetch_taxon_lineage_xml(taxon_id))
+    except (httpx.HTTPError, ValueError):
+        return None
 
 
 def _resolve_fallback_uniprot(
@@ -245,6 +424,133 @@ def search_pubmed_candidates(
     return candidates
 
 
+def _best_evidenced(
+    entries, log, tier, requested_organism=None, relatedness_by_organism=None,
+    quantity=None,
+):
+    """Narrow to the non-dominated rows, then take the minimum of those.
+
+    Bakker's advice was to let reliability drive the choice. Until now the
+    score was computed, emitted, displayed -- and ignored here, where the
+    only decision that consumes it is made. Selection was
+    `min(key=km_value)`: take the smallest number.
+
+    That is not neutral. A poorly-described measurement is more likely to
+    sit in the tail, and a minimum seeks the tail. On human LDH it discarded
+    the pool's only STRENDA-complete row (0.045, pH 7.4 and 37 C) for one
+    where BRENDA reported no commentary whatsoever (0.03).
+
+    Dominance needs no weights: a row is dropped only when another beats it
+    on EVERY axis. Among what survives, `min()` remains, and remains
+    arbitrary -- see ADR 0047. The arbitrariness is now confined to rows
+    that no other row beats outright.
+    """
+    if len(entries) < 2:
+        _report_preparation(entries[0], log, tier, quantity)
+        return entries[0], None
+    kept = evidence_rank.frontier(
+        entries, requested_organism, relatedness_by_organism
+    )
+    for line in evidence_rank.describe_discards(
+        entries, kept, requested_organism, relatedness_by_organism
+    ):
+        log.append(f"{tier}: {line}")
+    if len(kept) < len(entries):
+        log.append(
+            f"{tier}: {len(kept)} of {len(entries)} row(s) are non-dominated; "
+            "choosing the lowest value among those"
+        )
+    chosen = min(kept, key=lambda e: e.km_value)
+    _report_preparation(chosen, log, tier, quantity)
+    # The tie is computed HERE, where `kept` exists, and returned alongside
+    # the row. Recomputing it at the call site would need the frontier
+    # again, and a second frontier is a second implementation.
+    return chosen, find_tie(kept, chosen)
+
+
+def _preparation_of(entry) -> "PreparationVerdict":
+    """One place the verdict is derived, so the field and the log agree.
+
+    Deriving it twice -- once for the log line, once for the field -- is two
+    implementations of one fact, which is ADR 0027 exactly.
+    """
+    return getattr(entry, "preparation", None) or enzyme_preparation.classify(
+        getattr(entry, "conditions", None)
+    )
+
+
+def _report_preparation(entry, log, tier, quantity=None) -> None:
+    """Say when the chosen row measured a preparation, not the free enzyme.
+
+    ADR 0029 removes rows measuring a protein VARIANT. It cannot see a
+    covalent modification, an affinity tag or an immobilised enzyme, because
+    none of those is a sequence change -- and BRENDA records all three in
+    the same commentary cell.
+
+    Measured before this existed: `resolve_kinetic_value("1.1.1.27",
+    "Homo sapiens", "NADH", quantity="ki")` returned **0.00059**, whose
+    commentary reads "competitive versus NADH, pH 7.5, 37 C, recombinant
+    His-tagged enzyme". The search log said only "BRENDA exact", the
+    citation carried `notes=None`, and no flag mentioned the tag. A tagged
+    construct's inhibition constant was served as the human enzyme's.
+
+    Reporting only. Whether to EXCLUDE these by default, as ADR 0029 does
+    for variants, is a policy question with a real cost on both sides and is
+    left open in ADR 0090 rather than decided here -- silently narrowing
+    what a student can resolve is the kind of change that should be argued
+    for, not slipped in beside a logging fix.
+    """
+    verdict = _preparation_of(entry)
+    sentence = enzyme_preparation.describe(verdict, quantity)
+    if sentence:
+        log.append(f"{tier}: {sentence}")
+
+
+def _partition_variants(entries):
+    """`(usable, withheld)` — rows measuring the enzyme, and rows measuring
+    a variant of it.
+
+    `unstated` rows are USABLE. They are the majority of the corpus, BRENDA
+    does not require curators to write "wild-type" when the paper measured
+    wild-type, and withholding them would refuse most of the literature over
+    an absence of words. That is a deliberate asymmetry: this filter removes
+    rows that SAY they are variants, and claims nothing about the rest.
+
+    Stated plainly because it is the limit of the check. An unlabelled
+    mutant still passes, and the fix for that is better BRENDA commentary,
+    not a more aggressive regex here.
+    """
+    usable, withheld = [], []
+    for entry in entries:
+        verdict = getattr(entry, "variant", None)
+        if verdict is not None and verdict.status == "variant":
+            withheld.append(entry)
+        else:
+            usable.append(entry)
+    return usable, withheld
+
+
+def _variant_withheld_result(withheld, log):
+    """Every candidate measured a variant. Say which, and of what kind."""
+    described = sorted(
+        {
+            (e.variant.evidence or e.variant.kind or "unnamed variant")
+            for e in withheld
+            if e.variant is not None
+        }
+    )
+    log.append(
+        f"All {len(withheld)} candidate row(s) measured a protein variant "
+        f"({', '.join(described) or 'unnamed'}); withheld: allow_variants=False"
+    )
+    return KineticResult(
+        found=False,
+        source="variant_withheld",
+        variant_candidates_available=described,
+        search_log=log,
+    )
+
+
 def resolve_kinetic_value(
     enzyme_ec: str,
     organism: str,
@@ -255,6 +561,9 @@ def resolve_kinetic_value(
     taxon_id_provider: TaxonIdProvider = enzyme_lookup.fetch_taxon_id,
     search_literature: bool = True,
     quantity: str = "km",
+    allow_cross_species: bool = False,
+    allow_variants: bool = False,
+    lineage_provider: LineageProvider | None = None,
 ) -> KineticResult:
     """Resolve a kinetic value for (enzyme, organism, substrate) by trying
     BRENDA exact match, then BRENDA cross-species, then PubMed literature
@@ -281,13 +590,81 @@ def resolve_kinetic_value(
         taxon_id_provider, table_label=table_label,
     )
     if exact:
-        best = min(exact, key=lambda e: e.km_value)
+        # Variant rows are removed BEFORE selection, not flagged after it.
+        #
+        # That ordering is the whole point. Selection is min(), point
+        # substitutions are chosen precisely because they change the
+        # kinetics, and they therefore sit in the tail a minimum reaches
+        # into: in the AChE turnover fixture the lowest mutant kcat is
+        # twelve times below the lowest wild-type one. Flagging afterwards
+        # would attach a warning to a value that had already been selected
+        # FOR being a mutant. See ADR 0029.
+        if not allow_variants:
+            usable, withheld = _partition_variants(exact)
+            if withheld:
+                log.append(
+                    f"Excluded {len(withheld)} of {len(exact)} exact-match "
+                    "row(s) measuring a protein variant"
+                )
+            if not usable:
+                return _variant_withheld_result(withheld, log)
+            exact = usable
+        # Detect designed contrasts BEFORE reporting a winner. A value
+        # returned while the other arm of its own experiment sits unmentioned
+        # in the same pool is half an answer, and the reader cannot ask for
+        # the other half without being told it exists.
+        contrasts = find_contrasts([(e.km_value, e.conditions) for e in exact])
+        mixtures = find_form_mixtures([(e.km_value, e.conditions) for e in exact])
+        source_rows = [(e.km_value, e.organism, e.conditions) for e in exact]
+        discrepancies = find_organism_discrepancies(source_rows)
+        source_mix = find_source_mixtures(source_rows)
+        source_unavailable = source_check_status(source_rows)
+        if source_unavailable:
+            log.append(source_unavailable.reason)
+        if discrepancies:
+            log.append(
+                f"{len(discrepancies)} row(s) whose commentary names a different "
+                "organism than the organism column"
+            )
+        if source_mix:
+            log.append(
+                f"{len(source_mix)} organism(s) measured from several biological "
+                "sources: "
+                + "; ".join(
+                    f"{m.organism} ({', '.join(m.values_by_source)})" for m in source_mix
+                )
+            )
+        if mixtures:
+            log.append(
+                f"{len(mixtures)} pool(s) mixing named enzyme forms: "
+                + "; ".join(
+                    f"{m.base} ({', '.join(m.values_by_form)})" for m in mixtures
+                )
+            )
+        if contrasts:
+            log.append(
+                f"{len(contrasts)} presence/absence contrast(s) in the candidate pool: "
+                + "; ".join(c.compound for c in contrasts)
+            )
+        best, tie = _best_evidenced(
+            exact, log, "exact match", organism, quantity=quantity
+        )
         return KineticResult(
             found=True,
             value=best.km_value,
             unit=best.unit,
             organism=best.organism,
             source="brenda_exact",
+            effector_contrasts=contrasts,
+            form_mixtures=mixtures,
+            organism_discrepancies=discrepancies,
+            source_mixtures=source_mix,
+            source_check_unavailable=source_unavailable,
+            variant=best.variant,
+            preparation=_preparation_of(best),
+            selection_tie=tie,
+            selected_form=name_selected_form(mixtures, best.km_value),
+            effectors=list(best.effectors),
             citation=citation_from_brenda_entry(best),
             assay_ph=best.assay_ph,
             assay_temperature_c=best.assay_temperature_c,
@@ -301,16 +678,187 @@ def resolve_kinetic_value(
         enzyme_ec, None, substrate, html_provider, uniprot_provider,
         taxon_id_provider, table_label=table_label,
     )
+
+    # Cross-species use is OPT-IN, and off by default.
+    #
+    # This tier used to fire automatically: no human Km, so return the
+    # rabbit one with cross_species_flag=True and a warning. Lisa Jeske of
+    # the BRENDA curation team (DSMZ) was asked directly whether that is
+    # the right behaviour for a tool consuming BRENDA at scale, and said
+    # it is not:
+    #
+    #   "Enzyme kinetics are species-specific ... Transferring a value
+    #    from one species to another is not recommended from a
+    #    biochemical standpoint. ... The simulation should rather abort or
+    #    leave the value empty if there is no exact organism match,
+    #    instead of providing incorrect data. ... the student/teacher must
+    #    actively check a box ('Allow cross-species data'), accompanied by
+    #    a clear educational warning that this is an inaccurate model."
+    #
+    # A warning attached to a returned value is read by whoever is looking
+    # for a reason to doubt the number. A student reading a result screen
+    # is not that person. Requiring the opt-in moves the decision to
+    # before the number exists, which is the only point at which it is
+    # actually a decision.
+    #
+    # The withheld case still reports WHICH organisms had data, because a
+    # refusal that cannot say what it refused leaves the user no way to
+    # exercise the opt-in it just demanded of them.
+    #
+    # This is deliberately narrower than ADR 0018 as originally written;
+    # see ADR 0024 for the full argument, including Herbert Sauro's
+    # opposite recommendation and why the teaching case resolves it this
+    # way.
+    if broad and not allow_cross_species:
+        organisms = sorted({e.organism for e in broad if e.organism})
+        log.append(
+            f"Cross-species value(s) found in {', '.join(organisms) or 'unnamed organism(s)'} "
+            f"but withheld: allow_cross_species=False"
+        )
+        return KineticResult(
+            found=False,
+            source="cross_species_withheld",
+            cross_species_organisms_available=organisms,
+            search_log=log,
+        )
+
     if broad:
-        best = min(broad, key=lambda e: e.km_value)
+        # THE OPT-IN IS NOT THE WHOLE CHECK.
+        #
+        # Jeske gave three recommendations, not one. The opt-in above is
+        # the second. This is the third:
+        #
+        #   "The software should at least check whether the organisms are
+        #    closely related enough (e.g., two different mammals instead of
+        #    a bacterium and a human)."
+        #
+        # Without it, ticking the box buys a Plasmodium falciparum Ki as a
+        # stand-in for a mouse -- which is the real content of golden tuple
+        # G5, not a hypothetical. A checkbox that grants unlimited
+        # substitution is a checkbox that makes the user complicit in a
+        # decision they had no information about.
+        #
+        # Candidates whose relatedness cannot be RESOLVED are dropped too.
+        # See taxonomy.assess_relatedness: "unknown" is a third state, and
+        # it does not permit.
+        provider = lineage_provider or default_lineage_provider
+        query_lineage = provider(organism) if organism else None
+
+        verdicts: list[Relatedness] = []
+        acceptable = []
+        for entry in broad:
+            verdict = assess_relatedness(
+                query_lineage,
+                provider(entry.organism) if entry.organism else None,
+                query_name=organism,
+                candidate_name=entry.organism,
+            )
+            verdicts.append(verdict)
+            if verdict.permits_transfer:
+                acceptable.append(entry)
+
+        for verdict in verdicts:
+            log.append(
+                f"Relatedness {verdict.candidate_organism} -> "
+                f"{verdict.query_organism}: {verdict.status}"
+                + (f" (shared {verdict.shared_rank} {verdict.shared_name})"
+                   if verdict.shared_rank else "")
+            )
+
+        if not acceptable:
+            log.append(
+                "Every cross-species candidate failed the relatedness check; "
+                "nothing returned"
+            )
+            return KineticResult(
+                found=False,
+                source="cross_species_too_distant",
+                cross_species_organisms_available=sorted(
+                    {e.organism for e in broad if e.organism}
+                ),
+                relatedness=verdicts,
+                search_log=log,
+            )
+
+        if not allow_variants:
+            usable, withheld = _partition_variants(acceptable)
+            if withheld:
+                log.append(
+                    f"Excluded {len(withheld)} of {len(acceptable)} "
+                    "cross-species row(s) measuring a protein variant"
+                )
+            if not usable:
+                return _variant_withheld_result(withheld, log)
+            acceptable = usable
+
+        # Detect designed contrasts BEFORE reporting a winner. A value
+        # returned while the other arm of its own experiment sits unmentioned
+        # in the same pool is half an answer, and the reader cannot ask for
+        # the other half without being told it exists.
+        contrasts = find_contrasts([(e.km_value, e.conditions) for e in acceptable])
+        mixtures = find_form_mixtures([(e.km_value, e.conditions) for e in acceptable])
+        source_rows = [(e.km_value, e.organism, e.conditions) for e in acceptable]
+        discrepancies = find_organism_discrepancies(source_rows)
+        source_mix = find_source_mixtures(source_rows)
+        source_unavailable = source_check_status(source_rows)
+        if source_unavailable:
+            log.append(source_unavailable.reason)
+        if discrepancies:
+            log.append(
+                f"{len(discrepancies)} row(s) whose commentary names a different "
+                "organism than the organism column"
+            )
+        if source_mix:
+            log.append(
+                f"{len(source_mix)} organism(s) measured from several biological "
+                "sources: "
+                + "; ".join(
+                    f"{m.organism} ({', '.join(m.values_by_source)})" for m in source_mix
+                )
+            )
+        if mixtures:
+            log.append(
+                f"{len(mixtures)} pool(s) mixing named enzyme forms: "
+                + "; ".join(
+                    f"{m.base} ({', '.join(m.values_by_form)})" for m in mixtures
+                )
+            )
+        if contrasts:
+            log.append(
+                f"{len(contrasts)} presence/absence contrast(s) in the candidate pool: "
+                + "; ".join(c.compound for c in contrasts)
+            )
+        best, tie = _best_evidenced(
+            acceptable,
+            log,
+            "cross-species",
+            organism,
+            # The gate above already computed a verdict per candidate
+            # organism. Passing them here is what turns "close enough?"
+            # into "which of these is closest?" -- see ADR 0024 and the
+            # relatedness_depth axis in evidence_rank.
+            {v.candidate_organism: v for v in verdicts},
+            quantity=quantity,
+        )
         return KineticResult(
             found=True,
             value=best.km_value,
             unit=best.unit,
             organism=best.organism,
             source="brenda_cross_species",
+            effector_contrasts=contrasts,
+            form_mixtures=mixtures,
+            organism_discrepancies=discrepancies,
+            source_mixtures=source_mix,
+            source_check_unavailable=source_unavailable,
+            variant=best.variant,
+            preparation=_preparation_of(best),
+            selection_tie=tie,
+            selected_form=name_selected_form(mixtures, best.km_value),
+            effectors=list(best.effectors),
             citation=citation_from_brenda_entry(best),
             cross_species_flag=True,
+            relatedness=verdicts,
             assay_ph=best.assay_ph,
             assay_temperature_c=best.assay_temperature_c,
             assay_buffer=best.assay_buffer,

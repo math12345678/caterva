@@ -26,6 +26,35 @@ produce, in which case you are not the one with the right to grant an
 Apache-2.0 licence over it. That is a normal thing to check and a bad thing
 to discover late.
 
+## One thing to get right before you describe this project anywhere
+
+**Terrium is not Tellurium, and please do not write that it is.**
+
+[Tellurium](https://tellurium.analogmachine.org/) is an established
+systems-biology environment from Herbert Sauro's lab at the University of
+Washington. Terrium is unaffiliated with it, is not a fork of it, and does
+not depend on the `tellurium` package — a prohibition made executable by
+`scripts/check_forbidden_packages.py`, which fails the build if anyone adds
+it.
+
+The confusion is easy to fall into, because Terrium **does** use
+`libroadrunner` and `antimony`, and those come from the same lab. Using them
+is ordinary — they are separately licensed open-source libraries, consumed
+through their public APIs, exactly as they are meant to be. But *using a
+library a group publishes* is not *being their project*, and the names being
+one letter apart makes that distinction easy to lose.
+
+This is not pedantry. A cold email from this project has already been read
+by a researcher as a false claim of credit, and that was a fair reading of
+what was sent. If you write a README line, a blog post, a conference
+abstract or a grant application that mentions Terrium, please keep the
+distinction explicit.
+
+`scripts/check_non_affiliation_notice.py` checks the disclaimer is still
+present on every shipping surface; `scripts/check_no_tellurium_integration_claims.py`
+checks no document claims the opposite. Background:
+`Business/LEGAL_BRIEF_NAMING.md`.
+
 ## Before you start
 
 Read `README.md` first, specifically the "Two gotchas worth knowing"
@@ -197,9 +226,22 @@ lucky/unlucky data condition.
 make pr          # do this before opening a PR
 ```
 
+**If a guard fails on a count, you do not have to hunt for it.**
+
+```bash
+make counts-fix   # updates the README numbers derived from the tree
+```
+
+Adding a test moves three numbers in the README, adding a guard moves two,
+adding an ADR moves one. `check_documented_counts.py` knows all of them;
+`--write` corrects the ones it derives and leaves the rest, and says which
+is which. It will not touch the domain count, a quoted example, or an
+approximate figure inside its tolerance — those are judgment calls, and a
+tool that rewrote them would make a guess look verified.
+
 Tests are not all CI runs. The `test` job in
 `.github/workflows/tests.yml` runs eleven steps; the two pytest invocations
-are the ninth and tenth. The rest are **guards** — thirty-six small scripts
+are the ninth and tenth. The rest are **guards** — small scripts
 that check things a test suite structurally cannot: that documented counts
 match reality, that every citation can be looked up, that no guard has
 quietly stopped running, that a value computed in Python actually reaches a

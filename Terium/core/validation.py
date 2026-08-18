@@ -2,13 +2,27 @@
 
 from __future__ import annotations
 
+
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """See Terium/core/import_mode.py. Inlined deliberately: this
+    guards the import machinery itself, so it cannot import a
+    helper to do its job."""
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
 import math
 from typing import Any, List, Sequence
 
 import numpy as np
 try:
     from Terium.core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE, LV_EXCURSION_RATIO_FLAG_ABOVE)
-except ModuleNotFoundError:  # flat mode: Terium/ on sys.path, no repo root
+except ModuleNotFoundError as _exc:  # flat mode: Terium/ on sys.path, no repo root
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.data_structures import (ParameterValidation, KM_PLAUSIBLE_MIN_MM, KM_PLAUSIBLE_MAX_MM, R0_IMPLAUSIBLE_ABOVE, PCR_MIN_EFFICIENCY, PCR_MAX_EFFICIENCY, PCR_PLAUSIBLE_LOW_EFFICIENCY, MC_PLAUSIBLE_MIN_SAMPLES, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MIN_REPLICATE_RUNS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT, MD_PLAUSIBLE_MIN_PARTICLES, MD_PLAUSIBLE_MAX_TIMESTEP, MD_PLAUSIBLE_TEMPERATURE_LOW, MD_PLAUSIBLE_TEMPERATURE_HIGH, SSA_PLAUSIBLE_MIN_POPULATION, SSA_PLAUSIBLE_MAX_RATE, SSA_BIMOLECULAR_PLAUSIBLE_MAX_RATE, SSA_PLAUSIBLE_MIN_REPLICATES, ENZYME_CONC_MM_RATIO_FLAG_ABOVE, LV_PLAUSIBLE_MIN_RATE, LV_PLAUSIBLE_MAX_RATE, LV_EXCURSION_RATIO_FLAG_ABOVE)  # type: ignore[no-redef]
 
 def _finite_positive(value: Any, label: str, errors: List[str],

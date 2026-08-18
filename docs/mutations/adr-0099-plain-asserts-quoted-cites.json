@@ -1,0 +1,83 @@
+{
+  "_why": [
+    "ADR 0099's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "check_no_tellurium_integration_claims.py failed the build on",
+    "docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md, whose inventory line reads",
+    "`Docw/terrium_full.docx    also: claims \"Tellurium integration\"`. The",
+    "phrase is the thing being removed, named so somebody can find it. The",
+    "document planning the cleanup was the one blocking CI, and the only way",
+    "to go green would have been to describe the offending files too vaguely",
+    "for anyone to act on.",
+    "",
+    "Third instance this session of the same distinction: a count written",
+    "plainly is an assertion, a count in quotes is a citation. It applies to",
+    "any claim a guard reads, not just numbers, and is now stated once.",
+    "",
+    "T2 and T3 were both wrong on the first attempt, and both wrong in ways",
+    "that produced a PASS. T2 removed one of two claim sentences in the",
+    "document, so the assertion it was meant to break stayed true. T3 edited",
+    "a string inside the guard's own _selftest rather than the CLAIM regex.",
+    "A weak mutation reports a gap that is not there; these reported safety",
+    "that was not there, which is worse.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0099-plain-asserts-quoted-cites.json"
+  ],
+  "test": "python3 -m pytest Tests/test_no_tellurium_integration_claims.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "T1",
+      "description": "the remediation plan loses its DISCUSSES entry",
+      "_claimed": "caught",
+      "_note": "The defect exactly: make guards exits 1, naming the document that plans the cleanup as a document claiming Tellurium integration.",
+      "file": "scripts/check_no_tellurium_integration_claims.py",
+      "find": "    \"docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md\": (",
+      "replace": "    \"docs/NO_SUCH_FILE_HERE.md\": ("
+    },
+    {
+      "id": "T2",
+      "description": "one of the two quoted claims is removed (the exemption stays justified)",
+      "_claimed": "not caught, correctly",
+      "_note": "NOT CAUGHT is the right answer here and the row is kept to show why.\n    The property -- an exemption whose justification has gone must be deleted rather than left as a standing hole -- is asserted by test_the_remediation_plan_is_not_accused_of_the_thing_it_removes, which fails if the document stops quoting a claim. But the document quotes one TWICE: the inventory line, and a sentence describing what the guard does. Removing either alone leaves the exemption correctly justified, so the test passes and should.\n    Expressing the real mutation needs two edits and mutate.py applies one per row. Verified by hand instead: `sed -i 's|Tellurium integration|REDACTED|g'` on the document gives `1 failed, 6 passed`, and the failure is that test. Recorded as a harness limitation rather than as coverage, because a reader who sees NOT CAUGHT with no explanation will reasonably read it as a gap.",
+      "file": "docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md",
+      "find": "Docw/terrium_full.docx                    also: claims \"Tellurium integration\"",
+      "replace": "Docw/terrium_full.docx                    also: a naming problem"
+    },
+    {
+      "id": "T3",
+      "description": "CLAIM stops matching the bare phrase",
+      "_claimed": "caught",
+      "_note": "`Tellurium integration` with no verb is how the claim actually appears in the roles table of Docw/terrium_full.docx -- assigned to a named engineer, so it reads as a live work item rather than an aspiration. The first attempt at this row edited a fixture string in the guard's _selftest instead of the regex, and passed.",
+      "file": "scripts/check_no_tellurium_integration_claims.py",
+      "find": "|\\btellurium\\s+integration\\b",
+      "replace": "|\\bzzz_never_matches\\b"
+    },
+    {
+      "id": "T4",
+      "description": "a document is added to the exempt set without a decision",
+      "_claimed": "caught",
+      "_note": "Each DISCUSSES entry blinds the guard to a whole file. Pinning does not ban growth; it requires that growth be a decision somebody made.\n    The first version of this row mutated the pinning ASSERTION into a tautology and passed -- correctly, because a test edited to be vacuous is check_no_vacuous_tests.py's job, not pytest's. The row now mutates the thing the pin exists to notice: the exempt set itself.",
+      "file": "scripts/check_no_tellurium_integration_claims.py",
+      "find": "DISCUSSES: dict[str, str] = {\n",
+      "replace": "DISCUSSES: dict[str, str] = {\n    \"README.md\": \"x\" * 60,\n"
+    },
+    {
+      "id": "T5",
+      "description": "a denial is read as a claim",
+      "_claimed": "caught",
+      "_note": "NOTICE and README say Terrium is NOT built on Tellurium. A guard that cannot tell a denial from a claim fails on the two documents it exists to protect. Escaped first: every sentence in the test carried two or three denial markers, so deleting `not` was covered by `is not`, `does not` and `unaffiliated`. test_each_denial_word_carries_its_own_weight isolates one marker per sentence.",
+      "file": "scripts/check_no_tellurium_integration_claims.py",
+      "find": "DENIAL = re.compile(\n    r\"\\b(not|never|no|without|avoid|forbidden|banned|instead\\s+of|rather\\s+than",
+      "replace": "DENIAL = re.compile(\n    r\"\\b(zzz_never|never|no|without|avoid|forbidden|banned|instead\\s+of|rather\\s+than"
+    },
+    {
+      "id": "T6",
+      "description": "the blind-scan floor is removed",
+      "_claimed": "caught",
+      "_note": "This guard's first version globbed one directory and reported success while copies under Science-Agent-Pipeline/attached_assets/ went unread. A scan that matches nothing must not read as a clean bill of health.",
+      "file": "scripts/check_no_tellurium_integration_claims.py",
+      "find": "    if len(docs) < _MIN_DOCS or len(office) < _MIN_OFFICE:",
+      "replace": "    if False:"
+    }
+  ]
+}

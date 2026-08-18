@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
+
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """See Terium/core/import_mode.py. Inlined deliberately: this
+    guards the import machinery itself, so it cannot import a
+    helper to do its job."""
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
 from typing import Dict, Iterable, List, Sequence
 
 try:
     from Terium.core.data_structures import (ParameterValidation, SimulationError, SimulationResult)  # type: ignore[no-redef]
-except ModuleNotFoundError:  # flat mode: Terium/ on sys.path, no repo root
+except ModuleNotFoundError as _exc:  # flat mode: Terium/ on sys.path, no repo root
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.data_structures import (ParameterValidation, SimulationError, SimulationResult)  # type: ignore[no-redef]
 
 try:
@@ -21,7 +35,12 @@ try:
         build_lotka_volterra_antimony, build_cell_cycle_oscillator_antimony,
         build_repressilator_antimony,
         antimony_to_sbml)  # type: ignore[no-redef]
-except ModuleNotFoundError:
+except ModuleNotFoundError as _exc:
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.utils import _load_runner  # type: ignore[no-redef]
     from core.validation import (
         validate_michaelis_menten_params, validate_mm_competitive_params,

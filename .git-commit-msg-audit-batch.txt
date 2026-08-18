@@ -1,0 +1,65 @@
+Fix real bugs found while auditing 4 concurrent-agent doc/code batches, add correction banners for fabricated claims
+
+Route-ordering bug (server.ts): GET /api/jobs/:jobId was registered before
+/api/jobs/history and /api/jobs/query in the manual if-chain dispatcher.
+Its [a-z0-9_]+ regex matched "history" and "query" as job IDs, so both
+specific routes were unreachable dead code -- live-tested, both returned
+404 {"error":"Job not found"}. Reordered so specific routes are checked
+first. Mutation-tested: reverted the order, reproduced the exact same 404
+on both routes, restored the fix, reconfirmed 200 on all three.
+
+sweep-batch-metrics.ts: recordSweepMetrics()/recordBatchMetrics() defaulted
+successRate/averageTimeMs/minTimeMs/maxTimeMs to 0 for an empty results
+array -- the same fabricated-zero-sample pattern already fixed in
+metrics-collector.ts (db41b66). Changed to number | null. Mutation-tested:
+reverted to 0, confirmed the existing tests failed with the exact old
+value, restored, confirmed 19/19 green.
+
+metrics-exporter.ts: 6 of 8 nullable gauge fields still used "?? 0" instead
+of omitting the Prometheus line on null (only successRate and getPercentile
+had been fixed in db41b66). Fixed all 6 to omit-on-null, matching the
+established pattern. Verified by calling generatePrometheusMetrics()
+against an empty collector before/after.
+
+openapi.yaml: added 13 real routes that were missing (GET /api/jobs/{jobId}
+plus all 12 /api/metrics/* routes) and 6 schemas built from the actual
+collector source. Verified via js-yaml parse (30/30 paths) and a live
+curl + JSON.parse of /api/openapi.json matching server.ts exactly.
+
+API_QUICK_REFERENCE.md: removed a broken "Query jobs with filters" section
+(wrong examples), restored /api/jobs/{jobId} to the endpoint list, removed
+a false "ki/i0/p0 required" claim contradicted by request-validator.ts:54.
+
+advanced-analytics.ts: fixed missing /sqrt(2) in normalCDF (Abramowitz &
+Stegun 7.1.26) and a NaN-slope case that wasn't mapped to 'indeterminate'.
+
+commandSweep.ts: fixed outlier index misattribution and a NaN trend
+display bug.
+
+job-query-builder.ts / result-comparator.ts: fixed fabricated-zero
+confidence/duration filtering, negative-limit/offset pagination, and a
+misplaced Math.abs() paren causing an order-dependent confidence-diff bug.
+
+Added correction banners (additive only, no content deleted) to 17 docs
+found describing fabricated test/line counts, stale non-nullable type
+shapes, or claims that contradict the null-safe behavior actually shipped
+in db41b66: BUILD_STATUS_SUMMARY.md, WIRING_VERIFICATION_REPORT.md,
+OVERNIGHT_LOG.md, NEXT_STEPS.md, REFACTOR_STATUS.md, CHANGELOG.md,
+SECURITY.md, METRICS_GUIDE.md, METRICS_DELIVERY_SUMMARY.md,
+MONITORING_SETUP.md, MONITORING_DELIVERY_SUMMARY.md, QUICK_START_METRICS.md,
+SWEEP_BATCH_METRICS.md, OPENAPI_GUIDE.md, OPENAPI_DELIVERY_SUMMARY.md,
+SESSION_EXTENSION_SUMMARY.md, CODE_OVERVIEW.md, DELIVERY_SUMMARY.md.
+
+IMPLEMENTATION_CHECKLIST.md, docker-compose-monitoring.yml,
+grafana-dashboard.json, grafana-dashboards.yml, grafana-datasources.yml,
+prometheus-rules.yml, prometheus.yml, scripts/generate-client.sh,
+scripts/generate-openapi-clients.ts confirmed accurate, no changes needed.
+
+Verification: tsc --noEmit clean; jest suites touched by this batch all
+green (sweep-batch-metrics 19/19, metrics-collector 21/21,
+advanced-analytics 19/19, job-query-builder 34/34, result-comparator
+28/28, commandSweep 6/6). One pre-existing unrelated failure in
+performance-monitor.test.ts (3 tests), untouched by this batch.
+
+REFACTORING_PROPOSAL.md, CONTRIBUTING.md checked and found accurate,
+left as-is.

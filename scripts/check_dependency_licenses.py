@@ -210,10 +210,21 @@ BLOCKING: frozenset[str] = frozenset({"tellurium"})
 #: Dependencies that must NOT be used, with the reason.
 NO_GRANT: dict[str, str] = {
     "tellurium": (
-        "Constitution Rule 7 and ADR 0001. Not a licensing problem — "
-        "Tellurium is Apache 2.0 — but a naming and provenance one: Terrium "
-        "must not depend on the umbrella package whose name it already "
-        "resembles. Enforced separately by check_forbidden_packages.py."
+        "Constitution Rule 7. NOT a licensing problem — Tellurium is "
+        "Apache 2.0, which is a grant of permission, and this guard exists "
+        "to find dependencies that grant none.\n"
+        "    Two separate reasons, kept separate because they were being "
+        "merged:\n"
+        "      * ADR 0001 (the only reason that ADR gives): the umbrella "
+        "package pulls in python-libcombine and python-libnuml, which lack "
+        "wheels on some supported platforms and fall back to a cmake/swig "
+        "source build — for COMBINE-archive features Terrium does not use.\n"
+        "      * The naming review (docs/LICENSING.md, NOTICE): Terrium "
+        "must not depend on the project whose name it resembles, so the "
+        "non-affiliation notice stays true.\n"
+        "    ADR 0001 says nothing about naming; citing it for that put a "
+        "reason in a source that does not contain it.\n"
+        "    Enforced separately by check_forbidden_packages.py."
     ),
     "@replit/vite-plugin-cartographer": _REPLIT_NO_LICENCE,
     "@replit/vite-plugin-dev-banner": _REPLIT_NO_LICENCE,

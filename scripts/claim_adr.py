@@ -177,6 +177,39 @@ def stub(number: int, slug: str) -> str:
     )
 
 
+def slugify(text: str) -> str:
+    """Turn whatever was passed into a filename this repository can use.
+
+    THE THIRD INSTANCE OF ONE BUG
+    -----------------------------
+    This tool already refuses a flag passed as a slug, and refuses a
+    stringification artefact passed as a slug. Both are checks on what the
+    slug MEANS. Neither looked at its SHAPE, so a perfectly sincere title --
+
+        claim_adr.py "evidence the guard could not recognise"
+
+    -- produced `docs/adr/0098-evidence the guard could not recognise.md`, a
+    documentation filename containing spaces. The old error text on the
+    multiple-argument path actively invited it: *"Quote it if the title
+    contains spaces."* Quoting is how you get the spaces INTO the name.
+
+    Spaces in a path here are not cosmetic. This repository's own advice is
+    copy-pasteable shell (`python3 scripts/mutate.py --set docs/...`), its
+    link checker walks markdown paths, and `split_repos.sh` copies these
+    files by name. Every one of those breaks on an unquoted space, and the
+    breakage appears somewhere other than where the name was chosen.
+
+    Normalise rather than reject: the caller's intent is unambiguous, and
+    `claim()` prints the path it actually created, so the result is visible
+    rather than silent. Rejecting would only make somebody type the hyphens
+    that can be derived.
+    """
+    text = text.strip().strip("/").removesuffix(".md")
+    text = re.sub(r"^\d{4}-", "", text)
+    text = re.sub(r"[^a-zA-Z0-9]+", "-", text).strip("-").lower()
+    return text
+
+
 def claim(
     slug: str,
     settle: float = SETTLE_SECONDS,
@@ -184,8 +217,7 @@ def claim(
     _settle_hook=None,
 ) -> Path:
     """Claim a number for `slug`, yielding to a competing claim if needed."""
-    slug = slug.strip().strip("/").removesuffix(".md")
-    slug = re.sub(r"^\d{4}-", "", slug)
+    slug = slugify(slug)
 
     number = next_free(existing())
     for round_index in range(MAX_ROUNDS):
@@ -364,6 +396,29 @@ def selftest() -> int:
         if _looks_like_an_artefact(real_slug):
             failures.append(f"{real_slug!r} wrongly rejected as an artefact")
 
+    # The THIRD instance of the same bug, and the one the other two missed:
+    # both of those check what a slug MEANS. Neither looks at its SHAPE, so
+    # a sincere quoted title became a filename with spaces in it. A
+    # documentation path containing a space breaks every copy-pasteable
+    # command in this repository's docs, its markdown link checker, and
+    # split_repos.sh -- each of them somewhere other than here.
+    for raw, want in [
+        ("evidence the guard could not recognise", "evidence-the-guard-could-not-recognise"),
+        ("  Padded Title  ", "padded-title"),
+        ("0098-already-numbered.md", "already-numbered"),
+        ("Mixed CASE and  double  spaces", "mixed-case-and-double-spaces"),
+        ("trailing punctuation!!", "trailing-punctuation"),
+        # Already correct input must pass through untouched, or the fix
+        # silently rewrites every existing caller's slug.
+        ("a-pool-that-mixes-enzyme-forms", "a-pool-that-mixes-enzyme-forms"),
+    ]:
+        got = slugify(raw)
+        if got != want:
+            failures.append(f"slugify({raw!r}) == {got!r}, expected {want!r}")
+    for raw in ("evidence the guard could not recognise", "Padded Title"):
+        if " " in slugify(raw):
+            failures.append(f"slugify({raw!r}) left a space in a filename")
+
     if failures:
         print("SELFTEST FAILED:")
         for line in failures:
@@ -426,7 +481,9 @@ def main() -> int:
     if len(argv) != 1:
         print(
             f"Expected one slug, got {len(argv)} arguments: {argv}\n"
-            "Quote it if the title contains spaces.",
+            "Quote the title, and it will be hyphenated for you -- a quoted\n"
+            "title used to become a filename with spaces in it, which breaks\n"
+            "every copy-pasteable command in this repository's own docs.",
             file=sys.stderr,
         )
         return 2

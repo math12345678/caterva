@@ -12,6 +12,7 @@ not merely installed.
 from __future__ import annotations
 
 import math
+import pathlib
 import platform
 import sys
 
@@ -165,9 +166,40 @@ def check_end_to_end() -> None:
         return
     ok("translated to SBML")
 
+    # The tolerances come from the ENGINE's constants, not from literals
+    # here.
+    #
+    # They were `1e-10` and `1e-12`, hardcoded, and identical to
+    # `DEFAULT_RELATIVE_TOLERANCE` / `DEFAULT_ABSOLUTE_TOLERANCE` in
+    # `Terium/core/data_structures.py`. Two statements of one fact, and the
+    # README leans the project's most load-bearing claim on this check:
+    #
+    #     "If it passes, the numerics are trustworthy."
+    #
+    # Loosen the engine's defaults -- ADR 0005 shows they have been tuned
+    # once already -- and this check would go on certifying the OLD
+    # settings, for a configuration the product no longer runs. The claim
+    # would become false with nothing turning red.
+    #
+    # A failed import is reported, not swallowed. Falling back to literals
+    # would rebuild the defect the import exists to remove, and "could not
+    # read the engine's tolerances" is a different fact from "the numerics
+    # are fine".
+    try:
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
+        from Terium.core.data_structures import (
+            DEFAULT_ABSOLUTE_TOLERANCE,
+            DEFAULT_RELATIVE_TOLERANCE,
+        )
+    except Exception as exc:
+        bad(f"could not read the engine's integrator tolerances: {exc}",
+            "this check cannot verify the settings the product uses; "
+            "fix the import before trusting a green run")
+        return
+
     runner = roadrunner.RoadRunner(sbml)
-    runner.integrator.relative_tolerance = 1e-10
-    runner.integrator.absolute_tolerance = 1e-12
+    runner.integrator.relative_tolerance = DEFAULT_RELATIVE_TOLERANCE
+    runner.integrator.absolute_tolerance = DEFAULT_ABSOLUTE_TOLERANCE
     result = runner.simulate(0, t, 2)
     simulated = float(result[-1][1])
     ok("roadrunner integrated the model")
@@ -184,7 +216,9 @@ def check_end_to_end() -> None:
 
     error = abs(simulated - exact) / exact
     if error < 1e-6:
-        ok(f"result matches the exact solution (relative error {error:.2e})")
+        ok(f"result matches the exact solution (relative error {error:.2e}) "
+           f"at the engine's own tolerances "
+           f"({DEFAULT_RELATIVE_TOLERANCE:.0e}/{DEFAULT_ABSOLUTE_TOLERANCE:.0e})")
     else:
         bad(f"numerical result is wrong: got {simulated:.10f}, "
             f"expected {exact:.10f} (relative error {error:.2e})",

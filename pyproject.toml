@@ -1,7 +1,7 @@
 [project]
 name = "terrium"
 version = "0.1.0"
-description = "Scientific computing for teaching labs"
+description = "Scientific computing for teaching labs. Unaffiliated with Tellurium."
 requires-python = ">=3.10,<3.14"
 dependencies = [
     "libroadrunner==2.8.0",
@@ -104,6 +104,16 @@ addopts = "-v --tb=short"
 # outbound-network-restricted environment during collection, not even
 # inside a test. Reproduced directly, not from a report.
 python_files = ["test_*.py"]
+
+[tool.setuptools]
+# Declared rather than left to setuptools' default glob, which happens to
+# include NOTICE* today (verified: dist.py patterns are LICEN[CS]E*,
+# COPYING*, NOTICE*, AUTHORS*). Apache 2.0 section 4(d) requires NOTICE to
+# travel with any redistribution, and relying on a default for a licence
+# obligation means a setuptools change or an explicit license-files entry
+# added later could drop it silently. This is the one file where "it works
+# by default" is not a good enough answer.
+license-files = ["LICENSE", "NOTICE"]
 
 [build-system]
 requires = ["setuptools>=61.0"]

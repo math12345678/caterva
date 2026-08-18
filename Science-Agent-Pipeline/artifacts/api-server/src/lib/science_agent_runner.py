@@ -80,6 +80,7 @@ from typing import Any, Dict
 import enzyme_lookup
 import epidemiology_resolver
 import fallback_logic
+import reliability
 from fallback_logic import KineticResult
 import httpx
 import popgen_resolver
@@ -106,6 +107,34 @@ def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
     return enzyme_lookup.fetch_ec_number_by_name(enzyme_name, None)
 
 
+def taxon_id_for(organism: str | None) -> str | None:
+    """NCBI Taxonomy id for an organism name, or None if it cannot be got.
+
+    None means "not resolved". It never means "assume human" -- that
+    substitution used to live in `enzyme_lookup.DEFAULT_TAXON_ID` and fired
+    on a *network failure*, stamping a human identifier onto a thermophile's
+    measurement (see Tests/test_no_default_organism.py).
+
+    Emitted so the SBML exporter can write `bqbiol:hasTaxon` on each
+    parameter. Without it the cross-species mismatch is prose only, and
+    prose is invisible to a pipeline. The runner already resolved this id
+    for its own EC lookup and threw it away.
+
+    Referenced through the `enzyme_lookup` module rather than by name so the
+    test suite can monkeypatch it and stay offline.
+    """
+    if not organism:
+        return None
+    try:
+        return enzyme_lookup.fetch_taxon_id(organism)
+    except Exception:
+        # A failed taxonomy lookup must not sink a resolution that
+        # otherwise succeeded. The annotation is an addition to the answer,
+        # not a precondition for it -- so its absence is reported by being
+        # absent, and the Km is still returned.
+        return None
+
+
 def resolve_substrate_from_kegg(ec_number: str) -> str | None:
     """Live substrate-name lookup for an EC number via KEGG, used to fill
     in a substrate name when the caller didn't supply one -- which happens
@@ -130,6 +159,17 @@ def resolve_substrate_from_kegg(ec_number: str) -> str | None:
         text = enzyme_lookup.fetch_kegg_enzyme_text(ec_number)
     except httpx.HTTPError:
         return None
+    except enzyme_lookup.KeggLicenceNotConfigured:
+        # KEGG is OFF by default because Terrium has no licence position for
+        # it (ADR 0068, NOTICE, docs/LICENSING.md). This is a deliberate
+        # abstention, not a swallowed failure, which is why it is caught by
+        # NAME rather than by widening the clause above -- widening it is
+        # what `test_programming_error_is_not_swallowed` exists to prevent.
+        #
+        # Degrading to None is already the designed behaviour for "KEGG did
+        # not give us a substrate", and the unfiltered BRENDA fallback below
+        # handles it. The user sees a broader BRENDA result set, not a crash.
+        return None
     substrates = enzyme_lookup.parse_kegg_substrates(text)
     return substrates[0] if substrates else None
 
@@ -140,6 +180,8 @@ def resolve_kinetic_value(
     organism: str,
     ec_number: str,
     quantity: str = "km",
+    allow_cross_species: bool = False,
+    allow_variants: bool = False,
 ) -> KineticResult:
     """Thin wrapper around the real fallback logic in Tests/fallback_logic.py.
 
@@ -156,6 +198,11 @@ def resolve_kinetic_value(
     BRENDA table label (QUANTITY_TABLE_LABELS in fallback_logic.py) and to
     the PubMed query term. This wrapper does no translation of its own so
     there's exactly one place that mapping can drift.
+
+    ``allow_cross_species`` defaults to False and passes straight through
+    for the same reason: fallback_logic owns the policy and this wrapper
+    owns nothing. Defaulting it True here would silently re-enable the
+    behaviour ADR 0024 disabled, in a file nobody would think to check.
     """
     return fallback_logic.resolve_kinetic_value(
         enzyme_ec=ec_number,
@@ -163,7 +210,136 @@ def resolve_kinetic_value(
         substrate=substrate,
         enzyme_name=enzyme_name,
         quantity=quantity,
+        allow_cross_species=allow_cross_species,
+        allow_variants=allow_variants,
     )
+
+
+
+def _parse_physiological(payload: dict):
+    """Build a PhysiologicalReference from the caller's payload, or None.
+
+    ALL FIVE FIELDS ARE REQUIRED, and a partial reference is refused rather
+    than completed.
+
+    A caller who supplies a pH and no temperature has stated half of what
+    the model represents. Filling the other half -- with 37 C, say -- would
+    silently assume a mammal, which is the exact assumption this axis was
+    designed not to make: 37 C misdescribes Thermus thermophilus, whose
+    enzymes are measured near 70 C. Tolerances are equally not defaultable:
+    how far a Km may drift before it stops representing the modelled system
+    is a property of the enzyme.
+
+    So a partial reference produces None, and the axis reports
+    `not_assessed` with its reason -- which is true, rather than a
+    confident grade against a reference nobody fully stated.
+    """
+    spec = payload.get("physiologicalReference")
+    if not isinstance(spec, dict):
+        return None
+
+    required = ("ph", "temperatureC", "basis", "phTolerance", "temperatureToleranceC")
+    if any(spec.get(field) is None for field in required):
+        return None
+
+    try:
+        return reliability.PhysiologicalReference(
+            ph=float(spec["ph"]),
+            temperature_c=float(spec["temperatureC"]),
+            basis=str(spec["basis"]),
+            ph_tolerance=float(spec["phTolerance"]),
+            temperature_tolerance_c=float(spec["temperatureToleranceC"]),
+        )
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolved_effectors_dict(effectors):
+    """Resolve each effector to a PubChem compound, or pass it through.
+
+    Network failure is NOT an error. A resolved kinetic value with an
+    unresolved effector is still a resolved kinetic value; refusing the
+    lookup because PubChem was slow would turn an enrichment into a
+    dependency. `compare_effectors` reads an unresolved identity as
+    "could not check", never as "the conditions agree".
+    """
+    if not effectors:
+        return []
+    try:
+        import effector as effector_module
+        return [e.model_dump() for e in effector_module.resolve_effectors(effectors)]
+    except Exception:  # noqa: BLE001
+        return [e.model_dump() for e in effectors]
+
+
+def _buffer_identity_dict(raw_buffer):
+    """Resolve a reported buffer string to a comparable identity, or None.
+
+    NETWORK FAILURE IS NOT AN ERROR HERE. A resolved kinetic value with an
+    unresolved buffer is still a resolved kinetic value; refusing the whole
+    lookup because PubChem was slow would turn an enrichment into a
+    dependency. buffer_identity's own three states carry the failure
+    forward, and the coherence check reads `unresolvable` as "could not
+    check", never as "buffers agree".
+    """
+    if not raw_buffer:
+        return None
+    try:
+        import buffer_identity
+        return buffer_identity.resolve_identity(raw_buffer).model_dump()
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "raw": raw_buffer,
+            "status": "unresolvable",
+            "reason": (
+                f"Buffer identity lookup failed ({type(exc).__name__}). "
+                "The buffer was reported; it could not be resolved to a "
+                "compound."
+            ),
+        }
+
+
+def _reliability_dict(result, requested_organism: str, physiological=None) -> dict:
+    """Grade the resolved value on Bakker's three axes (ADR 0024).
+
+    No physiological reference is passed, and that is not an oversight: it
+    is an experimental condition the caller states, not something this layer
+    may assume. Absent one, the proximity axis reports `not_assessed` and
+    says why. See Tests/reliability.py.
+    """
+    verdict = next(
+        (
+            v.model_dump()
+            for v in result.relatedness
+            if v.candidate_organism == result.organism
+        ),
+        None,
+    )
+    score = reliability.score_reliability(
+        ph=result.assay_ph,
+        temperature_c=result.assay_temperature_c,
+        unreported=list(result.assay_unreported),
+        reference=physiological,
+        requested_organism=requested_organism,
+        measured_organism=result.organism,
+        cross_species=result.cross_species_flag,
+        relatedness=verdict,
+    )
+    return {
+        "assayCompleteness": {
+            "grade": score.assay_completeness.grade,
+            "reason": score.assay_completeness.reason,
+        },
+        "conditionProximity": {
+            "grade": score.condition_proximity.grade,
+            "reason": score.condition_proximity.reason,
+        },
+        "organismMatch": {
+            "grade": score.organism_match.grade,
+            "reason": score.organism_match.reason,
+        },
+        "noAggregateReason": score.no_aggregate_reason,
+    }
 
 
 def _ensure_terium_path() -> str:
@@ -299,13 +475,32 @@ def main() -> None:
 
         enzyme_name = payload.get("enzymeName", "")
         substrate = payload.get("substrate", "")
-        organism = payload.get("organism", "Homo sapiens")
+        # NOT `payload.get("organism", "Homo sapiens")`. That default sat
+        # here until 2026-08-15 and answered about humans whenever a caller
+        # omitted the organism -- the same defect as DEFAULT_TAXON_ID one
+        # layer up, and in a tool whose headline behaviour is refusing to
+        # substitute one organism for another. An empty organism now flows
+        # through as empty and the resolver refuses, which is the true
+        # answer to a question nobody finished asking.
+        organism = payload.get("organism") or ""
         ec_number = payload.get("ecNumber", "")
         parameter_type = payload.get("parameterType", "")
         quantity = payload.get("quantity", "km")
         if quantity not in ("km", "ki", "kcat"):
             quantity = "km"
         enzyme_conc = payload.get("enzymeConc")
+        #: Opt-in for cross-species values (ADR 0024). Absent means False:
+        #: reading a missing flag permissively is exactly how the old
+        #: automatic fallback would creep back in.
+        allow_cross_species = payload.get("allowCrossSpecies") is True
+        #: Opt in to values measured on a sequence variant -- a point mutant
+        #: or a named isozyme (ADR 0029). Absent means False, for the same
+        #: reason allowCrossSpecies reads that way: the permissive reading of
+        #: a missing flag is how the old behaviour returns silently.
+        allow_variants = payload.get("allowVariants") is True
+        #: The conditions the model represents. An experimental condition
+        #: the caller states, never assumed here (ADR 0012/0013).
+        physiological = _parse_physiological(payload)
         resolution_log: list[str] = []
 
         # Handle population genetics parameter resolution
@@ -454,7 +649,12 @@ def main() -> None:
                 )
                 return
 
-        result = resolve_kinetic_value(enzyme_name, substrate, organism, ec_number, quantity=quantity)
+        result = resolve_kinetic_value(
+            enzyme_name, substrate, organism, ec_number,
+            quantity=quantity,
+            allow_cross_species=allow_cross_species,
+            allow_variants=allow_variants,
+        )
         result.search_log = resolution_log + result.search_log
 
         if result.found and result.value is not None:
@@ -468,6 +668,13 @@ def main() -> None:
                 value_key: result.value,
                 "unit": result.unit,
                 "organism": result.organism,
+                # The taxon of the organism the value was MEASURED in, and
+                # of the one the caller ASKED about. Two fields because for
+                # a cross-species result they differ, and that difference is
+                # exactly what makes the substitution machine-detectable in
+                # the exported SBML rather than only readable in a note.
+                "taxonId": taxon_id_for(result.organism),
+                "requestedTaxonId": taxon_id_for(organism),
                 "source": result.source,
                 "crossSpecies": result.cross_species_flag,
                 # STRENDA-mandated assay conditions (ADR 0010). Keys are
@@ -478,8 +685,120 @@ def main() -> None:
                     "ph": result.assay_ph,
                     "temperatureC": result.assay_temperature_c,
                     "buffer": result.assay_buffer,
+                    # The buffer string resolved to a comparable chemical
+                    # identity (ADR 0028). The raw string stays alongside it:
+                    # this is an ADDITION to what was reported, never a
+                    # replacement for it, and a reader has to be able to
+                    # disagree with the resolution.
+                    "bufferIdentity": _buffer_identity_dict(result.assay_buffer),
                     "unreported": result.assay_unreported,
                 },
+                # Which protein this row measured (ADR 0029). Emitted for
+                # FOUND values as well as withheld ones: `unstated` is the
+                # majority case, and a reader needs to know the row simply
+                # did not say rather than assume it was wild-type.
+                "variant": (
+                    result.variant.model_dump() if result.variant else None
+                ),
+                # How the enzyme was PREPARED (ADR 0092): immobilised,
+                # affinity-tagged, covalently modified, native, or unstated.
+                #
+                # Emitted beside `variant` because it is the same question
+                # one category over -- ADR 0029 asks "is this the enzyme's
+                # sequence?", this asks "is this the free enzyme?" -- and
+                # neither is visible to the other's filter.
+                #
+                # Measured before it existed: the human LDH Ki resolved to
+                # 0.00059, a "recombinant His-tagged enzyme" row, with
+                # nothing in the response saying so. ADR 0038 is the
+                # precedent for emitting it HERE: effectors were compared
+                # correctly and stopped at this boundary, and severing the
+                # resolver broke none of the 35 unit tests.
+                "preparation": (
+                    {
+                        **result.preparation.model_dump(),
+                        # The DECISION, made once, here, by the module that
+                        # owns the rule.
+                        #
+                        # `differs_for(quantity)` is the whole judgement:
+                        # was the enzyme altered, and did the curator say
+                        # the alteration left THIS quantity alone. The
+                        # first version emitted only the inputs and let
+                        # queryResolver.ts re-derive it, which is two
+                        # implementations of one rule -- ADR 0027 exactly,
+                        # written while fixing ADR 0027's shape elsewhere.
+                        #
+                        # A client may still read `status` and
+                        # `stated_not_to_affect` to render differently.
+                        # What it must not do is decide again.
+                        "warrantsWarning": result.preparation.differs_for(
+                            quantity
+                        ),
+                    }
+                    if result.preparation else None
+                ),
+                # Cofactors and effectors, with PubChem identity resolved
+                # HERE rather than during parsing -- so parsing a fixture
+                # stays offline and a network outage degrades the identity
+                # rather than failing the whole lookup (ADR 0032).
+                "effectors": _resolved_effectors_dict(result.effectors),
+                # The tie the evidence could not break (ADR 0048). Emitted on
+                # FOUND results: the point is that a value was returned while
+                # equally-evidenced alternatives existed unmentioned.
+                # Which named form the returned value IS, when the pool
+                # mixed forms (ADR 0052). None in every fixture today.
+                "selectedForm": (
+                    result.selected_form.model_dump()
+                    if result.selected_form else None
+                ),
+                "selectionTie": (
+                    result.selection_tie.model_dump()
+                    if result.selection_tie else None
+                ),
+                # Every relatedness verdict, including the ones that
+                # REJECTED a candidate. A filter that reports only what
+                # survived it cannot be argued with, and the organisms it
+                # dropped are precisely what a reader would want to check.
+                "relatedness": [v.model_dump() for v in result.relatedness],
+                # POOL-LEVEL FINDINGS. Facts about the candidate set, not
+                # about the value that won it.
+                #
+                # These were computed and dropped here for four ADRs. The
+                # resolver attached them to KineticResult, the runner never
+                # emitted them, and only a prose line reached the diagnostic
+                # log -- which is not `provenance.flags`, the list the CLI
+                # and web UI actually render. Exactly ADR 0027's defect: a
+                # thing computed correctly and discarded at a boundary,
+                # invisible because every test on the computation passed.
+                # See ADR 0039.
+                "poolFindings": {
+                    "effectorContrasts": [c.model_dump() for c in result.effector_contrasts],
+                    "formMixtures": [m.model_dump() for m in result.form_mixtures],
+                    "organismDiscrepancies": [
+                        d.model_dump() for d in result.organism_discrepancies
+                    ],
+                    "sourceMixtures": [m.model_dump() for m in result.source_mixtures],
+                    # "nothing found" and "nothing checked" are different
+                    # facts. Set when source tokens were extracted and none
+                    # could be classified -- with NCBI unreachable, a pool
+                    # holding heart and muscle reports no mixture at all.
+                    #
+                    # Omitted from the first draft of this dict, one pass
+                    # after the field was added, and caught by
+                    # check_findings_reach_a_surface.py on its first run.
+                    # The guard written to stop fields being dropped found
+                    # one that had already been dropped.
+                    "sourceCheckUnavailable": (
+                        result.source_check_unavailable.model_dump()
+                        if result.source_check_unavailable
+                        else None
+                    ),
+                },
+                # Bakker's three axes, graded in Python so the CLI and the
+                # API show the same grades by construction rather than by
+                # two implementations happening to agree. Both are asserted
+                # against Tests/reliability_cases.json.
+                "reliability": _reliability_dict(result, organism, physiological),
                 "citation": _citation_to_dict(result.citation),
                 "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                 "logs": result.search_log,
@@ -523,6 +842,17 @@ def main() -> None:
                         "ok": True,
                         "found": False,
                         "source": result.source,
+                        # A refusal has to say what it refused. Without
+                        # this the client sees source="cross_species_withheld"
+                        # and cannot tell the user what opting in would
+                        # get them -- the miss becomes unactionable at the
+                        # API boundary even though the resolver knew.
+                        "crossSpeciesOrganismsAvailable": result.cross_species_organisms_available,
+                        # Which variants were found and withheld. A refusal
+                        # that cannot name what it refused leaves the opt-in
+                        # it demands unexercisable.
+                        "variantCandidatesAvailable": result.variant_candidates_available,
+                        "relatedness": [v.model_dump() for v in result.relatedness],
                         "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                         "logs": result.search_log,
                     }

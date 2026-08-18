@@ -5,7 +5,14 @@
 #               the reasoning is lost and the file reads as an ignore-list)
 #
 # A line here means the fragment has been LOOKED AT, not that it is harmless.
-# One of the two groups below is an OPEN FINDING.
+#
+# Both groups below have now been READ, not merely reviewed:
+#   the modification group -> ADR 0092 (preparation is a first-class verdict)
+#   `muscle` in the tail   -> the pooled-tissue finding, ADR 0101
+#
+# Nothing here is an open finding today. That is a statement about this
+# file, not about the parser: these fragments are still unparsed, and the
+# reason each is acceptable is written beside it.
 #
 # Coverage: 92% of 263 commentaries fully understood.
 #   73%  ADR 0031, when the guard was introduced
@@ -18,8 +25,23 @@
 # and a tail of substrate names.
 
 # ========================================================================
-# CHEMICAL MODIFICATION, TAGGING AND PREPARATION -- OPEN FINDING
+# CHEMICAL MODIFICATION, TAGGING AND PREPARATION -- READ (ADR 0092)
 # ========================================================================
+#
+# RESOLVED. `Tests/enzyme_preparation.py` classifies these into
+# native / immobilised / tagged / modified / unstated / absent, and the
+# verdict travels to `provenance.flags`. 18 corpus rows carry a marker;
+# ADR 0029's variant filter called every one of them `unstated`, and the
+# human LDH Ki was resolving to a His-tagged construct with nothing saying
+# so.
+#
+# The "does not alter the Kcat value" line below turned out to be the most
+# important one here: the curator states the modification had NO effect on
+# a NAMED quantity, and golden tuple G2 depends on it. A blanket exclusion
+# would have deleted a value the source itself calls equivalent.
+#
+# The fragments remain unparsed as free text; what changed is that the
+# facts inside them are now extracted and reported.
 #
 # The last substantive group. Covalent modification, affinity tags and
 # immobilisation change kinetics and are not sequence changes, so ADR 0029
@@ -49,9 +71,19 @@ soluble  # x1
 # measurement OF, and the fields carrying that information (substrate,
 # quantity) are parsed separately.
 # 
-# "muscle" survives here as a bare token in a row whose phrasing ADR 0037's
-# `from` pattern does not reach; the same word is read on the rows that say
-# "enzyme from muscle".
+# "muscle" survived here as a bare token in a row whose phrasing ADR 0037's
+# `from` pattern does not reach. FOLLOWED UP (ADR 0101): the row is
+#
+#     Gallus gallus  16.0  "enzyme form heart and muscle"
+#
+# -- BRENDA's typo for "from" -- and it was being filed as a clean HEART
+# measurement beside the genuine 60.0 heart row. It is material pooled from
+# two tissues whose values differ 54-fold. `find_source_mixtures` now names
+# such a row as unattributable to any single source.
+#
+# The token stays in this tail because it is still not parsed as a source
+# claim in its own right; what changed is that the row is no longer
+# misattributed.
 #
 Glu Gly Arg 4 nitroanilide  # x1
 N Ch3 3+  # x2

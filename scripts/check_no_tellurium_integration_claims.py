@@ -134,7 +134,28 @@ DISCUSSES: dict[str, str] = {
         "Carries correction banners that restate superseded claims; same "
         "reason the third-party guard reads only its table."
     ),
+    "docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md": (
+        "The remediation plan for these exact files. Its inventory reads "
+        '`Docw/terrium_full.docx    also: claims \"Tellurium integration\"` '
+        "-- the phrase is the thing being removed, named so somebody can "
+        "find it. This guard failed the build on it, so the document "
+        "planning the cleanup was the one blocking CI, and the only way to "
+        "go green would have been to describe the offending files "
+        "vaguely enough that nobody could act on them."
+    ),
 }
+
+#: Every DISCUSSES entry exempts a WHOLE document, so a genuine new claim in
+#: one of these would go unseen. That cost was acceptable at two entries and
+#: is worth watching at three: `Tests/test_no_tellurium_integration_claims.py`
+#: pins this dict, so it cannot grow without somebody deciding it should.
+#:
+#: The narrower fix -- exempt the quoted occurrence rather than the file --
+#: is what `check_documented_counts.is_quoted` does for counts. It is not
+#: done here because this guard's author chose per-document exemption with
+#: written reasons and said why; changing that is a redesign, not a repair,
+#: and belongs to whoever owns the design rather than to the pass that
+#: happened to hit the false positive.
 
 #: `**/*.docx`, not `Docw/*.docx`. The first version of this guard named the
 #: one directory where the claims had been found, which is the defect it was

@@ -15,11 +15,19 @@
     "are detected and reported INDETERMINATE. Verified by breaking the",
     "guard's own syntax and confirming the harness refuses to call it caught.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0045-boundary-guard.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0045-boundary-guard.json",
+    "",
+    "ADR 0100 shares this set rather than opening a second one: G2 IS that record's table, and the two mutations belong together -- G2 only became expressible once the invariant it protects was stated, and G1 is the defect it nearly excused. Two files would split one finding.",
+    "ADR 0102 shares it too: that pass changed the fixture, the path matcher and the TypeScript sources read, and G1/G2 re-run unchanged are the evidence it did not quietly stop catching anything."
   ],
-  "covers": ["0039", "0045"],
+  "covers": [
+    "0039",
+    "0045",
+    "0100",
+    "0102"
+  ],
   "verdict": "exit_code",
-  "test": "python3 scripts/check_findings_reach_a_surface.py",
+  "test": "python3 scripts/check_findings_reach_a_surface.py --selftest && python3 scripts/check_findings_reach_a_surface.py",
   "mutations": [
     {
       "id": "G1",
@@ -29,6 +37,30 @@
       "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py",
       "find": "                \"poolFindings\": {",
       "replace": "                \"poolFindingsDisabledByMutation\": {"
+    },
+    {
+      "id": "G2",
+      "description": "the 'not measurable' state decided by the WIRE path, so a deleted emission excuses a top-level field",
+      "_claimed": "fails now; this mutation IS the bug it re-creates",
+      "_note": [
+        "The historical failure, verbatim. Descending into nested models added",
+        "a third state, and its first version tested the wire path.",
+        "`effector_contrasts` is TOP-LEVEL with the dotted alias",
+        "`poolFindings.effectorContrasts`, so deleting that emission emptied",
+        "`measurable_parents`, reclassified the field 'not measurable', and",
+        "skipped it. G1 flipped to NOT CAUGHT: the new state swallowed the",
+        "exact defect the guard exists for, and the excuse got STRONGER the",
+        "more thoroughly the emission was deleted.",
+        "",
+        "This was first written as a mutation of the closure and came back NOT",
+        "CAUGHT -- correctly, because the weakness is conditional on G1 and",
+        "changes no output on its own. The invariant moved into `--selftest`,",
+        "which asserts it directly, and only then did the mutation become",
+        "expressible."
+      ],
+      "file": "scripts/check_findings_reach_a_surface.py",
+      "find": "    if \".\" not in field:\n        return True\n    parent = aliases.get(field, field).rsplit(\".\", 1)[0]",
+      "replace": "    if \".\" not in aliases.get(field, field):\n        return True\n    parent = aliases.get(field, field).rsplit(\".\", 1)[0]"
     }
   ]
 }

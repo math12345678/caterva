@@ -1,7 +1,7 @@
 {
   "name": "workspace",
   "version": "0.0.0",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "packageManager": "pnpm@11.20.0",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock 2>/dev/null; :'",

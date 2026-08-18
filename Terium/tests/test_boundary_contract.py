@@ -16,6 +16,8 @@ The runner is loaded from source here -- the same file the API server spawns
 from __future__ import annotations
 
 import importlib.util
+import io
+import json
 import sys
 from pathlib import Path
 from typing import ClassVar
@@ -172,6 +174,60 @@ class TestBoundaryContract:
         )
         violations = _contract_violations(runner)
         assert any("simulate_molecular_dynamics" in v for v in violations)
+
+    # The mutation above deletes the entry from BOTH tables, so what catches it
+    # is the engine axis: `simulate_molecular_dynamics` stops being dispatched.
+    # That left the two branches comparing DISPATCH against _RUNNERS -- the
+    # `unhandled_domains` and `stray_handlers` checks -- never once shown to
+    # fire. They are the branches that matter most at runtime, because main()
+    # tests membership in one table and looks the handler up in the other. The
+    # two mutations below edit exactly one table each.
+
+    def test_mutation_handler_removed_but_dispatch_kept_is_detected(self, monkeypatch):
+        """One-sided mutation: _RUNNERS loses a domain, DISPATCH still lists it.
+
+        Before this was proven, a slip here reached the student as the string
+        ``'pcr'`` -- the repr of a KeyError -- reported as if the request were
+        invalid.
+        """
+        monkeypatch.setattr(
+            runner,
+            "_RUNNERS",
+            {k: v for k, v in runner._RUNNERS.items() if k != "pcr"},  # noqa: SLF001
+        )
+        violations = _contract_violations(runner)
+        assert any("without a run_* handler" in v and "pcr" in v for v in violations)
+
+    def test_mutation_dispatch_removed_but_handler_kept_is_detected(self, monkeypatch):
+        """One-sided mutation: DISPATCH loses a domain, _RUNNERS still has it.
+
+        The opposite drift, and the quieter one: the handler simply becomes
+        unreachable. Nothing fails, the domain just stops existing.
+        """
+        monkeypatch.setattr(
+            runner, "DISPATCH", {k: v for k, v in runner.DISPATCH.items() if k != "pcr"}
+        )
+        violations = _contract_violations(runner)
+        assert any("not reachable via DISPATCH" in v and "pcr" in v for v in violations)
+
+    def test_drifted_tables_report_a_build_defect_not_a_bad_request(self, monkeypatch):
+        """main() must not present an internal drift as the student's mistake."""
+        monkeypatch.setattr(
+            runner,
+            "_RUNNERS",
+            {k: v for k, v in runner._RUNNERS.items() if k != "pcr"},  # noqa: SLF001
+        )
+        monkeypatch.setattr(
+            sys, "stdin", io.StringIO(json.dumps({"domain": "pcr", "parameters": {}}))
+        )
+        buf = io.StringIO()
+        monkeypatch.setattr(sys, "stdout", buf)
+        with pytest.raises(SystemExit):
+            runner.main()
+        error = json.loads(buf.getvalue())["error"]
+        assert "build defect" in error
+        assert "unknown domain" not in error  # the request was valid
+        assert error != "'pcr'"  # the bare KeyError repr this replaced
 
 
 class TestRunnerExecution:

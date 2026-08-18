@@ -2813,14 +2813,28 @@ def test_effective_size_harmonic_mean_known_values() -> None:
 
 def test_effective_size_harmonic_mean_never_exceeds_arithmetic() -> None:
     """Harmonic <= arithmetic, strict unless constant (AM-GM)."""
+    strict_cases = 0
     for series in ([1000, 10, 1000], [500, 50, 500, 50],
                    [1000, 200] * 50 + [1000], [7, 7, 7, 7]):
         hm = effective_size_harmonic_mean(series)
         am = sum(series) / len(series)
+
+        # The inequality itself holds for EVERY series, so it is asserted
+        # unconditionally. Previously both assertions sat inside an
+        # if/else, which `check_no_vacuous_tests.py` reports -- and while
+        # the branch here is on the INPUT (are all sizes equal?) rather than
+        # on an unknown outcome, so the test could still fail, stating the
+        # universal law outright is both stronger and clearer.
+        assert hm <= am + 1e-12, f"harmonic {hm} exceeded arithmetic {am}"
+
         if all(n == series[0] for n in series):
+            # Equality case of AM-GM: a constant series has hm == am.
             assert abs(hm - am) < 1e-12
         else:
+            strict_cases += 1
             assert hm < am, f"harmonic {hm} should be < arithmetic {am}"
+
+    assert strict_cases, "no varying series was tested; strictness went unchecked"
 
 
 def test_effective_size_harmonic_mean_matches_simulated_ne() -> None:

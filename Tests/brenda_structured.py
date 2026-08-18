@@ -82,10 +82,22 @@ def parse_brenda_km(ec_number: str, target_organism: str = "Homo sapiens",
     # that's 100+ redundant live HTTP requests per run instead of one,
     # and risks hitting NCBI/UniProt rate limits. The result is identical
     # for every row of the same EC+organism, so it belongs outside the loop.
+    #
+    # This read `fetch_taxon_id(target_organism) or DEFAULT_TAXON_ID` until
+    # 2026-08-15. fetch_taxon_id returns None when NCBI is unreachable,
+    # rate-limited, or does not know the name -- so a network blip while
+    # asking about Thermus aquaticus fetched the HUMAN accession and
+    # stamped it onto a thermophile's row, which is downstream written to
+    # `entry.uniprot` and travels as that measurement's protein identity.
+    #
+    # No taxon means no fallback accession. A row then carries
+    # uniprot=None, which is true, instead of a confident accession for the
+    # wrong species.
     fallback_uniprot = None
     try:
-        taxon_id = enzyme_lookup.fetch_taxon_id(target_organism) or enzyme_lookup.DEFAULT_TAXON_ID
-        fallback_uniprot = enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
+        taxon_id = enzyme_lookup.fetch_taxon_id(target_organism)
+        if taxon_id:
+            fallback_uniprot = enzyme_lookup.fetch_uniprot_accession(ec_number, taxon_id)
     except Exception:
         fallback_uniprot = None
 
@@ -174,33 +186,45 @@ def parse_brenda_km(ec_number: str, target_organism: str = "Homo sapiens",
 
     return results
 
-# Test on LDH (1.1.1.27) and AChE (3.1.1.7)
-print("=== Human LDH (EC 1.1.1.27) ===")
-ldh_results = parse_brenda_km("1.1.1.27", "Homo sapiens",
-                               ["lactate", "pyruvate", "NADH", "NAD+"])
-for r in ldh_results:
-    flag = "  [FLAGGED]" if r.flagged else ""
-    print(f"  Km={r.km_value} {r.unit} | substrate={r.substrate} | "
-          f"uniprot={r.uniprot} | ref={r.reference_id}{flag}")
-    if r.conditions:
-        print(f"    conditions: {r.conditions[:100]}")
-    if r.flag_reason:
-        print(f"    flag_reason: {r.flag_reason}")
+if __name__ == "__main__":
+    # Ran at MODULE SCOPE until 2026-08-15, so `import brenda_structured`
+    # performed two live BRENDA fetches as a side effect of the import.
+    #
+    # Two consequences, both bad. Nothing could unit-test this module --
+    # collection failed at the import line, which is why it had no test file
+    # while its sibling `brenda_client` had several. And BRENDA asked that
+    # tools be gentle with their servers; a module that fetches on import
+    # hits them every time anything anywhere imports it, including a test
+    # run that never intended to touch the network.
+    #
+    # The demo is kept, not deleted. It is a useful manual smoke check; it
+    # was only ever in the wrong place.
+    print("=== Human LDH (EC 1.1.1.27) ===")
+    ldh_results = parse_brenda_km("1.1.1.27", "Homo sapiens",
+                                   ["lactate", "pyruvate", "NADH", "NAD+"])
+    for r in ldh_results:
+        flag = "  [FLAGGED]" if r.flagged else ""
+        print(f"  Km={r.km_value} {r.unit} | substrate={r.substrate} | "
+              f"uniprot={r.uniprot} | ref={r.reference_id}{flag}")
+        if r.conditions:
+            print(f"    conditions: {r.conditions[:100]}")
+        if r.flag_reason:
+            print(f"    flag_reason: {r.flag_reason}")
 
-print(f"\n  Total: {len(ldh_results)} entries "
-      f"({sum(1 for r in ldh_results if r.flagged)} flagged)")
+    print(f"\n  Total: {len(ldh_results)} entries "
+          f"({sum(1 for r in ldh_results if r.flagged)} flagged)")
 
-print("\n=== Human AChE (EC 3.1.1.7) ===")
-ache_results = parse_brenda_km("3.1.1.7", "Homo sapiens",
-                                ["acetylcholine", "acetylthiocholine", "acetyl thiocholine"])
-for r in ache_results:
-    flag = "  [FLAGGED]" if r.flagged else ""
-    print(f"  Km={r.km_value} {r.unit} | substrate={r.substrate} | "
-          f"uniprot={r.uniprot} | ref={r.reference_id}{flag}")
-    if r.conditions:
-        print(f"    conditions: {r.conditions[:100]}")
-    if r.flag_reason:
-        print(f"    flag_reason: {r.flag_reason}")
+    print("\n=== Human AChE (EC 3.1.1.7) ===")
+    ache_results = parse_brenda_km("3.1.1.7", "Homo sapiens",
+                                    ["acetylcholine", "acetylthiocholine", "acetyl thiocholine"])
+    for r in ache_results:
+        flag = "  [FLAGGED]" if r.flagged else ""
+        print(f"  Km={r.km_value} {r.unit} | substrate={r.substrate} | "
+              f"uniprot={r.uniprot} | ref={r.reference_id}{flag}")
+        if r.conditions:
+            print(f"    conditions: {r.conditions[:100]}")
+        if r.flag_reason:
+            print(f"    flag_reason: {r.flag_reason}")
 
-print(f"\n  Total: {len(ache_results)} entries "
-      f"({sum(1 for r in ache_results if r.flagged)} flagged)")
+    print(f"\n  Total: {len(ache_results)} entries "
+          f"({sum(1 for r in ache_results if r.flagged)} flagged)")

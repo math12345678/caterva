@@ -790,8 +790,22 @@ export class AssumptionValidator {
       vmax: number;
       s0: number;
       measurementTime: number;
-      temperature: number;
-      pH: number;
+      /**
+       * The temperature the KINETIC CONSTANTS WERE MEASURED AT, in Celsius --
+       * not a temperature the caller chose to simulate at. The simulation has
+       * no temperature of its own: the ODE never reads one (see
+       * `runSimulation`, which discards this object), because a Km's
+       * temperature dependence is already inside the measured Km.
+       *
+       * Optional, and absent is the common case. BRENDA does not require a
+       * curator to record an assay temperature, so `not_reported` is a real
+       * and frequent answer. Undefined means the check below does not run;
+       * it does NOT mean 37.
+       */
+      temperature?: number;
+      /** The pH the kinetic constants were measured at. Optional for the same
+       *  reason as `temperature`. */
+      pH?: number;
       /** Initial total enzyme concentration, in the SAME units as km and
        *  s0. Required to evaluate the steady-state assumption at all. */
       e0?: number;
@@ -906,7 +920,22 @@ export class AssumptionValidator {
     // polymerase is assayed near 72 C), as are gastric and lysosomal
     // enzymes near pH 2 and 4.5. Failing a run on these ranges would
     // reject correct science.
-    if (conditions.temperature < 4 || conditions.temperature > 45) {
+    // Both checks were unreachable in the shipped product until ADR 0055.
+    // Every entry point -- the web server, three CLI paths, the batch
+    // processor, the parameter sweep and both model-comparison calls --
+    // passed a hardcoded `{ temperature: 37, pH: 7.4 }`, which is the dead
+    // centre of both ranges. Nine call sites, one literal, and a warning
+    // that could not fire from anywhere a user could reach.
+    //
+    // The unit tests passed the whole time, because they called this
+    // function directly with values the product never sends.
+    if (conditions.temperature === undefined || !Number.isFinite(conditions.temperature)) {
+      notEvaluated.push(
+        'Assay temperature: the resolved parameters did not report one, so ' +
+        'no range check was made. This is NOT a statement that the ' +
+        'temperature was suitable -- it is a statement that it is unknown.'
+      );
+    } else if (conditions.temperature < 4 || conditions.temperature > 45) {
       warnings.push(
         `Temperature ${conditions.temperature} C is outside the 4-45 C range ` +
         'typical of mesophilic enzyme assays. Not an error -- thermophilic ' +
@@ -915,7 +944,13 @@ export class AssumptionValidator {
       );
     }
 
-    if (conditions.pH < 5 || conditions.pH > 9) {
+    if (conditions.pH === undefined || !Number.isFinite(conditions.pH)) {
+      notEvaluated.push(
+        'Assay pH: the resolved parameters did not report one, so no range ' +
+        'check was made. This is NOT a statement that the pH was suitable -- ' +
+        'it is a statement that it is unknown.'
+      );
+    } else if (conditions.pH < 5 || conditions.pH > 9) {
       warnings.push(
         `pH ${conditions.pH} is outside the pH 5-9 range typical of enzyme ` +
         'assays. Not an error -- gastric and lysosomal enzymes operate well ' +

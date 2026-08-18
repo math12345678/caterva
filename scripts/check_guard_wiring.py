@@ -214,6 +214,10 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_third_party_requests_disclosed": ("verify_build",),
     "check_mutation_tables_reproducible": ("verify_build",),
     "mutate": ("verify_build",),
+    #: The two-front-end guard. verify_build only: it runs the real
+    #: runner subprocess to see what is emitted, which CI has no
+    #: Python environment for and a pytest wrapper would nest.
+    "check_both_front_ends_read_it": ("verify_build",),
 }
 
 

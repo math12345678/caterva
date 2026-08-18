@@ -11,7 +11,7 @@ export interface ExecutionMetrics {
   startTime: number;
   endTime: number;
   executionTimeMs: number;
-  // Terrium's engine (Tellurium/libRoadRunner via a fixed-step integrator,
+  // Terrium's engine (libRoadRunner via a fixed-step integrator,
   // see Terium/) is not an iterative solver reporting a real convergence
   // count -- there is no such number to measure. Callers record the
   // trajectory point count here (a real, verifiable fact about the run:

@@ -57,7 +57,30 @@ PUBCHEM_SYNONYMS_URL = (
 )
 NCBI_TAXONOMY_ESEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 
-DEFAULT_TAXON_ID = "9606"  # Homo sapiens
+# DEFAULT_TAXON_ID used to live here, set to "9606" (Homo sapiens), and was
+# the default argument of three network functions.
+#
+# It is deleted rather than moved. A default organism is the same defect as
+# a default pH: "physiological" means something different for every
+# organism (ADR 0012/0013), and so does "the organism". The failure mode was
+# worse here, because it fired on a NETWORK FAILURE rather than on a missing
+# argument:
+#
+#     taxon_id = fetch_taxon_id(organism) or DEFAULT_TAXON_ID
+#
+# fetch_taxon_id returns None when NCBI is unreachable, rate-limited, or does
+# not recognise the name. Ask about Thermus aquaticus while NCBI is down and
+# the next line fetched the *human* UniProt accession and attached it to a
+# thermophile's measurement. The "could not look" outcome was collapsed into
+# a confident wrong answer -- in the codebase whose headline behaviour is
+# refusing to substitute one organism's value for another's.
+#
+# Every caller already passed a taxon explicitly, so nothing depended on it.
+# It was a latent hazard one omitted argument away from firing.
+#
+# The correct handling is in fallback_logic._resolve_fallback_uniprot, which
+# has always said `if not taxon_id: return None`. Two implementations of one
+# step; they disagreed, and the wrong one was the one with a default.
 
 
 # ---------------------------------------------------------------------------
@@ -103,11 +126,17 @@ def parse_taxon_id(data: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 def fetch_uniprot_accession(
-    ec_number: str, taxon_id: str = DEFAULT_TAXON_ID, timeout: float = 15
+    ec_number: str, taxon_id: str, timeout: float = 15
 ) -> str | None:
     """Fetch the canonical (reviewed/Swiss-Prot) UniProt accession for an
     EC number in a given organism. Returns None if nothing is found -
-    never guesses or fabricates an accession."""
+    never guesses or fabricates an accession.
+
+    `taxon_id` is REQUIRED. It carried a default of 9606 until 2026-08-15,
+    which made that docstring's last clause false in the way that mattered
+    most: it did not fabricate an accession, it fabricated the *organism*,
+    then returned a real human accession for whatever species the caller
+    was actually asking about."""
     params: dict[str, str | int] = {
         "query": f"ec:{ec_number} AND organism_id:{taxon_id} AND reviewed:true",
         "fields": "accession",
@@ -131,8 +160,72 @@ def parse_uniprot_accession(data: dict) -> str | None:
 # KEGG: EC number -> real reaction substrate name(s)
 # ---------------------------------------------------------------------------
 
+class KeggLicenceNotConfigured(RuntimeError):
+    """KEGG is reachable but Terrium has no licence position for it.
+
+    A distinct type rather than a bare RuntimeError so a caller can tell
+    "we chose not to ask KEGG" from "KEGG did not answer". Those are the
+    same distinction the resolver keeps everywhere else, and collapsing
+    them here would report a deliberate abstention as a network failure.
+    """
+
+
+#: Opt-in switch for the KEGG lookup. OFF unless explicitly set.
+#:
+#: WHY THIS EXISTS
+#: ---------------
+#: KEGG's terms (https://www.kegg.jp/kegg/legal.html, 1 October 2024) say
+#: KEGG "is not a public database, nor is it a publicly funded database",
+#: that non-academic use "requires a commercial license", and that even
+#: academic users "who utilize KEGG for providing services are requested to
+#: obtain an academic service provider license".
+#:
+#: Terrium provides a service, and this repository contains an incorporation
+#: checklist, a cap table and a fundraising tracker. On either reading a
+#: licence from Pathway Solutions (https://www.pathway.jp/) is indicated,
+#: and nobody has obtained one.
+#:
+#: The project's own precedent settles what to do. SABIO-RK was evaluated
+#: and DECLINED for having non-commercial-only terms; stdpopsim was moved
+#: out of the default install when its GPL-3.0 licence turned out to sit
+#: awkwardly with an Apache-2.0 project (ADR 0061). KEGG's terms are
+#: comparable to SABIO-RK's and KEGG was integrated anyway -- not after
+#: weighing them, but before anyone read them (ADR 0068, NOTICE).
+#:
+#: So the default is now OFF. Terrium makes no KEGG request unless an
+#: operator sets this, and setting it is the operator stating that their own
+#: licence position permits it. That is the same shape as CORE, which
+#: already refuses to run without CORE_API_KEY -- obtaining the key IS
+#: engaging CORE's licensing process.
+#:
+#: This does NOT assert that using KEGG would be unlawful. It asserts that
+#: Terrium does not currently know that it is lawful, and that a tool whose
+#: central claim is traceability should not make an unexamined request on a
+#: user's behalf.
+KEGG_OPT_IN_ENV = "TERRIUM_ENABLE_KEGG"
+
+
+def kegg_enabled() -> bool:
+    """Whether the operator has opted in to KEGG lookups."""
+    return os.environ.get(KEGG_OPT_IN_ENV, "").strip().lower() in {"1", "true", "yes"}
+
+
 def fetch_kegg_enzyme_text(ec_number: str, timeout: float = 15) -> str:
-    """Fetch the raw KEGG flat-file text for an EC number."""
+    """Fetch the raw KEGG flat-file text for an EC number.
+
+    Raises KeggLicenceNotConfigured unless TERRIUM_ENABLE_KEGG is set. See
+    KEGG_OPT_IN_ENV above for why the default is off.
+    """
+    if not kegg_enabled():
+        raise KeggLicenceNotConfigured(
+            "KEGG lookup is disabled by default. KEGG is not a public database: "
+            "non-academic use requires a commercial licence, and academic users "
+            "providing a service are asked to obtain an academic service-provider "
+            "licence (https://www.kegg.jp/kegg/legal.html). Terrium has not "
+            f"obtained one. Set {KEGG_OPT_IN_ENV}=1 to enable this lookup, which "
+            "is you stating that your own licence position permits it. "
+            "See NOTICE and docs/LICENSING.md."
+        )
     url = KEGG_GET_URL.format(ec_number=ec_number)
     r = retry_get(url, timeout=timeout)
     r.raise_for_status()
@@ -262,14 +355,19 @@ def expand_substrates_with_synonyms(
 # ---------------------------------------------------------------------------
 
 def fetch_ec_number_by_name(
-    enzyme_name: str, taxon_id: str | None = DEFAULT_TAXON_ID, timeout: float = 15
+    enzyme_name: str, taxon_id: str | None, timeout: float = 15
 ) -> str | None:
     """Fetch an EC number for an enzyme by its common/protein name via
     UniProt's REST search. Returns None if nothing is found - never
     guesses or fabricates an EC number.
 
-    taxon_id narrows the search to one organism when given; pass None to
-    search UniProt without an organism filter (the caller's second attempt
+    taxon_id is REQUIRED and explicit: pass an id to narrow to one organism,
+    or pass None to search UniProt without an organism filter. There is no
+    default, because a default here silently answers about a species the
+    caller never named. `None` is a deliberate statement ("any organism");
+    an omitted argument is not.
+
+    Passing None narrows nothing and (the caller's second attempt
     when a species-restricted search finds nothing, mirroring the
     exact-then-cross-species pattern in fallback_logic.py)."""
     query = f'protein_name:"{enzyme_name}" AND reviewed:true'
@@ -311,7 +409,7 @@ def parse_ec_number_search(data: dict) -> str | None:
 
 
 def resolve_enzyme(
-    ec_number: str, taxon_id: str = DEFAULT_TAXON_ID
+    ec_number: str, taxon_id: str
 ) -> dict:
     """Convenience wrapper: resolve both UniProt accession and substrate
     names for an EC number in one call. Network-dependent; use

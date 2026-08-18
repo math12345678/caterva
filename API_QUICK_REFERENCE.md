@@ -1,95 +1,96 @@
-# 📋 Terrium API Quick Reference
+# API Quick Reference
 
-**18 Endpoints | All Production-Ready | Zero External Dependencies**
+> **⚠️ CORRECTION (2026-08-12):**
+> - The "Query jobs with filters" examples (`curl ".../api/jobs/query?..."`) and the `GET /api/jobs/history` endpoint listed above do not work. In `src/web/server.ts`, `GET /api/jobs/:jobId` (`pathname.match(/^\/api\/jobs\/[a-z0-9_]+$/i)`, line 235) is registered before `/api/jobs/history` (line 251) and `/api/jobs/query` (line 259), and its regex matches the literal strings `history` and `query` as valid job IDs. Reproduced live: both routes currently return `404 {"error":"Job not found"}` instead of their documented behavior. This is a routing bug in `server.ts` (out of scope for this audit to fix), not a wording issue.
+> - This doc's endpoint list also omits `GET /api/jobs/{jobId}` (get a single job's status/result) entirely — it is a real, working route in `server.ts` that should be documented alongside `/api/jobs/history` and `/api/jobs/query`.
+> - "Required Parameters (by model)" claims `ki`/`i0` are required for `competitive-inhibition`/`non-competitive-inhibition` and `ki`/`p0` for `product-inhibition`. Reading `src/validation/request-validator.ts` (`validateSimulationRequest()`, line 54) shows the actual required-parameter check is `['km', 'vmax', 's0']` for every model — `ki`/`i0`/`p0` are never validated as required, regardless of which `query` model is chosen (this matches `openapi.yaml`'s `/api/simulate` schema, which correctly lists only `km`/`vmax`/`s0` as `required`).
 
----
+## Endpoints at a Glance
 
-## Core Simulation (4)
-
+### Health & Status
 ```
-POST   /api/simulate              Run single kinetic simulation
-POST   /api/compare               Compare all 4 kinetic models
-GET    /api/health                System status & uptime
-GET    /                          Web dashboard
-```
-
----
-
-## Job Management (3)
-
-```
-GET    /api/jobs/:jobId           Get job status & results
-GET    /api/jobs/history          Recent jobs (last 50)
-GET    /api/stats                 Aggregate statistics
+GET  /api/health          System status and uptime
+GET  /api/stats           Aggregate statistics
 ```
 
----
-
-## Parameter Sweeps (2)
-
+### Simulations
 ```
-POST   /api/sweep                 Run parameter sweep
-GET    /api/sweeps/:sweepId       Get sweep results
+POST /api/simulate        Run single simulation
 ```
 
----
-
-## Batch Processing (2)
-
+### Sweeps (Parameter ranges)
 ```
-POST   /api/batch                 Run batch jobs (parallel)
-GET    /api/batches/:batchId      Get batch results
+POST /api/sweep           Sweep parameters across range
+GET  /api/sweeps/{id}     Get sweep results
 ```
 
----
-
-## Export (5) — NEW
-
+### Batch Processing
 ```
-GET    /api/export/jobs/csv       Export job history as CSV
-GET    /api/export/sweep/:id/csv  Export sweep results as CSV
-GET    /api/export/batch/:id/csv  Export batch results as CSV
-GET    /api/export/comparison/:id/csv  Export model comparison as CSV
-GET    /api/export/stats/csv      Export statistics as CSV
+POST /api/batch           Run multiple parameter sets
+GET  /api/batches/{id}    Get batch results
 ```
 
----
-
-## Analysis (2) — NEW
-
+### Comparison & Analysis
 ```
-POST   /api/compare/jobs          Compare 2+ job results
-GET    /api/analyze/sweep/:id     Analyze sweep sensitivity
+POST /api/compare         Compare parameter sets
+POST /api/compare/jobs    Compare completed jobs
+GET  /api/analyze/sweep/{id}  Sensitivity analysis
+```
+
+### Queries
+```
+GET  /api/jobs/history    Recent 50 jobs
+GET  /api/jobs/query      Advanced filtering
+```
+
+### Export
+```
+GET  /api/export/jobs/csv          Jobs to CSV
+GET  /api/export/stats/csv         Statistics to CSV
+GET  /api/export/sweeps/{id}/csv   Sweep to CSV
+GET  /api/export/batches/{id}/csv  Batch to CSV
+GET  /api/export/comparisons/{id}/csv  Comparison to CSV
+```
+
+### Documentation
+```
+GET  /api/docs            Swagger UI (interactive)
+GET  /api/docs/redoc      ReDoc (alternative UI)
+GET  /api/openapi.json    Raw OpenAPI 3.0 spec
 ```
 
 ---
 
-## Quick Examples
+## Common Requests
 
-### Single Simulation
+### Run a simulation
 ```bash
 curl -X POST http://localhost:3000/api/simulate \
   -H "Content-Type: application/json" \
   -d '{
     "query": "michaelis-menten",
-    "parameters": {"km": 5.2, "vmax": 12.8, "s0": 10},
-    "enzyme": "lactate dehydrogenase",
-    "substrate": "lactate"
-  }' | jq '.jobId'
+    "parameters": {
+      "km": 5.2,
+      "vmax": 12.8,
+      "s0": 10.0
+    }
+  }'
 ```
 
-### Parameter Sweep
+### Parameter sweep
 ```bash
 curl -X POST http://localhost:3000/api/sweep \
   -H "Content-Type: application/json" \
   -d '{
     "query": "michaelis-menten",
     "baseParameters": {"vmax": 12.8, "s0": 10},
-    "sweepParameters": [{"name": "km", "spec": "1:10:0.5"}]
-  }' | jq '.sweepId'
+    "sweepParameters": [
+      {"name": "km", "spec": "1:10:0.5"}
+    ]
+  }'
 ```
 
-### Batch Jobs
+### Batch processing
 ```bash
 curl -X POST http://localhost:3000/api/batch \
   -H "Content-Type: application/json" \
@@ -102,160 +103,206 @@ curl -X POST http://localhost:3000/api/batch \
       {"km": 3, "vmax": 14}
     ],
     "concurrency": 3
-  }' | jq '.batchId'
+  }'
 ```
 
-### Export Results
-```bash
-# Export job history
-curl http://localhost:3000/api/export/jobs/csv > jobs.csv
-
-# Export sweep
-curl http://localhost:3000/api/export/sweep/sweep_123/csv > sweep.csv
-
-# Export batch
-curl http://localhost:3000/api/export/batch/batch_123/csv > batch.csv
-
-# Export model comparison
-curl http://localhost:3000/api/export/comparison/compare_123/csv > models.csv
-
-# Export statistics
-curl http://localhost:3000/api/export/stats/csv > stats.csv
-```
-
-### Compare Jobs
+### Compare jobs
 ```bash
 curl -X POST http://localhost:3000/api/compare/jobs \
   -H "Content-Type: application/json" \
   -d '{
-    "jobIds": ["job_1726074000_abc", "job_1726074015_def"]
-  }' | jq '.'
+    "jobIds": ["job_1722973200000_abc", "job_1722973210000_def"]
+  }'
 ```
 
-### Analyze Sensitivity
+### Query jobs with filters
 ```bash
-curl http://localhost:3000/api/analyze/sweep/sweep_123456 | jq '.'
+# Completed jobs with high confidence
+curl "http://localhost:3000/api/jobs/query?status=complete&minConfidence=0.9"
+
+# Failed jobs
+curl "http://localhost:3000/api/jobs/query?status=error"
+
+# Specific model
+curl "http://localhost:3000/api/jobs/query?model=michaelis-menten"
+
+# Date range
+curl "http://localhost:3000/api/jobs/query?startTime=2026-08-01&endTime=2026-08-15"
+
+# Sorting and pagination
+curl "http://localhost:3000/api/jobs/query?sortBy=confidence&sortOrder=desc&limit=10&offset=0"
 ```
 
-### Check Status
+### Export data
 ```bash
-# Job status
-curl http://localhost:3000/api/jobs/job_123456
+# Export all jobs to CSV
+curl -s http://localhost:3000/api/export/jobs/csv > jobs.csv
 
-# Sweep status
-curl http://localhost:3000/api/sweeps/sweep_123456
-
-# Batch status
-curl http://localhost:3000/api/batches/batch_123456
-
-# System health
-curl http://localhost:3000/api/health
-
-# Recent jobs
-curl http://localhost:3000/api/jobs/history
-
-# System statistics
-curl http://localhost:3000/api/stats
+# Export statistics
+curl -s http://localhost:3000/api/export/stats/csv > stats.csv
 ```
 
 ---
 
-## Response Formats
+## Response Status Codes
 
-### Simulate Response
-```json
-{
-  "jobId": "job_1726074000_abc123def",
-  "status": "queued"
-}
-```
+| Code | Meaning |
+|------|---------|
+| 200 | Success |
+| 400 | Validation failed (bad request) |
+| 404 | Resource not found |
+| 500 | Server error |
 
-### Job Status (Complete)
-```json
-{
-  "status": "complete",
-  "progress": 100,
-  "result": {
-    "query": "michaelis-menten",
-    "finalValue": 2.34,
-    "confidence": 0.95,
-    "validated": true
-  },
-  "duration": 156
-}
-```
-
-### Comparison Response
-```json
-{
-  "job1Id": "job_1",
-  "job2Id": "job_2",
-  "similarity": "very_similar",
-  "metrics": {
-    "difference": 0.22,
-    "percentDifference": 9.87,
-    "isDifferenceSignificant": false
-  },
-  "insights": [...]
-}
-```
-
-### Sensitivity Analysis
-```json
-{
-  "sensitivity": 78.5,
-  "inflectionPoints": [8, 12, 16],
-  "mean": 2.98,
-  "stdDev": 2.75,
-  "optimalParameterIndex": 15
-}
-```
+All error responses include detailed validation messages.
 
 ---
 
-## Features at a Glance
+## Supported Models
 
-| Feature | Endpoint | Status |
-|---------|----------|--------|
-| Single simulation | /api/simulate | ✅ |
-| Job tracking | /api/jobs/* | ✅ |
-| Parameter sweeps | /api/sweep* | ✅ |
-| Batch processing | /api/batch* | ✅ |
-| Model comparison | /api/compare | ✅ |
-| CSV export | /api/export/* | ✅ |
-| Job comparison | /api/compare/jobs | ✅ |
-| Sensitivity analysis | /api/analyze/* | ✅ |
-| Real literature | Built-in | ✅ |
-| Web dashboard | / | ✅ |
+- `michaelis-menten` — Standard MM kinetics
+- `competitive-inhibition` — With competitive inhibitor
+- `non-competitive-inhibition` — With non-competitive inhibitor
+- `product-inhibition` — With product inhibition
+
+---
+
+## Required Parameters (by model)
+
+### michaelis-menten
+- `km` — Michaelis constant
+- `vmax` — Maximum velocity
+- `s0` — Initial substrate concentration
+
+### competitive-inhibition
+- `km` — Michaelis constant
+- `vmax` — Maximum velocity
+- `s0` — Initial substrate concentration
+- `ki` — Inhibitor constant
+- `i0` — Initial inhibitor concentration
+
+### non-competitive-inhibition
+- `km` — Michaelis constant
+- `vmax` — Maximum velocity
+- `s0` — Initial substrate concentration
+- `ki` — Inhibitor constant
+- `i0` — Initial inhibitor concentration
+
+### product-inhibition
+- `km` — Michaelis constant
+- `vmax` — Maximum velocity
+- `s0` — Initial substrate concentration
+- `ki` — Product inhibition constant
+- `p0` — Initial product concentration
+
+---
+
+## Clients & SDKs
+
+### Use generated clients
+
+```bash
+# Generate TypeScript client
+npm run generate:client:ts
+
+# Generate Python client
+npm run generate:client:python
+
+# Generate Go client
+npm run generate:client:go
+
+# Generate Rust client
+npm run generate:client:rust
+```
+
+### TypeScript usage
+```typescript
+import { DefaultApi } from './generated-client';
+
+const api = new DefaultApi({ basePath: 'http://localhost:3000' });
+const job = await api.simulate({
+  query: 'michaelis-menten',
+  parameters: { km: 5.2, vmax: 12.8, s0: 10 }
+});
+```
+
+### Python usage
+```python
+from openapi_client import ApiClient, DefaultApi
+
+api = DefaultApi(ApiClient())
+job = api.simulate({
+    'query': 'michaelis-menten',
+    'parameters': {'km': 5.2, 'vmax': 12.8, 's0': 10}
+})
+```
 
 ---
 
 ## Documentation
 
-- **START_HERE.md** — Quick start guide
-- **VERIFIED_SYSTEM_STATUS.md** — Master status reference
-- **EXPORT_AND_ANALYSIS_GUIDE.md** — Detailed export & analysis
-- **DEPLOYMENT_AND_OPS.md** — Production deployment
-- **API_QUICK_REFERENCE.md** — This file
+| Resource | Link |
+|----------|------|
+| Interactive UI | http://localhost:3000/api/docs |
+| Alternative UI | http://localhost:3000/api/docs/redoc |
+| Raw Spec | http://localhost:3000/api/openapi.json |
+| Full Guide | `./OPENAPI_GUIDE.md` |
+| Integration Guide | `./QUICK_START_DEPLOYMENT.md` |
 
 ---
 
-## Start Using It
+## Authentication (Future)
 
+Currently: No authentication required
+
+Future support for:
+- API keys
+- OAuth 2.0
+- JWT tokens
+
+See `openapi.yaml` for spec-level auth definitions.
+
+---
+
+## Rate Limiting (Future)
+
+Currently: No rate limiting
+
+Future limits:
+- Public endpoints: 100 req/min per IP
+- Authenticated: 1000 req/min per user
+
+---
+
+## Quick Start
+
+### 1. Start the server
 ```bash
-# Start server
 npm run web:start
+```
 
-# Visit dashboard
-open http://localhost:3000
+### 2. Visit the docs
+```bash
+open http://localhost:3000/api/docs
+```
 
-# Or use API directly
-curl http://localhost:3000/api/health
+### 3. Try an endpoint
+Click "Try it out" on any endpoint in Swagger UI
+
+### 4. Generate a client (optional)
+```bash
+npm run generate:client:ts
 ```
 
 ---
 
-**All endpoints use no external dependencies (Node.js built-ins only)**  
-**All data persists to terrium-jobs.jsonl**  
-**CSV export for all result types**  
-**Ready to deploy** 🚀
+## Support
+
+- **Issue reports** → GitHub
+- **Questions** → Documentation at `/api/docs`
+- **Integration help** → See `OPENAPI_GUIDE.md`
+
+---
+
+**Last updated:** 2026-08-12  
+**API Version:** 1.0.0  
+**Specification:** OpenAPI 3.0.0

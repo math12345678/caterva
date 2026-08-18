@@ -76,7 +76,19 @@ _PH_UNREPORTED_RE = re.compile(
 # "in buffer" and "assay buffer".
 _BUFFER_RE = re.compile(
     r"\b("
-    r"(?:\d+(?:\.\d+)?\s*m[MK]\s+)?"
+    # Concentration prefix. `m[MK]` matched "mM" and "mK" but NOT a bare
+    # "M", so "0.5 M Tris-HCl buffer" captured as "Tris-HCl buffer" and
+    # the molarity was dropped on the floor.
+    #
+    # That silently disabled the honesty mechanism in ADR 0028:
+    # `BufferIdentity.concentration_text` exists so a reader can see that
+    # 0.5 M and 10 mM were treated as the same buffer, and it was empty
+    # for precisely the molar strings that motivated it. A field added to
+    # disclose a limitation, blind to the case it was written for.
+    #
+    # Found by scripts/check_commentary_coverage.py, which reported
+    # "0 5 M" as unread text beside eight kinetic values.
+    r"(?:\d+(?:\.\d+)?\s*[munµ]?M\s+)?"
     r"(?:phosphate|Tris(?:-HCl)?|HEPES|MOPS|MES|PIPES|citrate|acetate|"
     r"glycine|borate|carbonate|imidazole|bicine|tricine|TAPS|CHES|CAPS)"
     r"(?:[\s-]+buffer)?"

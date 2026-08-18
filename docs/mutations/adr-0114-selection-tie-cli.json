@@ -1,0 +1,81 @@
+{
+  "_why": [
+    "ADR 0114's table. Bakker's 'the evidence did not choose' now reaches the",
+    "CLI, and these are the ways that could silently stop being true.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0114-selection-tie-cli.json"
+  ],
+  "covers": [
+    "0114"
+  ],
+  "test": "npx jest src/cli/__tests__/selectionTieShown.test.ts src/literature/__tests__/offlineResolverEndToEnd.test.ts --no-cache",
+  "_why_both_files": [
+    "The rendering test MOCKS the resolver, so it cannot see a parsing",
+    "regression -- which is exactly how ADR 0109's first set produced two",
+    "confident NOT CAUGHTs. The boundary test drives the real subprocess",
+    "through the stub runner. One file proves the CLI renders what it is",
+    "handed; the other proves anything hands it over. Neither is sufficient",
+    "and the harness said so out loud last time."
+  ],
+  "mutations": [
+    {
+      "id": "S1",
+      "description": "the tie is dropped at the boundary (the original defect)",
+      "_note": [
+        "The state the CLI shipped in for the life of the feature: the runner",
+        "emits `selectionTie`, `literatureResolver.ts` never reads it, and a",
+        "student is handed 21.1 out of a 306-fold spread with nothing saying",
+        "the evidence found 6467 equally credible."
+      ],
+      "file": "src/literature/literatureResolver.ts",
+      "find": "    selectionTie: parseSelectionTie(parsed['selectionTie']),",
+      "replace": "    selectionTie: parseSelectionTie(undefined),"
+    },
+    {
+      "id": "S2",
+      "description": "the tie is parsed but never rendered",
+      "_note": [
+        "The half-fix: plumbed through the type, carried across the boundary,",
+        "and printed by nobody. ADR 0039's defect, and the reason the CLI",
+        "tests assert on rendered output rather than on the object."
+      ],
+      "file": "src/cli/commandResolve.ts",
+      "find": "  if (result.selectionTie && result.selectionTie.candidates.length > 1) {",
+      "replace": "  if (false) {"
+    },
+    {
+      "id": "S3",
+      "description": "a one-candidate 'tie' is announced as a tie",
+      "_note": [
+        "Fewer than two candidates is not a tie. `SelectionTie()` with an",
+        "empty list is also what an unpopulated field looks like, which is",
+        "why `selection_tie.py` makes `is_tied` a POSITIVE test.",
+        "",
+        "A warning about nothing is worse than no warning: it trains readers",
+        "to skip warnings, which is the one thing this project cannot afford",
+        "given how many it prints."
+      ],
+      "file": "src/cli/commandResolve.ts",
+      "find": "  if (result.selectionTie && result.selectionTie.candidates.length > 1) {",
+      "replace": "  if (result.selectionTie) {"
+    },
+    {
+      "id": "S4",
+      "description": "the alternatives lose their reference ids",
+      "_note": [
+        "A bare count is unactionable -- the reader has to be able to go and",
+        "look at the row that was NOT returned. `selection_tie.py` says it:",
+        "'a named alternative is checkable; a bare number is not.'"
+      ],
+      "file": "src/cli/commandResolve.ts",
+      "find": "      const ref = cand.reference_id ? c(DIM, `  [ref ${cand.reference_id}]`) : '';",
+      "replace": "      const ref = '';"
+    }
+  ],
+  "_ran_singly": [
+    "S1..S4 were each run with `--only`, because the two-file suite costs",
+    "~25s and a baseline plus four mutations exceeds the sandbox's per-call",
+    "ceiling. The `--only` flag exists for this (ADR 0083): it splits the run",
+    "without splitting the record. All four caught."
+  ]
+}
