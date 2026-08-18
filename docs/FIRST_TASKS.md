@@ -267,6 +267,49 @@ only when the unit really was omitted. A test drives `sweep`, not just
 written, which is why it is a task here rather than a fix. Check with whoever
 is in that file before starting.
 
+### Where the unit is actually lost — read this before fixing anything
+
+Not in the pipeline. In `scientificCLI.ts`, at the sweep case:
+
+```ts
+const baseParameters: Record<string, number> = {};   // <- the defect is this type
+...
+const quantity = parseQuantity(key, raw);            // correct: {value, unit, unitDeclared}
+baseParameters[key] = quantity.value;                // the unit is dropped here
+provenance.push({ ..., unit: quantity.unit, unitAssumed: !quantity.unitDeclared });
+```
+
+`parseQuantity` does its job. The unit is captured — into `provenance`, which
+is for *display*. `baseParameters` is `Record<string, number>` and structurally
+cannot carry a unit, so a bare number reaches the pipeline, and the pipeline
+does the only thing it can with a bare number: looks the unit up by name.
+
+The engine is not being lied to by the pipeline. It is being told the truth by
+a type that has nowhere to put it. This is the shape this repository keeps
+finding — a fact computed correctly, recorded correctly, and not reaching the
+one place that needed it.
+
+### URGENT if you are refactoring this area right now
+
+An in-progress change in `scientificCLI.ts` adds:
+
+```ts
+function readQuantities(params?: Record<string, string>): {
+  parameters: Record<string, number>;                            // same defect
+  provenance: Record<string, { source: string; unit: string }>;  // unit lives here
+}
+```
+
+That is the identical split, in a helper that other commands will call. It
+centralises the bug instead of removing it: today only `sweep` drops declared
+units, and after that helper lands, every command routed through it does.
+
+**Fix the type, not the call sites.** Something like
+`Record<string, { value: number; unit: string }>`, or convert to the engine's
+canonical unit at that boundary and record that the conversion happened. Either
+way the unit must travel with the number, because any pair of parallel
+structures — one with the value, one with the unit — will drift again.
+
 ## What makes a task finished here
 
 Not "the code works". The bar is:
