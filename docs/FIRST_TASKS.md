@@ -203,6 +203,70 @@ make pr
 The guards CI runs, in CI's order, then the suites. A green `make pr` means
 a green PR.
 
+## 8. `sweep` throws away the unit you declared, and the README example proves it
+
+**Severity: this one produces a wrong scientific answer, silently.**
+**Files:** `src/integration/scientificPipeline.ts` (~line 1102),
+`src/cli/commandSweep.ts`, `src/integration/__tests__/declaredUnitsReachTheEngine.test.ts`
+
+Run the example printed in `README.md` and in `sweep`'s own `help`:
+
+```bash
+npx ts-node src/cli/scientificCLI.ts sweep mm \
+  --parameter s0 --range 2:10:2 --km 0.5mM --vmax 0.1mM/s
+```
+
+You get:
+
+```
+      2  2.0000
+      4  4.0000
+      6  6.0000
+      8  8.0000
+     10  10.0000
+  trend  increasing  (slope 2.00e+0)
+```
+
+Every output equals its input to four decimals. No reaction occurred. The
+tool then interprets that flat identity line as "increasing", confidently.
+
+Prove the cause by multiplying vmax by 60,000 — the ratio between `mM/s` and
+`μM/min`:
+
+```bash
+npx ts-node src/cli/scientificCLI.ts sweep mm \
+  --parameter s0 --range 2:10:2 --km 0.5mM --vmax 6000mM/s
+# 2 -> 1.2393, 10 -> 9.0499 — substrate is actually consumed
+```
+
+The declared `mM/s` is discarded and re-read as `μM/min` by
+`getAssumedUnitForUserInput()`, a table keyed on the parameter *name*:
+
+```ts
+const units: Record<string, string> = { km: 'mM', vmax: 'μM/min', ... };
+```
+
+It even logs `"User supplied a bare number; unit was ASSUMED, not declared"` —
+which is false, the user declared `mM/s` — and logs it as JSON on stdout where
+no student will read it.
+
+**Why this survived.** `parseQuantity.ts` was written to kill exactly this
+table; its docstring says so: *"The old CLI assigned vmax -> uM/min from a name
+table... reinterpreted by a factor of 60,000 and the run continued."* And
+`declaredUnitsReachTheEngine.test.ts` pins the fix — for `simulate` only. Its
+own header names the `simulate` dispatcher. `sweep` reaches the pipeline by
+another route and kept the original bug. A correct fix and a correct test,
+both scoped to one of the two commands that needed them.
+
+**Definition of done.** The README example consumes substrate. A declared unit
+is never replaced by a table lookup on any path. The "ASSUMED" warning fires
+only when the unit really was omitted. A test drives `sweep`, not just
+`simulate`, and you have watched it go red by restoring the table.
+
+**Note:** `scientificPipeline.ts` was being actively edited when this was
+written, which is why it is a task here rather than a fix. Check with whoever
+is in that file before starting.
+
 ## What makes a task finished here
 
 Not "the code works". The bar is:
