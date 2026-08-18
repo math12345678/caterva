@@ -1,0 +1,98 @@
+{
+  "_why": [
+    "ADR 0116's table. A plain-language question can now name the system, and",
+    "these are the ways that could turn into SILENT inference -- which is the",
+    "one thing the constraint it relaxes exists to prevent.",
+    "",
+    "Every mutation here attacks the same property: a real BRENDA citation",
+    "must never be attached to a system no person confirmed.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0116-confirm-the-system.json"
+  ],
+  "covers": [
+    "0116"
+  ],
+  "test": "npx jest src/cli/__tests__/confirmSystem.test.ts --no-cache",
+  "mutations": [
+    {
+      "id": "Y1",
+      "description": "a bare return counts as consent",
+      "_note": [
+        "The default flips from no to yes. An empty line is somebody pressing",
+        "return to make a prompt go away, and reading it as agreement makes",
+        "the confirmation decorative -- present in review, functionally a",
+        "silent inference.",
+        "",
+        "This is the likeliest careless change: `answer !== 'n'` reads as",
+        "friendlier and is the bug."
+      ],
+      "file": "src/cli/confirmSystem.ts",
+      "find": "  if (answer === 'y' || answer === 'yes') {",
+      "replace": "  if (answer !== 'n' && answer !== 'no') {"
+    },
+    {
+      "id": "Y2",
+      "description": "a headless run auto-confirms instead of refusing",
+      "_note": [
+        "With no terminal there is nobody to ask. A default-confirm here is",
+        "exactly the inference the constraint forbids, with a prompt in the",
+        "code path that nobody ever sees -- a pipe, a CI job or `| head`",
+        "would silently attach citations to a parsed system.",
+        "",
+        "It would also look correct in every interactive test, because those",
+        "have a TTY."
+      ],
+      "file": "src/cli/confirmSystem.ts",
+      "find": "  if (!io.isTTY) {\n    return { confirmed: false, reason: 'no-terminal' };\n  }",
+      "replace": "  if (!io.isTTY) {\n    return { confirmed: true };\n  }"
+    },
+    {
+      "id": "Y3",
+      "description": "--yes stops disclosing what it read",
+      "_note": [
+        "`--yes` skips the QUESTION, not the DISCLOSURE. A batch run whose",
+        "citations came from a parse has to say so in its own transcript, or",
+        "nobody can audit afterwards which system was actually cited.",
+        "",
+        "Deleting the write is the tempting tidy-up: the prompt is skipped,",
+        "so the text looks like leftovers."
+      ],
+      "file": "src/cli/confirmSystem.ts",
+      "find": "    io.write(describeParsedSystem(system));\n    io.write('Confirmed by --yes.\\n');",
+      "replace": "    io.write('');"
+    },
+    {
+      "id": "Y4",
+      "description": "the parser stops refusing a question that names nothing",
+      "_note": [
+        "`plausible()` rejects a fragment made entirely of noise words, so",
+        "'of the model on the model in the model' matches the SHAPE and still",
+        "returns null. Without it the tool would offer a command naming",
+        "'model' as an enzyme, which discredits every suggestion it makes.",
+        "",
+        "A wrong suggestion is worse than none: it teaches a student the tool",
+        "guesses badly, and they stop reading the ones that are right."
+      ],
+      "file": "src/cli/suggestResolveCommand.ts",
+      "find": "  return !words.every((w) => NOISE.has(w));",
+      "replace": "  return true;"
+    }
+  ],
+  "_why_one_file_and_what_that_costs": [
+    "Y1-Y3 mutate `confirmSystem.ts`, whose tests are all in this one file.",
+    "Y4 mutates `suggestResolveCommand.ts` and is run against ITS file, with",
+    "`--test` overridden on the command line -- recorded here rather than",
+    "left as an undocumented second invocation:",
+    "",
+    "  python3 scripts/mutate.py --set docs/mutations/adr-0116-confirm-the-system.json \\",
+    "      --only Y4 --test 'npx jest src/cli/__tests__/suggestResolveCommand.test.ts --no-cache'",
+    "",
+    "Both files in one command is the correct default and it does not fit:",
+    "baseline plus one mutation exceeded the 178 s per-call ceiling in this",
+    "environment (measured -- the run was interrupted mid-Y1). Splitting the",
+    "RUN without splitting the RECORD is what --only is for (ADR 0083); this",
+    "note exists so the narrower command is not mistaken for the ADR 0026",
+    "mistake, where a set ran a suite narrower than the record cited and",
+    "produced a confident NOT CAUGHT."
+  ]
+}

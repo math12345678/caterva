@@ -370,6 +370,7 @@ def test_not_found_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "substratesAvailable": [],
         "relatedness": [],
         "literatureCandidates": [
             {"pmid": "34962677", "title": "Some paper",
@@ -423,6 +424,7 @@ def test_core_candidate_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "substratesAvailable": [],
         "relatedness": [],
         "literatureCandidates": [
             {"pmid": None, "title": "An open-access CORE result",
@@ -581,6 +583,7 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        "substratesAvailable": [],
         # Empty here because the opt-in was never given, so no relatedness
         # check ran. Populated on the too_distant path, where it carries the
         # reason each candidate was rejected.

@@ -23,6 +23,7 @@ import {
   type EngineParameterValue
 } from '../engine/teriumBridge';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
+import { substrateDepletionWindowSeconds } from './integrationWindow';
 import {
   deriveRunConditions,
   describeConflicts,
@@ -402,6 +403,40 @@ export class ScientificPipeline {
       // through the declared units rather than assuming they already
       // match -- a caller working in uM against a Km in mM would otherwise
       // compute an epsilon 1000x too large and see a spurious failure.
+      // Km in the substrate's units, for the window derivation below and
+      // for the depletion check, which was being handed the raw Km beside
+      // an already-converted Vmax.
+      const kmInSubstrateUnits =
+        resolvedParameters.km && resolvedParameters.s0
+          ? convertConcentration(
+              resolvedParameters.km.value,
+              resolvedParameters.km.unit,
+              resolvedParameters.s0.unit
+            )
+          : resolvedParameters.km?.value;
+
+      // How long to run for, from the integrated Michaelis-Menten equation
+      // rather than from a constant. See integrationWindow.ts: a fixed ten
+      // seconds showed 0.014% of a reaction whose Vmax came from BRENDA in
+      // uM/min, and the whole of one whose Vmax was in mM/s.
+      //
+      // Falls back to the constant when the window cannot be derived --
+      // a missing Vmax, a non-MM domain -- rather than inventing a
+      // timescale. `windowDerived` records which happened so the response
+      // can say so instead of presenting both as the same kind of number.
+      const derivedWindow =
+        kmInSubstrateUnits !== undefined &&
+        vmaxInSubstrateUnitsPerSec !== undefined &&
+        resolvedParameters.s0
+          ? substrateDepletionWindowSeconds({
+              km: kmInSubstrateUnits,
+              vmaxPerSecond: vmaxInSubstrateUnitsPerSec,
+              s0: resolvedParameters.s0.value
+            })
+          : undefined;
+      const integrationWindow =
+        derivedWindow ?? ScientificPipeline.SIMULATION_END_TIME_S;
+
       const e0InSubstrateUnits =
         request.enzymeConcentration && resolvedParameters.s0
           ? convertConcentration(
@@ -444,7 +479,7 @@ export class ScientificPipeline {
         // every single run: Segel's criterion needs e0 and nothing supplied
         // it, so Layer 3's first check did no work at all.
         ...(e0InSubstrateUnits !== undefined ? { e0: e0InSubstrateUnits } : {}),
-        measurementTime: ScientificPipeline.SIMULATION_END_TIME_S
+        measurementTime: integrationWindow
       };
 
       const validationResult = await ScientificValidationPipeline.validate(
@@ -497,7 +532,8 @@ export class ScientificPipeline {
 
       const simulationOutput = await this.runSimulation(
         resolvedParameters,
-        conditions
+        conditions,
+        integrationWindow
       );
 
       this.reproducibilityService.addPhase(
@@ -933,7 +969,8 @@ ${integrityReport}
    */
   private async runSimulation(
     parameters: Record<string, any>,
-    conditions: any
+    conditions: any,
+    endTimeSeconds: number = ScientificPipeline.SIMULATION_END_TIME_S
   ): Promise<any> {
     void conditions;
 
@@ -949,17 +986,56 @@ ${integrityReport}
         : undefined;
     };
 
+    // The engine integrates bare numbers, so they must all be expressed in
+    // ONE system before it sees them. `end` is in seconds and `[S]` is
+    // reported in the substrate's units, so that system is: concentrations
+    // in s0's unit, rates in s0's unit per second.
+    //
+    // This block did not exist. `numeric()` above unwraps {value, unit} and
+    // keeps only `.value`, so a Km in μM and an s0 in mM were integrated as
+    // if they were the same unit, and a Vmax in mM/s was integrated as the
+    // number 12.8 whatever it meant. The units were present on every
+    // parameter and read by nothing on this path -- `vmaxInSubstrateUnitsPerSecond`
+    // was already used twenty lines up, but only to feed the depletion
+    // CHECK, never the run it was checking.
+    //
+    // So the validator was doing correct arithmetic about a trajectory the
+    // engine had computed from different numbers. Both were internally
+    // consistent, which is why nothing failed.
+    //
+    // Refuses rather than assumes: if a unit is missing, the converters
+    // throw, and that surfaces as a validation failure instead of a
+    // confident trajectory nobody can interpret.
+    const unitOf = (name: string): string | undefined => {
+      const raw = parameters[name];
+      return typeof raw === 'object' && raw ? raw.unit : undefined;
+    };
+    const substrateUnit = unitOf('s0');
+
+    const kmRaw = numeric('km');
+    const vmaxRaw = numeric('vmax');
+    const s0Raw = numeric('s0');
+
+    const kmConverted =
+      kmRaw !== undefined && substrateUnit && unitOf('km')
+        ? convertConcentration(kmRaw, unitOf('km')!, substrateUnit)
+        : kmRaw;
+    const vmaxConverted =
+      vmaxRaw !== undefined && substrateUnit && unitOf('vmax')
+        ? vmaxInSubstrateUnitsPerSecond(vmaxRaw, unitOf('vmax'), substrateUnit)
+        : vmaxRaw;
+
     const engineParameters: Record<string, EngineParameterValue> = {
-      km: numeric('km') ?? null,
-      vmax: numeric('vmax') ?? null,
-      s0: numeric('s0') ?? null,
+      km: kmConverted ?? null,
+      vmax: vmaxConverted ?? null,
+      s0: s0Raw ?? null,
       // `end` and `points` are the names terium_runner.py actually
       // reads. This first sent `t_end`/`n_points`, which the runner
       // ignores -- and the mistake was nearly invisible, because the
       // runner's default `end` is also 10.0, so the window looked correct
       // while the resolution silently stayed at the default 51. See the
       // echo check in runTerium, which now catches this class of error.
-      end: ScientificPipeline.SIMULATION_END_TIME_S,
+      end: endTimeSeconds,
       points: ScientificPipeline.SIMULATION_POINTS
     };
 

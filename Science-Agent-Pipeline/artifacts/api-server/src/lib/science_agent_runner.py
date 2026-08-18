@@ -852,6 +852,13 @@ def main() -> None:
                         # that cannot name what it refused leaves the opt-in
                         # it demands unexercisable.
                         "variantCandidatesAvailable": result.variant_candidates_available,
+                        # The same courtesy for the field a student is far
+                        # MORE likely to get wrong. An organism has one
+                        # binomial name; a metabolite has a dozen aliases,
+                        # and BRENDA's label for lactate is `(S)-lactate`,
+                        # so "lactate" matches by substring and "L-lactate"
+                        # returns nothing at all.
+                        "substratesAvailable": result.substrates_available,
                         "relatedness": [v.model_dump() for v in result.relatedness],
                         "literatureCandidates": _candidates_to_dict(result.literature_candidates),
                         "logs": result.search_log,
