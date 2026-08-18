@@ -11780,3 +11780,158 @@ lower-case, so both spellings agreed and dropping `.lower()` broke nothing;
 | Not mine | `check_no_tellurium_integration_claims` fails on **ADR 0099**, whose own title is "plain asserts, quoted cites": a document that QUOTES the phrase is read as claiming it — the exact defect that ADR describes, in the guard beside it |
 | For the owner | delete `docs/adr/0117-the-name-the-database-uses.md` (an ADR-number collision another agent and I hit simultaneously; the guard caught it, this sandbox cannot unlink) and `.selftest_probe.md` |
 | Next | the more valuable half: a student should be able to ask what an enzyme reports BEFORE asking for a value, rather than discovering it through a failed query |
+
+### Same evening: the fallback suggestion named the wrong enzyme
+
+Following the same thread — make the first minute work — a concurrent agent
+had already added guidance to attempt #1, and `suggestResolveCommand.ts`
+builds it properly from the student's own sentence. Its reasoning is right:
+**offering is not inferring**, so the guess never becomes provenance without
+a human in between.
+
+One branch beside it still held a literal. Measured:
+
+```
+$ simulate "acetylcholinesterase"
+-> scientific simulate "michaelis menten" --resolve \
+     --enzyme "lactate dehydrogenase" --substrate pyruvate \
+     --organism "Homo sapiens" --s0 10mM --enzyme-conc 0.001mM
+```
+
+A complete, copy-pasteable command for a **different enzyme**. A student who
+runs it gets LDH results believing they asked about acetylcholinesterase — a
+real BRENDA citation attached to a system they never named, which is the
+failure this project calls worse than no provenance.
+
+It is worse than a generic example *because it looks tailored*. `<enzyme>`
+is obviously a slot; a specific enzyme name reads as an answer. The fallback
+now uses placeholders, which are never the wrong enzyme, while the parsing
+branch still builds the command from the student's own words.
+
+**Fourth appearance of hardcoded lactate dehydrogenase.** ADR 0059 found it
+in `literature`, `validate` and `simulate`. The module written to fix the
+class had a sibling branch that never got the message.
+
+The test asserts the CLASS: for a query naming enzyme X, no *other* enzyme
+name may appear anywhere in the output. That catches the next hardcoded
+example whichever enzyme someone reaches for.
+
+### Two mutation attempts that mutated nothing
+
+The first `sed` did not match — the `\\n` escaping was wrong — and
+`grep -c` "confirmed" the mutation by matching my own comment quoting the
+old buggy output. Tests passed, and had I stopped there I would have
+recorded a mutation-tested fix on the basis of a mutation that never
+happened. The second attempt failed the same way in Python.
+
+Applying it by line number, with an assertion that the line actually
+changed, made three of four tests fail. The fourth correctly survived: it
+exercises the parsing branch, which the mutation did not touch.
+
+**A mutation test that does not verify the mutation applied proves exactly
+nothing**, and it fails in the reassuring direction. That is now the fourth
+time this session the instrument, not the subject, was the thing at fault.
+
+### OPEN DEFECT: the suggested command discards flags the user already typed
+
+Found 2026-08-17, verified, **not fixed** — recorded here because it is
+reproducible in two commands and I ran out of room to fix and mutation-test
+it properly.
+
+```
+$ simulate "michaelis menten of lactate dehydrogenase on pyruvate in Homo sapiens" \
+    --s0 10mM --vmax 1.2mM/s
+✗ SIMULATION DID NOT RUN
+  1. Parameter 'km': ... no user-supplied value and no literature match
+
+  Run this and it will:
+
+    scientific simulate "michaelis menten" --resolve \
+      --enzyme "lactate dehydrogenase" --substrate "pyruvate" \
+      --organism "Homo sapiens" \
+      --s0 10mM --enzyme-conc 0.001mM        <- note what is missing
+```
+
+**`--vmax 1.2mM/s` is gone.** The suggestion is a fixed template
+(`--s0 10mM --enzyme-conc 0.001mM`) that ignores the flags already on the
+command line. It replaces a Vmax the user supplied with an `--enzyme-conc`
+intended to derive Vmax from kcat x [E]0.
+
+Running the suggested command verbatim:
+
+```
+$ scientific simulate "michaelis menten" --resolve --enzyme "lactate dehydrogenase" \
+    --substrate "pyruvate" --organism "Homo sapiens" --s0 10mM --enzyme-conc 0.001mM
+-> exit 2, "Cannot run. These are unresolved:"
+```
+
+So the guidance takes a user whose own flags were nearly sufficient and
+hands them a command that **fails**, having thrown away the value that would
+have worked.
+
+This is ADR 0070's class — a suggested command that cannot run — with an
+extra edge: it is not merely unhelpful, it is a regression on the user's own
+input. `formatResolveCommand` builds the system half from the parsed
+sentence and then appends a hardcoded tail.
+
+**The fix**: `formatResolveCommand` needs the flags already supplied, and
+should carry through the ones that are still valid rather than appending a
+template. `--enzyme-conc` should be suggested only when Vmax is NOT already
+supplied — the two are alternatives, and offering both at once is what makes
+the command wrong.
+
+**The test that would pin it** is the one ADR 0116 already established:
+extract the suggested command and run it. That test exists for the
+`--resolve` refusal path and does not cover this path, which is why this
+survived.
+
+
+## Forty-seventh pass — the list came from the wrong table
+
+Started on the next discovery feature and it immediately exposed a defect in
+the one shipped the day before.
+
+ADR 0118 makes a substrate miss name the substrates the enzyme reports.
+Measured on `brenda_ldh_fixture.html`, which carries a "KM Values" table and
+**no** "Ki Values" table:
+
+```
+substrates_present(ec, provider, KI_TABLE_LABEL)
+  -> ['(S)-lactate', 'NAD+', 'oxamate', 'pyruvate']
+```
+
+The Km table's substrates, offered as an answer about Ki. A student asking
+for a Ki with a near-miss substrate name was told the enzyme reports four
+substrates that have no Ki data at all — so they re-run with one, fail
+again, and come away believing Ki data exists. A helpful-looking sentence
+that is false, introduced while fixing a helpful-looking sentence that was
+false.
+
+The cause was documented the whole time. `_find_table_container` returns
+None when the label is absent, and tells the caller to "fall back to
+whole-page scanning and treat results as less trustworthy". For the resolver
+that is fine — substrate and organism filters remove the foreign rows, and
+the real resolver does correctly return `not_found` for a Ki here. ADR
+0118's helper runs in permissive mode with every one of those filters off,
+which is what permissive mode is FOR, and I read the documented caveat as
+being about parsing quality rather than about which table.
+
+The fix diagnoses the quantity instead of correcting the list: *"BRENDA's
+page for 1.1.1.27 carries no 'Ki Values' table at all… the substrate name is
+not what went wrong."* A corrected substrate list would have been accurate
+and still useless — it answers a question the reader was not asking.
+
+**What this says about the previous pass.** ADR 0118 was mutation-tested
+four ways and shipped. All four mutations probed the new code; none probed
+its input. The test that would have caught this is now written first in the
+new class — **assert the premise**: this fixture has a Km table and no Ki
+table, and if anyone enriches it later these tests must fail rather than
+quietly stop testing anything.
+
+| | |
+|---|---|
+| Mutations | 2 caught — revert the presence check in `_nothing_matched`; drop the guard inside `substrates_present` |
+| Tests | `test_substrates_available.py` 14 → 18 |
+| Suites | literature 918 green; the only red is `check_no_tellurium_integration_claims` on **ADR 0099**, another agent's, and it is that ADR's own subject — a document that QUOTES the phrase read as claiming it |
+| Next | the discovery command this pass was starting: let a student ask what an enzyme reports BEFORE the first query. `has_data_table` and `substrates_present` are now the two pieces it needs |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording |

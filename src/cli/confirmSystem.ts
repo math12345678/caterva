@@ -89,7 +89,7 @@ export async function confirmSystem(
   }
 
   if (!io.isTTY) {
-    return { confirmed: true };
+    return { confirmed: false, reason: 'no-terminal' };
   }
 
   io.write(describeParsedSystem(system));

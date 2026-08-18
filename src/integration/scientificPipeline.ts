@@ -23,7 +23,10 @@ import {
   type EngineParameterValue
 } from '../engine/teriumBridge';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
-import { substrateDepletionWindowSeconds } from './integrationWindow';
+import {
+  initialRateWindowSeconds,
+  substrateDepletionWindowSeconds
+} from './integrationWindow';
 import {
   deriveRunConditions,
   describeConflicts,
@@ -424,18 +427,14 @@ export class ScientificPipeline {
       // a missing Vmax, a non-MM domain -- rather than inventing a
       // timescale. `windowDerived` records which happened so the response
       // can say so instead of presenting both as the same kind of number.
-      const derivedWindow =
-        kmInSubstrateUnits !== undefined &&
-        vmaxInSubstrateUnitsPerSec !== undefined &&
-        resolvedParameters.s0
-          ? substrateDepletionWindowSeconds({
-              km: kmInSubstrateUnits,
+      const integrationWindow = this.integrationWindowFor(resolvedParameters);
+      const initialRateWindow =
+        vmaxInSubstrateUnitsPerSec !== undefined && resolvedParameters.s0
+          ? initialRateWindowSeconds({
               vmaxPerSecond: vmaxInSubstrateUnitsPerSec,
               s0: resolvedParameters.s0.value
-            })
-          : undefined;
-      const integrationWindow =
-        derivedWindow ?? ScientificPipeline.SIMULATION_END_TIME_S;
+            }) ?? integrationWindow
+          : integrationWindow;
 
       const e0InSubstrateUnits =
         request.enzymeConcentration && resolvedParameters.s0
@@ -479,7 +478,17 @@ export class ScientificPipeline {
         // every single run: Segel's criterion needs e0 and nothing supplied
         // it, so Layer 3's first check did no work at all.
         ...(e0InSubstrateUnits !== undefined ? { e0: e0InSubstrateUnits } : {}),
-        measurementTime: integrationWindow
+        // NOT the plot window. `integrationWindow` runs to 95% conversion so
+        // a student sees the saturation curve; reading that same number
+        // here made Check 2 report "substrate exhausted" on every run --
+        // true, and a warning about a window nobody had claimed.
+        //
+        // This is the period over which an initial-rate reading stays
+        // defensible: t = 0.05*S0/Vmax, the 5% convention the check itself
+        // cites. See integrationWindow.ts, which also records that Check 2
+        // therefore passes BY CONSTRUCTION on this path and must not be
+        // read as independent evidence here.
+        measurementTime: initialRateWindow
       };
 
       const validationResult = await ScientificValidationPipeline.validate(
@@ -532,8 +541,7 @@ export class ScientificPipeline {
 
       const simulationOutput = await this.runSimulation(
         resolvedParameters,
-        conditions,
-        integrationWindow
+        conditions
       );
 
       this.reproducibilityService.addPhase(
@@ -967,10 +975,67 @@ ${integrityReport}
    * uses. Missing parameters raise MissingParameterError rather than being
    * defaulted, and physical validity is decided by the engine.
    */
+  /**
+   * The window this run integrates over, derived from its own parameters.
+   *
+   * A METHOD RATHER THAN A VALUE PASSED AROUND, deliberately.
+   *
+   * The first version computed the window in `execute()` and passed it to
+   * `runSimulation` as an argument with the old constant as its default.
+   * `verifyReproducibility` calls `runSimulation` directly, with two
+   * arguments -- so the replay silently took the default, integrated a
+   * different window from the original run, and reported the run as NOT
+   * REPRODUCIBLE. A stored result that cannot be reproduced is the single
+   * worst output this pipeline can give, and it was caused by a defaulted
+   * argument.
+   *
+   * Deriving it from the parameters, at the point the parameters are used,
+   * makes that class of drift impossible: same inputs, same window, by
+   * construction rather than by both callers remembering.
+   *
+   * Constitution Rule 4 -- a shared constraint is enforced by structure or
+   * by a test, not by a comment asking two call sites to agree. There WAS
+   * such a comment on `SIMULATION_END_TIME_S`, and this is the drift it
+   * asked for and did not prevent.
+   */
+  private integrationWindowFor(parameters: Record<string, any>): number {
+    const unitOf = (name: string): string | undefined => {
+      const raw = parameters[name];
+      return typeof raw === 'object' && raw ? raw.unit : undefined;
+    };
+    const numberOf = (name: string): number | undefined => {
+      const raw = parameters[name];
+      const value = typeof raw === 'object' && raw ? raw.value : raw;
+      return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+    };
+
+    const s0 = numberOf('s0');
+    const km = numberOf('km');
+    const vmax = numberOf('vmax');
+    const s0Unit = unitOf('s0');
+    if (s0 === undefined || km === undefined || vmax === undefined || !s0Unit) {
+      return ScientificPipeline.SIMULATION_END_TIME_S;
+    }
+
+    try {
+      const derived = substrateDepletionWindowSeconds({
+        km: unitOf('km') ? convertConcentration(km, unitOf('km')!, s0Unit) : km,
+        vmaxPerSecond: unitOf('vmax')
+          ? vmaxInSubstrateUnitsPerSecond(vmax, unitOf('vmax'), s0Unit)
+          : vmax,
+        s0
+      });
+      return derived ?? ScientificPipeline.SIMULATION_END_TIME_S;
+    } catch {
+      // An unconvertible unit is a validation problem, reported elsewhere.
+      // It must not also become an invented timescale here.
+      return ScientificPipeline.SIMULATION_END_TIME_S;
+    }
+  }
+
   private async runSimulation(
     parameters: Record<string, any>,
-    conditions: any,
-    endTimeSeconds: number = ScientificPipeline.SIMULATION_END_TIME_S
+    conditions: any
   ): Promise<any> {
     void conditions;
 
@@ -1035,7 +1100,7 @@ ${integrityReport}
       // runner's default `end` is also 10.0, so the window looked correct
       // while the resolution silently stayed at the default 51. See the
       // echo check in runTerium, which now catches this class of error.
-      end: endTimeSeconds,
+      end: this.integrationWindowFor(parameters),
       points: ScientificPipeline.SIMULATION_POINTS
     };
 

@@ -709,6 +709,32 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
 
 
 def main() -> None:
+    # `--list-domains`: what this engine can actually simulate, from DISPATCH.
+    #
+    # WHY THIS EXISTS
+    # ---------------
+    # Terrium advertises fifteen teaching domains. Until now nothing could
+    # tell a student what they are. `scientificCLI.ts help` lists nine
+    # commands, all of them enzyme kinetics or generic; `python -m Terium.cli
+    # --help` lists seven subcommands, all population genetics and Gillespie.
+    # Neither mentions the other, and neither names epidemiology, PCR, Monte
+    # Carlo or molecular dynamics at all -- domains this engine runs and has
+    # over a thousand tests for.
+    #
+    # A capability nobody can find is not a capability. That is ADR 0090's
+    # sentence about exported functions, and it applies with more force to a
+    # product surface: the code was written, verified against closed-form
+    # solutions, and left undiscoverable.
+    #
+    # Emitted from DISPATCH rather than typed out. A hand-written list is a
+    # second source of truth that goes stale the first time a domain is
+    # added, and this file already carries a comment about exactly that
+    # hazard -- the membership test and the call site indexing two tables
+    # "kept equal by hand (they have diverged before)".
+    if "--list-domains" in sys.argv:
+        print(json.dumps({"ok": True, "domains": sorted(DISPATCH)}))
+        return
+
     try:
         raw = sys.stdin.read()
         if not raw:

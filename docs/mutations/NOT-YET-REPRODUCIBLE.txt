@@ -94,6 +94,8 @@
 0076   # the adjacent paper is the one you miscite
 0081   # the audit says ready and not what is owed -- concurrent agent's,
        # arrived this pass. Set file owed, per the standing policy.
+0118   # the name the database uses -- arrived 2026-08-18, another agent's,
+       # mid-pass. Asked, not claimed.
 0113   # the conditions that stayed on the screen -- arrived 2026-08-17,
        # another agent's, mid-pass. Asked, not claimed: re-deriving it
        # means editing their record if a result disagrees, and the record
@@ -149,6 +151,31 @@
 #
 # Three identical verdicts is the result being looked for. Any disagreement
 # means the mtime fix is not the whole story.
+#
+# UPDATE 2026-08-18 -- THE MTIME FIX IS NOT THE WHOLE STORY.
+#
+# Half two above was "NOT TESTED, and not testable here". It has now been
+# observed, in a suite small enough to fit the ceiling.
+#
+# ADR 0119's Y4 mutates `plausible()` in suggestResolveCommand.ts to return
+# true unconditionally. Direct execution of the mutated module:
+#
+#     under mutation -> {"enzyme":"model","substrate":"model","organism":"model"}
+#
+# and `suggestResolveCommand.test.ts` asserts `toBeNull()` on that exact
+# query. The test MUST fail. Jest reported 15 of 15 passing, so the runner
+# did not see the change -- with `--no-cache` passed TWICE (injected by
+# mutate.py per ADR 0083, and again in the --test override).
+#
+# So `--no-cache` does not close it. What does is unknown; candidates are
+# ts-jest's own transform cache keyed independently of jest's, and the
+# haste map. Somebody should find out before another NOT CAUGHT in a
+# TypeScript suite is believed.
+#
+# THE ASYMMETRY STILL HOLDS, and it is why no past verdict is retracted: a
+# stale cache can only manufacture a false NOT CAUGHT, never a false
+# "caught". Every `caught` in this repository stands. What is now in doubt
+# is every NOT CAUGHT recorded against a jest suite.
 #
 # NOTE ON THE `.unverified` SUFFIX ABOVE: adopted from a concurrent agent who
 # hit this same ceiling independently and parked two set files rather than

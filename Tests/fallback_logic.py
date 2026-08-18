@@ -50,6 +50,7 @@ from brenda_client import (
     KM_TABLE_LABEL,
     TURNOVER_TABLE_LABEL,
     fetch_brenda_html,
+    has_data_table,
     parse_brenda_km_html,
 )
 from citation import Citation, citation_from_brenda_entry, pubmed_url
@@ -440,8 +441,25 @@ def substrates_present(
     reader choose. A list of real labels is more useful than a guessed
     match and cannot be wrong.
     """
+    html = html_provider(ec_number)
+
+    # THE TABLE HAS TO BE THE ONE ASKED ABOUT.
+    #
+    # `parse_brenda_km_html` falls back to scanning the whole page when the
+    # labelled container is missing, which is safe for the resolver -- a
+    # target substrate and organism filter the foreign rows out -- and not
+    # safe here, where nothing filters. Measured on the LDH fixture, which
+    # carries a "KM Values" table and no "Ki Values" table: asking for the
+    # Ki table returned the Km table's eight rows, so a student asking for
+    # a Ki was told the enzyme "reports" four substrates that have no Ki
+    # data at all. They re-run, fail again, and now believe Ki data exists.
+    #
+    # Shipped in ADR 0118 and found the next day while building on it.
+    if not has_data_table(html, table_label):
+        return []
+
     entries = parse_brenda_km_html(
-        html_provider(ec_number),
+        html,
         ec_number,
         # No substrate filter, and no organism filter: the question is what
         # this ENZYME has data for, which is what a reader needs in order to
@@ -481,6 +499,16 @@ def _nothing_matched(
     things worse.
     """
     try:
+        if not has_data_table(html_provider(ec_number), table_label):
+            # A better diagnosis than any substrate list: the reader got the
+            # QUANTITY wrong, not the substrate name, and telling them about
+            # substrates would send them round the same loop.
+            log.append(
+                f"BRENDA's page for {ec_number} carries no {table_label!r} "
+                "table at all, so no substrate has a value of this kind here. "
+                "The substrate name is not what went wrong."
+            )
+            return []
         available = substrates_present(ec_number, html_provider, table_label)
     except Exception as exc:  # noqa: BLE001 - a hint, never a new failure
         log.append(f"Could not list the substrates present: {exc}")

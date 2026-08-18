@@ -21,7 +21,12 @@ from __future__ import annotations
 
 import pytest
 
-from brenda_client import KM_TABLE_LABEL
+from brenda_client import (
+    KI_TABLE_LABEL,
+    KM_TABLE_LABEL,
+    TURNOVER_TABLE_LABEL,
+    has_data_table,
+)
 from fallback_logic import (
     KineticResult,
     _nothing_matched,
@@ -201,6 +206,68 @@ def test_the_diagnostic_reparse_cannot_turn_a_miss_into_a_crash():
     assert any("Could not list the substrates" in line for line in result.search_log), (
         "the hint failed silently; a reader should be told why it is absent"
     )
+
+
+class TestTheListMustComeFromTheTableItNames:
+    """The defect this feature shipped with, found the next day.
+
+    `parse_brenda_km_html` falls back to scanning the whole page when the
+    labelled container is absent, and says so: the caller "should fall back
+    to whole-page scanning and treat results as less trustworthy". That is
+    safe for the resolver, where a target substrate and organism filter the
+    foreign rows out. It was not safe for this hint, which runs in
+    permissive mode with nothing filtering.
+
+    Measured on the LDH fixture, which carries a "KM Values" table and no
+    "Ki Values" table: asking for the Ki table returned the Km table's
+    eight rows. A student asking for a Ki was told the enzyme "reports"
+    four substrates that have no Ki data at all — so they re-run, fail
+    again, and now believe Ki data exists.
+
+    A helpful-looking sentence that is false, introduced while fixing a
+    helpful-looking sentence that was false.
+    """
+
+    def test_the_fixture_really_has_only_one_of_the_three_tables(self):
+        """The premise, asserted rather than assumed.
+
+        If someone later adds a Ki table to this fixture, these tests would
+        quietly stop testing anything.
+        """
+        html = load_fixture("brenda_ldh_fixture.html")
+        assert has_data_table(html, KM_TABLE_LABEL)
+        assert not has_data_table(html, KI_TABLE_LABEL)
+        assert not has_data_table(html, TURNOVER_TABLE_LABEL)
+
+    def test_no_substrates_are_reported_for_a_table_that_is_not_there(self):
+        assert substrates_present(LDH, ldh_provider(), KI_TABLE_LABEL) == []
+        assert substrates_present(LDH, ldh_provider(), TURNOVER_TABLE_LABEL) == []
+
+    def test_the_km_table_still_reports_its_substrates(self):
+        """The fix must not silence the case it was built for."""
+        assert "(S)-lactate" in substrates_present(LDH, ldh_provider(), KM_TABLE_LABEL)
+
+    def test_the_reader_is_told_the_QUANTITY_is_missing_not_the_substrate(self):
+        """A better diagnosis than a corrected list.
+
+        The reader got the quantity wrong, not the substrate name, and a
+        substrate list would send them round the same loop.
+        """
+        result = resolve_kinetic_value(
+            LDH, "Homo sapiens", "L-lactate",
+            html_provider=ldh_provider(),
+            uniprot_provider=fake_uniprot_provider,
+            taxon_id_provider=fake_taxon_id_provider,
+            search_literature=False, allow_cross_species=False, quantity="ki",
+            lineage_provider=fixture_lineage_provider,
+        )
+        assert result.substrates_available == []
+        joined = " ".join(result.search_log)
+        assert "carries no 'Ki Values' table at all" in joined
+        assert "The substrate name is not what went wrong" in joined
+        assert "(S)-lactate" not in joined, (
+            "a substrate from the Km table was offered as an answer about Ki"
+        )
 
 
 def test_an_enzyme_whose_table_is_empty_says_nothing_rather_than_an_empty_list():
