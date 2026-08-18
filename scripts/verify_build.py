@@ -34,6 +34,21 @@ REPO_ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 API_SERVER_DIR = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-server"
 
+#: The simulation engine package. One `r` -- the importable package is
+#: `Terium`, the product is `Terrium` (there is a whole guard about that).
+#:
+#: This constant did not exist. `run_python_tests()` referenced it twice and
+#: raised `NameError: name 'TERIUM_DIR' is not defined` on the first line
+#: that touched it -- so the non-`--quick` path of THIS SCRIPT crashed before
+#: running a single Python test, and every check sequenced after it never
+#: ran either.
+#:
+#: It survived because `ruff` is configured in pyproject.toml with forty-odd
+#: rule families selected and is executed by nothing: not CI, not the
+#: Makefile, not this file. F821 (undefined-name) finds it in under a second.
+#: A linter that is configured and never run reads as coverage and is not.
+TERIUM_DIR = REPO_ROOT / "Terium"
+
 
 def run_command(
     cmd: str,
@@ -682,6 +697,38 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}",
             timeout=120,
         ),
+        # ...and one that reaches only ONE of the two front ends has been
+        # reported to half the users. Found by hand twice (ADR 0106, 0109),
+        # the second time only because an unrelated fix made a leaf name
+        # collide. Nothing was looking.
+        #
+        # Wired one pass late, on purpose. The first attempt was unwired
+        # again the same day: mutation testing returned 0 caught, 3 not
+        # caught, because against a green tree every failure path is
+        # unreachable and deleting one changes nothing. A guard whose
+        # refusals have never been observed to fire does not go into a
+        # harness everyone runs. `--selftest` supplies the failing input,
+        # and all three mutations are caught now. See ADR 0111.
+        run_guard(
+            "Both Front Ends Guard (self-check)",
+            f"python {SCRIPTS_DIR / 'check_both_front_ends_read_it.py'} --selftest",
+            timeout=60,
+        ),
+        run_guard(
+            "Both Front Ends Guard",
+            f"python {SCRIPTS_DIR / 'check_both_front_ends_read_it.py'}",
+            timeout=180,
+        ),
+        # The classifier deciding which fields get checked AT ALL. A bug
+        # there is silent by construction -- the field is not reported
+        # undelivered and not reported delivered, it stops being asked
+        # about. Its first version excused ADR 0039's original defect. See
+        # ADR 0100.
+        run_guard(
+            "Finding Reachability Self-Check",
+            f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'} --selftest",
+            timeout=60,
+        ),
         # Another agent's guard, arrived unwired during this same pass and
         # wired here rather than left for them: a number hardcoded into a
         # page reads exactly like a measured one. Verified passing (exit 0,
@@ -718,6 +765,16 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             f"python {SCRIPTS_DIR / 'check_mutation_tables_reproducible.py'}",
             timeout=120,
         ),
+        # It shipped with no self-test, enforcing on other people's records a
+        # rule it did not meet itself. The eighth case is the load-bearing
+        # one: a set file may satisfy the guard by naming a command instead
+        # of mutations, and an alternative route nobody checks is a hole, not
+        # an alternative. See ADR 0098.
+        run_guard(
+            "Mutation Table Guard Self-Check",
+            f"python {SCRIPTS_DIR / 'check_mutation_tables_reproducible.py'} --selftest",
+            timeout=120,
+        ),
         # The self-check carries ADR 0079's failing input: a sibling guard's
         # comment-stripper deleted from the `//` in `https://` onward,
         # removing the licence URI from the text being searched for it. This
@@ -737,6 +794,17 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             "Third-Party Request Disclosure Guard",
             f"python {SCRIPTS_DIR / 'check_third_party_requests_disclosed.py'}",
             timeout=120,
+        ),
+        # ruff is configured in pyproject.toml with forty-odd rule families
+        # and was executed by NOTHING. F821 found `TERIUM_DIR` undefined in
+        # THIS FILE -- so the non-`--quick` path crashed with a NameError
+        # before running a single Python test, and every check after it
+        # never ran. A linter configured and never invoked reads as coverage
+        # and is not. See ADR 0093.
+        run_guard(
+            "Python Bug-Lint Guard",
+            f"python {SCRIPTS_DIR / 'check_python_bug_lints.py'}",
+            timeout=180,
         ),
         run_guard(
             "Unwired Export Guard (self-check)",

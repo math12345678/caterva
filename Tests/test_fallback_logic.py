@@ -12,6 +12,7 @@ import os
 import pytest
 
 import fallback_logic
+from fixture_lineages import fixture_lineage_provider
 from fallback_logic import LiteratureCandidate, resolve_kinetic_value
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), "fixtures")
@@ -160,6 +161,8 @@ def test_falls_back_to_cross_species_when_no_human_row_matches(ldh_provider):
         uniprot_provider=fake_uniprot_provider,
         taxon_id_provider=fake_taxon_id_provider,
         search_literature=False,
+        allow_cross_species=True,
+        lineage_provider=fixture_lineage_provider,
     )
     assert result.found is True
     assert result.source == "brenda_cross_species"
@@ -176,6 +179,8 @@ def test_cross_species_result_still_has_citation(ldh_provider):
         uniprot_provider=fake_uniprot_provider,
         taxon_id_provider=fake_taxon_id_provider,
         search_literature=False,
+        allow_cross_species=True,
+        lineage_provider=fixture_lineage_provider,
     )
     assert result.citation is not None
     assert result.citation.source == "BRENDA"
@@ -319,6 +324,8 @@ class TestAssayConditionsReachTheResult:
             uniprot_provider=fake_uniprot_provider,
             taxon_id_provider=fake_taxon_id_provider,
             search_literature=False,
+            allow_cross_species=True,
+            lineage_provider=fixture_lineage_provider,
         )
         assert result.found is True
         assert result.cross_species_flag is True
@@ -418,15 +425,36 @@ def test_ki_cross_species_resolves_and_is_flagged(ldh_ki_provider):
         taxon_id_provider=fake_taxon_id_provider,
         search_literature=False,
         quantity="ki",
+        allow_cross_species=True,
+        lineage_provider=fixture_lineage_provider,
     )
     assert result.found is True
     assert result.source == "brenda_cross_species"
     assert result.cross_species_flag is True
-    # Minimum gossypol Ki across organisms: 0.0007 mM Plasmodium
-    # falciparum (Q27743), ref 654758 -- a real cross-species record.
-    assert result.value == 0.0007
-    assert result.organism == "Plasmodium falciparum"
-    assert result.citation.reference_id == "654758"
+
+    # THIS ANSWER CHANGED, AND THE CHANGE IS THE POINT.
+    #
+    # The lowest gossypol Ki in the fixture is 0.0007 mM in Plasmodium
+    # falciparum (ref 654758), and before the relatedness check that is
+    # what a Mus musculus query returned -- an apicomplexan parasite's
+    # inhibition constant offered as a mouse's. Cryptosporidium parvum was
+    # in the running too.
+    #
+    # Both share only the domain Eukaryota with a mouse, so both are now
+    # excluded, and the answer is the Homo sapiens value: still
+    # cross-species, still flagged, but between two mammals sharing the
+    # superorder Euarchontoglires.
+    #
+    # "min across all organisms" was never a scientific criterion. It was
+    # an arbitrary tie-break that happened to be reproducible, and it
+    # selected on the wrong axis entirely.
+    assert result.value == 0.0014
+    assert result.organism == "Homo sapiens"
+    assert result.citation.reference_id == "711801"
+
+    rejected = {v.candidate_organism for v in result.relatedness
+                if v.status == "too_distant"}
+    assert rejected == {"Plasmodium falciparum", "Cryptosporidium parvum"}
 
 
 def test_ki_never_fabricates_when_table_has_no_match(ldh_ki_provider):
@@ -728,3 +756,237 @@ def test_search_literature_false_skips_core_too(monkeypatch, ldh_provider):
         search_literature=False,
     )
     assert result.found is False
+
+
+# ---------------------------------------------------------------------------
+# Tier 2 is OPT-IN (ADR 0024, on Lisa Jeske's recommendation)
+#
+# The tests above pass allow_cross_species=True because they are testing what
+# the cross-species tier DOES. These test whether it fires at all, which is a
+# different question and the one that changed.
+# ---------------------------------------------------------------------------
+
+def test_cross_species_is_withheld_by_default(ldh_provider):
+    """No mouse row exists in the LDH fixture, but human and pig rows do.
+
+    The old behaviour returned the pig value with a warning flag. The
+    behaviour Jeske recommended -- and this asserts -- is that nothing is
+    returned unless the caller opted in."""
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Mus musculus",
+        "lactate",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.found is False
+    assert result.source == "cross_species_withheld"
+    assert result.value is None
+    assert result.citation is None
+    assert result.cross_species_flag is False
+
+
+def test_withheld_result_names_the_organisms_it_withheld(ldh_provider):
+    """A refusal that cannot say what it refused is unactionable: the user
+    cannot opt in to something they were never told existed.
+
+    This is the assertion that distinguishes 'withheld' from 'not found',
+    and it is the reason cross_species_withheld is a separate source value
+    rather than a reuse of not_found."""
+    result = resolve_kinetic_value(
+        "1.1.1.27",
+        "Mus musculus",
+        "lactate",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.cross_species_organisms_available, (
+        "withheld result named no organisms, so the opt-in it demands "
+        "cannot be exercised"
+    )
+    assert "Homo sapiens" in result.cross_species_organisms_available
+    assert all(
+        isinstance(o, str) and o.strip()
+        for o in result.cross_species_organisms_available
+    )
+
+
+def test_withheld_is_distinct_from_genuinely_not_found(ldh_provider):
+    """'BRENDA has nothing' and 'BRENDA has something you did not ask for'
+    must not collapse into the same result, or the caller cannot tell a
+    real gap in the literature from a policy decision this code made."""
+    withheld = resolve_kinetic_value(
+        "1.1.1.27", "Mus musculus", "lactate",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    absent = resolve_kinetic_value(
+        "1.1.1.27", "Mus musculus", "a-substrate-that-is-not-in-the-fixture",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert withheld.found is absent.found is False
+    assert withheld.source == "cross_species_withheld"
+    assert absent.source == "not_found"
+    assert absent.cross_species_organisms_available == []
+
+
+def test_exact_match_is_unaffected_by_the_opt_in(ldh_provider):
+    """The gate must sit on tier 2 only. If it leaked into tier 1, an exact
+    same-organism match would start refusing -- which no one asked for and
+    which the withheld tests above would not catch."""
+    for flag in (False, True):
+        result = resolve_kinetic_value(
+            "1.1.1.27",
+            "Homo sapiens",
+            "lactate",
+            html_provider=ldh_provider,
+            uniprot_provider=fake_uniprot_provider,
+            taxon_id_provider=fake_taxon_id_provider,
+            search_literature=False,
+            allow_cross_species=flag,
+            lineage_provider=fixture_lineage_provider,
+        )
+        assert result.found is True, f"exact match broke with allow_cross_species={flag}"
+        assert result.source == "brenda_exact"
+        assert result.cross_species_flag is False
+
+
+def test_search_log_records_the_withholding(ldh_provider):
+    """The log is the audit trail. A value withheld silently is
+    indistinguishable from a lookup that never ran."""
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Mus musculus", "lactate",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    joined = " | ".join(result.search_log)
+    assert "withheld" in joined
+    assert "allow_cross_species=False" in joined
+
+
+# ---------------------------------------------------------------------------
+# Protein variants are removed from selection BEFORE the minimum is taken
+# (ADR 0029)
+#
+# The exact-match tier needs its own coverage, and it very nearly did not get
+# any: the first mutation run disabled this tier's filter entirely and every
+# test still passed. The cross-species golden case exercised the OTHER tier,
+# and a filter no test can break is a filter someone deletes as dead code.
+#
+# Mus musculus in the AChE turnover fixture is the case that exercises it:
+# 37 rows, 32 of them variants, all under one organism so the exact tier
+# fires and never reaches the cross-species branch.
+# ---------------------------------------------------------------------------
+
+# `ache_kcat_provider` is defined once, near the top of this file. A second,
+# identical copy sat here and silently shadowed it -- pytest takes the last
+# fixture of a given name. Identical today, so nothing misbehaved; the hazard
+# is the day one of them changes and only one is in effect, with no error
+# anywhere. Found by ruff's F811, which is configured in pyproject.toml and
+# was executed by nothing.
+
+
+def _resolve_mouse_ache(provider, **kwargs):
+    return resolve_kinetic_value(
+        "3.1.1.7", "Mus musculus", "acetylthiocholine",
+        html_provider=provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+        quantity="kcat",
+        lineage_provider=fixture_lineage_provider,
+        **kwargs,
+    )
+
+
+def test_exact_tier_excludes_variant_rows_from_selection(ache_kcat_provider):
+    """32 of the 37 mouse rows are mutants, and selection is min().
+
+    Without the filter the resolver reaches into a pool that is 86% point
+    substitutions -- and substitutions are chosen precisely because they
+    change the kinetics, so they populate the tail a minimum selects from.
+    """
+    withheld = _resolve_mouse_ache(ache_kcat_provider)
+    allowed = _resolve_mouse_ache(ache_kcat_provider, allow_variants=True)
+
+    assert withheld.found is True
+    assert allowed.found is True
+
+    # ORIGINALLY this asserted `withheld.value != allowed.value` -- that
+    # excluding variants changes the answer. That premise died when ADR 0047
+    # added the evidence frontier, which ranks a `wild_type` commentary above
+    # a `variant` one on its own. Both paths now converge on the same
+    # wild-type row, and the value stops distinguishing them.
+    #
+    # The assertion was rewritten rather than deleted, because the thing it
+    # was protecting is still real: the exact-tier filter must reach the
+    # selection. Two mechanisms agreeing is not the same as one of them being
+    # unnecessary -- the frontier only prefers wild-type when nothing beats
+    # that row on another axis, and the filter is what guarantees a variant
+    # can never be returned by default.
+    #
+    # So it now asserts the PROPERTY rather than a difference in outcome.
+    assert withheld.variant is not None
+    assert withheld.variant.status != "variant", (
+        "the default path returned a value measured on a protein variant"
+    )
+    assert any("protein variant" in line for line in withheld.search_log), (
+        "the exact-tier filter left no trace; it is not reaching the selection"
+    )
+    # And with the opt-in, variants are genuinely back in the pool.
+    assert not any(
+        "protein variant" in line for line in allowed.search_log
+    ), "allow_variants=True still excluded variant rows"
+
+
+def test_exact_tier_says_what_it_excluded(ache_kcat_provider):
+    """A silent filter is indistinguishable from no filter.
+
+    The count has to reach the log, or a reader cannot tell whether the
+    value they got was chosen from three rows or thirty-seven.
+    """
+    result = _resolve_mouse_ache(ache_kcat_provider)
+    excluded = [line for line in result.search_log if "protein variant" in line]
+    assert excluded, "nothing in the log records the exclusion"
+    assert "exact-match" in excluded[0]
+
+
+def test_the_opt_in_actually_re_admits_variants(ache_kcat_provider):
+    """The opt-in must be a real switch, not a message about one.
+
+    Same argument as allow_cross_species in ADR 0024: a flag that changes
+    nothing is worse than no flag, because the user believes they made a
+    choice.
+    """
+    result = _resolve_mouse_ache(ache_kcat_provider, allow_variants=True)
+    assert result.found is True
+    assert not any("protein variant" in line for line in result.search_log)
+
+
+def test_variant_filter_does_not_fire_when_nothing_is_a_variant(ldh_provider):
+    """The LDH human rows carry no variant markers.
+
+    Without this, a filter that excluded EVERYTHING would pass the tests
+    above -- they only assert that the two paths differ.
+    """
+    result = resolve_kinetic_value(
+        "1.1.1.27", "Homo sapiens", "lactate",
+        html_provider=ldh_provider,
+        uniprot_provider=fake_uniprot_provider,
+        taxon_id_provider=fake_taxon_id_provider,
+        search_literature=False,
+    )
+    assert result.found is True
+    assert result.source == "brenda_exact"
+    assert not any("protein variant" in line for line in result.search_log)

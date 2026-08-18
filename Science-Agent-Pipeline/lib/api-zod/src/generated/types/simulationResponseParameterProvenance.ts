@@ -5,9 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { ParameterProvenance } from './parameterProvenance';
+import type { ParameterProvenance } from "./parameterProvenance";
 
 /**
  * Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)
  */
-export type SimulationResponseParameterProvenance = {[key: string]: ParameterProvenance};
+export type SimulationResponseParameterProvenance = {
+  [key: string]: ParameterProvenance;
+};

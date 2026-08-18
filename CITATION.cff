@@ -11,9 +11,19 @@ abstract: >-
   validated enzyme kinetics (Michaelis-Menten), epidemiology (SIR/SEIR), and
   PCR amplification models with literature-grounded parameter plausibility
   checks.
+
+  Terrium is NOT Tellurium. Tellurium is a separate, established
+  systems-biology environment from the Sauro lab at the University of
+  Washington and collaborators. Terrium is an unaffiliated personal
+  project: not a fork of Tellurium, not endorsed by its authors, and
+  making no claim to their work. Terrium is a consumer of that ecosystem,
+  running on libRoadRunner (Apache 2.0, University of Washington) and
+  generating Antimony (MIT). The similar name is a mistake, and it has
+  already caused one researcher to reasonably read a cold email as a false
+  claim of credit.
 authors:
   - name: Terrium
-    website: "https://github.com/math12345678/terrium"
-license: LicenseRef-Terrium-Proprietary
-repository-code: "https://github.com/math12345678/terrium"
+    website: "https://github.com/Terrium-sim/terrium"
+license: Apache-2.0
+repository-code: "https://github.com/Terrium-sim/terrium"
 date-released: 2026-07-25

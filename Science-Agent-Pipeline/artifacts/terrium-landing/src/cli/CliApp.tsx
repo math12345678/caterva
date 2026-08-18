@@ -27,7 +27,6 @@ import StaggeredHero from "./StaggeredHero";
 import MetricsBar from "./MetricsBar";
 import PlaygroundTabs from "./PlaygroundTabs";
 import WorkflowCompare from "./WorkflowCompare";
-import TestimonialCarousel from "./TestimonialCarousel";
 import ExportFormats from "./ExportFormats";
 import GlossarySection from "./GlossarySection";
 import ChangelogModal from "./ChangelogModal";
@@ -684,9 +683,20 @@ export default function CliApp() {
       {/* WORKFLOW COMPARISON */}
       <div className="section-divider-amber" />
       <WorkflowCompare />
-      {/* TESTIMONIALS */}
-      <div className="section-divider-purple" />
-      <TestimonialCarousel />
+      {/* TESTIMONIALS -- removed 2026-08-15. The carousel carried five
+          invented quotes attributed to named academics at five real
+          universities, under a "Trusted by educators" heading, for a
+          pre-launch product with a waitlist and no users. The institutions
+          are listed in docs/ENDORSEMENTS.md and the reasoning in ADR 0071;
+          they are deliberately not repeated here, because restating a
+          false claim in order to explain its removal still puts the claim
+          in the page.
+
+          Do not restore this section with placeholder quotes. If real
+          endorsements are obtained, record them in docs/ENDORSEMENTS.md
+          with the permission behind each one --
+          scripts/check_no_fabricated_endorsements.py fails when a public
+          page names an institution without a matching record. */
       {/* GLOSSARY */}
       <div className="section-divider-blue" />
       <GlossarySection />

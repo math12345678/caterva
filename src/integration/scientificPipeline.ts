@@ -13,6 +13,7 @@
  */
 
 import { logger } from '../logger';
+import { SimulationError, describeError } from '../errors';
 import { ScientificValidationPipeline, ParameterValidator } from '../validation/scientificValidator';
 import { LiteratureService } from '../literature/literatureService';
 import { ReproducibilityService } from '../reproducibility/reproducibilityEngine';
@@ -22,6 +23,11 @@ import {
   type EngineParameterValue
 } from '../engine/teriumBridge';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
+import {
+  deriveRunConditions,
+  describeConflicts,
+  type RunConditions,
+} from '../validation/runConditions';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -44,9 +50,24 @@ export interface SimulationRequest {
    */
   domain?: string;
   parameters?: Record<string, number>;
+  /**
+   * ADR 0055 removed `temperature` and `pH` from this object.
+   *
+   * They were never a caller's to state. A simulation has no temperature of
+   * its own -- the Michaelis-Menten ODE takes none, and a Km's temperature
+   * dependence is already inside the measured Km. The only meaningful
+   * temperature is the one the constants were MEASURED at, which is a fact
+   * about the papers and not a setting.
+   *
+   * Their removal is deliberately a compile error rather than a silent
+   * ignore. Nine call sites passed `{ temperature: 37, pH: 7.4 }`; letting
+   * them keep compiling while the value stopped being used would leave nine
+   * lines that read as if they configured something.
+   *
+   * `buffer` stays: it names a substance, not a measured condition, and
+   * nothing downstream reads it as evidence.
+   */
   conditions?: {
-    temperature?: number;
-    pH?: number;
     buffer?: string;
   };
   /**
@@ -110,6 +131,22 @@ export interface ResolvedParameter {
   /** Identifiers (DOIs / BRENDA refs) the resolver returned, if any. */
   citations?: string[];
   sourceCount?: number;
+  /**
+   * The conditions this parameter was MEASURED at (ADR 0055).
+   *
+   * Not the conditions of the run. The run has no conditions of its own: the
+   * ODE takes no temperature, so a simulation is at whatever conditions its
+   * parameters came from. See `src/validation/runConditions.ts`.
+   *
+   * Absent on user-supplied parameters, and that absence is correct and
+   * load-bearing. A student who types `km = 5` has not told us a
+   * temperature, and inferring one from the other parameters would be the
+   * hardcoded 37 rebuilt out of neighbours.
+   */
+  assayConditions?: {
+    ph?: number | null;
+    temperatureC?: number | null;
+  } | null;
 }
 
 export interface SimulationResponse {
@@ -126,8 +163,35 @@ export interface SimulationResponse {
     computedMetrics: Record<string, number>;
   };
 
+  /**
+   * A unique identifier for THIS execution. Contains `Date.now()` and a
+   * random UUID by design, so two runs of identical inputs get different
+   * keys -- which is what an identifier is for, and the opposite of what
+   * the word "reproducibility" leads a reader to expect.
+   *
+   * `inputsHash` below is the one that reproduces.
+   */
   reproducibilityKey: string;
   dataIntegrityHash: string;
+  /**
+   * sha256 of `{query, parameters, conditions}`.
+   *
+   * The genuinely reproducible identifier: run the same query with the same
+   * parameters and this is the same string, on any machine, at any time. It
+   * was computed and stored from the beginning and never surfaced, while
+   * the key that CANNOT match across runs was printed on every one.
+   */
+  inputsHash: string;
+
+  /**
+   * The conditions this run's parameters were measured at (ADR 0055).
+   *
+   * Optional because the early-return failure paths above have no resolved
+   * parameters to derive it from. Optional is NOT a licence to ignore it on
+   * a successful run: a success without this field would be a trajectory
+   * with no stated conditions, which is the state this ADR ended.
+   */
+  runConditions?: RunConditions;
 
   metadata: {
     executionTimeMs: number;
@@ -271,6 +335,7 @@ export class ScientificPipeline {
           },
           reproducibilityKey: '',
           dataIntegrityHash: '',
+          inputsHash: '',
           parameterProvenance: resolvedParameters,
           metadata: {
             executionTimeMs: Date.now() - startTime,
@@ -346,9 +411,31 @@ export class ScientificPipeline {
             )
           : undefined;
 
+      // ADR 0055. This object used to open `temperature: 37, pH: 7.4`.
+      //
+      // The spread of `request.conditions` that followed made it look
+      // overridable, and it was -- but nine of the nine call sites in this
+      // repository passed exactly `{ temperature: 37, pH: 7.4 }`, so the
+      // literal WAS the value in every path a user could reach. The two
+      // validator range checks it fed sat at the dead centre of both ranges
+      // and could not fire.
+      //
+      // The conditions now come from the parameters' own provenance. The
+      // simulation does not have a temperature; its parameters do.
+      const runConditions = deriveRunConditions(resolvedParameters);
+      const conditionConflicts = describeConflicts(runConditions);
+
       const conditions = {
-        temperature: 37,
-        pH: 7.4,
+        // Absent when the provenance is silent OR when the parameters
+        // disagree. Both leave the validator reporting `notEvaluated`, which
+        // is the honest answer in both cases -- and the conflict itself is
+        // reported separately below, so the two are not confused.
+        ...(runConditions.temperatureC.status === 'agreed'
+          ? { temperature: runConditions.temperatureC.value }
+          : {}),
+        ...(runConditions.ph.status === 'agreed'
+          ? { pH: runConditions.ph.value }
+          : {}),
         ...request.conditions,
         km: resolvedParameters.km?.value,
         vmax: vmaxInSubstrateUnitsPerSec,
@@ -391,6 +478,7 @@ export class ScientificPipeline {
           },
           reproducibilityKey: '',
           dataIntegrityHash: '',
+          inputsHash: '',
           parameterProvenance: resolvedParameters,
           metadata: {
             executionTimeMs: Date.now() - startTime,
@@ -443,7 +531,11 @@ export class ScientificPipeline {
         request.query,
         resolvedParameters,
         conditions,
-        simulationOutput
+        simulationOutput,
+        // The engine's own answer, not this file's. Absent -> the record
+        // says "unrecorded" and `verifyReproducibility` declines, which is
+        // the honest outcome when nobody knows what it ran at.
+        simulationOutput?.solver
       );
 
       const executionTimeMs = Date.now() - startTime;
@@ -473,24 +565,35 @@ export class ScientificPipeline {
 
         reproducibilityKey: executionRecord.hashes.reproductionKey,
         dataIntegrityHash: executionRecord.hashes.outputHash,
+        inputsHash: executionRecord.hashes.inputHash,
 
         parameterProvenance: resolvedParameters,
+        // ADR 0055. The conditions the parameters were measured at, reported
+        // whether they agreed or not. A caller that renders only the
+        // trajectory now has the option of saying what the trajectory is a
+        // trajectory OF -- which was previously unavailable at any layer.
+        runConditions,
         metadata: {
           executionTimeMs,
           literatureSourcesUsed: literatureData.totalSources,
           confidenceScore: resultValidation.confidence,
-          warnings: []
+          // Was the literal `[]`. A field that is always empty is not a
+          // warnings list, it is a promise that nothing is wrong -- and this
+          // one shipped while the pipeline had a real warning to give.
+          warnings: conditionConflicts
         }
       };
     } catch (error) {
       logger.error({ jobId, error }, 'Simulation error');
 
-      throw {
+      // A real Error, not a plain object. The object form carried the
+      // cause faithfully in `message` and every consumer discarded it,
+      // because `instanceof Error` was false and `String(obj)` ran instead
+      // -- so the user saw "[object Object]". See src/errors.ts.
+      throw new SimulationError(describeError(error), {
         jobId,
-        error: 'SIMULATION_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error',
         executionTimeMs: Date.now() - startTime
-      };
+      });
     }
   }
 
@@ -499,7 +602,16 @@ export class ScientificPipeline {
    */
   async verifyReproducibility(jobId: string): Promise<{
     reproduced: boolean;
+    /** True only when the replay was bit-for-bit identical. `reproduced`
+     *  is broader: it also covers agreement within the solver's declared
+     *  tolerance. The caller needs both, because "identical" and "close
+     *  enough" are different claims and only one of them is exact. */
+    outputsIdentical: boolean;
     maxError: number;
+    /** Why the engine thinks a replay diverged. Computed by the verifier and
+     *  previously dropped here — the CLI had a failure to report and no
+     *  material to report it with. */
+    differences?: { possibleCauses: string[]; conclusion: string };
     summary: string;
   }> {
     logger.info({ jobId }, 'Verifying reproducibility');
@@ -519,7 +631,9 @@ export class ScientificPipeline {
 
     return {
       reproduced: result.verification.passed,
+      outputsIdentical: result.verification.outputsIdentical,
       maxError: result.verification.maxRelativeError,
+      differences: result.differences,
       summary: result.summary
     };
   }
@@ -559,7 +673,7 @@ ${JSON.stringify(record.inputs, null, 2)}
 Output Summary:
 - Trajectory points: ${record.output.trajectory.length}
 - Final value: ${record.output.metrics.finalValue}
-- Quality score: ${(record.validation.dataQualityScore * 100).toFixed(1)}%
+- Quality score: ${record.validation.dataQualityScore === undefined ? 'not assessed (the reliability axes are per-parameter; ADR 0024 Decision 3 declines a total)' : (record.validation.dataQualityScore * 100).toFixed(1) + '%'}
 
 Reproducibility:
 - Reproduction key: ${record.hashes.reproductionKey.slice(0, 16)}...
@@ -664,7 +778,12 @@ ${integrityReport}
             // and failed the run with NO_LITERATURE -- for a parameter
             // that had just been sourced.
             citations: recommendation.sources,
-            sourceCount: recommendation.sourceCount
+            sourceCount: recommendation.sourceCount,
+            // ADR 0055. Without this the parameter arrives knowing its value,
+            // its unit and its citation but not the conditions any of them
+            // are true under -- which is the state that made a hardcoded
+            // 37 C look like the only option.
+            assayConditions: recommendation.assayConditions
           };
         } catch (error) {
           logger.warn({ parameter: param }, 'No literature recommendation found');
@@ -889,6 +1008,11 @@ ${integrityReport}
     return {
       trajectory,
       finalValue,
+      // Carried out of the engine so the execution record can state how the
+      // run was integrated instead of inventing it. Optional because a
+      // future engine build might not report it -- and "unrecorded" is a
+      // better record than a confident wrong one.
+      solver: result.solver,
       metrics: {
         finalValue,
         finalVelocity:
@@ -1008,7 +1132,47 @@ ${integrityReport}
    * than a default: a query the pipeline cannot place is a query it must
    * not silently run as something else.
    */
+  /**
+   * PUBLIC and STATIC so the request validator can ask this question
+   * instead of keeping its own answer.
+   *
+   * `src/validation/request-validator.ts` held a hardcoded list of four
+   * "valid" queries. It had drifted from reality in both directions:
+   *
+   *   - it REJECTED `allosteric`, which `kinematicModels` implements
+   *     ("Allosteric (Hill)"), so a working model was unreachable over HTTP;
+   *   - it ACCEPTED `competitive-inhibition`, `non-competitive-inhibition`
+   *     and `product-inhibition`, which this pipeline cannot place on any
+   *     domain. Those requests were validated, queued, given a job id, and
+   *     the job then finished carrying `validated: false` and this very
+   *     error — while reporting `status: "complete"`.
+   *
+   * Three separate notions of "which models exist" (this pipeline's
+   * DOMAINS, the engine's `kinematicModels`, and the validator's list), all
+   * disagreeing. The validator now asks rather than remembers, which is one
+   * fewer copy to drift.
+   */
+  static namesAKnownDomain(query: string): boolean {
+    return ScientificPipeline.classifyDomainOf(query) !== undefined;
+  }
+
+  /**
+   * Every alias a caller may use, for error messages.
+   *
+   * Derived from the same DOMAINS table `classifyDomain` matches against,
+   * so the message can never list something the matcher would reject — the
+   * failure mode of the hardcoded list this replaced, which advertised
+   * three queries the pipeline could not run.
+   */
+  static knownDomainAliases(): string[] {
+    return Object.values(ScientificPipeline.DOMAINS).flatMap((s) => s.aliases);
+  }
+
   private classifyDomain(query: string): string | undefined {
+    return ScientificPipeline.classifyDomainOf(query);
+  }
+
+  private static classifyDomainOf(query: string): string | undefined {
     const text = query.toLowerCase();
 
     const candidates: Array<{ domain: string; alias: string }> = [];

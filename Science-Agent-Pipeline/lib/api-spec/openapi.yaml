@@ -164,6 +164,87 @@ components:
         query:
           type: string
           description: Natural-language simulation request (e.g. "simulate lactate dehydrogenase with pyruvate")
+        allowCrossSpecies:
+          type: boolean
+          default: false
+          description: >
+            Permit a measured parameter from a different but sufficiently
+            related organism when the requested organism has none. Off by
+            default (ADR 0024). Even when enabled, candidates must pass an
+            NCBI Taxonomy relatedness check -- enabling this permits a value
+            from a related organism, not from any organism. A value obtained
+            this way is still not a measurement of the organism you asked
+            about.
+        allowVariants:
+          type: boolean
+          default: false
+          description: >
+            Permit a measured parameter from a protein VARIANT -- a point
+            mutant, or a named isozyme -- rather than the enzyme as found.
+            Off by default (ADR 0029).
+
+            BRENDA's commentary says things like "Y124C mutant" and "isozyme
+            H4" in the same string that carries pH and temperature. Rows that
+            say so are removed before selection, because selection takes the
+            minimum and active-site substitutions are chosen precisely
+            BECAUSE they change the kinetics -- in the acetylcholinesterase
+            turnover table the lowest mutant kcat sits twelve times below the
+            lowest wild-type one.
+
+            Enabling this permits a value measured on a different protein.
+            The result describes that variant, not the enzyme you named.
+
+            Note the limit: a row whose commentary does not say either way is
+            USABLE and uncertified. BRENDA does not require curators to write
+            "wild-type", so an unlabelled mutant still passes regardless of
+            this flag.
+        physiologicalReference:
+          type: object
+          description: >
+            The pH and temperature the model is meant to represent, plus how
+            far a measurement may drift from them before it stops
+            representing the modelled system. Used to grade the
+            `conditionProximity` axis of a resolved parameter's reliability
+            (ADR 0024 Decision 3, ADR 0027).
+
+            Optional, and never defaulted. "Physiological" has no
+            organism-independent value: pH 7.4 and 37 C describe a mammal
+            and misdescribe Thermus thermophilus, whose enzymes are measured
+            near 70 C. Omit it and the axis reports `not_assessed` and says
+            why, which is true; supplying a guess would report a confident
+            `far` for a thermophile assay that was in fact ideal.
+
+            ALL FIVE FIELDS ARE REQUIRED IF THE OBJECT IS PRESENT. A partial
+            reference is refused rather than completed -- half a reference
+            plus an assumed 37 C is an assumed mammal.
+          properties:
+            ph:
+              type: number
+              description: pH the model represents.
+            temperatureC:
+              type: number
+              description: Temperature in degrees Celsius the model represents.
+            basis:
+              type: string
+              description: >
+                Where these conditions came from -- a citation, a species, or
+                the caller. Required so a reference can never be traced back
+                to "someone typed it".
+            phTolerance:
+              type: number
+              description: >
+                How far a measured pH may sit from the reference before the
+                value stops representing the modelled system. A property of
+                the enzyme, so it is stated rather than assumed.
+            temperatureToleranceC:
+              type: number
+              description: As phTolerance, in degrees Celsius.
+          required:
+            - ph
+            - temperatureC
+            - basis
+            - phTolerance
+            - temperatureToleranceC
       required:
         - query
     SimulationJobStatus:

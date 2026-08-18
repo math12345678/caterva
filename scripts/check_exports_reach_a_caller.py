@@ -66,7 +66,25 @@ CALLER_ROOT = REPO_ROOT / "src"
 
 BASELINE = REPO_ROOT / "docs" / "unwired-exports.txt"
 
-EXPORT_RE = re.compile(r"^export (?:async )?function (\w+)", re.MULTILINE)
+#: What counts as an exported capability.
+#:
+#: ADR 0090 shipped matching `export function` only, and said so in its
+#: Consequences: "widening it should come with a re-run of the baseline
+#: rather than an assumption that the counts still hold."
+#:
+#: Widened here, and the assumption was checked rather than carried: the
+#: three additional forms add 5 symbols to 46. Small -- but "small" was a
+#: guess until it was counted, and a stated limitation left alone for long
+#: enough stops being a limitation and becomes the scope.
+#:
+#: A class is a capability in the same sense a function is: `KineticSimulator`
+#: nobody constructs is as unreachable as `rankModelsByFit` nobody called.
+EXPORT_PATTERNS = [
+    re.compile(r"^export (?:async )?function (\w+)", re.MULTILINE),
+    re.compile(r"^export (?:abstract )?class (\w+)", re.MULTILINE),
+    # `export const x = (...) => ...` -- a function by another spelling.
+    re.compile(r"^export const (\w+)\s*[:=][^=\n]*=>", re.MULTILINE),
+]
 
 
 def is_test(path: Path) -> bool:
@@ -122,12 +140,16 @@ def selftest() -> int:
 
             (engine / "thing.ts").write_text(
                 "export function calledByProduct(): number { return 1; }\n"
-                "export function neverCalled(): number { return 2; }\n",
+                "export function neverCalled(): number { return 2; }\n"
+                # A class and an arrow const, so the widened matcher is
+                # exercised rather than assumed to work.
+                "export class UsedClass {}\n"
+                "export const usedArrow = (): number => 3;\n",
                 encoding="utf-8",
             )
             (root / "src" / "app.ts").write_text(
-                "import { calledByProduct } from './engine/thing';\n"
-                "calledByProduct();\n",
+                "import { calledByProduct, UsedClass, usedArrow } from './engine/thing';\n"
+                "calledByProduct(); new UsedClass(); usedArrow();\n",
                 encoding="utf-8",
             )
 
@@ -180,8 +202,10 @@ def main() -> int:
 
     exports: dict[str, Path] = {}
     for path in sources:
-        for match in EXPORT_RE.finditer(path.read_text(encoding="utf-8", errors="replace")):
-            exports[match.group(1)] = path
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for pattern in EXPORT_PATTERNS:
+            for match in pattern.finditer(text):
+                exports[match.group(1)] = path
 
     if not exports:
         print("FAIL: found no exported functions; the matcher is probably wrong.",

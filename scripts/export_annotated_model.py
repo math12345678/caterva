@@ -84,6 +84,23 @@ BUILDERS = {
 }
 
 
+def _assay_number(raw) -> float | None:
+    """A reported condition as a number, or None.
+
+    None for anything that is not one -- including the string "unknown",
+    which is a real value in payloads assembled by hand. `float("unknown")`
+    raises, and a crashing export is a worse answer than an omitted pH; but
+    silently coercing something unparseable to 0.0 would be worse still,
+    because pH 0 is a legal number and would read as a measurement.
+    """
+    if raw is None or isinstance(raw, bool):
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _fail(message: str) -> int:
     print(json.dumps({"ok": False, "error": message}))
     return 1
@@ -147,6 +164,7 @@ def build(payload: dict) -> tuple[int, str]:
             (str(axis), str(grade))
             for axis, grade in (entry.get("reliability") or {}).items()
         )
+        assay = entry.get("assayConditions") or {}
         provenance[SYMBOLS.get(name, name)] = ParameterProvenance(
             origin=str(entry.get("origin", "unknown")),
             citation=entry.get("citation"),
@@ -156,6 +174,14 @@ def build(payload: dict) -> tuple[int, str]:
             cross_species=bool(entry.get("crossSpecies")),
             reliability=reliability,
             note=entry.get("note"),
+            # Read from the SAME payload key as the SBML path below, so the
+            # two exports cannot disagree about what a reader is told. A
+            # fact present in one artifact and missing from the other makes
+            # the omission look like a property of the measurement.
+            assay_ph=_assay_number(assay.get("ph")),
+            assay_temperature_c=_assay_number(assay.get("temperatureC")),
+            assay_buffer=assay.get("buffer"),
+            assay_unreported=tuple(assay.get("unreported") or ()),
         )
 
     result = annotate_antimony(
@@ -210,6 +236,7 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
             (str(axis), str(grade), str(reasons.get(axis, "")))
             for axis, grade in (entry.get("reliability") or {}).items()
         )
+        assay = entry.get("assayConditions") or {}
         provenance[SYMBOLS.get(name, name)] = SbmlParameterProvenance(
             origin=str(entry.get("origin", "unknown")),
             citation=entry.get("citation"),
@@ -224,6 +251,10 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
             cross_species=bool(entry.get("crossSpecies")),
             reliability=reliability,
             note=entry.get("note"),
+            assay_ph=_assay_number(assay.get("ph")),
+            assay_temperature_c=_assay_number(assay.get("temperatureC")),
+            assay_buffer=assay.get("buffer"),
+            assay_unreported=tuple(assay.get("unreported") or ()),
         )
 
     outcome = annotate_sbml(
@@ -236,6 +267,14 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
         "annotated": outcome.annotated,
         "unannotated": outcome.unannotated,
         "cvterms": outcome.cvterms_written,
+        # Both numbers, because they answer different questions: what the
+        # writer intended, and what an independent parser finds in the bytes
+        # this export actually hands over. `annotate_sbml` refuses to return
+        # when the second is smaller, so reporting only the first would not
+        # mislead -- but it would leave the reader trusting the producer's
+        # word for the producer's own output, which is the arrangement the
+        # audit exists to replace.
+        "triplesReadBack": outcome.triples_read_back,
         "refusedUris": [
             {"parameter": n, "accession": a, "reason": w}
             for n, a, w in outcome.refused_uris

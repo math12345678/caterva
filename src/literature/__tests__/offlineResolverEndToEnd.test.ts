@@ -162,3 +162,123 @@ describe('the failure the boundary actually has', () => {
     }
   });
 });
+
+/**
+ * The candidate papers cross the subprocess boundary.
+ *
+ * WHY THIS IS HERE AND NOT IN THE CLI TEST
+ * ----------------------------------------
+ * `src/cli/__tests__/candidatePapersShown.test.ts` asserts that the command
+ * RENDERS papers it is handed. It mocks `resolveKinetic`, so the parsing
+ * this fix actually changed never runs — and the mutation harness said so
+ * immediately: reverting `literatureResolver.ts` to ignore
+ * `literatureCandidates` left all 21 of those tests passing.
+ *
+ * That is ADR 0027's finding verbatim — **a test that pins a component
+ * tells you nothing about the wiring** — and it is the second half of the
+ * pipe being tested while the bug lived in the first.
+ *
+ * So this drives the real subprocess through the stub, which is the seam
+ * this file exists for.
+ */
+describe('candidate papers survive the subprocess boundary', () => {
+  it('reaches the caller as structured papers, not just a log line', async () => {
+    const result = await resolveKinetic({ ...QUERY, quantity: 'ki' });
+    expect(result.found).toBe(false);
+    if (result.found) throw new Error('fixture should not resolve');
+
+    expect(result.candidates.map((p) => p.title)).toEqual([
+      'Kinetics of human muscle lactate dehydrogenase',
+      'Substrate affinity of LDH isoenzymes',
+    ]);
+    expect(result.candidates[0]?.pmid).toBe('1234567');
+    expect(result.candidates[1]?.doi).toBe('10.1000/example');
+  });
+
+  /**
+   * The fixture carries four entries; two are unusable. A title-less row
+   * cannot be shown and a locator-less row cannot be checked, so both are
+   * dropped — and the count the student is given comes from the filtered
+   * list, so it can never promise more papers than it names.
+   */
+  it('drops the entries that cannot be shown or cannot be checked', async () => {
+    const result = await resolveKinetic({ ...QUERY, quantity: 'ki' });
+    if (result.found) throw new Error('fixture should not resolve');
+
+    expect(result.candidates).toHaveLength(2);
+    expect(result.candidates.map((p) => p.title)).not.toContain('');
+    expect(result.candidates.map((p) => p.title)).not.toContain(
+      'A paper nobody can look up',
+    );
+  });
+
+  /**
+   * The genuinely-empty case must stay empty. If filtering or parsing ever
+   * invents a candidate, the CLI would print "the search did find papers"
+   * over a search that found none — the original defect, mirrored.
+   */
+  it('stays empty when the search really found nothing', async () => {
+    const result = await resolveKinetic({ ...QUERY, quantity: 'kcat' });
+    if (result.found) throw new Error('fixture should not resolve');
+    expect(result.candidates).toEqual([]);
+  });
+});
+
+/**
+ * The tie the evidence could not break crosses the subprocess boundary.
+ *
+ * `check_both_front_ends_read_it.py` (ADR 0110/0112) counted 24 keys the
+ * runner emits that only one front end reads. `selectionTie` was the
+ * highest-value one: the API path has rendered it since ADR 0051, and the
+ * CLI never mentioned it, so a CLI user was handed 21.1 — the lowest of six
+ * equally well-evidenced rows spanning to 6467 — with nothing saying the
+ * evidence found 6467 equally credible.
+ *
+ * Asserted at the BOUNDARY and not through a mock, because that is where
+ * the last two defects in this path lived and where a mocked test would
+ * have proved nothing (ADR 0109).
+ */
+describe('the selection tie survives the subprocess boundary', () => {
+  it('arrives as structured candidates with their references', async () => {
+    const result = await resolveKinetic({ ...QUERY, quantity: 'kcat_tied' as never });
+    expect(result.found).toBe(true);
+    if (!result.found) throw new Error('fixture should resolve');
+
+    const tie = result.selectionTie;
+    expect(tie).not.toBeNull();
+    expect(tie!.candidates.map((c) => c.value)).toEqual([21.1, 6467]);
+    expect(tie!.candidates[1]?.reference_id).toBe('761568');
+    expect(tie!.candidates[0]?.selected).toBe(true);
+  });
+
+  it('carries the spread as numbers, not only inside the sentence', async () => {
+    const result = await resolveKinetic({ ...QUERY, quantity: 'kcat_tied' as never });
+    if (!result.found) throw new Error('fixture should resolve');
+    expect(result.selectionTie!.low).toBe(21.1);
+    expect(result.selectionTie!.high).toBe(6467);
+    expect(result.selectionTie!.fold_range).toBeCloseTo(306.5);
+  });
+
+  /**
+   * A candidate with no value cannot be compared or shown, and a tie whose
+   * alternatives are blank is worse than no tie line at all. The fixture
+   * carries three rows; one has no value.
+   */
+  it('drops a candidate that carries no value', async () => {
+    const result = await resolveKinetic({ ...QUERY, quantity: 'kcat_tied' as never });
+    if (!result.found) throw new Error('fixture should resolve');
+    expect(result.selectionTie!.candidates).toHaveLength(2);
+  });
+
+  /**
+   * Fewer than two candidates is NOT a tie. `SelectionTie()` with an empty
+   * list is also what an unpopulated field looks like, which is why
+   * `selection_tie.py` makes `is_tied` a positive test — a check on mere
+   * presence would inherit the ambiguity it exists to remove.
+   */
+  it('reports no tie when the resolver reported none', async () => {
+    const result = await resolveKinetic({ ...QUERY, quantity: 'km' });
+    if (!result.found) throw new Error('fixture should resolve');
+    expect(result.selectionTie ?? null).toBeNull();
+  });
+});

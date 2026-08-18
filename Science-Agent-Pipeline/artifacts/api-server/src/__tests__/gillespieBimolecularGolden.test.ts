@@ -48,15 +48,44 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
   //
   // The assertion is on the ceiling's name and the offending total, because
   // those are what a user needs to act: which limit, and by how much.
-  it("rejects an over-budget initial population before simulating, and says why", async () => {
-    await expect(
-      runTerium("gillespie_ssa_bimolecular", { a0: 600_000, b0: 500_000 }),
-    ).rejects.toThrow(/MAX_API_SSA_POPULATION/);
+  // ONE spawn, two assertions about the SAME error.
+  //
+  // This used to call runTerium twice, once per regex. That doubled the
+  // cost of the most expensive test in the file -- each call spawns a
+  // Python interpreter -- and under shard contention the pair exceeded
+  // vitest's default 5s timeout and failed. Passing alone and failing in
+  // parallel is the worst failure mode a suite can have: it teaches people
+  // to re-run rather than investigate.
+  //
+  // It was also weaker as a test. Two spawns assert that two SEPARATE
+  // errors each match one pattern, which quietly assumes the two runs
+  // produced the same error. Capturing one error and asserting both
+  // properties of it is what the test meant to say.
+  //
+  // The explicit timeout is generous rather than tuned: a slow machine
+  // should report "too slow" rather than something that reads like a
+  // behaviour change.
+  it(
+    "rejects an over-budget initial population before simulating, and says why",
+    async () => {
+      const error = await runTerium("gillespie_ssa_bimolecular", {
+        a0: 600_000,
+        b0: 500_000,
+      }).then(
+        () => {
+          throw new Error(
+            "expected the runner to reject an over-budget population, but it resolved",
+          );
+        },
+        (err: unknown) => err as Error,
+      );
 
-    await expect(
-      runTerium("gillespie_ssa_bimolecular", { a0: 600_000, b0: 500_000 }),
-    ).rejects.toThrow(/1100000/);
-  });
+      // Which limit, and by how much -- the two things a user needs to act.
+      expect(error.message).toMatch(/MAX_API_SSA_POPULATION/);
+      expect(error.message).toMatch(/1100000/);
+    },
+    30_000,
+  );
 });
 
 describe("Bimolecular SSA resolution (Target I-style narrowness)", () => {

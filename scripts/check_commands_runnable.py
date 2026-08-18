@@ -114,6 +114,21 @@ ILLUSTRATIVE = {
         "fixture in test_ci_reproducible_locally.py; the test asserts it is "
         "unreachable, so creating it would break the test it belongs to"
     ),
+    # Same shape, different guard. `check_mutation_tables_reproducible.py`
+    # writes a fixture whose `reproduced_by` names this path and asserts the
+    # guard REJECTS it (exit 1) -- proof that its unwired-command branch can
+    # fail. Creating the file would disarm that proof.
+    #
+    # Listed rather than inferred: this guard cannot tell a fixture inside a
+    # `--selftest` block from an instruction, and a rule like "ignore names
+    # containing 'nothing'" would be this guard inventing a convention
+    # nobody agreed to. An explicit entry with the reason is the honest
+    # mechanism, which is why the mechanism exists.
+    "scripts/nothing_runs_this.py": (
+        "fixture in check_mutation_tables_reproducible.py's selftest; the "
+        "selftest asserts it is REJECTED, so creating it would break the "
+        "check it belongs to"
+    ),
 }
 
 _SEARCH_SUFFIXES = {".py", ".md", ".yml", ".yaml", ".sh", ".ts", ".json"}

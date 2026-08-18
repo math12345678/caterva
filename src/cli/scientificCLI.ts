@@ -3,7 +3,12 @@ import { commandResolve } from './commandResolve';
 import { commandSimulateResolved } from './commandSimulateResolved';
 import { JobManager, historyPath } from '../execution/job-manager';
 import { commandSweep } from './commandSweep';
+import { spawnSync } from 'child_process';
+
+import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
 import { parseArgs, parseQuantity } from './parseQuantity';
+import { parsePhysiological } from './physiologicalReference';
+import { collectRepeated, parseUserCitations } from './userCitations';
 import { convertConcentration } from '../units';
 
 /**
@@ -31,7 +36,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 import ScientificPipeline from '../integration/scientificPipeline';
 import { LiteratureService } from '../literature/literatureService';
-import { resolveDOIFromCrossRef, searchPubMedForEnzymeKinetics } from '../integrations/crossref-pubmed-real';
+import {
+  PubMedUnavailableError,
+  resolveDOIFromCrossRef,
+  searchPubMedForEnzymeKinetics,
+} from '../integrations/crossref-pubmed-real';
 import type { Literature } from '../literature/literatureService';
 
 // ============================================================================
@@ -83,7 +92,28 @@ function header(msg: string) {
  *
  * Timeout: 10 seconds max (to avoid hanging)
  */
-async function fetchRealLiterature(enzyme: string, substrate: string): Promise<Literature[]> {
+/**
+ * Three outcomes, not two — the same discipline `resolve` exits on.
+ *
+ * This returned `Literature[]` and gave `[]` both when PubMed genuinely had
+ * nothing and when the search could not be performed at all. The caller could
+ * not tell them apart, so it exited 0 for both: a network failure was
+ * reported as a successful search that found no papers.
+ *
+ * "We looked and there is nothing" and "we could not look" are different
+ * facts, and collapsing them teaches a reader to take an absence of evidence
+ * for evidence of absence. Every other lookup in this tool keeps them apart
+ * and exits 0 / 2 / 1 accordingly; this one is now no exception.
+ */
+type LiteratureSearch =
+  | { outcome: 'found'; papers: Literature[] }
+  | { outcome: 'empty' }
+  | { outcome: 'unavailable'; reason: string };
+
+async function fetchRealLiterature(
+  enzyme: string,
+  substrate: string,
+): Promise<LiteratureSearch> {
   const literature: Literature[] = [];
   let counter = 0;
 
@@ -136,30 +166,68 @@ async function fetchRealLiterature(enzyme: string, substrate: string): Promise<L
     }
 
     if (literature.length === 0) {
-      warning('No real papers found. Using default parameters.');
-      // Return default with no literature backing (will fail strict validation)
-      return [];
+      // Said "Using default parameters." until ADR 0055 deleted
+      // FALLBACK_PARAMETERS. The defaults were removed; the sentence
+      // announcing them was not, so the message went on describing a
+      // substitution that no longer happened.
+      //
+      // That direction of staleness is the dangerous one. A message
+      // promising defaults that are not applied teaches a reader to distrust
+      // a refusal that is actually working correctly -- and if they believe
+      // it, they will go looking for which numbers were slipped in.
+      return { outcome: 'empty' };
     }
 
-    return literature;
+    return { outcome: 'found', papers: literature };
   } catch (err) {
-    warning(`PubMed search failed or timed out: ${err instanceof Error ? err.message : String(err)}`);
-    warning('Continuing with user-provided parameters (unverified)');
-    return [];
+    // Classified by TYPE, not by reading the message.
+    //
+    // `PubMedUnavailableError` means no query strategy reached the registry,
+    // so nothing was learned. Any other throw is a genuine fault in this
+    // code path and is also not evidence of absence — but it is a different
+    // fault, and saying "the registry was unreachable" about a bug here
+    // would send someone to check their network for a problem in ours.
+    //
+    // "Continuing with user-provided parameters (unverified)" stood here,
+    // written for the fallback ADR 0055 deleted; this function returns
+    // papers, holds no parameters, and cannot continue with anything.
+    if (err instanceof PubMedUnavailableError) {
+      return { outcome: 'unavailable', reason: err.message };
+    }
+    return {
+      outcome: 'unavailable',
+      reason: `the search failed unexpectedly: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    };
   }
 }
 
-/**
- * Fallback to reasonable defaults when network is unavailable
- * These values are UNVERIFIED - marked as such in validation
- */
-const FALLBACK_PARAMETERS = {
-  km: 5.2,
-  vmax: 12.8,
-  s0: 10.0,
-  temperature: 37,
-  pH: 7.4
-};
+// ADR 0055 deleted FALLBACK_PARAMETERS from here:
+//
+//     /** Fallback to reasonable defaults when network is unavailable
+//      *  These values are UNVERIFIED - marked as such in validation */
+//     const FALLBACK_PARAMETERS = {
+//       km: 5.2, vmax: 12.8, s0: 10.0, temperature: 37, pH: 7.4
+//     };
+//
+// `km: 5.2` and `vmax: 12.8` are the same two numbers ADR 0044 removed from
+// the dashboard's simulation form, and ADR 0024 names 5.2 specifically as the
+// default this project must not have. They were still here, in the CLI,
+// months later.
+//
+// Nothing referenced the constant. It was dead, which is why nobody noticed --
+// and why no test could have found it. `check_no_unsourced_ui_numbers.py`
+// scans HTML pages only, so a forbidden default in TypeScript was outside
+// every guard the project had. `check_no_hardcoded_assay_conditions.py` found
+// it on its first run, via the `temperature: 37` two lines below the Km.
+//
+// "Marked as UNVERIFIED in validation" is not a defence. A number that was
+// never measured does not become admissible by being labelled; it becomes a
+// number a reader has to remember to distrust.
+//
+// There is no replacement. A network failure means the parameters could not
+// be resolved, and the honest response is to say so and stop.
 
 // ============================================================================
 // COMMANDS
@@ -170,9 +238,26 @@ async function commandValidate(query: string, params?: Record<string, string>) {
 
   const pipeline = new ScientificPipeline();
 
-  // Fetch real literature from real APIs
-  const literature = await fetchRealLiterature('lactate dehydrogenase', 'lactate');
-  pipeline.initializeLiterature(literature);
+  // NO LITERATURE IS FETCHED HERE, and that is a correction rather than a
+  // limitation. This line used to be:
+  //
+  //     fetchRealLiterature('lactate dehydrogenase', 'lactate')
+  //
+  // so `validate "acetylcholinesterase km=5.2"` fetched papers about lactate
+  // dehydrogenase and reported them as `Literature sources: N` beside the
+  // user's own query. A provenance count attributing another system's papers
+  // to your question is worse than no count at all.
+  //
+  // Fetching the *right* papers instead was considered and rejected: every
+  // entry `fetchRealLiterature` builds carries `extractedParameters: []`, and
+  // every consumer in literatureService reads exactly that field, so the
+  // fetch has never contributed a single value to a verdict. Wiring it to
+  // the user's enzyme would produce a truthful-looking source count backing
+  // nothing — the same illusion, harder to spot.
+  //
+  // So the honest state is reported: zero sources, and a pointer to the
+  // command that does resolve literature.
+  pipeline.initializeLiterature([]);
 
   const parameters: Record<string, number> = {};
   if (params) {
@@ -192,11 +277,7 @@ async function commandValidate(query: string, params?: Record<string, string>) {
   try {
     const response = await pipeline.execute({
       query,
-      parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
-      conditions: {
-        temperature: 37,
-        pH: 7.4
-      }
+      parameters: Object.keys(parameters).length > 0 ? parameters : undefined
     });
 
     console.log('');
@@ -231,9 +312,14 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
 
   const pipeline = new ScientificPipeline();
 
-  // Fetch real literature from real APIs
-  const literature = await fetchRealLiterature('lactate dehydrogenase', 'lactate');
-  pipeline.initializeLiterature(literature);
+  // Same correction as commandValidate: this fetched lactate dehydrogenase
+  // papers for every query, and they carried no extracted parameters, so
+  // they backed nothing while being counted as `Literature sources`.
+  //
+  // `simulate --resolve` is the literature-backed path — it goes through the
+  // BRENDA/PubMed resolver, which returns values with units, organisms and
+  // citations. This one runs the numbers you supply.
+  pipeline.initializeLiterature([]);
 
   const parameters: Record<string, number> = {};
   if (params) {
@@ -255,11 +341,7 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
   try {
     const response = await pipeline.execute({
       query,
-      parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
-      conditions: {
-        temperature: 37,
-        pH: 7.4
-      }
+      parameters: Object.keys(parameters).length > 0 ? parameters : undefined
     });
 
     console.log('');
@@ -367,19 +449,72 @@ async function commandVerifyReproducibility(jobId: string) {
     const result = await pipeline.verifyReproducibility(jobId);
 
     console.log('');
-    if (result.reproduced) {
-      success('FULLY REPRODUCIBLE');
+
+    // THREE OUTCOMES, AND THE MIDDLE ONE USED TO SWALLOW THE THIRD.
+    //
+    // This was:
+    //
+    //     if (result.reproduced) success('FULLY REPRODUCIBLE');
+    //     else warning('NUMERICALLY EQUIVALENT (within floating-point precision)');
+    //     ...
+    //     process.exit(0);
+    //
+    // `reproduced` is `verification.passed`, which already accounts for the
+    // solver's declared tolerance. So the `else` branch was the FAILURE
+    // branch, and it announced the failure as "numerically equivalent within
+    // floating-point precision" and exited 0.
+    //
+    // Measured, by perturbing one recorded trajectory point: a replay
+    // disagreeing by 33% printed "NUMERICALLY EQUIVALENT (within
+    // floating-point precision)" and returned success. The engine had it
+    // right the whole time — its own summary said "✗ NOT REPRODUCIBLE (max
+    // relative error: 3.33e-1 exceeds the solver's declared tolerance)" —
+    // and that line was printed two rows below the reassurance contradicting
+    // it. A script checking the exit code saw a pass.
+    //
+    // Exit codes follow `resolve`: 0 verified, 2 a real negative answer,
+    // 1 the check could not be performed.
+    if (result.outputsIdentical) {
+      success('FULLY REPRODUCIBLE — outputs are bit-for-bit identical');
+    } else if (result.reproduced) {
+      // A genuine middle state, and now it means what it says: the replay
+      // differed, and the difference is inside the tolerance the solver
+      // itself declares. That is a real and common outcome for floating
+      // point, which is why the phrase existed — it was simply attached to
+      // the wrong branch.
+      success('REPRODUCIBLE — within the solver\'s declared tolerance');
+      console.log(
+        `${colors.dim}  Not bit-identical. Floating-point summation order is not${colors.reset}\n` +
+          `${colors.dim}  guaranteed across runs; the disagreement is below the tolerance${colors.reset}\n` +
+          `${colors.dim}  the solver declares for this problem.${colors.reset}`,
+      );
     } else {
-      warning('NUMERICALLY EQUIVALENT (within floating-point precision)');
+      error('NOT REPRODUCIBLE');
+      console.log(
+        `${colors.dim}  The replay used the recorded inputs and did not reproduce the${colors.reset}\n` +
+          `${colors.dim}  recorded output, by more than the solver's declared tolerance.${colors.reset}`,
+      );
     }
 
     console.log(`\nMax relative error: ${result.maxError.toExponential(2)}`);
     console.log(`Summary: ${result.summary}`);
 
-    process.exit(0);
+    if (result.differences) {
+      // Computed by the verifier and dropped at the pipeline boundary until
+      // now, so a failing verification had nothing to say about why.
+      console.log(`\n${colors.dim}Possible causes:${colors.reset}`);
+      for (const cause of result.differences.possibleCauses) {
+        console.log(`  • ${cause}`);
+      }
+      console.log(`\n${result.differences.conclusion}`);
+    }
+
+    process.exit(result.reproduced ? 0 : 2);
   } catch (err) {
+    // Exit 1: the verification could not be performed. Distinct from exit 2,
+    // which means it ran and the answer was no.
     const errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
-    error(`Verification failed: ${errorMsg}`);
+    error(`Verification could not be performed: ${errorMsg}`);
     process.exit(1);
   }
 }
@@ -415,23 +550,82 @@ async function commandCheckIntegrity(jobId: string) {
   }
 }
 
-async function commandLiterature() {
-  header('REAL LITERATURE DATABASE');
+/**
+ * `literature <enzyme> --substrate S` — papers for a named system.
+ *
+ * THE ENZYME IS AN ARGUMENT NOW. IT USED TO BE A CONSTANT.
+ * -------------------------------------------------------
+ * This function took no parameters and called
+ * `fetchRealLiterature('lactate dehydrogenase', 'lactate')`. Whatever the
+ * user typed was discarded: `literature "acetylcholinesterase"` printed
+ * papers about lactate dehydrogenase, under a heading naming no system, with
+ * nothing on screen to say the results were for a different enzyme.
+ *
+ * That is the same hardcoded call the `simulate --resolve` header describes
+ * as the old broken behaviour. It was fixed there and survived here, in the
+ * one command whose entire output is a list of papers.
+ *
+ * The system is not inferred from free text, for the reason `resolve` gives:
+ * attaching real papers to a system the user did not name is provenance for
+ * the wrong measurement. Both parts must be stated, or the command refuses.
+ */
+async function commandLiterature(enzyme?: string, substrate?: string) {
+  if (!enzyme || !substrate) {
+    error('literature needs an enzyme and --substrate.');
+    console.log(
+      `\n${colors.dim}  Example: literature "lactate dehydrogenase" --substrate pyruvate${colors.reset}\n` +
+        `${colors.dim}  The system is never inferred from free text: showing papers for a${colors.reset}\n` +
+        `${colors.dim}  system you did not name is provenance for the wrong measurement.${colors.reset}\n`,
+    );
+    process.exit(1);
+  }
+
+  header(`PUBMED / CROSSREF — ${enzyme} / ${substrate}`);
 
   console.log(`${colors.dim}Fetching literature from PubMed and CrossRef...${colors.reset}\n`);
 
   try {
-    const literature = await fetchRealLiterature('lactate dehydrogenase', 'lactate');
+    const search = await fetchRealLiterature(enzyme, substrate);
 
-    if (literature.length === 0) {
-      warning('No literature found. Network may be unavailable.');
-      console.log('\nNote: Literature is fetched from real scientific databases:');
-      console.log('  • PubMed: 50+ million peer-reviewed papers');
-      console.log('  • CrossRef: 150+ million articles with validated DOIs');
-      console.log('  • BRENDA: 50,000+ enzymes with kinetic parameters (requires registration)');
-      process.exit(0);
+    // "PubMed: 50+ million peer-reviewed papers" stood in this block, ten
+    // lines below the code that deliberately sets `peerReviewed: false`
+    // because PubMed indexes preprints, editorials, letters and retracted
+    // articles. The blurb asserted exactly what the field refuses to. The
+    // round counts are gone with it: unsourced numbers in a tool whose rule
+    // is that numbers carry citations, and ones that go stale silently.
+    const sources = () => {
+      console.log('\nNote: literature is fetched live from:');
+      console.log('  • PubMed — indexed biomedical literature. Indexing is not');
+      console.log('    peer review: preprints, editorials, letters and retracted');
+      console.log('    articles are all indexed, so review status is not asserted.');
+      console.log('  • CrossRef — DOI resolution, used to confirm each paper exists.');
+      console.log('  • BRENDA — enzyme kinetics, used by `resolve` (requires registration).');
+    };
+
+    // Exit 2: the search ran and this system has no indexed papers.
+    if (search.outcome === 'empty') {
+      warning(`PubMed returned no papers for ${enzyme} / ${substrate}.`);
+      console.log(
+        `\n${colors.dim}  The search completed — this is an answer, not a failure.${colors.reset}`,
+      );
+      sources();
+      process.exit(2);
     }
 
+    // Exit 1: the search could not be performed, so nothing was learned.
+    // Reporting this as "no papers" would be an absence of evidence dressed
+    // as evidence of absence, which is the one thing this tool must not do.
+    if (search.outcome === 'unavailable') {
+      error(`The literature search could not be performed: ${search.reason}`);
+      console.log(
+        `\n${colors.dim}  This is NOT "no papers exist". Nothing was learned about${colors.reset}\n` +
+          `${colors.dim}  ${enzyme} / ${substrate} — the lookup itself did not run.${colors.reset}`,
+      );
+      sources();
+      process.exit(1);
+    }
+
+    const literature = search.papers;
     const literatureService = new LiteratureService();
     for (const lit of literature) {
       literatureService.addLiterature(lit);
@@ -450,9 +644,50 @@ async function commandLiterature() {
     const stats = literatureService.getStats();
     console.log(`${colors.dim}Statistics:${colors.reset}`);
     console.log(`  Total entries: ${stats.totalEntries}`);
-    console.log(`  Peer-reviewed: ${stats.peerReviewedCount}/${stats.totalEntries}`);
-    console.log(`  Avg impact factor: ${stats.averageImpactFactor.toFixed(2)}`);
-    console.log(`  Avg citations: ${Math.round(stats.averageCitations)}`);
+
+    // Impact factor and citation count are NOT printed, because nothing
+    // populates them.
+    //
+    // `fetchRealLiterature` never sets `impactFactor` or `citationCount` --
+    // PubMed's esummary does not carry either, and no second source is
+    // consulted. `getStats()` averages over the entries that have them,
+    // finds none, and returns its `: 0` fallback. So this block printed
+    //
+    //     Avg impact factor: 0.00
+    //     Avg citations: 0
+    //
+    // on every run since the command existed. Both read as findings about
+    // the papers -- that these are uncited articles in journals with no
+    // measurable impact -- when the true statement is that Terrium does not
+    // know. It is the same zero-for-null inversion already corrected in the
+    // perf collector, the response cache and the sweep analyser, reached
+    // here through a helper's default rather than through a literal.
+    //
+    // Not printed at all rather than printed as "unknown": a statistics
+    // block is read as a summary of what was measured, and a permanent
+    // "unknown" line is a field asking to be filled by someone who assumes
+    // the plumbing works.
+    console.log(
+      `  ${colors.dim}Impact factor and citation counts are not shown: PubMed's` +
+        ` summary${colors.reset}`,
+    );
+    console.log(
+      `  ${colors.dim}endpoint does not report them and Terrium does not` +
+        ` estimate them.${colors.reset}`,
+    );
+
+    // Review status is likewise NOT summarised. `peerReviewed` is set to
+    // `false` on every entry -- deliberately, because PubMed membership does
+    // not establish peer review (see fetchRealLiterature). Printing
+    // "Peer-reviewed: 0/5" would report that as a finding about the papers
+    // rather than as Terrium declining to assert it.
+    console.log(
+      `  ${colors.dim}Review status is left unasserted; PubMed indexes preprints,` +
+        `${colors.reset}`,
+    );
+    console.log(
+      `  ${colors.dim}editorials, letters and retracted articles.${colors.reset}`,
+    );
 
     process.exit(0);
   } catch (err) {
@@ -472,8 +707,17 @@ ${colors.bright}Usage:${colors.reset}
 
 ${colors.bright}Commands:${colors.reset}
 
+  corpus <path-to-brenda-download.tsv> [--json]
+    How much of BRENDA actually reports the pH and temperature a value was
+    measured under, across a bulk download you fetched yourself.
+    Nothing is downloaded automatically -- BRENDA asked that tools be gentle
+    with their servers, and a statistics command that silently pulls a
+    multi-megabyte export is not gentle.
+    ${colors.dim}Example:${colors.reset} corpus ~/Downloads/brenda_km.tsv
+
   resolve <enzyme> --substrate S --organism O [options]
-    Look up a kinetic constant in the literature and show where it came from.
+    Look up a measured kinetic parameter in the literature and show where it
+    came from.
     Resolves through BRENDA (exact, then cross-species) and then PubMed.
     Never invents a value.
     ${colors.dim}Example:${colors.reset} resolve "lactate dehydrogenase" --substrate pyruvate --organism "Homo sapiens"
@@ -482,15 +726,61 @@ ${colors.bright}Commands:${colors.reset}
       --organism NAME      organism to search for (required)
       --ec NUMBER          EC number, if you know it (else resolved via UniProt)
       --quantity km|ki|kcat  which constant to resolve (default: km)
+      --cite NAME="SOURCE"  Attach a source to a value YOU supplied, e.g.
+                           --cite km="Smith 2019, PMID 12345". Repeatable.
+                           Terrium does not check that the source reports the
+                           value — it records that the claim is yours, which is
+                           still far better than the number arriving from
+                           nowhere.
+      --export-model PATH  Write the model with every parameter's origin
+                           inside it, so the provenance travels with the file
+                           rather than staying in this terminal.
+                           .omex -> a COMBINE archive (Bergmann et al. 2014):
+                           the annotated SBML, the simulation experiment as
+                           SED-ML, and the citations. The only export a third
+                           party can actually RE-RUN -- a model says what the
+                           system is, not which time course was integrated.
+                           .xml / .sbml -> SBML with MIRIAM RDF annotations,
+                           the form other tools read without being told to.
+                           Any other extension -> Antimony with the origin in
+                           a comment. Comments are not part of the SBML data
+                           model, so they are deleted by translation -- which
+                           is why the SBML path exists.
+      --export-citations PATH
+                           Write every source behind the run as .bib or .ris,
+                           importable into Zotero, Mendeley or EndNote. Author,
+                           year and journal are absent rather than invented.
+      --physiological "pH,tempC"
+                           The conditions your model represents, e.g. "7.4,37"
+                           for a human-like model or "7.0,70" for a thermophile.
+                           Grades how far each measurement was taken from them.
+                           No default: "physiological" means something different
+                           for every organism.
+      --physiological-basis TEXT
+                           Where those conditions come from. Required with
+                           --physiological — the yardstick needs provenance too.
+      --physiological-tolerance "pH,tempC"
+                           How far a measurement may drift and still count as
+                           near. Defaults to 0.5 and 5 °C.
+      --allow-cross-species
+                           Accept a value measured in a DIFFERENT organism when
+                           the one you asked for has none. Off by default.
+                           Candidates must still pass an NCBI Taxonomy
+                           relatedness check, so this permits a related
+                           organism's value -- not any organism's. Whatever it
+                           returns is still not a measurement of your organism.
       --enzyme-conc VALUE  [E]0, e.g. 0.001mM. Bridges a kcat to a usable
                            Vmax = kcat x [E]0. Never defaulted (ADR 0013).
       --json               machine-readable output
     ${colors.dim}Exit codes:${colors.reset} 0 found · 2 literature has nothing · 1 lookup could not run
     ${colors.dim}Those are different facts and the tool keeps them apart.${colors.reset}
 
-  validate [query]
-    Validate a query against literature
-    ${colors.dim}Example:${colors.reset} validate "lactate dehydrogenase km=5.2"
+  validate <model> [--km ... --vmax ... --s0 ...]
+    Check that a model's parameters are present, plausible and dimensionally
+    sound, without running it. The model must be named (${colors.dim}mm${colors.reset}, ${colors.dim}sir${colors.reset}); it is
+    never inferred from free text. Parameters are supplied as flags, not
+    written into the query string.
+    ${colors.dim}Example:${colors.reset} validate "michaelis menten" --km 5.2 --vmax 12.8 --s0 10
 
   simulate [query] [options]
     Run a full simulation with validation
@@ -520,8 +810,55 @@ ${colors.bright}Commands:${colors.reset}
                            you choose, so it cannot be looked up
       --enzyme-conc VALUE  [E]0, needed for Vmax = kcat x [E]0
       --km / --vmax        supply either yourself; user values win
+      --model NAME         michaelis-menten (default) or a competitive /
+                           uncompetitive / non-competitive inhibition model,
+                           which additionally resolves a Ki
+      --sensitivity FRAC   report each parameter's influence at ±FRAC instead
+                           of running a single trajectory, e.g. 0.1 for ±10%
+      --allow-cross-species
+                           as in \`resolve\`: permits a related organism's
+                           value, still never any organism's
+      --cite NAME="SOURCE" attach your own source to a value you supplied
+      --physiological "pH,tempC" (with --physiological-basis TEXT)
+                           the conditions your model represents. Without it
+                           the condition-proximity axis reports not_assessed,
+                           because "physiological" has no organism-independent
+                           value (ADR 0012/0013)
+      --export-model PATH  the model with its provenance inside it. The format
+                           follows the extension:
+                             .omex        a COMBINE archive — the model, the
+                                          experiment that produced this result
+                                          as SED-ML, and the sources, in one
+                                          file somebody else can RE-RUN
+                             .xml/.sbml   SBML with standard MIRIAM annotations
+                                          that COPASI and JWS Online read
+                             anything else Antimony, origin in a comment
+                           Antimony comments do NOT survive translation to
+                           SBML, so the three are not interchangeable.
+      --export-citations PATH
+                           every source behind the run as .bib or .ris
       --json               machine-readable output
     ${colors.dim}Exit codes:${colors.reset} 0 ran · 2 something unresolved · 1 lookup failed
+    ${colors.dim}These options were all accepted here before they were listed here.${colors.reset}
+    ${colors.dim}An undocumented flag is as unreachable as an unimplemented one.${colors.reset}
+
+  sweep <model> --parameter NAME --range MIN:MAX:STEP [--km ... --vmax ... --s0 ...]
+    Run the model across a range of one parameter and interpret the curve,
+    rather than printing a column of numbers for you to squint at.
+    Every other flag is read as a parameter with its unit, exactly as
+    ${colors.dim}simulate${colors.reset} reads them, and its origin is reported the same way.
+    ${colors.dim}Example:${colors.reset} sweep mm --parameter s0 --range 1:20:1 --km 0.5mM --vmax 0.1mM/s
+    ${colors.dim}Options:${colors.reset}
+      --parameter NAME     which parameter to vary (required)
+      --range MIN:MAX:STEP three numbers, positive step, max > min (required)
+      --json               machine-readable output
+
+  history
+    List past ${colors.dim}simulate --resolve${colors.reset} runs, most recent first, with how many of
+    each run's parameters carried a literature citation. The run id printed
+    at the end of a simulation is only useful if something can resolve it
+    later; this is that something.
+    ${colors.dim}Example:${colors.reset} history
 
   verify [jobId]
     Verify reproducibility of a past simulation
@@ -531,9 +868,13 @@ ${colors.bright}Commands:${colors.reset}
     Check data integrity of a stored simulation
     ${colors.dim}Example:${colors.reset} check-integrity job_001
 
-  literature
-    Show built-in literature database
-    ${colors.dim}Example:${colors.reset} literature
+  literature <enzyme> --substrate S
+    Search PubMed and CrossRef for papers on a named system, and list them
+    with their PMIDs and DOIs. This is a LIVE search, not a bundled
+    database -- it needs the network, and it reports nothing it did not
+    fetch. Impact factors, citation counts and review status are not shown,
+    because the endpoint does not report them.
+    ${colors.dim}Example:${colors.reset} literature "lactate dehydrogenase" --substrate pyruvate
 
   help
     Show this help message
@@ -552,8 +893,8 @@ ${colors.bright}Examples:${colors.reset}
   4. Verify reproducibility:
      npx ts-node src/cli/scientificCLI.ts verify job_001
 
-  5. View literature:
-     npx ts-node src/cli/scientificCLI.ts literature
+  5. Find papers on a system:
+     npx ts-node src/cli/scientificCLI.ts literature "lactate dehydrogenase" --substrate pyruvate
   `);
 }
 
@@ -589,7 +930,30 @@ async function main() {
         showHelp();
         process.exit(1);
       }
-      await commandValidate(query);
+
+      // THE PARAMETERS WERE PARSED BY NOBODY AND DISCARDED.
+      //
+      // This was `await commandValidate(query)`. `commandValidate` declares
+      // `params?: Record<string, string>` and builds its `parameters` object
+      // from it — but no caller ever passed one, so `params` was always
+      // `undefined`, `parameters` was always `{}`, and every required
+      // parameter was reported missing:
+      //
+      //     ✗ VALIDATION FAILED
+      //     1. Parameter 'km': Required parameter 'km' for domain 'mm' has no
+      //        user-supplied value and no literature match
+      //
+      // even when the user had typed `--km 5.2 --vmax 12.8 --s0 10`. So
+      // `validate` could not succeed for any input: the branch that reads the
+      // user's numbers was unreachable, which is why it never looked wrong.
+      //
+      // An optional argument that every call site omits is a dead parameter,
+      // and dead code is not merely unused — it is unexercised, which is
+      // where confidently wrong behaviour lives. `simulate` two cases below
+      // has always built and passed this; the two drifted apart silently
+      // because nothing compared them.
+      const { flags: validateFlags } = parseArgs(rest.slice(1));
+      await commandValidate(query, validateFlags);
       break;
     }
 
@@ -626,7 +990,10 @@ async function main() {
 
         const overrides: Record<string, string> = {};
         for (const [k, v] of Object.entries(flags)) {
-          if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc', 'sensitivity', 'model'].includes(k)) continue;
+          if (['substrate', 'organism', 'enzyme', 'ec', 'enzyme-conc', 'sensitivity', 'model',
+             'allow-cross-species', 'export-model', 'export-citations', 'cite',
+             'physiological', 'physiological-basis', 'physiological-tolerance',
+            ].includes(k)) continue;
           overrides[k] = v;
         }
 
@@ -650,6 +1017,33 @@ async function main() {
           process.exit(1);
         }
 
+        // `--cite` is REPEATABLE, so it is read from raw argv rather than
+        // from parseArgs' flat record -- where a second --cite would
+        // silently overwrite the first and two citations would vanish
+        // without a word.
+        // The proximity axis was unreachable from the command that
+        // actually runs simulations: `--physiological` was parsed only in
+        // the `resolve` branch below. Same parser, same errors, so the two
+        // commands cannot disagree about what a valid reference is.
+        const simPhysiological = parsePhysiological(
+          flags['physiological'],
+          flags['physiological-tolerance'],
+          flags['physiological-basis'],
+        );
+        if (simPhysiological.error) {
+          error(simPhysiological.error);
+          process.exit(1);
+        }
+
+        const citationResult = parseUserCitations(
+          collectRepeated(rest, 'cite'),
+          Object.keys(overrides),
+        );
+        if (citationResult.error) {
+          error(citationResult.error);
+          process.exit(1);
+        }
+
         const code = await commandSimulateResolved({
           model: modelRaw as 'mm' | 'competitive' | 'noncompetitive' | 'product',
           enzyme,
@@ -660,6 +1054,10 @@ async function main() {
           enzymeConc: flags['enzyme-conc'],
           json: booleans.has('json'),
           sensitivity,
+          exportModel: flags['export-model'],
+          exportCitations: flags['export-citations'],
+          userCitations: citationResult.citations,
+          physiologicalReference: simPhysiological.reference,
         });
         process.exit(code);
       }
@@ -752,6 +1150,32 @@ async function main() {
         enzymeConc = convertConcentration(parsed.value, parsed.unit, 'mM');
       }
 
+      // `--allow-cross-species` is a boolean, but parseArgs decides that by
+      // looking at the NEXT token: `--allow-cross-species lactate` parses as
+      // the flag taking the value "lactate", and the opt-in silently does
+      // not happen. For most flags that is a minor annoyance. For this one
+      // it is the difference between a student getting a refusal they can
+      // act on and getting one that ignores the action they already took --
+      // so it is an error, not a shrug.
+      if (flags['allow-cross-species'] !== undefined) {
+        error(
+          `--allow-cross-species takes no value (got '${flags['allow-cross-species']}'). ` +
+          'It was probably written before a positional argument. Move it to the ' +
+          'end, or after another flag, so it is not read as taking one.'
+        );
+        process.exit(1);
+      }
+
+      const physiological = parsePhysiological(
+        flags['physiological'],
+        flags['physiological-tolerance'],
+        flags['physiological-basis'],
+      );
+      if (physiological.error) {
+        error(physiological.error);
+        process.exit(1);
+      }
+
       const code = await commandResolve({
         enzyme,
         ec,
@@ -760,8 +1184,39 @@ async function main() {
         quantity: quantityRaw,
         enzymeConc,
         json: booleans.has('json'),
+        allowCrossSpecies: booleans.has('allow-cross-species'),
+        physiologicalReference: physiological.reference,
       });
       process.exit(code);
+    }
+
+    case 'corpus': {
+      // Spawns scripts/brenda_corpus_stats.py rather than reimplementing
+      // the parser in TypeScript. There is one definition of BRENDA's bulk
+      // format (Tests/brenda_bulk.py) and one place that can drift from it:
+      // none.
+      const target = rest.find((arg) => !arg.startsWith('--'));
+      if (!target) {
+        error(
+          'corpus needs a path to a BRENDA bulk download, e.g.\n' +
+          '  scientific corpus ~/Downloads/brenda_km.tsv\n\n' +
+          'Nothing is fetched for you. The download URLs are in ' +
+          'docs/EXPERT_FEEDBACK.md, section 1d.',
+        );
+        process.exit(1);
+      }
+
+      const args = [
+        path.join(REPO_ROOT, 'scripts', 'brenda_corpus_stats.py'),
+        target,
+      ];
+      if (rest.includes('--json')) args.push('--json');
+
+      const proc = spawnSync(resolvePythonExecutable(REPO_ROOT), args, {
+        cwd: REPO_ROOT,
+        stdio: 'inherit',
+      });
+      process.exit(proc.status ?? 1);
     }
 
     case 'sweep': {
@@ -771,9 +1226,38 @@ async function main() {
       const parameter = flags['parameter'];
       const range = flags['range'];
 
+      // THE MODEL IS REQUIRED, AND THE DEFAULT USED TO BE UNRUNNABLE.
+      //
+      // This was `query: rest[0] && !rest[0].startsWith('--') ? rest[0] : 'sweep'`
+      // — with no query, the literal string `'sweep'` was passed as the model
+      // name. `'sweep'` is not a domain, so EVERY point in the sweep failed:
+      //
+      //     ✗ Every point in the sweep failed. The first reason was:
+      //         Query 'sweep' does not name a domain this pipeline knows
+      //
+      // and the tool's own documented example — `sweep --parameter s0
+      // --range 1:20:1 --km 0.5mM --vmax 0.1mM/s`, printed in `help` and
+      // again in this command's own error message — omitted the query and so
+      // could only ever produce that failure. Anyone following it concluded
+      // the feature was broken, which was a fair reading.
+      //
+      // A default that is guaranteed to fail is worse than a required
+      // argument: it defers the refusal past the point of running N
+      // simulations, and it reports a usage mistake as a modelling failure.
+      const query = rest[0] && !rest[0].startsWith('--') ? rest[0] : undefined;
+      if (!query) {
+        error('sweep needs a model to sweep, as its first argument.');
+        info('Example: sweep mm --parameter s0 --range 1:20:1 --km 0.5mM --vmax 0.1mM/s');
+        console.log(
+          `${colors.dim}  The model is never inferred: sweeping the wrong system is not a${colors.reset}\n` +
+            `${colors.dim}  partial answer, it is a different answer.${colors.reset}`,
+        );
+        process.exit(1);
+      }
+
       if (!parameter || !range) {
         error('sweep needs --parameter NAME and --range MIN:MAX:STEP');
-        info('Example: sweep --parameter s0 --range 1:20:1 --km 0.5mM --vmax 0.1mM/s');
+        info('Example: sweep mm --parameter s0 --range 1:20:1 --km 0.5mM --vmax 0.1mM/s');
         process.exit(1);
       }
 
@@ -809,7 +1293,7 @@ async function main() {
       }
 
       const code = await commandSweep({
-        query: rest[0] && !rest[0].startsWith('--') ? rest[0] : 'sweep',
+        query,
         parameter,
         min,
         max,
@@ -851,7 +1335,9 @@ async function main() {
     }
 
     case 'literature': {
-      commandLiterature();
+      const query = rest[0];
+      const { flags } = parseArgs(rest.slice(1));
+      commandLiterature(query, flags['substrate']);
       break;
     }
 

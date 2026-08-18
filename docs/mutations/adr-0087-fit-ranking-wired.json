@@ -1,0 +1,35 @@
+{
+  "_why": [
+    "ADR 0087's mutation table, shipped with the record.",
+    "",
+    "`rankModelsByFit` -- the function answering 'which mechanism does my",
+    "bench data support' -- had no production caller. Written, tested, and",
+    "invoked by nothing.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0087-fit-ranking-wired.json",
+    "",
+    "F1 first pointed at the condition INLINE IN THE ROUTE, and the test file defined its own copy of that condition rather than importing it -- so the mutation changed nothing the test could see and reported NOT CAUGHT. The decision now lives in `fitRankingFor`, the route calls it, and the test imports it. ADR 0027's duplicate-source-of-truth defect, committed inside a test written to demonstrate delivery."
+  ],
+  "covers": [
+    "0087"
+  ],
+  "test": "npx jest src/web/__tests__/compareFitWiring.test.ts",
+  "mutations": [
+    {
+      "id": "F1",
+      "description": "a non-finite measurement is ranked against instead of refused",
+      "_note": "`Math.abs(x - NaN)` is NaN, and `.sort()` on NaN comparisons leaves the array in input order -- which looks like a ranking and is an artefact of argument order. The worst kind of wrong answer: correctly shaped.",
+      "file": "src/engine/model-comparison.ts",
+      "find": "  if (typeof experimental !== \"number\" || !Number.isFinite(experimental)) {",
+      "replace": "  if (typeof experimental !== \"number\") {"
+    },
+    {
+      "id": "F2",
+      "description": "a non-number measurement is coerced rather than refused",
+      "_note": "The experimental-condition rule of ADR 0012/0013 applied to an input: `experimentalFinalValue` is a number the experimenter measured. Terrium cannot resolve it from literature and must not invent one, so absence means no ranking -- never a default. Defaulting to 0 would rank every model by how close it came to zero, which is a real ranking of nothing.",
+      "file": "src/engine/model-comparison.ts",
+      "find": "  if (typeof experimental !== \"number\" || !Number.isFinite(experimental)) {\n    return undefined;\n  }\n  return rankModelsByFit(models, experimental);",
+      "replace": "  return rankModelsByFit(models, Number(experimental) || 0);"
+    }
+  ]
+}

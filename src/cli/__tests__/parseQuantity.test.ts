@@ -55,3 +55,25 @@ describe('argument parsing', () => {
     expect(booleans.has('json')).toBe(true);
   });
 });
+
+describe('--allow-cross-species is a boolean the parser can swallow', () => {
+  it('lands in booleans when it is the last token', () => {
+    const { booleans } = parseArgs(['--organism', 'Mus musculus', '--allow-cross-species']);
+    expect(booleans.has('allow-cross-species')).toBe(true);
+  });
+
+  it('lands in booleans when followed by another flag', () => {
+    const { booleans } = parseArgs(['--allow-cross-species', '--json']);
+    expect(booleans.has('allow-cross-species')).toBe(true);
+  });
+
+  it('is MISREAD as taking a value when followed by a positional', () => {
+    // Documents the trap rather than pretending it does not exist. The
+    // parser cannot distinguish this case without a flag registry, so
+    // scientificCLI.ts rejects it explicitly instead of silently dropping
+    // an opt-in the user believes they gave.
+    const { flags, booleans } = parseArgs(['--allow-cross-species', 'lactate']);
+    expect(booleans.has('allow-cross-species')).toBe(false);
+    expect(flags['allow-cross-species']).toBe('lactate');
+  });
+});

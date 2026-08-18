@@ -9,14 +9,14 @@
 /**
  * Current pipeline stage for a submitted job
  */
-export type SimulationJobStatus = typeof SimulationJobStatus[keyof typeof SimulationJobStatus];
-
+export type SimulationJobStatus =
+  (typeof SimulationJobStatus)[keyof typeof SimulationJobStatus];
 
 export const SimulationJobStatus = {
-  pending: 'pending',
-  resolving: 'resolving',
-  validating: 'validating',
-  running: 'running',
-  completed: 'completed',
-  failed: 'failed',
+  pending: "pending",
+  resolving: "resolving",
+  validating: "validating",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
 } as const;

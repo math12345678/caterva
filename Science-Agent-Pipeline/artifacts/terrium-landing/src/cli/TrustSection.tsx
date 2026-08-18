@@ -189,7 +189,7 @@ export default function TrustSection() {
               {
                 step: "03",
                 title: "ODE Integration",
-                desc: "Terium + roadrunner solve the system to 1e-10 tolerance. Conserved quantities checked at every timestep.",
+                desc: "Terium + libRoadRunner solve the system, and conserved quantities are checked against the analytic invariant. Tolerances are per-domain, tightest on the closed-form cases.",
                 icon: "\u26A1",
               },
               {

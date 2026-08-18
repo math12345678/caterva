@@ -10,7 +10,7 @@ git clone --recursive https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 1,291 tests (1,014 engine + 277 literature)
+make test      # 2,057 tests (1,181 engine + 876 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -58,13 +58,13 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 1,014 tests |
-| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 277 tests |
+| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 1,181 tests |
+| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 876 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
-| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 23 ADRs, API reference |
+| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 113 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
 | [`terrium-site`](https://github.com/Terrium-sim/terrium-site) · [`landing`](https://github.com/Terrium-sim/landing) · [`mule`](https://github.com/Terrium-sim/mule) | the three web front ends |
 | [`advanced-analysis`](https://github.com/Terrium-sim/advanced-analysis) · [`benchmark-results`](https://github.com/Terrium-sim/benchmark-results) | figures and measurements |
@@ -117,3 +117,34 @@ manifest, or if a document tells you to install it.
 
 See [LICENSE](LICENSE). Citation metadata in
 [CITATION.cff](CITATION.cff).
+
+---
+
+## Licence, and one thing worth knowing
+
+Apache-2.0. See [`LICENSE`](https://github.com/Terrium-sim/main/blob/main/LICENSE)
+and [`NOTICE`](https://github.com/Terrium-sim/main/blob/main/NOTICE) in the
+umbrella repository — NOTICE carries the BRENDA CC BY 4.0 attribution and the
+third-party software terms, and Apache-2.0 §4(d) makes it travel with any
+redistribution.
+
+**Terrium is not Tellurium.**
+[Tellurium](https://tellurium.analogmachine.org/) is an established
+systems-biology environment from the Sauro lab at the University of
+Washington. Terrium is unaffiliated with it and is not a fork of it. Terrium
+is a *consumer* of that ecosystem — it runs on libRoadRunner and generates
+Antimony, both from that group. The similar name is a mistake and is
+addressed in the umbrella README.
+
+## Contributing
+
+Start at [**START_HERE.md**](START_HERE.md) — one page to a working
+environment and a real first task.
+
+**This is where work happens.** `main` is the umbrella: the other seventeen
+repositories are regenerated from it by `scripts/split_repos.sh`, so a commit
+made directly into one of those is overwritten on the next split. Commit
+here.
+
+What your contribution arrives under:
+[`docs/INBOUND_LICENSE.md`](https://github.com/Terrium-sim/main/blob/main/docs/INBOUND_LICENSE.md).

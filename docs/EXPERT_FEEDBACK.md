@@ -9408,3 +9408,2234 @@ argument rather than rediscovering it.
 
 Waiting on people: Sauro's ADR 0024 Decision 2, Bakker's axis weighting,
 Jeske on BRENDA's missing organism column.
+
+---
+
+## Twenty-fifth pass — 2026-08-17
+
+Same method, pointed at the highest-stakes claim in the repository.
+
+### The claim
+
+The README says:
+
+> `make check` is not a version-string check. It builds a real
+> Michaelis-Menten model, translates it to SBML, integrates it, and
+> compares the result to the exact closed-form solution. **If it passes,
+> the numerics are trustworthy.**
+
+Everything a student is told to believe rests on that sentence. So: what
+does it actually verify?
+
+### What it does well
+
+Better than expected, and worth saying so. It solves the implicit
+Michaelis-Menten form
+
+    Km·ln(S₀/S) + (S₀ − S) = Vmax·t
+
+by bisection to 200 iterations, integrates the real model through
+libRoadRunner, and requires relative error below 1e-6. Observed: **3.23e-10**.
+The monotonicity of the bisection is correct — f is decreasing in S, and
+the branch moves the bound the right way. This is a genuine numerical
+check, not a smoke test.
+
+### What it verified that nobody runs
+
+It set the integrator to `1e-10` and `1e-12` — **as literals**.
+
+`Terium/core/data_structures.py` defines
+`DEFAULT_RELATIVE_TOLERANCE = 1e-10` and
+`DEFAULT_ABSOLUTE_TOLERANCE = 1e-12`. Identical. Correct. And a second
+statement of one fact.
+
+ADR 0005 shows these were tuned once already. Loosen them again and
+`check_env.py` would go on integrating at the old settings and printing
+"the numerics are trustworthy" — for a configuration the product no longer
+runs. **The README's central sentence would become false with nothing
+turning red.** This is ADR 0003's duplicate-source-of-truth lineage,
+attached to the one claim the whole project's credibility hangs on.
+
+The check now imports the engine's constants and reports which ones it
+used:
+
+```
+PASS  result matches the exact solution (relative error 3.23e-10)
+      at the engine's own tolerances (1e-10/1e-12)
+```
+
+A green line that does not say what it verified invites the reader to
+assume it verified more than it did.
+
+### The failure mode the fix could have introduced
+
+The obvious way to write the import is with a fallback to the old literals
+if it fails. That rebuilds exactly the defect the import removes — and
+worse, it fires precisely when the engine is broken, which is when the
+check matters most. **"Could not read the engine's tolerances" and "the
+numerics are fine" are different facts**, so the import failing is a hard
+failure with the reason named.
+
+Verified by breaking the engine for real rather than by reading the code:
+
+```
+FAIL  could not read the engine's integrator tolerances: simulated broken engine
+      fix: this check cannot verify the settings the product uses;
+           fix the import before trusting a green run
+1 check(s) failed. The environment is not ready.
+```
+
+### Mutation testing
+
+| mutation | result |
+|---|---|
+| reinstate the hardcoded literals | ✕ two tests |
+| fall back to literals when the import fails | ✕ caught |
+
+The second test matches an assignment of a float literal to either
+tolerance, so the regression is caught in the shape it would actually come
+back — not just the exact two numbers that were there before.
+
+### Verification
+
+- `Tests/`: 51 files in three groups — 388, then 412 + 1 skipped, then 10.
+- `Terium/tests`: all 47 files across four chunks, every chunk exit 0.
+- `tsc --noEmit` clean.
+- `scripts/check_env.py` exits 0 with the engine's tolerances reported.
+- Guards: `check_guard_wiring`, `check_ci_reproducible_locally`,
+  `check_dependencies_declared`, `check_citation_cff`,
+  `check_documented_counts` — all exit 0. README refreshed (1,179 engine +
+  810 literature).
+
+### Three passes, one method
+
+- **libSEDML** stores XPaths and never resolves them → targets could have
+  pointed at nothing.
+- **libSBML** writes RDF it will then decline to read, and
+  `checkConsistency()` says nothing → annotations could have come unmoored.
+- **`make check`** integrated at literals rather than at the engine's
+  settings → it could have certified a configuration nobody runs.
+
+None of the three was a wrong number. All three were checks reporting on
+less of the world than their names promise, which is this codebase's oldest
+theme — and the method that finds them is one question: *what does this
+thing actually verify, as opposed to what does it appear to?*
+
+### Still open
+
+Sauro's ADR 0024 Decision 2, Bakker's axis weighting, Jeske on BRENDA's
+missing organism column. Unchanged for ten passes, and still waiting on
+people rather than on commits.
+
+---
+
+## Thirty-fifth pass — 2026-08-15
+
+### I nearly shipped a duplicate of somebody else's field
+
+Last pass's two red guards were a concurrent agent's in-flight ADR 0092. I
+left them, correctly. This pass their work had been static for 37 minutes, so
+I picked up the unfinished half: `KineticResult.preparation` was **emitted by
+the runner and never received by TypeScript** — the ADR 0027/0039 boundary
+drop, abandoned mid-wiring.
+
+I grepped `scienceAgent.ts`, found no `preparation`, and wrote the type
+declaration. It was already there. They had added it in the minutes between
+my grep and my edit, and I created a **second declaration of the same field**
+— ADR 0027's duplicate-source-of-truth defect, produced not by design but by
+concurrency.
+
+The lesson is narrow and worth keeping: **in a repository with concurrent
+authors, "I checked and it was not there" has a shelf life.** Re-check
+immediately before writing, not once before deciding. My grep and my edit
+were four minutes apart and that was enough.
+
+Removed mine, kept theirs untouched. The delivery guard now reports **26 of
+26 fields reaching a reader** — they finished it while I was working.
+
+### The last OPEN FINDING in the residue baseline
+
+ADR 0092 closes the group I named passes ago as the final unexamined one:
+covalent modification, affinity tags, immobilisation — acrylodan, PEGylation,
+His-tags, `immobiized` [sic].
+
+It is Jeske's warning applied to the **protein** rather than the conditions.
+Hers was pH, temperature, cofactors, buffers; this is the same class of fact
+about what the number was measured *on*. ADR 0029's variant filter cannot see
+it, because a His-tag is not a sequence change — every one of the 18 affected
+rows classifies `unstated`, which is to say eligible for selection as
+ordinary enzyme.
+
+Measured before their fix: human LDH resolves a Ki of **0.00059** from a row
+reading *"recombinant His-tagged enzyme"*, and nothing in the response said
+so.
+
+### Their table, re-derived
+
+| Mutation | Result |
+|---|---|
+| `unstated` reported as `native` | caught |
+| `is_as_isolated` becomes the negative test | caught |
+
+The first is the inversion this project has found more often than any other,
+one category over from ADR 0029: `unstated` is silence, `native` is a curator
+saying the enzyme was free and unmodified.
+
+The second is not in their table. I added it because the module's docstring
+*argues* for the positive form — `status != "modified"` would return True for
+`unstated`, `absent`, `tagged` and `immobilised` alike — and an argument in
+prose is not a check. Same reason ADR 0090's hand-verification became a
+self-test last pass.
+
+### Verification
+
+| | |
+|---|---|
+| Delivery guard | 26 of 26 fields reach a reader |
+| Guards | 6 of 6 green |
+| `tsc --noEmit` (api-server) | clean after removing my duplicate |
+| `test_enzyme_preparation` | 17 passed |
+| Mutation sets | ADR 0092 added, 2 of 2 caught |
+
+### Still open
+
+Seventeen mutation-table baseline entries, none mine.
+
+Waiting on people: Sauro's ADR 0024 Decision 2, Bakker's axis weighting,
+Jeske on BRENDA's missing organism column.
+
+### The last mile, and two things mutation said about my own tests
+
+The preparation verdict now travels the whole chain: runner emits it beside
+`variant`, `ScienceAgentResult` carries it, `queryResolver.ts` turns it into
+a `provenance.flags` entry — the list the CLI and web UI actually render.
+The test asserts on the flags, following `poolFindingsReachTheUser.test.ts`,
+which exists because four ADRs' findings died at that exact boundary while
+"each one tested the computation; none tested the boundary".
+
+Three mutations on the chain, and two of the results were about my tests
+rather than the code.
+
+**The silence tests checked the vocabulary, not the silence.** Making the
+flag builder fall back to `"an enzyme"` for every status would put a flag on
+all 263 commentaries — and both silence tests passed, because they matched
+`/TAGGED|IMMOBILISED|COVALENTLY/` and the fallback contains none of those
+words. A test asserting an absence has to name the thing that must be
+absent, not three examples of it. They now match the sentence every
+preparation flag ends with.
+
+**And one "uncaught" mutation was caught — by a guard I had not re-run.**
+Removing the runner's emission left both test suites green, which looked
+like the ADR 0038 defect reappearing in my own work.
+`check_findings_reach_a_surface.py` catches it and names the field: it
+executes the runner and walks every `KineticResult` field to a reader,
+precisely because ADR 0027 and ADR 0038 were this. It did its job on the
+first new field added since it was written.
+
+Worth recording as a correction to my own method: "mutation not caught" is a
+claim about *what I ran*, not about the repository. The guards are part of
+the harness, and I had left them out of the loop.
+
+| | |
+|---|---|
+| `tsc --noEmit` | clean |
+| API suites | 13 passed (preparation flag + pool findings) |
+| Python | 17 passed |
+| Boundary guard | green with the field, red and naming it without |
+
+### Two guards asked me for something, and one caught somebody else
+
+`check_runner_boundary.py` refused the new field until it was declared:
+
+> `KineticResult.preparation` has no entry in `EMITTED_AS`, so nothing says
+> whether it crosses the boundary. Add one — either the wire key it is
+> emitted as, or None with a reason it stays internal. Four fields defaulted
+> to 'does not cross' silently in ADR 0039 and none of their tests noticed.
+
+That is the right demand: not "is it emitted?" but "has somebody *decided*
+whether it should be?". Declared as `"preparation": "preparation"`; the
+guard now reports 26 fields with a recorded decision.
+
+And the Python vacuous scan added an hour earlier stopped its first new
+test — another agent's, written ten minutes before:
+
+```python
+if not has_submodules:
+    assert not recursive, ...
+```
+
+Genuine, not a false positive: the day a `.gitmodules` appears the test
+passes having checked nothing while its name still claims something. Their
+intent survives a strictly stronger form —
+`assert not recursive or has_submodules` — which states the implication
+unconditionally and holds in both worlds. Verified it still fires on the
+case it was written for.
+
+Fixing it rather than leaving the red was the point of shipping the guard.
+A guard that makes the tree red for everyone and is then routed around
+teaches people to route around guards.
+
+---
+
+## Twenty-sixth pass — 2026-08-17, later
+
+The method again, on the thing every run prints: a "repro key" and an
+invitation to `check-integrity` later.
+
+### Three defects in the reproducibility record
+
+**1. It described a solver Terrium does not use.**
+
+`createRecord` hardcoded:
+
+```ts
+solver: { algorithm: 'RK45', absoluteTolerance: 1e-8, relativeTolerance: 1e-6 }
+```
+
+Terrium integrates with **CVODE** at **1e-10 / 1e-12**. Every field wrong,
+in the record whose entire job is describing how a result was produced.
+
+**2. That made the reproducibility verifier meaningless.**
+
+This is the part that matters. `verifyReproducibility` calibrates its
+comparison from those numbers — deliberately, with a comment saying
+"nothing here is a constant chosen by this file". True of that file, false
+of the system: the constant was chosen one function away. So a reproduction
+differing by **one part in a million** was certified against a run accurate
+to **one part in ten billion**. Four orders of magnitude too generous.
+
+A test named *"accepts a difference inside the solver's declared
+tolerance"* perturbed by 1e-4 and passed. It now perturbs by 5e-9, because
+that is what "inside tolerance" actually means for this engine.
+
+The `: 1e-6` / `: 1e-8` fallbacks are gone entirely. If a record does not
+say how it was integrated, the verifier **refuses** — comparing against a
+tolerance it invented certifies at a standard nobody chose.
+
+**3. It fabricated an assessment, contradicting a written decision.**
+
+```ts
+validation: { dataQualityScore: 0.9, biologicalPlausibility: 'high', … }
+```
+
+Constants, rendered by two reports as **"Quality score: 90.0%"**. And ADR
+0024 Decision 3 explicitly declines to offer an aggregate quality score,
+because combining Bakker's axes needs a trade-off nobody has measured. One
+layer refused to produce a number while another invented one and printed it
+as a percentage.
+
+Now `undefined`, `'not assessed'`, and the reports say so and point at the
+per-parameter axes.
+
+### Where the real numbers come from
+
+The tempting fix was to write `CVODE`, `1e-10`, `1e-12` into the TypeScript
+— which is the duplicate-source-of-truth defect that put the wrong values
+there to begin with, and exactly what the previous pass removed from
+`check_env.py`.
+
+Instead the **engine reports its own configuration**:
+`terium_runner.py` reads `DEFAULT_RELATIVE_TOLERANCE` /
+`DEFAULT_ABSOLUTE_TOLERANCE` and puts them in its result; the bridge carries
+them; the pipeline passes them to `recordExecution`. The only side that
+knows is the side that says.
+
+When it is absent, the record says `unrecorded` and verification declines.
+A record that admits it does not know is useless in a visible way; one that
+says RK45 is useless in a way that looks like information.
+
+### Mutation testing
+
+| mutation | result |
+|---|---|
+| restore `RK45` at 1e-6 / 1e-8 | ✕ three tests |
+| restore `dataQualityScore: 0.9` | ✕ caught |
+
+### Verification
+
+- `Tests/`: 53 files in three groups — 379, 428 + 1 skipped, 10.
+- `Terium/tests`: all 47 files across four chunks, every chunk exit 0.
+- `tsc --noEmit` clean; `src/reproducibility` 40 passed, `src/integration`
+  28 passed, `teriumBridge` included — 54 across the four suites.
+- `check_engine_contract` exits 0.
+
+### Two failures that are not mine
+
+- `Tests/test_runner_contract.py::test_golden_found_output_shape` — a
+  concurrent agent added a `preparation` field to
+  `science_agent_runner.py`. Different file from the one I changed
+  (`terium_runner.py`); both are modified in the working tree, only one by
+  me.
+- `check_doc_paths_resolve` — flagging `Terrium-sim/main.git` and two
+  others quoted **inside prose about a URL discrepancy** in `START_HERE.md`,
+  which another agent is editing right now. Those are git remotes, not
+  paths, so this is a guard false positive on someone else's in-flight
+  file. Minutes old; the two-hour rule from the twentieth pass has not
+  expired.
+
+### What the method has now found
+
+- libSEDML stores XPaths and never resolves them.
+- libSBML writes RDF it declines to read; `checkConsistency()` is silent.
+- `make check` integrated at literals, not the engine's settings.
+- The execution record described a solver nobody runs, which miscalibrated
+  the reproducibility verifier by four orders of magnitude, and invented a
+  quality score a written decision refuses to offer.
+
+Four passes, four instances of the same shape: **a check reporting on less
+of the world than its name promises.** The fourth is the worst, because the
+thing whose name promised the most — "reproducibility" — was the one
+verifying the least.
+
+### Still open
+
+Sauro's ADR 0024 Decision 2, Bakker's axis weighting, Jeske on BRENDA's
+missing organism column.
+
+---
+
+## Thirty-sixth pass — 2026-08-15
+
+### Checking whether last pass's lesson needed a mechanism at all
+
+Last pass I nearly shipped a duplicate declaration of another agent's field
+and wrote it up as a discipline problem. This project's standard is that a
+lesson in prose stops being checked, so the first question was whether a
+mechanism already existed.
+
+**It does.** `tsc` reports `TS2300: Duplicate identifier` — verified by
+re-creating the duplicate and running the compiler. No guard needed, and my
+write-up over-claimed. Worth doing that check *before* building something:
+the cheapest guard is the one already there.
+
+But `KineticResult` is Python, and pydantic accepts a duplicate field
+silently — last definition wins, no error, no warning. So the same question
+on the other side of the boundary: does anything catch it?
+
+### A linter configured with forty rule families, executed by nothing
+
+`pyproject.toml` selects forty-odd ruff rule families including `F`. Nothing
+runs it: not CI, not the Makefile, not `verify_build.py`.
+
+What that cost, measured rather than supposed:
+
+```
+scripts/verify_build.py:813  F821  Undefined name `TERIUM_DIR`
+scripts/verify_build.py:822  F821  Undefined name `TERIUM_DIR`
+```
+
+`run_python_tests()` referenced a constant that does not exist, and it is
+called unconditionally on the non-`--quick` path:
+
+```
+>>> run_python_tests(quick=True)
+NameError: name 'TERIUM_DIR' is not defined
+```
+
+**The script that verifies the build crashed in the branch that runs the
+tests** — before executing one, and taking every check sequenced after it
+down too.
+
+I have been recording "the engine suite was not run this pass" for many
+passes and attributing it to the sandbox's time limit. That was wrong, and
+the real reason was one undefined name that a configured linter finds in
+under a second.
+
+Also found: a duplicate `ache_kcat_provider` fixture silently shadowing an
+identical one — pytest takes the last. The very class I nearly created by
+hand, sitting in the tree already.
+
+### The shape
+
+A `[tool.ruff.lint]` block listing forty rule families is the most
+convincing possible statement that a project lints thoroughly, and it is
+completely compatible with never linting.
+
+That is this codebase's recurring defect in new clothes: a check that cannot
+fail, because it never runs. `check_guard_wiring.py` already enforces *"a
+guard is not delivered until something runs it unasked"* — for guards in
+`scripts/`. It had nothing to say about a linter configured in
+`pyproject.toml`.
+
+### Wired narrowly, and the rest counted
+
+`check_python_bug_lints.py` runs F821, F811 and E9 — defects rather than
+preferences — and is green. The full configured ruleset reports **249**
+findings; wiring that would make the shared build red on arrival, which is
+the thing I refused to do to somebody else's guard two passes ago.
+
+F401 and F841 are bug-class too and find 23 findings today. They are
+excluded and **printed on every run** as a count, so the gap is a number
+somebody can decide about rather than a silence. They are also not mine to
+autofix in bulk across files other agents are editing.
+
+A missing ruff makes the guard **fail**, not skip. A check that passes when
+its tool is absent reports OK on every machine that lacks it — which is
+every machine where nobody installed it, which is how this went unrun.
+
+Verified against the exact historical failure: deleting the `TERIUM_DIR`
+definition gives exit 1, restoring it gives exit 0.
+
+### Verification
+
+| | |
+|---|---|
+| Guards | 5 of 5 green, including the new one |
+| Guard wiring | 62, none orphaned |
+| ADR index | 92, all unique and indexed |
+| `test_fallback_logic` | 36 passed after removing the shadowed fixture |
+
+### Still open
+
+`verify_build.py`'s Python-test path now runs for the first time. **What it
+reports is a separate question this pass does not answer** — the engine
+suite exceeds the sandbox's per-call limit, and claiming otherwise would be
+the defect this pass is about.
+
+226 style-class ruff findings remain, deliberately.
+
+Waiting on people: Sauro's ADR 0024 Decision 2, Bakker's axis weighting,
+Jeske on BRENDA's missing organism column.
+
+### Measuring the open question turned it into a different question
+
+ADR 0092 left one thing open: whether to exclude tagged/immobilised/modified
+rows from selection, as ADR 0029 does for variants. An open question nobody
+returns to becomes the default nobody chose, so the cost was measured.
+
+**369** pools survive the variant filter; **360** would still resolve.
+Through the real resolver, exactly **three** queries would go from answered
+to unanswerable — and the first is **golden tuple G2**, the hand-verified
+Km 0.09 for human AChE. That row is PEGylated. The same shape ADR 0029
+found: "the golden set had an isozyme pinned as the expected answer".
+
+Then the commentary answered the question:
+
+> attachment of polyethylene glycol side chains to lysine residues **does
+> not alter the Km value**
+
+The curator states the modification had no effect *on Km*. A blanket
+exclusion would have deleted a value the source itself calls equivalent to
+the free enzyme's — and the residue baseline had predicted precisely this:
+"the one case where the commentary tells us a difference does not matter."
+
+**The clause is quantity-specific, and that is the whole point.** The same
+PEGylated AChE row carries it for Km in one table and Kcat in another, so it
+is a statement about a *measurement*, not about the protein. `differs_for()`
+now takes the quantity being resolved; a Km statement does not excuse a Ki.
+
+The two facts stay separate — `status` is still `modified`, and
+`stated_not_to_affect` records the claim — because collapsing them into
+`native` would lose the fact that the enzyme was altered, which is what lets
+a reader judge the claim. A mutation doing that fails three tests.
+
+The open question is now much smaller and much better posed: the cost of
+exclusion is **two Ki values**, both His-tagged, neither carrying a
+no-effect statement. That is a decision someone can actually make.
+
+Worth naming as method: I nearly shipped "excluding costs 3 queries" as the
+finding. Reading the row that would be lost is what turned it into "one of
+them is golden, and the source says it is fine" — a different conclusion,
+reached only by looking at the data rather than the count.
+
+| | |
+|---|---|
+| Affected suites | 106 passed (preparation, fallback, golden set, evidence rank) |
+| Mutations on this ADR | 6, all caught |
+| Guards | findings-reach-a-surface, runner-boundary, vacuous, ADR index — green |
+
+One unrelated red, another agent's: `DOCUMENTATION_INDEX.md` says the root
+holds 41 markdown files and it holds 45. No root markdown was added here.
+
+### The exception had to cross the boundary too
+
+Making the Python side quantity-aware created a disagreement an hour later.
+The resolver's log went silent on golden tuple G2 — correctly, since the
+curator says the PEGylation does not alter Km — while `preparationFlags()`
+in `queryResolver.ts` still read only `status` and would have flagged it.
+
+Two renderers of one fact, disagreeing, in a change made to fix a reporting
+defect. ADR 0003 and ADR 0027's shape, committed by me while writing about
+ADR 0003 and ADR 0027.
+
+The interesting part: **the data was crossing the whole time.**
+`model_dump()` emits `stated_not_to_affect`; the TypeScript type ignored it.
+That is the quieter version of the boundary bug this project has recorded
+six times — not a field that fails to cross, but one that crosses and is not
+read. No boundary guard catches that, because from the guard's point of view
+the field arrives.
+
+Found by asking, of my own change, the question the guards cannot: *do both
+sides now say the same thing?* Both apply the same quantity-matched rule,
+with two mutations pinning it — dropping the exception, and applying it
+without matching the quantity.
+
+| | |
+|---|---|
+| `preparationFlag.test.ts` | 6 passed |
+| `tsc --noEmit` | clean |
+| Mutations | 2, both caught |
+
+---
+
+## Thirty-seventh pass — 2026-08-15
+
+Last pass ended with a question I explicitly refused to answer: *"the
+Python-test path now runs for the first time. What it reports is a separate
+question this pass does not answer."* This is that answer.
+
+### The engine suite runs, and it is green
+
+47 test files under `Terium/tests`, collected cleanly, run in three chunks
+because the whole suite exceeds the sandbox's per-call limit:
+
+| chunk | result |
+|---|---|
+| files 1–16 | **208 passed, 3 skipped** |
+| files 17–32 | **371 passed** |
+| files 33–47 | passed — count not captured |
+
+The third chunk completed green earlier in the pass; a later run to capture
+its exact count hit the ceiling. So "passed" is established and the number is
+not, and that distinction is worth keeping rather than rounding away.
+
+This is the first time in this session that the engine suite has been
+verified rather than assumed. I had been recording "not run this pass" and
+attributing it to the time limit — the actual cause was last pass's
+`NameError`.
+
+### The one failure was a check refusing to lie
+
+Chunk 1 failed once:
+
+```
+AssertionError: UNREACHABLE  cffconvert is not installed, so validity was
+    NOT checked. Declared in requirements-dev.txt. This is not a pass:
+    'could not check' and 'checked and fine' are different facts.
+```
+
+That is the citation guard **behaving correctly** — refusing to report a
+pass for a check it could not perform. Another agent built the identical
+discipline into it that I built into the ruff guard one pass earlier, for
+the same stated reason, apparently independently.
+
+Installing the declared dependency converted the refusal into a real result:
+
+```
+Checked CITATION.cff
+  valid against CFF 1.2.0 (cffconvert)
+  repository-code points at this repository
+  licence agrees with LICENSE
+```
+
+So the answer is better than "the suite passes": the suite passes **and**
+`CITATION.cff` is genuinely valid, which nobody had established before.
+
+### What the NameError was hiding
+
+Two declared dev dependencies — `ruff` and `cffconvert` — were not installed
+here, and in both cases the guard **refused** rather than passing. The
+project's discipline was working.
+
+The refusals were invisible because `verify_build.py` crashed before
+reaching them. One undefined name concealed a set of correctly-behaving
+guards, which is worse than concealing broken ones: it made a working
+standard look like an absent one.
+
+No new guard for this. The mechanism that should catch it already exists
+(`check_guard_wiring`, `check_python_bug_lints`) and the reason it did not
+is now fixed. Building something here would be inventing a check for a
+problem whose cause was already removed — and this project has a rule about
+inventing checks to satisfy checks.
+
+### Verification
+
+| | |
+|---|---|
+| `Terium/tests` | 579+ passed across 47 files, 3 skipped, 0 failed |
+| `CITATION.cff` | valid against CFF 1.2.0, verified not assumed |
+| Guards | green |
+
+### Still open
+
+The exact count for chunk 3. Stated rather than estimated.
+
+226 style-class ruff findings, and 23 bug-class (F401/F841) counted but not
+wired.
+
+Seventeen mutation-table baseline entries, none mine.
+
+Waiting on people: Sauro's ADR 0024 Decision 2, Bakker's axis weighting,
+Jeske on BRENDA's missing organism column.
+
+### The same defect, three repairs, each one looking complete
+
+Worth recording as a sequence, because I declared victory three times.
+
+1. **Computed but not delivered.** The preparation verdict existed on the
+   Python result and nothing showed it.
+2. **Delivered to the log only.** Fixed by appending to `search_log` —
+   which `queryResolver.ts` already records as "the same as reaching
+   nobody" for four prior ADRs. Caught by asking *does it reach the reader?*
+3. **Delivered twice.** The quantity exception was applied in Python AND
+   re-derived in `preparationFlags()`. They agreed. ADR 0027 is not about
+   disagreement — it is about two implementations, which agree right up
+   until one is edited.
+4. **Delivered once, unverified at the seam.** The runner now emits
+   `warrantsWarning` and TypeScript reads it. Mutation: make the runner
+   emit `True` unconditionally, so golden tuple G2 warns about a
+   modification its own commentary says did not occur.
+
+   **Both suites stayed green.** Python tests `differs_for`, not the
+   emission. TypeScript mocks the runner and supplies the field itself.
+
+`Tests/test_preparation_crosses_the_boundary.py` reads the emitted JSON and
+asserts the decision *against the rule* —
+`emitted["warrantsWarning"] is result.preparation.differs_for(quantity)` —
+rather than against a literal, so the two cannot drift apart. Both mutations
+now fail it.
+
+The lesson is not "check the boundary", which this project already knows and
+has six ADRs about. It is that **each repair moved the defect somewhere the
+previous check could not see**, and each looked finished at the time. The
+only thing that found steps 2, 3 and 4 was re-asking the same question of
+the new arrangement rather than trusting that fixing it once fixed it.
+
+| | |
+|---|---|
+| Python | 29 passed (preparation, boundary, runner) |
+| TypeScript | 6 passed, `tsc` clean |
+| Mutations across the sequence | 11, all now caught |
+| Guards | runner-boundary, findings-reach-a-surface, vacuous, ADR index — green |
+
+---
+
+## Twenty-seventh pass — 2026-08-17, evening
+
+The other half of last pass's finding: not what the record *stores*, but
+what the terminal *calls* it.
+
+### A key labelled reproducible that cannot reproduce
+
+Every run printed:
+
+```
+  repro key  f91d4baef4eca6df3005f53766e8ed82…
+```
+
+That value is `sha256(inputHash : outputHash : Date.now() : randomUUID())`.
+The randomness is **correct** — it is a unique execution identifier, and the
+comment beside it records the collision that forced the UUID in. What is
+wrong is the word.
+
+Two identical runs produce different keys **by construction**. A student
+comparing two runs' "repro keys" would conclude the tool is
+non-deterministic, and the tool would have told them so itself.
+
+Meanwhile `inputHash` — `sha256({query, parameters, conditions})`, which
+*does* match across runs, on any machine, at any time — was computed,
+stored, and **shown to nobody**. It never left the pipeline.
+
+Now both are printed, each labelled with what it actually is:
+
+```
+  inputs     acd8a451bf18f5d3a0f0c9076d9da70b…  (same inputs give the same value)
+  run id     e295d5b61b0e209547730cc11eec4ca0…  (unique per run, never repeats)
+```
+
+Measured across two real invocations: `inputs` identical, `run id`
+different. That is the claim, and it is now the observed behaviour rather
+than the label.
+
+### Mutation testing
+
+| mutation | result |
+|---|---|
+| expose the random key as the "inputs" hash (i.e. the original bug) | ✕ caught |
+| hash only the query, ignoring parameters | ✕ caught by the input-sensitivity test |
+
+The third test exists because a hash that ignored a parameter would look
+stable for entirely the wrong reason — and would pass the first test.
+
+### A restore that did not happen
+
+The second mutation's restore was killed by the sandbox timeout mid-command,
+leaving the mutant in the tree. Caught by checking the file rather than
+assuming the `cp` had run, and restored before continuing. Recorded because
+"the cleanup ran" is exactly the sort of thing this document has twice
+caught itself assuming.
+
+### Another agent's test, fixed after 77 minutes
+
+`test_golden_found_output_shape` had been red across the whole previous
+pass: the runner gained a `preparation` field (ADR 0092 — *a preparation of
+the enzyme is not the enzyme*) and the contract test was never updated.
+
+Left alone last pass as in-flight. Seventy-seven minutes later, with the
+ADR written and the runner shipped, it is settled work with a mechanical
+omission — so the field was added to the expected shape, with the reasoning
+and the attribution in a comment. Same judgement as the twentieth pass
+applied to `stdpopsim`: respecting in-flight work and leaving a shared suite
+red stop being the same thing.
+
+### Verification
+
+- `Tests/`: 53 files in two groups — 440 passed, then 390 passed + 1
+  skipped, plus `test_runner_contract` now 19 passed.
+- `Terium/tests`: 46 of 47 files across four chunks, every chunk exit 0.
+- `tsc --noEmit` clean. `src/reproducibility` 44 passed,
+  `src/integration` 28 passed, the three new CLI tests pass individually.
+- Guards: `check_guard_wiring`, `check_citation_cff`,
+  `check_dependencies_declared`, `check_ci_reproducible_locally`,
+  `check_documented_counts` all exit 0. README refreshed (1,180 engine +
+  845 literature); one more CI-only step
+  (`check_no_tellurium_integration_claims`) given a `make guards` route
+  after confirming it runs locally and passes.
+
+### The one file not verified
+
+`Terium/tests/test_popgen_correctness.py` **hangs** — 282 tests collect,
+then one never returns. The file is modified in the working tree by a
+concurrent agent, and it ran clean in earlier chunks this session. Nothing I
+changed touches population genetics.
+
+Stated rather than omitted, and rather than reported as "45 of 47 passed"
+without saying which two and why. A suite that cannot be run is not a suite
+that passed.
+
+### Still open
+
+Sauro's ADR 0024 Decision 2, Bakker's axis weighting, Jeske on BRENDA's
+missing organism column.
+
+### Applying the lesson backwards found nothing, which is the result
+
+Having just fixed `preparation` for delivering its judgement twice, I asked
+the same question of `variant` — the feature it was modelled on.
+
+Three checks, three negatives:
+
+- **Does TypeScript re-derive the variant judgement?** No. It reads
+  `source === "variant_withheld"`, which is Python's verdict encoded in a
+  field. The pattern `warrantsWarning` now follows was already there.
+- **Does the found-row variant verdict reach a reader?** Yes —
+  `src/cli/commandResolve.ts:202` renders it, including the line "that is
+  not the same as it being wild-type". I was ready to call this an
+  undelivered finding; the CLI surface is where it lands, and looking is
+  what stopped the claim.
+- **Is `check_findings_reach_a_surface.py` crediting fields by loose
+  substring?** Its `_mentions` is a substring test, so in principle a field
+  could be credited because its name appears in an unrelated context —
+  `variant` occurs in `queryResolver.ts` only as `variant_withheld`.
+  Measured across all 26 fields: substring and word-boundary matching agree
+  on every one. And the near-term hazard I expected — a new
+  `preparation_note` inheriting `preparation`'s credit — does not exist,
+  because the guard converts to camelCase first and `preparationNote` is
+  not a substring of `preparation`.
+
+No change made. Recording it because "I checked the obvious next place and
+it was already right" is a result, and because the alternative — tightening
+a guard that is not failing — would have added risk for no measured gain.
+It is also the third time this session that looking stopped a wrong claim
+rather than producing a right one.
+
+---
+
+## Thirty-eighth pass — 2026-08-15
+
+Closing both debts I left open last pass, and one of them was worth the trip.
+
+### The engine suite's exact figure
+
+Last pass reported chunk 3 as "passed, count not captured", which was
+honest and unsatisfying. The count is **278 passed**, plus one file run
+separately.
+
+The reason it kept exceeding the ceiling turned out to be worth more than
+the number: **`tests/test_popgen_correctness.py` takes 147 seconds on its
+own** — 83% of a 178-second budget in a single file. I had been attributing
+"the engine suite exceeds the limit" vaguely to its size. It is one file.
+
+Full figures, all green:
+
+| chunk | result |
+|---|---|
+| files 1–16 | 208 passed, 3 skipped |
+| files 17–32 | 371 passed |
+| files 33–47, minus popgen | 278 passed |
+| `test_popgen_correctness.py` alone | 66 passed, 147s |
+
+**923 passed, 3 skipped, 0 failed** across 47 files.
+
+### A guard that opened a file it never read
+
+The lint debt was 23 findings, and I had said they were "not mine to fix in
+bulk" — which stays true; they are one-per-file across twenty-two files that
+several agents are writing. Three were unambiguously mine, and one of those
+was a real finding:
+
+```python
+runner_src = RUNNER.read_text()     # assigned, never used
+```
+
+in `check_findings_reach_a_surface.py` — **my own boundary guard**. Two
+lines below it sits the comment explaining why:
+
+> The runner hop is verified by EXECUTION, not by reading its source. Name
+> matching passed when the emission of `poolFindings` was deleted.
+
+So `runner_src` is the **fossil of the v1/v2 name-matching approach that ADR
+0045 records as having failed**. The guard was rewritten twice to execute the
+runner instead of reading it, and the read survived both rewrites. A guard
+that opens a file it does not consult is a small lie about what it checks.
+
+That is exactly what F841 is for, and it is the argument for wiring these
+rules rather than carrying them: *an unused binding is usually the residue of
+something that was removed.* The rule found the residue of a superseded
+method inside the guard whose ADR documents that method failing.
+
+The other two were an unused fixture import and an unused module import,
+both verified genuinely unused by counting occurrences first — a pytest
+fixture referenced by a test signature appears twice, and these appeared
+once. 23 → 20, with the count and the reason both in the guard.
+
+### Verification
+
+| | |
+|---|---|
+| `Terium/tests` | 923 passed, 3 skipped, 0 failed, 47 files |
+| Delivery guard | 26 of 26 after editing it |
+| `test_form_mixture` + `test_fallback_logic` | 60 passed |
+| Bug-lint guard | green; outstanding now F401 x17, F841 x3 |
+
+### Still open
+
+Twenty bug-class lint findings in other agents' files, counted and printed
+on every run.
+
+226 style-class findings, deliberately.
+
+Seventeen mutation-table baseline entries, none mine.
+
+Waiting on people: Sauro's ADR 0024 Decision 2, Bakker's axis weighting,
+Jeske on BRENDA's missing organism column.
+
+### Stopping on the count guard, deliberately
+
+`check_documented_counts.py` was synced four times in this pass and drifted
+within minutes each time:
+
+```
+sync 1  engine 1,128  literature 784
+sync 2  engine 1,134  literature 784
+sync 3  engine 1,142  literature 855   ADRs 94
+sync 4  engine 1,142  literature 861   ADRs 95   -> already 862 / 2,004 on re-run
+```
+
+Two agents are adding tests and ADRs continuously, and at least one other is
+also syncing: `docs/readmes/main.md` now carries the numbers I wrote into
+README two syncs earlier.
+
+The guard is correct and the red is real. It will be satisfied by whoever
+writes last, and that is not something I can be by trying harder. Four
+attempts is enough to establish that continuing is churn rather than
+progress — and churning on a shared file while another agent edits it is
+how two correct changes become one broken one.
+
+Left red, with the state recorded here so the next person knows it is a
+race and not a mystery. Everything this pass actually built is green:
+24 Python tests, 24 TypeScript tests, `tsc` clean, and all eight guards
+covering the work itself.
+
+---
+
+## Twenty-second pass — the open question, closed against the symmetry
+
+ADR 0092 left one thing open: whether to exclude tagged / immobilised /
+modified rows from selection, as ADR 0029 does for variants. The measured
+cost was down to **two Ki values**, and mirroring ADR 0029 looked like the
+tidy answer.
+
+Before mirroring it, its justification was checked. **It does not transfer.**
+
+ADR 0029 argues that active-site substitutions sit at the extremes of the
+distribution because they are *chosen precisely because they change the
+number*. Nobody adds a purification tag in order to change the kinetics.
+
+### The literature is sharper than the analogy
+
+Miskovic et al. (2024) put the same His-tag on **both termini of one
+enzyme** and report the C-terminal tag had "a negligible effect", while the
+N-terminal tag caused aggregation and "reduced enzyme activity, but
+**preserved affinity for the substrates**" — concluding that tag influence
+"should not be overlooked".
+*Int J Mol Sci* 25(14), 7613, doi:10.3390/ijms25147613 (PMID 39062851), via
+PubMed.
+
+Three consequences, each against a blanket rule:
+
+1. **The effect depends on placement, which BRENDA does not record.**
+   "recombinant His-tagged enzyme" does not say which terminus, so the
+   honest state is *unknown* — not "probably harmful", which is what
+   exclusion asserts.
+2. **The effect is quantity-dependent.** Where the tag did harm it reduced
+   *activity* and preserved *substrate affinity*. Both values Terrium would
+   lose are **Ki** — affinity constants, the quantity that survived in the
+   one case measured end to end.
+3. **The original defect was silence, and silence is already fixed.** The
+   value now arrives flagged, naming the tag and quoting the commentary.
+   Exclusion is a second, stronger remedy for a problem the first already
+   addresses.
+
+Closed as: reported, not withheld. Excluding would refuse two real, cited
+values on a mechanism the literature says is conditional on a detail the
+source does not state — closer to inventing a finding than to refusing one.
+
+The flag now carries the citation, so a reader who needs to judge it can
+reach the paper that measured it. And the ADR records what would reopen the
+question: a corpus where BRENDA states tag placement, or a tagged row that
+is the only source for a **kcat** rather than a Ki. Both checkable, neither
+true today.
+
+### Why the open question was worth writing down
+
+The reasoning above only exists because the question was recorded rather
+than defaulted. Had ADR 0092 quietly excluded — the tidy, symmetric,
+ADR-0029-consistent choice — nothing would have prompted the check that
+found the analogy broken, and two correctly-cited values would have been
+refused for a reason that turns out not to hold.
+
+The section heading in the ADR was changed from "What is deliberately NOT
+decided" to the question itself, with the original text kept beneath. An
+ADR that hides having been undecided loses the part a later reader most
+needs.
+
+| | |
+|---|---|
+| Tests | 24 passed (preparation + boundary) |
+| Guards | ADR index green |
+| Open items left | Bakker on axis weighting; Sauro on default-versus-refuse; the DOI↔title check behind `--live`; NCBI's citation request |
+
+---
+
+## Pass 39 — evidence the guard could not recognise
+
+**Sauro's warning, found in our own tooling.** His objection to a tool that
+refuses too readily was that *it pushes researchers to hardcode*: faced with
+a check they cannot satisfy honestly, people satisfy it dishonestly.
+
+`check_mutation_tables_reproducible.py` was doing that to us. ADR 0069 sat on
+the outstanding-evidence list with a note saying it was "close to discharged
+already" — its mutation table is `mutate.py --selftest`, which
+`verify_build.py` runs on **every build**. The evidence was not merely
+re-runnable; it was being re-run, which is stronger than any set file in that
+directory. The guard counted it as unchecked debt anyway, because it
+recognised exactly one shape of evidence.
+
+The only two ways to clear it were to invent a set file that could not
+actually reproduce the table, or leave the record on the list forever. The
+first is fabricating evidence to satisfy an evidence guard.
+
+A set file may now declare `"reproduced_by": "scripts/mutate.py --selftest"`,
+and **the guard fails unless `verify_build.py` really runs that command.**
+The check is the design: an alternative route nobody verifies is a hole, not
+an alternative.
+
+**The mutations found what eight self-test cases missed.** The guard was
+wired into the build with no self-test at all — enforcing on other records a
+rule it did not meet itself. Eleven cases now, and two of them exist because
+a mutation asked:
+
+| | mutation | result |
+|---|---|---|
+| M1 | `reproduced_by` matching: `and` → `or` | caught |
+| M2 | delete the unrunnable-set check | **NOT CAUGHT**, then caught |
+| M4 | neuter the per-entry key check | caught |
+| M3 | revert `slugify` to what it shipped with | caught |
+
+M2 was not caught because every one of my eight cases either shipped a valid
+set file or took the new branch sitting in front of it. **The branch the
+guard had enforced since the day it was written was the one branch nothing
+exercised.** Then, with the fix in, M2 became INDETERMINATE — the mutant
+crashed, because the new loop read `spec["mutations"]` directly and was safe
+only by virtue of the branch above it. A crash is not a refusal.
+
+**A set file that passed the guard and killed the harness.** This record's
+own set file used `search` where `mutate.py` reads `find`. The guard called
+it reproducible; the harness died on `KeyError` after the baseline had run.
+Its docstring says *"an unrunnable set file is worse than none: it reads as
+coverage"* — and it was deciding runnability from the outer shape only.
+Contents are now checked; all 32 existing sets pass.
+
+**A documentation filename with spaces in it.** `claim_adr.py "evidence the
+guard could not recognise"` produced exactly that, and the tool's own error
+text invited it: *"Quote it if the title contains spaces."* Third instance of
+one bug in that file — it already refuses a flag passed as a slug, and a
+stringification artefact passed as a slug. Both ask what the slug *means*;
+neither looked at its *shape*.
+
+| | |
+|---|---|
+| Mutations | 4 caught, 0 not caught, 0 indeterminate |
+| Self-tests | mutation-table guard 11/11 (new), claim_adr OK, mutate OK |
+| Guards | ADR index, guard wiring, documented counts, bug lints all green |
+| Outstanding evidence | **18 → 17.** The entry removed was the only one that was mine; last pass's record said "none of them mine", which was wrong |
+| Open items left | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column; the DOI↔title check behind `--live` |
+
+---
+
+## Twenty-eighth pass — 2026-08-17, night
+
+### A correction: it never hung
+
+The previous pass closed with this, under a heading saying a suite that
+cannot be run is not a suite that passed:
+
+> `Terium/tests/test_popgen_correctness.py` **hangs** — 282 tests collect,
+> then one never returns.
+
+**That was wrong.** Measured this pass:
+
+```
+282 passed in 57.58s
+```
+
+It has never hung. What happened is that I ran it batched with other files
+inside a 175-second sandbox ceiling, the batch exceeded the ceiling, and I
+read my own timeout as the test's failure to return. When I then narrowed it
+with `--timeout=10`, a 58-second file naturally tripped a 10-second limit,
+and that looked like confirmation.
+
+This is the third measurement error of this shape in the session:
+
+1. `pgrep -f "pytest Terium"` matching its own command line — twenty minutes
+   of "RUNNING" for a process that had already died.
+2. `EXIT=$?` after a pipe reporting `tail`'s status, not the CLI's — a run
+   that exits 2 read as exiting 0.
+3. This one: a per-call timeout read as a hang.
+
+Each time the instrument reported on something other than the subject. That
+is precisely the defect these passes have been finding in the codebase — and
+it is worth recording that the same failure is easier to commit than to
+catch, including by someone who has spent four passes hunting it.
+
+### What the mistake was actually pointing at
+
+The diagnosis was wrong; the discomfort was not. **Nothing anywhere states
+how long the suite takes.** The README documents `make setup` as "2-5 min"
+and says nothing about `make test`, so a contributor watching a silent
+terminal for four minutes has no way to tell normal from broken — which is
+exactly the inference I made, with far more context than a newcomer has.
+
+Measured, on the reference container, `-p no:randomly`:
+
+| suite | time |
+|---|---|
+| `Terium/tests` (engine) | ~3.5-4 min (exceeds a 175 s budget in one call) |
+| `Tests/` (literature) | ~2.9 min (40.7 + 115.3 + 17.6 s in three groups) |
+| `test_popgen_correctness.py` alone | 58 s — the largest single file |
+
+Now in the README, next to `make test`, with the reason it is there: the
+absence of a figure is what makes a slow suite look like a broken one.
+
+The table deliberately carries **no test counts**. Those are stated once
+above it and checked by `check_documented_counts.py`; a second copy in a
+table nobody guards is a number that drifts silently, which is the defect
+this document has recorded more often than any other.
+
+### Housekeeping the counts guard demanded
+
+`check_documented_counts.py` has gained a `--write` mode since I last used
+it (another agent's work — a good addition). It corrects README.md and
+leaves the three published-repo mirrors under `docs/readmes/` alone, so
+those were updated by hand: five stale claims across `main.md`,
+`terium.md` and `tests.md`.
+
+### Verification
+
+- `Tests/`: 57 files in three groups — 425, 431 + 1 skipped, 20. All pass.
+- `Terium/tests`: `test_popgen_correctness.py` 282 passed; files 1-24
+  pass in 49 s; the remainder exceed a single call and were verified in
+  chunks last pass.
+- `check_documented_counts` exits 0 across README and all three mirrors.
+
+### A false accusation in my own guard
+
+`check_commands_runnable.py` — one I built — began reporting
+`scripts/nothing_runs_this.py` as a documented command that cannot run.
+
+It is a **fixture**. `check_mutation_tables_reproducible.py` (another
+agent's, written this evening) puts that name in a `reproduced_by` field
+during its selftest and asserts the guard REJECTS it, proving its
+unwired-command branch can fail. Creating the file would disarm that proof.
+
+Added to `ILLUSTRATIVE` with the reason — the mechanism already existed for
+exactly this, with one prior entry of the same shape. Not inferred by a
+rule: this guard cannot distinguish a selftest fixture from an instruction,
+and something like "ignore names containing 'nothing'" would be the guard
+inventing a convention nobody agreed to.
+
+Fixing it was mine regardless of who triggered it. A guard that falsely
+accuses is worse than no guard, and this one is mine.
+
+### Not mine
+
+`src/web/server.ts` fails to compile — an unterminated string in a
+template literal, from a concurrent agent's in-flight edit eighteen minutes
+old. It is the only file `tsc` complains about.
+
+### Still open
+
+Sauro's ADR 0024 Decision 2, Bakker's axis weighting, Jeske on BRENDA's
+missing organism column — eleven passes now, and still waiting on people.
+
+---
+
+## Twenty-third pass — the residue baseline's accepted tail was not all accepted
+
+With the OPEN FINDING group read, the remaining group in
+`docs/commentary-residue-baseline.txt` is marked accepted — substrate names,
+inhibition modes, assay descriptors. One entry carried a note:
+
+> `muscle` survives here as a bare token in a row whose phrasing ADR 0037's
+> `from` pattern does not reach
+
+Following that up found the row:
+
+```
+Gallus gallus   16.0   "enzyme form heart and muscle"
+```
+
+`form`, not `from` — BRENDA's own typo. And `extract_source_claims` takes
+the first token after "from" and stops, so **the row was filed as a clean
+HEART measurement**, beside the genuine 60.0 heart row, widening the
+reported heart range to 16.0–60.0.
+
+It is not a heart measurement. It is material pooled from the two tissues
+whose values differ 54-fold — which is ADR 0037's entire subject. A row that
+is itself a mixture, sitting inside a mixture report, counted as a clean
+member of one side.
+
+### The vocabulary problem, and why the corpus solves it
+
+The obvious fix — also read the word after "and" — invents claims.
+`_classify_token` returns `"source"` for **everything** it does not
+recognise as an organism:
+
+```
+muscle -> source    stored   -> source
+heart  -> source    purified -> source
+liver  -> source    pH       -> source    25 -> source
+```
+
+So "enzyme from heart and stored at 4 °C" would claim `stored` as a tissue.
+A hardcoded tissue list was the other option and the other trap: it would
+silently miss anything unlisted.
+
+The pool is the vocabulary. `muscle` counts as a tissue on the 16.0 row
+because **another row in the same organism states it outright**. That is
+evidence rather than a guess, and it needs no list.
+
+### My own prose asserted what the code did not do
+
+The reason text said the pooled row is "counted under each source it names,
+so the ranges above overlap by construction". The first implementation only
+*recorded* the fact for the sentence; it never added the value to the second
+group. The sentence was false.
+
+Caught by the test — which I had written from the intent rather than from
+the code, so it failed on the gap. That is ADR 0081's shape again, and the
+second time this session my own documentation has claimed behaviour that was
+not implemented. Writing the test from what the change is *for*, before
+reading what it *does*, is what caught both.
+
+Three mutations, all caught: removing the second pass, abandoning the pool
+vocabulary for a bare "word after `and`", and counting the pooled row under
+only the first source.
+
+| | |
+|---|---|
+| `test_source_context.py` | 33 passed (29 pre-existing, 4 new) |
+| Affected suites | 86 passed |
+| Guards | findings-reach, vacuous, commentary coverage — green |
+
+---
+
+## Pass 40 — the container was not the contents
+
+**The boundary guard was measuring 26 of 97 fields and printing a number
+that read like 97 of 97.**
+
+It reported `Fields on KineticResult: 26 / Reaching a rendering surface: 26 /
+Stopping short: 0`. Every statement true, and all of them about
+`KineticResult`'s own attributes. The findings built for Jeske's and
+Bakker's feedback are not attributes — they are nested objects.
+`selection_tie` counted as delivered because a surface named `selectionTie`;
+`SelectionTie` carries `candidates`, `reason`, `low`, `high` and
+`fold_range`, and the guard had no opinion about any of them.
+
+Descending one level: **71 nested fields under 26.**
+
+This is the presence of a container taken as evidence about its contents —
+the third place this project has found that exact half-check, after ADR
+0090's matcher that could not see classes and last pass's set file judged
+runnable without inspecting its entries.
+
+**The cause was a comment in the fixture builder:**
+
+```python
+if "list" in ann:
+    continue  # empty list still emits its key
+```
+
+True of the key. False of everything inside it. `poolFindings
+.effectorContrasts` emitted as `[]` proves the container travels and says
+nothing about `compound`, `reason`, `present_values`, `absent_values`. The
+sentence explaining the blind spot has been sitting in the file for as long
+as the guard has existed, written by someone answering the shallow question
+well.
+
+**What could not be established, and was not claimed.** The fixture now
+populates nested models recursively, and it was not enough: the runner
+*rebuilds* its lists rather than forwarding them, so those containers still
+emerge empty. Both available answers were wrong — "undelivered" would be 71
+false accusations (ADR 0051/0056: a patch that did not apply, read as a test
+that did not catch), "delivered" restores the blind spot with a bigger
+number in front of it. They are a third state, counted and named, and the
+success line was narrowed so it stops claiming more than was measured.
+
+**Then the third state swallowed the defect the guard exists for.** Within a
+minute, the mutation set said ADR 0039's original defect — the runner stops
+emitting `poolFindings` — was **NOT CAUGHT**. `is_measurable` was testing
+the wire path; `effector_contrasts` is a top-level field whose alias is
+dotted, so deleting the emission emptied the measurable-parents set and the
+field was reclassified "not measurable" and skipped.
+
+**A guard that got quieter as the bug got worse.** The state was added to
+make it more honest and for four minutes made it blind. Nesting is now
+decided by the model path — a fact about the schema, which breaking the
+runner cannot change.
+
+**The mutation that could not be a mutation.** G2 was first written as a
+mutation of that line and came back NOT CAUGHT, correctly: the weakness is
+conditional on G1, and alone it changes no output. A no-op mutation cannot
+be caught, and recording it as caught would be a verdict the harness never
+established. `is_measurable` moved to module level so the invariant could be
+asserted directly — with an *empty* set of measurable parents, no top-level
+field is excused — and only then did the mutation become expressible.
+
+| | |
+|---|---|
+| Mutations | G1 caught, G2 caught (0 not caught, 0 indeterminate) |
+| Self-tests | reachability classifier 5 cases (new), wired into verify_build |
+| Guards | reachability, mutation tables, ADR index, guard wiring, bug lints, doc links green |
+| Measured | 26 delivered, 0 stopping short, **71 not measurable and said so** |
+| Next | the runner's rebuilt lists, not more guard. Which of the 71 are prose-carried and which are dropped cannot be answered until they are measurable |
+| Still red | `check_documented_counts` — three hand-corrections this session, each invalidated within minutes by concurrent test-writing. Structural, not stale |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+---
+
+## Pass 41 — the probe nobody read
+
+Last pass concluded the runner "rebuilds its lists rather than forwarding
+them", and left 71 nested fields unmeasurable on that basis. **That was
+wrong.** The runner forwards them faithfully:
+
+```python
+"effectorContrasts": [c.model_dump() for c in result.effector_contrasts],
+```
+
+The empty lists were a statement about the fixture, and the fixture was
+somewhere nobody looked. `_emitted_keys()` runs two subprocesses; the first
+builds a fully populated result, monkeypatches the resolver with it, and
+exits — **only its exit status is ever consulted.** The recursive populator
+written last pass went into the dead one. A whole probe computing something
+no caller reads, inside the guard written to detect things computed and
+never read.
+
+Once the population moved to the fixture that is actually consumed:
+
+| | before | after |
+|---|---|---|
+| reaching a rendering surface | 26 | **67** |
+| stopping short | 0 | **12** |
+| not measurable | 71 | 18 |
+
+**Eight of the first twenty findings were the guard being wrong, and that
+mattered more than the twelve that were right.**
+
+*The wire mixes casing conventions.* The runner camelCases the keys it
+writes by hand and `model_dump()` preserves snake_case underneath, so the
+real path is `selectionTie.candidates.reference_id` — neither pure form.
+Matching on both pure forms reported `reference_id` as never emitted: the
+field whose own docstring says it exists so "a named alternative is
+checkable and a bare number is not", and which the flag builder renders as
+`[ref N]`.
+
+*The types live in a file the guard did not read.* `scienceAgent.ts` imports
+`Effector` from `provenance.ts`, where all five of its fields are declared —
+so seven were reported as never received by TypeScript. **A matcher whose
+scope is narrower than the thing it measures does not report "I could not
+see", it reports "it is not there."**
+
+**Nine of the twelve real ones are prose-carried**, and verified one at a
+time by reading the renderer: `selection_tie.low/high/fold_range` inside
+`SelectionTie.reason`; `relatedness.shared_rank/shared_name/query_organism/
+candidate_organism` inside `RelatednessVerdict.reason`, on the
+`cross_species_too_distant` branch Jeske asked for;
+`selected_form.designator/sibling_designators` inside `SelectedForm.reason`.
+They reach a student as English. They are not machine-readable, and the
+baseline says so rather than letting "delivered" mean "delivered as data".
+
+**Three are a real defect, and it is Katz's and Jeske's territory.**
+`formatResolvedCitation` composes `BRENDA (ref 740253) — https://…` and its
+parameter type does not declare `title`. The title is resolved, emitted and
+typed, and a student sees a reference number instead of the name of the
+paper — in a tool whose entire claim is that its values are
+literature-backed.
+
+Deferred rather than accepted, with the cost written down: that display
+string is asserted verbatim in 21 places across 9 test files owned by other
+agents, and all three parsers of it survive an appended title. Filing it in a
+baseline whose header says "a line here is a DECISION" would be using that
+file as a mute button, so the baseline now has a second section titled *A
+real gap, deferred with the cost stated.*
+
+| | |
+|---|---|
+| Mutations | G1 caught, G2 caught — re-run unchanged, which is the evidence a change this size did not quietly stop catching things |
+| Self-test | 5 cases green |
+| Guards | reachability, mutation tables, ADR index, guard wiring, bug lints, doc links green |
+| Next | `citation.title` in its own pass; the 18 unmeasurable need runner branches the three fixture cases do not reach |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+
+## Thirty-ninth pass — a count written into a sentence, and a fix that proved nothing
+
+Closing out the residue-baseline thread. `docs/commentary-residue-baseline.txt`
+still opened with *"One of the two groups below is an OPEN FINDING"* after both
+groups had been read — the modification group by ADR 0092, and `muscle` in the
+accepted tail by ADR 0101. Both are now recorded as read, with the reason each
+fragment stays unparsed written beside it. The file is a record of what was
+looked at, not of what is harmless, and the tail has now demonstrated it can
+hide a live defect.
+
+**The baseline edit cited ADR 0094.** That number belongs to another agent's
+ADR on an unrelated subject; mine is 0101. Caught by checking before writing
+the file rather than after — the correct number was not knowable without
+looking, and two stale pointers would have been committed.
+
+Adding the ADR made four documented counts stale, so I ran
+`check_documented_counts.py`. It reported them, and the line above its output
+read:
+
+```
+├── docs/                       ADRs1,129 engineering constitution, API docs
+```
+
+HEAD reads `ADRs, engineering constitution`. An **engine test count written
+over a comma**, in a sentence never about tests, in a file with 121 uncommitted
+insertions from a concurrent agent.
+
+I could not reproduce it — replaying `rewrite()` against HEAD produces the four
+right edits and no corruption. The cause is recorded as unknown, which is the
+argument for a **check** rather than only a repair: the guard whose subject is
+the accuracy of these documents counted the numbers and never looked at what
+they were glued to. Scoped by measurement before wiring: one hit across every
+markdown file in the repository, and `SBML2`, `CC BY 4.0`, `Python3.11` and
+`ADR 0055` do not match.
+
+**The part worth recording.** I also made the writer splice by position instead
+of `m.group(0).replace(m.group(2), shown, 1)`, and added a property assertion —
+*rewriting changes digits and nothing else*. Then reverted the splice to check
+the assertion had earned its place. **It stayed green.** No current pattern can
+reach the bug, which is the same fact that makes the fix safe and the test
+worthless. `_splice` is now a named function with a case that separates the two
+spellings (`'12 x 12'` → `'12 x 99'` positionally, `'99 x 12'` by text).
+
+A fix whose absence nothing detects is indistinguishable from no fix.
+
+The four stale ADR counts resolved themselves mid-pass — a concurrent agent ran
+`--write`. The remaining red is the test-count race already recorded, and is
+not mine.
+
+One near-miss avoided: `test_guard_selftests.py` failed on
+`check_no_tellurium_integration_claims.py`, which is a `PermissionError`
+unlinking a probe on the host mount — this sandbox, not their guard. The same
+artifact I misattributed to another agent earlier in the week.
+
+| | |
+|---|---|
+| Mutations | 3 caught — detector defanged, detector over-broadened (fires on `SBML2`, `Python3.11`), splice reverted to `.replace` |
+| Self-test | 4 guard-count, 6 ADR-count, 6 welded-number forms; plus the splice collision case |
+| Guards | commentary coverage, ADR index (102), documented counts (welded-number check green over 28 docs) |
+| Tests | `test_source_context.py` 33 green |
+| Next | nothing this thread requires; the residue baseline is closed |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording |
+
+---
+
+## Pass 42 — the title of the paper
+
+Last pass deferred `citation.title` and wrote down a cost: the display string
+is "asserted verbatim in 21 places across 9 test files owned by other
+agents."
+
+**That number meant nothing.** It counted assertions ON the string, not
+assertions that would CHANGE. Not one of those fixtures carries a title, so
+appending it broke none of them — 100 tests passed unmodified. The real cost
+was one line and a test file. Counting the thing that is easy to count and
+calling it the thing you meant is how a small job stays undone, and it is
+why this landed now instead of "next pass" again.
+
+**What a student was reading:**
+
+```
+BRENDA (ref 740253) — https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27
+```
+
+The title is resolved by the Python side, emitted by the runner, and declared
+on the TypeScript interface. The display composer's parameter type did not
+mention it. In a tool whose entire claim is that its values are
+literature-backed, the one human-readable part of the evidence was the part
+not shown. On the popgen and epidemiology paths it is worse than cosmetic:
+there `title` carries the whole formatted reference, so what was dropped was
+the citation itself.
+
+**The first version of the test could not fail.** It asserted on string
+constants spelling out what the formatter was believed to produce — six
+cases, all green, all of which would have stayed green with the formatter
+unchanged. Rewritten to drive the real `resolveQuery` with a mocked runner
+supplying a phrase nothing at that call site could invent. Running it also
+corrected a second case: a title-only citation does not merely omit the
+title, it degrades to unresolved and the simulation is REFUSED. The weaker
+assertion would have passed with the locator gate moved.
+
+| # | mutation | result |
+|---|---|---|
+| T1 | the title stops being appended (the original defect) | caught |
+| T2 | the title placed before the ref group, where three parsers read | caught |
+
+**T3 was withdrawn and that is a finding.** It moved the locator gate below
+the title and came back NOT CAUGHT — correctly. `locatableCitation` has two
+independent gates, and a title-only citation produces no locators either, so
+the second refuses it whatever the first does. Defence in depth a mutation
+demonstrated rather than assumed. Recording it as NOT CAUGHT would have put a
+gap in the table that does not exist.
+
+**Then the fix made the guard acquit a field it should not have.**
+`literature_candidates.title` stopped being reported as undelivered. Nothing
+about it changed — the last hop looks for a bare LEAF NAME in the rendering
+surfaces, and the word `title` now appears there for a different field on a
+different code path.
+
+A false acquittal is worse than the false accusations found last pass: an
+accusation gets investigated, an acquittal is the blind spot restored with
+the guard's blessing on it. Leaf matching was fine while the walk was flat;
+descending into nested models made `title`, `reason`, `raw`, `status`,
+`source`, `organism`, `unit`, `url`, `value` and three more each belong to
+several fields, and nobody noticed because the consequence only appears when
+one of a colliding pair gets wired.
+
+An ambiguous leaf can no longer produce a "delivered" verdict:
+
+| | |
+|---|---|
+| reaching a rendering surface | 38 |
+| **verdict not trustworthy (leaf shared)** | **31** |
+| stopping short | 10 (all reviewed) |
+| not measurable by this probe | 18 |
+
+**31 of the 69 deliveries the guard was asserting could not be told apart
+from a same-named sibling.** A stop is never reclassified as ambiguous, so
+this can only weaken a pass, never excuse a failure.
+
+| | |
+|---|---|
+| Tests | 121 passed across 5 files; 7 new |
+| Mutations | T1, T2 caught; G1, G2 re-run and still caught |
+| Guards | reachability, mutation tables, ADR index, guard wiring, bug lints, doc links green |
+| Baseline | `citation.title` REMOVED, not annotated — a baseline that only grows records problems instead of solving them |
+| Next | the 31 ambiguous verdicts need the last hop to see the parent, or a renderer checked by hand |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+
+## Fortieth pass — the audit that passed on an empty document
+
+Installing ruff so I could lint my own change made `check_python_bug_lints.py`
+runnable, and it prints what it does not yet enforce: `F841 x3`. *Local
+assigned and never used* is this project's house defect in one line, so I read
+all three. One was:
+
+```python
+root = etree.fromstring(sbml_text.encode("utf-8"))
+sbml_ns = etree.QName(root).namespace      # never read again
+```
+
+in `audit_annotations` — the independent RDF reader that exists precisely
+because libSBML cannot be trusted to check its own output.
+
+**An HTML error page audited clean.** `ok=True`, no triples, no problems. The
+module already has a test named
+`test_an_unannotated_model_audits_clean_rather_than_erroring` whose reasoning
+is right — "a checker that cannot tell *nothing to check* from *something is
+wrong* is useless on the common case" — and which stopped one short. A
+document that is not SBML is not *nothing to check*; it is the wrong document.
+A fetch returning a 404 page read as a model with no annotations. The value
+needed to tell them apart was being computed and dropped on the line above.
+
+**And the audit could not see annotations that were simply absent.** Deleting
+every `<annotation>` block from a freshly annotated document:
+
+```
+cvterms_written=3   audit triples=0   ok=True   problems=[]
+```
+
+The check written because *"libSBML happily writes RDF that libSBML then
+declines to read"* was blind to the RDF not being there at all. This module's
+own comment records that exact failure occurring once — "annotated NOTHING
+while still reporting success … and a green run". It was fixed at the lookup.
+The detector that should have caught it was left unable to, and nobody went
+back.
+
+Two numbers sat in the same function and were never compared: what the writer
+intended, and what an independent reader found. `annotate_sbml` now reconciles
+them, and `triples_read_back` travels to the outcome, the summary and the
+export JSON — reporting only the producer's count of its own output is the
+arrangement the audit exists to replace.
+
+`>=` not `==`, deliberately: every CVTerm carries one resource today, but a
+two-resource term must not fail. Loss always shows up as fewer.
+
+**A leaked probe was moving a number other tests assert on.**
+`test_the_live_root_count_in_the_opening_sentence_is_right` went red at 41
+against 42. The extra file was `.selftest_probe.md` — written into the
+repository ROOT by another guard's `--selftest` and deleted in a `finally`
+that this filesystem refuses. Untracked and un-ignored, so `root_count()`
+counted it, and the failure named `DOCUMENTATION_INDEX.md` rather than the
+probe. Now ignored, the same judgement `.aider.chat.history.md` already gets.
+I could not delete it: this sandbox can create and modify on the host mount
+but not remove, so the file is still on disk and should be deleted.
+
+Two guards were red here for the right reason and were left alone rather than
+worked around — `check_python_bug_lints` refusing to report green without
+ruff, and `check_citation_cff` refusing to call *could not check* a pass.
+Installing each turned a refusal into a real check. Both then passed.
+
+| | |
+|---|---|
+| Mutations | 4 caught — drop the not-SBML check; drop the reconciliation; pin the full namespace instead of the stem (fails the BioModels level-2 case); make the reconciliation fire when equal |
+| Tests | `test_sbml_provenance.py` 30 → 35, 5 new; provenance/export/citation/archive selection 125 green |
+| Lints | F841 clear across Tests, scripts, Terium |
+| Guards | ADR index (104), python bug lints, citation CFF, doc links, findings-reach-a-surface, vacuous, guard wiring all green |
+| Next | `F401 x17` is the other bug class the lint guard lists and does not enforce — unread, and worth the same treatment |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; delete `.selftest_probe.md` from the repo root |
+
+
+## Forty-first pass — the twenty-seventh citation
+
+Continuing down the lint guard's unenforced list, from `F841` to `F401`. Most
+were unused `pytest` imports. Three were a test module importing a symbol it
+never exercises — coverage that reads as present and is not. Two were covered
+elsewhere. The third was `bibtex_key`, which takes a `seen` set, so it handles
+key collisions, and a BibTeX key collision makes a citation disappear.
+
+The suffix was `chr(ord("a") + n)`. Past `z` that is `{`, `|`, `}`, `~`:
+
+```
+@misc{brenda740253z,
+@misc{brenda740253{,
+@misc{brenda740253},
+```
+
+The docstring says the guard exists because BibTeX "silently keeps one of
+them … the bibliography would be short by an entry and nothing would say so."
+But `@misc{brenda740253}` closes the entry group early, so BibTeX reads a
+complete empty entry and parses the rest at top level. **A duplicate key costs
+one entry; this costs every entry after it.** The guard against silent loss
+was, past 26, a way to lose more.
+
+`test_keys_are_valid_bibtex_identifiers` already asserted exactly the right
+property — `[A-Za-z0-9_:-]+` — on three parameters, which reaches one
+collision. Not a missing test. A correct assertion on input that could not
+exercise it, which is this session's shape for the ninth time.
+
+**Then mutating my own fix hung the suite instead of failing it.** Making the
+suffix cycle `a..z..a` meant every candidate past the 26th was already taken,
+and `while key in seen` had no bound. In a script driven by a JSON payload
+that is not a wrong answer — it is no answer and no error. Now bounded by
+`len(seen) + 1` and raising. A wrong answer can be seen; a hang cannot.
+
+**And proving it end-to-end found the real one.**
+`scripts/export_citations.py` died on its import line —
+`ModuleNotFoundError: No module named 'Terium'` — because it puts
+`REPO_ROOT/Tests` on the path and not `REPO_ROOT`, while `citation_export`
+imports the shared source table. **In HEAD.** Every test imports the library
+directly, where pytest has already supplied the path, so the library was
+covered and the door a user walks through was not. The script's own docstring
+calls it "the reachable end of Tests/citation_export.py — which was built and
+then callable from nowhere". It had become that again, with a green suite.
+
+The two new script tests run it as a subprocess from a temporary directory,
+so neither pytest nor the working directory can lend it an import it cannot
+find itself.
+
+| | |
+|---|---|
+| Mutations | 3 caught — revert the suffix to the ASCII walk; make the disambiguator wrap instead of carry; remove the repo root from the script's path |
+| Tests | `test_citation_export.py` 28 → 31 |
+| End-to-end | 60 parameters / one reference through the real script: 61 unique keys, braces balanced, suffixes `aa`, `ab`, `ac` |
+| Guards | ADR index (106) green |
+| Next | `_note_for` builds `missing` from a tuple of hardcoded `None`s — a constant dressed as a computation. Correct today; needs a decision about whether absent `title` belongs in that sentence |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; delete `.selftest_probe.md` from the repo root |
+
+---
+
+## Pass 43 — the papers nobody was shown
+
+**Teaching the last hop to see the parent** (the step ADR 0104 named): the
+surface check now requires a function that both names the parent AND reads
+the leaf as a member access, not the bare word anywhere in three files.
+
+| | before | after |
+|---|---|---|
+| reaching a rendering surface | 38 | **69** |
+| verdict not trustworthy | 31 | **1** |
+
+The member-reference requirement is what makes it honest — block-scope
+co-occurrence alone cleared 31, and tightening to a real property access put
+two back into "unknown" that co-occurrence had cleared by accident. It can
+only move a field from *unknown* to *delivered*, never from *undelivered* to
+anything, and the splitter fails the build if it ever produces one block,
+which would be file-wide matching under a new name.
+
+**Then the last unresolved ambiguity turned out to be hiding a live defect.**
+
+`literatureCandidates` had **two** non-test references in the entire tree:
+the interface declaration and an empty-array initialiser. Nothing read it.
+
+When BRENDA holds no value, Terrium searches PubMed and CORE, finds papers,
+and returns them — the fallback whose whole job is the case where the primary
+path failed. The runner emits them on two branches. And a student was told
+*"could not be resolved from literature"* while the system held papers that
+probably report it, fetched at the cost of two API calls.
+
+ADR 0039's defect on the one path that exists to help when everything else
+failed, and **Bakker's principle inverted**: excluding the entire remaining
+evidence base by not mentioning it is the most complete exclusion available.
+
+**My own baseline entry had asserted a renderer that does not exist** — "the
+CLI renders its own summary of them from the structured array." I wrote a
+claim I had not looked for, into the file whose purpose is recording
+decisions somebody checked. Kept in the baseline as a correction.
+
+**A flag would have reached nobody either.** The first fix pushed one, and
+every case came back empty. A probe showed why: when a constant cannot be
+resolved and was not supplied, `resolveQuery` THROWS. No response, no flags.
+The offer belongs in the refusal — the message telling the student to go find
+the value themselves. `missingKeyDetails` already promotes a per-key note
+into that error, and exists for exactly this reasoning: *telling a user the
+literature has nothing, when it has something they could have had, is the
+true-sounding-and-misleading shape treated as a defect everywhere else.*
+
+**The test caught the regression the comment warned about.** Promoting a note
+drops the generic sentence — which is where `Add km=<value>` lives. Attaching
+the offer removed the one instruction a student can act on. That regression is
+recorded in `missingKeyDetails` as having happened once before; it happened
+again, and the test caught it, not the comment.
+
+| | |
+|---|---|
+| Mutations | L1, L2, L3 all caught |
+| Tests | 118 across 5 files; 6 new; `tsc` clean |
+| Guards | reachability 69/1/10/18 exit 0; ADR index, guard wiring, bug lints green |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+
+## Forty-second pass — the note that described a different entry
+
+Last pass I deferred one item with a reason: `_note_for` builds its
+missing-fields list from a tuple of hardcoded `None`s, "produces the correct
+sentence today", and changing it needed a decision about `title`.
+
+**The premise was wrong.** Printing the note against both cases:
+
+```
+TITLED   -> ... records the source identifier only; author, year, journal
+             are NOT known ...
+UNTITLED -> ... records the source identifier only; author, year, journal
+             are NOT known ...
+```
+
+Identical, and the entries are not. The titled entry emits
+`title = {LDH kinetics in human}` and the note inside it says Terrium records
+the source identifier *only* — false about the entry it is attached to. The
+untitled entry has no title field at all, and the note names three absences
+and not the field every reference manager displays first: the one absence a
+user is guaranteed to notice was the one it did not explain.
+
+So the deferral was not "correct but unlovely code", it was two false
+statements I had looked straight at and classified as cosmetic. I read the
+comprehension and stopped at *does it return the right list*, without asking
+*is the sentence it builds true of this entry*.
+
+Now asked of the citation — `getattr` over `_BIBTEX_WANTS` — so a field added
+to `Citation` later cannot leave the note reporting it unknown. `to_ris`
+already shares `_note_for`, so both renderers move together (ADR 0003).
+
+A constant wearing the costume of a computation: it had a loop, a condition
+and a filter, and could return exactly one value. That is why nobody checked
+it — it read as though it adapted.
+
+| | |
+|---|---|
+| Mutations | 2 caught — revert to the constant (titled case fails); drop `title` from the wanted list (all three fail) |
+| Tests | `test_citation_export.py` 31 → 34 |
+| Guards | ADR index (107), doc links (200) green |
+| Next | nothing owed by this thread |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; delete `.selftest_probe.md` from the repo root |
+
+---
+
+## Pass 44 — the second front end
+
+Last pass fixed the discarded candidate papers on the API path. **The CLI
+had the same defect, with a worse message.**
+
+```
+○ No km found for lactate dehydrogenase / pyruvate / Homo sapiens.
+  BRENDA and PubMed were searched and returned nothing. This is an
+  answer, not a failure — no value has been invented to fill the gap.
+```
+
+PubMed had not returned nothing. `literatureResolver.ts` parsed the runner's
+response into `{ found: false, quantity, logs }` and never read
+`literatureCandidates` — the list was discarded one function before the
+sentence denying it existed. The line is untrue in exactly the case where the
+student most needs somewhere to go next, and it is the line written to sound
+trustworthy.
+
+Fourth recording of the standing lesson: **a lesson applied only where it was
+first learned is a lesson half-taken.**
+
+Two facts now get two messages — the original sentence is kept for the case
+where it is *true*, because a search that found nothing and a search that
+found something nobody used must not share a rendering (ADR 0065). Papers
+carry a locator each, and which one differs by source: PubMed's esummary
+never supplies a DOI, CORE has no PMID. `--json` carries them too.
+
+**Then the harness caught me testing the wrong half of the pipe.**
+
+My first test file mocked `resolveKinetic` and asserted on rendered output.
+Seven cases, all green:
+
+```
+C1: the candidates are dropped at the boundary again ... NOT CAUGHT
+C3: a candidate with no locator is rendered anyway    ... NOT CAUGHT
+```
+
+Both mutate `literatureResolver.ts`, which those tests mock — so the parsing
+this change actually fixed never executed. They proved the command renders
+papers it is handed and proved nothing about whether anything hands them
+over, while the bug was, in both passes, precisely that nothing did.
+
+ADR 0027 says it in one line: *a test that pins a component tells you nothing
+about the wiring.* I wrote a component test for a wiring defect, and only the
+harness noticed.
+
+`offlineResolverEndToEnd.test.ts` already existed for this, and its docstring
+names the reason — *"Deliberately NOT a module mock… the boundary where every
+bug in this path has actually been."* The stub runner gained a candidates
+fixture including one title-less and one locator-less entry, so a test can
+tell "rendered what it was given" from "filtered first", which four good rows
+cannot.
+
+| # | mutation | result |
+|---|---|---|
+| C1 | candidates dropped at the boundary again | caught |
+| C2 | the false sentence printed even when papers were found | caught |
+| C3 | a candidate with no locator rendered anyway | caught |
+
+C2 earns its place: it prints the papers **and** the false sentence — the
+shape a careless fix produces, a screen contradicting itself. A test that
+only checked the papers appear would pass it.
+
+| | |
+|---|---|
+| Tests | 11 boundary + 7 CLI, all green |
+| Guards | reachability, mutation tables, ADR index, guard wiring green |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+
+## Forty-third pass — what the tie does to the model
+
+Back to the feedback itself rather than the lint list. Jeske's four
+conditions are all built now (pH and T, ADR 0026; buffers, ADR 0028;
+cofactors, ADR 0032 — the summary table at the top of this file still says
+cofactors are unread and is stale). The largest unbuilt recommendation left
+was Bakker's second one.
+
+ADR 0047 narrowed selection to the non-dominated set; ADR 0051 reported the
+tie among the survivors and stated plainly *"This is not an ensemble."* True,
+and it leaves a reader with this, from the real resolution path:
+
+```
+170.7 1/s   immobiized recombinant enzyme, pH 7.0, 25°C   (returned)
+276.5 1/s   soluble recombinant enzyme, pH 7.0, 25°C
+```
+
+Both BRENDA reference 741355 — the same paper, reporting the pair precisely
+to contrast them. A student gets 170.7 and a sentence saying 276.5 was
+equally well evidenced. ADR 0051 says the reader "is equipped to make" the
+judgement about whether that matters. They are — if shown the model under
+each value, which nobody had run.
+
+**Her ensemble stays declined, and the distinction is exact.** ADR 0024's
+reason still holds in every word: sampling needs a distribution and flux data
+to reject against, and without the rejection step the spread *looks* like a
+rigorous uncertainty estimate. So: no distribution is sampled, no weights are
+invented, no uncertainty is claimed, nothing is interpolated between
+candidates. The model is run at the values the literature reports and at no
+others. What is reported is disagreement among sources, propagated through
+arithmetic a reader can check.
+
+Three refusals carry it. A missing `vmax` or `s0` is `not_assessed` naming
+the missing input — the refusal `reliabilityScore.ts` already makes for
+"physiological pH and T", and a guessed `s0` is worse than a mis-scored axis
+because it changes the trajectory shown. A **kcat tie is refused outright**,
+which is awkward because the tie above IS a kcat tie: `vmax = kcat·[E]` needs
+the assay's enzyme concentration and BRENDA does not report it. And no
+aggregate, because a mean over values whose weights are unknown would answer
+Bakker's still-unanswered weighting question by stealth.
+
+**Two defects found while building it.** Two candidates that both failed to
+simulate returned `status="assessed"` and `is_assessed=True` while the model
+had said nothing — `len(outcomes) > 1` counted *attempts*. Found by running
+it, not by reasoning about it. And the reason string was assembled as
+`headline if ran else other + suffix`, which Python parses as
+`headline if ran else (other + suffix)`, so on the branch that matters both
+the failure note and the "NOT an uncertainty estimate" disclaimer were
+silently dropped. The house defect, in the three lines written to prevent it.
+
+`check_scripts_reachable.py` then refused the new script — "no non-test file
+names this script, so nothing can spawn it" — until `exportSpreadConsequence`
+was wired into the CLI's export module. That is the guard doing precisely
+what ADR 0107 asked of it, one pass later, unprompted.
+
+| | |
+|---|---|
+| Mutations | 4 caught — default the missing setting; drop failed candidates; read the trajectory's first row instead of its last; take the substrate column by index |
+| Tests | `test_spread_consequence.py` 16 new; `spreadConsequenceExport.test.ts` 3 new, spawning the real script |
+| Guards | scripts-reachable, vacuous, findings-reach-a-surface, bug lints, hardcoded-assay-conditions, ADR index (110), doc links (203) |
+| Next | the summary table at the top of this file is stale on cofactors and should be reconciled against what shipped |
+| Open items | Bakker on axis weighting (still the blocker for a weighted anything); Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; delete `.selftest_probe.md` from the repo root |
+
+---
+
+## Pass 45 — the finding that reached half the users
+
+Same defect twice in two passes — a finding rendered to one front end and
+not the other — and **the second was found by accident**, when an unrelated
+fix made a leaf name collide. Nothing was looking. That is the argument for
+a check at two instances rather than the usual three.
+
+**79 keys emitted by the runner. 55 read by both front ends. 24 by one, or
+neither.** Not obscure ones:
+
+- **`selectionTie`** — Bakker's "the evidence did not choose". Rendered on
+  the API path; the CLI never mentions it. A CLI user is handed the lowest of
+  six equally well-evidenced rows spanning 306-fold, with nothing saying so.
+- **`preparation`** — the His-tagged enzyme that is not the free enzyme. API
+  only.
+- **`column_taxon`, `commentary_taxon`** — Jeske's organism-column
+  discrepancy, read by **neither**.
+
+Jeske's factors and Bakker's axes were built once and delivered to one
+audience.
+
+**Scope was wrong on the first attempt, for the third time in four passes.**
+Reading two files instead of two whole pipes reported 34; nine were the
+matcher's fault. A matcher narrower than the thing it measures does not
+report "I could not see" — it reports "it is not there."
+
+**The baseline is debt, not decisions, and says so.** Two entries were
+verified by reading the renderers; twenty-two were counted. Writing
+"reviewed" beside them would make the file a rubber stamp with better
+formatting. The contract is ADR 0072's — it stops the debt growing. My first
+draft of the success message claimed the entries were "recorded as
+deliberately reaching one", which is a *different file's* contract and
+exactly the overclaim this guard exists to find.
+
+The matcher under-reports: `selected` went into the baseline and the guard
+rejected it, because `selected` is also an ordinary local variable. So 24 is
+a floor. The rule catching a real error in its own first draft is the best
+evidence available that it works.
+
+**The guard is written, green, and NOT wired.** Mutation testing returned
+**0 caught, 3 not caught** — and the guard is not what is wrong. All three
+delete a failure path, and the guard is currently green, so removing a check
+that is not firing changes no output. Same structure as ADR 0100's G2 and
+ADR 0104's T3.
+
+The fix is a `--selftest` that builds a tree *with the failure present*, not
+a better mutation. Until that exists the guard stays out of `verify_build`,
+because a guard whose refusals have never been observed to fire does not go
+into a harness everyone runs. I wired it, the mutation run said no, and I
+unwired it — the rule doing its job on the person who wrote it.
+
+| | |
+|---|---|
+| Measured | 79 keys; 55 both sides; 24 one-sided (2 verified as gaps) |
+| Mutations | 0 caught, 3 not caught — set recorded as not-yet-evidence, with why |
+| Guards | wiring, ADR index, bug lints, doc links, mutation tables green |
+| Next | the `--selftest`, then wire it, then `selectionTie` into the CLI |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+---
+
+## Pass 46 — the input where the refusals fire
+
+Last pass left a guard written, green, and **deliberately unwired**, because
+mutation testing returned 0 caught, 3 not caught. This pass paid that debt.
+
+The guard was never what was wrong. All three mutations delete a failure
+path, and against the real tree the guard is green — nothing unreviewed,
+nothing stale, both sides non-empty. **Removing a check that is not firing
+changes no output.** The fix was not a better mutation; it was an input where
+the refusals fire.
+
+`--selftest` builds one: a temporary tree, a stubbed key set, a baseline
+rewritten between cases. Six cases, and the mutations became expressible the
+moment it existed.
+
+| # | mutation | before | after |
+|---|---|---|---|
+| B1 | a new one-sided finding no longer fails | NOT CAUGHT | **caught** |
+| B2 | the baseline can be added to but never emptied | NOT CAUGHT | **caught** |
+| B3 | an empty side reads as "nothing is one-sided" | NOT CAUGHT | **caught** |
+
+**B3 held out, and that was the useful part.** My case pointed the CLI glob
+at a directory that does not exist, so deleting the empty-side check let the
+guard carry on — and then every key looked one-sided, including one the
+baseline did not list, so the *unreviewed* check failed the build anyway. The
+guard was defended twice and the weaker defence was doing the work.
+
+Third time this pattern has appeared. Worth naming: **a mutation that is a
+no-op against the chosen input is not evidence of safety, it is evidence that
+the input was chosen badly.** Twice before the honest answer was to withdraw
+the mutation. Here it was to fix the fixture, because the dangerous case is
+real — an empty side *when the baseline covers every key*, where the guard
+reports "everything one-sided, everything accounted for" and prints OK on a
+comparison that never happened. Only the empty-side check stands between it
+and that.
+
+**Wired now, and the delay was the point.** It was wired, the mutation run
+said no, it was unwired, the missing input was built, and it is wired now —
+the rule working on the person who wrote it: *a guard whose refusals have
+never been observed to fire does not go into a harness everyone runs.*
+
+What it reports is unchanged and is why any of this matters: **79 keys
+emitted, 55 read by both front ends, 24 by one or neither** — including
+`selectionTie` (Bakker's "the evidence did not choose", rendered by the API,
+never mentioned by the CLI), `preparation`, and `column_taxon`/
+`commentary_taxon`, read by neither.
+
+| | |
+|---|---|
+| Mutations | B1, B2, B3 all caught (was 0 of 3) |
+| Self-test | 6 cases, wired beside the guard |
+| Guards | 64, all wired, all with their refusals observed |
+| Next | pay the debt down, starting with `selectionTie` into the CLI |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+
+## Forty-fourth pass — the conditions that stayed on the screen
+
+Four ADRs answer Jeske's "fantasy numbers" sentence: pH and temperature
+(0010, 0026), buffer identity (0028), cofactors (0032). Parsed, graded,
+rendered on the terminal, compared across parameters by `assayCoherence.ts`.
+
+They were not in the exported model. The notes on an exported Km, measured:
+
+```
+Measured in Homo sapiens. Source: BRENDA ref 740253
+Reliability [...] assay completeness: complete — pH and temperature both reported
+```
+
+The file tells a reader the conditions **exist** and never says what they
+were — worse than absent, because "complete — pH and temperature both
+reported" reads as though the document contains them.
+
+The artifact is the thing that outlives the terminal session: shared,
+attached to a report, opened months later by somebody who never saw the
+screen. It is exactly where her sentence needed to survive and the one place
+it did not. It is Sauro's mechanism unfinished too — the export exists
+because of *"write a warning comment in the antimony file you generate"*,
+and the comment could not tell a reader whether two parameters came from
+compatible experiments.
+
+Now in **both** exports, because a fact present in one artifact and missing
+from the other makes the omission look like a property of the measurement
+rather than of the export path. `unreported` travels rather than being
+inferred: an absent `ph` is ambiguous between "the paper did not report it"
+and "this export did not carry it", and those are facts about different
+people.
+
+The grade and the values are now two encodings of one fact in one document
+(ADR 0003), and they get **different sentences** for their two ways of
+disagreeing — a grade contradicted by the source is a defect in the scoring,
+a grade whose conditions never arrived is a defect in the payload, and
+telling a reader only "inconsistent" leaves them unable to act on either.
+
+**And a mutation escaped.** The first four tests built their own
+`ModelExportRequest` and asserted the written file carried the conditions.
+All four stayed green when I deleted `assayConditions: row.assayConditions`
+from the CLI's provenance builder — they proved the export path worked and
+could not prove anything ever filled it in. That is the `bufferIdentity`
+defect this repository already documents in as many words: *"the rendering
+tests mock `resolveKinetic`, so they assert what the CLI does with an object
+rather than whether the object is ever populated. Deleting the plumbing left
+all fourteen of them passing."* The second test now runs from a mocked
+resolver to the bytes on disk, and both plumbing cuts fail it.
+
+| | |
+|---|---|
+| Mutations | 7 caught — drop the rendered conditions; omit the unreported list; remove the contradiction dedup; collapse the two discrepancy sentences; drop the Antimony footer line; and the two plumbing cuts that the first test round missed |
+| Tests | `test_assay_conditions_travel.py` 12 new; `assayConditionsInExport.test.ts` 4; `assayConditionsReachTheExport.test.ts` 1 (resolver-to-disk) |
+| Guards | ADR index (112), doc links, bug lints, vacuous, findings-reach-a-surface, hardcoded-assay-conditions |
+| Not mine | `src/web/server.ts` is syntactically broken in the working tree (`tsc` TS1005 from line 816) and fine in HEAD — another agent mid-edit |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; delete `.selftest_probe.md`; the stale cofactor row in this file's summary table |
+
+---
+
+## Pass 47 — the evidence did not choose, on the CLI
+
+The guard wired last pass counted 24 findings reaching one front end and not
+the other. **This pass paid off the highest-value one**, and it is Bakker's.
+
+`evidence_rank.py` narrows candidates to the non-dominated frontier — a row
+is dropped only when another beats it on every axis, which needs no weights
+and so could be built without inventing any. Among the survivors nothing is
+beaten outright, so `min()` chooses, and `selection_tie.py` exists to say
+that out loud:
+
+> Reporting the minimum silently presents literature disagreement as a
+> measurement.
+
+The API path has printed it since ADR 0051. **The CLI printed the number
+alone.** A student running `scientific resolve` on LDH turnover was handed
+`21.1` and never told the evidence ranked `6467` equally credible — six rows,
+every one wild-type with pH and temperature reported, spanning 306-fold.
+
+Now:
+
+```
+⚠ The evidence did not choose this value.
+  2 rows were ranked equally well evidenced, spanning 21.1 to 6467, a 306-fold range.
+  → 21.1 1/s  [ref 684519]  (returned)
+    6467 1/s  [ref 761568]
+        wild-type, presence of D-fructose-1,6-diphosphate
+```
+
+Alternatives named with their reference ids and their commentary, because *a
+named alternative is checkable and a bare number is not* — and the commentary
+is what a reader needs to make the judgement the ranking declined to make.
+`reason` printed verbatim: rewording it in the client would make the CLI a
+second place the finding's wording can drift.
+
+**Fewer than two candidates is not a tie**, checked again on this side rather
+than trusted, because `SelectionTie()` with an empty list is also what an
+unpopulated field looks like — the ambiguity `is_tied` was made a positive
+test to remove. A warning about nothing teaches readers to skip warnings.
+
+| # | mutation | result |
+|---|---|---|
+| S1 | the tie dropped at the boundary (the original defect) | caught |
+| S2 | parsed but never rendered | caught |
+| S3 | a one-candidate "tie" announced as a tie | caught |
+| S4 | the alternatives lose their reference ids | caught |
+
+Both a boundary test and a rendering test are in the set command, and that is
+not padding: the rendering test mocks the resolver, which is exactly how last
+pass's first set produced two confident NOT CAUGHTs. One proves the CLI
+renders what it is handed; the other proves anything hands it over.
+
+**The debt is 24 → 22.** `fold_range` cleared alongside `selectionTie`
+because it travels inside the same object — these entries are not
+independent, and the count can drop by more than one per fix.
+
+| | |
+|---|---|
+| Mutations | S1–S4 all caught (run singly; the suite exceeds the ceiling) |
+| Tests | 15 boundary + 8 rendering |
+| Guards | both-front-ends, ADR index, wiring, doc links, mutation tables, bug lints green |
+| Next | `selectedForm`, then `column_taxon`/`commentary_taxon` — the only two read by NEITHER front end |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; Jeske on BRENDA's missing organism column |
+
+
+## Forty-fifth pass — the build was red, and one of the reasons was mine
+
+Ran the whole thing rather than the parts I had touched. Three findings, in
+increasing order of how much they should have been avoidable.
+
+**1. The TypeScript build had been red.** `tsc` reported 14 errors, all in
+`src/web/server.ts`, and the cause is worth keeping:
+
+```js
+const redoc = `
+  ...
+  <!-- Pinned, deliberately. This read `redoc@next` until 2026-08-16. -->
+```
+
+A comment explaining the redoc version pin, written in this project's house
+prose style — backticks around identifiers — **inside a JS template
+literal**, where a backtick is syntax. The first one closed the string and
+everything after it parsed as TypeScript. The comment is good and the fix
+keeps it verbatim: the backticks are escaped, so the served HTML is
+unchanged.
+
+`check_typescript_compiles.py` exists and would have caught it the moment
+anyone ran it.
+
+**2. Two of my own tests were written for the wrong runner.** I wrote
+`assayConditionsInExport.test.ts` and `spreadConsequenceExport.test.ts`
+against vitest and ran them with `npx vitest`, which installed vitest
+transiently. This repository runs **jest** (`"test": "jest"`). They passed
+in front of me and would never have run in CI — and they broke `tsc`, which
+is how I found out. Converted; both now run under jest, and
+`check_typescript_suites_discovered.py` confirms all 53 root suites are
+discovered.
+
+**3. I left a mutation in the codebase.** The full literature run failed two
+tests in `test_citation_export.py` — my own file, green when I left it.
+Line 205 was still:
+
+```python
+(known if False else missing).append(field) if field != "title" or True else None
+```
+
+the M1 probe from the `_known_and_missing` work. The batch had printed
+`=== restored === 34 passed`, so the restore held at that moment and did not
+survive; with concurrent agents writing the same tree, a `cp` restore is a
+race.
+
+And this project already solved it. `scripts/mutate.py` exists **because**
+hand-rolled harnesses did exactly this, and its docstring lists my failure
+as case 3 of 3: *"The restore silently failed. `/tmp` was not writable, so
+every `cp` restore did nothing and five mutations accumulated in the tree."*
+I hand-rolled `cp` backups all session anyway.
+
+The lesson is not a fourth mechanism. Three existed — `mutate.py` for safe
+mutation, `check_typescript_compiles.py` for the build,
+`verify_build.py`/`make pr` for the whole thing — and none of them was run
+until the end. Writing a new guard here would be the wrong response to
+having skipped the ones already built.
+
+| | |
+|---|---|
+| Literature | 900 passed, 2 skipped |
+| Engine | green except `check_no_tellurium_integration_claims --selftest`, which fails only in this sandbox (cannot `unlink` on the host mount) |
+| TypeScript | compiles clean; 7 new jest tests pass |
+| Left for the owner | `.selftest_probe.md` still in the repo root — gitignored, but this sandbox cannot delete it |
+| Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; the stale cofactor and licence rows in this file's summary table |

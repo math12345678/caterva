@@ -225,17 +225,15 @@ async function example3_scientificPipeline() {
     query: 'Michaelis-Menten kinetics for lactate dehydrogenase',
     parameters: {
       s0: 10.0  // User provides initial substrate
-    },
-    conditions: {
-      temperature: 37,
-      pH: 7.4
     }
   };
 
   console.log('\nSimulation Request:');
   console.log(`  Query: ${request.query}`);
   console.log(`  User parameters: ${JSON.stringify(request.parameters)}`);
-  console.log(`  Conditions: ${JSON.stringify(request.conditions)}`);
+  // The request no longer states conditions (ADR 0054) -- they belong to the
+  // parameters, not to the run, so they are printed from the RESPONSE below
+  // where they are known.
 
   try {
     const response = await pipeline.execute(request);
@@ -257,6 +255,23 @@ async function example3_scientificPipeline() {
     console.log(`  Execution time: ${response.metadata.executionTimeMs}ms`);
     console.log(`  Literature sources used: ${response.metadata.literatureSourcesUsed}`);
     console.log(`  Confidence score: ${(response.metadata.confidenceScore * 100).toFixed(1)}%`);
+
+    // ADR 0054: what conditions the trajectory is a trajectory OF. Printed
+    // even when the answer is "nobody recorded them", because a run whose
+    // conditions are unknown looks exactly like one at 37 C unless it says so.
+    const rc = response.runConditions;
+    if (rc) {
+      const say = (v: { status: string; value?: number }, unit: string) =>
+        v.status === 'agreed' ? `${v.value}${unit}` : v.status.replace('_', ' ');
+      console.log('\nAssay conditions the parameters were measured at:');
+      console.log(`  Temperature: ${say(rc.temperatureC, ' C')}`);
+      console.log(`  pH:          ${say(rc.ph, '')}`);
+    }
+
+    if (response.metadata.warnings.length > 0) {
+      console.log('\nWarnings:');
+      response.metadata.warnings.forEach(w => console.log(`  - ${w}`));
+    }
 
     console.log('\nReproducibility:');
     console.log(`  Reproduction key: ${response.reproducibilityKey.slice(0, 20)}...`);

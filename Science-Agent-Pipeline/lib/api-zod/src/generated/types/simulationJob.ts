@@ -5,9 +5,9 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { ErrorResponse } from './errorResponse';
-import type { SimulationJobStatus } from './simulationJobStatus';
-import type { SimulationResponse } from './simulationResponse';
+import type { ErrorResponse } from "./errorResponse";
+import type { SimulationJobStatus } from "./simulationJobStatus";
+import type { SimulationResponse } from "./simulationResponse";
 
 export interface SimulationJob {
   /** Unique identifier for this pipeline run */
@@ -16,10 +16,10 @@ export interface SimulationJob {
   /** Original natural-language query */
   query: string;
   /**
-     * Completion percentage based on pipeline stage
-     * @minimum 0
-     * @maximum 100
-     */
+   * Completion percentage based on pipeline stage
+   * @minimum 0
+   * @maximum 100
+   */
   progress: number;
   result?: SimulationResponse;
   error?: ErrorResponse;

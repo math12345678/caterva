@@ -12,13 +12,28 @@ import * as path from 'path';
 import * as yaml from 'js-yaml';
 import { URL } from 'url';
 import { logger } from '../logger';
+import { describeError } from '../errors';
 import ScientificPipeline from '../integration/scientificPipeline';
 import { searchPubMedForEnzymeKinetics } from '../integrations/crossref-pubmed-real';
 import { resolveDOIFromCrossRef } from '../integrations/crossref-pubmed-real';
+// The SAME resolver the CLI uses. Not a second implementation and not a
+// reimplementation over the api-server's HTTP surface: ADR 0027 records what
+// happens when one score has two producers, and this endpoint exists
+// precisely so the web page stops being a second-class citizen with a
+// different answer.
+import { resolveKinetic, ResolverUnavailableError } from '../literature/literatureResolver';
 import { runSweep, parseSweepParameter } from '../engine/parameter-sweep';
 import { processBatch, createMultiParamBatchJobs } from '../engine/batch-processor';
-import { compareModels } from '../engine/model-comparison';
+import { compareModels, fitRankingFor } from '../engine/model-comparison';
 import { getDefaultDatabase } from '../storage/job-database';
+import { recordRequest, getPerfSnapshot } from './perfCollector';
+import {
+  cacheKey,
+  getCacheStats,
+  isCacheable,
+  readCache,
+  writeCache,
+} from './responseCache';
 import {
   exportJobHistoryToCSV,
   exportSweepToCSV,
@@ -82,6 +97,66 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url || '', `http://${req.headers.host}`);
   const pathname = url.pathname;
+
+  // Timing wraps EVERY response, including the ones that throw and the
+  // 404, by hooking res.end rather than by remembering to call a recorder
+  // in each of the forty branches below. A perf collector that only sees
+  // the paths someone remembered to instrument reports the healthy subset
+  // of the system and calls it the system.
+  const startedAt = Date.now();
+  const originalEnd = res.end.bind(res);
+  let recorded = false;
+  (res as any).end = function patchedEnd(this: unknown, ...args: unknown[]) {
+    if (!recorded) {
+      recorded = true;
+      recordRequest(pathname, req.method || 'GET', Date.now() - startedAt, res.statusCode);
+    }
+    return (originalEnd as (...a: unknown[]) => unknown).apply(this, args);
+  };
+
+  // Short-TTL cache for read-only aggregates (allowlist in responseCache.ts).
+  if (isCacheable(pathname, req.method || 'GET')) {
+    const key = cacheKey(pathname, url.search);
+    const cached = readCache(key);
+    if (cached !== null) {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Cache': 'HIT' });
+      res.end(cached);
+      return;
+    }
+    // Set HERE, not in the patched `end` below.
+    //
+    // It used to be `res.setHeader('X-Cache', 'MISS')` inside `cachingEnd`,
+    // and that killed the whole server on every cache miss. Each handler
+    // calls `res.writeHead(...)` before `res.end(...)`, so by the time the
+    // patched `end` ran the headers were already sent and `setHeader` threw
+    // `ERR_HTTP_HEADERS_SENT`. The throw reached the outer catch, which
+    // called `res.writeHead(500, ...)` on the same sent response, threw
+    // again from inside the catch, and took the process down.
+    //
+    //     $ curl localhost:3000/api/metrics    -> connection reset
+    //     $ curl localhost:3000/api/health     -> connection refused
+    //
+    // Every allowlisted route — /api/stats and the /api/metrics family, the
+    // ones the dashboard polls — was fatal on first request. The second
+    // request would have been a cache HIT and fine; the server never lived
+    // to serve it.
+    //
+    // We are inside `cached === null`, so this IS a miss and can be declared
+    // immediately. Nothing has written to the response yet, and a header set
+    // before `writeHead` survives the merge — verified, not assumed.
+    res.setHeader('X-Cache', 'MISS');
+
+    // Capture this response so the next identical request can be served
+    // from memory. Only 200s are stored: caching an error would make a
+    // transient failure look persistent for the whole TTL.
+    const capturingEnd = res.end.bind(res);
+    (res as any).end = function cachingEnd(this: unknown, chunk?: unknown, ...rest: unknown[]) {
+      if (res.statusCode === 200 && typeof chunk === 'string') {
+        writeCache(key, chunk);
+      }
+      return (capturingEnd as (...a: unknown[]) => unknown).apply(this, [chunk, ...rest]);
+    };
+  }
 
   try {
     // POST /api/simulate
@@ -155,8 +230,7 @@ const server = http.createServer(async (req, res) => {
 
               const response = await pipeline.execute({
                 query,
-                parameters,
-                conditions: { temperature: 37, pH: 7.4 }
+                parameters
               });
 
               const jobStartTime = jobs.get(jobId)?.startTime || Date.now();
@@ -206,7 +280,7 @@ const server = http.createServer(async (req, res) => {
               const jobEndTime = Date.now();
               jobs.set(jobId, {
                 status: 'error',
-                error: error instanceof Error ? error.message : String(error),
+                error: describeError(error),
                 endTime: jobEndTime,
                 duration: jobEndTime - jobStartTime
               });
@@ -218,7 +292,7 @@ const server = http.createServer(async (req, res) => {
                 executionTimeMs: jobEndTime - jobStartTime,
                 convergenceSteps: 0,
                 success: false,
-                errorMessage: error instanceof Error ? error.message : String(error)
+                errorMessage: describeError(error)
               });
               logger.error({ jobId, error }, 'Simulation error');
             }
@@ -228,6 +302,32 @@ const server = http.createServer(async (req, res) => {
           res.end(JSON.stringify({ error: 'Invalid JSON' }));
         }
       });
+      return;
+    }
+
+    // GET /api/jobs/history (list all jobs)
+    // NOTE: must be registered before the /api/jobs/:jobId catch-all below,
+    // otherwise the :jobId regex matches the literal string "history" and
+    // shadows this route (same for /api/jobs/query).
+    if (pathname === '/api/jobs/history' && req.method === 'GET') {
+      const recentJobs = db.getRecentJobs(50);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ jobs: recentJobs, count: recentJobs.length }));
+      return;
+    }
+
+    // GET /api/jobs/query (advanced job query with filters)
+    // NOTE: must also be registered before /api/jobs/:jobId — see above.
+    if (pathname === '/api/jobs/query' && req.method === 'GET') {
+      const url = new URL(req.url || '', `http://${req.headers.host}`);
+      const queryStr = url.search.substring(1); // Remove leading '?'
+
+      const filter = parseQueryString(queryStr);
+      const allJobs = db.getRecentJobs(10000); // Get all for filtering
+      const result = filterJobs(allJobs, filter);
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
       return;
     }
 
@@ -247,29 +347,73 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // GET /api/jobs/history (list all jobs)
-    if (pathname === '/api/jobs/history' && req.method === 'GET') {
-      const recentJobs = db.getRecentJobs(50);
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ jobs: recentJobs, count: recentJobs.length }));
-      return;
-    }
-
-    // GET /api/jobs/query (advanced job query with filters)
-    if (pathname === '/api/jobs/query' && req.method === 'GET') {
-      const url = new URL(req.url || '', `http://${req.headers.host}`);
-      const queryStr = url.search.substring(1); // Remove leading '?'
-
-      const filter = parseQueryString(queryStr);
-      const allJobs = db.getRecentJobs(10000); // Get all for filtering
-      const result = filterJobs(allJobs, filter);
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify(result));
-      return;
-    }
-
     // GET /api/stats (statistics)
+    // GET /api/resolve — a measured parameter, with everything known about it
+    //
+    // WHY THIS EXISTS
+    // Until now this server had no way to resolve anything. The dashboard's
+    // only honest option was to tell the student to go and use the CLI,
+    // which is not a product, it is an apology.
+    //
+    // It returns the WHOLE resolved object, not just the number. The value
+    // alone is what a student would have typed anyway; the citation, assay
+    // conditions, protein variant, cofactors and reliability grades are the
+    // part that makes it different from a guess — and dropping them here
+    // would repeat ADR 0040 on a new surface.
+    if (pathname === '/api/resolve' && req.method === 'GET') {
+      const enzyme = url.searchParams.get('enzyme') ?? undefined;
+      const substrate = url.searchParams.get('substrate') ?? '';
+      const organism = url.searchParams.get('organism') ?? '';
+      const rawQuantity = url.searchParams.get('quantity') ?? 'km';
+      const quantity =
+        rawQuantity === 'ki' || rawQuantity === 'kcat' ? rawQuantity : 'km';
+
+      // Refuse rather than assume. An organism is not optional and must not
+      // be defaulted to human: "the enzyme" is not a thing that has one Km,
+      // which is the whole of Jeske's objection (ADR 0024).
+      const missing: string[] = [];
+      if (!enzyme) missing.push('enzyme');
+      if (!substrate) missing.push('substrate');
+      if (!organism) missing.push('organism');
+      if (missing.length > 0) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          error: 'MISSING_REQUIRED_INPUT',
+          missing,
+          message:
+            `Cannot resolve: ${missing.join(', ')} not supplied. An organism ` +
+            'is required and is never assumed — kinetic parameters are ' +
+            'species-specific, so "the enzyme" does not have one Km.',
+        }));
+        return;
+      }
+
+      try {
+        const resolved = await resolveKinetic({
+          enzymeName: enzyme,
+          substrate,
+          organism,
+          quantity,
+          allowCrossSpecies: url.searchParams.get('allowCrossSpecies') === 'true',
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(resolved));
+      } catch (err) {
+        // THREE OUTCOMES, NOT TWO. `found: false` above means the literature
+        // genuinely holds nothing; this means the lookup could not run. A
+        // client that cannot tell them apart teaches its user to read an
+        // absence of evidence as evidence of absence, which is the reason
+        // the CLI has three exit codes.
+        const message =
+          err instanceof ResolverUnavailableError
+            ? err.message
+            : 'The literature resolver could not be run.';
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'RESOLVER_UNAVAILABLE', message }));
+      }
+      return;
+    }
+
     if (pathname === '/api/stats' && req.method === 'GET') {
       const stats = db.getStatistics();
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -316,20 +460,51 @@ const server = http.createServer(async (req, res) => {
                 batches.set(compareId, { ...batches.get(compareId), progress, completed });
               });
 
+              // Rank the models against the caller's OWN measurement, when
+              // they supplied one.
+              //
+              // `rankModelsByFit` had no production caller. It is the
+              // function that answers "which mechanism does my bench data
+              // support" -- the most consequential question this codebase
+              // can be asked -- and nothing invoked it, so the answer was
+              // computed by nobody and reached no one.
+              //
+              // That is ADR 0039's defect class at the scale of a whole
+              // capability: not a field dropped at a boundary, but an entire
+              // analysis written, tested, and never wired. It also meant the
+              // defect ADR 0060 found in it (a model that never ran ranking
+              // FIRST, because its fabricated 0 sat closest to a small
+              // experimental value) could sit there unnoticed.
+              //
+              // Optional by design. `experimentalFinalValue` is a
+              // measurement the experimenter made; Terrium cannot resolve it
+              // from literature and must not invent one, so its absence
+              // means "no fit ranking", never a default.
+              const experimental = data.experimentalFinalValue;
+              const fit = fitRankingFor(result.models, experimental);
+
               batches.set(compareId, {
                 status: 'complete',
                 progress: 100,
-                result,
+                result: fit ? { ...result, experimentalFinalValue: experimental, fit } : result,
                 endTime: Date.now(),
                 duration: Date.now() - (batches.get(compareId)?.startTime || 0),
                 type: 'comparison'
               });
 
-              logger.info({ compareId, bestModel: result.bestModel }, 'Model comparison complete');
+              logger.info(
+                {
+                  compareId,
+                  bestModel: result.bestModel,
+                  fitRanked: fit?.ranked.length ?? 0,
+                  fitExcluded: fit?.excluded.length ?? 0,
+                },
+                'Model comparison complete',
+              );
             } catch (error) {
               batches.set(compareId, {
                 status: 'error',
-                error: error instanceof Error ? error.message : String(error),
+                error: describeError(error),
                 endTime: Date.now(),
                 duration: Date.now() - (batches.get(compareId)?.startTime || 0),
                 type: 'comparison'
@@ -407,7 +582,7 @@ const server = http.createServer(async (req, res) => {
             } catch (error) {
               batches.set(batchId, {
                 status: 'error',
-                error: error instanceof Error ? error.message : String(error),
+                error: describeError(error),
                 endTime: Date.now(),
                 duration: Date.now() - (batches.get(batchId)?.startTime || 0)
               });
@@ -494,7 +669,7 @@ const server = http.createServer(async (req, res) => {
             } catch (error) {
               sweeps.set(sweepId, {
                 status: 'error',
-                error: error instanceof Error ? error.message : String(error),
+                error: describeError(error),
                 endTime: Date.now(),
                 duration: Date.now() - (sweeps.get(sweepId)?.startTime || 0)
               });
@@ -625,7 +800,10 @@ const server = http.createServer(async (req, res) => {
   <title>Terrium API Documentation (ReDoc)</title>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link href="https://fonts.googleapis.com/css?family=Montserrat:300,400,700|Roboto:300,400,700" rel="stylesheet">
+  <!-- No webfont. This pulled Montserrat and Roboto from fonts.googleapis.com,
+       handing every reader's IP to Google before the page rendered (GDPR
+       Art. 4; CJEU Breyer C-582/14; LG Muenchen I, 20 Jan 2022, Az. 3 O
+       17493/20). Redoc's own defaults fall back to the system UI font. -->
   <style>
     body {
       margin: 0;
@@ -635,7 +813,14 @@ const server = http.createServer(async (req, res) => {
 </head>
 <body>
   <redoc spec-url="/api/openapi.json"></redoc>
-  <script src="https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js"></script>
+  <!-- Pinned, deliberately. This read \`redoc@next\` until 2026-08-16. \`next\` is
+       not a version: it is whatever was published most recently under that
+       dist-tag, and jsDelivr's own API reports it currently resolving to
+       3.0.0-rc.0 -- a release candidate. So this page was serving readers a
+       pre-release build that changed without anyone here deciding it should,
+       on a server with no authentication. \`latest\` is 2.5.3, which is what the
+       \`<redoc spec-url=...>\` element above is written against. -->
+  <script src="https://cdn.jsdelivr.net/npm/redoc@2.5.3/bundles/redoc.standalone.js"></script>
 </body>
 </html>
       `;
@@ -814,6 +999,25 @@ const server = http.createServer(async (req, res) => {
     }
 
     // GET /api/metrics (Overall performance metrics)
+    // GET /api/perf (per-endpoint timing; documented in
+    // API_PERFORMANCE_GUIDE.md long before it existed)
+    if (pathname === '/api/perf' && req.method === 'GET') {
+      const limitRaw = url.searchParams.get('limit');
+      const parsedLimit = limitRaw === null ? 5 : Number.parseInt(limitRaw, 10);
+      const limit =
+        Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 100) : 5;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(getPerfSnapshot(limit)));
+      return;
+    }
+
+    // GET /api/cache/stats
+    if (pathname === '/api/cache/stats' && req.method === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(getCacheStats()));
+      return;
+    }
+
     if (pathname === '/api/metrics' && req.method === 'GET') {
       const aggregated = metrics.getAggregatedMetrics();
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -960,13 +1164,54 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
   } catch (error) {
+    // LOG FIRST. This used to log last, so when the recovery below threw the
+    // error that caused it was never recorded — the operator got a dead
+    // process and a silent log.
+    logger.error({ error, pathname, method: req.method }, 'Server error');
+
+    // A handler that throws AFTER it started responding cannot be sent a 500:
+    // the status line is already on the wire. Calling `writeHead` here throws
+    // `ERR_HTTP_HEADERS_SENT` from inside the catch, where nothing is left to
+    // catch it, and Node terminates the process.
+    //
+    // That is how one malformed request became a denial of service for every
+    // other user of this server. An error handler that can crash the process
+    // is worse than no error handler, because it converts a single failed
+    // request into a total outage.
+    //
+    // Nothing useful can be sent at this point, so the connection is
+    // destroyed: the client sees a truncated response and retries, rather
+    // than hanging until timeout on a request that will never complete.
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
+
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Server error' }));
-    logger.error({ error }, 'Server error');
   }
 });
 
 server.listen(PORT, () => {
   console.log(`\n🧪 Terrium Dashboard: http://localhost:${PORT}\n`);
+
+  // Printed on every start, not tucked into a document nobody opens.
+  //
+  // This server has NO authentication, and `GET /api/jobs/history` returns
+  // the last 50 jobs -- including the query text somebody typed -- to any
+  // caller. There is no per-user separation because there are no users.
+  //
+  // That is defensible for a localhost tool. What was not defensible is
+  // that nothing said so: a teacher could put this on a lab network, and a
+  // student could open the history panel and be reading somebody else's
+  // work without either of them having any reason to expect it.
+  //
+  // The banner is the honest place for it. Anyone deploying reads this
+  // line; far fewer read SECURITY.md first.
+  console.log(
+    '⚠  No authentication. /api/jobs/history returns EVERY user\'s queries\n' +
+    '   to anyone who can reach this port. Safe on localhost; do not expose\n' +
+    '   it to a shared network or the internet as-is. See SECURITY.md.\n'
+  );
   logger.info({ port: PORT }, `✓ Server running`);
 });

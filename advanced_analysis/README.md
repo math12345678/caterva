@@ -24,7 +24,7 @@ pip install -r requirements.txt
 
 ## Figure Suite (working)
 
-The figure generator in `scripts/generate_figures.py` produces 10 publication-quality
+The figure generator in `advanced_analysis/scripts/generate_figures.py` produces 10 publication-quality
 figures that run the real engine and overlay the closed-form/statistical reference
 each domain is validated against:
 
@@ -76,15 +76,27 @@ python performance/benchmark_all_domains.py
 jupyter notebook performance/performance_analysis.ipynb
 ```
 
-### 3. Provenance Tracking Visualization
+### 3. Provenance Tracking Visualization — NOT BUILT
 
-```bash
-# Run the interactive dashboard
-streamlit run provenance_visualization/scripts/dashboard.py
+There is no `provenance_visualization/` directory. This section previously
+gave two commands for it:
 
-# Generate a provenance report
-python provenance_visualization/scripts/generate_report.py --model SIR --output report.md
-```
+    streamlit run provenance_visualization/scripts/dashboard.py
+    python provenance_visualization/scripts/generate_report.py --model SIR
+
+Neither script has ever existed. Anyone who followed them got a file-not-found
+error and reasonably concluded the project was broken.
+
+Kept as a stated gap rather than deleted, because the idea is worth building
+and a silent deletion would lose it. What exists today for provenance is:
+
+    scientific resolve ... --export-model model.txt      # Antimony with
+                                                         # provenance in comments
+    scientific resolve ... --export-citations refs.bib   # BibTeX / RIS
+
+`scripts/check_commands_runnable.py` now fails the build on a documented
+command that cannot run, which is what should have caught this the day it
+was written.
 
 ### 4. Simulation Validation System
 
@@ -174,8 +186,7 @@ python performance/benchmark_all_domains.py
 # 3. Launch performance analysis notebook
 jupyter notebook performance/performance_analysis.ipynb
 
-# 4. Run provenance dashboard
-streamlit run provenance_visualization/scripts/dashboard.py
+# 4. (there is no provenance dashboard -- see "NOT BUILT" above)
 
 # 5. Run validation pipeline for a specific model
 python validation/run_validation_pipeline.py \

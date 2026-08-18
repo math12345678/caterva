@@ -53,7 +53,7 @@ const WITH_TERRIUM: Step[] = [
     icon: "\u2705",
     label: "Verified result",
     detail:
-      "RK4 integration validated against closed-form solutions to 1e-10 tolerance. Every number links to a PubMed citation.",
+      "RK4 integration validated against closed-form solutions, an independent integrator, or a physical invariant, depending on the domain. Every resolved parameter carries its citation.",
   },
   {
     icon: "\u26A1",

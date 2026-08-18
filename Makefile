@@ -28,6 +28,7 @@ help:
 	@echo "  make test-sim   simulation engine only (Terium/)"
 	@echo "  make test-lit   literature layer only (Tests/)"
 	@echo "  make guards     the guards CI runs (no test suites)"
+	@echo "  make counts-fix update README counts after adding a test/guard/ADR"
 	@echo "  make pr         everything CI runs -- do this before opening a PR"
 	@echo "  make cli        Terium CLI help (python -m Terium.cli)"
 	@echo "  make clean      remove caches and build artifacts"
@@ -228,6 +229,9 @@ guards: require-pytest
 	@"$(PY)" scripts/check_forbidden_packages.py
 	@echo ">> guard wiring"
 	@"$(PY)" scripts/check_guard_wiring.py
+	@echo ">> no Tellurium integration claims"
+	@"$(PY)" scripts/check_no_tellurium_integration_claims.py --selftest
+	@"$(PY)" scripts/check_no_tellurium_integration_claims.py
 	@echo ">> LLM disclosure"
 	@"$(PY)" scripts/check_llm_disclosure.py --selftest
 	@"$(PY)" scripts/check_llm_disclosure.py
@@ -278,6 +282,19 @@ guards: require-pytest
 	@"$(PY)" scripts/verify_build.py --quick
 	@echo ">> silent skips"
 	@"$(PY)" scripts/check_no_silent_skips.py
+
+# Correct the counts in README.md that are derived from the tree.
+#
+# Adding a test changes three numbers; adding a guard changes two; adding
+# an ADR changes one. `make guards` fails on all of them and used to say
+# "Update README.md", which is a six-line hand-edit for figures a script
+# already knows. That is a contribution barrier built out of a correct
+# check.
+#
+# Deliberately not folded into `guards`: a check that silently edits your
+# working tree is not a check. You ask for the write.
+counts-fix: check-python
+	@"$(PY)" scripts/check_documented_counts.py --write
 
 # What CI will run, in CI's order, as far as a laptop can go.
 pr: guards test

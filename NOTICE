@@ -99,6 +99,36 @@ THE TRIGGER THAT CHANGES THIS
   publishes is added while this NOTICE lacks the LGPL conveyance section.
   That guard exists so the obligation is not discovered after the fact.
 
+  WHAT ELSE ATTACHES AT THAT MOMENT
+
+  The section above names libSBML because that is the dependency Terrium
+  installs. A published image also conveys **its base image**, and that is
+  a separate set of licences nobody put in this file.
+
+  Terrium's Dockerfiles start from:
+
+      FROM node:22-alpine       (Dockerfile, both stages)
+      FROM python:3.12-slim     (.devcontainer/Dockerfile)
+
+  Alpine ships **busybox, which is GPL-2.0**. Debian slim ships coreutils
+  and bash, which are **GPL-3.0**, over **glibc, which is LGPL-2.1**. None
+  of that is unusual and none of it is a reason to change base image —
+  publishing container images built on official bases is ordinary practice,
+  and the obligations are ordinary too. But they are obligations, they are
+  not the same ones as libSBML's, and "we checked the Python dependencies"
+  is not the same as "we checked the image".
+
+  This is recorded rather than resolved because **nothing is published**, so
+  nothing attaches yet. The point of writing it down now is that the person
+  who runs `docker push` will be looking at the section above, which names
+  one library, and would reasonably conclude the analysis was complete.
+
+  Before publishing an image, someone should read the licence manifests of
+  the specific base image tags in use — `docker run --rm <image> sh -c 'cat
+  /usr/share/doc/*/copyright'` on the Debian one, and Alpine's
+  `/lib/apk/db/installed` on the other. That is a real task, not a formality,
+  and it has not been done.
+
 
 stdpopsim — GPL-3.0-or-later, and why it is not installed by default
 --------------------------------------------------------------------
@@ -334,6 +364,20 @@ it is recorded here because exceeding it gets a client blocked.
 
 KEGG — queried live, and UNRESOLVED
 ----------------------------------
+
+The heading still says UNRESOLVED because the licence question is
+unresolved. What changed on 2026-08-16 is narrower: **the call is now off by
+default.**
+
+`Tests/enzyme_lookup.py` raises `KeggLicenceNotConfigured` unless
+`TERRIUM_ENABLE_KEGG` is set, so Terrium contacts KEGG only when an operator
+has stated that their own licence position permits it (ADR 0096). Until
+then the resolver degrades to the unfiltered BRENDA fallback.
+
+Gating removes the exposure. It does not settle the entitlement, and
+**no licence has been obtained from Pathway Solutions.** Anyone setting that
+variable is making the claim themselves, and the analysis below is what they
+should read first.
 
 Terrium makes live calls to `https://rest.kegg.jp/get/ec:<ec_number>` from
 the server, in `resolve_substrate_from_kegg()`

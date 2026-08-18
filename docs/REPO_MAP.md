@@ -1,18 +1,34 @@
 # Repository map
 
-Terrium is published as 18 repositories under
-[github.com/Terrium-sim](https://github.com/Terrium-sim). This file records
-what goes where and, where the answer was not obvious, why.
+**This describes a plan, not the current layout.** Terrium is *to be*
+published as 18 repositories under
+[github.com/Terrium-sim](https://github.com/Terrium-sim); today it is one
+repository, and `docs/PUBLISHING.md` holds the procedure that has not been
+run. This file records what would go where and, where the answer was not
+obvious, why.
 
-`main` is an **umbrella**: it carries the top-level README, the compose and
-container files, CI, and git submodules pointing at the others. No source
-file lives in two repositories, so nothing can drift out of sync — which is
-the failure this project has spent most of its effort eliminating
+That distinction is the reason for this paragraph. The line above read
+"Terrium **is** published as 18 repositories", in the present tense, in a
+document `DOCUMENTATION_INDEX.md` offers as "find my way around the tree" —
+so a newcomer looking for `backend-main` would go hunting for a repository
+that does not exist and conclude they had lost it.
+
+After the split, `main` becomes an **umbrella**: top-level README, compose
+and container files, CI, and git submodules pointing at the others. No
+source file would live in two repositories, so nothing could drift out of
+sync — the failure this project has spent most of its effort eliminating
 everywhere else.
 
+Clone today:
+
 ```bash
-git clone --recursive https://github.com/Terrium-sim/main.git
+git clone https://github.com/Terrium-sim/main.git
 ```
+
+`--recursive` belongs on that command only once submodules exist. It was
+there, doing nothing, and `Tests/test_clone_instructions_agree.py` will
+require it again the moment a `.gitmodules` appears — so the flag comes
+back with the split rather than ahead of it.
 
 ## The map
 
@@ -21,9 +37,9 @@ git clone --recursive https://github.com/Terrium-sim/main.git
 | `main` | umbrella: README, LICENSE, CITATION.cff, CONTRIBUTING, SECURITY, CHANGELOG, Docker/compose, submodules | root files (14 current docs) | new |
 | `backend-main` | TypeScript library, CLI, engine bridge, web server, storage, validation, literature layer | `src/`, `examples/` | preserved |
 | `frontend-main` | the dashboard UI served by the web server | `src/web/dashboard.html` | preserved |
-| `wiring-main` | the 22 guards, CI workflow, Makefile, build/lint/type config | `scripts/`, `.github/`, `Makefile`, `pyproject.toml`, `tsconfig.json`, `requirements*.txt` | preserved |
-| `terium` | the simulation engine (15 domains) and its 1,014 tests | `Terium/` (was `Tellurium/`) | preserved, see below |
-| `tests` | the literature layer and its 277 tests — resolvers, BRENDA/PubMed clients | `Tests/` | preserved |
+| `wiring-main` | the guards, CI workflow, Makefile, build/lint/type config | `scripts/`, `.github/`, `Makefile`, `pyproject.toml`, `tsconfig.json`, `requirements*.txt` | preserved |
+| `terium` | the simulation engine (15 domains) and its tests | `Terium/` (was `Tellurium/`) | preserved, see below |
+| `tests` | the literature layer — resolvers, BRENDA/PubMed clients | `Tests/` | preserved |
 | `business` | strategy, pitch material, and the build-stage record | `Business/` | preserved |
 | `documents` | ADRs, the constitution, architecture notes, Word deliverables | `docs/`, `Docw/` | preserved |
 | `advanced-analysis` | analysis scripts and generated figures | `advanced_analysis/` | preserved |
@@ -98,7 +114,7 @@ Full per-file classification is in
 
 ## Keeping it honest
 
-The split does not weaken any guard. `wiring-main` holds all 22, and they
+The split does not weaken any guard. `wiring-main` holds all of them, and they
 run against the recursive checkout, so:
 
 - `check_example_endpoints.py` still resolves every documented endpoint
@@ -106,6 +122,10 @@ run against the recursive checkout, so:
 - `check_no_orphan_modules.py` still sees the whole import graph.
 - `check_documented_counts.py` still reconciles the README's test counts
   against `terium` and `tests`.
+
+Counts are deliberately not stated in this table. They changed under three
+onboarding documents without anyone noticing — the figure a reader needs is
+in `README.md`, which `scripts/check_documented_counts.py` keeps true.
 
 A guard that only worked inside one repository would be a guard that stopped
 working the moment the repository was split, which is the same

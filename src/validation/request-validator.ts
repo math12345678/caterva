@@ -5,6 +5,8 @@
  * Ensures data integrity and prevents malformed requests
  */
 
+import { ScientificPipeline } from '../integration/scientificPipeline';
+
 export interface ValidationError {
   field: string;
   message: string;
@@ -32,17 +34,32 @@ export function validateSimulationRequest(data: any): ValidationResult {
     errors.push({ field: 'query', message: 'query must be a non-empty string', value: data.query });
   }
 
-  const validQueries = [
-    'michaelis-menten',
-    'competitive-inhibition',
-    'non-competitive-inhibition',
-    'product-inhibition'
-  ];
-
-  if (data.query && !validQueries.includes(data.query)) {
+  // ASKED, NOT REMEMBERED.
+  //
+  // This was a hardcoded list of four queries, and it had drifted from the
+  // pipeline in both directions at once:
+  //
+  //   - it REJECTED `allosteric`, which the engine implements ("Allosteric
+  //     (Hill)" in `kinematicModels`), so a working model was unreachable
+  //     over HTTP;
+  //   - it ACCEPTED `competitive-inhibition`, `non-competitive-inhibition`
+  //     and `product-inhibition`, which the pipeline cannot place on any
+  //     domain. Measured: those requests passed validation, were queued,
+  //     returned a job id, and the job then reported `status: "complete"`
+  //     while carrying `validated: false` and "does not name a domain this
+  //     pipeline knows (mm, sir)". The refusal arrived buried inside a
+  //     result labelled complete, rather than as a 400 at request time.
+  //
+  // A validator that keeps its own copy of what the engine supports
+  // validates the copy. It now asks the pipeline, which is the thing that
+  // actually decides whether the query can run.
+  if (data.query && typeof data.query === 'string'
+      && !ScientificPipeline.namesAKnownDomain(data.query)) {
     errors.push({
       field: 'query',
-      message: `query must be one of: ${validQueries.join(', ')}`,
+      message:
+        `query must name a model this pipeline can run: ` +
+        `${ScientificPipeline.knownDomainAliases().join(', ')}`,
       value: data.query
     });
   }
@@ -94,6 +111,18 @@ export function validateSweepRequest(data: any): ValidationResult {
   // Query validation
   if (!data.query || typeof data.query !== 'string') {
     errors.push({ field: 'query', message: 'query must be a non-empty string' });
+  } else if (!ScientificPipeline.namesAKnownDomain(data.query)) {
+    // `/api/simulate` checks this and `/api/sweep` did not, so the same
+    // string was a 400 on one route and an accepted job on the other —
+    // then every point of the sweep failed downstream for a reason the
+    // caller only saw by reading the finished result.
+    errors.push({
+      field: 'query',
+      message:
+        `query must name a model this pipeline can run: ` +
+        `${ScientificPipeline.knownDomainAliases().join(', ')}`,
+      value: data.query
+    });
   }
 
   // Base parameters validation
@@ -179,6 +208,17 @@ export function validateBatchRequest(data: any): ValidationResult {
   // Query validation
   if (!data.query || typeof data.query !== 'string') {
     errors.push({ field: 'query', message: 'query must be a non-empty string' });
+  } else if (!ScientificPipeline.namesAKnownDomain(data.query)) {
+    // Same check as `/api/simulate` and `/api/sweep`. A batch is the worst
+    // route to leave unchecked: one unrunnable query becomes N failed jobs,
+    // each recorded, each reporting complete.
+    errors.push({
+      field: 'query',
+      message:
+        `query must name a model this pipeline can run: ` +
+        `${ScientificPipeline.knownDomainAliases().join(', ')}`,
+      value: data.query
+    });
   }
 
   // Parameter sets validation

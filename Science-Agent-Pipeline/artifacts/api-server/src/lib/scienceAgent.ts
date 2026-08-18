@@ -5,6 +5,11 @@ import { fileURLToPath } from "node:url";
 import { logger } from "./logger";
 import { findRepositoryRoot } from "./repoRoot";
 import { resolvePythonExecutable } from "./python";
+import type {
+  PhysiologicalReference,
+  ReliabilityScore,
+} from "./reliabilityScore";
+import type { BufferIdentity, Effector } from "./provenance";
 
 export interface Citation {
   source: string;
@@ -73,6 +78,134 @@ export interface ScienceAgentResult {
    * asked for (BRENDA cross-species fallback). Stage 5 Part 3: first-class
    * across the boundary, previously dropped by the runner. */
   crossSpecies?: boolean;
+  /** Organisms that DO hold a value when the requested organism does not,
+   * and cross-species use was not opted into. Populated only when
+   * `source === "cross_species_withheld"` (ADR 0024).
+   *
+   * Present so a refusal can name what it refused. `found: false` with an
+   * empty reason is indistinguishable from "the literature has nothing",
+   * and those are different facts: one is a gap in science, the other is a
+   * policy this code applied. Conflating them is the same category error
+   * that ADR 0012/0013 exist to prevent, one level up. */
+  crossSpeciesOrganismsAvailable?: string[];
+  /** Variant descriptors ("Y124C", "isozyme H4") for rows that WERE found
+   * and were withheld because they measure a sequence variant rather than
+   * the enzyme (ADR 0029). Populated only when
+   * `source === "variant_withheld"`. */
+  variantCandidatesAvailable?: string[];
+  /** Which protein the winning row measured. Present on FOUND results too:
+   * `unstated` is the majority case in BRENDA and it is NOT wild-type, so a
+   * reader must be able to tell "the row did not say" from "the row said
+   * wild-type". */
+  variant?: VariantVerdict;
+  /**
+   * How the enzyme was PREPARED for the winning row (ADR 0092):
+   * `native` | `immobilised` | `tagged` | `modified` | `unstated` | `absent`.
+   *
+   * TOP-LEVEL beside `variant`, because that is where the runner emits it —
+   * the same check that saved `effectors` from being permanently
+   * `undefined` inside `assayConditions`.
+   *
+   * `unstated` is the majority case and is NOT `native`. A reader must be
+   * able to tell "the row did not say" from "the row said native enzyme".
+   */
+  preparation?: {
+    status: string;
+    evidence?: string | null;
+    /**
+     * The quantity the curator explicitly says the preparation did NOT
+     * change ("KM", "KCAT"), or null.
+     *
+     * Quantity-specific by nature: the same PEGylated AChE row carries the
+     * clause for Km in one BRENDA table and Kcat in another, so it is a
+     * statement about a measurement rather than about the protein.
+     */
+    stated_not_to_affect?: string | null;
+    /**
+     * Whether this preparation should be flagged for the quantity that was
+     * resolved — decided by `enzyme_preparation.differs_for()` in Python,
+     * which owns the rule.
+     *
+     * Read this rather than re-deriving from `status` and
+     * `stated_not_to_affect`. Those are the INPUTS; recomputing the
+     * judgement here would be a second implementation of one rule, which
+     * is ADR 0027's defect exactly.
+     */
+    warrantsWarning?: boolean;
+  };
+  /**
+   * Cofactors and effectors named in the winning row's commentary, resolved
+   * to PubChem compounds by the runner (ADR 0032).
+   *
+   * TOP-LEVEL, beside `variant`, because that is where the runner emits it.
+   * The first draft of this field put it inside `assayConditions`, where it
+   * reads more naturally and would have been permanently `undefined` — the
+   * exact shape of ADR 0027's defect, caught this time by checking the
+   * emitter instead of assuming it.
+   *
+   * An empty array means the commentary named none. That is different from
+   * a clause that WAS found and could not be resolved, which arrives
+   * carrying an identity with status "unresolvable".
+   */
+  effectors?: Effector[];
+  /**
+   * Set when the evidence ranked several rows equal and a tie-break chose
+   * among them (ADR 0048).
+   *
+   * On the LDH turnover table six non-dominated rows span 21.1 to 6467 — a
+   * 306-fold range, every one wild-type with pH and temperature reported.
+   * The returned value is the lowest, and without this field nothing says
+   * the evidence found 6467 equally credible.
+   *
+   * Absent means no tie was found. That is different from a tie with no
+   * candidates, which is why `candidates` is checked rather than presence.
+   */
+  selectionTie?: SelectionTie | null;
+  /**
+   * Which named form the returned value IS, when the candidate pool mixed
+   * forms of one enzyme (ADR 0052).
+   *
+   * `poolFindings.formMixtures` warns that "returning the lowest would pick
+   * a form rather than answer the question" — conditionally. This says
+   * whether it did.
+   *
+   * Null in every fixture today: the pipeline selects rows carrying no
+   * designator. That is luck rather than design, and a test pins it so a
+   * BRENDA update that changes it fails loudly.
+   */
+  selectedForm?: SelectedForm | null;
+  /**
+   * Bakker's three axes, as computed by the PYTHON resolver
+   * (Tests/reliability.py) and emitted by science_agent_runner.py.
+   *
+   * This field is the fix for a duplicate source of truth. The runner has
+   * always computed and emitted this score; `ScienceAgentResult` had no
+   * field to receive it, so the API server discarded it and recomputed the
+   * same three axes in TypeScript — and the recomputation was strictly
+   * worse, because its call site never passed a PhysiologicalReference and
+   * `conditionProximity` was therefore permanently `not_assessed`.
+   *
+   * The CLI (src/literature/literatureResolver.ts) already consumed the
+   * Python score. So the two front ends disagreed on a third of the score
+   * while a parity test asserted they agreed — the test pinned the two
+   * IMPLEMENTATIONS against a shared fixture, which cannot detect a call
+   * site that passes different arguments.
+   */
+  reliability?: ReliabilityScore;
+  /** Per-candidate relatedness verdicts from taxonomy.py (ADR 0024).
+   * Includes rejected candidates, deliberately — see the runner. */
+  relatedness?: RelatednessVerdict[];
+  /**
+   * Facts about the candidate POOL, not about the value that won it
+   * (ADR 0039).
+   *
+   * Four detectors computed these and the runner dropped them: the
+   * resolver attached them to its result, nothing emitted them, and only a
+   * prose line reached the diagnostic log. Every test on every detector
+   * passed throughout, because each tested the computation and none tested
+   * the boundary. ADR 0027's defect, four times over.
+   */
+  poolFindings?: PoolFindings;
   citation?: Citation;
   /** Assay conditions the Km was measured under, parsed from the BRENDA
    * commentary by the Python client. STRENDA requires temperature and pH
@@ -87,11 +220,111 @@ export interface ScienceAgentResult {
     ph?: number | null;
     temperatureC?: number | null;
     buffer?: string | null;
+    /** The buffer resolved to a PubChem compound (ADR 0028). Absent when
+     * no buffer was reported; `status: "unresolvable"` when one was
+     * reported and could not be resolved -- those are different facts. */
+    bufferIdentity?: BufferIdentity | null;
     /** Fields BRENDA explicitly states the publication did not report. */
     unreported?: string[];
   };
   literatureCandidates: LiteratureCandidate[];
   logs: string[];
+}
+
+/** Mirrors form_mixture.SelectedForm. */
+export interface SelectedForm {
+  base: string;
+  designator: string;
+  value: number;
+  sibling_designators?: string[];
+  reason: string;
+}
+
+/** Mirrors selection_tie.SelectionTie. snake_case inside the candidates
+ * because they cross the wire as Python emits them. */
+export interface SelectionTie {
+  candidates: Array<{
+    value: number;
+    unit?: string | null;
+    organism?: string | null;
+    reference_id?: string | null;
+    conditions?: string | null;
+    selected?: boolean;
+  }>;
+  low?: number | null;
+  high?: number | null;
+  fold_range?: number | null;
+  reason: string;
+}
+
+/** Mirrors protein_variant.VariantVerdict. snake_case for the same reason
+ * RelatednessVerdict is: it crosses the wire as Python emits it. */
+export interface VariantVerdict {
+  /** "wild_type" | "variant" | "unstated" | "absent" */
+  status: string;
+  /** "mutant" | "isozyme" when status is "variant". */
+  kind?: string | null;
+  /** The exact substring that decided it, so a reader can check the
+   * classifier rather than trust it. */
+  evidence?: string | null;
+  recombinant?: boolean;
+  reason: string;
+}
+
+/** Mirrors taxonomy.Relatedness on the Python side. Field names are
+ * snake_case because they cross the wire as the Python model emits them;
+ * renaming here would create a second place the two halves could drift. */
+/** Mirrors the runner's `poolFindings`. snake_case inside each item, for
+ * the same reason RelatednessVerdict is: they cross the wire as the Python
+ * models emit them, and renaming here would create a second place the two
+ * halves could drift. */
+export interface PoolFindings {
+  /** A compound the pool reports both with and without (ADR 0033). */
+  effectorContrasts?: Array<{
+    compound: string;
+    present_values: number[];
+    absent_values: number[];
+    reason: string;
+  }>;
+  /** One base named with several form designators (ADR 0035). */
+  formMixtures?: Array<{
+    base: string;
+    values_by_form: Record<string, number[]>;
+    reason: string;
+  }>;
+  /** A row whose commentary names a different organism than its column
+   * (ADR 0037). */
+  organismDiscrepancies?: Array<{
+    value: number;
+    column_organism: string;
+    commentary_organism: string;
+    reason: string;
+  }>;
+  /** One organism measured from several biological sources (ADR 0037). */
+  sourceMixtures?: Array<{
+    organism: string;
+    values_by_source: Record<string, number[]>;
+    reason: string;
+  }>;
+  /**
+   * Set when source tokens were found and NONE could be classified, so the
+   * pool was not checked for mixed sources at all.
+   *
+   * Without it, `sourceMixtures: []` means both "the pool was clean" and
+   * "the classifier could not reach NCBI" — the conflation ADR 0024 and
+   * ADR 0029 both exist to prevent, shipped inside a module written to
+   * avoid it.
+   */
+  sourceCheckUnavailable?: { tokens: string[]; reason: string } | null;
+}
+
+export interface RelatednessVerdict {
+  status: string;
+  shared_rank?: string | null;
+  shared_name?: string | null;
+  query_organism?: string | null;
+  candidate_organism?: string | null;
+  reason?: string;
 }
 
 export interface EntityExtraction {
@@ -111,6 +344,29 @@ export interface EntityExtraction {
    * always a value that traced back to a user override in queryResolver.ts,
    * never something this layer invents. */
   enzymeConc?: number;
+  /** Opt in to values measured in a different organism (ADR 0024).
+   *
+   * Absent means false. The permissive reading of a missing flag is
+   * precisely how the automatic cross-species fallback would come back,
+   * silently, in a diff that looked like a refactor. */
+  allowCrossSpecies?: boolean;
+  /** Opt in to a value measured on a sequence variant (ADR 0029). Absent
+   * means false, for the same reason allowCrossSpecies reads that way. */
+  allowVariants?: boolean;
+  /**
+   * The conditions the model is meant to represent (ADR 0024, Decision 3).
+   *
+   * Forwarded verbatim to the runner, which grades `conditionProximity`
+   * against it. Never defaulted here or anywhere else: "physiological" has
+   * no organism-independent value, and baking in 7.4/37 would silently
+   * assume a mammal and report a confident `far` for a thermophile assay
+   * that was in fact ideal.
+   *
+   * Its absence is why the API server's proximity axis could only ever say
+   * `not_assessed` — not because the grader was broken, but because nobody
+   * had ever been able to state what the model represents.
+   */
+  physiologicalReference?: PhysiologicalReference;
 }
 
 interface PythonError {
@@ -282,6 +538,15 @@ export async function resolveKineticValue(
     parameterType: entities.parameterType ?? "",
     quantity: entities.quantity ?? "km",
     enzymeConc: entities.enzymeConc,
+    allowCrossSpecies: entities.allowCrossSpecies === true,
+    allowVariants: entities.allowVariants === true,
+    // Omitted rather than sent as undefined: the runner's
+    // _parse_physiological refuses a partial reference, and an explicit
+    // `undefined` in the JSON payload is indistinguishable from a partial
+    // one at the far end.
+    ...(entities.physiologicalReference
+      ? { physiologicalReference: entities.physiologicalReference }
+      : {}),
   });
 }
 

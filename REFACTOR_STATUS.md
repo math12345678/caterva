@@ -1,5 +1,11 @@
 # Engine package split — COMPLETE
 
+> **⚠️ CORRECTION (2026-08-12):** the structural claim (shim holds no `simulate_*`/`validate_*`/`build_*` definitions, package split in effect) is still true today — verified directly: `grep -c "^def simulate_\|^def validate_\|^def build_" Terium/terium_engine.py` returns 0. But the specific numbers below are stale, not current:
+> - **"292 lines (was 4283)"** — `terium_engine.py` is now **356 lines** (it grew after later work added more re-exports for new domains such as `mm_competitive_inhibition`, the SSA variants, `lotka_volterra`, `cell_cycle_oscillator`, `repressilator`).
+> - **"49 tests, in two halves"** for `Terium/tests/test_validator_agreement.py` — it currently collects **52** tests (`python3 -m pytest Terium/tests/test_validator_agreement.py --collect-only -q`).
+> - **"the shim imported all 84 public names... and then redefined most of them below"** — the test file's own current docstring (`Terium/tests/test_validator_agreement.py:3-5`), which is the authoritative record of this historical incident, says **67** public names were imported and **64** redefined, not 84/"most". These two in-repo sources disagree with each other; neither matches this document.
+> - Also worth noting (not a fabrication, a gap): `EXPECTED_HOMES` in that same test file only lists **18** public names, and hasn't been extended to cover domains added after the split (e.g. `simulate_gillespie_ssa*`, `simulate_lotka_volterra`, `simulate_cell_cycle_oscillator`, `simulate_repressilator`) — so the "__module__ assertion" regression guard this document describes as complete does not currently cover those newer domains.
+
 `Terium/terium_engine.py` has been split into a package per
 `REFACTORING_PROPOSAL.md`. This file previously tracked an in-flight,
 partially-broken refactor. That work has landed.

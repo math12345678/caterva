@@ -1,4 +1,7 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { buildTeriumEnvironment } from "../lib/teriumRunner";
@@ -135,5 +138,86 @@ describe("Python bridge interpreter selection", () => {
     expect(() => resolvePythonExecutable(process.cwd())).toThrow(
       /No supported Python 3\.10–3\.13 interpreter with Terrium dependencies found/,
     );
+  });
+});
+
+describe("interpreter discovery does not judge by filename", () => {
+  const originalConfigured = process.env["TERRIUM_PYTHON"];
+  const originalPath = process.env["PATH"];
+
+  afterEach(() => {
+    if (originalConfigured === undefined) delete process.env["TERRIUM_PYTHON"];
+    else process.env["TERRIUM_PYTHON"] = originalConfigured;
+    process.env["PATH"] = originalPath;
+  });
+
+  /**
+   * Build a PATH containing exactly one interpreter, named `python3`.
+   *
+   * The scenario has to be CONSTRUCTED, not hoped for. The first version of
+   * this test hid a python3.10 symlink and asserted resolution still worked
+   * — but /usr/bin/python3.10 exists natively on this image, so the scenario
+   * never occurred, and removing the fallback under test changed nothing.
+   * The test passed either way, which makes it worse than no test: it was
+   * reported as coverage of a line it could not reach.
+   */
+  function pathWithOnlyBarePython3(source: string): string | undefined {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "terrium-py-"));
+    try {
+      fs.symlinkSync(source, path.join(dir, "python3"));
+    } catch {
+      return undefined;
+    }
+    return dir;
+  }
+
+  it("accepts a bare `python3` when no version-specific name is on PATH", () => {
+    const repoRoot = process.cwd();
+    const real = ["python3.13", "python3.12", "python3.11", "python3.10"]
+      .map((n) => {
+        const r = spawnSync("sh", ["-c", `command -v ${n}`], { encoding: "utf8" });
+        return r.status === 0 ? r.stdout.trim() : undefined;
+      })
+      .find((p): p is string => Boolean(p) && canRunSupportedPython(p!, repoRoot));
+
+    if (!real) {
+      console.warn(
+        "SKIP: no supported interpreter on this machine to build the " +
+          "single-python3 PATH from.",
+      );
+      return;
+    }
+
+    const isolated = pathWithOnlyBarePython3(real);
+    if (!isolated) {
+      console.warn("SKIP: could not create the isolated PATH directory.");
+      return;
+    }
+
+    delete process.env["TERRIUM_PYTHON"];
+    process.env["PATH"] = isolated;
+
+    // The container case: one fully-provisioned interpreter, no python3.NN
+    // anywhere. Before the fallback existed this threw and told the user to
+    // install a Python they already had.
+    expect(() => resolvePythonExecutable(repoRoot)).not.toThrow();
+    expect(resolvePythonExecutable(repoRoot)).toBe("python3");
+  });
+
+  it("still prefers a version-specific name over bare python3", () => {
+    // The fallback must stay a fallback. With both viable, choosing
+    // `python3` would make the selection depend on wherever a symlink
+    // happens to point today.
+    const repoRoot = process.cwd();
+    const specific = ["python3.13", "python3.12", "python3.11", "python3.10"].find(
+      (c) => canRunSupportedPython(c, repoRoot),
+    );
+    if (!specific) {
+      console.warn("SKIP: no python3.NN on PATH, so precedence is untestable.");
+      return;
+    }
+
+    delete process.env["TERRIUM_PYTHON"];
+    expect(resolvePythonExecutable(repoRoot)).not.toBe("python3");
   });
 });

@@ -5,11 +5,11 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { Provenance } from './provenance';
-import type { SimulationResponseDomain } from './simulationResponseDomain';
-import type { SimulationResponseParameterProvenance } from './simulationResponseParameterProvenance';
-import type { SimulationResponseParameters } from './simulationResponseParameters';
-import type { SimulationResponseTrajectoryItem } from './simulationResponseTrajectoryItem';
+import type { Provenance } from "./provenance";
+import type { SimulationResponseDomain } from "./simulationResponseDomain";
+import type { SimulationResponseParameterProvenance } from "./simulationResponseParameterProvenance";
+import type { SimulationResponseParameters } from "./simulationResponseParameters";
+import type { SimulationResponseTrajectoryItem } from "./simulationResponseTrajectoryItem";
 
 export interface SimulationResponse {
   /** Unique identifier for this pipeline run */

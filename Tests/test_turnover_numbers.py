@@ -565,12 +565,29 @@ class TestCommentaryIsReadByPositionNotLength:
             target_organism=None,
             require_substrate_match=False,
         )
+        checked = 0
         for entry in entries:
             if entry.conditions is not None:
+                checked += 1
                 assert entry.conditions != entry.substrate, (
                     f"commentary equals substrate for kcat {entry.km_value} -- "
                     "the longest-cell heuristic is back"
                 )
+
+        # Without this the test passes when NO entry has commentary -- which
+        # is precisely what a parser regression looks like. The defect it
+        # names ("the longest-cell heuristic is back") and the state that
+        # makes it vacuous are the same failure, so it would have gone green
+        # exactly when it mattered.
+        #
+        # 71 of the fixture's 72 rows carry commentary today. The threshold
+        # is 1 rather than 71: this test is about the substrate/commentary
+        # confusion, and pinning the corpus size is another test's job.
+        assert checked > 0, (
+            f"none of the {len(entries)} parsed rows carried commentary, so "
+            "this test checked nothing -- the parser has stopped capturing "
+            "`conditions`"
+        )
 
     def test_an_absent_commentary_is_none_not_the_organism(self):
         """Rows whose commentary cell is "-" must report None.

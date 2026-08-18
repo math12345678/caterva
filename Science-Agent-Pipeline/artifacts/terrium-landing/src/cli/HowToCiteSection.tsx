@@ -121,6 +121,18 @@ export default function HowToCiteSection() {
                   with the actual DOI once published. Every simulation run ID is
                   included for full reproducibility.
                 </p>
+                <p className="mb-2">
+                  <strong className="text-white/40">
+                    Terrium is not Tellurium.
+                  </strong>{" "}
+                  Tellurium is a separate, established systems-biology
+                  environment from the Sauro lab at the University of
+                  Washington. Terrium is unaffiliated with it and claims none
+                  of its work. Terrium runs on that group&rsquo;s
+                  libRoadRunner (Apache 2.0 licence) and generates their
+                  Antimony (MIT licence) &mdash; if you cite Terrium for a
+                  simulation result, cite those too.
+                </p>
                 <p className="text-white/20">
                   Questions about citation?{" "}
                   <a

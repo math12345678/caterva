@@ -1,0 +1,128 @@
+{
+  "_why": [
+    "ADR 0094's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "Two defects, one shape: a check that computed the right number and",
+    "compared it to the wrong thing.",
+    "",
+    "check_doc_paths_resolve.py went red because the pass that fixed the",
+    "clone-URL disagreement wrote the explanation into START_HERE.md,",
+    "backticking three repository slugs. `Terrium-sim/terrium.git` has the",
+    "shape of a repo-relative path and is not one. A guard born from a",
+    "wrong path typed while fixing paths was taken down by prose typed",
+    "while fixing prose.",
+    "",
+    "test_archive_counts_are_current.py computed root_count() and",
+    "deliberately declined to assert it, guarding the dated claim on line",
+    "43 of DOCUMENTATION_INDEX.md while the undated live one on line 3",
+    "said the root holds 81 markdown files. It holds 41.",
+    "",
+    "P4 is the row that mattered most: it attacks the FIX rather than the",
+    "code, by making the remote classifier match everything. Under the",
+    "original floor -- which counted tokens seen, not tokens verified --",
+    "that passes green having checked nothing. P5 is that earlier floor,",
+    "kept as a row so the reason the floor moved stays reproducible.",
+    "",
+    "A9 is the accident. root_count() globbed dotfiles and counted",
+    "`.aider.chat.history.md`, which is in .gitignore and untracked, so no",
+    "clone has ever contained it. The prose numbers came from a shell",
+    "glob, which skips dotfiles. The two had been measuring different sets",
+    "since the function was written, and it was invisible for exactly as",
+    "long as nothing compared them.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0094-the-guard-the-fix-broke.json"
+  ],
+  "test": "python3 -m pytest Tests/test_doc_paths_resolve.py Tests/test_archive_counts_are_current.py Tests/test_clone_instructions_agree.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "P1",
+      "description": "the test the .git exemption is handed off to no longer reads clone commands",
+      "_claimed": "caught",
+      "_note": "The exemption is a delegation, not a skip. If the delegate stops checking, nothing checks the clone URLs and the guard must say so rather than continuing to wave three tokens through.",
+      "file": "Tests/test_clone_instructions_agree.py",
+      "find": "_CLONE_RE = re.compile(r\"git clone",
+      "replace": "_CLONE_RE = re.compile(r\"git kablooie"
+    },
+    {
+      "id": "P2",
+      "description": "the handoff check accepts a delegate that never mentions .git",
+      "_claimed": "caught",
+      "_note": "Two conditions, because a test could keep the words `git clone` while losing the URL matching that makes the delegation real.",
+      "file": "scripts/check_doc_paths_resolve.py",
+      "find": "    if \".git\" not in text:\n        return f\"{HANDOFF} no longer matches `.git` URLs\"\n",
+      "replace": ""
+    },
+    {
+      "id": "P3",
+      "description": "the remote classifier matches nothing, so the exemption disappears",
+      "_claimed": "caught",
+      "_note": "Removing the exemption must not pass quietly either -- the three slugs go straight back to being reported as missing files, which is the defect this ADR opens with.",
+      "file": "scripts/check_doc_paths_resolve.py",
+      "find": "_REMOTE_RE = re.compile(r\"\\.git$\")",
+      "replace": "_REMOTE_RE = re.compile(r\"(?!x)x\")"
+    },
+    {
+      "id": "P4",
+      "description": "the remote classifier matches EVERYTHING, delegating every token",
+      "_claimed": "caught",
+      "_note": "The vacuity attack. Every path-shaped token becomes somebody else's problem and zero are verified. Caught only because the floor counts what was checked.",
+      "file": "scripts/check_doc_paths_resolve.py",
+      "find": "_REMOTE_RE = re.compile(r\"\\.git$\")",
+      "replace": "_REMOTE_RE = re.compile(r\"\")"
+    },
+    {
+      "id": "P5",
+      "description": "the floor counts tokens seen rather than tokens verified, and everything is delegated",
+      "_claimed": "caught",
+      "_note": "This is the version that shipped first, and the row that decided the design. The hole needs two things at once -- a floor counting tokens seen, and a classifier swallowing them -- and mutate.py applies one edit per row. A two-part row was written first; the harness has no key for it, so it would have applied half, reported on a mutation that never happened, and been believed. The property is asserted instead, by test_delegating_everything_trips_the_floor, which supplies the swallowing classifier itself. So this row mutates only the floor and the test provides the other half.",
+      "file": "scripts/check_doc_paths_resolve.py",
+      "find": "        total += len(here)",
+      "replace": "        total += len(here) + len(remote)"
+    },
+    {
+      "id": "A6",
+      "description": "the original defect replayed: the index says the root holds 81",
+      "_claimed": "caught",
+      "_note": "The verbatim historical text. A guard that cannot fail on the thing it was written for is decoration.",
+      "file": "DOCUMENTATION_INDEX.md",
+      "find": "root holds 41 markdown files",
+      "replace": "root holds 81 markdown files"
+    },
+    {
+      "id": "A7",
+      "description": "the live sentence is deleted rather than corrected",
+      "_claimed": "caught",
+      "_note": "Deleting the claim satisfies a naive count check by removing what it counts. Both the presence test and the value test have to fire.",
+      "file": "DOCUMENTATION_INDEX.md",
+      "find": "The repository root holds 41 markdown files. ",
+      "replace": ""
+    },
+    {
+      "id": "A8",
+      "description": "the live sentence is relabelled as a dated one",
+      "_claimed": "caught",
+      "_note": "The subtler escape: rewrite `holds 41` as `held 41 as of 2026-08-16` and the live claim is gone while the file still looks careful. Dating a number is the right move for a finished migration and the wrong move for a directory that changes.",
+      "file": "DOCUMENTATION_INDEX.md",
+      "find": "The repository root holds 41 markdown files.",
+      "replace": "The root held 41 markdown files as of 2026-08-16."
+    },
+    {
+      "id": "A9",
+      "description": "root_count() goes back to globbing dotfiles",
+      "_claimed": "caught",
+      "_note": "Found by accident: the new assertion failed on its first real run, 41 against 42, because the glob counted a gitignored aider scratch file. Kept as a row because the off-by-one was undetectable until something compared the number to a document.",
+      "file": "Tests/test_archive_counts_are_current.py",
+      "find": "    out = subprocess.run(\n        [\"git\", \"ls-files\", \"--cached\", \"--others\", \"--exclude-standard\", \"--\", \"*.md\"],",
+      "replace": "    return len(list(ROOT.glob(\"*.md\")))\n    out = subprocess.run(\n        [\"git\", \"ls-files\", \"--cached\", \"--others\", \"--exclude-standard\", \"--\", \"*.md\"],"
+    },
+    {
+      "id": "A10",
+      "description": "the dated claim stops needing a date",
+      "_claimed": "caught",
+      "_note": "The other half of the tense rule. Without this, `as of YYYY-MM-DD` could be dropped from the migration sentence and an undated historical number would read as current -- which is the failure check_investor_claims.py exists to draw.\n    The find string carries its error message as context. The bare regex now appears twice -- once in the original assertion, once in the presence test added beside it -- and the harness returned INDETERMINATE rather than guessing which. That is the behaviour worth having: a coin-flip between two call sites would have produced a confident verdict about an unknown edit.",
+      "file": "Tests/test_archive_counts_are_current.py",
+      "find": "markdown files to \\d+ as of \\d{4}-\\d{2}-\\d{2}\", text), (\n        \"DOCUMENTATION_INDEX.md states what the root count became without \"",
+      "replace": "markdown files to \\d+ ON \\d{4}-\\d{2}-\\d{2}\", text), (\n        \"DOCUMENTATION_INDEX.md states what the root count became without \""
+    }
+  ]
+}

@@ -2,17 +2,36 @@
 
 from __future__ import annotations
 
+
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """See Terium/core/import_mode.py. Inlined deliberately: this
+    guards the import machinery itself, so it cannot import a
+    helper to do its job."""
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
 from typing import Any, Dict, Sequence
 
 import numpy as np
 try:
     from Terium.core.data_structures import (SimulationResult)
-except ModuleNotFoundError:  # flat mode: Terium/ on sys.path, no repo root
+except ModuleNotFoundError as _exc:  # flat mode: Terium/ on sys.path, no repo root
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.data_structures import (SimulationResult)  # type: ignore[no-redef]
 
 try:
     from Terium.core.validation import validate_wright_fisher_params
-except ModuleNotFoundError:
+except ModuleNotFoundError as _exc:
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.validation import validate_wright_fisher_params  # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------

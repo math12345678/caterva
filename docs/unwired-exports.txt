@@ -1,0 +1,57 @@
+# Exported engine/storage functions that nothing in the product calls.
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# An exported function nobody calls was computed for nobody. That is ADR
+# 0039's defect at the scale of a capability, and this project has found it
+# BY HAND three times:
+#
+#   - sbml-builder.ts, "an orphan that looked covered because it had tests"
+#   - rankModelsByFit, unwired for the life of the engine (ADR 0087) -- and
+#     where ADR 0060's defect sat symptomless, because code nobody calls has
+#     no symptoms
+#   - compareModelPair, below
+#
+# Being on this list is a legitimate answer. Inventing a caller to satisfy a
+# check is worse than the gap. What is not legitimate is leaving the decision
+# to be inferred from silence, which is what the previous three cost.
+#
+# check_exports_reach_a_caller.py fails if an entry here gains a caller and
+# is not removed. A list that can be added to but never emptied records a
+# problem instead of fixing it.
+#
+# Opened 2026-08-15 with 7 entries; 8 after the matcher was widened to
+# cover classes and arrow consts (ADR 0090's stated limitation, acted on
+# rather than left to become the scope).
+
+# --- Superseded by a different implementation the product actually uses ---
+createBatchJobs        # server.ts uses createMultiParamBatchJobs instead. Two
+                       # builders, one caller; this is the unused one.
+buildSBML              # A dispatcher over the four builders. inhibitionModels.ts
+                       # imports those four directly, so the dispatcher adds a
+                       # second way to choose a model -- see ADR 0027 on what
+                       # two ways to answer one question costs.
+
+# --- Deliberately not wired, and the reason is on record ---
+getModel               # kinetic-models.ts holds rate equations for models the
+listModels             # SBML path already covers. inhibitionModels.test.ts:
+KineticSimulator       # wiring them "would have been a FIFTH implementation of
+                       # enzyme kinetics". Left unwired ON PURPOSE.
+                       #
+                       # KineticSimulator is the CLASS in that same module and
+                       # the same decision. It was missing from this list until
+                       # the matcher was widened past `export function`, so the
+                       # record covered two thirds of one deliberate choice and
+                       # looked complete. A baseline is only as honest as the
+                       # matcher that fills it.
+compareModelPair       # Needs a route comparing exactly two models, which
+                       # nothing asks for. ADR 0087 declined to invent one.
+
+# --- Utilities with no current consumer ---
+buildQueryUrl          # Builds a query string for the job filter API. The
+                       # server parses filters, it does not construct them; the
+                       # only builder would be a UI that does not exist yet.
+clearSweepBatchMetrics # Test-support: resets the in-memory metrics store. Used
+                       # by tests only, which is what it is for. Exported
+                       # rather than test-local because the store is module
+                       # state and a test cannot reach it otherwise.

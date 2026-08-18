@@ -5,7 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { CitationLocatorKind } from './citationLocatorKind';
+import type { CitationLocatorKind } from "./citationLocatorKind";
 
 export interface CitationLocator {
   /** What kind of locator this is */

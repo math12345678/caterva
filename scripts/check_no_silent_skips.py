@@ -39,9 +39,10 @@ Usage:
 
 from __future__ import annotations
 
-import re
 import subprocess
 import sys
+import tempfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Tuple
 
@@ -60,39 +61,70 @@ EXPECTED_MAX_SKIPS = 0
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     """Run one suite. Returns (passed, skipped, skip_reasons) or None.
 
-    `-rs` makes pytest print the reason for every skip, so a failure can name
-    what stopped running instead of just reporting a number.
-    """
-    try:
-        proc = subprocess.run(
-            [sys.executable, "-m", "pytest", str(path), "-q", "-rs",
-             "-p", "no:randomly"],
-            capture_output=True,
-            text=True,
-            timeout=1800,
-            cwd=str(REPO_ROOT),
-        )
-    except (subprocess.TimeoutExpired, OSError) as exc:
-        print(f"  ! could not run {path.name}: {exc}")
-        return None
+    RESULTS ARE READ FROM JUnit XML, NOT FROM THE TERMINAL OUTPUT.
 
-    out = proc.stdout
+    This used to parse `(\d+) passed` out of stdout, and for the engine
+    suite it parsed nothing at all -- so the guard reported "1 of 2 suite(s)
+    did not run: engine" on a suite that ran perfectly and exited 0.
+
+    The cause is worth writing down because it is invisible and it will
+    recur. `Terium/pytest.ini` already sets `addopts = -q`. When pytest is
+    invoked with `Terium/tests` as the argument it resolves rootdir to
+    `Terium/` and picks up that ini, so this guard's own `-q` became the
+    SECOND one. Two `-q` flags is quiet level 2, which suppresses the
+    summary line entirely. The suite printed its dots, exited 0, and said
+    nothing a regex could read.
+
+    Any tool that shells out to pytest with `-q` hits this. The fix is not
+    to drop the flag -- it is to stop reading prose that a verbosity setting
+    three directories away can silently delete. JUnit XML carries exact
+    counts, is unaffected by `-q`, and distinguishes skipped from passed
+    structurally instead of by wording.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        report = Path(tmp) / "report.xml"
+        try:
+            subprocess.run(
+                [sys.executable, "-m", "pytest", str(path), "-rs",
+                 "-p", "no:randomly", f"--junitxml={report}"],
+                capture_output=True,
+                text=True,
+                timeout=1800,
+                cwd=str(REPO_ROOT),
+            )
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            print(f"  ! could not run {path.name}: {exc}")
+            return None
+
+        if not report.exists():
+            print(f"  ! pytest produced no JUnit report for {path}")
+            return None
+
+        try:
+            root = ET.parse(report).getroot()
+        except ET.ParseError as exc:
+            print(f"  ! unreadable JUnit report for {path}: {exc}")
+            return None
+
+    cases = root.iter("testcase")
     passed = 0
     skipped = 0
+    reasons: List[str] = []
 
-    m = re.search(r"(\d+) passed", out)
-    if m:
-        passed = int(m.group(1))
-    m = re.search(r"(\d+) skipped", out)
-    if m:
-        skipped = int(m.group(1))
-
-    # "SKIPPED [1] path/to/test.py:120: no flagged entries in this fixture"
-    reasons = re.findall(r"^SKIPPED \[\d+\] (.+)$", out, re.MULTILINE)
+    for case in cases:
+        skip = case.find("skipped")
+        if skip is not None:
+            skipped += 1
+            where = f"{case.get('file') or case.get('classname')}::{case.get('name')}"
+            why = (skip.get("message") or "").strip()
+            reasons.append(f"{where}: {why}" if why else where)
+        elif case.find("failure") is None and case.find("error") is None:
+            passed += 1
 
     if passed == 0 and skipped == 0:
-        print(f"  ! no test results parsed from {path}")
-        print(out[-800:])
+        # A report containing no test cases means collection produced
+        # nothing -- still an unknown skip count, not a zero.
+        print(f"  ! no test cases in the JUnit report for {path}")
         return None
 
     return passed, skipped, reasons

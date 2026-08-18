@@ -580,6 +580,13 @@ describe("GET /api/simulate/:jobId/audit", () => {
     expect(Array.isArray(res.body.parameterAudits)).toBe(true);
     expect(res.body).toHaveProperty("domainCitation");
     expect(res.body.domainCitation).toContain("Lehninger");
+
+    // The obligations must reach the RESPONSE, not merely be computable.
+    // Every "computed and not delivered" defect this project has found --
+    // ADR 0027, 0038, 0039, 0047 -- was a value that existed correctly
+    // one layer below the surface a reader sees.
+    expect(res.body).toHaveProperty("dataSourceObligations");
+    expect(Array.isArray(res.body.dataSourceObligations)).toBe(true);
   });
 });
 

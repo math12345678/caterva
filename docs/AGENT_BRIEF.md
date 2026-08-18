@@ -3,6 +3,11 @@
 Paste this into any agent working on this repository. It is short on
 purpose. Everything here was written after an agent got it wrong.
 
+Two ready-to-paste prompts — one that corrects an agent which worked here
+before, one that sets a fresh agent going — are in
+[`AGENT_BRIEFING.md`](AGENT_BRIEFING.md). Human contributors want
+[`../START_HERE.md`](../START_HERE.md) instead.
+
 ## The one rule everything else follows from
 
 **Nothing is real until it is verified against something that is not this
@@ -13,7 +18,7 @@ solver against itself. See `docs/CONSTITUTION.md`.
 ## Before you claim you are done
 
 ```bash
-python3 scripts/verify_build.py --quick     # 13 guards, ~30s, offline
+python3 scripts/verify_build.py --quick     # the guards, ~30s, offline
 ```
 
 If it does not print `ALL CHECKS PASSED`, you are not done. Do not report

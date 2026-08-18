@@ -3,10 +3,24 @@
 from __future__ import annotations
 
 
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """See Terium/core/import_mode.py. Inlined deliberately: this
+    guards the import machinery itself, so it cannot import a
+    helper to do its job."""
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
+
 import roadrunner
 try:
     from Terium.core.data_structures import (ModelBuildError, SimulationError, DEFAULT_RELATIVE_TOLERANCE, DEFAULT_ABSOLUTE_TOLERANCE)
-except ModuleNotFoundError:  # flat mode: Terium/ on sys.path, no repo root
+except ModuleNotFoundError as _exc:  # flat mode: Terium/ on sys.path, no repo root
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.data_structures import (ModelBuildError, SimulationError, DEFAULT_RELATIVE_TOLERANCE, DEFAULT_ABSOLUTE_TOLERANCE)  # type: ignore[no-redef]
 
 def _fmt(value: float) -> str:

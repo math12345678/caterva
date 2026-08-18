@@ -12,20 +12,79 @@ import {
   type CitationLocator,
 } from "./citeVerify";
 
+import type { ReliabilityScore } from "./reliabilityScore";
+
 export class RequiredParametersMissingError extends Error {
   readonly domain: string;
   readonly missing: string[];
+  /** Per-key explanation of WHY the key is missing, keyed by parameter
+   * name. Carried alongside the message so a caller can render the reason
+   * without re-parsing prose. */
+  readonly details: Record<string, string>;
 
-  constructor(domain: string, missing: string[]) {
-    const example = missing.map((k) => `${k}=<value>`).join(" ");
-    super(
-      `Cannot simulate '${domain}': ${missing.join(", ")} could not be ` +
-        `resolved from literature and ${missing.length > 1 ? "were" : "was"} not ` +
-        `supplied in the query. Add ${example} to your query and try again.`,
-    );
+  /**
+   * `details` exists because the summary sentence is not always true.
+   *
+   * "could not be resolved from literature" is accurate when BRENDA and
+   * PubMed genuinely hold nothing. It is FALSE when a value was found in
+   * another organism and withheld because cross-species use was not opted
+   * into (ADR 0024) — that value was resolved from the literature, and the
+   * refusal is this system's policy, not the literature's silence.
+   *
+   * Telling a user the literature has nothing, when it has something they
+   * could have had by flipping a flag, is the true-sounding-and-misleading
+   * shape this project treats as a defect everywhere else. So any
+   * provenance note attached to a missing key is appended verbatim, and
+   * the generic sentence is dropped for keys that have one.
+   */
+  constructor(
+    domain: string,
+    missing: string[],
+    details: Record<string, string> = {},
+  ) {
+    const explained = missing.filter((k) => details[k]);
+    const unexplained = missing.filter((k) => !details[k]);
+
+    const parts: string[] = [];
+    if (unexplained.length > 0) {
+      const example = unexplained.map((k) => `${k}=<value>`).join(" ");
+      parts.push(
+        `Cannot simulate '${domain}': ${unexplained.join(", ")} could not be ` +
+          `resolved from literature and ${unexplained.length > 1 ? "were" : "was"} not ` +
+          `supplied in the query. Add ${example} to your query and try again.` +
+          // THE SECOND SENTENCE IS THE POINT.
+          //
+          // Herbert Sauro predicted that a refusing tool makes the
+          // researcher "hardcode a number with no warning at all -- a
+          // strictly worse outcome caused by the strict rule". Terrium was
+          // not merely vulnerable to that: this message INSTRUCTED it. A
+          // user who goes and finds a Km in a paper, types it in, and gets
+          // it recorded as origin=user with no citation has been walked
+          // into exactly the outcome he described, by the tool whose
+          // entire purpose is not losing sources.
+          //
+          // Pointing at --cite here is what closes it, and here is the
+          // only place it can be said: the moment the user is about to go
+          // find a number somewhere.
+          " If you have a source for the value, attach it with " +
+          `--cite ${unexplained[0]}=\"...\" so it is recorded rather than ` +
+          "lost.",
+      );
+    } else {
+      parts.push(
+        `Cannot simulate '${domain}': ${missing.join(", ")} ` +
+          `${missing.length > 1 ? "are" : "is"} unresolved.`,
+      );
+    }
+    for (const key of explained) {
+      parts.push(`${key}: ${details[key]}`);
+    }
+
+    super(parts.join(" "));
     this.name = "RequiredParametersMissingError";
     this.domain = domain;
     this.missing = missing;
+    this.details = details;
   }
 }
 
@@ -125,6 +184,78 @@ export interface AssayConditions {
   temperatureC?: number;
   /** Buffer system, when reported. Not STRENDA-mandatory but materially useful. */
   buffer?: string;
+  /**
+   * `buffer` resolved to a comparable chemical identity by
+   * `Tests/buffer_identity.py` (ADR 0028).
+   *
+   * An ADDITION to `buffer`, never a replacement: the raw string is what a
+   * reader needs in order to disagree with the resolution, and a resolution
+   * nobody can check is a claim rather than a fact.
+   */
+  bufferIdentity?: BufferIdentity;
+  /**
+   * Cofactors and effectors named in the same commentary (ADR 0032).
+   *
+   * Lives on `assayConditions` rather than beside it because that is what
+   * they are: part of what the assay contained, in the same sense as pH.
+   */
+  effectors?: Effector[];
+}
+
+/**
+ * A reported buffer string resolved to a PubChem compound.
+ *
+ * Mirrors `buffer_identity.BufferIdentity`. Field names are snake_case
+ * because they cross the wire as the Python model emits them; renaming here
+ * would create a second place the two halves could drift.
+ */
+/**
+ * A cofactor or allosteric effector reported for this measurement.
+ *
+ * Mirrors `effector.Effector`. snake_case because it crosses the wire as
+ * Python emits it; renaming here would create a second place the two halves
+ * could drift (ADR 0027).
+ */
+export interface Effector {
+  /** The clause exactly as written, so a reader can disagree with the parse. */
+  raw: string;
+  compound_text: string;
+  /**
+   * "present" | "absent" | "unstated".
+   *
+   * NOT a detail of identity. Two rows naming the same compound with
+   * opposite presence are the case ADR 0032 exists for — a wild-type LDH
+   * measured with and without fructose 1,6-bisphosphate, at the same pH and
+   * temperature, from the same paper. Every other field agrees.
+   */
+  presence: string;
+  /** Recorded and NOT compared. See ADR 0032 on why no threshold. */
+  concentration_text?: string | null;
+  /** PubChem resolution, reused from the buffer machinery. */
+  identity?: BufferIdentity | null;
+}
+
+export interface BufferIdentity {
+  /** The string exactly as the source reported it. */
+  raw: string;
+  /** Species name after stripping concentration and the word "buffer". */
+  species?: string | null;
+  /** PubChem compound id for `species`. */
+  cid?: number | null;
+  /**
+   * Parent (neutral form) compound id — what identity is compared on, so
+   * that Tris and Tris-HCl read as one buffer system rather than two
+   * compounds.
+   */
+  parent_cid?: number | null;
+  /**
+   * The concentration text that was stripped and NOT compared. Present so a
+   * reader can see that 0.5 M and 10 mM were treated as the same buffer.
+   */
+  concentration_text?: string | null;
+  /** "resolved" | "unresolvable" | "not_reported". Three states, never two. */
+  status: string;
+  reason?: string | null;
 }
 
 /**
@@ -214,6 +345,42 @@ export interface ParameterProvenance {
   citationLocators?: CitationLocator[];
   /** Why a lookup was attempted and failed, if so. */
   note?: string;
+  /**
+   * Machine-readable reason a REQUIRED parameter is unresolved, when the
+   * reason is something other than "the literature has nothing".
+   *
+   * Exists so the error message can be assembled from a fact rather than
+   * from pattern-matching on `note`. The one case so far is
+   * `cross_species_withheld` (ADR 0024): a value WAS found in the
+   * literature, in another organism, and withheld by policy. The default
+   * sentence — "could not be resolved from literature" — is simply false
+   * for it, and a message that is false in a way that sounds authoritative
+   * is the failure mode this project spends most of its effort on.
+   */
+  unresolvedReason?:
+    | "cross_species_withheld"
+    | "cross_species_too_distant"
+    | "variant_withheld"
+    /**
+     * BRENDA held nothing, and the PubMed/CORE fallback found papers that
+     * may report the value.
+     *
+     * Every other member of this union means "a value existed and Terrium
+     * declined it". This one means "no value, but here is where to look",
+     * and it belongs here for the same reason the others do: it makes the
+     * generic sentence ("could not be resolved from literature") false by
+     * omission. The literature was not silent — nobody read it out.
+     */
+    | "literature_candidates";
+  /**
+   * Graded reliability of a RESOLVED value, on three independently
+   * reported axes (ADR 0024 Decision 3, on Barbara Bakker's method).
+   *
+   * Deliberately not a number. See reliabilityScore.ts for why combining
+   * the axes would require a trade-off Terrium does not have and must not
+   * invent.
+   */
+  reliability?: ReliabilityScore;
 }
 
 /**

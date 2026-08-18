@@ -5,10 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import {
-  useMutation,
-  useQuery
-} from '@tanstack/react-query';
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
   MutationFunction,
   QueryFunction,
@@ -16,34 +13,34 @@ import type {
   UseMutationOptions,
   UseMutationResult,
   UseQueryOptions,
-  UseQueryResult
-} from '@tanstack/react-query';
+  UseQueryResult,
+} from "@tanstack/react-query";
 
 import type {
   ErrorResponse,
   HealthStatus,
   SimulationJob,
-  SimulationRequest
-} from './api.schemas';
+  SimulationRequest,
+} from "./api.schemas";
 
-import { customFetch } from '../custom-fetch';
-import type { ErrorType , BodyType } from '../custom-fetch';
+import { customFetch } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
-      type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
-
+type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
-
-
-const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
+const withQueryKey = <T extends object, K>(
+  query: T,
+  queryKey: K,
+): T & { queryKey: K } => {
   const result = { queryKey } as T & { queryKey: K };
   for (const key of Object.keys(query)) {
     // The explicit queryKey always wins, matching the previous
     // `{ ...query, queryKey }` spread where it was set last.
-    if (key === 'queryKey') continue;
+    if (key === "queryKey") continue;
     Object.defineProperty(result, key, {
       enumerable: true,
       configurable: true,
@@ -54,90 +51,84 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
 };
 
 export const getHealthCheckUrl = () => {
-
-
-
-
-  return `/api/healthz`
-}
+  return `/api/healthz`;
+};
 
 /**
  * Returns server health status
  * @summary Health check
  */
-export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
-
-  return customFetch<HealthStatus>(getHealthCheckUrl(),
-  {
+export const healthCheck = async (
+  options?: RequestInit,
+): Promise<HealthStatus> => {
+  return customFetch<HealthStatus>(getHealthCheckUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
+    method: "GET",
+  });
+};
 
 export const getHealthCheckQueryKey = () => {
-    return [
-    `/api/healthz`
-    ] as const;
-    }
+  return [`/api/healthz`] as const;
+};
 
+export const getHealthCheckQueryOptions = <
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getHealthCheckQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({
+    signal,
+  }) => healthCheck({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getHealthCheckQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type HealthCheckQueryResult = NonNullable<Awaited<ReturnType<typeof healthCheck>>>
-export type HealthCheckQueryError = ErrorType<unknown>
-
+export type HealthCheckQueryResult = NonNullable<
+  Awaited<ReturnType<typeof healthCheck>>
+>;
+export type HealthCheckQueryError = ErrorType<unknown>;
 
 /**
  * @summary Health check
  */
 
-export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useHealthCheck<
+  TData = Awaited<ReturnType<typeof healthCheck>>,
+  TError = ErrorType<unknown>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof healthCheck>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getHealthCheckQueryOptions(options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getHealthCheckQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-
-
-
-
-
-
 export const getListSimulationJobsUrl = () => {
-
-
-
-
-  return `/api/simulate`
-}
+  return `/api/simulate`;
+};
 
 /**
  * Returns the most recent simulation jobs from the in-memory queue,
@@ -145,79 +136,77 @@ export const getListSimulationJobsUrl = () => {
  * result; failed jobs include the error.
  * @summary List recent simulation jobs
  */
-export const listSimulationJobs = async ( options?: RequestInit): Promise<SimulationJob[]> => {
-
-  return customFetch<SimulationJob[]>(getListSimulationJobsUrl(),
-  {
+export const listSimulationJobs = async (
+  options?: RequestInit,
+): Promise<SimulationJob[]> => {
+  return customFetch<SimulationJob[]>(getListSimulationJobsUrl(), {
     ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
+    method: "GET",
+  });
+};
 
 export const getListSimulationJobsQueryKey = () => {
-    return [
-    `/api/simulate`
-    ] as const;
-    }
+  return [`/api/simulate`] as const;
+};
 
+export const getListSimulationJobsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listSimulationJobs>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listSimulationJobs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-export const getListSimulationJobsQueryOptions = <TData = Awaited<ReturnType<typeof listSimulationJobs>>, TError = ErrorType<ErrorResponse>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSimulationJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
+  const queryKey = queryOptions?.queryKey ?? getListSimulationJobsQueryKey();
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listSimulationJobs>>
+  > = ({ signal }) => listSimulationJobs({ signal, ...requestOptions });
 
-  const queryKey =  queryOptions?.queryKey ?? getListSimulationJobsQueryKey();
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listSimulationJobs>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSimulationJobs>>> = ({ signal }) => listSimulationJobs({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSimulationJobs>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type ListSimulationJobsQueryResult = NonNullable<Awaited<ReturnType<typeof listSimulationJobs>>>
-export type ListSimulationJobsQueryError = ErrorType<ErrorResponse>
-
+export type ListSimulationJobsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listSimulationJobs>>
+>;
+export type ListSimulationJobsQueryError = ErrorType<ErrorResponse>;
 
 /**
  * @summary List recent simulation jobs
  */
 
-export function useListSimulationJobs<TData = Awaited<ReturnType<typeof listSimulationJobs>>, TError = ErrorType<ErrorResponse>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSimulationJobs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useListSimulationJobs<
+  TData = Awaited<ReturnType<typeof listSimulationJobs>>,
+  TError = ErrorType<ErrorResponse>,
+>(options?: {
+  query?: UseQueryOptions<
+    Awaited<ReturnType<typeof listSimulationJobs>>,
+    TError,
+    TData
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListSimulationJobsQueryOptions(options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getListSimulationJobsQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-
-
-
-
-
-
 export const getRunSimulationUrl = () => {
-
-
-
-
-  return `/api/simulate`
-}
+  return `/api/simulate`;
+};
 
 /**
  * Accepts a natural-language request, enqueues an simulation job, and
@@ -225,221 +214,260 @@ export const getRunSimulationUrl = () => {
  * `GET /simulate/{jobId}/stream` for real-time progress.
  * @summary Submit a science-agent simulation job
  */
-export const runSimulation = async (simulationRequest: SimulationRequest, options?: RequestInit): Promise<SimulationJob> => {
-
-  return customFetch<SimulationJob>(getRunSimulationUrl(),
-  {
+export const runSimulation = async (
+  simulationRequest: SimulationRequest,
+  options?: RequestInit,
+): Promise<SimulationJob> => {
+  return customFetch<SimulationJob>(getRunSimulationUrl(), {
     ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(simulationRequest)
-  }
-);}
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(simulationRequest),
+  });
+};
 
+export const getRunSimulationMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runSimulation>>,
+    TError,
+    { data: BodyType<SimulationRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof runSimulation>>,
+  TError,
+  { data: BodyType<SimulationRequest> },
+  TContext
+> => {
+  const mutationKey = ["runSimulation"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
 
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof runSimulation>>,
+    { data: BodyType<SimulationRequest> }
+  > = (props) => {
+    const { data } = props ?? {};
 
+    return runSimulation(data, requestOptions);
+  };
 
+  return { mutationFn, ...mutationOptions };
+};
 
-export const getRunSimulationMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runSimulation>>, TError,{data: BodyType<SimulationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof runSimulation>>, TError,{data: BodyType<SimulationRequest>}, TContext> => {
+export type RunSimulationMutationResult = NonNullable<
+  Awaited<ReturnType<typeof runSimulation>>
+>;
+export type RunSimulationMutationBody = BodyType<SimulationRequest>;
+export type RunSimulationMutationError = ErrorType<ErrorResponse>;
 
-const mutationKey = ['runSimulation'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof runSimulation>>, {data: BodyType<SimulationRequest>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  runSimulation(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type RunSimulationMutationResult = NonNullable<Awaited<ReturnType<typeof runSimulation>>>
-    export type RunSimulationMutationBody = BodyType<SimulationRequest>
-    export type RunSimulationMutationError = ErrorType<ErrorResponse>
-
-    /**
+/**
  * @summary Submit a science-agent simulation job
  */
-export const useRunSimulation = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof runSimulation>>, TError,{data: BodyType<SimulationRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof runSimulation>>,
-        TError,
-        {data: BodyType<SimulationRequest>},
-        TContext
-      > => {
-      return useMutation(getRunSimulationMutationOptions(options));
-    }
+export const useRunSimulation = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof runSimulation>>,
+    TError,
+    { data: BodyType<SimulationRequest> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof runSimulation>>,
+  TError,
+  { data: BodyType<SimulationRequest> },
+  TContext
+> => {
+  return useMutation(getRunSimulationMutationOptions(options));
+};
 
-export const getGetSimulationJobUrl = (jobId: string,) => {
-
-
-
-
-  return `/api/simulate/${jobId}`
-}
+export const getGetSimulationJobUrl = (jobId: string) => {
+  return `/api/simulate/${jobId}`;
+};
 
 /**
  * Returns the current job status and, when completed, the full
  * simulation result.
  * @summary Get a simulation job by ID
  */
-export const getSimulationJob = async (jobId: string, options?: RequestInit): Promise<SimulationJob> => {
-
-  return customFetch<SimulationJob>(getGetSimulationJobUrl(jobId),
-  {
+export const getSimulationJob = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<SimulationJob> => {
+  return customFetch<SimulationJob>(getGetSimulationJobUrl(jobId), {
     ...options,
-    method: 'GET'
+    method: "GET",
+  });
+};
 
+export const getGetSimulationJobQueryKey = (jobId: string) => {
+  return [`/api/simulate/${jobId}`] as const;
+};
 
-  }
-);}
-
-
-
-
-
-export const getGetSimulationJobQueryKey = (jobId: string,) => {
-    return [
-    `/api/simulate/${jobId}`
-    ] as const;
-    }
-
-
-export const getGetSimulationJobQueryOptions = <TData = Awaited<ReturnType<typeof getSimulationJob>>, TError = ErrorType<ErrorResponse>>(jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSimulationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetSimulationJobQueryOptions = <
+  TData = Awaited<ReturnType<typeof getSimulationJob>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSimulationJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetSimulationJobQueryKey(jobId);
 
-  const queryKey =  queryOptions?.queryKey ?? getGetSimulationJobQueryKey(jobId);
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof getSimulationJob>>
+  > = ({ signal }) => getSimulationJob(jobId, { signal, ...requestOptions });
 
+  return {
+    queryKey,
+    queryFn,
+    enabled: jobId !== null && jobId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof getSimulationJob>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSimulationJob>>> = ({ signal }) => getSimulationJob(jobId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: jobId !== null && jobId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSimulationJob>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetSimulationJobQueryResult = NonNullable<Awaited<ReturnType<typeof getSimulationJob>>>
-export type GetSimulationJobQueryError = ErrorType<ErrorResponse>
-
+export type GetSimulationJobQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getSimulationJob>>
+>;
+export type GetSimulationJobQueryError = ErrorType<ErrorResponse>;
 
 /**
  * @summary Get a simulation job by ID
  */
 
-export function useGetSimulationJob<TData = Awaited<ReturnType<typeof getSimulationJob>>, TError = ErrorType<ErrorResponse>>(
- jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSimulationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetSimulationJob<
+  TData = Awaited<ReturnType<typeof getSimulationJob>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getSimulationJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetSimulationJobQueryOptions(jobId, options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetSimulationJobQueryOptions(jobId,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-
-
-
-
-
-
-export const getStreamSimulationJobUrl = (jobId: string,) => {
-
-
-
-
-  return `/api/simulate/${jobId}/stream`
-}
+export const getStreamSimulationJobUrl = (jobId: string) => {
+  return `/api/simulate/${jobId}/stream`;
+};
 
 /**
  * Server-Sent Events endpoint that emits status updates and the final
  * result for a simulation job.
  * @summary Stream simulation job progress
  */
-export const streamSimulationJob = async (jobId: string, options?: RequestInit): Promise<SimulationJob> => {
-
-  return customFetch<SimulationJob>(getStreamSimulationJobUrl(jobId),
-  {
+export const streamSimulationJob = async (
+  jobId: string,
+  options?: RequestInit,
+): Promise<SimulationJob> => {
+  return customFetch<SimulationJob>(getStreamSimulationJobUrl(jobId), {
     ...options,
-    method: 'GET'
+    method: "GET",
+  });
+};
 
+export const getStreamSimulationJobQueryKey = (jobId: string) => {
+  return [`/api/simulate/${jobId}/stream`] as const;
+};
 
-  }
-);}
-
-
-
-
-
-export const getStreamSimulationJobQueryKey = (jobId: string,) => {
-    return [
-    `/api/simulate/${jobId}/stream`
-    ] as const;
-    }
-
-
-export const getStreamSimulationJobQueryOptions = <TData = Awaited<ReturnType<typeof streamSimulationJob>>, TError = ErrorType<ErrorResponse>>(jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamSimulationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getStreamSimulationJobQueryOptions = <
+  TData = Awaited<ReturnType<typeof streamSimulationJob>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof streamSimulationJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
 ) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+  const queryKey =
+    queryOptions?.queryKey ?? getStreamSimulationJobQueryKey(jobId);
 
-  const queryKey =  queryOptions?.queryKey ?? getStreamSimulationJobQueryKey(jobId);
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof streamSimulationJob>>
+  > = ({ signal }) => streamSimulationJob(jobId, { signal, ...requestOptions });
 
+  return {
+    queryKey,
+    queryFn,
+    enabled: jobId !== null && jobId !== undefined,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof streamSimulationJob>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
 
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof streamSimulationJob>>> = ({ signal }) => streamSimulationJob(jobId, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, enabled: jobId !== null && jobId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof streamSimulationJob>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type StreamSimulationJobQueryResult = NonNullable<Awaited<ReturnType<typeof streamSimulationJob>>>
-export type StreamSimulationJobQueryError = ErrorType<ErrorResponse>
-
+export type StreamSimulationJobQueryResult = NonNullable<
+  Awaited<ReturnType<typeof streamSimulationJob>>
+>;
+export type StreamSimulationJobQueryError = ErrorType<ErrorResponse>;
 
 /**
  * @summary Stream simulation job progress
  */
 
-export function useStreamSimulationJob<TData = Awaited<ReturnType<typeof streamSimulationJob>>, TError = ErrorType<ErrorResponse>>(
- jobId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof streamSimulationJob>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useStreamSimulationJob<
+  TData = Awaited<ReturnType<typeof streamSimulationJob>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  jobId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof streamSimulationJob>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getStreamSimulationJobQueryOptions(jobId, options);
 
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getStreamSimulationJobQueryOptions(jobId,options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
-

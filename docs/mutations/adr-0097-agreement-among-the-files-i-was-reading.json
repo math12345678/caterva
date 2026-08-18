@@ -1,0 +1,96 @@
+{
+  "_why": [
+    "ADR 0097's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0093 found the clone URL stated three ways and made README.md,",
+    "START_HERE.md and CONTRIBUTING.md agree. It picked `Terrium-sim/terrium`",
+    "because that is what README happened to say, without counting how often",
+    "each spelling appeared. The count was 3 against 126 -- and the 126",
+    "included all five contact_links on .github/ISSUE_TEMPLATE/config.yml,",
+    "the GitHub New Issue page, which a newcomer reaches before cloning",
+    "anything.",
+    "",
+    "So the repair reduced a three-way disagreement among three files and",
+    "left the repository more inconsistent than it found it, while reporting",
+    "the problem as fixed. The owner confirmed Terrium-sim/main on",
+    "2026-08-16.",
+    "",
+    "S1 and S2 are the widened check. A blob URL whose path resolves to a",
+    "file in this tree is a claim about THIS repository, whoever it says owns",
+    "it -- evidence rather than a name, so the planned split repos",
+    "(Terrium-sim/frontend-main and the rest) are correctly not caught.",
+    "",
+    "C4 and C5 are the two things the new test-count matcher must NOT do.",
+    "docs/readmes/business.md records a real incident in which 275 tests",
+    "failed; docs/FIRST_TASKS.md cites 1,291 tests as the defect it warns",
+    "about. Rewriting either would falsify a record to make a build go green.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0097-agreement-among-the-files-i-was-reading.json"
+  ],
+  "test": "python3 -m pytest Tests/test_clone_instructions_agree.py Tests/test_documented_counts.py -q -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "S1",
+      "description": "the agreement check narrows back to the three entry-point documents",
+      "_claimed": "caught",
+      "_note": "The defect exactly. With SELF_REFERENCES back to ENTRY_POINTS, the New Issue page and docs/REPO_MAP.md leave the scope and can disagree freely.",
+      "file": "Tests/test_clone_instructions_agree.py",
+      "find": "SELF_REFERENCES = ENTRY_POINTS + (\n    \"SUPPORT.md\",",
+      "replace": "SELF_REFERENCES = ENTRY_POINTS + (\n) if True else ENTRY_POINTS + (\n    \"SUPPORT.md\","
+    },
+    {
+      "id": "S2",
+      "description": "a self-link is accepted without checking the path exists here",
+      "_claimed": "caught",
+      "_note": "Dropping the existence test turns the rule from evidence into a name match, and the eighteen planned split repos start being demanded to agree with the monorepo -- a guard that fails on correct documents is a guard that gets deleted. Escaped on the first run: every blob URL in the real files happens to resolve, so the rule was invisible. extract_self_links() was split out to be testable on synthetic input.",
+      "file": "Tests/test_clone_instructions_agree.py",
+      "find": "        if (ROOT / m.group(\"path\")).exists()\n    ]",
+      "replace": "    ]"
+    },
+    {
+      "id": "S3",
+      "description": "clone_commands() reads only the entry points again",
+      "_claimed": "caught",
+      "_note": "This is how docs/REPO_MAP.md kept `git clone --recursive .../main.git` -- both halves of a defect that had been fixed two files away.\n    Three false readings before a true one, all recorded because each was a different failure. (1) INDETERMINATE: the find string matched both clone_commands() and self_links(), whose opening lines are identical. (2) NOT CAUGHT, correctly: once REPO_MAP was fixed there was nothing left for the wider scope to catch, so the scope could be reverted and the suite would agree -- coverage that exists only while a defect exists is not coverage. test_the_scan_reaches_past_the_three_entry_points now asserts the scope directly. (3) NOT CAUGHT again, this time wrongly: that test took the union of clone_commands() and self_links(), so narrowing either alone was still satisfied by the other. Asserted separately now. (4) NOT CAUGHT a third time and unreproducible -- applying the identical edit by hand failed the test. It went away after `rm -rf Tests/__pycache__`. Stale bytecode is a false NOT CAUGHT that looks exactly like a real gap, which is the reason ADR 0069 exists.",
+      "file": "Tests/test_clone_instructions_agree.py",
+      "find": "    for name in SELF_REFERENCES:\n        path = ROOT / name\n        if not path.exists():\n            continue\n        for m in _CLONE_RE",
+      "replace": "    for name in ENTRY_POINTS:\n        path = ROOT / name\n        if not path.exists():\n            continue\n        for m in _CLONE_RE"
+    },
+    {
+      "id": "C4",
+      "description": "the test-count matcher reads a report of tests failing as a suite size",
+      "_claimed": "caught",
+      "_note": "docs/readmes/business.md: 'a guard that printed \"every collected test ran\" while 275 tests failed'. A count of tests that failed is not a count of tests, and correcting it would edit the record of the incident.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "_OUTCOME_WORDS = (\"failed\", \"passed\", \"broke\", \"were\", \"did\", \"ran\", \"collected\")",
+      "replace": "_OUTCOME_WORDS = (\"zzzznever\",)"
+    },
+    {
+      "id": "C5",
+      "description": "the test-count matcher stops honouring quotation",
+      "_claimed": "caught",
+      "_note": "docs/FIRST_TASKS.md cites '22 guards and 1,291 tests' as the defect it is warning about. The project's existing convention -- plain means assert, quoted means cite -- is what keeps that sentence writable.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "            if is_quoted(line, match.start(), match.end()):\n                continue\n            claims.append((lineno, int(match.group(1).replace(\",\", \"\"))))",
+      "replace": "            claims.append((lineno, int(match.group(1).replace(\",\", \"\"))))"
+    },
+    {
+      "id": "C6",
+      "description": "an uncollected suite makes every test count look stale",
+      "_claimed": "caught",
+      "_note": "With no baseline, every claim differs from every real figure. Reporting the whole repository as wrong the moment pytest cannot run is a guard nobody will believe the second time.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "    if not actual:\n        return []  # nothing collected; see rewrite() on inventing numbers",
+      "replace": "    pass"
+    },
+    {
+      "id": "C7",
+      "description": "the drafted public READMEs drop out of the checked set",
+      "_claimed": "caught",
+      "_note": "They are the file GitHub renders first on every repository the split would create. Not-live-yet was the reason nothing checked them, and it is the reason they matter most.",
+      "file": "scripts/check_documented_counts.py",
+      "find": "    str(p.relative_to(REPO_ROOT))\n    for p in (REPO_ROOT / \"docs\" / \"readmes\").glob(\"*.md\")",
+      "replace": "    str(p.relative_to(REPO_ROOT))\n    for p in (REPO_ROOT / \"docs\" / \"readmes\").glob(\"*.nothing\")"
+    }
+  ]
+}

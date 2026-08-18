@@ -35,8 +35,10 @@ export default function CookieConsent() {
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-white/50 leading-relaxed mb-3">
-                  We use essential cookies only — no tracking, no ads. Data
+                  We use essential cookies only — no analytics, no ads. Data
                   sources (BRENDA, KEGG, PubMed) are queried server-side.
+                  This page does load web fonts from Google, which means
+                  Google receives your IP address.
                 </p>
                 <div className="flex items-center gap-2">
                   <button

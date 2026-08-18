@@ -1,486 +1,243 @@
-> **⚠️ CORRECTION (2026-08-11):** the "197+ tests / 84% / 0 vulnerabilities" block further below is unverified and inconsistent with sibling docs written the same day (some cite "178" for the same snapshot) — run `npm test` for the real current count (17 test files, 249+ test blocks as a grep lower bound, growing). The endpoint list here (sweep/batch/stats/jobs-history/health) is the most accurate of this batch of docs and does match `src/web/server.ts`.
+# Start here
 
-# 🚀 Terrium — START HERE
+You are in the right place whether you are an intern joining the team or a
+stranger who found this on GitHub. This is the only document you have to
+read before you do something useful. Everything else is linked from here and
+can wait until you need it.
 
-**The complete scientific enzyme kinetics simulation platform**
+## What Terrium is, in one paragraph
 
-Everything you need is built. Everything works. Let's start using it.
+A simulation engine for teaching labs. A student asks a question in plain
+language; Terrium finds the real parameters in the scientific literature,
+runs the simulation, and shows where every number came from. Fifteen
+domains — enzyme kinetics, epidemics, population genetics, molecular
+dynamics.
 
----
+## The one idea
 
-## ⚡ Quick Start (30 seconds)
+**Terrium refuses to invent.** If it cannot find a real value for a
+parameter, it stops and says so rather than filling in something plausible.
 
-```bash
-cd /Users/smyan/Desktop/Coding/Terrium
-npm run web:start
-```
+That sounds obvious. It is unusual. Most tools default a missing value to
+something reasonable-looking and the student never learns the number was
+made up.
 
-Then open: **http://localhost:3000**
+Everything else follows from that, including the distinction you will use
+most:
 
-That's it. You now have:
-- ✅ Interactive web dashboard
-- ✅ Real-time simulation results
-- ✅ Live trajectory visualization
-- ✅ Full REST API
-- ✅ Persistent job history
+| | example | needs a citation? |
+|---|---|---|
+| **Measured quantity** | Km, Ki, kcat, Vmax | **Yes.** Somebody measured it in a lab. |
+| **Experimental condition** | s0, i0, end, points | **No.** *You* chose it. |
 
----
+Asking for a citation for a substrate concentration you picked is a category
+error. It has broken this codebase twice.
 
-## 🎯 What You Can Do
+Temperature and pH look like conditions but are **neither** — they are facts
+about the papers your parameters came from, not settings you choose. Getting
+that wrong shipped a hardcoded 37 °C into every entry point for months
+([ADR 0055](docs/adr/0055-a-simulation-has-no-temperature-of-its-own.md)).
 
-### 1️⃣ **Single Simulations** (Easiest)
-```bash
-# Via web dashboard
-Visit http://localhost:3000
-→ Fill form (enzyme, substrate, parameters)
-→ Click "Run Simulation"
-→ See results instantly
-```
-
-### 2️⃣ **Parameter Sweeps** (Explore Space)
-```bash
-# Sweep Km from 1-10 mM in 0.5 steps (20 simulations)
-curl -X POST http://localhost:3000/api/sweep \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "michaelis-menten",
-    "baseParameters": { "vmax": 12.8, "s0": 10 },
-    "sweepParameters": [{ "name": "km", "spec": "1:10:0.5" }]
-  }'
-```
-
-### 3️⃣ **Batch Jobs** (Run in Parallel)
-```bash
-# Run 5 simulations with different parameters
-curl -X POST http://localhost:3000/api/batch \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "michaelis-menten",
-    "baseParameters": { "s0": 10 },
-    "parameterSets": [
-      { "km": 1, "vmax": 10 },
-      { "km": 2, "vmax": 12 },
-      { "km": 3, "vmax": 14 },
-      { "km": 4, "vmax": 16 },
-      { "km": 5, "vmax": 18 }
-    ],
-    "concurrency": 3
-  }'
-```
-
-### 4️⃣ **Job History** (Persistent Storage)
-```bash
-# Get recent jobs
-curl http://localhost:3000/api/jobs/history
-
-# Get statistics
-curl http://localhost:3000/api/stats
-
-# See trends over time
-# (jobs are saved to terrium-jobs.jsonl)
-```
-
----
-
-## 🧪 What Models Are Supported
-
-All models generate valid **SBML Level 3** with complete MathML equations:
-
-### 1. Michaelis-Menten
-Classic enzyme kinetics:
-```
-v = (Vmax × [S]) / (Km + [S])
-```
-**Use when:** Basic enzyme kinetics
-
-### 2. Competitive Inhibition
-Inhibitor competes for active site:
-```
-v = (Vmax × [S]) / (Km(1 + [I]/Ki) + [S])
-```
-**Use when:** Testing with competitive inhibitor
-
-### 3. Non-Competitive Inhibition
-Inhibitor binds free and bound enzyme:
-```
-v = (Vmax × [S]) / ((Km + [S])(1 + [I]/Ki))
-```
-**Use when:** Testing with non-competitive inhibitor
-
-### 4. Product Inhibition
-Product provides feedback inhibition:
-```
-v = (Vmax × [S]) / (Km + [S](1 + [P]/Kp))
-```
-**Use when:** Modeling product accumulation
-
----
-
-## 📊 API Reference
-
-### Core Endpoints
-
-#### Submit Single Simulation
-```bash
-POST /api/simulate
-{
-  "query": "michaelis-menten",
-  "parameters": { "km": 5.2, "vmax": 12.8, "s0": 10 },
-  "enzyme": "lactate dehydrogenase",
-  "substrate": "lactate"
-}
-→ { "jobId": "job_...", "status": "queued" }
-```
-
-#### Check Simulation Status
-```bash
-GET /api/jobs/:jobId
-→ { "status": "running|complete|error", "progress": 50, "result": {...} }
-```
-
-#### Run Parameter Sweep
-```bash
-POST /api/sweep
-{
-  "query": "michaelis-menten",
-  "baseParameters": { "vmax": 12.8, "s0": 10 },
-  "sweepParameters": [{ "name": "km", "spec": "1:10:0.5" }]
-}
-→ { "sweepId": "sweep_...", "status": "queued" }
-```
-
-#### Get Sweep Results
-```bash
-GET /api/sweeps/:sweepId
-→ { "status": "complete", "result": {...} }
-```
-
-#### Run Batch Jobs
-```bash
-POST /api/batch
-{
-  "query": "michaelis-menten",
-  "baseParameters": { "s0": 10 },
-  "parameterSets": [{ "km": 1, "vmax": 10 }, ...],
-  "concurrency": 3
-}
-→ { "batchId": "batch_...", "status": "queued" }
-```
-
-#### Get Batch Results
-```bash
-GET /api/batches/:batchId
-→ { "status": "complete", "result": {...} }
-```
-
-#### Job History
-```bash
-GET /api/jobs/history
-→ { "jobs": [...], "count": 50 }
-```
-
-#### Statistics
-```bash
-GET /api/stats
-→ { 
-  "totalJobs": 150,
-  "successful": 145,
-  "failed": 5,
-  "averageExecutionTimeMs": 75,
-  "queryCounts": { "michaelis-menten": 120, ... }
-}
-```
-
-#### Health Check
-```bash
-GET /api/health
-→ { "status": "ok", "uptime": 123.45, "jobs": {...}, "sweeps": {...} }
-```
-
----
-
-## 💻 Usage Examples
-
-### Example 1: Find Optimal Km
-
-**Question:** Which Km value gives best substrate conversion?
+## Get it running
 
 ```bash
-# Sweep Km from 0.5 to 10 mM
-curl -X POST http://localhost:3000/api/sweep \
-  -d '{
-    "query": "michaelis-menten",
-    "baseParameters": { "vmax": 12.8, "s0": 10 },
-    "sweepParameters": [{ "name": "km", "spec": "0.5:10:0.5" }]
-  }'
-
-# Poll for results
-curl http://localhost:3000/api/sweeps/sweep_...
-
-# Response includes:
-# - Each Km value and its final substrate concentration
-# - Optimal Km (minimum remaining substrate)
-# - Parameter sensitivity (how much Km matters)
+git clone https://github.com/Terrium-sim/main.git
+cd main
+make setup     # creates .venv, installs everything — 2–5 min, ~120 MB
+make check     # verifies the stack genuinely works
+make test      # the full suite
 ```
 
-### Example 2: Compare Conditions
+> **`git remote get-url origin` says something else** — it says
+> `math12345678/terrium.git`. That is the remote this working copy pushes
+> to; `Terrium-sim/main` is where the project is published, confirmed by
+> the owner on 2026-08-16. Both being true at once is normal for a repo
+> that moved, and it is recorded here because a newcomer who runs
+> `git remote -v` after cloning will see the difference and otherwise have
+> no way to tell which is wrong.
+>
+> This is worth knowing about how it got fixed. The URL was stated three
+> different ways — this file said `Terrium-sim/main`, `README.md` said
+> `Terrium-sim/terrium`, `origin` said neither — and the first repair made
+> all three agree on `terrium` **without checking which was more widely
+> used**. It was the minority spelling: 3 references against 126, and the
+> 126 included every link on the GitHub New Issue page. Agreement reached
+> by looking at three files is not agreement.
+>
+> `--recursive` was removed: there is no `.gitmodules` here, so it did
+> nothing. `docs/PUBLISHING.md` describes an 18-repository split in which
+> `main` becomes an umbrella of submodules; if that happens, the flag comes
+> back, and `Tests/test_clone_instructions_agree.py` will start requiring
+> it the moment a `.gitmodules` appears.
 
-**Question:** How do results differ across 5 different enzyme batches?
+`make setup` is the slow one. It downloads prebuilt wheels rather than
+compiling anything (libroadrunner alone is 50 MB), and pip prints nothing
+while it resolves. A silent terminal is not a hang.
+
+`make check` is not a version check. It builds a real Michaelis-Menten
+model, integrates it, and compares the result against the exact closed-form
+solution. If it passes, the numerics can be trusted.
+
+**If a step fails, run `make doctor` first.** It runs on a bare interpreter
+and imports nothing outside the standard library, so it still works when the
+venv is the broken thing. It prints every interpreter it found, the venv's
+state and which Python built it, each required package's version against its
+pin, and whether Node is present.
+
+If any of this fails on your machine, **that is a bug and we want to know.**
+A setup that only works for the person who wrote it is a real defect, and a
+newcomer is the best-placed person in the project to find it. Paste the
+`make doctor` output into the report — it is the whole environment in one
+block.
+
+Windows: use WSL2 or the Dev Container. The Makefile is POSIX shell. See
+[CONTRIBUTING.md](CONTRIBUTING.md#windows).
+
+## One letter that will confuse you
+
+The Python package is **`Terium`** — one r. The product, this repository and
+the GitHub organisation are **`Terrium`** — two.
+
+```python
+import Terium          # correct
+import Terrium         # ModuleNotFoundError, always
+```
+
+Both spellings are right in their place and you will see both everywhere.
+If you hit `No module named 'Terrium'`, **your environment is fine** — you
+have typed the product name where the package name goes. `make doctor` will
+tell you the install is healthy, which is true and unhelpful.
+
+`scripts/check_package_spelling.py` fails the build on the wrong import, so
+this costs you a CI run at worst rather than an afternoon.
+
+Whether the product should be renamed altogether is a live question — it
+shares a field and nearly a name with the Sauro lab's
+[Tellurium](https://tellurium.analogmachine.org/). See
+[`docs/RENAME_PLAN.md`](docs/RENAME_PLAN.md) for the cost, and the
+non-affiliation notice near the top of the README for why it matters.
+
+## Where things live
+
+| directory | what is in it |
+|---|---|
+| [`Terium/`](Terium/README.md) | the simulation engine — fifteen domains, and the Python that integrates them |
+| [`Tests/`](Tests/README.md) | the literature layer — BRENDA and PubMed clients, resolvers, the fallback chain |
+| [`src/`](src/README.md) | the TypeScript surface — CLI, web server, dashboard, engine bridge |
+| [`Science-Agent-Pipeline/`](Science-Agent-Pipeline/README.md) | the Express API server and the agent pipeline |
+| [`scripts/`](scripts/README.md) | the guards — the scripts that fail the build when a claim stops being true |
+| [`docs/`](docs/README.md) | ADRs, the constitution, the expert-feedback record |
+| [`examples/`](examples/README.md) | runnable end-to-end examples |
+
+## Your first task
+
+Pick one from **[docs/FIRST_TASKS.md](docs/FIRST_TASKS.md)**. Every entry
+there is a real open gap with a file to open, a command that shows it
+failing, and a way to know when you are done. None of them are made-up
+exercises.
+
+If none appeal, the most valuable thing a new person does is **find
+something wrong that everyone else stopped seeing**:
 
 ```bash
-curl -X POST http://localhost:3000/api/batch \
-  -d '{
-    "query": "michaelis-menten",
-    "baseParameters": { "s0": 10 },
-    "parameterSets": [
-      { "km": 2.1, "vmax": 10.5 },  # Batch 1
-      { "km": 2.3, "vmax": 10.8 },  # Batch 2
-      { "km": 2.0, "vmax": 11.2 },  # Batch 3
-      { "km": 2.4, "vmax": 10.3 },  # Batch 4
-      { "km": 2.2, "vmax": 11.0 }   # Batch 5
-    ],
-    "concurrency": 3
-  }'
-
-# Get all results at once
-# Compare final values across batches
-# Calculate mean ± std dev
+npx ts-node src/cli/scientificCLI.ts resolve "made up enzyme" \
+  --substrate nonsense --organism "Homo sapiens"
 ```
 
-### Example 3: Model Comparison
+Does it fail cleanly and tell you why? Try nonsense units, negative
+concentrations, an enzyme with a Unicode name, a substrate with an
+apostrophe. Try it with no network.
 
-**Question:** Which kinetic model fits best?
+A good report has three parts: **what you ran**, **what happened**, **what
+you expected.** That is enough. You do not need to know the fix.
+
+## The standard
+
+One rule shapes the whole project:
+
+> **A check that cannot fail is worse than no check, because it is trusted.**
+
+Practically, when you fix something:
+
+1. **Reproduce it first.** Do not trust a bug report, including your own
+   from an hour ago. Run it and watch it fail.
+2. **Mutation-test the fix.** Break it on purpose, confirm your test goes
+   red, put it back. A test that passes before and after your change tested
+   nothing.
+3. **Never report success on failure.** If something failed, say so. That
+   sounds too obvious to state; it has shipped here three times, most
+   recently in a script that printed *"All 16 repositories pushed"* after
+   every push had failed.
+
+Step 2 is the one people skip. It is also the one that has caught the most
+real defects in this codebase — including several in checks that were
+themselves written to catch defects.
+
+## Before you open a pull request
 
 ```bash
-# Run same substrate with different models
-for model in michaelis-menten competitive-inhibition non-competitive-inhibition product-inhibition; do
-  curl -X POST http://localhost:3000/api/simulate \
-    -d "{ \"query\": \"$model\", \"parameters\": {...} }"
-done
-
-# Compare trajectories
-# Which has best fit to experimental data?
+make pr
 ```
 
----
+That is the whole checklist. It runs the guards CI runs, in CI's order, then
+the test suites — so a green `make pr` means a green PR.
 
-## 📁 What's in the System
+It exists because it did not, and the omission was the kind this project
+cares about: `CONTRIBUTING.md` told contributors to run `make test`, which
+is two commands, while CI ran eleven. Someone who followed the instructions
+exactly still got a red X, from checks the instructions never mentioned
+([ADR 0057](docs/adr/0057-contributing-means-running-what-ci-runs.md)).
 
-### Web Interface
-```
-http://localhost:3000/
-├── Form: enzyme, substrate, kinetic model, parameters
-├── Submit button for single simulations
-├── Real-time progress indicator
-├── Results table (job ID, model, confidence, time)
-└── Trajectory chart (live updates)
-```
-
-### REST API (7 endpoints)
-```
-POST   /api/simulate      → Single simulation
-GET    /api/jobs/:jobId   → Job status & results
-POST   /api/sweep         → Parameter sweep
-GET    /api/sweeps/:id    → Sweep results
-POST   /api/batch         → Batch jobs
-GET    /api/batches/:id   → Batch results
-GET    /api/jobs/history  → Recent jobs
-GET    /api/stats         → Aggregate statistics
-GET    /api/health        → System status
-```
-
-### Simulation Engine
-```
-Input: Enzyme, substrate, kinetic model, parameters
-  ↓
-Fetch real literature (PubMed + CrossRef)
-  ↓
-Generate SBML Level 3 model
-  ↓
-Run Terium kinetics solver
-  ↓
-Validate results & calculate confidence
-  ↓
-Output: Time-series trajectory + final value
-```
-
-### Storage
-```
-Persistent: terrium-jobs.jsonl (JSON lines format)
-├── All completed jobs
-├── Queryable by status, time, model
-├── Exportable to CSV
-└── Used for statistics & history
-```
-
----
-
-## 🔧 Customization
-
-### Change Port
-```bash
-PORT=3001 npm run web
-# Server runs on :3001 instead of :3000
-```
-
-### Use Different Storage
-```bash
-# Edit src/storage/job-database.ts
-// Currently: JSON lines file (terrium-jobs.jsonl)
-// Can add: SQLite, PostgreSQL, MongoDB
-```
-
-### Add New Kinetic Model
-```bash
-# Edit src/engine/sbml-builder.ts
-// Add new function: buildYourModel()
-// Register in SBMLBuilders object
-```
-
----
-
-## 📈 Performance
-
-| Operation | Time |
-|-----------|------|
-| Single simulation | 50-100ms |
-| Sweep (10 points) | ~1 second |
-| Sweep (20 points) | ~2 seconds |
-| Batch (5 jobs, concurrency=3) | ~1 second |
-| PubMed search | 5-10 seconds |
-| **End-to-end** | **10-15 seconds** |
-
-Max concurrent jobs: Unlimited (limited by RAM)  
-Max timeout: 60 seconds (configurable)
-
----
-
-## 🎓 Learning Resources
-
-### Quick Reference
-1. `COMPLETE_GUIDE.md` — Full system guide
-2. `WEB_INTERFACE.md` — API documentation
-3. `FEATURE_SWEEP_COMPLETE.md` — Sweep details
-4. `IMPROVEMENT_ROADMAP.md` — Future features
-
-### Try These First
-```bash
-# 1. Start server
-npm run web:start
-
-# 2. Visit dashboard
-open http://localhost:3000
-
-# 3. Fill form and simulate
-# Fill in: enzyme, substrate, Km, Vmax, S0
-# Click: Run Simulation
-
-# 4. Try API
-curl http://localhost:3000/api/health
-
-# 5. Run sweep
-curl -X POST http://localhost:3000/api/sweep -d '...'
-```
-
----
-
-## ✅ Quality Metrics
-
-```
-✓ 197+ tests passing
-✓ 84% code coverage
-✓ 0 security vulnerabilities
-✓ 0 compilation errors
-✓ Full TypeScript strict mode
-✓ Production-grade error handling
-✓ Comprehensive logging
-✓ Complete documentation
-```
-
----
-
-## 🚀 What's Next?
-
-### Immediate (Ready to use now)
-- ✅ Parameter sweeps
-- ✅ Batch processing
-- ✅ Persistent job history
-- ✅ Web dashboard
-- ✅ REST API
-
-### Coming Soon (Phase 2)
-- 📋 Advanced export (CSV, JSON, PDF)
-- 📋 Model comparison UI
-- 📋 Sensitivity analysis
-- 📋 Database options (SQLite, PostgreSQL)
-
-### Future (Phase 3+)
-- 🔮 Machine learning fitting
-- 🔮 WebSocket real-time updates
-- 🔮 Kubernetes deployment
-- 🔮 Multi-substrate simulations
-
----
-
-## ❓ FAQ
-
-**Q: Do I need to install anything?**  
-A: Nope! Everything is in the repo. Just run `npm run web:start`
-
-**Q: How do I use the API?**  
-A: See "API Reference" section above. Use curl or any HTTP client.
-
-**Q: Can I save results?**  
-A: Yes! All jobs are saved to `terrium-jobs.jsonl`. Use `/api/jobs/history` to retrieve.
-
-**Q: How accurate are the results?**  
-A: Uses Terium + libroadrunner (industry-standard). Validation checks against literature.
-
-**Q: Can I run this in production?**  
-A: Yes! See READY_TO_SHIP.md for deployment guide.
-
-**Q: What if I need real literature to validate?**  
-A: System searches PubMed automatically. Add enzyme name for better results.
-
----
-
-## 📞 Support
-
-### Documentation
-- `COMPLETE_GUIDE.md` — Comprehensive system guide
-- `WEB_INTERFACE.md` — API endpoints + examples
-- `FEATURE_SWEEP_COMPLETE.md` — Sweep feature details
-- `IMPROVEMENT_ROADMAP.md` — Future enhancements
-
-### Troubleshooting
-- Check `npm run type-check` for TypeScript errors
-- Run `npm test` to verify all tests pass
-- Check logs in `~/.terrium/logs` for detailed errors
-
----
-
-## 🎉 You're Ready!
-
-Everything is built. Everything works. Start using it:
+If you want the pieces separately:
 
 ```bash
-npm run web:start
-# Visit http://localhost:3000
+make guards                                # the guards only, no suites
+python -m pytest Terium/tests Tests -q     # the Python suites
+npx tsc --noEmit -p .                      # both trees must compile
 ```
 
-The system is:
-- ✅ Production-ready
-- ✅ Fully tested
-- ✅ Comprehensively documented
-- ✅ Immediately usable
-- ✅ Easily extensible
+If a guard fails, fix the cause. **Do not weaken a guard to make the build
+green.** If you think a guard is wrong, say so in the PR and explain why —
+that is a legitimate position and has been right before.
 
-**Start now. Build amazing scientific insights.** 🚀
+In the PR, say what you verified and how. "Should work" is not a result.
 
----
+Branch naming: `yourname/what-it-does`, e.g. `priya/fix-csv-zero-export`.
 
-**Questions?** Check the documentation files.  
-**Want to contribute?** See IMPROVEMENT_ROADMAP.md for next features.  
-**Ready to deploy?** See READY_TO_SHIP.md for production setup.
+Work in **`main`**. Do not commit directly into `terium`, `tests`,
+`backend-main` and the rest — those are regenerated from here by
+`scripts/split_repos.sh`, and a commit made straight into one gets
+overwritten on the next split.
 
-Let's make enzyme kinetics research faster, easier, and more scientific. 🧬
+## Things that are genuinely fine
+
+- Asking a question that turns out to have an obvious answer.
+- Reporting a bug that turns out to be your environment. That is still a
+  documentation bug.
+- Disagreeing with a decision in the codebase. Several were wrong.
+- Not knowing the biology. Most of the work is software.
+- Taking a week on your first task. The standard here is unusual and it
+  takes a while to stop fighting it.
+
+## When you need more
+
+| what | where |
+|---|---|
+| the engineering rules, in full | [`docs/CONSTITUTION.md`](docs/CONSTITUTION.md) |
+| why a design is the way it is | [`docs/adr/`](docs/adr/) — start with the [index](docs/adr/README.md) |
+| what reviewers outside the project said, and what changed | [`docs/EXPERT_FEEDBACK.md`](docs/EXPERT_FEEDBACK.md) |
+| setup detail, Python version policy, PR rules | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
+| the HTTP API | [`docs/API.md`](docs/API.md) |
+| what lives in which of the 18 repositories | [`docs/REPO_MAP.md`](docs/REPO_MAP.md) |
+| how it was actually built, mistakes included | `Business/build-stages/` |
+| if you are an AI agent | [`docs/AGENT_BRIEF.md`](docs/AGENT_BRIEF.md) |
+
+`Business/build-stages/` is the honest one. Every stage records what broke
+and what the failure taught. If you want to understand why the project is
+paranoid about certain things, the reasons are there.
+
+Those records are **never rewritten** to match the present. They describe
+what was true on a date, including counts that have since changed. That is
+deliberate, and it is why the staleness guard
+(`scripts/check_documented_counts.py`) covers this file and the other
+present-tense docs but not the historical ones.

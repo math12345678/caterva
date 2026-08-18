@@ -37,14 +37,12 @@ const SAMPLE_LITERATURE: Literature[] = [
       {
         name: 'vmax',
         value: 12.8,
-        unit: 'μM/min',
-        conditions: { temperature: 37, pH: 7.4 }
+        unit: 'μM/min'
       },
       {
         name: 's0',
         value: 10.0,
-        unit: 'mM',
-        conditions: { temperature: 37, pH: 7.4 }
+        unit: 'mM'
       }
     ]
   },
@@ -64,8 +62,7 @@ const SAMPLE_LITERATURE: Literature[] = [
       {
         name: 'km',
         value: 5.1,
-        unit: 'mM',
-        conditions: { temperature: 37, pH: 7.4 }
+        unit: 'mM'
       },
       {
         name: 'vmax',
@@ -95,10 +92,6 @@ describe('ScientificPipeline Integration', () => {
         km: 5.2,
         vmax: 12.8,
         s0: 10.0
-      },
-      conditions: {
-        temperature: 37,
-        pH: 7.4
       }
     };
 
@@ -116,10 +109,6 @@ describe('ScientificPipeline Integration', () => {
       query: 'Michaelis-Menten for lactate dehydrogenase',
       parameters: {
         s0: 10.0 // Only substrate provided
-      },
-      conditions: {
-        temperature: 37,
-        pH: 7.4
       }
     };
 
@@ -133,8 +122,7 @@ describe('ScientificPipeline Integration', () => {
   it('should track reproducibility', async () => {
     const request: SimulationRequest = {
       query: 'Michaelis-Menten kinetics',
-      parameters: { km: 5.2, vmax: 12.8, s0: 10.0 },
-      conditions: { temperature: 37, pH: 7.4 }
+      parameters: { km: 5.2, vmax: 12.8, s0: 10.0 }
     };
 
     const response1 = await pipeline.execute(request);
@@ -150,8 +138,7 @@ describe('ScientificPipeline Integration', () => {
   it('should generate report for completed simulation', async () => {
     const request: SimulationRequest = {
       query: 'Michaelis-Menten kinetics',
-      parameters: { km: 5.2, vmax: 12.8, s0: 10.0 },
-      conditions: { temperature: 37, pH: 7.4 }
+      parameters: { km: 5.2, vmax: 12.8, s0: 10.0 }
     };
 
     const response = await pipeline.execute(request);
@@ -324,8 +311,7 @@ describe('ScientificPipeline Integration', () => {
   it('should reproduce identical results on re-execution', async () => {
     const request: SimulationRequest = {
       query: 'Michaelis-Menten kinetics',
-      parameters: { km: 5.2, vmax: 12.8, s0: 10.0 },
-      conditions: { temperature: 37, pH: 7.4 }
+      parameters: { km: 5.2, vmax: 12.8, s0: 10.0 }
     };
 
     const response1 = await pipeline.execute(request);
@@ -434,8 +420,7 @@ describe('ScientificPipeline Fail-Fast Behavior', () => {
     // was SIR and the run was blocked for having no beta.
     const response = await pipeline.execute({
       query: 'enzyme kinetics for lactate dehydrogenase',
-      parameters: { s0: 10.0 },
-      conditions: { temperature: 37, pH: 7.4 }
+      parameters: { s0: 10.0 }
     });
 
     expect(response.validationErrors.join(' ')).not.toMatch(/beta|gamma|i0/);

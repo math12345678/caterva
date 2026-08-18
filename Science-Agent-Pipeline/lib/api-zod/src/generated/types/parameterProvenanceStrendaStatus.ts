@@ -9,10 +9,10 @@
 /**
  * Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).
  */
-export type ParameterProvenanceStrendaStatus = typeof ParameterProvenanceStrendaStatus[keyof typeof ParameterProvenanceStrendaStatus];
-
+export type ParameterProvenanceStrendaStatus =
+  (typeof ParameterProvenanceStrendaStatus)[keyof typeof ParameterProvenanceStrendaStatus];
 
 export const ParameterProvenanceStrendaStatus = {
-  complete: 'complete',
-  incomplete: 'incomplete',
+  complete: "complete",
+  incomplete: "incomplete",
 } as const;

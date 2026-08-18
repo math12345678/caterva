@@ -9,46 +9,82 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * The pH and temperature the model is meant to represent, plus how far a measurement may drift from them before it stops representing the modelled system. Used to grade the `conditionProximity` axis of a resolved parameter's reliability (ADR 0024 Decision 3, ADR 0027).
+ * Optional, and never defaulted. "Physiological" has no organism-independent value: pH 7.4 and 37 C describe a mammal and misdescribe Thermus thermophilus, whose enzymes are measured near 70 C. Omit it and the axis reports `not_assessed` and says why, which is true; supplying a guess would report a confident `far` for a thermophile assay that was in fact ideal.
+ * ALL FIVE FIELDS ARE REQUIRED IF THE OBJECT IS PRESENT. A partial reference is refused rather than completed -- half a reference plus an assumed 37 C is an assumed mammal.
+ */
+export type SimulationRequestPhysiologicalReference = {
+  /** pH the model represents. */
+  ph: number;
+  /** Temperature in degrees Celsius the model represents. */
+  temperatureC: number;
+  /** Where these conditions came from -- a citation, a species, or the caller. Required so a reference can never be traced back to "someone typed it". */
+  basis: string;
+  /** How far a measured pH may sit from the reference before the value stops representing the modelled system. A property of the enzyme, so it is stated rather than assumed. */
+  phTolerance: number;
+  /** As phTolerance, in degrees Celsius. */
+  temperatureToleranceC: number;
+};
+
 export interface SimulationRequest {
   /** Natural-language simulation request (e.g. "simulate lactate dehydrogenase with pyruvate") */
   query: string;
+  /** Permit a measured parameter from a different but sufficiently related organism when the requested organism has none. Off by default (ADR 0024). Even when enabled, candidates must pass an NCBI Taxonomy relatedness check -- enabling this permits a value from a related organism, not from any organism. A value obtained this way is still not a measurement of the organism you asked about. */
+  allowCrossSpecies?: boolean;
+  /**
+   * Permit a measured parameter from a protein VARIANT -- a point mutant, or a named isozyme -- rather than the enzyme as found. Off by default (ADR 0029).
+   * BRENDA's commentary says things like "Y124C mutant" and "isozyme H4" in the same string that carries pH and temperature. Rows that say so are removed before selection, because selection takes the minimum and active-site substitutions are chosen precisely BECAUSE they change the kinetics -- in the acetylcholinesterase turnover table the lowest mutant kcat sits twelve times below the lowest wild-type one.
+   * Enabling this permits a value measured on a different protein. The result describes that variant, not the enzyme you named.
+   * Note the limit: a row whose commentary does not say either way is USABLE and uncertified. BRENDA does not require curators to write "wild-type", so an unlabelled mutant still passes regardless of this flag.
+   */
+  allowVariants?: boolean;
+  /**
+   * The pH and temperature the model is meant to represent, plus how far a measurement may drift from them before it stops representing the modelled system. Used to grade the `conditionProximity` axis of a resolved parameter's reliability (ADR 0024 Decision 3, ADR 0027).
+   * Optional, and never defaulted. "Physiological" has no organism-independent value: pH 7.4 and 37 C describe a mammal and misdescribe Thermus thermophilus, whose enzymes are measured near 70 C. Omit it and the axis reports `not_assessed` and says why, which is true; supplying a guess would report a confident `far` for a thermophile assay that was in fact ideal.
+   * ALL FIVE FIELDS ARE REQUIRED IF THE OBJECT IS PRESENT. A partial reference is refused rather than completed -- half a reference plus an assumed 37 C is an assumed mammal.
+   */
+  physiologicalReference?: SimulationRequestPhysiologicalReference;
 }
 
 /**
  * Current pipeline stage for a submitted job
  */
-export type SimulationJobStatus = typeof SimulationJobStatus[keyof typeof SimulationJobStatus];
-
+export type SimulationJobStatus =
+  (typeof SimulationJobStatus)[keyof typeof SimulationJobStatus];
 
 export const SimulationJobStatus = {
-  pending: 'pending',
-  resolving: 'resolving',
-  validating: 'validating',
-  running: 'running',
-  completed: 'completed',
-  failed: 'failed',
+  pending: "pending",
+  resolving: "resolving",
+  validating: "validating",
+  running: "running",
+  completed: "completed",
+  failed: "failed",
 } as const;
 
 /**
  * Resolved simulation domain
  */
-export type SimulationResponseDomain = typeof SimulationResponseDomain[keyof typeof SimulationResponseDomain];
-
+export type SimulationResponseDomain =
+  (typeof SimulationResponseDomain)[keyof typeof SimulationResponseDomain];
 
 export const SimulationResponseDomain = {
-  mm: 'mm',
-  sir: 'sir',
-  seir: 'seir',
-  pcr: 'pcr',
-  monte_carlo_pi: 'monte_carlo_pi',
-  wright_fisher: 'wright_fisher',
-  two_locus_wright_fisher: 'two_locus_wright_fisher',
-  molecular_dynamics: 'molecular_dynamics',
-  gillespie_ssa: 'gillespie_ssa',
-  gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
-  gillespie_ssa_replicates: 'gillespie_ssa_replicates',
-  sbml: 'sbml',
-  mm_competitive_inhibition: 'mm_competitive_inhibition',
+  mm: "mm",
+  mm_competitive_inhibition: "mm_competitive_inhibition",
+  sir: "sir",
+  seir: "seir",
+  pcr: "pcr",
+  monte_carlo_pi: "monte_carlo_pi",
+  wright_fisher: "wright_fisher",
+  two_locus_wright_fisher: "two_locus_wright_fisher",
+  molecular_dynamics: "molecular_dynamics",
+  gillespie_ssa: "gillespie_ssa",
+  gillespie_ssa_bimolecular: "gillespie_ssa_bimolecular",
+  gillespie_ssa_replicates: "gillespie_ssa_replicates",
+  lotka_volterra: "lotka_volterra",
+  cell_cycle_oscillator: "cell_cycle_oscillator",
+  repressilator: "repressilator",
+  sbml: "sbml",
 } as const;
 
 export interface Provenance {
@@ -63,25 +99,25 @@ export interface Provenance {
 /**
  * How this value was obtained for THIS query (ADR 0008). `llm` (ADR 0011) is a value the LLM resolver produced with no corroborating record; it is kept distinct from `default`, which is a value this project chose and documented. An `llm` entry always carries an explanatory note and never a citation.
  */
-export type ParameterProvenanceOrigin = typeof ParameterProvenanceOrigin[keyof typeof ParameterProvenanceOrigin];
-
+export type ParameterProvenanceOrigin =
+  (typeof ParameterProvenanceOrigin)[keyof typeof ParameterProvenanceOrigin];
 
 export const ParameterProvenanceOrigin = {
-  resolved: 'resolved',
-  user: 'user',
-  llm: 'llm',
-  default: 'default',
+  resolved: "resolved",
+  user: "user",
+  llm: "llm",
+  default: "default",
 } as const;
 
 /**
  * Whether the resolved citation is an exact organism/substrate match (verified) or a cross-species fallback (flagged). Present only when origin is resolved (Stage 5 Part 3).
  */
-export type ParameterProvenanceCitationStatus = typeof ParameterProvenanceCitationStatus[keyof typeof ParameterProvenanceCitationStatus];
-
+export type ParameterProvenanceCitationStatus =
+  (typeof ParameterProvenanceCitationStatus)[keyof typeof ParameterProvenanceCitationStatus];
 
 export const ParameterProvenanceCitationStatus = {
-  verified: 'verified',
-  flagged: 'flagged',
+  verified: "verified",
+  flagged: "flagged",
 } as const;
 
 export interface AssayConditions {
@@ -96,26 +132,26 @@ export interface AssayConditions {
 /**
  * Whether the assay conditions meet STRENDA's minimum reporting requirement (pH + temperature). Present only for resolved kinetic constants (ADR 0010).
  */
-export type ParameterProvenanceStrendaStatus = typeof ParameterProvenanceStrendaStatus[keyof typeof ParameterProvenanceStrendaStatus];
-
+export type ParameterProvenanceStrendaStatus =
+  (typeof ParameterProvenanceStrendaStatus)[keyof typeof ParameterProvenanceStrendaStatus];
 
 export const ParameterProvenanceStrendaStatus = {
-  complete: 'complete',
-  incomplete: 'incomplete',
+  complete: "complete",
+  incomplete: "incomplete",
 } as const;
 
 /**
  * What kind of locator this is
  */
-export type CitationLocatorKind = typeof CitationLocatorKind[keyof typeof CitationLocatorKind];
-
+export type CitationLocatorKind =
+  (typeof CitationLocatorKind)[keyof typeof CitationLocatorKind];
 
 export const CitationLocatorKind = {
-  brenda_ref: 'brenda_ref',
-  brenda_ec: 'brenda_ec',
-  pubmed: 'pubmed',
-  doi: 'doi',
-  url: 'url',
+  brenda_ref: "brenda_ref",
+  brenda_ec: "brenda_ec",
+  pubmed: "pubmed",
+  doi: "doi",
+  url: "url",
 } as const;
 
 export interface CitationLocator {
@@ -157,7 +193,9 @@ export type SimulationResponseTrajectoryItem = { [key: string]: unknown };
 /**
  * Per-parameter provenance; exactly one entry per key in parameters (ADR 0008)
  */
-export type SimulationResponseParameterProvenance = {[key: string]: ParameterProvenance};
+export type SimulationResponseParameterProvenance = {
+  [key: string]: ParameterProvenance;
+};
 
 export interface SimulationResponse {
   /** Unique identifier for this pipeline run */
@@ -189,14 +227,13 @@ export interface SimulationJob {
   /** Original natural-language query */
   query: string;
   /**
-     * Completion percentage based on pipeline stage
-     * @minimum 0
-     * @maximum 100
-     */
+   * Completion percentage based on pipeline stage
+   * @minimum 0
+   * @maximum 100
+   */
   progress: number;
   result?: SimulationResponse;
   error?: ErrorResponse;
   createdAt: string;
   updatedAt: string;
 }
-

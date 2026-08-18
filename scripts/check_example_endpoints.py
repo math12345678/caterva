@@ -245,7 +245,29 @@ def _web_server_routes() -> set[str]:
 
     for match in PATHNAME_MATCH_RE.finditer(text):
         # `\/api\/jobs\/[a-z0-9_]+$` -> `/api/jobs/:param`
-        raw = match.group(1).replace("\\/", "/")
+        #
+        # A NEGATED CHARACTER CLASS IS COLLAPSED FIRST, BEFORE `\/` IS
+        # UNESCAPED. `[^\/]+` is the idiomatic "one path segment" pattern,
+        # and it CONTAINS a slash. Unescaping first turned
+        #
+        #     \/api\/metrics\/sweeps\/[^\/]+$
+        #
+        # into `/api/metrics/sweeps/[^/]+$`, which then split on "/" into
+        # five segments -- `api`, `metrics`, `sweeps`, `[^`, `]+` -- and
+        # produced the route `/api/metrics/sweeps/:param/:param`. One
+        # segment too many, so every document correctly citing
+        # `/api/metrics/sweeps/<id>` was reported as a nonexistent endpoint.
+        #
+        # That accounted for the large majority of this guard's open
+        # findings: routes that were registered, documented correctly, and
+        # accused anyway. Third time this guard has produced confident false
+        # accusations (see docs/API.md for the first, the Prometheus
+        # foreign-port rule for the second). The pattern is always the same
+        # -- the parser understands less of the route table than it believes
+        # it does -- which is why it now reports the count of routes it
+        # parsed alongside its verdict.
+        raw = _NEGATED_CLASS_RE.sub(":param", match.group(1))
+        raw = raw.replace("\\/", "/")
         anchored = raw.endswith("$")
         body = raw.rstrip("$")
 
@@ -281,6 +303,11 @@ def _web_server_routes() -> set[str]:
 
     return routes
 
+
+#: `[^\/]+`, `[^/]+`, `[^\/]*` -- a negated class standing for exactly one
+#: path segment. Collapsed to `:param` BEFORE `\/` is unescaped, because the
+#: class body contains the very character the path is later split on.
+_NEGATED_CLASS_RE = re.compile(r"\[\^(?:\\/|/)[^\]]*\][+*]")
 
 #: `sweeps?` -> sweep, sweeps.  `batch(?:es)?` -> batch, batches.
 _OPTIONAL_GROUP = re.compile(r"^([A-Za-z0-9_-]+)\(\?:([A-Za-z0-9_-]+)\)\?$")
@@ -463,6 +490,81 @@ HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*)")
 DOC_MENTION_RE = re.compile(r"(/api/[A-Za-z0-9_/:$.*<>{}-]*)")
 
 
+#: Ports the Terrium HTTP servers listen on. A `/api/...` path preceded by an
+#: explicit host on any OTHER port is addressed at a different service and
+#: says nothing about Terrium's route table.
+#:
+#: This exists because the guard reported seven confident failures in
+#: MONITORING_SETUP.md for lines like
+#:
+#:     curl http://localhost:9090/api/v1/query?query=terrium_success_rate
+#:
+#: which is Prometheus's own HTTP API, correctly documented, on Prometheus's
+#: own port -- sitting two lines above a genuine Terrium example, in a file
+#: whose whole subject is wiring the two together.
+#:
+#: False POSITIVES are the dangerous direction for a guard. A red build
+#: compels someone to act, and the action here would have been deleting
+#: correct documentation. The same guard already produced 242 false
+#: accusations once by parsing half the route table (see docs/API.md); this
+#: is the same failure with a different cause, so it gets a named rule
+#: rather than an entry in an ignore list.
+TERRIUM_PORTS = {"3000", "3001", "8080"}
+
+_HOSTED_MENTION_RE = re.compile(
+    r"https?://[A-Za-z0-9_.:-]*?:(\d+)(?=/api/)"
+)
+
+
+def _foreign_service_ports(line: str) -> set[str]:
+    """Non-Terrium ports that appear immediately before an `/api/` path."""
+    return {
+        port
+        for port in _HOSTED_MENTION_RE.findall(line)
+        if port not in TERRIUM_PORTS
+    }
+
+
+#: A path that is the VALUE of a JSON "endpoint"/"path"/"route" key:
+#:
+#:     "endpoint": "/api/problematic",
+#:
+#: This is example DATA inside a documented response body -- what the
+#: monitoring payload would contain for a hypothetical failing route -- not
+#: a claim that the server serves it. The illustrative name is the giveaway
+#: ("problematic"), but the rule keys on structure rather than on the word,
+#: because the next one will be called something else.
+#:
+#: Third false-positive class found in this guard. All three shared a shape:
+#: the parser recognised a `/api/...` string and assumed the surrounding
+#: context was a claim about Terrium's routes. The context is what
+#: distinguishes a claim from a mention, and this guard now reads three
+#: kinds of it -- foreign host, JSON value position, and code-span wildcard.
+_JSON_VALUE_MENTION_RE = re.compile(
+    r'"(?:endpoint|path|route|url)"\s*:\s*"/api/'
+)
+
+#: A `*` inside a code span is a wildcard, not markdown emphasis:
+#:
+#:     invalidate all `/api/metrics/sweep*` at once
+#:
+#: `_normalise_mention` deliberately treats a bare trailing `*` as literal,
+#: because `**POST /api/simulate**` is bold markup wrapped around a real
+#: claim and excusing it would be a false NEGATIVE in the exact case this
+#: guard exists for. Backticks resolve the ambiguity: markdown emphasis does
+#: not apply inside a code span, so a `*` there can only be a wildcard.
+_CODE_SPAN_RE = re.compile(r"`([^`]*)`")
+
+
+def _wildcards_in_code_spans(line: str) -> set[str]:
+    """`/api/...` prefixes that appear starred INSIDE a code span."""
+    found: set[str] = set()
+    for span in _CODE_SPAN_RE.findall(line):
+        for match in re.finditer(r"(/api/[A-Za-z0-9_/:.-]*)\*", span):
+            found.add(match.group(1))
+    return found
+
+
 def _normalise_mention(raw: str) -> tuple[str, bool]:
     """`(endpoint, names_a_family)` for one raw `/api/...` match.
 
@@ -572,8 +674,25 @@ def doc_mentions(path: pathlib.Path) -> list[tuple[int, str, str | None]]:
         scrubbed_line = DOC_MENTION_RE.sub(" ", line)
         scrubbed_blob = DOC_MENTION_RE.sub(" ", blob)
 
+        # A path starred inside a code span names a FAMILY of routes, not
+        # an address. Collected before the mention loop so the check below
+        # can compare against the normalised prefix.
+        code_span_wildcards = _wildcards_in_code_spans(line)
+
+        # A path in JSON value position is example data in a documented
+        # response body, not a claim that the route exists.
+        json_value_positions = bool(_JSON_VALUE_MENTION_RE.search(line))
+
+        # Skip the whole line when it addresses another service by port.
+        # Line-level rather than match-level because the host sits before
+        # the path, and a curl line carries exactly one URL.
+        if _foreign_service_ports(line):
+            continue
+
         for match in DOC_MENTION_RE.finditer(line):
             endpoint, family = _normalise_mention(match.group(1))
+            if json_value_positions or endpoint in code_span_wildcards:
+                continue
             mentions.append(
                 (index + 1, endpoint, _exclusion(
                     endpoint=endpoint,

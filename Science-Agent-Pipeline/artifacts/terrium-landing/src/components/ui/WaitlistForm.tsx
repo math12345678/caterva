@@ -128,6 +128,7 @@ export const WaitlistForm: React.FC<{
               }}
               placeholder="Enter your email"
               aria-label="Email address"
+              aria-describedby="waitlist-privacy"
               disabled={loading}
               className={`w-full rounded-lg border bg-white/[0.02] px-4 py-3 text-[13px] font-mono text-white/80 outline-none placeholder:text-white/15 transition-all duration-200 ${
                 error ? "border-red-500/30" : "border-white/[0.06]"
@@ -162,6 +163,46 @@ export const WaitlistForm: React.FC<{
               {loading ? <LoadingDots /> : "Join Waitlist"}
             </motion.button>
           </Magnetic>
+
+          {/*
+            The notice has to be HERE, beside the field, not only in a
+            document somebody would have to go looking for. Transparency
+            about personal data attaches at the moment of collection, and
+            this form collected an email address with no statement of any
+            kind -- not who takes it, not why, not how to get it back.
+
+            Deliberately specific rather than reassuring. "We respect your
+            privacy" says nothing; "stored in a file on our server, no
+            mailing service, email us to have it deleted" is checkable, and
+            every clause of it was read out of src/routes/waitlist.ts.
+
+            `aria-describedby` on the input points here, so a screen reader
+            reaches the notice before the field is filled rather than after.
+          */}
+          <p
+            id="waitlist-privacy"
+            className="mt-3 text-[10px] leading-relaxed text-white/30 font-mono"
+          >
+            Your email is stored on our own server so we can tell you when
+            Terrium is ready. Not shared, not sold, no mailing list, no
+            tracking. Email{" "}
+            <a
+              href="mailto:mathlete.world@gmail.com"
+              className="underline hover:text-white/50"
+            >
+              mathlete.world@gmail.com
+            </a>{" "}
+            to have it removed. What we collect and what we do not:{" "}
+            <a
+              href="https://github.com/Terrium-sim/main/blob/main/docs/PRIVACY.md"
+              className="underline hover:text-white/50"
+              target="_blank"
+              rel="noreferrer"
+            >
+              docs/PRIVACY.md
+            </a>
+            .
+          </p>
         </motion.form>
       )}
     </AnimatePresence>

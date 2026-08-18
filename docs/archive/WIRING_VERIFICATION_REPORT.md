@@ -1,5 +1,12 @@
 # Terrium AI Architecture: Complete Wiring Verification
 
+> **⚠️ CORRECTION (2026-08-12):** several specifics in this report are stale/wrong against the current code:
+> - **"13 previously failing tests" / "13/13 domains" / "Domain coverage: 13"**: the real `SimulationDomain` union (`Science-Agent-Pipeline/artifacts/api-server/src/lib/teriumRunner.ts:11-38`) and the Python table it must match (`terium_runner.py:646-666`) now have **16** domains — the code comment says "15 core scientific domains + SBML escape hatch". Three (`lotka_volterra`, `cell_cycle_oscillator`, `repressilator`) were added after this report was written.
+> - **"Python Dispatch" — `DISPATCHER: Dict[str, Callable]` at `terium_runner.py` lines 585-586**: no object named `DISPATCHER` exists. The real table is `DISPATCH: Dict[str, str]` at `terium_runner.py:646`, and its values are handler **name strings** (e.g. `"mm": "simulate_michaelis_menten"`), not callables — the callables live in a separate `_RUNNERS` dict. `ARCHITECTURE_QUICK_REFERENCE.md`'s own correction banner already documents this same DISPATCHER→DISPATCH drift.
+> - **"Validation Logic (lines 262-275)" in `llmResolver.ts`**: the real domain-validation check is now at `llmResolver.ts:320-329` (`!SUPPORTED_DOMAINS.includes(parsed.domain ...)`, an array constant defined at line 104), not an inline `![...].includes(parsed.domain)` literal at 262-275.
+> - What's still true: `llmResolver.ts:40` does list `"mm_competitive_inhibition"` in the SYSTEM_PROMPT domain union, and `RESOLVABLE_FIELDS.mm_competitive_inhibition` (`provenance.ts:85`) does resolve both `km` and `ki` independently — the core wiring claim isn't fabricated, just several line numbers and the "13 domains"/"DISPATCHER" specifics are.
+> - Running the three cited test files via `vitest` (not the root `jest`, which can't find them — see the correction in `BUILD_STATUS_SUMMARY.md`) currently passes all 59 tests.
+
 **Date**: August 8, 2026  
 **Status**: ✅ **ALL WIRING COMPLETE — ZERO STRUCTURAL ERRORS**
 

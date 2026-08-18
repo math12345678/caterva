@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./teriumRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
-import { resolveKineticValue, resolveEpidemiologyParameters } from "./scienceAgent";
+import {
+  coherenceFromProvenance,
+  type CoherenceReport,
+} from "./assayCoherence";
+import { resolveKineticValue, resolveEpidemiologyParameters, type RelatednessVerdict } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
 import { matchDisease } from "./diseases";
@@ -46,16 +50,33 @@ function isValidNonEmptyString(value: unknown): value is string {
  * no pH, and the citation degrades to `flagged` downstream. See ADR 0010. */
 function toAssayConditions(
   raw: ScienceAgentResult["assayConditions"],
+  effectors?: ScienceAgentResult["effectors"],
 ): AssayConditions | undefined {
-  if (!raw) return undefined;
+  // `effectors` alone is enough to build a conditions object: a row can
+  // name a cofactor and report neither pH nor temperature, and dropping it
+  // because `assayConditions` was absent would lose the one thing the
+  // commentary DID say.
+  if (!raw && !effectors?.length) return undefined;
 
   const conditions: AssayConditions = {};
+
+  // Taken from the TOP LEVEL of the agent result, which is where the runner
+  // emits it -- not from `raw`. Reading it off `raw` compiles, type-checks,
+  // and yields `undefined` forever (ADR 0027's shape).
+  if (effectors?.length) {
+    conditions.effectors = effectors;
+  }
+
+  if (!raw) return conditions;
 
   if (isValidFiniteNumber(raw.ph)) {
     conditions.ph = raw.ph;
   }
   if (isValidFiniteNumber(raw.temperatureC)) {
     conditions.temperatureC = raw.temperatureC;
+  }
+  if (raw.bufferIdentity) {
+    conditions.bufferIdentity = raw.bufferIdentity;
   }
   if (isValidNonEmptyString(raw.buffer)) {
     conditions.buffer = raw.buffer;
@@ -74,15 +95,352 @@ const KINETIC_VALUE_MAP: Record<"km" | "ki", keyof ScienceAgentResult> = {
 };
 
 /**
+ * The form the returned value actually is, as a line a reader will see
+ * (ADR 0052).
+ *
+ * `poolFindingFlags` already emits the mixture warning — "returning the
+ * lowest would pick a form rather than answer the question". That sentence
+ * is conditional. This one is not: it fires only when the value in hand IS
+ * one of those forms.
+ *
+ * The two are deliberately separate flags rather than one merged sentence.
+ * The mixture is a fact about the pool and is worth saying whichever row
+ * won; this is a fact about the answer. Merging them would make the
+ * stronger claim disappear into the weaker one.
+ */
+function selectedFormFlags(
+  key: string,
+  form: ScienceAgentResult["selectedForm"],
+): string[] {
+  if (!form) return [];
+  return [`${key.toUpperCase()} — a form was picked: ${form.reason}`];
+}
+
+/**
+ * The tie the evidence could not break, as a line a reader will see
+ * (ADR 0051).
+ *
+ * This goes into `provenance.flags` — the list the CLI and web UI both
+ * render — rather than only onto a response field. ADR 0040 is the record
+ * of what happens otherwise: findings that reached the API and never
+ * reached the student.
+ *
+ * The alternatives are listed with their reference ids, because a named
+ * alternative is checkable and a bare count is not. Capped at four with an
+ * explicit remainder: a flag nobody finishes reading is a flag nobody
+ * reads, and the cap is stated rather than silently truncating.
+ */
+/**
+ * The papers Terrium found and then threw away.
+ *
+ * WHEN BRENDA HAS NOTHING, the resolver does not stop. It searches PubMed
+ * and CORE, and when that turns up papers it returns
+ * `source: "literature_candidates"` carrying the list — the fallback that
+ * exists precisely for the case where the primary path fails.
+ *
+ * `literatureCandidates` was declared on `ScienceAgentResult`, populated by
+ * `_candidates_to_dict`, emitted on two runner branches, and **read by
+ * nothing**. Not a surface, not the CLI, not a flag. A student asking for a
+ * constant BRENDA does not carry was told "could not resolve" while the
+ * system held a list of papers that probably contain the number, fetched at
+ * the cost of two API calls.
+ *
+ * That is ADR 0039's defect — computed, transported, dropped — on the one
+ * path whose whole job is to help when everything else failed. It is also
+ * Bakker's principle inverted: *do not exclude anything a priori*. Excluding
+ * the entire remaining evidence base by not mentioning it is the most
+ * complete exclusion available.
+ *
+ * Titles and locators, not a count. "We found 4 papers" is unusable; a
+ * reader needs to know WHICH, and the PMID or URL is what makes the offer
+ * checkable rather than a claim. Capped at four with an explicit remainder,
+ * for the reason `selectionTieFlags` gives: a flag nobody finishes reading
+ * is a flag nobody reads.
+ */
+function literatureCandidateNote(
+  key: string,
+  candidates: ScienceAgentResult["literatureCandidates"],
+): string | undefined {
+  if (!candidates || candidates.length === 0) return undefined;
+  const K = key.toUpperCase();
+
+  const shown = candidates.slice(0, 4);
+  const listed = shown
+    .map((c) => {
+      // A locator, in the order that is most directly checkable. PubMed's
+      // esummary never supplies a DOI, and CORE has no PMID, so neither
+      // alone covers both sources.
+      const locator = c.pmid
+        ? ` [PMID ${c.pmid}]`
+        : c.doi
+          ? ` [doi ${c.doi}]`
+          : c.url
+            ? ` [${c.url}]`
+            : "";
+      return `"${c.title}"${locator}`;
+    })
+    .join("; ");
+  const more =
+    candidates.length > shown.length
+      ? ` and ${candidates.length - shown.length} more`
+      : "";
+
+  return (
+    `Terrium found ${candidates.length} candidate paper(s) that may report ` +
+    `${K}. It does not extract numbers from full text, so these are for you ` +
+    `to read rather than a value it will use: ${listed}${more}. ` +
+    // THE INSTRUCTION, RESTATED, BECAUSE PROMOTING A NOTE DROPS IT.
+    //
+    // `missingKeyDetails` replaces the generic sentence for any key
+    // carrying an `unresolvedReason` -- and the generic sentence is where
+    // "Add km=<value> to your query" lives. Attaching this note therefore
+    // took away the one instruction the student can act on, which is a
+    // regression that function's own comment records having happened once
+    // before. Caught here by the test, not by reading.
+    `Once you have it, add ${key}=<value> to your query, and attach the ` +
+    `source with --cite ${key}="..." so it is recorded rather than lost.`
+  );
+}
+
+function selectionTieFlags(
+  key: string,
+  tie: ScienceAgentResult["selectionTie"],
+): string[] {
+  if (!tie || (tie.candidates?.length ?? 0) < 2) return [];
+  const K = key.toUpperCase();
+
+  const shown = tie.candidates.slice(0, 4);
+  const listed = shown
+    .map((c) => {
+      const mark = c.selected ? " (returned)" : "";
+      const ref = c.reference_id ? ` [ref ${c.reference_id}]` : "";
+      return `${c.value}${c.unit ? " " + c.unit : ""}${ref}${mark}`;
+    })
+    .join("; ");
+  const more =
+    tie.candidates.length > shown.length
+      ? ` and ${tie.candidates.length - shown.length} more`
+      : "";
+
+  return [`${K} — the evidence did not choose: ${tie.reason} Candidates: ${listed}${more}.`];
+}
+
+/**
+ * Turn pool-level findings into flags a reader will actually see.
+ *
+ * `provenance.flags` is what the CLI and the web UI render. The resolver's
+ * diagnostic `logs` are not — and for four ADRs these findings reached only
+ * the logs, which is the same as reaching nobody.
+ *
+ * Each finding already carries a `reason` written for a human. Nothing is
+ * reworded here: a client that paraphrases a finding becomes a second place
+ * the wording can drift, and the Python module is where the sentence was
+ * argued over.
+ */
+/**
+ * Say when the resolved value measured a PREPARATION, not the free enzyme.
+ *
+ * ADR 0029 removes rows measuring a sequence variant. An affinity tag, a
+ * covalent modification and immobilisation are none of them a sequence
+ * change, so that filter never saw them — and the human LDH Ki resolved to
+ * 0.00059, a "recombinant His-tagged enzyme" row, with nothing in the
+ * response saying so (ADR 0092).
+ *
+ * Silent for `unstated`, `absent` and `native`. A flag on every row in the
+ * corpus is noise, and noise is how the flags that matter stop being read.
+ */
+function preparationFlags(
+  key: string,
+  preparation: ScienceAgentResult["preparation"],
+): string[] {
+  if (!preparation) return [];
+
+  // The judgement is made ONCE, in Python, by the module that owns the
+  // rule: `enzyme_preparation.differs_for(quantity)`. It answers both
+  // halves — was the enzyme altered, and did the curator say the alteration
+  // left THIS quantity alone ("... does not alter the Km value", which is
+  // golden tuple G2's row).
+  //
+  // The first version re-derived that here from `status` and
+  // `stated_not_to_affect`. It agreed with Python, and it was still wrong:
+  // two implementations of one rule are what ADR 0027 is about, and they
+  // agree right up until one of them is edited.
+  //
+  // `warrantsWarning` is undefined only for a payload predating the field,
+  // in which case falling back to "there is a status we describe" is the
+  // conservative reading — it warns rather than staying silent.
+  if (preparation.warrantsWarning === false) return [];
+  const altered: Record<string, string> = {
+    immobilised: "an IMMOBILISED enzyme (diffusional limitation, altered microenvironment)",
+    tagged: "a TAGGED construct, carrying peptide the native protein does not",
+    modified: "a COVALENTLY MODIFIED enzyme",
+  };
+  const described = altered[preparation.status];
+  if (!described) return [];
+
+  const evidence = preparation.evidence ? ` — commentary: "${preparation.evidence}"` : "";
+  return [
+    `${key.toUpperCase()} — measured on ${described}${evidence}. This is a real, ` +
+      `correctly cited measurement of a preparation of the enzyme, not of the free enzyme.`,
+  ];
+}
+
+function poolFindingFlags(
+  key: string,
+  findings: ScienceAgentResult["poolFindings"],
+): string[] {
+  if (!findings) return [];
+  const K = key.toUpperCase();
+  const out: string[] = [];
+
+  for (const c of findings.effectorContrasts ?? []) {
+    out.push(`${K} — effector contrast: ${c.reason}`);
+  }
+  for (const m of findings.formMixtures ?? []) {
+    out.push(`${K} — mixed enzyme forms: ${m.reason}`);
+  }
+  for (const d of findings.organismDiscrepancies ?? []) {
+    out.push(`${K} — organism mismatch: ${d.reason}`);
+  }
+  for (const m of findings.sourceMixtures ?? []) {
+    out.push(`${K} — mixed biological sources: ${m.reason}`);
+  }
+  // Reported as its own flag rather than folded into the mixtures above.
+  // "we found no mixture" and "we could not look" must not share a
+  // rendering, or the absence of a warning becomes ambiguous.
+  if (findings.sourceCheckUnavailable) {
+    out.push(
+      `${K} — source check unavailable: ${findings.sourceCheckUnavailable.reason}`,
+    );
+  }
+  return out;
+}
+
+/**
+ * Collect the provenance notes for keys that failed validation, so the
+ * thrown error can say WHY each one is missing rather than asserting one
+ * generic reason for all of them.
+ *
+ * Only notes are carried across — never values. A note explains a refusal;
+ * it must not become a channel through which an unresolved number reaches
+ * the caller.
+ */
+function missingKeyDetails(
+  missing: string[],
+  provenance: Record<string, ParameterProvenance>,
+): Record<string, string> {
+  const details: Record<string, string> = {};
+  for (const key of missing) {
+    const entry = provenance[key];
+    // Gated on `unresolvedReason`, NOT on the mere presence of a note.
+    // Every unresolved key carries a note, including the ordinary
+    // "nothing in BRENDA/KEGG/PubMed" one — promoting all of them would
+    // strip the generic sentence (and the "Add km=<value>" instruction
+    // that goes with it) from the common case, which is a regression the
+    // first version of this function actually caused.
+    if (!entry?.unresolvedReason) continue;
+    const note = entry.note;
+    if (typeof note === "string" && note.trim().length > 0) {
+      details[key] = note;
+    }
+  }
+  return details;
+}
+
+/**
  * Helper to build unresolved kinetic provenance (consistent format).
  */
 function buildUnresolvedKineticProvenance(
   key: string,
-  reason: "not_found" | "no_locator",
+  reason:
+    | "not_found"
+    | "no_locator"
+    | "cross_species_withheld"
+    | "cross_species_too_distant"
+    | "variant_withheld",
+  organismsAvailable?: string[],
+  relatedness?: RelatednessVerdict[],
 ): ParameterProvenance {
+  const K = key.toUpperCase();
+
+  // The opt-in was given and the relatedness check still refused
+  // (ADR 0024, Jeske's third recommendation). This message must not read
+  // like the previous one, because the user has already acted once.
+  if (reason === "cross_species_too_distant") {
+    const explanations = (relatedness ?? [])
+      .filter((v) => v.status === "too_distant" && v.reason)
+      .map((v) => v.reason as string);
+    const detail = explanations.length > 0
+      ? " " + explanations.join(" ")
+      : organismsAvailable && organismsAvailable.length > 0
+        ? ` The available organisms were ${organismsAvailable.join(", ")}.`
+        : "";
+    return {
+      origin: "default",
+      unresolvedReason: "cross_species_too_distant",
+      note:
+        `Cross-species use was enabled, and no candidate passed the ` +
+        `relatedness check for ${K}.${detail} Enabling cross-species data ` +
+        `permits a value from a related organism; it does not permit one ` +
+        `from any organism.`,
+    };
+  }
+
+  // `cross_species_withheld` is deliberately NOT folded into `not_found`.
+  //
+  // "BRENDA has no value" and "BRENDA has a value, in a species you did
+  // not ask about, and cross-species use was not enabled" produce the same
+  // `found: false` but are different facts. The first is a gap in the
+  // literature. The second is a policy this code applied, and it is
+  // reversible by the user — but only if the message says so and names
+  // what is on the other side of the switch.
+  //
+  // See ADR 0024 and Lisa Jeske's (BRENDA/DSMZ) recommendation that
+  // cross-species be an explicit opt-in with an educational warning.
+  // A variant refusal is its own reason, not a flavour of "not found".
+  //
+  // "BRENDA holds nothing" and "BRENDA holds three values, all measured on
+  // point mutants" are different facts, and only the second is reversible by
+  // the reader. Same argument as cross-species, one field over — and the
+  // same consequence if collapsed: the opt-in becomes unexercisable,
+  // because nobody is told there is anything to opt into.
+  if (reason === "variant_withheld") {
+    const named =
+      organismsAvailable && organismsAvailable.length > 0
+        ? organismsAvailable.join(", ")
+        : "a sequence variant";
+    return {
+      origin: "default",
+      unresolvedReason: "variant_withheld",
+      note:
+        `Every ${K} BRENDA holds for this system was measured on a protein ` +
+        `variant (${named}) rather than on the enzyme as found. A point ` +
+        `substitution is usually chosen because it changes the kinetics, and ` +
+        `an isozyme is a different gene product, so neither is a ${K} for the ` +
+        `enzyme you asked about. Re-run with allowVariants to use one, ` +
+        `understanding that the result describes that variant.`,
+    };
+  }
+
+  if (reason === "cross_species_withheld") {
+    const named =
+      organismsAvailable && organismsAvailable.length > 0
+        ? organismsAvailable.join(", ")
+        : "another organism";
+    return {
+      origin: "default",
+      unresolvedReason: "cross_species_withheld",
+      note:
+        `No ${K} was measured in the requested organism. BRENDA holds a ${K} ` +
+        `for ${named}. Kinetic parameters are species-specific, so it was not ` +
+        `substituted; re-run with allowCrossSpecies to use it, understanding ` +
+        `that the resulting model is not a model of the organism you asked for.`,
+    };
+  }
+
   const messages = {
-    not_found: `Could not resolve a real ${key.toUpperCase()} value from BRENDA/KEGG/PubMed; using default ${key.toUpperCase()}.`,
-    no_locator: `Found a ${key.toUpperCase()} but its citation carries no locator (ref id or URL); not trusted as resolved — using default ${key.toUpperCase()}.`,
+    not_found: `Could not resolve a real ${K} value from BRENDA/KEGG/PubMed; using default ${K}.`,
+    no_locator: `Found a ${K} but its citation carries no locator (ref id or URL); not trusted as resolved — using default ${K}.`,
   };
   return {
     origin: "default",
@@ -102,6 +460,9 @@ async function applyKineticResolution(
   entities: EntityExtraction | undefined,
   overrides: Record<string, number | number[]>,
   domain: string,
+  allowCrossSpecies: boolean,
+  allowVariants: boolean,
+  physiologicalReference: ResolveQueryOptions["physiologicalReference"],
   parameters: Record<string, number | number[]>,
   parameterProvenance: Record<string, ParameterProvenance>,
   flags: string[],
@@ -132,10 +493,68 @@ async function applyKineticResolution(
     const agentResult = await resolveKineticValue({
       ...entities,
       quantity: key as "km" | "ki",
+      allowVariants,
+      physiologicalReference,
+      allowCrossSpecies,
     });
 
     if (!agentResult.found) {
-      provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
+      if (agentResult.source === "variant_withheld") {
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          "variant_withheld",
+          agentResult.variantCandidatesAvailable,
+        );
+      } else if (agentResult.source === "cross_species_withheld") {
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          "cross_species_withheld",
+          agentResult.crossSpeciesOrganismsAvailable,
+        );
+      } else if (agentResult.source === "cross_species_too_distant") {
+        // The user DID opt in, and the check still refused. Reporting this
+        // as "not found" would be the cruellest possible message: they
+        // took the action the previous error asked for and got the same
+        // wall back with no acknowledgement that anything changed.
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          "cross_species_too_distant",
+          agentResult.crossSpeciesOrganismsAvailable,
+          agentResult.relatedness,
+        );
+      } else {
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
+      }
+      // THE OFFER GOES IN THE PROVENANCE NOTE, NOT IN A FLAG.
+      //
+      // The first attempt pushed a flag. A probe showed why that reaches
+      // nobody: when a kinetic constant cannot be resolved and was not
+      // supplied, `resolveQuery` THROWS `RequiredParametersMissingError`.
+      // There is no response, so there are no flags to read — the papers
+      // were unreachable by construction on the one path where they matter.
+      //
+      // `missingKeyDetails` promotes a note to the error when the key
+      // carries an `unresolvedReason`, and that mechanism exists for
+      // precisely this reasoning: telling a user the literature has
+      // nothing, when it has something they could have had, is the
+      // true-sounding-and-misleading shape treated as a defect everywhere
+      // else here. Terrium holding papers it does not mention is that
+      // sentence again.
+      const offer = literatureCandidateNote(
+        key,
+        agentResult.literatureCandidates,
+      );
+      if (offer) {
+        const existing = provenanceUpdates[key];
+        provenanceUpdates[key] = {
+          ...existing,
+          unresolvedReason: existing?.unresolvedReason ?? "literature_candidates",
+          // Appended, never replacing. Promoting a note strips the generic
+          // sentence — including the "Add km=<value>" instruction — and
+          // that instruction is still the thing the student must act on.
+          note: [existing?.note, offer].filter(Boolean).join(" "),
+        };
+      }
       continue;
     }
 
@@ -160,18 +579,58 @@ async function applyKineticResolution(
 
     if (value !== undefined) {
       parameterUpdates[key] = value;
-      provenanceUpdates[key] = buildResolvedKineticProvenance({
+      const resolvedProvenance = buildResolvedKineticProvenance({
         parameterKey: key,
         source: agentResult.source ?? "unknown",
         citation,
         organism: agentResult.organism,
         citationStatus,
-        assayConditions: toAssayConditions(agentResult.assayConditions),
+        assayConditions: toAssayConditions(agentResult.assayConditions, agentResult.effectors),
         citationLocators: buildCitationLocators(agentResult.citation),
       });
+
+      // Bakker's graded axes ride alongside the binary citationStatus
+      // rather than replacing it. citationStatus governs whether the run
+      // may proceed (a policy); reliability describes how much to trust
+      // the number that did (a description). Collapsing the two would make
+      // a nuanced description into a gate, which is how "partial" evidence
+      // would start blocking runs it should only be annotating.
+      // THE RUNNER'S SCORE IS THE SCORE. This does not recompute it.
+      //
+      // It used to. `science_agent_runner.py` has always graded the value
+      // on Bakker's three axes and emitted the result, and this line threw
+      // that away and ran the TypeScript grader instead — with no
+      // `reference` argument, because none was reachable here. The
+      // proximity axis therefore returned `not_assessed` on every request
+      // the API server ever served. Not sometimes: always.
+      //
+      // Meanwhile the CLI consumed the Python score and reported real
+      // grades. Two front ends, one of them structurally incapable of the
+      // answer, and a parity test asserting they agreed — because the test
+      // pinned the two implementations against a shared fixture, which
+      // says nothing about a call site that hands one of them different
+      // arguments.
+      //
+      // Falling back to the TypeScript grader when the runner sends
+      // nothing was considered and rejected. A second implementation kept
+      // "just in case" is how this drift started, and a score computed by
+      // the fallback would be indistinguishable in the response from one
+      // computed by the resolver. Absent is reported as absent.
+      if (agentResult.reliability) {
+        resolvedProvenance.reliability = agentResult.reliability;
+      }
+
+      provenanceUpdates[key] = resolvedProvenance;
       flags.push(
         `Resolved ${key.toUpperCase()}=${value} ${agentResult.unit ?? "mM"} from ${agentResult.source ?? "unknown source"}.`,
       );
+      // Pool-level findings ride alongside the resolution flag, not instead
+      // of it. The value WAS resolved and IS cited; what these add is that
+      // the pool it came from held something the reader should look at.
+      flags.push(...poolFindingFlags(key, agentResult.poolFindings));
+      flags.push(...selectionTieFlags(key, agentResult.selectionTie));
+      flags.push(...selectedFormFlags(key, agentResult.selectedForm));
+      flags.push(...preparationFlags(key, agentResult.preparation));
     } else {
       provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
     }
@@ -283,7 +742,7 @@ async function applyVmaxFromKcatResolution(
       citation,
       organism: agentResult.organism,
       citationStatus,
-      assayConditions: toAssayConditions(agentResult.assayConditions),
+      assayConditions: toAssayConditions(agentResult.assayConditions, agentResult.effectors),
       citationLocators: buildCitationLocators(agentResult.citation),
       note: bridgeNote,
     }),
@@ -504,6 +963,14 @@ export interface ResolvedSimulation {
     flags: string[];
   };
   parameterProvenance: Record<string, ParameterProvenance>;
+  /**
+   * Whether the resolved parameters could have come from one experiment.
+   *
+   * Separate from `parameterProvenance` because it is not a property of any
+   * single parameter — it is a property of the set, and there is nowhere
+   * else for it to live. See assayCoherence.ts and ADR 0026.
+   */
+  assayCoherence: CoherenceReport;
 }
 
 interface DomainDefaults {
@@ -534,8 +1001,12 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     ],
     reasoning:
       "Keywords related to enzyme kinetics with competitive inhibition were found; defaulting to a Michaelis-Menten competitive inhibition simulation.",
+    // The paper that DEFINES this model, plus the steady-state derivation
+    // the competitive form rests on. See the note on `mm` below for why
+    // BRENDA is no longer listed here.
     modelCitations: [
-      "BRENDA — The Comprehensive Enzyme Information System, https://www.brenda-enzymes.org/",
+      "Michaelis L., Menten M.L. (1913) Die Kinetik der Invertinwirkung. Biochemische Zeitschrift 49, 333-369. English translation: Johnson K.A., Goody R.S. (2011) Biochemistry 50(39), 8264-8269. https://doi.org/10.1021/bi201284u",
+      "Briggs G.E., Haldane J.B.S. (1925) A note on the kinetics of enzyme action. Biochemical Journal 19(2), 338-339. https://doi.org/10.1042/bj0190338",
     ],
   },
   {
@@ -559,8 +1030,25 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     ],
     reasoning:
       "Keywords related to enzyme kinetics were found; defaulting to a Michaelis-Menten simulation.",
+    // BRENDA used to be the ONLY entry here, and it was wrong twice over.
+    //
+    // ADR 0008: `modelCitations` describes the MODEL, never a parameter
+    // value. Every other domain in this table cites the paper that defines
+    // its model -- Kermack & McKendrick for SIR, Gillespie for the SSA,
+    // Lotka for Lotka-Volterra, Elowitz & Leibler for the repressilator.
+    // These two cited a database, so the two domains most central to this
+    // project were the only ones whose model was uncited.
+    //
+    // And these `parameters` are hardcoded defaults (km 2, vmax 5) used
+    // when nothing resolved. On that path BRENDA supplied nothing, so
+    // naming it credited a source for numbers it had no part in -- the same
+    // false-provenance claim ADR 0063 refuses in the attribution block, and
+    // under CC BY 4.0 2(a)(6) the endorsement the licence forbids implying.
+    //
+    // BRENDA is credited where it actually contributes: per parameter, in
+    // `parameterProvenance`, and in the exported model's attribution block.
     modelCitations: [
-      "BRENDA — The Comprehensive Enzyme Information System, https://www.brenda-enzymes.org/",
+      "Michaelis L., Menten M.L. (1913) Die Kinetik der Invertinwirkung. Biochemische Zeitschrift 49, 333-369. English translation: Johnson K.A., Goody R.S. (2011) Biochemistry 50(39), 8264-8269. https://doi.org/10.1021/bi201284u",
     ],
   },
   {
@@ -1209,6 +1697,7 @@ function formatResolvedCitation(citation?: {
   source?: string;
   referenceId?: string | null;
   url?: string | null;
+  title?: string | null;
 }): string | undefined {
   if (!citation?.source) return undefined;
   const hasRef =
@@ -1217,7 +1706,33 @@ function formatResolvedCitation(citation?: {
   if (!hasRef && !hasUrl) return undefined;
   const refPart = hasRef ? ` (ref ${citation.referenceId})` : "";
   const urlPart = hasUrl ? ` — ${citation.url}` : "";
-  return `${citation.source}${refPart}${urlPart}`;
+
+  // THE TITLE, WHICH USED TO STOP HERE.
+  //
+  // `Citation.title` is resolved by the Python side, emitted by the runner
+  // and declared on the TypeScript interface -- and this function's
+  // parameter type did not mention it, so a student read
+  //
+  //     BRENDA (ref 740253) — https://www.brenda-enzymes.org/...
+  //
+  // and could not tell what paper it was without opening the link. In a
+  // tool whose whole claim is that its values are literature-backed, the
+  // one human-readable part of the evidence was the part not shown. Found
+  // by the reachability guard once it learned to look inside nested models
+  // (ADR 0102); deferred one pass on a cost that turned out to be wrong.
+  //
+  // POSITION IS LOAD-BEARING. Three things parse this string --
+  // `/\(ref ([^)]*)\)/` in provenance.ts and twice in citeVerify.ts -- and
+  // all of them read the ref id out of the parenthesis. The title goes
+  // AFTER that group and before the URL, so every one of them still
+  // matches the same span. Verified by test, not by reading.
+  //
+  // A title is not a locator, so it deliberately does NOT participate in
+  // the `hasRef || hasUrl` gate above: a citation carrying a title and
+  // nothing to find it by is still unlocatable, and must still degrade.
+  const title = citation.title?.trim();
+  const titlePart = title ? ` "${title}"` : "";
+  return `${citation.source}${refPart}${titlePart}${urlPart}`;
 }
 
 /**
@@ -1252,6 +1767,13 @@ function locatableCitation(citation?: {
   source?: string;
   referenceId?: string | null;
   url?: string | null;
+  // Declared here even though this function never reads it. The object is
+  // passed whole to `formatResolvedCitation`, so the title survives at
+  // runtime through structural typing while being invisible in the
+  // signature -- which is how it came to be dropped by the composer in the
+  // first place. A field that travels through a function unnamed is one
+  // destructuring away from being lost again.
+  title?: string | null;
 }): { display: string; locators: CitationLocator[] } | undefined {
   const display = formatResolvedCitation(citation);
   if (display === undefined) return undefined;
@@ -1260,7 +1782,58 @@ function locatableCitation(citation?: {
   return { display, locators };
 }
 
-export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
+export interface ResolveQueryOptions {
+  /**
+   * Permit a value measured in a different, sufficiently related organism
+   * (ADR 0024). Off unless explicitly true.
+   *
+   * This is the "Allow cross-species data" checkbox Lisa Jeske asked for,
+   * and this parameter is the only reason it is a real choice rather than
+   * a message about a choice: an opt-in reachable only from an internal
+   * subprocess payload is not an opt-in, it is a constant.
+   */
+  allowCrossSpecies?: boolean;
+  /**
+   * Permit a value measured on a sequence variant — a point mutant or a
+   * named isozyme (ADR 0029). Off unless explicitly true.
+   *
+   * Same argument as `allowCrossSpecies`: a point substitution is usually
+   * chosen BECAUSE it changes the kinetics, so its Km is not the enzyme's,
+   * and an unlabelled opt-in reachable only from an internal payload is not
+   * an opt-in.
+   */
+  allowVariants?: boolean;
+  /**
+   * The pH and temperature the model is meant to represent, plus how far a
+   * measurement may drift from them before it stops representing the
+   * modelled system (ADR 0024, Decision 3).
+   *
+   * Same reasoning as `allowCrossSpecies`: an input reachable only from an
+   * internal subprocess payload is not an input, it is a constant. Until
+   * this existed, the API server could not state what its model
+   * represented, so Bakker's proximity axis had nothing to grade against
+   * and returned `not_assessed` on every request.
+   *
+   * All five fields are required and a partial reference is refused rather
+   * than completed — see `_parse_physiological` in science_agent_runner.py.
+   * Half a reference plus an assumed 37 °C is an assumed mammal.
+   */
+  physiologicalReference?: {
+    ph: number;
+    temperatureC: number;
+    basis: string;
+    phTolerance: number;
+    temperatureToleranceC: number;
+  };
+}
+
+export async function resolveQuery(
+  query: string,
+  options: ResolveQueryOptions = {},
+): Promise<ResolvedSimulation> {
+  const allowCrossSpecies = options.allowCrossSpecies === true;
+  const allowVariants = options.allowVariants === true;
+  const physiologicalReference = options.physiologicalReference;
   const runId = randomUUID();
   const startTime = Date.now();
   const stageTimings: Record<string, { duration: number; success: boolean }> = {};
@@ -1315,6 +1888,9 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
         llmResult.entities,
         overrides,
         llmResult.domain,
+        allowCrossSpecies,
+        allowVariants,
+        physiologicalReference,
         parameters,
         parameterProvenance,
         flags,
@@ -1412,7 +1988,11 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     if (missing.length > 0) {
       const latencyMs = Date.now() - startTime;
       verifiableMetricsCollector.recordJobFailure(runId);
-      throw new RequiredParametersMissingError(llmResult.domain, missing);
+      throw new RequiredParametersMissingError(
+        llmResult.domain,
+        missing,
+        missingKeyDetails(missing, parameterProvenance),
+      );
     }
 
     // Stage 5: Simulation Output (preparation)
@@ -1441,6 +2021,19 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       );
     }
 
+    // Cross-parameter coherence. Computed once, after every resolver has run,
+    // because it is a question about the finished set: a Km resolved in step
+    // one and a Ki resolved in step two can each be flawless and still come
+    // from experiments that were never performed together (Jeske, ADR 0026).
+    //
+    // The flag is pushed into the SAME list the reader already reads. A
+    // finding filed somewhere the user does not look is indistinguishable
+    // from no finding.
+    const coherence = coherenceFromProvenance(parameterProvenance);
+    if (coherence.verdict === "differing_conditions") {
+      flags.push(`Assay coherence: ${coherence.reason}`);
+    }
+
     return {
       runId,
       domain: llmResult.domain,
@@ -1457,6 +2050,7 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
         flags,
       },
       parameterProvenance,
+      assayCoherence: coherence,
     };
   }
 
@@ -1500,6 +2094,9 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       fallbackEntities,
       overrides,
       best.domain,
+      allowCrossSpecies,
+      allowVariants,
+      physiologicalReference,
       parameters,
       parameterProvenance,
       flags,
@@ -1587,7 +2184,11 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
   if (missing.length > 0) {
     const latencyMs = Date.now() - startTime;
     verifiableMetricsCollector.recordJobFailure(runId);
-    throw new RequiredParametersMissingError(best.domain, missing);
+    throw new RequiredParametersMissingError(
+      best.domain,
+      missing,
+      missingKeyDetails(missing, parameterProvenance),
+    );
   }
 
   // Stage 5: Simulation Output (preparation - fallback path)
@@ -1616,6 +2217,19 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
     );
   }
 
+  // Cross-parameter coherence. Computed once, after every resolver has run,
+  // because it is a question about the finished set: a Km resolved in step
+  // one and a Ki resolved in step two can each be flawless and still come
+  // from experiments that were never performed together (Jeske, ADR 0026).
+  //
+  // The flag is pushed into the SAME list the reader already reads. A
+  // finding filed somewhere the user does not look is indistinguishable
+  // from no finding.
+  const coherence = coherenceFromProvenance(parameterProvenance);
+  if (coherence.verdict === "differing_conditions") {
+    flags.push(`Assay coherence: ${coherence.reason}`);
+  }
+
   return {
     runId,
     domain: best.domain,
@@ -1629,5 +2243,6 @@ export async function resolveQuery(query: string): Promise<ResolvedSimulation> {
       flags,
     },
     parameterProvenance,
+    assayCoherence: coherence,
   };
 }

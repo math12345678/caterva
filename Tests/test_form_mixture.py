@@ -283,7 +283,6 @@ def test_a_raising_resolver_does_not_drop_the_form(monkeypatch):
     silently drop real enzyme forms. Tested by making the resolver itself
     raise.
     """
-    import buffer_identity as bi
     import form_mixture
 
     def exploding(*_a, **_k):

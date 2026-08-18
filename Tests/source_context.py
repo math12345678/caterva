@@ -358,14 +358,61 @@ def find_source_mixtures(
     and in the LDH table it is a factor of fifty-four.
     """
     by_organism: dict[str, dict[str, list[float]]] = {}
+    #: (organism, value, commentary) for rows whose commentary names MORE
+    #: than one of the sources this pool knows about.
+    pooled: list[tuple[str, float, list[str]]] = []
+
+    # First pass: the labels each row claims on its own.
+    claimed: list[tuple[float, str, str | None, list[str]]] = []
     for value, organism, commentary in rows:
+        labels = []
         for claim in extract_source_claims(commentary, taxon_provider):
             if claim.kind != "source":
                 continue
             label = claim.token.lower()
             if claim.disease_state:
                 label = f"{claim.disease_state} {label}"
+            labels.append(label)
+        claimed.append((value, organism, commentary, labels))
+        for label in labels:
             by_organism.setdefault(organism, {}).setdefault(label, []).append(value)
+
+    # Second pass: a row that NAMES another source this organism reports.
+    #
+    # `extract_source_claims` takes the first token after "from" and stops,
+    # so "enzyme form heart and muscle" (BRENDA's typo for "from") yielded
+    # `heart` alone and the row was filed as a clean heart measurement --
+    # alongside the genuine 60.0 heart row, widening the reported heart
+    # range to 16.0-60.0. It is not a heart measurement; it is material
+    # pooled from two tissues whose values differ 54-fold (ADR 0037).
+    #
+    # The extra sources are found using the POOL as the vocabulary rather
+    # than a hardcoded tissue list. `_classify_token` calls every
+    # unrecognised word a source -- `stored`, `purified`, even `pH` -- so
+    # reading the word after "and" directly would invent claims. A label
+    # only counts here if another row in the same organism states it
+    # outright, which is evidence rather than a guess.
+    for value, organism, commentary, labels in claimed:
+        known = set(by_organism.get(organism, {})) - set(labels)
+        if not commentary or not known:
+            continue
+        lowered = commentary.lower()
+        also = sorted(
+            label for label in known
+            if re.search(rf"\b{re.escape(label)}\b", lowered)
+        )
+        if also:
+            pooled.append((organism, value, sorted(labels) + also))
+            # Counted under EVERY source it names. The row is evidence
+            # about each tissue's material and about neither alone, so
+            # leaving it in one group would attribute a pooled measurement
+            # to material it did not come from by itself.
+            #
+            # The `reason` text said this before the code did — a sentence
+            # asserting behaviour that was not implemented, caught by the
+            # test written from the intent rather than from the code.
+            for label in also:
+                by_organism[organism][label].append(value)
 
     mixtures: list[SourceMixture] = []
     for organism in sorted(by_organism):
@@ -384,12 +431,34 @@ def find_source_mixtures(
             f"{s} = {v[0]}" + (f"–{v[-1]}" if len(v) > 1 else "")
             for s, v in values_by_source.items()
         )
+        # A row that names several of these sources is not a member of any
+        # one of them: it is material pooled across tissues, sitting in a
+        # group it did not come from on its own. Reported separately because
+        # "two rows disagree" and "one row is itself a mixture" are
+        # different facts, and only the second means the number cannot be
+        # attributed at all.
+        pooled_here = [
+            (value, labels) for org, value, labels in pooled if org == organism
+        ]
+        pooled_note = ""
+        if pooled_here:
+            described_pooled = "; ".join(
+                f"{value} (commentary names {' and '.join(labels)})"
+                for value, labels in sorted(pooled_here)
+            )
+            pooled_note = (
+                f" One or more rows name SEVERAL of these sources at once and "
+                f"cannot be attributed to any single one: {described_pooled}. "
+                "Such a row is counted under each source it names, so the "
+                "ranges above overlap by construction."
+            )
+
         mixture.reason = (
             f"Within {organism}, the candidate rows report {len(sources)} "
             f"different biological sources: {described}.{magnitude} The "
             "cross-species gate cannot see this -- every row is the organism "
             "that was asked for, and they are still measurements of "
-            "different material."
+            f"different material.{pooled_note}"
         )
         mixtures.append(mixture)
     return mixtures

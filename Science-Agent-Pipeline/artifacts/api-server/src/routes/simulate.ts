@@ -8,12 +8,16 @@ import {
 import { desc, sql } from "drizzle-orm";
 import {
   RunSimulationBody,
+  type SimulationRequest as RunSimulationRequest,
   GetSimulationJobParams,
   StreamSimulationJobParams,
 } from "@workspace/api-zod";
 import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { resolveQuery } from "../lib/queryResolver";
+import { citationObligations } from "../lib/dataSources";
+import type { SourceObligation } from "../lib/dataSources";
+import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
 import { runTerium, type SimulationDomain } from "../lib/teriumRunner";
 import { SimulationParameterSchemas } from "../lib/schemas";
 import * as queue from "../lib/queue";
@@ -211,8 +215,22 @@ router.post(
       }
 
       const { query } = parse.data;
-      const normalizedQuery = normalizeQuery(query);
-      logger.info({ query, normalizedQuery }, "Enqueuing simulation job");
+      const allowCrossSpecies = parse.data.allowCrossSpecies === true;
+      // Absent means false, for the same reason allowCrossSpecies reads that
+      // way: the permissive reading of a missing flag is how an opt-in
+      // quietly stops being one.
+      const allowVariants = parse.data.allowVariants === true;
+      const physiologicalReference = parse.data.physiologicalReference;
+      const normalizedQuery = normalizeQuery(
+        query,
+        allowCrossSpecies,
+        allowVariants,
+        physiologicalReference,
+      );
+      logger.info(
+        { query, normalizedQuery, allowCrossSpecies, allowVariants },
+        "Enqueuing simulation job",
+      );
 
       const cached = isDbAvailable()
         ? await findCachedSimulation(normalizedQuery)
@@ -229,7 +247,13 @@ router.post(
       const job = queue.createJob(query);
 
       // Run the pipeline asynchronously. Errors are captured in the job state.
-      runPipeline(job.jobId, query).catch((err) => {
+      runPipeline(
+        job.jobId,
+        query,
+        allowCrossSpecies,
+        allowVariants,
+        physiologicalReference,
+      ).catch((err) => {
         logger.error(
           { err, jobId: job.jobId },
           "Pipeline runner threw unexpectedly",
@@ -251,8 +275,74 @@ router.post(
 /**
  * Normalize a query so that tiny whitespace/casing differences hit the cache.
  */
-function normalizeQuery(query: string): string {
-  return query.trim().toLowerCase().replace(/\s+/g, " ");
+/**
+ * The cache key for a query.
+ *
+ * `allowCrossSpecies` is part of the key, not an afterthought. The same
+ * query run with and without the opt-in produces genuinely different
+ * answers -- one refuses, the other may return a related organism's value
+ * -- so a key that ignored it would serve one user's result to the other.
+ *
+ * The dangerous direction is specific: a cross-species value cached by
+ * someone who opted in, then served to a student who did not. They would
+ * receive a rabbit's Km presented as their answer, having explicitly never
+ * agreed to that, and every guard downstream would be satisfied because
+ * the value really was resolved and really was cited. Jeske's checkbox
+ * would be defeated by a cache.
+ *
+ * The suffix is only appended when the flag is on, so existing cache
+ * entries written before ADR 0024 still hit for the default path rather
+ * than being silently invalidated.
+ */
+// Exported for testing. The cache key is the single place where an opt-in
+// can be defeated without any guard noticing -- ADR 0016's failure class --
+// and until now nothing tested it at all, for any of the three flags.
+export function normalizeQuery(
+  query: string,
+  allowCrossSpecies = false,
+  allowVariants = false,
+  physiologicalReference?: RunSimulationRequest["physiologicalReference"],
+): string {
+  const base = query.trim().toLowerCase().replace(/\s+/g, " ");
+  const withSpecies = allowCrossSpecies
+    ? `${base} [allow-cross-species]`
+    : base;
+
+  // `allowVariants` is part of the key for exactly the reason
+  // `allowCrossSpecies` is, and the dangerous direction is the same: a point
+  // mutant's constant, cached by someone who opted in, then served to a
+  // student who did not. They would receive a Y337A mutant's kcat presented
+  // as the enzyme's, having explicitly never agreed to it, and every guard
+  // downstream would pass because the value really was resolved and really
+  // was cited. ADR 0029's opt-in defeated by a cache.
+  //
+  // Appended only when on, so entries written before this still hit for the
+  // default path rather than being silently invalidated.
+  const withVariants = allowVariants
+    ? `${withSpecies} [allow-variants]`
+    : withSpecies;
+
+  // The reference is part of the key for the same reason allowCrossSpecies
+  // is, and the argument is ADR 0016's: two callers who state different
+  // modelled conditions are asking different questions, and the answers
+  // differ in the `conditionProximity` grade of every resolved parameter.
+  //
+  // Without this, a result graded `near` against a thermophile's 70 C would
+  // be served to a caller who stated 37 C, carrying a reliability grade
+  // computed against conditions they never described -- and every guard
+  // downstream would pass, because the value really was resolved and really
+  // was cited. Exactly the shape of the cross-species cache leak this
+  // function already guards against, one field over.
+  //
+  // Only appended when a reference was supplied, so entries written before
+  // this existed still hit for the no-reference path rather than being
+  // silently invalidated.
+  if (!physiologicalReference) return withVariants;
+  const r = physiologicalReference;
+  return (
+    `${withVariants} [ref ${r.ph}/${r.temperatureC}` +
+    `±${r.phTolerance}/${r.temperatureToleranceC} ${r.basis.trim().toLowerCase()}]`
+  );
 }
 
 /**
@@ -419,18 +509,29 @@ router.get(
         return;
       }
 
-      const trajectory = job.result.trajectory;
-      const headers = Object.keys(trajectory[0]!);
-      const rows = trajectory.map((point) =>
-        headers.map((h) => String(point[h] ?? "")).join(","),
-      );
+      // The provenance rides WITH the data, in the same file.
+      //
+      // This route returned bare numbers, described in its own docstring as
+      // being for import into R, Python or Excel. That file is the artifact
+      // that outlives the session and ends up in a lab report, and it
+      // carried no citation at all -- in a project whose whole claim is
+      // that every number traces to a source. See ADR 0050.
+      const csv = buildTrajectoryCsv({
+        runId: job.result.runId,
+        domain: job.result.domain,
+        completedAt: job.result.completedAt,
+        parameters: job.result.parameters,
+        trajectory: job.result.trajectory,
+        provenance: job.result.provenance,
+        parameterProvenance: job.result.parameterProvenance,
+      });
 
       res.setHeader("Content-Type", "text/csv");
       res.setHeader(
         "Content-Disposition",
         `attachment; filename="simulation-${jobId.slice(0, 8)}.csv"`,
       );
-      res.send([headers.join(","), ...rows].join("\n"));
+      res.send(csv);
     } catch (err) {
       next(err);
     }
@@ -546,6 +647,16 @@ interface AuditReport {
   jobId: string;
   domain: string;
   publicationReady: boolean;
+  /**
+   * What the data sources behind this run ask of someone who publishes it.
+   *
+   * `publicationReady` is a green light for putting these numbers in a
+   * paper, and this report said nothing about the obligations that come
+   * with doing so -- while NOTICE states that citing Terrium is not a
+   * substitute for citing BRENDA. Empty when no described source
+   * contributed. See dataSources.ts and ADR 0081.
+   */
+  dataSourceObligations: SourceObligation[];
   blockedParameters: string[];
   overallConfidence: number;
   parameterAudits: ParameterAudit[];
@@ -728,6 +839,10 @@ function buildAuditReport(
     jobId,
     domain,
     publicationReady,
+    // Derived from the provenance actually present: a source that supplied
+    // nothing is not listed, because an obligation to cite data the run did
+    // not use is a false one.
+    dataSourceObligations: citationObligations(provenance),
     blockedParameters,
     overallConfidence,
     parameterAudits,
@@ -802,7 +917,13 @@ async function findCachedSimulation(
  * Between each stage we check for cancellation. Jobs that are cancelled
  * mid-flight are marked as cancelled rather than failed.
  */
-async function runPipeline(jobId: string, query: string): Promise<void> {
+async function runPipeline(
+  jobId: string,
+  query: string,
+  allowCrossSpecies = false,
+  allowVariants = false,
+  physiologicalReference?: RunSimulationRequest["physiologicalReference"],
+): Promise<void> {
   const abort = new AbortController();
   queue.registerAbortController(jobId, abort);
 
@@ -810,7 +931,11 @@ async function runPipeline(jobId: string, query: string): Promise<void> {
     if (queue.isCancelled(jobId)) return;
 
     queue.updateJob(jobId, { status: "resolving" });
-    const resolved = await resolveQuery(query);
+    const resolved = await resolveQuery(query, {
+      allowCrossSpecies,
+      allowVariants,
+      physiologicalReference,
+    });
 
     if (queue.isCancelled(jobId)) return;
     queue.updateJob(jobId, { status: "validating" });

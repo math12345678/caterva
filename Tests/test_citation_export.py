@@ -6,7 +6,12 @@ be cited onward with Terrium's name on it.
 """
 from __future__ import annotations
 
+import json
+import pathlib
 import re
+import subprocess
+import sys
+import tempfile
 
 import pytest
 
@@ -14,6 +19,9 @@ from citation import Citation
 from citation_export import (
     _BIBTEX_SPECIALS,
     CitedParameter,
+    _disambiguator,
+    _known_and_missing,
+    _note_for,
     bibtex_key,
     to_bibtex,
     to_ris,
@@ -108,6 +116,238 @@ def test_keys_are_valid_bibtex_identifiers():
     keys = re.findall(r"@misc\{([^,]+),", to_bibtex([KM, KI, SAME_REFERENCE_AS_KM]))
     for key in keys:
         assert re.fullmatch(r"[A-Za-z0-9_:-]+", key), key
+
+
+def _sharing_one_reference(count: int) -> list[CitedParameter]:
+    """`count` parameters whose source and reference id are identical.
+
+    Not contrived. One BRENDA reference routinely supplies several
+    constants for the same enzyme, and `scripts/export_citations.py` builds
+    this list from a JSON payload of arbitrary length.
+    """
+    return [
+        CitedParameter(
+            parameter=f"k{index}",
+            citation=Citation(source="BRENDA", reference_id="740253"),
+            value=float(index),
+            unit="mM",
+        )
+        for index in range(count)
+    ]
+
+
+def test_the_key_stays_a_valid_identifier_past_the_alphabet():
+    """The test above, on input that can actually break it.
+
+    `test_keys_are_valid_bibtex_identifiers` asserts exactly the right
+    property and passes three parameters, which reaches one collision. The
+    27th collision used to produce `brenda740253{`.
+    """
+    keys = re.findall(r"@misc\{([^,]+),", to_bibtex(_sharing_one_reference(60)))
+    for key in keys:
+        assert re.fullmatch(r"[A-Za-z0-9_:-]+", key), key
+    assert len(set(keys)) == len(keys), "duplicate key among 60 shared-reference entries"
+
+
+def test_a_brace_in_a_key_would_corrupt_every_entry_after_it():
+    """Why this is worse than the duplicate key it was preventing.
+
+    `@misc{brenda740253}` closes the entry group early: BibTeX reads a
+    complete empty entry and parses the remaining body at top level. A
+    duplicate key costs one entry; this costs the rest of the file.
+
+    Asserted structurally — the braces in the emitted document balance, and
+    there is one `@misc{` per entry — rather than by naming the four
+    characters, so a suffix scheme that escaped into some other punctuation
+    would also be caught.
+    """
+    document = to_bibtex(_sharing_one_reference(60))
+    for key in re.findall(r"@misc\{([^,]+),", document):
+        assert "{" not in key and "}" not in key, key
+    assert document.count("{") == document.count("}"), (
+        "unbalanced braces in the emitted .bib; an entry group was opened or "
+        "closed by something that was supposed to be a key"
+    )
+
+
+class TestTheNoteMatchesTheEntry:
+    """The note enumerates what is absent, so it must enumerate correctly.
+
+    It was built from a tuple of hardcoded `None`s and always returned
+    `author, year, journal` — producing a false statement in each
+    direction, which is what a constant dressed as a computation buys you.
+    """
+
+    TITLED = CitedParameter(
+        parameter="km",
+        value=2.5,
+        unit="mM",
+        citation=Citation(
+            source="BRENDA", reference_id="740253", title="LDH kinetics in human"
+        ),
+    )
+    UNTITLED = CitedParameter(
+        parameter="km",
+        value=2.5,
+        unit="mM",
+        citation=Citation(source="BRENDA", reference_id="740253"),
+    )
+
+    def test_an_entry_that_carries_a_title_does_not_claim_otherwise(self):
+        # `title = {...}` is emitted, so "records the source identifier
+        # only" is false about the entry it sits inside.
+        document = to_bibtex([self.TITLED])
+        assert "title = {LDH kinetics in human}" in document
+        note = _note_for(self.TITLED)
+        assert "the source identifier and the title" in note
+        assert "source identifier only" not in note
+
+    def test_an_entry_with_no_title_says_the_title_is_missing(self):
+        # The field a reference manager displays first. An untitled entry
+        # is the absence a user notices, and it was the one absence the
+        # note did not mention.
+        document = to_bibtex([self.UNTITLED])
+        assert "title = {" not in document.split("@misc{terrium-source-")[0]
+        assert "author, year, journal, title are NOT known" in _note_for(self.UNTITLED)
+
+    def test_the_answer_is_asked_of_the_citation_not_assumed(self):
+        """The property that makes this a computation.
+
+        A `Citation` carrying every wanted field must leave the note with
+        nothing to report as missing. Under the old constant this was
+        impossible — `author, year, journal` came back regardless of what
+        the citation held.
+        """
+
+        class FullCitation(Citation):
+            author: str = "Smith, J."
+            year: str = "2020"
+            journal: str = "J. Biol. Chem."
+
+        full = CitedParameter(
+            parameter="km",
+            citation=FullCitation(
+                source="BRENDA", reference_id="740253", title="LDH kinetics"
+            ),
+        )
+        known, missing = _known_and_missing(full.citation)
+        assert missing == []
+        assert known == ["author", "year", "journal", "title"]
+
+
+def _run_the_script(payload: dict) -> dict:
+    """Invoke `scripts/export_citations.py` the way a caller does.
+
+    As a SUBPROCESS, with no `sys.path` help from pytest. That is the whole
+    point: every other test in this file imports `citation_export`
+    directly, and pytest has already put the repository root on the path,
+    so they cannot see an import the script itself cannot satisfy.
+    """
+    script = (
+        pathlib.Path(__file__).resolve().parents[1] / "scripts" / "export_citations.py"
+    )
+    completed = subprocess.run(
+        [sys.executable, str(script)],
+        input=json.dumps(payload),
+        capture_output=True,
+        text=True,
+        cwd=tempfile.gettempdir(),  # not the repo, so nothing is on the path by luck
+    )
+    assert completed.returncode == 0, completed.stderr
+    return json.loads(completed.stdout)
+
+
+def test_the_script_runs_end_to_end():
+    """The regression guard for an import the library tests cannot see.
+
+    Measured: `scripts/export_citations.py` died on its import line with
+    `ModuleNotFoundError: No module named 'Terium'` — in HEAD, since
+    `citation_export` began reading the shared source table. Its own
+    docstring calls it "the reachable end of Tests/citation_export.py --
+    which was built and then callable from nowhere", and it had become
+    unreachable again with a full green suite.
+
+    Run from a temporary directory so the repository root cannot end up on
+    `sys.path` by accident of the working directory.
+    """
+    result = _run_the_script(
+        {
+            "format": "bibtex",
+            "cited": [
+                {
+                    "parameter": "km",
+                    "citationSource": "BRENDA",
+                    "referenceId": "740253",
+                    "value": 2.5,
+                    "unit": "mM",
+                }
+            ],
+        }
+    )
+    assert result["ok"] is True
+    assert result["entries"] == 1
+    assert "@misc{brenda740253," in result["document"]
+
+
+def test_the_script_survives_many_parameters_from_one_reference():
+    """The collision fix through the door a user actually uses.
+
+    60 parameters, one reference. Before the fix this emitted
+    `@misc{brenda740253},` — a key containing the brace that closes the
+    entry group — and everything after it parsed as garbage.
+    """
+    result = _run_the_script(
+        {
+            "format": "bibtex",
+            "cited": [
+                {
+                    "parameter": f"k{index}",
+                    "citationSource": "BRENDA",
+                    "referenceId": "740253",
+                    "value": index,
+                }
+                for index in range(60)
+            ],
+        }
+    )
+    document = result["document"]
+    keys = re.findall(r"@misc\{([^,]+),", document)
+    assert len(set(keys)) == len(keys)
+    assert all(re.fullmatch(r"[A-Za-z0-9_:-]+", key) for key in keys), keys
+    assert document.count("{") == document.count("}")
+
+
+def test_a_broken_disambiguator_raises_instead_of_hanging(monkeypatch):
+    """How the previous version of this fix was found to be incomplete.
+
+    Mutating `_disambiguator` to cycle a..z..a rather than carry to `aa`
+    did not fail the suite — it stopped the test run dead. `while key in
+    seen` had no bound, so every candidate past the 26th was already taken
+    and the loop spun forever. In `scripts/export_citations.py`, driven by
+    a JSON payload, that is a hang: nothing returns and nothing is
+    reported.
+
+    A wrong answer can be seen. A hang cannot.
+    """
+    import citation_export
+
+    monkeypatch.setattr(
+        citation_export, "_disambiguator", lambda index: chr(ord("a") + index % 26)
+    )
+    seen: set[str] = set()
+    with pytest.raises(RuntimeError, match="stopped being distinct"):
+        for _ in range(40):
+            bibtex_key(SAME_REFERENCE_AS_KM, seen)
+
+
+def test_the_disambiguator_runs_a_to_z_then_aa():
+    """The sequence itself, so the boundary is pinned rather than inferred.
+
+    26 is where the old implementation left the alphabet.
+    """
+    assert [_disambiguator(i) for i in (0, 1, 25)] == ["a", "b", "z"]
+    assert [_disambiguator(i) for i in (26, 27, 51, 52)] == ["aa", "ab", "az", "ba"]
+    assert all(_disambiguator(i).isalpha() for i in range(1000))
 
 
 def test_a_citation_with_no_identifier_still_gets_a_key():

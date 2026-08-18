@@ -1,5 +1,12 @@
 # Changelog
 
+> **⚠️ CORRECTION (2026-08-12):** the `## Unreleased` section's counts are stale — the repo has moved well past the state they describe:
+> - **"11 guard scripts"**: running `python3 scripts/verify_build.py --quick` today shows the Guard Wiring Guard reporting **"all 22 guards run in at least one harness"** — 22 guards now exist, not 11.
+> - **"Engine test suite: 715 -> 883 tests"**: `python3 -m pytest --collect-only` in `Terium/` now collects **1,014** tests.
+> - **"Literature test suite: 182 -> 214 tests"**: `Tests/` now collects **277** tests.
+> - **"TypeScript test suite: 111 -> 224 tests (16 files)"**: `Science-Agent-Pipeline/artifacts/api-server` now has **433** test cases across **32** `*.test.ts` files (`npx vitest list`).
+> This is ordinary changelog staleness (the Unreleased section wasn't updated as later work landed, and later work was logged in `OVERNIGHT_LOG.md` instead — see that file's own correction banner for the same underlying drift), not fabrication.
+
 No versioned releases exist yet -- there's no published package, no tagged
 release, just an active `main` branch. Entries below are grouped by real
 date from git history, not semantic version numbers, because assigning

@@ -87,6 +87,25 @@ export interface ParameterRecommendation {
   sourceCount: number;
   confidence: number;
   warnings: string[];
+  /**
+   * The conditions the value was MEASURED at, as the resolver returned them
+   * (STRENDA, ADR 0010).
+   *
+   * Added by ADR 0055. `ResolvedKinetic` has carried this since ADR 0010 and
+   * this interface had no field to receive it, so `resolveFromLiterature`
+   * dropped it one line after reading it — and with nothing downstream able
+   * to know an assay temperature, every caller passed a hardcoded 37 C
+   * instead. The dead range check in `AssumptionValidator` was the visible
+   * end of that chain.
+   *
+   * Fifth instance in this project of a value that is computed, correct, and
+   * discarded at a boundary because the receiving type has no field for it.
+   * See ADR 0027, 0038, 0039, 0040.
+   */
+  assayConditions?: {
+    ph?: number | null;
+    temperatureC?: number | null;
+  } | null;
 }
 
 export interface CrossVerificationResult {
@@ -590,6 +609,18 @@ export class LiteratureService {
         ? [String(result.citation.reference_id)]
         : [],
       sourceCount: result.citation ? 1 : 0,
+      // The conditions the row was measured under, carried rather than
+      // dropped. Passed through as the resolver reported it, including its
+      // nulls: a null pH is BRENDA saying the curator did not record one,
+      // and flattening it to `undefined` here would lose the distinction
+      // between "not recorded" and "no provenance at all" that
+      // deriveRunConditions needs to tell not_reported from silence.
+      assayConditions: result.assayConditions
+        ? {
+            ph: result.assayConditions.ph,
+            temperatureC: result.assayConditions.temperatureC,
+          }
+        : undefined,
       // A cross-species value is real and citable but was measured in a
       // DIFFERENT organism than the one asked about, so it cannot carry the
       // same confidence as an exact match. The reduction is a policy

@@ -89,6 +89,16 @@
             color: #555;
         }
 
+        .measured-tag, .chosen-tag {
+            font-size: 0.7em; padding: 2px 6px; border-radius: 3px;
+            vertical-align: middle; margin-left: 6px; font-weight: 600;
+        }
+        /* Measured and chosen are styled DIFFERENTLY on purpose. The
+           distinction between a measured quantity and an experimental
+           condition is the one ADR 0012/0013 rest on, and a teaching tool
+           should show it rather than assume the student arrives knowing. */
+        .measured-tag { background: #fde68a; color: #78350f; }
+        .chosen-tag   { background: #dbeafe; color: #1e3a5f; }
         .metric-value {
             font-size: 18px;
             color: #667eea;
@@ -250,20 +260,22 @@
                     <span class="metric-label">Status</span>
                     <span class="status-badge status-success">✓ Operational</span>
                 </div>
+                <!-- "Tests Passing 178/178", "Coverage 84.04%" and
+                     "Uptime 99.9%" used to sit here as static HTML with no
+                     id and nothing writing to them.
+
+                     The test count was stale by a factor of nine. Coverage
+                     had no live source. Uptime was invented outright —
+                     nothing in this project measures uptime.
+
+                     They rendered identically to the four LIVE metrics
+                     below, so a reader could not tell which numbers were
+                     real. In a tool whose whole claim is that every number
+                     is traceable, that is the failure it exists to prevent,
+                     committed by its own front page. See ADR 0041. -->
                 <div class="metric">
-                    <span class="metric-label">Tests Passing</span>
-                    <span class="metric-value">178/178</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Coverage</span>
-                    <span class="metric-value">84.04%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 84.04%"></div>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Uptime</span>
-                    <span class="metric-value">99.9%</span>
+                    <span class="metric-label">Health</span>
+                    <span class="metric-value" id="healthState">checking…</span>
                 </div>
             </div>
 
@@ -289,21 +301,24 @@
 
             <div class="card">
                 <h2>Literature Database</h2>
-                <div class="metric">
-                    <span class="metric-label">Sources</span>
-                    <span class="metric-value">3</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Parameters</span>
-                    <span class="metric-value">6</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Avg Impact Factor</span>
-                    <span class="metric-value">19.79</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Avg Citations</span>
-                    <span class="metric-value">904</span>
+                <!-- "Sources 3", "Parameters 6", "Avg Impact Factor 19.79"
+                     and "Avg Citations 904" were static HTML. Nothing
+                     computed them and this server has no endpoint that
+                     could: there is no /api/literature.
+
+                     "Avg Impact Factor 19.79" is the one worth remembering.
+                     It is specific to two decimal places, it looks
+                     measured, and it was typed. A student reading it has no
+                     way to tell it apart from the resolved Km three cards
+                     down, which is real and cited. -->
+                <div class="alert alert-info" style="margin: 0;">
+                    Not shown here. This page has no endpoint for the
+                    literature inventory, and numbers with no source do not
+                    belong on a screen — that is the rule the resolver
+                    applies to a Km, and it applies to a dashboard too.
+                    <br><br>
+                    Use <code>scientific resolve</code> for a parameter with
+                    its citation, assay conditions and reliability grades.
                 </div>
             </div>
         </div>
@@ -312,7 +327,18 @@
         <div class="card" style="margin-bottom: 30px;">
             <h2>Run Simulation</h2>
             <div class="alert alert-info">
-                💡 Enter parameters or use the advanced features (batch, sweep, sensitivity) in the CLI or API
+                <strong>Km and Vmax are measurements. S0 is a choice.</strong>
+                Km is a property of an enzyme that somebody measured under
+                stated conditions; S0 is the starting concentration
+                <em>you</em> decide to simulate. That is why nothing below is
+                filled in for you — this page has no way to know which
+                measurement you mean, and a plausible number typed into a box
+                is the thing this whole project refuses to produce.
+                <br><br>
+                To get a Km <em>with</em> its citation, assay conditions,
+                organism and reliability grades, use
+                <code>scientific resolve "lactate dehydrogenase" --substrate lactate --organism "Homo sapiens"</code>
+                and paste the value here.
             </div>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                 <div>
@@ -333,19 +359,41 @@
                         <option>allosteric</option>
                     </select>
                 </div>
+                <!-- NOTHING HERE IS PRE-FILLED. See ADR 0043.
+                     This form shipped with km="5.2" and vmax="12.8".
+                     ADR 0024, stating the rule the whole project rests on,
+                     reads: "a parameter that cannot be sourced stops the
+                     run. No `km = 5.2` fallback, no plausible-looking
+                     default."
+                     The form was pre-filled with the exact number the
+                     constitution uses as its example of the forbidden
+                     thing — and 5.2 matches no LDH measurement in the
+                     corpus. With the enzyme and substrate also pre-filled,
+                     a student could open the page, press Run, and get a
+                     confidence score and a green tick for a simulation
+                     built on a number from nowhere. -->
                 <div>
-                    <label>Km (mM)</label>
-                    <input type="number" id="km" value="5.2" min="0.1" step="0.1">
+                    <label>Organism <span class="chosen-tag">you specify</span></label>
+                    <input type="text" id="organism" placeholder="e.g. Homo sapiens">
                 </div>
                 <div>
-                    <label>Vmax (μM/min)</label>
-                    <input type="number" id="vmax" value="12.8" min="0.1" step="0.1">
+                    <label>Km (mM) <span class="measured-tag">measured</span></label>
+                    <input type="number" id="km" placeholder="required — a measurement" min="0.1" step="0.1">
+                    <button type="button" id="resolveKm" onclick="resolveKm()"
+                            style="margin-top:6px;font-size:0.8em;padding:4px 10px;">
+                        Resolve from literature
+                    </button>
                 </div>
                 <div>
-                    <label>S0 (mM)</label>
-                    <input type="number" id="s0" value="10" min="0.1" step="0.1">
+                    <label>Vmax (μM/min) <span class="measured-tag">measured</span></label>
+                    <input type="number" id="vmax" placeholder="required — a measurement" min="0.1" step="0.1">
+                </div>
+                <div>
+                    <label>S0 (mM) <span class="chosen-tag">your choice</span></label>
+                    <input type="number" id="s0" placeholder="required — you choose this" min="0.1" step="0.1">
                 </div>
             </div>
+            <div id="kmProvenance" style="display:none;margin-top:16px;"></div>
             <div class="controls">
                 <button onclick="runSimulation()">▶ Run Simulation</button>
                 <button onclick="runBatch()">⚡ Batch Processing</button>
@@ -368,6 +416,17 @@
                     <canvas id="metricsChart"></canvas>
                 </div>
             </div>
+        </div>
+
+        <!--
+            The conditions the last run's parameters were MEASURED at
+            (ADR 0055). Hidden until a run produces one, because an empty
+            panel reading "pH —, temperature —" is indistinguishable from a
+            run whose papers reported nothing, and those are different facts.
+        -->
+        <div class="card" id="runConditionsCard" style="margin-top: 30px; display: none;">
+            <h2>Conditions this run is at</h2>
+            <div id="runConditions"></div>
         </div>
 
         <!-- Results Table -->
@@ -504,9 +563,28 @@
             const enzyme = document.getElementById('enzyme')?.value || 'lactate dehydrogenase';
             const substrate = document.getElementById('substrate')?.value || 'lactate';
 
-            // Validate inputs
-            if (!km || !vmax || !s0) {
-                alert('Please enter Km, Vmax, and initial substrate concentration');
+            // Refuse rather than default. This is the same rule the
+            // resolver applies (ADR 0012/0013): a missing measured quantity
+            // stops the run, it does not become a plausible number.
+            //
+            // Before ADR 0043 this branch was unreachable in practice — the
+            // form shipped pre-filled, so `km` was never empty and the
+            // refusal never fired. A guard clause behind a default is a
+            // guard clause nothing exercises.
+            const missing = [];
+            if (!km) missing.push('Km');
+            if (!vmax) missing.push('Vmax');
+            if (!s0) missing.push('S0');
+            if (missing.length > 0) {
+                alert(
+                    `Cannot simulate: ${missing.join(', ')} not supplied.\n\n` +
+                    'Km and Vmax are measurements — this page will not invent ' +
+                    'one for you. Resolve them with their citation using:\n\n' +
+                    '  scientific resolve "<enzyme>" --substrate "<substrate>" ' +
+                    '--organism "<organism>"\n\n' +
+                    'S0 is your choice of starting concentration; pick the one ' +
+                    'your experiment used.'
+                );
                 return;
             }
 
@@ -575,6 +653,14 @@
                         time: job.duration || 0,
                         status: result.validated ? '✓ Success' : '⚠ Unverified'
                     });
+
+                    // ADR 0055 computed this and nothing displayed it. A
+                    // trajectory with no stated conditions looks exactly like
+                    // one at 37 °C.
+                    renderRunConditions(
+                        result.runConditions,
+                        result.metadata && result.metadata.warnings
+                    );
                 }
             } catch (error) {
                 console.error('Simulation error:', error);
@@ -632,6 +718,288 @@
             // Update metrics
             const runs = table.querySelectorAll('tr').length;
             document.getElementById('totalRuns').textContent = runs;
+        }
+
+        // Health, from /api/health rather than from a number typed into
+        // the HTML. This is the metric that REPLACED three fabricated ones,
+        // so it had better be sourced — replacing invented numbers with
+        // another invented number would be the same mistake wearing a fix.
+        //
+        // A failed fetch shows "unreachable", never "operational". The
+        // optimistic reading of a failed check is how "✓ Operational" comes
+        // to sit above a server that is down.
+        async function loadHealth() {
+            const el = document.getElementById('healthState');
+            if (!el) return;
+            try {
+                const res = await fetch('/api/health');
+                el.textContent = res.ok ? 'ok' : `HTTP ${res.status}`;
+            } catch {
+                el.textContent = 'unreachable';
+            }
+        }
+        loadHealth();
+
+        // Resolve a Km from the literature, and show where it came from.
+        //
+        // The value alone is what the student would have typed anyway. The
+        // citation, assay conditions, protein variant, cofactors and
+        // reliability grades are what make it different from a guess — so
+        // this renders all of them, and refuses to fill the field silently.
+        //
+        // Everything printed here comes from the response. Nothing is
+        // invented, and where the resolver said it does not know, this says
+        // so rather than leaving a blank the reader will fill in optimistically.
+        function escapeHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        /**
+         * The conditions a simulation ran at — which are the conditions its
+         * PARAMETERS were measured at, not anything the student chose.
+         *
+         * Three states, rendered three different ways on purpose:
+         *
+         *   agreed        every parameter that reported a value reported the
+         *                 same one. Shown as the value.
+         *   conflicting   they reported different ones. The papers disagree,
+         *                 so the model mixes experiments. Shown as a warning
+         *                 naming both, with NO value — there isn't one.
+         *   not_reported  nobody wrote it down. Shown as "not reported",
+         *                 plainly, and NOT as a warning: nothing is wrong,
+         *                 the record is just silent.
+         *
+         * Collapsing `conflicting` into `not_reported` would be the defect
+         * ADR 0055 exists to prevent, one layer up. Both end with no usable
+         * number and they are entirely different facts: one is a gap in
+         * BRENDA's record, the other is a defect in the model being built.
+         */
+        function renderRunConditions(rc, warnings) {
+            const card = document.getElementById('runConditionsCard');
+            const panel = document.getElementById('runConditions');
+            if (!card || !panel) return;
+
+            if (!rc) {
+                // Absent, not empty. A failed run has no resolved parameters
+                // to derive conditions from, and showing a blank panel would
+                // imply we looked and found nothing.
+                card.style.display = 'none';
+                return;
+            }
+
+            const rows = [];
+
+            const describe = (verdict, label, unit) => {
+                if (!verdict) return;
+                if (verdict.status === 'agreed') {
+                    rows.push(`<div class="metric">` +
+                        `<span class="metric-label">${escapeHtml(label)}</span>` +
+                        `<span class="measured-tag">${escapeHtml(String(verdict.value))}` +
+                        `${escapeHtml(unit)}</span></div>`);
+                } else if (verdict.status === 'conflicting') {
+                    const detail = (verdict.reported || [])
+                        .map(r => `${escapeHtml(r.parameter)} at ` +
+                                  `${escapeHtml(String(r.value))}${escapeHtml(unit)}`)
+                        .join(', ');
+                    rows.push(`<div class="alert alert-info">` +
+                        `⚠ <strong>${escapeHtml(label)} conflict.</strong> ${detail}. ` +
+                        `These parameters were measured under different conditions, ` +
+                        `so this model mixes experiments rather than describing one. ` +
+                        `No ${escapeHtml(label.toLowerCase())} is assumed for this run ` +
+                        `and none is averaged — the mean of two assay values is not ` +
+                        `an assay value.</div>`);
+                } else {
+                    // Deliberately not an alert. "The papers didn't say" is
+                    // the common case and is not a problem; styling it as a
+                    // warning would train the reader to skim past the ones
+                    // that are.
+                    rows.push(`<div class="metric">` +
+                        `<span class="metric-label">${escapeHtml(label)}</span>` +
+                        `<span>not reported</span></div>`);
+                }
+
+                // Which parameters stayed silent. One parameter reporting is
+                // not a conflict, but it is not a consensus either, and a
+                // reader who sees "25 °C" deserves to know it came from one
+                // of three values.
+                const silent = (verdict.silent || []);
+                if (verdict.status === 'agreed' && silent.length > 0) {
+                    rows.push(`<div class="metric"><span class="metric-label"></span>` +
+                        `<span style="opacity:0.75">` +
+                        `${escapeHtml(silent.join(', '))} reported no ` +
+                        `${escapeHtml(label.toLowerCase())}</span></div>`);
+                }
+            };
+
+            describe(rc.temperatureC, 'Temperature', ' °C');
+            describe(rc.ph, 'pH', '');
+
+            rows.push(`<div class="metric"><span class="metric-label"></span>` +
+                `<span style="opacity:0.75">A simulation has no temperature of ` +
+                `its own — it runs at whatever conditions its parameters were ` +
+                `measured at.</span></div>`);
+
+            if (Array.isArray(warnings) && warnings.length > 0) {
+                // The pipeline's own conflict text, which is more specific
+                // than anything reconstructable here.
+                for (const w of warnings) {
+                    rows.push(`<div class="alert alert-info">${escapeHtml(w)}</div>`);
+                }
+            }
+
+            panel.innerHTML = rows.join('');
+            card.style.display = 'block';
+        }
+
+        function renderProvenance(r) {
+            const panel = document.getElementById('kmProvenance');
+            const rows = [];
+
+            rows.push(`<div class="metric"><span class="metric-label">Organism</span>` +
+                `<span>${escapeHtml(r.organism || '(not reported)')}</span></div>`);
+            rows.push(`<div class="metric"><span class="metric-label">Source</span>` +
+                `<span>${escapeHtml(r.source)}</span></div>`);
+
+            if (r.citation) {
+                const ref = r.citation.reference_id
+                    ? ` ref ${escapeHtml(r.citation.reference_id)}` : '';
+                rows.push(`<div class="metric"><span class="metric-label">Citation</span>` +
+                    `<span>${escapeHtml(r.citation.source)}${ref}</span></div>`);
+            } else {
+                // Not silence. A resolved value with no citation is a fact
+                // about the result the reader has to be told.
+                rows.push(`<div class="metric"><span class="metric-label">Citation</span>` +
+                    `<span>none returned — treat as unverified</span></div>`);
+            }
+
+            const a = r.assayConditions || {};
+            const ph = a.ph == null ? 'not reported' : a.ph;
+            const temp = a.temperatureC == null ? 'not reported' : a.temperatureC + ' °C';
+            rows.push(`<div class="metric"><span class="metric-label">Assay</span>` +
+                `<span>pH ${escapeHtml(ph)}, ${escapeHtml(temp)}</span></div>`);
+
+            if (a.bufferIdentity && a.bufferIdentity.status === 'resolved') {
+                rows.push(`<div class="metric"><span class="metric-label">Buffer</span>` +
+                    `<span>${escapeHtml(a.bufferIdentity.species || a.bufferIdentity.raw)} ` +
+                    `(PubChem ${escapeHtml(a.bufferIdentity.parent_cid)})</span></div>`);
+            }
+
+            let notes = '';
+            if (r.crossSpecies) {
+                notes += `<div class="alert alert-info">⚠ <strong>Cross-species.</strong> ` +
+                    `Measured in ${escapeHtml(r.organism)}, not the organism you asked ` +
+                    `about. Real and citable, but do not report it as that organism's ` +
+                    `measurement.</div>`;
+            }
+            if (r.variant) {
+                if (r.variant.status === 'variant') {
+                    const what = r.variant.kind === 'isozyme'
+                        ? 'a named isozyme' : 'a sequence variant';
+                    notes += `<div class="alert alert-info">⚠ <strong>Measured on ` +
+                        `${what}.</strong> The source says ` +
+                        `${escapeHtml(r.variant.evidence || '(unnamed)')}. ` +
+                        `${escapeHtml(r.variant.reason)}</div>`;
+                } else if (r.variant.status !== 'wild_type') {
+                    // `unstated` is the majority of BRENDA and it is NOT
+                    // wild-type. Printing nothing here would let the reader
+                    // infer the enzyme as found (ADR 0029).
+                    notes += `<div class="alert alert-info">The source does not say ` +
+                        `whether this was the wild-type enzyme or a variant. That is ` +
+                        `not the same as it being wild-type.</div>`;
+                }
+            }
+            if (Array.isArray(r.effectors) && r.effectors.length > 0) {
+                const parts = r.effectors.map(e =>
+                    e.presence === 'absent'
+                        ? `<strong>without</strong> ${escapeHtml(e.compound_text)}`
+                        : `${escapeHtml(e.concentration_text || '')} ${escapeHtml(e.compound_text)}`.trim()
+                );
+                notes += `<div class="alert alert-info">Measured with: ` +
+                    `${parts.join(', ')}</div>`;
+            }
+            if (r.reliability) {
+                const ax = r.reliability;
+                notes += `<div class="alert alert-info">Reliability — ` +
+                    `assay ${escapeHtml(ax.assayCompleteness.grade)}, ` +
+                    `conditions ${escapeHtml(ax.conditionProximity.grade)}, ` +
+                    `organism ${escapeHtml(ax.organismMatch.grade)}. ` +
+                    `No overall score is offered, on purpose.</div>`;
+            }
+
+            panel.innerHTML =
+                `<h3 style="margin:0 0 10px;">Where this number came from</h3>` +
+                rows.join('') + notes;
+            panel.style.display = 'block';
+        }
+
+        async function resolveKm() {
+            const enzyme = document.getElementById('enzyme').value;
+            const substrate = document.getElementById('substrate').value;
+            // NEVER defaulted. The first draft of this function fell back to
+            // 'Homo sapiens' when the field was missing — the exact
+            // substitution ADR 0024 exists to prevent, introduced by the fix
+            // for it. Caught by writing the test, not by reading the code.
+            const organism = document.getElementById('organism').value;
+            const panel = document.getElementById('kmProvenance');
+            const btn = document.getElementById('resolveKm');
+
+            const need = [];
+            if (!enzyme) need.push('enzyme');
+            if (!substrate) need.push('substrate');
+            if (!organism) need.push('organism');
+            if (need.length > 0) {
+                alert(
+                    `Cannot resolve: ${need.join(', ')} not supplied.\n\n` +
+                    'An organism is required and is never assumed. Kinetic ' +
+                    'parameters are species-specific, so "the enzyme" does ' +
+                    'not have one Km.'
+                );
+                return;
+            }
+
+            btn.disabled = true;
+            const original = btn.textContent;
+            btn.textContent = 'Resolving…';
+            try {
+                const params = new URLSearchParams({
+                    enzyme: enzyme, substrate: substrate,
+                    organism: organism, quantity: 'km'
+                });
+                const res = await fetch('/api/resolve?' + params.toString());
+                const body = await res.json();
+
+                if (res.status === 503) {
+                    // The lookup could not run. NOT the same as "nothing
+                    // found", and the field stays empty either way — but the
+                    // student needs to know which happened.
+                    panel.innerHTML = `<div class="alert alert-info">` +
+                        `The literature resolver could not run, so nothing was ` +
+                        `looked up. This is not the same as the literature ` +
+                        `having no value.<br><small>${escapeHtml(body.message)}</small></div>`;
+                    panel.style.display = 'block';
+                    return;
+                }
+                if (!res.ok || body.found === false) {
+                    panel.innerHTML = `<div class="alert alert-info">` +
+                        `No Km found for ${escapeHtml(enzyme)} / ` +
+                        `${escapeHtml(substrate)} in ${escapeHtml(organism)}. ` +
+                        `The field is left empty on purpose.</div>`;
+                    panel.style.display = 'block';
+                    return;
+                }
+
+                document.getElementById('km').value = body.value;
+                renderProvenance(body);
+            } catch (e) {
+                panel.innerHTML = `<div class="alert alert-info">` +
+                    `Could not reach the resolver.</div>`;
+                panel.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = original;
+            }
         }
 
         // Export Functions

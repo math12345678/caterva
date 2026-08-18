@@ -84,6 +84,13 @@ export interface TeriumResult {
   /** The engine's Rule 2 signal: physically valid but implausible. */
   flagged: boolean;
   flagReason: string | null;
+  /** How the engine actually integrated, reported by the engine rather
+   *  than restated here. The execution record used to invent this. */
+  solver?: {
+    algorithm: string;
+    relativeTolerance: number;
+    absoluteTolerance: number;
+  };
 }
 
 interface EngineError {

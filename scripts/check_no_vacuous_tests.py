@@ -70,6 +70,7 @@ Run directly: python scripts/check_no_vacuous_tests.py
 
 from __future__ import annotations
 
+import ast
 import os
 import pathlib
 import re
@@ -192,6 +193,165 @@ def _extract_tests(source: str) -> list[tuple[str, int, str]]:
     return tests
 
 
+#: Roots holding the pytest suites. Separate from SEARCH_ROOTS because the
+#: Python scan is AST-based, not brace-based.
+PYTHON_ROOTS = ["Tests", "Terium/tests"]
+
+PYTHON_TEST_FILE = re.compile(r"^test_.*\.py$")
+
+#: Python tests whose every assertion sits behind an `if`, recorded rather
+#: than fixed here.
+#:
+#: WHY A BASELINE AND NOT A CLEAN SWEEP
+#: This guard was TypeScript-only for its whole life, so the Python suites
+#: were never scanned -- and "OK: every test has at least one assertion that
+#: always runs" was a claim about a third of the tests it appeared to cover.
+#: Turning it on found these eight. They belong to several agents' modules
+#: and fixing them blind would be worse than recording them: some are
+#: genuinely conditional for a reason their author knows.
+#:
+#: The list may SHRINK, never grow. Anything not listed here is a failure.
+#:
+#: EVERY ENTRY MUST CARRY A REASON, and the four that remain do. That is the
+#: difference between a debt and a decision:
+#:
+#:   * a bare key says only "this is known", which is how an exemption
+#:     outlives the thing that justified it;
+#:   * a reason says whether the test is conditional BY DESIGN -- BRENDA
+#:     often reports no pH, so "assert it where reported" is the claim --
+#:     or merely conditional and awaiting a fix.
+#:
+#: It started at eight. Four were fixed rather than excused, each with the
+#: mutation that proves the fix:
+#:
+#:   test_bibtex_specials_in_a_title_are_escaped   two of six parameters
+#:       asserted nothing, and they were the two hardest cases (`{braces}`,
+#:       `back\slash` -- the ones escaping to macros rather than a backslash
+#:       prefix). Coverage was inverted from the risk.
+#:   test_the_commentary_is_never_the_substrate    would have gone green if
+#:       the parser stopped capturing commentary, which IS the regression it
+#:       names.
+#:   test_trypsin_classic_substrates_are_typed_classic   would have gone
+#:       green if no classic substrate parsed at all.
+#:   test_effective_size_harmonic_mean_never_exceeds_arithmetic   its branch
+#:       was on the INPUT rather than an unknown outcome, so it could still
+#:       fail -- but harmonic <= arithmetic holds for every series, and
+#:       saying so unconditionally is stronger than branching around it.
+PYTHON_BASELINE: dict[str, str] = {
+    "Tests/test_turnover_numbers.py::test_variants_sharing_a_value_are_kept_apart": (
+        "asserts only when two entries share a kcat value, which is the "
+        "situation it exists to judge. TestTurnoverFixtures also runs "
+        "test_the_fixture_parses_to_at_least_one_entry over the same "
+        "`fixture` param, so an empty parse fails there rather than "
+        "passing silently here"
+    ),
+    "Tests/test_turnover_numbers.py::test_assay_conditions_are_parsed_where_reported": (
+        "conditional BY NAME -- BRENDA often reports no pH or temperature, "
+        "and the test's claim is that any value present is physically "
+        "sensible. Requiring a reported value in every fixture would "
+        "contradict what it checks. Non-emptiness is covered by the "
+        "sibling test_the_fixture_parses_to_at_least_one_entry"
+    ),
+    "Tests/test_popgen_resolver.py::test_mutation_rate_is_positive": (
+        "module-level skip when stdpopsim is absent (ADR 0061 made it "
+        "opt-in), so the body does not run silently -- but when it DOES "
+        "run and the resolver reports not-found, it asserts nothing"
+    ),
+    "Tests/test_popgen_resolver.py::test_mutation_rate_is_plausible": (
+        "same module-level skip as test_mutation_rate_is_positive"
+    ),
+}
+
+
+class _PythonAsserts(ast.NodeVisitor):
+    """Counts assertions reachable with and without passing through an `if`.
+
+    Loops count as unconditional, matching the TypeScript half. This guard's
+    own docstring already declines to judge `for` over a possibly-empty
+    collection, and applying a stricter rule to Python than to TypeScript
+    would make the two halves mean different things.
+    """
+
+    def __init__(self) -> None:
+        self.depth = 0
+        self.free = 0
+        self.guarded = 0
+
+    def _count(self) -> None:
+        if self.depth:
+            self.guarded += 1
+        else:
+            self.free += 1
+
+    def visit_If(self, node: ast.If) -> None:
+        self.depth += 1
+        for child in node.body + node.orelse:
+            self.visit(child)
+        self.depth -= 1
+        self.visit(node.test)
+
+    def visit_Assert(self, node: ast.Assert) -> None:
+        self._count()
+
+    def visit_With(self, node: ast.With) -> None:
+        if any("raises" in ast.dump(item.context_expr) for item in node.items):
+            self._count()
+        self.generic_visit(node)
+
+
+def _python_violations() -> list[str]:
+    violations: list[str] = []
+    scanned = 0
+
+    for root_name in PYTHON_ROOTS:
+        root = REPO_ROOT / root_name
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            if not PYTHON_TEST_FILE.match(path.name):
+                continue
+            if any(part in SKIP_PARTS for part in path.parts):
+                continue
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+            except (OSError, SyntaxError):
+                continue
+
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if not node.name.startswith("test"):
+                    continue
+                scanned += 1
+
+                counter = _PythonAsserts()
+                for statement in node.body:
+                    counter.visit(statement)
+
+                if counter.free or not counter.guarded:
+                    continue
+
+                key = f"{path.relative_to(REPO_ROOT)}::{node.name}"
+                if key in PYTHON_BASELINE:
+                    continue
+
+                violations.append(
+                    f"{key} (line {node.lineno}) -- all "
+                    f"{counter.guarded} assertion(s) are inside an `if`, so "
+                    "this test cannot fail: the branch is skipped and "
+                    "nothing is checked. Assert the condition itself, or "
+                    "seed the state the test needs."
+                )
+
+    if scanned == 0:
+        violations.append(
+            "No Python test functions were found under "
+            + ", ".join(PYTHON_ROOTS)
+            + ". Refusing to report success on an empty scan."
+        )
+    return violations
+
+
 def check() -> list[str]:
     """Returns a list of violation strings, empty when every test asserts."""
     files = _test_files()
@@ -234,13 +394,24 @@ def check() -> list[str]:
                 "ALLOWED in this script with a reason."
             )
 
+    violations.extend(_python_violations())
     return violations
 
 
 def main() -> int:
     violations = check()
     if not violations:
-        print("OK: every test has at least one assertion that always runs.")
+        print(
+            "OK: every test has at least one assertion that always runs.\n"
+            f"    Scanned TypeScript under {', '.join(SEARCH_ROOTS)}\n"
+            f"    and Python under {', '.join(PYTHON_ROOTS)}"
+            + (
+                f" ({len(PYTHON_BASELINE)} Python test(s) on the recorded "
+                "baseline; see PYTHON_BASELINE)."
+                if PYTHON_BASELINE
+                else "."
+            )
+        )
         return 0
 
     print(f"Vacuous tests found ({len(violations)}):\n")
@@ -253,5 +424,98 @@ def main() -> int:
     return 1
 
 
+def _selftest() -> int:
+    """Prove the Python half fires, on suites this function writes.
+
+    The TypeScript half has years of real findings behind it. The Python
+    half was added today and reported OK on its first run -- which is
+    exactly the state a check is in when it cannot fail. This establishes
+    that it can.
+    """
+    import tempfile
+
+    global PYTHON_ROOTS, REPO_ROOT, PYTHON_BASELINE
+    saved = (PYTHON_ROOTS, REPO_ROOT, PYTHON_BASELINE)
+    failures: list[str] = []
+
+    def run(files: dict[str, str], baseline: dict[str, str] | None = None):
+        global PYTHON_ROOTS, REPO_ROOT, PYTHON_BASELINE
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            (root / "suite").mkdir()
+            for name, body in files.items():
+                (root / "suite" / name).write_text(body, encoding="utf-8")
+            REPO_ROOT = root
+            PYTHON_ROOTS = ["suite"]
+            PYTHON_BASELINE = baseline or {}
+            return _python_violations()
+
+    vacuous = (
+        "def test_thing():\n"
+        "    result = compute()\n"
+        "    if result:\n"
+        "        assert result.ok\n"
+    )
+    healthy = (
+        "def test_thing():\n"
+        "    result = compute()\n"
+        "    assert result is not None\n"
+        "    if result:\n"
+        "        assert result.ok\n"
+    )
+    looping = (
+        "def test_thing():\n"
+        "    for item in items():\n"
+        "        assert item.ok\n"
+    )
+    raises = (
+        "def test_thing():\n"
+        "    with pytest.raises(ValueError):\n"
+        "        boom()\n"
+    )
+
+    try:
+        # Negative case FIRST. If a healthy test is reported, every positive
+        # below would fire on anything.
+        if run({"test_a.py": healthy}):
+            failures.append("a test with an unconditional assert was reported")
+
+        if not run({"test_a.py": vacuous}):
+            failures.append("a wholly conditional assert was NOT reported")
+
+        if run({"test_a.py": looping}):
+            failures.append(
+                "a `for` loop was treated as conditional; the TypeScript half "
+                "declines to judge loops and the two must agree"
+            )
+
+        if run({"test_a.py": raises}):
+            failures.append("`with pytest.raises` was not counted as an assertion")
+
+        key = "suite/test_a.py::test_thing"
+        if run({"test_a.py": vacuous}, {key: "recorded"}):
+            failures.append("the baseline did not suppress a recorded entry")
+
+        if not run({}):
+            failures.append("an empty scan reported success")
+
+        # A test function with no assertions at all is a different problem
+        # and not this guard's business.
+        if run({"test_a.py": "def test_thing():\n    compute()\n"}):
+            failures.append("a test with no assertions was reported")
+    finally:
+        PYTHON_ROOTS, REPO_ROOT, PYTHON_BASELINE = saved
+
+    if failures:
+        print(f"SELFTEST FAILED ({len(failures)}):")
+        for failure in failures:
+            print(f"  - {failure}")
+        return 1
+    print("SELFTEST OK: the Python scan fires, and a healthy test still passes.")
+    return 0
+
+
 if __name__ == "__main__":
+    if "--selftest" in sys.argv[1:]:
+        sys.exit(_selftest())
     sys.exit(main())

@@ -325,3 +325,83 @@ def test_a_pool_naming_no_source_is_not_unavailable():
 
     rows = [(1.0, "Gallus gallus", "pH 7.4, 37°C")]
     assert source_check_status(rows, exploding) is None
+
+
+# ---------------------------------------------------------------------------
+# A row that names two sources belongs to neither
+#
+# `docs/commentary-residue-baseline.txt` kept `muscle` in its accepted tail
+# with the note that it "survives here as a bare token in a row whose
+# phrasing ADR 0037's `from` pattern does not reach". Following that up
+# found the row:
+#
+#     Gallus gallus   16.0   "enzyme form heart and muscle"
+#
+# — BRENDA's own typo for "from". `extract_source_claims` takes the first
+# token after "from" and stops, so the row was filed as a clean HEART
+# measurement beside the genuine 60.0 heart row, widening the reported heart
+# range to 16.0–60.0. It is not a heart measurement. It is material pooled
+# from the two tissues whose values differ 54-fold, which is ADR 0037's
+# entire subject.
+# ---------------------------------------------------------------------------
+
+POOLED_TISSUE_ROWS = [
+    (60.0, "Gallus gallus", "enzyme from heart"),
+    (1.1, "Gallus gallus", "enzyme from muscle"),
+    (3.3, "Gallus gallus", "enzyme from muscle"),
+    (16.0, "Gallus gallus", "enzyme form heart and muscle"),
+]
+
+
+def _chicken(rows):
+    found = [
+        m for m in find_source_mixtures(rows, fake_taxon)
+        if m.organism == "Gallus gallus"
+    ]
+    assert found, "the chicken mixture disappeared entirely"
+    return found[0]
+
+
+def test_a_row_naming_two_tissues_is_reported_as_unattributable():
+    """The finding. Silence here is what let 16.0 pass as a heart value."""
+    reason = _chicken(POOLED_TISSUE_ROWS).reason
+    assert "SEVERAL of these sources at once" in reason
+    assert "16.0" in reason
+    assert "heart and muscle" in reason
+
+
+def test_the_pooled_row_is_not_silently_a_member_of_one_source():
+    """It is counted under BOTH, and the reason says the ranges therefore
+    overlap. Counting it under one would attribute a pooled measurement to
+    material it did not come from on its own."""
+    mixture = _chicken(POOLED_TISSUE_ROWS)
+    assert 16.0 in mixture.values_by_source["heart"]
+    assert 16.0 in mixture.values_by_source["muscle"]
+    assert "overlap by construction" in mixture.reason
+
+
+def test_a_pool_with_no_pooled_row_says_nothing_about_one():
+    """The note must not appear when no row names two sources. A sentence on
+    every mixture is noise, and noise is how the ones that matter stop being
+    read (ADR 0028)."""
+    reason = _chicken(REAL_LDH_ROWS).reason
+    assert "SEVERAL of these sources" not in reason
+
+
+def test_the_extra_source_must_be_one_the_POOL_states_outright():
+    """The vocabulary comes from the corpus, not from a hardcoded list.
+
+    `_classify_token` calls every unrecognised word a source — `stored`,
+    `purified`, even `pH` and `25` — so reading the word after "and"
+    directly would invent claims. A label counts only when another row in
+    the same organism states it outright.
+    """
+    rows = [
+        (60.0, "Gallus gallus", "enzyme from heart"),
+        (1.1, "Gallus gallus", "enzyme from muscle"),
+        # "stored" is not a tissue and no row claims it as a source.
+        (9.9, "Gallus gallus", "enzyme from heart and stored at 4 C"),
+    ]
+    mixture = _chicken(rows)
+    assert "stored" not in mixture.values_by_source
+    assert "stored" not in mixture.reason

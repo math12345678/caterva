@@ -181,23 +181,117 @@ describe('Result Comparator', () => {
       expect(insights.join(' ')).not.toContain('0.000');
     });
 
-    it('handles missing result fields', () => {
-      const job1 = {
-        jobId: 'job_1',
-        query: 'test',
-        result: undefined
-      };
-
+    it('reports a job with no result as null, not as a final value of zero', () => {
+      // This test previously asserted `job1FinalValue === 0`, which is the
+      // defect: `job.result?.finalValue || 0` gave a job that never finished
+      // a real-looking measurement of zero.
+      const job1 = { jobId: 'job_1', query: 'test', result: undefined };
       const job2 = {
         jobId: 'job_2',
         query: 'test',
         result: { finalValue: 2.0, confidence: 0.9, validated: false }
       };
 
-      // Should not crash
       const comparison = compareJobs(job1, job2);
-      expect(comparison.job1FinalValue).toBe(0);
+
+      expect(comparison.job1FinalValue).toBeNull();
+      expect(comparison.job1FinalValue).not.toBe(0);
       expect(comparison.job2FinalValue).toBe(2.0);
+      expect(comparison.comparable).toBe(false);
+      expect(comparison.incomparableReason).toMatch(/produced no final value/);
+      expect(comparison.similarity).toBeNull();
+      expect(comparison.metrics.percentDifference).toBeNull();
+    });
+
+    it('does NOT report two jobs that produced nothing as identical', () => {
+      // THE DEFECT, in its sharpest form. Measured before the fix:
+      //
+      //   job1FinalValue : 0
+      //   job2FinalValue : 0
+      //   similarity     : identical
+      //   percentDiff    : 0
+      //
+      // Two failed runs, reported as results that agree perfectly — a
+      // scientific claim manufactured out of two absences, at
+      // POST /api/compare/jobs, which is a live route.
+      const a = { jobId: 'job_a', query: 'michaelis-menten', result: undefined };
+      const b = { jobId: 'job_b', query: 'competitive-inhibition', result: undefined };
+
+      const comparison = compareJobs(a, b);
+
+      expect(comparison.similarity).not.toBe('identical');
+      expect(comparison.similarity).toBeNull();
+      expect(comparison.comparable).toBe(false);
+      // The refusal names BOTH jobs, so a caller can see it is not one side.
+      expect(comparison.incomparableReason).toContain('job_a');
+      expect(comparison.incomparableReason).toContain('job_b');
+    });
+
+    it('still compares a genuine final value of zero', () => {
+      // The other direction, and why `?? null` was chosen over `|| 0`.
+      // Full substrate consumption gives a real zero and is the normal end
+      // state of a Michaelis-Menten run; a filter that treated zero as
+      // absent would throw away the answer.
+      const consumed = {
+        jobId: 'job_1', query: 'mm',
+        result: { finalValue: 0, confidence: 0.9, validated: true }
+      };
+      const partial = {
+        jobId: 'job_2', query: 'mm',
+        result: { finalValue: 5, confidence: 0.9, validated: true }
+      };
+
+      const comparison = compareJobs(consumed, partial);
+
+      expect(comparison.comparable).not.toBe(false);
+      expect(comparison.job1FinalValue).toBe(0);
+      expect(comparison.metrics.difference).toBe(5);
+    });
+
+    it('keeps a genuine zero in the NESTED pipeline shape too', () => {
+      // Found by mutation. The test above uses the flat shape, so a mutation
+      // that made the nested reader treat 0 as absent
+      // (`typeof nested === 'number' && nested !== 0`) passed every test:
+      // the flat fallback still returned 0 and nothing noticed.
+      //
+      // The pipeline emits the NESTED shape, so that is the path a real job
+      // takes. Covering only the flat one tested the fallback and left the
+      // primary reader unguarded -- the same shape as ADR 0056, where
+      // nineteen tests agreed with the code about a shape production never
+      // produces.
+      const consumed = {
+        jobId: 'job_1', query: 'mm',
+        result: { validated: true, results: { finalValue: 0 } }
+      };
+      const partial = {
+        jobId: 'job_2', query: 'mm',
+        result: { validated: true, results: { finalValue: 5 } }
+      };
+
+      const comparison = compareJobs(consumed, partial);
+
+      expect(comparison.job1FinalValue).toBe(0);
+      expect(comparison.job1FinalValue).not.toBeNull();
+      expect(comparison.comparable).not.toBe(false);
+      expect(comparison.metrics.difference).toBe(5);
+    });
+
+    it('reads the nested pipeline shape as well as the flat one', () => {
+      // ADR 0056: the pipeline returns `results.finalValue`; only some
+      // callers flatten it. Reading one shape blanked every real job.
+      const nested = {
+        jobId: 'job_1', query: 'mm',
+        result: { validated: true, results: { finalValue: 3.5 } }
+      };
+      const flat = {
+        jobId: 'job_2', query: 'mm',
+        result: { finalValue: 3.5, confidence: 0.9, validated: true }
+      };
+
+      const comparison = compareJobs(nested, flat);
+
+      expect(comparison.job1FinalValue).toBe(3.5);
+      expect(comparison.similarity).toBe('identical');
     });
   });
 
@@ -314,7 +408,7 @@ describe('Result Comparator', () => {
 
     it('returns null for single result', () => {
       const sweep = {
-        results: [{ finalValue: 1.0 }]
+        results: [{ finalValue: 1.0, validated: true }]
       };
 
       const result = analyzeSensitivity(sweep);
@@ -324,9 +418,9 @@ describe('Result Comparator', () => {
     it('calculates sensitivity for flat sweep', () => {
       const sweep = {
         results: [
-          { finalValue: 1.0 },
-          { finalValue: 1.0 },
-          { finalValue: 1.0 }
+          { finalValue: 1.0, validated: true },
+          { finalValue: 1.0, validated: true },
+          { finalValue: 1.0, validated: true }
         ]
       };
 
@@ -340,11 +434,11 @@ describe('Result Comparator', () => {
     it('calculates sensitivity for varied sweep', () => {
       const sweep = {
         results: [
-          { finalValue: 1.0 },
-          { finalValue: 2.0 },
-          { finalValue: 3.0 },
-          { finalValue: 4.0 },
-          { finalValue: 5.0 }
+          { finalValue: 1.0, validated: true },
+          { finalValue: 2.0, validated: true },
+          { finalValue: 3.0, validated: true },
+          { finalValue: 4.0, validated: true },
+          { finalValue: 5.0, validated: true }
         ]
       };
 
@@ -357,29 +451,106 @@ describe('Result Comparator', () => {
       expect(analysis.range).toBe(4.0);
     });
 
-    it('identifies optimal parameter index', () => {
+    it('does NOT name an optimal point — that contradicted analyzeSweep', () => {
+      // This replaces a test that asserted `optimalParameterIndex === 2`,
+      // the index of the MAXIMUM value. `analyzeSweep` defines the optimum
+      // as the MINIMUM ("minimum substrate remaining = maximum
+      // conversion"), and both answers reached users: analyzeSweep's via
+      // the exported CSV, this one via GET /api/analyze/sweep/:sweepId.
+      // On 4.0, 2.5, 9.1 they named opposite ends of the range.
+      //
+      // ADR 0027's ruling on a duplicate implementation was to delete it
+      // rather than bypass it, because a bypassed duplicate comes back. So
+      // this is a deletion guard, not an absence of coverage: it fails if
+      // anyone reintroduces an optimum here under any name.
       const sweep = {
         results: [
-          { finalValue: 1.0 },
-          { finalValue: 2.0 },
-          { finalValue: 5.0 }, // Maximum
-          { finalValue: 3.0 }
+          { finalValue: 1.0, validated: true },
+          { finalValue: 2.0, validated: true },
+          { finalValue: 5.0, validated: true },
+          { finalValue: 3.0, validated: true }
         ]
       };
 
       const analysis = analyzeSensitivity(sweep);
 
-      expect(analysis.optimalParameterIndex).toBe(2);
+      expect(analysis.optimalParameterIndex).toBeUndefined();
+      const optimumish = Object.keys(analysis).filter(k => /optim|best/i.test(k));
+      expect(optimumish).toEqual([]);
+    });
+
+    it('excludes points that did not run from every statistic', () => {
+      // The defect this guards: `results.map(r => r.finalValue || 0)` gave
+      // a crashed point a value of 0, and 0 is a real reading (full
+      // substrate consumption), so nothing downstream could tell them
+      // apart. mean, min, max, range, stdDev and sensitivity were all
+      // computed over fabricated zeros.
+      const withFailure = {
+        results: [
+          { finalValue: 4.0, validated: true },
+          { finalValue: 2.5, validated: true },
+          { finalValue: null, validated: false, error: 'solver diverged' }
+        ]
+      };
+      const withoutIt = {
+        results: [
+          { finalValue: 4.0, validated: true },
+          { finalValue: 2.5, validated: true }
+        ]
+      };
+
+      const a = analyzeSensitivity(withFailure);
+      const b = analyzeSensitivity(withoutIt);
+
+      expect(a.mean).toBe(b.mean);
+      expect(a.min).toBe(b.min);
+      expect(a.stdDev).toBe(b.stdDev);
+      // ...and it says how much of the grid is missing, rather than
+      // reporting the same shape of answer as a sweep where none failed.
+      expect(a.pointsAnalyzed).toBe(2);
+      expect(a.pointsExcluded).toBe(1);
+      expect(a.totalPoints).toBe(3);
+    });
+
+    it('refuses when fewer than two points are usable', () => {
+      // One usable point cannot show a response to a parameter change.
+      // A number here would be meaningless and would still get plotted.
+      const analysis = analyzeSensitivity({
+        results: [
+          { finalValue: 4.0, validated: true },
+          { finalValue: null, validated: false, error: 'boom' }
+        ]
+      });
+
+      expect(analysis.sensitivity).toBeNull();
+      expect(analysis.mean).toBeNull();
+      expect(analysis.unanalysableReason).toMatch(/at least two/);
+    });
+
+    it('treats a point that does not say whether it ran as unusable', () => {
+      // Absence of `validated` must not read as success. Requiring
+      // `=== true` rather than `!== false` is the difference between
+      // "checked and fine" and "nobody said".
+      // NOTE: these two fixtures deliberately omit `validated`. A bulk edit
+      // that adds `validated: true` to every sweep fixture in this file
+      // must not touch them — doing so silently converts this test into a
+      // duplicate of the happy path. It has already happened once.
+      const analysis = analyzeSensitivity({
+        results: [{ finalValue: 4.0 }, { finalValue: 2.5 }]
+      });
+
+      expect(analysis.pointsAnalyzed).toBe(0);
+      expect(analysis.mean).toBeNull();
     });
 
     it('detects inflection points', () => {
       const sweep = {
         results: [
-          { finalValue: 1.0 },
-          { finalValue: 1.1 },
-          { finalValue: 1.15 },
-          { finalValue: 4.0 }, // Large jump
-          { finalValue: 5.0 }
+          { finalValue: 1.0, validated: true },
+          { finalValue: 1.1, validated: true },
+          { finalValue: 1.15, validated: true },
+          { finalValue: 4.0, validated: true }, // Large jump
+          { finalValue: 5.0, validated: true }
         ]
       };
 
@@ -392,9 +563,9 @@ describe('Result Comparator', () => {
     it('calculates standard deviation correctly', () => {
       const sweep = {
         results: [
-          { finalValue: 1.0 },
-          { finalValue: 2.0 },
-          { finalValue: 3.0 }
+          { finalValue: 1.0, validated: true },
+          { finalValue: 2.0, validated: true },
+          { finalValue: 3.0, validated: true }
         ]
       };
 
@@ -406,8 +577,8 @@ describe('Result Comparator', () => {
     it('handles missing analysis field in sweep', () => {
       const sweep = {
         results: [
-          { finalValue: 1.0 },
-          { finalValue: 2.0 }
+          { finalValue: 1.0, validated: true },
+          { finalValue: 2.0, validated: true }
         ]
         // No analysis field
       };
@@ -439,15 +610,20 @@ describe('Result Comparator', () => {
 
       const comparison = compareJobs(jobs[0], jobs[1]);
 
-      expect(isFinite(comparison.metrics.percentDifference)).toBe(true);
+      // Non-null asserted rather than cast away: both jobs have a real
+      // finalValue here, so `comparable` is true and the metric is a number.
+      // If that ever stops holding, this line should fail rather than
+      // quietly compare against a fabricated zero.
+      expect(comparison.comparable).not.toBe(false);
+      expect(isFinite(comparison.metrics.percentDifference!)).toBe(true);
     });
 
     it('handles negative values in sweep', () => {
       const sweep = {
         results: [
-          { finalValue: -5.0 },
-          { finalValue: -2.0 },
-          { finalValue: 1.0 }
+          { finalValue: -5.0, validated: true },
+          { finalValue: -2.0, validated: true },
+          { finalValue: 1.0, validated: true }
         ]
       };
 

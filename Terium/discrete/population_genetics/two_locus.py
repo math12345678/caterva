@@ -2,6 +2,15 @@
 
 from __future__ import annotations
 
+
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """See Terium/core/import_mode.py. Inlined deliberately: this
+    guards the import machinery itself, so it cannot import a
+    helper to do its job."""
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Sequence, Tuple
@@ -9,7 +18,12 @@ from typing import Any, Dict, List, Sequence, Tuple
 import numpy as np
 try:
     from Terium.core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MIN_REPLICATE_RUNS)
-except ModuleNotFoundError:  # flat mode: Terium/ on sys.path, no repo root
+except ModuleNotFoundError as _exc:  # flat mode: Terium/ on sys.path, no repo root
+    if not _package_path_missing(_exc):
+        # A missing THIRD-PARTY dependency. Flat mode cannot fix it,
+        # and retrying replaces the real reason with a confusing
+        # 'No module named core'. See Terium/core/import_mode.py.
+        raise
     from core.data_structures import (ParameterValidation, ModelBuildError, WF_PLAUSIBLE_MAX_GENERATIONS, WF_PLAUSIBLE_MAX_MUTATION_RATE, WF_PLAUSIBLE_MIN_POPULATION_SIZE, WF_PLAUSIBLE_MIN_REPLICATE_RUNS)  # type: ignore[no-redef]
 
 # ---------------------------------------------------------------------------

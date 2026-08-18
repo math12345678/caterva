@@ -1,0 +1,66 @@
+{
+  "_why": [
+    "ADR 0106's table. The papers Terrium finds when BRENDA holds nothing now",
+    "reach the student, inside the refusal that tells them to go and find the",
+    "value themselves.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0106-literature-candidates.json"
+  ],
+
+  "covers": ["0106"],
+
+  "test": "npx vitest run src/__tests__/literatureCandidatesReachReader.test.ts src/__tests__/provenance.test.ts --root Science-Agent-Pipeline/artifacts/api-server",
+
+  "_why_two_files": [
+    "`provenance.test.ts` pins `RequiredParametersMissingError`'s message",
+    "composition, which is what this change writes into. A set running only",
+    "the new file would not notice the offer breaking the error's existing",
+    "contract."
+  ],
+
+  "mutations": [
+    {
+      "id": "L1",
+      "description": "the candidates stop being offered (the original defect)",
+      "_note": [
+        "The state this repository shipped in: `literatureCandidates` had two",
+        "non-test references in the whole tree -- the declaration and an",
+        "empty-array initialiser -- and a student was told the literature had",
+        "nothing while the system held the papers."
+      ],
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "  if (!candidates || candidates.length === 0) return undefined;",
+      "replace": "  if (true) return undefined;"
+    },
+    {
+      "id": "L2",
+      "description": "the offer replaces the instruction instead of restating it",
+      "_note": [
+        "`missingKeyDetails` drops the generic sentence for any key carrying",
+        "an `unresolvedReason`, and that sentence is where `Add km=<value>`",
+        "lives. Attaching the offer therefore removed the one instruction the",
+        "student can act on.",
+        "",
+        "This is not hypothetical: it happened while writing the change, and",
+        "the test caught it rather than the comment that warns about it --",
+        "which `missingKeyDetails` records having caused once before."
+      ],
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "    `Once you have it, add ${key}=<value> to your query, and attach the ` +\n    `source with --cite ${key}=\"...\" so it is recorded rather than lost.`",
+      "replace": "    ``"
+    },
+    {
+      "id": "L3",
+      "description": "only one kind of locator is carried, so half the offers lose theirs",
+      "_note": [
+        "PubMed's esummary never supplies a DOI and CORE has no PMID, so a",
+        "single-source locator silently strips the provenance from every",
+        "candidate that came from the other one. A title with no locator is a",
+        "claim; a title with one is checkable."
+      ],
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "      const locator = c.pmid\n        ? ` [PMID ${c.pmid}]`\n        : c.doi\n          ? ` [doi ${c.doi}]`",
+      "replace": "      const locator = c.pmid\n        ? ` [PMID ${c.pmid}]`\n        : false\n          ? ` [doi ${c.doi}]`"
+    }
+  ]
+}

@@ -16,7 +16,7 @@ const FAQS = [
   {
     id: "how-accurate",
     q: "How accurate are the simulations?",
-    a: "Every simulation is validated against closed-form solutions to 1e-10 tolerance in the Python test suite. Parameters are sourced exclusively from peer-reviewed literature — BRENDA for enzyme kinetics, KEGG for pathway data, and PubMed for supporting citations. We flag low-confidence values and never fabricate numbers. The RK4 integrator checks conserved quantities (population, mass) at every timestep.",
+    a: "Every domain is checked against something that is not the solver itself: an exact closed-form solution, an independent integrator (scipy's solve_ivp, which shares no code with roadrunner), or a physical invariant tested across the input space with Hypothesis. Tolerances vary by domain, from 1e-10 on the analytic cases to 1e-4 where a stochastic method makes anything tighter meaningless. Parameters are sourced exclusively from peer-reviewed literature — BRENDA for enzyme kinetics, KEGG for pathway data, and PubMed for supporting citations. We flag low-confidence values and never fabricate numbers. The RK4 integrator checks conserved quantities (population, mass) at every timestep.",
   },
   {
     id: "no-code",
@@ -26,7 +26,7 @@ const FAQS = [
   {
     id: "domains",
     q: "What scientific domains are supported?",
-    a: "Currently live: enzyme kinetics (Michaelis-Menten) and epidemiology (SIR/SEIR). Planned: PCR amplification, Monte Carlo simulation, population genetics, and molecular dynamics setup. We release domains only after the full test suite passes — 304+ tests and counting across the engine and literature layers.",
+    a: "Fifteen domains are built: enzyme kinetics (plain and competitively inhibited Michaelis-Menten), SIR/SEIR epidemiology, PCR amplification, Monte Carlo, population genetics (Wright-Fisher, one- and two-locus), Lennard-Jones molecular dynamics, Gillespie SSA (three variants), and three ODE oscillators — Lotka-Volterra, the Tyson cell-cycle model and the Elowitz-Leibler repressilator. We release a domain only after its suite passes; the counts in README.md are checked against the repository on every build by scripts/check_documented_counts.py.",
   },
   {
     id: "pricing",

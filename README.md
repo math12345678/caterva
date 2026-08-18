@@ -1,5 +1,10 @@
 # Terrium
 
+> **Contributing, or just arrived? → [START_HERE.md](START_HERE.md)**
+>
+> One page: what this is, how to get it running, where things live, and a
+> real first task. Everything else is linked from there.
+
 Scientific computing for teaching labs. Students ask a question in plain
 language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
@@ -14,15 +19,52 @@ bimolecular association, and a multi-replicate ensemble view), and three
 ODE oscillators: Lotka-Volterra predator-prey, the Tyson (1991) cdc2-cyclin
 cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
+> **Terrium is not Tellurium.**
+>
+> [Tellurium](https://tellurium.analogmachine.org/) is an established
+> systems-biology environment from the Sauro lab at the University of
+> Washington and collaborators including Lucian Smith and Matthias König.
+> Terrium is an unaffiliated personal project. It is not a fork of
+> Tellurium, not endorsed by its authors, and makes no claim to their work.
+>
+> Terrium is a *consumer* of that ecosystem: it runs on libRoadRunner and
+> generates Antimony, both of which come from that group. The similar name
+> is a mistake of mine and has already caused one researcher to reasonably
+> read a cold email as a false claim of credit. Saying so here is cheaper
+> than letting the next person work it out.
+
 ## Quick start
 
 ```bash
-git clone https://github.com/math12345678/terrium.git
-cd terrium
+git clone https://github.com/Terrium-sim/main.git
+cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 1,291 tests (1,014 engine + 277 literature)
+make test      # runs all 2,062 tests (1,162 engine + 900 literature)
 ```
+
+**`make test` takes six to eight minutes**, and prints nothing per-file
+while it runs. That is normal. It is written here because the absence of a
+figure is what makes a slow suite look like a broken one — the author of
+this note spent a pass diagnosing a "hang" in
+`Terium/tests/test_popgen_correctness.py` that was a 58-second file being
+run inside a 175-second budget alongside others. It had never hung.
+
+Measured on the reference container, `-p no:randomly`:
+
+| suite | time |
+|---|---|
+| `Terium/tests` (engine) | ~3.5-4 min |
+| `Tests/` (literature) | ~2.9 min |
+| `test_popgen_correctness.py` alone | 58 s |
+
+Test counts are deliberately absent from that table: they are stated once
+above and checked by `check_documented_counts.py`, and a second copy here
+would be a number that drifts with nothing watching it.
+
+`make test-sim` and `make test-lit` run one half each if you only changed
+one, and `pytest --durations=10` names the slowest tests when you want to
+know where the time went.
 
 `make setup` needs an interpreter in the supported window and downloads
 about 120 MB of prebuilt wheels for the direct pins alone — libroadrunner is
@@ -38,13 +80,33 @@ seven required packages import and at what version against the pin, whether
 guards — then lists what to do about each. It prints what it checked, not
 just a verdict.
 
-`test_popgen_resolver.py` skips its 19 tests when `stdpopsim` is not
-installed. `make check` reports that as a warning so the gap is visible; a
-silent skip would let the population-genetics literature path go untested
-and still read as green. The one platform where it reliably will not install
-is Linux on arm64: `msprime`, stdpopsim's C-extension dependency, publishes
-wheels for manylinux x86_64, macOS and Windows only, so pip builds it from
-source there and needs `libgsl-dev` plus a compiler.
+### The population-genetics resolver is opt-in
+
+`stdpopsim` is **not** installed by `make setup`. It is GPL-3.0-or-later and
+Terrium is Apache-2.0, so a default install would put copyleft code into the
+environment of a project that declares a permissive licence — compatible in
+one direction only, and not something a reader should have to derive by
+comparing two licence files.
+
+```bash
+pip install -r requirements-popgen.txt     # adds GPL-3.0-or-later code
+```
+
+Nothing is violated either way: Terrium never bundles stdpopsim, and running
+two separately-installed packages together is use rather than distribution.
+Splitting it just means you can see what you have. See
+[ADR 0061](docs/adr/0061-gpl-out-of-the-default-install.md) and NOTICE.
+
+Without it, `test_popgen_resolver.py` skips its 19 tests and the resolver
+returns `found=false` with a log saying stdpopsim is not installed — never a
+substituted value. `make check` reports the skip as a warning so the gap is
+visible; a silent skip would let the population-genetics literature path go
+untested and still read as green.
+
+The one platform where it reliably will not install is Linux on arm64:
+`msprime`, stdpopsim's C-extension dependency, publishes wheels for
+manylinux x86_64, macOS and Windows only, so pip builds it from source there
+and needs `libgsl-dev` plus a compiler.
 
 `make check` is not a version-string check. It builds a real Michaelis-Menten
 model, translates it to SBML, integrates it, and compares the result to the
@@ -96,7 +158,7 @@ refuses to invent.
 npx ts-node src/cli/scientificCLI.ts help
 ```
 
-### Look up a constant
+### Look up a measured parameter
 
 ```bash
 scientific resolve "lactate dehydrogenase" \
@@ -107,12 +169,41 @@ scientific resolve "lactate dehydrogenase" \
 ✓ KM = 2.5 mM
 
   System    lactate dehydrogenase / pyruvate
-  Organism  Oryctolagus cuniculus
-  Source    brenda_cross_species
+  Organism  Homo sapiens
+  Source    brenda_exact
   Citation  BRENDA ref 649716
+```
 
-⚠ Cross-species match. This was measured in Oryctolagus cuniculus, not Homo sapiens.
-  Real and citable, but do not report it as a Homo sapiens measurement.
+When the organism you asked for has no measurement, Terrium does **not**
+quietly hand you another organism's:
+
+```
+✗ No KM measured in Homo sapiens for this system.
+
+  BRENDA holds a KM for Oryctolagus cuniculus and Sus scrofa.
+  Kinetic parameters are species-specific, so it was not substituted.
+  Re-run with --allow-cross-species to use one, understanding that the
+  resulting model is not a model of the organism you asked for.
+```
+
+That refusal is deliberate. It follows a recommendation from Lisa Jeske of
+the BRENDA curation team: *"The simulation should rather abort or leave the
+value empty if there is no exact organism match, instead of providing
+incorrect data."* See [ADR 0024](docs/adr/0024-refusing-versus-defaulting-an-unsourced-parameter.md).
+
+Opting in does not disable judgement. Candidates must still share a
+taxonomic **class** with the organism you asked about, checked live against
+NCBI Taxonomy — so a second mammal is offered and a *Plasmodium falciparum*
+value for a mouse is not:
+
+```
+✗ Cross-species use was enabled, and no candidate passed the relatedness check.
+
+  Plasmodium falciparum and Mus musculus diverge above the class level —
+  their nearest shared ranked ancestor is the domain Eukaryota.
+
+  Enabling cross-species data permits a value from a related organism;
+  it does not permit one from any organism.
 ```
 
 It resolves through BRENDA (exact match, then cross-species) and then
@@ -128,7 +219,11 @@ Most tools collapse the last two. They are different facts, and a tool that
 reports "no result" when it actually could not reach the registry teaches
 you to read an absence of evidence as evidence of absence.
 
-`--quantity km|ki|kcat` picks which constant. `--json` for scripting.
+`--quantity km|ki|kcat` picks which measured parameter. `--json` for scripting.
+
+Add `--allow-cross-species` to accept a value measured in a different but
+sufficiently related organism when yours has none. Off by default, and
+candidates must still pass an NCBI Taxonomy relatedness check.
 
 ### Run a simulation with everything sourced
 
@@ -364,19 +459,19 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,014 tests
+│   └── tests/                1,162 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                     277 tests
+│   └── ...                   900 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    23 decision records (and counting)
+│   └── adr/                    113 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
-├── scripts/                    ~20 guard scripts + build verification
+├── scripts/                    64 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -450,7 +545,7 @@ models carry a comment explaining the rename.
 `KM_PLAUSIBLE_MAX_MM` must stay identical between `brenda_client.py` and
 `terium_engine.py`. They drifted once (1e3 vs 1e4), which meant a Km of
 5000 mM was flagged by the literature layer and then silently accepted as
-confirmed by the simulation layer. `tests/test_brenda_integration.py` now pins
+confirmed by the simulation layer. `Terium/tests/test_brenda_integration.py` now pins
 them together.
 
 ## Common commands
@@ -458,10 +553,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 1,291 tests
+make test        # run all 2,003 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (1,014 tests)
-make test-lit    # literature layer only (277 tests)
-python3 scripts/verify_build.py --quick  # all 22 guard scripts, incl. TypeScript compile
+make test-sim    # simulation engine only (1,142 tests)
+make test-lit    # literature layer only (847 tests)
+python3 scripts/verify_build.py --quick  # all 64 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

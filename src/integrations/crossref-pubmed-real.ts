@@ -7,6 +7,25 @@
 
 import { logger } from '../logger';
 
+/**
+ * The registry could not be reached, so nothing was learned.
+ *
+ * A distinct type rather than a distinguishing phrase in a message, because
+ * the moment the difference lives in prose, the only way to act on it is to
+ * match a substring — and a caller that greps an error message is one
+ * rewording away from silently reclassifying "we could not look" as "there is
+ * nothing there".
+ *
+ * Mirrors `ResolverUnavailableError` in the literature resolver, which draws
+ * the same line for the same reason.
+ */
+export class PubMedUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PubMedUnavailableError';
+  }
+}
+
 // ============================================================================
 // CROSSREF - REAL DOI RESOLUTION
 // ============================================================================
@@ -80,6 +99,27 @@ export async function searchPubMedForEnzymeKinetics(
     enzyme // Fallback to just enzyme name
   ];
 
+  // WHY THIS COUNTER EXISTS
+  // -----------------------
+  // Every branch below `continue`s, and the loop ended by throwing one error
+  // that read: "No real literature found ... Check your network access and
+  // verify this enzyme/substrate pair has published kinetics data."
+  //
+  // That one sentence covered three different situations — the network was
+  // unreachable, PubMed returned an error, or PubMed ran the search and
+  // genuinely had nothing — and it hedged across all of them because the
+  // code could not tell which had happened. The caller therefore could not
+  // either, and reported a dead network as "this enzyme has no papers".
+  //
+  // An absence of evidence presented as evidence of absence is the one thing
+  // this tool must not do, and the rest of it (resolve's 0/2/1 exit codes)
+  // is built entirely around keeping the two apart.
+  //
+  // So: a strategy that COMPLETED and returned zero results is counted.
+  // A strategy that could not run at all is not. If no strategy completed,
+  // nothing was learned.
+  let strategiesCompleted = 0;
+
   for (const searchQuery of queries) {
     try {
       logger.info({ enzyme, substrate, query: searchQuery }, `Searching PubMed: "${searchQuery}"`);
@@ -127,6 +167,11 @@ export async function searchPubMedForEnzymeKinetics(
 
       const pmids = searchData.esearchresult?.idlist || [];
 
+      // This strategy REACHED PubMed and got a well-formed answer. Whether
+      // the answer is "here are 40 PMIDs" or "none", the search happened —
+      // which is the fact the caller needs and could not previously get.
+      strategiesCompleted++;
+
       if (pmids.length === 0) {
         logger.warn({ query: searchQuery }, 'No PubMed results found for this query');
         continue; // Try next query
@@ -162,13 +207,26 @@ export async function searchPubMedForEnzymeKinetics(
     }
   }
 
-  // All strategies exhausted
-  logger.error({ enzyme, substrate }, 'All PubMed search strategies failed - cannot find real literature');
-  throw new Error(
-    `No real literature found on PubMed for "${enzyme}" and "${substrate}". ` +
-    'The system requires verified papers from scientific databases. ' +
-    'Check your network access and verify this enzyme/substrate pair has published kinetics data.'
+  // All strategies exhausted. WHICH KIND of exhaustion decides what is true.
+  if (strategiesCompleted === 0) {
+    // Nothing reached PubMed. No claim can be made about what PubMed holds.
+    logger.error(
+      { enzyme, substrate, strategies: queries.length },
+      'No PubMed search strategy could be performed - the registry was not reached',
+    );
+    throw new PubMedUnavailableError(
+      `The PubMed search for "${enzyme}" / "${substrate}" could not be performed: ` +
+        `none of the ${queries.length} query strategies reached the registry. ` +
+        'This says nothing about whether such papers exist.',
+    );
+  }
+
+  // At least one search ran and came back empty. That IS an answer.
+  logger.warn(
+    { enzyme, substrate, strategiesCompleted },
+    'PubMed searched and returned no results for this system',
   );
+  return [];
 }
 
 /**

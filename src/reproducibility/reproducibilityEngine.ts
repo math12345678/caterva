@@ -11,6 +11,9 @@
  */
 
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { logger } from '../logger';
 
 // ============================================================================
@@ -50,8 +53,12 @@ export interface ExecutionRecord {
   // Solver configuration
   solver: {
     algorithm: string;
-    absoluteTolerance: number;
-    relativeTolerance: number;
+    /** Undefined when the run did not record how it was integrated.
+     *  `verifyReproducibility` refuses rather than picking a tolerance,
+     *  because a comparison calibrated by this file certifies at a
+     *  standard nobody chose. */
+    absoluteTolerance: number | undefined;
+    relativeTolerance: number | undefined;
     randomSeed?: number;
   };
 
@@ -78,7 +85,7 @@ export interface ExecutionRecord {
 
   // Validation
   validation: {
-    dataQualityScore: number;
+    dataQualityScore: number | undefined;
     biologicalPlausibility: string;
     comparisonToLiterature: string;
   };
@@ -118,7 +125,10 @@ export class ExecutionRecorder {
     query: string,
     parameters: Record<string, any>,
     conditions: Record<string, any>,
-    output: any
+    output: any,
+    /** How the run was actually integrated. Omitted -> recorded as
+     *  unrecorded, never guessed. */
+    solver?: ExecutionRecord['solver']
   ): ExecutionRecord {
     // Hash the representation that is actually STORED on the record, not
     // the raw arguments.
@@ -198,10 +208,27 @@ export class ExecutionRecorder {
       // stored inputs drift apart in the first place.
       inputs: storedInputs,
 
-      solver: {
-        algorithm: 'RK45',
-        absoluteTolerance: 1e-8,
-        relativeTolerance: 1e-6,
+      // The solver configuration of the run being recorded.
+      //
+      // This said `RK45` at rtol 1e-6 / atol 1e-8. Terrium integrates with
+      // **CVODE** at 1e-10 / 1e-12 (DEFAULT_RELATIVE_TOLERANCE and
+      // DEFAULT_ABSOLUTE_TOLERANCE). Every field was wrong, in the record
+      // whose entire job is describing how a result was produced.
+      //
+      // Not merely cosmetic: `verifyReproducibility` reads these tolerances
+      // to calibrate its comparison, so a reproduction differing by 1e-7 --
+      // ten thousand times looser than the integrator's own accuracy -- was
+      // certified FULLY REPRODUCIBLE. The comment there claimed "nothing
+      // here is a constant chosen by this file", which was true of that
+      // file and false of the system: the constant was chosen here.
+      //
+      // Unknown rather than invented when the caller does not supply it. A
+      // record saying "unrecorded" is useless in a visible way; one saying
+      // RK45 is useless in a way that looks like information.
+      solver: solver ?? {
+        algorithm: 'unrecorded',
+        absoluteTolerance: undefined,
+        relativeTolerance: undefined,
         randomSeed: undefined
       },
 
@@ -217,9 +244,21 @@ export class ExecutionRecorder {
       },
 
       validation: {
-        dataQualityScore: 0.9,
-        biologicalPlausibility: 'high',
-        comparisonToLiterature: 'within range'
+        // These were 0.9, 'high' and 'within range' -- constants, rendered
+        // by the report as "Quality score: 90.0%".
+        //
+        // A fabricated assessment presented as a measurement is the worst
+        // thing this project can emit, and it contradicted a written
+        // decision: ADR 0024 Decision 3 refuses an aggregate quality score
+        // because combining Bakker's axes needs a trade-off nobody has
+        // measured. One layer refused to produce a number while another
+        // invented one.
+        //
+        // Nothing is assessed here now. The real, per-parameter assessment
+        // is the reliability axes, and it travels with the run.
+        dataQualityScore: undefined,
+        biologicalPlausibility: 'not assessed',
+        comparisonToLiterature: 'not assessed'
       }
     };
   }
@@ -298,22 +337,41 @@ export class ReproducibilityVerifier {
     // a run integrated to a tighter tolerance is held to a tighter
     // reproducibility standard automatically. Nothing here is a constant
     // chosen by this file.
-    const relativeTolerance =
-      Number.isFinite(originalRecord.solver.relativeTolerance)
-        && originalRecord.solver.relativeTolerance > 0
-        ? originalRecord.solver.relativeTolerance
-        : 1e-6;
-    const absoluteTolerance =
-      Number.isFinite(originalRecord.solver.absoluteTolerance)
-        && originalRecord.solver.absoluteTolerance > 0
-        ? originalRecord.solver.absoluteTolerance
-        : 1e-8;
+    // No fallback. The old `: 1e-6` / `: 1e-8` looked like defensive
+    // defaults and were the thing that made this verifier meaningless: a
+    // run integrated at 1e-10 was compared at 1e-6, so a reproduction four
+    // orders of magnitude off passed.
+    //
+    // If the record does not say how it was integrated, this cannot say
+    // whether it was reproduced. Refusing is the honest third outcome;
+    // substituting a tolerance nobody used certifies at a standard nobody
+    // chose.
+    const relativeTolerance = originalRecord.solver.relativeTolerance;
+    const absoluteTolerance = originalRecord.solver.absoluteTolerance;
+    const calibrated =
+      Number.isFinite(relativeTolerance) && (relativeTolerance as number) > 0
+      && Number.isFinite(absoluteTolerance) && (absoluteTolerance as number) > 0;
+
+    if (!calibrated) {
+      throw new Error(
+        `Cannot verify reproducibility of ${originalRecord.jobId}: the record ` +
+        `does not state the solver tolerances it ran at ` +
+        `(algorithm=${originalRecord.solver.algorithm}). Comparing against a ` +
+        `tolerance this function invented would certify the run at a standard ` +
+        `nobody chose.`
+      );
+    }
+
+    // Past the guard above these are numbers. Bound once so every message
+    // below reads the same narrowed values rather than re-asserting.
+    const atol = absoluteTolerance as number;
+    const rtol = relativeTolerance as number;
 
     const comparison = this.compareOutputs(
       originalRecord.output,
       reproduced,
-      absoluteTolerance,
-      relativeTolerance
+      atol,
+      rtol
     );
 
     // Verify hashes
@@ -351,7 +409,7 @@ export class ReproducibilityVerifier {
       ? `✓ REPRODUCIBLE (max relative error: ${comparison.maxRelativeError.toExponential(2)}${outputHashMatch ? ", output bit-identical" : ""})`
       : !inputHashMatch
         ? "✗ NOT VERIFIABLE: recorded input hash does not match the inputs replayed, so this comparison says nothing about reproducibility"
-        : `✗ NOT REPRODUCIBLE (max relative error: ${comparison.maxRelativeError.toExponential(2)} exceeds the solver's declared tolerance (atol ${absoluteTolerance.toExponential(2)}, rtol ${relativeTolerance.toExponential(2)}))`;
+        : `✗ NOT REPRODUCIBLE (max relative error: ${comparison.maxRelativeError.toExponential(2)} exceeds the solver's declared tolerance (atol ${atol.toExponential(2)}, rtol ${rtol.toExponential(2)}))`;
 
     logger.info(
       {
@@ -397,8 +455,8 @@ export class ReproducibilityVerifier {
                 'Genuine non-determinism in the simulation code'
               ],
             conclusion: numericallyReproduced
-              ? `Results numerically equivalent within the solver's declared precision (max relative error ${comparison.maxRelativeError.toExponential(2)} within atol ${absoluteTolerance.toExponential(2)} + rtol ${relativeTolerance.toExponential(2)})`
-              : `Results DIFFER: max relative error ${comparison.maxRelativeError.toExponential(2)} exceeds the solver's declared tolerance (atol ${absoluteTolerance.toExponential(2)}, rtol ${relativeTolerance.toExponential(2)}) by ${comparison.maxToleranceRatio.toExponential(2)}x. This is not floating-point noise.`
+              ? `Results numerically equivalent within the solver's declared precision (max relative error ${comparison.maxRelativeError.toExponential(2)} within atol ${atol.toExponential(2)} + rtol ${rtol.toExponential(2)})`
+              : `Results DIFFER: max relative error ${comparison.maxRelativeError.toExponential(2)} exceeds the solver's declared tolerance (atol ${atol.toExponential(2)}, rtol ${rtol.toExponential(2)}) by ${comparison.maxToleranceRatio.toExponential(2)}x. This is not floating-point noise.`
           }
           : undefined,
 
@@ -627,7 +685,7 @@ Details:
 ${issues.length > 0 ? `Issues:\n${issues.map(i => `- ${i}`).join('\n')}` : 'No issues detected'}
 ${warnings.length > 0 ? `Warnings (not corruption):\n${warnings.map(w => `- ${w}`).join('\n')}` : ''}
 
-Data Quality Score: ${(record.validation.dataQualityScore * 100).toFixed(1)}%
+Data Quality Score: ${record.validation.dataQualityScore === undefined ? 'not assessed (see the reliability axes, which are per-parameter)' : (record.validation.dataQualityScore * 100).toFixed(1) + '%'}
 Biological Plausibility: ${record.validation.biologicalPlausibility}
     `;
   }
@@ -636,6 +694,32 @@ Biological Plausibility: ${record.validation.biologicalPlausibility}
 // ============================================================================
 // REPRODUCIBILITY SERVICE (MAIN API)
 // ============================================================================
+
+/**
+ * Where execution records live between processes.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * `records` below was a bare in-memory Map, and the CLI is a fresh process
+ * per invocation. So `scientific verify <jobId>` and
+ * `scientific check-integrity <jobId>` looked up a job in a Map that had just
+ * been constructed empty, and threw `Record not found for job <jobId>` — for
+ * every job id, always, since the commands existed.
+ *
+ * `history` meanwhile persists to `~/.terrium/history.json` and lists those
+ * same ids happily. Its help text reads: "The run id printed at the end of a
+ * simulation is only useful if something can resolve it later; this is that
+ * something." So the tool printed an id, listed it, and then denied it
+ * existed — the two stores never agreed because only one of them was a store.
+ *
+ * Neither command could have been caught by a unit test of this class: a test
+ * that calls `recordExecution` and then `checkIntegrity` in one process
+ * passes, because the Map is populated. The defect only exists ACROSS
+ * processes, which is the only way a user ever meets it.
+ */
+export function recordsDir(): string {
+  return path.join(os.homedir(), '.terrium', 'records');
+}
 
 export class ReproducibilityService {
   private records: Map<string, ExecutionRecord> = new Map();
@@ -648,20 +732,91 @@ export class ReproducibilityService {
     query: string,
     parameters: Record<string, any>,
     conditions: Record<string, any>,
-    output: any
+    output: any,
+    /** How the run was integrated. Passed straight through: a service that
+     *  dropped it would put the record back to "unrecorded" and make
+     *  verification impossible, which is exactly the failure this
+     *  parameter exists to prevent. */
+    solver?: ExecutionRecord['solver']
   ): ExecutionRecord {
     const record = ExecutionRecorder.createRecord(
       jobId,
       query,
       parameters,
       conditions,
-      output
+      output,
+      solver
     );
 
     this.records.set(jobId, record);
+    this.persist(record);
     logger.info({ jobId }, 'Execution recorded');
 
     return record;
+  }
+
+  /**
+   * Write the record where a later process can find it.
+   *
+   * Failure to persist NEVER throws. A simulation that produced a correct
+   * result did produce it, and turning an unwritable home directory into a
+   * failed run would make the exit code mean two different things. The
+   * consequence — that `verify` will not find this job — is logged where an
+   * operator can see it, which is the same trade `writeExports` makes.
+   */
+  private persist(record: ExecutionRecord): void {
+    try {
+      const dir = recordsDir();
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        path.join(dir, `${record.jobId}.json`),
+        JSON.stringify(record, null, 2),
+        'utf-8'
+      );
+    } catch (err) {
+      logger.warn(
+        { jobId: record.jobId, error: err instanceof Error ? err.message : String(err) },
+        'Execution record could not be persisted; verify/check-integrity will not find this job'
+      );
+    }
+  }
+
+  /**
+   * In-memory first, then disk.
+   *
+   * The Map is still the fast path within a process, and it is also the only
+   * path that sees phases added by `addPhase` after the record was written.
+   * Disk is what makes a job id mean something tomorrow.
+   *
+   * `timestamp` is revived to a Date: JSON.stringify writes it as a string,
+   * and every consumer of `ExecutionRecord.timestamp` expects the object.
+   * Leaving it a string would give a record that looks loaded and throws on
+   * first use, which is worse than not loading it.
+   */
+  private load(jobId: string): ExecutionRecord | undefined {
+    const cached = this.records.get(jobId);
+    if (cached) return cached;
+
+    try {
+      const file = path.join(recordsDir(), `${jobId}.json`);
+      if (!fs.existsSync(file)) return undefined;
+      const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as ExecutionRecord;
+      parsed.timestamp = new Date(parsed.timestamp);
+      this.records.set(jobId, parsed);
+      return parsed;
+    } catch (err) {
+      // A corrupt record is NOT a missing one, and must not be reported as
+      // "no such job" -- that would send someone looking for a job they ran.
+      logger.error(
+        { jobId, error: err instanceof Error ? err.message : String(err) },
+        'Execution record exists but could not be read'
+      );
+      throw new Error(
+        `The execution record for ${jobId} exists but could not be read: ` +
+          `${err instanceof Error ? err.message : String(err)}. ` +
+          'This is a damaged record, not a missing one.'
+      );
+    }
   }
 
   /**
@@ -674,6 +829,12 @@ export class ReproducibilityService {
     stepCount?: number,
     warnings?: string[]
   ): void {
+    // Deliberately the Map only, NOT `load()`. A phase is added while a run
+    // is in flight, to the record that run is building. Reviving a finished
+    // record from disk to append a phase would mutate a copy that is never
+    // written back — the caller would see a successful call and the phase
+    // would vanish, which is the silent-discard pattern this repository has
+    // spent several passes removing.
     const record = this.records.get(jobId);
     if (!record) {
       logger.warn({ jobId }, 'Record not found for phase tracking');
@@ -690,9 +851,12 @@ export class ReproducibilityService {
     jobId: string,
     reproducer: (inputs: any) => Promise<any>
   ): Promise<ReproductionAttempt> {
-    const record = this.records.get(jobId);
+    const record = this.load(jobId);
     if (!record) {
-      throw new Error(`Record not found for job ${jobId}`);
+      throw new Error(
+        `No execution record for job ${jobId}. Records are written when a ` +
+          `simulation runs; \`history\` lists the jobs that have them.`
+      );
     }
 
     return ReproducibilityVerifier.verify(record, reproducer);
@@ -705,9 +869,12 @@ export class ReproducibilityService {
     intact: boolean;
     issues: string[];
   } {
-    const record = this.records.get(jobId);
+    const record = this.load(jobId);
     if (!record) {
-      throw new Error(`Record not found for job ${jobId}`);
+      throw new Error(
+        `No execution record for job ${jobId}. Records are written when a ` +
+          `simulation runs; \`history\` lists the jobs that have them.`
+      );
     }
 
     return DataIntegrityChecker.verify(record);
@@ -717,9 +884,12 @@ export class ReproducibilityService {
    * Get integrity report
    */
   getIntegrityReport(jobId: string): string {
-    const record = this.records.get(jobId);
+    const record = this.load(jobId);
     if (!record) {
-      throw new Error(`Record not found for job ${jobId}`);
+      throw new Error(
+        `No execution record for job ${jobId}. Records are written when a ` +
+          `simulation runs; \`history\` lists the jobs that have them.`
+      );
     }
 
     return DataIntegrityChecker.generateReport(record);
@@ -729,7 +899,7 @@ export class ReproducibilityService {
    * Get execution record
    */
   getRecord(jobId: string): ExecutionRecord | undefined {
-    return this.records.get(jobId);
+    return this.load(jobId);
   }
 
   /**

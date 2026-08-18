@@ -41,8 +41,13 @@ compare.
 
 This is not busywork. A sweep like this found a 725-line API reference
 describing endpoints that had never existed, and — while this list was being
-written — three onboarding documents claiming 22 guards and 1,291 tests when
-the real figures were 35 and 1,684.
+written — three onboarding documents claiming "22 guards and 1,291 tests"
+when the real figures were 35 and 1,684.
+
+(Those figures are quoted because they are the defect, not a claim about
+today. `check_documented_counts.py` reads a plainly-written count as an
+assertion and a quoted one as an example — so citing a stale number in
+prose needs the quotes, or the guard is right to object.)
 
 ```bash
 python scripts/check_documented_counts.py
@@ -56,9 +61,24 @@ is not a result.
 
 ## Real work — a day or two
 
-### 3. Nothing renders the conditions a simulation ran at
+### 3. Nothing renders the conditions a simulation ran at — ~~open~~ **DONE, dashboard half**
 
-**This is the highest-value task on the list.** It is the gap
+> **Half of this was completed on 2026-08-16 and this entry did not say so.**
+> `src/web/dashboard.html` now has a `runConditionsCard`, a `runConditions`
+> panel, reads `result.runConditions` and renders it. A newcomer who picked
+> this task, ran the "never rendered" grep below and found five hits would
+> reasonably conclude the task list lies.
+>
+> **The CLI half is still open**: `grep -c runConditions
+> src/cli/commandResolve.ts` returns 0. That is the remaining task, and it
+> is smaller than what is described below.
+>
+> `Tests/test_first_tasks_are_still_open.py` now runs the diagnostic
+> commands in this file so a task cannot close silently again. A task list
+> that goes stale is a trap for exactly the person you most want to help:
+> they spend their first day on something already finished.
+
+It is the gap
 [ADR 0055](adr/0055-a-simulation-has-no-temperature-of-its-own.md) names in
 its own "what it does not do" section.
 
@@ -112,7 +132,13 @@ must not look like a passed one.
 provenance panel renders neither.
 
 ```bash
-grep -oE "^  (assayConditions|poolFindings|selectionTie)" src/literature/literatureResolver.ts
+grep -oE "^  (assayConditions|poolFindings)" src/literature/literatureResolver.ts
+# NOTE 2026-08-16: `selectionTie` was listed here too and is not in
+# src/literature/ at all -- it lives on the Python/api-server path
+# (ADR 0051). Two of the three fields are real; the third sent
+# readers looking for something that was never there.
+# `assayConditions` now reaches the dashboard (line 877); poolFindings
+# still does not, and that is the live part of this task.
 grep -c "poolFindings" src/web/dashboard.html    # 0
 ```
 

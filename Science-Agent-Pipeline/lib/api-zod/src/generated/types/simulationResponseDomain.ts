@@ -9,21 +9,24 @@
 /**
  * Resolved simulation domain
  */
-export type SimulationResponseDomain = typeof SimulationResponseDomain[keyof typeof SimulationResponseDomain];
-
+export type SimulationResponseDomain =
+  (typeof SimulationResponseDomain)[keyof typeof SimulationResponseDomain];
 
 export const SimulationResponseDomain = {
-  mm: 'mm',
-  sir: 'sir',
-  seir: 'seir',
-  pcr: 'pcr',
-  monte_carlo_pi: 'monte_carlo_pi',
-  wright_fisher: 'wright_fisher',
-  two_locus_wright_fisher: 'two_locus_wright_fisher',
-  molecular_dynamics: 'molecular_dynamics',
-  gillespie_ssa: 'gillespie_ssa',
-  gillespie_ssa_bimolecular: 'gillespie_ssa_bimolecular',
-  gillespie_ssa_replicates: 'gillespie_ssa_replicates',
-  sbml: 'sbml',
-  mm_competitive_inhibition: 'mm_competitive_inhibition',
+  mm: "mm",
+  mm_competitive_inhibition: "mm_competitive_inhibition",
+  sir: "sir",
+  seir: "seir",
+  pcr: "pcr",
+  monte_carlo_pi: "monte_carlo_pi",
+  wright_fisher: "wright_fisher",
+  two_locus_wright_fisher: "two_locus_wright_fisher",
+  molecular_dynamics: "molecular_dynamics",
+  gillespie_ssa: "gillespie_ssa",
+  gillespie_ssa_bimolecular: "gillespie_ssa_bimolecular",
+  gillespie_ssa_replicates: "gillespie_ssa_replicates",
+  lotka_volterra: "lotka_volterra",
+  cell_cycle_oscillator: "cell_cycle_oscillator",
+  repressilator: "repressilator",
+  sbml: "sbml",
 } as const;

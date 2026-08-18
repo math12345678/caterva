@@ -1,0 +1,87 @@
+# Fields that stop before reaching a reader, reviewed and accepted.
+#
+# Regenerate: python3 scripts/check_findings_reach_a_surface.py --update-baseline
+#
+# A line here is a DECISION that the field does not need its own place on a
+# surface. It is NOT a mute button. Every entry below was checked by reading
+# the code that renders its parent, not by accepting the guard's word.
+#
+# This file was empty until the guard learned to descend into nested models
+# (ADR 0100/0101). It reported 26 of 26 top-level fields delivered and had no
+# opinion about the 71 fields inside them.
+#
+# ---------------------------------------------------------------------------
+# CATEGORY 1: CARRIED AS PROSE, INSIDE A SIBLING THAT IS RENDERED
+# ---------------------------------------------------------------------------
+# These reach a student. They reach them as English, inside a `reason` string
+# the Python module composes and a flag builder prints verbatim. The structured
+# field is not separately rendered, and does not need to be: rewording it in
+# TypeScript would make the client a second place the sentence can drift, which
+# queryResolver.ts explicitly refuses to be.
+#
+# What they are NOT is machine-readable. A client cannot sort or threshold on a
+# fold-range it has to parse out of a sentence. Stated so that "delivered" is
+# not read as "delivered as data".
+
+selection_tie.low          # inside SelectionTie.reason: "their values span
+                           # 0.045 to 0.5, a 11.1-fold range". Rendered by
+                           # selectionTieFlags, which prints `tie.reason`
+                           # verbatim into provenance.flags.
+selection_tie.high         # same sentence, same flag.
+selection_tie.fold_range   # same sentence. This is the number that tells a
+                           # student the evidence disagreed 11-fold; it reaches
+                           # them, as words.
+
+relatedness.shared_rank    # inside RelatednessVerdict.reason, rendered by
+                           # buildUnresolvedKineticProvenance on the
+                           # cross_species_too_distant path -- the branch Jeske
+                           # asked for. `.filter(v => v.reason)` then joins them.
+relatedness.shared_name    # same sentence.
+relatedness.query_organism # same sentence.
+relatedness.candidate_organism  # same sentence.
+
+selected_form.designator   # inside SelectedForm.reason, rendered by
+                           # selectedFormFlags: "a form was picked: {reason}".
+selected_form.sibling_designators  # same sentence.
+
+# ---------------------------------------------------------------------------
+# CATEGORY 2: A REAL GAP, DEFERRED WITH THE COST STATED
+# ---------------------------------------------------------------------------
+# NOT internal, NOT prose-carried. Recorded here so the build is not red on a
+# known item, and named as a defect rather than filed as a decision. If this
+# section is still here in a month, that is the answer to whether "deferred"
+# meant anything.
+#
+# `citation.title` WAS HERE AND IS NOW FIXED (ADR 0103). It is removed rather
+# than annotated, because a baseline that only ever grows is a way of
+# recording a problem instead of solving it.
+#
+# THE DEFERRAL WAS MADE ON A COST THAT WAS WRONG. The entry said the display
+# string is "asserted verbatim in 21 places across 9 test files", which was a
+# count of assertions ON the string, not of assertions that would CHANGE.
+# Not one of those fixtures carries a title, so appending it broke none of
+# them -- all 100 tests in the two files passed unmodified. The real cost was
+# one line plus a test file.
+#
+# Counting the thing that is easy to count, and calling it the thing you
+# meant, is how a small job stays undone. Worth more than the fix.
+
+# `literature_candidates.*` WAS HERE AND IS NOW FIXED (ADR 0105), and the
+# note that stood here was WRONG in a way worth keeping:
+#
+#     "the CLI renders its own summary of them from the structured array"
+#
+# It does not. `literatureCandidates` had exactly two non-test references in
+# the entire tree -- the interface declaration and an empty-array initialiser.
+# Nothing read it. I asserted a renderer I had not looked for, in a file whose
+# whole purpose is recording decisions somebody checked.
+#
+# What was actually happening: when BRENDA holds nothing, Terrium searches
+# PubMed and CORE, finds papers, and then REFUSES the query with "could not be
+# resolved from literature" -- while holding the list. The papers are now in
+# that refusal, which is the only place a student meets this path.
+
+selected_form.value  # Prose-carried, verified by reading `selectedFormFlags`:
+                     # it renders `form.reason` and nothing else. The value is
+                     # named inside that sentence. Not machine-readable, same
+                     # caveat as Category 1 above.

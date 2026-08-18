@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import re
 import sys
+import time
 from pathlib import Path
 
 import httpx
@@ -40,6 +41,36 @@ if str(TESTS_DIR) not in sys.path:
     sys.path.insert(0, str(TESTS_DIR))
 
 from http_retry import retry_get  # noqa: E402
+
+#: Hard wall-clock budget for the whole run. The point of this script is to
+#: re-verify citations, and a citation whose host hangs is a FAIL, not a
+#: reason to hang the build. 2026-08-14: a stalled upstream host combined
+#: with generous 20s-per-phase httpx timeouts made a single check eat the
+#: full 120s guard budget. A bounded deadline turns that into a fast,
+#: explicit failure.
+BUDGET_SECONDS = 90
+_DEADLINE = time.monotonic() + BUDGET_SECONDS
+
+
+def bounded_get(url: str, **kwargs: object) -> httpx.Response:
+    """retry_get with the remaining global budget applied to every phase.
+
+    httpx's default getaddrinfo path does not honor timeouts, so the only
+    hard guarantee is the outer budget: once it is spent, we refuse to
+    start another request (that raises, and the caller reports a clean
+    failure) rather than sit in a hung connect.
+    """
+    remaining = _DEADLINE - time.monotonic()
+    if remaining <= 0:
+        raise httpx.TimeoutException(
+            f"global {BUDGET_SECONDS}s budget exhausted before checking {url}"
+        )
+    per_phase = min(12.0, remaining)
+    timeout = httpx.Timeout(
+        per_phase, connect=min(8.0, remaining),
+        read=per_phase, write=per_phase, pool=min(8.0, remaining),
+    )
+    return retry_get(url, timeout=timeout, **kwargs)
 
 # --- Golden set (Tests/test_golden_set.py, hand-verified tuples) ---------
 GOLDEN_SET = [
@@ -157,10 +188,20 @@ WARN = "\033[33m!\033[0m"
 
 def check(label: str, ok: bool, detail: str) -> bool:
     mark = PASS if ok else FAIL
-    print(f"  {mark} {label}")
+    print(f"  {mark} {label}", flush=True)
     if not ok:
-        print(f"      {detail}")
+        print(f"      {detail}", flush=True)
     return ok
+
+
+def is_ok(status: int) -> bool:
+    """Any 2xx is a resolve.
+
+    Strictly `== 200` has failed twice in the wild: PubMed's CDN answered
+    203 Non-Authoritative Information while serving the page, and BRENDA
+    answers 200/203 interchangeably. 2xx means the host answered.
+    """
+    return 200 <= status < 300
 
 
 _STOPWORDS = {
@@ -176,18 +217,81 @@ def _words(title: str) -> set[str]:
     }
 
 
-def _titles_overlap(claimed: str, registered: str) -> bool:
-    """Whether two titles plausibly name the same work.
+#: How many distinctive words each side must have before two titles that
+#: share vocabulary are called AMBIGUOUS rather than the same work.
+#:
+#: Two, because one is routinely produced by punctuation, a subtitle, or the
+#: journal text our stored titles append -- and calling those ambiguous would
+#: flood the report and get it ignored.
+_DISTINCTIVE_THRESHOLD = 2
 
-    Deliberately lenient: our stored titles often append journal/volume
-    text or bracket a translated original, so an exact match would be
-    noise. Two content words in common is enough to say "same paper";
-    zero in common is what a swapped DOI looks like.
+
+def compare_titles(claimed: str, registered: str) -> str:
+    """`"match"`, `"mismatch"`, `"ambiguous"`, or `"unknown"`.
+
+    Three states plus "we could not look", because two is not enough here.
+
+    THE CASE THE BOOLEAN VERSION MISSED
+    -----------------------------------
+    `_titles_overlap` returned True on two content words in common. That
+    catches a DOI swapped for a paper about something else -- the fabricated
+    recombination-rate DOI cited for a mutation rate, which is the defect it
+    was written for. It cannot catch the swap that actually happens.
+
+    Measured on two real papers this repository cites:
+
+        claimed:    "A general method for numerically simulating the
+                     stochastic time evolution of coupled chemical
+                     reactions"          (Gillespie 1976, J. Comput. Phys.)
+        registered: "Exact stochastic simulation of coupled chemical
+                     reactions"          (Gillespie 1977, J. Phys. Chem.)
+
+        shared: {chemical, coupled, reactions, stochastic}  -> 4 >= 2 -> True
+
+    Nobody accidentally cites a paper on an unrelated subject. They cite the
+    ADJACENT paper -- same author, same algorithm, one year apart -- and
+    those two share vocabulary by construction. The check passed exactly the
+    error it is most likely to meet.
+
+    So: shared vocabulary is necessary and not sufficient. When BOTH titles
+    carry distinctive words the other lacks, they may be two papers rather
+    than one description of one, and that is reported as ambiguous rather
+    than waved through.
+
+    Containment stays lenient, deliberately. Our stored titles append
+    journal/volume text and bracket translated originals, so the registered
+    title is often a subset of the claimed one -- one distinctive side only,
+    which is a decorated match, not two papers.
     """
     claimed_words, registered_words = _words(claimed), _words(registered)
     if not claimed_words or not registered_words:
-        return True  # nothing to compare -- do not manufacture a failure
-    return len(claimed_words & registered_words) >= 2
+        # Nothing to compare. NOT a pass -- the caller reports this
+        # separately, because "we could not check" reading as "checked and
+        # fine" is the inversion this project keeps finding.
+        return "unknown"
+
+    if len(claimed_words & registered_words) < 2:
+        return "mismatch"
+
+    only_claimed = claimed_words - registered_words
+    only_registered = registered_words - claimed_words
+    if (
+        len(only_claimed) >= _DISTINCTIVE_THRESHOLD
+        and len(only_registered) >= _DISTINCTIVE_THRESHOLD
+    ):
+        return "ambiguous"
+    return "match"
+
+
+def _titles_overlap(claimed: str, registered: str) -> bool:
+    """Back-compatible boolean: only an outright mismatch is False.
+
+    Retained so the pass/fail column keeps its old meaning -- an ambiguous
+    pair is not evidence of a wrong citation, and failing on it would turn a
+    report people read into one they mute. Ambiguity is surfaced in its own
+    section instead.
+    """
+    return compare_titles(claimed, registered) != "mismatch"
 
 
 def claimed_titles() -> dict[str, str]:
@@ -242,29 +346,30 @@ def main() -> int:
     for entry in GOLDEN_SET:
         url = brenda_url(entry["ec"])
         try:
-            r = retry_get(url, timeout=20)
+            r = bounded_get(url)
             status = r.status_code
-            body_ok = status == 200 and str(entry["ref"]) in r.text
-            ok = status == 200 and body_ok
-            if not ok and not body_ok:
-                detail = (
-                    f"{url} -> HTTP {status}; page does not contain ref "
-                    f"{entry['ref']} (BRENDA may have restructured)"
-                )
-            else:
-                detail = f"{url} -> HTTP {status}"
+            ok = is_ok(status) and str(entry["ref"]) in r.text
+            detail = f"{url} -> HTTP {status}"
+            if not ok:
+                if is_ok(status):
+                    detail += (
+                        f"; page does not contain ref {entry['ref']} "
+                        "(BRENDA may have restructured)"
+                    )
+                else:
+                    detail += " (expected 2xx)"
             if not check(f"[{entry['id']}]", ok, detail):
                 failures += 1
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
             failures += 1
             check(f"[{entry['id']}]", False, f"{url} -> {exc!r}")
 
-    print("\nPubMed PMIDs (must resolve to a 200):")
+    print("\nPubMed PMIDs (must resolve to a 2xx):")
     for pmid in PMIDS:
         url = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
         try:
-            r = retry_get(url, timeout=20)
-            ok = r.status_code == 200
+            r = bounded_get(url)
+            ok = is_ok(r.status_code)
             check(f"PMID {pmid}", ok, f"{url} -> HTTP {r.status_code}")
             if not ok:
                 failures += 1
@@ -291,13 +396,14 @@ def main() -> int:
     claimed_by_doi = claimed_titles()
     title_checked = 0
     existence_only: list[str] = []
+    ambiguous: list[str] = []
 
     for doi in sorted(all_dois):
         where = ", ".join(sorted(set(all_dois[doi])))
         url = f"https://api.crossref.org/works/{doi}"
         try:
-            r = retry_get(url, timeout=20)
-            ok = r.status_code == 200
+            r = bounded_get(url)
+            ok = is_ok(r.status_code)
             detail = f"{url} -> HTTP {r.status_code}"
 
             # A DOI that RESOLVES is not a DOI that supports the claim.
@@ -318,6 +424,18 @@ def main() -> int:
                 if registered and claimed:
                     title_checked += 1
                     detail = f"{url} -> {registered!r}"
+                    verdict = compare_titles(claimed, registered)
+                    if verdict == "ambiguous":
+                        # Shared vocabulary, but each title carries words the
+                        # other lacks. Two papers by one author on one topic
+                        # look exactly like this, and so does one paper
+                        # described two ways -- which is why it is listed for
+                        # a human rather than decided here.
+                        ambiguous.append(
+                            f"{doi} [{where}]\n"
+                            f"        we cite : {claimed!r}\n"
+                            f"        CrossRef: {registered!r}"
+                        )
                     if not _titles_overlap(claimed, registered):
                         ok = False
                         detail = (
@@ -352,6 +470,20 @@ def main() -> int:
         except httpx.HTTPError as exc:  # pragma: no cover - network dependent
             failures += 1
             check(f"{doi}  [{where}]", False, f"{url} -> {exc!r}")
+
+    if ambiguous:
+        print(
+            f"\n{len(ambiguous)} DOI(s) could NOT be told apart from a "
+            "neighbouring paper:"
+        )
+        for item in ambiguous:
+            print(f"      {item}")
+        print(
+            "      Both titles share vocabulary AND each carries words the\n"
+            "      other lacks. That is what an adjacent paper by the same\n"
+            "      author looks like -- check these by hand; the automated\n"
+            "      comparison cannot settle them."
+        )
 
     print("\nStatic modelCitations URLs in queryResolver.ts (must resolve):")
     urls = set()
@@ -394,8 +526,8 @@ def main() -> int:
 
     for url in sorted(urls):
         try:
-            r = retry_get(url, timeout=20, follow_redirects=True)
-            ok = r.status_code == 200
+            r = bounded_get(url, follow_redirects=True)
+            ok = is_ok(r.status_code)
             check(url, ok, f"-> HTTP {r.status_code}")
             if not ok:
                 failures += 1

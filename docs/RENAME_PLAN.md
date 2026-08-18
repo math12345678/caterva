@@ -115,30 +115,52 @@ link, a stale count or an unrunnable command.
 
 | what | note |
 |---|---|
-| GitHub org and repo URLs | Docs point at `Terrium-sim/*`; `origin` is `math12345678/terrium`. **These already disagree** — see below |
+| GitHub org and repo URLs | Published at `Terrium-sim/main` (owner-confirmed 2026-08-16); `origin` is `math12345678/terrium`. Both true — see below |
 | PyPI / npm names | Not published. Nothing to migrate **today** |
 | Domain, landing site | `terrium-site/`, `landing/` |
 | Binary artefacts | `terrium_pitch_deck.pptx`, five `.docx` files under `Docw/` — hand edits, not scriptable |
 | Anyone already emailed | The outreach that caused the incident |
 
-## The pre-existing URL disagreement
+## The URL disagreement — resolved 2026-08-16
 
-`README.md`'s quick start says:
+**`https://github.com/Terrium-sim/main` is the published location**,
+confirmed by the owner. `git remote get-url origin` says
+`https://github.com/math12345678/terrium.git`, which is where this working
+copy pushes; both are true at once, which is normal for a repository that
+moved.
 
-```bash
-git clone https://github.com/Terrium-sim/terrium.git
-```
+Every self-reference now says `Terrium-sim/main`, and
+`Tests/test_clone_instructions_agree.py` keeps them there — including the
+five `contact_links` on `.github/ISSUE_TEMPLATE/config.yml`, which are what
+a newcomer reaches before cloning anything.
 
-`git remote get-url origin` says `https://github.com/math12345678/terrium.git`.
+### How this was nearly settled the wrong way
 
-`docs/PUBLISHING.md` describes splitting into six `Terrium-sim/*`
-repositories, and `docs/ARCHIVE_TRIAGE.md` links to four of them.
+The URL was stated three ways: `Terrium-sim/main` here and in most places,
+`Terrium-sim/terrium` in `README.md`, `math12345678/terrium` in `origin`.
+The first repair made README, START_HERE and CONTRIBUTING agree — on
+`terrium`, chosen because it was what README happened to say, **without
+counting how often each appeared**.
 
-I could not verify which is correct — this sandbox has no GitHub network
-access, so `git ls-remote` fails for every URL including the real origin,
-which makes the test uninformative rather than negative. **Someone with
-network access needs to confirm what exists.** If the org is being created
-anyway, that is the cheapest possible moment to pick the final name.
+The count was 3 against 126. The 126 included every link on the GitHub New
+Issue page and the clone command in `docs/REPO_MAP.md`. So the repair
+reduced a three-way disagreement in three files and left the repository
+more inconsistent than it found it, while reporting the problem as fixed.
+
+Two lessons, both cheap and both skipped:
+
+- **Count before normalising.** One `grep -c` across the tree would have
+  shown which spelling was load-bearing. Internal agreement among the files
+  you happen to be reading is not agreement.
+- **A surface is not always a document.** `.github/ISSUE_TEMPLATE/config.yml`
+  is YAML, so an audit looking at markdown never saw the most
+  contributor-facing links in the project.
+
+The sandbox has no GitHub network access, so `git ls-remote` fails for
+every URL including the real origin — the test is uninformative rather than
+negative, and *which* URL is right was never checkable from here. What was
+checkable, and was not checked, is which one the repository already
+believed.
 
 ## The recommendation on sequencing
 

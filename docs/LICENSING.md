@@ -133,7 +133,17 @@ have an untraceable moment in its own compliance history.
 **NCBI Taxonomy and PubMed.** US Government works, public domain in the
 US. Citation requested, not required.
 
-**KEGG — the one unresolved item, and the more serious of the two.**
+**KEGG — GATED 2026-08-16 (ADR 0096); licence still unobtained.**
+The live call is now off unless `TERRIUM_ENABLE_KEGG` is set, so Terrium no
+longer queries KEGG on a user's behalf by default. The licence question
+below is unchanged and unanswered — gating removes the exposure, it does not
+resolve the entitlement. Anyone setting that variable is asserting their own
+position. The remaining action is unchanged: contact Pathway Solutions.
+
+The original assessment, which is what someone should read before enabling
+it:
+
+
 `resolve_substrate_from_kegg()` calls `https://rest.kegg.jp/get/ec:<ec>`
 live, server-side, on the resolution path. KEGG's terms
 (https://www.kegg.jp/kegg/legal.html, 1 October 2024) state that KEGG is

@@ -1,4 +1,10 @@
 
+> **⚠️ CORRECTION (2026-08-12):** this log's entries were verified (live-probed) at the time they were written, but the file stops at Cycle 33 (commit `97ca83b`), which is **72 commits behind current `HEAD`** (`git log --oneline | wc -l` = 239; `97ca83b` is at position 73). None of the test/guard counts recorded here reflect the current tree — a reader should not treat the last entry as current status:
+> - Cycle 33's "make test-sim = 907 passed" (897 prior + 10 new, engine only) — current: `python3 -m pytest --collect-only` in `Terium/` collects **1,014** tests. The gap is real work (e.g. the `lotka_volterra`/`cell_cycle_oscillator`/`repressilator` domains landed after this log stopped), not a discrepancy in the log itself.
+> - Repeated "273 TypeScript tests PASS" entries (Cycles 20-32) — the Science-Agent-Pipeline API server now has **433** TypeScript test cases across 32 files (`npx vitest list`), not 273. See the correction in `NEXT_STEPS.md` for the same drift.
+> - "1,155 Python tests" (897 engine + 258 literature, Cycles 26-32) — current collected total is **1,291** (1,014 engine + 277 literature).
+> This is normal log staleness from continued development after the last entry, not fabrication — every cycle's claim was checked against live commands per this log's own stated discipline (see the Cycle 20 lesson quoted within). Treat it as a historical record, not a live status.
+
 ## Overnight Log - Cycle 12 (STALLED)
 
 ### Summary
