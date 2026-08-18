@@ -2,7 +2,7 @@
 
 Part of [**Terrium**](https://github.com/Terrium-sim/main) — scientific computing for teaching labs.
 
-The constitution, 113 ADRs, architecture notes and the Word deliverables.
+The constitution, 117 ADRs, architecture notes and the Word deliverables.
 29 files.
 
 ## Start here

@@ -133,6 +133,133 @@ function assayConditionsFor(
   return anything ? normalised : undefined;
 }
 
+/**
+ * A reason the run could not proceed, in a form the CLI can act on.
+ *
+ * WHY THIS EXISTS BESIDE THE PROSE LIST
+ * ------------------------------------
+ * `unresolved` holds sentences for a human. Building the command that would
+ * fix the run needs the parameter name and the flag, and recovering those by
+ * parsing the sentences would be parsing our own output — the
+ * duplicate-source-of-truth defect this repository keeps finding, with a
+ * formatting step in between (see the `splitCitation` note above, where
+ * exactly that produced zero MIRIAM annotations).
+ *
+ * So the structure is collected alongside the prose rather than extracted
+ * from it.
+ *
+ * THE DISTINCTION THAT MATTERS
+ * ----------------------------
+ * `condition` — a value the USER chooses. `s0`, `i0` and `[E]0` describe the
+ * experiment being run, not the enzyme, so no database can report them and
+ * refusing to default them is not a gap in Terrium's coverage. The honest
+ * response is to say "this one is yours to pick".
+ *
+ * `literature` — a measured quantity that BRENDA/PubMed did not yield. Here
+ * the refusal IS about coverage, and the useful next step is different: cite
+ * a source yourself, or accept a related organism.
+ *
+ * Telling a student "vmax is unresolved" without saying which kind of
+ * problem it is leaves them stuck in the same place either way.
+ */
+interface Blocker {
+  parameter: string;
+  kind: 'condition' | 'literature';
+  /** Flag that supplies it, with a usable example — `--s0 10mM`. */
+  suggestion?: string;
+  /** One line the reader can act on. */
+  why: string;
+}
+
+/**
+ * The command that would have worked, printed after a refusal.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * Used as a student uses it, Terrium took three attempts and six flags
+ * before producing a single number, and the refusal at each step named what
+ * was missing without saying what to type next.
+ *
+ * That is Sauro's objection in ADR 0024, which is still open: a tool that
+ * refuses pushes people to "hardcode a number with no warning at all". A
+ * student stuck on `[E]0` will search for a plausible enzyme concentration,
+ * paste it in, and now hold an unsourced parameter with no record of where
+ * it came from — which is worse than anything Terrium was protecting them
+ * from.
+ *
+ * The refusal stands. Nothing is defaulted, nothing is invented. What
+ * changes is that the way forward is on screen instead of left as an
+ * exercise, and the two kinds of blocker are told apart, because they need
+ * opposite responses:
+ *
+ *   condition   you pick it — it describes your experiment
+ *   literature  the databases had nothing — cite a source, or widen the search
+ *
+ * A refusal a reader cannot act on is the defect this project fixes
+ * everywhere else. This is the same fix applied to its own front door.
+ */
+function renderNextStep(
+  options: SimulateResolvedOptions,
+  blockers: Blocker[],
+  emit: (text: string) => void,
+): void {
+  if (blockers.length === 0) return;
+
+  const conditions = blockers.filter((b) => b.kind === 'condition');
+  const gaps = blockers.filter((b) => b.kind === 'literature');
+
+  emit(`\n${c(BOLD, 'What to do next')}\n\n`);
+
+  if (conditions.length > 0) {
+    emit(
+      `${c(DIM, '  These describe YOUR experiment, so no database can report them.')}\n` +
+        `${c(DIM, '  Choosing them is not guessing — it is stating your conditions.')}\n\n`,
+    );
+    for (const b of conditions) {
+      emit(`    ${c(BOLD, b.suggestion ?? `--${b.parameter}`)}\n`);
+      emit(`${c(DIM, '      ' + b.why)}\n`);
+    }
+    emit('\n');
+  }
+
+  if (gaps.length > 0) {
+    emit(
+      `${c(DIM, '  These are measured quantities the literature did not yield.')}\n\n`,
+    );
+    for (const b of gaps) {
+      emit(`    ${c(BOLD, b.suggestion ?? `--${b.parameter}`)}\n`);
+      emit(`${c(DIM, '      ' + b.why)}\n`);
+    }
+    emit(
+      `\n${c(DIM, '  If you have a source for one of these, record it rather than')}\n` +
+        `${c(DIM, '  typing a bare number — the value then travels with its citation:')}\n\n` +
+        `    ${c(BOLD, `--cite ${gaps[0]!.parameter}="Smith 2019, PMID 12345"`)}\n` +
+        `${c(DIM, '      Terrium does not verify the source; it records that you supplied it.')}\n` +
+        `\n${c(DIM, '  Or widen the search, understanding what you are accepting:')}\n\n` +
+        `    ${c(BOLD, '--allow-cross-species')}\n` +
+        `${c(DIM, '      a value measured in a related organism, still checked for')}\n` +
+        `${c(DIM, '      taxonomic proximity and reported as a substitution.')}\n`,
+    );
+  }
+
+  // The whole command, so it can be copied rather than reassembled. Built
+  // from `options`, which is what the run actually used -- not from the
+  // argv this process was handed, which may have been reordered or come
+  // from a script.
+  const parts = [
+    'scientific simulate "michaelis menten" --resolve',
+    `  --enzyme ${JSON.stringify(options.enzyme ?? '<enzyme>')}`,
+    `  --substrate ${JSON.stringify(options.substrate)}`,
+    `  --organism ${JSON.stringify(options.organism)}`,
+    ...blockers.map((b) => `  ${b.suggestion ?? `--${b.parameter} <value>`}`),
+  ];
+  emit(
+    `\n${c(DIM, '  In full, with the example values above:')}\n\n` +
+      parts.map((p) => `    ${p}`).join(' \\\n') +
+      '\n',
+  );
+}
+
 export interface SimulateResolvedOptions {
   enzyme?: string;
   ec?: string;
@@ -548,6 +675,9 @@ export async function commandSimulateResolved(
 
   const provenance: ParameterProvenance[] = [];
   const unresolved: string[] = [];
+  //: Same refusals as `unresolved`, structured so the next command can be
+  //: built rather than described. See the Blocker docstring.
+  const blockers: Blocker[] = [];
 
   // ---- user-supplied values first -------------------------------------
   //
@@ -607,6 +737,12 @@ export async function commandSimulateResolved(
         });
         if (!result.found) {
           unresolved.push('km');
+          blockers.push({
+            parameter: 'km',
+            kind: 'literature',
+            suggestion: '--km 10.7mM',
+            why: 'BRENDA and PubMed returned no Km for this system.',
+          });
           continue;
         }
         userValues['km'] = { value: result.value, unit: result.unit };
@@ -636,6 +772,15 @@ export async function commandSimulateResolved(
             'vmax (needs --enzyme-conc: Vmax = kcat x [E]0, and BRENDA does ' +
               'not report [E]0)',
           );
+          blockers.push({
+            parameter: 'enzyme-conc',
+            kind: 'condition',
+            suggestion: '--enzyme-conc 0.01mM',
+            why:
+              'Vmax = kcat x [E]0. BRENDA reports kcat but never [E]0, ' +
+              'because how much enzyme you put in the tube is your ' +
+              'experiment, not a property of the enzyme.',
+          });
           continue;
         }
         const result = await resolveKinetic({
@@ -649,6 +794,14 @@ export async function commandSimulateResolved(
         });
         if (!result.found || result.bridgedVmax === undefined) {
           unresolved.push('vmax (no kcat found to bridge)');
+          blockers.push({
+            parameter: 'vmax',
+            kind: 'literature',
+            suggestion: '--vmax 1.2mM/s',
+            why:
+              'No kcat was found for this system, so there is nothing to ' +
+              'multiply by [E]0 to obtain Vmax.',
+          });
           continue;
         }
         userValues['vmax'] = { value: result.bridgedVmax, unit: 'mM/s' };
@@ -726,6 +879,12 @@ export async function commandSimulateResolved(
         });
       } else {
         unresolved.push('ki (no inhibition constant in the literature for this system)');
+        blockers.push({
+          parameter: 'ki',
+          kind: 'literature',
+          suggestion: '--ki 5mM',
+          why: 'No inhibition constant in the literature for this system.',
+        });
       }
     } catch (err) {
       if (err instanceof ResolverUnavailableError) {
@@ -745,6 +904,14 @@ export async function commandSimulateResolved(
       unresolved.push(
         `${required} (an experimental condition — supply it, e.g. --${required} 10mM)`,
       );
+      blockers.push({
+        parameter: required,
+        kind: 'condition',
+        suggestion: `--${required} 10mM`,
+        why:
+          `${required} describes the experiment you are running, not the ` +
+          'enzyme. No database can report it for you.',
+      });
     }
   }
 
@@ -803,8 +970,15 @@ export async function commandSimulateResolved(
       }
       say(
         `\n${c(DIM, 'No value has been invented to fill the gap. A simulation on a')}\n` +
-          `${c(DIM, 'defaulted parameter produces a result that looks measured and is not.')}\n\n`,
+          `${c(DIM, 'defaulted parameter produces a result that looks measured and is not.')}\n`,
       );
+      // The refusal is correct. Leaving the reader there is not — that is
+      // how a student ends up pasting a number they found in a search
+      // result, which is the outcome the refusal exists to prevent.
+      //
+      // Routed through `say`, so under --json it stays off stdout and the
+      // document remains the only thing there (ADR 0077).
+      renderNextStep(options, blockers, say);
     }
 
     // The flags the user typed are honoured even though the run was refused.

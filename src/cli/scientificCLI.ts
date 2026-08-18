@@ -10,6 +10,11 @@ import { parseArgs, parseQuantity } from './parseQuantity';
 import { parsePhysiological } from './physiologicalReference';
 import { collectRepeated, parseUserCitations } from './userCitations';
 import { convertConcentration } from '../units';
+import {
+  parseSystemFromQuery,
+  formatResolveCommand,
+} from './suggestResolveCommand';
+import { confirmSystem, terminalIO } from './confirmSystem';
 
 /**
  * Scientific Pipeline CLI
@@ -233,6 +238,68 @@ async function fetchRealLiterature(
 // COMMANDS
 // ============================================================================
 
+/**
+ * Read `--km 5.2mM --vmax 12.8mM/s` into numbers AND the units they declared.
+ *
+ * WHAT THIS REPLACED, AND WHY IT MATTERED
+ *
+ * Both `validate` and `simulate` did:
+ *
+ *     parameters[key] = parseFloat(value);
+ *
+ * `parseFloat('12.8mM/s')` is `12.8`. The unit was dropped on the floor.
+ * `SimulationRequest.parameters` is `Record<string, number>`, so nothing
+ * downstream could recover it, and the pipeline fell back to
+ * `getAssumedUnitForUserInput` — a table keyed on the parameter's NAME,
+ * which answers `μM/min` for vmax whatever the user wrote.
+ *
+ * So `--vmax 12.8mM/s` was computed as 12.8 μM/min. **A factor of 60,000**,
+ * silently, on the first example in `help`. And the run then logged
+ *
+ *     "User supplied a bare number; unit was ASSUMED, not declared"
+ *
+ * which told the user they had omitted a unit they had in fact typed.
+ *
+ * `parseQuantity` was written to fix exactly this — its own docstring names
+ * the 60,000 — and was wired into `--resolve` and `sweep` while these two
+ * commands, the ones `help` leads with, kept `parseFloat`.
+ *
+ * The units channel already existed too: `providedProvenance[key].unit` is
+ * preferred over the assumption at `scientificPipeline.ts:718`. Nothing had
+ * to be invented; the declared unit only had to be carried the last inch.
+ *
+ * Only DECLARED units are forwarded. A bare `--km 5.2` still gets the
+ * conventional unit and still warns, because that warning is now true.
+ */
+function readQuantities(params?: Record<string, string>): {
+  parameters: Record<string, number>;
+  provenance: Record<string, { source: string; unit: string }> | undefined;
+} {
+  const parameters: Record<string, number> = {};
+  const provenance: Record<string, { source: string; unit: string }> = {};
+
+  for (const [key, raw] of Object.entries(params ?? {})) {
+    let quantity;
+    try {
+      quantity = parseQuantity(key, raw);
+    } catch (err) {
+      // Exit rather than fall back. A number whose unit could not be read
+      // is the input this whole path exists to stop being guessed at.
+      error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+    parameters[key] = quantity.value;
+    if (quantity.unitDeclared) {
+      provenance[key] = { source: 'user', unit: quantity.unit };
+    }
+  }
+
+  return {
+    parameters,
+    provenance: Object.keys(provenance).length > 0 ? provenance : undefined
+  };
+}
+
 async function commandValidate(query: string, params?: Record<string, string>) {
   header('SCIENTIFIC VALIDATION');
 
@@ -259,12 +326,7 @@ async function commandValidate(query: string, params?: Record<string, string>) {
   // command that does resolve literature.
   pipeline.initializeLiterature([]);
 
-  const parameters: Record<string, number> = {};
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      parameters[key] = parseFloat(value);
-    }
-  }
+  const { parameters, provenance } = readQuantities(params);
 
   info(`Query: ${query}`);
   if (Object.keys(parameters).length > 0) {
@@ -277,7 +339,11 @@ async function commandValidate(query: string, params?: Record<string, string>) {
   try {
     const response = await pipeline.execute({
       query,
-      parameters: Object.keys(parameters).length > 0 ? parameters : undefined
+      parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
+      // Carries the unit the user actually typed. Without this the
+      // pipeline falls back to a table keyed on the parameter NAME and
+      // reads every vmax as uM/min -- 60,000x wrong for one in mM/s.
+      providedProvenance: provenance
     });
 
     console.log('');
@@ -321,12 +387,7 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
   // citations. This one runs the numbers you supply.
   pipeline.initializeLiterature([]);
 
-  const parameters: Record<string, number> = {};
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      parameters[key] = parseFloat(value);
-    }
-  }
+  const { parameters, provenance } = readQuantities(params);
 
   info(`Query: ${query}`);
   if (Object.keys(parameters).length > 0) {
@@ -334,14 +395,38 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
   }
 
   console.log('');
-  info('Resolving parameters...');
-  info('Validating against literature...');
+  // THESE THREE LINES DESCRIBED A DIFFERENT COMMAND.
+  //
+  // They read "Resolving parameters... / Validating against literature... /
+  // Running simulation..." — printed unconditionally, fifteen lines below
+  // `pipeline.initializeLiterature([])`, which hands the pipeline an EMPTY
+  // literature database on purpose. Nothing was resolved. No literature was
+  // consulted. The comment above that call says so plainly: "This one runs
+  // the numbers you supply."
+  //
+  // So the most-seen output in the product told a student it had searched
+  // the literature, and then reported "no literature match" for every
+  // parameter. A reader can only conclude Terrium looked and found nothing,
+  // which is false — and it is false in the direction that makes the
+  // product look empty rather than misconfigured.
+  //
+  // Same class as the CLI line that claimed "BRENDA and PubMed were
+  // searched and returned nothing" while holding the papers (ADR 0109): a
+  // reassuring progress message that is not true, in the exact spot where
+  // the reader has no way to check.
+  //
+  // What this path actually does is now what it says.
+  info('Checking the query and the values you supplied...');
   info('Running simulation...');
 
   try {
     const response = await pipeline.execute({
       query,
-      parameters: Object.keys(parameters).length > 0 ? parameters : undefined
+      parameters: Object.keys(parameters).length > 0 ? parameters : undefined,
+      // Carries the unit the user actually typed. Without this the
+      // pipeline falls back to a table keyed on the parameter NAME and
+      // reads every vmax as uM/min -- 60,000x wrong for one in mM/s.
+      providedProvenance: provenance
     });
 
     console.log('');
@@ -379,12 +464,75 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
       response.validationErrors.forEach((err, i) => {
         console.log(`  ${i + 1}. ${err}`);
       });
-      console.log(
-        '\n' + colors.dim +
-        'No trajectory was produced, so there are no results to show.\n' +
-        'Supply the missing values in the query, or name a system to resolve\n' +
-        'them from literature with --resolve.' + colors.reset + '\n'
-      );
+      // THE OLD ADVICE ASKED FOR SOMETHING THE STUDENT HAD ALREADY GIVEN.
+      //
+      // It said "name a system to resolve them from literature with
+      // --resolve" — to a reader who had just typed
+      //
+      //     simulate "michaelis menten of lactate dehydrogenase on pyruvate
+      //               in Homo sapiens"
+      //
+      // The enzyme, the substrate and the organism are all in that sentence.
+      // The tool asked them to say it again, in a syntax it did not show.
+      //
+      // Offering the command is NOT the silent inference the pipeline
+      // forbids. Nothing is resolved here and no citation is attached; a
+      // command is printed, and the student names the system explicitly by
+      // running it. The guess never becomes provenance without a human in
+      // between, which is the whole of the constraint.
+      const system = parseSystemFromQuery(query);
+      if (system !== null) {
+        console.log(
+          '\n' + colors.dim +
+          'No trajectory was produced, so there are no results to show.\n' +
+          'Your question names a system, so Terrium can look these up — it\n' +
+          'just will not guess them out of a sentence. Run this and it will:' +
+          colors.reset + '\n\n' +
+          formatResolveCommand(system) + '\n\n' +
+          colors.dim +
+          'Check the three names first. They were read from your question,\n' +
+          'and a citation attached to the wrong system is worse than none.' +
+          colors.reset + '\n'
+        );
+      } else {
+        // PLACEHOLDERS, NOT ANOTHER ENZYME'S NAME.
+        //
+        // This printed a fully-formed command naming `lactate dehydrogenase`,
+        // whatever the student had typed. Measured:
+        //
+        //   $ simulate "acetylcholinesterase"
+        //   -> scientific simulate "michaelis menten" --resolve \
+        //        --enzyme "lactate dehydrogenase" --substrate pyruvate ...
+        //
+        // A student who copies that gets LDH results while believing they
+        // asked about acetylcholinesterase — a real citation attached to a
+        // system they never named, which this repository calls worse than no
+        // provenance and which ADR 0059 already found three times over.
+        //
+        // It is worse than a generic example precisely because it looks
+        // tailored: a complete command with a specific enzyme in it reads as
+        // an answer rather than a template.
+        //
+        // The `if` branch above builds the command from the student's own
+        // sentence when it can be parsed. This is the branch where it could
+        // not, and the honest thing there is a slot they must fill: a
+        // placeholder is never the wrong enzyme.
+        console.log(
+          '\n' + colors.dim +
+          'No trajectory was produced, so there are no results to show.\n' +
+          'Either supply the values in the query — e.g. --km 5.2 --vmax 12.8\n' +
+          '--s0 10 — or name a system and let Terrium resolve them:\n' +
+          colors.reset + '\n' +
+          '  scientific simulate "michaelis menten" --resolve \\\n' +
+          '    --enzyme "<enzyme>" --substrate "<substrate>" \\\n' +
+          '    --organism "<organism>" --s0 10mM --enzyme-conc 0.001mM\n' +
+          '\n' + colors.dim +
+          'Replace the three names with your system. Terrium does not read\n' +
+          'them out of your question, because a citation attached to a system\n' +
+          'you did not name is worse than no citation at all.\n' +
+          colors.reset
+        );
+      }
       process.exit(1);
     }
 
@@ -973,19 +1121,66 @@ async function main() {
       // --resolve: look up what wasn't supplied, from the real literature
       // layer, and print the provenance of every number used.
       if (booleans.has('resolve')) {
-        const substrate = flags['substrate'];
-        const organism = flags['organism'];
-        const enzyme = flags['enzyme'];
+        let substrate = flags['substrate'];
+        let organism = flags['organism'];
+        let enzyme = flags['enzyme'];
         const ec = flags['ec'];
 
         if (!substrate || !organism || (!enzyme && !ec)) {
-          error(
-            '--resolve needs --substrate, --organism, and either --enzyme or --ec. ' +
-            'The system is never inferred from the query text: attaching a real ' +
-            'citation to a system you did not name is provenance for the wrong ' +
-            'measurement.'
-          );
-          process.exit(1);
+          // SIX FLAGS TO RUN ONE SIMULATION WAS THE PROBLEM.
+          //
+          // This used to refuse outright, with a reason that is still
+          // correct: "attaching a real citation to a system you did not name
+          // is provenance for the wrong measurement." The constraint is
+          // about a system NOBODY NAMED — so the question it actually asks
+          // is whether a person named it, not whether a regex was involved.
+          //
+          // A confirmation answers that. The three names are read out of the
+          // sentence, printed, and nothing is resolved until a human agrees
+          // to them. At the instant a citation is attached, somebody has
+          // read "lactate dehydrogenase / pyruvate / Homo sapiens" and said
+          // yes — which is more explicit than three flags, because flags are
+          // typed once and never re-read.
+          //
+          // With no terminal there is nobody to ask, so a pipe or a CI job
+          // gets the old refusal plus the exact command. A default-confirm
+          // would be the silent inference this forbids, with a prompt in the
+          // code that nobody ever sees.
+          const parsed = parseSystemFromQuery(query);
+          const decision = parsed
+            ? await confirmSystem(parsed, terminalIO(), {
+                assumeYes: booleans.has('yes'),
+              })
+            : null;
+
+          if (parsed && decision?.confirmed === true) {
+            enzyme = parsed.enzyme;
+            substrate = parsed.substrate;
+            organism = parsed.organism;
+          } else {
+            error(
+              '--resolve needs --substrate, --organism, and either --enzyme or --ec. ' +
+              'The system is never inferred from the query text without your ' +
+              'confirmation: attaching a real citation to a system you did not ' +
+              'name is provenance for the wrong measurement.'
+            );
+            if (parsed) {
+              // The parse succeeded and was refused, or could not be put. Say
+              // which, because "declined" and "nobody was there to ask" are
+              // different facts and only one of them means try again.
+              console.error(
+                '\n' + colors.dim +
+                (decision?.confirmed === false && decision.reason === 'no-terminal'
+                  ? 'Your question names a system, but nothing is attached to this\n' +
+                    'terminal, so there was nobody to confirm it with. Either run\n' +
+                    'this interactively, add --yes, or name it explicitly:'
+                  : 'Not resolved. If the names below are right, run this:') +
+                colors.reset + '\n\n' +
+                formatResolveCommand(parsed) + '\n'
+              );
+            }
+            process.exit(1);
+          }
         }
 
         const overrides: Record<string, string> = {};
@@ -1066,13 +1261,28 @@ async function main() {
       // table keyed on the parameter's NAME. The old path silently gave
       // vmax "uM/min" regardless of what the user meant, so a Vmax in mM/s
       // was reinterpreted by a factor of 60,000 and the run continued.
+      //
+      // THE VALUE IS FORWARDED AS TYPED, unit and all. This line read
+      //
+      //     params[key] = String(quantity.value);
+      //
+      // which parsed the unit, checked it, used it to decide whether to
+      // warn -- and then threw it away before `commandSimulate` was
+      // called. Downstream saw "12.8" and the pipeline assigned uM/min from
+      // the parameter's name, so the 60,000x reinterpretation this comment
+      // says was fixed was still happening, one level below the fix.
+      //
+      // Validating a unit and discarding it is the harder failure to see,
+      // because every visible symptom of the original bug is gone: the
+      // typo check works, the assumed-unit message is right, and the number
+      // is still wrong.
       const params: Record<string, string> = {};
       const assumed: string[] = [];
       for (const [key, raw] of Object.entries(flags)) {
         if (key === 'json' || key === 'verbose') continue;
         try {
           const quantity = parseQuantity(key, raw);
-          params[key] = String(quantity.value);
+          params[key] = raw;
           if (!quantity.unitDeclared) {
             assumed.push(`--${key} (assumed ${quantity.unit})`);
           }

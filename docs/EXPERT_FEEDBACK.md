@@ -11639,3 +11639,144 @@ having skipped the ones already built.
 | TypeScript | compiles clean; 7 new jest tests pass |
 | Left for the owner | `.selftest_probe.md` still in the repo root — gitignored, but this sandbox cannot delete it |
 | Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; the stale cofactor and licence rows in this file's summary table |
+
+
+---
+
+## 2026-08-17 — the tool was correct and not useful, which are different things
+
+Smyan's note: *"I don't think it's fixing any problem."* He is right, and
+using Terrium from a standing start shows why in about ninety seconds.
+
+```
+$ simulate "lactate dehydrogenase"
+  -> does not name a domain this pipeline knows (mm, sir)
+$ simulate "michaelis menten" --resolve --substrate pyruvate \
+    --organism "Homo sapiens" --enzyme "lactate dehydrogenase"
+  -> Cannot run: vmax, s0
+```
+
+**Three attempts, six flags, no number.** Every refusal scientifically
+correct, and not one of them said what to type next.
+
+### This is Sauro's objection, and it was still open
+
+ADR 0024 built Jeske's cross-species gate and Bakker's reliability axes.
+Sauro's was never answered:
+
+> a refusing tool pushes people to "hardcode a number with no warning at all"
+
+Which is precisely what that screen produces. A student stuck on `[E]0`
+searches for a plausible enzyme concentration, pastes it, and now holds an
+unsourced parameter with no record of its origin — worse than the refusal,
+because the refusal was at least visible.
+
+Terrium was optimising for not being wrong and had stopped optimising for
+being useful. It had only noticed one of those.
+
+### What changed
+
+The refusal stands — nothing defaulted, nothing invented. The difference is
+that the two kinds of blocker are now told apart, because the old output
+made them look identical:
+
+  **condition** (`s0`, `i0`, `[E]0`) — describes YOUR experiment. No
+  database can report it. Choosing it is not guessing.
+
+  **literature** (`km`, `vmax`, `ki`) — the databases had nothing. Cite a
+  source, or widen the search.
+
+That distinction is the whole thing. Listing both as "unresolved" implies
+both are gaps in Terrium's coverage; one is, and the other is a value that
+is *theirs to pick*. Saying so turns a dead end into a decision the student
+is qualified to make.
+
+For a literature gap the guidance points at `--cite`, which already existed
+and which nothing pointed at from the one screen where it is needed. **That
+is the answer to Sauro**: the student who was going to paste a number
+anyway now pastes it with its provenance attached, and every downstream
+surface marks it `user_cited` rather than `resolved`.
+
+### The assertion that matters
+
+Not that a "What to do next" section prints — plausible-looking flags that
+do not work would satisfy that and be worse than silence (ADR 0070, where
+`help`'s own examples could not run for months).
+
+So the test **extracts the suggested flags and runs them**, and requires the
+run to reach a *different* blocker. Verified end to end: refusal → guidance
+→ refusal → guidance → a run with `km 10.73 mM brenda_exact BRENDA ref
+740253`.
+
+### Two bugs in my own test, both the project's recurring shapes
+
+- `[a-z-]` where the data had digits: the extractor matched `--enzyme-conc`
+  and silently skipped `--s0`. It returned one flag instead of two and
+  looked like it worked. A pattern matching a subset while appearing
+  complete — I wrote a fresh instance of the defect this repository keeps
+  finding.
+- `e.status ?? 1` turned a spawn killed under load into `code 1`, the CLI's
+  "could not perform the lookup" code, so an environment failure read as a
+  product bug. The harness throws on a null status now. An environment
+  failure must not be able to impersonate a result.
+
+Recorded as ADR 0116. ADR 0024 Decision 2 moves from open to answered:
+**refuse, and hand over the means to proceed honestly.**
+
+
+## Forty-sixth pass — the name the database uses
+
+The owner said Terrium did not feel like it was fixing a problem. Rather
+than argue, I used it as a student would.
+
+The live path could not run here — BRENDA returns 403 to this sandbox — so
+the measurement went through the real resolver against the LDH fixture:
+
+```
+substrate="lactate"    -> found=True,  10.73
+substrate="L-lactate"  -> found=False, source="not_found"
+```
+
+Both name the same compound. BRENDA's label is `(S)-lactate`, so "lactate"
+matches as a substring and "L-lactate" does not, and the student is told:
+
+> Could not resolve a real KM value from BRENDA/KEGG/PubMed
+
+which reads as *the literature has nothing* and is false. The data is in the
+table that was already fetched and parsed. A reasonable question about the
+most-studied enzyme in the corpus produces a wall.
+
+**That is the answer to the owner's critique, and it is not a scientific
+failure.** Every refusal here is individually defensible — Jeske's
+cross-species gate, the variant filter, the assay checks. What none of them
+learned to do is point anywhere. `cross_species_withheld` and
+`variant_withheld` already name what they refused, and the reason is written
+into `queryResolver.ts`: *"a refusal that cannot name what it refused leaves
+the opt-in it demands unexercisable."* Substrates were the one field left
+out, and they are the field a reader is far MORE likely to get wrong — an
+organism has one binomial name, a metabolite has a dozen aliases and the one
+BRENDA chose carries a stereo descriptor nobody can guess.
+
+So a `not_found` now names the labels the table holds, and **refuses to
+substitute**. `expand_substrates_with_synonyms` exists, is called by nothing
+but its own test, and was deliberately left that way: a PubChem synonym list
+carries salts, stereoisomers and esters, and matching one returns a
+measurement of a different molecule under the name the student asked for —
+Jeske's cross-species objection one field over.
+
+**Two of my four mutations were caught by nothing.** The test named for the
+cry-wolf guard asked for `pyruvate` in *Danio rerio*, which returns
+`cross_species_withheld` — a branch that never calls the helper, so it
+passed via the source branch rather than the guard. And the
+case-insensitivity test asked for `PYRUVATE`, whose label is already
+lower-case, so both spellings agreed and dropping `.lower()` broke nothing;
+`NAD+` is the label with capitals in it.
+
+| | |
+|---|---|
+| Mutations | 4, all caught after two tests were rewritten to reach what they named |
+| Tests | `test_substrates_available.py` 14 new; `substrateMissNamesWhatExists.test.ts` 5 new |
+| Contract | `test_runner_contract.py` shapes updated deliberately — the runner JSON gained `substratesAvailable` |
+| Not mine | `check_no_tellurium_integration_claims` fails on **ADR 0099**, whose own title is "plain asserts, quoted cites": a document that QUOTES the phrase is read as claiming it — the exact defect that ADR describes, in the guard beside it |
+| For the owner | delete `docs/adr/0117-the-name-the-database-uses.md` (an ADR-number collision another agent and I hit simultaneously; the guard caught it, this sandbox cannot unlink) and `.selftest_probe.md` |
+| Next | the more valuable half: a student should be able to ask what an enzyme reports BEFORE asking for a value, rather than discovering it through a failed query |

@@ -350,6 +350,19 @@ function missingKeyDetails(
 /**
  * Helper to build unresolved kinetic provenance (consistent format).
  */
+/**
+ * Exported for tests ONLY, under a name that says so.
+ *
+ * The alternative was asserting on this message through `resolveQuery`,
+ * which throws `RequiredParametersMissingError` when a kinetic constant is
+ * unresolved — the comment beside the offer below records that discovery.
+ * A test that cannot reach the string it is about would be the vacuous
+ * kind this repository already has a guard against.
+ */
+export const buildUnresolvedKineticProvenanceForTest = (
+  ...args: Parameters<typeof buildUnresolvedKineticProvenance>
+) => buildUnresolvedKineticProvenance(...args);
+
 function buildUnresolvedKineticProvenance(
   key: string,
   reason:
@@ -360,6 +373,7 @@ function buildUnresolvedKineticProvenance(
     | "variant_withheld",
   organismsAvailable?: string[],
   relatedness?: RelatednessVerdict[],
+  substratesAvailable?: string[],
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -435,6 +449,33 @@ function buildUnresolvedKineticProvenance(
         `for ${named}. Kinetic parameters are species-specific, so it was not ` +
         `substituted; re-run with allowCrossSpecies to use it, understanding ` +
         `that the resulting model is not a model of the organism you asked for.`,
+    };
+  }
+
+  // "BRENDA has nothing for this enzyme" and "BRENDA has plenty, under a
+  // name you did not type" are different facts, and the second is the one
+  // a student hits most.
+  //
+  // Measured: `substrate="lactate"` resolves to 10.73 and
+  // `substrate="L-lactate"` returns not_found, because BRENDA's label is
+  // `(S)-lactate` — "lactate" matches as a substring and "L-lactate" does
+  // not. The student is told the literature is empty. It is not.
+  //
+  // This is the same courtesy the two branches above extend to organisms
+  // and variants, for the field a reader is far MORE likely to get wrong:
+  // an organism has one binomial name, a metabolite has a dozen aliases.
+  if (reason === "not_found" && substratesAvailable && substratesAvailable.length > 0) {
+    return {
+      origin: "default",
+      unresolvedReason: "not_found",
+      note:
+        `No ${K} was found for the substrate you named, but this enzyme ` +
+        `reports ${K} values for: ${substratesAvailable.join(", ")}. ` +
+        `Substrate names differ between databases and papers, so the one ` +
+        `you meant may be spelled differently above. Terrium does not ` +
+        `substitute one substrate for another — a similar name can be a ` +
+        `salt, a stereoisomer or an ester, which is a different molecule — ` +
+        `so re-run with the name you meant.`,
     };
   }
 
@@ -523,7 +564,13 @@ async function applyKineticResolution(
           agentResult.relatedness,
         );
       } else {
-        provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          "not_found",
+          undefined,
+          undefined,
+          agentResult.substratesAvailable,
+        );
       }
       // THE OFFER GOES IN THE PROVENANCE NOTE, NOT IN A FLAG.
       //

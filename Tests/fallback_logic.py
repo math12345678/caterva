@@ -249,6 +249,24 @@ class KineticResult(BaseModel):
     #: organism gate cannot see, because every row IS the organism asked for.
     source_mixtures: "list[SourceMixture]" = []
 
+    #: Substrate labels this EC number's table DOES carry, when the
+    #: requested one matched nothing.
+    #:
+    #: Measured: `substrate="lactate"` resolves to 10.73 and
+    #: `substrate="L-lactate"` returns not_found, because BRENDA's label is
+    #: `(S)-lactate` — "lactate" matches as a substring and "L-lactate"
+    #: does not. Without this the student is told the literature has
+    #: nothing, which is false, and has no way to discover the string that
+    #: would work.
+    #:
+    #: The same courtesy ADR 0024 extends to organisms, which a student is
+    #: far LESS likely to get wrong: an organism has one binomial name, a
+    #: metabolite has a dozen aliases.
+    #:
+    #: Empty on found results — computing it costs a second parse of the
+    #: table and nobody needs it when the answer arrived.
+    substrates_available: list[str] = []
+
     #: Set when source tokens were extracted and NONE could be classified.
     #:
     #: Without it, `source_mixtures == []` means both "the pool was clean"
@@ -374,6 +392,112 @@ def _brenda_entries(
     # Never surface flagged (implausible) rows as a "found" result -
     # they're data-quality problems, not answers.
     return [e for e in entries if not e.flagged]
+
+
+def substrates_present(
+    ec_number: str,
+    html_provider: HtmlProvider,
+    table_label: str = KM_TABLE_LABEL,
+) -> list[str]:
+    """Every substrate label this EC number's table actually carries.
+
+    WHY THIS EXISTS
+    ---------------
+    Measured through the real resolver, on the LDH fixture:
+
+        substrate="lactate"    -> found, 10.73
+        substrate="L-lactate"  -> found=False, source="not_found"
+
+    Both name the same compound. `fallback_logic` passes
+    `target_substrates=[substrate]` -- the one string the user typed -- so a
+    reasonable synonym returns nothing, and a student reasonably concludes
+    BRENDA has no data for this enzyme. The data is right there under a
+    different string.
+
+    ADR 0024 already solved the same problem for ORGANISMS: a withheld
+    cross-species result names which organisms held values, "so the opt-in
+    can actually be exercised". Nobody applied it to substrates, which is
+    the field a student is far more likely to get wrong -- an organism has
+    one binomial name, a metabolite has a dozen aliases.
+
+    WHY NOT SYNONYM EXPANSION
+    -------------------------
+    `enzyme_lookup.expand_substrates_with_synonyms` exists and is called by
+    nothing but its own test. It could have been wired here, and
+    deliberately was not:
+
+    * it costs a PubChem request per name, on the hot path of every lookup;
+    * PubChem synonyms are not substrate identity. "lactate" and "lactic
+      acid" are the same compound; a synonym list can also carry a salt, a
+      stereoisomer or a related ester, and silently matching one of those
+      returns a measurement of a DIFFERENT MOLECULE under the name the
+      student asked for. That is ADR 0024's cross-species error wearing
+      another costume, and this project refuses the substitution rather
+      than making it quietly.
+
+    So: no network, no guessing, no substitution. The table is already
+    fetched and already parsed; this reports what is in it and lets the
+    reader choose. A list of real labels is more useful than a guessed
+    match and cannot be wrong.
+    """
+    entries = parse_brenda_km_html(
+        html_provider(ec_number),
+        ec_number,
+        # No substrate filter, and no organism filter: the question is what
+        # this ENZYME has data for, which is what a reader needs in order to
+        # ask again. `require_substrate_match=False` is the permissive mode
+        # that already exists for rows whose compound name does not match a
+        # requested one -- exactly the rows wanted here.
+        target_substrates=[],
+        target_organism=None,
+        require_substrate_match=False,
+        table_label=table_label,
+    )
+    labels = {
+        (getattr(entry, "substrate", None) or "").strip()
+        for entry in entries
+    }
+    return sorted(label for label in labels if label)
+
+
+def _nothing_matched(
+    ec_number: str,
+    substrate: str,
+    html_provider,
+    table_label: str,
+    log: list,
+) -> list:
+    """The substrates this enzyme does have, for a refusal that teaches.
+
+    Guarded so the list is only built when it can help: if the requested
+    substrate IS one of the labels present, the miss was about the organism
+    or the quantity and naming the substrate list would point a reader at
+    the wrong thing entirely -- the cry-wolf shape ADR 0028 describes,
+    where a suggestion that fires on the wrong case gets ignored on the
+    right one.
+
+    Never raises. This runs on a path that has already failed, and a
+    diagnostic that turns a "no value found" into a stack trace has made
+    things worse.
+    """
+    try:
+        available = substrates_present(ec_number, html_provider, table_label)
+    except Exception as exc:  # noqa: BLE001 - a hint, never a new failure
+        log.append(f"Could not list the substrates present: {exc}")
+        return []
+
+    asked = (substrate or "").strip().lower()
+    if any(asked == label.lower() for label in available):
+        return []
+
+    if available:
+        log.append(
+            f"No {substrate!r} row, but this EC number reports: "
+            + ", ".join(available)
+            + ". Terrium does not substitute one substrate for another, so "
+            "re-run with the name you meant."
+        )
+    return available
 
 
 def search_pubmed_candidates(
@@ -867,8 +991,16 @@ def resolve_kinetic_value(
         )
 
     if not search_literature:
+        available = _nothing_matched(
+            enzyme_ec, substrate, html_provider, table_label, log
+        )
         log.append("Literature search skipped (search_literature=False)")
-        return KineticResult(found=False, source="not_found", search_log=log)
+        return KineticResult(
+            found=False,
+            source="not_found",
+            substrates_available=available,
+            search_log=log,
+        )
 
     log.append(f"PubMed literature search: {enzyme_name or enzyme_ec}, {organism}, {substrate}")
     candidates = search_pubmed_candidates(
@@ -922,10 +1054,20 @@ def resolve_kinetic_value(
             search_log=log,
         )
 
+    # The hint goes BEFORE the conclusion. `_nothing_matched` appends its
+    # own line, and two existing tests read `search_log[-1]` for the
+    # verdict -- correctly: a reader scanning the end of the log wants the
+    # answer, not the advice that led to it.
+    available = _nothing_matched(enzyme_ec, substrate, html_provider, table_label, log)
     log.append(
         "Exhausted BRENDA (exact + cross-species), PubMed, and CORE - genuine gap"
     )
-    return KineticResult(found=False, source="not_found", search_log=log)
+    return KineticResult(
+        found=False,
+        source="not_found",
+        substrates_available=available,
+        search_log=log,
+    )
 
 
 if __name__ == "__main__":

@@ -88,6 +88,11 @@ export interface ScienceAgentResult {
    * policy this code applied. Conflating them is the same category error
    * that ADR 0012/0013 exist to prevent, one level up. */
   crossSpeciesOrganismsAvailable?: string[];
+  /** Substrate labels this EC number DOES report, when the requested one
+   *  matched nothing. BRENDA's label for lactate is `(S)-lactate`, so
+   *  "lactate" matches by substring and "L-lactate" returns nothing —
+   *  and the student is told the literature is empty when it is not. */
+  substratesAvailable?: string[];
   /** Variant descriptors ("Y124C", "isozyme H4") for rows that WERE found
    * and were withheld because they measure a sequence variant rather than
    * the enzyme (ADR 0029). Populated only when
