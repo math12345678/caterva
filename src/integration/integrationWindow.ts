@@ -92,3 +92,56 @@ export function substrateDepletionWindowSeconds(
   const seconds = (km * Math.log(1 / f) + s0 * (1 - f)) / vmaxPerSecond;
   return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
 }
+
+/** Depletion the initial-rate convention tolerates, as a fraction of S0. */
+export const INITIAL_RATE_DEPLETION = 0.05;
+
+/**
+ * How long an initial-rate reading stays defensible, in seconds.
+ *
+ * A DIFFERENT WINDOW FROM THE ONE ABOVE, and conflating them was a real
+ * mistake in this pipeline.
+ *
+ * `substrateDepletionWindowSeconds` answers "how long to plot" and is
+ * chosen to show the whole reaction. `AssumptionValidator`'s second check
+ * asks something else — over the period you would read a *rate* from, does
+ * the substrate stay approximately constant? Feeding it the plot window
+ * made it report 95% depletion on every run and warn every time, which is
+ * true and useless: it is a warning about a window nobody claimed.
+ *
+ * The formula is the convention's own definition. The validator bounds
+ * depletion by the zero-order worst case, Vmax·t/S0, so the window where
+ * that bound reaches 5% is
+ *
+ *     t = 0.05·S0 / Vmax
+ *
+ * Because the bound is an upper bound, actual depletion over this window is
+ * strictly less than 5% — which is what an experimentalist choosing an
+ * assay window would do, and is conservative in the right direction.
+ *
+ * **This makes the validator's depletion check pass by construction on the
+ * pipeline's own path**, and that is stated here rather than left for
+ * someone to discover: the check is doing real work for any caller that
+ * supplies its own window, and on this path it is a definition rather than
+ * a finding. Reading it as independent evidence would be reading a
+ * tautology as a result.
+ *
+ * The 5% figure is a textbook convention, not a measured threshold — the
+ * validator says so where it uses it, and no primary source establishing it
+ * was found.
+ */
+export function initialRateWindowSeconds(inputs: {
+  vmaxPerSecond: number;
+  s0: number;
+  depletionFraction?: number;
+}): number | undefined {
+  const { vmaxPerSecond, s0 } = inputs;
+  const d = inputs.depletionFraction ?? INITIAL_RATE_DEPLETION;
+
+  if (![vmaxPerSecond, s0].every(Number.isFinite)) return undefined;
+  if (vmaxPerSecond <= 0 || s0 <= 0) return undefined;
+  if (!(d > 0) || d >= 1) return undefined;
+
+  const seconds = (d * s0) / vmaxPerSecond;
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : undefined;
+}

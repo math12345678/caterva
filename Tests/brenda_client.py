@@ -261,6 +261,31 @@ def _find_table_container(soup: BeautifulSoup, label: str):
     return None
 
 
+def has_data_table(html: str, table_label: str) -> bool:
+    """Whether this page actually carries the named table.
+
+    WHY A CALLER WOULD NEED TO ASK
+    ------------------------------
+    `_find_table_container` returns None when the label is absent, and its
+    docstring tells the caller to "fall back to whole-page scanning and
+    treat results as less trustworthy". `parse_brenda_km_html` does exactly
+    that, which is right for the resolver: with a target substrate and a
+    target organism, rows from the wrong table are filtered out anyway.
+
+    It is NOT right for a caller running in permissive mode, where nothing
+    filters. Measured: `parse_brenda_km_html(..., table_label="Ki Values",
+    target_substrates=[], target_organism=None,
+    require_substrate_match=False)` on an LDH page that has only a "KM
+    Values" table returns 8 rows -- the Km table's -- and a caller that
+    reports them as Ki data is describing measurements that do not exist.
+
+    "This enzyme has no Ki table" is also a better answer than a corrected
+    list would be: it diagnoses the QUANTITY rather than the substrate
+    name, which is what the reader actually got wrong.
+    """
+    return _find_table_container(BeautifulSoup(html, "html.parser"), table_label) is not None
+
+
 def parse_brenda_km_html(
     html: str,
     ec_number: str,

@@ -20,6 +20,8 @@
  */
 import {
   DEFAULT_FRACTION_REMAINING,
+  INITIAL_RATE_DEPLETION,
+  initialRateWindowSeconds,
   substrateDepletionWindowSeconds
 } from '../integrationWindow';
 
@@ -119,5 +121,50 @@ describe('substrateDepletionWindowSeconds', () => {
       // never fire and a made-up timescale would be presented as derived.
       expect(substrateDepletionWindowSeconds(base)).toBeGreaterThan(0);
     });
+  });
+});
+
+/**
+ * The two windows answer different questions and must not be the same
+ * number.
+ *
+ * Coupling them made the validator's initial-rate check report "substrate
+ * exhausted" on every run — true of the plot window, and a warning about a
+ * window nobody had claimed. It dropped confidence on every full-reaction
+ * simulation.
+ */
+describe('the plot window and the initial-rate window are different', () => {
+  const km = 5.2;
+  const s0 = 10;
+  const vmax = 12.8e-3 / 60;
+
+  test('the initial-rate window is far shorter', () => {
+    const plot = substrateDepletionWindowSeconds({ km, vmaxPerSecond: vmax, s0 })!;
+    const rate = initialRateWindowSeconds({ vmaxPerSecond: vmax, s0 })!;
+    expect(rate).toBeLessThan(plot);
+    expect(plot / rate).toBeGreaterThan(10);
+  });
+
+  test('actual depletion over the initial-rate window is under 5%', () => {
+    // The validator bounds depletion by the zero-order worst case, so the
+    // window where that bound reaches 5% leaves TRUE depletion below it.
+    // Conservative in the right direction, which is the point.
+    const rate = initialRateWindowSeconds({ vmaxPerSecond: vmax, s0 })!;
+    const remaining = substrateAt(rate, s0, km, vmax);
+    const depleted = (s0 - remaining) / s0;
+    expect(depleted).toBeLessThan(INITIAL_RATE_DEPLETION);
+    // ...and not absurdly conservative either; it should be close to it.
+    expect(depleted).toBeGreaterThan(INITIAL_RATE_DEPLETION / 2);
+  });
+
+  test('the zero-order bound over that window is exactly the convention', () => {
+    const rate = initialRateWindowSeconds({ vmaxPerSecond: vmax, s0 })!;
+    expect((vmax * rate) / s0).toBeCloseTo(INITIAL_RATE_DEPLETION, 12);
+  });
+
+  test('it refuses the same broken inputs rather than inventing one', () => {
+    expect(initialRateWindowSeconds({ vmaxPerSecond: 0, s0: 10 })).toBeUndefined();
+    expect(initialRateWindowSeconds({ vmaxPerSecond: 1, s0: 0 })).toBeUndefined();
+    expect(initialRateWindowSeconds({ vmaxPerSecond: NaN, s0: 10 })).toBeUndefined();
   });
 });
