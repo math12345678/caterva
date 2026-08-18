@@ -52,6 +52,61 @@ const ASSUMED_UNITS: Readonly<Record<string, string>> = {
 const NUMBER_THEN_UNIT = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*(.*)$/;
 
 /**
+ * Flags that mean a chemical NAME under `--resolve` and a QUANTITY without it.
+ *
+ * This is the trap. `resolve` is documented as
+ *
+ *     scientific resolve "lactate dehydrogenase" --substrate pyruvate ...
+ *
+ * so `--substrate pyruvate` is the first thing anyone learns. Carrying that
+ * straight over to `simulate` -- the obvious next step, and the one the README
+ * teaches next -- fails, because without `--resolve` the same flag is an
+ * initial concentration. The old message was "could not read a number",
+ * which is true, names the symptom, and hides the cause completely.
+ */
+const NAME_UNDER_RESOLVE = new Set(['substrate', 'enzyme']);
+
+/** Anything with no digit at all is a word, not a malformed number. */
+const HAS_DIGIT = /\d/;
+
+/**
+ * Say what is actually wrong, and when the cause is knowable, say that too.
+ *
+ * A parse error should distinguish "you typed 5,2 instead of 5.2" from "you
+ * passed a name where a quantity goes", because those need different fixes and
+ * only the second is a wrong mental model of the command.
+ */
+function explainUnreadable(name: string, raw: string): string {
+  if (HAS_DIGIT.test(raw)) {
+    return (
+      `--${name} ${raw}: could not read a number. Expected something like ` +
+      `'5.2' or '5.2mM'.`
+    );
+  }
+
+  const flag = name.replace(/_/g, '-');
+  if (!NAME_UNDER_RESOLVE.has(name.replace(/-/g, '_'))) {
+    return (
+      `--${flag} ${raw}: '${raw}' is a name, not a quantity. This flag takes ` +
+      `a number, like '5.2' or '5.2mM'.`
+    );
+  }
+
+  return (
+    `--${flag} ${raw}: '${raw}' is a name, not a quantity.\n\n` +
+    `  In 'simulate', --${flag} is a concentration. It only means a name to ` +
+    `look up\n` +
+    `  when you also pass --resolve, which is what turns the run into a ` +
+    `literature\n  lookup. You probably want:\n\n` +
+    `    simulate mm --resolve --enzyme "<enzyme>" \\\n` +
+    `      --${flag} ${raw} --organism "<organism>" \\\n` +
+    `      --s0 10mM --enzyme-conc 0.001mM\n\n` +
+    `  Or, to look the value up without simulating:\n\n` +
+    `    resolve "<enzyme>" --${flag} ${raw} --organism "<organism>"`
+  );
+}
+
+/**
  * Parse a CLI quantity for `name`.
  *
  * Throws on anything it cannot interpret rather than falling back to a
@@ -61,10 +116,7 @@ const NUMBER_THEN_UNIT = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s*(.*)
 export function parseQuantity(name: string, raw: string): ParsedQuantity {
   const match = NUMBER_THEN_UNIT.exec(raw);
   if (!match) {
-    throw new UnitError(
-      `--${name} ${raw}: could not read a number. Expected something like ` +
-      `'5.2' or '5.2mM'.`
-    );
+    throw new UnitError(explainUnreadable(name, raw));
   }
 
   const value = Number(match[1]);

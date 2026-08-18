@@ -77,3 +77,33 @@ describe('--allow-cross-species is a boolean the parser can swallow', () => {
     expect(flags['allow-cross-species']).toBe('lactate');
   });
 });
+
+describe('a name where a quantity goes names the cause, not just the symptom', () => {
+  // Reproduced from the README. `resolve` is documented as
+  //   scientific resolve "lactate dehydrogenase" --substrate pyruvate ...
+  // so `--substrate pyruvate` is the first thing anyone learns. Carrying it
+  // to `simulate`, which the README teaches next, used to fail with
+  // "could not read a number" -- true, and silent about the actual cause,
+  // which is that --substrate is a concentration unless --resolve is passed.
+  it('tells you about --resolve when a dual-meaning flag gets a name', () => {
+    expect(() => parseQuantity('substrate', 'pyruvate')).toThrow(/--resolve/);
+    expect(() => parseQuantity('substrate', 'pyruvate')).toThrow(/is a name, not a quantity/);
+    // and it hands over a command that actually works
+    expect(() => parseQuantity('substrate', 'pyruvate')).toThrow(/simulate mm --resolve/);
+  });
+
+  it('does not invoke --resolve for a flag that has no name meaning', () => {
+    // --s0 is a concentration in every mode. Suggesting --resolve here would
+    // send someone down a path that cannot help them.
+    expect(() => parseQuantity('s0', 'banana')).toThrow(/is a name, not a quantity/);
+    expect(() => parseQuantity('s0', 'banana')).not.toThrow(/--resolve/);
+  });
+
+  it('still reports a malformed NUMBER as a malformed number', () => {
+    // The new branch keys on "contains no digit". A typo'd number has digits
+    // and must keep the original message, or this fix would have traded one
+    // misleading error for another.
+    expect(() => parseQuantity('km', '5.2.3')).toThrow(/could not read a number|unit/i);
+    expect(() => parseQuantity('km', '5.2.3')).not.toThrow(/is a name/);
+  });
+});
