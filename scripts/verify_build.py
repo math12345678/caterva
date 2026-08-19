@@ -692,6 +692,15 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             timeout=60,
         ),
         # A computed finding that reaches no surface has not been reported.
+        # `scientific domains` prints fifteen copy-pasteable commands, and a
+        # student's first act is to paste one. Shape assertions passed while
+        # `wf --n 100 --p0 0.5` was in the catalogue and neither flag exists.
+        # The only thing that settles it is running them. See ADR 0122.
+        run_guard(
+            "Domain Examples Run",
+            f"python {SCRIPTS_DIR / 'check_domain_examples_run.py'}",
+            timeout=180,
+        ),
         run_guard(
             "Finding Reachability Guard",
             f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}",

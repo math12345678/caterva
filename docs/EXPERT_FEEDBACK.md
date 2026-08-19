@@ -11935,3 +11935,61 @@ quietly stop testing anything.
 | Suites | literature 918 green; the only red is `check_no_tellurium_integration_claims` on **ADR 0099**, another agent's, and it is that ADR's own subject — a document that QUOTES the phrase read as claiming it |
 | Next | the discovery command this pass was starting: let a student ask what an enzyme reports BEFORE the first query. `has_data_table` and `substrates_present` are now the two pieces it needs |
 | Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording |
+
+
+## Forty-eighth pass — the first query was a guess
+
+The owner's critique, taken at the level it was meant. Measured through the
+real resolver:
+
+```
+substrate="lactate"    -> found, 10.73
+substrate="L-lactate"  -> found=False
+```
+
+BRENDA's label is `(S)-lactate`. A student's first query guesses **three
+things at once** — the substrate's exact label, an organism that has rows,
+and whether the enzyme holds that quantity at all — and a wrong guess on any
+of the three produces the same `not_found`, which is indistinguishable from
+*the literature has nothing*.
+
+ADR 0118 made the miss name the substrates. ADR 0116 hands you the next
+command after a refusal. Both repair the moment of failure. Neither removes
+the reason the first command fails, and that is a fair description of a tool
+whose whole value is finding literature values while leaving "find out what
+exists" to the user.
+
+So: `scientific catalog 1.1.1.27`.
+
+```
+EC 1.1.1.27 — what BRENDA reports:
+  km    8 row(s); substrates: (S)-lactate, NAD+, oxamate, pyruvate
+  ki    no 'Ki Values' table on this page
+  kcat  no 'Turnover Numbers' table on this page
+  organisms: Homo sapiens, Sus scrofa
+```
+
+Three properties carry it. A missing table is `reported=False` and not an
+empty list — ADR 0120 is what happens without that distinction, and a
+catalog is the worst possible place for it, because a catalog is what a
+reader trusts before they know anything. **One fetch** for three tables,
+asserted by a test: Jeske asked that tools be gentle with DSMZ's servers,
+and three requests to answer one question would be a poor way to honour that
+with nothing in the output to reveal it. And no ranking or suggestion — it
+reports, and the choice stays the reader's.
+
+**Two ADR-number collisions in two passes, and the tool for it already
+existed.** `scripts/claim_adr.py` implements optimistic concurrency for
+exactly this and its docstring says the manual remedy "has now been done
+three times in two days". I hand-picked numbers anyway and hit the race
+twice. Same shape as `mutate.py` two passes ago: the mechanism was built,
+and I did not reach for it. This time the renumber went through the tool.
+
+| | |
+|---|---|
+| Mutations | 4 caught — parse a table that is not there; fetch the page once per quantity; call a present-but-empty table usable; drop a quantity from the map |
+| Tests | `test_enzyme_catalog.py` 12 new; `catalogCommand.test.ts` 3 spawning the real CLI |
+| Reachability | `check_scripts_reachable.py` green — the script is named by the CLI, and the jest test invokes the command rather than importing the module |
+| For the owner | `rm docs/adr/0123-the-first-query-was-a-guess.md` — an emptied collision placeholder this sandbox cannot unlink |
+| Not mine | `0125-a-score-that-could-only-be-zero.md` is unlisted in the index (the other half of the same collision); `check_no_tellurium_integration_claims` still red on ADR 0099 |
+| Next | the guess this does NOT remove: a student who knows only "lactate dehydrogenase" still has to get from the name to an EC number |

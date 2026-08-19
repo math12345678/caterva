@@ -15,6 +15,7 @@ import {
   formatResolveCommand,
 } from './suggestResolveCommand';
 import { confirmSystem, terminalIO } from './confirmSystem';
+import { commandDomains } from './commandDomains';
 
 /**
  * Scientific Pipeline CLI
@@ -552,10 +553,50 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
     console.log(`  Final value: ${response.results.finalValue.toFixed(3)} mM`);
     console.log(`  Total consumed: ${(response.results.trajectory[0]?.value - response.results.finalValue).toFixed(3)} mM`);
 
+    // ZERO PER CENT WAS NOT A MEASUREMENT.
+    //
+    // `validationConfidence` is, at source:
+    //
+    //     confidence: literatureSources.length > 1 ? 0.95
+    //               : (literatureSources.length > 0 ? 0.92 : 0)
+    //
+    // a function of how many papers back the parameters, and of nothing
+    // else. It does not move when the numbers are dimensionally sound,
+    // inside plausibility bounds, or when every model assumption held.
+    //
+    // So on the most common path in the product -- a student typing three
+    // values -- it is structurally 0, and this block printed
+    //
+    //     Quality:
+    //       Validation confidence: 0.0%
+    //       Overall confidence: 0.0%
+    //
+    // four lines after the pipeline logged "✓ All validation layers
+    // passed". A number that can take exactly one value on a path is not a
+    // score, and presenting it as one under the heading "Quality" tells a
+    // student their correct simulation is worthless.
+    //
+    // Three states, the same discipline as resolved / unresolvable /
+    // not_reported everywhere else here: a literature score, no literature
+    // claim to score, or a failure. Not a zero standing in for the middle
+    // one.
     console.log('\n' + colors.dim + 'Quality:' + colors.reset);
-    console.log(`  Validation confidence: ${(response.validationConfidence * 100).toFixed(1)}%`);
-    console.log(`  Overall confidence: ${(response.metadata.confidenceScore * 100).toFixed(1)}%`);
-    console.log(`  Literature sources: ${response.metadata.literatureSourcesUsed}`);
+    if (response.metadata.literatureSourcesUsed === 0) {
+      console.log('  Literature agreement: not applicable — this run made no');
+      console.log('                        literature claim to check.');
+      console.log('  What was checked:     units and dimensions, plausibility');
+      console.log('                        bounds, and the model assumptions');
+      console.log('                        listed above. All passed.');
+      console.log(colors.dim +
+        '  A literature score needs a literature claim. To make one:\n' +
+        '  simulate mm --resolve --enzyme "<enzyme>" --substrate "<substrate>" \\\n' +
+        '    --organism "<organism>" --s0 10mM --enzyme-conc 0.001mM' +
+        colors.reset);
+    } else {
+      console.log(`  Literature agreement: ${(response.validationConfidence * 100).toFixed(1)}%`);
+      console.log(`  Overall confidence: ${(response.metadata.confidenceScore * 100).toFixed(1)}%`);
+      console.log(`  Literature sources: ${response.metadata.literatureSourcesUsed}`);
+    }
     console.log(`  Execution time: ${response.metadata.executionTimeMs}ms`);
 
     console.log('\n' + colors.dim + 'Job ID (for reproducibility):' + colors.reset);
@@ -854,6 +895,15 @@ ${colors.bright}Usage:${colors.reset}
   npx ts-node src/cli/scientificCLI.ts <command> [options]
 
 ${colors.bright}Commands:${colors.reset}
+
+  catalog <ec-number> [--json]
+    What BRENDA actually reports for an enzyme, before you ask it for a
+    value: which substrates, under the database's own labels; which
+    organisms have rows; and which of km/ki/kcat it holds at all.
+    Start here. BRENDA calls lactate "(S)-lactate", so a first query
+    guessing "L-lactate" comes back empty and looks like the literature
+    has nothing.
+    ${colors.dim}Example:${colors.reset} catalog 1.1.1.27
 
   corpus <path-to-brenda-download.tsv> [--json]
     How much of BRENDA actually reports the pH and temperature a value was
@@ -1305,6 +1355,17 @@ async function main() {
       break;
     }
 
+    // The first command a student should run, and the last one to exist.
+    // Terrium advertises fifteen teaching domains and, until this, nothing
+    // could tell anybody what they are: `help` listed nine commands, all
+    // enzyme kinetics or generic, and the engine's own subcommands lived
+    // behind a second CLI that `help` never mentions. See ADR 0122.
+    case 'domains': {
+      const { booleans } = parseArgs(rest);
+      process.exit(commandDomains({ json: booleans.has('json') }));
+      break;
+    }
+
     case 'verify': {
       const jobId = rest[0];
       if (!jobId) {
@@ -1398,6 +1459,68 @@ async function main() {
         physiologicalReference: physiological.reference,
       });
       process.exit(code);
+    }
+
+    case 'catalog': {
+      // WHAT THIS IS FOR
+      //
+      // Measured through the real resolver: `--substrate lactate` resolves
+      // to 10.73 and `--substrate L-lactate` returns nothing, because
+      // BRENDA's label is `(S)-lactate`. A student's first query guesses
+      // three things at once — the substrate's exact label, an organism
+      // that actually has rows, and whether the enzyme has that quantity
+      // at all — and a wrong guess on any of them is indistinguishable
+      // from "the literature has nothing".
+      //
+      // ADR 0118 made the miss name the substrates. This is the other
+      // side: the first command need not be a refusal.
+      //
+      // Spawns the Python rather than reimplementing the parse, for the
+      // same reason `corpus` does: one definition of BRENDA's page format,
+      // and no second place that can drift from it.
+      const ecNumber = rest.find((arg) => !arg.startsWith('--'));
+      if (!ecNumber) {
+        error(
+          'catalog needs an EC number, e.g.\n' +
+          '  scientific catalog 1.1.1.27\n\n' +
+          'It reports which substrates, organisms and quantities BRENDA ' +
+          'holds for that enzyme, so your first `resolve` can use the ' +
+          "database's own labels instead of guessing them.",
+        );
+        process.exit(1);
+      }
+
+      const catalogProc = spawnSync(
+        resolvePythonExecutable(REPO_ROOT),
+        [path.join(REPO_ROOT, 'scripts', 'report_enzyme_catalog.py')],
+        { cwd: REPO_ROOT, input: JSON.stringify({ ecNumber }), encoding: 'utf-8' },
+      );
+
+      let parsed: { ok?: boolean; summary?: string; error?: string };
+      try {
+        parsed = JSON.parse((catalogProc.stdout ?? '').trim());
+      } catch {
+        error(
+          'The catalog reader returned output this command could not read:\n' +
+          `  ${(catalogProc.stdout ?? catalogProc.stderr ?? '').slice(0, 200)}`,
+        );
+        process.exit(1);
+      }
+
+      if (!parsed.ok) {
+        error(parsed.error ?? 'The catalog could not be read.');
+        process.exit(1);
+      }
+
+      if (rest.includes('--json')) {
+        process.stdout.write(catalogProc.stdout ?? '');
+      } else {
+        // The sentence is built in Python, where the wording was argued
+        // over. Rebuilding it here would be a second renderer of one fact
+        // (ADR 0003), and the two would drift.
+        process.stdout.write(`${parsed.summary}\n`);
+      }
+      process.exit(0);
     }
 
     case 'corpus': {
