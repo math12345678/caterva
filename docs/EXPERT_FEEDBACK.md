@@ -11993,3 +11993,51 @@ and I did not reach for it. This time the renumber went through the tool.
 | For the owner | `rm docs/adr/0123-the-first-query-was-a-guess.md` — an emptied collision placeholder this sandbox cannot unlink |
 | Not mine | `0125-a-score-that-could-only-be-zero.md` is unlisted in the index (the other half of the same collision); `check_no_tellurium_integration_claims` still red on ADR 0099 |
 | Next | the guess this does NOT remove: a student who knows only "lactate dehydrogenase" still has to get from the name to an EC number |
+
+
+## Forty-ninth pass — a name is not an enzyme
+
+Last pass named the guess the catalog does not remove: a student who knows
+only "lactate dehydrogenase" still has to reach an EC number. Following that
+found something worse than a missing convenience.
+
+`fetch_ec_number_by_name` asked UniProt with `size: 1`, and
+`parse_ec_number_search` took `results[0]` and then `ec_numbers[0]`. Two
+silent picks, measured:
+
+```
+one protein carrying two EC numbers -> "1.1.1.27"
+two proteins matching one name      -> "1.1.1.27"
+```
+
+**EC 1.1.1.27 is L-lactate dehydrogenase. EC 1.1.1.28 is D-lactate
+dehydrogenase.** Different proteins, different stereoisomers, one common
+name — and "lactate dehydrogenase" is the example in this repository's own
+CLI help text.
+
+This is the first step of the workflow and the one where a silent choice
+costs most. An EC number is not a parameter; it is the identity of the
+protein everything downstream is about. A wrong Km is a wrong number. A
+wrong EC is a real, correctly formatted citation for a **different enzyme** —
+the failure this whole project exists to prevent, arriving before any of the
+machinery that prevents it gets to run. And `size: 1` meant the second shape
+could not be detected even in principle.
+
+Now every candidate is returned in relevance order, and `catalog --enzyme`
+refuses by naming them — the same shape as the cross-species and variant
+refusals, which name what they refused so the choice can be exercised.
+
+**One thing left undone on purpose.** `science_agent_runner.resolve_ec_number`
+still takes the first candidate silently. It is one call and the fix is
+obvious, but it returns into an API path with no exception boundary and three
+other agents are writing in this tree today. Changing the control flow of the
+entry point on an untested path, blind, is how a correct fix becomes an
+outage. It is recorded with the measurement as an open item instead — the
+candidates are now computable, so what remains is a product decision about
+what that interface should do with an ambiguity.
+
+| | |
+|---|---|
+| Mutations | 4 caught — read only the first result; read only the first EC on a protein; sort the candidates (discarding UniProt's relevance order, making "first" arbitrary); drop alternative-name ECs |
+| Tests | `test_enzyme_catalog.py` 12 → 18; `test_enzyme_lookup.py` still green on the single-value parser, now built on the plural one |
+| Open | the API runner's silent pick; Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording |

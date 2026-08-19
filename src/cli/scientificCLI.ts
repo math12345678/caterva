@@ -896,7 +896,7 @@ ${colors.bright}Usage:${colors.reset}
 
 ${colors.bright}Commands:${colors.reset}
 
-  catalog <ec-number> [--json]
+  catalog <ec-number> | --enzyme NAME [--json]
     What BRENDA actually reports for an enzyme, before you ask it for a
     value: which substrates, under the database's own labels; which
     organisms have rows; and which of km/ki/kcat it holds at all.
@@ -1479,10 +1479,20 @@ async function main() {
       // same reason `corpus` does: one definition of BRENDA's page format,
       // and no second place that can drift from it.
       const ecNumber = rest.find((arg) => !arg.startsWith('--'));
-      if (!ecNumber) {
+      // A NAME is accepted too, and resolved through UniProt — but a name
+      // is not an enzyme. "lactate dehydrogenase" is EC 1.1.1.27 (L-) and
+      // EC 1.1.1.28 (D-), different proteins on different stereoisomers.
+      // The Python side refuses and names both rather than picking, for
+      // the reason a wrong EC is worse than a wrong value: it is a real
+      // citation for the wrong enzyme.
+      const enzymeAt = rest.indexOf('--enzyme');
+      const enzyme = enzymeAt >= 0 ? rest[enzymeAt + 1] : undefined;
+
+      if (!ecNumber && !enzyme) {
         error(
-          'catalog needs an EC number, e.g.\n' +
-          '  scientific catalog 1.1.1.27\n\n' +
+          'catalog needs an EC number or an enzyme name, e.g.\n' +
+          '  scientific catalog 1.1.1.27\n' +
+          '  scientific catalog --enzyme "alcohol dehydrogenase"\n\n' +
           'It reports which substrates, organisms and quantities BRENDA ' +
           'holds for that enzyme, so your first `resolve` can use the ' +
           "database's own labels instead of guessing them.",
@@ -1493,7 +1503,7 @@ async function main() {
       const catalogProc = spawnSync(
         resolvePythonExecutable(REPO_ROOT),
         [path.join(REPO_ROOT, 'scripts', 'report_enzyme_catalog.py')],
-        { cwd: REPO_ROOT, input: JSON.stringify({ ecNumber }), encoding: 'utf-8' },
+        { cwd: REPO_ROOT, input: JSON.stringify({ ecNumber, enzyme }), encoding: 'utf-8' },
       );
 
       let parsed: { ok?: boolean; summary?: string; error?: string };
