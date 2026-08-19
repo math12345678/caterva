@@ -99,12 +99,35 @@ def resolve_ec_number(enzyme_name: str, organism: str) -> str | None:
     Referenced via the enzyme_lookup module (not imported by name) so
     tests can monkeypatch enzyme_lookup.fetch_taxon_id /
     enzyme_lookup.fetch_ec_number_by_name and stay offline."""
+    candidates = resolve_ec_candidates(enzyme_name, organism)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def resolve_ec_candidates(enzyme_name: str, organism: str) -> list:
+    """EVERY EC number UniProt indexes under this name.
+
+    WHY THE PLURAL
+    --------------
+    `resolve_ec_number` used to take the first and say nothing. EC 1.1.1.27
+    is L-lactate dehydrogenase and EC 1.1.1.28 is D-lactate dehydrogenase:
+    different proteins on different stereoisomers, one common name -- and
+    "lactate dehydrogenase" is the example in this project's own CLI help.
+
+    An EC number is not a parameter. It is the identity of the protein
+    every citation downstream refers to, so picking one silently produces a
+    correctly formatted reference to the wrong enzyme, before any of the
+    machinery that prevents exactly that gets to run (ADR 0126).
+
+    The organism-first, then-unrestricted order is unchanged: a mismatch
+    between the caller's organism guess and what UniProt has indexed should
+    not sink an otherwise-real match.
+    """
     taxon_id = enzyme_lookup.fetch_taxon_id(organism) if organism else None
     if taxon_id:
-        ec = enzyme_lookup.fetch_ec_number_by_name(enzyme_name, taxon_id)
-        if ec:
-            return ec
-    return enzyme_lookup.fetch_ec_number_by_name(enzyme_name, None)
+        narrowed = enzyme_lookup.fetch_ec_numbers_by_name(enzyme_name, taxon_id)
+        if narrowed:
+            return narrowed
+    return enzyme_lookup.fetch_ec_numbers_by_name(enzyme_name, None)
 
 
 def taxon_id_for(organism: str | None) -> str | None:
@@ -615,7 +638,35 @@ def main() -> None:
                 raise ValueError(  # noqa: TRY301
                     "enzymeName or ecNumber is required to resolve real enzyme parameters"
                 )
-            ec_number = resolve_ec_number(enzyme_name, organism) or ""
+            ec_candidates = resolve_ec_candidates(enzyme_name, organism)
+            if len(ec_candidates) > 1:
+                # NOT `ec_not_resolved`. UniProt resolved it fine — to more
+                # than one enzyme. Reporting that as "could not resolve"
+                # would be a worse message than the silent pick it
+                # replaces, because it denies the existence of the answer
+                # instead of asking which one was meant.
+                print(
+                    json.dumps(
+                        {
+                            "ok": True,
+                            "found": False,
+                            "source": "ec_ambiguous",
+                            "ecCandidates": ec_candidates,
+                            "literatureCandidates": [],
+                            "logs": [
+                                f"'{enzyme_name}' names more than one enzyme: "
+                                + ", ".join(ec_candidates)
+                                + ". These are different proteins, so no EC "
+                                "number was chosen — a wrong one is a citation "
+                                "for the wrong enzyme, not merely a wrong "
+                                "value. Re-run with the EC number you meant."
+                            ],
+                        }
+                    )
+                )
+                return
+
+            ec_number = ec_candidates[0] if ec_candidates else ""
             if ec_number:
                 resolution_log.append(
                     f"Resolved EC {ec_number} for '{enzyme_name}' via UniProt name search."

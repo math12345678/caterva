@@ -461,8 +461,8 @@ def test_missing_ec_number_resolves_it_live_via_uniprot(monkeypatch):
     monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: "9606")
     monkeypatch.setattr(
         enzyme_lookup,
-        "fetch_ec_number_by_name",
-        lambda name, taxon_id: "3.2.1.1" if name == "alpha-amylase" else None,
+        "fetch_ec_numbers_by_name",
+        lambda name, taxon_id: ["3.2.1.1"] if name == "alpha-amylase" else [],
     )
 
     result = run_main(
@@ -488,7 +488,7 @@ def test_missing_ec_number_also_resolves_substrate_via_kegg(monkeypatch):
 
     monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: "9606")
     monkeypatch.setattr(
-        enzyme_lookup, "fetch_ec_number_by_name", lambda name, taxon_id: "3.2.1.1"
+        enzyme_lookup, "fetch_ec_numbers_by_name", lambda name, taxon_id: ["3.2.1.1"]
     )
     monkeypatch.setattr(
         enzyme_lookup,
@@ -525,7 +525,7 @@ def test_missing_ec_number_exhausted_uniprot_lookup_reports_not_found(monkeypatc
 
     monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: None)
     monkeypatch.setattr(
-        enzyme_lookup, "fetch_ec_number_by_name", lambda name, taxon_id: None
+        enzyme_lookup, "fetch_ec_numbers_by_name", lambda name, taxon_id: []
     )
 
     stdout = io.StringIO()
@@ -844,3 +844,83 @@ def test_pool_findings_cross_the_boundary_populated(monkeypatch):
         for item in findings[key]:
             assert item["reason"], key
     assert "sourceCheckUnavailable" in findings
+
+
+def test_an_ambiguous_enzyme_name_is_refused_and_the_candidates_named(monkeypatch):
+    """The third outcome, which used to be silently folded into the first.
+
+    `resolve_ec_number` took `candidates[0]` and said nothing. EC 1.1.1.27
+    is L-lactate dehydrogenase and EC 1.1.1.28 is D-lactate dehydrogenase —
+    different proteins on different stereoisomers, one common name, and
+    that name is the example in this project's own CLI help.
+
+    An EC number is not a parameter; it is the identity of the protein
+    every citation downstream refers to. Picking one silently produces a
+    correctly formatted reference to the wrong enzyme (ADR 0126).
+
+    This must NOT be reported as `ec_not_resolved`: UniProt resolved it
+    fine, to more than one thing. Saying "could not resolve" would deny the
+    existence of the answer instead of asking which one was meant, which is
+    a worse message than the silent pick it replaces.
+    """
+    import enzyme_lookup
+
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: None)
+    monkeypatch.setattr(
+        enzyme_lookup,
+        "fetch_ec_numbers_by_name",
+        lambda name, taxon_id: ["1.1.1.27", "1.1.1.28"],
+    )
+
+    stdout = io.StringIO()
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps({"enzymeName": "lactate dehydrogenase"}))
+    )
+    monkeypatch.setattr(sys, "stdout", stdout)
+    science_agent_runner.main()
+    result = json.loads(stdout.getvalue())
+
+    assert result["ok"] is True
+    assert result["found"] is False
+    assert result["source"] == "ec_ambiguous", (
+        "an ambiguity reported as ec_not_resolved denies the answer exists"
+    )
+    assert result["ecCandidates"] == ["1.1.1.27", "1.1.1.28"]
+
+    logs = " ".join(result["logs"])
+    assert "1.1.1.27" in logs and "1.1.1.28" in logs, (
+        "a refusal that cannot name what it refused leaves the choice "
+        "unexercisable"
+    )
+    assert "citation for the wrong enzyme" in logs
+
+
+def test_one_candidate_is_not_an_ambiguity(monkeypatch):
+    """The common case must stay silent, or the refusal is worthless.
+
+    Most enzyme names map to exactly one EC number, and a tool that asked
+    for confirmation every time would be ignored by the second query
+    (ADR 0028).
+    """
+    import enzyme_lookup
+
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda organism: None)
+    monkeypatch.setattr(
+        enzyme_lookup, "fetch_ec_numbers_by_name", lambda name, taxon_id: ["3.2.1.1"]
+    )
+
+    stdout = io.StringIO()
+    monkeypatch.setattr(
+        sys, "stdin", io.StringIO(json.dumps({"enzymeName": "alpha-amylase"}))
+    )
+    monkeypatch.setattr(sys, "stdout", stdout)
+    monkeypatch.setattr(
+        science_agent_runner, "resolve_substrate_from_kegg", lambda ec: None
+    )
+    monkeypatch.setattr(
+        fallback_logic, "resolve_kinetic_value", lambda *a, **k: golden_result()
+    )
+    science_agent_runner.main()
+    result = json.loads(stdout.getvalue())
+
+    assert result.get("source") != "ec_ambiguous"
