@@ -632,7 +632,7 @@
                         model: model,
                         params: `km=${km}, vmax=${vmax}, s0=${s0}`,
                         finalValue: '--',
-                        confidence: '0',
+                        confidence: '\u2014',
                         time: job.duration || 0,
                         status: '✗ ' + (job.error || 'Failed')
                     });
@@ -649,7 +649,16 @@
                         model: model,
                         params: `km=${km}, vmax=${vmax}, s0=${s0}`,
                         finalValue: result.results?.finalValue?.toFixed(3) || '--',
-                        confidence: (result.validationConfidence * 100).toFixed(1),
+                        // NOT a bare percentage. `validationConfidence` is
+                        // literature-source count and nothing else, so a run on
+                        // hand-typed values scores 0 however good it is -- and
+                        // this column already showed '0' for FAILURES and for
+                        // ERRORS, so one "0%" meant three different things: the
+                        // run failed, the run errored, or the run was perfect
+                        // and made no literature claim. See ADR 0125.
+                        confidence: (result.metadata?.literatureSourcesUsed ?? 0) === 0
+                            ? 'n/a'
+                            : (result.validationConfidence * 100).toFixed(1) + '%',
                         time: job.duration || 0,
                         status: result.validated ? '✓ Success' : '⚠ Unverified'
                     });
@@ -669,7 +678,7 @@
                     model: model,
                     params: `km=${km}, vmax=${vmax}, s0=${s0}`,
                     finalValue: '--',
-                    confidence: '0',
+                    confidence: '\u2014',
                     time: 0,
                     status: '✗ ' + (error.message || 'Error')
                 });
@@ -709,7 +718,7 @@
                 <td>${result.model}</td>
                 <td><small>${result.params}</small></td>
                 <td>${result.finalValue} mM</td>
-                <td>${result.confidence}%</td>
+                <td>${result.confidence}</td>
                 <td>${result.time}ms</td>
                 <td>${result.status}</td>
             `;

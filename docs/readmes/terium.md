@@ -37,7 +37,7 @@ Physical impossibility is rejected (`ok=False`); implausible-but-real is
 flagged (`ok=True, flagged=True`), never silently accepted or silently
 rejected.
 
-See [`documents`](https://github.com/Terrium-sim/documents) for the constitution and the 120 ADRs.
+See [`documents`](https://github.com/Terrium-sim/documents) for the constitution and the 123 ADRs.
 
 ## Licence, and one thing worth knowing
 

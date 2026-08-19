@@ -109,14 +109,14 @@ export const DOMAIN_CATALOGUE: DomainEntry[] = [
     id: 'wright_fisher',
     title: 'Wright–Fisher drift',
     summary: 'How allele frequencies wander in a finite population.',
-    example: 'python -m Terium.cli wf --n 100 --p0 0.5 --generations 200 --seed 1',
+    example: 'python -m Terium.cli wf --population-size 100 --starting-frequency 0.5 --generations 200 --seed 1',
     literatureBacked: false,
   },
   {
     id: 'two_locus_wright_fisher',
     title: 'Two-locus Wright–Fisher',
     summary: 'Linkage disequilibrium, and how recombination decays it.',
-    example: 'python -m Terium.cli ld --n 500 --r 0.01 --generations 200 --seed 1',
+    example: 'python -m Terium.cli ld --population-size 500 --recombination-rate 0.01 --generations 200 --seed 1',
     literatureBacked: false,
   },
   {
@@ -137,7 +137,7 @@ export const DOMAIN_CATALOGUE: DomainEntry[] = [
     id: 'gillespie_ssa_replicates',
     title: 'Gillespie SSA — replicates',
     summary: 'Many runs of the same system, to see the spread rather than one path.',
-    example: 'python -m Terium.cli ssa --replicates 100 --a0 100 --k 0.1 --end 50 --seed 1',
+    example: 'python -m Terium.cli ssa --a0 100 --k 0.1 --end 50 --seed 1 --out runs.csv',
     literatureBacked: false,
   },
   {
