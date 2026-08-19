@@ -12041,3 +12041,52 @@ what that interface should do with an ambiguity.
 | Mutations | 4 caught — read only the first result; read only the first EC on a protein; sort the candidates (discarding UniProt's relevance order, making "first" arbitrary); drop alternative-name ECs |
 | Tests | `test_enzyme_catalog.py` 12 → 18; `test_enzyme_lookup.py` still green on the single-value parser, now built on the plural one |
 | Open | the API runner's silent pick; Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording |
+
+
+## Fiftieth pass — the runner picked too, and my caution was wrong
+
+Last pass I fixed the silent name→EC pick in the CLI and left the same
+defect live in the API runner, with a reason:
+
+> it returns `str | None` into an API path with no exception boundary
+> around it [...] Changing the control flow of the entry point on an
+> untested path, blind, is how a "correct" fix becomes an outage.
+
+**Reading the branch showed that was wrong.** The runner already had a clean
+refusal in that exact position:
+
+```python
+else:
+    print(json.dumps({"ok": True, "found": False,
+                      "source": "ec_not_resolved", ...}))
+    return
+```
+
+An early return with a JSON body, covered by an existing contract test.
+Nothing needed to raise; there was never an exception to bound. I reasoned
+about the risk instead of looking at fifteen lines, and the cost was a pass
+with a live defect in the API — a student asking about "lactate
+dehydrogenase" got a Km for whichever of EC 1.1.1.27 and 1.1.1.28 UniProt
+ranked first.
+
+The fix is three outcomes where there were two, and the interesting decision
+is that **`ec_ambiguous` is not folded into `ec_not_resolved`**. UniProt
+resolved the name perfectly well — to two enzymes. Saying "could not
+resolve" would deny the existence of the answer rather than asking which was
+meant, and that is a *worse* message than the silent pick it replaces: the
+silent pick at least produced a simulation.
+
+**The tests had to move with it.** Three monkeypatches in
+`test_runner_contract.py` patched `fetch_ec_number_by_name`; the runner now
+calls `fetch_ec_numbers_by_name`. Left alone they would have stopped taking
+effect and the tests would have started making live UniProt requests —
+still passing, just slowly and non-deterministically, which is worse than
+breaking.
+
+| | |
+|---|---|
+| Mutations | 3 caught — restore the silent pick; report the ambiguity as `ec_not_resolved`; fire whenever there is more than ZERO candidate (the cry-wolf version, which would demand confirmation on every ordinary query) |
+| Tests | `test_runner_contract.py` 19 → 21; three monkeypatches repointed |
+| Suites | literature 522 + 397 green; the only red remains `check_no_tellurium_integration_claims` on ADR 0099, another agent's |
+| Next | `queryResolver.ts` does not render `ec_ambiguous` specially yet — the candidates reach the response but not the sentence. Smaller than this was; the information is now present |
+| Open | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording |
