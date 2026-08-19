@@ -384,6 +384,75 @@ def fetch_ec_number_by_name(
     return parse_ec_number_search(r.json())
 
 
+def parse_ec_number_candidates(data: dict) -> list[str]:
+    """EVERY distinct EC number in a UniProt search response.
+
+    WHY THE PLURAL MATTERS
+    ----------------------
+    `parse_ec_number_search` below takes `results[0]` and then
+    `ec_numbers[0]`. Two silent picks, on the FIRST step of the workflow --
+    and an EC number is not a parameter, it is the identity of the protein
+    everything downstream is about. A wrong Km is a wrong number; a wrong
+    EC is a citation for a different enzyme.
+
+    Both shapes are real:
+
+    * one protein carrying several EC numbers (bifunctional enzymes);
+    * several proteins matching one name -- "lactate dehydrogenase" is
+      EC 1.1.1.27 (L-lactate dehydrogenase) AND EC 1.1.1.28 (D-lactate
+      dehydrogenase), which are different enzymes acting on different
+      stereoisomers.
+
+    Measured before this existed: both collapsed to "1.1.1.27" with
+    nothing anywhere saying a choice had been made.
+
+    Order is preserved -- UniProt's relevance order is information, and
+    sorting would throw it away -- and duplicates are dropped, because the
+    same EC appearing on two entries is one candidate, not two.
+    """
+    candidates: list[str] = []
+    for result in data.get("results", []):
+        description = result.get("proteinDescription", {})
+        groups = [description.get("recommendedName", {}).get("ecNumbers", [])]
+        groups.extend(
+            alt.get("ecNumbers", []) for alt in description.get("alternativeNames", [])
+        )
+        for group in groups:
+            for entry in group or []:
+                value = entry.get("value")
+                if value and value not in candidates:
+                    candidates.append(value)
+    return candidates
+
+
+def fetch_ec_numbers_by_name(
+    enzyme_name: str, taxon_id: str | None, timeout: float = 15
+) -> list[str]:
+    """Every EC number UniProt indexes under this name, most relevant first.
+
+    `size` is 25 rather than 1. The single-result query could not see an
+    ambiguity even in principle: asking for one answer and getting one
+    answer says nothing about whether there was a second.
+
+    Same one request as before -- a larger page, not more calls.
+    """
+    query = f'protein_name:"{enzyme_name}" AND reviewed:true'
+    if taxon_id:
+        query += f" AND organism_id:{taxon_id}"
+    r = retry_get(
+        UNIPROT_SEARCH_URL,
+        params={
+            "query": query,
+            "fields": "accession,ec",
+            "format": "json",
+            "size": 25,
+        },
+        timeout=timeout,
+    )
+    r.raise_for_status()
+    return parse_ec_number_candidates(r.json())
+
+
 def parse_ec_number_search(data: dict) -> str | None:
     """Pure function: UniProt JSON response (fields=accession,ec) in, the
     first EC number string out, or None.
@@ -393,19 +462,16 @@ def parse_ec_number_search(data: dict) -> str | None:
     carry them only under an alternativeNames entry instead. Both are
     checked. Returns None (never guesses) if neither is present -- e.g. a
     matched protein with no assigned EC number, or an empty result set."""
-    results = data.get("results", [])
-    if not results:
-        return None
-    description = results[0].get("proteinDescription", {})
-    ec_numbers = description.get("recommendedName", {}).get("ecNumbers", [])
-    if not ec_numbers:
-        for alt in description.get("alternativeNames", []):
-            ec_numbers = alt.get("ecNumbers", [])
-            if ec_numbers:
-                break
-    if not ec_numbers:
-        return None
-    return ec_numbers[0].get("value")
+    # Built on `parse_ec_number_candidates` so the two cannot disagree
+    # about what UniProt's response contains. Two parsers of one document
+    # drift, and this project has the scars (ADR 0003).
+    #
+    # It still returns the FIRST candidate, so callers keep their current
+    # behaviour. That is a silent pick when there is more than one, and it
+    # is a known gap rather than a solved problem -- `catalog` refuses and
+    # names the candidates instead, and the runner path does not yet.
+    candidates = parse_ec_number_candidates(data)
+    return candidates[0] if candidates else None
 
 
 def resolve_enzyme(

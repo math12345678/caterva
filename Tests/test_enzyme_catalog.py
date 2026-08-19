@@ -190,3 +190,110 @@ def test_a_present_but_empty_table_is_not_called_usable():
     )
     assert inventory.reported
     assert not inventory.is_usable
+
+
+# ---------------------------------------------------------------------------
+# A name is not an enzyme
+# ---------------------------------------------------------------------------
+
+
+class TestTheNameToECStepRefusesToPick:
+    """The first step of the workflow, and the one where a silent choice
+    costs the most.
+
+    An EC number is not a parameter — it is the identity of the protein
+    everything downstream is about. A wrong Km is a wrong number; a wrong
+    EC is a real citation for a different enzyme.
+
+    Measured before `parse_ec_number_candidates` existed:
+    `parse_ec_number_search` took `results[0]` then `ec_numbers[0]` and the
+    UniProt query asked for `size=1`, so BOTH ambiguity shapes returned one
+    string with nothing saying a choice had been made.
+    """
+
+    #: One protein carrying two EC numbers — bifunctional enzymes are real.
+    TWO_ON_ONE_PROTEIN = {
+        "results": [
+            {
+                "proteinDescription": {
+                    "recommendedName": {
+                        "ecNumbers": [{"value": "1.1.1.27"}, {"value": "1.1.1.28"}]
+                    }
+                }
+            }
+        ]
+    }
+
+    #: Two proteins matching one name. EC 1.1.1.27 is L-lactate
+    #: dehydrogenase and EC 1.1.1.28 is D-lactate dehydrogenase: different
+    #: enzymes, different stereoisomers, one common name.
+    TWO_PROTEINS = {
+        "results": [
+            {"proteinDescription": {"recommendedName": {"ecNumbers": [{"value": "1.1.1.27"}]}}},
+            {"proteinDescription": {"recommendedName": {"ecNumbers": [{"value": "1.1.1.28"}]}}},
+        ]
+    }
+
+    def test_both_candidates_are_reported_not_just_the_first(self):
+        from enzyme_lookup import parse_ec_number_candidates
+
+        assert parse_ec_number_candidates(self.TWO_ON_ONE_PROTEIN) == [
+            "1.1.1.27",
+            "1.1.1.28",
+        ]
+        assert parse_ec_number_candidates(self.TWO_PROTEINS) == [
+            "1.1.1.27",
+            "1.1.1.28",
+        ]
+
+    def test_relevance_order_is_kept(self):
+        """UniProt's ordering is information. Sorting would discard it and
+        make the first candidate arbitrary."""
+        from enzyme_lookup import parse_ec_number_candidates
+
+        reversed_hits = {"results": list(reversed(self.TWO_PROTEINS["results"]))}
+        assert parse_ec_number_candidates(reversed_hits) == ["1.1.1.28", "1.1.1.27"]
+
+    def test_the_same_ec_on_two_entries_is_one_candidate(self):
+        """Two entries for one enzyme is not an ambiguity, and reporting it
+        as one would make the command refuse a question it can answer."""
+        from enzyme_lookup import parse_ec_number_candidates
+
+        duplicated = {
+            "results": [
+                {"proteinDescription": {"recommendedName": {"ecNumbers": [{"value": "1.1.1.27"}]}}},
+                {"proteinDescription": {"recommendedName": {"ecNumbers": [{"value": "1.1.1.27"}]}}},
+            ]
+        }
+        assert parse_ec_number_candidates(duplicated) == ["1.1.1.27"]
+
+    def test_alternative_names_are_read_too(self):
+        """Some UniProt entries carry the EC only under an alternative
+        name. The single-value parser already handled this and the plural
+        one must not lose it."""
+        from enzyme_lookup import parse_ec_number_candidates
+
+        alt_only = {
+            "results": [
+                {
+                    "proteinDescription": {
+                        "alternativeNames": [{"ecNumbers": [{"value": "3.2.1.1"}]}]
+                    }
+                }
+            ]
+        }
+        assert parse_ec_number_candidates(alt_only) == ["3.2.1.1"]
+
+    def test_nothing_indexed_is_an_empty_list_not_a_guess(self):
+        from enzyme_lookup import parse_ec_number_candidates
+
+        assert parse_ec_number_candidates({"results": []}) == []
+
+    def test_the_single_value_parser_still_agrees_with_the_plural_one(self):
+        """One derivation, so the two cannot disagree about what UniProt's
+        response contains (ADR 0003)."""
+        from enzyme_lookup import parse_ec_number_candidates, parse_ec_number_search
+
+        for data in (self.TWO_ON_ONE_PROTEIN, self.TWO_PROTEINS, {"results": []}):
+            candidates = parse_ec_number_candidates(data)
+            assert parse_ec_number_search(data) == (candidates[0] if candidates else None)
