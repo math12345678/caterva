@@ -46,6 +46,7 @@ generations scale linearly with their counters, and the queue limits
 from __future__ import annotations
 
 import json
+import pathlib
 import sys
 from typing import Any, Callable, Dict, Sequence
 
@@ -734,6 +735,99 @@ def main() -> None:
     if "--list-domains" in sys.argv:
         print(json.dumps({"ok": True, "domains": sorted(DISPATCH)}))
         return
+
+    # `--ensemble`: run the model once per sampled parameter set and return
+    # the envelope, instead of once with a single chosen value.
+    #
+    # THIS IS THE ANSWER TO THE QUESTION BOTH PROFESSORS ANSWERED THE SAME WAY.
+    #
+    # Bakker: "we generated an ensemble of models by sampling from a
+    # distribution of possible parameters [...] these scores were then used to
+    # give the parameter a weight in the sampling."
+    #
+    # Sauro, told about the alternative: "with Barbara's you can sample and
+    # get an ensemble distribution. That is the right way to do it."
+    #
+    # It lives HERE, on the runner, rather than in either front end, because
+    # the runner is the one place both the CLI and the API read from. A
+    # capability added to one of them reaches half the users, which this
+    # repository has now recorded four times and made a guard for
+    # (docs/one-sided-findings.txt).
+    #
+    # Payload shape:
+    #   {"domain": "mm", "parameters": {...},
+    #    "ensemble": {"parameter": "km", "draws": [...], "seed": 1}}
+    #
+    # The DRAWS are supplied rather than computed here. Weighting them is the
+    # literature layer's job -- it needs the per-candidate reliability scores
+    # -- and recomputing them in the engine would be a second implementation
+    # of the sampling, which is ADR 0027's defect exactly.
+    if "--ensemble" in sys.argv:
+        try:
+            payload = json.loads(sys.stdin.read() or "{}")
+            domain = payload.get("domain")
+            if domain not in DISPATCH:
+                raise ValueError(f"unknown domain: {domain!r}")  # noqa: TRY301
+            spec = payload.get("ensemble") or {}
+            parameter = spec.get("parameter")
+            draws = spec.get("draws")
+            if not parameter or not isinstance(draws, list) or not draws:
+                raise ValueError(  # noqa: TRY301
+                    "ensemble needs {'parameter': name, 'draws': [...], 'seed': n}"
+                )
+
+            # `Tests/` holds the literature layer. Located from the
+            # importable `Terium` package rather than from this file's
+            # path: the runner is spawned with a PYTHONPATH the server
+            # chooses, and walking up from __file__ would break the
+            # moment either tree moves.
+            import Terium as _terium_pkg  # noqa: PLC0415
+            _root = pathlib.Path(_terium_pkg.__file__).resolve().parent.parent
+            sys.path.insert(0, str(_root / "Tests"))
+            from model_ensemble import run_model_ensemble  # noqa: PLC0415
+
+            simulate = getattr(terium_engine, DISPATCH[domain])
+            result = run_model_ensemble(
+                simulate=simulate,
+                base_parameters=payload.get("parameters", {}),
+                parameter_draws={parameter: [float(d) for d in draws]},
+                seed=int(spec.get("seed", 0)),
+                max_runs=int(spec.get("maxRuns", 200)),
+            )
+            print(json.dumps({
+                "ok": True,
+                "ensemble": {
+                    "swept": list(result.swept),
+                    "seed": result.seed,
+                    "succeeded": result.succeeded,
+                    "attempted": result.attempted,
+                    # Every failure, with the parameter set that caused it, so
+                    # a band drawn over fewer runs than requested can be
+                    # explained rather than merely noticed.
+                    "failed": [
+                        {"parameters": f.parameters, "reason": f.reason}
+                        for f in result.failed
+                    ],
+                    "supportNote": result.support_note(),
+                    "disclaimer": result.disclaimer,
+                    "envelopes": [
+                        {
+                            "column": e.column,
+                            "times": list(e.times),
+                            "low": list(e.low),
+                            "p05": list(e.p05),
+                            "median": list(e.median),
+                            "p95": list(e.p95),
+                            "high": list(e.high),
+                        }
+                        for e in result.envelopes
+                    ],
+                },
+            }))
+            return
+        except Exception as exc:  # noqa: BLE001
+            print(json.dumps({"ok": False, "error": f"{type(exc).__name__}: {exc}"}))
+            return
 
     try:
         raw = sys.stdin.read()

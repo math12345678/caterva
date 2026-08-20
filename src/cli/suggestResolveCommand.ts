@@ -135,13 +135,65 @@ export function parseSystemFromQuery(query: string): ParsedSystem | null {
  * suggestion — they would reasonably conclude the tool is broken rather than
  * that they owe it one more number.
  */
-export function formatResolveCommand(system: ParsedSystem): string {
+export function formatResolveCommand(
+  system: ParsedSystem,
+  /**
+   * Values the user ALREADY typed, as `{ s0: '10mM', vmax: '1.2mM/s' }`.
+   *
+   * WHY THIS PARAMETER EXISTS
+   * -------------------------
+   * The tail was a fixed `--s0 10mM --enzyme-conc 0.001mM`, appended
+   * regardless of the command line it was suggesting a replacement for.
+   * Measured:
+   *
+   *   $ simulate "michaelis menten of lactate dehydrogenase on pyruvate
+   *               in Homo sapiens" --s0 10mM --vmax 1.2mM/s
+   *   -> suggests: ... --s0 10mM --enzyme-conc 0.001mM
+   *
+   * **The user's `--vmax 1.2mM/s` is gone.** It was replaced by an
+   * `--enzyme-conc` intended to DERIVE Vmax from kcat x [E]0 — and running
+   * the suggested command verbatim exits 2, "Cannot run", because the kcat
+   * it now depends on is not there.
+   *
+   * So the guidance took a user whose own flags were nearly sufficient and
+   * handed them a command that fails, having discarded the value that would
+   * have worked. Not merely unhelpful: a regression on their own input.
+   *
+   * `--vmax` and `--enzyme-conc` are ALTERNATIVES — supply Vmax directly, or
+   * supply [E]0 so it can be bridged from kcat. Offering both at once is
+   * what makes the command wrong.
+   */
+  supplied: Readonly<Record<string, string>> = {},
+): string {
   const q = (value: string): string => `"${value.replace(/"/g, '\\"')}"`;
-  return [
+
+  const lines = [
     'scientific simulate "michaelis menten" --resolve \\',
     `  --enzyme ${q(system.enzyme)} \\`,
     `  --substrate ${q(system.substrate)} \\`,
     `  --organism ${q(system.organism)} \\`,
-    '  --s0 10mM --enzyme-conc 0.001mM',
-  ].join('\n');
+  ];
+
+  // Carried through, not replaced. A flag the user typed is a decision they
+  // made; a suggestion that silently drops it is overruling them.
+  const tail: string[] = [];
+  tail.push(`--s0 ${supplied['s0'] ?? '10mM'}`);
+
+  if (supplied['vmax']) {
+    // They gave Vmax outright, so there is nothing to bridge and
+    // `--enzyme-conc` would be noise at best and misdirection at worst.
+    tail.push(`--vmax ${supplied['vmax']}`);
+  } else {
+    tail.push(`--enzyme-conc ${supplied['enzyme-conc'] ?? '0.001mM'}`);
+  }
+
+  // Anything else they typed survives too — km, ki, i0. Sorted so the
+  // suggestion is stable across runs rather than dependent on key order.
+  for (const name of Object.keys(supplied).sort()) {
+    if (name === 's0' || name === 'vmax' || name === 'enzyme-conc') continue;
+    tail.push(`--${name} ${supplied[name]}`);
+  }
+
+  lines.push(`  ${tail.join(' ')}`);
+  return lines.join('\n');
 }
