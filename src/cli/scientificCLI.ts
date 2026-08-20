@@ -16,6 +16,7 @@ import {
 } from './suggestResolveCommand';
 import { confirmSystem, terminalIO } from './confirmSystem';
 import { commandDomains } from './commandDomains';
+import { commandEnsemble } from './commandEnsemble';
 
 /**
  * Scientific Pipeline CLI
@@ -940,6 +941,24 @@ ${colors.bright}Commands:${colors.reset}
     multi-megabyte export is not gentle.
     ${colors.dim}Example:${colors.reset} corpus ~/Downloads/brenda_km.tsv
 
+  ensemble --fixture BRENDA.html --substrate S --seed N [options]
+    What the literature ACTUALLY supports, as a band rather than one number.
+    Every other command picks a single value; when the published
+    measurements disagree, this shows all of them -- weighted by how well
+    evidenced each is -- and runs the model once per draw so you can see
+    whether the disagreement changes the answer.
+    ${colors.dim}Example:${colors.reset} ensemble --fixture km.html --substrate pyruvate --seed 1 \\
+               --simulate michaelis_menten
+    ${colors.dim}Options:${colors.reset}
+      --seed N           required. An ensemble nobody can re-derive is not
+                         evidence, so there is no default.
+      --simulate DOMAIN  run the model per draw, e.g. michaelis_menten.
+                         Without it you get the parameter spread and no
+                         trajectory.
+      --organism NAME    default "Homo sapiens"
+      --draws N          how many times to sample (default 2000)
+      --json             machine-readable
+
   resolve <enzyme> --substrate S --organism O [options]
     Look up a measured kinetic parameter in the literature and show where it
     came from.
@@ -1387,6 +1406,36 @@ async function main() {
     // could tell anybody what they are: `help` listed nine commands, all
     // enzyme kinetics or generic, and the engine's own subcommands lived
     // behind a second CLI that `help` never mentions. See ADR 0122.
+    // What the literature actually supports, as a band rather than one
+    // number chosen by min(). Bakker's weighted sampling and Sauro's
+    // "you can sample and get an ensemble distribution". See ADR 0135.
+    case 'ensemble': {
+      const { flags, booleans } = parseArgs(rest);
+      const fixture = flags['fixture'];
+      const substrate = flags['substrate'];
+      const seed = flags['seed'];
+      if (!fixture || !substrate || !seed) {
+        error(
+          'ensemble needs --fixture <brenda.html> --substrate <name> --seed <n>. ' +
+          'The seed is required, not defaulted: an ensemble nobody can ' +
+          're-derive is not evidence.'
+        );
+        process.exit(1);
+      }
+      process.exit(commandEnsemble({
+        fixture,
+        substrate,
+        seed: Number(seed),
+        ...(flags['organism'] ? { organism: flags['organism'] } : {}),
+        ...(flags['ec'] ? { ec: flags['ec'] } : {}),
+        ...(flags['draws'] ? { draws: Number(flags['draws']) } : {}),
+        ...(flags['simulate'] ? { simulate: flags['simulate'] } : {}),
+        ...(flags['points'] ? { points: Number(flags['points']) } : {}),
+        json: booleans.has('json'),
+      }));
+      break;
+    }
+
     case 'domains': {
       const { booleans } = parseArgs(rest);
       process.exit(commandDomains({ json: booleans.has('json') }));

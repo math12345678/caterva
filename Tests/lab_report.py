@@ -147,6 +147,7 @@ def build_report(
     simulation: Any | None = None,
     bibtex: str | None = None,
     ensembles: dict[str, Any] | None = None,
+    also_refused: Sequence[str] = (),
 ) -> LabReport:
     """Assemble one document from what the run actually established.
 
@@ -155,6 +156,12 @@ def build_report(
     tool could not source this" is the single most important thing a reader
     of a lab report needs to know and the easiest thing for a printout to
     lose.
+
+    `also_refused` carries refusals the CALLER established, which this
+    function cannot see -- chiefly "the model was not run, and here is what
+    was missing". They render in the same section as the ones found here,
+    because a reader looking for what Terrium would not do must find all of
+    it in one place; a second list somewhere else is a gap with extra steps.
     """
     lines: list[str] = [f"# {title}", "", question, ""]
 
@@ -310,6 +317,8 @@ def build_report(
             reason = getattr(mixture, "reason", "")
             if reason:
                 refusals.append(f"{name}: {reason}")
+
+    refusals.extend(also_refused)
 
     if refusals:
         lines += [
