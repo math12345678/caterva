@@ -469,9 +469,9 @@ Terrium/
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    127 decision records (and counting)
+│   └── adr/                    128 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
-├── scripts/                    65 guard scripts + build verification
+├── scripts/                    66 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -557,6 +557,6 @@ make test        # run all 2,003 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,142 tests)
 make test-lit    # literature layer only (847 tests)
-python3 scripts/verify_build.py --quick  # all 65 guard scripts, incl. TypeScript compile
+python3 scripts/verify_build.py --quick  # all 66 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

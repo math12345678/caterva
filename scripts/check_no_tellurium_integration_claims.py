@@ -242,8 +242,70 @@ def _documents() -> list[Path]:
     return sorted(set(found))
 
 
+# THE CONVENTION, IMPORTED RATHER THAN RESTATED
+# ---------------------------------------------
+# ADR 0099 states it once:
+#
+#     A claim written plainly is an assertion and is checked. The same words
+#     in quotation marks or backticks are a citation and are not.
+#
+# and adds that the rule "is about claims, not numbers" -- it was written
+# for `check_documented_counts.is_quoted`, and a guard reading a PHRASE had
+# no reason to look for it.
+#
+# This guard then flagged `docs/adr/0099-plain-asserts-quoted-cites.md`,
+# whose entire subject is three guards confusing a citation with an
+# assertion. It reproduced the defect the ADR beside it describes, and did
+# so on every CI run: the failure sat in the workflow and turned main red
+# for seven consecutive commits.
+#
+# ADR 0099 offers two repairs and prefers the narrow one. A `DISCUSSES`
+# entry exempts a whole FILE, so a future ADR quoting the phrase trips this
+# again and the next author adds another entry. `is_quoted` exempts the
+# quoted OCCURRENCE, so every document that quotes the claim in order to
+# discuss it is covered once and forever.
+#
+# Imported from the module that owns it. A second copy of a convention is
+# two conventions the day one of them is edited (ADR 0003).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_documented_counts import is_quoted  # noqa: E402
+
+
 def _sentences(text: str) -> list[str]:
-    return re.split(r"(?<=[.!?;:])\s+|\n", text)
+    """Sentences, not lines.
+
+    THE DEFECT THIS FIXES
+    ---------------------
+    This split on EVERY newline. Markdown hard-wraps prose inside a
+    paragraph, so a sentence spanning two lines was torn in half at the
+    wrap point — and both halves were then judged as if each were a whole
+    claim.
+
+    Measured, in `docs/adr/0099-plain-asserts-quoted-cites.md`:
+
+        ...found no denial word on the line, and reported the document as
+        claiming
+        Terrium is built on Tellurium.
+
+    The second line alone reads as a flat assertion. With the first, it is
+    a REPORT of somebody else's claim. The guard flagged the tail and
+    turned CI red on every commit for a week.
+
+    It is not only about reporting clauses: `DENIAL` is checked per
+    sentence too, so any denial that happened to land on the previous line
+    was invisible. A false positive from a hard wrap is not an edge case in
+    a repository whose prose is wrapped at 72 columns throughout.
+
+    Paragraphs are separated by blank lines; within one, newlines are
+    whitespace. That is what markdown means by them, and now what this
+    reads.
+    """
+    sentences: list[str] = []
+    for paragraph in re.split(r"\n\s*\n", text):
+        joined = re.sub(r"\s*\n\s*", " ", paragraph.strip())
+        if joined:
+            sentences.extend(re.split(r"(?<=[.!?;:])\s+", joined))
+    return sentences
 
 
 def check(docs: list[Path] | None = None) -> list[str]:
@@ -268,7 +330,10 @@ def check(docs: list[Path] | None = None) -> list[str]:
         else:
             text = path.read_text(encoding="utf-8", errors="replace")
         for sentence in _sentences(text):
-            if CLAIM.search(sentence) and not DENIAL.search(sentence):
+            match = CLAIM.search(sentence)
+            if match and not DENIAL.search(sentence) and not is_quoted(
+                sentence, match.start(), match.end()
+            ):
                 problems.append(
                     f"{rel} claims Terrium uses Tellurium:\n"
                     f'      "{sentence.strip()[:150]}"\n'

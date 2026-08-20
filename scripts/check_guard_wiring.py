@@ -105,6 +105,11 @@ DELIBERATE_OMISSIONS = {
 #: here; the guard-wiring check will tell you so.
 EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_citation_format": ("verify_build", "ci", "pytest"),
+    # CI only, deliberately. It asks PyPI whether each pinned version
+    # exists, so it needs the network and belongs where the network is
+    # expected — a pytest wrapper would turn every offline test run red,
+    # which is how a guard earns the habit of being skipped (ADR 0028).
+    "check_pins_resolve": ("ci",),
     # Wired 2026-08-15. `make guards` is a fourth harness this script does
     # not model -- it reads verify_build, CI and pytest. The pytest wrapper
     # is what makes it enforcing; the make target is what makes it usable.
