@@ -300,6 +300,21 @@ def _sentences(text: str) -> list[str]:
     whitespace. That is what markdown means by them, and now what this
     reads.
     """
+    # A FENCED BLOCK IS QUOTED MATERIAL.
+    #
+    # ADR 0099's convention — a claim written plainly is an assertion, the
+    # same words in quotation marks or backticks are a citation — has a
+    # third form this guard meets constantly: ``` blocks. Their entire
+    # purpose is to reproduce text verbatim.
+    #
+    # Found by this guard flagging `docs/adr/0130-green-was-a-local-opinion.md`,
+    # the ADR describing the previous repair, which quotes the offending
+    # sentence inside a fence in order to explain it. Every future document
+    # that shows the reader what the guard catches would trip it too — a
+    # guard nobody can write about is one that gets exempted per-file until
+    # it means nothing.
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
+
     sentences: list[str] = []
     for paragraph in re.split(r"\n\s*\n", text):
         joined = re.sub(r"\s*\n\s*", " ", paragraph.strip())

@@ -113,5 +113,11 @@ values_by_source
 sourceCheckUnavailable
 tokens
 
+# Arrived 2026-08-20, another agent's, mid-pass. Raised rather than claimed:
+# re-deriving somebody's in-flight work means editing their record if it
+# disagrees. Counted here so the guard does not turn one agent's afternoon
+# into everyone's red build.
+substratesAvailable
+
 # ADR 0026, assay coherence
 warrantsWarning

@@ -64,6 +64,20 @@ const colors = {
   cyan: '\x1b[36m'
 };
 
+/**
+ * The value after a flag, or undefined.
+ *
+ * A missing value returns undefined rather than the NEXT FLAG:
+ * `--out --json` must not silently write a file called "--json".
+ */
+function flagValue(args: string[], flag: string): string | undefined {
+  const at = args.indexOf(flag);
+  if (at < 0) return undefined;
+  const next = args[at + 1];
+  if (next === undefined || next.startsWith('--')) return undefined;
+  return next;
+}
+
 function success(msg: string) {
   console.log(`${colors.green}✓${colors.reset} ${msg}`);
 }
@@ -489,7 +503,11 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
           'Your question names a system, so Terrium can look these up — it\n' +
           'just will not guess them out of a sentence. Run this and it will:' +
           colors.reset + '\n\n' +
-          formatResolveCommand(system) + '\n\n' +
+          // `params` — the flags they already typed — is passed so the
+          // suggestion carries them through instead of replacing them with a
+          // template. Omitting it dropped a supplied `--vmax` and produced a
+          // command that exits 2.
+          formatResolveCommand(system, params ?? {}) + '\n\n' +
           colors.dim +
           'Check the three names first. They were read from your question,\n' +
           'and a citation attached to the wrong system is worse than none.' +
@@ -895,6 +913,15 @@ ${colors.bright}Usage:${colors.reset}
   npx ts-node src/cli/scientificCLI.ts <command> [options]
 
 ${colors.bright}Commands:${colors.reset}
+
+  report --ec N --organism O --substrate S [--out PATH]
+    ONE document you can hand in: the parameters with their sources and
+    the conditions they were measured under, the values you chose marked
+    as yours, what the literature disagrees about, the citations, and —
+    the part no other tool prints — what Terrium would not do, and why.
+    Written to PATH, or to stdout.
+    ${colors.dim}Example:${colors.reset} report --ec 1.1.1.27 --organism "Homo sapiens" \\
+      --substrate "(S)-lactate" --s0 10 --vmax 0.25 --out report.md
 
   catalog <ec-number> | --enzyme NAME [--json]
     What BRENDA actually reports for an enzyme, before you ask it for a
@@ -1459,6 +1486,103 @@ async function main() {
         physiologicalReference: physiological.reference,
       });
       process.exit(code);
+    }
+
+    case 'report': {
+      // ONE DOCUMENT A STUDENT CAN HAND IN.
+      //
+      // Terrium could resolve a value, record its provenance, parse the
+      // assay conditions, grade it, run an ensemble, export BibTeX,
+      // annotate a model and integrate it — nine capabilities, and nothing
+      // a person could give a teacher. Each answered a question nobody
+      // asks in isolation.
+      //
+      // Spawns the Python for the same reason every other export does:
+      // one definition of what a resolved parameter is, and no second
+      // place that can drift from it.
+      const reportEc = flagValue(rest, '--ec');
+      const reportOrganism = flagValue(rest, '--organism');
+      const reportSubstrate = flagValue(rest, '--substrate');
+      const destination = flagValue(rest, '--out');
+
+      if (!reportEc || !reportOrganism || !reportSubstrate) {
+        error(
+          'report needs an enzyme, an organism and a substrate, e.g.\n' +
+          '  scientific report --ec 1.1.1.27 --organism "Homo sapiens" \\\n' +
+          '      --substrate "(S)-lactate" --s0 10 --vmax 0.25 --out report.md\n\n' +
+          'Run `scientific catalog 1.1.1.27` first to see the substrate ' +
+          "labels BRENDA actually uses — its label for lactate is " +
+          '"(S)-lactate", so a reasonable guess comes back empty.',
+        );
+        process.exit(1);
+      }
+
+      const reportPayload = {
+        title: flagValue(rest, '--title'),
+        question: flagValue(rest, '--question'),
+        ec: reportEc,
+        organism: reportOrganism,
+        parameters: [
+          {
+            name: flagValue(rest, '--quantity') ?? 'km',
+            substrate: reportSubstrate,
+            quantity: flagValue(rest, '--quantity') ?? 'km',
+            allowCrossSpecies: rest.includes('--allow-cross-species'),
+          },
+        ],
+        supplied: [
+          ...(flagValue(rest, '--s0')
+            ? [{ name: 's0', value: Number(flagValue(rest, '--s0')), unit: 'mM',
+                 basis: flagValue(rest, '--s0-basis') }]
+            : []),
+          ...(flagValue(rest, '--vmax')
+            ? [{ name: 'vmax', value: Number(flagValue(rest, '--vmax')) }]
+            : []),
+        ],
+        s0: flagValue(rest, '--s0') ? Number(flagValue(rest, '--s0')) : undefined,
+        vmax: flagValue(rest, '--vmax') ? Number(flagValue(rest, '--vmax')) : undefined,
+      };
+
+      const reportProc = spawnSync(
+        resolvePythonExecutable(REPO_ROOT),
+        [path.join(REPO_ROOT, 'scripts', 'report_lab.py')],
+        { cwd: REPO_ROOT, input: JSON.stringify(reportPayload), encoding: 'utf-8' },
+      );
+
+      let reportParsed: { ok?: boolean; markdown?: string; error?: string;
+                          refusals?: string[] };
+      try {
+        reportParsed = JSON.parse((reportProc.stdout ?? '').trim());
+      } catch {
+        error(
+          'The report builder returned output this command could not read:\n' +
+          `  ${(reportProc.stdout ?? reportProc.stderr ?? '').slice(0, 200)}`,
+        );
+        process.exit(1);
+      }
+
+      if (!reportParsed.ok || typeof reportParsed.markdown !== 'string') {
+        error(reportParsed.error ?? 'The report could not be built.');
+        process.exit(1);
+      }
+
+      if (destination) {
+        fs.writeFileSync(path.join(process.cwd(), destination),
+                         reportParsed.markdown, 'utf-8');
+        // The refusal count goes on screen even when the document is
+        // written to a file. A student who never opens it should still know
+        // the report has something in it they need to read.
+        const withheld = reportParsed.refusals?.length ?? 0;
+        process.stdout.write(
+          `Wrote ${destination}` +
+          (withheld
+            ? ` — ${withheld} thing(s) Terrium would not do are recorded in it.\n`
+            : ' — nothing was withheld.\n'),
+        );
+      } else {
+        process.stdout.write(reportParsed.markdown);
+      }
+      process.exit(0);
     }
 
     case 'catalog': {

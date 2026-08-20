@@ -1,0 +1,374 @@
+"""
+lab_report.py
+
+One document a student can hand in.
+
+WHY THIS EXISTS
+---------------
+Terrium had, separately: a resolver that finds literature values, a
+provenance record for each one, assay conditions, reliability grades on
+Bakker's axes, an ensemble for values the evidence cannot rank, a BibTeX
+exporter, an annotated model exporter, and a simulation engine.
+
+Nine capabilities, and nothing a person could hand to a teacher.
+
+Every one of those is an ANSWER TO A QUESTION NOBODY ASKED IN ISOLATION. A
+student in a teaching lab has one job: run the simulation, and show where
+the numbers came from. Terrium could do both halves and made the student
+assemble them from a terminal transcript, two export files and a screen
+they had already scrolled past.
+
+WHAT MAKES THIS DIFFERENT FROM A PRINTOUT
+-----------------------------------------
+The section other tools do not have is **what Terrium refused to do**.
+
+A report that silently omits what could not be sourced is this project's
+own defect at document scale: computed, correct, and not delivered. A
+reader cannot tell a parameter nobody has measured from one the tool
+declined to substitute, and those are different facts with different
+remedies. So refusals are content here, each with the reason and the action
+that would change it.
+
+NOTHING IS RESTATED
+-------------------
+Every sentence about a value comes from the module that owns that value's
+reasoning -- `spread_consequence` for ensembles, `citation_export` for the
+bibliography, the resolver's own `reason` strings for caveats. This module
+arranges; it does not re-derive. Two renderers of one fact drift, and this
+repository has spent most of its effort on instances of exactly that
+(ADR 0003, ADR 0027, ADR 0113).
+"""
+from __future__ import annotations
+
+from typing import Any, Sequence
+
+from pydantic import BaseModel
+
+
+class SuppliedValue(BaseModel):
+    """A number the student chose, not one the literature reports.
+
+    Kept apart from resolved values everywhere it appears. `s0` is the
+    experiment being run; a Km is a property of the enzyme. Presenting them
+    in one undifferentiated table is how a reader comes to believe the tool
+    sourced something it did not, which is the failure the whole provenance
+    layer exists to prevent.
+    """
+
+    name: str
+    value: float
+    unit: str | None = None
+    #: Why this number rather than another. Optional -- a student may have
+    #: no reason beyond "the lab handout said so", and inventing one for
+    #: them would be worse than leaving it blank.
+    basis: str | None = None
+
+
+def _fmt(value: Any) -> str:
+    """Numbers a reader can check against the source, without noise."""
+    if isinstance(value, float):
+        return f"{value:.6g}"
+    return str(value)
+
+
+def _conditions_phrase(result: Any) -> str:
+    """What the source said about how the measurement was made.
+
+    Reads the resolver's own fields. Returns "" when the source said
+    nothing AND nothing recorded its silence -- which is different from a
+    source that explicitly reported nothing, and the caller renders that
+    difference rather than this function flattening it.
+    """
+    measured = []
+    if getattr(result, "assay_ph", None) is not None:
+        measured.append(f"pH {_fmt(result.assay_ph)}")
+    if getattr(result, "assay_temperature_c", None) is not None:
+        measured.append(f"{_fmt(result.assay_temperature_c)} °C")
+    if getattr(result, "assay_buffer", None):
+        measured.append(f"in {result.assay_buffer}")
+    return ", ".join(measured)
+
+
+def _citation_text(result: Any) -> str:
+    citation = getattr(result, "citation", None)
+    if citation is None:
+        return "no citation recorded"
+    source = getattr(citation, "source", None) or "unknown source"
+    reference = getattr(citation, "reference_id", None)
+    title = getattr(citation, "title", None)
+    parts = [f"{source} ref {reference}" if reference else source]
+    if title:
+        parts.append(f"“{title}”")
+    return " — ".join(parts)
+
+
+class LabReport(BaseModel):
+    """The document, and the facts it was built from.
+
+    A model rather than a bare string so a caller can assert on the parts
+    without parsing prose -- a test that greps the rendered markdown is a
+    test of the wording, and the wording is the least important thing here.
+    """
+
+    title: str
+    question: str
+    markdown: str
+
+    #: Parameter names that carry a literature citation.
+    sourced: list[str] = []
+    #: Parameter names the student supplied.
+    supplied: list[str] = []
+    #: One line per thing Terrium declined to do, in the reader's terms.
+    refusals: list[str] = []
+    #: Parameters where the literature reports more than one value.
+    disagreements: list[str] = []
+
+    @property
+    def is_defensible(self) -> bool:
+        """Every number in the model is either cited or declared as the
+        student's own.
+
+        A POSITIVE test. `not refusals` would call a report with no
+        parameters at all defensible, and an empty report is not a strong
+        one -- it is an empty one.
+        """
+        return bool(self.sourced or self.supplied) and not any(
+            name not in self.sourced and name not in self.supplied
+            for name in self.sourced + self.supplied
+        )
+
+
+def build_report(
+    *,
+    title: str,
+    question: str,
+    resolved: dict[str, Any],
+    supplied: Sequence[SuppliedValue] = (),
+    simulation: Any | None = None,
+    bibtex: str | None = None,
+    ensembles: dict[str, Any] | None = None,
+) -> LabReport:
+    """Assemble one document from what the run actually established.
+
+    `resolved` maps a parameter name to a `KineticResult` -- found or not.
+    A NOT-found result is not skipped: it becomes a refusal, because "the
+    tool could not source this" is the single most important thing a reader
+    of a lab report needs to know and the easiest thing for a printout to
+    lose.
+    """
+    lines: list[str] = [f"# {title}", "", question, ""]
+
+    sourced: list[str] = []
+    supplied_names = [s.name for s in supplied]
+    refusals: list[str] = []
+    disagreements: list[str] = []
+
+    # ---- What the model ran on -------------------------------------------
+    lines += ["## Parameters", ""]
+    lines += ["| parameter | value | origin | source |", "|---|---|---|---|"]
+
+    for name, result in resolved.items():
+        if getattr(result, "found", False):
+            sourced.append(name)
+            lines.append(
+                f"| {name} | {_fmt(result.value)} {getattr(result, 'unit', '') or ''} "
+                f"| literature | {_citation_text(result)} |"
+            )
+        else:
+            lines.append(
+                f"| {name} | — | **not sourced** | see *What Terrium would "
+                f"not do* |"
+            )
+
+    for value in supplied:
+        lines.append(
+            f"| {value.name} | {_fmt(value.value)} {value.unit or ''} "
+            f"| **yours** | {value.basis or 'not stated'} |"
+        )
+
+    lines += [
+        "",
+        "A value marked **yours** describes the experiment, not the enzyme. "
+        "No database reports it, and Terrium has not checked it.",
+        "",
+    ]
+
+    # ---- The conditions each measurement was made under -------------------
+    condition_lines: list[str] = []
+    for name, result in resolved.items():
+        if not getattr(result, "found", False):
+            continue
+        measured = _conditions_phrase(result)
+        unreported = list(getattr(result, "assay_unreported", []) or [])
+        if not measured and not unreported:
+            continue
+        entry = f"- **{name}** — "
+        entry += f"measured at {measured}" if measured else "no conditions reported"
+        if unreported:
+            entry += f"; the source did not report {', '.join(unreported)}"
+        condition_lines.append(entry)
+
+    if condition_lines:
+        lines += [
+            "## Conditions the values were measured under",
+            "",
+            "Kinetic values move with pH, temperature and buffer. Two values "
+            "measured under different conditions describe experiments nobody "
+            "ran together.",
+            "",
+            *condition_lines,
+            "",
+        ]
+
+    # ---- Where the literature disagrees ----------------------------------
+    for name, verdict in (ensembles or {}).items():
+        reason = getattr(verdict, "reason", "")
+        if not reason:
+            continue
+        disagreements.append(name)
+        lines += [
+            f"## The literature disagrees about {name}",
+            "",
+            # The module that owns the reasoning wrote this sentence. It is
+            # quoted, not paraphrased: a second wording is a second claim.
+            reason,
+            "",
+        ]
+        outcomes = getattr(verdict, "outcomes", []) or []
+        if outcomes:
+            lines += ["| value | result |", "|---|---|"]
+            for outcome in outcomes:
+                shown = (
+                    _fmt(outcome.outcome)
+                    if getattr(outcome, "outcome", None) is not None
+                    else f"could not be simulated — {getattr(outcome, 'failure', '')}"
+                )
+                mark = " (returned)" if getattr(outcome, "selected", False) else ""
+                lines.append(f"| {_fmt(outcome.value)}{mark} | {shown} |")
+            lines.append("")
+
+    # ---- What Terrium would not do ---------------------------------------
+    #
+    # THE SECTION THAT MAKES THIS A TERRIUM REPORT.
+    #
+    # Every other tool's output is what it managed to produce. A refusal
+    # that appears nowhere is indistinguishable from a question nobody
+    # asked, and the student cannot act on it or defend the gap to a
+    # teacher.
+    for name, result in resolved.items():
+        if getattr(result, "found", False):
+            continue
+        source = getattr(result, "source", "") or "not_found"
+        detail = {
+            "cross_species_withheld": (
+                "a value exists in another organism and was not substituted, "
+                "because a kinetic constant is species-specific"
+            ),
+            "variant_withheld": (
+                "every value found was measured on a protein variant rather "
+                "than the enzyme as found"
+            ),
+            "ec_ambiguous": (
+                "the enzyme name matched more than one EC number, and "
+                "choosing one would cite a different protein"
+            ),
+            "ec_not_resolved": (
+                "no EC number could be found for that name, so no database "
+                "was asked"
+            ),
+            "literature_candidates": (
+                "no database value was found; candidate papers were located "
+                "but no number was read out of them"
+            ),
+        }.get(source, "no value was found in BRENDA, KEGG or PubMed")
+
+        # A `not_found` covers two quite different situations, and the
+        # resolver already distinguishes them (ADR 0118): the substrate name
+        # matched nothing while the enzyme reports others, versus a genuine
+        # gap. The first is fixable by the reader in one edit, so saying
+        # only "not found" wastes the work that established which it was.
+        available = list(getattr(result, "substrates_available", []) or [])
+        if available:
+            detail = (
+                "the substrate name matched nothing, though this enzyme "
+                f"reports values for {', '.join(available)} — Terrium does "
+                "not substitute a similar name, because a similar name can "
+                "be a different molecule"
+            )
+        refusals.append(f"{name}: {detail}")
+
+    for name, result in resolved.items():
+        preparation = getattr(result, "preparation", None)
+        if preparation is not None and getattr(
+            preparation, "differs_from_the_free_enzyme", False
+        ):
+            refusals.append(
+                f"{name}: the value returned was measured on a "
+                f"{preparation.status} enzyme, not the free enzyme"
+            )
+        for mixture in getattr(result, "source_mixtures", []) or []:
+            reason = getattr(mixture, "reason", "")
+            if reason:
+                refusals.append(f"{name}: {reason}")
+
+    if refusals:
+        lines += [
+            "## What Terrium would not do",
+            "",
+            "These are not omissions. Each one is a decision, with the reason "
+            "and what would change it.",
+            "",
+            *[f"- {r}" for r in refusals],
+            "",
+        ]
+    else:
+        lines += [
+            "## What Terrium would not do",
+            "",
+            "Nothing was withheld: every parameter resolved to a cited value "
+            "or was supplied by you.",
+            "",
+        ]
+
+    # ---- The run ----------------------------------------------------------
+    if simulation is not None:
+        colnames = list(getattr(simulation, "colnames", []) or [])
+        data = list(getattr(simulation, "data", []) or [])
+        if colnames and data:
+            lines += ["## Result", "", "| " + " | ".join(colnames) + " |",
+                      "|" + "---|" * len(colnames)]
+            # First and last row only. A lab report is not a data dump, and
+            # the full trajectory belongs in the CSV export.
+            for row in (data[0], data[-1]):
+                lines.append("| " + " | ".join(_fmt(v) for v in row) + " |")
+            lines += [
+                "",
+                f"{len(data)} time points; first and last shown. The full "
+                "trajectory is in the CSV export.",
+                "",
+            ]
+
+    # ---- Citations --------------------------------------------------------
+    if bibtex:
+        lines += [
+            "## Citations",
+            "",
+            "Import into Zotero, Mendeley or EndNote. Author, year and "
+            "journal are absent rather than invented — complete each entry "
+            "from its source before citing it.",
+            "",
+            "```bibtex",
+            bibtex.rstrip(),
+            "```",
+            "",
+        ]
+
+    return LabReport(
+        title=title,
+        question=question,
+        markdown="\n".join(lines).rstrip() + "\n",
+        sourced=sourced,
+        supplied=supplied_names,
+        refusals=refusals,
+        disagreements=disagreements,
+    )

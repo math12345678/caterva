@@ -109,3 +109,11 @@ htmlcov/
 # disk, out of the repository. See the commit that removed them.
 Docw/
 Science-Agent-Pipeline/attached_assets/*.docx
+
+# pnpm's scratch files. It writes `_tmp_<pid>_<hash>` beside the package
+# being installed and unlinks them on success; an install that dies partway
+# leaves them behind. Two were committed on 2026-08-20 by `git add -A`.
+#
+# Zero bytes, no content, no meaning -- and indistinguishable from a real
+# file to whoever reads the tree next.
+_tmp_[0-9]*_*

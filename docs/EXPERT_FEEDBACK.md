@@ -18,7 +18,7 @@ Terrium is that a check which cannot fail is worse than no check.
 | Lisa Jeske | check organism relatedness | **adopted** | shipped |
 | Lisa Jeske | mixing conditions gives "fantasy numbers" | **adopted** | pH + temperature (ADR 0026), buffers (ADR 0028); cofactors ARE in the corpus and still unread — ADR 0031 corrects an earlier claim that they were absent |
 | *(found while reading her sentence)* | the commentary also says "Y124C mutant" | **new finding** | variant rows excluded from selection (ADR 0029) |
-| Barbara Bakker (UMCG) | score parameters, sample an ensemble | **half adopted** | scoring shipped, sampling declined |
+| Barbara Bakker (UMCG) | score parameters, sample an ensemble | **adopted** | scoring shipped 2026-08-13; **sampling shipped 2026-08-20** (ADR 0131). Recorded as "declined" for a week while Sauro, who called it "the right way to do it", was waiting on it |
 | Barbara Bakker | *(the score, as actually served)* | **was two-thirds dead in the API** | one implementation now (ADR 0027) |
 | Herbert Sauro (UW) | default a missing value and warn | **policy unresolved** | mechanism shipped; the failure he *predicted* is closed with `--cite` |
 | Daniel Katz (NCSA) | per-constant citation is confusing | **our wording was wrong** | language changed; citations now export as BibTeX/RIS |
@@ -12203,3 +12203,39 @@ is worth keeping and not worth believing in.
 | Tests | `test_cross_species_ensemble.py` 9 new; 59 green across the tie/ensemble/runner suites |
 | Next | **nothing renders it yet.** The candidates reach `KineticResult`; the CLI and API still print a plain refusal. Same "reaches the reader" gap ADR 0128 just closed for the identity failures — and until it is closed, the answer to Sauro is true of the library and not of the product |
 | Open | Bakker on axis weighting (still unanswered, so nothing here is weighted); the `--live` DOI check; NCBI's citation request wording |
+
+**UPDATE — fixed and tested 2026-08-17.**
+
+`formatResolveCommand` now takes the flags the user already supplied and
+carries them through. `--vmax` and `--enzyme-conc` are treated as the
+alternatives they are: supply Vmax directly, or supply [E]0 so it can be
+bridged from kcat. Offering both was what made the command wrong.
+
+Verified by hand, the case that was broken:
+
+```
+$ simulate "michaelis menten of lactate dehydrogenase on pyruvate in
+    Homo sapiens" --s0 10mM --vmax 1.2mM/s
+-> suggests: ... --s0 10mM --vmax 1.2mM/s        (was: --enzyme-conc 0.001mM)
+
+$ <that suggested command, verbatim>
+-> exit 0
+   km 10.73 mM  brenda_exact  BRENDA ref 740253
+   final 0.5000 mM
+```
+
+Before: the suggestion discarded `--vmax` and exited 2.
+
+`src/cli/__tests__/suggestionCarriesYourFlags.test.ts` — six unit tests
+against `formatResolveCommand` itself, which is where the defect lived, and
+which run in milliseconds rather than the minutes a CLI spawn costs.
+
+Mutation-tested, with the mutation VERIFIED APPLIED before measuring (an
+assertion that the exact string was replaced): restoring the fixed tail fails
+the two tests that pin the defect. The other four survive for good reasons —
+they cover the no-Vmax branch, unknown flags, key-order stability, and the
+zero-flag worked example, none of which the mutation touches.
+
+Two of those four exist to stop an overcorrection: always dropping
+`--enzyme-conc` would satisfy "keeps a supplied --vmax" while deleting the
+kcat bridge (ADR 0019) from the one case that needs it.
