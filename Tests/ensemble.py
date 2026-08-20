@@ -84,6 +84,7 @@ from __future__ import annotations
 
 import math
 import random
+import sys
 from dataclasses import dataclass, field
 from typing import Mapping, Sequence
 
@@ -437,6 +438,38 @@ def _format_report(result: EnsembleResult, quantity: str = "value") -> str:
     return "\n".join(lines)
 
 
+def _format_band(band) -> str:
+    """The trajectory envelope, as a person reads it.
+
+    Beside the parameter spread rather than instead of it: the two answer
+    different questions. The parameter spread says the literature disagrees;
+    the band says how much that disagreement matters to the answer, which is
+    the only one of the two a student can act on.
+    """
+    lines: list[str] = ["", "  What that disagreement does to the simulation:", ""]
+    lines.append(f"  {band.support_note()}")
+    lines.append("")
+    for envelope in band.envelopes:
+        # A column whose band is flat everywhere is not interesting and
+        # crowds out the one that is. Reported as a single line instead of
+        # a table of identical numbers.
+        widths = [h - lo for lo, h in zip(envelope.low, envelope.high)]
+        if max(widths) <= 0:
+            lines.append(f"  {envelope.column}: identical across every run.")
+            continue
+        widest = max(range(len(widths)), key=lambda i: widths[i])
+        lines.append(f"  {envelope.column}")
+        lines.append(f"    {'t':>8}  {'low':>12}  {'median':>12}  {'high':>12}")
+        for i, t in enumerate(envelope.times):
+            mark = "  <-- widest" if i == widest else ""
+            lines.append(
+                f"    {t:>8.3g}  {envelope.low[i]:>12.5g}  "
+                f"{envelope.median[i]:>12.5g}  {envelope.high[i]:>12.5g}{mark}"
+            )
+        lines.append("")
+    return "\n".join(lines)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """`python -m ensemble --fixture ... --substrate ...`
 
@@ -448,6 +481,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     output is checkable and BRENDA is not hit by a demonstration.
     """
     import argparse
+    import json
     import pathlib as _pathlib
 
     parser = argparse.ArgumentParser(
@@ -465,7 +499,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         required=True,
         help="required: an ensemble nobody can re-derive is not evidence",
     )
+    parser.add_argument(
+        "--simulate",
+        help="engine domain to run per draw, e.g. michaelis_menten. Without "
+             "this you get the parameter spread but no trajectory.",
+    )
+    parser.add_argument("--parameter", default="km", help="which parameter the draws vary")
+    parser.add_argument("--vmax", type=float, default=5.0)
+    parser.add_argument("--s0", type=float, default=10.0)
+    parser.add_argument("--end", type=float, default=10.0)
+    parser.add_argument("--points", type=int, default=11)
+    parser.add_argument("--max-runs", dest="max_runs", type=int, default=200)
+    parser.add_argument("--json", action="store_true", help="machine-readable output")
     args = parser.parse_args(list(argv) if argv is not None else None)
+
+    # This module's own directory, so `brenda_client` and `evidence_rank`
+    # import whatever the caller's working directory happens to be. The CLI
+    # spawns it from the repository root; running it by hand happens from
+    # Tests/. Depending on cwd made the first of those fail with a fixture
+    # path resolved twice.
+    _here = str(_pathlib.Path(__file__).resolve().parent)
+    if _here not in sys.path:
+        sys.path.insert(0, _here)
 
     import brenda_client
     import evidence_rank
@@ -486,9 +541,87 @@ def main(argv: Sequence[str] | None = None) -> int:
     result = ensemble_from_entries(
         kept, draws=args.draws, seed=args.seed, requested_organism=args.organism
     )
+
+    # THE SIMULATION HALF. Without `--simulate` this reports the spread of the
+    # PARAMETER, which is Bakker's weighting and is not yet what Sauro asked
+    # for -- "with Barbara's you can sample and get an ensemble distribution".
+    # With it, the model is run once per draw and the band is what comes back.
+    band = None
+    if args.simulate:
+        try:
+            from model_ensemble import ensemble_over
+        except ImportError:  # pragma: no cover
+            from Tests.model_ensemble import ensemble_over  # type: ignore
+        # The engine lives at the repository root, one level above Tests/.
+        # Added here rather than relying on the caller's PYTHONPATH so the
+        # command works when run directly from Tests/, which is how the
+        # docstring says to run it.
+        _root = str(_pathlib.Path(__file__).resolve().parent.parent)
+        if _root not in sys.path:
+            sys.path.insert(0, _root)
+        import Terium.terium_engine as _engine
+
+        simulate_fn = getattr(_engine, f"simulate_{args.simulate}", None)
+        if simulate_fn is None:
+            print(f"No engine function for domain {args.simulate!r}.")
+            return 2
+        band = ensemble_over(
+            simulate=simulate_fn,
+            base_parameters=dict(
+                vmax=args.vmax, s0=args.s0, end=args.end, points=args.points
+            ),
+            parameter=args.parameter,
+            drawn=result,
+            max_runs=args.max_runs,
+        )
+
+    if args.json:
+        payload = {
+            "ok": True,
+            "substrate": args.substrate,
+            "organism": args.organism,
+            "rows": len(rows),
+            "frontier": len(kept),
+            "seed": result.seed,
+            "disclaimer": result.disclaimer,
+            "candidates": [
+                {
+                    "value": w.candidate.value,
+                    "unit": w.candidate.unit,
+                    "probability": w.probability,
+                    "referenceId": w.candidate.reference_id,
+                    "conditions": w.candidate.conditions,
+                    "grades": [grade for _, grade, _ in w.breakdown],
+                }
+                for w in sorted(result.weighted, key=lambda x: -x.probability)
+            ],
+            "summary": result.summary(),
+        }
+        if band is not None:
+            payload["band"] = {
+                "swept": list(band.swept),
+                "succeeded": band.succeeded,
+                "attempted": band.attempted,
+                "supportNote": band.support_note(),
+                "envelopes": [
+                    {
+                        "column": e.column,
+                        "times": list(e.times),
+                        "low": list(e.low),
+                        "median": list(e.median),
+                        "high": list(e.high),
+                    }
+                    for e in band.envelopes
+                ],
+            }
+        print(json.dumps(payload, indent=2))
+        return 0
+
     print(f"\n{args.substrate} / {args.organism}  --  {len(rows)} row(s), "
           f"{len(kept)} on the non-dominated frontier")
     print(_format_report(result, quantity="Km"))
+    if band is not None:
+        print(_format_band(band))
     return 0
 
 
