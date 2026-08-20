@@ -208,6 +208,28 @@ class KineticResult(BaseModel):
     #: see `SelectionTie.is_tied`.
     selection_tie: "SelectionTie | None" = None
 
+    #: Every row on the non-dominated frontier, with the reliability score
+    #: each was graded by -- Bakker's weights, before they are sampled.
+    #:
+    #: WHY THE SCORES ARE HERE AND NOT RECOMPUTED LATER
+    #: ------------------------------------------------
+    #: `science_agent_runner` grades exactly one value: the winner. That is
+    #: all a single-value answer needs, and it is why the scoring shipped
+    #: while the sampling did not -- there was never a per-candidate score
+    #: for the sampling to weight anything with.
+    #:
+    #: The rows carry `assay_ph`, `assay_temperature_c`, `assay_unreported`
+    #: and `organism`, which is exactly what `score_reliability` reads. They
+    #: exist only inside the selection function; by the time a caller holds
+    #: a KineticResult they have been collapsed to one value and a list of
+    #: TiedCandidates with no assay fields. Rebuilding them downstream would
+    #: mean resolving the same query twice.
+    #:
+    #: Empty when nothing was resolved. An empty list is "no ensemble to
+    #: draw", which the caller must report as a resolution failure rather
+    #: than as a band with no members.
+    ensemble_candidates: list = []
+
     #: Set when the value returned IS one of the named forms the pool mixed.
     #:
     #: `FormMixture.reason` warns that "returning the lowest would pick a
@@ -626,7 +648,11 @@ def _best_evidenced(
     """
     if len(entries) < 2:
         _report_preparation(entries[0], log, tier, quantity)
-        return entries[0], None
+        # One row is its own frontier. Returned as a list of one rather
+        # than empty: an ensemble over a single measurement is a
+        # legitimate (if narrow) ensemble, and an empty list here would
+        # read downstream as 'nothing was resolved'.
+        return entries[0], None, list(entries)
     kept = evidence_rank.frontier(
         entries, requested_organism, relatedness_by_organism
     )
@@ -644,7 +670,76 @@ def _best_evidenced(
     # The tie is computed HERE, where `kept` exists, and returned alongside
     # the row. Recomputing it at the call site would need the frontier
     # again, and a second frontier is a second implementation.
-    return chosen, find_tie(kept, chosen)
+    #
+    # THE FRONTIER ITSELF IS RETURNED TOO, for the same reason and one step
+    # further. Bakker's ensemble needs a reliability score for EVERY
+    # surviving row, not just the winner, and those rows carry the assay pH,
+    # temperature and organism that `score_reliability` grades on. They exist
+    # only here; by the time the caller has a KineticResult they have been
+    # collapsed to one value and a list of bare TiedCandidates with no assay
+    # fields.
+    #
+    # So the ensemble could not be built downstream without re-parsing
+    # BRENDA, which would be a second resolution of the same query -- the
+    # duplicate-source-of-truth defect that this comment's first paragraph
+    # already refuses one level up.
+    return chosen, find_tie(kept, chosen), list(kept)
+
+
+def _score_frontier(
+    frontier,
+    requested_organism,
+    physiological=None,
+    relatedness_by_organism=None,
+) -> list:
+    """Grade every surviving row, so the ensemble has weights to sample by.
+
+    ONE IMPLEMENTATION, NOT TWO. These use `score_reliability` -- the same
+    function that grades the winner on its way to the API response. A second
+    grader for candidates would be ADR 0027 exactly: two implementations of
+    one score, drifting until somebody notices they disagree.
+
+    Returns plain dicts rather than `ensemble.Candidate` objects. The
+    literature layer must not import the ensemble module to produce its own
+    output: that would make the resolver depend on the sampler, when the
+    real relationship is the other way round.
+    """
+    import reliability
+
+    scored = []
+    for entry in frontier or []:
+        value = getattr(entry, "km_value", None)
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            continue
+        measured = getattr(entry, "organism", None)
+        verdict = None
+        if relatedness_by_organism and measured:
+            verdict = relatedness_by_organism.get(measured)
+        score = reliability.score_reliability(
+            ph=getattr(entry, "assay_ph", None),
+            temperature_c=getattr(entry, "assay_temperature_c", None),
+            unreported=list(getattr(entry, "assay_unreported", []) or []),
+            reference=physiological,
+            requested_organism=requested_organism,
+            measured_organism=measured,
+            cross_species=bool(
+                requested_organism and measured and requested_organism != measured
+            ),
+            relatedness=verdict,
+        )
+        scored.append({
+            "value": float(value),
+            "unit": getattr(entry, "unit", None),
+            "organism": measured,
+            "reference_id": getattr(entry, "reference_id", None),
+            "conditions": getattr(entry, "conditions", None),
+            "grades": {
+                "assay_completeness": score.assay_completeness.grade,
+                "condition_proximity": score.condition_proximity.grade,
+                "organism_match": score.organism_match.grade,
+            },
+        })
+    return scored
 
 
 def _preparation_of(entry) -> "PreparationVerdict":
@@ -825,7 +920,7 @@ def resolve_kinetic_value(
                 f"{len(contrasts)} presence/absence contrast(s) in the candidate pool: "
                 + "; ".join(c.compound for c in contrasts)
             )
-        best, tie = _best_evidenced(
+        best, tie, frontier = _best_evidenced(
             exact, log, "exact match", organism, quantity=quantity
         )
         return KineticResult(
@@ -842,6 +937,13 @@ def resolve_kinetic_value(
             variant=best.variant,
             preparation=_preparation_of(best),
             selection_tie=tie,
+            # No physiological reference at this layer -- it is a runner
+            # input, supplied per request, and the resolver never sees it.
+            # So `condition_proximity` grades `not_assessed` for every row,
+            # which is the honest state and costs the weighting nothing: an
+            # axis where every candidate scores alike cannot discriminate,
+            # and cancels under normalisation (see ensemble.py).
+            ensemble_candidates=_score_frontier(frontier, organism),
             selected_form=name_selected_form(mixtures, best.km_value),
             effectors=list(best.effectors),
             citation=citation_from_brenda_entry(best),
@@ -1031,7 +1133,7 @@ def resolve_kinetic_value(
                 f"{len(contrasts)} presence/absence contrast(s) in the candidate pool: "
                 + "; ".join(c.compound for c in contrasts)
             )
-        best, tie = _best_evidenced(
+        best, tie, frontier = _best_evidenced(
             acceptable,
             log,
             "cross-species",
@@ -1057,6 +1159,13 @@ def resolve_kinetic_value(
             variant=best.variant,
             preparation=_preparation_of(best),
             selection_tie=tie,
+            # No physiological reference at this layer -- it is a runner
+            # input, supplied per request, and the resolver never sees it.
+            # So `condition_proximity` grades `not_assessed` for every row,
+            # which is the honest state and costs the weighting nothing: an
+            # axis where every candidate scores alike cannot discriminate,
+            # and cancels under normalisation (see ensemble.py).
+            ensemble_candidates=_score_frontier(frontier, organism),
             selected_form=name_selected_form(mixtures, best.km_value),
             effectors=list(best.effectors),
             citation=citation_from_brenda_entry(best),

@@ -46,7 +46,10 @@ const RESET = '\x1b[0m';
 const YELLOW = '\x1b[33m';
 
 export interface EnsembleOptions {
-  fixture: string;
+  /** A saved BRENDA table. Omit to resolve live — see commandEnsemble. */
+  fixture?: string;
+  /** Enzyme name for a live lookup, when no fixture is given. */
+  enzyme?: string;
   substrate: string;
   organism?: string;
   ec?: string;
@@ -97,11 +100,12 @@ interface EnsemblePayload {
 export function runEnsemble(options: EnsembleOptions): EnsemblePayload | null {
   const args = [
     ENSEMBLE,
-    '--fixture', options.fixture,
     '--substrate', options.substrate,
     '--seed', String(options.seed),
     '--json',
   ];
+  if (options.fixture) args.push('--fixture', options.fixture);
+  if (options.enzyme) args.push('--enzyme', options.enzyme);
   if (options.organism) args.push('--organism', options.organism);
   if (options.ec) args.push('--ec', options.ec);
   if (options.draws) args.push('--draws', String(options.draws));
