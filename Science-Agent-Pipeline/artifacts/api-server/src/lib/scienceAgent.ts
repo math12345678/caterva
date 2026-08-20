@@ -93,6 +93,10 @@ export interface ScienceAgentResult {
    *  "lactate" matches by substring and "L-lactate" returns nothing —
    *  and the student is told the literature is empty when it is not. */
   substratesAvailable?: string[];
+  /** EC numbers UniProt indexed under the enzyme NAME, when it matched more
+   *  than one. An EC number is the identity of the protein every citation
+   *  refers to, so the runner refuses to pick and names them (ADR 0127). */
+  ecCandidates?: string[];
   /** Variant descriptors ("Y124C", "isozyme H4") for rows that WERE found
    * and were withheld because they measure a sequence variant rather than
    * the enzyme (ADR 0029). Populated only when

@@ -370,10 +370,13 @@ function buildUnresolvedKineticProvenance(
     | "no_locator"
     | "cross_species_withheld"
     | "cross_species_too_distant"
-    | "variant_withheld",
+    | "variant_withheld"
+    | "ec_not_resolved"
+    | "ec_ambiguous",
   organismsAvailable?: string[],
   relatedness?: RelatednessVerdict[],
   substratesAvailable?: string[],
+  ecCandidates?: string[],
 ): ParameterProvenance {
   const K = key.toUpperCase();
 
@@ -449,6 +452,45 @@ function buildUnresolvedKineticProvenance(
         `for ${named}. Kinetic parameters are species-specific, so it was not ` +
         `substituted; re-run with allowCrossSpecies to use it, understanding ` +
         `that the resulting model is not a model of the organism you asked for.`,
+    };
+  }
+
+  // THE RUN NEVER REACHED BRENDA.
+  //
+  // Both of these stop at the enzyme name, before any database is asked
+  // for a value — and both used to fall into the generic message below:
+  //
+  //     "Could not resolve a real KM value from BRENDA/KEGG/PubMed"
+  //
+  // which names three sources that were never consulted. A student reads
+  // that as "the literature has no value for my enzyme" and goes looking
+  // for a different problem than the one they have. Naming the stage that
+  // actually failed is the difference between a dead end and a next step.
+  if (reason === "ec_ambiguous") {
+    const named = ecCandidates && ecCandidates.length > 0
+      ? ecCandidates.join(", ")
+      : "more than one EC number";
+    return {
+      origin: "default",
+      unresolvedReason: "ec_ambiguous",
+      note:
+        `The enzyme name you gave matches more than one enzyme (${named}), ` +
+        `so no ${K} was looked up. These are different proteins — EC ` +
+        `1.1.1.27 and EC 1.1.1.28 are the L- and D- lactate dehydrogenases ` +
+        `— and picking one would attach a real citation to an enzyme you ` +
+        `did not ask about. Re-run with the EC number you meant.`,
+    };
+  }
+
+  if (reason === "ec_not_resolved") {
+    return {
+      origin: "default",
+      unresolvedReason: "ec_not_resolved",
+      note:
+        `No EC number could be found for the enzyme name you gave, so no ` +
+        `${K} was looked up — BRENDA, KEGG and PubMed were never asked. ` +
+        `This is a problem with the NAME, not with the literature: check ` +
+        `the spelling, or supply the EC number directly if you know it.`,
     };
   }
 
@@ -562,6 +604,18 @@ async function applyKineticResolution(
           "cross_species_too_distant",
           agentResult.crossSpeciesOrganismsAvailable,
           agentResult.relatedness,
+        );
+      } else if (
+        agentResult.source === "ec_ambiguous" ||
+        agentResult.source === "ec_not_resolved"
+      ) {
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          agentResult.source,
+          undefined,
+          undefined,
+          undefined,
+          agentResult.ecCandidates,
         );
       } else {
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(

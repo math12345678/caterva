@@ -362,6 +362,29 @@ export interface ParameterProvenance {
     | "cross_species_too_distant"
     | "variant_withheld"
     /**
+     * The run stopped at the ENZYME NAME, before any database was asked
+     * for a value.
+     *
+     * `ec_not_resolved` — UniProt indexed nothing under that name.
+     * `ec_ambiguous`    — it indexed several, and they are different
+     *                     proteins (EC 1.1.1.27 and EC 1.1.1.28 are the L-
+     *                     and D- lactate dehydrogenases).
+     *
+     * Both belong here for the reason the others do, and more sharply: the
+     * generic sentence names BRENDA, KEGG and PubMed, none of which was
+     * consulted. It does not merely omit a fact — it blames the wrong
+     * stage, and sends a reader to look for a problem they do not have.
+     */
+    | "ec_not_resolved"
+    | "ec_ambiguous"
+    /**
+     * Nothing was found anywhere. The plain case, and the only one the
+     * generic sentence actually describes — named explicitly so the union
+     * covers what `buildUnresolvedKineticProvenance` can produce, rather
+     * than leaving its widest branch unassignable.
+     */
+    | "not_found"
+    /**
      * BRENDA held nothing, and the PubMed/CORE fallback found papers that
      * may report the value.
      *
