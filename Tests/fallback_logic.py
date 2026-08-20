@@ -73,7 +73,7 @@ from source_context import (
 import evidence_rank
 from protein_variant import VariantVerdict
 from enzyme_preparation import PreparationVerdict
-from selection_tie import SelectionTie, find_tie
+from selection_tie import SelectionTie, TiedCandidate, find_tie
 from taxonomy import (
     Lineage,
     Relatedness,
@@ -151,6 +151,33 @@ class KineticResult(BaseModel):
     #: unactionable -- the student cannot opt in to something they were
     #: never told existed.
     cross_species_organisms_available: list[str] = []
+
+    #: Every cross-species row WITH its value, when the requested organism
+    #: had none.
+    #:
+    #: WHY THE VALUES AND NOT JUST THE NAMES
+    #: -------------------------------------
+    #: Herbert Sauro, asked whether to default a missing value or refuse,
+    #: replied:
+    #:
+    #:     I thought you'd decided to build an ensemble when values are
+    #:     unknown?
+    #:
+    #: That dissolves the question rather than answering it. Defaulting to
+    #: 0.5 invents a number; refusing gives a student nothing; substituting
+    #: a rabbit Km presents one organism's measurement as another's, which
+    #: is what Jeske objected to. Running the model at EVERY organism's
+    #: measured value is none of the three.
+    #:
+    #: `cross_species_organisms_available` already named the organisms, and
+    #: `broad` — the rows those names came from — carried the values and
+    #: was discarded. The refusal knew the numbers and threw them away.
+    #:
+    #: Shaped as `TiedCandidate` deliberately, so `spread_consequence`
+    #: consumes these unchanged (ADR 0111). One ensemble mechanism, two
+    #: sources of candidates; a second one would be a second place the
+    #: reasoning could drift.
+    cross_species_candidates: "list[TiedCandidate]" = []
 
     #: Variant descriptors ("Y124C", "isozyme H4") for rows that WERE found
     #: and were withheld because they measure a variant rather than the
@@ -871,6 +898,30 @@ def resolve_kinetic_value(
             found=False,
             source="cross_species_withheld",
             cross_species_organisms_available=organisms,
+            # The numbers, not only the names. Every one is a real
+            # measurement with a reference; none of them is a measurement
+            # of the organism that was asked about, and nothing here says
+            # otherwise.
+            cross_species_candidates=[
+                TiedCandidate(
+                    value=float(e.km_value),
+                    unit=getattr(e, "unit", None),
+                    organism=e.organism,
+                    reference_id=getattr(e, "reference_id", None),
+                    conditions=getattr(e, "conditions", None),
+                    selected=False,
+                )
+                for e in broad
+                # PRECAUTIONARY, AND UNEXERCISED. `TiedCandidate.value` is
+                # a required float, so a row with no value would raise a
+                # ValidationError here rather than produce a bad candidate.
+                # Measured: all 8 rows in the LDH fixture carry a value, so
+                # no test exercises this filter and mutating it away breaks
+                # nothing. Said out loud rather than left to look tested —
+                # a guard nobody can fail is worth keeping and not worth
+                # believing in.
+                if getattr(e, "km_value", None) is not None
+            ],
             search_log=log,
         )
 

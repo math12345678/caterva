@@ -12090,3 +12090,116 @@ breaking.
 | Suites | literature 522 + 397 green; the only red remains `check_no_tellurium_integration_claims` on ADR 0099, another agent's |
 | Next | `queryResolver.ts` does not render `ec_ambiguous` specially yet — the candidates reach the response but not the sentence. Smaller than this was; the information is now present |
 | Open | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording |
+
+
+## Fifty-first pass — the stage that failed
+
+ADR 0127 made the runner emit `ec_ambiguous`. Nothing rendered it — and
+grepping showed `ec_not_resolved` had never been rendered either. Both fell
+into `queryResolver`'s generic branch:
+
+> Could not resolve a real KM value from BRENDA/KEGG/PubMed; using default KM.
+
+**None of those three was asked.** Both failures stop at the enzyme name,
+before any database is consulted. The message blames the literature for
+something that happened two steps earlier, and that is worse than a vague
+message: a vague one leaves a reader looking, a wrong one sends them away —
+hunting for a substrate-name problem or a rare organism they do not have.
+
+The three stages need three different fixes: check the enzyme name, use the
+database's own substrate label (ADR 0118), or opt in to a related organism
+(ADR 0024). A message covering two of them sends the reader to neither.
+
+**The test asserting the candidates render passed on the message's own
+example.** The `ec_ambiguous` sentence explains the case with "EC 1.1.1.27
+and EC 1.1.1.28 are the L- and D- lactate dehydrogenases", and my test used
+those two numbers as its candidate input — so `toContain("1.1.1.27")`
+matched the prose whether the candidates rendered or not. Measured:
+replacing `ecCandidates.join(", ")` with a constant left it green. It now
+uses EC numbers that appear nowhere in the sentence.
+
+Ninth instance this session of a test asserting something adjacent to what
+it names, and the first where the **worked example inside the message being
+tested** was what made it vacuous. Prose written to teach a reader hands a
+test something to match on for free.
+
+**And one "uncaught" mutation was a no-op.** Adding
+`|| reason === "ec_not_resolved"` to a branch placed AFTER the
+`ec_ambiguous` branch changes nothing — `ec_not_resolved` reaches it either
+way. Reading that as "not caught" is an accusation against a test that was
+fine, which `scripts/mutate.py` documents as failure mode 1. I re-ran with
+`--no-cache` first to rule out vitest caching, since a cached transform
+would have made every TypeScript mutation this session unreliable. It was
+not caching.
+
+`ParameterProvenance.unresolvedReason` also turned out not to include
+`not_found`, so `buildUnresolvedKineticProvenance`'s widest branch was
+unassignable — `tsc` on that package surfaced it the moment the union was
+touched.
+
+| | |
+|---|---|
+| Mutations | 3 caught after the vacuous test was repaired — revert both branches; fold the two identity failures into one message; drop the candidates from the sentence |
+| Tests | `theStageThatFailed.test.ts` 6 new; 27 green across the five suites this touches |
+| Types | `unresolvedReason` widened; `tsc` clean on the api-server package |
+| Note | the full api-server vitest run exceeds this sandbox's per-command limit, so it was verified by suite rather than in one pass |
+| Open | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; `check_no_tellurium_integration_claims` red on ADR 0099 (another agent's) |
+
+
+## Fifty-second pass — Sauro answered by dissolving the question
+
+Sauro was asked two questions — whether default-versus-refuse should depend
+on the use case, and whether the cross-species proxy is the pattern to apply
+generally. He answered neither:
+
+> I thought you'd decided to build an ensemble when values are unknown?
+
+That is not a dodge. It says the question was wrong: default-versus-refuse
+is a choice between two bad options, and a third exists. And he is the
+**second** professor to point at it — Bakker's recommendation was an
+ensemble too, and ADR 0024 Decision 3 declined it. Two independent experts,
+from opposite directions, at the same mechanism.
+
+**They are not talking about the same case**, and conflating them is how
+"we built an ensemble" would become a false claim:
+
+- Bakker: values EXIST and disagree — answered by ADR 0111, which runs the
+  model at every value the evidence ranked equal.
+- Sauro: the requested organism has NO value — where Terrium either
+  withholds or, with the opt-in, substitutes one organism's number.
+
+All three existing options were bad. Default 0.5 invents a number. Refusing
+shows a student nothing. A proxy returns a rabbit's Km as a human's, which
+is Jeske's objection and the reason cross-species became opt-in. Running the
+model at every organism's MEASURED value is none of the three.
+
+**And the refusal already knew the numbers.** The withheld branch computed
+`broad` — every cross-species row with its value, organism, reference and
+commentary — and kept only the organism names. Everything Sauro's ensemble
+needs was in the function that declined to provide it.
+
+Shaped as `TiedCandidate`, so `spread_consequence.consequence_of` consumes
+them unchanged: one ensemble mechanism, two sources of candidates. The two
+cases really are the same act — *the literature reports these numbers and
+Terrium will not pick between them*.
+
+What it does not become: `found` stays False, `value` stays None, no
+candidate is `selected`. Carrying a rabbit's number so a student can see
+what it does is a different act from returning it as the answer, and the
+difference has to survive in the fields rather than only in the prose.
+
+**Two of four mutations were my errors, not the tests'.**
+`cross_species_candidates=[] or [...]` evaluates to the second operand in
+Python and changed nothing — the same class of false accusation `mutate.py`
+documents, and the second time this session I have written a no-op mutation
+and had to catch myself before blaming a test. The other: the no-value
+filter is unexercised because all 8 fixture rows carry values. That is now
+stated in the code rather than left looking tested — a guard nobody can fail
+is worth keeping and not worth believing in.
+
+| | |
+|---|---|
+| Mutations | 2 real, both caught — mark a candidate `selected`; drop the reference that makes it checkable. 2 were my own bad mutations |
+| Tests | `test_cross_species_ensemble.py` 9 new; 59 green across the tie/ensemble/runner suites |
+| Next | **nothing renders it yet.** The candidates reach `KineticResult`; the CLI and API still print a plain refusal. Same "reaches the reader" gap ADR 0128 just closed for the identity failures — and until it is closed, the answer to Sauro is true of the library and not of the product |
+| Open | Bakker on axis weighting (still unanswered, so nothing here is weighted); the `--live` DOI check; NCBI's citation request wording |
