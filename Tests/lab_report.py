@@ -147,6 +147,7 @@ def build_report(
     simulation: Any | None = None,
     bibtex: str | None = None,
     ensembles: dict[str, Any] | None = None,
+    bands: dict[str, Any] | None = None,
     also_refused: Sequence[str] = (),
 ) -> LabReport:
     """Assemble one document from what the run actually established.
@@ -253,6 +254,65 @@ def build_report(
                 mark = " (returned)" if getattr(outcome, "selected", False) else ""
                 lines.append(f"| {_fmt(outcome.value)}{mark} | {shown} |")
             lines.append("")
+
+    # ---- The band across everything the evidence supports ------------------
+    #
+    # The section above ENUMERATES: which paper gives which answer. This one
+    # SAMPLES: what the model does across the distribution those papers
+    # support, weighted by reliability (ADR 0131, ADR 0132).
+    #
+    # Both, because they answer different questions and a student needs
+    # both — the specific row to defend a number to a teacher, and the band
+    # to say how much the answer depends on which paper they picked. ADR
+    # 0134 binds them: the band cannot reach outside the enumerated
+    # outcomes, and `test_ensembles_agree.py` fails if it does.
+    for name, band in (bands or {}).items():
+        envelopes = list(getattr(band, "envelopes", []) or [])
+        if not envelopes:
+            continue
+        if name not in disagreements:
+            disagreements.append(name)
+
+        failed = list(getattr(band, "failed", []) or [])
+        lines += [
+            f"## What the model does across the evidence — {name}",
+            "",
+            # The seed, because a band nobody can reproduce is not
+            # evidence. `sample_ensemble` makes it a required argument for
+            # that reason; dropping it from the document would undo the
+            # requirement at the last step.
+            f"{getattr(band, 'succeeded', '?')} run(s) at values drawn from "
+            f"the literature and weighted by reliability. Seed "
+            f"{getattr(band, 'seed', '?')} — re-running with it reproduces "
+            "this band exactly.",
+        ]
+        if failed:
+            # Runs that failed are not quietly dropped. A band computed from
+            # the survivors and presented as if every draw had run is
+            # narrower than the evidence, and says nothing about why.
+            lines.append(
+                f"{len(failed)} run(s) did not complete and are excluded from "
+                "the figures below."
+            )
+        lines.append("")
+
+        for envelope in envelopes:
+            lines += [
+                f"- **{envelope.column}** at the end of the run: "
+                f"{_fmt(envelope.low[-1])} lowest, "
+                f"{_fmt(envelope.p05[-1])} 5th, "
+                f"{_fmt(envelope.median[-1])} median, "
+                f"{_fmt(envelope.p95[-1])} 95th, "
+                f"{_fmt(envelope.high[-1])} highest",
+            ]
+        lines.append("")
+
+        disclaimer = getattr(band, "disclaimer", "")
+        if disclaimer:
+            # Quoted, not reworded. The module computing the band wrote the
+            # sentence about what it does and does not mean; a second
+            # wording here would be a second claim (ADR 0003).
+            lines += [disclaimer, ""]
 
     # ---- What Terrium would not do ---------------------------------------
     #

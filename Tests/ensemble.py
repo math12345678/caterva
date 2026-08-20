@@ -438,6 +438,39 @@ def _format_report(result: EnsembleResult, quantity: str = "value") -> str:
     return "\n".join(lines)
 
 
+def candidates_from_scored(scored: Sequence[Mapping]) -> list[Candidate]:
+    """Rebuild `Candidate` objects from the resolver's scored frontier.
+
+    `KineticResult.ensemble_candidates` carries plain dicts on purpose: the
+    literature layer must not import this module to produce its output, or
+    the resolver would depend on the sampler when the real relationship runs
+    the other way. This is the adapter on the sampler's side of that line.
+    """
+    try:
+        from reliability import Axis, ReliabilityScore
+    except ImportError:  # pragma: no cover
+        from Tests.reliability import Axis, ReliabilityScore  # type: ignore
+
+    out: list[Candidate] = []
+    for row in scored:
+        grades = row.get("grades") or {}
+        out.append(
+            Candidate(
+                value=float(row["value"]),
+                score=ReliabilityScore(
+                    assay_completeness=Axis(grade=grades["assay_completeness"], reason=""),
+                    condition_proximity=Axis(grade=grades["condition_proximity"], reason=""),
+                    organism_match=Axis(grade=grades["organism_match"], reason=""),
+                ),
+                unit=row.get("unit"),
+                organism=row.get("organism"),
+                reference_id=row.get("reference_id"),
+                conditions=row.get("conditions"),
+            )
+        )
+    return out
+
+
 def _format_band(band) -> str:
     """The trajectory envelope, as a person reads it.
 
@@ -488,10 +521,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         prog="ensemble",
         description="Sample an ensemble from scored BRENDA values (Bakker's method).",
     )
-    parser.add_argument("--fixture", required=True, help="a saved BRENDA HTML table")
+    parser.add_argument(
+        "--fixture",
+        help="a saved BRENDA HTML table. Omit to resolve live, which is what "
+             "a student without a saved table has to do.",
+    )
+    parser.add_argument("--enzyme", help="enzyme name, for a live lookup")
     parser.add_argument("--ec", default="1.1.1.27")
     parser.add_argument("--substrate", required=True)
     parser.add_argument("--organism", default="Homo sapiens")
+    parser.add_argument("--quantity", default="km", choices=["km", "ki", "kcat"])
     parser.add_argument("--draws", type=int, default=2000)
     parser.add_argument(
         "--seed",
@@ -525,22 +564,59 @@ def main(argv: Sequence[str] | None = None) -> int:
     import brenda_client
     import evidence_rank
 
-    html = _pathlib.Path(args.fixture).read_text(encoding="utf-8")
-    rows = brenda_client.parse_brenda_km_html(
-        html, args.ec, [args.substrate], args.organism
-    )
-    if not rows:
-        print(
-            f"No rows for {args.substrate!r} in {args.fixture}. "
-            "Nothing was resolved, so there is no ensemble to draw -- which is "
-            "a resolution failure to report, not an empty result.",
+    # TWO WAYS IN, AND THE LIVE ONE IS THE POINT.
+    #
+    # `--fixture` reads a saved BRENDA table: offline, checkable, and what
+    # the tests use. It is also a file a student does not have, which made
+    # this command effectively unrunnable for the person it is for.
+    #
+    # Without it, the ordinary resolver runs -- the same
+    # `resolve_kinetic_value` behind `scientific resolve`, hitting BRENDA
+    # exactly once. The ensemble then draws from the frontier that
+    # resolution already scored, so the sampling costs no extra requests.
+    # BRENDA asked that tools be gentle; a command that re-queried per draw
+    # would not be.
+    if args.fixture:
+        html = _pathlib.Path(args.fixture).read_text(encoding="utf-8")
+        rows = brenda_client.parse_brenda_km_html(
+            html, args.ec, [args.substrate], args.organism
         )
-        return 2
+        if not rows:
+            print(json.dumps({"ok": False, "error":
+                  f"No rows for {args.substrate!r} in {args.fixture}."})
+                  if args.json else
+                  f"No rows for {args.substrate!r} in {args.fixture}. "
+                  "Nothing was resolved, so there is no ensemble to draw -- "
+                  "which is a resolution failure to report, not an empty result.")
+            return 2
+        kept = evidence_rank.frontier(rows, args.organism, None)
+        result = ensemble_from_entries(
+            kept, draws=args.draws, seed=args.seed, requested_organism=args.organism
+        )
+        n_rows, n_frontier = len(rows), len(kept)
+    else:
+        if not args.enzyme and not args.ec:
+            print("A live lookup needs --enzyme or --ec.")
+            return 2
+        import fallback_logic
 
-    kept = evidence_rank.frontier(rows, args.organism, None)
-    result = ensemble_from_entries(
-        kept, draws=args.draws, seed=args.seed, requested_organism=args.organism
-    )
+        resolved = fallback_logic.resolve_kinetic_value(
+            args.ec, args.organism, args.substrate,
+            enzyme_name=args.enzyme, quantity=args.quantity,
+        )
+        scored = getattr(resolved, "ensemble_candidates", []) or []
+        if not scored:
+            message = (
+                f"Nothing resolved for {args.substrate} / {args.organism}. "
+                "There is no ensemble to draw -- a resolution failure to "
+                "report, not an empty band."
+            )
+            print(json.dumps({"ok": False, "error": message}) if args.json else message)
+            return 2
+        result = sample_ensemble(
+            candidates_from_scored(scored), draws=args.draws, seed=args.seed
+        )
+        n_rows = n_frontier = len(scored)
 
     # THE SIMULATION HALF. Without `--simulate` this reports the spread of the
     # PARAMETER, which is Bakker's weighting and is not yet what Sauro asked
@@ -580,8 +656,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "ok": True,
             "substrate": args.substrate,
             "organism": args.organism,
-            "rows": len(rows),
-            "frontier": len(kept),
+            "rows": n_rows,
+            "frontier": n_frontier,
             "seed": result.seed,
             "disclaimer": result.disclaimer,
             "candidates": [
@@ -617,8 +693,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps(payload, indent=2))
         return 0
 
-    print(f"\n{args.substrate} / {args.organism}  --  {len(rows)} row(s), "
-          f"{len(kept)} on the non-dominated frontier")
+    print(f"\n{args.substrate} / {args.organism}  --  {n_rows} row(s), "
+          f"{n_frontier} on the non-dominated frontier")
     print(_format_report(result, quantity="Km"))
     if band is not None:
         print(_format_band(band))

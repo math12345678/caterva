@@ -941,14 +941,14 @@ ${colors.bright}Commands:${colors.reset}
     multi-megabyte export is not gentle.
     ${colors.dim}Example:${colors.reset} corpus ~/Downloads/brenda_km.tsv
 
-  ensemble --fixture BRENDA.html --substrate S --seed N [options]
+  ensemble --enzyme E --substrate S --seed N [options]
     What the literature ACTUALLY supports, as a band rather than one number.
     Every other command picks a single value; when the published
     measurements disagree, this shows all of them -- weighted by how well
     evidenced each is -- and runs the model once per draw so you can see
     whether the disagreement changes the answer.
-    ${colors.dim}Example:${colors.reset} ensemble --fixture km.html --substrate pyruvate --seed 1 \\
-               --simulate michaelis_menten
+    ${colors.dim}Example:${colors.reset} ensemble --enzyme "lactate dehydrogenase" \\
+               --substrate pyruvate --seed 1 --simulate michaelis_menten
     ${colors.dim}Options:${colors.reset}
       --seed N           required. An ensemble nobody can re-derive is not
                          evidence, so there is no default.
@@ -956,6 +956,9 @@ ${colors.bright}Commands:${colors.reset}
                          Without it you get the parameter spread and no
                          trajectory.
       --organism NAME    default "Homo sapiens"
+      --fixture PATH     read a saved BRENDA table instead of looking
+                         it up. Offline and checkable; the live path
+                         is the one a student without a saved table has.
       --draws N          how many times to sample (default 2000)
       --json             machine-readable
 
@@ -1411,19 +1414,23 @@ async function main() {
     // "you can sample and get an ensemble distribution". See ADR 0135.
     case 'ensemble': {
       const { flags, booleans } = parseArgs(rest);
-      const fixture = flags['fixture'];
       const substrate = flags['substrate'];
       const seed = flags['seed'];
-      if (!fixture || !substrate || !seed) {
+      // `--fixture` is optional now. Without it the ordinary resolver runs,
+      // which is the only path a student who has no saved BRENDA table can
+      // take -- and they are the person this command is for.
+      if (!substrate || !seed || (!flags['fixture'] && !flags['enzyme'] && !flags['ec'])) {
         error(
-          'ensemble needs --fixture <brenda.html> --substrate <name> --seed <n>. ' +
-          'The seed is required, not defaulted: an ensemble nobody can ' +
-          're-derive is not evidence.'
+          'ensemble needs --substrate <name> --seed <n>, and either ' +
+          '--enzyme/--ec to look it up or --fixture <brenda.html> to read a ' +
+          'saved table. The seed is required, not defaulted: an ensemble ' +
+          'nobody can re-derive is not evidence.'
         );
         process.exit(1);
       }
       process.exit(commandEnsemble({
-        fixture,
+        ...(flags['fixture'] ? { fixture: flags['fixture'] } : {}),
+        ...(flags['enzyme'] ? { enzyme: flags['enzyme'] } : {}),
         substrate,
         seed: Number(seed),
         ...(flags['organism'] ? { organism: flags['organism'] } : {}),

@@ -12239,3 +12239,49 @@ zero-flag worked example, none of which the mutation touches.
 Two of those four exist to stop an overcorrection: always dropping
 `--enzyme-conc` would satisfy "keeps a supplied --vmax" while deleting the
 kcat bridge (ADR 0019) from the one case that needs it.
+
+
+## Fifty-third pass — the band joins the enumeration, and I duplicated my own section
+
+`test_ensembles_agree.py` (ADR 0134) made it safe to put both ensembles in
+one document: the band cannot reach outside the enumerated outcomes without
+a test failing. So the lab report now carries both — the enumeration says
+which paper gives which answer, the band says how much the answer depends on
+which paper the student picked.
+
+Three things the band section refuses to lose:
+
+- **The seed.** `sample_ensemble` makes it a required argument because an
+  ensemble nobody can reproduce is not evidence. Printing the band without
+  it would undo that requirement at the last step.
+- **Runs that failed.** A band computed from the survivors and presented as
+  if every draw had run is narrower than the evidence and says nothing
+  about why.
+- **The disclaimer, quoted.** The module that computes the band wrote the
+  sentence about what it does and does not mean.
+
+**And I shipped the section twice before catching it.** A grep for `bands`
+came back empty, I concluded my earlier edit had been lost to a concurrent
+write, and re-applied the whole thing. It had not been lost — only the
+signature half had failed. The rendered document then printed *"What the
+model does across the evidence"* twice, with two different wordings, which
+is how I found it: by reading the output rather than the test result. The
+tests passed throughout.
+
+Removing the duplicate then cut out an intervening block another agent had
+added between my two copies, which showed up as a `NameError` — recovered by
+checking the diff was purely additive rather than by guessing at what had
+been there.
+
+Two lessons, and the second is the one worth keeping: a grep is a
+measurement, and I acted on a single one without checking it against the
+file. And **the tests never saw either defect** — not the duplicate section,
+not the deleted block. Reading the artifact caught both.
+
+| | |
+|---|---|
+| Mutations | 4 caught — exclude failed runs silently; drop the seed; drop the disclaimer; render a heading for an empty band |
+| Tests | `test_lab_report_band.py` 6 new; 26 green across report and ensemble-agreement suites |
+| Guards | documented counts, vacuous, bug lints, scripts-reachable green |
+| Next | `report` still does not RUN the simulation — the trajectory section renders only if a caller supplies one. Wiring the engine in is what makes it genuinely one command |
+| Open | the api-server CI job, red since 2026-08-05 and not reproducible in this sandbox |
