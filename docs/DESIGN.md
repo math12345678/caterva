@@ -71,23 +71,65 @@ value's identity. A design that stores `km: 10.73` and treats conditions as
 an optional annotation has already lost — which is why §4 makes the resolved
 value a compound object, not a float.
 
-### Bakker (UMCG) — score parameters, and describe how much to trust them
+### Bakker (UMCG) — score parameters, and use the scores to *sample*
 
-Three axes: assay completeness, condition proximity, organism match. She
-also suggested sampling an ensemble, which was declined and should stay
-declined for the teaching audience — a student needs one defensible number,
-not a distribution they cannot interpret.
+Her actual words, 2026-08-13:
 
-**Design implication:** a resolved value carries a grade, and the grade is
-part of the answer, not a footnote. Also: **she was asked for the axis
-weighting and has not answered.** No weighting may be invented in the
-meantime. Three separate grades, never a single blended score.
+> In practice, we chose the best option, but **do not exclude anything a
+> priori**. We are preparing a publication in which we generated an ensemble
+> of models by sampling from a distribution of possible parameters. We gave
+> each parameter a score based on its reliability and applicability, such as
+> physiological pH and T, species [...] and completeness of assay
+> description. **These scores were then used to give the parameter a weight
+> in the sampling.**
 
-### Sauro (UW) — refusing pushes people to hardcode
+Method published: *Ensemble kinetic modelling links residual enzyme activity
+to clinical symptoms in mitochondrial β-oxidation defects*, bioRxiv
+`10.64898/2026.05.05.722902`.
 
-> a tool that refuses to produce a runnable model blocks step one, and the
-> researcher works around it by hardcoding a number with no warning at all —
-> a strictly worse outcome caused by the strict rule.
+**Correction to an earlier draft of this document.** It said the axis
+weighting "was asked for and has not been answered", and that the ensemble
+"was declined and should stay declined". Both are wrong, and reading her
+reply directly is what showed it. She answered the weighting question in the
+sentence that defines it: *the scores are the weights, and what they weight
+is the sampling.* The grades were never meant to be three numbers printed
+beside a value — they were the mechanism for drawing from the evidence.
+
+**Design implication:** the scores are not a display. Rendering them as a
+badge and stopping there implements the vocabulary of her method and none of
+it.
+
+### Sauro (UW) — first default it, then: sample it
+
+Sauro answered twice, and **the second answer supersedes the first.** Only
+the first was in this document.
+
+*2026-08-13, 00:10* — before he knew of the other replies:
+
+> If Brenda or pubmed has no value for a particular km I would just give it
+> a default value, say 0.5 and write a warning comment in the antimony file.
+
+*2026-08-13, 22:17* — shown Jeske's position and Bakker's side by side:
+
+> **Barbara Bakker's approach is better.** With Jessie's approach you don't
+> get any simulation, with Barbara's you can sample and get an ensemble
+> distribution. **That is the right way to do it.** I would still give a
+> warning so the user knows what's happening. If a value is missing, use a
+> value from the closest organism and generate a distribution of values. Run
+> each through roadrunner. You get a result and you're honest about the
+> uncertainty.
+
+This is the director of the NIH Center for Reproducible Biomodels
+independently arriving at Bakker's method after being shown all three
+options. **Two of the four experts converge on it, and the reply sent back
+promised to build it** — "I will work on implementing the ensemble sampling".
+
+His underlying warning survives both answers, and is the sharpest thing any
+of the four said: a tool that will not produce a runnable model blocks step
+one, so the researcher works around it by hardcoding a number with no
+warning at all — a worse outcome, caused by the stricter rule. (That
+sentence is this project's restatement. An earlier draft of this document
+set it in a quotation block as if it were his. It is not.)
 
 Terrium did not merely risk this; **it instructed it.** The error said "Add
 km=<value> and try again", the user found a real number in a real paper,
@@ -99,6 +141,42 @@ losing sources.
 cannot produce a value must offer a way to supply one **with its source
 attached**. Refusal without a path is a defect, not rigour. This is why §4
 has exactly one refusal shape and it always includes `--cite`.
+
+### Katz (NCSA / Illinois) — "I don't really understand the idea"
+
+Absent from every earlier draft of this document, which is the most
+revealing thing about those drafts: he is the only correspondent whose
+speciality *is* software citation, and his reply is the only one that
+rejects the premise rather than the implementation.
+
+> This is out of scope for JOSS, as it is not software that is used by
+> researchers to do their research.
+>
+> **I don't really understand the idea of per constant citation. Most
+> constants are well known and are not typically cited.**
+
+A design document that omits the one expert who does not believe in the
+product is not a design document. Two things follow.
+
+**He is right about a class of constants, and it is not this class.** The
+gas constant is well known. Avogadro's number is well known. A Km is not a
+constant in that sense at all — it is a *measurement*, made once, under
+conditions, by someone, and it moves. Terrium's own corpus is the evidence:
+ADR 0033 found the same enzyme reported at 21.1 and 327.2 depending on
+whether an allosteric activator was present, and ADR 0037 found chicken LDH
+at 60 from heart and 1.1 from muscle. Nobody cites *R*. Everybody should
+cite a number with a 15-fold spread across the literature.
+
+**This is a naming failure as much as a design one.** "Per-constant
+citation" invites exactly his reading, because it calls the thing a
+constant. It is per-*measurement* provenance. If the pitch makes a
+sympathetic expert think the answer is obvious and the question is silly,
+the pitch is wrong before the code is.
+
+**Design implication:** the spread is not a footnote to the answer — it is
+the argument for the product. Where the literature agrees, Terrium should
+say so plainly and Katz's objection holds. Where it disagrees by 15-fold,
+that disagreement is the finding, and it is what §4.2 must show.
 
 ### König (HU Berlin) — the email read as a claim of credit
 
@@ -295,10 +373,35 @@ Recorded so it can be challenged rather than discovered later.
   sentence well enough to propose a system. It is a suggestion the user
   confirms, so a bad parse is visible rather than dangerous — but if it is
   wrong more than occasionally, the feature is noise.
-- **I have not read the professors' emails directly.** Everything in §2 comes
-  from `EXPERT_FEEDBACK.md`, which is this project's record of them — good,
-  detailed, and still a paraphrase. Their actual words should be read before
-  §2 is treated as settled.
+- ~~**I have not read the professors' emails directly.**~~ **Resolved
+  2026-08-18: read in full, and §2 was wrong.** Three errors, all in the
+  same direction — the paraphrase was more favourable to what Terrium had
+  already built than the sources were:
+  1. Bakker's ensemble was recorded as "declined, and should stay declined".
+     Sauro, shown all three options, called it *"the right way to do it"*,
+     and the reply sent back promised to build it.
+  2. Her axis weighting was recorded as "asked for and unanswered". She
+     answered it in the defining sentence: the scores *are* the weights, and
+     they weight the sampling.
+  3. Katz — the one correspondent who rejects the premise — was absent
+     entirely.
+
+  The lesson is not "read the primary sources", which everyone already
+  knows. It is that **a summary of criticism drifts toward the summariser**,
+  and nothing in a paraphrase chain can detect it. The quotes are now inline
+  above so a reader can check them without a mailbox.
+
+- **Jeske's concrete recommendations are still not all taken**, and they are
+  specific enough to be checked off:
+  - *Bulk CSV download over SOAP* — she gave the exact URLs and the reason
+    (she is building a REST API; SOAP would be double work by year end).
+    Terrium still scrapes per-query HTML.
+  - *Check the organisms are closely related enough* — "two different
+    mammals instead of a bacterium and a human". §4.3 advertises
+    `--allow-cross-species  relatedness checked`; whether the check is real
+    relatedness or a lineage string comparison needs verifying before that
+    line is left standing.
+  - *SABIO-RK* — recommended as a second source, unexamined.
 - **"All of the above" may still be too much.** §1 orders the audiences, but
   ordering is a promise about sequencing that is easy to make and hard to
   keep.
