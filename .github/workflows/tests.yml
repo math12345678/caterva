@@ -127,6 +127,14 @@ jobs:
       - name: Dependency-licence guard
         run: python scripts/check_dependency_licenses.py
 
+      # Every pinned version exists on PyPI. Written after CI failed on six
+      # consecutive pushes and the pin was "fixed" by misreading pip: `from
+      # versions: 2.7.0` means "for this interpreter on this architecture",
+      # not "in the index". It then ran in no harness at all, which
+      # check_guard_wiring reports and which is why THIS step exists.
+      - name: Pinned-version resolution guard
+        run: python scripts/check_pins_resolve.py
+
       # Publishing a build artifact changes Terrium's licence
       # obligations. Nothing publishes today, which is the whole reason the
       # LGPL/GPL terms of the dependencies impose nothing -- so the day that
