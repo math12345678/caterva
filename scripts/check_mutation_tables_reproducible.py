@@ -84,14 +84,37 @@ VERIFY_BUILD = REPO_ROOT / "scripts" / "verify_build.py"
 #: than from one imagined format -- a matcher built from one example would
 #: have found 3 of 37 and reported the other 34 as having no table, which is
 #: the "confident false negative" failure this project has hit before.
+#: `^[ \t]*` — AN INDENTED TABLE IS STILL A TABLE.
+#:
+#: This anchored on `^\|` and therefore could not see a table indented by
+#: even one space. Markdown indents a table whenever it sits inside a bullet:
+#:
+#:     - Six mutations, each asserted to have applied before measuring:
+#:
+#:       | mutation | result |
+#:       |---|---|
+#:
+#: which renders identically on GitHub and is a perfectly ordinary way to
+#: write one. Four consecutive ADRs (0136, 0139, 0141, 0142) published
+#: mutation tables in exactly that form and this guard reported all four as
+#: presenting no mutation results -- so the build stayed green on the one
+#: dimension CONTRIBUTING promises it will not:
+#:
+#:     "If your ADR presents a mutation table, it needs a set file:
+#:      check_mutation_tables_reproducible.py fails the build without one."
+#:
+#: A check that cannot fail is worse than no check, because it is trusted.
+#: This one was trusted by its own contributing guide, in writing.
 MUTATION_TABLE_RE = re.compile(
-    r"^\|\s*(?:#\s*\|\s*)?mutation\s*\|",
+    r"^[ \t]*\|\s*(?:#\s*\|\s*)?mutation\s*\|",
     re.IGNORECASE | re.MULTILINE,
 )
 
 #: A heading that introduces mutation results, for ADRs that report them as
 #: prose rather than a table.
-MUTATION_HEADING_RE = re.compile(r"^#+\s+.*\bmutation", re.IGNORECASE | re.MULTILINE)
+MUTATION_HEADING_RE = re.compile(
+    r"^[ \t]*#+\s+.*\bmutation", re.IGNORECASE | re.MULTILINE
+)
 
 #: What `mutate.py` indexes on a mutation entry with no default:
 #: `mutation["file"]`, `mutation["find"]`, `mutation["replace"]`. Anything

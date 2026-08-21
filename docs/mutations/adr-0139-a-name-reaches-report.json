@@ -1,0 +1,47 @@
+{
+  "_why": [
+    "ADR 0139's mutation, re-derived under scripts/mutate.py.",
+    "",
+    "The ADR's table is a single row, and it is the most interesting kind:",
+    "the mutation was not chosen, it HAPPENED. A concurrent agent's mutation",
+    "loop restored scripts/report_lab.py from a snapshot taken before my",
+    "import line existed. The call site survived; the import did not.",
+    "",
+    "That is worse than a syntax error because nothing notices it -- the",
+    "module still imports cleanly, and a source-text check for",
+    "`ec_number_for_name` still passes, because the name is right there at",
+    "the call site. Only running the branch finds it.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0139-a-name-reaches-report.json"
+  ],
+  "test": "cd Tests && python3 -m pytest test_a_name_reaches_every_command.py -q --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "E1",
+      "description": "the shared name->EC policy is called without being imported",
+      "_claimed": "caught by test_the_enzyme_name_branch_actually_runs",
+      "_note": "Verified by hand on a copy before this set existed: the module still imports, and the branch raises `NameError: name 'EnzymeNameNotResolved' is not defined`. The source-level assertion for `from enzyme_lookup import` exists to say WHICH line is missing; this is the one that proves the code runs.",
+      "file": "scripts/report_lab.py",
+      "find": "from enzyme_lookup import EnzymeNameNotResolved, ec_number_for_name  # noqa: E402\n",
+      "replace": ""
+    },
+    {
+      "id": "E2",
+      "description": "an ambiguous enzyme name silently resolves to the first candidate",
+      "_claimed": "caught by test_an_ambiguous_name_refuses_rather_than_picking",
+      "_note": "The defect ADR 0126 fixed for `catalog`, restored at the shared policy so it would reach `report` too. 1.1.1.27 is L-lactate dehydrogenase and 1.1.1.28 is D-: a wrong EC is a correctly formatted citation for a different protein.",
+      "file": "Tests/enzyme_lookup.py",
+      "find": "    if len(candidates) > 1:\n        raise EnzymeNameNotResolved(",
+      "replace": "    if False:\n        raise EnzymeNameNotResolved("
+    },
+    {
+      "id": "E3",
+      "description": "a network failure is reported as an unknown enzyme",
+      "_claimed": "caught by test_a_network_failure_is_not_reported_as_an_unknown_enzyme",
+      "_note": "The three-state rule at the name step. 'UniProt has no such enzyme' and 'UniProt could not be reached' send a student to opposite places; collapsing them tells someone their enzyme does not exist because the wifi dropped.",
+      "file": "Tests/enzyme_lookup.py",
+      "find": "        raise EnzymeNameNotResolved(\n            f\"Could not look up {enzyme_name!r} in UniProt: {exc}\"\n        ) from exc",
+      "replace": "        candidates = []"
+    }
+  ]
+}

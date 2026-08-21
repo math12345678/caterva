@@ -1,0 +1,47 @@
+{
+  "_why": [
+    "ADR 0141's TYPESCRIPT half, re-derived under scripts/mutate.py.",
+    "",
+    "Two defects, one cause: `report` read quantities with `Number()` instead",
+    "of the parser every other command uses. `Number('10mM')` is NaN, and a",
+    "bare `--vmax 0.25` was used as mM/s while parseQuantity assumes uM/min --",
+    "the same three characters, 60,000x apart, decided by which command read",
+    "them. A wrong Vmax does not fail; it produces a plausible trajectory in",
+    "a document meant for a teacher.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0141-cli-quantities.json",
+    "",
+    "Split from the Python half (adr-0141-payload-guard.json): a set has one",
+    "test command, and this ADR's evidence spans jest and pytest."
+  ],
+  "test": "npx jest src/cli/__tests__/reportQuantities.test.ts --silent",
+  "mutations": [
+    {
+      "id": "Q1",
+      "description": "s0 is read with Number() again",
+      "_claimed": "7 failed",
+      "_note": "The original defect. `Number('10mM')` is NaN, JSON.stringify writes null, and the value disappears before anything can complain.",
+      "file": "src/cli/reportQuantities.ts",
+      "find": "      const parsed = parseQuantity('s0', s0Raw);",
+      "replace": "      const parsed = { value: Number(s0Raw), unit: 'mM', unitDeclared: true };"
+    },
+    {
+      "id": "Q2",
+      "description": "a bare vmax is used as mM/s instead of converted from uM/min",
+      "_claimed": "1 failed",
+      "_note": "The 60,000x error. The test pins it as a number rather than as a policy, because a policy assertion would pass on any conversion.",
+      "file": "src/cli/reportQuantities.ts",
+      "find": "        value: vmaxInSubstrateUnitsPerSecond(\n          parsed.value,\n          parsed.unit,\n          ENGINE_CONCENTRATION,\n        ),",
+      "replace": "        value: parsed.value,"
+    },
+    {
+      "id": "Q3",
+      "description": "an assumed unit is no longer recorded as assumed",
+      "_claimed": "1 failed",
+      "_note": "parseQuantity already separates a unit the user declared from one it chose. That is the provenance argument applied to units, and flattening it at the CLI boundary loses it for the document.",
+      "file": "src/cli/reportQuantities.ts",
+      "find": "        basis: raw['s0-basis'],\n        assumedUnit: parsed.unitDeclared ? undefined : parsed.unit,",
+      "replace": "        basis: raw['s0-basis'],\n        assumedUnit: undefined,"
+    }
+  ]
+}

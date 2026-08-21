@@ -271,6 +271,18 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"python {SCRIPTS_DIR / 'check_non_affiliation_notice.py'}"
     ))
 
+    # Every BRENDA reference printed in the documentation is one that exists.
+    # The README demonstrated per-value provenance with three citations and
+    # all three were wrong: `ref 12345` was a placeholder appearing nowhere,
+    # and `ref 649716` is an acetylcholinesterase reference printed under a
+    # lactate dehydrogenase example. A reader who checks one and finds
+    # nothing has the AI-invented-claims suspicion confirmed by the project's
+    # own front page, which no later argument undoes. See ADR 0144.
+    guards.append(run_guard(
+        "Documented Citations Guard",
+        f"python {SCRIPTS_DIR / 'check_documented_citations_are_real.py'}"
+    ))
+
     # The importable package is `Terium` (one r); the product is `Terrium`
     # (two). `import Terrium` is always a ModuleNotFoundError, and a newcomer
     # who hits it concludes their environment is broken -- then runs
