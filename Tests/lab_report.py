@@ -64,6 +64,39 @@ class SuppliedValue(BaseModel):
     basis: str | None = None
 
 
+class DerivedValue(BaseModel):
+    """A number computed from a cited one and a chosen one.
+
+    THE THIRD KIND, AND WHY IT NEEDS ITS OWN TYPE
+    ---------------------------------------------
+    The report has always had two origins: `literature` (a value with a
+    citation) and `yours` (a value the student picked). A bridged Vmax is
+    neither, and calling it either is a lie in a specific direction:
+
+      * `literature` claims BRENDA reports a Vmax for this assay. It does
+        not -- it reports a kcat, and Vmax depends on how much enzyme the
+        student put in (ADR 0012, ADR 0013).
+      * `yours` discards the citation for the kcat, which is the whole
+        reason the number is defensible.
+
+    So it is its own origin, carrying BOTH halves: the cited part with its
+    reference, and the chosen part marked as chosen. A reader can check
+    each independently, which is the entire point of the document.
+    """
+
+    name: str
+    value: float
+    unit: str | None = None
+    #: The literature half, rendered as-is: "kcat 1.07 1/s (BRENDA ref 740253)".
+    #: Written by the caller that owns the resolution, never re-derived here.
+    from_cited: str
+    #: The student's half: "[E]0 0.001 mM, yours".
+    from_chosen: str
+    #: How they were combined, e.g. "Vmax = kcat x [E]0". Stated rather than
+    #: implied: a reader who cannot see the operation cannot check the number.
+    relation: str
+
+
 def _fmt(value: Any) -> str:
     """Numbers a reader can check against the source, without noise."""
     if isinstance(value, float):
@@ -118,6 +151,8 @@ class LabReport(BaseModel):
     sourced: list[str] = []
     #: Parameter names the student supplied.
     supplied: list[str] = []
+    #: Parameter names computed from a cited value and a chosen one.
+    derived: list[str] = []
     #: One line per thing Terrium declined to do, in the reader's terms.
     refusals: list[str] = []
     #: Parameters where the literature reports more than one value.
@@ -132,9 +167,12 @@ class LabReport(BaseModel):
         parameters at all defensible, and an empty report is not a strong
         one -- it is an empty one.
         """
-        return bool(self.sourced or self.supplied) and not any(
-            name not in self.sourced and name not in self.supplied
-            for name in self.sourced + self.supplied
+        accounted = self.sourced + self.supplied + self.derived
+        return bool(accounted) and not any(
+            name not in self.sourced
+            and name not in self.supplied
+            and name not in self.derived
+            for name in accounted
         )
 
 
@@ -144,6 +182,7 @@ def build_report(
     question: str,
     resolved: dict[str, Any],
     supplied: Sequence[SuppliedValue] = (),
+    derived: Sequence[DerivedValue] = (),
     simulation: Any | None = None,
     bibtex: str | None = None,
     ensembles: dict[str, Any] | None = None,
@@ -194,12 +233,33 @@ def build_report(
             f"| **yours** | {value.basis or 'not stated'} |"
         )
 
+    derived_names: list[str] = []
+    for value in derived:
+        derived_names.append(value.name)
+        # BOTH halves in the source column. A reader checking this number
+        # needs the paper for the cited part and the knowledge that the
+        # other part was chosen -- collapsing either one is the misreport
+        # `DerivedValue` exists to prevent.
+        lines.append(
+            f"| {value.name} | {_fmt(value.value)} {value.unit or ''} "
+            f"| **derived** | {value.relation}: {value.from_cited}, "
+            f"and {value.from_chosen} |"
+        )
+
     lines += [
         "",
         "A value marked **yours** describes the experiment, not the enzyme. "
         "No database reports it, and Terrium has not checked it.",
         "",
     ]
+
+    if derived_names:
+        lines += [
+            "A value marked **derived** was computed, not looked up. It is "
+            "only as good as both of its parts: the cited measurement, and "
+            "the number you chose. No database reports it for this assay.",
+            "",
+        ]
 
     # ---- The conditions each measurement was made under -------------------
     condition_lines: list[str] = []
@@ -438,6 +498,7 @@ def build_report(
         markdown="\n".join(lines).rstrip() + "\n",
         sourced=sourced,
         supplied=supplied_names,
+        derived=derived_names,
         refusals=refusals,
         disagreements=disagreements,
     )
