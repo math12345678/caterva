@@ -31,11 +31,31 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
+      # Records what the runner ACTUALLY resolved, before anything can fail
+      # on it. Three passes have been spent guessing at this job from the
+      # outside: the pins were misread once from an aarch64 sandbox
+      # (ADR 0140), and every guard in this job is green on a developer
+      # machine, so the difference lives in the installed set and nowhere a
+      # local run can see it.
+      #
+      # `always()` because the interesting case is the failing one, and a
+      # diagnostic that only runs on success describes the run nobody needed
+      # explained.
+      - name: Record the resolved environment
+        if: always()
+        run: |
+          {
+            echo "### Resolved environment — python ${{ matrix.python-version }}"
+            echo '```'
+            python -c "import sys, platform; print(sys.version); print(platform.platform())"
+            python -m pip --version
+            python -m pip list --format=freeze | grep -Ei 'libroadrunner|antimony|libsbml|libsedml|numpy|scipy|pytest|hypothesis|cffconvert' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify the environment is genuinely working
         run: python scripts/check_env.py
 
-      # Runs standalone as well as via the pytest wrapper: this job fails
-      # fast on a bad citation rather than waiting out the full suite.
       - name: Citation-format guard
         run: python scripts/check_citation_format.py
 
@@ -286,6 +306,22 @@ jobs:
       - name: Identifier pattern freshness
         continue-on-error: true
         run: python scripts/check_identifier_patterns_fresh.py
+
+      # The job's failure, as ONE annotation on the run page, so the cause is
+      # legible without opening a log. Every failure here so far has been
+      # read second-hand from a notification email that carries only a count
+      # of annotations, never their text.
+      - name: Name the failing step
+        if: failure()
+        run: |
+          echo "::error title=tests/${{ matrix.python-version }} failed::\
+          A step above this one failed. The resolved environment is in the \
+          job summary. Every guard in this job passes on a developer machine \
+          (checked 2026-08-21), so suspect the installed set or the pip cache \
+          restored by setup-python, which the api-server job does not use."
+
+      # Runs standalone as well as via the pytest wrapper: this job fails
+      # fast on a bad citation rather than waiting out the full suite.
 
   api-server:
     runs-on: ubuntu-latest
