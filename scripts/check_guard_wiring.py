@@ -105,11 +105,22 @@ DELIBERATE_OMISSIONS = {
 #: here; the guard-wiring check will tell you so.
 EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_citation_format": ("verify_build", "ci", "pytest"),
-    # CI only, deliberately. It asks PyPI whether each pinned version
-    # exists, so it needs the network and belongs where the network is
-    # expected — a pytest wrapper would turn every offline test run red,
-    # which is how a guard earns the habit of being skipped (ADR 0028).
+    # CI and `make guards`. NOT a pytest wrapper: it asks PyPI whether each
+    # pinned version exists, and a wrapper would turn every offline test run
+    # red — which is how a guard earns the habit of being skipped (ADR 0028).
+    #
+    # `make guards` was added after `check_ci_reproducible_locally` refused
+    # the CI-only version, and it was right to. The step runs perfectly well
+    # on a laptop; it just needs network. "Cannot reasonably run locally" and
+    # "I did not give it a local route" are different claims, and only the
+    # first belongs in CI_ONLY.
     "check_pins_resolve": ("ci",),
+    # CI only, and deliberately: it reads .github/workflows, so it has
+    # nothing to say on a developer's machine and would be a guard people
+    # learn to scroll past. It runs in the Python job rather than the job it
+    # describes, because a guard that runs inside the broken job reports the
+    # breakage after the breakage.
+    "check_ci_toolchain": ("ci",),
     # Wired 2026-08-15. `make guards` is a fourth harness this script does
     # not model -- it reads verify_build, CI and pytest. The pytest wrapper
     # is what makes it enforcing; the make target is what makes it usable.

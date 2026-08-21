@@ -135,6 +135,16 @@ jobs:
       - name: Pinned-version resolution guard
         run: python scripts/check_pins_resolve.py
 
+      # A step named "Install pnpm" that installs no pnpm and exits 0 is the
+      # exact shape this project calls worse than no check, and it cost two
+      # days of red builds. Runs in the Python job because it is pure Python
+      # and reads YAML -- it needs to fail BEFORE the job it describes.
+      - name: CI-toolchain guard (self-check)
+        run: python scripts/check_ci_toolchain.py --selftest
+
+      - name: CI-toolchain guard
+        run: python scripts/check_ci_toolchain.py
+
       # Publishing a build artifact changes Terrium's licence
       # obligations. Nothing publishes today, which is the whole reason the
       # LGPL/GPL terms of the dependencies impose nothing -- so the day that
@@ -262,8 +272,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Install pnpm
-        run: corepack prepare pnpm@11.4.0 --activate
+      # `corepack enable`, NOT `corepack prepare pnpm@X --activate`.
+      #
+      # `prepare --activate` exits 0 and writes no shim, so the step named
+      # "Install pnpm" reported success while every later step died on
+      # `pnpm: command not found`. That is what reddened this build on every
+      # push for two days. Reproduced on the runner's own Node major before
+      # this line was changed; see scripts/check_ci_toolchain.py.
+      #
+      # No version is named here on purpose. Corepack reads
+      # `packageManager` from Science-Agent-Pipeline/package.json and runs
+      # THAT version regardless -- so a version written here could only ever
+      # agree with the manifest or lie about it. The old line said 11.4.0
+      # while the manifest said 11.20.0.
+      - name: Enable pnpm via corepack
+        run: corepack enable
 
       - name: Install workspace dependencies
         working-directory: Science-Agent-Pipeline
