@@ -41,6 +41,22 @@ RESPONSES = {
         "organism": "Homo sapiens",
         "source": "brenda_exact",
         "crossSpecies": False,
+        # The scored frontier a real resolution carries (ADR 0137). Two rows
+        # with DIFFERENT grades, so a test can tell rendering from echoing:
+        # a fixture where every row scores alike cannot show that the grades
+        # reached the screen at all.
+        "ensembleCandidates": [
+            {"value": 10.73, "unit": "mM", "organism": "Homo sapiens",
+             "reference_id": "740253", "conditions": "pH 7.4, 25C",
+             "grades": {"assay_completeness": "complete",
+                        "condition_proximity": "not_assessed",
+                        "organism_match": "exact"}},
+            {"value": 0.398, "unit": "mM", "organism": "Homo sapiens",
+             "reference_id": "286442", "conditions": None,
+             "grades": {"assay_completeness": "absent",
+                        "condition_proximity": "not_assessed",
+                        "organism_match": "exact"}},
+        ],
         "relatedness": [],
         "reliability": {
             "assayCompleteness": {

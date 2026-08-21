@@ -270,6 +270,16 @@ export interface ResolvedKinetic {
    * candidates -- hence `candidates` is what gets checked, never presence.
    */
   selectionTie?: SelectionTie | null;
+  /**
+   * Every surviving row with the grades that weight it (ADR 0137).
+   *
+   * `selectionTie` says the evidence could not choose. This says what each
+   * alternative is WORTH, and it is carried on the ordinary `resolve` path
+   * — not only inside `scientific ensemble` — because a finding built for
+   * one front end reaches half the users. That has been recorded four times
+   * here and is what `check_both_front_ends_read_it.py` exists to stop.
+   */
+  ensembleCandidates?: EnsembleCandidate[];
   logs: string[];
 }
 
@@ -284,6 +294,20 @@ export interface TiedCandidate {
   conditions: string | null;
   /** Whether this is the row that was returned. */
   selected: boolean;
+}
+
+/** One published measurement with the three axes that weight its sampling. */
+export interface EnsembleCandidate {
+  value: number;
+  unit: string | null;
+  organism: string | null;
+  reference_id: string | null;
+  conditions: string | null;
+  grades: {
+    assay_completeness: string;
+    condition_proximity: string;
+    organism_match: string;
+  };
 }
 
 export interface SelectionTie {
@@ -376,6 +400,46 @@ export type ResolverResult = ResolvedKinetic | UnresolvedKinetic;
  * finding becomes a second place the wording can drift, which
  * `queryResolver.ts` explicitly refuses to be.
  */
+/**
+ * Read the runner's `ensembleCandidates`, keeping only usable rows.
+ *
+ * A row needs a finite value and all three grades. One missing either is not
+ * a measurement this can weight, and passing it through would either crash
+ * the sampler or render as a blank entry — both worse than dropping it, and
+ * the count shown to a reader comes from the filtered list so it can never
+ * promise more values than it names.
+ */
+function parseEnsembleCandidates(raw: unknown): EnsembleCandidate[] {
+  if (!Array.isArray(raw)) return [];
+  const out: EnsembleCandidate[] = [];
+  for (const entry of raw) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const row = entry as Record<string, unknown>;
+    const value = row['value'];
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue;
+    const grades = row['grades'];
+    if (typeof grades !== 'object' || grades === null) continue;
+    const g = grades as Record<string, unknown>;
+    const named = ['assay_completeness', 'condition_proximity', 'organism_match'];
+    if (!named.every((k) => typeof g[k] === 'string')) continue;
+    const str = (k: string): string | null =>
+      typeof row[k] === 'string' && row[k] !== '' ? (row[k] as string) : null;
+    out.push({
+      value,
+      unit: str('unit'),
+      organism: str('organism'),
+      reference_id: str('reference_id'),
+      conditions: str('conditions'),
+      grades: {
+        assay_completeness: g['assay_completeness'] as string,
+        condition_proximity: g['condition_proximity'] as string,
+        organism_match: g['organism_match'] as string,
+      },
+    });
+  }
+  return out;
+}
+
 function parseSelectionTie(raw: unknown): SelectionTie | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const record = raw as Record<string, unknown>;
@@ -535,6 +599,10 @@ export function mapFoundResult(
     // reason -- a check on presence would inherit the ambiguity it was
     // written to remove.
     selectionTie: parseSelectionTie(parsed['selectionTie']),
+    // Read through rather than cast: a row with no usable value or no grades
+    // is not a candidate, and letting one through would put a blank line in
+    // front of a student where a measurement should be.
+    ensembleCandidates: parseEnsembleCandidates(parsed['ensembleCandidates']),
     // BRENDA cross-species means the value came from a DIFFERENT organism
     // than the one asked about. Still real and citable, but the caller must
     // be able to see it rather than have it presented as a same-organism

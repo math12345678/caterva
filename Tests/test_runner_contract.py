@@ -113,6 +113,14 @@ def test_golden_found_output_shape(monkeypatch):
         # candidate, or every surviving candidate reported the same value.
         # Distinct from a tie with no candidates, which cannot occur.
         "selectionTie": None,
+        # Empty because `golden_result()` is built by hand and carries no
+        # frontier -- not because a resolution has none. A real resolution
+        # attaches every surviving row with its reliability grades, which is
+        # what the ensemble samples by (ADR 0137). Asserted explicitly rather
+        # than omitted: this contract test exists to fail when the emitted
+        # shape changes, and a key left out of the expectation would let the
+        # field disappear without anyone noticing.
+        "ensembleCandidates": [],
         # None means the returned value is not one of the named forms the
         # pool mixed. That is the good outcome, and it is the outcome in
         # every fixture today -- see ADR 0052, and the corpus test in

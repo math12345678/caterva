@@ -233,6 +233,40 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     );
   }
 
+  // WHAT EACH SURVIVING VALUE IS WORTH (Bakker; ADR 0137)
+  //
+  // The tie block below says the evidence did not choose. This says how much
+  // each alternative WEIGHS -- the three axes graded per candidate, which is
+  // what an ensemble samples by.
+  //
+  // Printed on the ordinary `resolve` path, not only inside `scientific
+  // ensemble`, because a finding built for one front end reaches half the
+  // users. The API renders the same grades into provenance.flags; this is
+  // the other half of that pair, and `check_both_front_ends_read_it.py`
+  // fails the build when only one of them exists.
+  if (result.ensembleCandidates && result.ensembleCandidates.length > 1) {
+    const rows = result.ensembleCandidates;
+    process.stdout.write(
+      `\n${c(DIM, `${rows.length} published values survive the evidence ranking:`)}\n`,
+    );
+    for (const row of rows) {
+      const unit = row.unit ? ` ${row.unit}` : '';
+      const ref = row.reference_id ? c(DIM, `  [ref ${row.reference_id}]`) : '';
+      process.stdout.write(`    ${row.value}${unit}${ref}\n`);
+      process.stdout.write(
+        c(DIM, `        ${row.grades.assay_completeness} / ` +
+          `${row.grades.condition_proximity} / ${row.grades.organism_match}\n`),
+      );
+    }
+    // Named, not described. A reader shown a spread with no way to act on it
+    // is left where ADR 0115 found them.
+    process.stdout.write(
+      c(DIM, '  These grades are the weights an ensemble samples by. To see\n') +
+      c(DIM, '  whether the disagreement changes the answer:\n') +
+      `    ${c(BOLD, 'scientific ensemble --enzyme ... --substrate ... --seed 1 --simulate michaelis_menten')}\n`,
+    );
+  }
+
   // THE EVIDENCE DID NOT CHOOSE THIS NUMBER (Bakker; ADR 0048/0051)
   //
   // Printed high, next to the cross-species warning, because it is the same

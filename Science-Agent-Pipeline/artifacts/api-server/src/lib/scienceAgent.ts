@@ -20,6 +20,21 @@ export interface Citation {
   notes?: string;
 }
 
+/** One published measurement, with the grades that decide its sampling weight. */
+export interface EnsembleCandidate {
+  value: number;
+  unit: string | null;
+  organism: string | null;
+  reference_id: string | null;
+  conditions: string | null;
+  /** The three axes, by name. Not combined into a total — see reliability.py. */
+  grades: {
+    assay_completeness: string;
+    condition_proximity: string;
+    organism_match: string;
+  };
+}
+
 export interface LiteratureCandidate {
   title: string;
   url: string;
@@ -170,6 +185,20 @@ export interface ScienceAgentResult {
    * candidates, which is why `candidates` is checked rather than presence.
    */
   selectionTie?: SelectionTie | null;
+  /**
+   * Every row on the non-dominated frontier, with the reliability grades
+   * that weight it — Bakker's three axes, scored per candidate rather than
+   * only for the winner.
+   *
+   * `selectionTie` says the evidence could not choose and names the
+   * alternatives. This says what each one is WORTH, which is the input the
+   * ensemble samples by and the reason the sampling could not be built until
+   * the resolver started carrying it (ADR 0137).
+   *
+   * Empty means nothing was resolved — a resolution failure to report, never
+   * a band with no members.
+   */
+  ensembleCandidates?: EnsembleCandidate[];
   /**
    * Which named form the returned value IS, when the candidate pool mixed
    * forms of one enzyme (ADR 0052).

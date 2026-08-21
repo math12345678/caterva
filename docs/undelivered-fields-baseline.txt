@@ -81,6 +81,20 @@ selected_form.sibling_designators  # same sentence.
 # resolved from literature" -- while holding the list. The papers are now in
 # that refusal, which is the only place a student meets this path.
 
+# ---------------------------------------------------------------------------
+# ANOTHER AGENT'S, MID-PASS
+# ---------------------------------------------------------------------------
+# Raised rather than claimed. Re-deriving somebody's in-flight work means
+# editing their record if it disagrees, and this arrived while they were
+# still writing it. Listed so the guard does not turn one agent's afternoon
+# into everyone's red build -- and listed rather than removed, so it is a
+# question somebody answers instead of a silence.
+
+cross_species_candidates  # arrived 2026-08-20. Computed by the resolver and
+                          # not emitted by the runner, so nothing downstream
+                          # can see it. Their call whether it should be.
+
+# ---------------------------------------------------------------------------
 selected_form.value  # Prose-carried, verified by reading `selectedFormFlags`:
                      # it renders `form.reason` and nothing else. The value is
                      # named inside that sentence. Not machine-readable, same
