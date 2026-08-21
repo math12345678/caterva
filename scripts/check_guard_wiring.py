@@ -125,6 +125,15 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # the fast local path that stops being run the moment it stops being
     # fast. Expected RED until the repository is published -- see ADR 0143.
     "check_quickstart_clone_works": ("ci",),
+    # CI only for the same reason as its sibling above -- it reuses that
+    # module's probe, so it makes the same network calls and belongs in the
+    # same place. Not in `make guards`: a local target that reaches GitHub
+    # twice stops being fast, and a slow local target stops being run.
+    #
+    # Unlike the sibling it is GREEN today, and stays green through
+    # publication only if the notice is removed on that day. It is the guard
+    # that fires when a TRUE sentence stops being true.
+    "check_availability_notice_matches_reality": ("ci",),
     # Wired 2026-08-15. `make guards` is a fourth harness this script does
     # not model -- it reads verify_build, CI and pytest. The pytest wrapper
     # is what makes it enforcing; the make target is what makes it usable.

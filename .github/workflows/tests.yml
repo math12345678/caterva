@@ -155,6 +155,22 @@ jobs:
       - name: Quickstart-clone guard
         run: python scripts/check_quickstart_clone_works.py || [ $? -eq 3 ]
 
+      # The step above tells the MAINTAINER, in a log only somebody with push
+      # access opens. This one checks the thing that tells the STRANGER: the
+      # "Not public yet" notice on README.md and START_HERE.md.
+      #
+      # Unlike the step above, this one is GREEN today and is expected to
+      # stay green in both directions. It fails if the repositories are
+      # private and the front page does not say so, and it fails again the
+      # day they are published and the notice is left standing -- a warning
+      # turning away visitors who can plainly clone the thing. Nothing else
+      # in the tree goes red when a true sentence stops being true.
+      - name: Availability-notice guard (self-check)
+        run: python scripts/check_availability_notice_matches_reality.py --selftest
+
+      - name: Availability-notice guard
+        run: python scripts/check_availability_notice_matches_reality.py || [ $? -eq 3 ]
+
       # A step named "Install pnpm" that installs no pnpm and exits 0 is the
       # exact shape this project calls worse than no check, and it cost two
       # days of red builds. Runs in the Python job because it is pure Python
