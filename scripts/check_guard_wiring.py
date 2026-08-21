@@ -141,6 +141,19 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_doc_paths_resolve": ("pytest",),
     "check_dependency_licenses": ("ci", "pytest", "verify_build"),
     "check_non_affiliation_notice": ("ci", "pytest", "verify_build"),
+    # Wired 2026-08-21 (ADR 0144). Every `BRENDA ref NNNNNN` printed in the
+    # documentation must be an id that occurs in a committed fixture. The
+    # README demonstrated per-value provenance three times and all three
+    # citations were wrong -- `ref 12345` existed nowhere, and `ref 649716`
+    # is an acetylcholinesterase reference printed under a lactate
+    # dehydrogenase example. A reader who checks one and finds nothing has
+    # the AI-invented-claims suspicion confirmed by the front page itself.
+    # pytest added the same day: `Tests/test_documented_citations_guard.py`
+    # exercises it in BOTH directions, which one harness running it green
+    # never did. It also gives `scripts/mutate.py` a countable suite -- a
+    # guard script exits 0 or 1, and the harness refuses to grade what it
+    # cannot count, so ADR 0144's own table had nothing to reproduce against.
+    "check_documented_citations_are_real": ("verify_build", "pytest"),
     "check_no_fabricated_endorsements": ("ci", "pytest", "verify_build"),
     "check_public_images_reviewed": ("pytest",),
     "check_public_claims": ("pytest",),
