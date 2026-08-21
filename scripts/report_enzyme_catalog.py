@@ -41,7 +41,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from brenda_client import fetch_brenda_html  # noqa: E402
 from enzyme_catalog import catalog  # noqa: E402
-from enzyme_lookup import fetch_ec_numbers_by_name  # noqa: E402
+from enzyme_lookup import EnzymeNameNotResolved, ec_number_for_name  # noqa: E402
 
 
 def _fail(message: str) -> int:
@@ -59,41 +59,14 @@ def main() -> int:
     enzyme_name = payload.get("enzyme")
 
     if not ec_number and enzyme_name:
-        # A NAME IS NOT AN ENZYME.
-        #
-        # "lactate dehydrogenase" is EC 1.1.1.27 (L-lactate dehydrogenase)
-        # AND EC 1.1.1.28 (D-lactate dehydrogenase) -- different enzymes on
-        # different stereoisomers. Measured: `parse_ec_number_search` took
-        # `results[0]` then `ec_numbers[0]` and returned "1.1.1.27" with
-        # nothing saying a choice had been made.
-        #
-        # An EC number is not a parameter; it is the identity of the protein
-        # everything downstream is about. A wrong Km is a wrong number, and
-        # a wrong EC is a citation for a different enzyme. So this refuses
-        # and names the candidates, exactly as the cross-species and variant
-        # refusals do -- a refusal that cannot say what it refused leaves
-        # the choice unexercisable.
+        # A NAME IS NOT AN ENZYME. The decision, its reasoning and its
+        # wording live in `enzyme_lookup.ec_number_for_name`, because
+        # `report` needs the identical policy and two copies of one refusal
+        # drift (ADR 0126, ADR 0137).
         try:
-            candidates = fetch_ec_numbers_by_name(str(enzyme_name), None)
-        except Exception as exc:  # noqa: BLE001 - reported, never a trace
-            return _fail(f"Could not look up {enzyme_name!r} in UniProt: {exc}")
-
-        if not candidates:
-            return _fail(
-                f"UniProt indexes no reviewed enzyme named {enzyme_name!r} "
-                "with an EC number. Check the spelling, or pass the EC number "
-                "directly if you know it."
-            )
-        if len(candidates) > 1:
-            return _fail(
-                f"{enzyme_name!r} names more than one enzyme: "
-                + ", ".join(candidates)
-                + ". These are different proteins, so Terrium will not pick "
-                "one for you — a wrong EC number is a citation for the wrong "
-                "enzyme, not merely a wrong value. Re-run with the one you "
-                "meant."
-            )
-        ec_number = candidates[0]
+            ec_number = ec_number_for_name(str(enzyme_name))
+        except EnzymeNameNotResolved as exc:
+            return _fail(str(exc))
 
     if not ec_number:
         return _fail(

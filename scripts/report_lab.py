@@ -43,8 +43,11 @@ sys.path.insert(0, str(REPO_ROOT / "Tests"))
 sys.path.insert(0, str(REPO_ROOT))
 
 from brenda_client import fetch_brenda_html  # noqa: E402
+from enzyme_lookup import EnzymeNameNotResolved, ec_number_for_name  # noqa: E402
 from fallback_logic import resolve_kinetic_value  # noqa: E402
 from lab_report import SuppliedValue, build_report  # noqa: E402
+from ensemble import ensemble_from_entries  # noqa: E402
+from model_ensemble import ensemble_over  # noqa: E402
 from spread_consequence import consequence_of  # noqa: E402
 
 
@@ -113,6 +116,59 @@ def model_inputs(
     return values
 
 
+def band_for(candidates, *, parameter, inputs, seed, draws):
+    """The weighted band across the values, or None with the reason.
+
+    WHY A SEED IS REQUIRED RATHER THAN DEFAULTED
+    --------------------------------------------
+    `sample_ensemble` makes `seed` a required argument because an ensemble
+    nobody can reproduce is not evidence, and this repository's whole claim
+    is that its numbers can be re-derived. Defaulting one here would undo
+    that at the last step -- the report would carry a band, print a seed
+    the caller never chose, and look reproducible.
+
+    So a missing seed produces no band AND a sentence saying so, rather
+    than a band nobody asked to be able to repeat.
+
+    Returns (band, refusal). Exactly one is None.
+    """
+    if len(candidates) < 2:
+        return None, None
+    if seed is None:
+        return None, (
+            "no band was produced across the "
+            f"{len(candidates)} values the literature reports for "
+            f"{parameter}: no seed was supplied, and an ensemble nobody can "
+            "reproduce is not evidence. Re-run with --seed N."
+        )
+    missing = [n for n in ("km", "vmax", "s0") if inputs.get(n) is None]
+    if missing:
+        return None, (
+            f"no band was produced for {parameter}: the model cannot be run "
+            f"without {', '.join(missing)}."
+        )
+
+    from Terium.continuous.simulations import simulate_michaelis_menten
+
+    try:
+        drawn = ensemble_from_entries(
+            candidates, draws=draws, seed=seed, value_attr="value"
+        )
+        return ensemble_over(
+            simulate=simulate_michaelis_menten,
+            base_parameters={
+                "km": inputs["km"], "vmax": inputs["vmax"], "s0": inputs["s0"]
+            },
+            parameter=parameter,
+            drawn=drawn,
+        ), None
+    except Exception as exc:  # noqa: BLE001 - reported, never a traceback
+        # A band that will not compute is a finding about the values, which
+        # are printed above it. Swallowing it would leave the document
+        # silently narrower than the evidence.
+        return None, f"no band was produced for {parameter}: {exc}"
+
+
 #: What the Michaelis-Menten model cannot run without, and who owns each.
 #:
 #: The distinction is the one the professors' correspondence turns on: a km
@@ -136,16 +192,41 @@ def main() -> int:
 
     ec = payload.get("ec")
     organism = payload.get("organism")
+
+    # A STUDENT KNOWS THE NAME, NOT THE NUMBER.
+    #
+    # `report` shipped requiring an EC number, so the first thing a teaching
+    # lab's student typed -- the enzyme's name, the flag `catalog` and
+    # `simulate` both already accept -- was refused by a message beginning
+    # "report needs an enzyme". Measured, before this:
+    #
+    #   $ report --enzyme "lactate dehydrogenase" --organism "Homo sapiens" \
+    #            --substrate lactate
+    #   -> report needs an enzyme, an organism and a substrate
+    #
+    # The name is resolved through the SAME policy `catalog` uses, which
+    # refuses rather than picking when a name maps to more than one enzyme.
+    # Resolving is not guessing: UniProt is asked, and one answer is an
+    # answer. Two answers is a refusal that names both.
+    if not ec and payload.get("enzyme"):
+        try:
+            ec = ec_number_for_name(str(payload["enzyme"]))
+        except EnzymeNameNotResolved as exc:
+            return _fail(str(exc))
+
     if not ec or not organism:
         return _fail(
-            "A report needs 'ec' and 'organism'. Both are the identity of "
-            "what is being modelled, and neither is inferred from free text: "
-            "guessing either would attach real citations to a system nobody "
-            "named."
+            "A report needs an enzyme and an organism. Give the enzyme as an "
+            "EC number ('ec') or as a name ('enzyme') — a name is looked up "
+            "in UniProt, and refused if it matches more than one enzyme. The "
+            "organism is not inferred from free text: guessing it would "
+            "attach real citations to a system nobody named."
         )
 
     resolved: dict = {}
     ensembles: dict = {}
+    bands: dict = {}
+    band_refusals: list[str] = []
     quantities: dict[str, str] = {}
     for entry in payload.get("parameters") or []:
         name = entry.get("name")
@@ -202,6 +283,21 @@ def main() -> int:
                 vmax=inputs.get("vmax"),
                 s0=inputs.get("s0"),
             )
+            # And the weighted band over the same candidates. Both appear in
+            # the document because they answer different questions, and ADR
+            # 0134's agreement test makes carrying both safe: the band
+            # cannot reach outside the enumerated outcomes.
+            band, why_not = band_for(
+                candidates,
+                parameter=quantities.get(name, "km"),
+                inputs=inputs,
+                seed=payload.get("seed"),
+                draws=int(payload.get("draws", 400)),
+            )
+            if band is not None:
+                bands[name] = band
+            elif why_not:
+                band_refusals.append(why_not)
 
     simulation = None
     also_refused: list[str] = []
@@ -243,9 +339,10 @@ def main() -> int:
         resolved=resolved,
         supplied=supplied,
         ensembles=ensembles,
+        bands=bands,
         simulation=simulation,
         bibtex=payload.get("bibtex"),
-        also_refused=also_refused,
+        also_refused=also_refused + band_refusals,
     )
 
     print(

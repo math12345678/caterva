@@ -922,7 +922,9 @@ ${colors.bright}Commands:${colors.reset}
     the part no other tool prints — what Terrium would not do, and why.
     Written to PATH, or to stdout.
     ${colors.dim}Example:${colors.reset} report --ec 1.1.1.27 --organism "Homo sapiens" \\
-      --substrate "(S)-lactate" --s0 10 --vmax 0.25 --out report.md
+      --substrate "(S)-lactate" --s0 10 --vmax 0.25 --seed 1 --out report.md
+    Add --seed N to include the weighted band across every value the
+    literature reports. Without it the report says no band was made.
 
   catalog <ec-number> | --enzyme NAME [--json]
     What BRENDA actually reports for an enzyme, before you ask it for a
@@ -1557,18 +1559,32 @@ async function main() {
       // one definition of what a resolved parameter is, and no second
       // place that can drift from it.
       const reportEc = flagValue(rest, '--ec');
+      // A NAME IS ACCEPTED TOO, because a student knows one and not the
+      // other. `catalog` and `simulate --resolve` have always taken
+      // `--enzyme`; `report` did not, so the first thing a teaching lab
+      // typed was refused by a message that began "report needs an enzyme"
+      // — while rejecting the enzyme they had just given. See ADR 0139.
+      //
+      // The Python side resolves it through the same policy `catalog` uses
+      // and REFUSES when a name maps to more than one enzyme: "lactate
+      // dehydrogenase" is EC 1.1.1.27 (L-) and 1.1.1.28 (D-), and a wrong
+      // EC is a real citation for the wrong protein (ADR 0126).
+      const reportEnzyme = flagValue(rest, '--enzyme');
       const reportOrganism = flagValue(rest, '--organism');
       const reportSubstrate = flagValue(rest, '--substrate');
       const destination = flagValue(rest, '--out');
 
-      if (!reportEc || !reportOrganism || !reportSubstrate) {
+      if ((!reportEc && !reportEnzyme) || !reportOrganism || !reportSubstrate) {
         error(
           'report needs an enzyme, an organism and a substrate, e.g.\n' +
-          '  scientific report --ec 1.1.1.27 --organism "Homo sapiens" \\\n' +
-          '      --substrate "(S)-lactate" --s0 10 --vmax 0.25 --out report.md\n\n' +
-          'Run `scientific catalog 1.1.1.27` first to see the substrate ' +
-          "labels BRENDA actually uses — its label for lactate is " +
-          '"(S)-lactate", so a reasonable guess comes back empty.',
+          '  scientific report --enzyme "alcohol dehydrogenase" \\\n' +
+          '      --organism "Homo sapiens" --substrate ethanol \\\n' +
+          '      --s0 10 --vmax 0.25 --out report.md\n\n' +
+          'The enzyme can be a name (looked up in UniProt, and refused if ' +
+          'it names more than one enzyme) or an EC number, --ec 1.1.1.27.\n\n' +
+          'Run `scientific catalog --enzyme "alcohol dehydrogenase"` first ' +
+          "to see the substrate labels BRENDA actually uses — its label for " +
+          'lactate is "(S)-lactate", so a reasonable guess comes back empty.',
         );
         process.exit(1);
       }
@@ -1577,6 +1593,7 @@ async function main() {
         title: flagValue(rest, '--title'),
         question: flagValue(rest, '--question'),
         ec: reportEc,
+        enzyme: reportEnzyme,
         organism: reportOrganism,
         parameters: [
           {
@@ -1596,6 +1613,12 @@ async function main() {
             : []),
         ],
         s0: flagValue(rest, '--s0') ? Number(flagValue(rest, '--s0')) : undefined,
+        // The seed is passed through, never generated. `sample_ensemble`
+        // makes it required because an ensemble nobody can reproduce is not
+        // evidence; inventing one here would print a seed the student never
+        // chose and call the band reproducible. Without it the report says
+        // no band was produced, and why.
+        seed: flagValue(rest, '--seed') ? Number(flagValue(rest, '--seed')) : undefined,
         vmax: flagValue(rest, '--vmax') ? Number(flagValue(rest, '--vmax')) : undefined,
       };
 
