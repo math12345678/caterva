@@ -453,6 +453,81 @@ def fetch_ec_numbers_by_name(
     return parse_ec_number_candidates(r.json())
 
 
+class EnzymeNameNotResolved(ValueError):
+    """A name did not identify exactly one enzyme.
+
+    Carries the candidates so a caller can render them. A refusal that
+    cannot say what it refused leaves the choice unexercisable, which is the
+    shape every other refusal in this project has (ADR 0024, ADR 0118).
+    """
+
+    def __init__(self, message: str, candidates: list[str] | None = None):
+        super().__init__(message)
+        self.candidates = candidates or []
+
+
+def ec_number_for_name(
+    enzyme_name: str,
+    taxon_id: str | None = None,
+    *,
+    fetch=None,
+) -> str:
+    """The ONE EC number this name identifies, or a refusal naming the rest.
+
+    WHY THIS IS A FUNCTION AND NOT AN `if` IN EACH COMMAND
+    -----------------------------------------------------
+    A NAME IS NOT AN ENZYME. "lactate dehydrogenase" is EC 1.1.1.27
+    (L-lactate dehydrogenase) AND EC 1.1.1.28 (D-lactate dehydrogenase) --
+    different proteins acting on different stereoisomers, one common name,
+    and the example in this repository's own help text (ADR 0126).
+
+    An EC number is not a parameter; it is the IDENTITY OF THE PROTEIN
+    everything downstream is about. A wrong Km is a wrong number. A wrong EC
+    is a real, correctly formatted citation for a different enzyme -- the
+    failure this project exists to prevent, arriving before any of the
+    machinery that prevents it gets to run.
+
+    ADR 0126 built this decision inside `report_enzyme_catalog.py`, where
+    only `catalog` could reach it. `report` then shipped requiring `--ec`,
+    so a student who knew the name and not the number was refused by a
+    message that began "report needs an enzyme". Copying the block would
+    have made two implementations of one policy, which is the defect this
+    repository has found in a plausibility table (ADR 0003), a reliability
+    score (ADR 0027), a codegen probe (ADR 0036) and a request validator
+    (ADR 0086). So it moved here, and both commands call it.
+
+    `fetch` is injectable for tests ONLY. It defaults to the real UniProt
+    call; a test that had to reach the network to check a refusal message
+    would fail for reasons unrelated to the refusal.
+    """
+    lookup = fetch or fetch_ec_numbers_by_name
+    try:
+        candidates = lookup(str(enzyme_name), taxon_id)
+    except EnzymeNameNotResolved:
+        raise
+    except Exception as exc:  # noqa: BLE001 - reported, never a traceback
+        raise EnzymeNameNotResolved(
+            f"Could not look up {enzyme_name!r} in UniProt: {exc}"
+        ) from exc
+
+    if not candidates:
+        raise EnzymeNameNotResolved(
+            f"UniProt indexes no reviewed enzyme named {enzyme_name!r} with "
+            "an EC number. Check the spelling, or pass the EC number "
+            "directly if you know it."
+        )
+    if len(candidates) > 1:
+        raise EnzymeNameNotResolved(
+            f"{enzyme_name!r} names more than one enzyme: "
+            + ", ".join(candidates)
+            + ". These are different proteins, so Terrium will not pick one "
+            "for you — a wrong EC number is a citation for the wrong enzyme, "
+            "not merely a wrong value. Re-run with the one you meant.",
+            candidates,
+        )
+    return candidates[0]
+
+
 def parse_ec_number_search(data: dict) -> str | None:
     """Pure function: UniProt JSON response (fields=accession,ec) in, the
     first EC number string out, or None.
