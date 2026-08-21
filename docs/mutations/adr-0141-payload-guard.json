@@ -1,0 +1,47 @@
+{
+  "_why": [
+    "ADR 0141's PYTHON half, re-derived under scripts/mutate.py.",
+    "",
+    "The defect: `--s0 10mM` became NaN in the CLI, `null` in JSON, and was",
+    "then filtered out here -- so the document told a student 's0 is missing",
+    "-- yours to choose' about a number they had chosen. A refusal that",
+    "blames the user for the tool's own data loss is worse than a crash.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0141-payload-guard.json",
+    "",
+    "Split from the TypeScript half (adr-0141-cli-quantities.json) because a",
+    "set has ONE test command and this ADR's evidence spans two runners.",
+    "Chaining jest and pytest into one command would make the harness's test",
+    "counting read one runner's output as the other's."
+  ],
+  "test": "cd Tests && python3 -m pytest test_a_lost_number_is_not_a_missing_one.py -q --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "N1",
+      "description": "a null value is dropped silently again",
+      "_claimed": "3 failed",
+      "_note": "The original defect, restored. This is the line that turned a lost number into a lecture about not providing it.",
+      "file": "scripts/report_lab.py",
+      "find": "        if entry.get(\"value\") is None:",
+      "replace": "        if False:"
+    },
+    {
+      "id": "N2",
+      "description": "zero is treated as absence",
+      "_claimed": "1 failed",
+      "_note": "The obvious guard, `if not entry.get('value')`, refuses a legitimate s0 of 0 -- the same class of bug as the one being fixed, a real number read as absence. Pinned so a later edit cannot reintroduce it.",
+      "file": "scripts/report_lab.py",
+      "find": "        if entry.get(\"value\") is None:",
+      "replace": "        if not entry.get(\"value\"):"
+    },
+    {
+      "id": "N3",
+      "description": "the payload is checked only after the network call",
+      "_claimed": "1 failed",
+      "_note": "Where this guard first sat. The observed failure was `Could not resolve 'km': 403 Forbidden` -- the network masking the payload defect entirely, and the check untestable without a network.",
+      "file": "scripts/report_lab.py",
+      "find": "    try:\n        supplied = supplied_values(payload)\n    except MalformedSuppliedValue as exc:\n        return _fail(str(exc))\n\n",
+      "replace": ""
+    }
+  ]
+}

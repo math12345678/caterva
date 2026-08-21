@@ -1,0 +1,65 @@
+{
+  "_why": [
+    "ADR 0136's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The finding: `build_report` rendered a Result section and the only",
+    "production caller never passed it a simulation, so the one command whose",
+    "purpose is 'run the simulation and show where the numbers came from' did",
+    "the second half only. The unit test passed throughout by building its",
+    "own Trajectory -- a test that constructs its own input cannot verify how",
+    "the input is produced (ADR 0038).",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0136-report-result-section.json",
+    "",
+    "The find strings are the CURRENT lines, not the ones the ADR was written",
+    "against: ADR 0141 and 0142 have edited this file since. A set file is a",
+    "claim about the code as it stands, so re-deriving it after later work is",
+    "the point of having one -- a set that only ever matched the tree on the",
+    "day it was written would rot into an INDETERMINATE nobody investigates.",
+    "",
+    "The fourth mutation in the ADR's table -- reading the payload instead of",
+    "the derived inputs for the ensemble -- SURVIVED on its first run and is",
+    "recorded there as a survivor. It is not in this set because the test",
+    "that closes it was added in the same pass and the mutation now fails;",
+    "keeping it would restate a caught mutation as if it had always been one."
+  ],
+  "test": "cd Tests && python3 -m pytest test_report_command_runs_the_model.py -q --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "R1",
+      "description": "the simulation is not passed to the report (the state before this ADR)",
+      "_claimed": "3 failed",
+      "_note": "The defect itself. Everything else in the document still renders, which is why it survived so long: the report looked complete and simply stopped before the thing the student came for.",
+      "file": "scripts/report_lab.py",
+      "find": "        simulation=simulation,",
+      "replace": "        simulation=None,"
+    },
+    {
+      "id": "R2",
+      "description": "refusals established by the caller are dropped",
+      "_claimed": "3 failed",
+      "_note": "'The model was not run, and here is what was missing' is a refusal build_report cannot see for itself. Dropping it leaves a document that is silent about its own biggest gap.",
+      "file": "scripts/report_lab.py",
+      "find": "        also_refused=also_refused + band_refusals + derive_refusals,",
+      "replace": "        also_refused=[],"
+    },
+    {
+      "id": "R3",
+      "description": "a value given twice with two numbers is resolved by precedence instead of refused",
+      "_claimed": "1 failed",
+      "_note": "s0 could arrive as payload['s0'] AND inside supplied, read by different sections, with nothing comparing them: a document stating 5 while computed at 10, internally consistent in appearance. Picking a winner silently restores the defect with a rule attached.",
+      "file": "scripts/report_lab.py",
+      "find": "        if name in values and float(values[name]) != float(value):",
+      "replace": "        if False:"
+    },
+    {
+      "id": "R4",
+      "description": "the ensemble reads the payload again instead of the derived inputs",
+      "_claimed": "1 failed (after the eighth test was added; it SURVIVED before)",
+      "_note": "The honest one. This survived the first seven tests because the fixture they use produces no ensemble, so nothing exercised it. The eighth test uses Danio rerio, which has no Km for pyruvate in the fixture and therefore yields a real cross-species ensemble. Its FIRST version also survived, because it asserted the absence of a sentence and guessed the wording wrong.",
+      "file": "scripts/report_lab.py",
+      "find": "                vmax=inputs.get(\"vmax\"),\n                s0=inputs.get(\"s0\"),",
+      "replace": "                vmax=payload.get(\"vmax\"),\n                s0=payload.get(\"s0\"),"
+    }
+  ]
+}
