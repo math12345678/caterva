@@ -12285,3 +12285,48 @@ not the deleted block. Reading the artifact caught both.
 | Guards | documented counts, vacuous, bug lints, scripts-reachable green |
 | Next | `report` still does not RUN the simulation — the trajectory section renders only if a caller supplies one. Wiring the engine in is what makes it genuinely one command |
 | Open | the api-server CI job, red since 2026-08-05 and not reproducible in this sandbox |
+
+
+## Fifty-fourth pass — the band reaches the document
+
+Another agent had already wired the simulation into `report_lab.py` — the
+thing I named as next — and did it better than my sketch: a missing `s0`
+becomes a refusal naming who owns the value, and a model that will not
+integrate is reported rather than swallowed. Not duplicated.
+
+That surfaced the gap in my own work. `build_report` grew a `bands`
+parameter and **nothing passed it**. The section rendered correctly, was
+tested six ways, and could not appear in any document a person could
+produce. Computed, correct, undelivered — the defect this repository spends
+its effort on, in the feature added to display the results of the last one.
+
+Now `report_lab.band_for` builds it and the command passes it. Two refusals
+carry the weight:
+
+- **No seed, no band.** `sample_ensemble` makes the seed required because an
+  ensemble nobody can reproduce is not evidence. Defaulting one here would
+  undo that at the last step: the report would carry a band, print a seed
+  the caller never chose, and look reproducible. Instead the document says
+  no band was produced and names `--seed`.
+- **A band that will not compute is reported.** This runs while a document
+  is being assembled; a traceback replaces "a report that says what it could
+  not do" with no report at all.
+
+**A test passed for the wrong reason again — the fifth this session.**
+`test_a_missing_model_input_is_named` asserted `"s0" in refusal`. Deleting
+the check let the code reach `inputs["s0"]`, raise `KeyError('s0')`, and
+land in the generic handler — whose message also contains "s0". The
+assertion held while the check it named was gone. It now compares the whole
+sentence.
+
+The pattern across all five: **a `contains` against output that also
+explains itself is not an assertion.** Prose, worked examples and exception
+messages all supply the substring for free. Assert the row, the line, or the
+whole sentence.
+
+| | |
+|---|---|
+| Mutations | 3 caught — default the seed; band a single candidate; ignore missing model inputs (this one only after the assertion was tightened) |
+| Tests | `test_report_band_reaches_the_document.py` 6 new; 12 green with the band-rendering suite |
+| CLI | `--seed N` passed through, never generated |
+| Open | the api-server CI job, red since 2026-08-05, still not reproducible here |

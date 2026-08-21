@@ -202,6 +202,64 @@ function literatureCandidateNote(
   );
 }
 
+/**
+ * What each published value is worth, and how a client can draw the band.
+ *
+ * `selectionTieFlags` says the evidence did not choose and names the
+ * alternatives. This says how much each one WEIGHS — Bakker's three axes,
+ * graded per candidate:
+ *
+ *   "We gave each parameter a score based on its reliability and
+ *    applicability [...] These scores were then used to give the parameter a
+ *    weight in the sampling."
+ *
+ * The flag is emitted whenever the frontier held more than one row, which is
+ * exactly when the weights are decision-relevant. One row is not a
+ * disagreement and a flag about it would be noise — and this project cannot
+ * afford noisy flags, because it prints a lot of them.
+ *
+ * It names the command rather than describing it. `scientific ensemble` is
+ * what turns these weights into a trajectory band, and a reader told that a
+ * spread exists without being told how to see its effect is left where
+ * ADR 0115 found them: holding a finding with no next step.
+ */
+function ensembleCandidateFlags(
+  key: string,
+  candidates: ScienceAgentResult["ensembleCandidates"],
+): string[] {
+  if (!candidates || candidates.length < 2) return [];
+  const K = key.toUpperCase();
+
+  // Capped at four with an explicit remainder, for the reason
+  // `selectionTieFlags` gives: a flag nobody finishes reading is a flag
+  // nobody reads.
+  const shown = candidates.slice(0, 4);
+  const listed = shown
+    .map((c) => {
+      const unit = c.unit ? ` ${c.unit}` : '';
+      const ref = c.reference_id ? ` [ref ${c.reference_id}]` : '';
+      const grades = [
+        c.grades.assay_completeness,
+        c.grades.condition_proximity,
+        c.grades.organism_match,
+      ].join('/');
+      return `${c.value}${unit}${ref} (${grades})`;
+    })
+    .join('; ');
+  const more =
+    candidates.length > shown.length
+      ? ` and ${candidates.length - shown.length} more`
+      : '';
+
+  return [
+    `${K} — ${candidates.length} published values survive the evidence ranking, ` +
+      `each graded on assay completeness / condition proximity / organism ` +
+      `match: ${listed}${more}. These grades are the weights an ensemble ` +
+      `samples by; \`scientific ensemble\` runs the model once per draw and ` +
+      `shows whether the disagreement changes the answer.`,
+  ];
+}
+
 function selectionTieFlags(
   key: string,
   tie: ScienceAgentResult["selectionTie"],
@@ -730,6 +788,9 @@ async function applyKineticResolution(
       // the pool it came from held something the reader should look at.
       flags.push(...poolFindingFlags(key, agentResult.poolFindings));
       flags.push(...selectionTieFlags(key, agentResult.selectionTie));
+      flags.push(
+        ...ensembleCandidateFlags(key, agentResult.ensembleCandidates),
+      );
       flags.push(...selectedFormFlags(key, agentResult.selectedForm));
       flags.push(...preparationFlags(key, agentResult.preparation));
     } else {

@@ -806,6 +806,24 @@ def main() -> None:
                     result.selection_tie.model_dump()
                     if result.selection_tie else None
                 ),
+                # EVERY SURVIVING ROW, WITH THE SCORE THAT WEIGHTS IT.
+                #
+                # `selectionTie` says the evidence could not choose and lists
+                # the alternatives. This says how much each one is worth --
+                # Bakker's three axes, graded per candidate rather than only
+                # for the winner, which is what the sampling needs and what
+                # made it unbuildable until the resolver started carrying
+                # them (ADR 0137).
+                #
+                # Emitted whether or not anybody samples: it is a handful of
+                # dicts, and a client that wants to draw a band should not
+                # have to ask for a second resolution to get the weights.
+                #
+                # Empty means nothing was resolved, which is a resolution
+                # failure to report -- never a band with no members.
+                "ensembleCandidates": list(
+                    getattr(result, "ensemble_candidates", []) or []
+                ),
                 # Every relatedness verdict, including the ones that
                 # REJECTED a candidate. A filter that reports only what
                 # survived it cannot be argued with, and the organisms it
