@@ -45,7 +45,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from brenda_client import fetch_brenda_html  # noqa: E402
 from enzyme_lookup import EnzymeNameNotResolved, ec_number_for_name  # noqa: E402
 from fallback_logic import resolve_kinetic_value  # noqa: E402
-from lab_report import SuppliedValue, build_report  # noqa: E402
+from lab_report import DerivedValue, SuppliedValue, build_report  # noqa: E402
 from ensemble import ensemble_from_entries  # noqa: E402
 from model_ensemble import ensemble_over  # noqa: E402
 from spread_consequence import consequence_of  # noqa: E402
@@ -222,6 +222,112 @@ def band_for(candidates, *, parameter, inputs, seed, draws):
         return None, f"no band was produced for {parameter}: {exc}"
 
 
+def one_page_per_run(fetch):
+    """Fetch each EC page once, however many quantities are read from it.
+
+    BRENDA serves km, ki and kcat as separate TABLES ON ONE PAGE, and
+    `resolve_kinetic_value` fetches inside itself — so a report asking for
+    two parameters fetched the same page twice, and adding the kcat lookup
+    for the Vmax bridge would have made it three.
+
+    Lisa Jeske (BRENDA/DSMZ) asked directly that tools be gentle with their
+    servers, and this repository already refuses to auto-download a bulk
+    corpus for that reason. Re-requesting a page Terrium is still holding is
+    the same discourtesy in miniature, repeated once per parameter.
+
+    Scoped to a single run deliberately. A cache that outlives the process
+    would make a report reproducible against a page nobody can see any more,
+    which is a provenance problem dressed as an optimisation (ADR 0016).
+    """
+    cache: dict[str, str] = {}
+
+    def get(ec_number: str, timeout: float = 15) -> str:
+        key = str(ec_number)
+        if key not in cache:
+            cache[key] = fetch(key, timeout)
+        return cache[key]
+
+    get.fetches = cache  # type: ignore[attr-defined]
+    return get
+
+
+def bridge_vmax(kcat_result, enzyme_conc: float, km: float | None):
+    """Vmax from a literature kcat and the student's enzyme concentration.
+
+    WHY THIS EXISTS
+    ---------------
+    `report` required `--vmax`, which is the one required input a teaching
+    lab's student genuinely cannot produce: Vmax is a property of *their
+    tube*, not of the enzyme, and no database reports it. BRENDA does report
+    kcat, and `simulate --resolve` has bridged the two since ADR 0019 — so
+    `report` was demanding a number it could have computed.
+
+    WHAT IS NOT REIMPLEMENTED HERE
+    ------------------------------
+    The arithmetic, the unit convention and the validation all live in
+    `Terium.core.validation.vmax_from_kcat` (ADR 0012, ADR 0013), which also
+    flags the [E]0 << Km assumption the Michaelis-Menten rate law rests on.
+    Multiplying two floats here instead would have been three lines and a
+    second definition of what the bridge means — the defect this repository
+    has spent most of its effort on. This function resolves nothing and
+    computes nothing; it arranges and it reports.
+
+    Returns (DerivedValue, warnings) or (None, refusal-string).
+    """
+    from Terium.core.validation import vmax_from_kcat
+
+    if not getattr(kcat_result, "found", False) or kcat_result.value is None:
+        return None, (
+            "vmax could not be derived: an enzyme concentration was given, "
+            "but no kcat was found to combine it with. Vmax = kcat x [E]0 "
+            "needs both."
+        )
+
+    try:
+        value, validation = vmax_from_kcat(
+            float(kcat_result.value), float(enzyme_conc), km
+        )
+    except Exception as exc:  # noqa: BLE001 - reported, never a traceback
+        return None, f"vmax could not be derived from kcat: {exc}"
+
+    if not getattr(validation, "ok", True):
+        # A rejected bridge is a finding about the numbers, and the reason
+        # names which one. Returning a Vmax anyway would put an invalid
+        # number in the table with a citation beside it.
+        reasons = "; ".join(getattr(validation, "errors", []) or ["rejected"])
+        return None, f"vmax could not be derived from kcat: {reasons}"
+
+    unit = getattr(kcat_result, "unit", None) or "1/s"
+    return (
+        DerivedValue(
+            name="vmax",
+            value=value,
+            unit="mM/s",
+            from_cited=(
+                f"kcat {_fmt_number(kcat_result.value)} {unit} "
+                f"({_citation_of(kcat_result)})"
+            ),
+            from_chosen=f"[E]0 {_fmt_number(enzyme_conc)} mM, which is yours",
+            relation="Vmax = kcat x [E]0",
+        ),
+        list(getattr(validation, "warnings", []) or []),
+    )
+
+
+def _fmt_number(value) -> str:
+    return f"{float(value):.6g}"
+
+
+def _citation_of(result) -> str:
+    """The reference for a resolved value, or an honest absence."""
+    citation = getattr(result, "citation", None)
+    if citation is None:
+        return "no citation recorded"
+    source = getattr(citation, "source", None) or "unknown source"
+    reference = getattr(citation, "reference_id", None)
+    return f"{source} ref {reference}" if reference else source
+
+
 #: What the Michaelis-Menten model cannot run without, and who owns each.
 #:
 #: The distinction is the one the professors' correspondence turns on: a km
@@ -285,6 +391,9 @@ def main() -> int:
     except MalformedSuppliedValue as exc:
         return _fail(str(exc))
 
+    # One fetch per page, not one per quantity. See `one_page_per_run`.
+    page = one_page_per_run(fetch_brenda_html)
+
     resolved: dict = {}
     ensembles: dict = {}
     bands: dict = {}
@@ -302,7 +411,7 @@ def main() -> int:
         try:
             result = resolve_kinetic_value(
                 str(ec), str(organism), str(substrate),
-                html_provider=fetch_brenda_html,
+                html_provider=page,
                 quantity=str(entry.get("quantity", "km")),
                 allow_cross_species=bool(entry.get("allowCrossSpecies", False)),
             )
@@ -312,11 +421,57 @@ def main() -> int:
         resolved[str(name)] = result
         quantities[str(name)] = str(entry.get("quantity", "km"))
 
-
     try:
         inputs = model_inputs(resolved, quantities, supplied, payload)
     except ConflictingValue as exc:
         return _fail(str(exc))
+
+    # ---- Vmax from kcat, when the student gave [E]0 instead ---------------
+    #
+    # Only when Vmax is genuinely absent. A supplied Vmax is a decision, and
+    # silently replacing it with a derived one would overrule the student
+    # using a number they cannot see — the same defect as discarding their
+    # --vmax in a suggested command (ADR 0116).
+    derived: list[DerivedValue] = []
+    derive_refusals: list[str] = []
+    enzyme_conc = payload.get("enzymeConc")
+
+    if enzyme_conc is not None and "vmax" not in inputs:
+        substrate = None
+        for entry in payload.get("parameters") or []:
+            if entry.get("substrate"):
+                substrate = str(entry["substrate"])
+                break
+        try:
+            kcat_result = resolve_kinetic_value(
+                str(ec), str(organism), str(substrate),
+                html_provider=page,
+                quantity="kcat",
+                allow_cross_species=bool(
+                    (payload.get("parameters") or [{}])[0].get(
+                        "allowCrossSpecies", False
+                    )
+                ),
+            )
+        except Exception as exc:  # noqa: BLE001 - reported, never a traceback
+            return _fail(f"Could not resolve kcat: {exc}")
+
+        value, detail = bridge_vmax(kcat_result, float(enzyme_conc), inputs.get("km"))
+        if value is None:
+            derive_refusals.append(str(detail))
+        else:
+            derived.append(value)
+            inputs["vmax"] = value.value
+            # The rate law's [E]0 << Km assumption is stretched, not broken.
+            # The run still teaches something, so it is a warning in the
+            # document rather than a refusal (ADR 0013).
+            derive_refusals.extend(str(w) for w in (detail or []))
+    elif enzyme_conc is not None:
+        derive_refusals.append(
+            "an enzyme concentration was given and not used: a vmax was "
+            "already supplied, and Terrium does not overrule a value you "
+            "chose with one it computed."
+        )
 
     # ---- The ensemble, and the run, from the SAME numbers -----------------
     #
@@ -390,11 +545,12 @@ def main() -> int:
         question=str(payload.get("question") or ""),
         resolved=resolved,
         supplied=supplied,
+        derived=derived,
         ensembles=ensembles,
         bands=bands,
         simulation=simulation,
         bibtex=payload.get("bibtex"),
-        also_refused=also_refused + band_refusals,
+        also_refused=also_refused + band_refusals + derive_refusals,
     )
 
     print(
@@ -404,6 +560,7 @@ def main() -> int:
                 "markdown": report.markdown,
                 "sourced": report.sourced,
                 "supplied": report.supplied,
+                "derived": report.derived,
                 "refusals": report.refusals,
                 "disagreements": report.disagreements,
                 "defensible": report.is_defensible,

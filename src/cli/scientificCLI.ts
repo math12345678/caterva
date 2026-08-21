@@ -1614,6 +1614,21 @@ async function main() {
       const reportSuppliedValue = (name: string): number | undefined =>
         reportQuantities.supplied.find((s) => s.name === name)?.value;
 
+      // [E]0, which bridges a literature kcat to a runnable Vmax. Parsed
+      // exactly as `simulate --resolve` parses it — same flag, same unit
+      // handling — because Vmax is the one required input a teaching lab's
+      // student cannot produce, and BRENDA holds the kcat behind it.
+      let reportEnzymeConc: number | undefined;
+      if (flagValue(rest, '--enzyme-conc')) {
+        try {
+          const parsed = parseQuantity('e0', flagValue(rest, '--enzyme-conc')!);
+          reportEnzymeConc = convertConcentration(parsed.value, parsed.unit, 'mM');
+        } catch (err) {
+          error(err instanceof Error ? err.message : String(err));
+          process.exit(1);
+        }
+      }
+
       const reportPayload = {
         title: flagValue(rest, '--title'),
         question: flagValue(rest, '--question'),
@@ -1634,6 +1649,7 @@ async function main() {
         // this CLI's own help teaches, vanished and the document replied
         // "s0 is missing — yours to choose". See ADR 0141.
         supplied: reportQuantities.supplied,
+        enzymeConc: reportEnzymeConc,
         s0: reportSuppliedValue('s0'),
         // The seed is passed through, never generated. `sample_ensemble`
         // makes it required because an ensemble nobody can reproduce is not
