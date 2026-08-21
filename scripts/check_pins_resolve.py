@@ -28,6 +28,50 @@ project's dependency manifest on the strength of one command's output.
 The changes were reverted. This guard is what remains, and its job is to
 make that specific error impossible to repeat.
 
+THE SAME ERROR, INVERTED, ON 2026-08-20 -- READ THIS BEFORE PROBING PINS
+------------------------------------------------------------------------
+Hunting the still-unexplained `test` job failure, I tried to ask the right
+question this time: resolve for the RUNNER's platform rather than this one,
+
+    pip install --dry-run --only-binary=:all: \
+        --platform manylinux_2_28_x86_64 --python-version 310 --abi cp310 \
+        -r requirements-dev.txt
+
+and it reported:
+
+    ERROR: Could not find a version that satisfies the requirement
+           antimony==2.14.0 (from versions: 2.15.0, 3.0.0, 3.1.0, ...)
+
+on all three Pythons -- a perfect match for the symptom (all four jobs dying
+in under forty seconds, before any suite). I edited the pin to 2.15.0.
+
+**It was wrong.** `--platform` matches wheel tags EXACTLY; it does not know
+that a manylinux_2_28 machine also runs manylinux_2_17 and manylinux2014
+wheels. Passing the full set the runner actually accepts:
+
+    antimony-2.14.0-py3-none-manylinux2014_x86_64.whl   <- it was always there
+
+The pin was reverted before it was committed. Two more probes in the same
+hour failed the same way: `python-libsedml==2.0.33` "did not exist" until the
+platform list was widened, and a `cffconvert` dependency conflict turned out
+to be `docopt`, which is sdist-only and was excluded by my own
+`--only-binary=:all:` -- a flag CI does not pass.
+
+So this is not one mistake with a fix; it is a SHAPE, and it is the
+repository's most frequent one:
+
+    a matcher narrower than the thing it measures reports "it is not there",
+    when what it means is "I could not see".
+
+Three times in matchers (ADR 0102, 0104, 0122), once against the dependency
+manifest (above), and now three times in a single hour against pip's own
+platform flags -- twice nearly rewriting a pin that was correct.
+
+IF YOU ARE ABOUT TO CHANGE A PIN BECAUSE A TOOL SAID A VERSION IS MISSING:
+the burden is on the probe, not the package. Widen the matcher until it
+says the version is missing for reasons you can name, or get the actual
+build log. Do not edit requirements.txt on the strength of one command.
+
 WHAT IT CHECKS
 --------------
 Every `name==version` pin has at least one file published on PyPI, asked of
