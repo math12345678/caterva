@@ -60,6 +60,59 @@ class ConflictingValue(ValueError):
     """The same quantity arrived twice, with two different numbers."""
 
 
+class MalformedSuppliedValue(ValueError):
+    """A supplied value arrived without a name or without a number."""
+
+
+def supplied_values(payload: dict) -> list[SuppliedValue]:
+    """The student's own numbers, with a lost one refused rather than dropped.
+
+    A NULL VALUE IS A CALLER THAT LOST A NUMBER, NOT A CALLER WITH NOTHING
+    TO SAY.
+
+    This was a comprehension filtering on `s.get("value") is not None`, so an
+    entry arriving with a null value was silently removed. That is exactly
+    what `--s0 10mM` produced: the CLI read it with `Number()`, which gives
+    NaN, `JSON.stringify` wrote `null`, this filter deleted it, and the
+    document told the student
+
+        the simulation was not run: s0 is missing — yours to choose
+
+    about a number they had chosen. A refusal that blames the user for the
+    tool's own data loss is worse than a crash: it looks actionable and it is
+    wrong (ADR 0141).
+
+    The CLI is fixed. This stays as the second line, because a name with no
+    number is a defect in whoever built the payload, and the only safe thing
+    to do with a defect is say so. Skipping it yields a report that is wrong
+    about its own inputs while looking complete.
+    """
+    values: list[SuppliedValue] = []
+    for entry in payload.get("supplied") or []:
+        name = entry.get("name")
+        if name is None:
+            raise MalformedSuppliedValue(
+                "A supplied value arrived with no name. Terrium cannot put "
+                "it in the report, and will not drop it silently."
+            )
+        if entry.get("value") is None:
+            raise MalformedSuppliedValue(
+                f"The supplied value {str(name)!r} arrived with no number. "
+                "This usually means a unit was not understood upstream — "
+                f"check what you passed for --{name}. Terrium will not drop "
+                "it and then report it as missing."
+            )
+        values.append(
+            SuppliedValue(
+                name=str(name),
+                value=float(entry["value"]),
+                unit=entry.get("unit"),
+                basis=entry.get("basis"),
+            )
+        )
+    return values
+
+
 def model_inputs(
     resolved: dict,
     quantities: dict[str, str],
@@ -223,6 +276,15 @@ def main() -> int:
             "attach real citations to a system nobody named."
         )
 
+    # Read BEFORE anything is fetched. A malformed payload should cost a
+    # message, not a BRENDA round trip followed by a document with a hole in
+    # it — and a check that only runs after a network call cannot be tested
+    # without one.
+    try:
+        supplied = supplied_values(payload)
+    except MalformedSuppliedValue as exc:
+        return _fail(str(exc))
+
     resolved: dict = {}
     ensembles: dict = {}
     bands: dict = {}
@@ -250,16 +312,6 @@ def main() -> int:
         resolved[str(name)] = result
         quantities[str(name)] = str(entry.get("quantity", "km"))
 
-    supplied = [
-        SuppliedValue(
-            name=str(s.get("name")),
-            value=float(s.get("value")),
-            unit=s.get("unit"),
-            basis=s.get("basis"),
-        )
-        for s in payload.get("supplied") or []
-        if s.get("name") is not None and s.get("value") is not None
-    ]
 
     try:
         inputs = model_inputs(resolved, quantities, supplied, payload)

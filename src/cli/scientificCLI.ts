@@ -8,6 +8,7 @@ import { spawnSync } from 'child_process';
 import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
 import { parseArgs, parseQuantity } from './parseQuantity';
 import { parsePhysiological } from './physiologicalReference';
+import { parseReportQuantities } from './reportQuantities';
 import { collectRepeated, parseUserCitations } from './userCitations';
 import { convertConcentration } from '../units';
 import {
@@ -922,7 +923,10 @@ ${colors.bright}Commands:${colors.reset}
     the part no other tool prints — what Terrium would not do, and why.
     Written to PATH, or to stdout.
     ${colors.dim}Example:${colors.reset} report --ec 1.1.1.27 --organism "Homo sapiens" \\
-      --substrate "(S)-lactate" --s0 10 --vmax 0.25 --seed 1 --out report.md
+      --substrate "(S)-lactate" --s0 10mM --vmax 0.25mM/s --seed 1 --out report.md
+    Units are read the same way everywhere. A bare number is ASSUMED --
+    mM for s0, uM/min for vmax -- and the report says which values were
+    assumed, because vmax in mM/s read as uM/min is off by 60,000x.
     Add --seed N to include the weighted band across every value the
     literature reports. Without it the report says no band was made.
 
@@ -1579,7 +1583,7 @@ async function main() {
           'report needs an enzyme, an organism and a substrate, e.g.\n' +
           '  scientific report --enzyme "alcohol dehydrogenase" \\\n' +
           '      --organism "Homo sapiens" --substrate ethanol \\\n' +
-          '      --s0 10 --vmax 0.25 --out report.md\n\n' +
+          '      --s0 10mM --vmax 0.25mM/s --out report.md\n\n' +
           'The enzyme can be a name (looked up in UniProt, and refused if ' +
           'it names more than one enzyme) or an EC number, --ec 1.1.1.27.\n\n' +
           'Run `scientific catalog --enzyme "alcohol dehydrogenase"` first ' +
@@ -1588,6 +1592,27 @@ async function main() {
         );
         process.exit(1);
       }
+
+      // A NUMBER THE STUDENT TYPED MUST NEVER BECOME NULL IN SILENCE.
+      //
+      // Parsed before anything is spawned, so a bad value costs a message
+      // rather than a BRENDA round trip and a document with a hole in it.
+      const reportQuantities = parseReportQuantities({
+        s0: flagValue(rest, '--s0'),
+        vmax: flagValue(rest, '--vmax'),
+        's0-basis': flagValue(rest, '--s0-basis'),
+        'vmax-basis': flagValue(rest, '--vmax-basis'),
+      });
+
+      if (reportQuantities.problems.length > 0) {
+        // Every problem, not the first. Fixing one, re-running a lookup and
+        // meeting the next is how the third gets abandoned.
+        error(reportQuantities.problems.join('\n\n'));
+        process.exit(1);
+      }
+
+      const reportSuppliedValue = (name: string): number | undefined =>
+        reportQuantities.supplied.find((s) => s.name === name)?.value;
 
       const reportPayload = {
         title: flagValue(rest, '--title'),
@@ -1603,23 +1628,20 @@ async function main() {
             allowCrossSpecies: rest.includes('--allow-cross-species'),
           },
         ],
-        supplied: [
-          ...(flagValue(rest, '--s0')
-            ? [{ name: 's0', value: Number(flagValue(rest, '--s0')), unit: 'mM',
-                 basis: flagValue(rest, '--s0-basis') }]
-            : []),
-          ...(flagValue(rest, '--vmax')
-            ? [{ name: 'vmax', value: Number(flagValue(rest, '--vmax')) }]
-            : []),
-        ],
-        s0: flagValue(rest, '--s0') ? Number(flagValue(rest, '--s0')) : undefined,
+        // Read by the SAME parser every other command uses. `Number()` was
+        // here, and `Number('10mM')` is NaN, which `JSON.stringify` writes
+        // as null, which the Python side skips — so `--s0 10mM`, the syntax
+        // this CLI's own help teaches, vanished and the document replied
+        // "s0 is missing — yours to choose". See ADR 0141.
+        supplied: reportQuantities.supplied,
+        s0: reportSuppliedValue('s0'),
         // The seed is passed through, never generated. `sample_ensemble`
         // makes it required because an ensemble nobody can reproduce is not
         // evidence; inventing one here would print a seed the student never
         // chose and call the band reproducible. Without it the report says
         // no band was produced, and why.
         seed: flagValue(rest, '--seed') ? Number(flagValue(rest, '--seed')) : undefined,
-        vmax: flagValue(rest, '--vmax') ? Number(flagValue(rest, '--vmax')) : undefined,
+        vmax: reportSuppliedValue('vmax'),
       };
 
       const reportProc = spawnSync(
