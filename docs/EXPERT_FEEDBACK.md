@@ -12330,3 +12330,150 @@ whole sentence.
 | Tests | `test_report_band_reaches_the_document.py` 6 new; 12 green with the band-rendering suite |
 | CLI | `--seed N` passed through, never generated |
 | Open | the api-server CI job, red since 2026-08-05, still not reproducible here |
+
+
+## Fifty-fifth pass — what was actually keeping CI red
+
+ADR 0130 fixed three CI blockers and the build stayed red. The run duration
+went from 42 seconds to 1m42 — the Python jobs were getting much further and
+still failing — so the fixes worked and were not the whole story.
+
+Running the suites in slices small enough for this sandbox found two more,
+and **both were mine**:
+
+**1. My own CI step had no local route.** `check_ci_reproducible_locally`
+(another agent's) refused `check_pins_resolve.py`: CI ran it, nothing local
+did, and no CI_ONLY entry explained why. I had recorded `("ci",)` in
+`EXPECTED_WIRING` with a reason about the network — but *"cannot reasonably
+run locally"* and *"I did not give it a local route"* are different claims,
+and only the first belongs in CI_ONLY. It runs perfectly well on a laptop
+with network, so it went into `make guards`, which is what the guard
+suggested first.
+
+**2. The pitch deck understated the tests by 17%.** `terrium_pitch_deck.pptx`
+claimed 1,852 automated tests against 2,220 in the repository, on two
+slides, outside the guard's 15% tolerance. Rewritten by rebuilding the zip
+entry by entry — 73 parts before and after, identical name set, exactly two
+differing: `slide6.xml` and `slide11.xml`.
+
+The guard's own note is worth repeating: *"Every instance of this found so
+far has UNDERSTATED the evidence, which is luck rather than policy — the
+same neglect points the other way just as easily, and this is the audience
+where that matters most."*
+
+**Still red, and not mine.** Three CI steps appeared while this pass was
+running — `check_ci_toolchain.py`, its selftest, and `corepack enable` —
+none classified yet. Another agent is mid-way through that; classifying them
+myself would duplicate a fix they are probably writing. This is the fourth
+collision this week, and the pattern is now clear enough to state: in a tree
+with several agents, *"the guard is red"* is not sufficient grounds to fix it
+— check whether the redness is younger than your session.
+
+| | |
+|---|---|
+| Fixed | `check_pins_resolve` given a local route; pitch deck corrected on two slides |
+| Verified | 543 + 69 + 50 + 142 + 280 tests green across five slices; the only remaining Python failure is the three unclassified steps above |
+| For the owner | `rm terrium_pitch_deck.pptx.bak` — a backup I made before rewriting the deck and cannot delete from this sandbox |
+| Open | the api-server job, red since 2026-08-05 and still not reproducible here |
+
+## Fifty-sixth pass — nobody can get it
+
+The brief was to make the GitHub repository easy — "make it easy to be
+amazing". So I asked the question that comes before every other question
+about a repository, and had not been asked here: **can a stranger obtain
+it?**
+
+No. Measured, not assumed:
+
+| repository | anonymous `git ls-remote` |
+|---|---|
+| `Terrium-sim/main` (documented in 19 places) | not readable |
+| `Terrium-sim/terrium` | not readable |
+| `math12345678/terrium` (`origin`) | not readable |
+
+2,235 tests, 70 guards, 143 decisions, four professors' feedback worked into
+the design — all of it behind a credential prompt. Every other thing on the
+"make it amazing" list is downstream of this one.
+
+The documented URL is **not a typo**, which I checked before proposing to
+change it: `Tests/test_clone_instructions_agree.py` records the deliberate
+choice of `Terrium-sim/main` over `origin` as the intended public home. The
+repositories simply have not been published.
+
+### What was already there, and what it could not do
+
+`check_quickstart_clone_works.py` (ADR 0143) had already found this and
+wired itself into CI red on purpose. That decision is right and I did not
+touch it.
+
+But look at who it reaches. A CI log is opened by people with push access.
+The person the finding is *about* — "a stranger who found this on GitHub",
+in START_HERE.md's own opening line — never sees it. Their experience is
+unchanged by the guard existing: read the front page, run line one, get a
+username prompt, conclude they did something wrong.
+
+So README.md and START_HERE.md now say it, above the quickstart, in the
+place the affected reader is already looking.
+
+### The half that needed a guard
+
+A notice is a claim, and this one rots in a direction nothing here watches.
+
+On the day the repositories go public it becomes a front page turning
+qualified visitors away from something they can plainly clone. Nothing would
+go red. **Nothing in this tree fires when a *true* sentence stops being
+true** — every other guard catches claims that were wrong when written. And
+the people positioned to notice are precisely the ones who cannot: they have
+had access all along, so the notice never applied to them.
+
+That is *computed and not delivered* wearing its other face — delivered,
+then no longer computed.
+
+`check_availability_notice_matches_reality.py` answers four states rather
+than a boolean, with a fifth — *the probe could not run* — exiting 3,
+because "I could not see" must never become "it is fine". It imports ADR
+0143's probe instead of writing a second one, so there is one thing to keep
+true about GitHub rather than two. A notice means the sentinel **and** a
+link to ADR 0143: a bare marker string is a guard you satisfy by typing the
+marker, and the selftest rejects the sentinel alone to prove both halves
+carry weight.
+
+Mutation-verified on the real tree — `**Not public yet.**` → `**Heads up.**`
+turned it from exit 0 to exit 1 naming README.md — and the restore verified
+by `diff`, because a `cp` restore silently failed once here before and left
+a mutation in the codebase.
+
+### Also measured: the front door is 43 files wide
+
+Fourteen root markdown files are reachable from no front door and no
+`docs/*.md`:
+
+`API_ENHANCEMENT_SUMMARY`, `API_PERFORMANCE_GUIDE`, `BATCH_SWEEP_METRICS_INDEX`,
+`IMPLEMENTATION_CHECKLIST`, `METRICS_DELIVERY_SUMMARY`, `METRICS_GUIDE`,
+`MONITORING_DELIVERY_SUMMARY`, `OPENAPI_DELIVERY_SUMMARY`, `OPENAPI_GUIDE`,
+`QUICK_START_METRICS`, `SESSION_EXTENSION_SUMMARY`, `SWEEP_BATCH_METRICS`
+— plus `GOVERNANCE.md` and `SUPPORT.md`, which are **not** orphans: GitHub
+surfaces those two itself, and that is the distinction a bulk sweep would
+have destroyed.
+
+Not moved this pass, deliberately. `.git/index.lock` is stale again so no
+`git mv` is possible, and a half-relocated tree with several agents
+committing into it is how work gets swept into somebody else's commit. It is
+a proposal, not a change.
+
+### Not mine
+
+`check_documented_citations_are_real.py` (ADR 0144) appeared between two of
+my own commands and has no `EXPECTED_WIRING` entry, so `check_guard_wiring`
+is red. Younger than this session; another agent is mid-way through it.
+Fifth collision this week.
+
+| | |
+|---|---|
+| Built | `check_availability_notice_matches_reality.py`, four states + selftest + mutation; wired into CI; ADR 0145 |
+| Fixed | availability stated on both front doors; counts resynced across README and four `docs/readmes/` files after the tree grew under me twice |
+| Verified | counts, doc links, doc paths, scripts-reachable, and the new guard all green; the new guard proven to catch by mutation with the restore checked |
+| **For the owner** | **publish the repositories.** ADR 0143's CI step goes green the day it happens, and 0145's tells you to delete the notice. Nothing else in this document is upstream of that |
+| For the owner | `rm .git/index.lock` (stale, blocks every write) and `rm terrium_pitch_deck.pptx.bak` |
+| Proposed | move the 12 genuine orphans out of the root; keep `GOVERNANCE.md` and `SUPPORT.md` where GitHub looks for them |
+| Open | the api-server job, red since 2026-08-05, still not reproducible here |

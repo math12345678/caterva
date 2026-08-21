@@ -35,12 +35,25 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
 ## Quick start
 
+> **Not public yet.** The command below needs access today: every
+> `Terrium-sim` repository is still private, and `git ls-remote` on any of
+> them prompts for a username. If you are reading this without a GitHub
+> account that has been added, **line one is as far as you get** — that is a
+> fact about the repository, not a mistake you made.
+>
+> `scripts/check_quickstart_clone_works.py` reports this on every CI run and
+> will keep the build red until it stops being true
+> ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md)). This
+> notice is checked in the other direction too: publish the repositories and
+> `check_availability_notice_matches_reality.py` fails until it is deleted,
+> so it cannot outlive the thing it describes.
+
 ```bash
 git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,234 tests (1,164 engine + 1070 literature)
+make test      # runs all 2,235 tests (1,165 engine + 1070 literature)
 ```
 
 **`make test` takes six to eight minutes**, and prints nothing per-file
@@ -171,7 +184,7 @@ scientific resolve "lactate dehydrogenase" \
   System    lactate dehydrogenase / pyruvate
   Organism  Homo sapiens
   Source    brenda_exact
-  Citation  BRENDA ref 649716
+  Citation  BRENDA ref 740253
 ```
 
 When the organism you asked for has no measurement, Terrium does **not**
@@ -237,8 +250,8 @@ scientific simulate mm --resolve \
 Parameters and where they came from
   s0    10 mM      user
   e0    0.001 mM   user
-  km    0.14 mM    brenda_exact  BRENDA ref 12345
-  vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 649716
+  km    0.14 mM    brenda_exact  BRENDA ref 740253
+  vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 741355
         ⚠ measured in Oryctolagus cuniculus, not the organism requested
 
   2 of 4 parameter(s) carry a literature citation.
@@ -459,7 +472,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,164 tests
+│   └── tests/                1,165 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -469,9 +482,9 @@ Terrium/
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    141 decision records (and counting)
+│   └── adr/                    144 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
-├── scripts/                    68 guard scripts + build verification
+├── scripts/                    70 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -557,6 +570,6 @@ make test        # run all 2,003 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,142 tests)
 make test-lit    # literature layer only (847 tests)
-python3 scripts/verify_build.py --quick  # all 68 guard scripts, incl. TypeScript compile
+python3 scripts/verify_build.py --quick  # all 70 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```
