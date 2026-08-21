@@ -121,6 +121,10 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # describes, because a guard that runs inside the broken job reports the
     # breakage after the breakage.
     "check_ci_toolchain": ("ci",),
+    # CI only: it makes real network calls to GitHub, so it has no place in
+    # the fast local path that stops being run the moment it stops being
+    # fast. Expected RED until the repository is published -- see ADR 0143.
+    "check_quickstart_clone_works": ("ci",),
     # Wired 2026-08-15. `make guards` is a fourth harness this script does
     # not model -- it reads verify_build, CI and pytest. The pytest wrapper
     # is what makes it enforcing; the make target is what makes it usable.
