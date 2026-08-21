@@ -135,6 +135,26 @@ jobs:
       - name: Pinned-version resolution guard
         run: python scripts/check_pins_resolve.py
 
+      # The only claim that has to be true before any other claim matters:
+      # that a stranger can obtain this at all. START_HERE.md opens by
+      # addressing "a stranger who found this on GitHub" and hands them a
+      # `git clone` of a repository that is not readable anonymously.
+      #
+      # THIS STEP IS EXPECTED TO FAIL UNTIL THE REPOSITORY IS PUBLISHED.
+      # That is deliberate. It is a true finding about the most important
+      # sentence in the project, and muting it would be recording the
+      # problem instead of fixing it. It goes green the day the repo is
+      # public, with no code change.
+      #
+      # Exit 3 means "could not check" (no network, GitHub down) and is NOT
+      # a failure -- the guard probes known-public controls first precisely
+      # so an outage cannot masquerade as a broken URL.
+      - name: Quickstart-clone guard (self-check)
+        run: python scripts/check_quickstart_clone_works.py --selftest || [ $? -eq 3 ]
+
+      - name: Quickstart-clone guard
+        run: python scripts/check_quickstart_clone_works.py || [ $? -eq 3 ]
+
       # A step named "Install pnpm" that installs no pnpm and exits 0 is the
       # exact shape this project calls worse than no check, and it cost two
       # days of red builds. Runs in the Python job because it is pure Python
