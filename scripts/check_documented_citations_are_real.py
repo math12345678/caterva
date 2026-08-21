@@ -52,15 +52,42 @@ import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
-#: Where a reader meets an example citation.
-SURFACES = (
+#: Where a reader meets an example citation, named explicitly.
+_NAMED_SURFACES = (
     "README.md",
     "docs/DESIGN.md",
     "CONTRIBUTING.md",
 )
 
+#: The front page of every PUBLISHED repository, DISCOVERED rather than listed.
+#:
+#: The first version of this guard enumerated three files and missed the two
+#: that matter most. `docs/readmes/main.md` and `docs/readmes/backend-main.md`
+#: are the READMEs of published repositories — the page a stranger lands on —
+#: and both still carried `BRENDA ref 12345`, the invented citation this guard
+#: was written to remove, for a full day after it was written.
+#:
+#: A hand-written list covers what its author remembered. `check_published_
+#: repo_readmes.py` already treats this directory as the set of shipping front
+#: pages; discovering it the same way means the eighteenth published README is
+#: covered on the day it is added, by nobody.
+_README_DIR = "docs/readmes"
+
+
+def surfaces() -> tuple[str, ...]:
+    """Named surfaces plus every published README, in a stable order."""
+    discovered = sorted(
+        f"{_README_DIR}/{path.name}"
+        for path in (REPO_ROOT / _README_DIR).glob("*.md")
+    )
+    return _NAMED_SURFACES + tuple(discovered)
+
+
 #: Below this, the surface list has been gutted rather than the problem fixed.
-_MIN_SURFACES = 3
+#: Raised from 3 once the published READMEs were discovered rather than listed:
+#: a floor that only counts the hand-written names would not notice the whole
+#: discovered set disappearing.
+_MIN_SURFACES = 10
 
 FIXTURE_DIR = REPO_ROOT / "Tests" / "fixtures"
 
@@ -91,7 +118,7 @@ def check() -> list[str]:
             "without them this check cannot mean anything."
         ]
 
-    for rel in SURFACES:
+    for rel in surfaces():
         path = REPO_ROOT / rel
         if not path.exists():
             problems.append(
@@ -115,9 +142,10 @@ def check() -> list[str]:
 
 
 def main() -> int:
-    if len(SURFACES) < _MIN_SURFACES:
+    active = surfaces()
+    if len(active) < _MIN_SURFACES:
         print(
-            f"FAIL: SURFACES lists only {len(SURFACES)} file(s), below the "
+            f"FAIL: only {len(active)} surface(s) resolved, below the "
             f"floor of {_MIN_SURFACES}. Deleting the checklist is the "
             "easiest way to pass a check."
         )
@@ -126,7 +154,7 @@ def main() -> int:
     problems = check()
     known = known_reference_ids()
     print(f"Reference ids in fixtures: {len(known)}")
-    print(f"Surfaces checked:          {len(SURFACES)}")
+    print(f"Surfaces checked:          {len(active)}")
     print(f"Problems:                  {len(problems)}")
 
     if problems:

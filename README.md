@@ -53,7 +53,7 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,242 tests (1,165 engine + 1077 literature)
+make test      # runs all 2,267 tests (1,182 engine + 1085 literature)
 ```
 
 **`make test` takes six to eight minutes**, and prints nothing per-file
@@ -472,17 +472,17 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,165 tests
+│   └── tests/                1,182 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1077 tests
+│   └── ...                   1085 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    146 decision records (and counting)
+│   └── adr/                    148 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    70 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
