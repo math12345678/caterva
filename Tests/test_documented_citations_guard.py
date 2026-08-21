@@ -80,25 +80,7 @@ def test_an_invented_citation_fails_the_guard(tmp_path, bad_ref, why, monkeypatc
     damaged = readme.replace("BRENDA ref 740253", f"BRENDA ref {bad_ref}", 1)
     assert damaged != readme
 
-    scratch = tmp_path / "repo"
-    (scratch / "Tests" / "fixtures").mkdir(parents=True)
-    (scratch / "docs").mkdir()
-    (scratch / "scripts").mkdir()
-    (scratch / "README.md").write_text(damaged, encoding="utf-8")
-    (scratch / "docs" / "DESIGN.md").write_text("", encoding="utf-8")
-    (scratch / "CONTRIBUTING.md").write_text("", encoding="utf-8")
-    for fixture in sorted((REPO / "Tests" / "fixtures").glob("brenda_*.html")):
-        (scratch / "Tests" / "fixtures" / fixture.name).write_text(
-            fixture.read_text(encoding="utf-8", errors="replace"), encoding="utf-8"
-        )
-    (scratch / "scripts" / GUARD.name).write_text(
-        GUARD.read_text(encoding="utf-8"), encoding="utf-8"
-    )
-
-    result = subprocess.run(
-        [sys.executable, str(scratch / "scripts" / GUARD.name)],
-        cwd=scratch, capture_output=True, text=True, timeout=120,
-    )
+    result = run_in(scratch_tree(tmp_path, readme=damaged))
 
     assert result.returncode == 1, f"the guard passed on {why}:\n{result.stdout}"
     assert bad_ref in result.stdout
@@ -106,13 +88,24 @@ def test_an_invented_citation_fails_the_guard(tmp_path, bad_ref, why, monkeypatc
 
 
 def scratch_tree(tmp_path, *, readme: str, fixtures: bool = True,
-                 surfaces: bool = True) -> Path:
-    """A minimal tree the guard can run against, missing what we choose."""
+                 surfaces: bool = True, readmes: int = 12) -> Path:
+    """A minimal tree the guard can run against, missing what we choose.
+
+    `readmes` exists because the guard DISCOVERS `docs/readmes/*.md` rather
+    than listing them, and refuses to run below `_MIN_SURFACES`. A scratch
+    tree with three files trips the floor and reports that instead of the
+    thing under test -- which is the floor working, and would make every
+    assertion below meaningless.
+    """
     root = tmp_path / "repo"
     (root / "Tests" / "fixtures").mkdir(parents=True)
-    (root / "docs").mkdir()
+    (root / "docs" / "readmes").mkdir(parents=True)
     (root / "scripts").mkdir()
     (root / "README.md").write_text(readme, encoding="utf-8")
+    for index in range(readmes):
+        (root / "docs" / "readmes" / f"repo{index}.md").write_text(
+            "", encoding="utf-8"
+        )
     if surfaces:
         (root / "docs" / "DESIGN.md").write_text("", encoding="utf-8")
         (root / "CONTRIBUTING.md").write_text("", encoding="utf-8")
@@ -189,11 +182,39 @@ def test_the_surface_list_cannot_be_quietly_gutted():
     the same reason. Asserted here because a floor nothing tests is a
     constant with a comment.
     """
-    source = GUARD.read_text(encoding="utf-8")
-    assert "_MIN_SURFACES" in source
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("citation_guard", GUARD)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    assert len(module.SURFACES) >= module._MIN_SURFACES
+    assert len(module.surfaces()) >= module._MIN_SURFACES
+
+
+def test_the_published_readmes_are_discovered_not_enumerated():
+    """The two files that mattered most were missing from the first list.
+
+    `docs/readmes/main.md` and `docs/readmes/backend-main.md` are the front
+    pages of published repositories, and both carried `BRENDA ref 12345` for
+    a day after the guard that forbids it was written — because the guard
+    enumerated three files by hand and neither was among them.
+
+    A hand-written list covers what its author remembered. Asserting that
+    the set is DERIVED from the directory is what makes the next published
+    README covered by nobody.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("citation_guard", GUARD)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    covered = set(module.surfaces())
+    on_disk = {
+        f"docs/readmes/{path.name}"
+        for path in (REPO / "docs" / "readmes").glob("*.md")
+    }
+    assert on_disk, "no published READMEs found; the directory moved"
+    assert on_disk <= covered, (
+        "published READMEs the guard does not check: "
+        f"{sorted(on_disk - covered)}"
+    )

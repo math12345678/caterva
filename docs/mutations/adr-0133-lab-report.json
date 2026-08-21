@@ -1,0 +1,95 @@
+{
+  "_why": [
+    "ADR 0133's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "0133 is the ADR that answered the owner's sentence -- 'Terrium is a",
+    "tool. People should use Terrium.' -- by joining nine capabilities into",
+    "one document a student could hand to a teacher. Its table has been",
+    "unreproduced since it was written; the guard that should have said so",
+    "could not see an indented table until ADR 0144.",
+    "",
+    "The find strings are the CURRENT lines. ADRs 0136, 0141 and 0142 have",
+    "each edited this file since, and a set file is a claim about the code as",
+    "it stands -- one that only ever matched the tree on the day it was",
+    "written would rot into an INDETERMINATE nobody investigates.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0133-lab-report.json",
+    "",
+    "The test command runs the whole suite the ADR cites. `-q` is absent for",
+    "the reason recorded in adr-0013: a suite the harness cannot count is one",
+    "it refuses to grade, which is the harness working rather than failing.",
+    "",
+    "L1 CAME BACK NOT CAUGHT ON THE FIRST RUN, and ADR 0133 had claimed it",
+    "was covered. The reason is worth keeping: deleting the `not sourced` ROW",
+    "from the Parameters table leaves the refusals section intact, and every",
+    "test in the file asserted on the refusal. Two separate code paths inside",
+    "one function -- one renders the table, one builds the refusal list -- and",
+    "testing the second says nothing about the first. That is ADR 0038's rule",
+    "about call sites, applied within a single function.",
+    "",
+    "`test_an_unsourced_parameter_still_has_a_row_in_the_table` closes it. A",
+    "reader scanning the table for `ki` must FIND it there, marked, rather",
+    "than have to notice an absence -- and absence is precisely what a reader",
+    "cannot see.",
+    "",
+    "RUNTIME: the full set is ~3 minutes (a 30s suite x 6). It runs as one",
+    "command; `--only L1,L2,L3` exists for a caller with a shorter budget."
+  ],
+  "test": "cd Tests && python3 -m pytest test_lab_report.py --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "L1",
+      "description": "an unsourced parameter is skipped instead of shown as not sourced",
+      "_claimed": "claimed caught by ADR 0133; was NOT CAUGHT until a test was added",
+      "_note": "The printout behaviour this whole command exists to replace. A document that silently omits what it could not find is indistinguishable from one where nobody looked, and the student cannot defend a gap they cannot see.",
+      "file": "Tests/lab_report.py",
+      "find": "        else:\n            lines.append(\n                f\"| {name} | \u2014 | **not sourced** | see *What Terrium would \"",
+      "replace": "        elif False:\n            lines.append(\n                f\"| {name} | \u2014 | **not sourced** | see *What Terrium would \""
+    },
+    {
+      "id": "L2",
+      "description": "the ensemble reason is paraphrased instead of quoted verbatim",
+      "_claimed": "caught",
+      "_note": "Every sentence about a value comes from the module that owns that value's reasoning. Two renderers of one fact drift, and this repository has spent most of its effort on instances of exactly that.",
+      "file": "Tests/lab_report.py",
+      "find": "            reason,",
+      "replace": "            \"The literature reports more than one value for this parameter.\","
+    },
+    {
+      "id": "L3",
+      "description": "a value the student chose is presented as literature-sourced",
+      "_claimed": "caught, but only after the test was repaired",
+      "_note": "The one that escaped first. `test_a_value_the_student_chose_is_marked_as_theirs` asserted `\"**yours**\" in text`, and the explanatory sentence BELOW the table contains those words -- so the assertion matched prose that is always present. It now reads the `| s0 |` row. Third occurrence of the rule ADR 0148 names.",
+      "file": "Tests/lab_report.py",
+      "find": "            f\"| **yours** | {value.basis or 'not stated'} |\"",
+      "replace": "            f\"| literature | {value.basis or 'not stated'} |\""
+    },
+    {
+      "id": "L4",
+      "description": "the substrate hint is dropped from a refusal",
+      "_claimed": "caught",
+      "_note": "ADR 0118 established that a substrate miss and a genuine gap are different findings with different remedies. The first is fixable by the reader in one edit, so saying only 'not found' throws away the work that established which it was.",
+      "file": "Tests/lab_report.py",
+      "find": "        available = list(getattr(result, \"substrates_available\", []) or [])",
+      "replace": "        available = []"
+    },
+    {
+      "id": "L5",
+      "description": "the whole trajectory is dumped instead of first and last row",
+      "_claimed": "caught",
+      "_note": "A lab report is not a data dump. The full trajectory belongs in the CSV export, and a document that inlines 101 rows is one nobody reads to the end -- including past the section that says what Terrium refused to do.",
+      "file": "Tests/lab_report.py",
+      "find": "            for row in (data[0], data[-1]):",
+      "replace": "            for row in data:"
+    },
+    {
+      "id": "L6",
+      "description": "a report with no parameters at all is called defensible",
+      "_claimed": "caught",
+      "_note": "`is_defensible` is a POSITIVE test on purpose. `not refusals` would call an empty report defensible, and an empty report is not a strong one -- it is an empty one.",
+      "file": "Tests/lab_report.py",
+      "find": "        return bool(accounted) and not any(",
+      "replace": "        return not any("
+    }
+  ]
+}

@@ -30,8 +30,8 @@ source it refuses to invent:
 ```
 Parameters and where they came from
   s0    10 mM      user
-  km    0.14 mM    brenda_exact  BRENDA ref 12345
-  vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 649716
+  km    0.14 mM    brenda_exact  BRENDA ref 740253
+  vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 741355
         ⚠ measured in Oryctolagus cuniculus, not the organism requested
 ```
 

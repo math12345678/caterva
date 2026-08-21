@@ -108,6 +108,36 @@ def test_an_unsourced_parameter_becomes_a_refusal_rather_than_a_gap():
     assert "These are not omissions" in result.markdown
 
 
+def test_an_unsourced_parameter_still_has_a_row_in_the_table():
+    """The refusal below is not a substitute for the row above.
+
+    A reader scanning the Parameters table for `ki` must find it there,
+    marked, rather than have to notice its absence and go looking. Absence
+    is precisely what a reader cannot see.
+
+    WHY THIS EXISTS SEPARATELY FROM THE TEST ABOVE
+    ----------------------------------------------
+    Deleting the `not sourced` row while leaving the refusals section intact
+    passed all 16 tests in this file. `scripts/mutate.py` reported it NOT
+    CAUGHT while re-deriving ADR 0133's table, which had claimed the
+    behaviour was covered.
+
+    The two halves are separate code paths -- one renders the table, one
+    builds the refusal list -- and testing the second says nothing about the
+    first. That is ADR 0038's rule about call sites, applied inside a single
+    function.
+    """
+    result = report(resolved={"km": ask("lactate"), "ki": ask("lactate", quantity="ki")})
+
+    rows = [
+        line for line in result.markdown.splitlines() if line.startswith("| ki |")
+    ]
+    assert rows, "the unsourced parameter has no row in the Parameters table"
+    assert "not sourced" in rows[0]
+    # Points at where the reason lives, so the row is actionable on its own.
+    assert "What Terrium would" in rows[0]
+
+
 def test_a_withheld_cross_species_value_says_so_and_says_why():
     """Not "no value" — a value EXISTS and was not substituted. Those are
     different facts with different remedies (ADR 0024)."""
