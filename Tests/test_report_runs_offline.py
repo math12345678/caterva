@@ -170,3 +170,96 @@ def test_a_missing_fixture_is_named_rather_than_fetched(tmp_path):
     result = run(offline_payload(fixture=str(tmp_path / "absent.html")))
     assert result.get("ok") is not True
     assert "No saved BRENDA page" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# The student's own measurement, when the literature has none.
+#
+# Sauro: "If you refuse to run what does the user do?" These hold the two
+# things that stop the answer being a default in disguise.
+# ---------------------------------------------------------------------------
+
+def supplied_km_payload() -> dict:
+    """A substrate this page does not report, and a km the student measured."""
+    return offline_payload(
+        parameters=[{"name": "km", "substrate": "ethanol", "quantity": "km"}],
+        supplied=[
+            {"name": "s0", "value": 10, "unit": "mM"},
+            {"name": "vmax", "value": 0.25, "unit": "mM/s"},
+            {"name": "km", "value": 5.2, "unit": "mM",
+             "basis": "measured in our lab, 14 Mar 2026"},
+        ],
+        km=5.2,
+    )
+
+
+def test_the_parameter_table_lists_km_once_not_twice():
+    """Two true rows made an unreadable table.
+
+    A km the literature could not supply and the student measured produced
+    BOTH `km — not sourced` and `km 5.2 mM yours`. Each was accurate; the
+    table was not. A document handed to a teacher cannot list one parameter
+    twice, once as absent.
+
+    Asserted by COUNTING rows, because a `contains` on either row passes
+    while both are present — which is the state this test exists to forbid.
+    """
+    markdown = run(supplied_km_payload())["markdown"]
+    # Sliced to the section, not to the first blank line: a heading is
+    # followed by one, so `split("\n\n")[0]` was empty and the assertion
+    # below read 0 rows — passing for "nothing here" instead of failing for
+    # "two of them". Caught because it counts rather than matching one.
+    section = markdown.split("## Parameters", 1)[1].split("\n## ", 1)[0]
+    km_rows = [r for r in section.splitlines() if r.strip().startswith("| km ")]
+    assert len(km_rows) == 1, f"km appears {len(km_rows)} times:\n" + "\n".join(km_rows)
+    assert "5.2" in km_rows[0] and "measured in our lab" in km_rows[0]
+
+
+def test_the_lookup_failure_is_still_reported_even_though_the_row_is_gone():
+    """Dropping the empty row must not drop the finding.
+
+    The row was removed because it was redundant, not because the failed
+    lookup stopped mattering. If this ever fails, the fix above turned into
+    a way of hiding that the literature had nothing.
+    """
+    markdown = run(supplied_km_payload())["markdown"]
+    refusals = markdown.split("## What Terrium would not do", 1)[1]
+    assert "the substrate name matched nothing" in refusals
+
+
+def test_a_supplied_measurement_is_not_called_an_experimental_condition():
+    """'describes the experiment, not the enzyme' is false for a measured km.
+
+    It is right for s0 — the student chose how much substrate to add. A km
+    they measured at a bench IS a property of the enzyme; it simply has them
+    as its source. Printing the condition sentence under it would tell a
+    teacher the opposite of what the number is.
+    """
+    markdown = run(supplied_km_payload())["markdown"]
+    assert "Except for **km**" in markdown
+    assert "you are its source rather than a paper" in markdown
+
+
+def test_vmax_is_not_described_as_a_measurement_the_literature_lacked():
+    """ADR 0142: Vmax is a property of the student's tube, not the enzyme.
+
+    The payload above supplies vmax too. If it were treated as a measurement,
+    the document would say the literature failed to supply something no
+    database holds in the first place.
+    """
+    markdown = run(supplied_km_payload())["markdown"]
+    exception = markdown.split("Except for ", 1)[1].split(":", 1)[0]
+    assert "vmax" not in exception, f"vmax listed as a measurement: {exception!r}"
+
+
+def test_the_model_actually_ran_on_the_supplied_value():
+    """The whole point of accepting it. A number that is printed and not used
+    would be the defect this project has recorded most often."""
+    result = run(supplied_km_payload())
+    markdown = result["markdown"]
+    assert "## Result" in markdown
+    # Substrate depletes: the run happened rather than being skipped.
+    last = [r for r in markdown.split("## Result", 1)[1].splitlines()
+            if r.strip().startswith("| 10 |")]
+    assert last, "no final time point — the simulation did not run"
+    assert "10 | 10 " not in last[0], "substrate did not change; km was not used"

@@ -1047,6 +1047,13 @@ ${colors.bright}Commands:${colors.reset}
     assumed, because vmax in mM/s read as uM/min is off by 60,000x.
     Add --seed N to include the weighted band across every value the
     literature reports. Without it the report says no band was made.
+    When the literature genuinely has no value, you can supply your own
+    measurement -- but only with its source:
+      --km 5.2mM --km-basis "measured in our lab, 14 Mar 2026"
+    The report marks it yours and prints the basis, so a reader knows what
+    stands behind the number. A bare --km is refused: a measured value with
+    no stated source is a default with extra steps, and a default is a
+    number nobody can be asked about. s0 needs no basis -- you chose it.
     --fixture <brenda.html> reads a page you saved instead of fetching
     one, and then makes NO network requests at all -- so the organism is
     not verified against NCBI, and the report says so in its own
@@ -1743,8 +1750,13 @@ async function main() {
       const reportQuantities = parseReportQuantities({
         s0: flagValue(rest, '--s0'),
         vmax: flagValue(rest, '--vmax'),
+        // A measured value the student has and the literature does not.
+        // Refused without --km-basis: see reportQuantities.ts, and Sauro's
+        // "if you refuse to run, what does the user do?"
+        km: flagValue(rest, '--km'),
         's0-basis': flagValue(rest, '--s0-basis'),
         'vmax-basis': flagValue(rest, '--vmax-basis'),
+        'km-basis': flagValue(rest, '--km-basis'),
       });
 
       if (reportQuantities.problems.length > 0) {
@@ -1812,6 +1824,11 @@ async function main() {
         // no band was produced, and why.
         seed: flagValue(rest, '--seed') ? Number(flagValue(rest, '--seed')) : undefined,
         vmax: reportSuppliedValue('vmax'),
+        // Forwarded so `model_inputs` sees it and the simulation runs. It
+        // still travels in `supplied` as well, and `model_inputs` refuses a
+        // disagreement between the two rather than picking a winner — the
+        // same guard that already covers s0.
+        km: reportSuppliedValue('km'),
       };
 
       const reportProc = spawnSync(

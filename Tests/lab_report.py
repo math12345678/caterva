@@ -221,6 +221,20 @@ def build_report(
                 f"| {name} | {_fmt(result.value)} {getattr(result, 'unit', '') or ''} "
                 f"| literature | {_citation_text(result)} |"
             )
+        elif name in supplied_names:
+            # ONE ROW PER PARAMETER, EVEN WHEN TWO THINGS ARE TRUE ABOUT IT.
+            #
+            # A km the literature could not supply and the student measured
+            # themselves produced TWO rows: "km — not sourced" and "km 5.2 mM
+            # yours". Both were accurate and the table was not: a document
+            # handed to a teacher listing the same parameter twice, once as
+            # absent, is a document nobody can read.
+            #
+            # The supplied row below carries the value and its basis. Only
+            # the empty row is dropped, and the lookup's failure is still in
+            # "What Terrium would not do" — so nothing is hidden, it is just
+            # not said twice in contradictory ways.
+            continue
         else:
             lines.append(
                 f"| {name} | — | **not sourced** | see *What Terrium would "
@@ -246,12 +260,40 @@ def build_report(
             f"and {value.from_chosen} |"
         )
 
+    # THAT SENTENCE STOPPED BEING TRUE WHEN A MEASUREMENT COULD BE SUPPLIED.
+    #
+    # "describes the experiment, not the enzyme" is right for s0 and e0 --
+    # conditions the student chose, which need no citation (START_HERE). It
+    # is WRONG for a km they measured at a bench: that is a property of the
+    # enzyme, it simply has the student as its source rather than a paper.
+    #
+    # Printing the condition sentence under a supplied km would tell a
+    # teacher the number is not about the enzyme, which is the opposite of
+    # what it is. So the caveat follows what was actually supplied.
+    # km, ki, kcat -- the three quantities BRENDA reports and somebody
+    # measured at a bench. NOT vmax: ADR 0142 settled that Vmax is a property
+    # of the student's own tube, which no database reports, so it belongs
+    # with the conditions above and putting it here would have told a reader
+    # the literature had failed to supply something it never holds.
+    _MEASURED = {"km", "ki", "kcat"}
+    supplied_measurements = sorted(_MEASURED.intersection(supplied_names))
+
     lines += [
         "",
         "A value marked **yours** describes the experiment, not the enzyme. "
         "No database reports it, and Terrium has not checked it.",
         "",
     ]
+    if supplied_measurements:
+        lines += [
+            "Except for "
+            + ", ".join(f"**{n}**" for n in supplied_measurements)
+            + ": that IS a property of the enzyme, and you are its source "
+            "rather than a paper. The literature could not supply it and "
+            "Terrium did not invent one — the basis in the table is what "
+            "stands behind the number, and it is the thing to question.",
+            "",
+        ]
 
     if derived_names:
         lines += [

@@ -133,3 +133,66 @@ describe('report reads quantities the way the rest of the CLI does', () => {
     expect(by('s0', out)?.basis).toBe('lab handout');
   });
 });
+
+/**
+ * A MEASUREMENT THE STUDENT HAS AND THE LITERATURE DOES NOT.
+ *
+ * Herbert Sauro: "If you refuse to run what does the user do?" When the
+ * literature genuinely holds nothing there is no ensemble to build, and
+ * refusing leaves a student with nowhere to go. His suggestion was a default
+ * of 0.5 with a warning; the objection is not that 0.5 is a bad guess but
+ * that nobody chose it, so there is no one to ask about it.
+ *
+ * The third option is their own number, attributed. These tests hold the line
+ * that makes it not-a-default: the basis is REQUIRED for a measurement, and
+ * only for a measurement.
+ */
+describe('a supplied km', () => {
+  it('is refused as a bare number, with the fix in the message', () => {
+    const { supplied, problems } = parseReportQuantities({ km: '5.2mM' });
+    expect(supplied).toHaveLength(0);
+    expect(problems).toHaveLength(1);
+    // The sentence, not a substring that the explanation also contains.
+    expect(problems[0]).toContain('--km-basis');
+    expect(problems[0]).toContain('a default with extra steps');
+  });
+
+  it('is refused when the basis is present but empty', () => {
+    // `--km-basis ""` is a caller who satisfied the flag and said nothing.
+    // Accepting it would make the requirement a formality.
+    const { supplied, problems } = parseReportQuantities({
+      km: '5.2mM', 'km-basis': '   ',
+    });
+    expect(supplied).toHaveLength(0);
+    expect(problems).toHaveLength(1);
+  });
+
+  it('is accepted with a basis, and carries it', () => {
+    const { supplied, problems } = parseReportQuantities({
+      km: '5.2mM', 'km-basis': 'measured in our lab, 14 Mar 2026',
+    });
+    expect(problems).toEqual([]);
+    expect(supplied).toHaveLength(1);
+    expect(supplied[0]).toMatchObject({
+      name: 'km', value: 5.2, unit: 'mM',
+      basis: 'measured in our lab, 14 Mar 2026',
+    });
+  });
+
+  it('records that a bare unit was ASSUMED, as every other quantity does', () => {
+    const { supplied } = parseReportQuantities({
+      km: '5.2', 'km-basis': 'handout',
+    });
+    expect(supplied[0].assumedUnit).toBe('mM');
+  });
+
+  it('does not impose a basis on s0, which is a condition', () => {
+    // The category error START_HERE says has broken this codebase twice:
+    // asking for a citation for a substrate concentration the student chose.
+    // If this ever fails, the requirement above has leaked.
+    const { supplied, problems } = parseReportQuantities({ s0: '10mM' });
+    expect(problems).toEqual([]);
+    expect(supplied).toHaveLength(1);
+    expect(supplied[0].basis).toBeUndefined();
+  });
+});
