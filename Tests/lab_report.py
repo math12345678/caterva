@@ -40,6 +40,7 @@ repository has spent most of its effort on instances of exactly that
 """
 from __future__ import annotations
 
+import pathlib
 from typing import Any, Sequence
 
 from pydantic import BaseModel
@@ -174,6 +175,111 @@ class LabReport(BaseModel):
             and name not in self.derived
             for name in accounted
         )
+
+
+def _code_version(root: "pathlib.Path | None" = None) -> tuple[str, str | None]:
+    """The commit this ran from, and why it cannot be trusted if so.
+
+    Returns (description, caveat). The caveat is None only when the answer
+    is genuinely usable.
+
+    THREE STATES, BECAUSE A DIRTY TREE IS NOT THE COMMIT.
+    -----------------------------------------------------
+    Printing `commit abc1234` while the working tree has uncommitted changes
+    is the most confident kind of wrong: a reader checks out abc1234, gets
+    different numbers, and has no way to discover why. The code that ran was
+    not that commit.
+
+    Not a git checkout at all — an install from a tarball or a copied
+    directory — is a third answer, and "I do not know" must not be rendered
+    as a blank line the reader takes for "nothing to report".
+    """
+    import subprocess
+
+    # Parameterised so the DETECTION can be tested against a real git
+    # repository, not just the rendering. The first version of these tests
+    # monkeypatched this whole function, so deleting the dirty-tree branch
+    # left all four passing — a test of the wording standing in for a test
+    # of the logic, which is the shape this project keeps finding.
+    root = root or pathlib.Path(__file__).resolve().parent.parent
+    try:
+        commit = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True, text=True, cwd=str(root), timeout=15,
+        )
+        if commit.returncode != 0:
+            return ("unknown", "this is not a git checkout, so the exact "
+                               "code that produced this cannot be named.")
+        sha = commit.stdout.strip()
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True, text=True, cwd=str(root), timeout=20,
+        )
+        if dirty.returncode == 0 and dirty.stdout.strip():
+            changed = len(dirty.stdout.strip().splitlines())
+            return (
+                f"{sha} plus {changed} uncommitted change(s)",
+                "the working tree was modified, so checking out "
+                f"{sha} will NOT reproduce this exactly. Commit first if "
+                "this document is going anywhere.",
+            )
+        return (sha, None)
+    except (OSError, subprocess.SubprocessError):
+        return ("unknown", "git could not be run, so the exact code that "
+                           "produced this cannot be named.")
+
+
+def _provenance_lines() -> list[str]:
+    """How this document was produced, at the bottom of the document.
+
+    WHY A REPORT HAS TO SAY THIS
+    ----------------------------
+    The band section already claims *"Seed 1 — re-running with it reproduces
+    this band exactly."* That sentence was true and unusable: re-running
+    with WHICH version? A report carried no commit, no date, and no command.
+
+    For a tool whose entire argument is that its numbers can be re-derived,
+    and whose most likely reader is a reproducibility centre, a
+    reproducibility claim with nothing behind it is the house defect at the
+    worst possible address — the claim delivered, the means withheld.
+
+    WHAT IS DELIBERATELY NOT HERE
+    -----------------------------
+    A hash of the inputs. `scientificPipeline` computes one and this
+    function cannot see it, and a second implementation would be a second
+    thing to keep true. Named as absent rather than half-built.
+    """
+    from datetime import datetime, timezone
+
+    version, caveat = _code_version()
+    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+    lines = [
+        "",
+        "---",
+        "",
+        "## How this document was produced",
+        "",
+        "| | |",
+        "|---|---|",
+        f"| Terrium commit | `{version}` |",
+        f"| Generated | {generated} |",
+        "",
+    ]
+    if caveat:
+        lines += [
+            f"**This document is not reproducible as it stands:** {caveat}",
+            "",
+        ]
+    else:
+        lines += [
+            "Check out that commit and re-run the command that produced "
+            "this — with the same seed — and every number above should come "
+            "back identical. If it does not, one of them is wrong and this "
+            "row is how you find out which.",
+            "",
+        ]
+    return lines
 
 
 def build_report(
@@ -533,6 +639,8 @@ def build_report(
             "```",
             "",
         ]
+
+    lines += _provenance_lines()
 
     return LabReport(
         title=title,

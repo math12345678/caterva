@@ -12986,3 +12986,53 @@ written to make expire.
 | Verified | passes today on a clean tree; falsifying a README count makes it exit 1 naming the check and what would ship wrong; restore checked by `diff` |
 | Deliberate | no carriage-return progress line — it looks tidy in a terminal and leaves half-overwritten duplicates in a log or a pasted issue, which is where this gets read |
 | **For the owner** | `make publish-check`, then PUBLISHING.md sections 1–2, then make them public |
+
+## Sixty-seventh pass — the report claimed reproducibility and did not record it
+
+You keep saying the paper has to be perfect. So I read a Terrium report the
+way a reviewer would, and the first thing I looked for was missing.
+
+Every report has carried this since the band section was built:
+
+> Seed 1 — re-running with it reproduces this band exactly.
+
+Re-running with **which version**? No commit, no date, no command. The one
+document this project exists to produce asserted reproducibility and
+withheld the only fact needed to act on it — and the most likely reader of
+it directs the NIH Center for Reproducible Biomedical Modeling.
+
+Reports now end with the commit and the UTC time, in three states: clean
+says re-run and the numbers should match; a modified tree says **"this
+document is not reproducible as it stands"**, because printing a sha while
+the tree is dirty is the most confident kind of wrong; and "not a git
+checkout" is its own answer, because "I do not know" must not render as a
+blank a reader takes for "nothing to report".
+
+The first report produced after the change refused to vouch for itself. My
+tree was dirty. That is the feature working on its first run.
+
+### The mistake in my tests, which is the part worth keeping
+
+The first four tests monkeypatched `_code_version` and asserted on the
+rendered markdown. They passed. Then the mutation — replacing the dirty
+check with `if False:`, deleting the detection entirely — and **all four
+still passed.**
+
+Tests of the wording standing in for tests of the logic. Fifth time this
+session, written by the person who had just typed a paragraph about
+avoiding it.
+
+The fix was not another assertion. `_code_version` now takes a `root`, so a
+test builds a real git repository in `tmp_path`, commits, checks clean,
+modifies a file, checks dirty. The same mutation fails it now.
+
+**A function that can only be tested by stubbing it is a function whose
+logic nothing tests.**
+
+| | |
+|---|---|
+| Built | the provenance footer, three states, 4 new tests (23 in the file) |
+| Verified | the same mutation run twice — not caught before the refactor, caught after; both restores checked by `diff` |
+| Deliberately absent | an input hash. The pipeline computes one already, and a second implementation would be a second thing to keep true |
+| Expect | most reports during development to carry the warning. That is correct, and the alternative is a document quietly claiming more than it can support |
+| **For the owner** | `make publish-check`, then PUBLISHING.md 1–2, then make them public |

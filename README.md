@@ -53,7 +53,7 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,279 tests (1,183 engine + 1096 literature)
+make test      # runs all 2,285 tests (1,183 engine + 1102 literature)
 ```
 
 ### See what it produces, before anything else
@@ -494,13 +494,13 @@ Terrium/
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1096 tests
+│   └── ...                   1102 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    157 decision records (and counting)
+│   └── adr/                    158 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    71 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
@@ -584,10 +584,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,279 tests
+make test        # run all 2,285 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,183 tests)
-make test-lit    # literature layer only (1096 tests)
+make test-lit    # literature layer only (1102 tests)
 python3 scripts/verify_build.py --quick  # all 71 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```
