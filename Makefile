@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo cli clean
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check cli clean
 
 help:
 	@echo "Terrium"
@@ -33,6 +33,8 @@ help:
 	@echo "  make pr         everything CI runs -- do this before opening a PR"
 	@echo "  make cli        Terium CLI help (python -m Terium.cli)"
 	@echo "  make clean      remove caches and build artifacts"
+	@echo ""
+	@echo "  make publish-check   all offline checks before going public"
 	@echo ""
 	@echo "First time here? Run: make setup && make demo"
 	@echo "About to open a PR? Run: make pr"
@@ -317,6 +319,15 @@ pr: guards test
 # Before this, seeing one output meant clearing six separate hurdles, so
 # nobody had ever seen it without being told how. Possible only since
 # `report` learned `--fixture` (ADR 0149).
+# Everything checkable before publishing, in one command. Publication is
+# the last thing between Terrium and anybody using it, and PUBLISHING.md is
+# a careful five-section manual procedure — which is exactly the kind of
+# thing that gets put off. This says either "the only thing left is the
+# push" or precisely what is not ready, and is honest that it cannot see
+# GitHub.
+publish-check: check-python
+	@"$(PY)" scripts/publish_preflight.py
+
 demo: check-python
 	@"$(PY)" scripts/demo.py
 
