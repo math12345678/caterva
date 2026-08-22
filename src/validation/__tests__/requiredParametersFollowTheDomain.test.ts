@@ -33,6 +33,7 @@
  */
 import { validateSimulationRequest } from '../request-validator';
 import { ScientificPipeline } from '../../integration/scientificPipeline';
+import { INHIBITION_MODELS } from '../../cli/inhibitionModels';
 
 describe('required parameters follow the domain', () => {
   it('asks the epidemic domain for its own parameters', () => {
@@ -102,7 +103,13 @@ describe('what the pipeline can dispatch, as opposed to name', () => {
     // BECAUSE an executor arrived — which is the distinction this test
     // exists to enforce, and the reason it is a literal rather than
     // something derived from DOMAINS: derived, it could never disagree.
-    expect([...ScientificPipeline.DISPATCHABLE_DOMAINS]).toEqual(['mm', 'sir']);
+    expect([...ScientificPipeline.DISPATCHABLE_DOMAINS]).toEqual([
+      'mm',
+      'sir',
+      'competitive',
+      'noncompetitive',
+      'product',
+    ]);
   });
 
   it('dispatches nothing it cannot classify', () => {
@@ -182,5 +189,55 @@ describe('an SIR summary', () => {
     expect(Object.keys(m)).not.toContain('conversionPercentage');
     expect(Object.keys(m)).not.toContain('totalSubstrateConsumed');
     expect(Object.keys(m)).not.toContain('maxVelocity');
+  });
+});
+
+/**
+ * The three inhibition models, reachable over HTTP.
+ *
+ * The dashboard offered them and the API rejected them (ADR 0149). They
+ * were disabled with a label, then dispatched (ADR 0157) — and the order
+ * matters: the label came off because the model ran, not because the label
+ * was inconvenient.
+ */
+describe('inhibition models', () => {
+  it.each([
+    ['competitive-inhibition', 'competitive'],
+    ['non-competitive-inhibition', 'noncompetitive'],
+    ['product-inhibition', 'product'],
+  ])('%s classifies as %s and is dispatchable', (query, domain) => {
+    expect(ScientificPipeline.requiredParametersFor(query)).toEqual(
+      INHIBITION_MODELS[domain as 'competitive'].requires
+    );
+    expect([...ScientificPipeline.DISPATCHABLE_DOMAINS]).toContain(domain);
+  });
+
+  it('does not let the shorter alias claim the longer query', () => {
+    // `non-competitive-inhibition` CONTAINS `competitive-inhibition`. If the
+    // classifier matched on first-found rather than longest, this query
+    // would run competitive inhibition on non-competitive parameters —
+    // right numbers, wrong model, no error.
+    expect(ScientificPipeline.requiredParametersFor('non-competitive-inhibition'))
+      .toEqual(INHIBITION_MODELS.noncompetitive.requires);
+  });
+
+  it('takes its required parameters from INHIBITION_MODELS, not a copy', () => {
+    // The regression that produced "km is required" for an epidemic was a
+    // second copy of a requirement list. Asserting identity of contents
+    // here means a change to INHIBITION_MODELS cannot silently disagree
+    // with what the validator demands.
+    for (const model of ['competitive', 'noncompetitive', 'product'] as const) {
+      expect(ScientificPipeline.requiredParametersFor(model))
+        .toBe(INHIBITION_MODELS[model].requires);
+    }
+  });
+
+  it('requires ki for every one of them', () => {
+    // The parameter that distinguishes an inhibition run from plain
+    // Michaelis-Menten. If it ever became optional, the models would
+    // silently degrade to the model they exist to differ from.
+    for (const model of ['competitive', 'noncompetitive', 'product'] as const) {
+      expect(ScientificPipeline.requiredParametersFor(model)).toContain('ki');
+    }
   });
 });

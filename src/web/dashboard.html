@@ -351,24 +351,23 @@
                 </div>
                 <div>
                     <label>Kinetic Model</label>
-                    <!-- FOUR OF THESE FIVE DID NOT WORK, AND LOOKED LIKE THEY
-                         DID. Measured 2026-08-21 against /api/simulate: only
-                         michaelis-menten is accepted. The other four are real
-                         Terrium domains, but the API's query classifier does
-                         not recognise these labels, so clicking Run returned
-                         a validation failure that the page then replaced with
-                         "Simulation request failed".
+                    <!-- All five work again, and the middle three took two
+                         passes to get there. Measured 2026-08-22: they were
+                         disabled because /api/simulate rejected them, then
+                         re-enabled once the pipeline learned to dispatch
+                         them (ADR 0157) rather than because the label
+                         stopped being inconvenient.
 
-                         Offering a control that cannot work is the UI form of
-                         a check that cannot fail: it is trusted. Disabled and
-                         labelled until the classifier learns them, because a
-                         student who picks one deserves to know before they
-                         wait for a job that was never queued. -->
+                         `allosteric` stays disabled: kinematicModels
+                         implements "Allosteric (Hill)", but the pipeline
+                         has no domain for it and this pass did not build
+                         one. Offering a control that cannot work is the UI
+                         form of a check that cannot fail. -->
                     <select id="model">
                         <option>michaelis-menten</option>
-                        <option disabled>competitive-inhibition — CLI only, see `scientific domains`</option>
-                        <option disabled>non-competitive-inhibition — CLI only, see `scientific domains`</option>
-                        <option disabled>product-inhibition — CLI only, see `scientific domains`</option>
+                        <option>competitive-inhibition</option>
+                        <option>non-competitive-inhibition</option>
+                        <option>product-inhibition</option>
                         <option disabled>allosteric — CLI only, see `scientific domains`</option>
                     </select>
                 </div>
