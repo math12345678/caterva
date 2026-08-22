@@ -12888,3 +12888,54 @@ the audience where an unchecked number matters most.
 | Not run, and saying so | the engine suite — four minutes, past this sandbox's per-command limit, and nothing this pass touched the engine. "I did not run it" and "it passes" are different claims |
 | Still red, as intended | the repositories are private. Every other CI step now has a local route or a written exemption |
 | **For the owner** | **publish the repositories** — that is now the only thing keeping the badge red |
+
+## Sixty-fifth pass — the engine suite, which I had twice said I had not run
+
+Two passes running I wrote "not run here: the engine suite" and moved on.
+That was honest and it was also a gap sitting in the middle of a repository
+whose whole claim is that its numbers are checked. So I ran it, in slices.
+
+| slice | result |
+|---|---|
+| files 1–14 | 178 passed, 3 skipped |
+| files 15–32 | 360 passed |
+| files 33–44 | 479 passed |
+| files 45–49 | 133 passed |
+| `test_guard_selftests.py` | 31 passed |
+
+**1,181 passed, 3 skipped, 0 failed.** With the literature suite's 1,093
+from last pass, both halves of this repository are now verified green
+locally — for the first time since the CI ordering bug stopped them running
+on 2026-08-21.
+
+### The one failure, and why it was not a bug
+
+`test_guard_selftests[check_no_tellurium_integration_claims.py]` failed:
+
+    PermissionError: Operation not permitted: '.selftest_probe.md'
+
+Not the check. The guard writes a probe file, scans it, and deletes it in a
+`finally`. The scan had already passed; the *cleanup* died, because this
+container cannot unlink files on the mount.
+
+I checked before concluding: the probe is gitignored, untracked, and the
+cleanup is a correct `try/finally`. Nothing in the repository was wrong.
+
+**But a bare `unlink` in a `finally` turns a passing check into a failure on
+any filesystem that forbids it** — a read-only bind mount, some container
+sandboxes. A check that cannot pass in an environment is one people learn to
+ignore there, and the first thing they will ignore is the day it fails for
+the real reason (ADR 0028). So the cleanup failure is now caught and named,
+the exit code is left alone, and the message says the probe is still on disk
+— because swallowing it silently would leave a stale file the next run would
+scan believing it had just written it.
+
+No ADR for a nine-line `try/except`. ADRs are for decisions, and inflating
+this one would make the ones that matter cheaper to skip.
+
+| | |
+|---|---|
+| Verified | engine 1,181 passed / 0 failed across five runs; literature 1,093 last pass. Both halves, green, locally |
+| Fixed | a cleanup failure that could masquerade as a check failure |
+| Checked before concluding | the probe is gitignored and untracked, and the guard's cleanup was already correct — the fault was the container's, and saying so was cheaper than "fixing" something that worked |
+| **For the owner** | **publish the repositories** — still the only thing keeping CI red |

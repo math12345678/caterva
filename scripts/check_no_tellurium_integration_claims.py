@@ -396,7 +396,35 @@ def _selftest() -> int:
         if not any(".selftest_probe.md" in p for p in check(docs=padding)):
             failures.append("a document carrying the claim was not caught")
     finally:
-        probe.unlink(missing_ok=True)
+        # A CLEANUP FAILURE IS NOT A CHECK FAILURE, AND IS NOT NOTHING.
+        #
+        # This was a bare `probe.unlink(missing_ok=True)`. On a filesystem
+        # that forbids unlink -- a read-only bind mount, some container
+        # sandboxes -- it raises PermissionError out of `finally`, so a
+        # selftest whose assertion had already PASSED reported failure for a
+        # reason unrelated to what it checks.
+        #
+        # Measured 2026-08-22: the whole engine suite is green except this
+        # one case, which died on `Operation not permitted` after the scan
+        # it was testing had succeeded. A check that cannot pass in some
+        # environments is one people learn to ignore in those environments
+        # (ADR 0028), and the first thing they will ignore is the day it
+        # fails for the real reason.
+        #
+        # Swallowed silently would be worse: the probe is gitignored, so a
+        # leftover would sit in the tree unnoticed and the next run would
+        # scan a file it thought it had created fresh. So it is caught,
+        # named, and the exit code left alone.
+        try:
+            probe.unlink(missing_ok=True)
+        except OSError as exc:
+            print(
+                f"  [cleanup] could not remove {probe.name}: {exc}\n"
+                "            The check above still ran and its result stands.\n"
+                "            Delete the file by hand; it is gitignored, so it\n"
+                "            will not be committed, but a stale probe means the\n"
+                "            next selftest scans a file it did not just write."
+            )
 
     # The HISTORICAL entries are now inert: the files they name are no longer
     # tracked. That is recorded rather than removed, because the reasons are
