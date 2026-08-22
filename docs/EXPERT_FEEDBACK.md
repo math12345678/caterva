@@ -12939,3 +12939,50 @@ this one would make the ones that matter cheaper to skip.
 | Fixed | a cleanup failure that could masquerade as a check failure |
 | Checked before concluding | the probe is gitignored and untracked, and the guard's cleanup was already correct — the fault was the container's, and saying so was cheaper than "fixing" something that worked |
 | **For the owner** | **publish the repositories** — still the only thing keeping CI red |
+
+## Sixty-sixth pass — making the last step easy instead of naming it again
+
+Nine passes have ended with the same line: publish the repositories, it is
+the only thing keeping CI red, and it is yours. Saying it a tenth time is
+not help.
+
+So I looked at what publishing actually costs. `docs/PUBLISHING.md` is a
+careful 140-line, five-section manual procedure. `scripts/split_repos.sh` is
+688 lines and genuinely good — it defaults to a dry run, and it reports what
+happened rather than what was attempted, because its first version printed
+"All 16 repositories pushed" on a machine where every push had failed.
+
+Nothing was wrong with either. What was missing was a way to know you are
+ready before you start. A long manual procedure with no preflight is a thing
+people put off, and every day it is put off, all of this work stays behind a
+login.
+
+`make publish-check` runs the ten offline checks that bear on publication —
+split-repo READMEs, LICENSE and NOTICE travelling with each repository, the
+non-affiliation notice, BRENDA's CC BY attribution, dependency licences,
+fabricated endorsements, documented counts, investor claims, doc links, the
+Tellurium claim guard — and prints either "the only thing left is the push"
+or exactly what would ship wrong.
+
+None of those checks is new. Gathering them is not a new check, it is a
+route through the existing ones aimed at one question, and the route was
+what was missing.
+
+**It says what it cannot do, and that is the load-bearing part.** It cannot
+see GitHub. An anonymous probe cannot tell "private" from "does not exist" —
+both answer 404 — so it does not guess, and it names that rather than
+implying the job is done. A preflight reporting "ready to publish" while
+blind to GitHub would be a check that cannot fail, in the one place where
+being wrong costs most.
+
+It also states what happens on the day: `check_quickstart_clone_works` goes
+red → green with no edit, and `check_availability_notice_matches_reality`
+goes green → RED, telling you to delete the "Not public yet" notice it was
+written to make expire.
+
+| | |
+|---|---|
+| Built | `scripts/publish_preflight.py`, `make publish-check`, wired into `make help` and PUBLISHING.md's opening |
+| Verified | passes today on a clean tree; falsifying a README count makes it exit 1 naming the check and what would ship wrong; restore checked by `diff` |
+| Deliberate | no carriage-return progress line — it looks tidy in a terminal and leaves half-overwritten duplicates in a log or a pasted issue, which is where this gets read |
+| **For the owner** | `make publish-check`, then PUBLISHING.md sections 1–2, then make them public |

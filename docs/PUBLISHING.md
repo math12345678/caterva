@@ -4,6 +4,26 @@ Everything is prepared. These are the commands to run **on your machine** —
 the sandbox this was built in has no GitHub credentials, so nothing has been
 pushed.
 
+## Before anything: `make publish-check`
+
+```bash
+make publish-check
+```
+
+Runs every check that can be made without credentials — the split-repo
+READMEs, LICENSE and NOTICE travelling with each repository, the
+non-affiliation notice, BRENDA's CC BY attribution, dependency licences,
+documented counts, investor-facing figures, doc links. It prints either
+"the only thing left is the push" or exactly what is not ready and what
+would ship wrong if you pushed anyway.
+
+It is honest about its limits and lists them: it cannot see GitHub, so it
+cannot tell you whether the eighteen repositories exist — an anonymous probe
+gets the same 404 for "private" and "does not exist", and guessing between
+them is the mistake this project has recorded nine times.
+
+The sections below are the steps it cannot do for you.
+
 ## 0. Get the prepared work
 
 ```bash
