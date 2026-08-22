@@ -24,6 +24,11 @@ import {
 } from '../engine/teriumBridge';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 import {
+  INHIBITION_MODELS,
+  PRODUCT_INHIBITION_CAVEAT,
+  runInhibitionModel,
+} from '../cli/inhibitionModels';
+import {
   initialRateWindowSeconds,
   substrateDepletionWindowSeconds
 } from './integrationWindow';
@@ -162,9 +167,26 @@ export interface SimulationResponse {
   validationErrors: string[];
 
   results: {
-    trajectory: Array<{ time: number; value: number; velocity: number }>;
+    /**
+     * Shape depends on the domain. Michaelis-Menten reports
+     * {time, value, velocity}; SIR reports {time, susceptible, infected,
+     * recovered}; the inhibition models report {time, substrate}.
+     *
+     * Deliberately not forced into one shape: an epidemic given a
+     * `velocity` field, or an inhibition run given `finalValue` labelled as
+     * substrate conversion, is correct arithmetic under a name describing a
+     * different experiment (ADR 0156).
+     */
+    trajectory: Array<Record<string, number>>;
     finalValue: number;
-    computedMetrics: Record<string, number>;
+    computedMetrics: Record<string, unknown>;
+    /** Which model actually ran. Absent on the Michaelis-Menten path. */
+    domain?: string;
+    /** True when the model was assembled as SBML rather than shipped by the engine. */
+    viaSbml?: boolean;
+    engineDomain?: string;
+    /** A modelling assumption the caller must check. Never omitted when it applies. */
+    caveat?: string;
   };
 
   /**
@@ -605,7 +627,30 @@ export class ScientificPipeline {
         results: {
           trajectory: simulationOutput.trajectory || [],
           finalValue: simulationOutput.finalValue || 0,
-          computedMetrics: simulationOutput.metrics || {}
+          computedMetrics: simulationOutput.metrics || {},
+          // COMPUTED AND NOT DELIVERED, CAUGHT IN THE ACT.
+          //
+          // `runInhibition` attaches `PRODUCT_INHIBITION_CAVEAT` to its
+          // result, under a docstring saying an HTTP surface that returned
+          // only a trajectory "would be making the assumption silently,
+          // which is worse than not offering the model".
+          //
+          // This object then copied three fields and dropped the rest. The
+          // caveat was built, returned, and thrown away one layer up — in
+          // the same change as the paragraph forbidding it. Measured: the
+          // string `caveat` appeared nowhere in the job payload.
+          //
+          // Named per field rather than spread, so adding one to a run
+          // still requires saying it belongs in the response. A spread
+          // would have prevented this bug and hidden the next decision.
+          ...(simulationOutput.domain ? { domain: simulationOutput.domain } : {}),
+          ...(simulationOutput.viaSbml !== undefined
+            ? { viaSbml: simulationOutput.viaSbml }
+            : {}),
+          ...(simulationOutput.engineDomain
+            ? { engineDomain: simulationOutput.engineDomain }
+            : {}),
+          ...(simulationOutput.caveat ? { caveat: simulationOutput.caveat } : {})
         },
 
         reproducibilityKey: executionRecord.hashes.reproductionKey,
@@ -1066,6 +1111,89 @@ ${integrityReport}
    * send -- an ADDED key, which the bridge's echo check tolerates because
    * that check exists to catch parameters silently DROPPED.
    */
+  /**
+   * The three inhibition models, over HTTP at last.
+   *
+   * WHY IT CALLS THE CLI'S FUNCTION RATHER THAN BUILDING ITS OWN
+   * ------------------------------------------------------------
+   * `runInhibitionModel` already knows which of the three has a first-class
+   * engine domain (`competitive` -> `mm_competitive_inhibition`) and which
+   * two are built as SBML and run through the engine's `sbml` domain. It
+   * also already refuses a missing parameter with a message worth reading.
+   *
+   * Reimplementing that here would be a fifth notion of "which models
+   * exist" in a codebase that has spent two ADRs deleting the third and
+   * fourth (0155, 0156). It lives in `src/cli/` only because that is where
+   * it was needed first; nothing about it is CLI-specific.
+   *
+   * WHAT MUST NOT BE DROPPED ON THE WAY
+   * -----------------------------------
+   * `PRODUCT_INHIBITION_CAVEAT`. Product inhibition needs Kp — the
+   * inhibition constant of the reaction's OWN product — and the value a
+   * user brings is typically a Ki from BRENDA's inhibitor table, which
+   * names some inhibitor that is not necessarily this product.
+   *
+   * The CLI states that. An HTTP surface that ran the same model and
+   * returned only a trajectory would be making the assumption silently,
+   * which is worse than not offering the model: the caller cannot check an
+   * assumption nobody told them about. So the caveat travels on the result.
+   */
+  private async runInhibition(
+    model: 'competitive' | 'noncompetitive' | 'product',
+    parameters: Record<string, any>
+  ): Promise<any> {
+    const numeric = (name: string): number | undefined => {
+      const raw = parameters[name];
+      if (raw === undefined || raw === null) return undefined;
+      const value = typeof raw === 'object' ? raw.value : raw;
+      return typeof value === 'number' && Number.isFinite(value)
+        ? value
+        : undefined;
+    };
+
+    const km = numeric('km');
+    const vmax = numeric('vmax');
+    const s0 = numeric('s0');
+    if (km === undefined || vmax === undefined || s0 === undefined) {
+      // Reached only if validation let it through; stated rather than
+      // coerced, because `?? 0` here would run the model on a made-up zero.
+      throw new Error(
+        `${model} inhibition needs km, vmax and s0 as numbers. Terrium does ` +
+        'not substitute a default for a parameter it was not given.'
+      );
+    }
+
+    const run = await runInhibitionModel(model, {
+      km,
+      vmax,
+      s0,
+      ...(numeric('ki') !== undefined ? { ki: numeric('ki')! } : {}),
+      ...(numeric('i0') !== undefined ? { i0: numeric('i0')! } : {}),
+      end: this.integrationWindowFor(parameters),
+      points: ScientificPipeline.SIMULATION_POINTS,
+    });
+
+    const { points } = extractSeries(run.trajectory, '[S]');
+
+    return {
+      domain: model,
+      // Whether the run went through a first-class engine domain or was
+      // assembled as SBML. Not cosmetic: an SBML route is a model this
+      // repository BUILT rather than one the engine ships, and a reader
+      // comparing two results is entitled to know which they are holding.
+      viaSbml: run.viaSbml,
+      engineDomain: run.domain,
+      trajectory: points.map((point) => ({
+        time: point.time,
+        substrate: point.value,
+      })),
+      metrics: {
+        finalSubstrate: points.length > 0 ? points[points.length - 1]!.value : 0,
+      },
+      ...(model === 'product' ? { caveat: PRODUCT_INHIBITION_CAVEAT } : {}),
+    };
+  }
+
   private async runSir(parameters: Record<string, any>): Promise<any> {
     const numeric = (name: string): number | undefined => {
       const raw = parameters[name];
@@ -1230,6 +1358,10 @@ ${integrityReport}
     // applied here where it was not.
     if (domain === 'sir') {
       return this.runSir(parameters);
+    }
+
+    if (domain === 'competitive' || domain === 'noncompetitive' || domain === 'product') {
+      return this.runInhibition(domain, parameters);
     }
 
     if (domain !== undefined && !ScientificPipeline.DISPATCHABLE_DOMAINS.includes(
@@ -1470,6 +1602,41 @@ ${integrityReport}
       required: ['beta', 'gamma', 's0', 'i0'],
       aliases: ['sir', 'epidemic', 'infection', 'outbreak', 'susceptible'],
     },
+    // The three the dashboard offered and the API rejected (ADR 0149).
+    //
+    // `required` is NOT written out here. It is read from
+    // `INHIBITION_MODELS`, which is where the CLI already gets it — a
+    // second copy is how `request-validator.ts` came to demand `km` of an
+    // epidemic (ADR 0155), and writing one back in immediately after
+    // deleting it would be hard to explain.
+    competitive: {
+      required: INHIBITION_MODELS.competitive.requires,
+      aliases: ['competitive-inhibition', 'competitive inhibition', 'competitive'],
+    },
+    noncompetitive: {
+      required: INHIBITION_MODELS.noncompetitive.requires,
+      // Longest first: `non-competitive-inhibition` contains
+      // `competitive-inhibition` as a substring, so the shorter alias would
+      // otherwise claim the query and run the wrong model on the right
+      // parameters. The classifier sorts by alias length at match time,
+      // which is why that is a note and not a bug.
+      aliases: [
+        'non-competitive-inhibition',
+        'non-competitive inhibition',
+        'noncompetitive-inhibition',
+        'noncompetitive',
+      ],
+    },
+    product: {
+      required: INHIBITION_MODELS.product.requires,
+      // The bare key is an alias too. It was omitted here and the omission
+      // was caught by `dispatches nothing it cannot classify`: `product`
+      // was in DISPATCHABLE_DOMAINS and unclassifiable, so
+      // `requiredParametersFor('product')` fell back to Michaelis-Menten
+      // and returned a list with no `ki` in it — the parameter that makes
+      // it an inhibition model at all.
+      aliases: ['product-inhibition', 'product inhibition', 'product'],
+    },
   };
 
   /**
@@ -1560,7 +1727,13 @@ ${integrityReport}
    * claim it runs. Naming both states is what lets the refusal below be
    * specific.
    */
-  static readonly DISPATCHABLE_DOMAINS = ['mm', 'sir'] as const;
+  static readonly DISPATCHABLE_DOMAINS = [
+    'mm',
+    'sir',
+    'competitive',
+    'noncompetitive',
+    'product',
+  ] as const;
 
   private classifyDomain(query: string): string | undefined {
     return ScientificPipeline.classifyDomainOf(query);

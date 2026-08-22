@@ -78,14 +78,34 @@ async function run(vmaxUnit: string, km = KM_MM, kmUnit = 'mM') {
   return trajectory;
 }
 
-/** The largest closed-form residual over the trajectory, in mM. */
+/**
+ * The largest closed-form residual over the trajectory, in mM.
+ *
+ * Takes the general trajectory type and narrows here. `results.trajectory`
+ * became a union when SIR and the inhibition models arrived (ADR 0156,
+ * 0157): an epidemic reports {susceptible, infected, recovered} and has no
+ * `value` at all. This file drives the Michaelis-Menten path exclusively —
+ * `run()` sends a `michaelis menten` query — so `value` is present, and a
+ * point without one is a real failure rather than a type inconvenience.
+ * Hence the explicit check instead of a cast.
+ */
 function worstResidual(
-  trajectory: Array<{ time: number; value: number }>,
+  trajectory: Array<Record<string, number>>,
   vmaxPerSec: number,
   km = KM_MM
 ): number {
+  const substrate = trajectory.map((p) => {
+    if (typeof p.value !== 'number' || typeof p.time !== 'number') {
+      throw new Error(
+        'a Michaelis-Menten trajectory point has no time/value: ' +
+        JSON.stringify(p)
+      );
+    }
+    return { time: p.time, value: p.value };
+  });
+
   return Math.max(
-    ...trajectory
+    ...substrate
       .filter(p => p.value > 1e-6)
       .map(p => Math.abs(implicitResidual(p.value, S0_MM, km, vmaxPerSec, p.time)))
   );

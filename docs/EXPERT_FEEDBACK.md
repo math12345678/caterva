@@ -12753,3 +12753,55 @@ could never disagree.
 | Guarded | the absence of `conversionPercentage`, `totalSubstrateConsumed` and `maxVelocity` is asserted, so the enzyme envelope cannot creep back |
 | Open | the three inhibition models over HTTP — named in the dashboard's disabled options, not built |
 | **For the owner** | **publish the repositories** |
+
+## Sixty-second pass — I dropped the caveat I had just written a paragraph about
+
+The last gap I had named twice: the three inhibition models, offered by the
+dashboard and rejected by the API since ADR 0149. They run now — competitive
+through the engine's own domain, non-competitive and product assembled as
+SBML — by calling the CLI's existing `runInhibitionModel` rather than
+becoming a fifth notion of "which models exist" two ADRs after deleting the
+third and fourth.
+
+**The feature is not the finding.**
+
+`runInhibition` attaches `PRODUCT_INHIBITION_CAVEAT` to its result, under a
+docstring I wrote in the same change:
+
+> An HTTP surface that ran the same model and returned only a trajectory
+> would be making the assumption silently, which is worse than not offering
+> the model: the caller cannot check an assumption nobody told them about.
+
+The response builder one layer up copied three fields and dropped the rest.
+Measured on the running server: the string `caveat` appeared **nowhere** in
+the job payload. Computed, returned, thrown away — in the same commit as the
+paragraph forbidding it.
+
+*Computed and not delivered* is this repository's most-repeated defect, and
+I have now written six ADRs about it. Knowing its name in that much detail
+did not stop me writing it again. The response fields are named
+individually rather than spread, because a spread would have prevented this
+bug and hidden the next decision.
+
+### A test I wrote speculatively caught a real gap
+
+`dispatches nothing it cannot classify` — added last pass as "the mirrored
+drift", with no known instance — failed on `product`. The bare key was
+missing from its alias list, so `product` was dispatchable, unclassifiable,
+and fell through to the Michaelis-Menten requirement list. That list has no
+`ki` in it: the parameter that makes it an inhibition model at all.
+
+Second run, real bug.
+
+Also now guarded: `non-competitive-inhibition` **contains**
+`competitive-inhibition` as a substring, and the failure mode is running the
+wrong model on the right parameters with no error at all.
+
+| | |
+|---|---|
+| Built | three inhibition models over HTTP; four of five dashboard options work, and the label came off because the model runs |
+| Fixed | the dropped caveat; the missing `product` alias found by my own test |
+| Verified | 18 jest cases; all three driven end to end with routing checked per model; the caveat asserted present having been measured absent; `toBe` not `toEqual` on the requirement list, so a copy cannot pass by having equal contents |
+| Changed | `results.trajectory` is `Record<string, number>` — three real shapes — and the one consumer assuming `{time, value}` narrows explicitly and throws rather than casting |
+| Open, deliberately | `allosteric`: implemented in `kinematicModels`, no pipeline domain, not built this pass |
+| **For the owner** | **publish the repositories** |
