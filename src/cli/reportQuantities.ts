@@ -128,5 +128,58 @@ export function parseReportQuantities(
     }
   }
 
+  const kmRaw = raw['km'];
+  const kmBasis = raw['km-basis'];
+
+  // A MEASUREMENT MAY BE SUPPLIED, BUT NEVER BARE.
+  //
+  // Herbert Sauro asked the question this answers: "If you refuse to run
+  // what does the user do?" When the literature genuinely holds no value —
+  // not a mistyped substrate label, not an outage, actually nothing — there
+  // is nothing to sample, so there is no ensemble, and refusing leaves a
+  // student with nowhere to go. He is right about that.
+  //
+  // His own suggestion was a default of 0.5 with a warning in the Antimony.
+  // The objection to it is not that 0.5 is a bad guess; it is that nobody
+  // chose it, so there is no one to ask about it and nothing in the document
+  // a teacher can challenge.
+  //
+  // The third option is the student's own number, ATTRIBUTED. They measured
+  // it in the lab, or it is on the handout. That is a human source, it is
+  // defensible, and the model runs.
+  //
+  // WHY THE BASIS IS REQUIRED HERE AND NOT FOR s0
+  // ---------------------------------------------
+  // `s0` is an experimental CONDITION — the student chose how much substrate
+  // to put in, and asking them to cite that is the category error START_HERE
+  // says has broken this codebase twice. `km` is a MEASUREMENT: somebody
+  // stood at a bench and measured it. Accepting one bare would erase exactly
+  // the distinction this whole project is built on, and `--km 5.2` with no
+  // source is a default with extra steps.
+  if (kmRaw !== undefined && (kmBasis === undefined || kmBasis.trim() === '')) {
+    problems.push(
+      'km is a measured property of the enzyme, so Terrium will not take it ' +
+      'as a bare number. Say where it came from:\n' +
+      '  --km 5.2mM --km-basis "measured in our lab, 14 Mar 2026"\n\n' +
+      'The report prints that basis beside the value, so whoever reads it ' +
+      'knows the number is yours rather than the literature\'s. A km with ' +
+      'no stated source is a default with extra steps — and a default is ' +
+      'a number nobody can be asked about.',
+    );
+  } else if (kmRaw !== undefined) {
+    try {
+      const parsed = parseQuantity('km', kmRaw);
+      supplied.push({
+        name: 'km',
+        value: convertConcentration(parsed.value, parsed.unit, ENGINE_CONCENTRATION),
+        unit: ENGINE_CONCENTRATION,
+        basis: kmBasis,
+        assumedUnit: parsed.unitDeclared ? undefined : parsed.unit,
+      });
+    } catch (err) {
+      problems.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return { supplied, problems };
 }
