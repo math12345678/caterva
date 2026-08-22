@@ -53,8 +53,26 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,272 tests (1,182 engine + 1090 literature)
+make test      # runs all 2,278 tests (1,182 engine + 1096 literature)
 ```
+
+### See what it produces, before anything else
+
+```bash
+make demo
+```
+
+Thirty seconds. No network, no BRENDA account, no Node. It reads a saved
+BRENDA page committed under `Tests/fixtures/`, runs the real report builder
+— the same one the CLI spawns — and prints the document a student would hand
+in: the Km with its reference, the values you chose marked as yours, what
+the published measurements disagree about, and a section listing what
+Terrium refused to do and why.
+
+Because it uses a saved page it demonstrates the pipeline rather than a live
+lookup, and **the document says so itself** rather than leaving you to work
+it out. Drop `--fixture` from the command it prints at the end to run the
+same thing against BRENDA.
 
 **`make test` takes six to eight minutes**, and prints nothing per-file
 while it runs. That is normal. It is written here because the absence of a
@@ -476,13 +494,13 @@ Terrium/
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1090 tests
+│   └── ...                   1096 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    150 decision records (and counting)
+│   └── adr/                    152 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    70 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
@@ -566,10 +584,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,003 tests
+make test        # run all 2,278 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (1,142 tests)
-make test-lit    # literature layer only (847 tests)
+make test-sim    # simulation engine only (1,182 tests)
+make test-lit    # literature layer only (1096 tests)
 python3 scripts/verify_build.py --quick  # all 70 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

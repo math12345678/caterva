@@ -281,6 +281,20 @@ def documented_adr_counts(text: str) -> List[Tuple[int, int]]:
 _OUTCOME_WORDS = ("failed", "passed", "broke", "were", "did", "ran", "collected")
 
 
+#: Text before a `<N> tests` that means it is NOT a suite size.
+#:
+#: `test_popgen_resolver.py skips its 19 tests` is a true statement about
+#: one file. Checking it against the suite totals would fail forever, and a
+#: guard that fires on a correct sentence gets suppressed (ADR 0028) --
+#: which is very likely why README was excluded from the test-count check
+#: wholesale rather than having this three-line exception.
+#:
+#: Deliberately narrow. Anything not listed here IS checked: an exclusion
+#: list that grows to cover every awkward case is how a check stops
+#: checking.
+_NOT_A_SUITE_SIZE = re.compile(r"\bskips its\s*$")
+
+
 def documented_test_counts(text: str) -> List[Tuple[int, int]]:
     """Every "<N> tests" claim about the size of a suite, with its line.
 
@@ -295,6 +309,8 @@ def documented_test_counts(text: str) -> List[Tuple[int, int]]:
     for lineno, line in enumerate(text.splitlines(), start=1):
         for match in pattern.finditer(line):
             if is_quoted(line, match.start(), match.end()):
+                continue
+            if _NOT_A_SUITE_SIZE.search(line[: match.start()]):
                 continue
             claims.append((lineno, int(match.group(1).replace(",", ""))))
     return claims
@@ -476,11 +492,46 @@ def rewrite(text: str, actual: dict, guards: int, adrs: int) -> Tuple[str, List[
     # a stale one: it would look freshly verified.
     if {"make_test", "engine", "literature"} <= set(actual):
         for pattern, key, label in (
-            (r"(~)?runs all ([\d,]+) tests", "make_test", "make test total"),
+            # `runs?` because the README says "run all 2,003 tests" in its
+            # command reference and "runs all N tests" in the quickstart.
+            # One letter, and the fixer reached one of them for months while
+            # the other drifted 275 tests -- 12% -- out of date.
+            (r"(~)?runs? all ([\d,]+) tests", "make_test", "make test total"),
             (r"(~)?tests/\s+([\d,]+) tests", "engine", "engine tests"),
             (r"(~)?\.\.\.\s+([\d,]+) tests", "literature", "literature tests"),
             (r"(~)?\(([\d,]+) engine", "engine", "engine tests (inline)"),
             (r"(~)?\+ ([\d,]+) literature", "literature", "literature tests (inline)"),
+            # ---- Added 2026-08-22, for the split-repo READMEs ------------
+            #
+            # These four lines went stale on every commit that added a test,
+            # reddened CI, and could only be fixed by hand -- so the same
+            # hand-edit this flag exists to remove was being done three or
+            # four times a session. Measured: it happened four times in one
+            # session before anyone looked at why.
+            #
+            # The original rule was right and is kept: a bare `1,014 tests.`
+            # has no antecedent on its line, so which suite it means is a
+            # judgement, and a fixer that picked one would invent an
+            # attribution. What was too broad was the CONCLUSION -- "test
+            # counts are never written outside README" -- when the real
+            # constraint is "only where the line says which suite it means".
+            #
+            # Each pattern below reads an attribution the line makes itself:
+            (r"(~)?make test\s+#\s+([\d,]+) tests", "make_test", "make test total"),
+            (r"(~)?([\d,]+) engine tests\b", "engine", "engine tests (named)"),
+            # `[^|\n]` stops at a table-cell boundary, so a row about the
+            # literature layer cannot reach into the next cell for its digits.
+            (r"(~)?literature layer[^|\n]*?([\d,]+) tests", "literature",
+             "literature tests (named)"),
+            # The symmetric case, and it is here because adding only the
+            # literature one immediately fixed `make test-lit ... (847
+            # tests)` -- stale by 22% -- while leaving `make test-sim ...
+            # (1,142 tests)` on the line ABOVE it untouched. A fixer that
+            # repairs one half of a pair and not the other produces a
+            # document that looks freshly checked and is half wrong.
+            (r"(~)?simulation engine[^|\n]*?([\d,]+) tests", "engine",
+             "engine tests (named)"),
+            (r"(~)?\d+ domains, ([\d,]+) tests", "engine", "engine tests (domains row)"),
         ):
             text = apply(text, re.compile(pattern), actual[key], label)
 
@@ -541,6 +592,29 @@ def check_other_docs(actual: dict | None = None) -> List[str]:
 
         failures.extend(adr_failures(relative, text, actual_adrs))
         failures.extend(test_count_failures(relative, text, actual))
+
+    # THE README'S OWN TEST COUNTS, WHICH NOTHING WAS CHECKING.
+    #
+    # The `continue` above skips README to avoid double-reporting guard and
+    # ADR counts, which main() checks itself. But main() never ran
+    # test_count_failures on it -- so the only README test counts under any
+    # scrutiny were the ones `rewrite`'s five patterns happened to reach,
+    # while the guard printed "OK: README test counts ... match the
+    # repository".
+    #
+    # Two were wrong when this was written: `run all 2,003 tests` (275 out)
+    # and `simulation engine only (1,142 tests)`. Both on the README's
+    # command reference, the page everybody reads.
+    #
+    # That is the same shape the skip's own comment warns about -- "it is
+    # NOT a statement that the README is checked more thoroughly. That is
+    # what this comment used to say, and it was how '23 decision records'
+    # survived." The comment was corrected; the gap it described was not.
+    readme = REPO_ROOT / "README.md"
+    if readme.exists():
+        failures.extend(
+            test_count_failures("README.md", readme.read_text(encoding="utf-8"), actual)
+        )
 
     if not failures:
         print(
@@ -793,7 +867,19 @@ def main() -> int:
               f"({len(PRESENT_TENSE_DOCS)} docs)")
 
     print()
-    if failures and "--write" in sys.argv:
+    # NOT `if failures and ...`. That gate meant the fixer only ever ran
+    # when the CHECKER had already found something, so any staleness the
+    # checker could not see was also unfixable -- even when `rewrite` knew
+    # exactly how to fix it. Two numbers in the README's own command
+    # reference sat wrong for months behind that gate: `run all 2,003 tests`
+    # (275 out, because the pattern said `runs all`) and `simulation engine
+    # only (1,142 tests)`. Both were reachable by the fixer and invisible to
+    # the checker, so nothing ever triggered the run that would have
+    # corrected them.
+    #
+    # Two pattern sets that must agree, with one silently limiting the
+    # other, is this repository's most-repeated shape wearing a new hat.
+    if "--write" in sys.argv:
         # No wholesale refusal when a suite fails to collect. The rule that
         # matters -- never write a number nobody measured -- belongs to
         # `rewrite`, which skips test counts whenever any suite is missing
@@ -821,10 +907,17 @@ def main() -> int:
         # into eighteen -- the barrier this flag exists to remove,
         # reintroduced by widening the check.
         #
-        # Test counts are NOT written outside the README. `1,014 tests.`
-        # in docs/readmes/terium.md has no antecedent on the line, so which
-        # suite it means is a judgement, and a fixer that picked one would
-        # be inventing an attribution. Those are reported and left.
+        # Test counts ARE written outside the README now, but only through
+        # the patterns that read an attribution the LINE makes -- `make test
+        # # N tests`, `N engine tests`, `literature layer ... N tests`. A
+        # bare `1,014 tests.` still matches nothing and is still reported
+        # and left, because which suite it means is a judgement and a fixer
+        # that picked one would invent an attribution.
+        #
+        # `actual` is passed rather than `{}`. Withholding it was a blanket
+        # refusal standing in for a narrow one, and it cost four hand-edits
+        # in a single session -- the barrier this flag exists to remove,
+        # reintroduced by the fixer that removes it.
         for relative in PRESENT_TENSE_DOCS:
             if relative == "README.md":
                 continue
@@ -832,7 +925,7 @@ def main() -> int:
             if not path.exists():
                 continue
             before = path.read_text(encoding="utf-8")
-            after, edits = rewrite(before, {}, actual_guards, actual_adrs)
+            after, edits = rewrite(before, actual, actual_guards, actual_adrs)
             if edits:
                 path.write_text(after, encoding="utf-8")
                 changed.extend(f"{relative} {e}" for e in edits)
