@@ -500,7 +500,7 @@ Terrium/
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    156 decision records (and counting)
+│   └── adr/                    157 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    71 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command

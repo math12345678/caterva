@@ -38,7 +38,7 @@ rather than list a placeholder person.
 |---|---|
 | Company name | Terrium |
 | Company website | **[YOUR INPUT]** — `ROADMAP.md` flags the domain check (terrium.ai/.dev/.io) as unconfirmed status; don't put a URL here unless you've actually secured one |
-| Product stage | **Prototype** (not "Idea") — you have a working simulation engine, 1,893 passing tests, a live interactive landing page with a real end-to-end simulator, not a mockup |
+| Product stage | **Prototype** (not "Idea") — you have a working simulation engine, 2,279 passing tests, a live interactive landing page with a real end-to-end simulator, not a mockup |
 | Sector | Education / EdTech (closest fit if "SaaS/B2B" is the only option, since the buyer is institutional) |
 | Subsector | Scientific computing / research tools |
 | Operating country | **[YOUR INPUT]** |
@@ -153,8 +153,8 @@ Being direct about where things actually stand, per `ROADMAP.md` — Phase 1
 
 | Field | Answer |
 |---|---|
-| Metric | Verified test coverage / engine correctness (1,893 passing tests, each simulation domain checked against an exact closed-form solution or independent solver) |
-| Value | 1,893 tests passing, 0 failing, across 15 live simulation domains |
+| Metric | Verified test coverage / engine correctness (2,279 passing tests, each simulation domain checked against an exact closed-form solution or independent solver) |
+| Value | 2,279 tests passing, 0 failing, across 15 live simulation domains |
 | Why this is the most important metric | Terrium is pre-pilot — there's no user or revenue metric yet that would honestly represent traction. The metric that actually matters right now is whether the product does what it claims (real, correct, citable simulations), because that's the entire value proposition. Everything else (pilots, revenue) is Phase 1, which hasn't started. |
 
 ## MRR

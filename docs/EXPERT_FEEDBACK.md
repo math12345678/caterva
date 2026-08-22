@@ -12851,3 +12851,40 @@ than leaving them named.
 | Verified | all 22 runnable Python guards green locally, which is what left ordering as the only explanation |
 | Expected next run | slower (seven minutes, not 55 seconds) and still red, both on purpose |
 | **For the owner** | **publish the repositories** — the badge goes green the same day |
+
+## Sixty-fourth pass — the payoff, one pass later
+
+Last pass restored a test run that had been stopped for a day. Rather than
+push and let the runner tell me, I ran the literature suite locally in
+slices first. Three real failures, all invisible for as long as the suite
+had not been running.
+
+**A stale CI exemption.** `CI_ONLY['corepack prepare pnpm']` matched no step
+any more — ADR 0140 replaced that line and the exemption stayed. A blanket
+exemption whose subject no longer exists is worse than none: written
+permission for something nobody can see, which would silently cover the next
+step that happened to match. The test that caught it checks the allowlist
+against reality, which is the only thing that stops an allowlist becoming a
+hole.
+
+**Seventeen unclassified CI steps.** Last pass I named them and called them
+"someone else's to explain." That was wrong. Nobody else was going to be
+here, and leaving a suite red for a reason I can fix is deferral dressed as
+restraint. All classified now, with real reasons: 29 CI-only, 40 runnable
+from `make`, 0 neither.
+
+**A funding application claiming 1,893 tests.**
+`Business/FYDEMY_APPLICATION_DRAFT.md`, three places — the status slide, the
+"Verified test coverage" metric, and the value line — against 2,279 in the
+repository. 17% off, with the same figure in `mule/index.html`'s footer.
+Both understate, which is luck rather than policy, and the fourth time this
+neglect has happened to fall the flattering way. A funding application is
+the audience where an unchecked number matters most.
+
+| | |
+|---|---|
+| Fixed | the orphaned exemption; 17 step classifications; two stale investor-facing figures |
+| Verified | literature suite 1,093 passed / 0 failed across three slices; `check_ci_reproducible_locally` and `check_investor_claims` green |
+| Not run, and saying so | the engine suite — four minutes, past this sandbox's per-command limit, and nothing this pass touched the engine. "I did not run it" and "it passes" are different claims |
+| Still red, as intended | the repositories are private. Every other CI step now has a local route or a written exemption |
+| **For the owner** | **publish the repositories** — that is now the only thing keeping the badge red |
