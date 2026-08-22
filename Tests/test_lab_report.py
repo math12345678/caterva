@@ -282,3 +282,107 @@ def test_an_empty_report_is_not_called_defensible():
     empty = build_report(title="t", question="q", resolved={}, supplied=[])
     assert not empty.is_defensible
     assert report().is_defensible
+
+
+# ---------------------------------------------------------------------------
+# How the document says it was produced.
+#
+# The band section already claimed "Seed N — re-running with it reproduces
+# this band exactly." True, and unusable: re-running with WHICH version? A
+# report carried no commit, no date, no command. For a tool whose entire
+# argument is that its numbers can be re-derived, that is the house defect
+# at the worst address — the claim delivered, the means withheld.
+# ---------------------------------------------------------------------------
+
+import lab_report as _lab_report
+
+
+def test_a_report_records_the_commit_and_the_time():
+    report = build_report(
+        title="t", question="q", resolved={}, supplied=[
+            SuppliedValue(name="s0", value=10.0, unit="mM")
+        ],
+    )
+    assert "## How this document was produced" in report.markdown
+    assert "Terrium commit" in report.markdown
+    assert "Generated" in report.markdown
+
+
+def test_a_dirty_tree_is_not_reported_as_a_commit(monkeypatch):
+    """The state that matters, and the easy one to get wrong.
+
+    Printing `commit abc1234` while the tree has uncommitted changes is the
+    most confident kind of wrong: a reader checks out abc1234, gets
+    different numbers, and cannot discover why. The code that ran was not
+    that commit.
+    """
+    monkeypatch.setattr(
+        _lab_report, "_code_version",
+        lambda: ("abc1234 plus 3 uncommitted change(s)", "the working tree was modified"),
+    )
+    report = build_report(title="t", question="q", resolved={})
+
+    assert "not reproducible as it stands" in report.markdown
+    # And it must NOT also print the invitation to check the commit out.
+    assert "should come back identical" not in report.markdown
+
+
+def test_a_clean_tree_says_how_to_reproduce(monkeypatch):
+    monkeypatch.setattr(_lab_report, "_code_version", lambda: ("abc1234", None))
+    report = build_report(title="t", question="q", resolved={})
+
+    assert "`abc1234`" in report.markdown
+    assert "should come back identical" in report.markdown
+    # No warning attached to a clean run: a caveat that fires on the
+    # ordinary case is one nobody reads on the case that matters (ADR 0028).
+    assert "not reproducible as it stands" not in report.markdown
+
+
+def test_not_a_git_checkout_is_its_own_answer(monkeypatch):
+    """'I do not know' must not render as a blank a reader takes for
+    'nothing to report'. A tarball install is a real way to run this."""
+    monkeypatch.setattr(
+        _lab_report, "_code_version",
+        lambda: ("unknown", "this is not a git checkout"),
+    )
+    report = build_report(title="t", question="q", resolved={})
+
+    assert "`unknown`" in report.markdown
+    assert "not reproducible as it stands" in report.markdown
+
+
+def _git(*args, cwd):
+    import subprocess
+    return subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True)
+
+
+def test_the_dirty_tree_DETECTION_works_against_a_real_repository(tmp_path):
+    """Drives `_code_version` itself, not a stub of it.
+
+    The four tests above monkeypatch `_code_version` wholesale, so they
+    check the RENDERING. Deleting the dirty-tree branch left every one of
+    them passing — verified by mutation, and it is the exact shape this
+    project keeps recording: a test of the wording standing in for a test of
+    the logic.
+    """
+    _git("init", "-q", cwd=tmp_path)
+    _git("config", "user.email", "t@example.com", cwd=tmp_path)
+    _git("config", "user.name", "t", cwd=tmp_path)
+    (tmp_path / "a.txt").write_text("one\n")
+    _git("add", "-A", cwd=tmp_path)
+    _git("commit", "-qm", "first", cwd=tmp_path)
+
+    version, caveat = _lab_report._code_version(tmp_path)
+    assert caveat is None, f"a clean checkout reported a caveat: {caveat}"
+    assert "uncommitted" not in version
+
+    (tmp_path / "a.txt").write_text("two\n")
+    version, caveat = _lab_report._code_version(tmp_path)
+    assert caveat is not None, "a modified tree was reported as reproducible"
+    assert "uncommitted change" in version
+
+
+def test_a_directory_that_is_not_a_repository_says_so(tmp_path):
+    version, caveat = _lab_report._code_version(tmp_path)
+    assert version == "unknown"
+    assert caveat and "not a git checkout" in caveat
