@@ -12697,3 +12697,59 @@ claiming it runs. Naming both states is what makes the refusal specific.
 | Guarded | `DISPATCHABLE_DOMAINS === ['mm']` is asserted and expected to CHANGE, not be deleted — it catches a widening without an executor |
 | Open, now stated | SIR and the three inhibition models are implemented and unreachable over HTTP. Made visible, not papered over, and not built |
 | **For the owner** | **publish the repositories** |
+
+## Sixty-first pass — SIR runs, and the peak that was not a peak
+
+Last pass ended: *"SIR and the three inhibition models are implemented and
+unreachable over HTTP. Made visible, not papered over, and not built."*
+This pass built SIR.
+
+The engine had it all along — `runTerium` has accepted `'sir'` since the
+bridge was written. The gap was entirely in the HTTP layer.
+
+**The trap is the obvious implementation.** Run the engine, return the
+object the `mm` path returns. Every field in it — `totalSubstrateConsumed`,
+`conversionPercentage`, `maxVelocity` — *computes* for an epidemic, and
+every one is labelled as enzymology. Correct arithmetic under names
+describing a different experiment, and nothing looks wrong. So SIR returns
+`peakInfected`, `attackRate`, `finalRecovered`, and the enzyme path is
+untouched.
+
+### The peak that was the edge of the window
+
+`integrationWindowFor` derives its window from substrate depletion — km,
+vmax, s0 — and falls back to 10 seconds when those are absent, which for an
+epidemic is always. Measured at beta 0.3, gamma 0.1: infections are still
+climbing steeply at t=10 and peak near t=26 at ~304. The naive report was
+
+    peakInfected: 65.4
+
+A real number from a real integration, describing the boundary of the run
+rather than the epidemic. **Somebody would plan around it.** Now `null` when
+infections are still rising, with `highestInfectedSeen` carrying the figure
+under a name that says what it is.
+
+The first version of the note said "re-run with a longer `end`" — and there
+was no way to, because `runSir` was calling the enzyme window function. A
+refusal that is not actionable is merely regretful. `end` now comes from the
+caller, and **no default is derived from gamma**: turning a rate into a
+window needs a multiplier, and this project does not invent constants. The
+note states what is derivable and lets the reader choose. With `end: 120`:
+peak 303.7 at t=26.4, attack rate 94.1% — the standard final-size result for
+R₀ = 3.
+
+### A test doing its job
+
+ADR 0155 shipped `DISPATCHABLE_DOMAINS === ['mm']` marked *"expected to
+CHANGE, not to be deleted"*. It fired one day later, and the list widened
+because an executor arrived — which is the distinction it exists to enforce,
+and why it is a literal rather than derived from `DOMAINS`. Derived, it
+could never disagree.
+
+| | |
+|---|---|
+| Built | `runSir`, its own result shape, the truncation guard, `summariseSir` pure and static so the judgement is testable without Python |
+| Verified | 12 jest cases; promoting the boundary to a peak fails the truncation test, restore checked by `diff`; both windows driven end to end against the server |
+| Guarded | the absence of `conversionPercentage`, `totalSubstrateConsumed` and `maxVelocity` is asserted, so the enzyme envelope cannot creep back |
+| Open | the three inhibition models over HTTP — named in the dashboard's disabled options, not built |
+| **For the owner** | **publish the repositories** |
