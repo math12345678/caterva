@@ -10,7 +10,8 @@ import { parseArgs, parseQuantity } from './parseQuantity';
 import { parsePhysiological } from './physiologicalReference';
 import { parseReportQuantities } from './reportQuantities';
 import { collectRepeated, parseUserCitations } from './userCitations';
-import { convertConcentration } from '../units';
+import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
+import { exportModel } from './exportArtifacts';
 import {
   parseSystemFromQuery,
   formatResolveCommand,
@@ -390,7 +391,11 @@ async function commandValidate(query: string, params?: Record<string, string>) {
   }
 }
 
-async function commandSimulate(query: string, params?: Record<string, string>) {
+async function commandSimulate(
+  query: string,
+  params?: Record<string, string>,
+  exportModelPath?: string,
+) {
   header('SCIENTIFIC SIMULATION');
 
   const pipeline = new ScientificPipeline();
@@ -635,6 +640,119 @@ async function commandSimulate(query: string, params?: Record<string, string>) {
       console.log(
         `  ${point.time.toFixed(1).padStart(8)} | ${point.value.toFixed(3).padStart(14)}`
       );
+    }
+
+    // A RUN ON YOUR OWN NUMBERS CAN STILL PRODUCE A REUSABLE ARTIFACT.
+    //
+    // `--export-model` existed only behind `--resolve`, so the only way to
+    // get an SBML file or a COMBINE archive out of Terrium was to have
+    // BRENDA reachable and a system it could resolve. A student with a Km
+    // and a Vmax from their own bench had no route to the one output
+    // somebody else can re-run — which is the output that matters most for
+    // a paper, a lab report, or a reviewer.
+    //
+    // `exportModel` never needed literature. Its `provenance` field takes
+    // an origin string, and `user` is a perfectly good origin; the exporter
+    // writes it into the model so the file states plainly where each number
+    // came from. Nothing had to be invented to allow this. The capability
+    // was already there and unreachable.
+    if (exportModelPath) {
+      // THE EXPORTED FILE MUST REPRODUCE THE RUN IT CAME FROM.
+      //
+      // `export_annotated_model.py` writes `float(parameters[name])` and
+      // declares no units anywhere — there is no `unit` string in that file
+      // at all. So whatever numbers arrive here are what a reviewer's
+      // COPASI or roadrunner will integrate, in one unstated system.
+      //
+      // Handing it the values as typed produced an SBML saying
+      // `Vmax = 12.8` for a run that integrated 12.8 μM/min. Re-running
+      // that file exhausts the substrate by t = 2.2 s, while Terrium had
+      // just printed S = 8.245 at t = 12,930 s. The artifact contradicted
+      // its own run by 60,000x — and it is the artifact that outlives the
+      // terminal, gets attached to a report, and is the only thing a
+      // reviewer can check.
+      //
+      // Converting into the substrate's units per second — the system the
+      // engine integrated in, and the one the printed trajectory is in —
+      // makes the file internally consistent and reproducible.
+      //
+      // It does NOT make it self-describing: without unit declarations the
+      // file still says 2.13e-4 rather than 2.13e-4 mM/s. That needs
+      // `unitDefinition` support in the Python exporter and the Antimony
+      // builders, which is a larger change. The unit is written into each
+      // parameter's notes here so a human reading the file is not left
+      // guessing, and the gap is recorded rather than papered over.
+      const numeric: Record<string, number> = {};
+      const exportProvenance: Record<string, { origin: string; note?: string }> = {};
+      const declared: Record<string, string> = {};
+      for (const [name, raw] of Object.entries(params ?? {})) {
+        declared[name] = parseQuantity(name, raw).unit;
+      }
+      const substrateUnit = declared['s0'];
+
+      for (const [name, raw] of Object.entries(params ?? {})) {
+        const q = parseQuantity(name, raw);
+        let value = q.value;
+        let unit = q.unit;
+        if (substrateUnit) {
+          if (name === 'vmax') {
+            value = vmaxInSubstrateUnitsPerSecond(q.value, q.unit, substrateUnit);
+            unit = `${substrateUnit}/s`;
+          } else if (name === 'km' || name === 's0' || name === 'ki') {
+            value = convertConcentration(q.value, q.unit, substrateUnit);
+            unit = substrateUnit;
+          }
+        }
+        numeric[name] = value;
+        // `user` and `user_assumed_unit` are different facts. A file that
+        // says `user` for a number whose unit this tool guessed would be
+        // overstating what the person actually specified.
+        exportProvenance[name] = {
+          origin: q.unitDeclared ? 'user' : 'user_assumed_unit',
+          note:
+            `${value} ${unit}` +
+            (q.value !== value ? ` (you gave ${q.value} ${q.unit})` : '') +
+            '. This model is written in ' +
+            `${substrateUnit ?? 'the units supplied'} and seconds.`,
+        };
+      }
+
+      const trajectory = response.results.trajectory;
+      const outcome = await exportModel(
+        {
+          domain: 'mm',
+          parameters: numeric,
+          provenance: exportProvenance,
+          query,
+          runId: response.jobId,
+          // Read off the trajectory that actually ran, never restated. An
+          // archive describing an experiment nobody performed is
+          // reproducible and wrong.
+          endTime: trajectory[trajectory.length - 1]?.time,
+          points: trajectory.length,
+          // The system everything above was converted into. Stated only
+          // because s0 declared it; without that there is nothing to
+          // declare and guessing is what this chain exists to stop.
+          ...(substrateUnit
+            ? { units: { concentration: substrateUnit, time: 's' } }
+            : {}),
+        },
+        exportModelPath,
+      );
+
+      console.log('');
+      if (outcome.ok) {
+        success(`Model written: ${outcome.path}`);
+        console.log(colors.dim +
+          '  Every parameter carries its origin inside the file. These are\n' +
+          '  your values, recorded as yours — the model says so rather than\n' +
+          '  leaving a reader to assume they were sourced.' +
+          colors.reset);
+      } else {
+        // Not fatal. The simulation ran and its results are above; losing
+        // the export must not retract them.
+        warning(`Model not written: ${outcome.error ?? 'unknown error'}`);
+      }
     }
 
     process.exit(0);
@@ -929,6 +1047,12 @@ ${colors.bright}Commands:${colors.reset}
     assumed, because vmax in mM/s read as uM/min is off by 60,000x.
     Add --seed N to include the weighted band across every value the
     literature reports. Without it the report says no band was made.
+    --fixture <brenda.html> reads a page you saved instead of fetching
+    one, and then makes NO network requests at all -- so the organism is
+    not verified against NCBI, and the report says so in its own
+    "What Terrium would not do" section rather than leaving you to
+    notice. The page's EC must match the one you asked for; Terrium
+    refuses to read one enzyme's rows under another's name.
 
   catalog <ec-number> | --enzyme NAME [--json]
     What BRENDA actually reports for an enzyme, before you ask it for a
@@ -1381,10 +1505,29 @@ async function main() {
       // because every visible symptom of the original bug is gone: the
       // typo check works, the assumed-unit message is right, and the number
       // is still wrong.
+      // NOT EVERY FLAG IS A QUANTITY, and this loop used to assume so.
+      //
+      // It skipped `json` and `verbose` and handed everything else to
+      // `parseQuantity`, so
+      //
+      //     simulate "michaelis menten" --km 5.2mM ... --export-model out.xml
+      //
+      // died with
+      //
+      //     --export-model out.xml: 'out.xml' is a name, not a quantity.
+      //     This flag takes a number, like '5.2' or '5.2mM'.
+      //
+      // which is precise, confident, and about the wrong thing. The flag
+      // does not take a number; it takes a path. A student reading that
+      // message would go looking for the number they were supposed to have
+      // typed.
+      const NON_QUANTITY = new Set([
+        'json', 'verbose', 'export-model', 'export-citations',
+      ]);
       const params: Record<string, string> = {};
       const assumed: string[] = [];
       for (const [key, raw] of Object.entries(flags)) {
-        if (key === 'json' || key === 'verbose') continue;
+        if (NON_QUANTITY.has(key)) continue;
         try {
           const quantity = parseQuantity(key, raw);
           params[key] = raw;
@@ -1406,7 +1549,7 @@ async function main() {
         );
       }
 
-      await commandSimulate(query, params);
+      await commandSimulate(query, params, flags['export-model']);
       break;
     }
 
@@ -1649,6 +1792,17 @@ async function main() {
         // this CLI's own help teaches, vanished and the document replied
         // "s0 is missing — yours to choose". See ADR 0141.
         supplied: reportQuantities.supplied,
+        // A SAVED PAGE INSTEAD OF A LIVE ONE.
+        //
+        // `ensemble` has taken `--fixture` since it was written; `report`,
+        // the command this project chose as its product, did not — so the
+        // exact invocation in its own help text answered `403 Forbidden`
+        // and stopped, with no path that did not need BRENDA reachable at
+        // that instant. The Python side verifies the page's EC against the
+        // one asked for and refuses a mismatch: reading LDH rows off a
+        // hexokinase query would attach real reference numbers to the wrong
+        // protein (ADR 0126).
+        fixture: flagValue(rest, '--fixture'),
         enzymeConc: reportEnzymeConc,
         s0: reportSuppliedValue('s0'),
         // The seed is passed through, never generated. `sample_ensemble`
@@ -1684,7 +1838,12 @@ async function main() {
       }
 
       if (destination) {
-        fs.writeFileSync(path.join(process.cwd(), destination),
+        // `path.join` and not `path.resolve` meant `--out /tmp/report.md`
+        // was glued onto the working directory and wrote to
+        // `<cwd>/tmp/report.md`, or died with ENOENT if that had no parent.
+        // An absolute path is the ordinary way to say where a file goes.
+        // `resolve` handles both and changes nothing for a relative one.
+        fs.writeFileSync(path.resolve(process.cwd(), destination),
                          reportParsed.markdown, 'utf-8');
         // The refusal count goes on screen even when the document is
         // written to a file. A student who never opens it should still know

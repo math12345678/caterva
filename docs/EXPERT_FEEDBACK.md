@@ -12477,3 +12477,53 @@ Fifth collision this week.
 | For the owner | `rm .git/index.lock` (stale, blocks every write) and `rm terrium_pitch_deck.pptx.bak` |
 | Proposed | move the 12 genuine orphans out of the root; keep `GOVERNANCE.md` and `SUPPORT.md` where GitHub looks for them |
 | Open | the api-server job, red since 2026-08-05, still not reproducible here |
+
+## Fifty-seventh pass — using it, rather than reading it
+
+Asked to test-run Terrium, both surfaces. Not a review. Typing what a
+student types, starting with the invocation printed in `report`'s own help.
+
+```
+✗ Could not resolve 'km': 403 Forbidden
+```
+
+That was the whole run. `ensemble` has taken `--fixture` since it was
+written; `report` — the command chosen as the product — had no path that did
+not need four live services at that instant, so it could not be
+demonstrated and no test could exercise it end to end.
+
+**The status was pointing at the wrong host.** The 403 was NCBI Taxonomy,
+not BRENDA. A message naming the parameter and the HTTP code but not the
+service sends a student to check whether the wrong database is down.
+
+A fixture run now makes no network requests at all — the first attempt
+replaced only the BRENDA fetch and still died on NCBI, the same lesson one
+layer down — and the cost is recorded rather than absorbed: organism
+relatedness is `not_assessed`, stated in the document's own *"What Terrium
+would not do"* section. The page's EC is verified rather than inferred from
+its filename, because reading LDH rows under a hexokinase query would return
+real reference numbers for the wrong protein (ADR 0126), and an offline path
+that bought testability with trustworthiness would not be worth having.
+
+**Web:** four of the five models in the dropdown never worked, and
+`dashboard.html` discarded the diagnosis one line after receiving it —
+`throw new Error('Simulation request failed')`, replacing a body that named
+every model the pipeline accepts.
+
+**A correction I am recording as prominently as the finding.** The API's
+`velocity: 4.1e-06` was first read as ADR 0141's 60,000x unit error
+repeating on the web. It is not: the dashboard labels the field
+`Vmax (μM/min)` and the engine agrees. What is true is narrower —
+`openapi.yaml` declares no units anywhere, so a direct caller passing `0.25`
+meaning mM/s gets a silently different answer. Reporting the wider claim
+would have been the same failure this project keeps finding in its own
+guards: a matcher wider than the evidence.
+
+| | |
+|---|---|
+| Built | `--fixture` on `report`, fully offline, EC verified; 6 tests, no skipif; ADR 0149 |
+| Fixed | the dashboard shows the API's real error; four dead dropdown options disabled and labelled; `--out /tmp/x.md` no longer written under cwd |
+| Verified | two mutations caught (EC check, offline note), both restores checked by `diff`; `tsc --noEmit` clean; doc links and counts green |
+| Corrected | the units claim above, narrowed to what the evidence supports |
+| Open | the query classifier's four unknown labels; no unit contract on the HTTP API |
+| Open | the api-server job, red since 2026-08-05 |
