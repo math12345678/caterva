@@ -541,7 +541,8 @@ export class ScientificPipeline {
 
       const simulationOutput = await this.runSimulation(
         resolvedParameters,
-        conditions
+        conditions,
+        domain
       );
 
       this.reproducibilityService.addPhase(
@@ -1035,9 +1036,37 @@ ${integrityReport}
 
   private async runSimulation(
     parameters: Record<string, any>,
-    conditions: any
+    conditions: any,
+    domain?: string
   ): Promise<any> {
     void conditions;
+
+    // THE DOMAIN REACHES THE EXECUTOR, AND ANYTHING ELSE IS REFUSED.
+    //
+    // This function took `(parameters, conditions)` and called
+    // `runTerium('mm', ...)`. The domain was classified, validated against,
+    // used to pick literature recommendations -- and then dropped on the
+    // floor one step before the model ran.
+    //
+    // Nothing wrong surfaced only because `required: ['km','vmax','s0']`
+    // made an SIR run die on a missing km. That is a coincidence standing
+    // in for a check: supply a query naming an epidemic AND a km, and this
+    // would have integrated Michaelis-Menten and reported `[S]` under it.
+    // Running the wrong model is not a partial answer, it is a different
+    // answer -- the sentence this file already uses about classification,
+    // applied here where it was not.
+    if (domain !== undefined && !ScientificPipeline.DISPATCHABLE_DOMAINS.includes(
+      domain as (typeof ScientificPipeline.DISPATCHABLE_DOMAINS)[number]
+    )) {
+      throw new Error(
+        `This pipeline classified your query as '${domain}' and cannot run ` +
+        `it over HTTP: only ` +
+        `${ScientificPipeline.DISPATCHABLE_DOMAINS.join(', ')} is dispatched ` +
+        `here today. The engine does implement ${domain}, and it is ` +
+        `reachable from the CLI — see \`scientific domains\`. Terrium will ` +
+        `not substitute a model you did not ask for.`
+      );
+    }
 
     // Unwrap the {value, unit, source, ...} envelope this tree carries.
     // No `||` fallbacks: an absent parameter stays absent so that
@@ -1308,6 +1337,53 @@ ${integrityReport}
   static knownDomainAliases(): string[] {
     return Object.values(ScientificPipeline.DOMAINS).flatMap((s) => s.aliases);
   }
+
+  /**
+   * What a query's own domain requires — asked, not remembered.
+   *
+   * `request-validator.ts` held `const requiredParams = ['km','vmax','s0']`
+   * in THREE places. So an epidemic query, which this classifier accepts
+   * and which the error message above advertises by name, was answered:
+   *
+   *     parameters.km is required
+   *     parameters.vmax is required
+   *
+   * Measured over HTTP on 2026-08-22 with `{"query":"sir epidemic",
+   * "parameters":{"beta":0.3,"gamma":0.1,"s0":990,"i0":10}}`.
+   *
+   * Two parameters the caller never mentioned, from a different branch of
+   * biology, for a model this pipeline told them it could run. A wrong
+   * error is worse than a bare failure: it sends somebody to fix the thing
+   * that is not broken.
+   *
+   * Unknown queries keep Michaelis-Menten's list. They already fail on the
+   * `query` field, and inventing a different requirement set for a domain
+   * nobody could name would add a second error about a first one.
+   */
+  static requiredParametersFor(query: string): string[] {
+    const domain = ScientificPipeline.classifyDomainOf(query);
+    return domain
+      ? (ScientificPipeline.DOMAINS[domain]?.required ?? [])
+      : ScientificPipeline.DOMAINS.mm!.required;
+  }
+
+  /**
+   * The domains this pipeline can actually DISPATCH, as opposed to name.
+   *
+   * `runSimulation` calls `runTerium('mm', ...)` with the domain nowhere in
+   * scope. So `sir` was classifiable, validatable, and undispatchable — the
+   * table said one thing and the executor did another, which is the same
+   * three-copies-of-the-truth problem `namesAKnownDomain` was written to
+   * fix, one layer further down.
+   *
+   * It is a separate list rather than a `dispatchable: true` flag on
+   * DOMAINS, because the two questions have genuinely different answers
+   * today and merging them would force a choice: either drop SIR from the
+   * classifier, losing the ability to say "I know what you asked for", or
+   * claim it runs. Naming both states is what lets the refusal below be
+   * specific.
+   */
+  static readonly DISPATCHABLE_DOMAINS = ['mm'] as const;
 
   private classifyDomain(query: string): string | undefined {
     return ScientificPipeline.classifyDomainOf(query);

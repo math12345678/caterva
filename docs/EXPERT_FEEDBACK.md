@@ -12640,3 +12640,60 @@ Seven numbers corrected on the first run, including a `literature layer only
 | Corrected | the api-server claim, carried wrong through three ADRs |
 | Open, deliberately | `check_quickstart_clone_works` stays red until the repositories are published (ADR 0143) |
 | **For the owner** | **publish the repositories** — still the only thing here that is not mine to do |
+
+## Sixtieth pass — the domain was classified, validated, and then dropped
+
+Last pass I disabled four dropdown options that the API rejected and called
+the classifier gap open. This pass I opened it.
+
+`ScientificPipeline` classifies a query into `mm` or `sir`. It does this
+carefully — aliases ordered longest-first, `undefined` when it cannot tell,
+on the stated principle that *"defaulting to a domain is the same defect as
+defaulting a parameter, one level up"*. The domain then drives validation,
+required parameters, and literature recommendations.
+
+**It does not drive the model.** `runSimulation(parameters, conditions)`
+never received it and called `runTerium('mm', ...)`.
+
+Measured over HTTP:
+
+```
+{"query":"sir epidemic","parameters":{"beta":0.3,"gamma":0.1,"s0":990,"i0":10}}
+-> parameters.km is required
+   parameters.vmax is required
+```
+
+An epidemic question answered with two enzyme-kinetics parameters, for a
+model the validator's own error message lists by name as one it can run.
+`const requiredParams = ['km','vmax','s0']` appeared three times in that
+file — a fourth copy of "which models exist", in a file whose docstring
+already complains there are three.
+
+**The half that mattered** is that fixing the validator alone would have
+made it worse. A correctly-validated SIR request would then have reached an
+integrator running Michaelis-Menten and been reported as `[S]`. Nothing had
+gone visibly wrong only because the missing `km` killed the run first — a
+coincidence doing the job of a check. The file already contains the right
+sentence, written about classification: *"a simulation of the wrong system
+is not a partial answer, it is a different answer."* It had never been
+applied at the point where the system is chosen.
+
+So the domain now reaches the executor, and anything undispatchable is
+refused by name — including where it does work:
+
+> This pipeline classified your query as 'sir' and cannot run it over HTTP:
+> only mm is dispatched here today. The engine does implement sir, and it is
+> reachable from the CLI.
+
+`DISPATCHABLE_DOMAINS` is deliberately a separate list from `DOMAINS`.
+Merging them would have forced a choice between dropping SIR from the
+classifier — losing the ability to say "I know what you asked for" — and
+claiming it runs. Naming both states is what makes the refusal specific.
+
+| | |
+|---|---|
+| Fixed | the validator asks the domain; the domain reaches the executor; four dashboard options relabelled to where they actually work |
+| Verified | 7 jest cases; restoring the hardcoded list fails the epidemic test, restore checked by `diff`; SIR and MM both driven end to end against the running server |
+| Guarded | `DISPATCHABLE_DOMAINS === ['mm']` is asserted and expected to CHANGE, not be deleted — it catches a widening without an executor |
+| Open, now stated | SIR and the three inhibition models are implemented and unreachable over HTTP. Made visible, not papered over, and not built |
+| **For the owner** | **publish the repositories** |

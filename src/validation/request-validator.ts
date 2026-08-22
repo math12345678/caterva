@@ -68,7 +68,12 @@ export function validateSimulationRequest(data: any): ValidationResult {
   if (!data.parameters || typeof data.parameters !== 'object') {
     errors.push({ field: 'parameters', message: 'parameters must be an object', value: data.parameters });
   } else {
-    const requiredParams = ['km', 'vmax', 's0'];
+    // Asked, not remembered. This literal appeared three times, so an
+    // epidemic query -- which the classifier accepts and the message
+    // above advertises by name -- was answered "km is required".
+    const requiredParams = ScientificPipeline.requiredParametersFor(
+      typeof data.query === 'string' ? data.query : ''
+    );
     for (const param of requiredParams) {
       if (!(param in data.parameters)) {
         errors.push({ field: `parameters.${param}`, message: `${param} is required` });
@@ -257,7 +262,12 @@ export function validateBatchRequest(data: any): ValidationResult {
             : {};
         const effective: Record<string, unknown> = { ...base, ...params };
 
-        const requiredParams = ['km', 'vmax', 's0'];
+        // Asked, not remembered. This literal appeared three times, so an
+    // epidemic query -- which the classifier accepts and the message
+    // above advertises by name -- was answered "km is required".
+    const requiredParams = ScientificPipeline.requiredParametersFor(
+      typeof data.query === 'string' ? data.query : ''
+    );
         for (const param of requiredParams) {
           // Name the place the caller would actually go to fix it.
           const field =
@@ -320,7 +330,12 @@ export function validateComparisonRequest(data: any): ValidationResult {
   if (!data.parameters || typeof data.parameters !== 'object') {
     errors.push({ field: 'parameters', message: 'parameters must be an object' });
   } else {
-    const requiredParams = ['km', 'vmax', 's0'];
+    // Asked, not remembered. This literal appeared three times, so an
+    // epidemic query -- which the classifier accepts and the message
+    // above advertises by name -- was answered "km is required".
+    const requiredParams = ScientificPipeline.requiredParametersFor(
+      typeof data.query === 'string' ? data.query : ''
+    );
     for (const param of requiredParams) {
       if (!(param in data.parameters)) {
         errors.push({ field: `parameters.${param}`, message: `${param} is required` });
