@@ -72,6 +72,72 @@ _MIN_RECIPES = 6
 #
 # Keyed by a distinctive substring of the command.
 CI_ONLY: dict[str, str] = {
+    # --- Classified 2026-08-22 (ADR 0159) ------------------------------
+    #
+    # These were unclassified, so this guard failed, so the pytest wrapper
+    # around it failed -- inside a suite that had not run in CI for a day
+    # because of the step-ordering bug in ADR 0158. Fixing the ordering
+    # uncovered them; they are not new.
+    "$GITHUB_STEP_SUMMARY": (
+        "writes a diagnostic into the GitHub run summary. There is no run "
+        "summary on a laptop, and `make doctor` already prints the same "
+        "interpreter and package facts locally."
+    ),
+    "python -c \"import sys, platform;": (
+        "part of the run-summary block above; same reason."
+    ),
+    "python -m pip --version": (
+        "part of the run-summary block above; same reason."
+    ),
+    "python -m pip list --format=freeze": (
+        "part of the run-summary block above; same reason."
+    ),
+    "echo '```'": (
+        "markdown fencing inside the run-summary block; not a check."
+    ),
+    "echo \"### Resolved environment": (
+        "the run-summary block's heading; not a check."
+    ),
+    "::error title=tests/": (
+        "emits a GitHub annotation on failure so the cause is legible from "
+        "the run page without opening a log. Annotations do not exist "
+        "outside Actions; locally the failing command's own output is right "
+        "there in the terminal."
+    ),
+    "A step above this one failed.": (
+        "continuation line of the annotation above."
+    ),
+    "job summary. Every guard in this job passes": (
+        "continuation line of the annotation above."
+    ),
+    "(checked 2026-08-21), so suspect the installed set": (
+        "continuation line of the annotation above."
+    ),
+    "restored by setup-python, which the api-server job does not use.": (
+        "continuation line of the annotation above."
+    ),
+    "python scripts/check_availability_notice_matches_reality.py": (
+        "probes GitHub over the network to decide whether the front page's "
+        "'not public yet' notice is still true. A local target that reaches "
+        "GitHub stops being fast, and a slow local target stops being run "
+        "(ADR 0028). Its --selftest drives all four verdicts offline."
+    ),
+    "python scripts/check_ci_toolchain.py": (
+        "reads .github/workflows and checks that a step named after "
+        "installing something installs it. Nothing to say on a developer's "
+        "machine, and it must fail BEFORE the job it describes."
+    ),
+    "python scripts/check_quickstart_clone_works.py": (
+        "makes real network calls to GitHub. Expected RED until the "
+        "repositories are published (ADR 0143), and deliberately the LAST "
+        "step in the job (ADR 0158) so it stops nothing behind it."
+    ),
+    "corepack enable": (
+        "activates pnpm on the runner. The local equivalent is having pnpm "
+        "installed, which CONTRIBUTING states; replaced "
+        "`corepack prepare pnpm@X --activate`, which exited 0 and installed "
+        "nothing (ADR 0140)."
+    ),
     "python scripts/check_ci_red_step_is_last.py": (
         "reads .github/workflows/tests.yml and checks the ORDER of its own "
         "job's steps. On a laptop it can only ever repeat what CI already "
@@ -90,10 +156,6 @@ CI_ONLY: dict[str, str] = {
     "pip install --upgrade pip": (
         "Part of CI's install step, not a check. `make setup` upgrades pip "
         "inside .venv itself."
-    ),
-    "corepack prepare pnpm": (
-        "Toolchain activation. `make doctor` reports whether pnpm is "
-        "present and prints this exact command as the fix."
     ),
     "pnpm install --frozen-lockfile": (
         "Needs a network install of the JS workspace. Documented in "
