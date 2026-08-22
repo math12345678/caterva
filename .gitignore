@@ -117,3 +117,8 @@ Science-Agent-Pipeline/attached_assets/*.docx
 # Zero bytes, no content, no meaning -- and indistinguishable from a real
 # file to whoever reads the tree next.
 _tmp_[0-9]*_*
+
+# `make demo` writes this. It is output, not source — regenerate it with
+# one command rather than committing a document that can drift from the
+# code that produced it.
+demo-report.md

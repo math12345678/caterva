@@ -12527,3 +12527,116 @@ guards: a matcher wider than the evidence.
 | Corrected | the units claim above, narrowed to what the evidence supports |
 | Open | the query classifier's four unknown labels; no unit contract on the HTTP API |
 | Open | the api-server job, red since 2026-08-05 |
+
+## Fifty-eighth pass — nobody had ever seen the output
+
+The brief was "make it easy to be amazing". So: how long does it take a
+person to see the thing this project is for?
+
+Six hurdles. A private clone, a 120 MB `make setup`, a Node toolchain,
+guessing which of ten commands, discovering that BRENDA calls lactate
+`(S)-lactate`, and four services being reachable at that instant. Each one
+defensible on its own. Together they meant **nobody had ever seen a Terrium
+document without being told how to get one.**
+
+`make demo` — thirty seconds, no network, no BRENDA account, no Node. It
+prints a real Km with its reference, the chosen values marked as yours, the
+published disagreement, and the refusals. `make help` opens with it, and
+"First time here?" is now `make setup && make demo` rather than an eight
+minute wait to be told the tests pass.
+
+Possible only because `report` learned `--fixture` yesterday (ADR 0149).
+
+**It renders nothing.** It calls the same `report_lab.py` the CLI spawns,
+because a demo with its own rendering path is the worst instance of this
+project's governing rule: it keeps looking impressive for months after the
+product rots, and the discrepancy surfaces in front of the first person to
+try the real command. Mutation-tested by teaching it to print a fabricated
+`BRENDA ref` row — three of six tests failed.
+
+### The correction, and it is the more useful half
+
+The fifty-sixth pass reported fourteen root markdown files reachable from no
+front door, and proposed moving twelve of them out.
+
+**I checked before acting, and the finding was wrong.** Every one is
+referenced by between one and six tracked files. The scan had looked at five
+front doors and `docs/*.md` and nothing else, then reported its own blind
+spot as an absence.
+
+Ninth instance of *a matcher narrower than the thing it measures*, and the
+first where the matcher was a one-off measurement rather than a shipped
+guard — which is exactly why nothing caught it. Guards in this repository
+get selftests and controls; a number computed once for a report gets
+neither, and lands in a document with the same authority.
+
+Nothing was moved. The move would have broken forty-odd references across a
+tree several agents are committing into, on a measurement that was wrong.
+
+| | |
+|---|---|
+| Built | `make demo`, `scripts/demo.py`, 6 tests, mutation-verified; README and `make help` lead with it |
+| Corrected | the fifty-sixth pass's root-orphan finding — measured wrong, not acted on |
+| Verified | doc links, doc paths, scripts-reachable green; the sentinel-overwrite test replaced an `unlink` that could not run in every container |
+| Not done | reorganising the 43-file root. The complaint is real; the evidence I had for which files to move was not |
+| **For the owner** | **publish the repositories.** Hurdle 1 of six still stops everyone; this pass shortened the path for people already through it |
+
+## Fifty-ninth pass — the checker and the fixer never compared notes
+
+CI has been red on every push. Rather than guess again, I read the failure
+notifications and then the guard that was failing.
+
+**First, a correction I have been repeating for three passes.** Every ADR
+and entry since 0145 has carried *"the api-server job, red since
+2026-08-05, still not reproducible here"*. It has been **green since
+2026-08-21** — ADR 0140's `corepack enable` fixed it:
+
+| run | api-server |
+|---|---|
+| 755f9a8, Aug 21 01:08 | Failed in 28s |
+| 7f7d212, Aug 21 22:29 | **Succeeded in 1m33s** |
+| 39b00ed, Aug 22 01:16 | **Succeeded in 1m35s** |
+
+Carried forward instead of rechecked. ADR 0145 — a true sentence left
+standing after its subject changed — was committed the same day, by me.
+Writing the principle down does not install it.
+
+Three plausible causes checked while chasing it, all wrong, recorded so the
+next person does not re-check them: the lockfile matches all nine workspace
+manifests exactly; `@esbuild/linux-x64` and `@rollup/rollup-linux-x64-gnu`
+are both in it, so no macOS-only resolution; and all 55 api-server test
+files pass on Linux across four shards.
+
+### What was actually red
+
+`check_documented_counts.py`, and for four separate reasons that share one
+cause: it has a **checker** and a `--write` **fixer** with different pattern
+sets, and nothing compares them.
+
+- The fixer passed `{}` to every document but README, so a commit adding a
+  test reddened CI on three files a human then had to edit. That happened
+  **four times in this session** before I asked why.
+- `--write` was gated on the checker finding something, so staleness the
+  checker could not see was unfixable even when the fixer knew how.
+- **README's test counts were checked by nothing at all**, while the guard
+  printed *"OK: README test counts match the repository"*. Two were wrong:
+  `run all 2,003 tests` (275 out, 12%) and `simulation engine only (1,142
+  tests)`. Both in the command reference — the block everybody reads.
+- The pattern said `runs all`; the command reference says `run all`. One
+  letter, and its twin one line away stayed current for months.
+
+The original reasoning was right and I kept it: a bare `1,014 tests.` has no
+antecedent on its line, so which suite it means is a judgement and a fixer
+that picked one would invent an attribution. What was too broad was the
+*conclusion* drawn from it.
+
+Seven numbers corrected on the first run, including a `literature layer only
+(847 tests)` that was 22% out.
+
+| | |
+|---|---|
+| Fixed | six new patterns, unconditional `--write`, README's counts checked, `terium.md` reworded so its number carries its own antecedent |
+| Verified | selftest still proves `rewrite()` changes digits and nothing else; falsifying the README total now fails naming the line, and passed before; the legitimate `skips its 19 tests` does not fire |
+| Corrected | the api-server claim, carried wrong through three ADRs |
+| Open, deliberately | `check_quickstart_clone_works` stays red until the repositories are published (ADR 0143) |
+| **For the owner** | **publish the repositories** — still the only thing here that is not mine to do |

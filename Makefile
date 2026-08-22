@@ -15,11 +15,12 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr cli clean
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo cli clean
 
 help:
 	@echo "Terrium"
 	@echo ""
+	@echo "  make demo       SEE A REAL REPORT -- 30s, no network, no account"
 	@echo "  make setup      create .venv and install everything"
 	@echo "  make doctor     diagnose a setup that will not work"
 	@echo "  make check      verify the environment actually works"
@@ -33,7 +34,7 @@ help:
 	@echo "  make cli        Terium CLI help (python -m Terium.cli)"
 	@echo "  make clean      remove caches and build artifacts"
 	@echo ""
-	@echo "First time here? Run: make setup && make check && make test"
+	@echo "First time here? Run: make setup && make demo"
 	@echo "About to open a PR? Run: make pr"
 	@echo "Something not working? Run: make doctor"
 
@@ -229,6 +230,8 @@ guards: require-pytest
 	@"$(PY)" scripts/check_forbidden_packages.py
 	@echo ">> guard wiring"
 	@"$(PY)" scripts/check_guard_wiring.py
+	@echo ">> pinned versions resolve on PyPI"
+	@"$(PY)" scripts/check_pins_resolve.py
 	@echo ">> no Tellurium integration claims"
 	@"$(PY)" scripts/check_no_tellurium_integration_claims.py --selftest
 	@"$(PY)" scripts/check_no_tellurium_integration_claims.py
@@ -306,6 +309,16 @@ pr: guards test
 	@echo ""
 	@echo "Both need a pnpm install in Science-Agent-Pipeline. If you touched"
 	@echo "the API server or the OpenAPI spec, run them; see RUN_TESTS.md."
+
+# The first thing to run, and the only one that needs nothing but `make
+# setup`. No network, no BRENDA account, no Node: it drives the same
+# `report_lab.py` the CLI spawns and prints the document it produced.
+#
+# Before this, seeing one output meant clearing six separate hurdles, so
+# nobody had ever seen it without being told how. Possible only since
+# `report` learned `--fixture` (ADR 0149).
+demo: check-python
+	@"$(PY)" scripts/demo.py
 
 cli: check-python
 	@"$(PY)" -m Terium.cli --help
