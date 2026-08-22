@@ -33,6 +33,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -251,6 +252,101 @@ def one_page_per_run(fetch):
     return get
 
 
+class FixtureUnusable(ValueError):
+    """A saved page was given that cannot answer the question asked."""
+
+
+#: BRENDA's own EC number as it appears on a saved page. Every fixture in
+#: `Tests/fixtures/` contains exactly one, and it is the page's subject.
+_EC_IN_PAGE = re.compile(r"\b\d+\.\d+\.\d+\.\d+\b")
+
+
+def fixture_reader(fixture: str | None, ec: str):
+    """The saved-page path, or the live one when no fixture was given.
+
+    WHY `report` NEEDED THIS
+    -----------------------
+    `ensemble` has taken `--fixture` since it was written. `report` did not,
+    and `report` is the command this project chose as its product — "one
+    command, one document a student can hand in".
+
+    Measured on 2026-08-21, running the exact invocation printed in the
+    command's own help text:
+
+        $ scientific report --ec 1.1.1.27 --organism "Homo sapiens" \\
+              --substrate "(S)-lactate" --s0 10mM --vmax 0.25mM/s --seed 1
+        -> Could not resolve 'km': 403 Forbidden
+
+    That is the whole run. BRENDA rate-limits, institutions proxy, and a
+    teaching lab of thirty students hitting one host in one period is exactly
+    the traffic Lisa Jeske asked this project to be gentle about. The
+    flagship command had no path that did not require the network to be
+    working at that moment — so it could not be demonstrated, could not be
+    exercised end to end by any test, and failed the student with a bare HTTP
+    status.
+
+    The capability already existed one command over. This is the fifth
+    consecutive instance of the same shape (ADR 0136, 0139, 0141, 0142):
+    parts that each work, and no wiring at the seam.
+
+    WHY IT VERIFIES THE EC RATHER THAN TRUSTING THE PATH
+    ----------------------------------------------------
+    A fixture is one saved page for one enzyme. Nothing about a filename
+    stops somebody passing `brenda_ldh_fixture.html` while asking about
+    EC 2.7.1.1 — and the resolver would then parse lactate dehydrogenase
+    rows, find them, and report them under hexokinase's name with real
+    reference numbers attached.
+
+    That is not a missing feature, it is **a real citation for the wrong
+    protein**, which ADR 0126 already refuses at the name-to-EC step. An
+    offline path that reintroduces it at the fixture step would have made
+    the tool less trustworthy in exchange for being testable.
+
+    So the page's own EC is read and compared. A page carrying no EC at all
+    is refused too: "I could not find one" must not pass as "it matches".
+    """
+    if not fixture:
+        return fetch_brenda_html
+
+    path = pathlib.Path(fixture).expanduser()
+    if not path.is_file():
+        raise FixtureUnusable(
+            f"No saved BRENDA page at {fixture!r}. --fixture takes a path to "
+            "an HTML page you saved yourself; Terrium does not download one "
+            "for you and then call the result offline."
+        )
+
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        raise FixtureUnusable(f"Could not read {fixture!r}: {exc}") from exc
+
+    found = set(_EC_IN_PAGE.findall(text))
+    if not found:
+        raise FixtureUnusable(
+            f"{fixture!r} contains no EC number, so Terrium cannot tell which "
+            "enzyme it describes. It will not read kinetic rows off a page it "
+            "cannot identify — a value is only as good as knowing what it "
+            "measures."
+        )
+    if str(ec) not in found:
+        raise FixtureUnusable(
+            f"{fixture!r} is a page for EC {', '.join(sorted(found))}, and you "
+            f"asked about EC {ec}. Terrium will not read rows from one "
+            "enzyme's page and report them under another's name: the "
+            "reference numbers would be real and the protein would be wrong "
+            "(ADR 0126)."
+        )
+
+    def read(ec_number: str, timeout: float = 15) -> str:
+        # `timeout` is accepted and ignored on purpose, so this is a drop-in
+        # for `fetch_brenda_html` and `one_page_per_run` needs no branch. A
+        # cache keyed on the EC still works: there is one page and one key.
+        return text
+
+    return read
+
+
 def bridge_vmax(kcat_result, enzyme_conc: float, km: float | None):
     """Vmax from a literature kcat and the student's enzyme concentration.
 
@@ -392,7 +488,47 @@ def main() -> int:
         return _fail(str(exc))
 
     # One fetch per page, not one per quantity. See `one_page_per_run`.
-    page = one_page_per_run(fetch_brenda_html)
+    try:
+        fetch = fixture_reader(payload.get("fixture"), str(ec))
+    except FixtureUnusable as exc:
+        return _fail(str(exc))
+    page = one_page_per_run(fetch)
+
+    # A SAVED PAGE MEANS THE WHOLE RUN IS OFFLINE, AND THE DOCUMENT SAYS SO.
+    #
+    # `--fixture` replaced only the BRENDA fetch at first, and the run still
+    # died — on **NCBI**, not BRENDA. `resolve_kinetic_value` also consults
+    # UniProt, NCBI Taxonomy and a literature search, and the failure it
+    # printed was `Could not resolve 'km': 403 Forbidden`, which names the
+    # parameter and the status and not the service. A student reading that
+    # would go and check whether BRENDA was down. It was not.
+    #
+    # So a fixture run does not consult them either. It cannot: the student
+    # reaching for a saved page is usually the student with no network.
+    #
+    # What that costs is REAL and is recorded rather than absorbed. Organism
+    # relatedness is graded from an NCBI lineage; without it the axis is
+    # `not_assessed`, which is the honest third state and not a pass. A
+    # document that quietly skipped the check would be indistinguishable
+    # from one where the organism matched.
+    offline = bool(payload.get("fixture"))
+    offline_note = (
+        "Terrium did not verify the organism against NCBI Taxonomy or "
+        "UniProt, and ran no literature search: you supplied a saved BRENDA "
+        "page with --fixture, so this run made no network requests at all. "
+        "Organism relatedness is therefore NOT ASSESSED rather than matched "
+        "— the rows below are whatever the saved page holds. Re-run without "
+        "--fixture, on a machine with network, to have that checked."
+    )
+    lookups = (
+        {
+            "uniprot_provider": lambda *a, **k: None,
+            "taxon_id_provider": lambda *a, **k: None,
+            "search_literature": False,
+        }
+        if offline
+        else {}
+    )
 
     resolved: dict = {}
     ensembles: dict = {}
@@ -412,6 +548,7 @@ def main() -> int:
             result = resolve_kinetic_value(
                 str(ec), str(organism), str(substrate),
                 html_provider=page,
+                **lookups,
                 quantity=str(entry.get("quantity", "km")),
                 allow_cross_species=bool(entry.get("allowCrossSpecies", False)),
             )
@@ -446,6 +583,7 @@ def main() -> int:
             kcat_result = resolve_kinetic_value(
                 str(ec), str(organism), str(substrate),
                 html_provider=page,
+                **lookups,
                 quantity="kcat",
                 allow_cross_species=bool(
                     (payload.get("parameters") or [{}])[0].get(
@@ -507,7 +645,12 @@ def main() -> int:
                 band_refusals.append(why_not)
 
     simulation = None
-    also_refused: list[str] = []
+    # The offline note is a REFUSAL, not a footnote. It belongs in "What
+    # Terrium would not do" beside everything else the run declined, because
+    # that is the section a reader checks before trusting the document — and
+    # an unverified organism is exactly the kind of gap this report exists to
+    # make visible rather than absorb.
+    also_refused: list[str] = [offline_note] if offline else []
     missing = [name for name in MM_REQUIRED if name not in inputs]
 
     if missing:

@@ -351,12 +351,25 @@
                 </div>
                 <div>
                     <label>Kinetic Model</label>
+                    <!-- FOUR OF THESE FIVE DID NOT WORK, AND LOOKED LIKE THEY
+                         DID. Measured 2026-08-21 against /api/simulate: only
+                         michaelis-menten is accepted. The other four are real
+                         Terrium domains, but the API's query classifier does
+                         not recognise these labels, so clicking Run returned
+                         a validation failure that the page then replaced with
+                         "Simulation request failed".
+
+                         Offering a control that cannot work is the UI form of
+                         a check that cannot fail: it is trusted. Disabled and
+                         labelled until the classifier learns them, because a
+                         student who picks one deserves to know before they
+                         wait for a job that was never queued. -->
                     <select id="model">
                         <option>michaelis-menten</option>
-                        <option>competitive-inhibition</option>
-                        <option>non-competitive-inhibition</option>
-                        <option>product-inhibition</option>
-                        <option>allosteric</option>
+                        <option disabled>competitive-inhibition — not yet accepted by the API</option>
+                        <option disabled>non-competitive-inhibition — not yet accepted by the API</option>
+                        <option disabled>product-inhibition — not yet accepted by the API</option>
+                        <option disabled>allosteric — not yet accepted by the API</option>
                     </select>
                 </div>
                 <!-- NOTHING HERE IS PRE-FILLED. See ADR 0043.
@@ -607,7 +620,39 @@
                     })
                 });
 
-                if (!response.ok) throw new Error('Simulation request failed');
+                // THE API'S DIAGNOSIS, NOT A REPLACEMENT FOR IT.
+                //
+                // This was `throw new Error('Simulation request failed')`,
+                // one line after a response whose body names the field, the
+                // reason, and every model the pipeline will accept. The
+                // useful message was computed, arrived, and was discarded
+                // before anybody could read it — so four of the five options
+                // in the dropdown above failed with five identical words.
+                //
+                // Measured 2026-08-21: competitive-inhibition,
+                // non-competitive-inhibition, product-inhibition and
+                // allosteric are all rejected by /api/simulate. The dropdown
+                // offers them; the classifier does not know them. That gap
+                // is real and is not fixed here — but until it is, the
+                // person clicking Run gets told which models DO work
+                // instead of "Simulation request failed".
+                if (!response.ok) {
+                    let detail = '';
+                    try {
+                        const body = await response.json();
+                        detail = (body.validationErrors || [])
+                            .map(e => `${e.field}: ${e.message}`)
+                            .join('\n') || body.error || '';
+                    } catch (_) {
+                        // A non-JSON body is a different failure (proxy,
+                        // crash). Say the status rather than inventing a
+                        // cause — "I could not read the reason" must not
+                        // read as "there was no reason".
+                        detail = `HTTP ${response.status}, and the response ` +
+                                 `body could not be read as JSON.`;
+                    }
+                    throw new Error(detail || `HTTP ${response.status}`);
+                }
 
                 const { jobId } = await response.json();
 
