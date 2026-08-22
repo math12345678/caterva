@@ -134,6 +134,11 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # publication only if the notice is removed on that day. It is the guard
     # that fires when a TRUE sentence stops being true.
     "check_availability_notice_matches_reality": ("ci",),
+    # CI only: it reads .github/workflows, so it has nothing to say on a
+    # developer's machine. Wired ABOVE the expected-red step it protects —
+    # placed after it, the guard against a step that stops the job would
+    # itself be stopped by that step.
+    "check_ci_red_step_is_last": ("ci",),
     # Wired 2026-08-15. `make guards` is a fourth harness this script does
     # not model -- it reads verify_build, CI and pytest. The pytest wrapper
     # is what makes it enforcing; the make target is what makes it usable.

@@ -12805,3 +12805,49 @@ wrong model on the right parameters with no error at all.
 | Changed | `results.trajectory` is `Record<string, number>` — three real shapes — and the one consumer assuming `{time, value}` narrows explicitly and throws rather than casting |
 | Open, deliberately | `allosteric`: implemented in `kinematicModels`, no pipeline domain, not built this pass |
 | **For the owner** | **publish the repositories** |
+
+## Sixty-third pass — the tests had not run in CI for a day
+
+Instead of adding a feature, I asked what CI was actually doing. Every
+Python guard in the `test` job runs green locally — 22 of them, checked one
+at a time. So the failure had to be something other than a guard's logic.
+
+`check_quickstart_clone_works` was **step 32 of 52**. A GitHub Actions job
+stops at its first failing step. The twenty steps after it never ran:
+`verify_build --quick`, the simulation engine tests, the literature layer
+tests.
+
+**Every test in this repository stopped running in CI on 2026-08-21.**
+
+The signal was in plain sight for a day. Every run finished in about 55
+seconds; a real suite takes seven minutes. I quoted those durations in three
+separate passes and read them as noise.
+
+ADR 0143's argument is untouched — the finding is true, muting it would be
+recording the problem instead of fixing it, and the build stays red until
+the repositories are published. **What was wrong was the position, not the
+decision.** 0143 said nothing about ordering because the cost of the
+ordering was not noticed, and a guard can be correct, verified, honest about
+its limits, and still disable everything behind it.
+
+`check_ci_red_step_is_last.py` now fails if an expected-red step precedes a
+suite. It is wired ABOVE the step it protects: placed after, a guard against
+a step that stops the job would itself be stopped by that step.
+
+### Named in advance, so nobody re-diagnoses it
+
+`check_ci_reproducible_locally` is already failing with 19 unclassified CI
+steps, 17 of which predate this pass. It runs in the pytest wrapper — one of
+the suites that has not been running. So the ordering bug was concealing a
+guard's own failure, and the next CI run will surface it. That is the guard
+working. The two steps this pass added are classified; the other seventeen
+are someone else's to explain, and inventing reasons for them would be worse
+than leaving them named.
+
+| | |
+|---|---|
+| Fixed | the clone guard moved to the end; 2,278 tests run in CI again |
+| Built | `check_ci_red_step_is_last.py`, selftest on constructed lists, mutation-verified by re-inserting the step and watching it name #32–#47 |
+| Verified | all 22 runnable Python guards green locally, which is what left ordering as the only explanation |
+| Expected next run | slower (seven minutes, not 55 seconds) and still red, both on purpose |
+| **For the owner** | **publish the repositories** — the badge goes green the same day |
