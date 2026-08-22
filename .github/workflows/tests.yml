@@ -155,27 +155,8 @@ jobs:
       - name: Pinned-version resolution guard
         run: python scripts/check_pins_resolve.py
 
-      # The only claim that has to be true before any other claim matters:
-      # that a stranger can obtain this at all. START_HERE.md opens by
-      # addressing "a stranger who found this on GitHub" and hands them a
-      # `git clone` of a repository that is not readable anonymously.
-      #
-      # THIS STEP IS EXPECTED TO FAIL UNTIL THE REPOSITORY IS PUBLISHED.
-      # That is deliberate. It is a true finding about the most important
-      # sentence in the project, and muting it would be recording the
-      # problem instead of fixing it. It goes green the day the repo is
-      # public, with no code change.
-      #
-      # Exit 3 means "could not check" (no network, GitHub down) and is NOT
-      # a failure -- the guard probes known-public controls first precisely
-      # so an outage cannot masquerade as a broken URL.
-      - name: Quickstart-clone guard (self-check)
-        run: python scripts/check_quickstart_clone_works.py --selftest || [ $? -eq 3 ]
-
-      - name: Quickstart-clone guard
-        run: python scripts/check_quickstart_clone_works.py || [ $? -eq 3 ]
-
-      # The step above tells the MAINTAINER, in a log only somebody with push
+      # The quickstart-clone guard — now the LAST step in this job, see the
+      # note there — tells the MAINTAINER, in a log only somebody with push
       # access opens. This one checks the thing that tells the STRANGER: the
       # "Not public yet" notice on README.md and START_HERE.md.
       #
@@ -322,6 +303,52 @@ jobs:
 
       # Runs standalone as well as via the pytest wrapper: this job fails
       # fast on a bad citation rather than waiting out the full suite.
+
+      # Wired ABOVE the step it protects, on purpose: a guard that runs
+      # after the expected-red step would itself never run, which is the
+      # bug it exists to catch, committed by the fix for it.
+      - name: CI ordering guard (self-check)
+        run: python scripts/check_ci_red_step_is_last.py --selftest
+
+      - name: CI ordering guard
+        run: python scripts/check_ci_red_step_is_last.py
+
+      # ---------------------------------------------------------------
+      # LAST, AND THE POSITION IS THE WHOLE POINT.
+      # ---------------------------------------------------------------
+      #
+      # The only claim that has to be true before any other claim matters:
+      # that a stranger can obtain this at all. START_HERE.md opens by
+      # addressing "a stranger who found this on GitHub" and hands them a
+      # `git clone` of a repository that is not readable anonymously.
+      #
+      # THIS STEP IS EXPECTED TO FAIL UNTIL THE REPOSITORY IS PUBLISHED.
+      # That is deliberate (ADR 0143) and is not changed here.
+      #
+      # WHAT IS CHANGED IS WHERE IT SITS. It was step 32 of 52. A GitHub
+      # Actions job stops at its first failing step, so the twenty steps
+      # after it never ran -- including `verify_build.py --quick` and BOTH
+      # test suites. Measured: every run since 2026-08-21 finished in about
+      # 55 seconds, and a real suite takes seven minutes.
+      #
+      # So a deliberately-red guard, wired to name a true problem, had been
+      # quietly costing this repository its entire test run on every push.
+      # ADR 0143 argued for keeping the finding visible and said nothing
+      # about ordering, because the cost of the ordering was not noticed.
+      #
+      # Running it last keeps every word of that argument -- the build is
+      # still red, on every push, until the repository is published -- and
+      # gives back the 2,278 tests. `check_ci_red_step_is_last.py` now
+      # fails if anything is added after it.
+      #
+      # Exit 3 means "could not check" (no network, GitHub down) and is NOT
+      # a failure -- the guard probes known-public controls first precisely
+      # so an outage cannot masquerade as a broken URL.
+      - name: Quickstart-clone guard (self-check)
+        run: python scripts/check_quickstart_clone_works.py --selftest || [ $? -eq 3 ]
+
+      - name: Quickstart-clone guard
+        run: python scripts/check_quickstart_clone_works.py || [ $? -eq 3 ]
 
   api-server:
     runs-on: ubuntu-latest

@@ -72,6 +72,17 @@ _MIN_RECIPES = 6
 #
 # Keyed by a distinctive substring of the command.
 CI_ONLY: dict[str, str] = {
+    "python scripts/check_ci_red_step_is_last.py": (
+        "reads .github/workflows/tests.yml and checks the ORDER of its own "
+        "job's steps. On a laptop it can only ever repeat what CI already "
+        "knows, and a guard with nothing to say locally is one people learn "
+        "to scroll past (ADR 0028). Its selftest drives both verdicts on "
+        "text rather than on the tree, so the logic is exercised offline."
+    ),
+    "python scripts/check_ci_red_step_is_last.py --selftest": (
+        "same script; the selftest is the offline half and is wired in CI "
+        "beside it."
+    ),
     "pip install -r requirements-dev.txt": (
         "`make setup` is the local equivalent and CONTRIBUTING opens with "
         "it; CI installs into the runner's system Python instead of a venv."
