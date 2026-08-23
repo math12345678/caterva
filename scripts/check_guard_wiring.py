@@ -150,6 +150,14 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # is what makes it enforcing; the make target is what makes it usable.
     "check_ci_reproducible_locally": ("pytest",),
     "check_doc_paths_resolve": ("pytest",),
+    # Wired 2026-08-23 (ADR 0173). pytest only, on purpose. This guard names
+    # the declared dependencies that are not installed, and the machine most
+    # likely to be missing them is a contributor's -- which is where pytest
+    # runs. Deliberately NOT in verify_build or CI: CI installs from the
+    # manifest it would be checking, so it can only ever report success
+    # there, and a check that cannot fail where it runs is worse than no
+    # check. `make deps-check` and `make doctor` are the human entry points.
+    "check_dev_dependencies": ("pytest",),
     "check_dependency_licenses": ("ci", "pytest", "verify_build"),
     "check_non_affiliation_notice": ("ci", "pytest", "verify_build"),
     # Wired 2026-08-21 (ADR 0144). Every `BRENDA ref NNNNNN` printed in the

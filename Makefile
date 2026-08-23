@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all
 
 help:
 	@echo "Terrium"
@@ -340,6 +340,15 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+guards-all: check-python
+	@# Every guard, reported together. `make guards` stops at the first
+	@# failure, which is right for a gate and wrong for a report: during one
+	@# session it died at the 5th of 28 guards and the other 23 never ran,
+	@# their silence reading exactly like success. Slower on purpose -- one
+	@# guard runs both pytest suites -- so this is the command for "what is
+	@# the whole state?", not the one in the inner loop.
+	@"$(PY)" scripts/run_all_guards.py
 
 deps-check: check-python
 	@# Which declared dependencies are missing, in terms of what to install.

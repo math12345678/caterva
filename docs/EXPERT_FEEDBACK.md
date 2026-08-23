@@ -13841,3 +13841,65 @@ not route through the code under test.**
 | Verified | three mutations, all caught after fixing the self-disabling test; picked up unasked by the guard-selftest discovery harness |
 | **For you** | `python3 -m pip install -r requirements-dev.txt` fixes the citation test. I have not run it: the venv is shared with another agent and that is your call. |
 | **Precisely** | `make test` is now 1 failed / 1175 passed, down from 2 failures — but only half of that is this pass's doing. The codegen test passes here because I symlinked `lib/api-zod/node_modules` while diagnosing it, and **that symlink is not committed**. On a clean checkout it fails exactly as before. |
+
+---
+
+## Pass: the failure that hid the others (ADR 0174)
+
+I have been reporting the state of this repository incorrectly all session,
+and this pass found out why.
+
+`make guards` is a sequential list and make stops at the first failure. It
+died at the **5th of 28** guards, on two ADR index entries pointing at
+another agent's uncommitted files. **Twenty-three guards never executed
+once.**
+
+I then wrote *"only the two pre-existing failures remain"* **five times** —
+in five ADRs and five commit messages — on the strength of having seen five
+guards out of twenty-eight. The silence of the other twenty-three read
+exactly like success, and I passed it on to you as such. That is the same
+mistake this repository documents over and over: an absence taken for a
+result. I made it in my own reporting while writing records about it.
+
+### What was hiding back there
+
+**A guard wiring violation I introduced that same session.** ADR 0173's new
+checker had no `EXPECTED_WIRING` entry — the repo's rule is that a guard is
+not delivered until something runs it unasked. Nothing told me, because
+`check_guard_wiring.py` runs *after* the guard that was failing.
+
+**A TypeScript syntax error committed at HEAD.** `CliApp.tsx` opens a JSX
+comment at line 686 and closes it at line 700 with `*/` and no `}`. One
+character. That file has not compiled since commit `982ebca`.
+`check_typescript_compiles.py` catches it correctly and is wired into
+`verify_build.py` — which fails on the *same ADR entry* before reaching the
+TypeScript stage. A working guard, a real defect, and a harness that never
+got there.
+
+### The whole picture, for the first time
+
+`make guards-all`: **37 ok, 4 failed**, 793 seconds. All four failures reduce
+to two causes and neither is a defect in this code — three are those same two
+ADR links, and the fourth is ADR 0173's missing dependencies in a **third
+costume**: all five skips are `could not import cffconvert` and `libsedml`,
+making a guard about silent skips fail for a reason unrelated to skipping.
+
+TIMEOUT is reported as its own state, not as a failure. One guard runs both
+pytest suites for eleven minutes, and a timeout is the runner's limit rather
+than the guard's verdict.
+
+### The fix, measured rather than assumed
+
+TS1005 and TS1382 go 2 → 0. But `terrium-landing` goes from 2 errors to
+**6**, because a file that cannot be parsed reports only its parse error —
+fixing it revealed four that were behind it. All six are missing type
+packages, not code. Saying "the error count is unchanged at 21" would be
+true and misleading; saying "the syntax errors are gone and four were
+revealed" is what happened.
+
+| | |
+|---|---|
+| Found | that I had been reporting five guards out of twenty-eight as the whole state, five times over; a wiring violation of my own; and a one-character compile break committed at HEAD |
+| Built | `scripts/run_all_guards.py`, `make guards-all`, the missing wiring entry, the missing `}` |
+| Verified | full sweep of 41 invocations; guard wiring back to OK at 73 guards; syntax errors 2 → 0 with the revealed errors counted honestly |
+| **The good news** | 37 of 41 guards pass, and every remaining failure is another agent's in-flight work or two uninstalled packages. The repository is in better shape than I have been telling you. |
