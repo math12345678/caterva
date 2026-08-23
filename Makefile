@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check
 
 help:
 	@echo "Terrium"
@@ -77,6 +77,8 @@ setup: check-python
 doctor:
 	@if command -v "$(PYTHON)" >/dev/null 2>&1; then \
 		"$(PYTHON)" scripts/doctor.py; \
+		echo ""; \
+		"$(PYTHON)" scripts/check_dev_dependencies.py || true; \
 	else \
 		echo "No '$(PYTHON)' on PATH, so nothing here can run."; \
 		echo ""; \
@@ -338,6 +340,13 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+deps-check: check-python
+	@# Which declared dependencies are missing, in terms of what to install.
+	@# Advisory on purpose: it is NOT a prerequisite of `test`, because 1162
+	@# of 1164 tests pass without them and blocking every test to report two
+	@# would trade a small confusing failure for a large one.
+	@"$(PY)" scripts/check_dev_dependencies.py
 
 llm-doctor:
 	@# Does each configured LLM provider actually answer? One small

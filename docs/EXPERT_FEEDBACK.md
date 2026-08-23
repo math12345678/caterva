@@ -13786,3 +13786,58 @@ for its full 20-second timeout. Six providers now take 4 seconds.
 | Verified | four mutations, all caught; run against the real keys; exit-3 path checked with every key unset; 748 api-server tests |
 | **For you** | `SILICONFLOW_API_KEY` has no balance; `TOKENROUTER_API_KEY` is malformed (the API wants a `tr_` prefix). Both work again once fixed. |
 | **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: a failure wearing two costumes (ADR 0173)
+
+I flagged the same two failing tests **five times** as "pre-existing, not
+mine" and never once looked at what they were. This pass looked.
+
+They are one failure. `cffconvert` is pinned in `requirements-dev.txt` and
+installed in no virtualenv here; `zod` is declared in `lib/api-zod` and that
+workspace had no `node_modules`. Symlinking it made the codegen selftest pass
+instantly, with no change to the check it was supposedly failing.
+
+Both guards were behaving correctly — each refused to call an unchecked thing
+valid, which is the discipline this repository is built on. What was missing
+was anything saying *why*, in terms of what to install. The messages named
+the citation file and the zod pin, which is where I would have gone if I had
+ever followed them up.
+
+`make deps-check` now says it in one line, and found `python-libsedml`
+missing, which nobody knew.
+
+### It reported five missing; three were installed
+
+The first version resolved distribution names to module names with `s/-/_/`.
+So `libroadrunner` (imports as `roadrunner`), `python-libsbml` (`libsbml`)
+and `beautifulsoup4` (`bs4`) all looked absent.
+
+**That is worse than the failure it was written to fix.** A real dependency
+with a confusing message costs an hour; a checker that invents three
+dependencies makes its own output untrustworthy and buries the two real ones
+— and the output looks completely plausible until somebody tries to install
+them. Asking `importlib.metadata` for the name the manifest actually uses
+removed the mapping rather than extending it.
+
+### A test that switched itself off
+
+Mutation V1 restores the guessing and was reported **NOT CAUGHT**.
+
+My test guarded itself with `if not guard.is_installed(...): pytest.skip()`.
+V1 breaks `is_installed` — so under the mutation the precondition failed and
+every case skipped itself. A test that disables itself under exactly the
+defect it exists to catch, and in the summary line it is indistinguishable
+from one that passed.
+
+The rule I did not have written down until now: **a test's guard clause must
+not route through the code under test.**
+
+| | |
+|---|---|
+| Found | that a failure I deferred five times was one uninstalled dependency in two disguises; then a false-positive in my own fix; then a test that disabled itself |
+| Built | `scripts/check_dev_dependencies.py` with a `--selftest`, `make deps-check`, wired into `make doctor`, 11 tests |
+| Verified | three mutations, all caught after fixing the self-disabling test; picked up unasked by the guard-selftest discovery harness |
+| **For you** | `python3 -m pip install -r requirements-dev.txt` fixes the citation test. I have not run it: the venv is shared with another agent and that is your call. |
+| **Precisely** | `make test` is now 1 failed / 1175 passed, down from 2 failures — but only half of that is this pass's doing. The codegen test passes here because I symlinked `lib/api-zod/node_modules` while diagnosing it, and **that symlink is not committed**. On a clean checkout it fails exactly as before. |
