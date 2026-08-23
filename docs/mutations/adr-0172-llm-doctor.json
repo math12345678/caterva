@@ -1,0 +1,74 @@
+{
+  "_why": [
+    "ADR 0172's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0172 adds a check that says which LLM providers actually work. The",
+    "mutations target the distinctions that make it worth running rather than",
+    "the request itself.",
+    "",
+    "D1 judges a provider on HTTP status alone. That is the SiliconFlow",
+    "failure: 200 with an error body saying the balance is empty. A checker",
+    "that trusts the status reports an unusable provider as healthy, which is",
+    "worse than not checking.",
+    "",
+    "D2 collapses `unconfigured` into `broken`, so a provider nobody set up",
+    "reads as one that is failing, and an operator debugs a provider they",
+    "never intended to use.",
+    "",
+    "D3 returns exit 0 when nothing is configured. Zero failures over zero",
+    "providers is the same shape of lie as an empty test suite passing.",
+    "",
+    "D4 removes the finish_reason 'length' allowance, restoring the false",
+    "positive the first version of this file produced: a reasoning model that",
+    "spends its token budget thinking was reported BROKEN while working",
+    "perfectly. It is here because a check that condemns something working is",
+    "worse than no check -- somebody acts on it.",
+    "",
+    "Not included, because no test here catches it: whether `explain`'s",
+    "substring matching classifies a provider message it has never seen. It",
+    "matches on words like 'balance' and 'does not exist'; a vendor phrasing",
+    "the same refusal differently falls through to the raw HTTP line, which",
+    "is honest but unhelpful, and nothing tests that path.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0172-llm-doctor.json"
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/llmDoctor.test.ts",
+  "mutations": [
+    {
+      "id": "D1",
+      "description": "a 200 response is accepted without reading the body",
+      "_claimed": "caught by the exhausted-balance test",
+      "_note": "The SiliconFlow shape: HTTP 200, error in the body. Judging on status alone reports a provider that refuses every request as healthy -- and since Terrium falls back to keyword classification silently, nothing downstream would contradict it.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/llmDoctor.ts",
+      "find": "    if (asRecord.error || (!asRecord.choices && asRecord.message)) {",
+      "replace": "    if (false) {"
+    },
+    {
+      "id": "D2",
+      "description": "a provider with no key is reported as broken",
+      "_claimed": "caught by the unconfigured tests",
+      "_note": "Absence is not a fault. Collapsing the two sends an operator to debug a provider they never intended to use, and buries the ones that are genuinely broken in a list of five.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/llmDoctor.ts",
+      "find": "      state: \"unconfigured\",\n      model,\n      detail: `no ${config.apiKeyEnvVar} set`,",
+      "replace": "      state: \"broken\",\n      model,\n      detail: `no ${config.apiKeyEnvVar} set`,"
+    },
+    {
+      "id": "D3",
+      "description": "no providers configured exits 0 instead of 3",
+      "_claimed": "caught by the exit-code tests",
+      "_note": "Zero failures over zero providers reads as a clean bill of health. Same shape as an empty test suite passing: the check ran, found nothing wrong, and checked nothing.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/llmDoctor.ts",
+      "find": "  if (reports.some((r) => r.state === \"broken\" || r.state === \"unreachable\")) return 1;\n  return 3;",
+      "replace": "  if (reports.some((r) => r.state === \"broken\" || r.state === \"unreachable\")) return 1;\n  return 0;"
+    },
+    {
+      "id": "D4",
+      "description": "a reasoning model that used its token budget is called broken",
+      "_claimed": "caught by the reasoning-model tests",
+      "_note": "The false positive this file shipped with for one run. Groq's openai/gpt-oss-120b returned finish_reason 'length' with empty content because the probe asked for 8 tokens; the key authenticated, the model existed and tokens were generated. Condemning a working provider is worse than not checking, because the report is acted on.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/llmDoctor.ts",
+      "find": "      if (choice?.finish_reason === \"length\") {",
+      "replace": "      if (false) {"
+    }
+  ]
+}

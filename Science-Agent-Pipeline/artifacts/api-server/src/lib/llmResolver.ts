@@ -110,7 +110,7 @@ Rules:
  * (e.g. GROQ_API_KEY) rather than overloading LLM_API_KEY, so more than
  * one can be configured at once without one silently shadowing another.
  */
-interface LLMProviderConfig {
+export interface LLMProviderConfig {
   apiUrl: string;
   apiKeyEnvVar: string;
   defaultModel: string;
@@ -143,7 +143,7 @@ const SUPPORTED_DOMAINS = [
   "repressilator",
 ] as const;
 
-const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
+export const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
   openai: {
     apiUrl: "https://api.openai.com/v1/chat/completions",
     apiKeyEnvVar: "OPENAI_API_KEY",

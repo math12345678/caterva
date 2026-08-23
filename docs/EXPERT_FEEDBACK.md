@@ -13728,3 +13728,61 @@ collected any* and *a rate of zero* are different facts.
 | Verified | five mutations, all caught first run; exit-3 semantics checked directly; end-to-end capture with redaction; 730 api-server tests |
 | **For you** | Set `TERRIUM_QUERY_LOG` on the deployment students use. One variable, and at the end of term you have the first real number in any of these records. |
 | **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: three ways to say no (ADR 0172)
+
+Your original question was "is the AI agent pipeline working?". Answering it
+took me an afternoon of manual `curl`, and the answer was three separate
+configuration failures that nothing in the repository reported. That should
+have been one command, so now it is.
+
+`make llm-doctor` sends one small completion per keyed provider, using the
+model Terrium would really send, and reports four states. Against your keys:
+
+```
+  OK      groq / openrouter / mistral
+  BROKEN  siliconflow   account balance or quota exhausted -- key is valid,
+                        there is nothing to spend
+  BROKEN  tokenrouter   the API key was rejected (check for a required prefix)
+```
+
+**Two of your five providers are unusable right now.** Neither is a code
+defect and nothing in this repository can fix them.
+
+### Why a completion and not a model listing
+
+The cheap check would be `/v1/models`. It proves less: SiliconFlow listed its
+models perfectly while refusing every completion for lack of balance, and
+Groq listed models while the *configured* one was absent. And a 200 is not a
+success — SiliconFlow answers HTTP 200 with the error in the body, so a
+checker trusting the status reports an unusable provider as healthy.
+
+### It condemned a working provider first
+
+The first run said **Groq BROKEN**. Groq was fine — 78 queries had gone
+through it an hour earlier producing every measurement in the last four
+records.
+
+My probe asked for `max_tokens: 8`. `gpt-oss-120b` is a reasoning model: it
+spent the whole budget thinking and returned `finish_reason: "length"` with
+empty content. Measured directly — at 8 tokens the content is `''`, at 64 it
+is `'ok'`.
+
+**A check that condemns something working is worse than no check**, because
+somebody acts on the report. This one would have sent you to fix the only
+provider that had just done all the work. Fixed by raising the budget and by
+treating that finish_reason as `ok`, with the converse asserted so the fix
+cannot quietly become "accept every empty answer".
+
+I also left an abort timer uncleared, so every probe held the event loop open
+for its full 20-second timeout. Six providers now take 4 seconds.
+
+| | |
+|---|---|
+| Found | two unusable providers in your config, and a false BROKEN in my own checker |
+| Built | four-state provider diagnosis, `make llm-doctor`, 18 tests |
+| Verified | four mutations, all caught; run against the real keys; exit-3 path checked with every key unset; 748 api-server tests |
+| **For you** | `SILICONFLOW_API_KEY` has no balance; `TOKENROUTER_API_KEY` is malformed (the API wants a `tr_` prefix). Both work again once fixed. |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |

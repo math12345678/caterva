@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor
 
 help:
 	@echo "Terrium"
@@ -338,6 +338,16 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+llm-doctor:
+	@# Does each configured LLM provider actually answer? One small
+	@# completion each, with the model Terrium would really send.
+	@# The script exits 0 if any provider works, 1 if every configured one is
+	@# broken, and 3 if none is configured -- "nothing was checked" is not
+	@# "everything is fine". (make collapses non-zero to its own Error N.)
+	@cd Science-Agent-Pipeline/artifacts/api-server && \
+		node "$$(ls -d ../../node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs | head -1)" \
+		src/lib/runLLMDoctor.ts
 
 query-log:
 	@# What real students actually asked, if this deployment opted in.
