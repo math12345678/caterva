@@ -130,3 +130,8 @@ demo-report.md
 # on purpose -- can drop one of these in the working tree.
 terrium-queries.jsonl
 *.querylog.jsonl
+
+# Release build artifacts (ADR 0176). The DMG is 84 MB and the frozen builder
+# 83 MB; both are reproducible from source with release/build_dmg.sh, so
+# neither belongs in git.
+release/build/

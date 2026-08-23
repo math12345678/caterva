@@ -13959,3 +13959,54 @@ fail, then restored byte-identical.
 | Verified | the extended check catches the removal and passes on restore; both selftests exit 0 with PyYAML and 3 without; `make deps-check` OK on 15 declared deps |
 | **Now visible** | The literature suite runs and reports 5 failures — including `terrium_pitch_deck.pptx` claiming 1,852 tests against the repository's 2,332. I have not fixed these and cannot say whether they pre-date the session, because they could not run before. |
 | **Worth knowing** | The packages went to `advanced_analysis/venv`, not the repo's `.venv`. On a bare shell `make` still picks a Python without them and the original failures return. Use `TERRIUM_PYTHON=...` or activate that venv. |
+
+---
+
+## Pass: the first release (ADR 0176)
+
+`make dmg` produces a signed, verified **84 MB `Terrium.dmg`** containing an
+app that runs on a Mac with nothing installed — no Python, no Node, no
+internet.
+
+### The constraint came from your repository, not your request
+
+`scripts/demo.py` warns that a demo with its own rendering path is the worst
+kind of check that cannot fail. **A shipped app is a demo that ships**, with a
+longer life and a wider audience. So the app cannot produce a document of its
+own: it runs a frozen `report_lab.py` — the same builder the CLI calls — and
+shows the bytes that come back. The viewer typesets them and *reports any line
+it cannot typeset* rather than dropping it.
+
+### Five things were wrong, and measurement found each
+
+**The dependency set, three times.** Tracing `demo.py` showed *no*
+third-party imports — it runs the builder as a **subprocess**, so the trace
+saw only the parent. Then excluding numpy failed. Then excluding antimony
+failed, because `import Terium` pulls in the entire engine. Only building and
+*running* the frozen binary settled it.
+
+**`hdiutil`: "No space left on device" — on a disk with 111 GB free.** It had
+under-sized the volume it was creating. The message is true of that volume and
+false of everything a person would check.
+
+**Signing refused with "resource fork, Finder information, or similar
+detritus".** This repo is under `~/Desktop`, which macOS syncs to iCloud; the
+file provider re-adds attributes faster than `xattr -cr` clears them. The app
+is now built outside the synced tree.
+
+**A check that could not fail — in the file whose own header warns about
+them.** `viewer.html`'s unhandled-line list was unreachable: the paragraph
+branch absorbed every unrecognised line, so a blockquote rendered as ordinary
+prose and the warning banner could never appear. I wrote that bug while
+quoting the rule against it. The negative-case assertion caught it on the
+first run, which is the only reason I know.
+
+**And the build script shipped what it promised not to.** It printed the
+signing failure and carried on to build a DMG from an unsigned app. Now fatal.
+
+| | |
+|---|---|
+| Built | `Terrium.app` (Swift/WKWebView + frozen builder + committed fixture), `viewer.html`, `build_dmg.sh`, `test_viewer.mjs`, `make dmg` |
+| Verified | app-level headless `--selftest`; 11 viewer checks against *this build's* report, not a sample; signature verifies; DMG mounts and the app launches from it |
+| **You must do** | Sign with a **Developer ID Application** certificate and notarise. The only certificate here is *Apple Development*, which signs for this Mac only — a downloaded copy will say "damaged". `READ ME FIRST.txt` gives users the right-click → Open workaround meanwhile. |
+| **Nobody has looked at it** | Screen recording is unavailable in this environment. The app is verified headlessly; its layout, fonts and dark-mode palette have never been seen. **Open it before it reaches a student.** |

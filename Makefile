@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all dmg
 
 help:
 	@echo "Terrium"
@@ -340,6 +340,14 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+dmg: check-python
+	@# Build Terrium.app and Terrium.dmg (ADR 0176).
+	@# Refuses to produce a DMG it has not verified: the app's own headless
+	@# --selftest must produce a report with its provenance sections, the
+	@# viewer must typeset THAT report with nothing unhandled, and the
+	@# signature must verify. Output: release/build/Terrium.dmg
+	@TERRIUM_PYTHON="$(PY)" ./release/build_dmg.sh
 
 guards-all: check-python
 	@# Every guard, reported together. `make guards` stops at the first

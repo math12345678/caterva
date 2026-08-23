@@ -28,3 +28,12 @@ cffconvert==2.0.0
 #
 # MIT (Ingy dot Net, Kirill Simonov).
 PyYAML==6.0.2
+
+# Freezes scripts/report_lab.py into the binary inside Terrium.app
+# (release/build_dmg.sh, ADR 0176). Build-time only: nothing imports it, and
+# nothing at runtime needs it.
+#
+# GPL-2.0-with-exception -- the exception explicitly permits distributing
+# frozen applications under any licence, which is the only way this project
+# uses it.
+pyinstaller==6.22.2
