@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check cli clean
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean
 
 help:
 	@echo "Terrium"
@@ -35,6 +35,7 @@ help:
 	@echo "  make clean      remove caches and build artifacts"
 	@echo ""
 	@echo "  make publish-check   all offline checks before going public"
+	@echo "  make evidence        measured figures, for writing about Terrium"
 	@echo ""
 	@echo "First time here? Run: make setup && make demo"
 	@echo "About to open a PR? Run: make pr"
@@ -325,6 +326,13 @@ pr: guards test
 # thing that gets put off. This says either "the only thing left is the
 # push" or precisely what is not ready, and is honest that it cannot see
 # GitHub.
+# The numbers a paper about Terrium would need, each computed by the run
+# rather than transcribed. Every figure carries the command that produced
+# it, and anything that cannot be measured offline is printed as "not
+# measurable here" with the reason rather than estimated.
+evidence: check-python
+	@"$(PY)" scripts/evidence_table.py
+
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
 

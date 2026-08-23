@@ -13036,3 +13036,63 @@ logic nothing tests.**
 | Deliberately absent | an input hash. The pipeline computes one already, and a second implementation would be a second thing to keep true |
 | Expect | most reports during development to carry the warning. That is correct, and the alternative is a document quietly claiming more than it can support |
 | **For the owner** | `make publish-check`, then PUBLISHING.md 1–2, then make them public |
+
+## Sixty-eighth pass — the numbers a paper would need, and two of them disagreed
+
+You keep saying the paper has to be perfect. Terrium's measurable facts are
+real and scattered: parser coverage prints as a side effect of a guard
+passing, test counts live inside another guard, domain and decision counts
+are file globs nobody runs by hand.
+
+So a figure destined for a paper gets typed from memory — which is how a
+funding application came to claim 1,893 tests against 2,279 last pass, and a
+pitch deck 1,852 against 2,220 before that. Both understated. Neither
+noticed for weeks.
+
+`make evidence` computes each one when it runs, prints the command that
+produced it, and refuses to estimate anything it cannot measure offline:
+
+```
+  Simulation engine tests             1183 tests collected across 48 files
+  Literature layer tests              1102 tests collected
+  Guard scripts                       71 guards
+  Architecture decisions              158 ADRs
+  Simulation domains                  16 entries in DOMAIN_CATALOGUE
+  BRENDA pages committed as fixtures  11 saved pages
+  BRENDA commentary the parser reads  242 of 263 fully parsed (92%)
+```
+
+Three questions are listed as open rather than approximated: coverage across
+BRENDA as a whole (eleven pages is not the database), whether an emitted
+citation describes the enzyme it is attached to (`check_documented_citations_are_real`
+says in its own docstring that it does not check this — the project's
+central claim and its weakest guard), and whether a report survives peer
+review, which no script measures.
+
+### Two numbers for one fact, again, in the function whose docstring forbade it
+
+The first run printed **87%** parser coverage. The guard prints **92%**.
+
+I had written `_commentary_coverage` with a docstring saying it reuses the
+guard's collector "because two implementations would be two numbers to keep
+true" — and then looped over `residue_of` myself, omitting the guard's
+minimum-length floor. A two-character residue is punctuation, not unread
+meaning. Two figures for one fact, under the same words, either of which
+could have reached a paper.
+
+Fixed by extracting `residue_counts()` so both call it. They agree now, and
+the guard's docstring records why the floor exists so the next caller cannot
+omit it by not knowing.
+
+**Second finding from the same run:** the engine row said *"not measurable
+here — pytest collection returned 0"* — a message naming a successful exit
+code as the reason for failure. The two suites have different `pytest.ini`
+files and print different collection formats; my parser understood one and
+blamed the subject for the other.
+
+| | |
+|---|---|
+| Built | `scripts/evidence_table.py`, `make evidence`, seven measured rows and three open questions |
+| Fixed | the 92%/87% disagreement, by extraction rather than by correcting a copy; the collection parser, which now handles both formats or says it understood neither |
+| Verified | guard and table now print the same figures; `check_scripts_reachable` and `check_guard_wiring` green |
+| **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |

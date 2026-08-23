@@ -190,6 +190,30 @@ def load_baseline() -> set[str]:
     }
 
 
+def residue_counts(commentaries: "list[str]") -> "collections.Counter[str]":
+    """Unread fragments and how often each occurs.
+
+    EXTRACTED so it can be called rather than reimplemented.
+
+    `scripts/evidence_table.py` needed this number and computed it itself
+    with `residue_of(c).strip()`, omitting the `_MIN_RESIDUE` floor. The two
+    disagreed on their first run -- 242 fully parsed here, 230 there, 92%
+    against 87% -- and both were printed under the same words. Two figures
+    for one fact, either of which could have reached a paper.
+
+    That is this repository's most-repeated defect, committed inside the
+    function whose docstring said it was avoiding it. The floor exists
+    because a two-character residue is punctuation, not unread meaning; a
+    caller that does not know that is not a caller that should be counting.
+    """
+    residues: "collections.Counter[str]" = collections.Counter()
+    for commentary in commentaries:
+        left = residue_of(commentary)
+        if len(left) >= _MIN_RESIDUE:
+            residues[left] += 1
+    return residues
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--update-baseline", action="store_true")
@@ -204,12 +228,7 @@ def main() -> int:
         print("This guard cannot report coverage it did not measure. Failing.")
         return 1
 
-    residues = collections.Counter()
-    for commentary in commentaries:
-        left = residue_of(commentary)
-        if len(left) >= _MIN_RESIDUE:
-            residues[left] += 1
-
+    residues = residue_counts(commentaries)
     covered = len(commentaries) - sum(residues.values())
     pct = 100.0 * covered / len(commentaries)
 
