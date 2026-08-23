@@ -1,0 +1,83 @@
+{
+  "_why": [
+    "ADR 0171's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0171 adds the first thing in this repository that records what a",
+    "person typed. The mutations therefore target the promises that make",
+    "that acceptable, not the feature.",
+    "",
+    "Q1 makes logging default-on by inventing a path when none is",
+    "configured. That is the failure that matters most: a deployment that",
+    "made no decision would start collecting student text.",
+    "",
+    "Q2 removes redaction, so an email address a student pastes reaches the",
+    "file verbatim.",
+    "",
+    "Q3 makes a failed write report success. An unwritable path would then",
+    "read as 'logging is working', and a lab would believe it had a term's",
+    "worth of queries when it had none.",
+    "",
+    "Q4 makes the summary quote a percentage over any sample size. Three",
+    "fallbacks out of five printed as '60%' is a number that claims far more",
+    "than five queries support.",
+    "",
+    "Q5 makes the labeller resolve an ambiguous prefix to its first match,",
+    "so typing 'mm' silently records mm rather than asking. A set whose",
+    "entire value is that a person chose every label must not contain labels",
+    "nobody chose.",
+    "",
+    "Not included, because no test here catches it: whether the redaction",
+    "patterns are sufficient. They are three crude regexes, the ADR says so,",
+    "and nothing tests text they were not written for.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0171-query-log.json"
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/queryLog.test.ts src/__tests__/labelQueryLog.test.ts",
+  "mutations": [
+    {
+      "id": "Q1",
+      "description": "logging turns itself on with a default path",
+      "_claimed": "caught by the off-unless-switched-on tests",
+      "_note": "The mutation that would matter in the field. Nothing errors and nothing looks different; a deployment that never opted in simply begins writing student queries to disk. A tool whose argument is that it refuses to invent data must not quietly start collecting it either.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryLog.ts",
+      "find": "  const configured = process.env.TERRIUM_QUERY_LOG;\n  return configured && configured.trim().length > 0 ? configured : null;",
+      "replace": "  const configured = process.env.TERRIUM_QUERY_LOG;\n  return configured && configured.trim().length > 0 ? configured : \"terrium-queries.jsonl\";"
+    },
+    {
+      "id": "Q2",
+      "description": "redaction is skipped and the raw query is written",
+      "_claimed": "caught by the redaction tests",
+      "_note": "An email address or URL a student pastes reaches the log verbatim, where somebody later shares the file. The redaction is crude and cannot catch everything, which is exactly why removing the part that does work should fail loudly.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryLog.ts",
+      "find": "  const { text, redacted } = redact(entry.query);",
+      "replace": "  const { redacted } = redact(entry.query);\n  const text = entry.query;"
+    },
+    {
+      "id": "Q3",
+      "description": "a failed write reports success",
+      "_claimed": "caught by the unwritable-path test",
+      "_note": "The three-state rule applied to a side effect: 'wrote it', 'logging is off' and 'tried and failed' are different facts. Collapsing the third into the first means a lab with a misconfigured path believes it is collecting a term's worth of queries and finds an empty file at the end of it.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryLog.ts",
+      "find": "    return {\n      state: \"failed\",",
+      "replace": "    return {\n      state: \"written\","
+    },
+    {
+      "id": "Q4",
+      "description": "the summary quotes a rate at any sample size",
+      "_claimed": "caught by the small-sample test",
+      "_note": "Three fallbacks in five printed as a 60% fallback rate. The number is arithmetically correct and epistemically worthless, and it is the shape of claim this repository keeps finding: a real computation presented with more confidence than its input carries.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryLog.ts",
+      "find": "  if (s.total < MINIMUM_QUERIES_TO_QUOTE_A_RATE) {",
+      "replace": "  if (false) {"
+    },
+    {
+      "id": "Q5",
+      "description": "an ambiguous label prefix resolves to the first match",
+      "_claimed": "caught by the ambiguous-prefix tests",
+      "_note": "Typing 'mm' would record mm rather than asking, even though it also prefixes mm_competitive_inhibition. The labelled set's only value is that a human chose every label; one label nobody chose is indistinguishable from the rest afterwards.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/labelQueryLog.ts",
+      "find": "  if (matches.length === 1) return { kind: \"label\", domain: matches[0]! };",
+      "replace": "  if (matches.length >= 1) return { kind: \"label\", domain: matches[0]! };"
+    }
+  ]
+}

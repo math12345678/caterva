@@ -122,3 +122,11 @@ _tmp_[0-9]*_*
 # one command rather than committing a document that can drift from the
 # code that produced it.
 demo-report.md
+
+# Query logs written by queryLog.ts (ADR 0171). Never committed: they hold
+# text real people typed. The feature is off unless TERRIUM_QUERY_LOG names a
+# file, but a misconfiguration -- or the Q1 mutation in
+# docs/mutations/adr-0171-query-log.json, which gives logging a default path
+# on purpose -- can drop one of these in the working tree.
+terrium-queries.jsonl
+*.querylog.jsonl

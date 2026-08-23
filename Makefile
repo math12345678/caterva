@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log
 
 help:
 	@echo "Terrium"
@@ -338,6 +338,17 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+query-log:
+	@# What real students actually asked, if this deployment opted in.
+	@# The script exits 3 when logging was never switched on or the log is
+	@# empty: "nobody has collected any" and "a rate of zero" are different
+	@# facts. Note make prints "Error 3" but exits 2 itself -- GNU make
+	@# collapses every recipe failure to its own code, so a caller that needs
+	@# the three-state code must run runQueryLogSummary.ts directly.
+	@cd Science-Agent-Pipeline/artifacts/api-server && \
+		node "$$(ls -d ../../node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs | head -1)" \
+		src/lib/runQueryLogSummary.ts $(LOG)
 
 classifier-bench:
 	@# Scores the keyword domain classifier over every labelled set, offline.

@@ -15,6 +15,8 @@ import {
 import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { resolveQuery } from "../lib/queryResolver";
+import { classifyDomainByKeyword } from "../lib/queryResolver";
+import { recordQuery } from "../lib/queryLog";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
@@ -931,6 +933,27 @@ async function runPipeline(
     if (queue.isCancelled(jobId)) return;
 
     queue.updateJob(jobId, { status: "resolving" });
+
+    // Record the question as asked, if this deployment opted in.
+    //
+    // Off unless TERRIUM_QUERY_LOG names a file. Placed here, before
+    // resolution, so a query is recorded whether or not the run goes on to
+    // succeed -- a question that ends in "could not be resolved from
+    // literature" is exactly the kind this log exists to count, and logging
+    // only successes would collect the queries the classifier already
+    // handles. See queryLog.ts for what is and is not written.
+    {
+      const guess = classifyDomainByKeyword(query);
+      recordQuery(
+        {
+          query,
+          keywordDomain: guess.defaults.domain,
+          keywordMatched: guess.matched,
+        },
+        new Date(),
+      );
+    }
+
     const resolved = await resolveQuery(query, {
       allowCrossSpecies,
       allowVariants,

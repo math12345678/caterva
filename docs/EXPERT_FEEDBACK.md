@@ -13671,3 +13671,60 @@ evidence that nothing reads, with the prompt recorded so it can be redone.
 | Built | nothing that survived; the classifier is byte-identical to last pass |
 | Verified | held-out measurement before and after, term-utilisation count, over-promotion re-checked at zero; 696 tests |
 | **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: the questions nobody collected (ADR 0171)
+
+Three records in a row have ended on the same sentence: five labelled query
+sets exist and no student wrote a line of any of them. ADR 0170 closed off
+the last route that avoided the problem — model-proposed vocabulary is fluent
+invention, and 97% of it never matched a real query.
+
+So this pass built the smallest thing that makes the question answerable, and
+stopped there rather than reaching for another classifier tweak.
+
+### What is actually unknown
+
+The keyword classifier scores between **57% and 90%** depending only on which
+model phrased the questions. That spread is wider than every improvement I
+have made to it. Which end a real student experiences is unknown, and no
+further generation settles it, because every set so far was written by
+whoever was also building the thing being measured.
+
+### The three decisions that made this acceptable to build
+
+**Off unless switched on.** No default path. This is the first thing in the
+repository that records what a person typed, and a tool whose whole argument
+is that it refuses to invent data should not quietly start collecting it
+either. The mutation that gives it a default path is the sharpest one in the
+table: nothing errors, nothing looks different, a deployment that never opted
+in simply begins writing student text to disk.
+
+**No identifiers, by construction.** Date rather than timestamp — a time of
+day lets a session be reassembled by timing. No user, session, request id or
+address, not because those are hard to strip later but because a log that
+never held them cannot leak them.
+
+**A human labels it, and the tool refuses to help.** An ambiguous prefix is
+rejected rather than resolved to its first match. Labelling with an LLM was
+the obvious shortcut and would have destroyed the result: the LLM classifier
+scores ~100% on such a set by construction, and the keyword score would
+measure agreement rather than correctness. That is ADR 0170's failure one
+level down again, and I could see it coming this time.
+
+### The number that costs nothing
+
+`make query-log` reports the fallback rate on real questions with no
+labelling at all. It refuses to quote a percentage below 30 queries — three
+fallbacks in five is not "a 60% fallback rate" — and exits 3 both when
+logging was never switched on and when the log is empty, because *nobody has
+collected any* and *a rate of zero* are different facts.
+
+| | |
+|---|---|
+| Found | that the remaining problem was not a code change, and building around it twice had already failed |
+| Built | opt-in query capture, redaction, a resumable human labelling tool, `make query-log`, 34 tests |
+| Verified | five mutations, all caught first run; exit-3 semantics checked directly; end-to-end capture with redaction; 730 api-server tests |
+| **For you** | Set `TERRIUM_QUERY_LOG` on the deployment students use. One variable, and at the end of term you have the first real number in any of these records. |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
