@@ -25,7 +25,7 @@ Parameters and where they came from
   lactate dehydrogenase (EC 1.1.1.27), pyruvate, Homo sapiens
   s0    10 mM      user
   e0    0.001 mM   user
-  km    0.14 mM    brenda_exact  BRENDA ref 740253
+  km    0.03 mM    brenda_exact  BRENDA ref 286469
   vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 741355
         ⚠ measured in Oryctolagus cuniculus, not the organism requested
 
@@ -65,7 +65,7 @@ can drift out of sync.
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
-| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 159 ADRs, API reference |
+| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 160 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
 | [`terrium-site`](https://github.com/Terrium-sim/terrium-site) · [`landing`](https://github.com/Terrium-sim/landing) · [`mule`](https://github.com/Terrium-sim/mule) | the three web front ends |
 | [`advanced-analysis`](https://github.com/Terrium-sim/advanced-analysis) · [`benchmark-results`](https://github.com/Terrium-sim/benchmark-results) | figures and measurements |

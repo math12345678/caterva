@@ -13146,3 +13146,60 @@ cannot see" rather than "pass quietly".
 | Verified | mutation on the real tree reproduces the historical defect and the guard names both ECs; restore checked by `diff` |
 | Still open | whether a ref describes the VALUE it is attached to — that needs the row, not just the reference. Named rather than implied |
 | **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
+
+## Seventieth pass — the example I used to describe the open question was the defect
+
+Last pass I closed the second of three ways a citation can be wrong, and
+named the third as open:
+
+> whether a ref describes the VALUE it is attached to — that 0.14 mM is the
+> Km on that page.
+
+I picked that example off the README. It took one pass to find out it was
+not hypothetical.
+
+The front page read, on three surfaces:
+
+    km    0.14 mM    brenda_exact  BRENDA ref 740253
+
+`740253` is real. It is on the lactate dehydrogenase page. It is the right
+enzyme, and both existing citation guards pass it. **`0.14` occurs nowhere
+in that fixture** — the rows under that reference read 10.73 and 21.78 mM,
+and the fixture's own note says the human rows are "all ref 740253 except
+pyruvate" while the example is a pyruvate query.
+
+The resolver, run over the same committed fixture, gives the truthful
+pairing: **0.03 mM, BRENDA ref 286469**. That is what all three surfaces say
+now, and it is what `make demo` prints — so the front page and the tool
+agree for the first time.
+
+A reader who followed that citation would have found a different number and
+no way to tell which was wrong. Following the citation is the entire
+behaviour this tool exists to make possible.
+
+### Three layers, each quieter than the last
+
+| how a citation is wrong | closed by |
+|---|---|
+| the reference does not exist | ADR 0144 |
+| the reference is for another enzyme | ADR 0161 |
+| the page does not report that value | this pass |
+
+Each survived the guard built for the one above it. `ref 12345` was visibly
+fake. `ref 649716` needed somebody to know AChE from LDH. This one needed
+somebody to open the page and read the row — which is the work a provenance
+tool is supposed to have already done.
+
+A derived value is exempt and the exemption is counted: `vmax 0.25 mM/s →
+kcat x [E]0 ref 741355` is honest, because the reference supports the kcat
+and the Vmax is that times a chosen [E]0 (ADR 0142). Failing it would fire
+on the correct case.
+
+| | |
+|---|---|
+| Found | a wrong value under a real reference, on three surfaces, on the front page of a provenance tool |
+| Fixed | corrected to what the resolver actually produces from the committed fixture |
+| Built | `value_mismatches()` in the guard that already owns this subject — no new file, because two readers of the same surfaces is the duplication these three ADRs keep deleting |
+| Verified | mutation reproduces this morning's front page and the guard names it; the derived line is not flagged either way |
+| Named as open | that the value is the row for the substrate and organism given. That needs parsed rows, which the resolver already produces |
+| **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
