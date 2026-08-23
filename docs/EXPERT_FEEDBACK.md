@@ -13254,3 +13254,62 @@ with regexes and just calling the function.
 | Verified | two mutations that every string guard passes and this fails; both restores checked by `diff` |
 | Named as open | `docs/DESIGN.md`'s separate example, and the derived Vmax line (ADR 0142) |
 | **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
+
+## Seventy-second pass — the page that teaches the trust model was misreporting it
+
+Last pass named `docs/DESIGN.md`'s example as not yet covered. Extending the
+same technique to it — resolve against the committed fixture, compare —
+found a fifth layer, and the worst one.
+
+The value was right. The reference was right. **Everything about how much to
+trust them was invented.**
+
+| DESIGN.md said | the resolver says |
+|---|---|
+| measured at **pH 7.5, 25 °C** | pH **8.0**; temperature **not reported** |
+| assay completeness **complete** | **partial** |
+| pH and temperature **both reported** | *"The source states it did not report: temperature."* |
+
+Three claims, three wrong, every one toward more confidence. All four
+earlier layers pass this example — the reference exists, it is LDH, 10.73 is
+on the page, and the value/reference pair is what the resolver returns.
+
+**Why this is the worst of the five.** A wrong Km is a wrong number, and a
+reader who checks finds it. A wrong *grade* teaches the reader what the
+grades mean. Somebody learning that `complete` is what you get when the
+source omits the temperature has learned the opposite of the rule, from the
+page written to teach it, and will read every future `complete` that way.
+
+The test does not hardcode `partial` either: it calls
+`grade_assay_completeness` with the resolver's own fields, so changing the
+rule fails here rather than leaving the design document describing a former
+version of the tool.
+
+### My own test cried wolf, and I narrowed rather than softened
+
+The first version asserted `pH 7.5` appeared **nowhere** in DESIGN.md. It
+failed on line 65 — an unrelated hypothetical about combining a Km at pH 7.5
+with a Ki at pH 6, which is a correct sentence about a different problem.
+
+A guard that fires on a correct sentence gets suppressed. So the claim was
+narrowed to the worked-example block, not loosened.
+
+### Five layers
+
+| | what was wrong | caught by |
+|---|---|---|
+| 0144 | the reference does not exist | a string check |
+| 0161 | the reference is another enzyme's | a string check |
+| 0162 | the page does not report the value | a string check |
+| 0163 | value and reference are not each other's | running the resolver |
+| 0164 | the confidence in them was invented | running the grader |
+
+Each was invisible to every check built before it. The last two were only
+reachable by running the thing rather than reading about it.
+
+| | |
+|---|---|
+| Found | three false confidence claims in the document that teaches confidence |
+| Built | 4 tests (8 in the file), the grade driven through the grader |
+| Verified | two mutations, both caught; invented values asserted absent rather than correct ones present; both restores checked by `diff` |
+| **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
