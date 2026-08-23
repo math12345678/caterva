@@ -140,6 +140,24 @@ PERMISSION: dict[str, tuple[str, str]] = {
     "lxml": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
     "pydantic": ("MIT", "Use, copy, modify, distribute, sell."),
     # --- Dev / test -------------------------------------------------------
+    "pyyaml": (
+        "MIT",
+        "Copyright (c) 2017-2021 Ingy dot Net; 2006-2016 Kirill Simonov. Read "
+        "from PyYAML-6.0.2.dist-info/LICENSE in the installed wheel. Use, "
+        "copy, modify, merge, publish, distribute, sublicense, sell.",
+    ),
+    "pyinstaller": (
+        "GPL-2.0-or-later WITH Bootloader-exception",
+        "Read from pyinstaller-6.22.2.dist-info/licenses/COPYING.txt in the "
+        "installed wheel, not from the package index. The GPL alone would be "
+        "a problem: Terrium.app embeds PyInstaller's bootloader, and copyleft "
+        "on that would reach the whole bundle. The Bootloader Exception is "
+        "what makes the release lawful -- the authors give 'unlimited "
+        "permission to link or embed compiled bootloader and related files "
+        "into combinations with other programs, and to distribute those "
+        "combinations without any restriction'. Build-time only otherwise: "
+        "nothing imports it and nothing at runtime needs it (ADR 0176).",
+    ),
     "pytest": ("MIT", "Use, copy, modify, distribute, sell."),
     "pytest-timeout": ("MIT", "Use, copy, modify, distribute, sell."),
     "hypothesis": ("MPL-2.0", "File-level copyleft; Terrium does not modify it."),
