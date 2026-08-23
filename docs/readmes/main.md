@@ -10,7 +10,7 @@ git clone --recursive https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 2,285 tests (1,183 engine + 1,102 literature)
+make test      # 2,286 tests (1,184 engine + 1,102 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -22,6 +22,7 @@ trustworthy.
 
 ```
 Parameters and where they came from
+  lactate dehydrogenase (EC 1.1.1.27), pyruvate, Homo sapiens
   s0    10 mM      user
   e0    0.001 mM   user
   km    0.14 mM    brenda_exact  BRENDA ref 740253
@@ -58,13 +59,13 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 1,183 tests |
+| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 1,184 tests |
 | [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,102 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
-| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 158 ADRs, API reference |
+| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 159 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
 | [`terrium-site`](https://github.com/Terrium-sim/terrium-site) · [`landing`](https://github.com/Terrium-sim/landing) · [`mule`](https://github.com/Terrium-sim/mule) | the three web front ends |
 | [`advanced-analysis`](https://github.com/Terrium-sim/advanced-analysis) · [`benchmark-results`](https://github.com/Terrium-sim/benchmark-results) | figures and measurements |

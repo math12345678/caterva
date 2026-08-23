@@ -281,6 +281,9 @@ guards: require-pytest
 	@"$(PY)" scripts/check_non_affiliation_notice.py
 	@echo ">> dependency licences"
 	@"$(PY)" scripts/check_dependency_licenses.py
+	@echo ">> citations name the right enzyme"
+	@"$(PY)" scripts/check_citations_match_their_enzyme.py --selftest
+	@"$(PY)" scripts/check_citations_match_their_enzyme.py
 	@echo ">> documented links resolve"
 	@"$(PY)" scripts/check_doc_links.py --selftest
 	@"$(PY)" scripts/check_doc_links.py

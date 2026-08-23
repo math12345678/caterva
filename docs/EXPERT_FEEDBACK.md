@@ -13096,3 +13096,53 @@ blamed the subject for the other.
 | Fixed | the 92%/87% disagreement, by extraction rather than by correcting a copy; the collection parser, which now handles both formats or says it understood neither |
 | Verified | guard and table now print the same figures; `check_scripts_reachable` and `check_guard_wiring` green |
 | **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
+
+## Sixty-ninth pass — I was wrong that it needed live BRENDA
+
+Last pass's evidence table listed the project's weakest guard and said it
+"needs live BRENDA":
+
+> Whether an emitted citation describes the enzyme it is attached to.
+
+That was the wrong call, and checking it is what produced this pass.
+
+ADR 0144 found `BRENDA ref 649716` — an acetylcholinesterase reference — on
+the README's front page under a lactate dehydrogenase example. Real id, real
+paper, wrong protein, on the front page of a provenance tool. It closed the
+flagrant half and was explicit that it could not close the subtle one,
+because deciding it "would mean parsing which fixture the surrounding prose
+is about, and a check that guesses is a check that cries wolf."
+
+**Measured: across the eleven committed fixtures, no reference id occurs
+under more than one EC.** 75 refs, zero ambiguous. The attribution has a
+definite offline answer — the 0144 guard already had the data and discarded
+it, flattening every fixture into one set of ids.
+
+The other side is not inferred either: an explicit five-name table, a
+twelve-line window above the citation, and anything outside it reported as
+**not checked** with a count.
+
+### The first run checked three of eight, and that was the useful part
+
+Five citations had no enzyme named within reach, so the guard printed them
+and said what would fix it. Doing what it said turned up something worse
+than a coverage gap: three provenance blocks show
+
+    km    0.14 mM    brenda_exact  BRENDA ref 740253
+
+**without naming the enzyme anywhere near it.** A reader could not tell
+which protein those numbers described either. One label per block took
+coverage from three to eight with nothing unchecked.
+
+Asking the guard to check the documentation made the documentation better.
+That is the argument for a check whose failure mode is "tell me what you
+cannot see" rather than "pass quietly".
+
+| | |
+|---|---|
+| Built | `check_citations_match_their_enzyme.py`, selftest that constructs ADR 0144's exact defect from the fixtures, wired into CI and `make guards` |
+| Fixed | three docs that printed a citation with no enzyme named near it |
+| Corrected | the evidence table's "needs live BRENDA", now a measured row. A list of open questions is only useful if things leave it |
+| Verified | mutation on the real tree reproduces the historical defect and the guard names both ECs; restore checked by `diff` |
+| Still open | whether a ref describes the VALUE it is attached to — that needs the row, not just the reference. Named rather than implied |
+| **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |

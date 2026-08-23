@@ -139,6 +139,12 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # placed after it, the guard against a step that stops the job would
     # itself be stopped by that step.
     "check_ci_red_step_is_last": ("ci",),
+    # Wired 2026-08-22 into CI *and* `make guards`. It reads committed
+    # fixtures and committed docs and touches no network, so there is no
+    # honest reason it cannot run on a laptop — and "I did not give it a
+    # local route" is not "cannot reasonably run locally" (ADR 0130).
+    # Closes the half ADR 0144 documented as out of scope.
+    "check_citations_match_their_enzyme": ("ci",),
     # Wired 2026-08-15. `make guards` is a fourth harness this script does
     # not model -- it reads verify_build, CI and pytest. The pytest wrapper
     # is what makes it enforcing; the make target is what makes it usable.

@@ -29,6 +29,7 @@ source it refuses to invent:
 
 ```
 Parameters and where they came from
+  lactate dehydrogenase (EC 1.1.1.27), pyruvate, Homo sapiens
   s0    10 mM      user
   km    0.14 mM    brenda_exact  BRENDA ref 740253
   vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 741355
