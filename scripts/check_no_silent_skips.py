@@ -59,7 +59,7 @@ EXPECTED_MAX_SKIPS = 0
 
 
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
-    """Run one suite. Returns (passed, skipped, skip_reasons) or None.
+    r"""Run one suite. Returns (passed, skipped, skip_reasons) or None.
 
     RESULTS ARE READ FROM JUnit XML, NOT FROM THE TERMINAL OUTPUT.
 

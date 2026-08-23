@@ -15,3 +15,16 @@ hypothesis==6.160.0
 # UNKNOWN is not a licence fact, and "it's probably Apache like the rest of
 # that org" is not one either.
 cffconvert==2.0.0
+
+# Reads .github/workflows/*.yml for scripts/check_ci_toolchain.py and
+# scripts/check_ci_red_step_is_last.py. Dev-only: nothing at runtime parses
+# YAML.
+#
+# Undeclared until 2026-08-23 (ADR 0175). Both guards imported it and neither
+# requirements file mentioned it, because check_dependencies_declared.py
+# excludes scripts/ on the documented assumption that its imports are
+# stdlib-only. The assumption was stated and never enforced; that guard now
+# scans scripts/ too.
+#
+# MIT (Ingy dot Net, Kirill Simonov).
+PyYAML==6.0.2

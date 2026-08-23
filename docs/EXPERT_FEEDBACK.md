@@ -13903,3 +13903,59 @@ revealed" is what happened.
 | Built | `scripts/run_all_guards.py`, `make guards-all`, the missing wiring entry, the missing `}` |
 | Verified | full sweep of 41 invocations; guard wiring back to OK at 73 guards; syntax errors 2 → 0 with the revealed errors counted honestly |
 | **The good news** | 37 of 41 guards pass, and every remaining failure is another agent's in-flight work or two uninstalled packages. The repository is in better shape than I have been telling you. |
+
+---
+
+## Pass: a package nobody declared (ADR 0175)
+
+You installed the dev requirements. ADR 0173's two failures went away and
+three different ones appeared — which is not a regression, it is ADR 0174's
+masking one level up. `make test` runs the engine suite then the literature
+suite and stops at the first. While engine was red, **the literature suite
+had never run at all.**
+
+Engine is now **1215 passed, 0 skipped** (was 1175 passed, 4 skipped, 1
+failed).
+
+### The alarming line in your output is not the problem
+
+The install downgraded antimony 3.1.3 → 2.14.0 and printed
+`tellurium 2.2.13 requires antimony>=3.1.0`. `requirements.txt` line 26 says,
+in as many words, *"do NOT `pip install tellurium`"* — the umbrella package
+pulls in libcombine and libnuml, which Terrium does not use and which fail to
+build where no wheels exist. The install restored exactly the pins this
+project requires. **The conflict is with a package the project tells you not
+to have.**
+
+### The real find
+
+**PyYAML is imported by two guards and declared in no requirements file.**
+They fail differently, and the difference is the whole point:
+
+- `check_ci_toolchain.py` → *"could not check, NOT checked and fine. Exiting 3."*
+- `check_ci_red_step_is_last.py` → unhandled `ModuleNotFoundError`, traceback
+
+A traceback is not a verdict. The selftest harness recorded the crash as a
+failing *check* rather than as a check that could not run.
+
+And `check_dependencies_declared.py` said *"every third-party import is
+declared"* the entire time — honestly, given its scope. It excludes
+`scripts/`, on reasoning written into the file: *"its imports are stdlib-only
+— if it ever grows third-party imports, those must be declared."*
+
+**The second sentence was a promise nothing kept.** `scripts/` grew one, and
+the check whose job was to notice had been told not to look. That is the
+shape this repository keeps finding, and it was sitting inside the guard for
+exactly this class of defect.
+
+Fixed: PyYAML declared, the crash given its sibling's three-state import,
+`scripts/` now scanned — proven by removing the declaration and watching it
+fail, then restored byte-identical.
+
+| | |
+|---|---|
+| Found | an undeclared dependency two guards need, a guard that crashes instead of reporting, and the guard for undeclared dependencies excluding the directory where one appeared |
+| Built | the declaration, the three-state import, the widened scan, and a `\d` SyntaxWarning fix |
+| Verified | the extended check catches the removal and passes on restore; both selftests exit 0 with PyYAML and 3 without; `make deps-check` OK on 15 declared deps |
+| **Now visible** | The literature suite runs and reports 5 failures — including `terrium_pitch_deck.pptx` claiming 1,852 tests against the repository's 2,332. I have not fixed these and cannot say whether they pre-date the session, because they could not run before. |
+| **Worth knowing** | The packages went to `advanced_analysis/venv`, not the repo's `.venv`. On a bare shell `make` still picks a Python without them and the original failures return. Use `TERRIUM_PYTHON=...` or activate that venv. |

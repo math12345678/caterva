@@ -131,8 +131,25 @@ def _local_module_stems() -> set[str]:
     return stems
 
 
+#: Directories scanned for third-party imports.
+#:
+#: `scripts/` was excluded until 2026-08-23 on the documented reasoning that
+#: it is "tooling, not product code or tests" and that "its imports are
+#: stdlib-only -- if it ever grows third-party imports, those must be
+#: declared". The second half was a promise nothing kept: two guards had
+#: grown `import yaml`, PyYAML appeared in no requirements file, and this
+#: check reported "every third-party import is declared" the whole time --
+#: honestly, given its scope, and falsely, given its sentence.
+#:
+#: An assumption that is stated and not enforced is the shape this repository
+#: keeps finding. It is enforced now: a guard that needs a package a
+#: contributor does not have fails on their machine, which is exactly the
+#: person this file protects.
+IMPORT_SCAN_DIRS = [*SOURCE_DIRS, REPO_ROOT / "scripts"]
+
+
 def _iter_source_files():
-    for src_dir in SOURCE_DIRS:
+    for src_dir in IMPORT_SCAN_DIRS:
         if not src_dir.exists():
             continue
         for path in src_dir.rglob("*.py"):
@@ -225,7 +242,8 @@ def main() -> int:
         if len(files) > 3:
             print(f"    ...and {len(files) - 3} more file(s)")
     print(
-        "\nThese modules are imported somewhere in Terium/ or Tests/ but "
+        "\nThese modules are imported somewhere in Terium/, Tests/ or "
+        "scripts/ but "
         "are not listed in any requirements*.txt file. A fresh "
         "install (like CI does) will fail to collect the affected tests."
     )
