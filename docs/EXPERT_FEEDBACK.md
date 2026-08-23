@@ -13616,3 +13616,58 @@ produced would have meant nothing.
 | Built | `refines` on four pairs, `resolveNesting`, 15 tests including an over-promotion guard and a zero-overlap invariant |
 | Verified | three mutations, two caught and one honestly NOT CAUGHT; over-promotion measured at zero over 228 queries; 696 api-server tests |
 | **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: fluent invention is not usage (ADR 0170) — a rejected approach
+
+This pass produced no working code, and that is the result rather than a
+failure to report around.
+
+After the nesting fix, the largest remaining error was coverage: 37 queries
+matching **no keyword at all**. They fail because students paraphrase — the
+repressilator as *"that biological timer circuit I read about"*, two-locus
+recombination as *"genes mixing and swapping"*, predator-prey as *"hunters
+and hunted"*.
+
+The vocabulary that would fix it is sitting in the fixtures. **Taking it from
+there is exactly what must not happen** — terms lifted from the test set make
+the test pass and measure nothing, which is the shared-author failure from
+two records ago, one level down.
+
+So I asked a model for the lay vocabulary from the domain definition alone:
+Mistral, shown one sentence per domain, never the fixtures or the keyword
+table, chosen because it authored one fixture and not the other two. 251
+terms, filtered for length, genericness, and cross-domain collision.
+
+### It does not work
+
+Held out: 89.7% → 89.7%, and 76.9% → 78.2%. One query, on one fixture, for
+251 terms and a whole generation-and-merge pipeline.
+
+The reason is legible in the terms. Asked how a student describes the
+repressilator, it gave *buzzing genes*, *gene heartbeat*, *gene pendulum*,
+*gene metronome*, *gene chatter*, *gene bounce*. Fluent, evocative, and
+**zero hits** against the three real repressilator queries that fell through.
+Across everything, **7 of 251 terms match any of the 228 fixture queries**.
+
+The part worth keeping: a model asked *"what words would someone use"*
+answers from **fluency, not usage**. Yet the same model asked to *be* a
+student and write a query produces text good enough to benchmark against.
+**Generating an instance works; describing the distribution does not.** I
+would not have predicted that, and I would have kept believing the opposite
+if I had shipped the terms without measuring which ones ever fired.
+
+I also re-measured over-promotion, as the previous record said must happen
+before any vocabulary widening. It stayed at **zero** across 228 queries. The
+risk did not materialise — the terms simply never fired.
+
+Everything is reverted. The generated file is kept as marked-REJECTED
+evidence that nothing reads, with the prompt recorded so it can be redone.
+
+| | |
+|---|---|
+| Found | that LLM-proposed vocabulary is plausible paraphrase, not observed paraphrase — 97% of it never matches anything |
+| Built | nothing that survived; the classifier is byte-identical to last pass |
+| Verified | held-out measurement before and after, term-utilisation count, over-promotion re-checked at zero; 696 tests |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
