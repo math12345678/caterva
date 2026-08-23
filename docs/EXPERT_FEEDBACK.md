@@ -13457,3 +13457,30 @@ reasoning was sound and the effect was zero, and only running it showed that.
 | Built | a third set commissioned from an LLM and committed as a fixture, a four-arm ablation, 10 more tests (24 across the two classifier files) |
 | Verified | two mutations, both caught, reproducible under `scripts/mutate.py`; a third deleted rather than tested; 655/655 api-server tests |
 | **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+### Follow-up in the same pass: the confound was real and negligible
+
+I flagged that the fixture was written by the same model being scored on it,
+called +17.9 points "an upper bound", and could have stopped there. A second
+fixture from a different model settled it in twenty minutes.
+
+| set | previous keyword | keyword (shipped) | LLM |
+|---|---|---|---|
+| Groq-authored, 78 | 69.2% | **79.5%** | **97.4%** |
+| Mistral-authored, 72 | 41.7% | **51.4%** | **97.2%** |
+
+Self-authorship was worth **0.2 points**. My upper bound was wrong in the
+other direction: the gap on the Mistral set is **+45.8**.
+
+And the thing I would have missed entirely by not running it: **the keyword
+table has no single accuracy.** 79.5% or 51.4%, same classifier, same 13
+domains, differing only in which model phrased the question — a 28-point
+swing, where the LLM moves 0.2. Every accuracy figure I have quoted for that
+classifier, including in my own ADR's decision section, is an accuracy
+against one way of asking. The suite now asserts the spread exists, so nobody
+can quote one number as "the" accuracy without a test failing.
+
+Three times this pass a number I was ready to report turned out to be
+measuring the measurement apparatus rather than the thing: a rate limit as
+accuracy, my own vocabulary as a held-out set, and a self-authored fixture as
+independent evidence. Only the third one I caught before writing it down.

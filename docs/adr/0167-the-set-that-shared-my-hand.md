@@ -48,8 +48,10 @@ after the vocabulary widened, which is not a result but a warning: the same
 person wrote the queries and the vocabulary, from the same source, so they
 matched by construction. `generateProbeQueries.ts` asks an LLM for student
 questions given only `DOMAIN_MEANINGS[domain]` — never the keyword table —
-and commits 78 of them as a fixture. On queries this author did not phrase,
-the classifier scores **79.5%**. That is the number this record stands behind.
+and commits them as a fixture. Two fixtures, from two different models: on
+queries this author did not phrase, the classifier scores **79.5%** and
+**51.4%**. The pair is what this record stands behind — see Verification for
+why neither number alone describes the classifier.
 
 ## Verification
 
@@ -80,6 +82,33 @@ two-character stray hit irrelevant. It was deleted rather than tested — a
 mutation nothing can catch because the code does nothing is a fact about the
 code.
 
+**The confound, and settling it.** The first fixture was written by the same
+model the LLM arm is scored on, so that arm was classifying its own phrasing
+while the keyword table was not. A second fixture from a different model
+(`mistral-small-latest`, 72 queries across 12 domains — generation failed for
+`gillespie_ssa` and was dropped with a warning rather than back-filled by
+hand) settles it:
+
+| set | previous keyword | keyword (shipped) | LLM (`gpt-oss-120b`) |
+|---|---|---|---|
+| Groq-authored, 78 | 54 (69.2%) | 62 (**79.5%**) | 76 (**97.4%**) |
+| Mistral-authored, 72 | 30 (41.7%) | 37 (**51.4%**) | 70 (**97.2%**) |
+
+Two things fall out, and the second is the one that matters.
+
+The self-authorship advantage is **0.2 points** — 97.4% on its own phrasing
+against 97.2% on someone else's. The confound I flagged was real and
+negligible, and my "+17.9 is an upper bound" was wrong in the other
+direction: on the Mistral set the gap is **+45.8**.
+
+And **the keyword table has no single accuracy.** It scores 79.5% or 51.4%
+depending only on which model phrased the question — a 28-point swing on the
+same classifier and the same 13 domains. The LLM moves 0.2 points across the
+same change. Any single figure quoted for the keyword table, including the
+79.5% in this record's own Decision section, is an accuracy *against one way
+of asking*. That is asserted by a test, so a future reader cannot quote one
+number as "the" accuracy without it failing.
+
 Mutation results, `docs/mutations/adr-0167-classifier-scoring.json`:
 
 | id | mutation | caught |
@@ -93,8 +122,10 @@ each naming the defect it had pinned; they now assert the corrected routing.
 
 ## Consequences
 
-A student with no LLM configured gets a domain right about four times in five
-instead of about two in three. The trust model is untouched: this changes
+A student with no LLM configured gets a domain right more often than before
+on both fixtures — four times in five on one, half the time on the other.
+Which of those a real student experiences is not known, and the honest
+summary is the range, not its top. The trust model is untouched: this changes
 which model runs, never where a number comes from.
 
 The suite now contains a test asserting the classifier does **not** score
@@ -121,7 +152,6 @@ than read as success.
   genuine semantic nesting — one domain's description is nearly a subset of
   the other's — and no amount of keyword vocabulary separates them. That is
   an argument for the LLM path, not against it.
-- **No comparison against the LLM on this fixture.** ADR 0166's +36 points
-  was measured on the contaminated dev set. The LLM has not been re-scored on
-  the LLM-authored queries, so the current gap between the two classifiers is
-  **not known** and no claim is made about it here.
+- **The two hardest keyword confusions are untouched by design** — see the
+  cross-model table in Verification; they are semantic nesting, not
+  vocabulary, and no keyword list separates them.

@@ -1,0 +1,296 @@
+{
+  "_generatedBy": "scripts: src/lib/generateProbeQueries.ts -- queries written by an LLM, not by the benchmark author, to break the shared-author bias described in that file's header.",
+  "_model": "mistral-small-latest",
+  "_promptShownToTheModel": "one line from DOMAIN_MEANINGS per domain; the keyword table was never shown",
+  "_labelMeans": "the domain the query was commissioned for, NOT independently verified ground truth",
+  "queries": [
+    {
+      "query": "Show me what happens when I change the enzyme concentration in the reaction",
+      "expected": "mm"
+    },
+    {
+      "query": "Can you run a kinetic assay without any inhibitors present?",
+      "expected": "mm"
+    },
+    {
+      "query": "I need to see how substrate concentration affects the rate over time",
+      "expected": "mm"
+    },
+    {
+      "query": "What’s the velocity curve like when no inhibitor is blocking the enzyme?",
+      "expected": "mm"
+    },
+    {
+      "query": "Run a simulation of an enzyme-catalyzed reaction from start to finish",
+      "expected": "mm"
+    },
+    {
+      "query": "Explain the relationship between substrate build-up and reaction speed in this setup",
+      "expected": "mm"
+    },
+    {
+      "query": "Show me how a competitive inhibitor affects the enzyme velocity curve",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Can you simulate michaelis menten kinetics with a competitor blocking the active site?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "What does a simulation of enzyme reaction with a rival molecule look like?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Help me see how adding an inhibitor changes the vmax and km in michaelis menten",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Plot enzyme activity when something similar to the substrate is present too",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Run a michaelis menten sim that includes a substance fighting for enzyme binding",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "how can I simulate a disease spreading through a population in this program?",
+      "expected": "sir"
+    },
+    {
+      "query": "what’s the best way to model an infectious outbreak here?",
+      "expected": "sir"
+    },
+    {
+      "query": "I need to run a simulation for how a virus moves through a community.",
+      "expected": "sir"
+    },
+    {
+      "query": "can you show me how to set up a simple disease spread demo?",
+      "expected": "sir"
+    },
+    {
+      "query": "how do I get the software to predict infection patterns over time?",
+      "expected": "sir"
+    },
+    {
+      "query": "I want to play around with how changes in behavior affect a disease’s reach.",
+      "expected": "sir"
+    },
+    {
+      "query": "Can I run a model where people get infected but don't spread it right away?",
+      "expected": "seir"
+    },
+    {
+      "query": "I need to simulate how a disease moves through groups, where some people are in between exposed and sick.",
+      "expected": "seir"
+    },
+    {
+      "query": "Is there a way to test how long it takes for someone to get sick after being around a carrier?",
+      "expected": "seir"
+    },
+    {
+      "query": "Let me try a run where people have a hidden phase before they can infect others.",
+      "expected": "seir"
+    },
+    {
+      "query": "How do I show cases where folks are exposed but not yet contagious in this tool?",
+      "expected": "seir"
+    },
+    {
+      "query": "Show me a demo of people carrying a germ but not passing it on until later.",
+      "expected": "seir"
+    },
+    {
+      "query": "How does changing the population size affect genetic drift in a simulation?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "What happens to allele frequencies if I run the population long enough?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Can I see what happens when some individuals leave and new ones join between generations?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Is there a way to see how starting with a rare allele changes over time?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "What if I try to introduce a new mutation, will it stick around?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "How does the chance of fixation vary depending on starting conditions?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Can I see how this simulation models repeated copying of dna segments?",
+      "expected": "pcr"
+    },
+    {
+      "query": "How does the program handle the process of making lots of dna copies step by step?",
+      "expected": "pcr"
+    },
+    {
+      "query": "What will happen if I run a test that copies genetic material many times in a row?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Show me what the amplification looks like when the copying cycles add up gradually.",
+      "expected": "pcr"
+    },
+    {
+      "query": "I need to understand how the tool artificially multiplies dna over and over - what's the flow like?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Explain the step-by-step buildup of extra dna during the copying rounds in this lab setup.",
+      "expected": "pcr"
+    },
+    {
+      "query": "Can you run a Lennard-Jones simulation for me?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Show me how particles interact with the Lennard-Jones model.",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "I need to see how the Lennard-Jones force works in action.",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Will you simulate two particles attracting and repelling based on the Lennard-Jones potential?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Run a demo where molecules follow the Lennard-Jones equations.",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "I want to watch the Lennard-Jones potential in motion between particles.",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "How can I simulate A plus B turning into C in this tool?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Show me the bimolecular reaction where two molecules bind to make a product.",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "I need to model the chance-based way A and B collide to form C.",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "What’s the best way to see how A + B → C unfolds over time?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Can the program show the random timing of when C gets made from A and B?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "I want to watch reactions where two different molecules combine into one.",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "What happens to genes mixing and swapping in a small population over generations?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Show me how recombination affects how genes connect with each other in a population.",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Let me see two genes moving through a simulation over many generations with shuffling.",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Can you model how traits inherited together might break apart over time?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "How does shuffling genes around in a limited group change what genes usually appear with others?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Play out how genes that often stick together might slowly split up in a small population.",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "How does the balance between wolves and rabbits change over time?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "Can you show me what happens when fox and rabbit populations interact?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "What's the effect on predator and prey numbers if I adjust their birth rates?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "I need to see how a sudden drop in food affects the system's balance.",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "Show me any patterns in the populations of hunters and hunted.",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "What would happen if I introduce more food for the prey species?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "what happens if I tweak the cyclins in this cell cycle model?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "can you show me how cdk levels spike and drop during division?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "how would changing the rules between cyclins mess up the simulation?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "is there a way to visualize the transitions from one cell phase to the next?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "what do the curves for the kinases even look like when I adjust things?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "how does the whole system respond if I slow down one of the regulator proteins?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Can you help me set up that biological timer circuit I read about?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "I need a simulation that shows how three genes can toggle each other on and off repeatedly, how do I access that?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Show me how the feedback loops work between a few different genes in a living cell model.",
+      "expected": "repressilator"
+    },
+    {
+      "query": "What’s the easiest way to visualize genes rhythmically activating and deactivating each other?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "I want to play around with a synthetic network where no single gene stays active for long, where is that?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Is there a toggle-switch demo using gene expression that I can run in this software?",
+      "expected": "repressilator"
+    }
+  ]
+}
