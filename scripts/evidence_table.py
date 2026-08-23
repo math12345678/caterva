@@ -28,14 +28,18 @@ re-derive any single figure without reading this file.
 
 WHAT IS DELIBERATELY NOT HERE
 -----------------------------
-Anything requiring the network. BRENDA coverage across the real database,
-how many published Km values Terrium can resolve in the wild, whether a
-citation it emits describes the enzyme it was attached to — all three are
-the questions a reviewer would most want answered, and all three need
-credentials and live data this cannot reach. They are listed at the end as
-open rather than approximated from eleven committed fixtures, because a
-number measured on eleven pages and presented as a property of the database
-would be exactly the overreach this project exists to refuse.
+Anything requiring the network: BRENDA coverage across the real database,
+and how many published Km values Terrium can resolve in the wild. Both are
+listed at the end as open rather than approximated from eleven committed
+fixtures, because a number measured on eleven pages and presented as a
+property of the database would be exactly the overreach this project exists
+to refuse.
+
+This paragraph used to include a third item — whether a citation describes
+the enzyme it is attached to — and said it needed credentials. It did not
+(ADR 0161), and it is a measured row now. The correction is left visible
+because the mistake was made here, in the file whose whole point is not
+asserting more than was measured.
 """
 from __future__ import annotations
 
