@@ -1156,6 +1156,15 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       points: 51,
     },
     keywords: [
+      "active site",
+      "competes",
+      "competing",
+      "compete",
+      "outcompete",
+      "rival ligand",
+      "ki",
+      "occupies the active site",
+      "blocks the active site",
       "competitive inhibition",
       "competitive",
       "inhibition",
@@ -1175,6 +1184,21 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "mm",
     parameters: { km: 2, vmax: 5, s0: 10, end: 10, points: 51 },
     keywords: [
+      "enzyme kinetics",
+      "reaction rate",
+      "turnover",
+      "catalysis",
+      "catalytic",
+      "initial velocity",
+      "product formation",
+      "progress curve",
+      "saturates",
+      "saturation",
+      "dehydrogenase",
+      "protease",
+      "ethanol",
+      "purified enzyme",
+      "digested",
       "enzyme",
       "michaelis",
       "km",
@@ -1224,7 +1248,19 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       end: 100,
       points: 101,
     },
-    keywords: ["sir", "infection", "epidemic", "virus", "disease", "outbreak"],
+    keywords: [
+      "contagious",
+      "susceptible",
+      "recovered",
+      "immunity",
+      "immune",
+      "transmission",
+      "spreads",
+      "attack rate",
+      "herd immunity",
+      "infected",
+      "illness",
+      "wave","sir", "infection", "epidemic", "virus", "disease", "outbreak"],
     reasoning:
       "Keywords related to infectious disease spread were found; defaulting to an SIR epidemic simulation.",
     modelCitations: [
@@ -1244,7 +1280,14 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       end: 100,
       points: 101,
     },
-    keywords: ["seir", "exposed", "latent", "incubation"],
+    keywords: [
+      "incubation period",
+      "pre-infectious",
+      "before they can pass it on",
+      "not contagious",
+      "carries it",
+      "latency",
+      "delay between","seir", "exposed", "latent", "incubation"],
     reasoning:
       "Keywords related to latent-period epidemiology were found; defaulting to an SEIR simulation.",
     modelCitations: [
@@ -1255,6 +1298,14 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "pcr",
     parameters: { n0: 100, efficiency: 0.95, cycles: 30 },
     keywords: [
+      "thermal cycles",
+      "doubling",
+      "amplify",
+      "dna copies",
+      "template strands",
+      "rounds of doubling",
+      "yield",
+      "per cycle",
       "pcr",
       "polymerase chain",
       "amplification",
@@ -1288,6 +1339,15 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       selection_coefficient: 0,
     },
     keywords: [
+      "allele",
+      "gene variant",
+      "variant",
+      "drift",
+      "neutral evolution",
+      "selection coefficient",
+      "sweep",
+      "gene frequency",
+      "takes over by chance",
       "wright-fisher",
       "genetic drift",
       "allele frequency",
@@ -1313,6 +1373,14 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       replicate_runs: 50,
     },
     keywords: [
+      "linked genes",
+      "two loci",
+      "crossing over",
+      "linkage",
+      "joint frequencies",
+      "two sites",
+      "nearby genes",
+      "inherited together",
       "linkage disequilibrium",
       "two locus",
       "two-locus",
@@ -1335,6 +1403,15 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       density: 0.85,
     },
     keywords: [
+      "atoms",
+      "argon",
+      "noble gas",
+      "pair potential",
+      "trajectories",
+      "atom cluster",
+      "positions of atoms",
+      "repelling",
+      "attracting",
       "molecular dynamics",
       "lennard-jones",
       "lennard jones",
@@ -1361,6 +1438,14 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "gillespie_ssa_bimolecular",
     parameters: { a0: 100, b0: 100, k: 0.005, end: 10 },
     keywords: [
+      "collide",
+      "collision",
+      "receptor",
+      "ligand",
+      "pairing",
+      "pair up",
+      "both reactants",
+      "form a product",
       "bimolecular",
       "second order",
       "second-order",
@@ -1380,6 +1465,13 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "gillespie_ssa",
     parameters: { a0: 1000, k: 0.5, end: 10 },
     keywords: [
+      "discrete event",
+      "molecule counts",
+      "low copy number",
+      "copy number",
+      "first-order decay",
+      "one reaction at a time",
+      "run to run",
       "gillespie",
       "stochastic",
       "ssa",
@@ -1399,6 +1491,17 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "lotka_volterra",
     parameters: { end: 20, points: 201 },
     keywords: [
+      "predator",
+      "prey",
+      "rabbit",
+      "fox",
+      "lynx",
+      "hare",
+      "ecosystem",
+      "eats",
+      "consumer-resource",
+      "out of step",
+      "rise and fall",
       "lotka-volterra",
       "lotka volterra",
       "predator-prey",
@@ -1416,6 +1519,12 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "cell_cycle_oscillator",
     parameters: { end: 100, points: 1001 },
     keywords: [
+      "cell division",
+      "dividing",
+      "divides",
+      "division",
+      "commits to dividing",
+      "regulatory protein",
       "cell cycle",
       "mitosis",
       "cyclin",
@@ -1432,6 +1541,17 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "repressilator",
     parameters: { end: 200, points: 2001 },
     keywords: [
+      "three genes",
+      "repress",
+      "represses",
+      "ring",
+      "engineered loop",
+      "synthetic oscillator",
+      "genetic oscillator",
+      "blinks",
+      "shutting off the next",
+      "turns the next one off",
+      "e. coli",
       "repressilator",
       "synthetic",
       "genetic circuit",
@@ -1608,13 +1728,71 @@ export interface KeywordClassification {
   matched: boolean;
 }
 
+/**
+ * Does `term` occur in `text`?
+ *
+ * This was briefly a word-boundary regex, on the reasoning that plain
+ * `includes` lets a short keyword fire on a word that merely contains it --
+ * "ki" inside "kinetics", "ring" inside "during". The reasoning is sound and
+ * the measurement did not support it: across all three labelled sets (131
+ * queries) the regex changed not one classification, and left one more query
+ * matching nothing than the substring test did.
+ *
+ * So it is gone. Summing scores across a domain's matched terms already
+ * makes a stray two-character hit irrelevant -- a spurious "ki" scores 2
+ * against an "enzyme kinetics" match scoring 15 -- which is why the
+ * pathology is real in principle and absent in practice. Keeping the regex
+ * would have meant carrying escaping logic, a lookbehind, and a plausible
+ * story, in exchange for nothing anybody could observe.
+ *
+ * If a future keyword is short enough to matter on its own, this is the
+ * decision to revisit, with a measurement rather than the argument.
+ */
+function matchesTerm(text: string, term: string): boolean {
+  return text.toLowerCase().includes(term.toLowerCase());
+}
+
+/**
+ * Classify a query to a simulation domain by scoring, not by table order.
+ *
+ * The previous rule was first-match-wins over an ordered list, and ADR 0166
+ * measured what that costs. Because `mm_competitive_inhibition` sits early
+ * and lists the bare word "inhibition", and `pcr` lists the bare word
+ * "cycles", an earlier domain's single generic word beat a later domain's
+ * exact name: "predator-prey cycles in an ecosystem" classified as PCR.
+ *
+ * Scoring by specificity fixes that without reordering anything. A matched
+ * term scores its own length, so a longer, more specific phrase outranks a
+ * short generic one no matter where each sits in the table -- "predator-prey"
+ * (13) beats "cycles" (6). Table order survives only as the tie-break, so
+ * the previous behaviour still decides genuinely equal matches.
+ *
+ * Scores are summed rather than maxed: a query matching several of a
+ * domain's terms is better evidence for it than a query matching one.
+ *
+ * `matched` stays the third state. Nothing here changes the fact that a
+ * query matching no term at all is a query this classifier cannot answer,
+ * and saying so is the whole reason the field exists.
+ */
 export function classifyDomainByKeyword(query: string): KeywordClassification {
-  const lower = query.toLowerCase();
+  let best: { defaults: DomainDefaults; score: number } | undefined;
 
   for (const candidate of DOMAIN_DEFAULTS) {
-    if (candidate.keywords.some((keyword) => lower.includes(keyword))) {
-      return { defaults: candidate, matched: true };
+    let score = 0;
+    for (const keyword of candidate.keywords) {
+      if (matchesTerm(query, keyword)) {
+        score += keyword.length;
+      }
     }
+    // Strictly greater: the first domain in the table wins a tie, which is
+    // exactly the old behaviour for equally-specific matches.
+    if (score > 0 && (best === undefined || score > best.score)) {
+      best = { defaults: candidate, score };
+    }
+  }
+
+  if (best !== undefined) {
+    return { defaults: best.defaults, matched: true };
   }
 
   const fallback =

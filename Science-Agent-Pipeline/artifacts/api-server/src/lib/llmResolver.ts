@@ -32,6 +32,43 @@ interface OpenAIResponse {
 // `sbml` is intentionally absent here: it is the internal raw-SBML escape
 // hatch, not a natural-language domain offered by the resolver. It remains
 // part of the runner/API dispatch contract and is validated separately.
+/**
+ * What each simulation domain means, in one line.
+ *
+ * These lines were embedded directly in SYSTEM_PROMPT. They are lifted out
+ * because a second consumer now needs them -- the benchmark's query
+ * generator describes a domain to an LLM in order to get queries written in
+ * somebody else's words. Two hand-maintained copies of "what `seir` means"
+ * would drift, and the drift would silently change what the benchmark is
+ * measuring relative to what the resolver is told.
+ */
+export const DOMAIN_MEANINGS: Record<string, string> = {
+  mm: "Michaelis-Menten enzyme kinetics (no inhibitor).",
+  mm_competitive_inhibition:
+    "Michaelis-Menten with competitive inhibitor (requires ki parameter).",
+  sir: "SIR epidemiology (Kermack & McKendrick 1927).",
+  seir: "SEIR epidemiology with exposed period (Anderson & May 1991).",
+  wright_fisher: "Wright-Fisher population genetics.",
+  gillespie_ssa:
+    "Gillespie stochastic simulation of first-order decay (A -> B).",
+  pcr: "discrete PCR amplification.",
+  molecular_dynamics: "Lennard-Jones molecular dynamics.",
+  gillespie_ssa_bimolecular:
+    "Gillespie SSA for bimolecular reactions (A + B -> C).",
+  two_locus_wright_fisher:
+    "two-locus Wright-Fisher with recombination and linkage disequilibrium.",
+  lotka_volterra:
+    "predator-prey population dynamics (Lotka 1925, Volterra 1926).",
+  cell_cycle_oscillator:
+    "molecular cell cycle via cyclin-CDK regulation (Tyson 1991).",
+  repressilator:
+    "synthetic genetic oscillator with three repressive genes (Elowitz & Leibler 2000).",
+};
+
+const DOMAIN_MEANING_LINES = Object.entries(DOMAIN_MEANINGS)
+  .map(([domain, meaning]) => `- "${domain}": ${meaning}`)
+  .join("\n");
+
 const SYSTEM_PROMPT = `You are the "science agent" resolver for a computational biology simulation pipeline.
 
 Given a natural-language query, return a single JSON object (no markdown, no prose) with this exact shape:
@@ -50,19 +87,7 @@ Given a natural-language query, return a single JSON object (no markdown, no pro
 }
 
 Domain meanings:
-- "mm": Michaelis-Menten enzyme kinetics (no inhibitor).
-- "mm_competitive_inhibition": Michaelis-Menten with competitive inhibitor (requires ki parameter).
-- "sir": SIR epidemiology (Kermack & McKendrick 1927).
-- "seir": SEIR epidemiology with exposed period (Anderson & May 1991).
-- "wright_fisher": Wright-Fisher population genetics.
-- "gillespie_ssa": Gillespie stochastic simulation of first-order decay (A -> B).
-- "pcr": discrete PCR amplification.
-- "molecular_dynamics": Lennard-Jones molecular dynamics.
-- "gillespie_ssa_bimolecular": Gillespie SSA for bimolecular reactions (A + B -> C).
-- "two_locus_wright_fisher": two-locus Wright-Fisher with recombination and linkage disequilibrium.
-- "lotka_volterra": predator-prey population dynamics (Lotka 1925, Volterra 1926).
-- "cell_cycle_oscillator": molecular cell cycle via cyclin-CDK regulation (Tyson 1991).
-- "repressilator": synthetic genetic oscillator with three repressive genes (Elowitz & Leibler 2000).
+${DOMAIN_MEANING_LINES}
 
 Rules:
 1. Return numeric values only for parameters the query explicitly states. The pipeline hard-blocks any value that is not user-supplied or literature-backed, so never invent numbers: omit a parameter entirely rather than guessing a value. Return an empty "parameters" object when the query states no numbers.

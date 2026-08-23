@@ -1,0 +1,320 @@
+{
+  "_generatedBy": "scripts: src/lib/generateProbeQueries.ts -- queries written by an LLM, not by the benchmark author, to break the shared-author bias described in that file's header.",
+  "_model": "openai/gpt-oss-120b",
+  "_promptShownToTheModel": "one line from DOMAIN_MEANINGS per domain; the keyword table was never shown",
+  "_labelMeans": "the domain the query was commissioned for, NOT independently verified ground truth",
+  "queries": [
+    {
+      "query": "Can you plot the enzyme velocity versus substrate level using Michaelis-Menten kinetics?",
+      "expected": "mm"
+    },
+    {
+      "query": "I want to see how the reaction speed changes as I add more substrate, no inhibitor involved.",
+      "expected": "mm"
+    },
+    {
+      "query": "Show me a simulation of the classic enzyme saturation curve.",
+      "expected": "mm"
+    },
+    {
+      "query": "How does the rate behave when substrate concentration increases, assuming normal Michaelis-Menten behavior?",
+      "expected": "mm"
+    },
+    {
+      "query": "Generate a graph of reaction rate against substrate concentration for a simple enzyme.",
+      "expected": "mm"
+    },
+    {
+      "query": "Could you run a model that displays the typical hyperbolic curve for an enzyme without any inhibitors?",
+      "expected": "mm"
+    },
+    {
+      "query": "Could you simulate an enzyme reaction using Michaelis‑Menten kinetics with a competitive inhibitor?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "I want to see how a competitive inhibitor changes the rate curve, can you run that simulation?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Show me a Michaelis‑Menten plot that includes a competitive inhibitor, please.",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Can we model the effect of a competitive inhibitor on substrate turnover?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Please generate a kinetic simulation where the enzyme has a competitive inhibitor present.",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "How does the presence of a competitive inhibitor alter the Michaelis‑Menten curve? Could you simulate it?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Can you show me how an infection spreads over time in a community?",
+      "expected": "sir"
+    },
+    {
+      "query": "I want to see a model of disease transmission and recovery, can you run it?",
+      "expected": "sir"
+    },
+    {
+      "query": "Please simulate a contagious outbreak and plot the number of sick people.",
+      "expected": "sir"
+    },
+    {
+      "query": "Give me a graph of how many people are healthy, infected, and recovered during an epidemic.",
+      "expected": "sir"
+    },
+    {
+      "query": "Show me what happens when a disease moves through a population with no interventions.",
+      "expected": "sir"
+    },
+    {
+      "query": "Run a simulation of a contagious disease and tell me the peak of infection.",
+      "expected": "sir"
+    },
+    {
+      "query": "Can you show me how an infection spreads when there's a hidden incubation phase?",
+      "expected": "seir"
+    },
+    {
+      "query": "I want to see a simulation where people go from susceptible to exposed before getting sick.",
+      "expected": "seir"
+    },
+    {
+      "query": "Could you run a model that includes a latency period before individuals become infectious?",
+      "expected": "seir"
+    },
+    {
+      "query": "Please generate a chart of disease dynamics with a separate exposed group.",
+      "expected": "seir"
+    },
+    {
+      "query": "How does the outbreak evolve if there's a delay between exposure and infectiousness?",
+      "expected": "seir"
+    },
+    {
+      "query": "Simulate the spread of a virus that has a stage where people are infected but not yet contagious.",
+      "expected": "seir"
+    },
+    {
+      "query": "Can you run a simple genetic drift simulation for a diploid population?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "I want to see how allele frequencies change over generations under random sampling, could you simulate that?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Show me a basic model of genetic drift with no selection or mutation.",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Could you generate a random allele frequency trajectory for a small population?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Please simulate the effect of sampling error on gene frequencies over time.",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Help me visualize how drift works in a finite population using a simulation.",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Can you simulate the stochastic decay of A into B using Gillespie's method?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "I need a Gillespie run for the reaction where A becomes B, could you do that?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "Please generate a stochastic trajectory for the conversion A → B.",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "Run a stochastic simulation of the A to B decay for me, please.",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "Could you show me a Gillespie simulation of A turning into B over time?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "I want to see how A decays to B using a stochastic algorithm.",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "Can you run a simulation of the DNA amplification process for me?",
+      "expected": "pcr"
+    },
+    {
+      "query": "I’d like to see a step‑by‑step model of how the DNA copying cycles work, could you show that?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Could you visualize the discrete cycles of the DNA replication experiment?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Please simulate the whole amplification routine so I can watch each stage.",
+      "expected": "pcr"
+    },
+    {
+      "query": "Can you generate a simple animation of the molecular copying steps?",
+      "expected": "pcr"
+    },
+    {
+      "query": "I want a quick run‑through of the lab amplification procedure – can you model that?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Can you run a simple Lennard-Jones simulation for a group of atoms?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "I want to see how particles move when they follow a Lennard-Jones potential, can you show that?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Please generate a short animation of particles interacting via Lennard-Jones forces.",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Could you model a gas where the particles interact with the Lennard-Jones potential?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Show me a basic Lennard-Jones run with periodic boundaries.",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Give me a quick visual of how a Lennard-Jones system evolves over time.",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Can you run a stochastic simulation of A plus B forming C?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "I’d like to see a Gillespie trajectory for A and B reacting to make C, can you do that?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Please simulate the bimolecular reaction where A and B combine into C using the SSA method.",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "How does the concentration of C change over time when A and B bind in a stochastic model?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Show me a time‑course plot for the reaction A plus B yields C with the stochastic algorithm.",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Could you generate a random trajectory for A + B → C using the Gillespie approach?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Can you simulate a Wright‑Fisher process for two genetic markers with recombination?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "I’d like to see how linkage disequilibrium evolves when recombination is allowed—could you run that simulation?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Could you generate a model of drift at a pair of loci that includes crossover events?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Please give me a simulation of allele frequencies at two linked sites under random mating and recombination.",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Show me a run of a population genetics simulation that tracks two loci and their LD with recombination?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Would it be possible to produce a Wright‑Fisher style simulation for two loci that lets me watch the effect of recombination over generations?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Can you show me how a predator and prey population change over time?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "What would happen to the number of wolves and rabbits if I run a simulation?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "I want to see a graph of predator and prey cycles, can you do that?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "How does the prey population affect the predator numbers in a simple model?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "Could you simulate a scenario where predators eat the prey and see the dynamics?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "Please run a predator‑prey simulation and show the results.",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "Show me how the cyclin and CDK interactions drive the cell cycle in the model.",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Can I see a simulation of the molecular cell cycle based on cyclin‑CDK regulation?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Run the cyclin‑CDK oscillator so I can watch the phases progress.",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "I want to visualize how cyclin levels rise and fall during the cycle—please simulate it.",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Give me a dynamic view of the cell‑division control network using the cyclin‑CDK mechanism.",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Please start the cell cycle model that uses cyclin‑CDK feedback loops.",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Could you show me how the synthetic gene oscillator behaves in a simulation?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "I want to run a simulation of the synthetic genetic clock made of repressive genes, can you do that?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Please simulate the synthetic oscillator circuit with mutually repressing genes.",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Can you generate a time‑course plot for the synthetic repressing gene network?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Show me the dynamics of the synthetic genetic oscillator with a loop of repressive elements?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Run a virtual experiment of the synthetic gene circuit that oscillates due to repression?",
+      "expected": "repressilator"
+    }
+  ]
+}

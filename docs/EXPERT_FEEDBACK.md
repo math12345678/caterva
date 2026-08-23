@@ -13390,3 +13390,70 @@ pinned, not fixed; reordering it carries its own regression risk.
 | Built | 20 tests across 2 files, a benchmark that scores the extracted (not copied) classifier, three-state config reporting |
 | Verified | two mutations, both caught, reproducible under `scripts/mutate.py`; both restores checked by `diff`; 645/645 api-server tests |
 | **Still red, not mine** | `make test` fails 2 Python tests — `cffconvert` is declared in `requirements-dev.txt` and installed in no venv on this machine. Pre-existing at HEAD. The ADR index links 0146 and 0150, which are another agent's uncommitted files. |
+
+---
+
+## Pass: the set that shared my hand (ADR 0167)
+
+Last pass measured the keyword classifier at 60% and left it unrepaired.
+This pass repaired it. The first thing the repair found was that **60% was
+wrong**, and that I had produced the wrong number myself.
+
+### The number was measuring my own hand
+
+ADR 0166's queries were written *after* I read the keyword table, to probe
+orderings that looked fragile. That makes them good at finding defects and
+worthless as a measure of accuracy: without intending to, I had written the
+table's vocabulary into the questions.
+
+Queries written from each domain's definition instead, before any tuning:
+the same committed classifier scores **17.9%**. Twenty-one of twenty-eight
+naturally-phrased queries matched no keyword at all and were answered `mm` by
+fallback. I had overstated the baseline by about forty points and amended
+ADR 0166 to say so.
+
+### Then my fix scored 100%, which is a warning, not a result
+
+After widening the vocabulary, the held-out set scored **28/28**. It should
+not have been reassuring: I had written the queries and the vocabulary, from
+the same source, so they matched by construction. "Written before tuning" was
+not enough independence when the same person does both.
+
+So I commissioned a third set from an LLM — shown one sentence per domain,
+never the keyword table — and committed it as a fixture. **79.5%.** That is
+the number I stand behind, and the suite now asserts the classifier does
+**not** score 100% on it, because a perfect score there would mean the
+fixture had stopped being independent.
+
+### The ablation contradicted my own reasoning
+
+| variant | accuracy | fallbacks |
+|---|---|---|
+| first-match-wins, original vocabulary (was committed) | 69.2% | 11 |
+| scoring, original vocabulary | 69.2% | 11 |
+| **scoring, wide vocabulary (shipped)** | **79.5%** | **2** |
+| first-match-wins, wide vocabulary | 75.6% | 3 |
+
+Specificity scoring got my longest justification and bought **zero points on
+its own**. Every point came from vocabulary. Scoring only became load-bearing
+once the wider vocabulary created the collisions it resolves — which is a
+real interaction, and not the one I had argued for before running it.
+
+### A change I made on reasoning and deleted on measurement
+
+Keyword matching briefly used a word-boundary regex, because `includes` lets
+`"ki"` fire inside `"kinetics"`. The mutation harness reported that mutation
+**NOT CAUGHT**. That sent me to measure instead of to write a test for it:
+across all 131 labelled queries the regex changed **no classification at
+all**, and left one more query matching nothing than plain `includes` did.
+
+I deleted it rather than testing it. A mutation nothing can catch because the
+code does nothing is a fact about the code, not a gap in the suite. The
+reasoning was sound and the effect was zero, and only running it showed that.
+
+| | |
+|---|---|
+| Found | my own published baseline overstated by ~40 points, and a "held-out" set that shared its author with the thing it scored |
+| Built | a third set commissioned from an LLM and committed as a fixture, a four-arm ablation, 10 more tests (24 across the two classifier files) |
+| Verified | two mutations, both caught, reproducible under `scripts/mutate.py`; a third deleted rather than tested; 655/655 api-server tests |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |

@@ -76,6 +76,23 @@ misdescribe it — the defect ADR 0164 fixed on a different page.
 The Groq default becomes `openai/gpt-oss-120b`, verified present in Groq's
 live `/v1/models`.
 
+## Correction (ADR 0167)
+
+The keyword baseline below — 15/25, 60.0% — is **overstated**, and this
+record is the reason it went unnoticed. Its labelled set was written after
+reading the keyword table, so the queries had absorbed the table's own
+vocabulary; the number measures a set that shares an author with the thing
+it scores.
+
+Measured on queries written without consulting the keyword table, the same
+committed classifier scores **17.9%**; on queries phrased by an LLM rather
+than by this author, **69.2%**. Neither is 60%.
+
+The LLM arm's 96% and the +36-point gap are subject to the same
+contamination and should be read as "on a set written to probe the keyword
+table", not as an accuracy. [ADR 0167](0167-the-set-that-shared-my-hand.md)
+has the sets, the ablation, and the numbers this one should have reported.
+
 ## Verification
 
 Measured on 2026-08-23, Groq `openai/gpt-oss-120b`, 25 labelled queries,
