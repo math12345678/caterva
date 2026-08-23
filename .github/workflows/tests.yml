@@ -142,6 +142,29 @@ jobs:
       - name: Model-citation guard
         run: python scripts/check_model_citations_cite_models.py
 
+      # The licence guard reads the LICENSE file that ships inside each
+      # installed package, so the JS workspaces have to exist before it runs.
+      # Without them it reported `wouter` and `zod` as unrecorded and failed
+      # the build -- which is the guard behaving correctly on an environment
+      # that could not answer, not a licensing problem.
+      #
+      # Installing here rather than relaxing the guard: a check that skips
+      # what it cannot reach would go quiet exactly when a new dependency
+      # arrives unlicensed, which is the case it exists for.
+      - name: Set up Node for the licence guard
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `corepack enable`, not `corepack prepare --activate`. See the
+      # api-server job below, where getting this wrong reddened every build.
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - name: Install JS workspaces
+        working-directory: Science-Agent-Pipeline
+        run: pnpm install --frozen-lockfile
+
       # Every dependency carries a recorded grant of permission to use
       # it. Unrecorded fails, deliberately.
       - name: Dependency-licence guard
