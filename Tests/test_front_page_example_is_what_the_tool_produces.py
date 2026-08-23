@@ -165,3 +165,114 @@ def test_the_units_agree(resolved):
         f"the resolver now returns {getattr(resolved, 'unit', None)}, and the "
         "front page says mM"
     )
+
+
+# ---------------------------------------------------------------------------
+# The FIFTH layer: right value, right reference, invented conditions.
+#
+# `docs/DESIGN.md` is the page that teaches what Terrium's trust grades mean,
+# using ref 740253 as its worked example. Measured against the committed
+# fixture, that example was wrong in three ways and every one of them
+# overstated confidence:
+#
+#     it said                          the resolver says
+#     ---------------------------      ------------------------------
+#     measured at pH 7.5, 25 °C        pH 8.0; temperature NOT reported
+#     assay completeness  complete     partial
+#     pH and temperature both          the source states it did not
+#       reported                         report temperature
+#
+# The value (10.73) and the reference (740253) were correct, so all four
+# earlier layers pass it. The document explaining the trust model was the
+# thing misreporting the trust model, in the reassuring direction.
+# ---------------------------------------------------------------------------
+
+DESIGN = REPO_ROOT / "docs" / "DESIGN.md"
+LACTATE = "(S)-lactate"
+
+
+@pytest.fixture(scope="module")
+def resolved_lactate():
+    text = FIXTURE.read_text(encoding="utf-8")
+
+    def page(ec_number: str, timeout: float = 15) -> str:
+        return text
+
+    result = resolve_kinetic_value(
+        EC, ORGANISM, LACTATE,
+        html_provider=page, quantity="km",
+        uniprot_provider=_no_network, taxon_id_provider=_no_network,
+        search_literature=False,
+    )
+    assert result.found, "the fixture no longer resolves a Km for (S)-lactate"
+    return result
+
+
+def test_the_design_example_value_and_reference_are_the_resolvers(resolved_lactate):
+    text = DESIGN.read_text(encoding="utf-8")
+    assert f"Km = {resolved_lactate.value} mM" in text, (
+        f"DESIGN.md's worked example does not show {resolved_lactate.value} mM"
+    )
+    assert f"ref {resolved_lactate.citation.reference_id}" in text
+
+
+def _worked_example() -> str:
+    """Just the ANSWER/SOURCE/TRUST block, not the whole document.
+
+    The first version of the test below asserted `pH 7.5` appeared NOWHERE
+    in DESIGN.md and failed on line 65 — an unrelated hypothetical about
+    combining a Km at pH 7.5 with a Ki at pH 6, which is a correct sentence
+    illustrating a different problem.
+
+    A guard that fires on a correct sentence gets suppressed (ADR 0028), and
+    the fix is to narrow the claim rather than to soften it: this is about
+    one worked example, so it reads one worked example.
+    """
+    text = DESIGN.read_text(encoding="utf-8")
+    start = text.index("  ANSWER      Km =")
+    return text[start : text.index("  RESULT", start)]
+
+
+def test_the_design_example_does_not_invent_assay_conditions(resolved_lactate):
+    """The specific numbers, asserted as absent from the example block.
+
+    `pH 7.5` and `25 °C` were in that block and in neither the fixture nor
+    the resolver's output. Asserting their ABSENCE rather than the presence
+    of the right ones is deliberate: a replacement that happened to contain
+    "8.0" somewhere would satisfy a positive check while leaving the
+    invented pair in place.
+    """
+    block = _worked_example()
+    assert "pH 7.5" not in block
+    assert "25 °C" not in block
+    assert f"pH {resolved_lactate.assay_ph}" in block
+
+
+def test_the_design_example_reports_the_temperature_as_unreported(resolved_lactate):
+    """The claim that mattered most, because it is about the grading itself."""
+    assert resolved_lactate.assay_temperature_c is None, (
+        "the fixture now reports a temperature, so DESIGN.md should say it"
+    )
+    assert "temperature" in (resolved_lactate.assay_unreported or [])
+    block = _worked_example()
+    assert "temperature NOT reported" in block
+    assert "pH and temperature both reported" not in block
+
+
+def test_the_design_example_states_the_grade_the_grader_gives(resolved_lactate):
+    """`complete` was written where the grader returns `partial`.
+
+    Driven through the grader rather than hardcoded, so a change to how
+    completeness is decided fails here instead of leaving the design
+    document describing a rule the code stopped following.
+    """
+    from reliability import grade_assay_completeness
+
+    axis = grade_assay_completeness(
+        ph=resolved_lactate.assay_ph,
+        temperature_c=resolved_lactate.assay_temperature_c,
+        unreported=resolved_lactate.assay_unreported,
+    )
+    assert f"assay completeness   {axis.grade}" in _worked_example(), (
+        f"DESIGN.md does not state the grade the grader returns ({axis.grade})"
+    )
