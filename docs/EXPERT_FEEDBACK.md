@@ -13484,3 +13484,72 @@ Three times this pass a number I was ready to report turned out to be
 measuring the measurement apparatus rather than the thing: a rate limit as
 accuracy, my own vocabulary as a held-out set, and a self-authored fixture as
 independent evidence. Only the third one I caught before writing it down.
+
+---
+
+## Pass: mentioning a thing to exclude it (ADR 0168)
+
+Four queries in the fixtures said, in so many words, that there was no
+inhibitor — and every one of them was given the inhibitor model. The matcher
+saw the word and could not see the "no" in front of it.
+
+That is not an ordinary miss. **Naming a thing in order to rule it out made
+that thing more likely to be selected.** The student who bothered to be
+explicit got the worst answer on offer.
+
+Negation handling: +2.6 and +2.8 points on two independent fixtures, neutral
+on the third, negative on none. The `mm -> mm_competitive_inhibition`
+confusion disappears entirely.
+
+### Two of three mutations were NOT CAUGHT, and both tests passed for the wrong reason
+
+The every-negator test asserted the domain came back `mm` over phrasings like
+*"enzyme kinetics in the absence of an inhibitor"*. It passed whether or not
+negation worked, and for two independent reasons: `"enzyme kinetics"`
+outscores `"inhibitor"` anyway, and where it does not, **the `mm` fallback
+returns `mm` regardless**. I had written a test whose assertion the fallback
+satisfies unconditionally.
+
+It now asserts `matched === false` on queries carrying no keyword except the
+negated one — the question actually being asked.
+
+The later-mention test negated one word and asserted a different one, so the
+first occurrence of the keyword under test was never the negated one, and the
+"check only the first occurrence" mutation sailed straight through.
+
+I would not have found either without the mutation harness. Both looked
+right, and both were green.
+
+### The `ki` detour, and a lesson narrowed rather than reversed
+
+Sharpening those tests turned one red: *"Run it lacking an inhibitor."* still
+chose inhibition, because `"ki"` — a two-character keyword I added last pass
+— matches inside `"la**cki**ng"`.
+
+The obvious repair was to restore the word-boundary regex I deleted last
+pass. Measured, it **costs** accuracy: 82.1% → 80.8% and 54.2% → 52.8%,
+because boundaries also stop `"decay"` matching `"decaying"`.
+
+The defect was never the matcher. It was a two-character keyword in a table
+whose scoring assumes terms mean something. Dropping `ki` fixed it with no
+accuracy cost. So last pass's deletion was right, and its lesson narrows to:
+*check the shortest term in the table before reaching for the matcher.*
+
+### A fixture that was not a measurement
+
+I generated fixtures from three more providers. Two failed every domain — and
+my generator **wrote the files anyway**, valid JSON with an empty array. The
+benchmark scored them `0/0`, printed `NaN%`, and gave the spread across
+"five" sets as `NaN points`. Nothing errored. A reader would have counted
+five rows and believed five measurements existed.
+
+That is the same defect as the rest of this record, one level up: an absence
+presented as a result. The generator now refuses below eight domains and
+exits 3; the benchmark names empty fixtures instead of scoring them.
+
+| | |
+|---|---|
+| Found | a classifier that punished precision, two of my own tests passing for the wrong reason, a keyword too short to be safe, and a generator that wrote absences as data |
+| Built | negation-aware matching, 8 tests, a third independent fixture, `make classifier-bench` (offline, refuses to print an aggregate) |
+| Verified | three mutations, all caught after two rounds of sharpening; ablation across three fixtures; 680 of 681 api-server tests -- the one failure is a pre-existing live-network flake that passes in isolation |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |

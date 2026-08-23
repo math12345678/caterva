@@ -1162,7 +1162,6 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "compete",
       "outcompete",
       "rival ligand",
-      "ki",
       "occupies the active site",
       "blocks the active site",
       "competitive inhibition",
@@ -1748,8 +1747,103 @@ export interface KeywordClassification {
  * If a future keyword is short enough to matter on its own, this is the
  * decision to revisit, with a measurement rather than the argument.
  */
+/**
+ * Words that turn a mention of a thing into a statement about its absence.
+ *
+ * Deliberately short and literal. Every entry here is a word that, sitting
+ * just before a keyword, reverses what that keyword is evidence for. A
+ * longer list would start catching hedges ("hardly", "rarely") that weaken a
+ * mention without negating it, and this mechanism has no way to represent
+ * "weaker".
+ */
+const NEGATORS = new Set([
+  "no",
+  "not",
+  "without",
+  "absent",
+  "absence",
+  "free",
+  "lacking",
+  "lack",
+  "lacks",
+  "excluding",
+  "minus",
+  "never",
+]);
+
+/** How many words before a keyword are searched for a negator. */
+const NEGATION_WINDOW_WORDS = 4;
+
+function isNegatedAt(lowerText: string, index: number): boolean {
+  const before = lowerText.slice(Math.max(0, index - 48), index);
+  const words = before.split(/[^a-z']+/).filter(Boolean);
+  return words
+    .slice(-NEGATION_WINDOW_WORDS)
+    .some((word) => NEGATORS.has(word));
+}
+
+/**
+ * Does `term` occur in `text`, other than as something the query denies?
+ *
+ * Plain substring matching scored these four real queries as competitive
+ * inhibition:
+ *
+ *   "...as I add more substrate, no inhibitor involved."
+ *   "...the typical hyperbolic curve for an enzyme without any inhibitors?"
+ *   "Can you run a kinetic assay without any inhibitors present?"
+ *   "What's the velocity curve like when no inhibitor is blocking the enzyme?"
+ *
+ * Every one of them says, in so many words, that there is no inhibitor --
+ * and every one was routed to the inhibitor model because the word
+ * "inhibitor" appeared. A student who took the trouble to rule something out
+ * got the model they ruled out.
+ *
+ * So a keyword only counts where at least one of its occurrences is not
+ * preceded by a negator. This is a genuinely shallow mechanism: it cannot
+ * represent scope, and "not sure how the inhibitor works" reads as negated
+ * when it is not. Whether that trade is worth taking is a measurement, and
+ * it is in ADR 0168 rather than in this comment.
+ */
+/**
+ * Every position at which `term` occurs in `lowerText`.
+ *
+ * Substring, not word-boundary. That decision has now been made twice and
+ * measured twice, and the second time nearly went the other way.
+ *
+ * ADR 0167 deleted a word-boundary regex because across 131 queries it
+ * changed no classification. Then this record's vocabulary added `"ki"` --
+ * two characters, a genuine keyword for the inhibition model -- and `"ki"`
+ * occurs inside `"lacking"`. "Run it lacking an inhibitor." selected the
+ * inhibition model on a fragment of the word ruling it out, and negation
+ * could not help: the fragment sits inside a word no negator precedes.
+ *
+ * The obvious repair was to bring the regex back. Measured, it costs
+ * accuracy on two of the three independent fixtures (82.1% -> 80.8%,
+ * 54.2% -> 52.8%) because boundaries also stop `"decay"` matching
+ * `"decaying"` and the like, and it raises the fallback count by a quarter.
+ *
+ * The defect was never the matcher. It was a two-character keyword, in a
+ * table whose scoring assumes terms are long enough to mean something. `ki`
+ * is a parameter name rather than something a student writes in a sentence,
+ * and `extractParameterOverrides` already reads `ki=0.5` on its own path, so
+ * it was removed from the keyword list and the matcher left alone.
+ *
+ * What to do if this recurs: check the shortest term in the table before
+ * reaching for the matcher.
+ */
+function termOccurrences(lowerText: string, term: string): number[] {
+  const needle = term.toLowerCase();
+  const found: number[] = [];
+  let i = lowerText.indexOf(needle);
+  while (i !== -1) { found.push(i); i = lowerText.indexOf(needle, i + needle.length); }
+  return found;
+}
+
 function matchesTerm(text: string, term: string): boolean {
-  return text.toLowerCase().includes(term.toLowerCase());
+  const haystack = text.toLowerCase();
+  return termOccurrences(haystack, term).some(
+    (index) => !isNegatedAt(haystack, index),
+  );
 }
 
 /**

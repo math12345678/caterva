@@ -67,6 +67,12 @@ const FIXTURES = [
     previousCorrect: 54,
   },
   {
+    name: "openrouter",
+    fixture: load("openrouter-authored-queries.json"),
+    domains: 13,
+    previousCorrect: 48,
+  },
+  {
     name: "mistral",
     fixture: load("mistral-authored-queries.json"),
     // 12, not 13: generation failed for one domain and the generator dropped
@@ -153,7 +159,12 @@ describe("across the two fixtures", () => {
       }
       return c / fx.queries.length;
     };
-    const spread = Math.abs(rate(FIXTURES[0]!.fixture) - rate(FIXTURES[1]!.fixture));
+    // Across every fixture, not two of them by index. The first version
+    // compared FIXTURES[0] against FIXTURES[1]; adding a third fixture in
+    // the middle silently changed which pair was being compared and the
+    // test failed for a reason that had nothing to do with the classifier.
+    const rates = FIXTURES.map((f) => rate(f.fixture));
+    const spread = Math.max(...rates) - Math.min(...rates);
     expect(spread).toBeGreaterThan(0.15);
   });
 });

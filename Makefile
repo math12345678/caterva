@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench
 
 help:
 	@echo "Terrium"
@@ -338,6 +338,14 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+classifier-bench:
+	@# Scores the keyword domain classifier over every labelled set, offline.
+	@# No API key and no network: the fixtures are committed, so the numbers
+	@# in ADR 0167 and ADR 0168 are reproducible from a fresh checkout.
+	@cd Science-Agent-Pipeline/artifacts/api-server && \
+		node "$$(ls -d ../../node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs | head -1)" \
+		src/lib/runKeywordBenchmark.ts
 
 demo: check-python
 	@"$(PY)" scripts/demo.py

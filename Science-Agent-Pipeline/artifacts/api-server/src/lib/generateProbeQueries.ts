@@ -141,13 +141,40 @@ export async function generateProbeSet(
   };
 }
 
+/**
+ * Fewest domains a fixture may cover and still be written.
+ *
+ * A fixture that covers almost nothing is worse than no fixture: it is a
+ * file that looks like evidence. Two providers failed every single domain
+ * here -- SiliconFlow and TokenRouter both returned nothing usable -- and an
+ * earlier version of this script wrote both anyway, as valid JSON with an
+ * empty `queries` array. The benchmark then scored them 0/0 and printed
+ * `NaN%`, and the spread across "five" sets became `NaN points`. Nothing
+ * errored. A reader would have seen five rows and believed five measurements
+ * existed.
+ */
+const MINIMUM_DOMAINS = 8;
+
 const outPath = process.argv[2];
 if (outPath) {
   const perDomain = Number.parseInt(process.argv[3] ?? "6", 10);
   const set = await generateProbeSet(perDomain, 7_000);
+  const domains = new Set(set.queries.map((q) => q.expected)).size;
+
+  if (domains < MINIMUM_DOMAINS) {
+    // Exit 3: could not produce a fixture. Distinct from exit 1, which would
+    // read as "the fixture is bad" rather than "there is no fixture".
+    console.error(
+      `REFUSED to write ${outPath}: got ${set.queries.length} queries across ` +
+        `${domains} domain(s), below the minimum of ${MINIMUM_DOMAINS}.\n` +
+        `An empty or near-empty fixture is not a weak measurement, it is the\n` +
+        `absence of one, and writing it would put a file that looks like\n` +
+        `evidence where no evidence exists. Check the provider's API key,\n` +
+        `URL and model id, then re-run.`,
+    );
+    process.exit(3);
+  }
+
   writeFileSync(outPath, `${JSON.stringify(set, null, 2)}\n`);
-  console.log(
-    `wrote ${set.queries.length} queries across ` +
-      `${new Set(set.queries.map((q) => q.expected)).size} domains to ${outPath}`,
-  );
+  console.log(`wrote ${set.queries.length} queries across ${domains} domains to ${outPath}`);
 }

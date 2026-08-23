@@ -1,0 +1,60 @@
+{
+  "_why": [
+    "ADR 0168's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0168 fixed a classifier that read 'no inhibitor involved' as a",
+    "request for the inhibitor model. A keyword now counts only where at",
+    "least one of its occurrences is not preceded by a negator.",
+    "",
+    "N1 removes the negation check entirely -- the defect, restored.",
+    "",
+    "N2 is the mutation that matters more. It makes the check too eager, by",
+    "scanning only the first occurrence of a keyword rather than every",
+    "occurrence. That passes every 'does not route a negated mention' test,",
+    "because those queries negate the only mention. It fails only on a query",
+    "that denies one thing and asserts another in the same sentence, which is",
+    "why such a test exists. The cheapest way to make a negation fix pass is",
+    "to over-apply it and start dropping real matches, and a table with only",
+    "N1 in it would not notice.",
+    "",
+    "N3 empties the negator list to a single word. The original bug arrived",
+    "as 'no inhibitor' and 'without any inhibitors'; a fix covering only the",
+    "phrasings that were reported leaves the same defect under every synonym.",
+    "",
+    "Not included, because no test here catches it: whether the negation",
+    "window is the right length. The four-word window is a judgement, the ADR",
+    "says so, and nothing in the suite would fail if it were three or five.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0168-negated-keywords.json"
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/negatedKeywords.test.ts src/__tests__/classifierEval.test.ts src/__tests__/llmAuthoredQueries.test.ts",
+  "mutations": [
+    {
+      "id": "N1",
+      "description": "the negation check is removed; any mention counts",
+      "_claimed": "caught by the negated-mention tests",
+      "_note": "The original defect. 'no inhibitor involved' routes to the inhibitor model again, and accuracy on the two affected fixtures falls by 2.6 and 2.8 points. Nothing errors -- the classifier just answers the question the student explicitly did not ask.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "    (index) => !isNegatedAt(haystack, index),",
+      "replace": "    () => true,"
+    },
+    {
+      "id": "N2",
+      "description": "only the first occurrence of a keyword is checked for negation",
+      "_claimed": "caught by the later-unnegated-mention test",
+      "_note": "The over-application failure. Every negated-mention test still passes, because in those queries the negated mention is the only one. A sentence that denies one thing and then asserts another silently loses the assertion. This is the mutation a table built only from the reported bug would miss.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "  return termOccurrences(haystack, term).some(",
+      "replace": "  return termOccurrences(haystack, term).slice(0, 1).some("
+    },
+    {
+      "id": "N3",
+      "description": "the negator list shrinks to only the words the bug was reported with",
+      "_claimed": "caught by the every-negator test",
+      "_note": "Fixing the reported phrasings and no others. 'without an inhibitor' keeps working; 'in the absence of an inhibitor' and 'free of inhibitor' go back to selecting the inhibitor model.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "  \"absent\",\n  \"absence\",\n  \"free\",\n  \"lacking\",\n  \"lack\",\n  \"lacks\",\n  \"excluding\",\n  \"minus\",\n  \"never\",",
+      "replace": ""
+    }
+  ]
+}

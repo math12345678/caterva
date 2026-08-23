@@ -1,0 +1,320 @@
+{
+  "_generatedBy": "scripts: src/lib/generateProbeQueries.ts -- queries written by an LLM, not by the benchmark author, to break the shared-author bias described in that file's header.",
+  "_model": "openai/gpt-4o-mini",
+  "_promptShownToTheModel": "one line from DOMAIN_MEANINGS per domain; the keyword table was never shown",
+  "_labelMeans": "the domain the query was commissioned for, NOT independently verified ground truth",
+  "queries": [
+    {
+      "query": "How does enzyme activity change with different substrate concentrations?",
+      "expected": "mm"
+    },
+    {
+      "query": "Can you show me what happens to reaction rates as I adjust the amount of substrate?",
+      "expected": "mm"
+    },
+    {
+      "query": "What's the relationship between substrate levels and enzyme speed in this simulation?",
+      "expected": "mm"
+    },
+    {
+      "query": "Can I see how quickly the enzyme works when there's a lot of substrate versus a little?",
+      "expected": "mm"
+    },
+    {
+      "query": "I want to explore how the speed of the enzyme changes with varying substrate amounts, can you help?",
+      "expected": "mm"
+    },
+    {
+      "query": "What do I need to do to visualize the effect of substrate concentration on enzyme efficiency?",
+      "expected": "mm"
+    },
+    {
+      "query": "How do I set up a simulation for Michaelis-Menten kinetics with a competitive inhibitor?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Can you help me understand how to include a competitive inhibitor in my simulation?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "What steps do I need to follow to model the effect of a competitive inhibitor using this tool?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Is there a way to show how a competitive inhibitor influences enzyme activity in my simulation?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "I'm trying to run a simulation that needs a ki parameter for competitive inhibition. How do I do that?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "Can you walk me through the process of adding a competitive inhibitor in the Michaelis-Menten model?",
+      "expected": "mm_competitive_inhibition"
+    },
+    {
+      "query": "How can I set up a simulation for the spread of a disease?",
+      "expected": "sir"
+    },
+    {
+      "query": "Can you show me what happens if we change the recovery rate?",
+      "expected": "sir"
+    },
+    {
+      "query": "I want to see how an outbreak grows over time, how do I do that?",
+      "expected": "sir"
+    },
+    {
+      "query": "What happens to the number of infected people if we increase the population size?",
+      "expected": "sir"
+    },
+    {
+      "query": "Is there a way to test what would happen if we introduce a vaccine in the model?",
+      "expected": "sir"
+    },
+    {
+      "query": "How do I adjust the initial number of infected individuals in the simulation?",
+      "expected": "sir"
+    },
+    {
+      "query": "How does the exposed period affect the spread of disease in the model?",
+      "expected": "seir"
+    },
+    {
+      "query": "Can you explain what happens to the population during the exposed phase in the simulation?",
+      "expected": "seir"
+    },
+    {
+      "query": "What are the different states a person goes through in the disease model, like before they get sick?",
+      "expected": "seir"
+    },
+    {
+      "query": "I'd like to know how long someone stays in the exposed state before showing symptoms?",
+      "expected": "seir"
+    },
+    {
+      "query": "How do we simulate the number of people who are exposed but not yet infectious?",
+      "expected": "seir"
+    },
+    {
+      "query": "What should I expect to see in the results when I change the exposed duration?",
+      "expected": "seir"
+    },
+    {
+      "query": "Can you show me how genetic variation changes over generations?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "I want to see what happens to allele frequencies in a small population. Can you help?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "How does random mating affect the gene pool in a simulated environment?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "What does it look like when a population goes through a bottleneck in terms of gene diversity?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Can you explain how drift works in a population and simulate it for me?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "I'm curious about how selection influences allele frequencies, can we run a simulation on that?",
+      "expected": "wright_fisher"
+    },
+    {
+      "query": "Can you show me how to run a simulation for a first-order decay process?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "How do I set up a random decay simulation from substance A to substance B?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "I'm looking to model a decay reaction. What steps do I need to take?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "What do I need to do to simulate A turning into B over time?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "Can you explain how to visualize the first-order decay in the simulation tool?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "How can I adjust the settings to see how A decays into B using stochastic methods?",
+      "expected": "gillespie_ssa"
+    },
+    {
+      "query": "How can I set up the simulation for DNA amplification?",
+      "expected": "pcr"
+    },
+    {
+      "query": "What steps do I follow to run the amplification process in the tool?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Can you show me how to visualize the results of the DNA copying?",
+      "expected": "pcr"
+    },
+    {
+      "query": "What controls do I have to adjust for simulating the amplification?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Is there a way to see how many copies of the DNA I get after each cycle?",
+      "expected": "pcr"
+    },
+    {
+      "query": "Can you explain how different temperatures affect the amplification in the simulation?",
+      "expected": "pcr"
+    },
+    {
+      "query": "How do I start a simulation using Lennard-Jones potentials?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Can you explain how the Lennard-Jones forces work in this tool?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "What do I need to set up to run a Lennard-Jones simulation?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Is there a way to visualize the interactions between particles in a Lennard-Jones model?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "Can I change the parameters of the Lennard-Jones potential during the simulation?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "What kind of insights can I get from using this Lennard-Jones simulation?",
+      "expected": "molecular_dynamics"
+    },
+    {
+      "query": "How can I run a simulation for two molecules reacting to form a product?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Can you show me how to set up a bimolecular reaction in the simulation?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "What steps do I need to follow to simulate A and B turning into C?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Is there a way to visualize the reaction between A and B in this tool?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "Can I adjust the reaction rates when simulating A plus B producing C?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "What's the best way to see the results of a bimolecular reaction in this lab tool?",
+      "expected": "gillespie_ssa_bimolecular"
+    },
+    {
+      "query": "How can I set up a simulation to see how two genes interact with each other in a population?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Can you show me how to run a test that looks at recombination between two loci?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "What's the best way to model linkage disequilibrium in a population simulation?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "I want to understand how recombination affects genetic variation. How can I do that?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "Is there a way to visualize the effects of two nearby genes on each other in the simulation?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "How do I run a simulation that includes both linkage and recombination between two genes?",
+      "expected": "two_locus_wright_fisher"
+    },
+    {
+      "query": "How do I start the predator-prey simulation?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "Can you show me how the predator and prey populations change over time?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "What's the best way to visualize the interaction between these two species?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "How do I adjust the initial numbers of predators and prey in the model?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "What happens if I increase the predator's reproduction rate?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "Can I see a graph of the population cycles for both the predator and prey?",
+      "expected": "lotka_volterra"
+    },
+    {
+      "query": "How does cyclin and CDK work together in the cell cycle?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Can you show me how the molecular process of the cell cycle happens with cyclins?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "What role do cyclins and CDKs play in regulating the different phases of the cell cycle?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "I want to see how changing cyclin levels affects the cycle stages.",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Explain how CDKs are activated by cyclins during the cell cycle.",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "Are there any visualizations of the interactions between cyclins and CDKs in the cell cycle?",
+      "expected": "cell_cycle_oscillator"
+    },
+    {
+      "query": "How can I set up the genetic oscillator with three genes in the simulation?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "What do I need to do to run the three-gene system in the simulator?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Can you show me how to visualize the output of the synthetic genetic circuit?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "What happens if I change the interaction between the genes in the model?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "I'm trying to understand how the genes interact in this simulation. Can you help?",
+      "expected": "repressilator"
+    },
+    {
+      "query": "Is it possible to see how the oscillator behaves over time with different conditions?",
+      "expected": "repressilator"
+    }
+  ]
+}
