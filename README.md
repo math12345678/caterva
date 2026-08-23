@@ -268,7 +268,7 @@ scientific simulate mm --resolve \
 Parameters and where they came from
   s0    10 mM      user
   e0    0.001 mM   user
-  km    0.14 mM    brenda_exact  BRENDA ref 740253
+  km    0.03 mM    brenda_exact  BRENDA ref 286469
   vmax  0.25 mM/s  brenda_cross_species → kcat x [E]0  BRENDA ref 741355
         ⚠ measured in Oryctolagus cuniculus, not the organism requested
 
@@ -500,7 +500,7 @@ Terrium/
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    159 decision records (and counting)
+│   └── adr/                    160 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    72 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command

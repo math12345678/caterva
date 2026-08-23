@@ -37,6 +37,22 @@ counted — never silently passed.
 before this was written. That was wrong, and the correction is the reason
 this file exists.
 
+AND THEN A THIRD LAYER
+----------------------
+Building the above surfaced the next one down. ADR 0144 closed "the
+reference does not exist"; the check below closes "the reference is for
+another enzyme"; `value_mismatches()` closes "the reference is real, the
+enzyme is right, and the page does not report that number".
+
+That last one was live on the front page while this file was being written:
+
+    km    0.14 mM    brenda_exact  BRENDA ref 740253
+
+`740253` is a real lactate dehydrogenase reference. `0.14` occurs nowhere in
+that fixture — the rows under it read 10.73 and 21.78 mM. A reader who
+followed the citation, which is the entire behaviour this tool exists to
+make possible, would have found a different number.
+
 THREE STATES
 ------------
     prose names a known enzyme, ref's fixture agrees   -> checked, OK
@@ -166,6 +182,83 @@ def check() -> tuple[list[str], int, list[str]]:
     return failures, checked, unchecked
 
 
+
+#: A documented value/unit followed by the reference it is attributed to.
+VALUE_AND_REF = re.compile(
+    r"([\d.]+)\s*(mM/s|mM|uM|µM|1/s)\s+.*?\bref(?:erence)?\s+(\d{6,})",
+    re.IGNORECASE,
+)
+
+#: Markers that the printed number was COMPUTED, not quoted off the page.
+#:
+#: `vmax 0.25 mM/s  brenda_cross_species -> kcat x [E]0  BRENDA ref 741355`
+#: is honest: the reference supports the kcat, and the Vmax is that kcat
+#: times an enzyme concentration the student chose (ADR 0142). Demanding
+#: that 0.25 appear on the BRENDA page would fail a line that is telling the
+#: truth, and a guard that fires on the correct case gets suppressed
+#: (ADR 0028).
+DERIVED_MARKERS = ("→", "->", "kcat x", "kcat ×")
+
+
+def value_mismatches() -> tuple[list[str], int, int]:
+    """Documented values that the page they cite does not report.
+
+    THE THIRD LAYER.
+    ----------------
+    ADR 0144 closed "the reference does not exist". ADR 0161 closed "the
+    reference is for another enzyme". This closes "the reference is real,
+    the enzyme is right, and the page does not report that number".
+
+    Found on the front page, three times, the day it was written:
+
+        km    0.14 mM    brenda_exact  BRENDA ref 740253
+
+    `740253` is a real reference on the lactate dehydrogenase page. The
+    string `0.14` does not occur anywhere in that fixture; the rows under
+    that reference read 10.73 and 21.78 mM. A reader who followed the
+    citation — which is the entire behaviour this tool exists to make
+    possible — would have found a different number and no way to tell which
+    was wrong.
+
+    Returns (failures, checked, skipped_as_derived).
+    """
+    pages: dict[str, str] = {
+        path.name: path.read_text(encoding="utf-8", errors="replace")
+        for path in sorted(FIXTURE_DIR.glob("*.html"))
+    }
+    failures: list[str] = []
+    checked = 0
+    derived = 0
+
+    for relative in surfaces():
+        path = REPO_ROOT / relative
+        if not path.exists():
+            continue
+        for number, line in enumerate(
+            path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
+        ):
+            for match in VALUE_AND_REF.finditer(line):
+                value, unit, ref = match.groups()
+                if any(marker in line for marker in DERIVED_MARKERS):
+                    derived += 1
+                    continue
+                citing = [n for n, t in pages.items() if re.search(r"\b" + ref + r"\b", t)]
+                if not citing:
+                    # check_documented_citations_are_real owns this case.
+                    continue
+                checked += 1
+                if not any(value in pages[n] for n in citing):
+                    failures.append(
+                        f"{relative}:{number} shows {value} {unit} citing ref "
+                        f"{ref}, and {value} does not occur on the page(s) "
+                        f"that reference appears on ({', '.join(citing)}).\n"
+                        "      A real reference for a number it does not "
+                        "report is the third and quietest way a citation can "
+                        "be wrong."
+                    )
+    return failures, checked, derived
+
+
 def _selftest() -> int:
     """Drives both verdicts on constructed text, not on the tree.
 
@@ -221,8 +314,11 @@ def main() -> int:
         return _selftest()
 
     failures, checked, unchecked = check()
+    value_failures, value_checked, derived = value_mismatches()
 
     print(f"Documented citations checked against their enzyme: {checked}")
+    print(f"Documented values checked against the cited page:  {value_checked}"
+          + (f"  ({derived} derived, so not quoted off a page)" if derived else ""))
     if unchecked:
         print(f"Not checked (no enzyme named nearby):            {len(unchecked)}")
         for line in unchecked:
@@ -232,13 +328,19 @@ def main() -> int:
             f"{CONTEXT_LINES} lines\n  of the citation and this guard covers it."
         )
 
-    if failures:
-        print(f"\nFAIL: {len(failures)} citation(s) attached to the wrong enzyme.\n")
-        for problem in failures:
-            print(f"  {problem}\n")
+    if failures or value_failures:
+        if failures:
+            print(f"\nFAIL: {len(failures)} citation(s) attached to the wrong enzyme.\n")
+            for problem in failures:
+                print(f"  {problem}\n")
+        if value_failures:
+            print(f"\nFAIL: {len(value_failures)} value(s) the cited page does not report.\n")
+            for problem in value_failures:
+                print(f"  {problem}\n")
         return 1
 
-    print("\nOK: every citation this guard could attribute names the right enzyme.")
+    print("\nOK: every citation this guard could attribute names the right")
+    print("    enzyme, and every quoted value occurs on the page it cites.")
     return 0
 
 
