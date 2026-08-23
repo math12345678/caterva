@@ -266,7 +266,7 @@ Whatever the question, the output is the same four blocks. A student learns
 it once.
 
 ```
-  ANSWER      Km = 10.73 mM
+  ANSWER      Km = 10.73 mM  ·  lactate dehydrogenase (EC 1.1.1.27)
 
   SOURCE      BRENDA ref 740253 · Homo sapiens · exact organism match
               measured at pH 7.5, 25 °C

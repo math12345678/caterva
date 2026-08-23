@@ -117,6 +117,19 @@ def _commentary_coverage() -> str:
     )
 
 
+def _citation_attribution() -> str:
+    """Was listed here as needing live BRENDA. It did not (ADR 0161)."""
+    try:
+        from check_citations_match_their_enzyme import check
+    except ImportError as exc:
+        return f"not measurable here — {exc}"
+    failures, checked, unchecked = check()
+    return (
+        f"{checked} attributed and correct, {len(failures)} wrong, "
+        f"{len(unchecked)} with no enzyme named nearby"
+    )
+
+
 def _file_count(pattern: str, what: str) -> Callable[[], str]:
     def measure() -> str:
         return f"{len(list(REPO_ROOT.glob(pattern)))} {what}"
@@ -149,6 +162,9 @@ ROWS: tuple[Row, ...] = (
         _file_count("Tests/fixtures/*.html", "saved pages")),
     Row("BRENDA commentary the parser reads",
         "python scripts/check_commentary_coverage.py", _commentary_coverage),
+    Row("Documented citations checked against their enzyme",
+        "python scripts/check_citations_match_their_enzyme.py",
+        _citation_attribution),
 )
 
 OPEN: tuple[tuple[str, str], ...] = (
@@ -156,11 +172,6 @@ OPEN: tuple[tuple[str, str], ...] = (
      "measured on eleven committed pages here. Presenting that as a property "
      "of the database would be the overreach this project refuses; it needs "
      "a bulk download, which BRENDA asks tools not to fetch automatically."),
-    ("Whether an emitted citation describes the enzyme it is attached to",
-     "`check_documented_citations_are_real` verifies every documented ref "
-     "exists in a fixture, and says explicitly that it does NOT check the "
-     "ref belongs to that enzyme (ADR 0144). That is the project's central "
-     "claim and its weakest guard, and it needs live BRENDA."),
     ("Whether a student's report survives peer review",
      "not a thing any script measures. Four professors have been asked; "
      "their answers are in docs/EXPERT_FEEDBACK.md, not in this table."),

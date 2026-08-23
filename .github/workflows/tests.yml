@@ -304,6 +304,18 @@ jobs:
       # Runs standalone as well as via the pytest wrapper: this job fails
       # fast on a bad citation rather than waiting out the full suite.
 
+      # ADR 0144 closed the flagrant half — a ref that exists nowhere.
+      # This closes the subtle half it said it could not: a REAL reference
+      # printed under the wrong enzyme, which is what actually happened
+      # (`ref 649716`, acetylcholinesterase, under a lactate dehydrogenase
+      # example on the front page). Offline: no reference id in the eleven
+      # committed fixtures occurs under more than one EC.
+      - name: Citation-enzyme guard (self-check)
+        run: python scripts/check_citations_match_their_enzyme.py --selftest
+
+      - name: Citation-enzyme guard
+        run: python scripts/check_citations_match_their_enzyme.py
+
       # Wired ABOVE the step it protects, on purpose: a guard that runs
       # after the expected-red step would itself never run, which is the
       # bug it exists to catch, committed by the fix for it.
