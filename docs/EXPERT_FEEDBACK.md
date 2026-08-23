@@ -13203,3 +13203,54 @@ on the correct case.
 | Verified | mutation reproduces this morning's front page and the guard names it; the derived line is not flagged either way |
 | Named as open | that the value is the row for the substrate and organism given. That needs parsed rows, which the resolver already produces |
 | **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
+
+## Seventy-first pass — stop matching strings, run the thing
+
+Last pass named the fourth and last way a citation can be wrong: the value
+and the reference are both real, both on the page, and not each other's.
+Every guard built so far reads strings, and strings cannot see a pair.
+
+So this one runs the resolver. `Tests/test_front_page_example_is_what_the_tool_produces.py`
+resolves pyruvate / *Homo sapiens* / EC 1.1.1.27 against the committed
+fixture, with every auxiliary lookup refused, and asserts the three surfaces
+carrying the provenance example show that value, that reference, that unit.
+
+The claim being checked stops being "these characters appear somewhere on
+that page" and becomes **"this is what the tool does"**.
+
+### Two mutations, and the second is the argument
+
+**`0.03` → `0.398`** — a real value on that page, the *other* candidate row,
+under the same reference:
+
+    check_citations_match_their_enzyme   OK    (0.398 is on the page)
+    this test                            FAIL  (the resolver returns 0.03)
+
+**`286469` → `286442`** — a real LDH reference, for the other row:
+
+    check_citations_match_their_enzyme   OK    (286442 is a real LDH ref)
+    this test                            FAIL  (the resolver cites 286469)
+
+Both restores verified by `diff`. Every string guard in the tree passes both,
+and every one of those guards is correct — the information is not in the
+strings.
+
+### The premise is asserted too
+
+Three of the four tests iterate a list of matched lines. Reword the example
+block and that list is empty, every assertion passes over nothing, and the
+suite reports green on a check that stopped checking. That is the
+most-recorded shape in this repository, and it would have arrived in the
+test written to close the last gap in it. So
+`test_all_three_surfaces_carry_the_example` fails if the count is not three.
+
+Four ADRs, four layers, and the last one required giving up on cleverness
+with regexes and just calling the function.
+
+| | |
+|---|---|
+| Built | 4 tests that run the resolver rather than reading the page |
+| Corrected | `evidence_table.py`'s docstring, which still said citation-enzyme attribution needed credentials — left visible, in the file whose point is not asserting more than was measured |
+| Verified | two mutations that every string guard passes and this fails; both restores checked by `diff` |
+| Named as open | `docs/DESIGN.md`'s separate example, and the derived Vmax line (ADR 0142) |
+| **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
