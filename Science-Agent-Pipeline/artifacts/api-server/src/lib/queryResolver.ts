@@ -1141,11 +1141,34 @@ interface DomainDefaults {
   keywords: string[];
   reasoning: string;
   modelCitations: string[];
+  /**
+   * The domain this one is a special case of, when it is one.
+   *
+   * Four pairs here are nested rather than merely similar: an SEIR epidemic
+   * *is* an SIR epidemic with one more compartment; a bimolecular Gillespie
+   * run *is* a Gillespie run; competitive inhibition *is* Michaelis-Menten
+   * with an inhibitor; two-locus Wright-Fisher *is* Wright-Fisher at two
+   * loci.
+   *
+   * That structure breaks the scoring rule. Summed scores treat every
+   * matched term as evidence for one domain over the others, but a parent's
+   * terms are true of the child as well -- "infection", "spreads" and
+   * "disease" describe an SEIR epidemic exactly as well as an SIR one. So
+   * the parent accumulates score on words that do not discriminate, and
+   * outvotes the child's one genuinely decisive phrase. Measured: "an
+   * infection spreads when there's a hidden incubation phase" scored SIR 16
+   * ("infection" + "spreads") against SEIR 10 ("incubation"), and the query
+   * that says incubation got the model without one.
+   *
+   * See `resolveNesting`.
+   */
+  refines?: SimulationDomain;
 }
 
 const DOMAIN_DEFAULTS: DomainDefaults[] = [
   {
     domain: "mm_competitive_inhibition",
+    refines: "mm",
     parameters: {
       km: 2,
       ki: 1.0,
@@ -1268,6 +1291,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
   {
     domain: "seir",
+    refines: "sir",
     parameters: {
       beta: 0.3,
       sigma: 0.2,
@@ -1363,6 +1387,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
   {
     domain: "two_locus_wright_fisher",
+    refines: "wright_fisher",
     parameters: {
       population_size: 100,
       generations: 20,
@@ -1435,6 +1460,7 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
   {
     domain: "gillespie_ssa_bimolecular",
+    refines: "gillespie_ssa",
     parameters: { a0: 100, b0: 100, k: 0.005, end: 10 },
     keywords: [
       "collide",
@@ -1868,6 +1894,104 @@ function matchesTerm(text: string, term: string): boolean {
  * query matching no term at all is a query this classifier cannot answer,
  * and saying so is the whole reason the field exists.
  */
+/**
+ * Terms a child domain has that its parent does not.
+ *
+ * These are the only words that can distinguish the two. A term both lists
+ * -- if any -- is evidence for the pair, not for either member, and counting
+ * it would recreate the problem at one remove.
+ */
+function distinctiveTerms(child: DomainDefaults, parent: DomainDefaults): string[] {
+  const parentTerms = new Set(parent.keywords.map((k) => k.toLowerCase()));
+  return child.keywords.filter((k) => !parentTerms.has(k.toLowerCase()));
+}
+
+/**
+ * Promote a scored winner to the nested special case the query asked for.
+ *
+ * The rule: if the winning domain has a child that `refines` it, and any of
+ * that child's *distinctive* terms appear in the query, the child wins --
+ * regardless of score.
+ *
+ * "Regardless of score" is the whole point and deserves the scrutiny. It is
+ * not a tie-break or a weight; a single distinctive phrase beats any amount
+ * of accumulated parent vocabulary. That is justified only because the
+ * relationship is genuine containment: every parent term is true of the
+ * child too, so no quantity of parent evidence is evidence *against* the
+ * child. "Incubation phase" says SEIR and nothing else does, however many
+ * times a query also says "infection" and "spreads".
+ *
+ * It is applied repeatedly, so a chain (were one ever declared) resolves to
+ * its most specific member. A cycle would hang, so the walk is bounded by
+ * the number of domains and asserts rather than looping.
+ *
+ * The obvious failure mode is over-promotion: a query mentioning an
+ * inhibitor only in passing gets the inhibition model. Two things bound it
+ * -- the negation handling of ADR 0168, which is why "no inhibitor involved"
+ * does not promote, and the requirement that the term be distinctive. What
+ * remains is measured in ADR 0169 rather than argued here.
+ */
+function resolveNesting(
+  winner: DomainDefaults,
+  query: string,
+): DomainDefaults {
+  let current = winner;
+
+  for (let step = 0; step <= DOMAIN_DEFAULTS.length; step++) {
+    const child = DOMAIN_DEFAULTS.find(
+      (candidate) =>
+        candidate.refines === current.domain &&
+        distinctiveTerms(candidate, current).some((term) =>
+          matchesTerm(query, term),
+        ),
+    );
+    if (!child) return current;
+    current = child;
+  }
+
+  // Unreachable unless `refines` describes a cycle, which would be a
+  // declaration error rather than a query the classifier cannot handle.
+  throw new Error(
+    `refines relation cycles at "${current.domain}"; a domain cannot be a special case of itself`,
+  );
+}
+
+/**
+ * The declared `refines` graph, as data.
+ *
+ * Exported so its shape can be asserted directly rather than inferred from
+ * classifications. The cycle guard in `resolveNesting` is unreachable with
+ * correct declarations, and a test that could only reach it by stubbing the
+ * table would be testing the stub; testing the declarations is the honest
+ * version of the same check.
+ */
+export function refinementPairs(): {
+  child: string;
+  parent: string;
+  childTerms: string[];
+  parentTerms: string[];
+  /** Terms the child has that the parent does not; the only ones that can
+   *  promote. Currently equal to the child's whole list, because no declared
+   *  pair shares a term -- see the invariant test. */
+  distinctive: string[];
+}[] {
+  return DOMAIN_DEFAULTS.filter((d) => d.refines !== undefined).map((child) => {
+    const parent = DOMAIN_DEFAULTS.find((p) => p.domain === child.refines);
+    if (parent === undefined) {
+      throw new Error(
+        `"${child.domain}" refines "${child.refines}", which is not a declared domain`,
+      );
+    }
+    return {
+      child: child.domain,
+      parent: parent.domain,
+      childTerms: child.keywords,
+      parentTerms: parent.keywords,
+      distinctive: distinctiveTerms(child, parent),
+    };
+  });
+}
+
 export function classifyDomainByKeyword(query: string): KeywordClassification {
   let best: { defaults: DomainDefaults; score: number } | undefined;
 
@@ -1886,7 +2010,9 @@ export function classifyDomainByKeyword(query: string): KeywordClassification {
   }
 
   if (best !== undefined) {
-    return { defaults: best.defaults, matched: true };
+    // Scoring picked the best-evidenced domain; nesting then asks whether
+    // the query named a special case of it. See `resolveNesting`.
+    return { defaults: resolveNesting(best.defaults, query), matched: true };
   }
 
   const fallback =

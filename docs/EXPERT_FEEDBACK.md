@@ -13553,3 +13553,66 @@ exits 3; the benchmark names empty fixtures instead of scoring them.
 | Built | negation-aware matching, 8 tests, a third independent fixture, `make classifier-bench` (offline, refuses to print an aggregate) |
 | Verified | three mutations, all caught after two rounds of sharpening; ablation across three fixtures; 680 of 681 api-server tests -- the one failure is a pre-existing live-network flake that passes in isolation |
 | **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: the parent outvoted the child (ADR 0169)
+
+You asked me to take the nesting problem. The first thing measuring it did
+was correct the framing I gave you.
+
+I had called `seir -> sir` and bimolecular-vs-unimolecular "semantic nesting
+that no keyword mechanism touches", implying a coverage gap. It is not. The
+child's distinctive phrase was usually *already in the query*:
+
+> "how an infection spreads when there's a **hidden incubation phase**"
+
+`"incubation"` matched SEIR and lost, because summed scoring gave SIR
+`"infection"` (9) + `"spreads"` (7) = 16 against SEIR's 10. The query said the
+one word that distinguishes the two models and got the other one.
+
+### Why summing was wrong, not just badly weighted
+
+Four pairs are genuinely nested — an SEIR epidemic *is* an SIR epidemic with
+one more compartment. So the parent's vocabulary is true of the child as
+well. `"infection"` is not evidence for SIR *over* SEIR; it is evidence for
+both. Summing it as though it discriminated is double-counting, and no
+adjustment of weights fixes a term that carries no information about the
+choice being made.
+
+`refines` declares the four pairs; a winner is promoted to a child whose
+distinctive terms appear unnegated, regardless of score. Regardless of score
+is the whole rule, and it is only defensible because containment means no
+quantity of parent evidence is evidence against the child.
+
+| fixture | before | after |
+|---|---|---|
+| Groq, 78 | 82.1% | **89.7%** |
+| Mistral, 72 | 54.2% | **56.9%** |
+| OpenRouter, 78 | 75.6% | **76.9%** |
+
+All three up, none down. Target confusions 8→3 and 7→4. **Over-promotion —
+the failure mode an absolute rule is most likely to have — measured at zero
+across all 228 fixture queries.**
+
+### One mutation reported NOT CAUGHT rather than papered over
+
+Promotion only counts terms the parent does not also list. The mutation that
+deletes that filter is **NOT CAUGHT**, and I am reporting it that way.
+
+Measured: all four pairs share exactly zero keywords, so the filter removes
+nothing and deleting it changes no classification. I kept it — it costs
+nothing and stays correct whatever the table later holds — and added an
+invariant test asserting the zero-overlap fact, so the day someone adds a
+shared term the filter becomes load-bearing and that test says so.
+
+I could have made the mutation catchable by adding an overlapping keyword.
+That would have been fitting the evidence to the table, and the number it
+produced would have meant nothing.
+
+| | |
+|---|---|
+| Found | that the nesting failure was scoring, not coverage — the opposite of what I told you last pass |
+| Built | `refines` on four pairs, `resolveNesting`, 15 tests including an over-promotion guard and a zero-overlap invariant |
+| Verified | three mutations, two caught and one honestly NOT CAUGHT; over-promotion measured at zero over 228 queries; 696 api-server tests |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
