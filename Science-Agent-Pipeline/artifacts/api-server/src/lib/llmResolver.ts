@@ -128,7 +128,14 @@ const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
   groq: {
     apiUrl: "https://api.groq.com/openai/v1/chat/completions",
     apiKeyEnvVar: "GROQ_API_KEY",
-    defaultModel: "llama-3.3-70b-versatile",
+    // Was "llama-3.3-70b-versatile" until Groq retired it. That default
+    // returned HTTP 404 "model does not exist or you do not have access",
+    // which `resolveQueryWithLLM` turns into null -- so the resolver fell
+    // back to the keyword table on every query and never said why. Checked
+    // against Groq's /v1/models on 2026-08-23: this id is present, the old
+    // one is not. A default that 404s is worse than no default, because it
+    // fails as a silent downgrade rather than as an error.
+    defaultModel: "openai/gpt-oss-120b",
     supportsJsonMode: true,
   },
   openrouter: {
@@ -162,6 +169,72 @@ const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
  * unresponsive endpoints.
  */
 const LLM_REQUEST_TIMEOUT_MS = 30_000;
+
+/** Why the LLM resolver is or is not usable, as three states rather than a
+ *  boolean. "Keys are present but unreachable" is the state that was
+ *  previously indistinguishable from "no keys at all". */
+export type LLMConfigState =
+  | { state: "configured"; provider: string; model: string }
+  | { state: "unconfigured"; detail: string }
+  | { state: "misconfigured"; detail: string };
+
+/**
+ * Report whether an LLM would actually be called, and if not, why.
+ *
+ * The case this exists for: an operator sets GROQ_API_KEY (and four other
+ * provider keys) but never sets LLM_PROVIDER. `getApiKey` only consults a
+ * provider's own env var once LLM_PROVIDER selects that provider, so every
+ * key is ignored, `resolveQueryWithLLM` returns null, and the pipeline
+ * silently classifies with the keyword table forever. Nothing logged it and
+ * `/pipeline/status` reported "Not set", which is not what is wrong -- the
+ * keys are set; the selector is missing. Telling an operator "not set" when
+ * five keys are present sends them to look in the wrong place.
+ */
+export function describeLLMConfig(): LLMConfigState {
+  const selector = process.env.LLM_PROVIDER?.toLowerCase();
+  const generic = process.env.LLM_API_KEY || process.env.OPENAI_API_KEY;
+
+  if (selector && !LLM_PROVIDERS[selector]) {
+    return {
+      state: "misconfigured",
+      detail:
+        `LLM_PROVIDER="${selector}" is not a known provider. Known: ` +
+        `${Object.keys(LLM_PROVIDERS).join(", ")}.`,
+    };
+  }
+
+  if (getApiKey()) {
+    return {
+      state: "configured",
+      provider: selector ?? "generic (LLM_API_KEY/OPENAI_API_KEY)",
+      model: getModel(),
+    };
+  }
+
+  // No key resolved. Distinguish "nothing configured" from "keys present
+  // but none selected", because only the second is a one-line fix.
+  const present = Object.entries(LLM_PROVIDERS)
+    .filter(([, cfg]) => !!process.env[cfg.apiKeyEnvVar])
+    .map(([name]) => name);
+
+  if (present.length > 0 && !selector && !generic) {
+    return {
+      state: "misconfigured",
+      detail:
+        `Provider key(s) present for: ${present.join(", ")}, but ` +
+        "LLM_PROVIDER is unset, so none of them is used and every query " +
+        `falls back to keyword matching. Set LLM_PROVIDER to one of: ` +
+        `${present.join(", ")}.`,
+    };
+  }
+
+  return {
+    state: "unconfigured",
+    detail:
+      "No LLM API key found. Set LLM_PROVIDER plus that provider's key, " +
+      "or LLM_API_KEY with LLM_API_URL. Queries use keyword matching.",
+  };
+}
 
 /**
  * Resolve which provider config is active. LLM_PROVIDER selects by name

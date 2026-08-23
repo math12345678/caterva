@@ -1,0 +1,48 @@
+{
+  "_why": [
+    "ADR 0166's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0166 measures the domain classifier: the keyword table scores 60% on",
+    "a labelled set where the LLM scores 96%. Both of the defects it fixes are",
+    "the same shape -- a third state ('I could not determine this') collapsed",
+    "into a confident second state, so the pipeline kept answering and nothing",
+    "said it had stopped knowing.",
+    "",
+    "M1 restores the collapse in the classifier: the keyword table's fallback",
+    "reported as a genuine match. That is what made the baseline look accurate",
+    "on queries it had never understood -- every unrecognised query silently",
+    "scored as enzyme kinetics.",
+    "",
+    "M2 restores the collapse in the config check: provider keys present but",
+    "unselected, reported as 'no keys set'. That is the state a real",
+    "deployment was in, with five provider keys and no LLM_PROVIDER.",
+    "",
+    "Not included, because these tests do not catch it: the stale Groq default",
+    "model. That was found by querying Groq's /v1/models over the network, and",
+    "no offline test asserts a remote model id still exists. A set file that",
+    "implied otherwise would overstate the evidence.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0166-classifier-three-state.json"
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/classifierEval.test.ts src/__tests__/llmConfigState.test.ts",
+  "mutations": [
+    {
+      "id": "M1",
+      "description": "the keyword table's fallback reports itself as a genuine match",
+      "_claimed": "caught by the three-state tests and by the fallback count",
+      "_note": "The domain returned is unchanged -- still `mm` -- so every existing test that only asserts on the domain still passes. Only a test that asks whether a keyword actually matched can see this, which is the point: for as long as `matched` did not exist, this defect was invisible by construction.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "  return { defaults: fallback, matched: false };",
+      "replace": "  return { defaults: fallback, matched: true };"
+    },
+    {
+      "id": "M2",
+      "description": "provider keys present but unselected are reported as no keys at all",
+      "_claimed": "caught by the misconfigured-state tests",
+      "_note": "The operator-visible symptom of this mutation is a status line reading 'Not set' while five API keys sit in .env -- which sends whoever is debugging it to add a sixth key rather than to set LLM_PROVIDER. The pipeline keeps returning results the whole time, just classified by keyword.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/llmResolver.ts",
+      "find": "  if (present.length > 0 && !selector && !generic) {",
+      "replace": "  if (false && present.length > 0 && !selector && !generic) {"
+    }
+  ]
+}

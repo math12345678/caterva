@@ -1585,6 +1585,43 @@ function validateArrayOverride(key: string, arr: number[]): void {
  * Array syntax requires `=` or `:` so it cannot be confused with a scalar
  * followed by unrelated text.
  */
+/**
+ * Classify a query to a simulation domain using the keyword table above.
+ *
+ * This is the resolver's behaviour when no LLM is configured, and it is the
+ * baseline the LLM classifier has to beat. It was extracted from
+ * `resolveQuery` rather than copied so that a benchmark measures the code
+ * that actually runs -- two implementations of one classification would
+ * drift, and the benchmark would then be measuring the copy.
+ *
+ * `matched` is the part callers could not previously see. First-match-wins
+ * over an ordered table means a query that matches nothing still yields a
+ * domain -- `mm`, because that is the fallback -- and the caller had no way
+ * to tell that apart from a genuine `mm` match. Reporting the two as one
+ * fact is what makes the keyword baseline look more accurate than it is:
+ * every unrecognised query is silently scored as an enzyme-kinetics query.
+ */
+export interface KeywordClassification {
+  defaults: DomainDefaults;
+  /** true when some keyword actually matched; false when nothing matched
+   *  and the `mm` fallback was substituted. */
+  matched: boolean;
+}
+
+export function classifyDomainByKeyword(query: string): KeywordClassification {
+  const lower = query.toLowerCase();
+
+  for (const candidate of DOMAIN_DEFAULTS) {
+    if (candidate.keywords.some((keyword) => lower.includes(keyword))) {
+      return { defaults: candidate, matched: true };
+    }
+  }
+
+  const fallback =
+    DOMAIN_DEFAULTS.find((d) => d.domain === "mm") ?? DOMAIN_DEFAULTS[0]!;
+  return { defaults: fallback, matched: false };
+}
+
 export function extractParameterOverrides(
   query: string,
 ): Record<string, number | number[]> {
@@ -2216,20 +2253,7 @@ export async function resolveQuery(
     };
   }
 
-  const lower = query.toLowerCase();
-
-  let best: DomainDefaults | undefined;
-  for (const candidate of DOMAIN_DEFAULTS) {
-    if (candidate.keywords.some((keyword) => lower.includes(keyword))) {
-      best = candidate;
-      break;
-    }
-  }
-
-  if (!best) {
-    best =
-      DOMAIN_DEFAULTS.find((d) => d.domain === "mm") ?? DOMAIN_DEFAULTS[0]!;
-  }
+  const { defaults: best } = classifyDomainByKeyword(query);
 
   let parameters = { ...best.parameters, ...overrides };
   let flags: string[] = [];

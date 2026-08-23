@@ -13313,3 +13313,80 @@ reachable by running the thing rather than reading about it.
 | Built | 4 tests (8 in the file), the grade driven through the grader |
 | Verified | two mutations, both caught; invented values asserted absent rather than correct ones present; both restores checked by `diff` |
 | **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
+
+---
+
+## Pass: the classifier nobody measured (ADR 0166)
+
+The brief was to find out whether the AI agent pipeline works. It does — 645
+api-server tests green, a live query resolving `km = 10.73 mM` from BRENDA
+with every other parameter marked `origin=user`. What had never been measured
+was the part doing the "AI": which domain the query gets classified into.
+
+### The measurement
+
+25 labelled queries, all 13 LLM-exposed domains, Groq `openai/gpt-oss-120b`:
+
+| classifier | correct | could not determine |
+|---|---|---|
+| keyword table | 15/25 (60.0%) | 4 |
+| LLM | 24/25 (96.0%) | 0 |
+
+**+36.0 points.** The LLM earns its call. That was not obvious beforehand: on
+three ad-hoc queries the two agreed exactly, which is how the question had
+stayed open.
+
+### The harness got it wrong first, and that is the part worth reading
+
+The first run scored the LLM at **−7 against the baseline**. The misses were
+HTTP 429s from Groq's free-tier token limit. `resolveQueryWithLLM` flattens
+every failure into `null` — no key, dead model, rate limit, malformed body —
+so the harness counted a billing tier as the model's accuracy and would have
+published it.
+
+It now paces, retries, and **refuses to print a comparison at all** while any
+query is unanswered. An absent LLM reports NOT MEASURED, never zero.
+
+### Three defects, all the same shape
+
+The third state collapsed into a confident second state, so the system kept
+answering and nothing recorded that it had stopped knowing.
+
+- The keyword table substitutes `mm` when nothing matches. A caller could not
+  distinguish a real enzyme-kinetics match from a query it never understood.
+- **Five provider keys were set and `LLM_PROVIDER` was not**, so `getApiKey`
+  resolved nothing and the LLM was never called. `/pipeline/status` said
+  `"Not set"` — sending whoever debugged it to add a sixth key.
+- Groq retired `llama-3.3-70b-versatile`; the default 404s. A unit test pinned
+  that id and passed the whole time, because a mocked `fetch` cannot return a
+  404 nobody asked for.
+
+### The table's misses are structural
+
+`sir` is checked before `seir`, so *"an incubation period before patients
+become infectious"* — the definition of the E compartment — routes to `sir`.
+`"oscillator"` matches the cell cycle before `repressilator` is reached. And
+*"predator-prey cycles"* becomes **`pcr`**, because `"cycles"` is a PCR
+keyword sitting earlier in the table: an ecology question answered with a DNA
+amplification model.
+
+These are pinned as individually named tests, so fixing one fails loudly and
+says which defect got fixed, rather than a score quietly moving.
+
+### What I did not do
+
+I did not touch the trust model. `origin: "llm"` is still blocked identically
+to `origin: "default"`; the LLM classifies and extracts entities and supplies
+no value that survives. Asked to "make the AI pipeline work", the tempting
+reading was to let LLM numbers through — that would delete the thing the
+project exists for, and it is a decision for the owner, not a fix.
+
+I also did not repair the keyword table. Its ordering defects are measured and
+pinned, not fixed; reordering it carries its own regression risk.
+
+| | |
+|---|---|
+| Found | a 36-point accuracy gap nobody had measured, an LLM that was never called, and a default model that 404s |
+| Built | 20 tests across 2 files, a benchmark that scores the extracted (not copied) classifier, three-state config reporting |
+| Verified | two mutations, both caught, reproducible under `scripts/mutate.py`; both restores checked by `diff`; 645/645 api-server tests |
+| **Still red, not mine** | `make test` fails 2 Python tests — `cffconvert` is declared in `requirements-dev.txt` and installed in no venv on this machine. Pre-existing at HEAD. The ADR index links 0146 and 0150, which are another agent's uncommitted files. |

@@ -14,6 +14,7 @@ import * as queue from "../lib/queue";
 import { resolvePythonExecutable } from "../lib/python";
 import { findRepositoryRoot } from "../lib/repoRoot";
 import { getDomainCitation } from "../lib/domain-literature";
+import { describeLLMConfig } from "../lib/llmResolver";
 
 const router: IRouter = Router();
 
@@ -116,14 +117,32 @@ router.get(
             ? "DATABASE_URL configured and connected"
             : "Not configured — results are in-memory only (no persistence)",
         },
-        {
-          ok: !!process.env["OPENAI_API_KEY"] || !!process.env["LLM_API_KEY"],
-          label: "openai / llm api key",
-          detail:
-            process.env["OPENAI_API_KEY"] || process.env["LLM_API_KEY"]
-              ? "Configured — queries will use LLM resolution"
-              : "Not set — falling back to keyword matching (no enzyme lookups via LLM)",
-        },
+        // Three states, not a boolean. "Keys are set but no LLM_PROVIDER
+        // selects one" reported as "Not set" sends an operator to look for
+        // a missing key that is already there. `ok` stays false for it --
+        // the LLM genuinely is not being called -- but the detail says
+        // which of the two problems it is.
+        //
+        // The wording also no longer says "queries will use LLM
+        // resolution". The LLM classifies the domain and extracts entities;
+        // it never supplies a parameter value that survives (ADR 0011),
+        // and a status line implying otherwise misdescribes the trust
+        // model to the person most likely to be relied on for it.
+        (() => {
+          const llm = describeLLMConfig();
+          if (llm.state === "configured") {
+            return {
+              ok: true,
+              label: "llm domain classifier",
+              detail: `Configured — provider ${llm.provider}, model ${llm.model}. Classifies the simulation domain and extracts entities; parameter values still come only from the query or from literature.`,
+            };
+          }
+          return {
+            ok: false,
+            label: "llm domain classifier",
+            detail: `${llm.state === "misconfigured" ? "Misconfigured" : "Not set"} — ${llm.detail}`,
+          };
+        })(),
       ];
 
       const allOk = subsystems.every((s) => s.ok);
