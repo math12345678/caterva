@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all dmg
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all dmg setup-js
 
 help:
 	@echo "Terrium"
@@ -340,6 +340,24 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+setup-js:
+	@# Install the JavaScript dependencies the Python guards read.
+	@#
+	@# `make setup` installs Python only, so there was no documented way to
+	@# get node_modules -- and several *Python* guards need them:
+	@# check_dependency_licenses.py reads the LICENSE file shipped inside each
+	@# package, and check_codegen_loads.py loads generated modules against the
+	@# installed zod. Without this a contributor sees those guards fail and
+	@# nothing tells them the cause is an uninstalled workspace (ADR 0173).
+	@#
+	@# Two managers on purpose: the root package.json is npm (it has
+	@# package-lock.json and no packageManager field); Science-Agent-Pipeline
+	@# is a pnpm workspace.
+	@command -v npm >/dev/null 2>&1 || { echo "npm not found -- install Node 22+"; exit 3; }
+	npm ci --no-audit --no-fund
+	@command -v pnpm >/dev/null 2>&1 || corepack enable
+	cd Science-Agent-Pipeline && pnpm install --frozen-lockfile
 
 dmg: check-python
 	@# Build Terrium.app and Terrium.dmg (ADR 0176).

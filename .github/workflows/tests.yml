@@ -165,6 +165,13 @@ jobs:
         working-directory: Science-Agent-Pipeline
         run: pnpm install --frozen-lockfile
 
+      # The root package.json is npm, not pnpm -- it has package-lock.json and
+      # no packageManager field. Its devDependencies (eslint, jest, ts-node
+      # and friends) are read by the same licence guard, so leaving them out
+      # moved the failure rather than fixing it.
+      - name: Install root JS dependencies
+        run: npm ci --no-audit --no-fund
+
       # Every dependency carries a recorded grant of permission to use
       # it. Unrecorded fails, deliberately.
       - name: Dependency-licence guard
