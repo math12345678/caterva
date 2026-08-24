@@ -358,6 +358,17 @@ setup-js:
 	npm ci --no-audit --no-fund
 	@command -v pnpm >/dev/null 2>&1 || corepack enable
 	cd Science-Agent-Pipeline && pnpm install --frozen-lockfile
+	@# Build the composite library projects.
+	@#
+	@# check_typescript_compiles runs `tsc --noEmit` per workspace, and a
+	@# workspace that REFERENCES a composite project cannot type-check until
+	@# that project's dist/ exists -- TS6305, "output file has not been built
+	@# from source file". Installing alone left 5 of 7 workspaces failing on
+	@# that and nothing said the cause was build ordering rather than code.
+	@#
+	@# --force because `tsc --build` trusts its .tsbuildinfo: with dist/
+	@# deleted but the cache intact it exits 0 and builds nothing.
+	cd Science-Agent-Pipeline && npx tsc --build --force lib/api-zod lib/db lib/api-client-react
 
 dmg: check-python
 	@# Build Terrium.app and Terrium.dmg (ADR 0176).

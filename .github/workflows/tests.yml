@@ -172,6 +172,15 @@ jobs:
       - name: Install root JS dependencies
         run: npm ci --no-audit --no-fund
 
+      # check_typescript_compiles runs `tsc --noEmit` per workspace, and a
+      # workspace referencing a composite project cannot type-check until that
+      # project's dist/ exists (TS6305). Without this, 5 of 7 workspaces failed
+      # on build ordering and the guard's output read like broken code.
+      # --force because `tsc --build` trusts its .tsbuildinfo cache.
+      - name: Build the composite TypeScript libraries
+        working-directory: Science-Agent-Pipeline
+        run: npx tsc --build --force lib/api-zod lib/db lib/api-client-react
+
       # Every dependency carries a recorded grant of permission to use
       # it. Unrecorded fails, deliberately.
       - name: Dependency-licence guard
