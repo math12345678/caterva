@@ -113,6 +113,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILD/Terrium"                       "$APP/Contents/MacOS/Terrium"
 cp "$BUILD/dist/terrium-report"           "$APP/Contents/Resources/terrium-report"
 cp "$HERE/app/viewer.html"                "$APP/Contents/Resources/viewer.html"
+cp "$HERE/app/lesson.js"                  "$APP/Contents/Resources/lesson.js"
 cp "$HERE/app/Terrium.icns"               "$APP/Contents/Resources/Terrium.icns"
 cp "$REPO/Tests/fixtures/brenda_ldh_fixture.html" \
                                           "$APP/Contents/Resources/brenda_ldh_fixture.html"
@@ -162,6 +163,13 @@ out.write_text(json.loads(done.stdout)["markdown"], encoding="utf-8")
 EXTRACT
   if ! node "$HERE/test_viewer.mjs" "$REPORT_MD"; then
     echo "     FAIL: the viewer cannot typeset this report. No DMG will be built." >&2
+    exit 1
+  fi
+  # The lesson layer, against the same report. It must either produce a
+  # lesson whose every figure is in the document, or refuse -- a teaching
+  # tool that always has something ready will eventually invent it.
+  if ! node "$HERE/test_lesson.mjs" "$REPORT_MD"; then
+    echo "     FAIL: the lesson layer disagrees with the report. No DMG will be built." >&2
     exit 1
   fi
 else

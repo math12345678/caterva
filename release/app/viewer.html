@@ -78,6 +78,27 @@
               background: rgba(127,127,127,0.12); padding: 1px 5px; border-radius: 4px; }
   .doc strong { font-weight: 650; }
   .status { color: var(--muted); font-size: 13.5px; }
+  .lesson {
+    border: 1px solid var(--line); border-radius: 10px; padding: 20px 22px;
+    margin: 0 0 26px; background: var(--panel);
+  }
+  .lesson h3 { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.07em;
+               text-transform: uppercase; color: var(--accent); font-weight: 650; }
+  .lesson .q { margin: 8px 0 16px; font-size: 16px; line-height: 1.5; }
+  .lesson .choice {
+    display: block; width: 100%; text-align: left; margin: 7px 0;
+    padding: 10px 14px; border-radius: 8px; border: 1px solid var(--line);
+    background: transparent; color: var(--ink); font-size: 14px; cursor: pointer;
+  }
+  .lesson .choice:hover:not(:disabled) { border-color: var(--accent); }
+  .lesson .choice.right { border-color: var(--accent); background: rgba(31,93,63,0.09); }
+  .lesson .choice.wrong { border-color: var(--warn-line); background: var(--warn-bg); }
+  .lesson .verdict { margin: 16px 0 6px; font-weight: 650; }
+  .lesson .why { margin: 8px 0; }
+  .lesson .caution { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--line);
+                     color: var(--muted); font-size: 13px; }
+  .lesson .skip { background: none; border: 0; color: var(--muted); font-size: 12.5px;
+                  cursor: pointer; padding: 6px 0; text-decoration: underline; }
   .failure {
     background: var(--warn-bg); border: 1px solid var(--warn-line);
     border-radius: 8px; padding: 14px 16px; margin: 16px 0;
@@ -96,6 +117,7 @@
 </header>
 <main><div class="doc" id="doc"><p class="status">Running the simulation…</p></div></main>
 
+<script src="lesson.js"></script>
 <script>
 "use strict";
 
@@ -209,6 +231,59 @@ function showFailure(title, detail) {
     `<p class="status">Nothing was written. This is a failure, not an empty report.</p>`;
 }
 
+/**
+ * Show the question before the answer.
+ *
+ * The report already contains this lesson and states it as a lecture. All
+ * this does is withhold the number for as long as it takes to ask what the
+ * reader expects -- which is the difference between being told that a 13x
+ * disagreement in Km barely moves the answer, and finding out you thought it
+ * would.
+ *
+ * If `lessonFrom` refuses -- because the literature reported one value, and
+ * there is nothing to compare -- the report is shown directly. It does not
+ * invent a question to have one.
+ */
+function renderLesson(markdown, onDone) {
+  const lesson = window.lessonFrom ? window.lessonFrom(markdown) : { ok: false };
+  if (!lesson.ok) { onDone(); return; }
+
+  const panel = document.createElement("div");
+  panel.className = "lesson";
+  panel.innerHTML =
+    `<h3>Before the answer</h3><p class="q">${esc(lesson.question)}</p>` +
+    lesson.choices.map(c =>
+      `<button class="choice" data-id="${esc(c.id)}">${esc(c.label)}</button>`).join("") +
+    `<button class="skip" id="lesson-skip">Skip to the report</button>`;
+  doc.innerHTML = "";
+  doc.appendChild(panel);
+
+  const finish = (chosenId) => {
+    for (const b of panel.querySelectorAll(".choice")) {
+      b.disabled = true;
+      if (b.dataset.id === lesson.correctId) b.classList.add("right");
+      else if (b.dataset.id === chosenId) b.classList.add("wrong");
+    }
+    const right = chosenId === lesson.correctId;
+    const verdict = document.createElement("div");
+    verdict.innerHTML =
+      `<p class="verdict">${right ? "Yes." : "Not quite."} ${esc(lesson.reveal)}</p>` +
+      `<p class="why">${esc(lesson.mechanism)}</p>` +
+      `<p class="caution">${esc(lesson.caution)}</p>`;
+    panel.querySelector("#lesson-skip").remove();
+    panel.appendChild(verdict);
+    onDone(panel);
+  };
+
+  for (const b of panel.querySelectorAll(".choice")) {
+    b.addEventListener("click", () => finish(b.dataset.id));
+  }
+  panel.querySelector("#lesson-skip").addEventListener("click", () => {
+    panel.remove();
+    onDone();
+  });
+}
+
 function render(markdown) {
   currentMarkdown = markdown;
   const { html, unhandled } = typeset(markdown);
@@ -220,7 +295,9 @@ function render(markdown) {
       `know how to typeset</h3>They are shown verbatim so nothing the builder ` +
       `said is lost:\n\n${esc(unhandled.join("\n"))}</div>`;
   }
+  const keep = doc.querySelector(".lesson");
   doc.innerHTML = banner + html;
+  if (keep) doc.insertBefore(keep, doc.firstChild);
   saveBtn.disabled = false;
 }
 
@@ -235,7 +312,7 @@ window.terriumResult = function (payload) {
     saveBtn.disabled = true;
     return;
   }
-  render(payload.markdown);
+  renderLesson(payload.markdown, () => render(payload.markdown));
 };
 
 window.terriumBusy = function () {
