@@ -1061,6 +1061,13 @@ ${colors.bright}Commands:${colors.reset}
     notice. The page's EC must match the one you asked for; Terrium
     refuses to read one enzyme's rows under another's name.
 
+  domains [--json]
+    Every domain the engine can actually simulate, asked OF the engine
+    rather than listed here. If it cannot be asked it says so and prints
+    nothing: a catalogue that looks authoritative and was never checked
+    is the failure this command exists to correct (ADR 0122).
+    ${colors.dim}Example:${colors.reset} domains
+
   catalog <ec-number> | --enzyme NAME [--json]
     What BRENDA actually reports for an enzyme, before you ask it for a
     value: which substrates, under the database's own labels; which
@@ -1097,6 +1104,9 @@ ${colors.bright}Commands:${colors.reset}
                          it up. Offline and checkable; the live path
                          is the one a student without a saved table has.
       --draws N          how many times to sample (default 2000)
+      --points N         timepoints per simulated draw. Only meaningful
+                         with --simulate; without it there is no
+                         trajectory to put points on.
       --json             machine-readable
 
   resolve <enzyme> --substrate S --organism O [options]
@@ -1193,6 +1203,12 @@ ${colors.bright}Commands:${colors.reset}
       --s0 VALUE           initial substrate -- an experimental condition
                            you choose, so it cannot be looked up
       --enzyme-conc VALUE  [E]0, needed for Vmax = kcat x [E]0
+      --yes                accept the names Terrium inferred without
+                           being asked. Only reached when the query
+                           names a system rather than an enzyme AND no
+                           terminal is attached to confirm with -- so
+                           it is for scripts and CI, where "nobody was
+                           there to ask" would otherwise stop the run.
       --km / --vmax        supply either yourself; user values win
       --model NAME         michaelis-menten (default) or a competitive /
                            uncompetitive / non-competitive inhibition model,
