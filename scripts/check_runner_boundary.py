@@ -139,6 +139,32 @@ EMITTED_AS: dict[str, str | None] = {
     # --- deliberately internal -------------------------------------------
     "literature_candidates": "literatureCandidates",
     "search_log": "logs",
+    # Added 2026-08-24. All three were undeclared, which this guard reports
+    # rather than letting them default to "does not cross" -- the exact
+    # silence ADR 0039 found four times. Each verdict below was established
+    # by reading science_agent_runner.py and the TypeScript that consumes it,
+    # not by inferring from the name.
+    #
+    # Emitted at science_agent_runner.py:825; read in queryResolver.ts as
+    # `ScienceAgentResult["ensembleCandidates"]` and by
+    # `ensembleCandidateFlags`.
+    "ensemble_candidates": "ensembleCandidates",
+    # Emitted at science_agent_runner.py:930; read in queryResolver.ts at
+    # :436 and used at :567 to tell a "not_found" refusal which substrates
+    # the enzyme DOES have rows for.
+    "substrates_available": "substratesAvailable",
+    # Internal. The runner never serialises it and no TypeScript field
+    # receives it -- checked by name across the runner and lib/.
+    #
+    # It carries the rows behind a cross-species refusal, shaped as
+    # `TiedCandidate` so `spread_consequence` can consume them unchanged
+    # (ADR 0111). The organisms themselves already cross, as
+    # `crossSpeciesOrganismsAvailable`; these are the VALUES, and they feed
+    # the ensemble on the Python side rather than travelling to a client.
+    #
+    # If a client ever needs to draw the cross-species band itself, this
+    # becomes a wire key and this comment is the thing to delete.
+    "cross_species_candidates": None,
 }
 
 #: Wire keys the runner emits that have no KineticResult origin.
