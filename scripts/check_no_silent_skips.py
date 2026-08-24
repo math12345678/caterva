@@ -39,6 +39,7 @@ Usage:
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -56,6 +57,50 @@ SUITES = [
 
 # The whole point of the guard. See module docstring before changing.
 EXPECTED_MAX_SKIPS = 0
+
+#: Skips that a declared OPTIONAL requirements file explains.
+#:
+#: `requirements-popgen.txt` keeps stdpopsim out of the default install on
+#: purpose: it is GPL-3.0-or-later and Terrium is Apache-2.0, so a default
+#: install must not quietly put copyleft code in the environment (ADR 0061).
+#: That file states the intended consequence in as many words -- the popgen
+#: tests "skip, and `make check` reports the skip as a warning rather than
+#: passing silently".
+#:
+#: A warning is not what happened. With `EXPECTED_MAX_SKIPS = 0` this was a
+#: red build, so the two documents disagreed about the same deliberate
+#: design, and the only routes out were installing the GPL package the split
+#: exists to avoid or raising the limit -- which this file's docstring
+#: forbids, and which would also blind the guard to the next real skip.
+#:
+#: So the exemption is per-test and CONDITIONAL, not a raised count. The
+#: entry is honoured only while the named module is genuinely absent; if
+#: someone installs the extra and the test skips anyway, that is a skip
+#: nothing explains and it goes red. An exemption that cannot expire is a
+#: rubber stamp.
+OPTIONAL_EXTRAS = {
+    "test_popgen_resolver": (
+        "stdpopsim", "requirements-popgen.txt",
+        "GPL-3.0-or-later, deliberately outside the default install (ADR 0061)",
+    ),
+}
+
+
+def explained_by_optional_extra(reason: str) -> tuple[str, str] | None:
+    """(requirements file, note) if an absent optional package explains it.
+
+    Matches on the test id in the reason line rather than on the skip
+    message, because the message is prose an author can reword.
+    """
+    for test_id, (module, req_file, note) in OPTIONAL_EXTRAS.items():
+        if test_id not in reason:
+            continue
+        if importlib.util.find_spec(module) is not None:
+            # Installed and still skipping: not explained. Fall through so
+            # it is reported as an ordinary unexplained skip.
+            return None
+        return req_file, note
+    return None
 
 
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
@@ -186,12 +231,30 @@ def main() -> int:
         )
         return 1
 
+    # Partition before counting: a skip an optional extra explains is
+    # reported, not tolerated silently, and not counted against the limit.
+    explained = [(r, e) for r in all_reasons if (e := explained_by_optional_extra(r))]
+    unexplained = [r for r in all_reasons if explained_by_optional_extra(r) is None]
+
+    if explained:
+        print(f"Explained by an optional extra ({len(explained)}), not counted:")
+        for reason, (req_file, note) in explained:
+            print(f"  - {reason}")
+            print(f"      absent by design: {note}")
+            print(f"      to run these:     pip install -r {req_file}")
+        print()
+
+    # The limit now applies to skips NOTHING explains. Counting the explained
+    # ones against it would leave no honest setting: 0 fails on a deliberate
+    # split, and 1 quietly buys room for an unrelated regression.
+    total_skipped -= len(explained)
+
     if total_skipped > EXPECTED_MAX_SKIPS:
         print(f"FAIL: {total_skipped} skipped test(s), expected at most "
               f"{EXPECTED_MAX_SKIPS}.")
-        if all_reasons:
+        if unexplained:
             print("\nSkipped:")
-            for reason in all_reasons:
+            for reason in unexplained:
                 print(f"  - {reason}")
         print(
             "\nA skipped test is a test that did not run. Before raising\n"
@@ -205,7 +268,8 @@ def main() -> int:
     # ran" is a claim a reader can check rather than take on trust.
     print(
         f"OK: {len(ran)}/{len(SUITES)} suites ran, {total_passed} tests, "
-        f"{total_skipped} skipped (limit {EXPECTED_MAX_SKIPS})."
+        f"{total_skipped} unexplained skip(s) (limit {EXPECTED_MAX_SKIPS})"
+        + (f", {len(explained)} explained by an optional extra." if explained else ".")
     )
     return 0
 

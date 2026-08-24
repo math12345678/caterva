@@ -100,6 +100,32 @@ def run_command(
         return success, stdout, stderr
 
 
+#: Guard commands are written as `python scripts/check_x.py` -- 79 of them.
+#: `python` is whatever the PATH says, which is not necessarily the
+#: interpreter running THIS script.
+#:
+#: Measured, on a developer machine: `python` was `/opt/anaconda3/bin/python`,
+#: which has no `cffconvert` or `python-libsedml`. So invoking
+#: `.venv/bin/python scripts/verify_build.py` -- a fully provisioned
+#: environment, chosen deliberately -- still ran every guard under anaconda,
+#: and the Documented Counts Guard reported 1,179 engine tests against a real
+#: 1,217, because a module that skips at import is not collected. A red build
+#: that says the documentation is wrong when the documentation is right.
+#:
+#: CI never saw it: `actions/setup-python` puts the right interpreter first on
+#: PATH, so `python` and `sys.executable` agree there and disagree only on the
+#: machines where someone is actually choosing an environment.
+#:
+#: Rewritten here rather than in the 79 call sites: one fact, one place, and a
+#: new guard added tomorrow gets it without knowing to.
+def _same_interpreter(cmd: str) -> str:
+    """`python ...` / `python3 ...` -> the interpreter running this script."""
+    for prefix in ("python3 ", "python "):
+        if cmd.startswith(prefix):
+            return f'"{sys.executable}" ' + cmd[len(prefix):]
+    return cmd
+
+
 def run_guard(
     name: str,
     cmd: str,
@@ -108,6 +134,7 @@ def run_guard(
 ) -> Tuple[str, bool, str]:
     """Run a guard and return (name, success, message)."""
     print(f"  Running {name}...", end=" ", flush=True)
+    cmd = _same_interpreter(cmd)
     success, stdout, stderr = run_command(cmd, cwd=cwd, timeout=timeout)
     
     if success:
