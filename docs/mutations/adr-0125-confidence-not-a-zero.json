@@ -1,0 +1,59 @@
+{
+  "_why": [
+    "ADR 0125's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The record shipped its three mutations as prose. This encodes them so a",
+    "reader can re-run the claim rather than trust it -- ADR 0069's whole",
+    "point, written after the hand-run harness had been wrong three separate",
+    "ways.",
+    "",
+    "HOW FAITHFUL THIS IS, SAID PLAINLY",
+    "----------------------------------",
+    "These patches were reconstructed on 2026-08-24 from the record's own",
+    "descriptions and the code they describe, NOT from the author's original",
+    "diffs, which were never committed. Each row below names the mutation ADR",
+    "0125 listed and the exact line in src/web/dashboard.html that implements",
+    "the behaviour it describes. If a mutation here is subtly different from",
+    "the one the author ran, this file is wrong in a way the ADR's prose is",
+    "not -- so the reconstruction is stated rather than implied.",
+    "",
+    "WHAT ADR 0125 WAS ABOUT",
+    "-----------------------",
+    "`confidence` measured literature source count and was rendered as a",
+    "percentage, so one \"0%\" meant three different things: the run failed, the",
+    "run errored, or the run was perfect and made no literature claim. The fix",
+    "renders an em-dash for failure and `n/a` for a correct unsourced run.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0125-confidence-not-a-zero.json"
+  ],
+  "test": "npx jest src/web/__tests__/confidenceIsNotAZero.test.ts",
+  "mutations": [
+    {
+      "id": "M1",
+      "description": "the cell forces a percentage again",
+      "_claimed": "caught",
+      "_note": "The defect exactly: an unsourced run renders 0.0% and is indistinguishable from a failure. This is the branch ADR 0125 added; removing it restores the ambiguity the record exists to describe.",
+      "file": "src/web/dashboard.html",
+      "find": "                        confidence: (result.metadata?.literatureSourcesUsed ?? 0) === 0\n                            ? 'n/a'\n                            : (result.validationConfidence * 100).toFixed(1) + '%',",
+      "replace": "                        confidence: (result.validationConfidence * 100).toFixed(1) + '%',"
+    },
+    {
+      "id": "M2",
+      "description": "the `n/a` branch is removed",
+      "_claimed": "caught",
+      "_note": "Keeps the conditional but collapses the unsourced arm onto the percentage, so a correct run that made no literature claim reports a number it has no basis for. Distinct from M1: the shape survives and only the honest label goes.",
+      "file": "src/web/dashboard.html",
+      "find": "                            ? 'n/a'\n",
+      "replace": "                            ? (result.validationConfidence * 100).toFixed(1) + '%'\n"
+    },
+    {
+      "id": "M3",
+      "description": "a failure path reuses '0'",
+      "_claimed": "caught",
+      "_note": "The em-dash on the job-failure path becomes '0', which is the original conflation reintroduced at the other end: a failed run reporting a score. The second failure path (the catch block at :725) is left alone on purpose, so this mutation isolates one of the two.",
+      "file": "src/web/dashboard.html",
+      "find": "                        confidence: '\\u2014',\n                        time: job.duration || 0,\n                        status: '✗ ' + (job.error || 'Failed')",
+      "replace": "                        confidence: '0',\n                        time: job.duration || 0,\n                        status: '✗ ' + (job.error || 'Failed')"
+    }
+  ]
+}
