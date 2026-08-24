@@ -33,9 +33,16 @@
     "cannot see.",
     "",
     "RUNTIME: the full set is ~3 minutes (a 30s suite x 6). It runs as one",
-    "command; `--only L1,L2,L3` exists for a caller with a shorter budget."
+    "command; `--only L1,L2,L3` exists for a caller with a shorter budget.",
+    "",
+    "COVERS ADR 0151",
+    "----------------",
+    "ADR 0151 section 3 re-derived THIS set and found L1 NOT CAUGHT, having been recorded as caught. The fix (test_an_unsourced_parameter_still_has_a_row_in_the_table) lives in the same suite, and this set is the evidence for both records -- 0133's original table and 0151's re-grading of it. Copying these six mutations into an adr-0151 file would put one fact in two places and let them drift; `covers` is the mechanism ADR 0033/0035 added for exactly this."
   ],
   "test": "cd Tests && python3 -m pytest test_lab_report.py --no-header -p no:cacheprovider",
+  "covers": [
+    "0151"
+  ],
   "mutations": [
     {
       "id": "L1",

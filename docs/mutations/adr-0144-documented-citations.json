@@ -16,9 +16,16 @@
     "guard does not catch it and the ADR says so. A set file that implied",
     "otherwise would overstate the evidence.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0144-documented-citations.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0144-documented-citations.json",
+    "",
+    "COVERS ADR 0151",
+    "----------------",
+    "ADR 0151 extended this guard (the surface set became derived rather than hand-listed) and re-ran this set to show the three mutations still caught. Same evidence, two records."
   ],
   "test": "cd Tests && python3 -m pytest test_documented_citations_guard.py --no-header -p no:cacheprovider",
+  "covers": [
+    "0151"
+  ],
   "mutations": [
     {
       "id": "C1",
