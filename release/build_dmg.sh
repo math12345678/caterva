@@ -113,6 +113,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BUILD/Terrium"                       "$APP/Contents/MacOS/Terrium"
 cp "$BUILD/dist/terrium-report"           "$APP/Contents/Resources/terrium-report"
 cp "$HERE/app/viewer.html"                "$APP/Contents/Resources/viewer.html"
+cp "$HERE/app/Terrium.icns"               "$APP/Contents/Resources/Terrium.icns"
 cp "$REPO/Tests/fixtures/brenda_ldh_fixture.html" \
                                           "$APP/Contents/Resources/brenda_ldh_fixture.html"
 cp "$REPO/LICENSE"                        "$APP/Contents/Resources/LICENSE"

@@ -6,6 +6,7 @@
   <key>CFBundleDisplayName</key>           <string>Terrium</string>
   <key>CFBundleIdentifier</key>            <string>sim.terrium.app</string>
   <key>CFBundleExecutable</key>            <string>Terrium</string>
+  <key>CFBundleIconFile</key>              <string>Terrium</string>
   <key>CFBundlePackageType</key>           <string>APPL</string>
   <key>CFBundleShortVersionString</key>    <string>@VERSION@</string>
   <key>CFBundleVersion</key>               <string>@VERSION@</string>

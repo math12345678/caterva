@@ -22,6 +22,7 @@ Inside the app:
 | `Resources/terrium-report` | `scripts/report_lab.py`, frozen with PyInstaller. **The same builder the CLI calls.** |
 | `Resources/brenda_ldh_fixture.html` | the committed BRENDA page the Km is resolved from. |
 | `Resources/viewer.html` | the typesetter. |
+| `Resources/Terrium.icns` | the app icon, cropped from `Logo.png`. |
 
 No Python, no Node, and no internet is needed on the machine that runs it.
 
@@ -117,7 +118,6 @@ import. Trimming this is real work and is not attempted here.
 - **Apple silicon only.** Built on arm64 and not tested on Intel. No universal
   binary is produced.
 - **Not notarised**, as above.
-- **No app icon.** The generic application icon is used.
 - **The window has not been seen by a human in this build environment.**
   Screen recording is unavailable here, so the app was verified by running its
   headless selftest and by testing the viewer against real output — not by

@@ -115,5 +115,14 @@ that runs on a Mac with nothing installed.
   used code path never calls but `import Terium` drags in. Trimming that means
   breaking the engine's import graph, which is a real change and not attempted
   here.
+- **The icon is a crop of `Logo.png`, not artwork made for an icon.** Built
+  from a single continuous square of the existing logo, corners rounded, at
+  80% inset. Two earlier attempts composited the mark onto a tile and both
+  failed visibly -- a flat colour left a ghost rectangle, and feathering the
+  join turned it into a glow -- because the logo's paper carries a vignette
+  and the cube's pale glass faces sit at the same luminance as it, so
+  brightness keying cannot separate them. Taking one uncut piece removes the
+  seam by removing the join. Nobody has looked at it at 16px, where the thin
+  linework probably disappears.
 - **The version number is chosen, not derived.** `0.1.0` marks a first
   release; nothing computes it and nothing checks it against the tree.
