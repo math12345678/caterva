@@ -37,3 +37,15 @@ PyYAML==6.0.2
 # frozen applications under any licence, which is the only way this project
 # uses it.
 pyinstaller==6.22.2
+
+# Bug-class lint for scripts/check_python_bug_lints.py (F821, F811, E9).
+#
+# Was declared ONLY in pyproject.toml's [project.optional-dependencies] dev
+# extra, which CI never installs -- CI installs this file. So the guard
+# reported "ruff is not installed, so nothing was checked" on every run and
+# `verify_build.py` failed on it. Two manifests declaring dev dependencies
+# had drifted; the pin here matches pyproject's exactly.
+#
+# MIT, Copyright (c) 2022 Charles Marsh -- read from
+# ruff-0.11.11.dist-info/licenses/LICENSE in the installed wheel.
+ruff==0.11.11

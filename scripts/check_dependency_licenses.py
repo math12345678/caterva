@@ -158,6 +158,12 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "combinations without any restriction'. Build-time only otherwise: "
         "nothing imports it and nothing at runtime needs it (ADR 0176).",
     ),
+    "ruff": (
+        "MIT",
+        "Copyright (c) 2022 Charles Marsh. Read from "
+        "ruff-0.11.11.dist-info/licenses/LICENSE in the installed wheel. "
+        "Use, copy, modify, merge, publish, distribute, sublicense, sell.",
+    ),
     "pytest": ("MIT", "Use, copy, modify, distribute, sell."),
     "pytest-timeout": ("MIT", "Use, copy, modify, distribute, sell."),
     "hypothesis": ("MPL-2.0", "File-level copyleft; Terrium does not modify it."),
