@@ -29,6 +29,7 @@ if LIB_DIR not in sys.path:
     sys.path.insert(0, LIB_DIR)
 
 import taxonomy
+import enzyme_lookup  # noqa: E402
 import fallback_logic  # noqa: E402
 import science_agent_runner  # noqa: E402
 from citation import Citation  # noqa: E402
@@ -86,8 +87,30 @@ def golden_result(cross_species: bool = False) -> KineticResult:
     )
 
 
-def run_main(monkeypatch, fake_resolve, payload):
+# A stub NCBI could not return, on purpose.
+#
+# `taxon_id_for` calls `enzyme_lookup.fetch_taxon_id`, which is a live HTTP
+# request to NCBI. This file never stubbed it, so the contract assertion read
+# `None` on a machine without a network and `'9606'` on one with -- and the
+# comment beside it explained the None as "a lookup that did not happen",
+# when the lookup happened and merely failed. The runner's own docstring says
+# the call is routed through the module "so the test suite can monkeypatch it
+# and stay offline"; this file simply never did.
+#
+# The value is deliberately not a plausible taxon id. Stubbing Homo sapiens
+# to "9606" would be indistinguishable from the live answer, so the test
+# would keep passing if the stub were removed -- ADR 0128's lesson, that an
+# expected value which could arrive by accident proves nothing. This one can
+# only arrive by crossing the boundary, and it names which organism was asked
+# about, so `taxonId` (measured in) and `requestedTaxonId` (asked about) can
+# be told apart.
+def stub_taxon_id(organism):
+    return f"stub-taxon:{organism}" if organism else None
+
+
+def run_main(monkeypatch, fake_resolve, payload, taxon_id=stub_taxon_id):
     monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", fake_resolve)
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", taxon_id)
     stdout = io.StringIO()
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
     monkeypatch.setattr(sys, "stdout", stdout)
@@ -140,8 +163,13 @@ def test_golden_found_output_shape(monkeypatch):
         # Both keys are present-and-null rather than absent, so a consumer
         # never has to tell "the runner is too old to emit this" from "the
         # lookup found nothing".
-        "taxonId": None,
-        "requestedTaxonId": None,
+        # Stubbed (see `stub_taxon_id`), so these assert the value CROSSED
+        # the boundary rather than that a network happened to be absent.
+        # Equal here because the golden fixture measured in the organism the
+        # caller asked about; `test_a_taxon_lookup_failure_is_not_a_default`
+        # covers the other direction.
+        "taxonId": "stub-taxon:Homo sapiens",
+        "requestedTaxonId": "stub-taxon:Homo sapiens",
         # A recombinant His-tagged preparation is not the wild-type enzyme
         # (ADR 0092). Emitted by the runner since 2026-08-17; the contract
         # test was not updated with it, so this shape assertion has been
@@ -932,3 +960,37 @@ def test_one_candidate_is_not_an_ambiguity(monkeypatch):
     result = json.loads(stdout.getvalue())
 
     assert result.get("source") != "ec_ambiguous"
+
+
+def test_a_taxon_lookup_failure_is_not_a_default(monkeypatch):
+    """A taxonomy lookup that fails reports nothing, not "assume human".
+
+    `enzyme_lookup.DEFAULT_TAXON_ID` used to read
+    `fetch_taxon_id(organism) or DEFAULT_TAXON_ID`, and `fetch_taxon_id`
+    returns None when NCBI is unreachable or rate-limited -- so a network
+    blip stamped 9606, a human identifier, onto a thermophile's measurement.
+    See Tests/test_no_default_organism.py.
+
+    The runner swallows the exception on purpose: a failed annotation must
+    not sink a Km that resolved. What it must not do is fill the gap.
+    """
+    def explodes(organism):
+        raise RuntimeError("NCBI unreachable")
+
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: golden_result(),
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+        taxon_id=explodes,
+    )
+    # The resolution survives...
+    assert result["ok"] is True and result["found"] is True
+    assert result["km"] == 10.73
+    # ...and the annotation is absent rather than invented.
+    assert result["taxonId"] is None
+    assert result["requestedTaxonId"] is None
+    # Present-and-null, not missing: a consumer must not have to tell
+    # "the runner is too old to emit this" from "the lookup found nothing".
+    assert "taxonId" in result and "requestedTaxonId" in result
+    assert "9606" not in json.dumps(result)
