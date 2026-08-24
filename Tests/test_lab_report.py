@@ -163,10 +163,34 @@ def test_a_substrate_miss_names_the_labels_that_would_have_worked():
 
 def test_the_absence_of_refusals_is_stated_rather_than_left_blank():
     """An empty section reads as an unfinished document. "Nothing was
-    withheld" is a claim, and it is the one a reader wants."""
-    text = report().markdown
+    withheld" is a claim, and it is the one a reader wants.
+
+    CONSTRUCTS THE EMPTY CASE, rather than hoping the default has one.
+    The first version asserted on `report()` and passed only because that
+    fixture happened to resolve without refusing. When the tissue-source
+    check landed -- the fixture's Km differs between diseased and healthy
+    breast, which is a real refusal -- the default grew a refusal and this
+    test went red while nothing it describes had broken.
+
+    A test that reaches its branch by luck reports on the fixture, not on
+    the code. `resolved={}` reaches it on purpose: every parameter was
+    supplied, so there is nothing to withhold, which is exactly the
+    sentence under test.
+    """
+    text = report(resolved={}).markdown
     assert "## What Terrium would not do" in text
     assert "Nothing was withheld" in text
+
+    # And the claim must be conditional. Emitting that sentence
+    # unconditionally would satisfy the assertion above while telling a
+    # reader nothing was withheld from a report that withheld something --
+    # the exact inversion the section exists to prevent.
+    withheld = report()
+    assert withheld.refusals, (
+        "the default fixture no longer refuses anything, so this half of "
+        "the test proves nothing; give it a case that does refuse"
+    )
+    assert "Nothing was withheld" not in withheld.markdown
 
 
 def test_a_preparation_caveat_reaches_the_report():
