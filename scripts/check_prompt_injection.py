@@ -58,6 +58,33 @@ THE MECHANISM DID NOT EXIST UNTIL 2026-08-11 (Part 22)
 
 The paragraph above, and the failure message below, both told readers to
 record benign findings in `trojan-baseline.json`. Nothing read that file.
+
+THE FOUR VERDICTS RECORDED ON 2026-08-24
+----------------------------------------
+Said plainly, because of who did it: the analysis below was prepared by an
+AI agent and applied on the owner's instruction to proceed. That is worth
+writing down, since an agent clearing findings about *text aimed at agents*
+is the shape this guard exists to catch. The reasoning is here to be
+disagreed with, and reverting is one commit.
+
+  * `START_HERE.md` -- a signpost row whose label names the machine half of
+    the audience, beside a link. Quoting that label here made THIS file trip
+    the same rule, so it is described rather than reproduced -- the trap the
+    commandResolve.ts entry already records. Exempts the POINTER only;
+    `docs/AGENT_BRIEF.md` is an instruction surface that nothing here has
+    reviewed.
+  * `Tests/enzyme_preparation.py` -- a docstring naming the cost of erring
+    in each direction on the recombinant/native threshold. Text that
+    volunteers its own failure modes is not talking a reviewer out of
+    anything.
+  * `docs/mutations/adr-0037-organism-column.json` -- a `_note` describing
+    a MUTATION's diagnostic power, not any code's safety.
+  * `docs/mutations/adr-0068-live-data-sources.json` -- a mutation PAYLOAD:
+    the `replace` side of a patch that rewrites a NOTICE line into a bland
+    reassurance, so a guard can be proven to catch exactly that. The string
+    exists to imitate concealment, and the scanner flagging it is the
+    scanner working. The entry is keyed to that one fingerprint, so the
+    same phrasing anywhere else is still a finding.
 Following the instruction did nothing: the entry landed, the build stayed
 red, and the reader believed they had recorded an exemption.
 

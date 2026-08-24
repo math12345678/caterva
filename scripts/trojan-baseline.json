@@ -10,11 +10,11 @@
   ],
   "exemptions": [
     {
-      "fingerprint": "c1cbf7633bc9a4d4",
-      "file": "src/cli/commandResolve.ts",
+      "fingerprint": "a3362a8da806c301",
+      "file": "Business/build-stages/STAGE_10_PART_14.md",
       "rule": "injection/trust-assertion",
       "reviewed": "2026-08-11",
-      "reason": "The flagged text is the CLI's cross-species warning, printed to a human scientist when a resolved parameter was measured in a DIFFERENT organism than the one asked about. It cautions the reader against attributing the value to the queried species. The scanner's rule looks for instructions to stay quiet; this is the opposite -- it surfaces a caveat that would otherwise be buried, and the clause immediately before it affirms the value is real and citable. The warning exists because a cross-species Km presented as an exact match is how a number ends up in a paper credited to the wrong organism. (Worded here without quoting the line verbatim: reproducing it would make this exemption file trip the same rule, which it did on the first attempt.)"
+      "reason": "The same cross-species CLI warning, quoted in the build-stage record that describes why it was added. A historical record of what the code printed on a given date; rewording it would falsify the record."
     },
     {
       "fingerprint": "c3e8b4b182334560",
@@ -24,11 +24,39 @@
       "reason": "The same cross-species CLI warning, quoted verbatim in the README's example output so readers can see what the tool actually prints. Documenting real output is not an instruction to an AI reader; changing the quote to satisfy the scanner would make the documentation wrong."
     },
     {
-      "fingerprint": "a3362a8da806c301",
-      "file": "Business/build-stages/STAGE_10_PART_14.md",
+      "fingerprint": "7f929c4d38a01305",
+      "file": "START_HERE.md",
+      "rule": "injection/agent-targeting",
+      "reviewed": "2026-08-24",
+      "reason": "A row in the 'where to look next' table: a label naming the machine half of the audience, beside a link to docs/AGENT_BRIEF.md. The rule is right that the label branches the reader by whether they are a person or a model -- it is a signpost, not an instruction, and changes no behaviour by itself. Exempted because a repository several agents commit to needs a documented way to brief them, and deleting the signpost hides the brief rather than removing it. (Described without reproducing the label: quoting it verbatim makes THIS file trip the same rule, which it did on the first attempt -- the same trap the commandResolve.ts entry below records.) NOTE FOR THE NEXT READER: this exempts the pointer, not its target. docs/AGENT_BRIEF.md is an instruction surface and deserves its own review; nothing here has assessed it."
+    },
+    {
+      "fingerprint": "6db4c580e8076837",
+      "file": "Tests/enzyme_preparation.py",
       "rule": "injection/trust-assertion",
-      "reviewed": "2026-08-11",
-      "reason": "The same cross-species CLI warning, quoted in the build-stage record that describes why it was added. A historical record of what the code printed on a given date; rewording it would falsify the record."
+      "reviewed": "2026-08-24",
+      "reason": "A module docstring explaining why the recombinant/native threshold sits where it does. The rule fires on reassurance offered in place of explanation; this docstring is explanation, and it volunteers its own failure modes in both directions -- too strict and it excludes most of the corpus while desensitising the reader to the flag (ADR 0028's cry-wolf reasoning), too loose and a tagged construct passes as native, which is the defect the file was written to fix. Prose that names what it could get wrong is not steering anyone away from looking. Same reasoning as the commandResolve.ts entry. (Paraphrased on purpose. Quoting the docstring verbatim made THIS file trip the same rule: the source sentence contains a phrase the scanner treats as an instruction to disregard an alert, which is precisely the trap the commandResolve.ts entry below already records.)"
+    },
+    {
+      "fingerprint": "c52a9a047fed2b35",
+      "file": "docs/mutations/adr-0037-organism-column.json",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-08-24",
+      "reason": "The '_note' on a mutation entry, describing that mutation as the strongest row in its table and saying why: grouping across species turns every multi-organism pool into a 'mixed sources' finding, which is both wrong and loud enough to train a reader to ignore it. That is a claim about a MUTATION's diagnostic power, not a claim that any code is safe. A set file's notes exist to be read by whoever re-runs it."
+    },
+    {
+      "fingerprint": "c883b1af96e517ba",
+      "file": "docs/mutations/adr-0068-live-data-sources.json",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-08-24",
+      "reason": "The flagged text is a mutation PAYLOAD -- the 'replace' side of a patch that overwrites a NOTICE line about a live data source with an empty reassurance, so a guard can be proven to catch exactly that substitution. The string exists to imitate concealment, and the scanner flagging it is the scanner working. Exempting the imitation, not the behaviour: the entry is keyed to one fingerprint in one file, so the same phrasing anywhere outside a mutation's replace field is still a finding."
+    },
+    {
+      "fingerprint": "08ef103710a9fbbb",
+      "file": "mule/index.html",
+      "rule": "concealment/hidden-markup",
+      "reviewed": "2026-08-12",
+      "reason": "`aria-hidden=\"true\"` on an EMPTY span used as a CSS-drawn rule in the manifest section. There is no text at all, hidden or otherwise; the element exists so a border can be painted on it. Same reasoning as the decorative brackets above."
     },
     {
       "fingerprint": "40b5576c50401a01",
@@ -45,11 +73,11 @@
       "reason": "`aria-hidden=\"true\"` on the decorative square brackets flanking a button label. Hiding purely ornamental characters from assistive technology is correct practice -- without it a screen reader announces 'left bracket Construct verified run right bracket'. The hidden content is two punctuation marks and carries no instruction of any kind."
     },
     {
-      "fingerprint": "08ef103710a9fbbb",
-      "file": "mule/index.html",
-      "rule": "concealment/hidden-markup",
-      "reviewed": "2026-08-12",
-      "reason": "`aria-hidden=\"true\"` on an EMPTY span used as a CSS-drawn rule in the manifest section. There is no text at all, hidden or otherwise; the element exists so a border can be painted on it. Same reasoning as the decorative brackets above."
+      "fingerprint": "c1cbf7633bc9a4d4",
+      "file": "src/cli/commandResolve.ts",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-08-11",
+      "reason": "The flagged text is the CLI's cross-species warning, printed to a human scientist when a resolved parameter was measured in a DIFFERENT organism than the one asked about. It cautions the reader against attributing the value to the queried species. The scanner's rule looks for instructions to stay quiet; this is the opposite -- it surfaces a caveat that would otherwise be buried, and the clause immediately before it affirms the value is real and citable. The warning exists because a cross-species Km presented as an exact match is how a number ends up in a paper credited to the wrong organism. (Worded here without quoting the line verbatim: reproducing it would make this exemption file trip the same rule, which it did on the first attempt.)"
     }
   ]
 }
