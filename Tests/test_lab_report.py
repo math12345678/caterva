@@ -438,3 +438,62 @@ def test_an_unstated_rate_law_is_reported_as_unstated():
     assert "| Rate law |" in text, "the row must be present even when unknown"
     assert "not stated by the caller" in text
     assert "Michaelis-Menten" not in text.split("## How this document was produced")[1]
+
+
+def test_the_stated_rate_law_matches_the_simulator_in_use():
+    """The `| Rate law |` row is a claim about the code, so check the code.
+
+    ADR 0180 added the row and named this as the gap it left: the rate law
+    was a bare string sitting near the import, so changing the simulator and
+    not the string would make every report assert an equation the run did
+    not use -- the exact lie the row exists to prevent, and silent.
+
+    So this reads the source rather than the runtime. Both places that pick a
+    simulator bind it to `simulator = <name>`, and every name bound that way
+    must appear in `RATE_LAW_BY_SIMULATOR`. Adding a simulator without saying
+    what it computes is then a red build, not a wrong document.
+
+    Reading the AST, not the text: a regex over the file would match the name
+    inside this docstring, in a comment, or in dead code, and would report
+    agreement it had not established.
+    """
+    import ast
+    import importlib.util
+    from pathlib import Path
+
+    source_path = Path(__file__).resolve().parents[1] / "scripts" / "report_lab.py"
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+
+    chosen: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if (isinstance(target, ast.Name) and target.id == "simulator"
+                    and isinstance(node.value, ast.Name)):
+                chosen.append(node.value.id)
+
+    # A test that found no assignments would pass by examining nothing --
+    # which is this repository's most-recorded defect, and the reason the
+    # count is asserted rather than the loop simply running zero times.
+    assert len(chosen) == 2, (
+        f"expected both simulator choices (band and trajectory), found "
+        f"{len(chosen)}: {chosen}. If a call site moved, this test is "
+        f"looking in the wrong place and is no longer checking anything."
+    )
+
+    spec = importlib.util.spec_from_file_location("_report_lab_src", source_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    for name in chosen:
+        assert name in module.RATE_LAW_BY_SIMULATOR, (
+            f"`{name}` is used to produce numbers in the report, and nothing "
+            f"says which rate law it implements. Add it to "
+            f"RATE_LAW_BY_SIMULATOR."
+        )
+        assert module.RATE_LAW == module.RATE_LAW_BY_SIMULATOR[name], (
+            f"the report states {module.RATE_LAW!r} but runs `{name}`, which "
+            f"is {module.RATE_LAW_BY_SIMULATOR[name]!r}."
+        )

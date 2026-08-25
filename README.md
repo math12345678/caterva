@@ -58,7 +58,7 @@ gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,335 tests (1,217 engine + 1118 literature)
+make test      # runs all 2,336 tests (1,217 engine + 1119 literature)
 ```
 
 ### See what it produces, before anything else
@@ -499,7 +499,7 @@ Terrium/
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1118 tests
+│   └── ...                   1119 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
@@ -589,10 +589,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,335 tests
+make test        # run all 2,336 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,217 tests)
-make test-lit    # literature layer only (1118 tests)
+make test-lit    # literature layer only (1119 tests)
 python3 scripts/verify_build.py --quick  # all 73 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

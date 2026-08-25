@@ -92,11 +92,28 @@ next person will make it too.
 
 **What this does not check.**
 
-- **That the stated rate law is the one that ran.** `RATE_LAW` is a string
-  beside the simulator import, not derived from the simulate function. If
-  someone changes the simulator and not the string, the document lies and
-  nothing here notices. Naming the function object would close it; that is a
-  larger change to `_band_for`'s shape and is not made here.
+- ~~**That the stated rate law is the one that ran.**~~ **Closed the same
+  day**, and it was smaller than this paragraph guessed. `RATE_LAW` is now
+  derived from `RATE_LAW_BY_SIMULATOR`, keyed by the simulator's name, and
+  `test_the_stated_rate_law_matches_the_simulator_in_use` reads the AST of
+  `report_lab.py` for every `simulator = <name>` binding and fails if a name
+  is missing from the map. Adding a simulator without saying what it computes
+  is a red build rather than a wrong document.
+
+  Writing it corrected the paragraph above in two ways. **There are two
+  simulator call sites, not one** — `_band_for` for the band and `main` for
+  the trajectory the Result section prints — and the comment I had just
+  written said "the only place that chooses the simulator", which is the sort
+  of wrong that makes a later checker look in one spot and report agreement
+  it never established. Both are bound and both are checked. And the test
+  asserts it found **exactly two** bindings, because a loop that runs zero
+  times passes while examining nothing; sabotage confirms both directions —
+  swapping in an unmapped simulator fails, and removing one binding fails
+  with "this test is looking in the wrong place and is no longer checking
+  anything."
+
+  The AST is read rather than the file text on purpose: a regex would match
+  the simulator's name inside a docstring, a comment, or dead code.
 - **Only Michaelis-Menten has an explanation.** Every other rate law gets an
   honest refusal, not a lesson. Hill kinetics has a perfectly good story
   about cooperativity and nothing tells it.
