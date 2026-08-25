@@ -79,6 +79,28 @@ BIBTEX = "application/x-bibtex"
 CFF = "application/x-yaml"
 PLAIN_TEXT = "text/plain"
 
+#: The provenance report, as a file a program can read.
+#:
+#: Frank Bergmann, asked whether SED-ML should carry per-parameter
+#: provenance, said it should not, and said where it should go instead
+#: (personal communication, 2026-08-25):
+#:
+#:   "What I'd suggest is to use a combination, perhaps stored as COMBINE
+#:    archive, that would contain: the sbml model, the sed-ml experiment,
+#:    some kind of structured format of your provenance report (could be
+#:    json, markdown, anything really), and all the other data..."
+#:
+#: The archive already carried the first two. The provenance existed only
+#: inside SBML `notes`, which is prose -- and his objection to that is not
+#: that it is wrong but that "this makes automated extraction difficult".
+#:
+#: Eduard Kerkhoven arrived at the same file from the other direction, on
+#: whether provenance belongs per-parameter or in Git history (personal
+#: communication, 2026-08-25): "It is essential though that the metadata is
+#: provided in flat-text format, so that Git can easily diff any changes."
+#: JSON with sorted keys and one field per line diffs; an XML blob does not.
+JSON = "application/json"
+
 MANIFEST_PATH = "manifest.xml"
 
 #: CVODE, the solver libRoadRunner actually uses for these models. KiSAO is

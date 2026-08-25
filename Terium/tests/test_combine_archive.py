@@ -697,3 +697,87 @@ class TestTheTargetsActuallyResolve:
         )
         resolution = resolve_targets(other, sedml)
         assert resolution.ok, resolution.unresolved
+
+
+def test_the_archive_carries_a_machine_readable_provenance_report():
+    """Provenance a program can read, beside the model it describes.
+
+    Frank Bergmann, asked whether SED-ML should carry per-parameter
+    provenance, said it should not and named where it should go instead
+    (personal communication, 2026-08-25): a COMBINE archive holding the
+    model, the experiment, "some kind of structured format of your
+    provenance report (could be json, markdown, anything really)", and the
+    rest. His objection to keeping it only in SBML `notes` was not that
+    notes are wrong -- he recommends them -- but that "this makes automated
+    extraction difficult".
+
+    The two must AGREE, which is the half worth testing. A structured report
+    that drifted from the model shipped beside it would be worse than no
+    report: a consumer would read the one that is easy to parse and get a
+    different answer from the one the simulation actually used.
+    """
+    import base64
+    import io
+    import json
+    import subprocess
+    import sys
+    import zipfile
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    payload = {
+        "format": "omex",
+        "domain": "mm",
+        "parameters": {"km": 0.31, "vmax": 0.25, "s0": 10.0},
+        "provenance": {
+            "km": {
+                "origin": "resolved",
+                "citation": "BRENDA ref 740253",
+                "organism": "Homo sapiens",
+                "source": "BRENDA",
+                "referenceId": "740253",
+                "assayConditions": {
+                    "ph": 7.4, "temperatureC": 30.0, "buffer": None,
+                    "unreported": ["cofactors"],
+                },
+            },
+        },
+        "endTime": 10.0,
+        "points": 51,
+    }
+    done = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "export_annotated_model.py")],
+        input=json.dumps(payload), capture_output=True, text=True,
+        cwd=str(repo_root), timeout=300,
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+    result = json.loads(done.stdout.strip())
+    assert result["ok"], result
+
+    archive = zipfile.ZipFile(io.BytesIO(base64.b64decode(result["modelBase64"])))
+    assert "provenance.json" in archive.namelist()
+
+    report = json.loads(archive.read("provenance.json"))
+    km = report["parameters"]["km"]
+    assert km["origin"] == "resolved"
+    assert km["citation"] == "BRENDA ref 740253"
+    # The assay conditions, including what the source did NOT state. An
+    # absent key would read as "nobody looked", which is a different claim
+    # from "the paper did not say".
+    assert km["assayConditions"]["ph"] == 7.4
+    assert km["assayConditions"]["unreported"] == ["cofactors"]
+
+    # And it agrees with the model in the SAME archive. Asserted on the
+    # reference id rather than on the word "BRENDA", which appears in the
+    # notes' surrounding prose and would match whether the value crossed or
+    # not (ADR 0128).
+    sbml = archive.read("model.xml").decode("utf-8")
+    assert "740253" in sbml
+    assert "7.4" in sbml
+
+    # The manifest must know about it, or a consumer walking the manifest
+    # never sees the file. `verify_archive` checks both directions, and this
+    # asserts the entry is actually declared rather than merely present.
+    manifest = archive.read("manifest.xml").decode("utf-8")
+    assert "provenance.json" in manifest
+    assert "application/json" in manifest

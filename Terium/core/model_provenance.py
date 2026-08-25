@@ -438,3 +438,102 @@ def unsourced_parameters(annotated_text: str) -> list[str]:
         ):
             flagged.append(match.group(1))
     return flagged
+
+
+def provenance_as_json(
+    provenance: "dict[str, ParameterProvenance]",
+    *,
+    rate_law: str | None = None,
+    code_version: str | None = None,
+) -> str:
+    """The same facts as the notes, in a form a program can read.
+
+    WHY THIS EXISTS
+    ---------------
+    Frank Bergmann, asked whether SED-ML should carry per-parameter
+    provenance, said it should not and named where it should go (personal
+    communication, 2026-08-25): a COMBINE archive holding the model, the
+    experiment, and "some kind of structured format of your provenance
+    report (could be json, markdown, anything really)". His objection to
+    keeping it only in SBML `notes` was not that notes are wrong -- he
+    recommends them -- but that "this makes automated extraction difficult".
+
+    NOT A SECOND SOURCE
+    -------------------
+    This serialises the SAME objects that wrote the SBML notes -- the dict
+    `build_sbml` hands to `annotate_sbml`, passed straight through rather
+    than rebuilt from the payload. A second construction from the same
+    payload would agree today and drift the first time one of them learned a
+    field, which is ADR 0003 with a file format attached.
+
+    It is written to accept either provenance dataclass: the Antimony
+    exporter and the SBML exporter carry different shapes on purpose (the
+    SBML one holds a reason per reliability axis, the Antimony one does
+    not), and `getattr` with a default reads what is there without
+    demanding one of them grow a field it has no use for.
+
+    `sort_keys` and one field per line because Eduard Kerkhoven, asked
+    whether provenance belongs per-parameter or in Git history, said both,
+    with a condition (personal communication, 2026-08-25): "It is essential
+    though that the metadata is provided in flat-text format, so that Git
+    can easily diff any changes that are made, instead of recording the
+    whole set of metadata anew with each release."
+
+    WHAT THIS IS NOT
+    ----------------
+    Not a standard. No schema in the COMBINE world describes this shape, and
+    Bergmann was explicit that there is currently no good machine-readable
+    place for source disagreement. It is named `application/json` in the
+    manifest rather than dressed up as a specification it does not implement.
+    """
+    import json
+
+    payload: dict[str, object] = {
+        "_format": "terrium-parameter-provenance/1",
+        "_note": (
+            "Not a COMBINE standard. A structured rendering of the same "
+            "facts carried in the SBML notes of the model in this archive, "
+            "so they can be read without parsing prose."
+        ),
+        "parameters": {
+            name: {
+                "origin": entry.origin,
+                "citation": entry.citation,
+                "citationStatus": getattr(entry, "citation_status", None),
+                "citationSource": getattr(entry, "citation_source", None),
+                "referenceId": getattr(entry, "reference_id", None),
+                "taxonId": getattr(entry, "taxon_id", None),
+                "organism": entry.organism,
+                "source": entry.source,
+                "crossSpecies": entry.cross_species,
+                # Two shapes: (axis, grade) from the Antimony exporter,
+                # (axis, grade, reason) from the SBML one. Unpacked by
+                # length rather than by assuming, because assuming produces
+                # a ValueError on the shape that is actually used here.
+                "reliability": {
+                    axis[0]: (
+                        {"grade": axis[1], "reason": axis[2]}
+                        if len(axis) > 2 and axis[2] else axis[1]
+                    )
+                    for axis in entry.reliability
+                },
+                "note": entry.note,
+                "assayConditions": {
+                    "ph": entry.assay_ph,
+                    "temperatureC": entry.assay_temperature_c,
+                    "buffer": entry.assay_buffer,
+                    # Kept as an explicit list rather than dropped. "The
+                    # source did not state the pH" is a finding about the
+                    # measurement; an absent key would read as "nobody
+                    # looked", which is a different thing.
+                    "unreported": list(entry.assay_unreported),
+                },
+            }
+            for name, entry in sorted(provenance.items())
+        },
+    }
+    if rate_law is not None:
+        payload["rateLaw"] = rate_law
+    if code_version is not None:
+        payload["codeVersion"] = code_version
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"

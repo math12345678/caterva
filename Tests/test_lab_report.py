@@ -497,3 +497,59 @@ def test_the_stated_rate_law_matches_the_simulator_in_use():
             f"the report states {module.RATE_LAW!r} but runs `{name}`, which "
             f"is {module.RATE_LAW_BY_SIMULATOR[name]!r}."
         )
+
+
+def test_the_reproducibility_claim_names_who_can_act_on_it(monkeypatch):
+    """A private commit hash is an instruction most readers cannot follow.
+
+    The section used to tell every reader to "check out that commit and
+    re-run". Jonathan Karr (BioSimulators), asked whether a commit hash is a
+    sufficient reproducibility baseline for a teaching tool, named the limit
+    (personal communication, 2026-08-25):
+
+        "If your source code is private, Git hashes will only be useful to
+         you because other people won't know what they mean."
+
+    Terrium's repositories are private and staying that way (ADR 0179), so
+    the instruction was addressed to a reader who cannot follow it -- in the
+    one section whose job is to say how the numbers can be checked.
+    """
+    import lab_report
+
+    # A clean tree, so the reproducible branch is the one under test. Without
+    # this the assertion passes or fails on whether the working copy happens
+    # to be committed, which is a fact about the machine and not the code.
+    monkeypatch.setattr(lab_report, "_code_version", lambda: ("abc1234", None))
+    text = "\n".join(lab_report._provenance_lines("Michaelis-Menten"))
+
+    assert "If you have access to the repository:" in text
+    assert "If you do not:" in text
+    assert "private" in text
+
+    # Karr's second point: a hash identifies code, not the environment. The
+    # same source under a different NumPy can produce different numbers.
+    assert "does not pin" in text
+    assert "requirements.txt" in text
+
+
+def test_a_dirty_tree_still_refuses_outright(monkeypatch):
+    """The new wording must not have softened the refusal it sits beside.
+
+    Splitting the claim into "if you have access" / "if you do not" is about
+    WHO can check it. Whether it can be checked at all is a separate
+    question, and an uncommitted working tree still answers it no -- so the
+    two branches must stay mutually exclusive.
+    """
+    import lab_report
+
+    monkeypatch.setattr(
+        lab_report, "_code_version",
+        lambda: ("abc1234", "the working tree was modified"),
+    )
+    text = "\n".join(lab_report._provenance_lines("Michaelis-Menten"))
+
+    assert "not reproducible as it stands" in text
+    assert "If you have access to the repository:" not in text, (
+        "a dirty tree must not also offer the instruction that assumes a "
+        "clean one"
+    )

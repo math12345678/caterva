@@ -298,11 +298,46 @@ def _provenance_lines(rate_law: str | None = None) -> list[str]:
             "",
         ]
     else:
+        # WHO CAN ACTUALLY ACT ON THIS
+        #
+        # The sentence used to be "check out that commit and re-run", said to
+        # every reader. Jonathan Karr (BioSimulators), asked whether a commit
+        # hash is a sufficient reproducibility baseline, gave the limit
+        # directly (personal communication, 2026-08-25):
+        #
+        #   "If your source code is private, Git hashes will only be useful
+        #    to you because other people won't know what they mean."
+        #
+        # Terrium's repositories are private and are staying that way
+        # (ADR 0179). So the instruction was addressed to a reader who cannot
+        # follow it, in the section of the document whose entire job is to
+        # say how the numbers can be checked. It is now addressed to whoever
+        # can act on it, and says plainly who that is.
+        #
+        # The second half is Karr's other point. A hash identifies the code
+        # and not the environment it ran in: the same source under a
+        # different NumPy can produce different numbers. Terrium pins its
+        # dependencies, which is why the claim is made at all -- but the pins
+        # live in requirements.txt, not in this document, so the document
+        # says what it is standing on rather than implying it covered
+        # everything.
         lines += [
-            "Check out that commit and re-run the command that produced "
-            "this — with the same seed — and every number above should come "
-            "back identical. If it does not, one of them is wrong and this "
-            "row is how you find out which.",
+            "**If you have access to the repository:** check out that commit "
+            "and re-run the command that produced this — with the same seed — "
+            "and every number above should come back identical. If it does "
+            "not, one of them is wrong and this row is how you find out which.",
+            "",
+            "**If you do not:** the hash above identifies the code to someone "
+            "who has it and nothing more, because these repositories are "
+            "private. It is not a link you can follow, and this document does "
+            "not pretend otherwise.",
+            "",
+            "**What the hash does not pin:** the environment. The same source "
+            "under a different NumPy or solver build can produce different "
+            "numbers. Terrium pins its dependencies in `requirements.txt`, "
+            "which is what makes the claim above worth making, but those pins "
+            "are not recorded here — so this is reproducibility of the code, "
+            "not of the whole stack a container would capture.",
             "",
         ]
     return lines
