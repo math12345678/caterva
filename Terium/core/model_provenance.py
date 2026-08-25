@@ -82,6 +82,9 @@ NO_PROVENANCE_MARKER = "NO PROVENANCE RECORDED"
 #: what excludes those.
 _ASSIGNMENT_RE = re.compile(r"^(\s*)([A-Za-z_]\w*)\s*=\s*([^;]+);\s*$")
 
+#: `  km notes "..."` as the annotator writes it.
+_NOTES_RE = re.compile(r'^\s*[A-Za-z_]\w*\s+notes\s+"[^"]*"\s*$')
+
 
 @dataclass(frozen=True)
 class ParameterProvenance:
@@ -229,6 +232,20 @@ class AnnotationResult:
     unannotated: tuple[str, ...] = field(default_factory=tuple)
 
 
+def _notes_body(text: str) -> str:
+    """One line of provenance, safe to put inside an Antimony `notes "..."`.
+
+    A double quote ends the string and there is no escape for it: `\\"` is a
+    syntax error, measured against the antimony library rather than assumed
+    ("Error in model string […] syntax error, unexpected element name").
+    So quotes become apostrophes -- a change to the prose, small and worth
+    naming, because the alternative is a model file that will not parse.
+
+    Newlines are collapsed for the same reason: `notes` takes one string.
+    """
+    return " ".join(text.replace('"', "'").split())
+
+
 def annotate_antimony(
     antimony_text: str,
     provenance: dict[str, ParameterProvenance],
@@ -237,10 +254,43 @@ def annotate_antimony(
     query: str | None = None,
     generated_at: str | None = None,
 ) -> AnnotationResult:
-    """Return `antimony_text` with provenance written into it as comments.
+    """Return `antimony_text` with provenance written into it.
 
-    The model is not modified. Only comment lines are inserted and inline
-    `//` trailers appended.
+    The model's mathematics is not modified. Comment lines are inserted,
+    inline `//` trailers appended, and an Antimony `notes` statement emitted
+    for every parameter that has provenance.
+
+    WHY BOTH A COMMENT AND A NOTE
+    -----------------------------
+    The comment is for the person reading the file. The note is the only one
+    that survives being used.
+
+    Comments do not cross a conversion. Lucian Smith, asked where
+    per-parameter provenance should live in Antimony given that a comment is
+    the intuitive place, answered (personal communication, 2026-08-25):
+
+        the correct way to add human-readable text to an element is to use
+        'notes':
+
+            a = 3
+            a notes "Smith 1998, pH 7.4, 30 C, rat liver"
+
+    Measured against the antimony library rather than taken on trust. With a
+    comment and a note on the same parameter:
+
+        Antimony -> SBML              note present, comment gone
+        Antimony -> SBML -> Antimony  note present, comment gone
+
+    So every provenance statement this project wrote into an Antimony file
+    was discarded the first time anyone loaded it into a tool -- in the
+    export whose entire purpose is that the value travels with its source.
+    A student handed the file saw the citations; the moment they opened it
+    in Tellurium or COPASI they had bare numbers.
+
+    Both are emitted because they answer different questions and are
+    rendered from the SAME `ParameterProvenance` in one pass, so they cannot
+    disagree. After a round trip the file carries less than it did, which is
+    a real loss and still strictly more than the nothing it carried before.
 
     `provenance` is keyed by parameter name as it appears in the Antimony
     (`Km`, `Vmax`, `S`, ...). Lookup is case-insensitive because the
@@ -263,9 +313,44 @@ def annotate_antimony(
         entry = lookup.get(name.lower())
         if entry is None:
             body.append(f"{line.rstrip()}  {COMMENT} {NO_PROVENANCE_MARKER}")
+            # Also as a note, for the reason stated in this file's own
+            # header: "an absent comment would read as approval, so there is
+            # never one." That principle survives conversion only if the
+            # marker does. Without this line, a model exported with an
+            # unsourced parameter, converted once, arrives with citations on
+            # everything else and silence here -- which is the strongest
+            # possible endorsement the file could give it.
+            body.append(
+                f'{match.group(1)}{name} notes "{_notes_body(NO_PROVENANCE_MARKER)}"'
+            )
         else:
             seen.add(name.lower())
-            body.append(f"{line.rstrip()}  {COMMENT} {entry.one_line()}")
+            summary = entry.one_line()
+            body.append(f"{line.rstrip()}  {COMMENT} {summary}")
+
+            # The durable half, and it carries the FULL record rather than
+            # the inline summary.
+            #
+            # `one_line()` omits the assay conditions -- those live in the
+            # footer's "PROVENANCE IN FULL" block, which is comments, which
+            # do not survive a conversion. So pH, temperature, buffer and
+            # what the source did not report were the part being lost, and
+            # they are the part the question was about: whether two values
+            # may legitimately be compared at all.
+            #
+            # Indented to the assignment's own indentation. This file is
+            # read by people -- that is the whole argument for Antimony over
+            # SBML -- and a flush-left line under an indented block reads as
+            # a mistake.
+            # Exactly the footer's "PROVENANCE IN FULL" rendering --
+            # `[origin]` then `detail_lines()` -- so the durable note and the
+            # human block are one rendering reused, not two that could
+            # describe the same parameter differently. `one_line()` is the
+            # fallback only where there are no details to give, which is the
+            # uncited origins: for those the summary IS the whole record.
+            details = entry.detail_lines() or [summary]
+            detail = f"[{entry.origin}] " + "; ".join(details)
+            body.append(f'{match.group(1)}{name} notes "{_notes_body(detail)}"')
 
     header = _header(run_id=run_id, query=query, generated_at=generated_at)
     footer = _footer(provenance, lookup, seen)
@@ -380,11 +465,27 @@ def strip_annotations(annotated_text: str) -> str:
     annotation ever changes a model, this is what catches it, and the test
     that uses it is the only thing standing between a provenance comment and
     a silently altered simulation.
+
+    Removes the `notes` statements too, now that provenance is written as
+    notes as well as comments. That is not a weakening of the property: the
+    invariant is that annotation does not change what the model COMPUTES,
+    and `annotated_model_still_translates_to_sbml` checks that against
+    libSBML by comparing parsed models, not text. This function is the
+    textual inverse, so it has to invert everything the annotator adds --
+    otherwise it reports a difference that is documentation and calls it a
+    change to the model.
     """
     lines: list[str] = []
     for line in annotated_text.splitlines():
         stripped = line.strip()
         if stripped.startswith(COMMENT):
+            continue
+        # `<name> notes "..."` -- emitted by the annotator, so the inverse
+        # takes it away. Matched as a whole line, not by containment: a
+        # model of its own could legitimately carry notes the annotator did
+        # not write, and stripping those would make this function lie about
+        # what the original said.
+        if _NOTES_RE.match(line):
             continue
         # Remove an inline trailer, but only one that is genuinely a
         # comment: Antimony assignments end in `;`, so the comment can only
