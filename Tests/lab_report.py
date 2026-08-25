@@ -229,7 +229,7 @@ def _code_version(root: "pathlib.Path | None" = None) -> tuple[str, str | None]:
                            "produced this cannot be named.")
 
 
-def _provenance_lines() -> list[str]:
+def _provenance_lines(rate_law: str | None = None) -> list[str]:
     """How this document was produced, at the bottom of the document.
 
     WHY A REPORT HAS TO SAY THIS
@@ -264,8 +264,34 @@ def _provenance_lines() -> list[str]:
         "|---|---|",
         f"| Terrium commit | `{version}` |",
         f"| Generated | {generated} |",
-        "",
     ]
+
+    # WHICH EQUATION THE NUMBERS CAME OUT OF
+    #
+    # The document said "running the model at each" and never said what the
+    # model was. Every figure in it -- the band, the disagreement spread, the
+    # trajectory -- is the output of one specific rate law, and a reader
+    # cannot check a number without knowing which.
+    #
+    # It became load-bearing when `release/app/lesson.js` began explaining
+    # results in terms of `v = Vmax*S/(Km+S)`. That sentence was TRUE of this
+    # run and asserted about any run: nothing in the document said the run
+    # used Michaelis-Menten, so a future domain with a `km` and a different
+    # rate law would have been handed an explanation that did not apply to
+    # it. The fix is not for the lesson to guess better -- it is for the
+    # document to say, once, here.
+    #
+    # None rather than a default: a run whose rate law is not known to the
+    # caller must report that it is not known, because "assume Michaelis-
+    # Menten" is exactly the substitution this project exists to refuse.
+    if rate_law:
+        lines.append(f"| Rate law | {rate_law} |")
+    else:
+        lines.append(
+            "| Rate law | not stated by the caller — the equation behind "
+            "these numbers is not recorded in this document |"
+        )
+    lines.append("")
     if caveat:
         lines += [
             f"**This document is not reproducible as it stands:** {caveat}",
@@ -294,6 +320,7 @@ def build_report(
     ensembles: dict[str, Any] | None = None,
     bands: dict[str, Any] | None = None,
     also_refused: Sequence[str] = (),
+    rate_law: str | None = None,
 ) -> LabReport:
     """Assemble one document from what the run actually established.
 
@@ -640,7 +667,7 @@ def build_report(
             "",
         ]
 
-    lines += _provenance_lines()
+    lines += _provenance_lines(rate_law)
 
     return LabReport(
         title=title,

@@ -115,5 +115,47 @@ if (lesson.ok) {
   }
 }
 
+// --- the explanation follows the document, not the author -------------
+// The mechanism sentence explains a result in terms of v = Vmax*S/(Km+S).
+// Nothing used to check that the run USED that rate law -- it is reached
+// whenever there is a km and an s0 -- so a domain with a km and a different
+// rate law would get a confident explanation that did not apply to it.
+//
+// Asserted on "% of Vmax", the DERIVED saturation figure. The word
+// "saturation" would match for free: the refusal sentence says the
+// saturation argument does not apply, and a check for it passes on the
+// refusal it was meant to detect. That mistake was made writing this test
+// and is recorded here because the next person will make it too.
+const claimsSaturation = (m) => /% of Vmax/.test(m);
+
+check("the real report states its rate law",
+      /\|\s*Rate law\s*\|/.test(markdown),
+      "no `Rate law` row in the provenance table");
+
+if (lesson.ok) {
+  check("a Michaelis-Menten run gets the saturation explanation",
+        claimsSaturation(lesson.mechanism), lesson.mechanism);
+
+  for (const [name, replacement] of [
+    ["a different rate law", "| Rate law | Hill — v = Vmax·S^n/(K^n + S^n) |"],
+    ["no rate law stated", ""],
+  ]) {
+    const altered = markdown.replace(/\|\s*Rate law\s*\|.*\|/, replacement);
+    if (altered === markdown) {
+      console.log(`  --    could not simulate ${name} in this report`);
+      continue;
+    }
+    const other = lessonFrom(altered);
+    check(`${name} -> no Michaelis-Menten explanation`,
+          other.ok && !claimsSaturation(other.mechanism),
+          other.ok ? other.mechanism : other.reason);
+    // The measurement stands even when the reason cannot be given. A lesson
+    // that withheld the result too would be refusing more than it must.
+    check(`${name} -> the measured outcome is still reported`,
+          other.ok && other.reveal.includes("factor of"),
+          other.ok ? other.reveal : other.reason);
+  }
+}
+
 console.log(failures === 0 ? "\nlesson OK" : `\nlesson FAILED: ${failures} check(s)`);
 process.exit(failures === 0 ? 0 : 1);

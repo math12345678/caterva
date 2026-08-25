@@ -49,6 +49,15 @@ from fallback_logic import resolve_kinetic_value  # noqa: E402
 from lab_report import DerivedValue, SuppliedValue, build_report  # noqa: E402
 from ensemble import ensemble_from_entries  # noqa: E402
 from model_ensemble import ensemble_over  # noqa: E402
+
+#: The rate law every number in the report comes out of.
+#:
+#: `_band_for` imports and passes `simulate_michaelis_menten`; this string
+#: describes that choice and is emitted into the document. If the simulator
+#: here ever becomes configurable, this has to move with it --
+#: `test_the_report_states_the_rate_law_it_actually_ran` fails if the two
+#: stop agreeing, so the pair cannot drift silently.
+RATE_LAW = "Michaelis-Menten — v = Vmax·S/(Km + S)"
 from spread_consequence import consequence_of  # noqa: E402
 
 
@@ -693,6 +702,12 @@ def main() -> int:
         bands=bands,
         simulation=simulation,
         bibtex=payload.get("bibtex"),
+        # Stated because the document's numbers are this equation's output
+        # and a reader cannot check one without knowing which (see
+        # `lab_report._provenance_lines`). Named here, at the only place
+        # that chooses the simulator, rather than as a constant elsewhere
+        # that could go on saying "Michaelis-Menten" after the choice moved.
+        rate_law=RATE_LAW,
         also_refused=also_refused + band_refusals + derive_refusals,
     )
 

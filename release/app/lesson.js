@@ -91,6 +91,42 @@ function parameterValue(markdown, name) {
 const ratio = (a, b) => (Math.max(a, b) / Math.min(a, b));
 
 /**
+ * The rate law the run used, as the report states it -- or null.
+ *
+ * WHY THIS IS READ AND NOT ASSUMED
+ * --------------------------------
+ * The mechanism sentence below explains a result in terms of
+ * `v = Vmax*S/(Km+S)`. That was true of the one report this was written
+ * against, and asserted about every report: nothing in the document said
+ * the run used Michaelis-Menten, and it is only reached when there is a
+ * `km` and an `s0`. A future domain with a `km` and a different rate law
+ * -- Hill kinetics, ping-pong, competitive inhibition -- would have been
+ * handed a confident explanation that did not apply to it.
+ *
+ * A wrong explanation is worse here than no explanation, because the whole
+ * point of this layer is to teach someone where a claim comes from.
+ */
+function rateLaw(markdown) {
+  const start = markdown.search(/^##\s+How this document was produced/m);
+  if (start === -1) return null;
+  const section = markdown.slice(start).split(/^##\s/m)[1] || "";
+  for (const line of section.split("\n")) {
+    const t = line.trim();
+    if (!t.startsWith("|")) continue;
+    const cells = t.slice(1, -1).split("|").map((c) => c.trim());
+    if (cells.length >= 2 && cells[0].toLowerCase() === "rate law") {
+      return cells[1] || null;
+    }
+  }
+  return null;
+}
+
+/** Michaelis-Menten, as opposed to merely having a Km. */
+function isMichaelisMenten(law) {
+  return law !== null && /michaelis[\s-]*menten/i.test(law);
+}
+
+/**
  * Build the lesson, or say why there is none.
  *
  * Shape: {ok: true, ...lesson} | {ok: false, reason}
@@ -138,8 +174,23 @@ function lessonFrom(markdown) {
                   || choices[choices.length - 1];
 
   const s0 = parameterValue(markdown, "s0");
+  const law = rateLaw(markdown);
+  const mm = isMichaelisMenten(law);
   let mechanism;
-  if (s0 && Math.max(...values) < s0.value) {
+  if (!mm) {
+    // The saturation argument is a fact about ONE rate law. Without the
+    // document saying which was used, the outcome is still reported --
+    // it was measured -- and the reason is not, because the reason would
+    // be invented.
+    mechanism = law
+      ? `This run used ${law}, not Michaelis-Menten, so the saturation ` +
+        `argument that would explain a spread this size does not apply. ` +
+        `The result above is what the model produced; the reason for it is ` +
+        `not derivable from this document.`
+      : `This report does not state which rate law produced these numbers, ` +
+        `so why the disagreement lands where it does is not derivable from ` +
+        `it. The spread itself is measured and stands.`;
+  } else if (s0 && Math.max(...values) < s0.value) {
     // Derived from the numbers in front of us, not asserted about this
     // enzyme in advance: Michaelis-Menten is v = Vmax*S/(Km+S), so when
     // every candidate Km sits well below S the enzyme is near saturation

@@ -410,3 +410,31 @@ def test_a_directory_that_is_not_a_repository_says_so(tmp_path):
     version, caveat = _lab_report._code_version(tmp_path)
     assert version == "unknown"
     assert caveat and "not a git checkout" in caveat
+
+
+def test_the_report_states_the_rate_law_it_actually_ran():
+    """The document's numbers are one equation's output. It says which.
+
+    The report claimed *"running the model at each"* and never named the
+    model. That became load-bearing when `release/app/lesson.js` started
+    explaining results in terms of `v = Vmax*S/(Km+S)`: the sentence was
+    true of the report it was written against and asserted about every
+    report, so a domain with a `km` and a different rate law would have been
+    handed an explanation that did not apply to it.
+
+    The fix is not for the lesson to guess better. It is for the document to
+    say, once, here -- and for the lesson to read it.
+    """
+    text = report(rate_law="Michaelis-Menten - v = Vmax*S/(Km + S)").markdown
+    assert "| Rate law | Michaelis-Menten - v = Vmax*S/(Km + S) |" in text
+
+
+def test_an_unstated_rate_law_is_reported_as_unstated():
+    """Not a default. "Assume Michaelis-Menten" is the substitution this
+    project exists to refuse, and it would be invisible: every number would
+    still be there, described by an equation nobody chose.
+    """
+    text = report().markdown
+    assert "| Rate law |" in text, "the row must be present even when unknown"
+    assert "not stated by the caller" in text
+    assert "Michaelis-Menten" not in text.split("## How this document was produced")[1]
