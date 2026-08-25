@@ -50,6 +50,48 @@ def test_antimony_comments_do_not_survive_translation_to_sbml():
     for the module existing. If a future Antimony gains comment-preserving
     translation this test fails, and the right response is to re-examine
     whether the SBML annotator is still needed — not to delete the test.
+
+    IT FAILED, AND THE RE-EXAMINATION IS BELOW
+    ------------------------------------------
+    It fired on 2026-08-25, and the cause was not a change in Antimony. It
+    was ADR 0182: `annotate_antimony` now emits a `notes` statement beside
+    each comment, and notes DO survive translation — so the strings this
+    test watched for started arriving in the SBML by a route it did not
+    know about.
+
+    The premise is intact. Comments are still discarded; the module was
+    never built on "provenance cannot reach SBML from Antimony", it was
+    built on "comments cannot". So the test now uses a plain comment rather
+    than the annotator's output, which measures the stated claim instead of
+    a by-product of how the annotator happens to be written today.
+
+    Is the SBML annotator still needed? Yes, and for a reason notes cannot
+    address. A note is prose. `annotate_sbml` writes CVTerms — a PubMed
+    identifier as a resolvable URI under `bqbiol:isDescribedBy`, a taxon
+    under `bqbiol:hasTaxon` — which is what lets a consumer follow a
+    citation rather than read one. Frank Bergmann's advice (ADR 0181) is
+    exactly this split: identifiers in CVTerms, prose in notes. Notes made
+    the human-readable half durable; they did not make it machine-readable.
+    """
+    sbml = to_sbml(
+        PLAIN_MODEL.replace(
+            "  Km = 2.5;",
+            "  Km = 2.5;  // BRENDA ref 649716, Homo sapiens",
+        )
+    )
+    for lost in ("BRENDA", "649716", "Homo sapiens"):
+        assert lost not in sbml, (
+            f"{lost!r} survived into SBML; this module's premise may no longer hold"
+        )
+
+
+def test_a_note_reaches_sbml_where_a_comment_does_not():
+    """The other half, so the pair says something the first cannot alone.
+
+    Without this, the test above passes on a translator that dropped
+    everything, and would keep passing if `annotate_antimony`'s notes
+    silently stopped being emitted — which is the failure ADR 0182 exists
+    to prevent, going unnoticed in the file that documents the loss.
     """
     annotated = annotate_antimony(
         PLAIN_MODEL,
@@ -62,10 +104,10 @@ def test_antimony_comments_do_not_survive_translation_to_sbml():
         },
     )
     sbml = to_sbml(annotated.text)
-
-    for lost in ("BRENDA", "649716", "Homo sapiens"):
-        assert lost not in sbml, (
-            f"{lost!r} survived into SBML; this module's premise may no longer hold"
+    for kept in ("649716", "Homo sapiens"):
+        assert kept in sbml, (
+            f"{kept!r} did not reach SBML; the Antimony notes of ADR 0182 "
+            f"are not being emitted or are no longer surviving translation"
         )
 
 

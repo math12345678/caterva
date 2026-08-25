@@ -155,16 +155,46 @@ def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     passed = 0
     skipped = 0
     reasons: List[str] = []
+    failures: List[str] = []
 
     for case in cases:
+        where = f"{case.get('file') or case.get('classname')}::{case.get('name')}"
         skip = case.find("skipped")
         if skip is not None:
             skipped += 1
-            where = f"{case.get('file') or case.get('classname')}::{case.get('name')}"
             why = (skip.get("message") or "").strip()
             reasons.append(f"{where}: {why}" if why else where)
-        elif case.find("failure") is None and case.find("error") is None:
+        elif case.find("failure") is not None or case.find("error") is not None:
+            # COUNTED, not discarded.
+            #
+            # This branch used to be `elif no failure and no error: passed
+            # += 1`, so a failing test was neither passed nor skipped -- it
+            # left the totals entirely. The guard then printed "1,222
+            # passed, 0 skipped" and exited 0 with tests failing in the
+            # report it had just parsed.
+            #
+            # That is this file's own docstring turned inward: "a green
+            # suite cannot distinguish 'ran and passed' from 'declined to
+            # run'." Here it could distinguish and said nothing. Measured
+            # the hard way on 2026-08-25 -- a full local guard sweep
+            # reported 41/41 green, and CI failed on a test this guard had
+            # already read.
+            failures.append(where)
+        else:
             passed += 1
+
+    if failures:
+        print(f"  ! {len(failures)} failing test(s) in {path.name}:")
+        for where in failures[:10]:
+            print(f"      {where}")
+        if len(failures) > 10:
+            print(f"      ... and {len(failures) - 10} more")
+        # None means "no trustworthy skip count", which is exactly right: a
+        # suite with failures may also have stopped short of tests that
+        # would have skipped. `main` turns this into a red build via the
+        # `unrun` path, and says the suite did not run cleanly rather than
+        # reporting a skip total about a suite that was already broken.
+        return None
 
     if passed == 0 and skipped == 0:
         # A report containing no test cases means collection produced
@@ -225,9 +255,14 @@ def main() -> int:
             f"{', '.join(unrun)}."
         )
         print(
-            "\nA suite that did not run has an unknown skip count. Reporting\n"
-            "a skip total that omits it would be a number about the suites\n"
-            "that happened to work, presented as a number about all of them."
+            "\nA suite that did not run, or that ran with failures, has an\n"
+            "unknown skip count. Reporting a skip total that omits it would\n"
+            "be a number about the suites that happened to work, presented\n"
+            "as a number about all of them.\n"
+            "\n"
+            "Failing tests are listed above. This guard is not the place to\n"
+            "diagnose them -- run the suite directly -- but it will not\n"
+            "print OK while holding a report that says they failed."
         )
         return 1
 
