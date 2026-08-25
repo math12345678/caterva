@@ -51,8 +51,13 @@ that wrong shipped a hardcoded 37 °C into every entry point for months
 > where `check_documented_counts.py` watches them; a second copy inside a
 > warning would be a number drifting with nothing looking at it.)
 
+> **Private repository.** These repositories are private and are staying
+> that way, so `gh repo clone` — which uses your GitHub credentials — is
+> the command that works. A plain `git clone` URL stops at a username
+> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).
+
 ```bash
-git clone https://github.com/Terrium-sim/main.git
+gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything — 2–5 min, ~120 MB
 make check     # verifies the stack genuinely works

@@ -48,8 +48,13 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 > `check_availability_notice_matches_reality.py` fails until it is deleted,
 > so it cannot outlive the thing it describes.
 
+> **Private repository.** These repositories are private and are staying
+> that way, so `gh repo clone` — which uses your GitHub credentials — is
+> the command that works. A plain `git clone` URL stops at a username
+> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).
+
 ```bash
-git clone https://github.com/Terrium-sim/main.git
+gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
@@ -500,7 +505,7 @@ Terrium/
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    173 decision records (and counting)
+│   └── adr/                    174 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    73 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command

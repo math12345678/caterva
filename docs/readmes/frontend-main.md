@@ -62,6 +62,13 @@ What your contribution arrives under:
 
 This repository is a submodule of [`Terrium-sim/main`](https://github.com/Terrium-sim/main). Clone the whole system with:
 
+> **Private repository.** `Terrium-sim/main` is not readable
+> anonymously and is not going to be, so `gh repo clone` (which uses your
+> GitHub credentials) is the command that works; a plain `git clone` URL
+> would stop at a username prompt. If you do not have access, this is the
+> point at which to ask for it rather than the point at which to debug
+> git. See [ADR 0179](../adr/0179-the-guard-that-could-not-go-green.md).
+
 ```bash
-git clone --recursive https://github.com/Terrium-sim/main.git
+gh repo clone Terrium-sim/main -- --recursive
 ```

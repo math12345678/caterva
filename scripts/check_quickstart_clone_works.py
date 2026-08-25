@@ -67,6 +67,36 @@ PUBLISHED_DIRS = ("docs/readmes",)
 
 CLONE = re.compile(r"git\s+clone\s+(?:--\S+\s+)*(https://github\.com/[^\s`'\")]+)")
 
+#: The authenticated form: `gh repo clone Terrium-sim/main`.
+#:
+#: ADR 0143 wired this guard deliberately red, on the premise that the fix
+#: "is not a code change and is not mine to make: the repository becomes
+#: readable, or the quickstart points somewhere that is. On that day this
+#: goes green with no edit."
+#:
+#: The owner has now decided the repositories stay private. That settles the
+#: premise the other way, and a guard that CANNOT go green is not a signal --
+#: it is a red light people learn to walk past, which is the thing ADR 0143
+#: argued against when it refused to baseline itself.
+#:
+#: So the guard now knows there are two audiences, and asks the right
+#: question of each rather than one question of both:
+#:
+#:   `git clone https://...`  promises anonymous access -> probed, as before.
+#:   `gh repo clone owner/x`  requires credentials       -> must SAY so.
+#:
+#: The second is not a way out. Swapping the command silently would trade a
+#: reader who hits a credential prompt for a reader who hits a credential
+#: prompt with no warning, so a document using this form must carry the
+#: access notice AND the decision behind it -- the sibling guard's rule, that
+#: the cheapest way to pass should also be the correct one.
+GH_CLONE = re.compile(r"gh\s+repo\s+clone\s+([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)")
+
+#: Both required, in the same document. A bare marker is a guard you satisfy
+#: by typing the marker.
+ACCESS_SENTINEL = "**Private repository.**"
+ACCESS_ADR_LINK = "0179-the-guard-that-could-not-go-green.md"
+
 #: Must be cloneable by anyone. If these fail, the network is the problem.
 #: Two, from different orgs, so one repository being renamed does not turn
 #: this guard into a permanent "could not check".
@@ -93,11 +123,44 @@ def reachable_anonymously(url: str) -> bool | None:
 
     `GIT_TERMINAL_PROMPT=0` is what makes this honest: without it git blocks
     on a username prompt, and a guard that hangs is a guard that gets removed.
+
+    IT WAS NOT ANONYMOUS
+    --------------------
+    Blocking the prompt is not the same as having no credentials. A developer
+    machine with `gh auth login` has
+
+        credential.https://github.com.helper = !gh auth git-credential
+
+    and the helper answers without any prompt to block. Measured here:
+    `git ls-remote https://github.com/Terrium-sim/main.git` returned 0, so
+    this function reported that a **private** repository "resolves for a user
+    with no credentials" -- the guard vouching for the exact promise it was
+    written to protect, on the machine of the one person who could not
+    discover the mistake by running it.
+
+    CI has no credentials, so CI got the right answer and the disagreement
+    was invisible: the check was correct precisely where nobody was looking
+    at it. Found by sabotage -- putting an anonymous URL back into a document
+    and expecting red, which is why the sabotage step exists.
+
+    `-c credential.helper=` empties the helper list, and the per-host entry
+    is cleared separately because a URL-scoped helper is not removed by
+    resetting the generic one. Verified in both directions: the private
+    repository now reports unreachable, and the public controls still report
+    reachable, so the override is not simply breaking every request.
+
+    Clearing config rather than the environment on purpose --
+    `GIT_CONFIG_GLOBAL=/dev/null` was tried first and the repository still
+    came back reachable, because the helper is not only reached through the
+    global file.
     """
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", GCM_INTERACTIVE="never")
     try:
         done = subprocess.run(
-            ["git", "ls-remote", url, "HEAD"],
+            ["git",
+             "-c", "credential.helper=",
+             "-c", "credential.https://github.com.helper=",
+             "ls-remote", url, "HEAD"],
             env=env,
             capture_output=True,
             timeout=TIMEOUT_S,
@@ -110,15 +173,22 @@ def reachable_anonymously(url: str) -> bool | None:
     return done.returncode == 0
 
 
-def documented_clone_urls() -> list[Reference]:
-    refs: list[Reference] = []
-    seen: set[tuple[str, str]] = set()
+def _newcomer_docs() -> list[Path]:
+    """The documents in scope, shared by both collectors.
+
+    One list, not two: a second copy would drift, and this project's
+    most-repeated defect is one fact stored twice with nothing comparing them.
+    """
     paths = [REPO_ROOT / name for name in PUBLISHED_DOCS]
     for directory in PUBLISHED_DIRS:
         paths.extend(sorted((REPO_ROOT / directory).glob("*.md")))
-    for path in paths:
-        if not path.is_file():
-            continue
+    return [p for p in paths if p.is_file()]
+
+
+def documented_clone_urls() -> list[Reference]:
+    refs: list[Reference] = []
+    seen: set[tuple[str, str]] = set()
+    for path in _newcomer_docs():
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
@@ -131,6 +201,48 @@ def documented_clone_urls() -> list[Reference]:
             if (rel, url) not in seen:
                 seen.add((rel, url))
                 refs.append(Reference(rel, url))
+    return refs
+
+
+class AuthReference(NamedTuple):
+    document: str
+    repo: str
+    has_sentinel: bool
+    has_adr_link: bool
+
+    @property
+    def is_honest(self) -> bool:
+        return self.has_sentinel and self.has_adr_link
+
+
+def documented_authenticated_clones() -> list[AuthReference]:
+    """`gh repo clone` references, and whether their document admits why.
+
+    Reachability is deliberately NOT probed. Answering it needs credentials,
+    and CI has none -- so a probe here would report "unreachable" for a
+    repository that is merely unreachable BY THIS RUNNER, which is the
+    narrower-matcher failure this guard's docstring exists to avoid. What can
+    be checked without credentials is whether the document warns the reader,
+    and that is what is checked. Stated rather than implied.
+    """
+    refs: list[AuthReference] = []
+    seen: set[tuple[str, str]] = set()
+    for path in _newcomer_docs():
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        rel = str(path.relative_to(REPO_ROOT))
+        for match in GH_CLONE.finditer(text):
+            repo = match.group(1)
+            if (rel, repo) in seen:
+                continue
+            seen.add((rel, repo))
+            refs.append(AuthReference(
+                rel, repo,
+                ACCESS_SENTINEL in text,
+                ACCESS_ADR_LINK in text,
+            ))
     return refs
 
 
@@ -198,15 +310,51 @@ def main() -> int:
             return 3
 
     refs = documented_clone_urls()
-    if not refs:
-        print("No `git clone` command found in any newcomer-facing document.")
+    auth_refs = documented_authenticated_clones()
+
+    if not refs and not auth_refs:
+        print("No clone command found in any newcomer-facing document.")
         print("  Nothing checked — that is a finding of its own if the")
         print("  quickstart is supposed to have one. Exiting 3.")
         return 3
 
+    # An authenticated command whose document does not admit it needs
+    # credentials is WORSE than the anonymous one it replaced: the reader
+    # still hits a prompt, and now nothing warned them. Checked first so
+    # switching commands can never be the cheap way past this guard.
+    silent = [r for r in auth_refs if not r.is_honest]
+    if silent:
+        print(f"\n`gh repo clone` with no access notice ({len(silent)}):\n")
+        for ref in silent:
+            missing = []
+            if not ref.has_sentinel:
+                missing.append(f'the sentinel {ACCESS_SENTINEL}')
+            if not ref.has_adr_link:
+                missing.append(f"a link to {ACCESS_ADR_LINK}")
+            print(f"  {ref.document}")
+            print(f"      gh repo clone {ref.repo}")
+            print(f"      -> missing {' and '.join(missing)}.")
+            print("         The reader still meets a credential prompt; now")
+            print("         nothing told them to expect one.\n")
+        print("  Both are required so the marker has to carry its reasoning.")
+        return 1
+
+    if auth_refs:
+        print(f"Authenticated clone commands: {len(auth_refs)}, "
+              f"all carrying the access notice.")
+        print("  NOT checked: whether the repository is reachable. That needs")
+        print("  credentials, which CI does not have — and a probe without")
+        print("  them would report 'unreachable' when it meant 'I could not")
+        print("  see', the failure this guard's controls exist to prevent.")
+        print()
+
+    if not refs:
+        print("No anonymous `git clone` command remains to probe.")
+        return 0
+
     broken = [r for r in refs if reachable_anonymously(r.url) is not True]
 
-    print(f"Clone commands checked: {len(refs)} (controls passed)")
+    print(f"Anonymous clone commands checked: {len(refs)} (controls passed)")
     if not broken:
         print("  every one resolves for a user with no credentials.")
         print()

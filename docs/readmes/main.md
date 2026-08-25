@@ -5,8 +5,15 @@ language; Terrium resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that
 has been independently checked.
 
+> **Private repository.** `Terrium-sim/main` is not readable
+> anonymously and is not going to be, so `gh repo clone` (which uses your
+> GitHub credentials) is the command that works; a plain `git clone` URL
+> would stop at a username prompt. If you do not have access, this is the
+> point at which to ask for it rather than the point at which to debug
+> git. See [ADR 0179](../adr/0179-the-guard-that-could-not-go-green.md).
+
 ```bash
-git clone --recursive https://github.com/Terrium-sim/main.git
+gh repo clone Terrium-sim/main -- --recursive
 cd main
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
@@ -65,7 +72,7 @@ can drift out of sync.
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
-| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 173 ADRs, API reference |
+| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 174 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
 | [`terrium-site`](https://github.com/Terrium-sim/terrium-site) · [`landing`](https://github.com/Terrium-sim/landing) · [`mule`](https://github.com/Terrium-sim/mule) | the three web front ends |
 | [`advanced-analysis`](https://github.com/Terrium-sim/advanced-analysis) · [`benchmark-results`](https://github.com/Terrium-sim/benchmark-results) | figures and measurements |
