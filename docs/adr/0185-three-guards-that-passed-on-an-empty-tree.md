@@ -105,10 +105,34 @@ Both directions, for all three:
 
 **What this does not check.**
 
-- **Only guards that print a success line without a number were starved.**
-  The 45 that state a count were assumed honest on the strength of the
-  count. A guard reporting a plausible number it did not derive from a real
-  scan would pass this audit.
+- ~~**Only guards that print a success line without a number were
+  starved.**~~ **All 55 were starved in a follow-up, and the method had two
+  faults.** First, the "empty" tree was not empty: the guards were copied
+  into `scripts/`, which several of them scan, so `check_package_spelling`
+  reported reading 54 files — its own siblings — and its new floor passed on
+  them. Re-run one guard per tree, and then with the guard placed outside
+  every directory it scans, which is the only arrangement that starves it.
+
+  Seven passed. Four are the known-correct conditionals. A fifth,
+  `check_python_bug_lints`, was a **false positive of the method again**: it
+  already refuses with "none of ['Tests', 'scripts', 'Terium'] exist;
+  nothing was checked", and had passed only because the guard file itself sat
+  in `scripts/`, a real target with a real file to lint.
+
+  Two were real, and both now carry floors:
+
+  - `check_rng_convention` said *"all stochastic domains comply with ADR
+    0005"* over zero `simulate_*` functions. It now states the count — 7
+    today — and refuses below 3.
+  - `check_prompt_injection` refuses in six ways already (npx missing,
+    timeout, OSError, empty stdout, unparseable JSON, wrong shape), each
+    saying a scan that did not happen is not a clean scan. It had no answer
+    for a scan that ran perfectly over nothing. The floor is on the INPUT,
+    because `trojan-scan` reports no denominator — its `summary` counts
+    findings, and zero findings is what a clean repository is supposed to
+    produce.
+
+  Survey re-run: 55 pass / 18 not, unchanged.
 - **An empty tree is one kind of broken.** A tree with the right shape and
   the wrong content — a scan root present but silently filtered to nothing
   — was not simulated.

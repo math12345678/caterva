@@ -217,6 +217,42 @@ def _load_baseline() -> tuple[dict[str, dict[str, str]], list[str]]:
     return baseline, problems
 
 
+#: Fewest files that must exist under the scan root for "clean" to mean
+#: anything.
+#:
+#: This guard refuses in six ways already -- npx missing, timeout, OSError,
+#: empty stdout, unparseable JSON, wrong JSON shape -- each saying that a
+#: scan which did not happen is not a clean scan. It had no answer for the
+#: seventh: a scan that ran perfectly over nothing. Measured, with the guard
+#: placed outside the tree it scans, it printed its success line having seen
+#: no files.
+#:
+#: The floor is on the INPUT rather than the output, because trojan-scan
+#: reports no denominator -- its `summary` counts findings, and zero findings
+#: is exactly what a clean repository is supposed to produce. Counting the
+#: files that exist is a sanity check on what was handed to the tool, not a
+#: second implementation of what the tool does with them.
+#:
+#: Established remedy, not an invention (ADR 0185):
+#: `check_public_images_reviewed` refuses with "found only 0 public image(s),
+#: below the floor of 5. The scan is broken, not the pages."
+_MIN_FILES = 100
+
+
+def _files_under_root() -> int:
+    """How many files the scanner was pointed at. Cheap and approximate."""
+    count = 0
+    for path in REPO_ROOT.rglob("*"):
+        parts = set(path.parts)
+        if parts & {"node_modules", ".git", "__pycache__", ".venv", "venv"}:
+            continue
+        if path.is_file():
+            count += 1
+            if count >= _MIN_FILES:
+                break          # the floor is a threshold, not a census
+    return count
+
+
 def check() -> list[str]:
     """Returns a list of violation strings, empty when the tree is clean."""
     if os.environ.get(SKIP_ENV) == "1":
@@ -225,6 +261,15 @@ def check() -> list[str]:
             "explicit opt-out, not a pass."
         )
         return []
+
+    seen = _files_under_root()
+    if seen < _MIN_FILES:
+        return [
+            f"only {seen} file(s) exist under the scan root, below the floor "
+            f"of {_MIN_FILES}. The scan is broken, not the tree -- over an "
+            "empty directory 'no injection indicators' is true and means "
+            "nothing."
+        ]
 
     if shutil.which("npx") is None:
         return [
