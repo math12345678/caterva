@@ -331,6 +331,31 @@ FAIL_PATTERNS = [
     re.compile(r"^=*\s*(\d+) failed", re.MULTILINE),                # pytest
 ]
 
+#: pytest reports a COLLECTION failure as `error`, not `failed`.
+#:
+#: A mutation that breaks a module other tests import at module scope
+#: produces `22 passed, 1 error in 4.2s`. Against FAIL_PATTERNS alone that
+#: reads as 22 tests run and zero failures -- so the suite is recorded as
+#: having run cleanly, and the mutation as NOT CAUGHT.
+#:
+#: It was caught. The error IS the suite noticing. And a false NOT CAUGHT is
+#: the verdict this file calls "the single most" damaging it can produce,
+#: because it reads as a real gap in the tests and sends someone to write a
+#: test for a case that is already covered.
+#:
+#: The PURE error case was always handled: `1 error in 0.31s` has no test
+#: count, so `ran` is False and the verdict is INDETERMINATE. It is the
+#: MIXED case that slipped through -- most of the suite collecting and
+#: passing, one module failing to import -- which is the ordinary shape of
+#: this failure, not an exotic one.
+#:
+#: Found by auditing the outcome parsers after ADR 0183, where a different
+#: guard was discarding failures the same way.
+ERROR_PATTERNS = [
+    re.compile(r"^=*\s*(?:\d+ \w+, )*(\d+) errors?\b", re.MULTILINE),   # pytest
+    re.compile(r"^Test Suites:.*?(\d+) failed", re.MULTILINE),          # jest
+]
+
 
 #: Colour escape sequences, stripped before any parsing.
 #:
@@ -375,11 +400,21 @@ class SuiteRun:
 
     @property
     def failures(self) -> int:
-        for pattern in FAIL_PATTERNS:
-            match = pattern.search(self.output)
-            if match:
-                return int(match.group(1))
-        return 0
+        """Tests that failed, plus suites that could not be collected.
+
+        Both are the suite objecting to the mutation, and a verdict that
+        counts one and not the other reports a caught mutation as missed.
+        Summed rather than either/or: `22 passed, 1 failed, 1 error` is two
+        objections, and reporting one would understate what happened.
+        """
+        total = 0
+        for patterns in (FAIL_PATTERNS, ERROR_PATTERNS):
+            for pattern in patterns:
+                match = pattern.search(self.output)
+                if match:
+                    total += int(match.group(1))
+                    break
+        return total
 
     @property
     def ran(self) -> bool:
@@ -742,6 +777,30 @@ def selftest() -> int:
         ok = verdict.state == "indeterminate"
         failures += 0 if ok else 1
         print(f"  [{'ok' if ok else 'FAIL'}] suite reports no test count: {verdict.symbol}")
+
+        # A pytest COLLECTION ERROR alongside passing tests is the suite
+        # objecting, and must be read as caught.
+        #
+        # `22 passed, 1 error in 4.2s` is what pytest prints when a mutation
+        # breaks a module that another test imports at module scope. Against
+        # the failure patterns alone it read as 22 tests run and zero
+        # failures -- a false NOT CAUGHT, which this file calls the single
+        # most damaging verdict it can produce, because it reads as a real
+        # gap and sends someone to write a test for a covered case.
+        #
+        # Asserted through `SuiteRun` rather than by running a suite that
+        # errors on collection: the parsing is the thing that was wrong, and
+        # a real erroring suite would also be missing a test count, which is
+        # the OTHER path and would pass this check for the wrong reason.
+        for label, output, want_failures in (
+            ("collection error beside passing tests", "===== 22 passed, 1 error in 4.2s =====", 1),
+            ("a failure and an error together", "===== 1 failed, 21 passed, 1 error in 4.2s =====", 2),
+            ("no error, no failure", "===== 23 passed in 4.2s =====", 0),
+        ):
+            got = SuiteRun(exit_code=1, raw_output=output).failures
+            ok = got == want_failures
+            failures += 0 if ok else 1
+            print(f"  [{'ok' if ok else 'FAIL'}] {label}: {got} objection(s), expected {want_failures}")
 
         # And the restore must have worked.
         restored = subject.read_text(encoding="utf-8")
