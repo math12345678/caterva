@@ -194,13 +194,17 @@ jobs:
       - name: Pinned-version resolution guard
         run: python scripts/check_pins_resolve.py
 
-      # The quickstart-clone guard — now the LAST step in this job, see the
-      # note there — tells the MAINTAINER, in a log only somebody with push
-      # access opens. This one checks the thing that tells the STRANGER: the
-      # "Not public yet" notice on README.md and START_HERE.md.
+      # The quickstart-clone guard checks that no document promises a
+      # stranger anonymous access it does not have. This one checks the
+      # thing that TELLS the stranger: the "Not public" notice on README.md
+      # and START_HERE.md.
       #
-      # Unlike the step above, this one is GREEN today and is expected to
-      # stay green in both directions. It fails if the repositories are
+      # ("Not public YET" until ADR 0179 settled that the repositories stay
+      # private. The word was a forecast nobody had made, and the guard's
+      # sentinel moved with the prose so the two cannot drift.)
+      #
+      # This one is GREEN today and is expected to stay green in both
+      # directions. It fails if the repositories are
       # private and the front page does not say so, and it fails again the
       # day they are published and the notice is left standing -- a warning
       # turning away visitors who can plainly clone the thing. Nothing else

@@ -97,11 +97,22 @@ did not check rather than letting a green tick imply it.
   limit of a check with no credentials, not an oversight.
 - **Not that the prose around the sentinel is accurate.** The guard reads a
   marker and a link, not a paragraph — the same limit its sibling states.
-- **The `**Not public yet.**` sentinel still says "yet".** ADR 0143's notice
-  was written expecting publication, and the word now understates a
-  decision. It is left alone because that string is the contract between two
-  guards, and changing it is a coordinated edit that should be its own
-  change rather than a side effect of this one.
+- ~~**The `**Not public yet.**` sentinel still says "yet".**~~ **Done as its
+  own change,** which is what this note asked for — and it was more coupled
+  than "the contract between two guards" suggested. Five places named the
+  string: the guard's `SENTINEL`, `README.md`, `START_HERE.md`,
+  `scripts/publish_preflight.py` and a CI comment. It is now `**Not
+  public.**`, true whatever is decided later, and the guard's inverse
+  property is intact — publishing still forces the notice to be deleted.
+  Sabotage confirms the old sentinel no longer satisfies it, so it cannot
+  drift back.
+
+  Two stale claims came out with it, both introduced by this record.
+  `README.md` said the clone guard "will keep the build red until it stops
+  being true" and `publish_preflight.py` promised it would go `red -> green`
+  on publication. ADR 0179 made that guard green while the repositories
+  stayed private, and neither sentence was updated — so the front page
+  described a red step that does not exist.
 - **Nobody has run `gh repo clone` from a clean machine.** The command is
   correct by construction and by `gh` documentation; it has not been
   executed here against an empty credential store.

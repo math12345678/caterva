@@ -170,11 +170,20 @@ def main() -> int:
     print("  2. ./scripts/split_repos.sh --push-https (needs credentials)")
     print("  3. make the repositories public")
     print()
-    print("On step 3, two guards change state with no code edit:")
-    print("  check_quickstart_clone_works              red  -> green")
+    # Was: "two guards change state ... clone_works red -> green".
+    # ADR 0179 made that guard green while the repositories stayed private,
+    # by teaching it that `gh repo clone` is a different promise from
+    # `git clone https://`. So it does not change state on publication any
+    # more, and saying it would send someone looking for a red step that is
+    # not there. One guard changes now, and it is the one that matters here.
+    print("On step 3, one guard changes state with no code edit:")
     print("  check_availability_notice_matches_reality green -> RED,")
-    print("      telling you to delete the 'Not public yet' notice it")
-    print("      was written to make expire.")
+    print("      telling you to delete the 'Not public' notice it was")
+    print("      written to make expire.")
+    print()
+    print("  check_quickstart_clone_works stays green either way: it asks")
+    print("      whether any document promises access it does not have, and")
+    print("      the quickstarts use `gh repo clone`, which promises none.")
     return 0
 
 

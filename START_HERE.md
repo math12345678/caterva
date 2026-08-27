@@ -40,10 +40,10 @@ that wrong shipped a hardcoded 37 °C into every entry point for months
 
 ## Get it running
 
-> **Not public yet.** This document opens by addressing "a stranger who
-> found this on GitHub", and then hands them a clone of a repository that is
-> still private — so for that reader the first command prompts for a
-> username and everything this page describes sits behind it, unreached.
+> **Not public.** This document opens by addressing "a stranger who found
+> this on GitHub", and then hands them a clone of a repository that is
+> private and staying that way — so for that reader everything this page
+> describes sits behind a credential prompt, unreached.
 > Said here rather than discovered at a credential prompt. See
 > [ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md).
 >

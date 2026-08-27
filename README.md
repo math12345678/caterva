@@ -35,15 +35,16 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
 ## Quick start
 
-> **Not public yet.** The command below needs access today: every
-> `Terrium-sim` repository is still private, and `git ls-remote` on any of
-> them prompts for a username. If you are reading this without a GitHub
-> account that has been added, **line one is as far as you get** — that is a
-> fact about the repository, not a mistake you made.
+> **Not public.** The command below needs access: every `Terrium-sim`
+> repository is private, and a plain `git ls-remote` on any of them prompts
+> for a username. If you are reading this without a GitHub account that has
+> been added, **line one is as far as you get** — that is a fact about the
+> repository, not a mistake you made.
 >
-> `scripts/check_quickstart_clone_works.py` reports this on every CI run and
-> will keep the build red until it stops being true
-> ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md)). This
+> `scripts/check_quickstart_clone_works.py` checks that no document promises
+> a stranger anonymous access it does not have
+> ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md),
+> [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md)). This
 > notice is checked in the other direction too: publish the repositories and
 > `check_availability_notice_matches_reality.py` fails until it is deleted,
 > so it cannot outlive the thing it describes.

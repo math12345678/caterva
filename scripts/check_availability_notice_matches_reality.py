@@ -91,7 +91,16 @@ from check_quickstart_clone_works import (  # noqa: E402
 #: README.md's first line; README.md is what GitHub renders.
 FRONT_DOORS = ("README.md", "START_HERE.md")
 
-SENTINEL = "**Not public yet.**"
+#: "yet" was a forecast, and it expired.
+#:
+#: ADR 0143 wrote this notice expecting publication to come. The owner has
+#: since decided the repositories stay private (ADR 0179), so "not public
+#: YET" told a reader that access was on its way -- a claim about the future
+#: that nobody had made. "Not public" is true whatever is decided later, and
+#: this guard's inverse property is untouched: publish the repositories and
+#: it still demands the notice be deleted, so the notice cannot outlive the
+#: thing it describes.
+SENTINEL = "**Not public.**"
 ADR_LINK = "0143-the-first-command-a-stranger-runs.md"
 
 
