@@ -90,11 +90,29 @@ understate what happened.
 
 **What this does not check.**
 
-- **No existing mutation table was re-graded.** The bug could only produce a
-  false NOT CAUGHT, and the tables in `docs/mutations/` record almost
-  entirely *caught* verdicts, which this change cannot have altered. A
-  recorded NOT CAUGHT that was really a collection error would still be
-  wrong today — none is known, and none was searched for.
+- ~~**No existing mutation table was re-graded.**~~ **Searched, and the
+  answer is none.** Every set file was read and every mutation row's
+  recorded verdict tallied. Eight rows mention "not caught"; six of those
+  are historical — the form *"NOT caught before X was added"* — describing
+  a row that is caught today. Two are live NOT CAUGHT verdicts, and neither
+  is reachable by this bug:
+
+  - `adr-0099` T2 runs pytest, but the mutation is a genuine no-op: the
+    document quotes the claim twice, so removing one leaves the exemption
+    correctly justified and the test rightly passes. The real mutation
+    needs two edits and `mutate.py` applies one per row; the record says so
+    and verifies it by hand with `sed` instead.
+  - `adr-0169` P2 runs vitest, which is outside this bug entirely — it was
+    pytest's `error` wording that went uncounted.
+
+  So no recorded verdict was manufactured by the defect. Stated as a
+  measured negative rather than the assumption the struck-through sentence
+  was making.
+
+  Done through the GitHub API rather than a working copy: macOS withdrew
+  this machine's Files-and-Folders access to `~/Desktop`, where the
+  repository lives, so the tree was unreadable locally while the audit ran.
+  It is a read of committed files either way.
 - **jest and vitest are matched on one pattern each**, guessed from their
   documented output rather than observed. The pytest patterns are the ones
   measured against real output.
