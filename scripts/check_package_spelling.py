@@ -103,7 +103,28 @@ def offending_lines(text: str) -> List[Tuple[int, str, str]]:
     return findings
 
 
+_MIN_FILES = 40
+
+#: Fewest files this scan must see before "clean" means anything.
+#:
+#: Measured, not guessed at: run in an empty tree this guard printed its
+#: success line having read nothing. "no Python file imports `Terrium`" is a
+#: universal over the files it scanned, and over zero files every universal
+#: is true -- so a reader could not tell a clean repository from a broken
+#: scan, which is the shape this project calls worse than no check.
+#:
+#: The floor is the established remedy here, not an invention:
+#: `check_public_images_reviewed` already refuses with "found only 0 public
+#: image(s), below the floor of 5. The scan is broken, not the pages."
+#:
+#: Set well below the real count (hundreds today) so ordinary deletion does not
+#: trip it. It is a smoke alarm for a scan that has stopped reaching its
+#: input -- a renamed directory, a moved root, a glob that no longer matches
+#: -- not a coverage target.
+
+
 def scan() -> List[str]:
+    scan.files_read = 0
     findings: List[str] = []
     for root in SCAN_ROOTS:
         base = REPO / root
@@ -118,6 +139,7 @@ def scan() -> List[str]:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 continue
+            scan.files_read += 1
             for number, line, label in offending_lines(text):
                 findings.append(
                     f"{path.relative_to(REPO)}:{number}: {label}\n"
@@ -205,9 +227,18 @@ def main() -> int:
         )
         return 1
 
+    if scan.files_read < _MIN_FILES:
+        print(
+            f"FAIL: read only {scan.files_read} Python file(s), below the "
+            f"floor of {_MIN_FILES}.\n"
+            "\nThe scan is broken, not the imports. Over zero files "
+            "\"no file imports `Terrium`\" is true and means nothing."
+        )
+        return 1
+
     print(
-        "OK: no Python file imports `Terrium`; the package is spelled "
-        "`Terium` everywhere it is imported."
+        f"OK: {scan.files_read} Python file(s) read; none imports `Terrium`. "
+        "The package is spelled `Terium` everywhere it is imported."
     )
     return 0
 
