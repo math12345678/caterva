@@ -106,7 +106,9 @@ caught before a push.
   OK.
 - **`verify_build --quick` still skips the long tests**, so the *quick* path
   remains what its name says. This closes the gap in the full sweep only.
-- **Nothing checks that a guard reporting on a suite reports everything the
-  suite told it.** This one was found because CI disagreed with it. Whether
-  another guard is discarding a category of result the same way has not been
-  audited.
+- ~~**Nothing checks that a guard reporting on a suite reports everything
+  the suite told it.**~~ **Done in
+  [ADR 0184](0184-the-audit-adr-0183-asked-for.md).** It audited the three
+  scripts that parse test outcomes and found one more: `mutate.py` counted
+  a pytest collection `error` as zero failures, turning a mutation the
+  suite had caught into a false NOT CAUGHT.

@@ -145,8 +145,12 @@ in this commit changes what Terrium refuses.
 - **`provenance.json` is not a standard** and nothing consumes it yet. It
   is a format invented here because, in Bergmann's words, there is currently
   no good computer-readable place for source disagreement.
-- **The Antimony `notes` syntax Smith gave is not implemented.** The SBML
-  path carries notes; whether the Antimony export uses `a notes "..."` was
-  not checked in this pass.
+- ~~**The Antimony `notes` syntax Smith gave is not implemented.**~~
+  **Closed by
+  [ADR 0182](0182-the-provenance-that-did-not-survive-being-used.md),** and
+  it was worse than unimplemented. Every parameter's provenance was written
+  as comments, and comments do not survive a conversion — measured in both
+  directions. The assay conditions, which decide whether two published
+  values may legitimately be compared, were the first thing discarded.
 - **Evidence codes are not adopted**, only noted as the answer to a
   question this project already half-solved.

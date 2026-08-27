@@ -109,10 +109,12 @@ disagree, and whether that disagreement reaches the answer.
 - **One lesson, one shape.** It teaches parameter disagreement and nothing
   else. The refusal path, the assay-condition grading, and the twelve other
   domains are all equally teachable and untouched.
-- **The mechanism sentence assumes Michaelis-Menten.** It is only reached when
-  the report has a `km` disagreement and an `s0`, but nothing checks that the
-  run actually used the MM model — a future domain with a `km` and a different
-  rate law would get a sentence that does not apply to it.
+- ~~**The mechanism sentence assumes Michaelis-Menten.**~~ **Closed by
+  [ADR 0180](0180-the-equation-the-document-never-named.md).** The report
+  now states the rate law it ran, and the lesson reads it instead of
+  assuming: a run under Hill kinetics gets an honest refusal rather than a
+  saturation argument that does not apply to it. Listed here as a
+  limitation, which 0180 corrects — it was a defect.
 - **No notion of a learner.** No progress, no second question, no record of
   what was answered. `queryLog.ts` (ADR 0171) could carry that and does not.
 - **The four bands are chosen, not derived.** 1.2×, 2×, and 0.6 of the
