@@ -240,6 +240,9 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_env": ("ci",),
     "check_forbidden_packages": ("verify_build", "ci", "pytest"),
     "check_guard_wiring": ("verify_build", "ci"),
+    # CI only, on purpose: it starts 73 subprocesses, which is a
+    # minute nobody wants inside `verify_build --quick`.
+    "check_guards_refuse_on_empty": ("ci",),
     "check_literature_inventory": ("verify_build",),
     "check_license_consistency": ("verify_build",),
     "check_no_disabled_tests": ("verify_build",),

@@ -215,6 +215,22 @@ jobs:
       - name: Availability-notice guard
         run: python scripts/check_availability_notice_matches_reality.py || [ $? -eq 3 ]
 
+      # Every OTHER guard, run against an empty directory, where reporting
+      # OK is a failure because there was nothing to be clean. Five guards
+      # were found doing exactly that by hand (ADR 0183, 0185); the same
+      # hand procedure also produced five FALSE positives, which is why it
+      # is a script now and not something somebody remembers to do.
+      #
+      # Its selftest runs first and separately: it plants a guard that
+      # always passes and one that always refuses, and asserts the starved
+      # tree contains exactly one file -- so a starve that silently stopped
+      # starving cannot look identical to a working one.
+      - name: Guards-refuse-on-empty guard (self-check)
+        run: python scripts/check_guards_refuse_on_empty.py --selftest
+
+      - name: Guards-refuse-on-empty guard
+        run: python scripts/check_guards_refuse_on_empty.py
+
       # A step named "Install pnpm" that installs no pnpm and exits 0 is the
       # exact shape this project calls worse than no check, and it cost two
       # days of red builds. Runs in the Python job because it is pure Python
