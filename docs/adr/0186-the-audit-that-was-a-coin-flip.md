@@ -89,6 +89,36 @@ Wired into CI with its selftest as a separate step, and registered in
 rather than accepted. CI only, deliberately: 73 subprocesses is a minute
 nobody wants inside `verify_build --quick`.
 
+## The first version of this shipped as zero bytes
+
+Everything above was written, run and sabotage-tested. Then the file was
+committed **empty**, and CI went green.
+
+The restore after the third sabotage was
+`git checkout $G || gh api ... > $G`. There is no git metadata in a tarball,
+so the checkout failed; the shell created and truncated the redirect target
+before the API call ran; the API call errored. A 12 KB file became 0 bytes.
+
+**Every check downstream was satisfied by a file that merely existed.** An
+empty Python file exits 0, so both CI steps passed. `check_guard_wiring`
+found the name in the workflow. `check_ci_reproducible_locally` found the
+`make` route. The record said 73 guards were being starved while nothing
+was. And the verification run immediately afterwards — grepping the file for
+stray content left by the sabotage — reported clean, **because grepping an
+empty file finds nothing**.
+
+That is this repository's own defect, produced by the commit that added the
+guard against it, and it survived four checks and one hand-verification.
+
+`_MIN_SELF_BYTES` closes it for this file: below 2 KB it has been truncated
+and says so. Sibling guards are checked too — a zero-byte guard is reported
+as *empty*, not as "passes on nothing", because the second understates it:
+there is no guard there at all. The selftest asserts an empty file exits 0,
+so the reason the size check exists is recorded next to it.
+
+Found only because a later probe — a tree shaped like the repository but
+containing no files — showed this guard passing with no output at all.
+
 ## Consequences
 
 - A new guard must refuse on an empty tree or be listed as conditional with
@@ -99,8 +129,13 @@ nobody wants inside `verify_build --quick`.
 **What this does not check.**
 
 - **Only one kind of broken.** An empty tree is not a tree with the right
-  shape and the wrong content — a scan root present but silently filtered to
-  nothing would still pass.
+  shape and the wrong content. Probed separately: with every top-level
+  directory present but empty, six guards still pass. Four are the listed
+  conditionals; the fifth was this file when it was empty; the sixth is
+  `check_python_bug_lints`, whose refusal covers *absent* targets
+  (`none of ['Tests', 'scripts', 'Terium'] exist`) and not present-but-empty
+  ones. That last is a real gap and is **not fixed here** — the shaped probe
+  is not wired into anything, so it remains a measurement someone took once.
 - **It does not read the exemption reasons.** They are strings; nothing
   verifies the sentence quoted is the sentence the guard prints, only that
   the guard still passes on nothing.
