@@ -95,6 +95,12 @@ NOT_YET_GREEN = {"F401": 17, "F841": 3}
 
 TARGETS = ["Tests", "scripts", "Terium"]
 
+#: Fewest Python files that must exist under TARGETS for a clean lint to
+#: mean anything. Well below the real count so ordinary deletion does not
+#: trip it -- a smoke alarm for a checkout that did not finish, not a
+#: coverage target. See ADR 0185 for the idiom.
+_MIN_PY_FILES = 50
+
 
 def main() -> int:
     if shutil.which("ruff") is None and not _module_available():
@@ -117,6 +123,35 @@ def main() -> int:
         print(f"FAIL: none of {TARGETS} exist; nothing was checked.", file=sys.stderr)
         return 1
 
+    # A target that EXISTS and is EMPTY is the same nothing, and the check
+    # above does not see it.
+    #
+    # Measured (ADR 0186): with Tests/, scripts/ and Terium/ present but
+    # containing no files, ruff finds nothing and this prints "OK: no
+    # bug-class lint findings" -- a clean bill of health over zero lines.
+    # The existing refusal covers a deleted directory; it does not cover a
+    # directory whose contents moved, or a checkout that failed halfway.
+    #
+    # Floor is on files handed to ruff, not on findings: zero findings is
+    # exactly what a healthy repository is supposed to produce.
+    py_files = sum(
+        1
+        for t in existing
+        for p in (REPO_ROOT / t).rglob("*.py")
+        if not {"__pycache__", ".venv", "venv", "node_modules"} & set(p.parts)
+    )
+    if py_files < _MIN_PY_FILES:
+        print(
+            f"FAIL: only {py_files} Python file(s) under {', '.join(existing)}, "
+            f"below the floor of {_MIN_PY_FILES}.\n"
+            "  The directories exist but are effectively empty, so ruff was "
+            "handed nothing\n"
+            "  and 'no bug-class lint findings' is true of nothing. The scan "
+            "is broken, not the code.",
+            file=sys.stderr,
+        )
+        return 1
+
     proc = subprocess.run(
         [sys.executable, "-m", "ruff", "check", "--select", ",".join(BUG_RULES), *existing],
         cwd=REPO_ROOT,
@@ -124,7 +159,8 @@ def main() -> int:
         text=True,
     )
 
-    print(f"Checked {', '.join(existing)} for {', '.join(BUG_RULES)}.")
+    print(f"Checked {py_files} Python file(s) under {', '.join(existing)} "
+          f"for {', '.join(BUG_RULES)}.")
     outstanding = ", ".join(f"{r} x{n}" for r, n in sorted(NOT_YET_GREEN.items()))
     print(f"  not yet wired (bug-class, not green): {outstanding}")
 

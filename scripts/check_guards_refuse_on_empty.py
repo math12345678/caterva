@@ -111,11 +111,36 @@ CONDITIONAL: dict[str, str] = {
 TIMEOUT_S = 60
 
 
-def starve(guard: Path) -> tuple[int, str]:
-    """Run one guard against an empty tree. Returns (exit code, first line)."""
+#: Top-level directories to create, empty, for the SHAPED probe.
+#:
+#: Derived from the repository rather than listed by hand, so a renamed or
+#: added scan root is covered without anyone remembering to update this.
+def _repo_top_level_dirs() -> list[str]:
+    return sorted(
+        p.name for p in REPO_ROOT.iterdir()
+        if p.is_dir() and not p.name.startswith(".")
+    )
+
+
+def starve(guard: Path, shaped: bool = False) -> tuple[int, str]:
+    """Run one guard against an empty tree. Returns (exit code, first line).
+
+    `shaped=True` creates every top-level directory of the real repository,
+    all empty. That is a different kind of broken from an absent tree, and a
+    sharper one: a guard can refuse because its scan root is missing while
+    saying nothing when the root is present and its contents are gone -- a
+    checkout that failed halfway, or a directory whose files moved.
+
+    `check_python_bug_lints` was exactly this. It refuses with "none of
+    ['Tests', 'scripts', 'Terium'] exist", and with those three present and
+    empty it reported a clean lint over zero lines (ADR 0186).
+    """
     with tempfile.TemporaryDirectory() as tmp:
+        if shaped:
+            for name in _repo_top_level_dirs():
+                (Path(tmp) / name).mkdir(exist_ok=True)
         holder = Path(tmp) / "_starved"
-        holder.mkdir()
+        holder.mkdir(exist_ok=True)
         copy = holder / guard.name
         shutil.copy2(guard, copy)
         try:
@@ -155,6 +180,7 @@ def main() -> int:
         return 3
 
     passed_on_nothing: list[tuple[str, str]] = []
+    shaped_only: list[tuple[str, str]] = []
     stale_exemptions: list[str] = []
     empty_guards: list[tuple[str, int]] = []
     refused = 0
@@ -168,7 +194,13 @@ def main() -> int:
             empty_guards.append((guard.name, size))
             continue
         code, first = starve(guard)
+        shaped_code, shaped_first = starve(guard, shaped=True)
         exempt = guard.name in CONDITIONAL
+        if shaped_code == 0 and not exempt and code != 0:
+            # Refused on an absent tree, passed on a present-but-empty one.
+            # Reported separately because the guard is not simply missing a
+            # floor -- it HAS a refusal and the refusal is too narrow.
+            shaped_only.append((guard.name, shaped_first))
         if code == 0 and not exempt:
             passed_on_nothing.append((guard.name, first))
         elif code != 0 and exempt:
@@ -192,6 +224,8 @@ def main() -> int:
     print(f"Guards starved: {len(guards)}")
     print(f"  refused on an empty tree      : {refused}")
     print(f"  exempt, and still conditional : {conditional_ok}")
+    print(f"  also refused a shaped-but-empty tree: "
+          f"{refused - len(shaped_only)} of {refused}")
 
     problems = False
 
@@ -220,6 +254,20 @@ def main() -> int:
             "  `check_public_images_reviewed` for the idiom -- or, if it is\n"
             "  honestly conditional, add it to CONDITIONAL with the sentence\n"
             "  it prints."
+        )
+
+    if shaped_only:
+        problems = True
+        print(f"\nRefused an ABSENT tree, passed a present-but-EMPTY one "
+              f"({len(shaped_only)}):\n")
+        for name, line in shaped_only:
+            print(f"  {name}")
+            print(f"      {line}\n")
+        print(
+            "  The refusal is too narrow. It covers a deleted scan root and\n"
+            "  not a root whose contents are gone -- a checkout that failed\n"
+            "  halfway, or files that moved. Count what was examined and put\n"
+            "  a floor under it (ADR 0185)."
         )
 
     if stale_exemptions:

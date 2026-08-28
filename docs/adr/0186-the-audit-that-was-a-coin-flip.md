@@ -128,14 +128,27 @@ containing no files — showed this guard passing with no output at all.
 
 **What this does not check.**
 
-- **Only one kind of broken.** An empty tree is not a tree with the right
-  shape and the wrong content. Probed separately: with every top-level
-  directory present but empty, six guards still pass. Four are the listed
-  conditionals; the fifth was this file when it was empty; the sixth is
-  `check_python_bug_lints`, whose refusal covers *absent* targets
-  (`none of ['Tests', 'scripts', 'Terium'] exist`) and not present-but-empty
-  ones. That last is a real gap and is **not fixed here** — the shaped probe
-  is not wired into anything, so it remains a measurement someone took once.
+- ~~**Only one kind of broken.**~~ **The shaped probe is wired in now.**
+  `starve(shaped=True)` builds every top-level directory of the real
+  repository, all empty, and each guard must refuse that too. The
+  directories are derived from the tree rather than listed, so a renamed or
+  added scan root is covered without anyone remembering.
+
+  It found the case this note predicted. `check_python_bug_lints` refuses
+  with *"none of ['Tests', 'scripts', 'Terium'] exist"* — a deleted scan
+  root — and with those three present and empty it reported *"OK: no
+  bug-class lint findings"* over zero lines. That is a checkout which failed
+  halfway, or files that moved, and the refusal did not reach it. It now
+  counts the Python files handed to ruff (322 today) and refuses below 50.
+
+  Reported as its own category — "refused an ABSENT tree, passed a
+  present-but-EMPTY one" — because such a guard is not simply missing a
+  floor: it *has* a refusal and the refusal is too narrow, which is a
+  different thing to go and fix.
+
+  Verified by sabotage: disabling that floor is caught by name, and the
+  report quotes the guard's own *"Checked 0 Python file(s)"*. Both modes
+  together cost 23 seconds.
 - **It does not read the exemption reasons.** They are strings; nothing
   verifies the sentence quoted is the sentence the guard prints, only that
   the guard still passes on nothing.
