@@ -570,8 +570,39 @@ def annotate_sbml(
             if not result.minted:
                 refused.append((name, prov.citation, result.reason or ""))
 
-        # How the value is known, as an ontology term rather than prose.
+        # How the value is known, as an ontology term rather than prose --
+        # and only when there is something to point at.
+        #
+        # ECO:0000269 says a person read an experiment and asserted this. A
+        # `resolved` parameter carrying no citation at all was getting that
+        # term anyway: the model claimed a paper measured the value while
+        # naming no paper. That is a provenance tool inventing evidence, in
+        # the field added to describe evidence.
+        #
+        # The citation is the thing the term is about, so its absence is the
+        # condition. Two ways a value can be `resolved` and uncited -- a
+        # resolver bug, or a caller filling in the origin by hand -- and
+        # neither is a reason to assert experimental support.
+        #
+        # This is also the honest reading of what could NOT be established
+        # about BRENDA (ADR 0187). Its manually curated core is what the
+        # scraper reads, but BRENDA also publishes AMENDA and FRENDA, which
+        # are text-mined with a measured precision of 64.8% (Chang et al.,
+        # NAR 2009). The 2009 paper does not say whether those results ever
+        # surface on the enzyme page this parser reads, and nothing here can
+        # tell a curated row from a mined one after the fact. What a row DOES
+        # carry when it is curated is a reference id -- so requiring one is
+        # the closest available proxy, and it is stated as a proxy rather
+        # than as proof.
         eco = _ECO_FOR_ORIGIN.get(prov.origin)
+        if eco and not (prov.citation or prov.reference_id):
+            refused.append((
+                name, eco,
+                "a resolved value with no citation or reference id: "
+                "ECO:0000269 asserts that a person read an experiment, and "
+                "there is nothing here to have read.",
+            ))
+            eco = None
         if eco:
             evidence = mint("eco", eco)
             if evidence.minted:

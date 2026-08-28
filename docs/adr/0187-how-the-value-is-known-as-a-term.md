@@ -150,10 +150,35 @@ number that drifts silently.
 
 - **Nobody has read one of these back in COPASI or Tellurium.** Unchanged
   from ADR 0181; libSBML round-trips it, which is evidence and not proof.
-- **`ECO:0000269` is a judgement about BRENDA.** It assumes BRENDA's rows
-  are experimental measurements curated by a person. That is what BRENDA
-  documents; it was not verified row by row, and a computationally-derived
-  row would be mislabelled.
+- ~~**`ECO:0000269` is a judgement about BRENDA.**~~ **Researched, and it
+  turned up a defect in this very feature.**
+
+  BRENDA's core is manually curated from 79,000+ primary references — but
+  BRENDA also publishes **AMENDA** and **FRENDA**, text-mined from PubMed
+  titles and abstracts, with a measured precision of **64.8%** and recall of
+  72% (Chang et al., *Nucleic Acids Research* 2009). The 2009 paper does not
+  say whether those results ever surface on the `enzyme.php` page this
+  parser reads, and nothing in a captured row distinguishes a curated one
+  from a mined one after the fact.
+
+  Looking for a discriminator found something worse. A `resolved` parameter
+  carrying **no citation at all** was still getting `ECO:0000269` — the
+  model asserting that a person read an experiment, while naming no
+  experiment. A provenance tool inventing evidence, in the field added to
+  describe evidence.
+
+  The evidence term now requires a citation or a reference id, and the
+  omission is **reported** through `refused_uris` rather than performed
+  silently, because a missing annotation is otherwise indistinguishable from
+  a parameter nobody looked at. A BRENDA reference id counts even though
+  `mint()` will not build a URI for it — that refusal is a fact about
+  identifiers.org, not about whether a curator read a paper, and gating on a
+  *mintable* citation would drop the term for exactly the rows Terrium
+  sources most.
+
+  What remains unverified is stated as a proxy rather than proof: a
+  reference id is what a curated row carries, so requiring one is the
+  closest available check, not a guarantee that the row was not mined.
 - **`bqbiol:isDescribedBy` is the qualifier, and it is imperfect.** The
   parameter is not *described by* an evidence class so much as it *has* one.
   No biological qualifier means "has evidence"; this is the closest, and

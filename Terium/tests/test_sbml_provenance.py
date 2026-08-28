@@ -678,3 +678,43 @@ def test_the_evidence_uri_uses_the_form_that_resolves(base_sbml):
     )
     assert "eco:ECO:" not in out.sbml, "the double-prefix form does not resolve"
     assert "eco/ECO:0000269" in out.sbml
+
+
+def test_an_uncited_resolved_value_gets_no_evidence_code(base_sbml):
+    """ECO:0000269 says a person read an experiment. Name the experiment.
+
+    A `resolved` parameter carrying no citation and no reference id was
+    getting the term anyway, so the model asserted that a paper measured the
+    value while naming no paper -- a provenance tool inventing evidence, in
+    the field added to describe evidence.
+
+    The refusal is REPORTED, not silent: a missing annotation is
+    indistinguishable from a parameter nobody looked at, and the whole point
+    of `refused_uris` is that a gap says why it is there.
+    """
+    out = annotate_sbml(
+        base_sbml, {"Km": SbmlParameterProvenance(origin="resolved")}
+    )
+    assert "identifiers.org/eco/" not in out.sbml
+    reasons = [why for _, acc, why in out.refused_uris if acc.startswith("ECO")]
+    assert reasons, "the omission must be reported, not merely performed"
+    assert "nothing here to have read" in reasons[0]
+
+
+def test_a_resolved_value_with_only_a_brenda_reference_still_gets_one(base_sbml):
+    """A BRENDA reference id is not a URI, and is still a citation.
+
+    `mint()` refuses to build a link for it (ADR 0064: BRENDA's namespace
+    covers EC numbers, not reference ids), so the row carries no
+    isDescribedBy. That is a fact about identifiers.org, not about whether a
+    curator read a paper -- and gating the evidence term on a *mintable*
+    citation would drop it for exactly the rows Terrium sources most.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(
+            origin="resolved", citation="BRENDA ref 740253",
+            citation_source="BRENDA", reference_id="740253",
+        )},
+    )
+    assert "eco/ECO:0000269" in out.sbml
