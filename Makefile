@@ -235,6 +235,9 @@ guards: require-pytest
 	@"$(PY)" scripts/check_forbidden_packages.py
 	@echo ">> guard wiring"
 	@"$(PY)" scripts/check_guard_wiring.py
+	@echo ">> guards refuse on an empty tree"
+	@"$(PY)" scripts/check_guards_refuse_on_empty.py --selftest
+	@"$(PY)" scripts/check_guards_refuse_on_empty.py
 	@echo ">> pinned versions resolve on PyPI"
 	@"$(PY)" scripts/check_pins_resolve.py
 	@echo ">> no Tellurium integration claims"
