@@ -38,6 +38,26 @@ def to_sbml(antimony_text: str) -> str:
     return antimony.getSBMLString(antimony.getMainModuleName())
 
 
+def identity_uris(sbml_text: str) -> dict[str, list[str]]:
+    """`read_back`, minus the evidence class.
+
+    Two different kinds of annotation ride on the same parameter and
+    `read_back` is qualifier-blind, so it returns both:
+
+      identity  -- WHICH paper, WHICH organism (pubmed, doi, taxonomy)
+      evidence  -- HOW the value is known (an ECO term)
+
+    The tests below are about the first. Asserting on the union made them
+    fail the moment the second was added (ADR 0187), which is not a defect
+    they were written to detect. Separating the categories is a narrowing of
+    scope, not a weakening: `test_a_resolved_parameter_carries_an_evidence_code`
+    asserts the evidence term directly, so nothing here stops watching it.
+    """
+    return {
+        name: [u for u in uris if "identifiers.org/eco/" not in u]
+        for name, uris in read_back(sbml_text).items()
+    }
+
 @pytest.fixture
 def base_sbml() -> str:
     return to_sbml(PLAIN_MODEL)
@@ -117,7 +137,7 @@ class TestWhatSurvives:
             base_sbml,
             {"km": SbmlParameterProvenance(origin="resolved", citation="PMID 12345678")},
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
     def test_a_taxon_is_annotated_only_when_it_was_actually_resolved(self, base_sbml):
         # An organism NAME is not an identifier. Deriving taxonomy:9606 from
@@ -127,7 +147,7 @@ class TestWhatSurvives:
             base_sbml,
             {"km": SbmlParameterProvenance(origin="resolved", organism="Homo sapiens")},
         )
-        assert read_back(without.sbml)["Km"] == []
+        assert identity_uris(without.sbml)["Km"] == []
 
         with_id = annotate_sbml(
             base_sbml,
@@ -180,7 +200,7 @@ class TestWhatIsRefusedRatherThanFaked:
             },
         )
         # No fabricated URI...
-        assert read_back(out.sbml)["Km"] == []
+        assert identity_uris(out.sbml)["Km"] == []
         assert "identifiers.org/brenda" not in out.sbml
         # ...but the reference is not lost either.
         assert "649716" in out.sbml
@@ -340,7 +360,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
                 )
             },
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
     def test_the_exact_string_the_cli_formats_is_handled(self, base_sbml):
         # Belt and braces: even WITHOUT the structured fields, the spelling
@@ -349,7 +369,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
             base_sbml,
             {"km": SbmlParameterProvenance(origin="resolved", citation="PubMed ref 12345678")},
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
     def test_a_brenda_registry_still_yields_no_uri_through_the_structured_path(
         self, base_sbml
@@ -367,7 +387,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
                 )
             },
         )
-        assert read_back(out.sbml)["Km"] == []
+        assert identity_uris(out.sbml)["Km"] == []
         assert "identifiers.org/brenda" not in out.sbml
 
     def test_an_unknown_registry_falls_back_to_scanning_the_text(self, base_sbml):
@@ -384,7 +404,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
                 )
             },
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
 
 class TestAnIndependentReaderCanUseTheAnnotations:
@@ -525,8 +545,15 @@ class TestTheWriteIsReconciledWithAnIndependentRead:
             ec_number="1.1.1.27",
             model_taxon_id="9606",
         )
-        assert out.cvterms_written == 3
-        assert out.triples_read_back == 3
+        # Four, and naming them is the point of asserting a number at all:
+        #   pubmed:12345678        the paper           (bqbiol:isDescribedBy)
+        #   eco/ECO:0000269        how it is known     (bqbiol:isDescribedBy)
+        #   ec-code:1.1.1.27       the enzyme          (model level)
+        #   taxonomy:9606          the organism        (bqbiol:hasTaxon)
+        # It was three until the evidence term was added (ADR 0187). A bare
+        # count that nobody can decompose is a number that drifts silently.
+        assert out.cvterms_written == 4
+        assert out.triples_read_back == 4
         assert "read back by an independent parser" in out.summary()
 
     def test_annotations_lost_in_writing_are_refused(self, base_sbml, monkeypatch):
@@ -578,3 +605,76 @@ class TestTheWriteIsReconciledWithAnIndependentRead:
         out = annotate_sbml(base_sbml, {})
         assert out.cvterms_written == 0
         assert out.triples_read_back == 0
+
+
+# ---------------------------------------------------------------------------
+# How the value is known, as an ontology term (ADR 0181, Gennari)
+# ---------------------------------------------------------------------------
+
+
+def test_a_resolved_parameter_carries_an_evidence_code(base_sbml):
+    """ECO:0000269 -- experimental evidence used in manual assertion.
+
+    John Gennari, asked whether there is an accepted way to mark an
+    annotation as computed rather than taken from a source, named evidence
+    codes (personal communication, 2026-08-27). This is also the one CVTerm
+    use Bergmann's advice endorses: he warned that provenance PROSE in a
+    CVTerm changes their semantic intent because readers expect
+    ontology-based terms. An ECO term is one.
+
+    Asserted on the resolvable URI, not on the string "ECO", because the
+    accession appears in the notes too and matching there would pass whether
+    or not a CVTerm was written.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(
+            origin="resolved", citation="PMID 16333295",
+            citation_source="pubmed", reference_id="16333295",
+        )},
+    )
+    assert "https://identifiers.org/eco/ECO:0000269" in out.sbml
+
+
+def test_a_user_supplied_parameter_gets_no_evidence_code(base_sbml):
+    """Not weak evidence -- not evidence.
+
+    An s0 the student chose is a condition of the experiment, not a claim
+    about the world, and an evidence ontology has nothing to say about it.
+    ECO:0000035 ("no evidence data found") would be wrong: nobody looked,
+    because none was called for. The notes already record that it was
+    supplied, so silence here is the accurate statement rather than a gap.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(origin="user", note="chosen by you")},
+    )
+    assert "identifiers.org/eco/" not in out.sbml
+
+
+def test_the_evidence_uri_uses_the_form_that_resolves(base_sbml):
+    """`eco:ECO:0000269` is a double prefix and 404s.
+
+    Measured against identifiers.org rather than assumed:
+
+        https://identifiers.org/eco:ECO:0000269   -> 404
+        https://identifiers.org/eco/ECO:0000269   -> 200
+
+    The colon form is right for every other namespace Terrium mints, so this
+    is an exception rather than a correction -- and emitting it without
+    noticing would have put a dead link inside an annotation whose entire
+    purpose is to be followable.
+
+    Offline: this asserts the shape Terrium emits, not that the network
+    answers. The resolution check that produced those numbers is recorded in
+    `miriam.py` beside the exception.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(
+            origin="resolved", citation="PMID 16333295",
+            citation_source="pubmed", reference_id="16333295",
+        )},
+    )
+    assert "eco:ECO:" not in out.sbml, "the double-prefix form does not resolve"
+    assert "eco/ECO:0000269" in out.sbml

@@ -198,6 +198,49 @@ class AnnotationOutcome:
         return "\n".join(lines)
 
 
+#: Terrium's origin -> the ECO term stating HOW the value is known.
+#:
+#: John Gennari, asked whether there is an accepted way to mark an
+#: annotation as computed rather than taken from a source (personal
+#: communication, 2026-08-27):
+#:
+#:   "Yes! There is an established way to indicate an annotation is computed
+#:    and predicted rather than 'from the source': An evidence code."
+#:
+#: This is also the one CVTerm use Frank Bergmann's advice positively
+#: endorses (ADR 0181). He warned that provenance PROSE in a CVTerm "changes
+#: the semantic intent ... tools reading them would expect them to be
+#: ontology-based". An ECO term is ontology-based: it is a class from a
+#: published ontology, resolvable, and means the same thing to every reader.
+#: Prose stays in notes; identity stays in isDescribedBy/hasTaxon; how the
+#: value is KNOWN becomes its own term.
+#:
+#: WHY ONLY ONE ORIGIN APPEARS HERE
+#: --------------------------------
+#: Terrium has four origins and only `resolved` gets a term.
+#:
+#:   resolved  a measurement curated from a publication -> ECO:0000269
+#:   user      the person chose it                      -> NO TERM, on purpose
+#:   llm       a language model produced it             -> never exported
+#:   default   nothing was found                        -> never exported
+#:
+#: `user` is not weakly-evidenced; it is not evidence at all. An s0 of 10 mM
+#: is a condition of the experiment being run, not a claim about the world,
+#: and there is nothing for an evidence ontology to say about it. ECO:0000035
+#: ("no evidence data found") would be wrong: nobody looked for evidence,
+#: because none was called for. Leaving it unannotated is the accurate
+#: statement, and the notes already say the value was supplied.
+#:
+#: `llm` and `default` block the run (ADR 0011), so a model carrying one
+#: never reaches this exporter. Mapping them would be describing a case that
+#: cannot occur.
+#:
+#: Labels verified against the EBI Ontology Lookup Service on 2026-08-28,
+#: not recalled: ECO:0000269 is "experimental evidence used in manual
+#: assertion" -- experimental because BRENDA's rows come from measurements,
+#: manual because a curator made the assertion.
+_ECO_FOR_ORIGIN = {"resolved": "ECO:0000269"}
+
 #: Registry name (as the resolvers spell it) -> identifiers.org prefix.
 #: Only registries whose accessions have a resolvable URI appear here.
 #: BRENDA is absent on purpose: its namespace is EC numbers, and a BRENDA
@@ -526,6 +569,22 @@ def annotate_sbml(
             result = mint("brenda", prov.citation)
             if not result.minted:
                 refused.append((name, prov.citation, result.reason or ""))
+
+        # How the value is known, as an ontology term rather than prose.
+        eco = _ECO_FOR_ORIGIN.get(prov.origin)
+        if eco:
+            evidence = mint("eco", eco)
+            if evidence.minted:
+                term = libsbml.CVTerm(libsbml.BIOLOGICAL_QUALIFIER)
+                # BQB_IS_DESCRIBED_BY: the parameter is described by this
+                # evidence class. Not BQB_IS -- the parameter is not an
+                # instance of an evidence code, it has one.
+                term.setBiologicalQualifierType(libsbml.BQB_IS_DESCRIBED_BY)
+                term.addResource(evidence.uri)
+                if parameter.addCVTerm(term) == libsbml.LIBSBML_OPERATION_SUCCESS:
+                    cvterms += 1
+            else:
+                refused.append((name, eco, evidence.reason or ""))
 
         if prov.taxon_id:
             taxon = mint("taxonomy", prov.taxon_id)
