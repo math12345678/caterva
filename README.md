@@ -508,7 +508,7 @@ Terrium/
 ├── docs/                       ADRs, engineering constitution, API docs
 │   └── adr/                    181 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
-├── scripts/                    73 guard scripts + build verification
+├── scripts/                    74 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -594,6 +594,6 @@ make test        # run all 2,344 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (1,223 tests)
 make test-lit    # literature layer only (1121 tests)
-python3 scripts/verify_build.py --quick  # all 73 guard scripts, incl. TypeScript compile
+python3 scripts/verify_build.py --quick  # all 74 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```
