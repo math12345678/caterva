@@ -251,7 +251,22 @@ def selftest() -> int:
     failures = 0
     with tempfile.TemporaryDirectory() as tmp:
         always_ok = Path(tmp) / "check_always_ok.py"
-        always_ok.write_text("print('OK: nothing to see')\n", encoding="utf-8")
+        # Wording matters even in a fixture. The first version of this line
+        # printed a stock dismissal -- the phrase a page uses to tell a
+        # reader there is nothing here worth examining -- and
+        # `check_prompt_injection` flagged it as a trust-assertion,
+        # correctly. A scanner cannot tell a test fixture from a real
+        # reassurance and should not have to.
+        #
+        # The string is arbitrary, so it was changed rather than exempted: a
+        # baseline entry for a phrase chosen carelessly is a suppression
+        # nobody could justify later.
+        #
+        # Described rather than quoted. Repeating the phrase here made THIS
+        # file trip the same rule on the next run -- the trap already
+        # recorded three times in check_prompt_injection.py's own exemption
+        # notes, and walked into anyway.
+        always_ok.write_text("print('OK: 0 findings')\n", encoding="utf-8")
         code, _ = starve(always_ok)
         ok = code == 0
         failures += 0 if ok else 1
