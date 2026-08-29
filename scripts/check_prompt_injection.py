@@ -314,8 +314,8 @@ def check() -> list[str]:
     # is how an exemption list stops being read.
     if exempted:
         print(f"Reviewed exemptions applied ({len(exempted)}):")
-        for entry in exempted:
-            print(f"  {entry}")
+        for line in exempted:
+            print(f"  {line}")
         print()
 
     return violations

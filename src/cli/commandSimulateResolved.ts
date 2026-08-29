@@ -454,7 +454,25 @@ async function writeExports(
    * course.
    */
   experiment?: { endTime?: number; points: number },
-): Promise<void> {
+  /**
+   * Reports, per requested file, whether the write actually happened.
+   *
+   * `null` means "not requested" and is deliberately distinct from
+   * `false`, "requested and did not arrive" -- collapsing those two is how
+   * a caller comes to read a run that produced nothing as a run that was
+   * asked for nothing.
+   *
+   * This used to be `Promise<void>`, which is the defect: both failure
+   * branches below print a red line and fall through, so the verdict
+   * existed and reached nobody. `exportModel` had already returned
+   * `{ ok: false, error }` -- it was observed, then dropped.
+   *
+   * Measured with `libsedml` absent: `simulate --resolve --export-model
+   * out.omex` printed a raw Python traceback, wrote no archive, and the
+   * `--json` document reported `exports.model: "out.omex"` exactly as it
+   * does on success.
+   */
+): Promise<{ model: boolean | null; citations: boolean | null }> {
   /**
    * Everything this function tells the user goes through here.
    *
@@ -479,6 +497,19 @@ async function writeExports(
     // run looked like it had merely failed late.
     if (!options.json) process.stdout.write(text);
   };
+
+  /**
+   * Per-file verdicts. `null` until the corresponding export is attempted,
+   * so a file nobody asked for stays `null` rather than becoming `false`.
+   *
+   * The model stays `null` on the `!runnable` path below, and that is the
+   * point: a model deliberately withheld because the simulation was
+   * refused is a decision Terrium made and explained, not a write that
+   * failed. `false` there would make "I declined to run" and "the file
+   * system said no" the same fact.
+   */
+  let modelWritten: boolean | null = null;
+  let citationsWritten: boolean | null = null;
 
   if (options.exportModel && !runnable) {
     say(
@@ -580,6 +611,7 @@ async function writeExports(
               `${c(DIM, '  which a person reads and a pipeline does not.')}\n`
           : `${c(DIM, '  Loadable by anything that reads Antimony. Every parameter carries')}\n` +
             `${c(DIM, '  its origin in a comment, so the provenance travels with the file.')}\n`;
+      modelWritten = true;
       say(`\n${c(BOLD, 'Model written')} ${outcome.path}\n` + blurb);
 
       // An identifier Terrium declined to mint a URI for is NOT a missing
@@ -598,6 +630,7 @@ async function writeExports(
         );
       }
     } else {
+      modelWritten = false;
       say(
         `\n${c(RED, '✗')} Model not written: ${outcome.error}\n`,
       );
@@ -625,6 +658,7 @@ async function writeExports(
 
     const outcome = await exportCitations(cited, options.exportCitations);
     if (outcome.ok) {
+      citationsWritten = true;
       say(
         `\n${c(BOLD, 'Citations written')} ${outcome.path}\n` +
           `${c(DIM, `  ${cited.length} source(s), importable into Zotero, Mendeley or EndNote.`)}\n` +
@@ -632,11 +666,14 @@ async function writeExports(
           `${c(DIM, '  the identifier and does not invent the rest.')}\n`,
       );
     } else {
+      citationsWritten = false;
       say(
         `\n${c(RED, '✗')} Citations not written: ${outcome.error}\n`,
       );
     }
   }
+
+  return { model: modelWritten, citations: citationsWritten };
 }
 
 export async function commandSimulateResolved(
@@ -1206,7 +1243,7 @@ export async function commandSimulateResolved(
     // Under `--json` these calls print nothing (see `say` in writeExports),
     // so the document below stays the only thing on stdout. The outcome is
     // reported inside it instead, which is where a script can act on it.
-    await writeExports(
+    const exportOutcomes = await writeExports(
       options,
       options.model === 'competitive' ? 'mm_competitive_inhibition' : 'mm',
       Object.fromEntries(provenance.map((row) => [row.name, row.value] as const)),
@@ -1220,13 +1257,31 @@ export async function commandSimulateResolved(
           status: 'ran',
           provenance,
           response,
-          // Paths REQUESTED. Whether each file now exists is checkable by
-          // the caller with one stat() — and stating "written: true" here
-          // would be this function asserting the success of a write it does
-          // not observe.
+          // Paths REQUESTED, and — since this pass — whether each write
+          // actually happened.
+          //
+          // The previous version carried only the paths, on the reasoning
+          // that "stating `written: true` here would be this function
+          // asserting the success of a write it does not observe." That is
+          // the one thing it is not: `exportModel` returns
+          // `{ ok: false, error }`, `writeExports` reads it, prints a red
+          // line, and threw the verdict away. An observed outcome dropped
+          // before it reaches the reader is this project's house defect,
+          // and the comment ten lines above already promised the opposite —
+          // "the outcome is reported inside it instead, which is where a
+          // script can act on it." It was not. Now it is.
+          //
+          // `stat()` was the suggested substitute and it cannot answer the
+          // question: a stale file from an earlier run at the same path
+          // exists and is wrong, so "the file is there" and "this run wrote
+          // it" are different facts. Only the writer knows which.
+          //
+          // Null path -> null outcome, never `false`: not requested and
+          // requested-but-failed must not collapse into one value.
           exports: {
             model: options.exportModel ?? null,
             citations: options.exportCitations ?? null,
+            written: exportOutcomes,
           },
         },
         null,

@@ -1,6 +1,31 @@
 # Terrium Advanced Analysis System
 
-This system provides advanced visualization, performance analysis, provenance tracking, and validation tools for the Terrium scientific simulation engine.
+> **Most of this document describes work that has not been built.**
+>
+> What is in this directory, in full:
+>
+> | path | status |
+> |---|---|
+> | `advanced_analysis/scripts/generate_figures.py` | **real** — drives the engine, writes the ten figures below |
+> | `advanced_analysis/figures/*.png` | **real** — its output, 10 files |
+> | `requirements.txt` | real, and installable since 2026-08-23 |
+> | `README.md` | this file |
+>
+> Nothing else. The **eleven** paths named in *Directory Structure* below —
+> `architecture/`, `performance/`, `provenance_visualization/`,
+> `validation/` and every file inside them — **do not exist**, checked one
+> by one. Three of the four components in *System Overview* are plans
+> written in the present tense.
+>
+> Said here rather than discovered by `cd architecture`. The section
+> headed *Figure Suite (working)* already carried the whole truth in one
+> parenthesis; this notice makes it legible without having to notice which
+> heading is qualified and which is not.
+>
+> The plan is kept rather than deleted — it is a real intent and deleting
+> it loses that — but a plan in the present tense is a claim, and this
+> project's rule is that a claim nobody can check should not read like a
+> fact.
 
 ## System Overview
 
@@ -112,10 +137,13 @@ python validation/run_validation_pipeline.py \
 jupyter notebook validation/validation_analysis.ipynb
 ```
 
-## Directory Structure
+## Directory Structure — PLANNED, not present
+
+Every directory below is unbuilt; see the notice at the top of this file
+for what is actually here.
 
 ```
-/advanced_analysis/
+/advanced_analysis/            # PLANNED LAYOUT — see notice above
 ├── architecture/
 │   ├── architecture_diagram.excalidraw  # Excalidraw JSON for architecture
 │   └── architecture_guide.md             # Documentation

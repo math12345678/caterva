@@ -233,8 +233,78 @@ CLAIMS: dict[str, tuple[str, Callable[[], int], float]] = {
 }
 
 
+
+#: Business/ documents that make a countable claim and are NOT scanned.
+#:
+#: `build-stages/` is excluded wholesale and that is not an oversight: those
+#: files are dated build logs. "Mutation reverted; 124 tests green" was true
+#: on the day it was written, and rewriting it to today's total would
+#: falsify a record rather than correct a claim. The same reasoning
+#: LICENSE's historical narrative gets in check_dependency_licenses.
+#:
+#: Everything else directly under Business/ is fair game, because the
+#: distinction that matters is not "investor" versus "internal" -- it is
+#: whether somebody will read the number as current.
+HISTORICAL_PREFIXES: tuple[str, ...] = ("Business/build-stages/",)
+
+#: Top-level Business documents deliberately not scanned, with the reason.
+#: Empty today. An entry here is a decision, not a default.
+UNSCANNED_WITH_REASON: dict[str, str] = {}
+
+
+def business_docs_making_claims() -> list[tuple[str, str]]:
+    """`(path, label)` for every Business/ doc that states a countable claim
+    and is not already covered.
+
+    WHY THIS EXISTS
+    ---------------
+    INVESTOR_DOCS is a hand-written tuple, and this file already calls the
+    pattern out by name: "Sixth instance of a correct guard on too narrow a
+    scope." A hand-written list covers what its author remembered on the day
+    -- ADR 0151 is the same defect on published READMEs, where the surface
+    set was made DERIVED for exactly this reason.
+
+    So the list stays (it is the thing that gets CHECKED, and it carries
+    real per-document reasoning), and this asks the complementary question:
+    is there a Business document making a claim that nothing is checking?
+    Today the answer is no. The point is that it stays no when somebody adds
+    the next fundraising doc.
+    """
+    covered = set(INVESTOR_DOCS) | set(UNSCANNED_WITH_REASON)
+    found: list[tuple[str, str]] = []
+    business = ROOT / "Business"
+    if not business.is_dir():
+        return found
+    for path in sorted(business.rglob("*.md")):
+        rel = path.relative_to(ROOT).as_posix()
+        if rel in covered:
+            continue
+        if any(rel.startswith(prefix) for prefix in HISTORICAL_PREFIXES):
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for label, (pattern, _live, _tol) in CLAIMS.items():
+            for match in re.finditer(pattern, text):
+                # A dated claim ages honestly -- same rule the scanned
+                # documents get, applied to the same window of text.
+                window = text[max(0, match.start() - 200) : match.end() + 200]
+                if _TIMESTAMP_RE.search(window):
+                    continue
+                found.append((rel, label))
+                break
+    return found
+
+
 def check() -> list[str]:
     problems: list[str] = []
+
+    for rel, label in business_docs_making_claims():
+        problems.append(
+            f"{rel} states a '{label}' figure and is scanned by nothing. "
+            "Add it to INVESTOR_DOCS so the number is checked against the "
+            "tree, or to UNSCANNED_WITH_REASON with why it should not be. "
+            "A claim nobody checks is how the application draft came to "
+            "understate the project by 77%."
+        )
     for rel in (*INVESTOR_DOCS, *PUBLIC_MARKETING):
         path = ROOT / rel
         if not path.exists():

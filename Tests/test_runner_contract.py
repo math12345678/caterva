@@ -29,6 +29,7 @@ if LIB_DIR not in sys.path:
     sys.path.insert(0, LIB_DIR)
 
 import taxonomy
+import enzyme_lookup  # noqa: E402
 import fallback_logic  # noqa: E402
 import science_agent_runner  # noqa: E402
 from citation import Citation  # noqa: E402
@@ -86,13 +87,53 @@ def golden_result(cross_species: bool = False) -> KineticResult:
     )
 
 
-def run_main(monkeypatch, fake_resolve, payload):
+def run_main(monkeypatch, fake_resolve, payload, taxon_id=None):
+    """Run the real runner with the kinetic lookup stubbed.
+
+    NCBI is stubbed too, and that is not a detail. `taxon_id_for` calls
+    `enzyme_lookup.fetch_taxon_id`, which is a live HTTP GET to NCBI
+    Taxonomy -- so a test that stubs only the resolver still reaches the
+    network, and its result depends on whether the machine can get there.
+    Measured: this file's shape assertion PASSED with the network blocked
+    and FAILED with it available, because "Homo sapiens" really does
+    resolve to 9606. A contract test that green-lights the shape only
+    while NCBI is unreachable is not pinning the contract; it is
+    reporting the weather.
+
+    `taxon_id` is what the stubbed lookup returns: None for "the lookup
+    found nothing", a string for a resolved id. It is a parameter rather
+    than a fixed None so the emitted-id path is reachable too -- with a
+    hardcoded None, no test in this file could ever see a taxon id
+    actually reach the output, and the two keys could stop being emitted
+    without anything going red.
+    """
     monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", fake_resolve)
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda *a, **k: taxon_id)
     stdout = io.StringIO()
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
     monkeypatch.setattr(sys, "stdout", stdout)
     science_agent_runner.main()
     return json.loads(stdout.getvalue())
+
+
+def test_a_resolved_taxon_reaches_the_output(monkeypatch):
+    """The other side of the two taxon keys.
+
+    Every other test here runs with the NCBI lookup returning nothing, so
+    the emitted ids are None in all of them. That pins "absent stays
+    absent" and nothing else: delete the two assignments in the runner and
+    the whole file would still pass. This is the case where the lookup
+    succeeds, so a resolved id has to travel from the lookup to the JSON.
+    """
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: golden_result(),
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+        taxon_id="9606",
+    )
+    assert result["taxonId"] == "9606"
+    assert result["requestedTaxonId"] == "9606"
 
 
 def test_golden_found_output_shape(monkeypatch):
@@ -130,9 +171,14 @@ def test_golden_found_output_shape(monkeypatch):
         "unit": "mM",
         "organism": "Homo sapiens",
         # The taxon of the organism the value was MEASURED in, and of the
-        # one the caller ASKED about. None here because this test stubs the
-        # resolver and does not stub NCBI -- and None is the honest report
-        # of a lookup that did not happen. It is emphatically NOT a default:
+        # one the caller ASKED about. None here because `run_main` stubs
+        # the NCBI lookup to find nothing -- None is the honest report of a
+        # lookup that came back empty. The earlier version of this comment
+        # said the lookup "did not happen" because the test did not stub
+        # NCBI; that was exactly backwards. Not stubbing it meant the
+        # lookup DID happen, over the network, and this assertion held only
+        # on a machine that could not reach NCBI. See run_main's docstring.
+        # It is emphatically NOT a default:
         # `enzyme_lookup.DEFAULT_TAXON_ID` used to turn exactly this
         # situation into a confident "9606" (see
         # Tests/test_no_default_organism.py).

@@ -549,8 +549,8 @@ def main() -> int:
             "only -- the DOI resolves, but nothing confirmed it is the paper "
             "being cited:"
         )
-        for entry in existence_only:
-            print(f"      {entry}")
+        for line in existence_only:
+            print(f"      {line}")
     if not all_dois:
         failures += 1
         print(

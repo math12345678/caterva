@@ -13313,3 +13313,391 @@ reachable by running the thing rather than reading about it.
 | Built | 4 tests (8 in the file), the grade driven through the grader |
 | Verified | two mutations, both caught; invented values asserted absent rather than correct ones present; both restores checked by `diff` |
 | **For the owner** | `make publish-check`, PUBLISHING.md 1–2, then make them public |
+
+---
+
+## Seventy-third pass — the build nothing compiled
+
+An audit rather than a hunt for a known defect. Measured on `874b191`
+with a clean tree, so every red below predates the pass.
+
+### The landing app had not compiled for five days
+
+`CliApp.tsx` opens a JSX comment with `{/*` at line 686, closes it with
+`*/` at 699, and never emits the `}`.
+
+```
+src/cli/CliApp.tsx:701:11: ERROR: Expected "}" but found "className"
+```
+
+`pnpm run build:landing` and `pnpm run typecheck` both failed. Introduced
+`982ebca` (2026-08-18), found today. One character.
+
+**I got the reason wrong first, and that is the more useful finding.**
+
+I wrote that none of the 72 guards could see it. Then I ran the thing.
+`scripts/check_typescript_compiles.py` exists, is wired into
+`verify_build.py`, covers all seven workspaces, and catches this exact
+defect — restore the byte and it exits 1 with
+`CliApp.tsx(701,12): error TS1005: '}' expected.`
+
+**The guard was never the problem. It never ran.** `make guards` is a
+sequence of `@` lines, so it stops at the first non-zero exit.
+`check_documented_counts.py` is the third step. `verify_build --quick` is
+second from last. The README claimed 2,286 tests against an actual 2,297.
+
+One number stale by eleven meant roughly two dozen later guards never
+executed — including the one that names the parse error. I found the
+other two red guards only because I ran all 27 individually after the make
+target died on step three.
+
+That is this project's own house defect, applied to guard verdicts rather
+than to values: computed, correct, and never delivered because something
+upstream exited first.
+
+The second half is about where the compiler lives. The guard needs a local
+`node_modules/typescript`, and without one it reports each workspace as
+`NOT type-checked` rather than passing it — exactly right, and the reason
+it cannot silently degrade. But `verify_build --quick` runs in CI's Python
+job, which does `pip install` and no `pnpm install`, while the Node job
+that does install runs only the api-server suite. Whether CI was red
+across those five days I could **not determine** from here; that needs the
+CI logs.
+
+So `pnpm run typecheck` now runs in the Node job, where the toolchain
+actually exists — not as a replacement for the better guard, but so the
+question gets asked somewhere that can answer it. And the api-server suite
+could never have caught this anyway: vitest compiles only what some test
+imports, and no test imports the landing app.
+
+### A contract test that was reporting the weather
+
+`test_runner_contract.py` stubs `resolve_kinetic_value` and nothing else.
+`taxon_id_for` calls `enzyme_lookup.fetch_taxon_id` — a live HTTP GET to
+NCBI. Same commit, same test, twice:
+
+| network | result |
+|---|---|
+| available | **FAILED** — `taxonId` was `'9606'`, expected `None` |
+| blocked | **passed** |
+
+Its own comment said the `None` was "the honest report of a lookup that
+did not happen." Backwards: not stubbing NCBI is what made the lookup
+happen. The assertion held only where NCBI was unreachable.
+
+And because every test in the file ran with the lookup unresolved,
+**deleting both taxon assignments in the runner changed no assertion** —
+the delivered path had no coverage at all. That mutation is T1, and it is
+the one worth having.
+
+### A test named for a branch it was not testing
+
+`lab_report.py` states "Nothing was withheld…" when there are no
+refusals. The test for that branch built its report from the shared
+fixture — which now resolves a km whose rows mix diseased and healthy
+breast tissue, so it carries a source-mixture refusal. The test asserted
+the no-refusal sentence against a document with a refusal in it. The
+branch it was named for had never been exercised.
+
+Fixed by building a report with nothing withheld, and asserting
+`refusals == []` first — without that, a change that stopped emitting
+refusals entirely would make the test pass for exactly the wrong reason.
+
+### One list, three copies
+
+`llmResolver.ts` held the resolver's domains as an array that validates
+the model's reply and, separately, as prose inside the prompt that tells
+the model what it may return. The array's docstring read *"Must match
+SYSTEM_PROMPT's domain enum"* — a rule addressed to a human and enforced
+by nothing. The test's copy pins one direction only: whether the allowlist
+*accepts* each domain. A domain dropped from the prompt is simply never
+proposed, and everything stays green. The prompt now interpolates the
+array, verified byte-identical to the line it replaced.
+
+### What I left red, deliberately
+
+The ADR index links `0146` and `0150`. **Neither file has ever existed in
+any commit.** Two decisions that are index rows and nothing else.
+
+- 0146 describes work that IS in the tree — its caveat about units living
+  only in `<notes>` matches a comment in `scientificCLI.ts` word for word.
+- 0150 claims libSBML consistency warnings went to **0**. Measured through
+  the real exporter — build the mm model, load it with antimony,
+  `checkConsistency` with unit checking on — **15 problems**, and
+  `unitDefinition` appears nowhere. The same 15 the row says it fixed.
+
+Retracting a row and implementing the units are materially different
+trees, and this is the record the project rests on. Not mine to pick. The
+guards stay red so it cannot be quietly forgotten.
+
+Also red and also the owner's: `terrium_pitch_deck.pptx` says 1,852 tests
+on two slides; the repository has 2,297.
+
+| | |
+|---|---|
+| Found | a five-day build break that a guard already caught and never got to run — `make guards` fail-fasts, and one README count stale by eleven hid two dozen later checks, a contract test whose verdict depended on network reachability, a test asserting the opposite of the branch it named, one domain list in three hand-kept copies, and an ADR index claiming a fix that measurably is not in the tree |
+| Built | `pnpm run typecheck` in CI + its local route and reason; 1 new test for the delivered taxon path; the no-refusal branch given its first coverage; the prompt's domain list derived rather than retyped |
+| Verified | 2 mutations, both caught against a green baseline; the JSX fix hand-verified and named as the weakest evidence, because grading it needs pnpm and a set file that says NOT CAUGHT without node_modules is worse than none; all restores checked by `diff` and `git diff` |
+| Not checked | `Business/`, `mule/`, `terrium-site/`, `advanced_analysis/`, `landing/`; whether the rest of the literature suite hits the network — two offline runs failed to finish, so **not determined**, not "fine"; whether CI was red during the five days, which needs the CI logs |
+| **For the owner** | decide 0146/0150 (retract or implement); the pitch-deck number; `make setup` here installs the `cffconvert` that leaves one engine test UNREACHABLE |
+
+---
+
+## Seventy-fourth pass — the suite nobody ran
+
+The seventy-third pass ended with a list headed *what I did not check*.
+This is that list, checked.
+
+### The product's own tests had never been run
+
+`src/` holds **115 TypeScript sources and 65 test files**, including
+`scientificCLI.ts` — the CLI `START_HERE.md` and `make demo` both tell a
+new user to run. `package.json` defines `test`, `type-check` and `build`
+for it. `make` invokes none of them. CI invokes none of them. CI's Node
+job installs `Science-Agent-Pipeline/` and runs *that* workspace's suite.
+
+First run: **918 tests, 7 failing.**
+
+None of the failures were subtle. They are what a suite becomes when
+nothing executes it:
+
+- The examples test kept a **hand-written list of the CLI's commands**. It
+  had drifted to miss four, including **`report`** — the flagship command,
+  the one the demo prints. Four lines above that list, the file's own
+  header explains that a hardcoded copy "would keep passing after someone
+  edited the help text". Its comment said "covers all nine" over ten names.
+- The same file read `Example:` lines with a **single-line regex** and two
+  examples are `\`-continued. It ran half a command, the CLI correctly
+  refused it, and the test reported **two correct examples as broken**.
+- A validation file had **two tests requiring opposite things** about the
+  same three domains, ever since ADR 0157 taught the pipeline to dispatch
+  them. It could not go green whatever the code did — and it read as "the
+  validator accepts junk".
+- Three archive tests spawned a bare `python3` while the CLI under test
+  resolves `.venv/bin/python3`. They were **unpassable on a machine that
+  followed CONTRIBUTING**, failing on a module `make setup` installs.
+
+### Exit 0, no file, and a document that said nothing was wrong
+
+Found while reproducing the last of those. With `libsedml` absent,
+`simulate --resolve --export-model out.omex` printed a raw Python
+traceback, wrote no archive, and **exited 0**. Under `--json` the red line
+is suppressed by design, and the `exports` block was byte-identical to a
+successful run.
+
+The verdict was never missing. `exportModel` returns
+`{ ok: false, error }`. `writeExports` read it, printed it, and was typed
+`Promise<void>`.
+
+Two comments in that file disagree about this, ten lines apart. One says
+the outcome "is reported inside it instead, which is where a script can
+act on it." The other says only paths belong there, because reporting the
+write would be "asserting the success of a write it does not observe."
+
+It is the one write it does observe.
+
+### `make setup` built an environment that could not run the guards
+
+`PyYAML` is declared **nowhere** and a guard imports it. `ruff` is
+declared only in a `pyproject.toml` extra that nothing installs — `make
+setup` and CI both read `requirements-dev.txt`. Two dependency lists that
+overlap without agreeing.
+
+So the guards passed for anyone who ignored CONTRIBUTING, because Anaconda
+ships both, and failed for anyone who followed it.
+
+And `verify_build.py` spawned **all 78** of its guards as a bare `python`
+from PATH rather than `sys.executable` — grading the tree with an
+interpreter nobody chose. Same defect as the archive tests, one layer up.
+
+### The documented counts are a fact about the machine
+
+Same checkout, same commit, same day:
+
+| suite | system python | `.venv` |
+|---|---|---|
+| engine | 1,167 | 1,205 |
+| literature | 1,130 | 1,116 |
+
+Both directions at once, for two different reasons. **The seventy-third
+pass wrote the wrong pair into the README** — honestly measured, from the
+wrong interpreter. The guard now prints which Python produced its numbers
+and warns when that is not a `.venv`.
+
+### The good failure
+
+`check_availability_notice_matches_reality.py` went red. The repository is
+**public now** — verified independently, `GIT_TERMINAL_PROMPT=0 git
+ls-remote` exits 0 with no prompt — and README.md and START_HERE.md still
+opened with "Not public yet."
+
+ADR 0145 built that guard for this exact day, arguing that nothing in the
+tree fires when a *true* sentence stops being true, and that the people
+positioned to notice are the ones who cannot, because they have had access
+all along.
+
+It fired, and it was right. Both notices are gone, and
+`check_quickstart_clone_works.py` — red on purpose since ADR 0143 — is
+green for the first time.
+
+### Also: `npm ci` could not install the root project
+
+The lockfile was missing two dependencies `package.json` declares, and
+claimed `MIT` where the manifest says `Apache-2.0`. Measured: `npm ci`
+exits 1, "Missing: @types/js-yaml@4.0.9 from lock file".
+
+### The network question, half-answered
+
+The last pass left it *not determined*. A second network-dependent test is
+now proven, running the opposite way from the first: it **passes online in
+9s and fails with the network blocked**, reaching PubChem through
+`find_form_mixtures`. The author had stubbed five providers; there is no
+seam for that one.
+
+Not fixed, and that is deliberate: neutering compound identification to
+get a green test is worse than the red. A full enumeration still did not
+finish — offline runs pass forty minutes on retry backoff — so the honest
+answer is **at least two, total unknown**, with nothing in the tree
+preventing a third.
+
+| | |
+|---|---|
+| Found | 918 tests nobody had ever run and 7 failing; a CLI that exits 0 having written nothing; a setup that cannot run its own guards; 78 guards graded by the wrong interpreter; test counts that differ by 38 depending on the machine; a broken `npm ci`; and a "not public yet" notice on a public repository |
+| Built | 1 new jest file for the export verdict, 2 corrected stale tests plus the direction each was missing, 3 undocumented CLI surfaces documented, 3 unrecorded boundary fields recorded, 2 guard dependencies declared with licences read from the shipped LICENSE |
+| Verified | root jest 7 failed → **918 passed**; engine green; `verify_build --quick` 11 → 6, measured like-for-like by stashing and restoring; 4 mutations all caught, every restore diff-checked |
+| Refused | to clear the prompt-injection findings — the guard demands a human verdict, and an AI clearing findings about text aimed at AI readers is the conflict it exists to catch |
+| **For the owner** | 0146/0150 (retract or implement); the pitch-deck number; the four injection findings; and a `cid_provider` seam on `resolve_kinetic_value` if the suite should be runnable offline |
+
+---
+
+## Seventy-fifth pass — the flag that skipped more than it said
+
+### CI was red, and I could have checked two passes ago
+
+Both previous entries said the CI question was *not determined* because it
+needed the logs. It needed `gh`, which is installed and authenticated.
+That was my error, not a limitation.
+
+**58 main-branch runs. Last green 2026-08-18T22:11:50Z. 28 consecutive
+failures since.** Every one of them on the same step, both Python
+versions:
+
+    check_ci_toolchain: PyYAML is not installed.
+      This is 'could not check', NOT 'checked and fine'. Exiting 3.
+
+That is the gap the last pass found from the other end. Verified rather
+than hoped: a clone of this tree with a venv built only from
+`requirements-dev.txt` runs that selftest to exit 0.
+
+**Two blockers are queued behind it**, invisible because CI stops at the
+first failure — the dead `0146`/`0150` links, and `verify_build --quick`,
+which was added to CI on 2026-08-22 and **cannot pass where it is
+placed**. It calls the TypeScript compile guard, which needs a local
+`node_modules/typescript` and correctly refuses to pass without one, in a
+job that runs `pip install` and no `pnpm install`.
+
+So fixing PyYAML does not turn CI green. It turns CI from red at step 34
+to red at the ADR record — which is the thing three passes have now
+handed back rather than decided.
+
+### A flag that made the tree look clean by not looking
+
+`verify_build.py` had five guard groups inside `if not
+args.no_typescript:`. One is about TypeScript.
+
+    --quick                    6 failures
+    --quick --no-typescript    3 failures
+
+The three that vanished: **ADR Index, Mutation Table Reproducibility,
+Prompt Injection.**
+
+Two of the four misplaced groups carried comments insisting they run in
+every mode — "so it runs in every mode rather than behind the slow-test
+flag", and "A guard against tests that cannot fail is worth little if it
+only runs in the slow path". Both were true about the intent and false
+about the code. That is worse than no comment: it is exactly why nobody
+re-read the indentation.
+
+### The compile guard could not see the product it guards
+
+It walked `Science-Agent-Pipeline/` and stopped — the defect it was
+written to fix, one directory up. Outside its reach: the repository root's
+`src/` (115 files, including the CLI `START_HERE.md` tells you to run),
+`landing/` — whose own tsconfig opens by explaining that this code "no
+tsconfig.json covered, so nothing type-checked it", written and never run
+— and `terrium-site/`. Seven workspaces, now ten.
+
+### `pip install -r requirements.txt` did not work, and two names had no packages
+
+`advanced_analysis/README.md` documents that command. Its first entry is
+`python>=3.10`, which is not a distribution, so it fails immediately. Two
+others were checked against PyPI: `timeit` — a **standard library module**
+— and `excalidraw-export` both return **404**.
+
+An unregistered name is not a typo. It is an open slot, and a requirements
+file is a standing instruction to install whatever appears in it.
+
+`check_pins_resolve.py` could not have caught any of it: a deliberate
+two-file list, and a matcher that only reads `==` while that file uses
+`>=` throughout.
+
+### The harness refused two of my mutations, and was right twice
+
+F2 exists so the structural test cannot pass by locating its subject,
+extracting nothing and reporting a clean match. My first version made the
+finder return an empty node *only when no branch exists* — and the branch
+exists, so the line never ran. My second was `return set() or {...}`,
+which evaluates to the set literal because an empty set is falsy.
+
+Both came back NOT CAUGHT, both correctly. An inert mutation reads exactly
+like an untested claim, and the only reason neither became a false
+"verified" line in ADR 0167 is that the harness graded them instead of me.
+
+| | |
+|---|---|
+| Found | CI red for 28 pushes with the cause already fixed and two blockers behind it; a flag hiding 25 guards; a compile guard blind to the product; a requirements file that cannot install, naming two packages that do not exist |
+| Built | the four misplaced groups moved out, with a structural test pinning the branch; compile-guard scope 7 → 10 workspaces; `check_pins_resolve` extended to names across four files |
+| Verified | 2 mutations caught after two inert ones were correctly refused; scope widening and name check hand-verified old-guard vs new-guard on the same tree, named as the weaker evidence; all restores diff-checked |
+| Checked and clean | `terrium-site` installs, type-checks and builds; 30 `mule/` JS files parse; `landing/` type-checks — three of them now inside the compile guard so they stay checked |
+| Then checked | `Business/`, named unread by three passes: every referenced path resolves, the architecture table maps to eleven real files, and the only two live claims are already scanned — the 2,279 is 1.8% off and tolerated on purpose. What was wrong is the SCOPE: `INVESTOR_DOCS` is a hand-written five, and the file already calls itself the "sixth instance of a correct guard on too narrow a scope". A derived pass now asks whether any Business doc makes an undated claim nothing covers |
+| Then fixed | mypy, configured since before anything installed it: **12 errors → 0 across 167 files**. Ten were one name holding two types in one function. The eleventh narrowed an AST node with a boolean flag, which is correct and unverifiable — `ast.walk` yields bare `AST` — and `continue` narrows for both readers. Declared in requirements-dev with licences read from the shipped LICENSE files. Installed, **not** enforced: wiring a type checker changes what green means, and that is still yours — now a one-liner instead of a one-liner plus a backlog |
+| Corrected | I claimed the inhibition domains were unreachable from `dashboard.html`, citing ADR 0149. **False** — ADR 0157 fixed it on 2026-08-22 and I repeated 0149 without opening the file. Measured: all four enabled options are accepted and map to distinct domains, and `allosteric` is disabled in the markup exactly as the validator rejects it. Reading an ADR and reporting it as current is the same act as trusting the 0146/0150 index rows — the defect these three records have been chasing |
+| Then checked | `mule/` — 30 files parse, **58 relative imports and 14 asset references all resolve**. `advanced_analysis` — and this one was not clean: its README's *Directory Structure* names **eleven paths and none of them exists**, with three of four "main components" written as present tense plans. The tell was one heading reading *Figure Suite (working)* while the rest said nothing, so the whole truth sat in a parenthesis. The plan is kept and the notice now states what is present |
+| Guarded | that notice is the kind that rots, so it fails in both directions: if somebody builds a claimed-absent path, and if the notice is deleted while they are still absent. ADR 0145's argument reused — the person who builds `validation/run_validation_pipeline.py` is exactly the person a stale notice would tell their work does not exist |
+| Finally | `mule/` — three passes wrote "30 files parse, which is all that has been established". Type-checked at last: **17 findings, nine of them one function.** `interactive()` drew a circular focus ring when `shape === 'circle'`; `shape` appeared three times in the whole tree, all in that function, across ten call sites passing rectangles. The condition was unsatisfiable, so removing it **cannot** change what renders. Half a feature, unreachable, is indistinguishable from support that exists. The other eight were DOM idioms the checker cannot narrow, closed with comments. Compile-guard scope **7 → 12 workspaces** this session |
+| A guard caught me | the notice I added to `advanced_analysis/README.md` named `scripts/generate_figures.py` — reads repo-relative, is directory-relative. The Documented Command Guard failed with *"is named by advanced_analysis/README.md and does not exist"*: its exact defect, committed by the person writing a notice about claims that do not match the tree |
+| **For the owner** | 0146/0150; where `verify_build --quick` belongs in CI; the pitch-deck number; the four injection findings; whether to wire mypy |
+
+### A collision, yielded — the units are being built right now
+
+Starting on ADR 0150's substance — the unit declarations the index row
+claims — I wrote `Terium/core/sbml_units.py`, measured the mm export at
+**15 consistency problems → 0**, and proved the fixed file bit-identical
+to the original over 51 points through roadrunner.
+
+Between my write and my next probe, **the file changed under me**: a
+different docstring, a different signature, mtime minutes old, link count
+2, and a third variant in the main checkout. Another agent is on exactly
+this defect, iterating live — their signature evolved between two of my
+probes. The brief's rule for a held path is yield, so I did: their file is
+untouched, unstaged, and mine survives only outside the tree.
+
+**Their version, measured as found** (`declare_units(sbml, 'mM',
+{'Km': 'concentration', 'Vmax': 'concentration_per_time'})`): declared,
+**0 consistency problems, bit-identical trajectory**. Their design is
+better than mine on the axis this repository keeps relearning —
+caller-supplied `parameter_kinds`, total-or-refuse, where mine kept a
+module-level table.
+
+**One measurement to hand over**, since the filesystem is the only
+channel: the before-file's law is concentration/time, so its
+*concentration* dynamics wrongly depend on compartment volume — `[S](10s)`
+at size 1.0 vs 2.0 **differs** before the fix and must **agree** after
+(MM concentration dynamics are volume-invariant; the `V * rate` law makes
+that true at every size, not only at the size-1 coincidence ADR 0146
+noted). I got this assertion backwards on my first try, which is why it
+is worth writing down. A test asserting that pair pins the fix's meaning,
+not just its warning count.
+
+Not recorded as an ADR: the decision is theirs to record, and two records
+of one decision is the drift this project exists to prevent.

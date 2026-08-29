@@ -1,0 +1,46 @@
+{
+  // Type-checking for mule/'s hand-written browser JavaScript.
+  //
+  // WHY THIS EXISTS
+  //
+  // mule/ ships 30 JavaScript files and nothing checked any of them. Three
+  // passes over this repository recorded the same sentence -- "30 files
+  // parse, which is all that has been established about them" -- because
+  // parsing is all `node --check` establishes.
+  //
+  // Type-checked for the first time on 2026-08-23: 17 findings. Nine of
+  // them were one function. `interactive()` in cathedral/render.js took a
+  // `shape` parameter and drew a circular focus ring when it was
+  // 'circle'; `shape` appeared exactly three times in the whole tree --
+  // that parameter and its two comparisons -- across ten call sites, and
+  // every box passed is {x, y, w, h}. The circular half had never
+  // executed. It is gone, and removing it could not change what renders,
+  // because the condition was unsatisfiable.
+  //
+  // WHY checkJs RATHER THAN A REWRITE
+  //
+  // This is a static page that works. The goal is to catch the next dead
+  // branch, not to convert the directory to TypeScript. `strict` is off
+  // deliberately: strict null checking on untyped DOM code produces
+  // hundreds of findings about lines that run correctly, and a guard that
+  // cries wolf gets muted (ADR 0028).
+  //
+  // `types: []` keeps @types/node out. This is browser code; pulling Node
+  // globals in would let a `process.env` reference type-check here and
+  // fail in a browser, which is the opposite of the point.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "es2022",
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "strict": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": []
+  },
+  "include": ["assets/js/**/*.js"],
+  "exclude": ["node_modules"]
+}

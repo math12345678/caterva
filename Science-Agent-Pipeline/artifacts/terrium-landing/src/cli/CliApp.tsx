@@ -696,7 +696,7 @@ export default function CliApp() {
           endorsements are obtained, record them in docs/ENDORSEMENTS.md
           with the permission behind each one --
           scripts/check_no_fabricated_endorsements.py fails when a public
-          page names an institution without a matching record. */
+          page names an institution without a matching record. */}
       {/* GLOSSARY */}
       <div className="section-divider-blue" />
       <GlossarySection />

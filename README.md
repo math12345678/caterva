@@ -35,25 +35,12 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
 ## Quick start
 
-> **Not public yet.** The command below needs access today: every
-> `Terrium-sim` repository is still private, and `git ls-remote` on any of
-> them prompts for a username. If you are reading this without a GitHub
-> account that has been added, **line one is as far as you get** — that is a
-> fact about the repository, not a mistake you made.
->
-> `scripts/check_quickstart_clone_works.py` reports this on every CI run and
-> will keep the build red until it stops being true
-> ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md)). This
-> notice is checked in the other direction too: publish the repositories and
-> `check_availability_notice_matches_reality.py` fails until it is deleted,
-> so it cannot outlive the thing it describes.
-
 ```bash
 git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,286 tests (1,184 engine + 1102 literature)
+make test      # runs all 2,326 tests (1,210 engine + 1116 literature)
 ```
 
 ### See what it produces, before anything else
@@ -490,17 +477,17 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,184 tests
+│   └── tests/                1,210 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1102 tests
+│   └── ...                   1116 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    160 decision records (and counting)
+│   └── adr/                    163 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    72 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
@@ -584,10 +571,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,286 tests
+make test        # run all 2,326 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (1,184 tests)
-make test-lit    # literature layer only (1102 tests)
+make test-sim    # simulation engine only (1,210 tests)
+make test-lit    # literature layer only (1116 tests)
 python3 scripts/verify_build.py --quick  # all 72 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

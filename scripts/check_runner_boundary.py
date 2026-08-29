@@ -136,7 +136,23 @@ EMITTED_AS: dict[str, str | None] = {
     "organism_discrepancies": "poolFindings",
     "source_mixtures": "poolFindings",
     "source_check_unavailable": "poolFindings",
+    # --- the ensemble and the catalogue -----------------------------------
+    #
+    # Read off the runner rather than reasoned about: `ensembleCandidates`
+    # is built at science_agent_runner.py:824 and `substratesAvailable` at
+    # :930, both from these fields.
+    "ensemble_candidates": "ensembleCandidates",
+    "substrates_available": "substratesAvailable",
     # --- deliberately internal -------------------------------------------
+    #
+    # Every measured value behind a cross-species REFUSAL, shaped as
+    # `TiedCandidate` so `spread_consequence` consumes it unchanged
+    # (ADR 0111). It does not cross: the runner never names it, and its
+    # readers -- `lab_report.py` and the ensemble -- are Python, on this
+    # side of the process boundary. Recorded as None rather than left out,
+    # because "nobody emits it" and "nobody has decided" look identical in
+    # an absent entry, and the second is what ADR 0039 cost.
+    "cross_species_candidates": None,
     "literature_candidates": "literatureCandidates",
     "search_log": "logs",
 }

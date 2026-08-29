@@ -403,6 +403,22 @@ jobs:
         working-directory: Science-Agent-Pipeline
         run: pnpm install --frozen-lockfile
 
+      # The TypeScript sources have to COMPILE, which the suite above does
+      # not establish: vitest only ever loads the modules a test imports,
+      # and nothing imports the landing app. `CliApp.tsx` sat on main with
+      # an unterminated JSX comment -- `{/* ... */` with no closing brace --
+      # from 2026-08-18 to 2026-08-23. `pnpm run build` and
+      # `pnpm run typecheck` both failed the whole time, the site could not
+      # be built at all, and nothing went red: the Makefile's world is
+      # Python, and this job ran the api-server tests and stopped.
+      #
+      # A parse error is the cheapest possible thing to catch and it
+      # survived five days, which is the argument for the step rather than
+      # for remembering to run it.
+      - name: TypeScript compiles
+        working-directory: Science-Agent-Pipeline
+        run: pnpm run typecheck
+
       - name: Application layer tests
         working-directory: Science-Agent-Pipeline
         run: pnpm --filter @workspace/api-server run test

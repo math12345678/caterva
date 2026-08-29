@@ -1,7 +1,31 @@
 # Terrium Advanced Analysis System Dependencies
+#
+# THREE ENTRIES WERE REMOVED because they made this file unusable or
+# unsafe, and `pip install -r requirements.txt` -- the command
+# README.md line 22 tells you to run -- failed on the first of them:
+#
+#     ERROR: Could not find a version that satisfies the requirement
+#     python>=3.10 (from versions: none)
+#
+#   * `python>=3.10` is not a distribution. The interpreter constraint is
+#     stated as a comment below, where it cannot be handed to a resolver.
+#   * `timeit` is a STANDARD LIBRARY module. It is not on PyPI -- checked,
+#     HTTP 404 -- so the name is an unclaimed slot, and a file that asks
+#     pip for it is asking to install whoever registers it first. Rule 7
+#     of docs/CONSTITUTION.md exists for this shape.
+#   * `excalidraw-export` is not on PyPI either (HTTP 404), same exposure.
+#
+# Neither removed package is imported by anything here. The only committed
+# script is scripts/generate_figures.py, and it imports Terium, matplotlib,
+# numpy and the standard library -- nothing else in this file. The rest is
+# left in place because it is declared intent for the components README.md
+# describes, and thinning it is the owner's call, not a side effect of
+# making the file install.
+#
+# Requires Python 3.10 or newer (see pyproject.toml, which is where the
+# version window is actually enforced).
 
 # Core dependencies
-python>=3.10
 jupyter>=1.0.0
 pandas>=1.5.0
 numpy>=1.23.0
@@ -18,10 +42,8 @@ jinja2>=3.1.0
 # Performance analysis
 psutil>=5.9.0
 memory_profiler>=0.60.0
-timeit>=1.0.0
 
 # Provenance visualization
-excalidraw-export>=0.1.0
 pyvis>=0.3.0
 
 # Validation system

@@ -117,6 +117,11 @@ export class Console {
   }
 
   /* ---------- status ---------- */
+  /**
+   * @param {string} id
+   * @param {string} key
+   * @param {{ time?: string }} [opts]
+   */
   setStatus(id, key, { time } = {}) {
     const row = qs(`[data-agent="${id}"]`, this.listEl);
     if (!row) return;

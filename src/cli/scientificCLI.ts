@@ -1061,6 +1061,12 @@ ${colors.bright}Commands:${colors.reset}
     notice. The page's EC must match the one you asked for; Terrium
     refuses to read one enzyme's rows under another's name.
 
+  domains [--json]
+    Every model Terrium can run, each with a command that runs it.
+    The values in those commands are examples, not defaults -- Terrium
+    has no defaults for measured quantities.
+    ${colors.dim}Example:${colors.reset} domains
+
   catalog <ec-number> | --enzyme NAME [--json]
     What BRENDA actually reports for an enzyme, before you ask it for a
     value: which substrates, under the database's own labels; which
@@ -1097,6 +1103,9 @@ ${colors.bright}Commands:${colors.reset}
                          it up. Offline and checkable; the live path
                          is the one a student without a saved table has.
       --draws N          how many times to sample (default 2000)
+      --points N         time points per simulated trajectory (default 11).
+                         Only meaningful with --simulate; without it there
+                         is no trajectory to put points on.
       --json             machine-readable
 
   resolve <enzyme> --substrate S --organism O [options]
@@ -1203,6 +1212,10 @@ ${colors.bright}Commands:${colors.reset}
                            as in \`resolve\`: permits a related organism's
                            value, still never any organism's
       --cite NAME="SOURCE" attach your own source to a value you supplied
+      --yes                accept the system read out of the query without
+                           being asked. Interactive runs confirm it first;
+                           a pipe or a CI job has nobody to ask, so it is
+                           refused there rather than assumed
       --physiological "pH,tempC" (with --physiological-basis TEXT)
                            the conditions your model represents. Without it
                            the condition-proximity axis reports not_assessed,
