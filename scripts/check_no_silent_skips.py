@@ -57,6 +57,48 @@ SUITES = [
 # The whole point of the guard. See module docstring before changing.
 EXPECTED_MAX_SKIPS = 0
 
+#: Skips that are a documented optional dependency rather than a
+#: regression, keyed by the identifier this guard prints, with the reason.
+#:
+#: WHY THIS EXISTS RATHER THAN A HIGHER EXPECTED_MAX_SKIPS
+#: -------------------------------------------------------
+#: The docstring above already allows for this case -- "some are genuinely
+#: conditional on an absent optional dependency" -- and gives only one
+#: lever, a count. A count is the wrong shape: raising it to 1 to admit
+#: the popgen skip also silently admits the NEXT skip, whatever it is, and
+#: the thing this guard exists to catch is precisely a skip nobody
+#: expected. One number cannot say "this one, for this reason".
+#:
+#: Naming them keeps the guard's whole power: an unexpected skip still
+#: fails, because it is not in here.
+#:
+#: THE LIST IS SUPPOSED TO SHRINK. An entry whose test stops skipping
+#: fails too -- same rule as EXPECTED_WIRING and NOT-YET-REPRODUCIBLE.txt.
+#: A baseline that can be added to but never emptied records a problem
+#: instead of fixing it.
+ALLOWED_SKIPS: dict[str, str] = {
+    "test_popgen_resolver": (
+        "Needs `stdpopsim`, which lives in the optional "
+        "requirements-popgen.txt. `make setup` installs requirements-dev.txt "
+        "and so does CI, so following CONTRIBUTING produces exactly this "
+        "skip -- it is the documented setup working as documented, not a "
+        "test that stopped running. Clear it by installing the popgen "
+        "extra, or by folding stdpopsim into requirements-dev if the "
+        "population-genetics domain stops being optional."
+    ),
+}
+
+
+def _skip_key(reason: str) -> str:
+    """The test identifier out of a printed skip line.
+
+    Lines look like `path::name: message` or `::name: message`. The key is
+    the name, because the file half is empty for a collection-level skip
+    and the message half is whatever pytest chose to say that day.
+    """
+    location = reason.split(":", 1)[0] if "::" not in reason else reason.split("::", 1)[1]
+    return location.split(":", 1)[0].strip()
+
 
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     """Run one suite. Returns (passed, skipped, skip_reasons) or None.
@@ -187,25 +229,57 @@ def main() -> int:
         return 1
 
     if total_skipped > EXPECTED_MAX_SKIPS:
-        print(f"FAIL: {total_skipped} skipped test(s), expected at most "
-              f"{EXPECTED_MAX_SKIPS}.")
-        if all_reasons:
+        unexpected = [r for r in all_reasons if _skip_key(r) not in ALLOWED_SKIPS]
+        allowed_seen = {_skip_key(r) for r in all_reasons} & set(ALLOWED_SKIPS)
+
+        if allowed_seen:
+            print(f"\nSkipped, and recorded as expected ({len(allowed_seen)}):")
+            for key in sorted(allowed_seen):
+                print(f"  - {key}\n      {ALLOWED_SKIPS[key]}")
+
+        if unexpected:
+            print(
+                f"\nFAIL: {len(unexpected)} unexpected skipped test(s), "
+                f"expected at most {EXPECTED_MAX_SKIPS}."
+            )
             print("\nSkipped:")
-            for reason in all_reasons:
+            for reason in unexpected:
                 print(f"  - {reason}")
-        print(
-            "\nA skipped test is a test that did not run. Before raising\n"
-            "EXPECTED_MAX_SKIPS, check whether the skip condition actually\n"
-            "indicates a regression -- that is what it meant the last time\n"
-            "(see this script's docstring)."
-        )
-        return 1
+            print(
+                "\nA skipped test is a test that did not run. Before adding\n"
+                "it to ALLOWED_SKIPS, check whether the skip condition\n"
+                "actually indicates a regression -- that is what it meant the\n"
+                "last time (see this script's docstring). An entry there needs\n"
+                "a reason, and a reason that is really 'it was red' is how a\n"
+                "budget becomes a suppression list."
+            )
+            return 1
+
+        # An allowance whose skip stopped happening is stale, and a baseline
+        # that only ever grows records a problem instead of fixing it.
+        stale = sorted(set(ALLOWED_SKIPS) - allowed_seen)
+        if stale:
+            print(
+                f"\nFAIL: {len(stale)} entr(y/ies) in ALLOWED_SKIPS no longer "
+                "skip:"
+            )
+            for key in stale:
+                print(f"  - {key}")
+            print(
+                "\nThe test runs again, which is the good outcome. Delete the\n"
+                "entry so the list keeps meaning what it says."
+            )
+            return 1
 
     # The success line names its own denominator, so "every collected test
     # ran" is a claim a reader can check rather than take on trust.
+    # "1 skipped (limit 0)" read as a contradiction the moment named
+    # allowances existed. The unexpected count is the one the limit governs,
+    # and it is the number a reader should be able to check.
     print(
         f"OK: {len(ran)}/{len(SUITES)} suites ran, {total_passed} tests, "
-        f"{total_skipped} skipped (limit {EXPECTED_MAX_SKIPS})."
+        f"0 unexpected skips (limit {EXPECTED_MAX_SKIPS}); "
+        f"{total_skipped} skipped and recorded."
     )
     return 0
 

@@ -75,23 +75,73 @@ TSC_TIMEOUT_S = 180
 
 
 def _candidate_workspaces() -> list[pathlib.Path]:
-    """Every directory under Science-Agent-Pipeline/ holding a tsconfig.json
-    and a src/ tree.
+    """Every directory in the repository holding a tsconfig.json and a src/
+    tree.
 
     Discovered rather than hardcoded: a hardcoded list is exactly how the
     original gap persisted -- something existed that nothing checked.
+
+    THE WALK USED TO START AT Science-Agent-Pipeline/ AND STOP THERE, which
+    reproduced the same defect one level up. Everything the pipeline
+    directory holds was covered; everything outside it was covered by
+    nothing, and that is where the product lives:
+
+      * the repository root -- `src/`, **115 TypeScript sources including
+        `src/cli/scientificCLI.ts`**, the CLI START_HERE.md and `make demo`
+        both tell a new user to run. Compiled by no guard, and by no CI
+        step either.
+      * `landing/` -- whose own tsconfig.json was written *because* someone
+        noticed the code was unchecked. Its header says so: "landing/ held
+        hand-written TypeScript that no tsconfig.json covered, so nothing
+        type-checked it". The config was added and nothing ever ran it.
+      * `terrium-site/` -- its own npm project, with a `typecheck` script
+        no automation calls.
+
+    Root-level configs are matched non-recursively per directory, and the
+    pipeline is still walked recursively, so nested workspaces there keep
+    working exactly as before.
     """
     found: list[pathlib.Path] = []
-    if not PIPELINE_DIR.is_dir():
-        return found
-    for tsconfig in PIPELINE_DIR.rglob("tsconfig.json"):
-        if any(part in SKIP_PARTS for part in tsconfig.parts):
+
+    if PIPELINE_DIR.is_dir():
+        for tsconfig in PIPELINE_DIR.rglob("tsconfig.json"):
+            if any(part in SKIP_PARTS for part in tsconfig.parts):
+                continue
+            workspace = tsconfig.parent
+            if not (workspace / "src").is_dir():
+                continue
+            found.append(workspace)
+
+    # The repository root, and one level down. Not `rglob` from REPO_ROOT:
+    # that walks .venv, node_modules and every fixture directory, and
+    # SKIP_PARTS is a denylist -- the wrong shape for a tree this size.
+    candidates = [REPO_ROOT] + [d for d in REPO_ROOT.iterdir() if d.is_dir()]
+    for directory in candidates:
+        if directory == PIPELINE_DIR:
             continue
-        workspace = tsconfig.parent
-        if not (workspace / "src").is_dir():
+        if directory.name in SKIP_PARTS or directory.name.startswith("."):
             continue
-        found.append(workspace)
-    return sorted(found)
+        tsconfig = directory / "tsconfig.json"
+        if not tsconfig.is_file():
+            continue
+        # `src/` OR an explicit `include`. The src/ test was a proxy for
+        # "this is a real workspace and not a stray config", and it turned
+        # out to exclude two that are: `mule/`, whose 30 browser JavaScript
+        # files live under assets/js and were checked by nothing until
+        # 2026-08-23, and `scripts/`, whose tsconfig was written precisely
+        # so `generate-openapi-clients.ts` would stop being compiled by
+        # nothing. A config that names its own inputs is as real a workspace
+        # as one that happens to use the conventional directory name.
+        #
+        # Configs with nothing to compile are still filtered downstream by
+        # `_compiles_something` and `_tsconfig_is_checkable`, so relaxing
+        # here cannot pull in a pure base or a solution-style config.
+        config = _load_tsconfig(tsconfig) or {}
+        if not (directory / "src").is_dir() and not config.get("include"):
+            continue
+        found.append(directory)
+
+    return sorted(set(found))
 
 
 

@@ -135,7 +135,11 @@ export class SystemMode {
       if (h0 > 0) document.documentElement.style.setProperty('--dock-h', `${h0}px`);
     };
     write();
-    if ('ResizeObserver' in window) {
+    // `'ResizeObserver' in window` narrows `window` itself, so the else
+    // branch types it as `never` and `window.addEventListener` is an
+    // error on a line that runs fine. Testing the property directly says
+    // the same thing about the environment without narrowing the object.
+    if (typeof ResizeObserver !== 'undefined') {
       new ResizeObserver(write).observe(face);
     } else {
       window.addEventListener('resize', write);
@@ -255,7 +259,10 @@ export class SystemMode {
        typing into the inquiry terminal. */
     document.addEventListener('keydown', (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const t = e.target;
+      // `e.target` is an EventTarget, which has no tagName. It is an
+      // element for every keydown this listener can see; the cast says so
+      // rather than the properties being read off a type that lacks them.
+      const t = /** @type {HTMLElement | null} */ (e.target);
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
       const i = ['1', '2', '3', '4'].indexOf(e.key);
       if (i < 0) return;

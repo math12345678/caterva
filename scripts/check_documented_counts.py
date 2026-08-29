@@ -707,14 +707,23 @@ def selftest() -> int:
     if mangled_numbers(written):
         failures.append(f"rewrite() produced a welded number: {written!r}")
 
-    for text, expected in guard_cases:
-        got = [v for _, v in documented_guard_counts(text)]
-        if got != expected:
-            failures.append(f"guard matcher on {text!r}: expected {expected}, got {got}")
-    for text, expected in adr_cases:
-        got = [v for _, v in documented_adr_counts(text)]
-        if got != expected:
-            failures.append(f"ADR matcher on {text!r}: expected {expected}, got {got}")
+    # `expected_counts`, not `expected`: the mangle-case loop above binds
+    # that name to a list of STRINGS, and these two bind it to a list of
+    # integers. One name, three types, in one function.
+    for text, expected_counts in guard_cases:
+        counts = [v for _, v in documented_guard_counts(text)]
+        if counts != expected_counts:
+            failures.append(
+                f"guard matcher on {text!r}: expected {expected_counts}, "
+                f"got {counts}"
+            )
+    for text, expected_counts in adr_cases:
+        counts = [v for _, v in documented_adr_counts(text)]
+        if counts != expected_counts:
+            failures.append(
+                f"ADR matcher on {text!r}: expected {expected_counts}, "
+                f"got {counts}"
+            )
 
     # The exclusion list must not silently overlap the checked list, or a
     # historical doc would be rewritten to satisfy a build.
@@ -750,7 +759,41 @@ def main() -> int:
     failures: List[str] = []
     skipped = False
 
-    print("Collecting actual test counts...")
+    # WHICH interpreter, stated rather than assumed.
+    #
+    # These counts are a fact about the environment, not only about the
+    # tree, and the spread is not small. Measured on one checkout, one
+    # commit, same day:
+    #
+    #     engine       1,167 (system python)   1,205 (.venv)
+    #     literature   1,130 (system python)   1,116 (.venv)
+    #
+    # Both directions at once. The engine collects MORE under `.venv`
+    # because `make setup` installs libsedml and roadrunner, which several
+    # modules need to import at all; the literature suite collects FEWER
+    # because `test_popgen_resolver.py` needs `stdpopsim`, which lives in
+    # the optional `requirements-popgen.txt` that `make setup` does not
+    # install -- and an Anaconda base happened to satisfy it.
+    #
+    # So `--write` run from the wrong interpreter produces numbers that are
+    # honestly measured and still wrong for this project, and the next
+    # contributor's `--write` silently reverses them. That is a number with
+    # two sources of truth, which is the thing this guard exists to stop.
+    #
+    # The authoritative environment is the documented one: `make setup`
+    # (a `.venv` from requirements-dev.txt), which is also what CI
+    # installs. Printing the interpreter turns "the number keeps changing"
+    # into one line that says why.
+    print(f"Collecting actual test counts using {sys.executable}")
+    if ".venv" not in sys.executable and "venv" not in sys.executable:
+        print(
+            "  NOTE: not a .venv interpreter. `make setup` builds the "
+            "environment\n"
+            "  these counts are documented against; anything else may "
+            "collect a\n"
+            "  different set. Re-run through `make guards` before "
+            "using --write."
+        )
     actual = {}
     for name, path in SUITES:
         count = collect_count(path)

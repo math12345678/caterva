@@ -163,10 +163,29 @@ def test_a_substrate_miss_names_the_labels_that_would_have_worked():
 
 def test_the_absence_of_refusals_is_stated_rather_than_left_blank():
     """An empty section reads as an unfinished document. "Nothing was
-    withheld" is a claim, and it is the one a reader wants."""
-    text = report().markdown
+    withheld" is a claim, and it is the one a reader wants.
+
+    `resolved={}` rather than the shared `report()` fixture, and that is
+    the whole point of the test. The default fixture resolves a real km
+    whose candidate rows mix diseased and healthy breast tissue, so it
+    now carries a source-mixture refusal -- which means this test was
+    asserting the no-refusals sentence against a document that had a
+    refusal in it, and had been failing rather than covering the branch
+    it names. The else-branch in `_refusals_section` was reachable only
+    by a report with nothing withheld, and no test built one.
+
+    The refusal list is asserted empty first. Without that, a future
+    change that stopped emitting refusals entirely would make this test
+    pass for exactly the wrong reason.
+    """
+    result = report(resolved={})
+    assert result.refusals == []
+    text = result.markdown
     assert "## What Terrium would not do" in text
-    assert "Nothing was withheld" in text
+    assert (
+        "Nothing was withheld: every parameter resolved to a cited value "
+        "or was supplied by you." in text
+    )
 
 
 def test_a_preparation_caveat_reaches_the_report():

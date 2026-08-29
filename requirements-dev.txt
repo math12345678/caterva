@@ -15,3 +15,70 @@ hypothesis==6.160.0
 # UNKNOWN is not a licence fact, and "it's probably Apache like the rest of
 # that org" is not one either.
 cffconvert==2.0.0
+
+# Parses .github/workflows/*.yml for scripts/check_ci_toolchain.py, which
+# reads the workflow to check the toolchain steps agree with the manifests.
+#
+# It was declared NOWHERE, and that is why nobody noticed: Anaconda ships
+# PyYAML, so on a developer machine the guard ran and passed. Follow
+# CONTRIBUTING instead -- `make setup`, which builds a clean .venv -- and
+# the same guard exits 3, "could not check", and takes
+# test_the_guards_selftest_passes down with it. The project's own
+# documented setup produced the one environment where a guard could not
+# do its job.
+#
+# MIT -- read from the installed wheel's metadata (`License: MIT`, and the
+# OSI classifier agrees), not from memory.
+PyYAML==6.0.3
+
+# Drives scripts/check_python_bug_lints.py (F821, F811, E9 -- defects, not
+# style) and is consulted by three other guards.
+#
+# ALREADY DECLARED, in pyproject.toml's [project.optional-dependencies]
+# dev -- and nothing installs from there. `make setup` installs this file,
+# and so does CI. Two dependency lists that overlap without agreeing:
+# pyproject's dev extra has ruff and mypy and no cffconvert; this file had
+# cffconvert and neither of those. The pin below is pyproject's, kept
+# identical on purpose, because two pins that drift are worse than one
+# list in the wrong place.
+#
+# The symptom was the guard reporting "No module named ruff" from inside
+# verify_build while passing on any machine with Anaconda on PATH.
+#
+# MIT -- read from the LICENSE the wheel ships
+# (ruff-0.11.11.dist-info/licenses/LICENSE): "MIT License, Copyright (c)
+# 2022 Charles Marsh".
+ruff==0.11.11
+
+# Type stubs for PyYAML, so `mypy` can check the two guards that parse the
+# workflow instead of reporting "Library stubs not installed for yaml".
+#
+# Added with the PyYAML entry above rather than separately: a runtime
+# dependency whose stubs are missing produces a mypy error that looks like
+# a code defect and is not one, and that is how twelve findings sat unread.
+#
+# Apache-2.0 -- read from the LICENSE the wheel ships
+# (types_pyyaml-*.dist-info/licenses/LICENSE): 'The "typeshed" project is
+# licensed under the terms of the Apache license', and the
+# License-Expression metadata agrees.
+types-PyYAML==6.0.12.20260815
+
+# The type checker pyproject.toml has configured all along.
+#
+# Same defect as ruff above: declared in
+# `[project.optional-dependencies] dev`, which `make setup` and CI never
+# read, so `[tool.mypy]` was a config block for a tool the documented
+# setup did not install. Run for the first time on 2026-08-23 it reported
+# 12 errors in 8 files; they are fixed and it now reports none across 167
+# source files.
+#
+# INSTALLED, NOT ENFORCED. Nothing runs this yet, and wiring it is a
+# decision about what a green build means -- the owner's, not a side
+# effect of making the declaration honest. It is a one-line change now
+# rather than a one-line change plus a backlog, which is the point of
+# clearing the 12 first.
+#
+# MIT -- read from the LICENSE the wheel ships
+# (mypy-1.15.0.dist-info/LICENSE): "Mypy (and mypyc) are licensed under
+# the terms of the MIT license".
+mypy==1.15.0

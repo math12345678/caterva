@@ -161,6 +161,15 @@ CI_ONLY: dict[str, str] = {
         "Needs a network install of the JS workspace. Documented in "
         "RUN_TESTS.md for the api-server workspace."
     ),
+    "pnpm run typecheck": (
+        "Compiles the TypeScript workspace, so it needs the Node toolchain "
+        "and a completed pnpm install -- the same reason as the api-server "
+        "suite below. `make pr` names it as one of the things it did not "
+        "run. It exists because vitest only compiles what a test imports: "
+        "the landing app is imported by no test, and an unterminated JSX "
+        "comment in CliApp.tsx broke `pnpm run build` for five days without "
+        "reddening anything."
+    ),
     "pnpm --filter @workspace/api-server run test": (
         "The TypeScript suite runs under pnpm in Science-Agent-Pipeline, "
         "outside the Python Makefile's world. RUN_TESTS.md covers it."

@@ -61,6 +61,10 @@ export function initPilot() {
 
   form.addEventListener('submit', (e) => {
     e.preventDefault();
+    // Annotated because a bare `null` initialiser infers `null`, so the
+    // assignment below widens nothing and `firstInvalid.focus()` is an
+    // error on a line that runs. The declaration is where the type lives.
+    /** @type {HTMLElement | null} */
     let firstInvalid = null;
 
     Object.keys(RULES).forEach((id) => {
