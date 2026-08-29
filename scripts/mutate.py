@@ -853,10 +853,10 @@ def main() -> int:
 
     for v in uncaught:
         print(f"\nNOT CAUGHT -- {v.id}: {v.description}\n  {v.detail}")
-    for v in unknown:
+    for v in indeterminate:
         print(f"\nINDETERMINATE -- {v.id}: {v.description}\n  {v.detail}", file=sys.stderr)
 
-    if unknown:
+    if indeterminate:
         print(
             "\nAn indeterminate result is not a passing test and not a failing one.\n"
             "It means the harness could not establish what happened. Fix the mutation\n"

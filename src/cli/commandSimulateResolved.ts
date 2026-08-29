@@ -534,6 +534,7 @@ async function writeExports(
               ? 'user_cited'
               : 'resolved',
         citation: row.citation,
+        unit: row.unit,
         organism: row.organism,
         taxonId: row.taxonId,
         source: row.origin,
@@ -613,6 +614,26 @@ async function writeExports(
             `${c(DIM, '  its origin in a comment, so the provenance travels with the file.')}\n`;
       modelWritten = true;
       say(`\n${c(BOLD, 'Model written')} ${outcome.path}\n` + blurb);
+
+      // The units verdict, delivered rather than left in the JSON detail.
+      // Three states (ADR 0150): declared, refused-with-reasons, and
+      // absent -- an exporter that never reported, which must not print
+      // as either of the other two.
+      if (outcome.format === 'sbml' || outcome.format === 'omex') {
+        if (outcome.unitsDeclared && outcome.unitsDeclared.length > 0) {
+          say(
+            `${c(DIM, `  Units declared on ${outcome.unitsDeclared.join(', ')} — the file`)}\n` +
+            `${c(DIM, '  states its own unit system, and libSBML can check it.')}\n`,
+          );
+        } else if (outcome.unitsRefused && outcome.unitsRefused.length > 0) {
+          say(
+            `${c(YELLOW, '  ⚠ no units declared:')} ${c(DIM, outcome.unitsRefused[0]!.reason)}\n`,
+          );
+          for (const refusal of outcome.unitsRefused.slice(1)) {
+            say(`${c(DIM, `    also ${refusal.symbol}: ${refusal.reason}`)}\n`);
+          }
+        }
+      }
 
       // An identifier Terrium declined to mint a URI for is NOT a missing
       // annotation — the source is real, it just has no resolvable form.

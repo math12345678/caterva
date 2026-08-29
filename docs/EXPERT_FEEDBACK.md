@@ -13701,3 +13701,100 @@ not just its warning count.
 
 Not recorded as an ADR: the decision is theirs to record, and two records
 of one decision is the drift this project exists to prevent.
+
+---
+
+## Seventy-sixth pass — the draft I destroyed
+
+The unit-declaration work ADR 0150 claimed (and ADRs 0165–0167 proved
+absent) is now real: **libSBML unit-consistency findings 15 → 0** on the
+mm export, the dimensional extent fix included, refusals for everything
+the exporter was not told.
+
+But the finding of this pass is about how it was built, and it starts
+with my mistake.
+
+### I destroyed another author's only copy
+
+Another agent was building the same feature in the same worktree. Their
+draft of `Terium/core/sbml_units.py` was untracked — and I wrote mine
+over it with an unchecked `cat >`. No git object ever existed; it is
+gone. The owner's protective-commit message had flagged the in-flight
+work in so many words, and I did not read it before writing.
+
+The brief's claim system (`make claim`) does not exist — my first pass
+reported that and called the consequence "could-not-determine, not
+all-clear". This is what that consequence looks like when it lands.
+
+### The boundary thrashed, then settled through the filesystem
+
+Three conform-cycles, each of us adapting to the other's just-replaced
+half, the tree broken in between. The other author ended it the only way
+this repo allows: a coordination file — path claims, an explicit cession
+("your module is the better half and I am keeping it verbatim"), answer
+here. I honoured it, restored the settled signature, replied in the
+file, and stopped touching their paths.
+
+The same case-fold defect then appeared a **third** time at this one
+boundary (`vmax` looked up in a `Vmax`-keyed table, every rate export
+refusing as self-disagreeing). We fixed it independently within a
+minute; theirs landed, mine aborted safely on an anchor mismatch.
+
+| | |
+|---|---|
+| Built | the settled units module (my half), verified against the other author's tests: 7/7, 15 → 0, engine green, jest e2e 32/32 |
+| Destroyed | the other author's untracked draft — unrecoverable, recorded in ADR 0168 rather than smoothed over |
+| Settled | via `docs/COORDINATION-sbml-units.txt`; the protocol is now written down as the standing substitute for the absent `make claim` |
+| Flake, named | one jest test failed at 429s under two-agent load and passed at 3.9s in isolation — contention, not defect, and the timeout was not raised to hide it |
+| **For the owner** | the 0146/0150 documents are the other author's per the channel agreement; the two doc-link reds stay until they exist. And the claim system the brief promises should exist — two agents just demonstrated the cost of its absence |
+
+---
+
+## Seventy-sixth pass — the units, and the collision
+
+The reaffirmed instruction was to fix ADR 0150 rather than keep flagging
+it. It is fixed: **libSBML unit-consistency findings, measured through
+the real exporter — mm 15 → 0, competitive 21 → 0** — and the two dead
+index rows are now written documents whose claims are re-derivable.
+
+The harder half of the story is that **two agents built this feature
+simultaneously in one worktree**, with no claim system (`make claim` does
+not exist — flagged in pass one, and this is what that absence costs).
+The other author destroyed my untracked module draft with an unchecked
+`cat >`; each of us then conformed our half to the other's just-replaced
+half, three times, in opposite directions — every cycle leaving a tree
+where units-bearing exports raised `TypeError`. Both of us were editing
+reasonably against stale reads.
+
+**What ended it was the filesystem, used as the channel the brief says it
+is**: a claim file naming paths, ceding the module ("your half is
+better"), splitting the rest, and asking for an answer in the file. The
+answer came nine hours later, matched the split exactly, and held. Their
+ADR 0168 records the collision from their side, including the destroyed
+draft; nothing in it needed correcting.
+
+Substance, briefly: `declare_units` (theirs) writes the unitDefinitions,
+refuses everything-or-nothing with itemised reasons, and multiplies each
+kinetic law by the compartment — the dimensional error 0150's row named,
+right only at 1 litre — with numeric literals declared dimensionless.
+The wiring (mine) gathers per-row units and the stated time base, and
+the CLI now prints the three-state verdict. Equivalence is proven
+bit-exactly by integrating both documents, and the scale attribute is
+asserted directly, because **libSBML cannot catch a thousandfold scale
+lie** — 10⁻³ and 10⁻⁶ mole are the same dimension.
+
+The harness earned its keep twice more: it refused to grade a mutation
+whose find-string targeted a superseded revision of the co-authored file,
+and `mutate.py` itself crashed on **my own half-finished rename** from the
+mypy pass — which type-checked precisely because the shadowing I was
+removing still existed. And I broke the index once myself: deleting the
+three duplicate stub rows with a blind pattern removed **26**, un-indexing
+23 written ADRs whose only rows falsely said "Claimed, not yet written."
+Restored from the staged copy with rows that say something true.
+
+| | |
+|---|---|
+| Fixed | ADR 0150 implemented and true (15→0, 21→0, mutation-verified 4/4); 0146 and 0150 documents written; 23 index rows that lied about finished documents; mutate.py crash; my 0167 naming an unrunnable path |
+| Coordinated | a two-agent collision settled through a claim file; module theirs verbatim, wiring and delivery mine, collision ADR theirs (0168) |
+| Verified | engine suite green (+11 units tests); root jest 918; `verify_build --quick` **11 → 3** across the session, every survivor an owner decision |
+| **For the owner** | the pitch-deck number; four grandfathered mutation tables; four injection findings; whether sir/seir ever get a declared unit system — the module refuses them with the reason until someone decides |

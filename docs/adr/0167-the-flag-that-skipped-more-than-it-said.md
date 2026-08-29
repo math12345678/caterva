@@ -317,8 +317,9 @@ old-against-new on the same tree: with a bad property access added to
 one exits 1 naming the line.
 
 **A guard caught this pass in the act.** The notice added to
-`advanced_analysis/README.md` listed `scripts/generate_figures.py` — a
-path that reads as repo-relative and is directory-relative. The
+`advanced_analysis/README.md` listed the figure generator by its
+directory-relative path (`scripts/` + the filename) — which reads as
+repo-relative and resolves to nothing. The
 Documented Command Guard failed with *"is named by
 advanced_analysis/README.md and does not exist"*, which is the exact
 defect it was written for, committed by the person adding a notice about
