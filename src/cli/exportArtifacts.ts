@@ -34,6 +34,19 @@ import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
 
 export interface ExportProvenance {
   origin: string;
+  /**
+   * The unit the exported VALUE is in, exactly as the CLI normalised it
+   * (ADR 0146: the substrate's concentration unit, and that unit per
+   * second for rates).
+   *
+   * `ParameterProvenance.unit` existed all along and this interface
+   * dropped it -- the third computed-and-not-delivered of the session,
+   * and the one ADR 0146 predicted: "without unit declarations the file
+   * still says 2.13e-4 rather than 2.13e-4 mM/s." The Python exporter
+   * turns these strings into SBML unitDefinitions, and refuses to declare
+   * anything for a parameter whose entry is absent.
+   */
+  unit?: string;
   citation?: string;
   organism?: string;
   source?: string;
@@ -122,6 +135,15 @@ export interface ExportOutcome {
    *  travel as text. Reported rather than silently omitted — an absent
    *  annotation and a refused one look identical in the file. */
   refusedUris?: Array<{ parameter: string; accession: string; reason: string }>;
+  /** SBML only: model symbols whose units were written as unitDefinitions
+   *  (ADR 0150). `[]` means the units pass ran and declared nothing;
+   *  `undefined` means the exporter predates the pass. */
+  unitsDeclared?: string[];
+  /** SBML only: why nothing was declared, per symbol or aspect. The
+   *  exporter declares everything or nothing — a half-declared file reads
+   *  as a checked one — so any entry here means the file carries no unit
+   *  declarations at all. */
+  unitsRefused?: Array<{ symbol: string; reason: string }>;
 }
 
 const SCRIPT_TIMEOUT_MS = 60_000;
@@ -228,6 +250,8 @@ export async function exportModel(
     error?: string;
     format?: string;
     cvterms?: number;
+    unitsDeclared?: string[];
+    unitsRefused?: Array<{ symbol: string; reason: string }>;
     unannotated?: string[];
     refusedUris?: Array<{ parameter: string; accession: string; reason: string }>;
   };
@@ -267,6 +291,13 @@ export async function exportModel(
     cvterms: parsed.cvterms,
     refusedUris: parsed.refusedUris ?? [],
     entries: parsed.entries ?? [],
+    // Empty array and undefined are different facts here: `[]` means the
+    // exporter ran the units pass and declared nothing (Antimony export,
+    // where there is nothing to declare), undefined means an older
+    // exporter that never reported. Both render as "no units declared" --
+    // but only one of them alongside named refusals.
+    unitsDeclared: parsed.unitsDeclared,
+    unitsRefused: parsed.unitsRefused,
   };
 }
 
