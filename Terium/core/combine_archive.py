@@ -62,8 +62,16 @@ exported SBML reconstructs the same model by a different route -- fresh
 parse of the written bytes rather than the in-process object -- not that two
 implementations of the mathematics concur.
 
-And COPASI is still untried. The plural in "opens in COPASI, Tellurium, JWS
-Online and the BioSimulators runners" above is now one-quarter measured.
+COPASI 4.46.300 was tried too, via basico, and it loads and simulates the
+exported model. That pairing IS two independent solvers: COPASI does not use
+roadrunner, and its substrate at t=10 is 7.585661077467333 against Terrium's
+7.585660864700605 -- a relative difference of 2.8e-08, which is the size of
+two adaptive integrators disagreeing at their default tolerances rather than
+a difference in the model.
+
+So the plural above is half measured. JWS Online and the BioSimulators
+runners are still inference. COPASI was handed `model.xml` rather than the
+archive, because `run_combine_archive` is absent from basico 0.86.
 
 A NOTE FOR ANYONE TRYING THIS
 -----------------------------

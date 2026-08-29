@@ -45,20 +45,42 @@ Terrium's own in-process run at the same parameters gives
 
 ## What this does not establish
 
-**It is not two independent solvers agreeing.** Terrium integrates through
-roadrunner and so does Tellurium. The matching trajectory shows the exported
-SBML reconstructs the same model by a different route — a fresh parse of the
-written bytes rather than the in-process object — not that two
-implementations of the mathematics concur. Reporting it as cross-validation
-would be the stronger claim, and it is not the one available.
+~~**It is not two independent solvers agreeing.**~~ **It now is, because
+COPASI was tried too.** Both Terrium and Tellurium integrate through
+roadrunner, so that pair showed only that the exported SBML reconstructs the
+same model by a different route. COPASI has its own integrator.
 
-**COPASI is still untried.** `combine_archive.py` says an `.omex` "opens in
-COPASI, Tellurium, JWS Online and the BioSimulators runners". That plural is
-now one-quarter measured. The other three are still inference from libSEDML
-being the reference implementation.
+| | substrate at t=10 |
+|---|---|
+| Terrium, in-process, roadrunner | `7.585660864700605` |
+| COPASI 4.46.300, via basico | `7.585661077467333` |
+
+Absolute difference **2.13 × 10⁻⁷**, relative **2.80 × 10⁻⁸** — agreement to
+about seven significant figures. That residual is the right size for two
+adaptive solvers at their default tolerances, and its being non-zero is
+itself the evidence that these are different integrators rather than the
+same one twice.
+
+COPASI loaded the SBML, found both species (`S`, `P`) and both parameters
+(`Vmax`, `Km`), and ran the time course.
+
+~~**COPASI is still untried.**~~ **Half measured now.** `combine_archive.py`
+claims an `.omex` "opens in COPASI, Tellurium, JWS Online and the
+BioSimulators runners". Two of the four have opened one. JWS Online and the
+BioSimulators runners remain inference.
 
 **One archive, one domain.** Michaelis-Menten, one parameter set. Nothing
 here says an SEIR export or a competitive-inhibition export opens.
+
+**COPASI read the model, not the archive.** `basico.run_combine_archive`
+does not exist in basico 0.86, so the whole-archive path was tested in
+Tellurium only. COPASI was handed `model.xml` directly.
+
+**COPASI's per-parameter CVTerms were not confirmed.**
+`basico.get_miriam_annotation()` returns the MODEL-level annotation — a
+created date — and the API surfaces no obvious per-parameter equivalent.
+That the CVTerms are in the bytes is established by the libSBML read-back
+above; that COPASI shows them to a user is not.
 
 ## Tellurium cannot be installed alongside Terrium
 
