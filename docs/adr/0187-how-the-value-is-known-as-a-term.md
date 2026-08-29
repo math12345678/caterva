@@ -179,9 +179,21 @@ number that drifts silently.
   What remains unverified is stated as a proxy rather than proof: a
   reference id is what a curated row carries, so requiring one is the
   closest available check, not a guarantee that the row was not mined.
-- **`bqbiol:isDescribedBy` is the qualifier, and it is imperfect.** The
-  parameter is not *described by* an evidence class so much as it *has* one.
-  No biological qualifier means "has evidence"; this is the closest, and
-  published models use it the same way.
+- ~~**`bqbiol:isDescribedBy` is the qualifier, and it is imperfect.**~~
+  **Checked, and the caveat was too pessimistic.** libSBML ships an example
+  called `addingEvidenceCodes`, and it puts the ECO reference under
+  `bqbiol:isDescribedBy` — the same qualifier, from the reference
+  implementation. This is the documented convention, not a nearest fit.
+
+  Two differences worth naming. The example builds the RDF by hand with
+  `appendAnnotation()` rather than through the CVTerm API; the API produces
+  the same structure, and using it is why `read_back` can find the term at
+  all. And it writes the old URN form `urn:miriam:obo.eco:ECO%3A0000004`,
+  where this emits the current identifiers.org URL.
+
+  Recorded because over-hedging is also inaccuracy: "imperfect, the closest
+  available" describes a judgement call, and this was a convention someone
+  had already documented. The caveat would have sent a reader looking for a
+  better qualifier that does not exist and is not needed.
 - **The mapping has one entry.** Four origins, one term. That is honest
   today and would need revisiting the moment an origin is added.
