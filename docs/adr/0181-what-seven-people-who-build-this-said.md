@@ -139,9 +139,12 @@ in this commit changes what Terrium refuses.
 
 **What this does not check.**
 
-- **Nobody has opened the archive in COPASI or Tellurium.** Unchanged from
-  `combine_archive.py`'s own note: libSEDML is the reference implementation
-  and that is good evidence, not proof.
+- ~~**Nobody has opened the archive in COPASI or Tellurium.**~~
+  **Tellurium has, on 2026-08-28** — see
+  [ADR 0189](0189-a-tool-that-did-not-write-it.md).
+  `te.executeCombineArchive()` opened the archive, resolved all four SED-ML
+  data generators against the model and ran the recorded time course.
+  COPASI is still untried.
 - **`provenance.json` is not a standard** and nothing consumes it yet. It
   is a format invented here because, in Bergmann's words, there is currently
   no good computer-readable place for source disagreement.

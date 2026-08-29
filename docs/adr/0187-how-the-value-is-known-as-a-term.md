@@ -148,8 +148,11 @@ number that drifts silently.
 
 **What this does not check.**
 
-- **Nobody has read one of these back in COPASI or Tellurium.** Unchanged
-  from ADR 0181; libSBML round-trips it, which is evidence and not proof.
+- ~~**Nobody has read one of these back in COPASI or Tellurium.**~~
+  **Tellurium has** ([ADR 0189](0189-a-tool-that-did-not-write-it.md)). All
+  three CVTerms on the resolved parameter — the paper, the evidence class
+  and the taxon — are visible to a reader in a different environment.
+  COPASI is still untried.
 - ~~**`ECO:0000269` is a judgement about BRENDA.**~~ **Researched, and it
   turned up a defect in this very feature.**
 
