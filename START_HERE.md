@@ -43,7 +43,12 @@ that wrong shipped a hardcoded 37 °C into every entry point for months
 > **Not public.** This document opens by addressing "a stranger who found
 > this on GitHub", and then hands them a clone of a repository that is
 > private and staying that way — so for that reader everything this page
-> describes sits behind a credential prompt, unreached.
+> describes sits behind a credential prompt, unreached.> (Removed 2026-08-23 on a probe that had silently authenticated
+> through a developer keychain; restored 2026-08-29 after CI — which
+> holds no credentials — and an unauthenticated API check both said
+> private. The probe now strips credential helpers so this cannot
+> recur.)
+>
 > Said here rather than discovered at a credential prompt. See
 > [ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md).
 >
@@ -54,8 +59,7 @@ that wrong shipped a hardcoded 37 °C into every entry point for months
 > **Private repository.** These repositories are private and are staying
 > that way, so `gh repo clone` — which uses your GitHub credentials — is
 > the command that works. A plain `git clone` URL stops at a username
-> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).
-```bash
+> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).```bash
 gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything — 2–5 min, ~120 MB

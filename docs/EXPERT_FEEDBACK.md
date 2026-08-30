@@ -14539,3 +14539,73 @@ a current date-released.
 | Verified | 3,912 tests and 38 guards green in nine parallel lanes; every DOI registrar-verified; publish-check: "Nothing in the tree would ship wrong" |
 | Fixed | a citation to a nonexistent chimeric paper (3 surfaces); the live checker's paren-blind DOI matcher; the CI verify_build placement; the deck; the version drift |
 | **For the owner** | the four injection findings (dossier ready); whether the two robot-blocked publishers warrant a manual title check |
+
+---
+
+## Seventy-eighth pass — the probe that was never anonymous
+
+A correction to the seventy-fourth pass, which reported "the repository
+is public now — verified independently, `GIT_TERMINAL_PROMPT=0 git
+ls-remote` exits 0" and deleted the front-page notices on that
+measurement. **The measurement was false.** `GIT_TERMINAL_PROMPT=0`
+stops git from prompting; it does not stop the keychain. `gh auth
+setup-git` had wired a token into the credential helper, the probe
+authenticated silently, and a private repository answered as public — to
+me, and to the guard itself on every developer machine since.
+
+CI holds no credentials for those URLs and went red on the next push.
+An unauthenticated `curl` of the GitHub API settled it: every repository
+involved returns 404 anonymously, including the one this session pushes
+to. ADR 0145's sentence — *"the people positioned to notice are the ones
+who cannot: they have had access all along"* — turned out to describe
+the probe, its author, and me, in that order.
+
+Fixed at the root: the probe now runs `git -c credential.helper=
+ls-remote`, which clears the helper list for that one invocation.
+Verified both ways on this authenticated machine against the same
+private URL — with helpers exit 0, without them exit 128. The notices
+are restored to README.md and START_HERE.md with a parenthetical saying
+why they left and came back.
+
+| | |
+|---|---|
+| Corrected | pass seventy-four's central "good failure" claim, which was a credentialed artifact |
+| Fixed | the probe (credential helpers stripped), both notices restored, availability guard green in the honest state |
+| CI after this push | red at Build guards on the four injection findings (a human's to clear), then red ONLY at quickstart-clone — ADR 0143's designed red until the repositories are published |
+
+---
+
+## Seventy-ninth pass — the push, the tag, and the artifact that would falsify its own NOTICE
+
+Main is pushed (874b191 → f065ca7, six commits) and **v0.1.0 is tagged
+and released** — source only, on purpose: the licence position rests on
+distributing nothing that contains libSBML, and the release notes say so.
+The notes' first draft overstated two figures from memory ("3,912 tests",
+"74 guards"); corrected to the measured 3,887 and 72 within minutes, and
+the notes now carry a sentence explaining why they cite their own
+measurement method.
+
+CI walked down from 28 undiagnosed reds to **exactly one failing guard**
+— prompt injection, four findings, red on all three Python versions
+because the guard demands a human verdict and no human has given one.
+Getting there surfaced two more guards with the ADR 0167 split
+(node-dependent, always-on: client-loads, suite-discovery); both moved
+into the toolchain group, and this time the sweep checked every guard
+verify_build runs for node use, so it is the last relocation rather than
+the latest.
+
+**PR #21 ("first DMG release") reviewed by five agent lanes: do not
+merge as-is.** The DMG freezes python-libsbml (LGPL-2.1) into a onefile
+binary and copies the unchanged NOTICE — "Nothing here bundles libSBML"
+— inside the artifact that bundles it. Three ADR number collisions with
+main (0166–0168), and ten-odd files where both sessions fixed the same
+defect independently, including the same credential-helper probe bug
+found twice. Review posted on the PR with the conflict map and the
+renumber/fix path; nothing has been conveyed yet, so nothing is broken
+yet.
+
+| | |
+|---|---|
+| Shipped | main pushed; v0.1.0 released with measured notes; PR #21 reviewed on the record |
+| CI | one designed red (injection, human verdict), then quickstart-clone by ADR 0143 until published |
+| **For the owner** | the four injection verdicts; PR #21's licence path (NOTICE conveyance + relink story, or keep DMGs private); repo visibility itself |

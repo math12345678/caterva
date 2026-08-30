@@ -457,20 +457,6 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_runner_boundary.py'}"
     ))
 
-    # The generated API contract must use syntax the installed zod actually
-    # has. orval's `version: "auto"` read zod 3.25's `zod/v4` SUBPATH as
-    # "v4 is available" and emitted `zod.iso.datetime(...)` while importing
-    # from plain "zod", where `iso` is undefined -- a contract that threw on
-    # import, produced by the documented codegen command.
-    #
-    # `tsc --noEmit` is structurally blind to it: zod 3.25 DECLARES `iso` in
-    # its types and does not export it at runtime. That is why this is a
-    # separate guard and not a compile step. See ADR 0030.
-    guards.append(run_guard(
-        "Generated Client Loads Guard",
-        f"{PYTHON} {SCRIPTS_DIR / 'check_generated_client_loads.py'}"
-    ))
-
     # How much of BRENDA's commentary Terrium can actually read.
     #
     # Not a correctness check -- a coverage measurement. It exists because a
@@ -565,7 +551,49 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
             "TypeScript Compile Guard",
             f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_compiles.py'}",
             timeout=300,
-        )
+        ),
+        # The generated API contract must use syntax the installed zod
+        # actually has. orval's `version: "auto"` read zod 3.25's `zod/v4`
+        # SUBPATH as "v4 is available" and emitted `zod.iso.datetime(...)`
+        # while importing from plain "zod", where `iso` is undefined -- a
+        # contract that threw on import, produced by the documented codegen
+        # command. `tsc --noEmit` is structurally blind to it: zod 3.25
+        # DECLARES `iso` in its types and does not export it at runtime.
+        # See ADR 0030.
+        #
+        # MOVED into this group on 2026-08-29: it loads the generated
+        # client under node against the installed zod, so it needs the
+        # same toolchain the compile guard needs, and it sat in an
+        # always-on group -- red in CI's Python job (no node_modules) and
+        # green on every developer machine, the exact split ADR 0167's
+        # flag fix was about. `--no-typescript` gating it is the flag
+        # meaning what it says: this IS a TypeScript-toolchain check.
+        run_guard(
+            "Generated Client Loads Guard",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_generated_client_loads.py'}",
+            timeout=300,
+        ),
+        # The TypeScript half of check_no_silent_skips. That guard counts
+        # pytest's "N skipped" line, so ~600 TypeScript tests across two
+        # runners were invisible to it AND to check_documented_counts: a
+        # whole suite could stop being collected and no number anywhere
+        # would move. Asks each runner which FILES it will run (~2s each,
+        # no imports) and compares against what is on disk.
+        #
+        # MOVED here 2026-08-29, third of three: it shells out to
+        # `npx jest --listTests` and `npx vitest list`, which need the
+        # installed runners — CI's Python job has system npx and no
+        # node_modules, so this was red there and green on every developer
+        # machine. The sweep that found it also checked every other guard
+        # verify_build runs for node/npx/pnpm use: none remain outside
+        # this group (check_prompt_injection uses npx for trojan-scan and
+        # runs fine on a bare runner — measured, its findings appear in
+        # the CI log).
+        run_guard(
+            "TypeScript Suite Discovery Guard",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
+            timeout=240,
+        ),
     ]
 
 
@@ -682,17 +710,6 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             "Example Endpoint Guard",
             f"{PYTHON} {SCRIPTS_DIR / 'check_example_endpoints.py'}",
             timeout=120,
-        ),
-        # The TypeScript half of check_no_silent_skips. That guard counts
-        # pytest's "N skipped" line, so ~600 TypeScript tests across two
-        # runners were invisible to it AND to check_documented_counts: a
-        # whole suite could stop being collected and no number anywhere
-        # would move. Asks each runner which FILES it will run (~2s each,
-        # no imports) and compares against what is on disk.
-        run_guard(
-            "TypeScript Suite Discovery Guard",
-            f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
-            timeout=240,
         ),
         # ------------------------------------------------------------------
         # Six guards below were written, correct, and wired to NOTHING.

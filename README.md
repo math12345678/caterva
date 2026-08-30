@@ -41,19 +41,23 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 > been added, **line one is as far as you get** — that is a fact about the
 > repository, not a mistake you made.
 >
+> (Removed 2026-08-23 on a probe that had silently authenticated
+> through a developer keychain; restored 2026-08-29 after CI — which
+> holds no credentials — and an unauthenticated API check both said
+> private. The probe now strips credential helpers so this cannot
+> recur.)
+>
 > `scripts/check_quickstart_clone_works.py` checks that no document promises
 > a stranger anonymous access it does not have
 > ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md),
-> [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md)). This
-> notice is checked in the other direction too: publish the repositories and
+> [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md)). This> notice is checked in the other direction too: publish the repositories and
 > `check_availability_notice_matches_reality.py` fails until it is deleted,
 > so it cannot outlive the thing it describes.
 
 > **Private repository.** These repositories are private and are staying
 > that way, so `gh repo clone` — which uses your GitHub credentials — is
 > the command that works. A plain `git clone` URL stops at a username
-> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).
-```bash
+> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).```bash
 gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
