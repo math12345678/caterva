@@ -29,7 +29,9 @@ const SIR_EXAMPLE = simulateSIR({
   end: 100,
   points: 101,
 });
-const SEIR_EXAMPLE = simulateSIR({
+// Same SIR integrator as SIR_EXAMPLE, just higher beta / lower gamma --
+// there is no E compartment here, so this must not be labeled SEIR.
+const SIR_HIGH_R0_EXAMPLE = simulateSIR({
   beta: 0.35,
   gamma: 0.05,
   s0: 990,
@@ -83,20 +85,20 @@ const EXAMPLES: ExampleCard[] = [
     query: "model an outbreak with beta 0.3 and gamma 0.1",
   },
   {
-    id: "seir-demo",
+    id: "sir-high-r0-demo",
     domain: "sir",
-    label: "SEIR Model",
+    label: "SIR (High R\u2080)",
     description:
-      "Extended epidemiology with incubation period and higher transmission.",
+      "Same SIR model with higher transmission and slower recovery, giving a higher R\u2080.",
     stats: [
       {
         label: "peak infected",
-        value: Math.max(...SEIR_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
+        value: Math.max(...SIR_HIGH_R0_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
       },
       { label: "R\u2080", value: (0.35 / 0.05).toFixed(2) },
     ],
     chart: {
-      data: SEIR_EXAMPLE.trajectory,
+      data: SIR_HIGH_R0_EXAMPLE.trajectory,
       series: [
         { key: "S", color: "#3B82F6" },
         { key: "I", color: "#EF4444" },
@@ -156,7 +158,14 @@ export default function ExampleGallery({ onTryQuery }: ExampleGalleryProps) {
             </div>
 
             <motion.button
-              onClick={() => onTryQuery(example.query)}
+              onClick={() => {
+                onTryQuery(example.query);
+                setTimeout(() => {
+                  document
+                    .getElementById("agent")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 100);
+              }}
               className="w-full rounded-md border border-[#1D8A72]/15 text-[10px] text-[#1D8A72]/60 py-1.5 transition-all duration-200 hover:bg-[#1D8A72]/[0.06] hover:text-[#1D8A72]"
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
