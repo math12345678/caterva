@@ -5,10 +5,10 @@
  *
  * No API key, no network. Every set is either committed source
  * (`classifierQueries.ts`) or a committed fixture, so the numbers in
- * ADR 0167 are reproducible by anyone who checks the repository out.
+ * ADR 0191 are reproducible by anyone who checks the repository out.
  *
  * It prints one row per set rather than one aggregate number, and refuses to
- * print an aggregate at all. That is the finding ADR 0167 landed on: the
+ * print an aggregate at all. That is the finding ADR 0191 landed on: the
  * keyword table scored 79.5% against one model's phrasing and 51.4% against
  * another's, on the same 13 domains. A mean over those would be a number
  * describing no situation any reader is in. The spread is the result.
@@ -106,7 +106,7 @@ for (const s of sets) {
 }
 
 // The independent sets are the only ones that can settle anything; the two
-// hand-written ones are printed for continuity with ADR 0166 and labelled
+// hand-written ones are printed for continuity with ADR 0190 and labelled
 // with why they cannot be used as evidence.
 const independent = sets.filter((s) => s.label.includes("LLM-authored"));
 if (independent.length >= 2) {

@@ -1,0 +1,42 @@
+{
+  "_why": [
+    "ADR 0167's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "One mutation, and it is the one that needed a harness: the --no-typescript",
+    "nesting defect. The structural test added for it is pure Python under",
+    "pytest, so unlike ADR 0166's evidence this one is gradeable.",
+    "",
+    "The other two verifications in that record are NOT here, and the ADR says",
+    "why: the TypeScript scope widening is graded by running `tsc` over ten",
+    "workspaces, which needs three separate node_modules trees, and the",
+    "requirements-name check needs live PyPI. A set file that reported NOT",
+    "CAUGHT on a machine without those is the confident wrong answer this",
+    "harness exists to prevent. Both were verified by hand, old-guard against",
+    "new-guard on the same tree, and the record names them as the weaker",
+    "evidence.",
+    "F2 REPLACED after the harness returned NOT CAUGHT on the first attempt, and the harness was right: the original mutation made the finder return an empty node only WHEN NO BRANCH EXISTS, and the branch does exist, so the mutated line never ran. An inert mutation reads exactly like an untested claim. The replacement breaks the extractor itself, which is the thing the second test is actually about.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0167-flag-and-scope.json"
+  ],
+  "test": "cd Terium && python3 -m pytest tests/test_no_typescript_flag_only_skips_typescript.py --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "F1",
+      "description": "the prompt-injection guard is moved back inside the --no-typescript branch",
+      "_claimed": "caught by test_the_flag_gates_only_the_typescript_group",
+      "_note": "This is the original defect, restored exactly. Measured before the fix: `--quick` reported 6 failures and `--quick --no-typescript` reported 3 on the same tree, the three hidden being ADR Index, Mutation Table Reproducibility and Prompt Injection.",
+      "file": "scripts/verify_build.py",
+      "find": "        total_failures += print_results(\"TypeScript Guards\", ts_guards)\n",
+      "replace": "        total_failures += print_results(\"TypeScript Guards\", ts_guards)\n        injection_guards = run_injection_guard()\n        total_failures += print_results(\"Prompt Injection Guard\", injection_guards)\n"
+    },
+    {
+      "id": "F2",
+      "description": "the guard-call extractor returns nothing, so the comparison is between two empty sets",
+      "_claimed": "caught by both tests in the file",
+      "_note": "The failure mode of a structural test is locating its subject, extracting nothing, and reporting a clean match. test_the_finder_would_notice_if_the_branch_disappeared exists for that and this is what proves it fires. The second attempt at this mutation was itself a no-op -- `return set() or {...}` evaluates to the set literal, because an empty set is falsy -- and the harness reported NOT CAUGHT for it too. Twice correct about a mutation that changed nothing.",
+      "file": "Terium/tests/test_no_typescript_flag_only_skips_typescript.py",
+      "find": "def _guard_calls(node: ast.If) -> set[str]:\n    return {",
+      "replace": "def _guard_calls(node: ast.If) -> set[str]:\n    return set()\n    return {"
+    }
+  ]
+}

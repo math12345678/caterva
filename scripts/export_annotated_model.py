@@ -258,6 +258,62 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
             assay_unreported=tuple(assay.get("unreported") or ()),
         )
 
+    # ---- units, before annotation (ADR 0150's claimed and missing work).
+    #
+    # `declare_units` owns the whole decision: which domains have
+    # concentration semantics, whether every model parameter has a stated
+    # unit, whether the stated units agree on one scale. A refusal returns
+    # the SBML unchanged with per-symbol reasons, and those ride out in
+    # the detail dict as `unitsRefused`, so a consumer can tell "declared"
+    # from "could not be declared" without diffing the XML.
+    #
+    # The per-parameter strings come from the same provenance entries as
+    # everything else -- the CLI writes each value's normalised unit onto
+    # its row (ADR 0146). The one fact only the payload-level `units` key
+    # carries is the TIME base of the system; the declarations hard-code
+    # per-second rates, so any other base refuses here, before the call,
+    # rather than being reinterpreted inside it.
+    from Terium.core.sbml_units import UnitsOutcome, declare_units
+
+    # ---- units, before annotation (ADR 0150's claimed and missing work).
+    #
+    # The module owns the whole judgement: vocabulary, rate detection from
+    # the unit string itself (`mM` vs `mM/s`), the case fold shared with
+    # annotate_sbml, the one-system check, per-parameter completeness, the
+    # domain gate, and the kinetic-law x compartment fix. This block only
+    # gathers what the caller SAID -- the per-row units ADR 0146 normalised
+    # everything into -- and one fact no row carries: the time base from
+    # `units: {concentration, time}`, sent since ADR 0146 and read by
+    # nothing until this pass. Per-second is the only base the
+    # declarations can state, so any other refuses here, before the call.
+    #
+    # (This file was, for one evening, the site of a two-agent collision:
+    # both authors built this feature at once and the exporter briefly
+    # carried each signature against the other's module. The resolution is
+    # this split -- the module is the other author's, verbatim; the wiring
+    # honours its contract and adds nothing it already owns.)
+    parameter_units = {
+        SYMBOLS.get(name, name): str(entry["unit"])
+        for name, entry in (payload.get("provenance") or {}).items()
+        if isinstance(entry, dict) and entry.get("unit")
+    }
+    stated_time = (payload.get("units") or {}).get("time")
+    if stated_time is not None and stated_time != "s":
+        units_outcome = UnitsOutcome(
+            sbml=sbml_text,
+            refusals=[(
+                "time",
+                f"the caller's time base {stated_time!r} is not seconds; "
+                "the declarations state per-second rates, so writing them "
+                "for another base would be wrong rather than incomplete",
+            )],
+        )
+    else:
+        units_outcome = declare_units(
+            sbml_text, parameter_units, domain=str(payload.get("domain"))
+        )
+    sbml_text = units_outcome.sbml
+
     outcome = annotate_sbml(
         sbml_text,
         provenance,
@@ -272,6 +328,11 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
         # 2026-08-25). Returned rather than rebuilt in `build_archive`,
         # which does not have this dict and would have to re-derive it.
         "provenanceJson": provenance_as_json(provenance),
+        "unitsDeclared": units_outcome.declared,
+        "unitsRefused": [
+            {"symbol": symbol, "reason": reason}
+            for symbol, reason in units_outcome.refusals
+        ],
         "annotated": outcome.annotated,
         "unannotated": outcome.unannotated,
         "cvterms": outcome.cvterms_written,

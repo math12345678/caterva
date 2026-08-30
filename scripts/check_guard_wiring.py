@@ -397,11 +397,14 @@ def _duplicate_expected_wiring_keys() -> list[str]:
 
     tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
     for node in ast.walk(tree):
-        is_table = (
-            isinstance(node, ast.AnnAssign)
-            and getattr(node.target, "id", "") == "EXPECTED_WIRING"
-        )
-        if is_table and isinstance(node.value, ast.Dict):
+        # Narrowed with `continue` rather than a boolean flag. `ast.walk`
+        # yields bare `AST`, which has no `.value`; the flag made the guard
+        # correct and unverifiable, and mypy reported exactly that.
+        if not isinstance(node, ast.AnnAssign):
+            continue
+        if getattr(node.target, "id", "") != "EXPECTED_WIRING":
+            continue
+        if isinstance(node.value, ast.Dict):
             keys = [k.value for k in node.value.keys if isinstance(k, ast.Constant)]
             return sorted(k for k, n in collections.Counter(keys).items() if n > 1)
     return []

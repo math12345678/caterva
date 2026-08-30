@@ -97,6 +97,30 @@
 0118   # the name the database uses -- arrived 2026-08-18, another agent's,
        # mid-pass. Asked, not claimed.
 0113   # the conditions that stayed on the screen -- arrived 2026-08-17,
+0166   # the suite nobody ran -- NOT the ADR 0069 story. The restores here
+       # file shipped with it. Parked rather than re-derived: a set built
+       # from someone else's prose risks the confident NOT CAUGHT the
+       # harness exists to prevent (registered 2026-08-29 to unblock the
+       # guard for CI; the ask stands with its author).
+       # includes a mutation another record already claimed and could not
+       # catch, so a naive set file would grade a claim its own ADR
+       # disputes.
+       # four (2026-08-23) and post-harness, so this entry is debt by
+       # choice, not history: its evidence spans a live-resolver run that
+       # a set file's test command cannot assume network for.
+       # were checked with `diff` and every guard re-run to exit 0, so the
+       # instrument is not in doubt; what is missing is a harness verdict.
+       # `mutate.py` grades a pytest suite by counting its tests, and all
+       # four mutations are either a guard with no pytest coverage
+       # (check_runner_boundary, check_cli_surface_documented -- neither
+       # has a --selftest) or a jest test. Pointing --test at `npx jest`
+       # would say NOT CAUGHT on any machine without node_modules. It
+       # refused outright when tried, reporting that the baseline ran no
+       # tests rather than grading one.
+       # CLEARABLE BY: giving those two guards a --selftest, which puts
+       # them under Terium/tests/test_guard_selftests.py and inside
+       # mutate.py's reach. Not done here; it is a change to the guards,
+       # not to the record of this pass.
        # another agent's, mid-pass. Asked, not claimed: re-deriving it
        # means editing their record if a result disagrees, and the record
        # was minutes old when this line was written.

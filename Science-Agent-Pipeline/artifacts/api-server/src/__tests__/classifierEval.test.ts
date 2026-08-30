@@ -1,8 +1,8 @@
 /**
  * What the domain-classifier benchmark measures, and proof it can fail.
  *
- * ADR 0166 measured the keyword table and pinned its defects as tests.
- * ADR 0167 repaired them: specificity scoring replaced first-match-wins, and
+ * ADR 0190 measured the keyword table and pinned its defects as tests.
+ * ADR 0191 repaired them: specificity scoring replaced first-match-wins, and
  * the vocabulary was widened from each domain's definition. Every pinned
  * defect test in this file therefore failed on purpose when the fix landed,
  * naming which defect had been fixed -- which is the notification those
@@ -122,7 +122,7 @@ describe("classifyDomainByKeyword reports three states, not two", () => {
   });
 });
 
-describe("defects ADR 0166 measured, now fixed by specificity scoring", () => {
+describe("defects ADR 0190 measured, now fixed by specificity scoring", () => {
   const domainOf = (q: string) => classifyDomainByKeyword(q).defaults.domain;
 
   it("routes an incubation-period epidemic to seir, not sir", () => {

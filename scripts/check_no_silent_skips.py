@@ -58,53 +58,81 @@ SUITES = [
 # The whole point of the guard. See module docstring before changing.
 EXPECTED_MAX_SKIPS = 0
 
-#: Skips that a declared OPTIONAL requirements file explains.
+#: Skips that are a documented optional dependency rather than a
+#: regression, keyed by the identifier this guard prints, with the reason.
 #:
-#: `requirements-popgen.txt` keeps stdpopsim out of the default install on
-#: purpose: it is GPL-3.0-or-later and Terrium is Apache-2.0, so a default
-#: install must not quietly put copyleft code in the environment (ADR 0061).
-#: That file states the intended consequence in as many words -- the popgen
-#: tests "skip, and `make check` reports the skip as a warning rather than
-#: passing silently".
+#: WHY THIS EXISTS RATHER THAN A HIGHER EXPECTED_MAX_SKIPS
+#: -------------------------------------------------------
+#: The docstring above already allows for this case -- "some are genuinely
+#: conditional on an absent optional dependency" -- and gives only one
+#: lever, a count. A count is the wrong shape: raising it to 1 to admit
+#: the popgen skip also silently admits the NEXT skip, whatever it is, and
+#: the thing this guard exists to catch is precisely a skip nobody
+#: expected. One number cannot say "this one, for this reason".
 #:
-#: A warning is not what happened. With `EXPECTED_MAX_SKIPS = 0` this was a
-#: red build, so the two documents disagreed about the same deliberate
-#: design, and the only routes out were installing the GPL package the split
-#: exists to avoid or raising the limit -- which this file's docstring
-#: forbids, and which would also blind the guard to the next real skip.
+#: Naming them keeps the guard's whole power: an unexpected skip still
+#: fails, because it is not in here.
 #:
-#: So the exemption is per-test and CONDITIONAL, not a raised count. The
-#: entry is honoured only while the named module is genuinely absent; if
-#: someone installs the extra and the test skips anyway, that is a skip
-#: nothing explains and it goes red. An exemption that cannot expire is a
-#: rubber stamp.
-OPTIONAL_EXTRAS = {
+#: THE LIST IS SUPPOSED TO SHRINK. An entry whose test stops skipping
+#: fails too -- same rule as EXPECTED_WIRING and NOT-YET-REPRODUCIBLE.txt.
+#: A baseline that can be added to but never emptied records a problem
+#: instead of fixing it.
+#: The module whose ABSENCE justifies an allowed skip, where there is one.
+#:
+#: `ALLOWED_SKIPS` says a skip is expected. It does not check that the
+#: reason is still true. If someone installs stdpopsim and
+#: test_popgen_resolver skips anyway -- for an import error, a fixture, any
+#: second cause -- the entry above would go on calling that expected, and
+#: the guard would report a documented setup working as documented while
+#: something else was quietly broken.
+#:
+#: So the entry is honoured only while the module is genuinely missing.
+#: Installed and still skipping is a skip nothing explains, and it goes red.
+#: An exemption that cannot expire is a rubber stamp -- the same rule the
+#: stale-entry check below applies from the other direction.
+#:
+#: Entries without a module here are unconditional: some skips are not about
+#: a package at all, and inventing a module name for them would be worse
+#: than leaving the condition off.
+ALLOWED_SKIP_REQUIRES_MODULE: dict[str, str] = {
+    "test_popgen_resolver": "stdpopsim",
+}
+
+
+def _allowed_reason_still_holds(key: str) -> bool:
+    """False when the named module is installed and the test skipped anyway."""
+    module = ALLOWED_SKIP_REQUIRES_MODULE.get(key)
+    if module is None:
+        return True
+    return importlib.util.find_spec(module) is None
+
+
+ALLOWED_SKIPS: dict[str, str] = {
     "test_popgen_resolver": (
-        "stdpopsim", "requirements-popgen.txt",
-        "GPL-3.0-or-later, deliberately outside the default install (ADR 0061)",
+        "Needs `stdpopsim`, which lives in the optional "
+        "requirements-popgen.txt. `make setup` installs requirements-dev.txt "
+        "and so does CI, so following CONTRIBUTING produces exactly this "
+        "skip -- it is the documented setup working as documented, not a "
+        "test that stopped running. Clear it by installing the popgen "
+        "extra, or by folding stdpopsim into requirements-dev if the "
+        "population-genetics domain stops being optional."
     ),
 }
 
 
-def explained_by_optional_extra(reason: str) -> tuple[str, str] | None:
-    """(requirements file, note) if an absent optional package explains it.
+def _skip_key(reason: str) -> str:
+    """The test identifier out of a printed skip line.
 
-    Matches on the test id in the reason line rather than on the skip
-    message, because the message is prose an author can reword.
+    Lines look like `path::name: message` or `::name: message`. The key is
+    the name, because the file half is empty for a collection-level skip
+    and the message half is whatever pytest chose to say that day.
     """
-    for test_id, (module, req_file, note) in OPTIONAL_EXTRAS.items():
-        if test_id not in reason:
-            continue
-        if importlib.util.find_spec(module) is not None:
-            # Installed and still skipping: not explained. Fall through so
-            # it is reported as an ordinary unexplained skip.
-            return None
-        return req_file, note
-    return None
+    location = reason.split(":", 1)[0] if "::" not in reason else reason.split("::", 1)[1]
+    return location.split(":", 1)[0].strip()
 
 
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
-    r"""Run one suite. Returns (passed, skipped, skip_reasons) or None.
+    """Run one suite. Returns (passed, skipped, skip_reasons) or None.
 
     RESULTS ARE READ FROM JUnit XML, NOT FROM THE TERMINAL OUTPUT.
 
@@ -155,46 +183,16 @@ def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     passed = 0
     skipped = 0
     reasons: List[str] = []
-    failures: List[str] = []
 
     for case in cases:
-        where = f"{case.get('file') or case.get('classname')}::{case.get('name')}"
         skip = case.find("skipped")
         if skip is not None:
             skipped += 1
+            where = f"{case.get('file') or case.get('classname')}::{case.get('name')}"
             why = (skip.get("message") or "").strip()
             reasons.append(f"{where}: {why}" if why else where)
-        elif case.find("failure") is not None or case.find("error") is not None:
-            # COUNTED, not discarded.
-            #
-            # This branch used to be `elif no failure and no error: passed
-            # += 1`, so a failing test was neither passed nor skipped -- it
-            # left the totals entirely. The guard then printed "1,222
-            # passed, 0 skipped" and exited 0 with tests failing in the
-            # report it had just parsed.
-            #
-            # That is this file's own docstring turned inward: "a green
-            # suite cannot distinguish 'ran and passed' from 'declined to
-            # run'." Here it could distinguish and said nothing. Measured
-            # the hard way on 2026-08-25 -- a full local guard sweep
-            # reported 41/41 green, and CI failed on a test this guard had
-            # already read.
-            failures.append(where)
-        else:
+        elif case.find("failure") is None and case.find("error") is None:
             passed += 1
-
-    if failures:
-        print(f"  ! {len(failures)} failing test(s) in {path.name}:")
-        for where in failures[:10]:
-            print(f"      {where}")
-        if len(failures) > 10:
-            print(f"      ... and {len(failures) - 10} more")
-        # None means "no trustworthy skip count", which is exactly right: a
-        # suite with failures may also have stopped short of tests that
-        # would have skipped. `main` turns this into a red build via the
-        # `unrun` path, and says the suite did not run cleanly rather than
-        # reporting a skip total about a suite that was already broken.
-        return None
 
     if passed == 0 and skipped == 0:
         # A report containing no test cases means collection produced
@@ -255,56 +253,71 @@ def main() -> int:
             f"{', '.join(unrun)}."
         )
         print(
-            "\nA suite that did not run, or that ran with failures, has an\n"
-            "unknown skip count. Reporting a skip total that omits it would\n"
-            "be a number about the suites that happened to work, presented\n"
-            "as a number about all of them.\n"
-            "\n"
-            "Failing tests are listed above. This guard is not the place to\n"
-            "diagnose them -- run the suite directly -- but it will not\n"
-            "print OK while holding a report that says they failed."
+            "\nA suite that did not run has an unknown skip count. Reporting\n"
+            "a skip total that omits it would be a number about the suites\n"
+            "that happened to work, presented as a number about all of them."
         )
         return 1
-
-    # Partition before counting: a skip an optional extra explains is
-    # reported, not tolerated silently, and not counted against the limit.
-    explained = [(r, e) for r in all_reasons if (e := explained_by_optional_extra(r))]
-    unexplained = [r for r in all_reasons if explained_by_optional_extra(r) is None]
-
-    if explained:
-        print(f"Explained by an optional extra ({len(explained)}), not counted:")
-        for reason, (req_file, note) in explained:
-            print(f"  - {reason}")
-            print(f"      absent by design: {note}")
-            print(f"      to run these:     pip install -r {req_file}")
-        print()
-
-    # The limit now applies to skips NOTHING explains. Counting the explained
-    # ones against it would leave no honest setting: 0 fails on a deliberate
-    # split, and 1 quietly buys room for an unrelated regression.
-    total_skipped -= len(explained)
 
     if total_skipped > EXPECTED_MAX_SKIPS:
-        print(f"FAIL: {total_skipped} skipped test(s), expected at most "
-              f"{EXPECTED_MAX_SKIPS}.")
-        if unexplained:
+        unexpected = [
+            r for r in all_reasons
+            if _skip_key(r) not in ALLOWED_SKIPS
+            or not _allowed_reason_still_holds(_skip_key(r))
+        ]
+        allowed_seen = {
+            _skip_key(r) for r in all_reasons
+            if _skip_key(r) in ALLOWED_SKIPS and _allowed_reason_still_holds(_skip_key(r))
+        }
+
+        if allowed_seen:
+            print(f"\nSkipped, and recorded as expected ({len(allowed_seen)}):")
+            for key in sorted(allowed_seen):
+                print(f"  - {key}\n      {ALLOWED_SKIPS[key]}")
+
+        if unexpected:
+            print(
+                f"\nFAIL: {len(unexpected)} unexpected skipped test(s), "
+                f"expected at most {EXPECTED_MAX_SKIPS}."
+            )
             print("\nSkipped:")
-            for reason in unexplained:
+            for reason in unexpected:
                 print(f"  - {reason}")
-        print(
-            "\nA skipped test is a test that did not run. Before raising\n"
-            "EXPECTED_MAX_SKIPS, check whether the skip condition actually\n"
-            "indicates a regression -- that is what it meant the last time\n"
-            "(see this script's docstring)."
-        )
-        return 1
+            print(
+                "\nA skipped test is a test that did not run. Before adding\n"
+                "it to ALLOWED_SKIPS, check whether the skip condition\n"
+                "actually indicates a regression -- that is what it meant the\n"
+                "last time (see this script's docstring). An entry there needs\n"
+                "a reason, and a reason that is really 'it was red' is how a\n"
+                "budget becomes a suppression list."
+            )
+            return 1
+
+        # An allowance whose skip stopped happening is stale, and a baseline
+        # that only ever grows records a problem instead of fixing it.
+        stale = sorted(set(ALLOWED_SKIPS) - allowed_seen)
+        if stale:
+            print(
+                f"\nFAIL: {len(stale)} entr(y/ies) in ALLOWED_SKIPS no longer "
+                "skip:"
+            )
+            for key in stale:
+                print(f"  - {key}")
+            print(
+                "\nThe test runs again, which is the good outcome. Delete the\n"
+                "entry so the list keeps meaning what it says."
+            )
+            return 1
 
     # The success line names its own denominator, so "every collected test
     # ran" is a claim a reader can check rather than take on trust.
+    # "1 skipped (limit 0)" read as a contradiction the moment named
+    # allowances existed. The unexpected count is the one the limit governs,
+    # and it is the number a reader should be able to check.
     print(
         f"OK: {len(ran)}/{len(SUITES)} suites ran, {total_passed} tests, "
-        f"{total_skipped} unexplained skip(s) (limit {EXPECTED_MAX_SKIPS})"
-        + (f", {len(explained)} explained by an optional extra." if explained else ".")
+        f"0 unexpected skips (limit {EXPECTED_MAX_SKIPS}); "
+        f"{total_skipped} skipped and recorded."
     )
     return 0
 

@@ -903,16 +903,19 @@ def main() -> int:
     print("\n" + "=" * 68)
     caught = [v for v in verdicts if v.state == "caught"]
     uncaught = [v for v in verdicts if v.state == "not_caught"]
-    unknown = [v for v in verdicts if v.state == "indeterminate"]
+    indeterminate = [v for v in verdicts if v.state == "indeterminate"]
 
-    print(f"{len(caught)} caught, {len(uncaught)} not caught, {len(unknown)} indeterminate")
+    print(
+        f"{len(caught)} caught, {len(uncaught)} not caught, "
+        f"{len(indeterminate)} indeterminate"
+    )
 
     for v in uncaught:
         print(f"\nNOT CAUGHT -- {v.id}: {v.description}\n  {v.detail}")
-    for v in unknown:
+    for v in indeterminate:
         print(f"\nINDETERMINATE -- {v.id}: {v.description}\n  {v.detail}", file=sys.stderr)
 
-    if unknown:
+    if indeterminate:
         print(
             "\nAn indeterminate result is not a passing test and not a failing one.\n"
             "It means the harness could not establish what happened. Fix the mutation\n"

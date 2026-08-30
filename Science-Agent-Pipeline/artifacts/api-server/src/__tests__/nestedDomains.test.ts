@@ -117,7 +117,7 @@ describe("a query that names only the general case keeps it", () => {
   });
 
   it("does not promote on a distinctive term the query denies", () => {
-    // The interaction with ADR 0168. "no inhibitor" contains the child's
+    // The interaction with ADR 0192. "no inhibitor" contains the child's
     // distinctive word; promotion must not fire on a mention the query
     // negates, or the negation work is undone by this one.
     expect(

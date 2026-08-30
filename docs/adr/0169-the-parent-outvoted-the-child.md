@@ -6,7 +6,7 @@
 
 ## Context
 
-Two confusions dominated ADR 0168's residue: `seir -> sir` (8 across the
+Two confusions dominated ADR 0192's residue: `seir -> sir` (8 across the
 independent fixtures) and `gillespie_ssa_bimolecular -> gillespie_ssa` (7).
 Both were named there as semantic nesting that no keyword mechanism
 addressed.
@@ -54,7 +54,7 @@ too, so no quantity of parent evidence is evidence *against* the child.
 "Incubation phase" says SEIR, and no amount of "infection" and "spreads" says
 otherwise.
 
-Promotion uses `matchesTerm`, so ADR 0168's negation handling applies on this
+Promotion uses `matchesTerm`, so ADR 0192's negation handling applies on this
 path too: "no inhibitor involved" does not promote.
 
 ## Verification

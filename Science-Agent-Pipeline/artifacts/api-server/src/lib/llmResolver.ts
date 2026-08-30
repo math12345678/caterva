@@ -29,6 +29,39 @@ interface OpenAIResponse {
   }[];
 }
 
+/**
+ * List of simulation domains exposed to the LLM resolver.
+ * Engine-internal domains (monte_carlo_pi, gillespie_ssa_replicates) are excluded.
+ *
+ * THE ONE PLACE. `SYSTEM_PROMPT` below interpolates `DOMAIN_UNION`, which is
+ * built from this array, so the list the model is offered and the list the
+ * reply is validated against cannot disagree. They used to be two hand-kept
+ * copies -- this docstring said "Must match SYSTEM_PROMPT's domain enum" and
+ * nothing checked that it did. The failure is silent in the worse direction:
+ * a domain dropped from the prompt is never proposed by the model, so it
+ * simply stops being reachable, and the allowlist test still passes because
+ * it only asks whether the allowlist ACCEPTS each domain -- never whether
+ * the prompt still offers it.
+ */
+const SUPPORTED_DOMAINS = [
+  "mm",
+  "mm_competitive_inhibition",
+  "sir",
+  "seir",
+  "wright_fisher",
+  "gillespie_ssa",
+  "pcr",
+  "molecular_dynamics",
+  "gillespie_ssa_bimolecular",
+  "two_locus_wright_fisher",
+  "lotka_volterra",
+  "cell_cycle_oscillator",
+  "repressilator",
+] as const;
+
+/** The domains as a TypeScript-style union, for interpolation into the prompt. */
+const DOMAIN_UNION = SUPPORTED_DOMAINS.map((d) => `"${d}"`).join(" | ");
+
 // `sbml` is intentionally absent here: it is the internal raw-SBML escape
 // hatch, not a natural-language domain offered by the resolver. It remains
 // part of the runner/API dispatch contract and is validated separately.
@@ -74,7 +107,7 @@ const SYSTEM_PROMPT = `You are the "science agent" resolver for a computational 
 Given a natural-language query, return a single JSON object (no markdown, no prose) with this exact shape:
 
 {
-  "domain": "mm" | "mm_competitive_inhibition" | "sir" | "seir" | "wright_fisher" | "gillespie_ssa" | "pcr" | "molecular_dynamics" | "gillespie_ssa_bimolecular" | "two_locus_wright_fisher" | "lotka_volterra" | "cell_cycle_oscillator" | "repressilator",
+  "domain": ${DOMAIN_UNION},
   "parameters": { ...numeric parameters the query explicitly states; omit anything else ... },
   "reasoning": "short explanation of how you mapped the query",
   "modelCitations": ["optional literature reference"],
@@ -122,26 +155,6 @@ export interface LLMProviderConfig {
   supportsJsonMode: boolean;
 }
 
-/**
- * List of simulation domains exposed to the LLM resolver.
- * Engine-internal domains (monte_carlo_pi, gillespie_ssa_replicates) are excluded.
- * Must match SYSTEM_PROMPT's domain enum.
- */
-const SUPPORTED_DOMAINS = [
-  "mm",
-  "mm_competitive_inhibition",
-  "sir",
-  "seir",
-  "wright_fisher",
-  "gillespie_ssa",
-  "pcr",
-  "molecular_dynamics",
-  "gillespie_ssa_bimolecular",
-  "two_locus_wright_fisher",
-  "lotka_volterra",
-  "cell_cycle_oscillator",
-  "repressilator",
-] as const;
 
 export const LLM_PROVIDERS: Record<string, LLMProviderConfig> = {
   openai: {

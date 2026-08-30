@@ -8,7 +8,7 @@
 
 Five labelled query sets exist. No student wrote a line of any of them.
 
-ADR 0167 said so. ADR 0169 said so. ADR 0170 said so and then closed off the
+ADR 0191 said so. ADR 0169 said so. ADR 0170 said so and then closed off the
 last route that avoided the problem: vocabulary proposed by a model is fluent
 invention — *"buzzing genes"*, *"gene pendulum"* — and 97% of it never
 matched a real query.

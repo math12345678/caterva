@@ -11,7 +11,7 @@ import { parsePhysiological } from './physiologicalReference';
 import { parseReportQuantities } from './reportQuantities';
 import { collectRepeated, parseUserCitations } from './userCitations';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
-import { exportModel } from './exportArtifacts';
+import { exportModel, type ExportProvenance } from './exportArtifacts';
 import {
   parseSystemFromQuery,
   formatResolveCommand,
@@ -683,7 +683,11 @@ async function commandSimulate(
       // parameter's notes here so a human reading the file is not left
       // guessing, and the gap is recorded rather than papered over.
       const numeric: Record<string, number> = {};
-      const exportProvenance: Record<string, { origin: string; note?: string }> = {};
+      // The REAL interface, not a local re-statement of part of it. The
+      // local shape lacked `unit`, so the unit this loop computes had a
+      // type error standing between it and the exporter -- a second copy
+      // of a contract is how a field gets delivered to nobody.
+      const exportProvenance: Record<string, ExportProvenance> = {};
       const declared: Record<string, string> = {};
       for (const [name, raw] of Object.entries(params ?? {})) {
         declared[name] = parseQuantity(name, raw).unit;
@@ -709,6 +713,11 @@ async function commandSimulate(
         // overstating what the person actually specified.
         exportProvenance[name] = {
           origin: q.unitDeclared ? 'user' : 'user_assumed_unit',
+          // The unit as DATA, not only inside the prose note below: the
+          // Python exporter turns these into SBML unitDefinitions, and a
+          // unit that lives only in a sentence is one no pipeline can
+          // declare (ADR 0150).
+          unit,
           note:
             `${value} ${unit}` +
             (q.value !== value ? ` (you gave ${q.value} ${q.unit})` : '') +
@@ -748,6 +757,18 @@ async function commandSimulate(
           '  your values, recorded as yours — the model says so rather than\n' +
           '  leaving a reader to assume they were sourced.' +
           colors.reset);
+        // Same three-state verdict as the resolve path. This is the
+        // command whose exported file once contradicted its own run by
+        // 60,000x (ADR 0146); whether the file now STATES its units is
+        // exactly what its reader needs to know.
+        if (outcome.unitsDeclared && outcome.unitsDeclared.length > 0) {
+          console.log(colors.dim +
+            `  Units declared on ${outcome.unitsDeclared.join(', ')} — libSBML` +
+            '\n  checks them instead of trusting the notes.' + colors.reset);
+        } else if (outcome.unitsRefused && outcome.unitsRefused.length > 0) {
+          console.log(`${colors.yellow}  ⚠ no units declared:${colors.reset} ` +
+            colors.dim + outcome.unitsRefused[0]!.reason + colors.reset);
+        }
       } else {
         // Not fatal. The simulation ran and its results are above; losing
         // the export must not retract them.
@@ -1066,6 +1087,10 @@ ${colors.bright}Commands:${colors.reset}
     rather than listed here. If it cannot be asked it says so and prints
     nothing: a catalogue that looks authoritative and was never checked
     is the failure this command exists to correct (ADR 0122).
+
+    Each comes with a command that runs it. The values in those commands
+    are examples, not defaults -- Terrium has no defaults for measured
+    quantities.
     ${colors.dim}Example:${colors.reset} domains
 
   catalog <ec-number> | --enzyme NAME [--json]
@@ -1104,9 +1129,9 @@ ${colors.bright}Commands:${colors.reset}
                          it up. Offline and checkable; the live path
                          is the one a student without a saved table has.
       --draws N          how many times to sample (default 2000)
-      --points N         timepoints per simulated draw. Only meaningful
-                         with --simulate; without it there is no
-                         trajectory to put points on.
+      --points N         time points per simulated trajectory (default 11).
+                         Only meaningful with --simulate; without it there
+                         is no trajectory to put points on.
       --json             machine-readable
 
   resolve <enzyme> --substrate S --organism O [options]
@@ -1219,6 +1244,10 @@ ${colors.bright}Commands:${colors.reset}
                            as in \`resolve\`: permits a related organism's
                            value, still never any organism's
       --cite NAME="SOURCE" attach your own source to a value you supplied
+      --yes                accept the system read out of the query without
+                           being asked. Interactive runs confirm it first;
+                           a pipe or a CI job has nobody to ask, so it is
+                           refused there rather than assumed
       --physiological "pH,tempC" (with --physiological-basis TEXT)
                            the conditions your model represents. Without it
                            the condition-proximity axis reports not_assessed,

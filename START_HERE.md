@@ -55,7 +55,6 @@ that wrong shipped a hardcoded 37 °C into every entry point for months
 > that way, so `gh repo clone` — which uses your GitHub credentials — is
 > the command that works. A plain `git clone` URL stops at a username
 > prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).
-
 ```bash
 gh repo clone Terrium-sim/main
 cd main

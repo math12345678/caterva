@@ -1,8 +1,8 @@
 {
   "_why": [
-    "ADR 0166's mutation table, re-derived under scripts/mutate.py.",
+    "ADR 0190's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "ADR 0166 measures the domain classifier: the keyword table scores 60% on",
+    "ADR 0190 measures the domain classifier: the keyword table scores 60% on",
     "a labelled set where the LLM scores 96%. Both of the defects it fixes are",
     "the same shape -- a third state ('I could not determine this') collapsed",
     "into a confident second state, so the pipeline kept answering and nothing",
@@ -22,7 +22,7 @@
     "no offline test asserts a remote model id still exists. A set file that",
     "implied otherwise would overstate the evidence.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0166-classifier-three-state.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0190-classifier-three-state.json"
   ],
   "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/classifierEval.test.ts src/__tests__/llmConfigState.test.ts",
   "mutations": [

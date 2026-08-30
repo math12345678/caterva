@@ -113,7 +113,36 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 REQUIREMENTS = [
     REPO_ROOT / "requirements.txt",
     REPO_ROOT / "requirements-dev.txt",
+    # Added after the two below were found unchecked. Explicit rather than
+    # globbed, keeping the property the comment above asks for.
+    REPO_ROOT / "requirements-popgen.txt",
+    REPO_ROOT / "advanced_analysis" / "requirements.txt",
 ]
+
+#: A requirement naming a distribution, whatever the operator -- `==`,
+#: `>=`, `~=` or a bare name.
+#:
+#: The version check above only ever looked at `==`, so a file using `>=`
+#: was parsed into zero pins and contributed nothing. That is how
+#: `advanced_analysis/requirements.txt` came to contain THREE entries that
+#: could not work:
+#:
+#:   * `python>=3.10`, which is not a distribution at all and made
+#:     `pip install -r requirements.txt` -- the command that file's README
+#:     documents -- fail outright on its first line;
+#:   * `timeit>=1.0.0`, a STANDARD LIBRARY module, absent from PyPI;
+#:   * `excalidraw-export>=0.1.0`, also absent from PyPI.
+#:
+#: The last two are the reason this check is about NAMES and not only
+#: versions. An unregistered name on PyPI is an open slot: the file is a
+#: standing instruction to install whatever a stranger uploads under it.
+#: Rule 7 of docs/CONSTITUTION.md is about exactly this shape, and nothing
+#: was looking at these files.
+NAME_RE = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:[=<>!~]|$)")
+
+#: Names that are standard-library modules, so asking PyPI for them is
+#: always wrong even if somebody has registered the name.
+STDLIB_NAMES = frozenset(sys.stdlib_module_names)
 
 #: `name==version`, ignoring comments, blank lines, `-r` includes and any
 #: environment markers after a semicolon.
@@ -130,6 +159,21 @@ def pins(path: pathlib.Path) -> list[tuple[str, str]]:
         match = PIN_RE.match(line)
         if match:
             out.append((match.group(1), match.group(2)))
+    return out
+
+
+def named_distributions(path: pathlib.Path) -> list[str]:
+    """Every distribution name a requirements file asks for."""
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "-")):
+            continue
+        match = NAME_RE.match(stripped)
+        if match:
+            out.append(match.group(1))
     return out
 
 
@@ -190,7 +234,71 @@ def main() -> int:
                 f"(PyPI has {len(available)} release(s); newest {newest})"
             )
 
+    # --- every NAMED distribution exists, whatever the operator ---------
+    #
+    # Separate from the version loop above, because "this version is wrong"
+    # and "this package has never existed" are different facts and the
+    # second is the more dangerous one: an unregistered name is a slot
+    # anybody can fill.
+    all_names: list[tuple[pathlib.Path, str]] = []
+    for path in REQUIREMENTS:
+        for name in named_distributions(path):
+            all_names.append((path, name))
+
+    phantom: list[str] = []
+    stdlib_asks: list[str] = []
+    for path, name in all_names:
+        if name.lower().replace("_", "-") in {"python"}:
+            phantom.append(
+                f"  {path.relative_to(REPO_ROOT)}: `{name}` is not a "
+                "distribution -- the interpreter version belongs in a "
+                "comment or pyproject.toml, not in a resolver's input"
+            )
+            continue
+        if name.replace("-", "_") in STDLIB_NAMES:
+            stdlib_asks.append(
+                f"  {path.relative_to(REPO_ROOT)}: `{name}` is a standard "
+                "library module. Asking PyPI for it installs whoever "
+                "registered the name, not the module you meant."
+            )
+            continue
+        available = released_versions(name)
+        if available is None:
+            unreachable.append(name)
+        elif not available:
+            phantom.append(
+                f"  {path.relative_to(REPO_ROOT)}: `{name}` has no releases "
+                "on PyPI"
+            )
+
     print(f"Pinned versions checked against PyPI: {len(all_pins)}")
+    print(f"Distribution names checked against PyPI: {len(all_names)}")
+
+    if stdlib_asks:
+        print(
+            f"\nStandard-library names asked of PyPI ({len(stdlib_asks)}):",
+            file=sys.stderr,
+        )
+        for line in stdlib_asks:
+            print(line, file=sys.stderr)
+
+    if phantom:
+        print(
+            f"\nRequirements naming something that is not on PyPI "
+            f"({len(phantom)}):",
+            file=sys.stderr,
+        )
+        for line in phantom:
+            print(line, file=sys.stderr)
+
+    if stdlib_asks or phantom:
+        print(
+            "\nA name with no package behind it is not a harmless typo. It is\n"
+            "an unclaimed slot, and this file is a standing instruction to\n"
+            "install whatever appears in it. See Rule 7 of docs/CONSTITUTION.md.",
+            file=sys.stderr,
+        )
+        return 1
 
     if unreachable:
         print(

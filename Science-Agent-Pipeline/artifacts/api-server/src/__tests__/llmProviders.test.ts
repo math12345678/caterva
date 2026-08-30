@@ -120,7 +120,7 @@ describe("LLM_PROVIDER selection reaches the actual HTTP request", () => {
     // fell back to keyword matching. This assertion pinned the broken id and
     // passed the whole time, because it checks what we send rather than
     // whether the provider accepts it -- a mocked fetch cannot fail a 404.
-    // Checked against Groq's live /v1/models on 2026-08-23 (ADR 0166).
+    // Checked against Groq's live /v1/models on 2026-08-23 (ADR 0190).
     expect(body.model).toBe("openai/gpt-oss-120b");
   });
 

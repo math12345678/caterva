@@ -16,6 +16,7 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { resolvePythonExecutable } from '../../engine/teriumBridge';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const CLI = path.join(REPO_ROOT, 'src', 'cli', 'scientificCLI.ts');
@@ -650,7 +651,22 @@ describe('simulate --resolve: the COMBINE archive re-runs', () => {
   ];
 
   function python(script: string, ...args: string[]): string {
-    return execFileSync('python3', ['-c', script, ...args], {
+    // The SAME interpreter the CLI under test uses, not a bare `python3`.
+    //
+    // These three tests read the archive back with libsedml and
+    // roadrunner. `make setup` installs both into `.venv`, and
+    // `resolvePythonExecutable` is how every product path finds it -- so
+    // hardcoding `python3` here pointed the verification at whatever
+    // interpreter happened to be first on PATH, which on a machine that
+    // followed CONTRIBUTING is the one WITHOUT the dependencies.
+    //
+    // The result was a suite that could not pass on a correctly set-up
+    // machine: `ModuleNotFoundError: No module named 'libsedml'`, raised by
+    // the test's own helper, about a module the project installs. Reusing
+    // the resolver rather than repeating its logic keeps one answer to
+    // "which Python is this project's Python" (TERRIUM_PYTHON, then
+    // .venv, then venv, then PATH).
+    return execFileSync(resolvePythonExecutable(REPO_ROOT), ['-c', script, ...args], {
       cwd: REPO_ROOT,
       encoding: 'utf-8',
     });
@@ -710,7 +726,20 @@ describe('simulate --resolve: the COMBINE archive re-runs', () => {
     const result = JSON.parse(out) as { ok: boolean; problems: string[]; present: string[] };
     expect(result.problems).toEqual([]);
     expect(result.ok).toBe(true);
-    expect(result.present.sort()).toEqual(['manifest.xml', 'model.xml', 'simulation.sedml']);
+    // CITATION.cff is IN the archive on purpose: a result that cites every
+    // measurement it used and not the tool that produced them is the
+    // converse of Katz's objection, and Terium/tests/test_citation_metadata.py
+    // pins the same bundling from the Python side. This list did not have it
+    // and had been stale since the file started being bundled -- unnoticed
+    // because the Python test that asserts it skips when `libsedml` is
+    // absent, and this one failed for that same missing module before it
+    // could ever reach this line.
+    expect(result.present.sort()).toEqual([
+      'CITATION.cff',
+      'manifest.xml',
+      'model.xml',
+      'simulation.sedml',
+    ]);
   });
 
   it('records the time course that actually ran, not a default', () => {

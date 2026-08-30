@@ -2,8 +2,7 @@
 
 Part of [**Terrium**](https://github.com/Terrium-sim/main) — scientific computing for teaching labs.
 
-The simulation engine. 64 files, 38 test modules, 1,229 engine tests.
-
+The simulation engine. 64 files, 38 test modules, 1,252 engine tests.
 Fifteen domains: Michaelis-Menten (plain and competitively inhibited),
 SIR/SEIR epidemiology, PCR amplification, Monte Carlo, Wright-Fisher
 population genetics (single- and two-locus), Lennard-Jones molecular
@@ -36,8 +35,7 @@ Physical impossibility is rejected (`ok=False`); implausible-but-real is
 flagged (`ok=True, flagged=True`), never silently accepted or silently
 rejected.
 
-See [`documents`](https://github.com/Terrium-sim/documents) for the constitution and the 184 ADRs.
-
+See [`documents`](https://github.com/Terrium-sim/documents) for the constitution and the 190 ADRs.
 ## Licence, and one thing worth knowing
 
 Apache-2.0. See [`LICENSE`](https://github.com/Terrium-sim/main/blob/main/LICENSE)

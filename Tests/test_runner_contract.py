@@ -87,35 +87,61 @@ def golden_result(cross_species: bool = False) -> KineticResult:
     )
 
 
-# A stub NCBI could not return, on purpose.
-#
-# `taxon_id_for` calls `enzyme_lookup.fetch_taxon_id`, which is a live HTTP
-# request to NCBI. This file never stubbed it, so the contract assertion read
-# `None` on a machine without a network and `'9606'` on one with -- and the
-# comment beside it explained the None as "a lookup that did not happen",
-# when the lookup happened and merely failed. The runner's own docstring says
-# the call is routed through the module "so the test suite can monkeypatch it
-# and stay offline"; this file simply never did.
-#
-# The value is deliberately not a plausible taxon id. Stubbing Homo sapiens
-# to "9606" would be indistinguishable from the live answer, so the test
-# would keep passing if the stub were removed -- ADR 0128's lesson, that an
-# expected value which could arrive by accident proves nothing. This one can
-# only arrive by crossing the boundary, and it names which organism was asked
-# about, so `taxonId` (measured in) and `requestedTaxonId` (asked about) can
-# be told apart.
-def stub_taxon_id(organism):
-    return f"stub-taxon:{organism}" if organism else None
+def run_main(monkeypatch, fake_resolve, payload, taxon_id=None):
+    """Run the real runner with the kinetic lookup stubbed.
 
+    NCBI is stubbed too, and that is not a detail. `taxon_id_for` calls
+    `enzyme_lookup.fetch_taxon_id`, which is a live HTTP GET to NCBI
+    Taxonomy -- so a test that stubs only the resolver still reaches the
+    network, and its result depends on whether the machine can get there.
+    Measured: this file's shape assertion PASSED with the network blocked
+    and FAILED with it available, because "Homo sapiens" really does
+    resolve to 9606. A contract test that green-lights the shape only
+    while NCBI is unreachable is not pinning the contract; it is
+    reporting the weather.
 
-def run_main(monkeypatch, fake_resolve, payload, taxon_id=stub_taxon_id):
+    `taxon_id` is what the stubbed lookup returns: None for "the lookup
+    found nothing", a string for a resolved id. It is a parameter rather
+    than a fixed None so the emitted-id path is reachable too -- with a
+    hardcoded None, no test in this file could ever see a taxon id
+    actually reach the output, and the two keys could stop being emitted
+    without anything going red.
+    """
     monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", fake_resolve)
-    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", taxon_id)
+    # A callable is accepted as well as a value. The lambda below ignores
+    # the organism, which means every stubbed lookup returns the SAME id --
+    # fine for the shape, and blind to the one thing the two keys exist to
+    # distinguish: `taxonId` is the organism the value was MEASURED in,
+    # `requestedTaxonId` the one the caller ASKED about, and in a
+    # cross-species result they differ. With one value for both, swapping
+    # them changes nothing and no test notices.
+    stub = taxon_id if callable(taxon_id) else (lambda *a, **k: taxon_id)
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", stub)
     stdout = io.StringIO()
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
     monkeypatch.setattr(sys, "stdout", stdout)
     science_agent_runner.main()
     return json.loads(stdout.getvalue())
+
+
+def test_a_resolved_taxon_reaches_the_output(monkeypatch):
+    """The other side of the two taxon keys.
+
+    Every other test here runs with the NCBI lookup returning nothing, so
+    the emitted ids are None in all of them. That pins "absent stays
+    absent" and nothing else: delete the two assignments in the runner and
+    the whole file would still pass. This is the case where the lookup
+    succeeds, so a resolved id has to travel from the lookup to the JSON.
+    """
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: golden_result(),
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
+        taxon_id="9606",
+    )
+    assert result["taxonId"] == "9606"
+    assert result["requestedTaxonId"] == "9606"
 
 
 def test_golden_found_output_shape(monkeypatch):
@@ -153,9 +179,14 @@ def test_golden_found_output_shape(monkeypatch):
         "unit": "mM",
         "organism": "Homo sapiens",
         # The taxon of the organism the value was MEASURED in, and of the
-        # one the caller ASKED about. None here because this test stubs the
-        # resolver and does not stub NCBI -- and None is the honest report
-        # of a lookup that did not happen. It is emphatically NOT a default:
+        # one the caller ASKED about. None here because `run_main` stubs
+        # the NCBI lookup to find nothing -- None is the honest report of a
+        # lookup that came back empty. The earlier version of this comment
+        # said the lookup "did not happen" because the test did not stub
+        # NCBI; that was exactly backwards. Not stubbing it meant the
+        # lookup DID happen, over the network, and this assertion held only
+        # on a machine that could not reach NCBI. See run_main's docstring.
+        # It is emphatically NOT a default:
         # `enzyme_lookup.DEFAULT_TAXON_ID` used to turn exactly this
         # situation into a confident "9606" (see
         # Tests/test_no_default_organism.py).
@@ -163,13 +194,8 @@ def test_golden_found_output_shape(monkeypatch):
         # Both keys are present-and-null rather than absent, so a consumer
         # never has to tell "the runner is too old to emit this" from "the
         # lookup found nothing".
-        # Stubbed (see `stub_taxon_id`), so these assert the value CROSSED
-        # the boundary rather than that a network happened to be absent.
-        # Equal here because the golden fixture measured in the organism the
-        # caller asked about; `test_a_taxon_lookup_failure_is_not_a_default`
-        # covers the other direction.
-        "taxonId": "stub-taxon:Homo sapiens",
-        "requestedTaxonId": "stub-taxon:Homo sapiens",
+        "taxonId": None,
+        "requestedTaxonId": None,
         # A recombinant His-tagged preparation is not the wild-type enzyme
         # (ADR 0092). Emitted by the runner since 2026-08-17; the contract
         # test was not updated with it, so this shape assertion has been
@@ -962,35 +988,32 @@ def test_one_candidate_is_not_an_ambiguity(monkeypatch):
     assert result.get("source") != "ec_ambiguous"
 
 
-def test_a_taxon_lookup_failure_is_not_a_default(monkeypatch):
-    """A taxonomy lookup that fails reports nothing, not "assume human".
+def test_the_two_taxon_keys_are_not_the_same_lookup(monkeypatch):
+    """`taxonId` and `requestedTaxonId` must be told apart.
 
-    `enzyme_lookup.DEFAULT_TAXON_ID` used to read
-    `fetch_taxon_id(organism) or DEFAULT_TAXON_ID`, and `fetch_taxon_id`
-    returns None when NCBI is unreachable or rate-limited -- so a network
-    blip stamped 9606, a human identifier, onto a thermophile's measurement.
-    See Tests/test_no_default_organism.py.
+    Every other test here stubs the lookup with a single value, so both keys
+    come back identical and swapping them in the runner would change no
+    assertion. This one stubs with a function that names the organism it was
+    asked about, which is the only way the difference is visible.
 
-    The runner swallows the exception on purpose: a failed annotation must
-    not sink a Km that resolved. What it must not do is fill the gap.
+    The stub value is deliberately not a plausible taxon id. Stubbing Homo
+    sapiens to "9606" would be indistinguishable from the live answer, so
+    the test would keep passing if the stub were removed -- ADR 0128's
+    lesson, that an expected value which can arrive by accident proves
+    nothing.
     """
-    def explodes(organism):
-        raise RuntimeError("NCBI unreachable")
-
     result = run_main(
         monkeypatch,
-        lambda *a, **k: golden_result(),
+        lambda *a, **k: golden_result(cross_species=True),
         {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
-         "organism": "Homo sapiens", "ecNumber": "1.1.1.27"},
-        taxon_id=explodes,
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27",
+         "allowCrossSpecies": True},
+        taxon_id=lambda organism: f"stub-taxon:{organism}" if organism else None,
     )
-    # The resolution survives...
-    assert result["ok"] is True and result["found"] is True
-    assert result["km"] == 10.73
-    # ...and the annotation is absent rather than invented.
-    assert result["taxonId"] is None
-    assert result["requestedTaxonId"] is None
-    # Present-and-null, not missing: a consumer must not have to tell
-    # "the runner is too old to emit this" from "the lookup found nothing".
-    assert "taxonId" in result and "requestedTaxonId" in result
-    assert "9606" not in json.dumps(result)
+    assert result["taxonId"] == "stub-taxon:Sus scrofa", (
+        "taxonId must be the organism the value was MEASURED in"
+    )
+    assert result["requestedTaxonId"] == "stub-taxon:Homo sapiens", (
+        "requestedTaxonId must be the organism the caller ASKED about"
+    )
+    assert result["taxonId"] != result["requestedTaxonId"]

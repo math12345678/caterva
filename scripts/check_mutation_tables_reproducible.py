@@ -357,7 +357,7 @@ def main() -> int:
             # all. A crash is not a refusal.
             for index, mutation in enumerate(spec.get("mutations") or []):
                 if not isinstance(mutation, dict):
-                    absent = REQUIRED_MUTATION_KEYS
+                    absent = sorted(REQUIRED_MUTATION_KEYS)
                 else:
                     absent = sorted(REQUIRED_MUTATION_KEYS - mutation.keys())
                 if absent:

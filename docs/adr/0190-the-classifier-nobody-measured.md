@@ -1,4 +1,4 @@
-# ADR 0166: The classifier nobody measured
+# ADR 0190: The classifier nobody measured
 
 **Status:** Accepted
 
@@ -76,7 +76,7 @@ misdescribe it — the defect ADR 0164 fixed on a different page.
 The Groq default becomes `openai/gpt-oss-120b`, verified present in Groq's
 live `/v1/models`.
 
-## Correction (ADR 0167)
+## Correction (ADR 0191)
 
 The keyword baseline below — 15/25, 60.0% — is **overstated**, and this
 record is the reason it went unnoticed. Its labelled set was written after
@@ -90,7 +90,7 @@ than by this author, **69.2%**. Neither is 60%.
 
 The LLM arm's 96% and the +36-point gap are subject to the same
 contamination and should be read as "on a set written to probe the keyword
-table", not as an accuracy. [ADR 0167](0167-the-set-that-shared-my-hand.md)
+table", not as an accuracy. [ADR 0191](0191-the-set-that-shared-my-hand.md)
 has the sets, the ablation, and the numbers this one should have reported.
 
 ## Verification

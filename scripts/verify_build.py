@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 import signal
+import shlex
 import subprocess
 import sys
 import time
@@ -48,6 +49,26 @@ API_SERVER_DIR = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-serve
 #: Makefile, not this file. F821 (undefined-name) finds it in under a second.
 #: A linter that is configured and never run reads as coverage and is not.
 TERIUM_DIR = REPO_ROOT / "Terium"
+
+
+#: The interpreter running THIS script, quoted for the shell.
+#:
+#: Every guard below used to be spawned as a bare `python`, which is
+#: whatever PATH resolves -- not the interpreter that started
+#: verify_build, and not necessarily the one `make setup` built. On a
+#: machine with Anaconda first on PATH the result was a run that graded
+#: the tree with an environment the project never installed: the Citation
+#: Metadata guard reported `cffconvert is not installed` and the
+#: Documented Counts guard reported different totals, while both passed
+#: when run directly through `.venv/bin/python3`.
+#:
+#: Neither result was wrong about the interpreter it used. They were
+#: answers to a question nobody asked -- "is the tree fine under some
+#: other Python" -- reported as the verdict on this one.
+#:
+#: `shlex.quote` because a virtualenv can sit under a path with spaces
+#: and `run_command` uses `shell=True`.
+PYTHON = shlex.quote(sys.executable)
 
 
 def run_command(
@@ -152,25 +173,25 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Citation format guard
     guards.append(run_guard(
         "Citation Format Guard",
-        f"python {SCRIPTS_DIR / 'check_citation_format.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_citation_format.py'}"
     ))
     
     # Engine contract guard
     guards.append(run_guard(
         "Engine Contract Guard",
-        f"python {SCRIPTS_DIR / 'check_engine_contract.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_engine_contract.py'}"
     ))
     
     # Dependencies guard
     guards.append(run_guard(
         "Dependencies Guard",
-        f"python {SCRIPTS_DIR / 'check_dependencies_declared.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_dependencies_declared.py'}"
     ))
     
     # Plausibility constants guard
     guards.append(run_guard(
         "Plausibility Constants Guard",
-        f"python {SCRIPTS_DIR / 'check_plausibility_constants.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_plausibility_constants.py'}"
     ))
 
     # No user input may reach a shell. The server spawns Python with the
@@ -179,11 +200,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # has no authentication. A correct thing nobody watches is a coincidence.
     guards.append(run_guard(
         "Subprocess Safety Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_subprocess_safety.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_subprocess_safety.py'} --selftest"
     ))
     guards.append(run_guard(
         "Subprocess Safety Guard",
-        f"python {SCRIPTS_DIR / 'check_subprocess_safety.py'}",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_subprocess_safety.py'}",
         timeout=180,
     ))
 
@@ -194,11 +215,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Goes quiet if the LLM path is ever removed.
     guards.append(run_guard(
         "LLM Disclosure Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_llm_disclosure.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_llm_disclosure.py'} --selftest"
     ))
     guards.append(run_guard(
         "LLM Disclosure Guard",
-        f"python {SCRIPTS_DIR / 'check_llm_disclosure.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_llm_disclosure.py'}"
     ))
 
     # The waitlist form collects an email address -- personal data -- and
@@ -208,11 +229,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Goes quiet if email collection is ever removed.
     guards.append(run_guard(
         "Privacy Notice Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_privacy_notice.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_privacy_notice.py'} --selftest"
     ))
     guards.append(run_guard(
         "Privacy Notice Guard",
-        f"python {SCRIPTS_DIR / 'check_privacy_notice.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_privacy_notice.py'}"
     ))
 
     # A server with no authentication must not be published to every
@@ -221,11 +242,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Goes quiet if authentication is added, same as the guard below.
     guards.append(run_guard(
         "Port Binding Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_port_binding.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_port_binding.py'} --selftest"
     ))
     guards.append(run_guard(
         "Port Binding Guard",
-        f"python {SCRIPTS_DIR / 'check_port_binding.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_port_binding.py'}"
     ))
 
     # The web server has no authentication and /api/jobs/history returns
@@ -234,11 +255,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # audit. Goes quiet if authentication is ever added.
     guards.append(run_guard(
         "Deployment Warning Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_deployment_warning.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_deployment_warning.py'} --selftest"
     ))
     guards.append(run_guard(
         "Deployment Warning Guard",
-        f"python {SCRIPTS_DIR / 'check_deployment_warning.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_deployment_warning.py'}"
     ))
 
     # Business material makes claims to people deciding whether to fund or
@@ -246,7 +267,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # and is read by someone with less ability to verify it.
     guards.append(run_guard(
         "Investor Claims Guard",
-        f"python {SCRIPTS_DIR / 'check_investor_claims.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_investor_claims.py'}"
     ))
 
     # No public page may claim an endorsement that is not on record.
@@ -255,7 +276,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # would be fabricating a credential from a real correspondence.
     guards.append(run_guard(
         "Fabricated Endorsement Guard",
-        f"python {SCRIPTS_DIR / 'check_no_fabricated_endorsements.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_no_fabricated_endorsements.py'}"
     ))
 
     # The seventeen split-repo READMEs are what a stranger arriving from a
@@ -264,11 +285,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # routing anyone to contributing.
     guards.append(run_guard(
         "Published Repo README Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_published_repo_readmes.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_published_repo_readmes.py'} --selftest"
     ))
     guards.append(run_guard(
         "Published Repo README Guard",
-        f"python {SCRIPTS_DIR / 'check_published_repo_readmes.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_published_repo_readmes.py'}"
     ))
 
     # The guard above checks what those seventeen READMEs *say*. This one
@@ -280,11 +301,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # use what they found.
     guards.append(run_guard(
         "Split-Repo Legal Files Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_split_repo_legal_files.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_split_repo_legal_files.py'} --selftest"
     ))
     guards.append(run_guard(
         "Split-Repo Legal Files Guard",
-        f"python {SCRIPTS_DIR / 'check_split_repo_legal_files.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_split_repo_legal_files.py'}"
     ))
 
     # Every shipping surface says Terrium is not affiliated with Tellurium.
@@ -295,7 +316,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # product is read on seven is a disclaimer nobody sees.
     guards.append(run_guard(
         "Non-Affiliation Notice Guard",
-        f"python {SCRIPTS_DIR / 'check_non_affiliation_notice.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_non_affiliation_notice.py'}"
     ))
 
     # Every BRENDA reference printed in the documentation is one that exists.
@@ -307,7 +328,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # own front page, which no later argument undoes. See ADR 0144.
     guards.append(run_guard(
         "Documented Citations Guard",
-        f"python {SCRIPTS_DIR / 'check_documented_citations_are_real.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_documented_citations_are_real.py'}"
     ))
 
     # The importable package is `Terium` (one r); the product is `Terrium`
@@ -316,11 +337,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # `make doctor`, which reports a healthy install.
     guards.append(run_guard(
         "Package Spelling Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_package_spelling.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_package_spelling.py'} --selftest"
     ))
     guards.append(run_guard(
         "Package Spelling Guard",
-        f"python {SCRIPTS_DIR / 'check_package_spelling.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_package_spelling.py'}"
     ))
 
     # Data-source attribution: every licence fact in the source table also
@@ -328,7 +349,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # attribution obligation travels downstream via Apache 2.0 4(d).
     guards.append(run_guard(
         "Data Source Attribution Guard",
-        f"python {SCRIPTS_DIR / 'check_data_source_attribution.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_data_source_attribution.py'}"
     ))
 
     # ADR 0008: modelCitations describes the MODEL. Two domains cited a
@@ -336,7 +357,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # in the table with no reference to the work defining them.
     guards.append(run_guard(
         "Model Citation Guard",
-        f"python {SCRIPTS_DIR / 'check_model_citations_cite_models.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_model_citations_cite_models.py'}"
     ))
 
     # Every dependency carries a recorded grant of permission to use it.
@@ -345,7 +366,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # licence at all.
     guards.append(run_guard(
         "Dependency Licence Guard",
-        f"python {SCRIPTS_DIR / 'check_dependency_licenses.py'}",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_dependency_licenses.py'}",
         timeout=180,
     ))
 
@@ -356,11 +377,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # on an unwatched fact is a coincidence, not a position.
     guards.append(run_guard(
         "Release Artifact Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_release_artifacts.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_release_artifacts.py'} --selftest"
     ))
     guards.append(run_guard(
         "Release Artifact Guard",
-        f"python {SCRIPTS_DIR / 'check_release_artifacts.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_release_artifacts.py'}"
     ))
 
     # Every relative link in a contributor doc resolves. START_HERE.md is
@@ -370,11 +391,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # plausible, wrong path to ADR 0001.
     guards.append(run_guard(
         "Doc Links Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_doc_links.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_doc_links.py'} --selftest"
     ))
     guards.append(run_guard(
         "Doc Links Guard",
-        f"python {SCRIPTS_DIR / 'check_doc_links.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_doc_links.py'}"
     ))
 
     # Documented counts guard -- test/domain counts vs reality, across every
@@ -389,11 +410,11 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # scope survived as long as it did.
     guards.append(run_guard(
         "Documented Counts Guard (self-check)",
-        f"python {SCRIPTS_DIR / 'check_documented_counts.py'} --selftest"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_documented_counts.py'} --selftest"
     ))
     guards.append(run_guard(
         "Documented Counts Guard",
-        f"python {SCRIPTS_DIR / 'check_documented_counts.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_documented_counts.py'}"
     ))
 
     # Python support window stated consistently across requirements.txt,
@@ -402,7 +423,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # the window was found wrong in all three files (ADR 0014).
     guards.append(run_guard(
         "Python Support Claim Guard",
-        f"python {SCRIPTS_DIR / 'check_python_support_claim.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_python_support_claim.py'}"
     ))
 
     # Rule 7 (never `pip install tellurium`) made executable. It was one of
@@ -410,7 +431,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # terium to requirements.txt passed every guard in the repo.
     guards.append(run_guard(
         "Constitution Rules 7+8 Guard",
-        f"python {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
     ))
 
     # The Stage 4 amendment made executable: a guard is not delivered until
@@ -420,7 +441,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # itself (it did, on its first run).
     guards.append(run_guard(
         "Guard Wiring Guard",
-        f"python {SCRIPTS_DIR / 'check_guard_wiring.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_guard_wiring.py'}"
     ))
 
     # The Python/TypeScript process boundary, both directions. Six ADRs
@@ -433,7 +454,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # "does not cross" silently and none of their tests noticed.
     guards.append(run_guard(
         "Runner Boundary Guard",
-        f"python {SCRIPTS_DIR / 'check_runner_boundary.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_runner_boundary.py'}"
     ))
 
     # The generated API contract must use syntax the installed zod actually
@@ -447,7 +468,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # separate guard and not a compile step. See ADR 0030.
     guards.append(run_guard(
         "Generated Client Loads Guard",
-        f"python {SCRIPTS_DIR / 'check_generated_client_loads.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_generated_client_loads.py'}"
     ))
 
     # How much of BRENDA's commentary Terrium can actually read.
@@ -470,12 +491,12 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # "passes only when someone thinks to run it". See ADR 0045.
     guards.append(run_guard(
         "Findings Reach A Surface Guard",
-        f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}"
     ))
 
     guards.append(run_guard(
         "Commentary Coverage Guard",
-        f"python {SCRIPTS_DIR / 'check_commentary_coverage.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_commentary_coverage.py'}"
     ))
 
     # Every simulation domain must be declared in all three API layers
@@ -487,7 +508,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Node toolchain is what is broken.
     guards.append(run_guard(
         "Domain Parity Guard",
-        f"python {SCRIPTS_DIR / 'check_domain_parity.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_domain_parity.py'}"
     ))
 
     # Every hardcoded scientific number must declare its provenance. The
@@ -497,7 +518,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # falsifiable: UNVERIFIED is an allowed answer, silence is not.
     guards.append(run_guard(
         "Literature Inventory Guard",
-        f"python {SCRIPTS_DIR / 'check_literature_inventory.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_literature_inventory.py'}"
     ))
 
     # Two guards were written and left unwired; check_guard_wiring reports
@@ -511,7 +532,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     #   once. A project about provenance must agree about its own terms.
     guards.append(run_guard(
         "License Consistency Guard",
-        f"python {SCRIPTS_DIR / 'check_license_consistency.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_license_consistency.py'}"
     ))
 
     # check_scripts_reachable.py: four times a feature was built, tested,
@@ -520,7 +541,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # scripts/ must be named by something that can spawn it.
     guards.append(run_guard(
         "Scripts Reachable Guard",
-        f"python {SCRIPTS_DIR / 'check_scripts_reachable.py'}"
+        f"{PYTHON} {SCRIPTS_DIR / 'check_scripts_reachable.py'}"
     ))
 
     return guards
@@ -542,7 +563,7 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
     return [
         run_guard(
             "TypeScript Compile Guard",
-            f"python {SCRIPTS_DIR / 'check_typescript_compiles.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_compiles.py'}",
             timeout=300,
         )
     ]
@@ -562,7 +583,7 @@ def run_hygiene_guard() -> List[Tuple[str, bool, str]]:
     return [
         run_guard(
             "Generated Files Guard",
-            f"python {SCRIPTS_DIR / 'check_no_generated_files_tracked.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_no_generated_files_tracked.py'}",
             timeout=180,
         )
     ]
@@ -585,7 +606,7 @@ def run_orphan_guard() -> List[Tuple[str, bool, str]]:
     return [
         run_guard(
             "Orphan Module Guard",
-            f"python {SCRIPTS_DIR / 'check_no_orphan_modules.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_no_orphan_modules.py'}",
             timeout=120,
         )
     ]
@@ -621,7 +642,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
     return [
         run_guard(
             "Vacuous Test Guard",
-            f"python {SCRIPTS_DIR / 'check_no_vacuous_tests.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_no_vacuous_tests.py'}",
             timeout=120,
         ),
         # Third member of the same family. The orphan guard catches code
@@ -638,7 +659,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # quietly".
         run_guard(
             "Disabled Test Guard",
-            f"python {SCRIPTS_DIR / 'check_no_disabled_tests.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_no_disabled_tests.py'}",
             timeout=120,
         ),
         # And the same idea aimed at documentation. An example is a promise
@@ -653,13 +674,13 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # without complaint -- the reassuring number would be the problem.
         run_guard(
             "Static Asset Guard",
-            f"python {SCRIPTS_DIR / 'check_static_assets.py'} "
+            f"{PYTHON} {SCRIPTS_DIR / 'check_static_assets.py'} "
             f"{SCRIPTS_DIR.parent / 'mule' / 'index.html'}",
             timeout=60,
         ),
         run_guard(
             "Example Endpoint Guard",
-            f"python {SCRIPTS_DIR / 'check_example_endpoints.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_example_endpoints.py'}",
             timeout=120,
         ),
         # The TypeScript half of check_no_silent_skips. That guard counts
@@ -670,7 +691,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # no imports) and compares against what is on disk.
         run_guard(
             "TypeScript Suite Discovery Guard",
-            f"python {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
             timeout=240,
         ),
         # ------------------------------------------------------------------
@@ -688,7 +709,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # Documentation promises a command; this runs it.
         run_guard(
             "Documented Command Guard",
-            f"python {SCRIPTS_DIR / 'check_commands_runnable.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_commands_runnable.py'}",
             timeout=120,
         ),
         # The other direction: a command or flag that works and is in no
@@ -696,7 +717,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # commands -- plus seven flags of `simulate --resolve`.
         run_guard(
             "CLI Surface Documentation Guard",
-            f"python {SCRIPTS_DIR / 'check_cli_surface_documented.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_cli_surface_documented.py'}",
             timeout=60,
         ),
         # A script nothing invokes. Dead code is not merely unused, it is
@@ -704,13 +725,13 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # numbers live.
         run_guard(
             "Script Reachability Guard",
-            f"python {SCRIPTS_DIR / 'check_scripts_reachable.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_scripts_reachable.py'}",
             timeout=180,
         ),
         # An ADR that exists and is in no index is an ADR nobody reads.
         run_guard(
             "ADR Index Guard",
-            f"python {SCRIPTS_DIR / 'check_adr_index.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_adr_index.py'}",
             timeout=60,
         ),
         # One licence claim in one place, everywhere. The relicensing to
@@ -718,7 +739,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # statement, not a typo.
         run_guard(
             "Licence Consistency Guard",
-            f"python {SCRIPTS_DIR / 'check_license_consistency.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_license_consistency.py'}",
             timeout=60,
         ),
         # CITATION.cff is how a result cites the tool that produced it, and
@@ -727,7 +748,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # button -- so nothing else would report it.
         run_guard(
             "Citation Metadata Guard",
-            f"python {SCRIPTS_DIR / 'check_citation_cff.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_citation_cff.py'}",
             timeout=60,
         ),
         # A computed finding that reaches no surface has not been reported.
@@ -737,12 +758,12 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # The only thing that settles it is running them. See ADR 0122.
         run_guard(
             "Domain Examples Run",
-            f"python {SCRIPTS_DIR / 'check_domain_examples_run.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_domain_examples_run.py'}",
             timeout=180,
         ),
         run_guard(
             "Finding Reachability Guard",
-            f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'}",
             timeout=120,
         ),
         # ...and one that reaches only ONE of the two front ends has been
@@ -759,12 +780,12 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # and all three mutations are caught now. See ADR 0111.
         run_guard(
             "Both Front Ends Guard (self-check)",
-            f"python {SCRIPTS_DIR / 'check_both_front_ends_read_it.py'} --selftest",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_both_front_ends_read_it.py'} --selftest",
             timeout=60,
         ),
         run_guard(
             "Both Front Ends Guard",
-            f"python {SCRIPTS_DIR / 'check_both_front_ends_read_it.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_both_front_ends_read_it.py'}",
             timeout=180,
         ),
         # The classifier deciding which fields get checked AT ALL. A bug
@@ -774,7 +795,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # ADR 0100.
         run_guard(
             "Finding Reachability Self-Check",
-            f"python {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'} --selftest",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_findings_reach_a_surface.py'} --selftest",
             timeout=60,
         ),
         # Another agent's guard, arrived unwired during this same pass and
@@ -784,7 +805,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # shared harness makes it everyone's problem and nobody's.
         run_guard(
             "Unsourced UI Number Guard",
-            f"python {SCRIPTS_DIR / 'check_no_unsourced_ui_numbers.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_no_unsourced_ui_numbers.py'}",
             timeout=120,
         ),
         # A thrown object literal is not an Error, so every consumer using
@@ -799,7 +820,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # hand-run harness produced a wrong answer. See ADR 0069.
         run_guard(
             "Mutation Harness Self-Check",
-            f"python {SCRIPTS_DIR / 'mutate.py'} --selftest",
+            f"{PYTHON} {SCRIPTS_DIR / 'mutate.py'} --selftest",
             timeout=120,
         ),
         # A mutation table is the evidence a reader is asked to accept, and
@@ -810,7 +831,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # to shrink rather than merely exist.
         run_guard(
             "Mutation Table Reproducibility Guard",
-            f"python {SCRIPTS_DIR / 'check_mutation_tables_reproducible.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_mutation_tables_reproducible.py'}",
             timeout=120,
         ),
         # It shipped with no self-test, enforcing on other people's records a
@@ -820,7 +841,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # an alternative. See ADR 0098.
         run_guard(
             "Mutation Table Guard Self-Check",
-            f"python {SCRIPTS_DIR / 'check_mutation_tables_reproducible.py'} --selftest",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_mutation_tables_reproducible.py'} --selftest",
             timeout=120,
         ),
         # The self-check carries ADR 0079's failing input: a sibling guard's
@@ -840,7 +861,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # exists to prevent.
         run_guard(
             "Third-Party Request Disclosure Guard",
-            f"python {SCRIPTS_DIR / 'check_third_party_requests_disclosed.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_third_party_requests_disclosed.py'}",
             timeout=120,
         ),
         # ruff is configured in pyproject.toml with forty-odd rule families
@@ -851,27 +872,27 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # and is not. See ADR 0093.
         run_guard(
             "Python Bug-Lint Guard",
-            f"python {SCRIPTS_DIR / 'check_python_bug_lints.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_python_bug_lints.py'}",
             timeout=180,
         ),
         run_guard(
             "Unwired Export Guard (self-check)",
-            f"python {SCRIPTS_DIR / 'check_exports_reach_a_caller.py'} --selftest",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_exports_reach_a_caller.py'} --selftest",
             timeout=120,
         ),
         run_guard(
             "Unwired Export Guard",
-            f"python {SCRIPTS_DIR / 'check_exports_reach_a_caller.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_exports_reach_a_caller.py'}",
             timeout=120,
         ),
         run_guard(
             "Thrown Value Guard (self-check)",
-            f"python {SCRIPTS_DIR / 'check_thrown_values_are_errors.py'} --selftest",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_thrown_values_are_errors.py'} --selftest",
             timeout=120,
         ),
         run_guard(
             "Thrown Value Guard",
-            f"python {SCRIPTS_DIR / 'check_thrown_values_are_errors.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_thrown_values_are_errors.py'}",
             timeout=120,
         ),
         # Also another agent's, also arrived unwired, also verified green
@@ -882,7 +903,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
         # rather than merely omitting it.
         run_guard(
             "Hardcoded Assay Condition Guard",
-            f"python {SCRIPTS_DIR / 'check_no_hardcoded_assay_conditions.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_no_hardcoded_assay_conditions.py'}",
             timeout=120,
         ),
     ]
@@ -905,7 +926,7 @@ def run_injection_guard() -> List[Tuple[str, bool, str]]:
     return [
         run_guard(
             "Prompt Injection Guard",
-            f"python {SCRIPTS_DIR / 'check_prompt_injection.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_prompt_injection.py'}",
             timeout=360,
         )
     ]
@@ -925,7 +946,7 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
         tests.extend(
             run_guard(
                 f"Python Test: {test_file}",
-                f"python -m pytest {test_file} -v",
+                f"{PYTHON} -m pytest {test_file} -v",
                 cwd=TERIUM_DIR
             )
             for test_file in test_files
@@ -968,7 +989,7 @@ def run_live_citation_guard() -> List[Tuple[str, bool, str]]:
     return [
         run_guard(
             "Live Citation Verification",
-            f"python {SCRIPTS_DIR / 'verify_citations_live.py'}",
+            f"{PYTHON} {SCRIPTS_DIR / 'verify_citations_live.py'}",
             timeout=180,
         )
     ]
@@ -982,7 +1003,7 @@ def run_rng_guard() -> List[Tuple[str, bool, str]]:
     if rng_guard.exists():
         guards.append(run_guard(
             "RNG Convention Guard",
-            f"python {rng_guard}"
+            f"{PYTHON} {rng_guard}"
         ))
     
     return guards
@@ -1063,24 +1084,51 @@ def main() -> int:
         ts_guards = run_typescript_guards()
         total_failures += print_results("TypeScript Guards", ts_guards)
 
-        # Offline, ~30s, and this repository is written to unattended by
-        # several AI agents that read each other's files -- so it runs in
-        # every mode rather than behind the slow-test flag.
-        injection_guards = run_injection_guard()
-        total_failures += print_results("Prompt Injection Guard", injection_guards)
+    # EVERYTHING BELOW IS OUTSIDE THAT `if`, AND USED NOT TO BE.
+    #
+    # Four groups sat inside the --no-typescript branch, so the flag
+    # documented as "Skip TypeScript tests" also switched off the
+    # prompt-injection scan, the orphan-module check, the 22-guard test
+    # honesty group -- ADR index, mutation-table reproducibility, CLI
+    # surface, licence consistency, bug-lints among them -- and the check
+    # that build output has not been committed. One of the twenty-five is
+    # about TypeScript compiling.
+    #
+    # Measured: `--quick` reported 9 failures and `--quick --no-typescript`
+    # reported 4 on the same tree, and the five that vanished included ADR
+    # Index, Mutation Table Reproducibility and Prompt Injection. A flag
+    # that makes a tree look cleaner by not looking is the shape this
+    # repository exists to refuse.
+    #
+    # Two of them carry comments insisting they run in every mode. Those
+    # comments were true about the intent and false about the code, which
+    # is worse than no comment: they are the reason nobody re-read the
+    # indentation.
+    #
+    # None of the four needs Node. The Node dependency is inside
+    # check_typescript_compiles.py, which correctly reports every
+    # workspace as NOT type-checked when there is no local typescript --
+    # so gating THAT on the flag is right, and gating these on it was an
+    # indentation error with a rationale written over the top.
 
-        orphan_guards = run_orphan_guard()
-        total_failures += print_results("Orphan Module Guard", orphan_guards)
+    # Offline, ~30s, and this repository is written to unattended by
+    # several AI agents that read each other's files -- so it runs in
+    # every mode rather than behind the slow-test flag.
+    injection_guards = run_injection_guard()
+    total_failures += print_results("Prompt Injection Guard", injection_guards)
 
-        # Runs in quick mode too: it is a syntactic scan of the test files,
-        # costs under a second, and the thing it catches is invisible in a
-        # test summary by construction. A guard against tests that cannot
-        # fail is worth little if it only runs in the slow path.
-        vacuous_guards = run_vacuous_test_guard()
-        total_failures += print_results("Test Honesty Guards", vacuous_guards)
+    orphan_guards = run_orphan_guard()
+    total_failures += print_results("Orphan Module Guard", orphan_guards)
 
-        hygiene_guards = run_hygiene_guard()
-        total_failures += print_results("Generated Files Guard", hygiene_guards)
+    # Runs in quick mode too: it is a syntactic scan of the test files,
+    # costs under a second, and the thing it catches is invisible in a
+    # test summary by construction. A guard against tests that cannot
+    # fail is worth little if it only runs in the slow path.
+    vacuous_guards = run_vacuous_test_guard()
+    total_failures += print_results("Test Honesty Guards", vacuous_guards)
+
+    hygiene_guards = run_hygiene_guard()
+    total_failures += print_results("Generated Files Guard", hygiene_guards)
 
     # Live citation guard (network; opt-in so offline builds stay green)
     if args.live:

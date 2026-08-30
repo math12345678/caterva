@@ -44,7 +44,24 @@ describe('scientific report', () => {
     // was written about.
     const { status, out } = run(['report']);
     expect(status).toBe(1);
-    expect(out).toContain('scientific catalog 1.1.1.27');
+
+    // Asserted on the CLAIM -- that the refusal hands you `catalog` as the
+    // next command -- not on one example invocation of it.
+    //
+    // The old assertion was `toContain('scientific catalog 1.1.1.27')`,
+    // and it broke when the message switched its example from an EC number
+    // to an enzyme name. Nothing about the behaviour changed: both forms
+    // are real (`catalog` takes a positional EC or `--enzyme NAME`), the
+    // refusal still points at `catalog`, and the test still failed. A test
+    // pinned to which example the prose happens to use reports a reworded
+    // sentence as a broken feature, and the next person's cheapest fix is
+    // to paste the new wording in -- which teaches nothing and breaks again.
+    expect(out).toMatch(/scientific catalog\b/);
+
+    // The reason it is worth running, which is the part a student needs:
+    // BRENDA's label is not the obvious one. This is the substance of
+    // ADR 0124 and is asserted separately from the command name, so a
+    // message that named `catalog` without saying why still fails.
     expect(out).toContain('(S)-lactate');
   }, 120_000);
 

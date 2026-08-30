@@ -19,7 +19,7 @@ thinks to include those.
 
 The vocabulary that would fix it is sitting in the fixtures, and reading it
 off them is precisely what must not happen: terms lifted from the test set
-make the test pass and measure nothing. That is ADR 0167's shared-author
+make the test pass and measure nothing. That is ADR 0191's shared-author
 failure one level down — instead of writing the questions and the vocabulary,
 one would be writing the vocabulary *from* the questions.
 
@@ -35,7 +35,7 @@ keyword table. Mistral was chosen because it authored one fixture and not the
 other two, so the Groq and OpenRouter sets stayed held-out for this change.
 
 It produced 251 terms across 13 domains, filtered for length (≥4 characters,
-after ADR 0168's `"ki"` detour), for genericness, and for cross-domain
+after ADR 0192's `"ki"` detour), for genericness, and for cross-domain
 collisions.
 
 **The approach does not work, and the code is reverted.**

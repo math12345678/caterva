@@ -1,4 +1,4 @@
-# ADR 0168: Mentioning a thing to exclude it
+# ADR 0192: Mentioning a thing to exclude it
 
 **Status:** Accepted
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-Four queries from ADR 0167's LLM-authored fixtures were classified as
+Four queries from ADR 0191's LLM-authored fixtures were classified as
 competitive inhibition:
 
 > "...as I add more substrate, **no inhibitor** involved."
@@ -80,7 +80,7 @@ selected the inhibition model. The cause was `"ki"` — a two-character keyword
 this record's predecessor added — matching inside `"la**cki**ng"`. Negation
 could not help, because the fragment sits inside a word no negator precedes.
 
-The obvious repair was to restore the word-boundary regex ADR 0167 deleted.
+The obvious repair was to restore the word-boundary regex ADR 0191 deleted.
 Measured, it **costs** accuracy: 82.1% → 80.8% and 54.2% → 52.8%, with a
 quarter more fallbacks, because boundaries also stop `"decay"` matching
 `"decaying"`.
@@ -90,7 +90,7 @@ whose scoring assumes terms are long enough to mean something. `ki` is a
 parameter name, not something a student writes in a sentence, and
 `extractParameterOverrides` already reads `ki=0.5` on its own path. It was
 removed from the keyword list and the matcher left alone — which vindicates
-ADR 0167's deletion rather than reversing it, and narrows its lesson to:
+ADR 0191's deletion rather than reversing it, and narrows its lesson to:
 *check the shortest term in the table before reaching for the matcher.*
 
 ## A fixture that was not a measurement
@@ -113,7 +113,7 @@ presented as a result.
 
 `make classifier-bench` — `runKeywordBenchmark.ts` — scores every labelled
 set offline, from committed fixtures, with no API key. It prints one row per
-set and **refuses to print an aggregate**, because ADR 0167 established that
+set and **refuses to print an aggregate**, because ADR 0191 established that
 this classifier has no single accuracy; a mean over 54.2% and 82.1% describes
 no reader's situation.
 

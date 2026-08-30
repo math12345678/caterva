@@ -1828,7 +1828,7 @@ function isNegatedAt(lowerText: string, index: number): boolean {
  * preceded by a negator. This is a genuinely shallow mechanism: it cannot
  * represent scope, and "not sure how the inhibitor works" reads as negated
  * when it is not. Whether that trade is worth taking is a measurement, and
- * it is in ADR 0168 rather than in this comment.
+ * it is in ADR 0192 rather than in this comment.
  */
 /**
  * Every position at which `term` occurs in `lowerText`.
@@ -1836,7 +1836,7 @@ function isNegatedAt(lowerText: string, index: number): boolean {
  * Substring, not word-boundary. That decision has now been made twice and
  * measured twice, and the second time nearly went the other way.
  *
- * ADR 0167 deleted a word-boundary regex because across 131 queries it
+ * ADR 0191 deleted a word-boundary regex because across 131 queries it
  * changed no classification. Then this record's vocabulary added `"ki"` --
  * two characters, a genuine keyword for the inhibition model -- and `"ki"`
  * occurs inside `"lacking"`. "Run it lacking an inhibitor." selected the
@@ -1875,7 +1875,7 @@ function matchesTerm(text: string, term: string): boolean {
 /**
  * Classify a query to a simulation domain by scoring, not by table order.
  *
- * The previous rule was first-match-wins over an ordered list, and ADR 0166
+ * The previous rule was first-match-wins over an ordered list, and ADR 0190
  * measured what that costs. Because `mm_competitive_inhibition` sits early
  * and lists the bare word "inhibition", and `pcr` lists the bare word
  * "cycles", an earlier domain's single generic word beat a later domain's
@@ -1927,7 +1927,7 @@ function distinctiveTerms(child: DomainDefaults, parent: DomainDefaults): string
  *
  * The obvious failure mode is over-promotion: a query mentioning an
  * inhibitor only in passing gets the inhibition model. Two things bound it
- * -- the negation handling of ADR 0168, which is why "no inhibitor involved"
+ * -- the negation handling of ADR 0192, which is why "no inhibitor involved"
  * does not promote, and the requirement that the term be distinctive. What
  * remains is measured in ADR 0169 rather than argued here.
  */

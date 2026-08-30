@@ -14,20 +14,48 @@ import {
   elbowPath, fracturePath, kineticsSeries, plotToPath, plotPoint, envelopePath
 } from '../lib/geometry.js';
 
-/** Interactive node scaffolding: focus ring + halo + a11y wiring. */
-function interactive(group, { id, kind, name, box, shape }) {
+/**
+ * Interactive node scaffolding: focus ring + halo + a11y wiring.
+ *
+ * RECTANGLES ONLY, and that is now stated rather than branched on.
+ *
+ * This took a `shape` parameter and chose a circular ring when it was
+ * `'circle'`. Nothing ever passed it. `shape` appeared exactly three
+ * times in the whole `mule/` tree -- this parameter and its two
+ * comparisons -- across ten call sites, and every box supplied is
+ * `{x, y, w, h}`. So `shape` was always `undefined`, both ternaries
+ * always took the else branch, and the circular half had never executed.
+ *
+ * Removing it cannot change what renders: that is a proof rather than an
+ * expectation, since the condition was unsatisfiable. It was found by
+ * type-checking this directory for the first time -- nine of the
+ * seventeen findings were this one function, reported once per caller.
+ *
+ * If a circular node is ever added, this needs the branch back AND a
+ * caller that passes the shape. Half of that arrangement, sitting here
+ * unreachable, is indistinguishable from support that exists.
+ *
+ * @param {SVGGElement} group
+ * @param {{ id: string, kind: string, name: string,
+ *           box: { x: number, y: number, w: number, h: number } }} node
+ */
+function interactive(group, { id, kind, name, box }) {
   group.setAttribute('tabindex', '0');
   group.setAttribute('role', 'button');
   group.setAttribute('data-node', id);
   group.setAttribute('data-kind', kind);
   group.setAttribute('aria-label', name);
   const pad = 7;
-  const ringBox = shape === 'circle'
-    ? s('circle', { class: 'focus-ring', cx: box.cx, cy: box.cy, r: box.r + pad })
-    : s('rect', { class: 'focus-ring', x: box.x - pad, y: box.y - pad, width: box.w + pad * 2, height: box.h + pad * 2 });
-  const halo = shape === 'circle'
-    ? s('circle', { class: 'halo', cx: box.cx, cy: box.cy, r: box.r + pad * 2 })
-    : s('rect', { class: 'halo', x: box.x - pad * 2, y: box.y - pad * 2, width: box.w + pad * 4, height: box.h + pad * 4 });
+  const ringBox = s('rect', {
+    class: 'focus-ring',
+    x: box.x - pad, y: box.y - pad,
+    width: box.w + pad * 2, height: box.h + pad * 2,
+  });
+  const halo = s('rect', {
+    class: 'halo',
+    x: box.x - pad * 2, y: box.y - pad * 2,
+    width: box.w + pad * 4, height: box.h + pad * 4,
+  });
   group.appendChild(halo);
   group.appendChild(ringBox);
   return group;
@@ -292,9 +320,12 @@ function buildSubstrate() {
      now lives in the sheet margin where a drawing's legend belongs, so here
      only a quiet index mark remains, pinned to the structure it names. */
   const lod = s('g', { class: 'tier-titles' });
-  [
+  // Annotated because the literal mixes numbers and strings, so `y` infers
+  // as `string | number` and `y - 3` below is unchecked. Every entry is a
+  // number today; the annotation is what keeps that true.
+  /** @type {Array<[number, string]>} */ ([
     [212, '01'], [470, '02'], [800, '03'], [1330, '04'], [1394, '05'], [1640, '06']
-  ].forEach(([y, index]) => {
+  ]).forEach(([y, index]) => {
     lod.appendChild(s('text', {
       class: 'tier-title-index', x: 118, y, 'text-anchor': 'end', text: `TIER ${index}`
     }));

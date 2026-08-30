@@ -167,6 +167,42 @@ PERMISSION: dict[str, tuple[str, str]] = {
     "pytest": ("MIT", "Use, copy, modify, distribute, sell."),
     "pytest-timeout": ("MIT", "Use, copy, modify, distribute, sell."),
     "hypothesis": ("MPL-2.0", "File-level copyleft; Terrium does not modify it."),
+    "ruff": (
+        "MIT",
+        "Lints for bug-class findings (scripts/check_python_bug_lints.py). "
+        "Read from the LICENSE the wheel ships "
+        "(ruff-0.11.11.dist-info/licenses/LICENSE): 'MIT License, "
+        "Copyright (c) 2022 Charles Marsh'. MIT grants use, copy, modify, "
+        "merge, publish, distribute, sublicense and sell, on condition the "
+        "copyright and permission notice are retained.",
+    ),
+    "mypy": (
+        "MIT",
+        "Static type checker, configured in pyproject.toml's [tool.mypy] "
+        "since before it was installed by anything. Read from the LICENSE "
+        "the wheel ships (mypy-1.15.0.dist-info/LICENSE): 'Mypy (and mypyc) "
+        "are licensed under the terms of the MIT license'. MIT grants use, "
+        "copy, modify, merge, publish, distribute, sublicense and sell, on "
+        "condition the copyright and permission notice are retained.",
+    ),
+    "types-pyyaml": (
+        "Apache-2.0",
+        "Type stubs for PyYAML, so mypy can check the workflow-parsing "
+        "guards. Read from the LICENSE the wheel ships: 'The \"typeshed\" "
+        "project is licensed under the terms of the Apache license', and "
+        "the License-Expression metadata says Apache-2.0. Apache-2.0 grants "
+        "use, reproduction and distribution, with the notice retained.",
+    ),
+    "pyyaml": (
+        "MIT",
+        "Parses the GitHub workflow for scripts/check_ci_toolchain.py. "
+        "Read from the LICENSE the wheel itself ships "
+        "(pyyaml-6.0.3.dist-info/licenses/LICENSE), not from a package "
+        "index: Copyright (c) 2017-2021 Ingy dot Net and (c) 2006-2016 "
+        "Kirill Simonov, granting use, copy, modify, merge, publish, "
+        "distribute, sublicense and sell, on condition the copyright and "
+        "permission notice are retained in all copies.",
+    ),
     "cffconvert": (
         "Apache-2.0",
         "Copyright 2018 The Citation File Format Developers. Read from the "

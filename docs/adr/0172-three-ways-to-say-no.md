@@ -12,7 +12,7 @@ turned out to be three separate configuration failures, none of which
 anything in Terrium reported:
 
 - **Groq** — the configured model `llama-3.3-70b-versatile` had been retired
-  and returned HTTP 404 (ADR 0166).
+  and returned HTTP 404 (ADR 0190).
 - **SiliconFlow** — key valid, account balance empty. It answers **HTTP 200**
   with an error body.
 - **TokenRouter** — the key is malformed; the API wants a `tr_` prefix.
@@ -90,7 +90,7 @@ the content is `''`, at 64 it is `'ok'`.
 
 **A check that condemns something working is worse than no check**, because
 the report is acted on: this one would have sent somebody to fix the only
-provider that had just produced every measurement in ADR 0167 through 0170.
+provider that had just produced every measurement in ADR 0191 through 0170.
 Fixed by raising the budget to 256 *and* by treating `finish_reason: "length"`
 with empty content as `ok` — the key authenticated, the model existed, tokens
 were generated. Both halves are asserted, including that empty content for
@@ -117,7 +117,7 @@ Full api-server suite: **748 tests, all passing** — 18 of them new.
 
 The original question now has a one-line answer, and so does its follow-up:
 *which* provider. `/pipeline/status` already reports whether a provider is
-selected (ADR 0166); this reports whether the selected one works, which is a
+selected (ADR 0190); this reports whether the selected one works, which is a
 different fact and was the one nobody had.
 
 **Two things for the operator, neither a code defect:**
@@ -131,7 +131,7 @@ in this repository can fix them.
   "invalid_api_key". A vendor phrasing the same refusal differently falls
   through to the raw HTTP line: honest, but unhelpful, and untested.
 - **It is not a capacity test.** A 429 is reported as `broken` with the note
-  that the key works. One probe says nothing about throughput, and ADR 0166's
+  that the key works. One probe says nothing about throughput, and ADR 0190's
   rate-limit trap is a reminder that free tiers fail under load in ways a
   single request never shows.
 - **One model per provider.** Whichever `LLM_MODEL` or the provider default

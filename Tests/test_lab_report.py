@@ -166,20 +166,31 @@ def test_the_absence_of_refusals_is_stated_rather_than_left_blank():
     withheld" is a claim, and it is the one a reader wants.
 
     CONSTRUCTS THE EMPTY CASE, rather than hoping the default has one.
-    The first version asserted on `report()` and passed only because that
-    fixture happened to resolve without refusing. When the tissue-source
-    check landed -- the fixture's Km differs between diseased and healthy
-    breast, which is a real refusal -- the default grew a refusal and this
-    test went red while nothing it describes had broken.
+    Both halves of this were written twice, independently, and each caught
+    something the other did not -- so both are kept.
 
-    A test that reaches its branch by luck reports on the fixture, not on
-    the code. `resolved={}` reaches it on purpose: every parameter was
-    supplied, so there is nothing to withhold, which is exactly the
-    sentence under test.
+    The first version asserted on the shared `report()` fixture and passed
+    only because that fixture happened to resolve without refusing. The
+    default resolves a real km whose candidate rows mix diseased and healthy
+    breast tissue, so it carries a source-mixture refusal: this test was
+    asserting the no-refusals sentence against a document that HAD a
+    refusal, and had been failing rather than covering the branch it names.
+    The else-branch in `_refusals_section` is reachable only by a report with
+    nothing withheld, and no test built one. `resolved={}` builds it.
+
+    THE REFUSAL LIST IS ASSERTED EMPTY FIRST. Without that, a future change
+    that stopped emitting refusals entirely would make this test pass for
+    exactly the wrong reason -- the document would be silent and this would
+    read that silence as "nothing was withheld".
     """
-    text = report(resolved={}).markdown
+    result = report(resolved={})
+    assert result.refusals == []
+    text = result.markdown
     assert "## What Terrium would not do" in text
-    assert "Nothing was withheld" in text
+    assert (
+        "Nothing was withheld: every parameter resolved to a cited value "
+        "or was supplied by you." in text
+    )
 
     # And the claim must be conditional. Emitting that sentence
     # unconditionally would satisfy the assertion above while telling a

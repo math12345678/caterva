@@ -313,13 +313,15 @@ counts-fix: check-python
 # What CI will run, in CI's order, as far as a laptop can go.
 pr: guards test
 	@echo ""
-	@echo "Local checks passed. Two things CI runs that this did not:"
+	@echo "Local checks passed. Three things CI runs that this did not:"
 	@echo ""
 	@echo "  - scripts/check_codegen_loads.py   (needs Node + pnpm install)"
+	@echo "  - pnpm run typecheck               (does the TypeScript COMPILE)"
 	@echo "  - the api-server TypeScript suite  (see RUN_TESTS.md)"
 	@echo ""
-	@echo "Both need a pnpm install in Science-Agent-Pipeline. If you touched"
-	@echo "the API server or the OpenAPI spec, run them; see RUN_TESTS.md."
+	@echo "All three need a pnpm install in Science-Agent-Pipeline. If you"
+	@echo "touched the API server, the landing app or the OpenAPI spec, run"
+	@echo "them; see RUN_TESTS.md."
 
 # The first thing to run, and the only one that needs nothing but `make
 # setup`. No network, no BRENDA account, no Node: it drives the same

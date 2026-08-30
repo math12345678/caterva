@@ -83,7 +83,7 @@ describe("a provider with no key", () => {
 });
 
 describe("every way a provider says no", () => {
-  it("names a retired model (the Groq failure from ADR 0166)", async () => {
+  it("names a retired model (the Groq failure from ADR 0190)", async () => {
     const r = await probeProvider(
       "t",
       CONFIG,

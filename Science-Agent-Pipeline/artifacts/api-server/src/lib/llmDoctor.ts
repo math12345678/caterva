@@ -6,7 +6,7 @@
  * that nothing reported:
  *
  * - Groq's default model `llama-3.3-70b-versatile` had been retired and
- *   returned HTTP 404 (ADR 0166).
+ *   returned HTTP 404 (ADR 0190).
  * - SiliconFlow's key was valid and its account balance was empty, so every
  *   request failed with a 200-shaped error body (ADR 0170).
  * - TokenRouter's key was malformed -- the API wants a `tr_` prefix -- so it

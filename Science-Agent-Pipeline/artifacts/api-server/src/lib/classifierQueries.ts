@@ -3,7 +3,7 @@
  *
  * Split into two sets, and the split is the point.
  *
- * `dev` is the original set from ADR 0166. It was written *after* reading
+ * `dev` is the original set from ADR 0190. It was written *after* reading
  * the keyword table, specifically probing orderings that looked fragile.
  * That makes it good at finding defects and disqualifying as evidence that a
  * fix generalises: tuning a classifier until it passes the set that was

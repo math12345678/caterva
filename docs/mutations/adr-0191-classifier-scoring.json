@@ -1,8 +1,8 @@
 {
   "_why": [
-    "ADR 0167's mutation table, re-derived under scripts/mutate.py.",
+    "ADR 0191's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "ADR 0167 replaced first-match-wins with specificity scoring and widened",
+    "ADR 0191 replaced first-match-wins with specificity scoring and widened",
     "the keyword vocabulary from each domain's definition. The interesting",
     "result was an ablation, not the headline: scoring alone moved the",
     "independent set by zero points, and only became load-bearing once the",
@@ -21,7 +21,7 @@
     "cannot be caught because the code does nothing is a signal about the code,",
     "not a gap in the suite.",
     "",
-    "S3 restores the fallback-reported-as-a-match collapse, which ADR 0166",
+    "S3 restores the fallback-reported-as-a-match collapse, which ADR 0190",
     "fixed and which this record's held-out reasoning depends on: if a",
     "fallback cannot be seen, the fallback count that exposed the shared-",
     "author bias cannot be seen either.",
@@ -32,7 +32,7 @@
     "tests that assumption. The ADR says so; a set file implying coverage",
     "would overstate the evidence.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0167-classifier-scoring.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0191-classifier-scoring.json"
   ],
   "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/classifierEval.test.ts src/__tests__/llmAuthoredQueries.test.ts src/__tests__/llmConfigState.test.ts",
   "mutations": [
@@ -49,7 +49,7 @@
       "id": "S3",
       "description": "the fallback reports itself as a genuine match again",
       "_claimed": "caught by the three-state tests and the fallback bound",
-      "_note": "ADR 0166's defect, restored. The domain returned is unchanged, so every test asserting only on the domain still passes. This is the mutation that would let a future shared-author fixture look independent: with no visible fallback count, 'matched nothing' and 'answered mm' are one fact again.",
+      "_note": "ADR 0190's defect, restored. The domain returned is unchanged, so every test asserting only on the domain still passes. This is the mutation that would let a future shared-author fixture look independent: with no visible fallback count, 'matched nothing' and 'answered mm' are one fact again.",
       "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
       "find": "  return { defaults: fallback, matched: false };",
       "replace": "  return { defaults: fallback, matched: true };"

@@ -1,4 +1,4 @@
-# ADR 0167: The set that shared my hand
+# ADR 0191: The set that shared my hand
 
 **Status:** Accepted
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-ADR 0166 measured the keyword domain classifier at **60%** and left it
+ADR 0190 measured the keyword domain classifier at **60%** and left it
 unrepaired, naming the repair as a separate decision. This is that decision,
 and the first thing it found was that 60% was wrong.
 
@@ -21,7 +21,7 @@ paper, without consulting the keyword list, before any tuning. On it the
 committed classifier scored **17.9%**, not 60%: **21 of 28** naturally-phrased
 queries matched no keyword at all and were answered `mm` by fallback.
 
-So the baseline ADR 0166 published overstated the keyword table by roughly
+So the baseline ADR 0190 published overstated the keyword table by roughly
 forty points, and understated how much the LLM was carrying.
 
 ## Decision
@@ -117,7 +117,7 @@ Mutation results, `docs/mutations/adr-0167-classifier-scoring.json`:
 | S3 | the fallback reports itself as a genuine match | yes |
 
 Full api-server suite: **58 files, 655 tests, all passing.** The eight tests
-ADR 0166 wrote to pin the old defects failed on purpose when this landed,
+ADR 0190 wrote to pin the old defects failed on purpose when this landed,
 each naming the defect it had pinned; they now assert the corrected routing.
 
 ## Consequences
