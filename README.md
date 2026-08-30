@@ -35,6 +35,25 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
 ## Quick start
 
+> **Not public yet.** (Removed 2026-08-23 on a probe that had
+> silently authenticated through a developer keychain; restored
+> 2026-08-29 after CI — which holds no credentials — and an
+> unauthenticated API check both said private. The probe now
+> strips credential helpers so this cannot recur.)
+>
+> **Not public yet.** The command below needs access today: every
+> `Terrium-sim` repository is still private, and `git ls-remote` on any of
+> them prompts for a username. If you are reading this without a GitHub
+> account that has been added, **line one is as far as you get** — that is a
+> fact about the repository, not a mistake you made.
+>
+> `scripts/check_quickstart_clone_works.py` reports this on every CI run and
+> will keep the build red until it stops being true
+> ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md)). This
+> notice is checked in the other direction too: publish the repositories and
+> `check_availability_notice_matches_reality.py` fails until it is deleted,
+> so it cannot outlive the thing it describes.
+
 ```bash
 git clone https://github.com/Terrium-sim/main.git
 cd main
