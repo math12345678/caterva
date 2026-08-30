@@ -196,11 +196,26 @@ export default function InteractiveShell({
   const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState<number | null>(null);
   const [showHints, setShowHints] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Scrolling the CONTAINER's own scrollTop, not scrollIntoView on a
+  // sentinel child. scrollIntoView({block:"end"}) does not stop at the
+  // nearest scrollable ancestor -- per spec it walks the WHOLE chain,
+  // including window, aligning the target to the bottom of every
+  // scrollable box it passes through. On mount, with this shell sitting
+  // partway down a 17,900px landing page, that scrolled the entire
+  // window ~3,800px on load -- every visitor landed on a solid-black
+  // screen with no visible content, because the real hero sat far above
+  // the viewport. Measured: window.scrollY was 3831.5 on a fresh load
+  // before this fix, with no user scroll action.
+  //
+  // Setting scrollTop directly can never move an ancestor; it is the
+  // standard pattern for auto-scrolling a bounded chat/log view.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const el = containerRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [lines]);
 
   const push = (kind: ShellLine["kind"], content: ReactNode) =>
@@ -461,6 +476,7 @@ export default function InteractiveShell({
 
   return (
     <div
+      ref={containerRef}
       onClick={() => inputRef.current?.focus()}
       className="cursor-text h-64 md:h-72 overflow-y-auto pr-1 [scrollbar-width:thin] relative"
     >
@@ -511,7 +527,7 @@ export default function InteractiveShell({
             )}
           </div>
         </form>
-        <div ref={bottomRef} />
+
       </div>
     </div>
   );
