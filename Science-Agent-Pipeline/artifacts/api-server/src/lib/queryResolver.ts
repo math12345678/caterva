@@ -1487,6 +1487,23 @@ const PARAMETER_PATTERN = new RegExp(
 );
 
 /**
+ * A token that is a known parameter name and NOTHING else -- no digits, no
+ * `=`/`:` attached. Used to detect "km 5" style pairs, where the name and
+ * the value are two SEPARATE whitespace-split tokens.
+ *
+ * `PARAMETER_PATTERN` above already makes its `[=:]?` optional, which reads
+ * as if it were meant to catch this shape -- and its own "Fallback" comment
+ * gives "km 5" as the worked example. It cannot: `query.split(/\s+/)`
+ * yields "km" and "5" as two independent tokens, and a regex tested against
+ * one token can never see the next one. No amount of rewriting that single
+ * regex fixes this; the extraction loop has to look at the PAIR.
+ */
+const BARE_PARAMETER_NAME_PATTERN = new RegExp(`^(${PARAMETER_NAMES})$`, "i");
+
+/** A bare numeric token: "5", "0.4", "1e-3" -- no key, no unit suffix. */
+const BARE_NUMBER_PATTERN = /^[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?$/i;
+
+/**
  * Validation errors for malformed array overrides.
  */
 export class ArrayOverrideValidationError extends Error {
@@ -1618,7 +1635,9 @@ export function extractParameterOverrides(
   // Keys already captured as arrays are skipped so a partial token
   // (e.g. `starting_frequencies=0.5,` from a space-split list) cannot
   // overwrite the validated array with a scalar.
-  for (const token of query.split(/\s+/)) {
+  const tokens = query.split(/\s+/);
+  for (let tokenIdx = 0; tokenIdx < tokens.length; tokenIdx++) {
+    const token = tokens[tokenIdx]!;
     // Try key=value or key:value pattern first
     const kvMatch = PARAMETER_TOKEN_PATTERN.exec(token);
     if (kvMatch) {
@@ -1663,7 +1682,8 @@ export function extractParameterOverrides(
       }
     }
 
-    // Fallback: try scalar match without explicit delimiter (e.g. "km 5")
+    // Fallback: try scalar match without explicit delimiter (e.g. "km5",
+    // glued with no space at all).
     const scalarMatch = PARAMETER_PATTERN.exec(token);
     if (scalarMatch) {
       const key = scalarMatch[1]!.toLowerCase();
@@ -1671,6 +1691,35 @@ export function extractParameterOverrides(
       const value = Number.parseFloat(scalarMatch[2]!);
       if (Number.isFinite(value)) {
         overrides[key] = value;
+      }
+      continue;
+    }
+
+    // Fallback: "km 5" -- name and value as two separate tokens, the shape
+    // this function's own docstring and the "Fallback" comment above both
+    // promised and neither could deliver, because a single-token regex
+    // cannot see the next token. Consuming the pair here is what makes it
+    // real. Only a BARE name (no `=`/`:`/digits already on it -- ruled out
+    // by every branch above reaching here) followed by a BARE number
+    // qualifies, so "km=5 10" or "beta: x" cannot accidentally pair with
+    // an unrelated neighboring number.
+    if (BARE_PARAMETER_NAME_PATTERN.test(token) && tokenIdx + 1 < tokens.length) {
+      const key = token.toLowerCase();
+      const nextToken = tokens[tokenIdx + 1]!;
+      if (!arrayKeys.has(key) && BARE_NUMBER_PATTERN.test(nextToken)) {
+        if (ARRAY_VALIDATORS[key] === undefined) {
+          const value = Number.parseFloat(nextToken);
+          if (Number.isFinite(value)) {
+            overrides[key] = value;
+            tokenIdx++; // consume the value token so it is not re-scanned
+          }
+        }
+        // An array parameter named bare ("starting_frequencies 0.5") is
+        // left unmatched here rather than rejected: unlike `key=0.5`,
+        // typing the name and a lone number with a space is at least as
+        // likely to be prose ("starting_frequencies 0.5 each" is not
+        // natural) as an attempted override, so silence is safer than an
+        // error a plain sentence could trigger by coincidence.
       }
     }
   }
@@ -2150,10 +2199,24 @@ export async function resolveQuery(
     if (missing.length > 0) {
       const latencyMs = Date.now() - startTime;
       verifiableMetricsCollector.recordJobFailure(runId);
+      // `parameters` is seeded from DOMAIN_DEFAULTS before anything real
+      // overlays it (see the `let parameters = {...domainDefaults.parameters,
+      // ...}` above), so an unresolved key can still hold that seed's
+      // illustrative number even while `missing` correctly says nobody
+      // verified it. Filtering by `missing` is what keeps a caller of this
+      // error from receiving a fabricated value labeled as resolved --
+      // exactly the "confident wrong number" this project exists to refuse.
+      // Caught by testing this feature end to end: without the filter, a
+      // caller reasonably reads "resolvedSoFar.vmax === 5" as a real,
+      // literature-grounded number.
+      const resolvedOnly = Object.fromEntries(
+        Object.entries(parameters).filter(([key]) => !missing.includes(key)),
+      );
       throw new RequiredParametersMissingError(
         llmResult.domain,
         missing,
         missingKeyDetails(missing, parameterProvenance),
+        resolvedOnly,
       );
     }
 
@@ -2346,10 +2409,18 @@ export async function resolveQuery(
   if (missing.length > 0) {
     const latencyMs = Date.now() - startTime;
     verifiableMetricsCollector.recordJobFailure(runId);
+    // Same filter as the LLM branch above, same reason: `parameters` here
+    // is seeded `{...best.parameters, ...overrides}` and an unresolved key
+    // can still carry that seed's placeholder number even though `missing`
+    // correctly flags it as unverified.
+    const resolvedOnly = Object.fromEntries(
+      Object.entries(parameters).filter(([key]) => !missing.includes(key)),
+    );
     throw new RequiredParametersMissingError(
       best.domain,
       missing,
       missingKeyDetails(missing, parameterProvenance),
+      resolvedOnly,
     );
   }
 

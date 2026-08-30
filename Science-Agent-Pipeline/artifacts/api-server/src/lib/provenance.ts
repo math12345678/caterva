@@ -21,6 +21,20 @@ export class RequiredParametersMissingError extends Error {
    * name. Carried alongside the message so a caller can render the reason
    * without re-parsing prose. */
   readonly details: Record<string, string>;
+  /**
+   * Everything the resolver DID establish before refusing -- literature
+   * values it found, and anything the caller already supplied inline.
+   * Optional and defaulting to `{}` so no existing call site (or a future
+   * one that forgets it) has to change; a caller that ignores it loses
+   * nothing it had before.
+   *
+   * Without this, a UI catching the refusal had the keys it was missing
+   * but not the ones it already had, and made the user re-type values
+   * that had already resolved correctly (e.g. a literature Km) just to
+   * fill in the one experimental condition (s0) that was actually
+   * missing.
+   */
+  readonly resolvedSoFar: Record<string, number | number[]>;
 
   /**
    * `details` exists because the summary sentence is not always true.
@@ -41,6 +55,7 @@ export class RequiredParametersMissingError extends Error {
     domain: string,
     missing: string[],
     details: Record<string, string> = {},
+    resolvedSoFar: Record<string, number | number[]> = {},
   ) {
     const explained = missing.filter((k) => details[k]);
     const unexplained = missing.filter((k) => !details[k]);
@@ -85,6 +100,7 @@ export class RequiredParametersMissingError extends Error {
     this.domain = domain;
     this.missing = missing;
     this.details = details;
+    this.resolvedSoFar = resolvedSoFar;
   }
 }
 

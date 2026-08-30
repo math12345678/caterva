@@ -394,6 +394,42 @@ describe("POST /api/resolve", () => {
     expect(res.body.missingKeys).toContain("gamma");
   });
 
+  it("names the domain on a 422, and never labels a missing key's fallback number as resolved", async () => {
+    // `domain` and `resolvedParameters` exist so a UI can render a
+    // labeled-field form for exactly what is missing, pre-filled with
+    // whatever already resolved. `resolvedParameters` is the load-bearing
+    // half of this test: `parameters` internally is seeded from
+    // DOMAIN_DEFAULTS before anything real overlays it (mm's illustrative
+    // vmax=5, s0=10, end=10, points=51), so an UNFILTERED pass-through
+    // would report those exact placeholder numbers as if BRENDA or the
+    // user had supplied them -- a fabricated value presented as resolved,
+    // which is the one thing this project treats as worse than an error
+    // message. This is a real regression this test caught once already:
+    // the first version of this response attached the raw, unfiltered
+    // map, and `resolvedParameters.vmax` came back `5`.
+    //
+    // `km=10.73` is supplied inline rather than left to resolve from
+    // BRENDA, matching this file's own convention (see "resolves an MM
+    // query" above, `km=2` inline) -- a test asserting on the SHAPE of a
+    // refusal should not also depend on a live literature lookup for its
+    // one resolved key.
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "simulate lactate dehydrogenase with pyruvate km=10.73" });
+    expect(res.status).toBe(422);
+    expect(res.body.domain).toBe("mm");
+    expect(res.body.missingKeys).toEqual(
+      expect.arrayContaining(["vmax", "s0", "end", "points"]),
+    );
+    for (const key of res.body.missingKeys) {
+      expect(res.body.resolvedParameters).not.toHaveProperty(key);
+    }
+    // The one key that DID resolve (the user-supplied km) must still be
+    // there -- filtering missing keys must not also filter out what
+    // legitimately resolved.
+    expect(res.body.resolvedParameters.km).toBe(10.73);
+  });
+
   it("resolves an MM query", async () => {
     const res = await request(server)
       .post("/api/resolve")
