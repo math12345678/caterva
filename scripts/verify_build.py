@@ -430,20 +430,6 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_runner_boundary.py'}"
     ))
 
-    # The generated API contract must use syntax the installed zod actually
-    # has. orval's `version: "auto"` read zod 3.25's `zod/v4` SUBPATH as
-    # "v4 is available" and emitted `zod.iso.datetime(...)` while importing
-    # from plain "zod", where `iso` is undefined -- a contract that threw on
-    # import, produced by the documented codegen command.
-    #
-    # `tsc --noEmit` is structurally blind to it: zod 3.25 DECLARES `iso` in
-    # its types and does not export it at runtime. That is why this is a
-    # separate guard and not a compile step. See ADR 0030.
-    guards.append(run_guard(
-        "Generated Client Loads Guard",
-        f"{PYTHON} {SCRIPTS_DIR / 'check_generated_client_loads.py'}"
-    ))
-
     # How much of BRENDA's commentary Terrium can actually read.
     #
     # Not a correctness check -- a coverage measurement. It exists because a
@@ -538,7 +524,28 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
             "TypeScript Compile Guard",
             f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_compiles.py'}",
             timeout=300,
-        )
+        ),
+        # The generated API contract must use syntax the installed zod
+        # actually has. orval's `version: "auto"` read zod 3.25's `zod/v4`
+        # SUBPATH as "v4 is available" and emitted `zod.iso.datetime(...)`
+        # while importing from plain "zod", where `iso` is undefined -- a
+        # contract that threw on import, produced by the documented codegen
+        # command. `tsc --noEmit` is structurally blind to it: zod 3.25
+        # DECLARES `iso` in its types and does not export it at runtime.
+        # See ADR 0030.
+        #
+        # MOVED into this group on 2026-08-29: it loads the generated
+        # client under node against the installed zod, so it needs the
+        # same toolchain the compile guard needs, and it sat in an
+        # always-on group -- red in CI's Python job (no node_modules) and
+        # green on every developer machine, the exact split ADR 0167's
+        # flag fix was about. `--no-typescript` gating it is the flag
+        # meaning what it says: this IS a TypeScript-toolchain check.
+        run_guard(
+            "Generated Client Loads Guard",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_generated_client_loads.py'}",
+            timeout=300,
+        ),
     ]
 
 
