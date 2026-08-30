@@ -546,6 +546,27 @@ def run_typescript_guards() -> List[Tuple[str, bool, str]]:
             f"{PYTHON} {SCRIPTS_DIR / 'check_generated_client_loads.py'}",
             timeout=300,
         ),
+        # The TypeScript half of check_no_silent_skips. That guard counts
+        # pytest's "N skipped" line, so ~600 TypeScript tests across two
+        # runners were invisible to it AND to check_documented_counts: a
+        # whole suite could stop being collected and no number anywhere
+        # would move. Asks each runner which FILES it will run (~2s each,
+        # no imports) and compares against what is on disk.
+        #
+        # MOVED here 2026-08-29, third of three: it shells out to
+        # `npx jest --listTests` and `npx vitest list`, which need the
+        # installed runners — CI's Python job has system npx and no
+        # node_modules, so this was red there and green on every developer
+        # machine. The sweep that found it also checked every other guard
+        # verify_build runs for node/npx/pnpm use: none remain outside
+        # this group (check_prompt_injection uses npx for trojan-scan and
+        # runs fine on a bare runner — measured, its findings appear in
+        # the CI log).
+        run_guard(
+            "TypeScript Suite Discovery Guard",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
+            timeout=240,
+        ),
     ]
 
 
@@ -662,17 +683,6 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             "Example Endpoint Guard",
             f"{PYTHON} {SCRIPTS_DIR / 'check_example_endpoints.py'}",
             timeout=120,
-        ),
-        # The TypeScript half of check_no_silent_skips. That guard counts
-        # pytest's "N skipped" line, so ~600 TypeScript tests across two
-        # runners were invisible to it AND to check_documented_counts: a
-        # whole suite could stop being collected and no number anywhere
-        # would move. Asks each runner which FILES it will run (~2s each,
-        # no imports) and compares against what is on disk.
-        run_guard(
-            "TypeScript Suite Discovery Guard",
-            f"{PYTHON} {SCRIPTS_DIR / 'check_typescript_suites_discovered.py'}",
-            timeout=240,
         ),
         # ------------------------------------------------------------------
         # Six guards below were written, correct, and wired to NOTHING.
