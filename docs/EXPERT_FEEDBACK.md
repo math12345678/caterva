@@ -13878,3 +13878,40 @@ why they left and came back.
 | Corrected | pass seventy-four's central "good failure" claim, which was a credentialed artifact |
 | Fixed | the probe (credential helpers stripped), both notices restored, availability guard green in the honest state |
 | CI after this push | red at Build guards on the four injection findings (a human's to clear), then red ONLY at quickstart-clone — ADR 0143's designed red until the repositories are published |
+
+---
+
+## Seventy-ninth pass — the push, the tag, and the artifact that would falsify its own NOTICE
+
+Main is pushed (874b191 → f065ca7, six commits) and **v0.1.0 is tagged
+and released** — source only, on purpose: the licence position rests on
+distributing nothing that contains libSBML, and the release notes say so.
+The notes' first draft overstated two figures from memory ("3,912 tests",
+"74 guards"); corrected to the measured 3,887 and 72 within minutes, and
+the notes now carry a sentence explaining why they cite their own
+measurement method.
+
+CI walked down from 28 undiagnosed reds to **exactly one failing guard**
+— prompt injection, four findings, red on all three Python versions
+because the guard demands a human verdict and no human has given one.
+Getting there surfaced two more guards with the ADR 0167 split
+(node-dependent, always-on: client-loads, suite-discovery); both moved
+into the toolchain group, and this time the sweep checked every guard
+verify_build runs for node use, so it is the last relocation rather than
+the latest.
+
+**PR #21 ("first DMG release") reviewed by five agent lanes: do not
+merge as-is.** The DMG freezes python-libsbml (LGPL-2.1) into a onefile
+binary and copies the unchanged NOTICE — "Nothing here bundles libSBML"
+— inside the artifact that bundles it. Three ADR number collisions with
+main (0166–0168), and ten-odd files where both sessions fixed the same
+defect independently, including the same credential-helper probe bug
+found twice. Review posted on the PR with the conflict map and the
+renumber/fix path; nothing has been conveyed yet, so nothing is broken
+yet.
+
+| | |
+|---|---|
+| Shipped | main pushed; v0.1.0 released with measured notes; PR #21 reviewed on the record |
+| CI | one designed red (injection, human verdict), then quickstart-clone by ADR 0143 until published |
+| **For the owner** | the four injection verdicts; PR #21's licence path (NOTICE conveyance + relink story, or keep DMGs private); repo visibility itself |
