@@ -13845,3 +13845,36 @@ a current date-released.
 | Verified | 3,912 tests and 38 guards green in nine parallel lanes; every DOI registrar-verified; publish-check: "Nothing in the tree would ship wrong" |
 | Fixed | a citation to a nonexistent chimeric paper (3 surfaces); the live checker's paren-blind DOI matcher; the CI verify_build placement; the deck; the version drift |
 | **For the owner** | the four injection findings (dossier ready); whether the two robot-blocked publishers warrant a manual title check |
+
+---
+
+## Seventy-eighth pass — the probe that was never anonymous
+
+A correction to the seventy-fourth pass, which reported "the repository
+is public now — verified independently, `GIT_TERMINAL_PROMPT=0 git
+ls-remote` exits 0" and deleted the front-page notices on that
+measurement. **The measurement was false.** `GIT_TERMINAL_PROMPT=0`
+stops git from prompting; it does not stop the keychain. `gh auth
+setup-git` had wired a token into the credential helper, the probe
+authenticated silently, and a private repository answered as public — to
+me, and to the guard itself on every developer machine since.
+
+CI holds no credentials for those URLs and went red on the next push.
+An unauthenticated `curl` of the GitHub API settled it: every repository
+involved returns 404 anonymously, including the one this session pushes
+to. ADR 0145's sentence — *"the people positioned to notice are the ones
+who cannot: they have had access all along"* — turned out to describe
+the probe, its author, and me, in that order.
+
+Fixed at the root: the probe now runs `git -c credential.helper=
+ls-remote`, which clears the helper list for that one invocation.
+Verified both ways on this authenticated machine against the same
+private URL — with helpers exit 0, without them exit 128. The notices
+are restored to README.md and START_HERE.md with a parenthetical saying
+why they left and came back.
+
+| | |
+|---|---|
+| Corrected | pass seventy-four's central "good failure" claim, which was a credentialed artifact |
+| Fixed | the probe (credential helpers stripped), both notices restored, availability guard green in the honest state |
+| CI after this push | red at Build guards on the four injection findings (a human's to clear), then red ONLY at quickstart-clone — ADR 0143's designed red until the repositories are published |

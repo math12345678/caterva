@@ -91,13 +91,32 @@ class Reference(NamedTuple):
 def reachable_anonymously(url: str) -> bool | None:
     """True / False / None, where None means the probe itself failed.
 
-    `GIT_TERMINAL_PROMPT=0` is what makes this honest: without it git blocks
-    on a username prompt, and a guard that hangs is a guard that gets removed.
+    `GIT_TERMINAL_PROMPT=0` stops git from PROMPTING -- necessary, since a
+    guard that hangs is a guard that gets removed -- but prompts were never
+    the only door. **Stored credentials walk straight through it.** On any
+    machine where `gh auth setup-git` or the OS keychain holds a GitHub
+    token, plain `git ls-remote` authenticates silently, and this probe
+    reported a PRIVATE repository as publicly reachable.
+
+    That is not hypothetical; it is how this repository's front-page
+    notice was wrongly deleted on 2026-08-23. A session ran what it
+    believed was an anonymous probe, got exit 0 through its own keychain,
+    concluded the repositories had been published, and removed the "Not
+    public yet" notice -- the exact failure ADR 0145 predicts ("the people
+    positioned to notice are the ones who cannot: they have had access all
+    along"), committed by the tooling built to prevent it. CI, which
+    holds no credentials for these URLs, disagreed on the next push, and
+    an unauthenticated `curl` of the GitHub API settled it: private.
+
+    `-c credential.helper=` (empty value) clears git's helper list for
+    this one invocation, so the keychain is out of the loop. Verified both
+    ways on an authenticated machine against the same private URL: with
+    helpers, exit 0; with this flag, exit 128.
     """
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="", GCM_INTERACTIVE="never")
     try:
         done = subprocess.run(
-            ["git", "ls-remote", url, "HEAD"],
+            ["git", "-c", "credential.helper=", "ls-remote", url, "HEAD"],
             env=env,
             capture_output=True,
             timeout=TIMEOUT_S,

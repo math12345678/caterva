@@ -40,6 +40,23 @@ that wrong shipped a hardcoded 37 °C into every entry point for months
 
 ## Get it running
 
+> **Not public yet.** (Removed 2026-08-23 on a probe that had
+> silently authenticated through a developer keychain; restored
+> 2026-08-29 after CI — which holds no credentials — and an
+> unauthenticated API check both said private. The probe now
+> strips credential helpers so this cannot recur.)
+>
+> **Not public yet.** This document opens by addressing "a stranger who
+> found this on GitHub", and then hands them a clone of a repository that is
+> still private — so for that reader the first command prompts for a
+> username and everything this page describes sits behind it, unreached.
+> Said here rather than discovered at a credential prompt. See
+> [ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md).
+>
+> (No test or guard counts in this notice on purpose. They are stated once,
+> where `check_documented_counts.py` watches them; a second copy inside a
+> warning would be a number drifting with nothing looking at it.)
+
 ```bash
 git clone https://github.com/Terrium-sim/main.git
 cd main
