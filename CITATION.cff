@@ -26,4 +26,9 @@ authors:
     website: "https://github.com/Terrium-sim/terrium"
 license: Apache-2.0
 repository-code: "https://github.com/Terrium-sim/terrium"
-date-released: 2026-07-25
+# The version matches pyproject.toml and package.json (both 0.1.0 as of
+# the v0.1.0 release; package.json said 1.0.0 until 2026-08-29 -- two
+# versions of one fact, and this is the third place, kept equal to the
+# release tag so "cite the version you used" resolves to a real tag).
+version: 0.1.0
+date-released: 2026-08-29

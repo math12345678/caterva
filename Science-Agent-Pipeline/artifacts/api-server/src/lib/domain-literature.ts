@@ -231,7 +231,13 @@ export const GILLESPIE_SSA_LITERATURE: DomainLiterature = {
       authors: "Gillespie, D. T.",
       year: 1976,
       title: "A general method for numerically simulating the stochastic time evolution of coupled chemical reactions",
-      doi: "10.1021/j100540a008",
+      // DOI corrected 2026-08-29 against CrossRef: the previous value,
+      // 10.1021/j100540a008, is Gillespie 1977 "Exact stochastic
+      // simulation of coupled chemical reactions" (J. Phys. Chem. 81) —
+      // the adjacent-paper swap ADR 0076 is about, caught by the live
+      // checker's ambiguity verdict. This title is the 1976 paper in
+      // J. Comput. Phys. 22(4):403-434.
+      doi: "10.1016/0021-9991(76)90041-3",
     },
     {
       authors: "Cao, Y., Gillespie, D. T., & Petzold, L. R.",
@@ -301,7 +307,13 @@ export const GILLESPIE_SSA_BIMOLECULAR_LITERATURE: DomainLiterature = {
       authors: "Gillespie, D. T.",
       year: 1976,
       title: "A general method for numerically simulating the stochastic time evolution of coupled chemical reactions",
-      doi: "10.1021/j100540a008",
+      // DOI corrected 2026-08-29 against CrossRef: the previous value,
+      // 10.1021/j100540a008, is Gillespie 1977 "Exact stochastic
+      // simulation of coupled chemical reactions" (J. Phys. Chem. 81) —
+      // the adjacent-paper swap ADR 0076 is about, caught by the live
+      // checker's ambiguity verdict. This title is the 1976 paper in
+      // J. Comput. Phys. 22(4):403-434.
+      doi: "10.1016/0021-9991(76)90041-3",
     },
   ],
   defaultJustification:

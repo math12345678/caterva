@@ -171,8 +171,12 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 ### D. Gillespie Stochastic Simulation Algorithm (SSA)
 
 **Original Algorithm**:
-- **Reference**: Gillespie, D. T. (1976). "A general method for numerically simulating the stochastic time evolution of coupled chemical reactions." *The Journal of Physical Chemistry*, 81(25), 2340–2361.
-- **Citation**: https://doi.org/10.1021/j100540a008
+- **Reference**: Gillespie, D. T. (1976). "A general method for numerically simulating the stochastic time evolution of coupled chemical reactions." *Journal of Computational Physics*, 22(4), 403–434.
+  (Chimeric until 2026-08-29: the 1976 title carried the 1977 paper's
+  journal, volume, pages and DOI — every field individually real, the
+  reference as a whole describing no paper that exists. All fields now
+  match CrossRef's record for the 1976 paper.)
+- **Citation**: https://doi.org/10.1016/0021-9991(76)90041-3
 - **Method**: Tau-leaping algorithm for stochastic reaction dynamics
 - **Reactions**: Chemical reactions modeled as Poisson processes
 - **Parameters**:

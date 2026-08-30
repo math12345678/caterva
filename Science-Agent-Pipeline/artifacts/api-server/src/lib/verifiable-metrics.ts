@@ -217,8 +217,12 @@ const LITERATURE_DB: Record<string, LiteratureReference> = {
     authors: "Gillespie, D. T.",
     year: 1976,
     title: "A general method for numerically simulating stochastic time evolution",
-    journal: "The Journal of Physical Chemistry",
-    doi: "10.1021/j100540a008",
+    // Corrected 2026-08-29: this entry carried the 1977 paper's journal
+    // AND DOI under the 1976 title — a chimeric reference describing no
+    // paper that exists. Both fields now match CrossRef's record for the
+    // 1976 paper (J. Comput. Phys. 22(4):403-434).
+    journal: "Journal of Computational Physics",
+    doi: "10.1016/0021-9991(76)90041-3",
   },
   NIELSEN_RESPONSE_TIME: {
     authors: "Nielsen, J.",

@@ -244,8 +244,18 @@ jobs:
       # The remaining guards (RNG convention, dependencies, engine contract,
       # plausibility constants) run in one step via the build-verification
       # script. --quick runs the guards only, not the test suites.
+      #
+      # --no-typescript, and the flag now means what it says (ADR 0167
+      # moved four unrelated guard groups out of it): this job installs
+      # Python and no Node toolchain, and check_typescript_compiles
+      # correctly reports every workspace as NOT type-checked when there
+      # is no local node_modules/typescript — which is Rule 2 behaviour,
+      # not a defect, and reddened this step on every push after it was
+      # added on 2026-08-22. TypeScript compilation is checked where the
+      # toolchain exists: the api-server job below runs `pnpm run
+      # typecheck` after its pnpm install.
       - name: Build guards
-        run: python scripts/verify_build.py --quick
+        run: python scripts/verify_build.py --quick --no-typescript
 
       - name: Simulation engine tests
         working-directory: Terium
