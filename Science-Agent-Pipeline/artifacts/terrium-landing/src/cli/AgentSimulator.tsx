@@ -774,6 +774,8 @@ export default function AgentSimulator({
                   domain={result.domain}
                   runId={result.runId}
                   parameters={result.parameters as Record<string, unknown>}
+                  citationCount={result.provenance.modelCitations?.length ?? 0}
+                  hasFlags={(result.provenance.flags?.length ?? 0) > 0}
                 />
                 <ExportButtons
                   trajectory={

@@ -140,6 +140,9 @@ export default function RecentRuns({
   const [copiedParams, setCopiedParams] = useState<Set<string>>(new Set());
   const [compare, setCompare] = useState<Set<string>>(new Set());
   const [highlighted, setHighlighted] = useState<Set<string>>(new Set());
+  const [newlyCompleted, setNewlyCompleted] = useState<Set<string>>(
+    new Set(),
+  );
   const [bookmarked, setBookmarked] = useState<Set<string>>(loadBookmarks);
 
   const toggleBookmark = (jobId: string, e: React.MouseEvent) => {
@@ -184,8 +187,10 @@ export default function RecentRuns({
         const data = await listSimulationJobs();
         if (!cancelled) {
           const newHighlighted = new Set<string>();
+          const newlyCompletedIds = new Set<string>();
           for (const job of data) {
             const prev = prevStatusRef.current.get(job.jobId);
+            const isNew = !knownIdsRef.current.has(job.jobId);
             if (prev && prev !== job.status) {
               if (job.status === "completed") {
                 toast.success("Simulation completed", {
@@ -209,11 +214,26 @@ export default function RecentRuns({
                 });
               }
             }
+            if (isNew && job.status === "completed") {
+              newlyCompletedIds.add(job.jobId);
+              setTimeout(
+                () =>
+                  setNewlyCompleted((n) => {
+                    const next = new Set(n);
+                    next.delete(job.jobId);
+                    return next;
+                  }),
+                4000,
+              );
+            }
             prevStatusRef.current.set(job.jobId, job.status);
             knownIdsRef.current.add(job.jobId);
           }
           if (newHighlighted.size > 0) {
             setHighlighted((h) => new Set([...h, ...newHighlighted]));
+          }
+          if (newlyCompletedIds.size > 0) {
+            setNewlyCompleted((n) => new Set([...n, ...newlyCompletedIds]));
           }
           setRuns(data);
           saveCachedRuns(data);
@@ -259,16 +279,28 @@ export default function RecentRuns({
   const handleCancel = async (jobId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setCancelling((prev) => new Set(prev).add(jobId));
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 10000);
     try {
       const response = await fetch(`/api/simulate/${jobId}/cancel`, {
         method: "POST",
+        signal: controller.signal,
       });
       if (response.ok) {
         const updated = await response.json();
         setRuns((prev) => prev.map((r) => (r.jobId === jobId ? updated : r)));
+      } else {
+        toast.error("Failed to cancel run", {
+          description: `Server responded with ${response.status}`,
+        });
       }
-    } catch {
+    } catch (err) {
+      toast.error("Failed to cancel run", {
+        description:
+          err instanceof Error ? err.message : "Request could not complete",
+      });
     } finally {
+      window.clearTimeout(timeoutId);
       setCancelling((prev) => {
         const next = new Set(prev);
         next.delete(jobId);
@@ -336,7 +368,7 @@ export default function RecentRuns({
 
       <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
         <AnimatePresence initial={false}>
-          {loading && (
+          {loading && runs.length === 0 && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -386,7 +418,7 @@ export default function RecentRuns({
                       >
                         {run.query}
                       </span>
-                      {!knownIdsRef.current.has(run.jobId) &&
+                      {newlyCompleted.has(run.jobId) &&
                         run.status === "completed" && (
                           <span className="shrink-0 inline-flex items-center rounded bg-[#1D8A72]/15 px-1.5 py-0.5 text-[8px] text-[#1D8A72] uppercase tracking-wide animate-pulse-soft">
                             new

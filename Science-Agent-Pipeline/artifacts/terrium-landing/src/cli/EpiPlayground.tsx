@@ -183,7 +183,10 @@ export default function EpiPlayground() {
                 <span className="w-2 h-0.5 rounded bg-[#1D8A72]" /> R
               </span>
               <span className="ml-auto">
-                herd immunity ≈ {((1 - 1 / (beta / gamma)) * 100).toFixed(0)}%
+                herd immunity ≈{" "}
+                {beta > gamma
+                  ? `${((1 - gamma / beta) * 100).toFixed(0)}%`
+                  : "n/a (R₀ < 1)"}
               </span>
             </div>
           </div>

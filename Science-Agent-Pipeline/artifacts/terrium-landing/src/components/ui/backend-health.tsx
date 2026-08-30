@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 type Status = "ok" | "error" | "loading";
@@ -26,7 +26,9 @@ function formatUptime(s: number): string {
 export default function BackendHealth() {
   const [status, setStatus] = useState<Status>("loading");
   const [detail, setDetail] = useState<PipelineStatus | null>(null);
+  const [detailError, setDetailError] = useState(false);
   const [showPanel, setShowPanel] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,9 +48,16 @@ export default function BackendHealth() {
         const res = await fetch("/api/pipeline/status");
         if (res.ok) {
           const data: PipelineStatus = await res.json();
-          if (!cancelled) setDetail(data);
+          if (!cancelled) {
+            setDetail(data);
+            setDetailError(false);
+          }
+        } else if (!cancelled) {
+          setDetailError(true);
         }
-      } catch {}
+      } catch {
+        if (!cancelled) setDetailError(true);
+      }
     };
 
     check();
@@ -64,9 +73,22 @@ export default function BackendHealth() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!showPanel) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowPanel(false);
+        toggleRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [showPanel]);
+
   return (
     <>
       <button
+        ref={toggleRef}
         onClick={() => setShowPanel((p) => !p)}
         className="flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors"
         title={
@@ -105,62 +127,80 @@ export default function BackendHealth() {
       </button>
 
       <AnimatePresence>
-        {showPanel && detail && (
+        {showPanel && (
           <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-40"
-              onClick={() => setShowPanel(false)}
+              onClick={() => {
+                setShowPanel(false);
+                toggleRef.current?.focus();
+              }}
             />
             <motion.div
               initial={{ opacity: 0, y: 4, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 4, scale: 0.96 }}
               transition={{ duration: 0.15, ease: "easeOut" }}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Pipeline Status"
               className="fixed top-14 left-4 z-50 w-72 rounded-xl border border-white/[0.08] bg-[#0a0f0c] shadow-2xl p-4"
             >
               <div className="flex items-center justify-between mb-3">
                 <span className="text-white/60 text-[11px] font-medium">
                   Pipeline Status
                 </span>
-                <span
-                  className={`text-[9px] uppercase tracking-wide ${detail.status === "healthy" ? "text-[#1D8A72]" : "text-yellow-500"}`}
-                >
-                  {detail.status}
-                </span>
-              </div>
-
-              <div className="space-y-1.5 mb-3 text-[10px]">
-                {detail.subsystems.map((s) => (
-                  <div key={s.label} className="flex items-center gap-2">
-                    <span
-                      className={`shrink-0 w-1.5 h-1.5 rounded-full ${s.ok ? "bg-[#1D8A72]" : "bg-red-400"}`}
-                    />
-                    <span className="text-white/40 truncate">{s.label}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="border-t border-white/[0.04] pt-2 text-[10px] space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-white/25">jobs in queue</span>
-                  <span className="text-white/50">{detail.queue.total}</span>
-                </div>
-                {Object.entries(detail.queue.byStatus).map(([s, count]) => (
-                  <div key={s} className="flex justify-between">
-                    <span className="text-white/25 pl-3">{s}</span>
-                    <span className="text-white/50">{count}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between pt-1 border-t border-white/[0.03]">
-                  <span className="text-white/25">uptime</span>
-                  <span className="text-white/50">
-                    {formatUptime(detail.uptime)}
+                {detail && (
+                  <span
+                    className={`text-[9px] uppercase tracking-wide ${detail.status === "healthy" ? "text-[#1D8A72]" : "text-yellow-500"}`}
+                  >
+                    {detail.status}
                   </span>
-                </div>
+                )}
               </div>
+
+              {detail ? (
+                <>
+                  <div className="space-y-1.5 mb-3 text-[10px]">
+                    {detail.subsystems.map((s) => (
+                      <div key={s.label} className="flex items-center gap-2">
+                        <span
+                          className={`shrink-0 w-1.5 h-1.5 rounded-full ${s.ok ? "bg-[#1D8A72]" : "bg-red-400"}`}
+                        />
+                        <span className="text-white/40 truncate">{s.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-white/[0.04] pt-2 text-[10px] space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-white/25">jobs in queue</span>
+                      <span className="text-white/50">{detail.queue.total}</span>
+                    </div>
+                    {Object.entries(detail.queue.byStatus).map(([s, count]) => (
+                      <div key={s} className="flex justify-between">
+                        <span className="text-white/25 pl-3">{s}</span>
+                        <span className="text-white/50">{count}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-1 border-t border-white/[0.03]">
+                      <span className="text-white/25">uptime</span>
+                      <span className="text-white/50">
+                        {formatUptime(detail.uptime)}
+                      </span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="text-[10px] text-white/40">
+                  {detailError
+                    ? "Pipeline details unavailable."
+                    : "Loading pipeline details…"}
+                </div>
+              )}
             </motion.div>
           </>
         )}
