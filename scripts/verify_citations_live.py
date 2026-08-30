@@ -132,7 +132,26 @@ DOI_SOURCE_FILES = [
 #: allowed to swallow trailing punctuation, quotes or markdown syntax,
 #: which would otherwise produce DOIs that fail lookup for cosmetic
 #: reasons and bury the real failures.
-DOI_PATTERN = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>,)\]}]+)")
+#:
+#: PARENTHESES ARE PART OF REAL DOIs. Elsevier's legacy scheme puts the
+#: two-digit year in parens -- Gillespie 1976 is
+#: `10.1016/0021-9991(76)90041-3` -- and the first version of this
+#: pattern excluded `)` outright, so that DOI truncated to
+#: `10.1016/0021-9991(76` and reported HTTP 404 against CrossRef: the
+#: checker manufacturing exactly the cosmetic failure this comment says
+#: it refuses to. (It surfaced the moment a citation was CORRECTED to
+#: that DOI -- the fix for a wrong reference tripped the checker's own
+#: matcher-narrower-than-its-subject defect, this repository's oldest
+#: recurring shape.) `)` is now allowed mid-DOI, and `_trim_doi` strips
+#: only a trailing unbalanced `)` -- the "(see 10.1234/x)" prose case.
+DOI_PATTERN = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>,\]}]+)")
+
+
+def _trim_doi(doi: str) -> str:
+    """Strip trailing `)` only when unbalanced against `(` in the DOI."""
+    while doi.endswith(")") and doi.count(")") > doi.count("("):
+        doi = doi[:-1]
+    return doi.rstrip(".;:")
 
 
 #: Lines that merely *discuss* a DOI rather than cite it. When a wrong DOI
@@ -175,7 +194,7 @@ def discovered_dois() -> dict[str, list[str]]:
             if _is_prose_line(line):
                 continue
             for match in DOI_PATTERN.finditer(line):
-                doi = match.group(1).rstrip(".;")
+                doi = _trim_doi(match.group(1))
                 found.setdefault(doi, []).append(path.name)
     return found
 

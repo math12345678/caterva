@@ -13798,3 +13798,50 @@ Restored from the staged copy with rows that say something true.
 | Coordinated | a two-agent collision settled through a claim file; module theirs verbatim, wiring and delivery mine, collision ADR theirs (0168) |
 | Verified | engine suite green (+11 units tests); root jest 918; `verify_build --quick` **11 → 3** across the session, every survivor an owner decision |
 | **For the owner** | the pitch-deck number; four grandfathered mutation tables; four injection findings; whether sir/seir ever get a declared unit system — the module refuses them with the reason until someone decides |
+
+---
+
+## Seventy-seventh pass — the push, and the paper that did not exist
+
+Nine verification lanes in parallel before the first push in this
+repository's history: 38 guards, engine 1,228, literature 1,116, jest
+918, vitest 625, both verify_build modes, the app surfaces, the release
+preflight, and a live literature sweep. Everything green except the one
+deliberate red (prompt injection: four findings whose guard requires a
+human verdict — dossier in the session report, baseline untouched).
+
+**The literature lane caught a chimera.** Three live surfaces cited
+Gillespie 1976 — *"A general method for numerically simulating…"* — under
+DOI `10.1021/j100540a008`, which CrossRef says is Gillespie **1977**,
+*"Exact stochastic simulation…"*. One entry had the 1976 title with the
+1977 journal, volume, pages AND DOI: every field individually real, the
+reference as a whole describing **no paper that exists**. This is the
+exact adjacent-paper swap ADR 0076 predicted ("same author, same
+algorithm, one year apart"). Fixed against CrossRef's records
+(`10.1016/0021-9991(76)90041-3`, J. Comput. Phys. 22(4):403–434); the
+1977 citations elsewhere are correct and untouched, as are the frozen
+build-stage logs.
+
+**Then the fix tripped the checker's own defect.** The corrected DOI
+contains parentheses — Elsevier's legacy year-in-parens scheme — and
+`verify_citations_live.py`'s pattern excluded `)`, truncating it to a
+404. The checker manufacturing exactly the cosmetic failure its own
+docstring says it refuses to. Parens allowed, unbalanced-trailing-paren
+trim added; the DOI now verifies live with a title match. Two publisher
+URLs still 403 a robot under any user agent; the registrar confirms both
+DOIs, and the checker's "re-verify by hand" stands as its correct answer.
+
+**Housekeeping the release demanded:** CI's build-guards step now runs
+`--no-typescript` (honest since ADR 0167 made the flag mean what it
+says; this job has no Node toolchain, and the api-server job typechecks
+where one exists). Four grandfathered mutation tables registered with
+reasons. The pitch deck's 1,852 updated to the measured 2,344.
+`package.json` said 1.0.0 while `pyproject.toml` said 0.1.0 — two
+versions of one fact; both now 0.1.0, and CITATION.cff states it beside
+a current date-released.
+
+| | |
+|---|---|
+| Verified | 3,912 tests and 38 guards green in nine parallel lanes; every DOI registrar-verified; publish-check: "Nothing in the tree would ship wrong" |
+| Fixed | a citation to a nonexistent chimeric paper (3 surfaces); the live checker's paren-blind DOI matcher; the CI verify_build placement; the deck; the version drift |
+| **For the owner** | the four injection findings (dossier ready); whether the two robot-blocked publishers warrant a manual title check |
