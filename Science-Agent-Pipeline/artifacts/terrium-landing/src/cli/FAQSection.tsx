@@ -41,7 +41,7 @@ const FAQS = [
   {
     id: "self-host",
     q: "Can I run Terrium on my own infrastructure?",
-    a: "Yes. The Terium engine and literature layer are open-source and runnable locally. The landing page simulator even runs RK4 integration directly in your browser — no server required for basic exploration. The full pipeline (agent + SSE streaming) requires the API server.",
+    a: "Not yet — the repository isn't public. The engine and literature layer are built to run locally and will ship Apache-2.0 licensed once it is; join the waitlist to hear when. In the meantime, the landing page simulator runs RK4 integration directly in your browser — no server required for basic exploration. The full pipeline (agent + SSE streaming) requires the API server.",
   },
   {
     id: "compare",
