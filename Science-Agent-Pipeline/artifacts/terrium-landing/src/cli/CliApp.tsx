@@ -99,11 +99,19 @@ const NAV_ITEMS = [
   "waitlist",
 ] as const;
 
+// Fifteen real domains, grouped into eight rows for a scannable list.
+// Source of truth: src/cli/domainCatalogue.ts, reconciled against the
+// engine's own DISPATCH table (ADR 0122 -- "fifteen domains nobody could
+// find"). Every one of these is routed end-to-end (LLM/keyword resolver ->
+// zod schema -> Python engine -> ODE/discrete integration), independently
+// re-verified for this list. `sbml` is deliberately not listed: it's a
+// generic model-ingest path with no API field to reach it, not a teaching
+// domain a query can resolve to (same exclusion the catalogue makes).
 const DOMAINS = [
   {
     id: "enzyme-kinetics",
     status: "live",
-    desc: "Michaelis-Menten kinetics, literature-verified Km/Vmax",
+    desc: "Michaelis-Menten kinetics, plain and competitively-inhibited — Km/Vmax/Ki literature-verified",
   },
   {
     id: "sir-seir-epidemiology",
@@ -112,23 +120,33 @@ const DOMAINS = [
   },
   {
     id: "pcr-amplification",
-    status: "planned",
-    desc: "PCR cycle simulation with primer/template parameters",
+    status: "live",
+    desc: "PCR amplification, exact closed-form growth model, mutation-verified",
   },
   {
     id: "monte-carlo",
-    status: "planned",
-    desc: "Stochastic simulation for systems without closed forms",
+    status: "live",
+    desc: "Monte Carlo estimation of pi, 1/sqrt(N) convergence verified",
   },
   {
     id: "population-genetics",
-    status: "planned",
-    desc: "Allele frequency drift and selection modeling",
+    status: "live",
+    desc: "Wright-Fisher drift & selection, plus two-locus linkage disequilibrium",
   },
   {
-    id: "molecular-dynamics-setup",
-    status: "planned",
-    desc: "MD run configuration from natural-language input",
+    id: "stochastic-kinetics",
+    status: "live",
+    desc: "Gillespie SSA stochastic kinetics — decay, bimolecular association, replicate ensembles",
+  },
+  {
+    id: "molecular-dynamics",
+    status: "live",
+    desc: "Lennard-Jones molecular dynamics, energy-conserved",
+  },
+  {
+    id: "ode-oscillators",
+    status: "live",
+    desc: "Lotka-Volterra predator-prey, the Tyson (1991) cell-cycle clock, and the Elowitz & Leibler (2000) repressilator",
   },
 ];
 
@@ -724,7 +742,9 @@ export default function CliApp() {
           </div>
           <h2 className="section-header">Supported domains</h2>
           <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
-            Enzyme kinetics, epidemiology, PCR, and beyond.
+            Enzyme kinetics, epidemiology, PCR, population genetics,
+            stochastic kinetics, molecular dynamics, and classic ODE
+            oscillators.
           </p>
           <TerminalWindow path="~ &mdash; terrium domains --list" glow>
             <div className="mb-4 text-white/90">
