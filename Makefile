@@ -222,6 +222,27 @@ test-slow: require-pytest
 # Not included, and deliberately: check_codegen_loads.py and the api-server
 # suite, both of which need a completed pnpm install. `make pr` names them
 # at the end rather than pretending they ran.
+#: Opens a freshly built export in a tool that did not write it.
+#:
+#: NOT part of `guards`, and deliberately so. It needs a second interpreter
+#: holding tellurium or basico, which cannot live in the pinned environment
+#: (tellurium requires antimony>=3.1.0, requirements.txt pins 2.14.0), and a
+#: check that cannot pass here would sit permanently red -- the failure
+#: ADR 0179 spent a commit removing.
+#:
+#: Without a reader it exits 3, "could not check", which is the honest
+#: answer rather than a green tick.
+#:
+#:     make interop READER=/path/to/other/venv/bin/python
+interop:
+	@if [ -z "$(READER)" ]; then \
+		echo ">> no READER given; the check will report that it could not run"; \
+	fi
+	@TERRIUM_INTEROP_PYTHON="$(READER)" "$(PY)" scripts/verify_export_opens_elsewhere.py
+
+interop-selftest:
+	@"$(PY)" scripts/verify_export_opens_elsewhere.py --selftest
+
 guards: require-pytest
 	@echo ">> environment"
 	@"$(PY)" scripts/check_env.py

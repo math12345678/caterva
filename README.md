@@ -62,7 +62,7 @@ gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,374 tests (1,252 engine + 1122 literature)```
+make test      # runs all 2,375 tests (1,253 engine + 1122 literature)```
 
 ### See what it produces, before anything else
 
@@ -498,7 +498,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,252 tests
+│   └── tests/                1,253 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -507,7 +507,7 @@ Terrium/
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    190 decision records (and counting)├── Business/                   build stages, roadmap, fundraising
+│   └── adr/                    191 decision records (and counting)├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    74 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
@@ -590,9 +590,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,374 tests
+make test        # run all 2,375 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (1,252 tests)
+make test-sim    # simulation engine only (1,253 tests)
 make test-lit    # literature layer only (1122 tests)
 python3 scripts/verify_build.py --quick  # all 74 guard scripts, incl. TypeScript compilemake clean       # remove caches
 ```
