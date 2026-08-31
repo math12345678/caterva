@@ -3,10 +3,16 @@ import { motion, AnimatePresence } from "framer-motion";
 import { simulateSIR } from "@/lib/simulate";
 import LineChart from "./LineChart";
 
+// This widget shows an SIR outbreak model (compartmental epidemiology),
+// so its citations must be the real SIR literature -- not an enzyme
+// EC number and a KEGG reaction ID, which is what stood here before and
+// belongs to an entirely different domain. See
+// Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts
+// (SIR_LITERATURE) for the source of truth.
 const citations = [
-  { label: "KEGG", id: "R00259", href: "#" },
-  { label: "BRENDA", id: "1.1.1.27", href: "#" },
-  { label: "PubMed", id: "30462309", href: "#" },
+  { label: "Kermack & McKendrick", id: "1927", href: "#" },
+  { label: "DOI", id: "10.1098/rspa.1927.0118", href: "#" },
+  { label: "Heesterbeek et al.", id: "2015", href: "#" },
 ];
 
 const replicatingParams = { beta: 0.35, gamma: 0.12 };
@@ -267,8 +273,10 @@ export default function DashboardPreview() {
                 ))}
               </div>
               <div className="text-[10px] text-white/25 leading-relaxed border-t border-white/[0.04] pt-2 mt-2">
-                Parameters sourced from literature. Every simulation output is
-                traceable to its source paper via DOI.
+                The SIR model itself is Kermack &amp; McKendrick (1927). The
+                β/γ shown here drift randomly for this preview &mdash; ask
+                about a named disease and Terrium resolves real rates with
+                a citation instead.
               </div>
             </motion.div>
           )}
