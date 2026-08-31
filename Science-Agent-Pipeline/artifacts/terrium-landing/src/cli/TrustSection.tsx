@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import Reveal from "./Reveal";
 import TerminalWindow from "./TerminalWindow";
+import { totals } from "@/lib/testResults";
 
 interface CounterProps {
   target: number;
@@ -118,7 +119,11 @@ export default function TrustSection() {
 
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
-          <AnimatedMetric target={2983} label="tests passing" delay={0} />
+          <AnimatedMetric
+            target={totals().passed}
+            label="tests passing"
+            delay={0}
+          />
           <AnimatedMetric
             target={15}
             label="simulation domains"

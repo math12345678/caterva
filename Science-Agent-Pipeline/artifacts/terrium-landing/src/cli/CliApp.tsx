@@ -42,6 +42,7 @@ import BackToTop from "@/components/ui/back-to-top";
 import { WaitlistForm } from "@/components/ui/WaitlistForm";
 import FooterMetrics from "@/components/ui/footer-metrics";
 import WaitlistCounter from "@/components/ui/waitlist-counter";
+import { totals } from "@/lib/testResults";
 
 const FAQSection = lazy(() => import("./FAQSection"));
 const TrustSection = lazy(() => import("./TrustSection"));
@@ -793,7 +794,8 @@ export default function CliApp() {
           </div>
           <h2 className="section-header">Test suite</h2>
           <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
-            2,983 tests across the full stack — zero failures.
+            {totals().passed.toLocaleString()} tests across the full stack
+            — zero failures.
           </p>
           <TerminalWindow path="~ &mdash; terrium test --run --no-skip -v" glow>
             <TestPanelBody />
