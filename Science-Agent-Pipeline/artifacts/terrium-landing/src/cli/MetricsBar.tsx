@@ -13,14 +13,14 @@ interface MetricItem {
 const METRICS: MetricItem[] = [
   {
     key: "tests",
-    target: 304,
-    suffix: "+",
+    target: 2983,
+    suffix: "",
     label: "tests passing",
     color: "#1D8A72",
   },
   {
     key: "domains",
-    target: 6,
+    target: 15,
     suffix: "",
     label: "simulation domains",
     color: "#3B82F6",
@@ -33,10 +33,10 @@ const METRICS: MetricItem[] = [
     color: "#F59E0B",
   },
   {
-    key: "opensource",
-    target: 100,
-    suffix: "%",
-    label: "open source",
+    key: "guards",
+    target: 72,
+    suffix: "",
+    label: "correctness guards",
     color: "#8B5CF6",
   },
 ];

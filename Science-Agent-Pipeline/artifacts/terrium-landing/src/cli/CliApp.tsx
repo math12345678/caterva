@@ -773,7 +773,7 @@ export default function CliApp() {
           </div>
           <h2 className="section-header">Test suite</h2>
           <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
-            48 tests across the full stack — every one passing.
+            2,983 tests across the full stack — zero failures.
           </p>
           <TerminalWindow path="~ &mdash; terrium test --run --no-skip -v" glow>
             <TestPanelBody />
