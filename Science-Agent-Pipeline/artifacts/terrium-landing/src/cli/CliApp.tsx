@@ -112,7 +112,7 @@ const DOMAINS = [
   {
     id: "enzyme-kinetics",
     status: "live",
-    desc: "Michaelis-Menten kinetics, plain and competitively-inhibited — Km/Vmax/Ki literature-verified",
+    desc: "Michaelis-Menten kinetics, plain and competitively-inhibited — Km/Ki literature-verified, Vmax user-supplied",
   },
   {
     id: "sir-seir-epidemiology",

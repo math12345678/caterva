@@ -14,8 +14,13 @@ interface ExampleCard {
   query: string;
 }
 
+// km is the real BRENDA-resolved value for this exact query ("lactate
+// dehydrogenase with pyruvate"), confirmed live against the running
+// pipeline -- not a placeholder. vmax has no literature-resolution path
+// in this system (it's always user-supplied), so it stays illustrative;
+// the description below reflects that split rather than claiming both.
 const MM_EXAMPLE = simulateMichaelisMenten({
-  km: 2,
+  km: 10.73,
   vmax: 5,
   s0: 10,
   end: 3,
@@ -45,7 +50,8 @@ const EXAMPLES: ExampleCard[] = [
     id: "mm-demo",
     domain: "mm",
     label: "Michaelis-Menten",
-    description: "Enzyme kinetics with literature-verified Km and Vmax values.",
+    description:
+      "Enzyme kinetics — Km literature-verified (10.73 mM, real BRENDA value), Vmax user-chosen.",
     stats: [
       {
         label: "final [S]",
