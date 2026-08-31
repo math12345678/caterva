@@ -26,7 +26,10 @@ const CONTRIBUTORS: Contributor[] = [
     name: "You?",
     role: "Contributor — join us",
     gradient: "from-[#8B5CF6] to-[#6D28D9]",
-    links: [{ label: "contribute", href: "https://github.com/smyan/terrium" }],
+    // The repository isn't public yet (see README.md's own "Not public
+    // yet" notice), so a "contribute" link to it would be a dead end for
+    // every visitor. The waitlist is the real, working way in today.
+    links: [{ label: "join waitlist", href: "#waitlist" }],
   },
 ];
 
@@ -218,16 +221,15 @@ export default function TeamSection() {
               </svg>
             </span>
             <span className="text-white/30">
-              Terrium is open source.{" "}
+              Terrium will be Apache-2.0 licensed. The repository isn&apos;t
+              public yet &mdash;{" "}
               <a
-                href="https://github.com/smyan/terrium"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#waitlist"
                 className="text-[#8B5CF6]/60 hover:text-[#8B5CF6] transition-colors"
               >
-                Star us on GitHub
+                join the waitlist
               </a>{" "}
-              &mdash; contributions welcome.
+              to hear when it is.
             </span>
           </div>
         </TerminalWindow>
