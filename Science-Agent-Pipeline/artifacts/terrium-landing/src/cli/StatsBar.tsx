@@ -1,48 +1,64 @@
 import { useEffect, useState } from "react";
 import AnimatedCounter from "@/components/ui/animated-counter";
+import { totals } from "@/lib/testResults";
 
 const staticStats = [
-  { key: "tests", target: 47, suffix: "+", label: "tests passing" },
-  { key: "domains", target: 2, suffix: "", label: "live domains" },
-  { key: "supported", target: 6, suffix: "", label: "supported domains" },
+  {
+    key: "tests",
+    target: totals().passed,
+    suffix: "",
+    label: "tests passing",
+  },
+  { key: "domains", target: 15, suffix: "", label: "simulation domains" },
 ];
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
 export default function StatsBar() {
-  const [waitlistCount, setWaitlistCount] = useState<number>(0);
-  const [uptimeHours, setUptimeHours] = useState<number>(0);
+  // null means "not loaded / request failed" -- distinct from a real 0,
+  // and never backfilled with a plausible-looking made-up number. A
+  // fallback like `waitlistCount || 47` used to run on both request
+  // failure AND a genuine zero count, so either an outage or an honest
+  // "nobody yet" got silently replaced with an invented "47".
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
+  const [uptimeHours, setUptimeHours] = useState<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
-    Promise.all([
-      fetch(`${API_BASE}/api/waitlist/count`, { signal: controller.signal })
-        .then((r) => r.json().then((d) => d.count))
-        .catch(() => 47),
-      fetch(`${API_BASE}/api/metrics`, { signal: controller.signal })
-        .then((r) => r.json().then((d) => Math.round(d.uptime / 3600)))
-        .catch(() => 24),
-    ]).then(([wc, uh]) => {
-      setWaitlistCount(wc);
-      setUptimeHours(uh);
-    });
+    fetch(`${API_BASE}/api/waitlist/count`, { signal: controller.signal })
+      .then((r) => r.json())
+      .then((d) => setWaitlistCount(d.count))
+      .catch(() => {});
+    fetch(`${API_BASE}/api/metrics`, { signal: controller.signal })
+      .then((r) => r.json())
+      .then((d) => setUptimeHours(Math.round(d.uptime / 3600)))
+      .catch(() => {});
     return () => controller.abort();
   }, []);
 
-  const liveStats = [
-    {
+  type StatItem = {
+    key: string;
+    target: number;
+    suffix: string;
+    label: string;
+  };
+  const liveStats: StatItem[] = [];
+  if (waitlistCount !== null) {
+    liveStats.push({
       key: "waiting",
-      target: waitlistCount || 47,
+      target: waitlistCount,
       suffix: "+",
       label: "researchers waiting",
-    },
-    {
+    });
+  }
+  if (uptimeHours !== null) {
+    liveStats.push({
       key: "uptime",
-      target: uptimeHours || 24,
-      suffix: "/7",
+      target: uptimeHours,
+      suffix: "h",
       label: "pipeline uptime",
-    },
-  ];
+    });
+  }
 
   const stats = [...staticStats, ...liveStats];
 
