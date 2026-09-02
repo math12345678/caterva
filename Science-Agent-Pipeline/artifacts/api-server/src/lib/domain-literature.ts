@@ -120,7 +120,7 @@ export const SIR_LITERATURE: DomainLiterature = {
       doi: "10.1098/rspa.1927.0118",
     },
     {
-      authors: "Heesterbeek, H., Britton, T., et al.",
+      authors: "Heesterbeek, H., Anderson, R. M., et al.",
       year: 2015,
       title: "Modeling infectious disease dynamics in the complex landscape of global health",
       doi: "10.1126/science.aaa4339",
@@ -274,7 +274,9 @@ export const PCR_LITERATURE: DomainLiterature = {
 
 /**
  * MOLECULAR_DYNAMICS Domain: Lennard-Jones Simulation
- * BACKING: Lennard-Jones, J. E. (1924)
+ * BACKING: Jones, J. E. (1924) -- published before his 1925 marriage, after
+ * which he adopted "Lennard-Jones." The potential is still named for him
+ * under that later name; the paper's own byline is not.
  * "On the determination of molecular fields"
  */
 export const MOLECULAR_DYNAMICS_LITERATURE: DomainLiterature = {
@@ -283,7 +285,13 @@ export const MOLECULAR_DYNAMICS_LITERATURE: DomainLiterature = {
     "Molecular dynamics using Lennard-Jones potential. V(r) = 4ε[(σ/r)¹² - (σ/r)⁶]. Simulates particle interactions with repulsive (r¹²) and attractive (r⁶) terms.",
   references: [
     {
-      authors: "Lennard-Jones, J. E.",
+      // Published as "Jones, J. E." -- he married Kathleen Lennard in 1925
+      // and adopted "Lennard-Jones" afterward, so the 1924 byline itself
+      // reads "Jones," not "Lennard-Jones" (confirmed against CrossRef's
+      // metadata for this DOI). The potential is still correctly called
+      // "Lennard-Jones" today; that's the model's later, eponymous name,
+      // not what's actually printed on this specific paper.
+      authors: "Jones, J. E.",
       year: 1924,
       title: "On the determination of molecular fields",
       doi: "10.1098/rspa.1924.0082",
