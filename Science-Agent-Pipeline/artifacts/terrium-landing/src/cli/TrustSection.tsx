@@ -112,7 +112,7 @@ export default function TrustSection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
         </div>
         <h2 className="section-header">Built on real science</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           Every number is traceable. Every simulation is verified. No black
           boxes.
         </p>
@@ -218,7 +218,7 @@ export default function TrustSection() {
                       {item.title}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/35 leading-relaxed">
+                  <p className="text-[11px] text-white/50 leading-relaxed">
                     {item.desc}
                   </p>
                 </div>

@@ -142,7 +142,7 @@ export default function GlossarySection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
         </div>
         <h2 className="section-header">Key terms</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           A quick reference for students and researchers. Click any term to
           expand.
         </p>

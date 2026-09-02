@@ -72,7 +72,7 @@ export default function LiveStatusPanel() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
         </div>
         <h2 className="section-header">System architecture</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-md">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-md">
           Data sources and compute infrastructure behind the pipeline.
         </p>
 

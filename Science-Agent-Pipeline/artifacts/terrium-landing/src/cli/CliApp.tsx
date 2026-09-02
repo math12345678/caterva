@@ -471,7 +471,7 @@ export default function CliApp() {
                   lines={[
                     {
                       text: "Ask a question.",
-                      className: "text-gradient-white hero-heading-strong",
+                      className: "text-white hero-heading-strong",
                       delayOffset: 0.1,
                     },
                     {
@@ -602,7 +602,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-white/[0.06] to-transparent" />
           </div>
           <h2 className="section-header">How it works</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-10 -mt-2 max-w-sm">
+          <p className="font-sans text-[13px] text-white/50 mb-10 -mt-2 max-w-sm">
             Three steps from question to verified result.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -690,7 +690,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
           </div>
           <h2 className="section-header">See it in action</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Pre-computed examples. No backend required.
           </p>
           <ExampleGallery onTryQuery={setRerunQuery} />
@@ -742,7 +742,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
           </div>
           <h2 className="section-header">Supported domains</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Enzyme kinetics, epidemiology, PCR, population genetics,
             stochastic kinetics, molecular dynamics, and classic ODE
             oscillators.
@@ -793,7 +793,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
           </div>
           <h2 className="section-header">Test suite</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             {totals().passed.toLocaleString()} tests across the full stack
             — zero failures.
           </p>
@@ -813,7 +813,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
           </div>
           <h2 className="section-header">Try the agent</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Describe your experiment. We handle the rest.
           </p>
           <AgentSimulator
@@ -834,7 +834,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
           </div>
           <h2 className="section-header">Recent runs</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Your past simulations, ready to re-run or export.
           </p>
           <RecentRuns onReRun={setRerunQuery} />
@@ -851,7 +851,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
           </div>
           <h2 className="section-header">Live simulator</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Browser-side ODE solver. Tune parameters in real time.
           </p>
           <SimulatorPanel domain={simDomain} onDomainChange={setSimDomain} />

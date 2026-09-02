@@ -93,7 +93,7 @@ export default function WorkflowCompare() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
         </div>
         <h2 className="section-header">The difference</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-md">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-md">
           Toggle between the old way and the Terrium way.
         </p>
 
@@ -177,7 +177,7 @@ export default function WorkflowCompare() {
                         step {i + 1}
                       </span>
                     </div>
-                    <p className="text-[11px] text-white/35 leading-relaxed pl-5">
+                    <p className="text-[11px] text-white/50 leading-relaxed pl-5">
                       {step.detail}
                     </p>
                   </div>

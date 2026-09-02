@@ -192,7 +192,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                             <h3 className="text-[13px] font-sans font-medium text-white/70 mb-1">
                               {rel.title}
                             </h3>
-                            <p className="text-[11px] text-white/35 leading-relaxed">
+                            <p className="text-[11px] text-white/50 leading-relaxed">
                               {rel.desc}
                             </p>
                           </div>
