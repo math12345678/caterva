@@ -394,7 +394,7 @@ export default function CliApp() {
 
           <button
             onClick={() => setMobileMenu(!mobileMenu)}
-            className="md:hidden flex flex-col gap-1 p-2 text-white/40 hover:text-white/70 transition-colors"
+            className="md:hidden flex flex-col gap-1 p-3.5 -m-1.5 text-white/40 hover:text-white/70 transition-colors"
             aria-label={mobileMenu ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenu}
           >
