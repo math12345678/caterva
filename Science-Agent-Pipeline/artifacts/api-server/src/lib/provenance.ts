@@ -105,6 +105,43 @@ export class RequiredParametersMissingError extends Error {
 }
 
 /**
+ * Thrown by the keyword fallback resolver when a query matches none of
+ * Terrium's fifteen domains -- even after word-set matching and light
+ * stemming, not just an exact-phrase miss.
+ *
+ * This replaces a worse behavior: silently classifying an unmatched query
+ * as Michaelis-Menten enzyme kinetics ("mm"), because `mm` happened to sit
+ * first in the domain table when nothing else matched. A query about
+ * "the spread of measles in a school" or "predator and prey populations"
+ * would silently receive an enzyme-kinetics simulation, with the model
+ * mismatch invisible anywhere in the response -- no error, no flag, just
+ * the wrong physics for the question asked. Guessing the wrong SCIENTIFIC
+ * MODEL is a worse failure than guessing a wrong NUMBER (the case
+ * `RequiredParametersMissingError` already refuses): a wrong number is
+ * visibly wrong once checked against a source, but a wrong model produces
+ * an internally consistent, plausible-looking trajectory for a question
+ * that was never actually asked.
+ */
+export class UnrecognizedQueryError extends Error {
+  readonly query: string;
+  readonly availableDomains: string[];
+
+  constructor(query: string, availableDomains: string[]) {
+    super(
+      `Could not match this query to any of Terrium's ${availableDomains.length} ` +
+        `simulation domains: ${availableDomains.join(", ")}. Try naming the ` +
+        "domain directly (e.g. \"simulate sir ...\"), using terms closer to " +
+        "the science (\"outbreak\", \"enzyme kinetics\", \"predator-prey\", " +
+        '"population genetics"), or supplying parameters directly with ' +
+        "key=value pairs.",
+    );
+    this.name = "UnrecognizedQueryError";
+    this.query = query;
+    this.availableDomains = availableDomains;
+  }
+}
+
+/**
  * Per-parameter provenance: what is actually known about each value the
  * resolver returns. See ADR 0008 and Business/build-stages/STAGE_04_PART_03.md.
  */

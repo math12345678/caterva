@@ -254,9 +254,23 @@ describe("POST /api/simulate/:jobId/cancel", () => {
   });
 
   it("cancels a pending job", async () => {
+    // Was "to cancel" -- an unrecognized query. That used to silently
+    // resolve to "mm" with full default parameters (see the domain-
+    // classification fix in queryResolver.ts) and run a real simulation,
+    // which took just long enough for this test's cancel request to land
+    // while the job was still pending. Now an unrecognized query throws
+    // UnrecognizedQueryError immediately instead of running the wrong
+    // simulation, so the job reaches a terminal state before the cancel
+    // request arrives (409, not 200) -- a race this test lost only because
+    // the system got faster at refusing nonsense, which is the point of
+    // that fix. Using a real, fully-specified query here instead, so the
+    // cancellation window comes from genuine simulation work, not from an
+    // accident of how slowly a bad query used to fail.
     const create = await request(server)
       .post("/api/simulate")
-      .send({ query: "to cancel" });
+      .send({
+        query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51",
+      });
     const { jobId } = create.body;
 
     const res = await request(server).post(`/api/simulate/${jobId}/cancel`);

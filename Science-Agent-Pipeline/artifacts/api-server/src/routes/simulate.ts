@@ -25,6 +25,7 @@ import { findCachedResultByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
 import {
   RequiredParametersMissingError,
+  UnrecognizedQueryError,
   STRENDA_GOVERNED_FIELDS,
   validateParameterProvenance,
   type ParameterProvenance,
@@ -1036,6 +1037,15 @@ async function runPipeline(
       // one is fixable by editing the query, a real PIPELINE_ERROR isn't.
       queue.setJobError(jobId, {
         error: "MISSING_REQUIRED_INPUT",
+        message: err.message,
+      });
+    } else if (err instanceof UnrecognizedQueryError) {
+      // Same distinction as above, one step earlier: the query never
+      // matched a domain at all, so there's nothing to run the engine on.
+      // Also fixable by editing the query -- naming a domain directly, or
+      // using vocabulary closer to the fifteen supported domains.
+      queue.setJobError(jobId, {
+        error: "UNRECOGNIZED_QUERY",
         message: err.message,
       });
     } else {

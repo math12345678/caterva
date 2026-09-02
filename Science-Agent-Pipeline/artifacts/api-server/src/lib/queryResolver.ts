@@ -12,6 +12,7 @@ import { matchDisease } from "./diseases";
 import {
   RESOLVABLE_FIELDS,
   RequiredParametersMissingError,
+  UnrecognizedQueryError,
   buildResolvedKineticProvenance,
   unverifiedOriginKeys,
   isAllDefaults,
@@ -1135,6 +1136,65 @@ export interface ResolvedSimulation {
   assayCoherence: CoherenceReport;
 }
 
+/**
+ * Splits text into lowercase word tokens for keyword matching. Kept
+ * separate from `extractParameterOverrides`'s tokenizer above: that one
+ * preserves punctuation meaningful to key=value syntax, this one only
+ * needs plain words.
+ */
+function tokenizeForMatching(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 0);
+}
+
+/**
+ * Deliberately not a real stemmer (no Porter algorithm, no dictionary) --
+ * just enough suffix-stripping that a plural doesn't silently miss a
+ * singular keyword, or vice versa. "allele frequencies" failing to match
+ * the keyword "allele frequency" is the exact bug this exists to close:
+ * every other part of the query was right, only the word ending differed.
+ */
+function lightStem(word: string): string {
+  if (word.length > 4 && word.endsWith("ies")) return word.slice(0, -3) + "y";
+  if (word.length > 4 && word.endsWith("es")) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) {
+    return word.slice(0, -1);
+  }
+  return word;
+}
+
+/**
+ * Whether `keyword` matches the query, tried two ways:
+ *
+ * 1. Exact substring (the original, stricter check) -- keeps every
+ *    existing single-word keyword and deliberately-phrased multi-word
+ *    keyword ("lennard-jones") working exactly as before.
+ * 2. Word-set match: every word in the keyword phrase appears SOMEWHERE
+ *    among the query's tokens (order-independent, lightly stemmed). This
+ *    is what makes "predator and prey" match the keyword "predator prey"
+ *    and "allele frequencies in a population" match "allele frequency" --
+ *    real phrasings that failed the old exact-substring check for no
+ *    reason connected to whether the query was actually about that domain.
+ *
+ * A single-word keyword with no match in either query token set correctly
+ * fails both checks; word-set matching only helps once a keyword has two
+ * or more words to spread across the query.
+ */
+function keywordMatches(
+  lowerQuery: string,
+  queryTokens: Set<string>,
+  keyword: string,
+): boolean {
+  if (lowerQuery.includes(keyword)) return true;
+  const keywordWords = tokenizeForMatching(keyword);
+  return (
+    keywordWords.length > 0 &&
+    keywordWords.every((w) => queryTokens.has(lightStem(w)))
+  );
+}
+
 interface DomainDefaults {
   domain: SimulationDomain;
   parameters: Record<string, number | number[]>;
@@ -1189,6 +1249,13 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "trypsin",
       "rubisco",
       "kinase",
+      "kinetics",
+      "enzymatic",
+      "catalyze",
+      "catalyzes",
+      "catalyzed",
+      "reaction rate",
+      "turnover",
     ],
     reasoning:
       "Keywords related to enzyme kinetics were found; defaulting to a Michaelis-Menten simulation.",
@@ -1224,7 +1291,44 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       end: 100,
       points: 101,
     },
-    keywords: ["sir", "infection", "epidemic", "virus", "disease", "outbreak"],
+    keywords: [
+      "sir",
+      "infection",
+      "epidemic",
+      "virus",
+      "disease",
+      "outbreak",
+      "pandemic",
+      "spread",
+      "contagious",
+      "infectious",
+      // Named diseases, so a query naming one directly ("model measles in
+      // a school") still reaches the SIR domain even without also saying
+      // "outbreak" or "epidemic". Only "covid" resolves an actual R0 from
+      // literature today (see diseases.ts / ADR 0017) -- the rest still
+      // correctly refuse rather than invent an R0, but at least refuse
+      // from the right domain instead of silently running as if the
+      // question had been about enzyme kinetics.
+      "covid",
+      "coronavirus",
+      "sars-cov-2",
+      "measles",
+      "influenza",
+      "flu",
+      "mumps",
+      "rubella",
+      "chickenpox",
+      "varicella",
+      "smallpox",
+      "pertussis",
+      "whooping cough",
+      "tuberculosis",
+      "cholera",
+      "ebola",
+      "mpox",
+      "monkeypox",
+      "norovirus",
+    ],
     reasoning:
       "Keywords related to infectious disease spread were found; defaulting to an SIR epidemic simulation.",
     modelCitations: [
@@ -2279,19 +2383,79 @@ export async function resolveQuery(
     };
   }
 
-  const lower = query.toLowerCase();
+  // Strip explicit parameter-override tokens ("km=2", "vmax=5", ...)
+  // before classifying. "km" and "vmax" are themselves mm keywords
+  // (someone writing "the km of this reaction" IS naming enzyme kinetics
+  // vocabulary) -- but every fully-specified mm/mm_competitive_inhibition
+  // query ALSO writes "km=<value>" as parameter syntax, which would
+  // otherwise inflate mm's score by 1-2 points purely from bookkeeping
+  // that has nothing to do with which of the two domains is meant. That
+  // let mm silently outscore mm_competitive_inhibition on a query that
+  // explicitly said "competitive inhibition", just because it also
+  // supplied km=/vmax= inline -- classification must run on what the
+  // query SAYS, not on which parameter names it happens to assign.
+  const classificationText = query
+    .split(/\s+/)
+    .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token))
+    .join(" ");
+  const lower = classificationText.toLowerCase();
+  const queryTokens = new Set(
+    tokenizeForMatching(classificationText).map(lightStem),
+  );
+
+  // `matchEnzyme` already recognizes ~25 specific enzymes by name (with a
+  // verified EC number, no network round trip) for the entity-extraction
+  // step below -- but classification never consulted it, so a query
+  // naming one of those exact enzymes (e.g. "citrate synthase kinetics",
+  // "chymotrypsin activity") could still fail to reach "mm" if the enzyme
+  // itself wasn't ALSO separately hardcoded into the mm keyword list. That
+  // is the same class of bug as the domain-classification gap above, just
+  // one layer down: two independent lists of the same enzymes, silently
+  // drifting apart. Treating a real `matchEnzyme` hit as a strong
+  // classification signal removes the second list rather than growing it.
+  const enzymeMatch = matchEnzyme(query);
 
   let best: DomainDefaults | undefined;
+  let bestScore = 0;
   for (const candidate of DOMAIN_DEFAULTS) {
-    if (candidate.keywords.some((keyword) => lower.includes(keyword))) {
+    let score = candidate.keywords.filter((keyword) =>
+      keywordMatches(lower, queryTokens, keyword),
+    ).length;
+    // Naming a real enzyme is generic evidence for "this is an enzyme-
+    // kinetics question" -- it should land on plain mm by default, so mm
+    // gets the larger share (+2). mm_competitive_inhibition gets a smaller
+    // share (+1) rather than none: giving both the same boost made them
+    // tie on any plain enzyme-kinetics query with no inhibitor language,
+    // with array order (mm_competitive_inhibition is declared first)
+    // silently deciding the wrong one every time. With the smaller share,
+    // mm wins outright when nothing else distinguishes them, but a query
+    // that ALSO says "inhibitor"/"competitive"/"inhibition" adds enough on
+    // top (mm_competitive_inhibition's own keyword score) to still win --
+    // inhibition is a real, additional claim the query has to make, not
+    // the default assumption for every enzyme mentioned.
+    if (enzymeMatch && candidate.domain === "mm") {
+      score += 2;
+    } else if (enzymeMatch && candidate.domain === "mm_competitive_inhibition") {
+      score += 1;
+    }
+    if (score > bestScore) {
       best = candidate;
-      break;
+      bestScore = score;
     }
   }
 
   if (!best) {
-    best =
-      DOMAIN_DEFAULTS.find((d) => d.domain === "mm") ?? DOMAIN_DEFAULTS[0]!;
+    // Previously fell through to `mm` (Michaelis-Menten) unconditionally --
+    // whatever domain happened to sit first in DOMAIN_DEFAULTS when nothing
+    // else matched. That is a worse failure than refusing: a query about
+    // "the spread of measles in a school" or "predator and prey
+    // populations" would silently receive an enzyme-kinetics simulation,
+    // with the domain mismatch invisible anywhere in the response. See
+    // UnrecognizedQueryError's own doc comment for the full reasoning.
+    throw new UnrecognizedQueryError(
+      query,
+      DOMAIN_DEFAULTS.map((d) => d.domain),
+    );
   }
 
   let parameters = { ...best.parameters, ...overrides };

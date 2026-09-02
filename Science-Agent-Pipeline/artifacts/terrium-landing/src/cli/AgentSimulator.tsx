@@ -305,6 +305,20 @@ export default function AgentSimulator({
           return;
         }
 
+        // The keyword classifier used to silently guess "mm" (Michaelis-
+        // Menten) for any query it couldn't match to a domain -- a
+        // predator-prey or population-genetics question would silently
+        // come back as an enzyme-kinetics simulation. Now it refuses
+        // honestly instead, and the backend message already lists the
+        // real available domains and how to rephrase -- surface that
+        // directly rather than routing it into the generic "Failed" dead
+        // end below, which offered no way forward.
+        if (err.error === "UnrecognizedQueryError") {
+          setError(err.message || "Could not match this query to a domain.");
+          setStage("idle");
+          return;
+        }
+
         throw new Error(err.message || "Resolve failed");
       }
       const data = await response.json();

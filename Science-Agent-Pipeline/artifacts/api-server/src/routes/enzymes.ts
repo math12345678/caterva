@@ -7,7 +7,10 @@ import {
 } from "express";
 import { ENZYMES } from "../lib/enzymes";
 import { resolveQuery } from "../lib/queryResolver";
-import { RequiredParametersMissingError } from "../lib/provenance";
+import {
+  RequiredParametersMissingError,
+  UnrecognizedQueryError,
+} from "../lib/provenance";
 import { logger } from "../lib/logger";
 import { validate } from "../lib/validate";
 import { ResolveBody } from "../lib/schemas";
@@ -66,6 +69,18 @@ router.post(
           // what succeeded instead of making the user retype it just to
           // supply the one thing that was actually missing.
           resolvedParameters: err.resolvedSoFar,
+        });
+        return;
+      }
+      if (err instanceof UnrecognizedQueryError) {
+        // Distinct from RequiredParametersMissingError: this query never
+        // matched a domain at all, so there is no `domain`/parameter shape
+        // to render a form for -- only a list of what IS supported, so the
+        // UI can suggest rephrasing or picking one directly.
+        res.status(422).json({
+          error: "UnrecognizedQueryError",
+          message: err.message,
+          availableDomains: err.availableDomains,
         });
         return;
       }
