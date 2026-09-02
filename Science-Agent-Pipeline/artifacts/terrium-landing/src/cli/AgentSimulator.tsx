@@ -671,7 +671,7 @@ export default function AgentSimulator({
             </div>
 
             {reasoning && (
-              <p className="text-[11px] text-white/30 italic mb-2 leading-relaxed border-l-2 border-[#1D8A72]/20 pl-3">
+              <p className="text-[11px] text-white/30 italic mb-2 leading-relaxed">
                 {reasoning}
               </p>
             )}

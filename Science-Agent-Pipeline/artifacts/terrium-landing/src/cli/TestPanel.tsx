@@ -161,7 +161,7 @@ export default function TestPanelBody() {
       </motion.div>
 
       {skipped > 0 && (
-        <div className="mt-4 text-[11px] text-white/30 leading-relaxed border-l-2 border-yellow-500/20 pl-3 py-1">
+        <div className="mt-4 text-[11px] text-white/30 leading-relaxed border border-yellow-500/15 bg-yellow-500/[0.03] px-3 py-2">
           <span className="text-yellow-500/60 font-medium">skip note: </span>
           {SKIP_EXPLANATION}
         </div>

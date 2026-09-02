@@ -74,7 +74,7 @@ export default function PricingPlans() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
         </div>
         <h2 className="section-header">Simple, transparent pricing</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           Start free. Upgrade when your lab needs more.
         </p>
 
@@ -113,7 +113,7 @@ export default function PricingPlans() {
                       {plan.period}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/35 mt-2 leading-relaxed">
+                  <p className="text-[11px] text-white/50 mt-2 leading-relaxed">
                     {plan.desc}
                   </p>
                 </div>

@@ -66,7 +66,7 @@ export default function HowToCiteSection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
         </div>
         <h2 className="section-header">How to cite</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           Every simulation is citable. Copy the BibTeX, APA, or Markdown below.
         </p>
 

@@ -85,7 +85,7 @@ export default function TeamSection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
         </div>
         <h2 className="section-header">Built by humans, for humans</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           A small team building big things. Open source, open science.
         </p>
 
@@ -122,7 +122,7 @@ export default function TeamSection() {
                   <h3 className="text-[14px] font-sans font-medium text-white/80 group-hover:text-white transition-colors">
                     {c.name}
                   </h3>
-                  <p className="text-[11px] text-white/35 mt-0.5 mb-2">
+                  <p className="text-[11px] text-white/50 mt-0.5 mb-2">
                     {c.role}
                   </p>
                   {c.links && (

@@ -120,7 +120,7 @@ export default function ExportFormats() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
         </div>
         <h2 className="section-header">Export anywhere</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-md">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-md">
           SBML for modeling tools, CSV for spreadsheets, JSON for custom
           pipelines. Every export includes full provenance.
         </p>
