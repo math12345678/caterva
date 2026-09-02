@@ -194,7 +194,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 ### E. Molecular Dynamics (Lennard-Jones Potential)
 
 **Theory**:
-- **Reference**: Lennard-Jones, J. E. (1924). "On the determination of molecular fields." *Proceedings of the Royal Society of London. Series A*, 106(738), 463–477.
+- **Reference**: Jones, J. E. (1924). "On the determination of molecular fields." *Proceedings of the Royal Society of London. Series A*, 106(738), 463–477. (Published under "Jones" -- he married in 1925 and adopted "Lennard-Jones" afterward; confirmed against CrossRef's metadata for this DOI. The potential is still correctly called "Lennard-Jones" today under his later, eponymous name.)
 - **Citation**: https://doi.org/10.1098/rspa.1924.0082
 - **Potential**: V(r) = 4ε[(σ/r)¹² - (σ/r)⁶]
 - **Components**:
