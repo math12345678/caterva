@@ -124,7 +124,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                 </span>
                 <button
                   onClick={onClose}
-                  className="text-white/25 hover:text-white/60 transition-colors p-0.5"
+                  className="text-white/25 hover:text-white/60 transition-colors p-2.5 -m-2.5"
                   aria-label="Close changelog"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">

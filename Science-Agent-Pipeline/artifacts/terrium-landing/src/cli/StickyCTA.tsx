@@ -109,7 +109,7 @@ export default function StickyCTA() {
 
               <button
                 onClick={handleDismiss}
-                className="p-1.5 rounded-md text-white/20 hover:text-white/40 transition-colors"
+                className="p-2.5 -m-1 rounded-md text-white/20 hover:text-white/40 transition-colors"
                 aria-label="Dismiss"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">

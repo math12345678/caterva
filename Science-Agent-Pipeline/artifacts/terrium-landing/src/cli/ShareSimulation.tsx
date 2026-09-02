@@ -221,7 +221,7 @@ export default function ShareSimulation({
               </span>
               <button
                 onClick={() => setOpen(false)}
-                className="text-white/20 hover:text-white/50 transition-colors"
+                className="text-white/20 hover:text-white/50 transition-colors p-2.5 -m-2.5"
                 aria-label="Close share panel"
               >
                 <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
