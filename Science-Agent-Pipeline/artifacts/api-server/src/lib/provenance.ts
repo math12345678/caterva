@@ -447,7 +447,20 @@ export interface ParameterProvenance {
      * generic sentence ("could not be resolved from literature") false by
      * omission. The literature was not silent — nobody read it out.
      */
-    | "literature_candidates";
+    | "literature_candidates"
+    /**
+     * The run stopped at the DISEASE NAME (epidemiology's counterpart to
+     * `ec_not_resolved`), before the (R0, infectious period) registry was
+     * consulted at all -- either no disease name was recognized in the
+     * query, or the one that was is not among the short list this system
+     * has a verified, methodology-compatible source for (see diseases.ts
+     * and ADR 0017; today that list is COVID-19 only). The generic
+     * sentence would say beta/gamma "could not be resolved from
+     * literature", which reads as "we checked and the literature had
+     * nothing" -- false for a real, well-studied disease like measles or
+     * influenza that simply isn't registered here yet.
+     */
+    | "disease_not_registered";
   /**
    * Graded reliability of a RESOLVED value, on three independently
    * reported axes (ADR 0024 Decision 3, on Barbara Bakker's method).

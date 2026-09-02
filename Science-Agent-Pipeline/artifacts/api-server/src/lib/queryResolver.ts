@@ -960,6 +960,39 @@ async function applyBetaGammaFromR0Resolution(
   }
   const disease = matchDisease(query);
   if (!disease) {
+    // Not "literature has nothing for this disease" -- this system only
+    // recognizes disease NAMES it has a verified, methodology-compatible
+    // (R0, infectious period) source for in the first place (see
+    // diseases.ts and ADR 0017), so a name outside that short list never
+    // even reaches the literature lookup below. Previously silent: a
+    // query naming a real disease (measles, influenza, ...) that
+    // correctly reaches the sir domain would refuse on missing beta/gamma
+    // via the generic "could not be resolved from literature" sentence --
+    // false by omission for a real, well-studied disease that simply
+    // isn't registered here yet, not one the literature has nothing on.
+    // Set directly on beta/gamma (not just a flag, which never reaches
+    // the RequiredParametersMissingError response the client actually
+    // sees) so missingKeyDetails can promote it into the error message.
+    const note =
+      "No disease name in this query matches Terrium's literature-backed " +
+      "R0 registry (currently COVID-19 only, per ADR 0017 -- other " +
+      "diseases were checked and did not have a compatible-methodology " +
+      "source). This is a gap in what this system has verified so far, " +
+      "not a statement that the literature is silent. Supply beta/gamma " +
+      "directly if you have a source for this disease.";
+    for (const key of ["beta", "gamma"] as const) {
+      if (!(key in overrides)) {
+        parameterProvenance = {
+          ...parameterProvenance,
+          [key]: {
+            ...parameterProvenance[key],
+            origin: parameterProvenance[key]?.origin ?? "default",
+            unresolvedReason: "disease_not_registered",
+            note,
+          },
+        };
+      }
+    }
     return { parameters, parameterProvenance, flags };
   }
 
