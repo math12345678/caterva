@@ -80,6 +80,30 @@ describe("keyword classifier: realistic phrasing that used to misclassify", () =
     expect(result.parameterProvenance["gamma"]?.origin).toBe("resolved");
   });
 
+  it('a real disease outside the registry (measles) explains WHY beta/gamma are unresolved, not just THAT they are', async () => {
+    // Before this fix, an unregistered disease's beta/gamma got the
+    // generic "could not be resolved from literature" sentence -- false by
+    // omission for a real, well-studied disease that simply isn't
+    // registered here yet (only COVID-19 is, per ADR 0017), as opposed to
+    // one the literature is actually silent on.
+    try {
+      await resolveQuery(
+        "the spread of measles in a school with 500 students",
+      );
+      throw new Error("expected resolveQuery to throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(RequiredParametersMissingError);
+      const err = e as RequiredParametersMissingError;
+      expect(err.domain).toBe("sir");
+      expect(err.details["beta"]).toMatch(
+        /matches Terrium's literature-backed R0 registry/,
+      );
+      expect(err.details["gamma"]).toMatch(
+        /matches Terrium's literature-backed R0 registry/,
+      );
+    }
+  });
+
   it("a genuinely unrecognized query throws UnrecognizedQueryError, not a silent mm default", async () => {
     await expect(
       resolveQuery("xyzzy plugh quux frobnicate"),
