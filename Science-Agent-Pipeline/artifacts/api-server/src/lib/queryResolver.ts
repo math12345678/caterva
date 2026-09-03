@@ -9,6 +9,7 @@ import { resolveKineticValue, resolveEpidemiologyParameters, type RelatednessVer
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
 import { matchDisease } from "./diseases";
+import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
   RequiredParametersMissingError,
@@ -2491,14 +2492,50 @@ export async function resolveQuery(
     );
   }
 
-  let parameters = { ...best.parameters, ...overrides };
+  // Quantities the user stated in words rather than as key=value.
+  //
+  // "model a covid-19 outbreak in a town of 10000 people" contains the
+  // population. Before this, only CLI syntax was read, so that number was
+  // invisible and the refusal asked the user to supply s0 -- a number they
+  // had already given, in the same sentence. Reading it is not inventing
+  // it; the difference between "a town of 10000 people" and "s0=10000" is
+  // grammar, not provenance, and both are origin "user".
+  //
+  // An explicit key=value ALWAYS wins over prose. Someone who writes
+  // "s0=500" after describing a town of 10000 is correcting themselves, and
+  // the more precise statement is the one they meant.
+  const stated = extractStatedQuantities(query, best.domain);
+  const statedPhrases: Record<string, string> = {};
+  const statedValues: Record<string, number> = {};
+  for (const q of stated) {
+    if (q.key in overrides) continue;
+    statedValues[q.key] = q.value;
+    statedPhrases[q.key] = q.sourcePhrase;
+  }
+  const effectiveOverrides = { ...statedValues, ...overrides };
+
+  let parameters = { ...best.parameters, ...effectiveOverrides };
   let flags: string[] = [];
   let parameterProvenance = buildParameterProvenance(
     parameters,
-    overrides,
+    effectiveOverrides,
     {},
     best.domain,
   );
+
+  // Record WHICH WORDS produced each stated value. This is what makes a
+  // misreading catchable: without it, a wrong binding is discoverable only
+  // from the trajectory, which is exactly the invisible-failure shape this
+  // project treats as worse than an error.
+  for (const [key, phrase] of Object.entries(statedPhrases)) {
+    const entry = parameterProvenance[key];
+    if (entry) {
+      parameterProvenance[key] = {
+        ...entry,
+        note: `Read from your query: "${phrase}".`,
+      };
+    }
+  }
 
   // If this looks like an enzyme query and no LLM is available, try the
   // hardcoded entity map and the science agent.
