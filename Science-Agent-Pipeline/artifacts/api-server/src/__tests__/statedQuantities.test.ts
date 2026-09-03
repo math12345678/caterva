@@ -142,6 +142,70 @@ describe("extractStatedQuantities — what the user actually said", () => {
     expect(got.find((q) => q.key === "s0")).toBeUndefined();
   });
 
+  // ---- enzyme vs substrate: two concentrations, five orders apart ------
+
+  it("reads the enzyme concentration as [E]0, not as the substrate", () => {
+    // The bug this replaces: the FIRST concentration in the sentence was
+    // bound to s0 unconditionally, so this query resolved s0 = 0.00005 mM
+    // -- the enzyme's concentration, presented as glucose's, stamped
+    // origin "user". A 200,000x error that simulates a flat, entirely
+    // plausible curve.
+    const q = "hexokinase with 50 nM enzyme and 10 mM glucose over 30 seconds";
+    expect(find(q, "mm", "enzyme_conc")?.value).toBeCloseTo(5e-5, 15);
+    expect(find(q, "mm", "s0")?.value).toBe(10);
+  });
+
+  it("reads [E]0 whichever side of the number the enzyme noun sits on", () => {
+    // "50 nM enzyme" and "enzyme at 50 nM" are the same statement.
+    for (const q of [
+      "hexokinase with 50 nM enzyme, glucose at 10 mM",
+      "hexokinase with enzyme at 50 nM, glucose at 10 mM",
+      "hexokinase at 50 nM with 10 mM glucose",
+      "hexokinase, [E]0 = 50 nM, 10 mM glucose",
+    ]) {
+      expect(find(q, "mm", "enzyme_conc")?.value, q).toBeCloseTo(5e-5, 15);
+      expect(find(q, "mm", "s0")?.value, q).toBe(10);
+    }
+  });
+
+  it("names the noun in the source phrase, so a mix-up is visible", () => {
+    // "s0 = 10 because you wrote '10 mM'" cannot be checked by a reader.
+    // "because you wrote '10 mM glucose'" can.
+    const q = "hexokinase with 50 nM enzyme and 10 mM glucose";
+    expect(find(q, "mm", "s0")?.sourcePhrase).toMatch(/glucose/i);
+    expect(find(q, "mm", "enzyme_conc")?.sourcePhrase).toMatch(/enzyme/i);
+  });
+
+  it("picks the enzyme's primary substrate when several are named", () => {
+    // Hexokinase phosphorylates glucose using ATP. Michaelis-Menten models
+    // saturation in ONE substrate, and enzymes.ts lists glucose first for
+    // exactly that reason -- so position in the sentence must not decide.
+    const q = "hexokinase with 1 mM ATP and 10 mM glucose";
+    expect(find(q, "mm", "s0")?.value).toBe(10);
+  });
+
+  it("refuses rather than guessing between two unlabelled concentrations", () => {
+    // Neither number is attached to a noun that says which is which.
+    // Extracting nothing hands this to the refusal path, which asks for s0
+    // by name -- a visible question instead of a silent coin-flip.
+    expect(find("michaelis menten with 10 mM and 2 mM", "mm", "s0")).toBeUndefined();
+  });
+
+  it("still reads a lone unlabelled concentration as the substrate", () => {
+    // Nothing else it could be, and this is the common phrasing.
+    expect(
+      find("how fast does hexokinase convert glucose at 10 mM", "mm", "s0")?.value,
+    ).toBe(10);
+  });
+
+  it("does not invent an enzyme concentration from an ordinary mention", () => {
+    // "enzyme kinetics at 10 mM" is a substrate concentration in a
+    // sentence that happens to contain the word "enzyme".
+    const q = "enzyme kinetics for hexokinase at 10 mM glucose";
+    expect(find(q, "mm", "enzyme_conc")).toBeUndefined();
+    expect(find(q, "mm", "s0")?.value).toBe(10);
+  });
+
   it("does not apply epidemiology nouns to unrelated domains", () => {
     // "people" means nothing to enzyme kinetics.
     expect(find("hexokinase with 500 people", "mm", "s0")).toBeUndefined();

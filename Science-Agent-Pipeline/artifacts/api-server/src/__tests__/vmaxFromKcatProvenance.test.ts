@@ -94,6 +94,51 @@ describe("Vmax-from-kcat bridge — ADR 0019", () => {
     );
   });
 
+  it("an [E]0 stated in words reaches the bridge, so a plain question runs", async () => {
+    // This is the whole point of the bridge finally being reachable.
+    //
+    // Measured before this: EVERY plain-language enzyme-kinetics question
+    // failed on "vmax could not be resolved from literature", because the
+    // only way to supply [E]0 was the CLI syntax `enzyme_conc=0.001`. A
+    // researcher describing their assay in a sentence could not get a
+    // simulation out of this system at all -- the kcat half was sitting
+    // in BRENDA the whole time, waiting on a number the user was perfectly
+    // willing to state, just not in that notation.
+    //
+    // "1 uM enzyme" is 0.001 mM, and it must arrive as origin "user":
+    // reading it out of prose is the user supplying it (grammar differs,
+    // provenance does not), never Terrium inferring it. ADR 0013 stands.
+    const resolved = await resolveQuery(
+      "simulate acetylcholinesterase with 10 mM acetylthiocholine and " +
+        "1 uM enzyme for 10 seconds",
+    );
+    expect(resolved.parameters["vmax"]).toBe(6.5);
+    expect(resolved.parameterProvenance["vmax"]!.origin).toBe("resolved");
+    expect(resolved.parameterProvenance["vmax"]!.note).toContain("0.001");
+
+    expect(resolved.parameters["enzyme_conc"]).toBeCloseTo(0.001, 15);
+    expect(resolved.parameterProvenance["enzyme_conc"]!.origin).toBe("user");
+
+    // And the substrate is the SUBSTRATE, not the enzyme -- the two
+    // concentrations in that sentence are 10,000x apart.
+    expect(resolved.parameters["s0"]).toBe(10);
+  });
+
+  it("explains the [E]0 route instead of telling the user to go find a Vmax", async () => {
+    // The generic refusal ("vmax could not be resolved from literature.
+    // Add vmax=<value>") does not merely omit the bridge -- it recommends
+    // the wrong action. A Vmax copied out of a paper was measured at that
+    // paper's enzyme concentration; dropping it into a run at a different
+    // [E]0 is wrong by the ratio of the two, and nothing downstream can
+    // tell. So the refusal has to name the actual route.
+    const query =
+      "simulate acetylcholinesterase with 10 mM acetylthiocholine for 10 seconds";
+    await expect(resolveQuery(query)).rejects.toThrow(
+      /enzyme concentration/i,
+    );
+    await expect(resolveQuery(query)).rejects.toThrow(/kcat/);
+  });
+
   it("an explicit user-supplied vmax always wins over the bridge", async () => {
     const query =
       "simulate acetylcholinesterase with substrate acetyl thiocholine " +
