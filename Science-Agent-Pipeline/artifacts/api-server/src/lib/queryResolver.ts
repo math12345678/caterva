@@ -12,6 +12,8 @@ import { matchDisease } from "./diseases";
 import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
+  DOMAINS_WITH_LITERATURE_RESOLUTION,
+  EPIDEMIOLOGY_BRIDGE_DOMAINS,
   RequiredParametersMissingError,
   UnrecognizedQueryError,
   buildResolvedKineticProvenance,
@@ -986,7 +988,12 @@ async function applyBetaGammaFromR0Resolution(
   parameterProvenance: Record<string, ParameterProvenance>;
   flags: string[];
 }> {
-  if (domain !== "sir") {
+  // The domain list lives in provenance.ts beside RESOLVABLE_FIELDS, so
+  // that DOMAINS_WITH_LITERATURE_RESOLUTION can be derived from it rather
+  // than restating which domains have a resolver. A hardcoded
+  // `domain !== "sir"` here would be a second copy of that fact, and the
+  // two would drift the way the enzyme and domain-keyword lists did.
+  if (!EPIDEMIOLOGY_BRIDGE_DOMAINS.has(domain)) {
     return { parameters, parameterProvenance, flags };
   }
   if ("beta" in overrides || "gamma" in overrides) {
@@ -2021,6 +2028,22 @@ function buildParameterProvenance(
       provenance[key] = {
         origin: "default",
         note: `No literature lookup exists for ${key}; only ${resolvable.join(", ")} is resolved from literature in this domain.`,
+      };
+    } else if (!DOMAINS_WITH_LITERATURE_RESOLUTION.has(domain)) {
+      // The whole domain has no lookup, so there is no "only X is
+      // resolved" to point at. Say the true thing instead of nothing:
+      // silence here is what let the refusal claim a search had happened.
+      //
+      // No `unresolvedReason` on purpose. Setting one would promote this
+      // into the per-key detail list, which drops the generic sentence
+      // AND the "Add key=<value>" instruction that goes with it — the
+      // regression missingKeyDetails' own comment records. The refusal
+      // sentence is corrected at its source instead.
+      provenance[key] = {
+        origin: "default",
+        note:
+          `No literature lookup exists for any parameter in the ` +
+          `'${domain}' domain; every value must be supplied in the query.`,
       };
     } else {
       provenance[key] = { origin: "default" };

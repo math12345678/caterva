@@ -63,10 +63,24 @@ export class RequiredParametersMissingError extends Error {
     const parts: string[] = [];
     if (unexplained.length > 0) {
       const example = unexplained.map((k) => `${k}=<value>`).join(" ");
+      // "could not be resolved from literature" is a claim about a search
+      // that happened. For a domain with no lookup at all, no search
+      // happened, and saying otherwise sends a researcher away from a
+      // value they could find in a paper in a minute. See
+      // DOMAINS_WITH_LITERATURE_RESOLUTION.
+      const searched = DOMAINS_WITH_LITERATURE_RESOLUTION.has(domain)
+        ? `${unexplained.join(", ")} could not be resolved from literature ` +
+          `and ${unexplained.length > 1 ? "were" : "was"} not supplied in ` +
+          "the query."
+        : `${unexplained.join(", ")} ` +
+          `${unexplained.length > 1 ? "were" : "was"} not supplied in the ` +
+          `query, and Terrium has no literature lookup for any parameter ` +
+          `in the '${domain}' domain — so ` +
+          `${unexplained.length > 1 ? "they were" : "it was"} never ` +
+          "searched for, rather than searched for and not found.";
       parts.push(
-        `Cannot simulate '${domain}': ${unexplained.join(", ")} could not be ` +
-          `resolved from literature and ${unexplained.length > 1 ? "were" : "was"} not ` +
-          `supplied in the query. Add ${example} to your query and try again.` +
+        `Cannot simulate '${domain}': ${searched}` +
+          ` Add ${example} to your query and try again.` +
           // THE SECOND SENTENCE IS THE POINT.
           //
           // Herbert Sauro predicted that a refusing tool makes the
@@ -202,6 +216,46 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
   // in Tests/popgen_resolver.py with primary citations).
   wright_fisher: ["mutation_rate"],
 };
+
+/**
+ * Domains whose (beta, gamma) resolve from a literature (R0, infectious
+ * period) pair — ADR 0017 / ADR 0020.
+ *
+ * Deliberately NOT in RESOLVABLE_FIELDS: that map means "one BRENDA-style
+ * table maps to one engine parameter", which is false here (an arithmetic
+ * bridge feeds two parameters from one registry entry). It lives here
+ * anyway, rather than as a bare `domain !== "sir"` inside the bridge, so
+ * that the set below can be DERIVED from it. The bridge imports this;
+ * there is one list, not two.
+ */
+export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set([
+  "sir",
+]);
+
+/**
+ * Every domain where ANY parameter has a literature lookup behind it.
+ *
+ * This exists because the refusal message was making a claim that is
+ * false for most of the catalogue. "km could not be resolved from
+ * literature" is accurate for enzyme kinetics: BRENDA, KEGG and PubMed
+ * were genuinely searched and came back empty. The same sentence was
+ * also being shown for the repressilator, Lotka-Volterra, PCR, molecular
+ * dynamics and the Gillespie domains, where nothing was ever searched
+ * because no lookup exists for them at all.
+ *
+ * A reader has no way to tell those apart, and they call for opposite
+ * actions. "The literature has nothing" means stop looking. "Terrium
+ * never looked" means the value is in a paper you can probably find in a
+ * minute. Telling a researcher the first when the second is true is the
+ * true-sounding-and-misleading shape this project spends most of its
+ * effort refusing to produce, and it was in the most-read sentence in
+ * the product.
+ *
+ * Derived, never hand-listed, so adding a resolver cannot leave this
+ * stale.
+ */
+export const DOMAINS_WITH_LITERATURE_RESOLUTION: ReadonlySet<string> =
+  new Set([...Object.keys(RESOLVABLE_FIELDS), ...EPIDEMIOLOGY_BRIDGE_DOMAINS]);
 
 /**
  * Assay conditions under which a kinetic constant was measured.
