@@ -49,6 +49,7 @@
  * time is domain-aware, and the note on population for why "a town of N"
  * is a TOTAL rather than a susceptible count.
  */
+import { matchEnzyme, type EnzymeEntry } from "./enzymes";
 import type { SimulationDomain } from "./teriumRunner";
 
 export interface StatedQuantity {
@@ -246,6 +247,154 @@ const CONCENTRATION_RE = new RegExp(
   "i",
 );
 
+/** Regex-safe form of a literal substrate name like "NADP+" or "H2O2". */
+function escapeRegExp(literal: string): string {
+  return literal.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * An enzyme-kinetics query can state TWO concentrations that mean entirely
+ * different things, and telling them apart is the whole job here.
+ *
+ *   "hexokinase with 50 nM enzyme and 10 mM glucose"
+ *                    ^^^^^^^^^^^^^      ^^^^^^^^^^^
+ *                    [E]0, enzyme_conc  substrate, s0
+ *
+ * These differ by five orders of magnitude, because they are different
+ * physical quantities: enzymes work at nM-uM, their substrates at uM-mM.
+ * An earlier version of this file took the FIRST concentration in the
+ * sentence and bound it to s0 unconditionally, so the query above resolved
+ * s0 = 0.00005 mM -- the ENZYME's concentration, presented as the
+ * substrate's, stamped origin "user" with the source phrase "50 nM". It
+ * would have simulated a flat, entirely plausible-looking curve for a
+ * question nobody asked. That is the exact invisible-wrong-number failure
+ * this module's header says it exists to prevent, and it was reachable the
+ * moment a query mentioned its enzyme concentration.
+ *
+ * (It was not reachable in practice only because Vmax could not resolve at
+ * all, so every such query failed earlier for a different reason. Making
+ * enzyme_conc readable -- below -- is what would have armed it.)
+ *
+ * So each concentration is classified by the noun it modifies, and an
+ * unclassifiable one is left to the refusal path.
+ */
+type ConcentrationRole = "enzyme" | "substrate" | "unlabelled";
+
+interface ConcentrationHit {
+  /** Already converted into mM. */
+  value: number;
+  phrase: string;
+  role: ConcentrationRole;
+  /** Which of the enzyme's known substrates it named, lowercased. */
+  substrate?: string;
+}
+
+/** "of the total" etc. between a number and the noun it modifies. */
+const NOUN_LEAD = "^\\s*(?:of\\s+)?(?:the\\s+)?(?:total\\s+)?";
+
+/** Generic ways to say "the enzyme" without naming it. */
+const ENZYME_WORD = "enzyme|catalyst|\\[e\\]\\s*[0₀]";
+
+/** What can sit between a noun and its value: "enzyme at 50 nM". */
+const VALUE_CONNECTOR = "(?:concentration\\s+)?(?:of|at|=|:|is)";
+
+/**
+ * Decide whether a concentration belongs to the enzyme or the substrate,
+ * from the words touching it.
+ *
+ * Order matters. A noun AFTER the number ("50 nM enzyme", "10 mM glucose")
+ * is the strongest signal, because that is the noun the quantity modifies.
+ * Only when nothing follows do we look backwards ("enzyme at 50 nM"), and
+ * a substrate named after the number always beats an enzyme named before
+ * it -- "hexokinase at 10 mM glucose" is a glucose concentration, however
+ * oddly it is worded.
+ */
+function classifyConcentration(
+  before: string,
+  after: string,
+  enzyme: EnzymeEntry | undefined,
+): { role: ConcentrationRole; substrate?: string; trailing?: string } {
+  const namedEnzyme = enzyme ? `|(?:${enzyme.pattern.source})` : "";
+
+  // 1. "... 50 nM enzyme", "... 1 uM hexokinase"
+  const afterEnzyme = new RegExp(
+    `${NOUN_LEAD}(?:${ENZYME_WORD}${namedEnzyme})\\b`,
+    "i",
+  ).exec(after);
+  if (afterEnzyme) return { role: "enzyme", trailing: afterEnzyme[0] };
+
+  // 2. "... 10 mM glucose". The substrate list comes from enzymes.ts
+  //    rather than a second hardcoded list here -- the same
+  //    two-lists-drifting-apart defect that domain classification hit.
+  const substrateNames = [
+    ...(enzyme?.substrates ?? []).map(escapeRegExp),
+    "substrate",
+  ];
+  const afterSubstrate = new RegExp(
+    `${NOUN_LEAD}(${substrateNames.join("|")})\\b`,
+    "i",
+  ).exec(after);
+  if (afterSubstrate) {
+    return {
+      role: "substrate",
+      substrate: afterSubstrate[1]!.toLowerCase(),
+      trailing: afterSubstrate[0],
+    };
+  }
+
+  // 3. "enzyme at 50 nM", "[E]0 = 5 uM". The connector is optional for the
+  //    generic word (nothing else "enzyme 50 nM" could mean) but REQUIRED
+  //    after a specific name, so the bare "hexokinase 10 mM glucose"
+  //    reading stays with the substrate above.
+  if (new RegExp(`(?:${ENZYME_WORD})\\s*(?:${VALUE_CONNECTOR})?\\s*$`, "i").test(before)) {
+    return { role: "enzyme" };
+  }
+  if (
+    enzyme &&
+    new RegExp(
+      `(?:${enzyme.pattern.source})\\s*(?:${VALUE_CONNECTOR})\\s*$`,
+      "i",
+    ).test(before)
+  ) {
+    return { role: "enzyme" };
+  }
+
+  return { role: "unlabelled" };
+}
+
+/**
+ * The substrate concentration, chosen from every candidate in the query.
+ *
+ * Michaelis-Menten has ONE substrate, but a query may legitimately name
+ * several concentrations ("10 mM glucose and 1 mM ATP"). Picking by
+ * position would be arbitrary, so the enzyme's own substrate list decides:
+ * enzymes.ts records substrates in order, and the first is the one whose
+ * saturation the model describes (glucose for hexokinase, not its ATP
+ * co-substrate). When that cannot settle it, this returns nothing and the
+ * refusal path asks for s0 by name -- a visible question rather than a
+ * silent coin-flip between two numbers the user did state.
+ */
+function chooseSubstrateConcentration(
+  candidates: ConcentrationHit[],
+  enzyme: EnzymeEntry | undefined,
+): ConcentrationHit | undefined {
+  const onlyDistinct = (list: ConcentrationHit[]): ConcentrationHit | undefined =>
+    list.length > 0 && list.every((h) => h.value === list[0]!.value)
+      ? list[0]
+      : undefined;
+
+  const named = candidates.filter((h) => h.substrate !== undefined);
+  if (named.length > 0) {
+    const primary = enzyme?.substrates[0]?.toLowerCase();
+    const onPrimary =
+      primary === undefined
+        ? undefined
+        : named.find((h) => h.substrate === primary);
+    return onPrimary ?? onlyDistinct(named);
+  }
+  return onlyDistinct(candidates);
+}
+
 /** A duration with an EXPLICIT unit. Never a bare number. */
 const DURATION_RE = new RegExp(
   `\\b(?:for|over|across|during)?\\s*${NUM}\\s*` +
@@ -329,17 +478,55 @@ export function extractStatedQuantities(
   }
 
   if (domain === "mm" || domain === "mm_competitive_inhibition") {
-    const m = CONCENTRATION_RE.exec(query);
-    if (m) {
+    const enzyme = matchEnzyme(query);
+    const hits: ConcentrationHit[] = [];
+    for (const m of query.matchAll(new RegExp(CONCENTRATION_RE.source, "gi"))) {
       const value = toNumber(m[1]!);
       const factor = CONCENTRATION_TO_MM[m[2]!.toLowerCase()];
-      if (value !== undefined && factor !== undefined) {
-        out.push({
-          key: "s0",
-          value: value * factor,
-          sourcePhrase: m[0].trim(),
-        });
-      }
+      if (value === undefined || factor === undefined) continue;
+      const start = m.index;
+      const end = start + m[0].length;
+      const cls = classifyConcentration(
+        query.slice(0, start),
+        query.slice(end),
+        enzyme,
+      );
+      hits.push({
+        value: value * factor,
+        // Keep the noun in the phrase, so provenance can say s0 = 10
+        // because you wrote "10 mM glucose" -- naming the noun is what
+        // makes a substrate/enzyme mix-up visible on the page.
+        phrase: (m[0] + (cls.trailing ?? "")).trim(),
+        role: cls.role,
+        ...(cls.substrate !== undefined ? { substrate: cls.substrate } : {}),
+      });
+    }
+
+    // [E]0. ADR 0013 says this is never resolved, inferred, or defaulted --
+    // and it still is not. Reading it out of "with 50 nM enzyme" is the
+    // user supplying it, in the same sense "enzyme_conc=0.00005" is; the
+    // difference is grammar. What it unlocks is ADR 0019's Vmax = kcat x
+    // [E]0 bridge, which had a literature kcat available all along and no
+    // way for a plain-language question to supply the other half.
+    const enzymeHit = hits.find((h) => h.role === "enzyme");
+    if (enzymeHit) {
+      out.push({
+        key: "enzyme_conc",
+        value: enzymeHit.value,
+        sourcePhrase: enzymeHit.phrase,
+      });
+    }
+
+    const substrateHit = chooseSubstrateConcentration(
+      hits.filter((h) => h.role !== "enzyme"),
+      enzyme,
+    );
+    if (substrateHit) {
+      out.push({
+        key: "s0",
+        value: substrateHit.value,
+        sourcePhrase: substrateHit.phrase,
+      });
     }
   }
 

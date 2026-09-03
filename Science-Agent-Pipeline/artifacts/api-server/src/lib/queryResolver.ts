@@ -844,11 +844,44 @@ async function applyVmaxFromKcatResolution(
   if ("vmax" in overrides) {
     return { parameters, parameterProvenance, flags };
   }
-  const enzymeConcOverride = overrides["enzyme_conc"];
-  if (typeof enzymeConcOverride !== "number") {
+  if (!entities?.ecNumber && !entities?.enzymeName) {
     return { parameters, parameterProvenance, flags };
   }
-  if (!entities?.ecNumber && !entities?.enzymeName) {
+  const enzymeConcOverride = overrides["enzyme_conc"];
+  if (typeof enzymeConcOverride !== "number") {
+    // Say WHY, instead of returning in silence.
+    //
+    // Silence here left the refusal to the generic sentence, which told
+    // the user "vmax could not be resolved from literature. Add
+    // vmax=<value>" — advice that is both wrong about the literature and
+    // wrong about the science. A Vmax copied from a paper was measured at
+    // that paper's [E]0, and dropping it into a run at a different [E]0 is
+    // wrong by the ratio of the two, invisibly. See the
+    // `enzyme_conc_not_supplied` doc comment in provenance.ts.
+    //
+    // We know an enzyme was identified (checked just above), so the kcat
+    // route genuinely exists for this query. It is not promised to
+    // succeed — if BRENDA holds no kcat, the flag above says so — only
+    // offered, which is the honest shape.
+    const existing = parameterProvenance["vmax"];
+    if (existing) {
+      parameterProvenance = {
+        ...parameterProvenance,
+        vmax: {
+          ...existing,
+          unresolvedReason: "enzyme_conc_not_supplied",
+          note:
+            "Vmax is not a property of the enzyme on its own — it is " +
+            "kcat × [E]0, so it depends on how much enzyme is in YOUR " +
+            "assay. Terrium resolves kcat from literature, but [E]0 is " +
+            "your experimental choice and is never guessed (ADR 0013). " +
+            "State the enzyme concentration — e.g. \"with 50 nM enzyme\" " +
+            "or enzyme_conc=0.00005 (mM) — and Vmax is derived and cited " +
+            "for you. Copying a Vmax out of a paper instead would import " +
+            "that paper's enzyme concentration along with it.",
+        },
+      };
+    }
     return { parameters, parameterProvenance, flags };
   }
 
@@ -2567,10 +2600,16 @@ export async function resolveQuery(
 
   // ADR 0019: bridge a literature kcat to Vmax, but only when the query
   // itself supplied enzyme_conc — never resolved, never defaulted.
+  //
+  // `effectiveOverrides`, not `overrides`: an [E]0 stated in words ("with
+  // 50 nM enzyme") is supplied by the query just as much as
+  // "enzyme_conc=0.00005" is, and reading it while passing only the
+  // key=value map here would have extracted the number and then dropped
+  // it on the floor one call later.
   {
     const vmaxResult = await applyVmaxFromKcatResolution(
       fallbackEntities,
-      overrides,
+      effectiveOverrides,
       best.domain,
       parameters,
       parameterProvenance,

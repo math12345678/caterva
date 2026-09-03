@@ -460,7 +460,28 @@ export interface ParameterProvenance {
      * nothing" -- false for a real, well-studied disease like measles or
      * influenza that simply isn't registered here yet.
      */
-    | "disease_not_registered";
+    | "disease_not_registered"
+    /**
+     * Vmax is missing ONLY because the enzyme concentration is (ADR 0013 /
+     * ADR 0019).
+     *
+     * This one is the sharpest case in the union, because the generic
+     * sentence does not just mislead -- it recommends bad science. Vmax is
+     * not a property of an enzyme; it is kcat x [E]0, so it is a property
+     * of an enzyme AT A CONCENTRATION. "vmax could not be resolved from
+     * literature. Add vmax=<value>" sends a researcher to a paper to copy
+     * a Vmax measured at that paper's enzyme concentration, into a
+     * simulation running at theirs. The number arrives looking sourced and
+     * is wrong by the ratio of the two [E]0 values -- silently, since
+     * nothing downstream can tell.
+     *
+     * The correct action is the opposite one: state YOUR enzyme
+     * concentration and let the kcat bridge derive Vmax with a real
+     * citation. kcat is the quantity literature actually reports about the
+     * enzyme itself, and [E]0 is the one thing here Terrium must never
+     * guess, because it is the user's experiment.
+     */
+    | "enzyme_conc_not_supplied";
   /**
    * Graded reliability of a RESOLVED value, on three independently
    * reported axes (ADR 0024 Decision 3, on Barbara Bakker's method).
