@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SimulationDomain } from "./teriumRunner";
 import type { ParameterProvenance } from "./provenance";
+import type { GroundedParameter } from "./modelGrounding";
 import { logger } from "./logger";
 
 export type JobStatus =
@@ -23,6 +24,17 @@ export interface SimulationResponse {
     flags: string[];
   };
   parameterProvenance: Record<string, ParameterProvenance>;
+  /**
+   * Per-parameter literature audit for a caller-supplied model.
+   *
+   * Present only for `POST /simulate/model` with `terrium:` declarations.
+   * Separate from `parameterProvenance` because it carries what
+   * provenance has no field for and a reader needs most: the caller's
+   * value AND the literature's, side by side, in the caller's own unit,
+   * with the fold difference between them. Folding it into the note
+   * string would make the numbers unreadable by anything but a human.
+   */
+  modelGrounding?: GroundedParameter[];
   completedAt: string;
 }
 
