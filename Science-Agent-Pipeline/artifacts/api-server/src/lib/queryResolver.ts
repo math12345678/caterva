@@ -2029,6 +2029,70 @@ function buildParameterProvenance(
   return provenance;
 }
 
+/**
+ * Quantities the user stated in words rather than as key=value.
+ *
+ * "model a covid-19 outbreak in a town of 10000 people" contains the
+ * population. Before this existed, only CLI syntax was read, so that
+ * number was invisible and the refusal asked the user to supply s0 -- a
+ * number they had already given, in the same sentence. Reading it is not
+ * inventing it; the difference between "a town of 10000 people" and
+ * "s0=10000" is grammar, not provenance, and both are origin "user".
+ *
+ * An explicit key=value ALWAYS wins over prose. Someone who writes
+ * "s0=500" after describing a town of 10000 is correcting themselves, and
+ * the more precise statement is the one they meant.
+ *
+ * Shared by both resolution paths on purpose. This started life inline in
+ * the keyword fallback only, which meant the entire natural-language
+ * capability switched off the moment an LLM key was configured: the LLM
+ * path built provenance from `overrides` alone, so prose numbers arrived
+ * as origin "llm" (ADR 0011) at best and were hard-blocked, leaving a
+ * plain question failing on one deployment and working on another for
+ * reasons no user could see.
+ */
+function readStatedQuantities(
+  query: string,
+  domain: SimulationDomain,
+  overrides: Record<string, number | number[]>,
+): {
+  effectiveOverrides: Record<string, number | number[]>;
+  statedPhrases: Record<string, string>;
+} {
+  const statedPhrases: Record<string, string> = {};
+  const statedValues: Record<string, number> = {};
+  for (const stated of extractStatedQuantities(query, domain)) {
+    if (stated.key in overrides) continue;
+    statedValues[stated.key] = stated.value;
+    statedPhrases[stated.key] = stated.sourcePhrase;
+  }
+  return {
+    effectiveOverrides: { ...statedValues, ...overrides },
+    statedPhrases,
+  };
+}
+
+/**
+ * Record WHICH WORDS produced each stated value.
+ *
+ * This is what makes a misreading catchable: without it, a wrong binding
+ * is discoverable only from the trajectory, which is exactly the
+ * invisible-failure shape this project treats as worse than an error.
+ */
+function noteStatedSources(
+  provenance: Record<string, ParameterProvenance>,
+  statedPhrases: Record<string, string>,
+): Record<string, ParameterProvenance> {
+  const out = { ...provenance };
+  for (const [key, phrase] of Object.entries(statedPhrases)) {
+    const entry = out[key];
+    if (entry) {
+      out[key] = { ...entry, note: `Read from your query: "${phrase}".` };
+    }
+  }
+  return out;
+}
+
 function provenanceViolations(
   parameters: Record<string, number | number[]>,
   parameterProvenance: Record<string, ParameterProvenance>,
@@ -2242,23 +2306,39 @@ export async function resolveQuery(
     const domainDefaults =
       DOMAIN_DEFAULTS.find((d) => d.domain === llmResult.domain) ||
       DOMAIN_DEFAULTS[0]!;
+    // Prose quantities outrank the LLM's own extraction, and sit below an
+    // explicit key=value. A number read deterministically out of the
+    // user's sentence, carrying the phrase that produced it, is the user
+    // stating it; the same number produced by a model from a prompt is
+    // origin "llm" and hard-blocked (ADR 0011). Ordering them the other
+    // way round would let model output shadow what the user actually
+    // wrote, and then block the query for containing model output.
+    const { effectiveOverrides, statedPhrases } = readStatedQuantities(
+      query,
+      llmResult.domain,
+      overrides,
+    );
+
     let parameters = {
       ...domainDefaults.parameters,
       ...llmResult.parameters,
-      ...overrides,
+      ...effectiveOverrides,
     };
     let flags: string[] = [];
     const modelCitations = [...llmResult.modelCitations];
-    let parameterProvenance = buildParameterProvenance(
-      parameters,
-      overrides,
-      llmResult.parameters,
-      llmResult.domain,
+    let parameterProvenance = noteStatedSources(
+      buildParameterProvenance(
+        parameters,
+        effectiveOverrides,
+        llmResult.parameters,
+        llmResult.domain,
+      ),
+      statedPhrases,
     );
 
     const resolvableForDomain = RESOLVABLE_FIELDS[llmResult.domain] ?? [];
     const hasUnoverriddenKinetic = resolvableForDomain.some(
-      (k) => !(k in overrides),
+      (k) => !(k in effectiveOverrides),
     );
     if (
       (llmResult.domain === "mm" ||
@@ -2268,7 +2348,7 @@ export async function resolveQuery(
     ) {
       const result = await applyKineticResolution(
         llmResult.entities,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         allowCrossSpecies,
         allowVariants,
@@ -2287,7 +2367,7 @@ export async function resolveQuery(
     {
       const vmaxResult = await applyVmaxFromKcatResolution(
         llmResult.entities,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         parameters,
         parameterProvenance,
@@ -2303,7 +2383,7 @@ export async function resolveQuery(
     {
       const epiResult = await applyBetaGammaFromR0Resolution(
         query,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         parameters,
         parameterProvenance,
@@ -2318,7 +2398,7 @@ export async function resolveQuery(
     if (llmResult.domain === "wright_fisher" || llmResult.domain === "two_locus_wright_fisher") {
       const popgenResult = await applyPopgenResolution(
         llmResult.entities,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         parameters,
         parameterProvenance,
@@ -2330,13 +2410,13 @@ export async function resolveQuery(
     }
 
     if (
-      Object.keys(overrides).length === 0 &&
+      Object.keys(effectiveOverrides).length === 0 &&
       Object.keys(llmResult.parameters).length === 0
     ) {
       flags.push(
         "No parameters were extracted from the query; using defaults.",
       );
-    } else if (Object.keys(overrides).length > 0) {
+    } else if (Object.keys(effectiveOverrides).length > 0) {
       flags.push("Applied parameter overrides found in the query string.");
     }
     const violations = provenanceViolations(parameters, parameterProvenance);
@@ -2525,57 +2605,25 @@ export async function resolveQuery(
     );
   }
 
-  // Quantities the user stated in words rather than as key=value.
-  //
-  // "model a covid-19 outbreak in a town of 10000 people" contains the
-  // population. Before this, only CLI syntax was read, so that number was
-  // invisible and the refusal asked the user to supply s0 -- a number they
-  // had already given, in the same sentence. Reading it is not inventing
-  // it; the difference between "a town of 10000 people" and "s0=10000" is
-  // grammar, not provenance, and both are origin "user".
-  //
-  // An explicit key=value ALWAYS wins over prose. Someone who writes
-  // "s0=500" after describing a town of 10000 is correcting themselves, and
-  // the more precise statement is the one they meant.
-  const stated = extractStatedQuantities(query, best.domain);
-  const statedPhrases: Record<string, string> = {};
-  const statedValues: Record<string, number> = {};
-  for (const q of stated) {
-    if (q.key in overrides) continue;
-    statedValues[q.key] = q.value;
-    statedPhrases[q.key] = q.sourcePhrase;
-  }
-  const effectiveOverrides = { ...statedValues, ...overrides };
+  const { effectiveOverrides, statedPhrases } = readStatedQuantities(
+    query,
+    best.domain,
+    overrides,
+  );
 
   let parameters = { ...best.parameters, ...effectiveOverrides };
   let flags: string[] = [];
-  let parameterProvenance = buildParameterProvenance(
-    parameters,
-    effectiveOverrides,
-    {},
-    best.domain,
+  let parameterProvenance = noteStatedSources(
+    buildParameterProvenance(parameters, effectiveOverrides, {}, best.domain),
+    statedPhrases,
   );
-
-  // Record WHICH WORDS produced each stated value. This is what makes a
-  // misreading catchable: without it, a wrong binding is discoverable only
-  // from the trajectory, which is exactly the invisible-failure shape this
-  // project treats as worse than an error.
-  for (const [key, phrase] of Object.entries(statedPhrases)) {
-    const entry = parameterProvenance[key];
-    if (entry) {
-      parameterProvenance[key] = {
-        ...entry,
-        note: `Read from your query: "${phrase}".`,
-      };
-    }
-  }
 
   // If this looks like an enzyme query and no LLM is available, try the
   // hardcoded entity map and the science agent.
   const fallbackEntities = extractEntitiesFromQuery(query);
   const resolvableForDomain = RESOLVABLE_FIELDS[best.domain] ?? [];
   const hasUnoverriddenKinetic = resolvableForDomain.some(
-    (k) => !(k in overrides),
+    (k) => !(k in effectiveOverrides),
   );
   if (
     (best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
@@ -2584,7 +2632,7 @@ export async function resolveQuery(
   ) {
     const result = await applyKineticResolution(
       fallbackEntities,
-      overrides,
+      effectiveOverrides,
       best.domain,
       allowCrossSpecies,
       allowVariants,
@@ -2625,7 +2673,7 @@ export async function resolveQuery(
   {
     const epiResult = await applyBetaGammaFromR0Resolution(
       query,
-      overrides,
+      effectiveOverrides,
       best.domain,
       parameters,
       parameterProvenance,
@@ -2640,7 +2688,7 @@ export async function resolveQuery(
   if (best.domain === "wright_fisher" || best.domain === "two_locus_wright_fisher") {
     const popgenResult = await applyPopgenResolution(
       fallbackEntities,
-      overrides,
+      effectiveOverrides,
       best.domain,
       parameters,
       parameterProvenance,
@@ -2651,7 +2699,7 @@ export async function resolveQuery(
     flags = popgenResult.flags;
   }
 
-  flags.push(...buildParameterExtractionFlags(overrides));
+  flags.push(...buildParameterExtractionFlags(effectiveOverrides));
   const violations = provenanceViolations(parameters, parameterProvenance);
   if (violations.length > 0) {
     throw new Error(
