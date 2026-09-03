@@ -47,8 +47,15 @@ from __future__ import annotations
 
 import json
 import pathlib
+import re
 import sys
 from typing import Any, Callable, Dict, Sequence
+
+# Used by run_sbml to count a supplied model's reactions/species against the
+# MAX_API_SBML_* ceilings. Declared in requirements.txt (python-libsbml) and
+# already imported across the engine (Terium/core/sbml_units.py and others),
+# so this adds a dependency to this file, not to the project.
+import libsbml  # type: ignore[import-untyped]
 
 
 # Application-runtime ceilings, not scientific plausibility bounds. The engine
@@ -101,6 +108,83 @@ MAX_API_SSA_REPLICATES = 1_000
 # ceiling -- chosen to keep the documented 108-particle x 10k-step case
 # (1.17e8) inside the budget while rejecting the pathological shapes.
 MAX_API_MD_PAIR_STEPS = 120_000_000
+
+# ---------------------------------------------------------------------------
+# Raw-SBML ceilings.
+#
+# run_sbml had NO ceilings of any kind. That was survivable only because
+# nothing could reach it: the API exposes no way to supply a model, and
+# resolve_query never yields domain "sbml". Any path that does expose it
+# needs these first, because unlike every other domain the cost here is not
+# keyed to a parameter this file can reason about.
+#
+# Measured 2026-09-02 on this machine (Python 3.13, libroadrunner 2.8.0),
+# by timing the engine directly:
+#
+#   points, on a 1-species decay model:
+#       51 ......... 0.29s      json    0.00 MB
+#       10,000 ..... 0.25s      json    0.40 MB
+#       100,000 .... 1.07s      json    4.02 MB
+#       500,000 .... 3.97s      json   20.14 MB
+#
+#   model size, at points=51, linear chain S0->S1->...->Sn:
+#       10 reactions .... 0.15s      50 reactions .... 0.84s
+#       200 reactions ... 4.66s     500 reactions ... 29.86s
+#
+# `points` is bounded by the RESULT payload, not by integration time: the
+# trajectory is serialised to JSON over the runner's stdout, parsed in Node,
+# held in the job queue and persisted. 20 MB per request is the problem long
+# before 4 seconds is. 100k points is ~4 MB and far beyond any plotting need
+# (no display resolves more than a few thousand points).
+#
+# Reaction count is the MD trap in a different costume: cost grows FASTER
+# than linearly (2.5x the reactions -> 6.4x the time, roughly quadratic), so
+# a limit that looks generous becomes a multi-minute request one step later.
+# 200 reactions is ~4.7s, a 25x margin under the 120s subprocess timeout, and
+# larger than the overwhelming majority of published kinetic models (the
+# BioModels median is well under 100 species).
+#
+# NOTE ON WHAT THESE CANNOT DO: for an arbitrary ODE system, integration cost
+# is not a function of any countable input. A STIFF 3-species model can cost
+# more than a benign 200-reaction one, and no static ceiling can see that
+# coming. These bound the shapes that ARE countable so the caller gets a
+# precise, actionable error instead of a timeout; the wall-clock timeout in
+# teriumRunner.ts remains the only real backstop for the rest.
+MAX_API_SBML_POINTS = 100_000
+MAX_API_SBML_REACTIONS = 200
+MAX_API_SBML_SPECIES = 200
+# A parse-cost guard applied before the document is handed to libsbml, so
+# something absurd is rejected without being parsed at all.
+#
+# Sized against SBML XML, which is what this handler actually receives --
+# NOT against Antimony. Measured, same models as above:
+#
+#     reactions   antimony    sbml xml    ratio
+#           10         523       8,251    15.8x
+#          100       5,027      75,575    15.0x
+#          200      10,627     150,875    14.2x
+#
+# SBML is ~15x the Antimony source it came from. A first version of this
+# constant was 100,000 because it had been sized against the Antimony
+# figures, which put it BELOW the ~151 KB a legitimate 200-reaction model
+# occupies: it rejected models the reaction ceiling was meant to allow, and
+# made MAX_API_SBML_REACTIONS unreachable dead code. Caught by testing each
+# ceiling against a real document rather than trusting the arithmetic.
+#
+# 400,000 is ~2.6x the largest model the reaction/species limits permit,
+# leaving room for documents that are denser per reaction (more reactants,
+# longer kinetic laws, MIRIAM annotations) while still bounding parse cost.
+# The reaction and species ceilings stay the binding constraints, which is
+# the intent -- this one is a backstop, not a second opinion.
+MAX_API_SBML_SOURCE_CHARS = 400_000
+
+# Antimony is the human-writable DSL the SBML above is usually generated
+# from, and it is ~15x more compact (see the ratio table), so its ceiling is
+# scaled to match: a model at MAX_API_SBML_REACTIONS is ~10.6 KB of Antimony,
+# and 40,000 keeps the same ~2.6x headroom the SBML limit has. The converted
+# SBML is checked against every ceiling above regardless, so this only bounds
+# the cost of the conversion itself.
+MAX_API_ANTIMONY_SOURCE_CHARS = 40_000
 
 
 def _fcc_particle_count(requested: int) -> int:
@@ -630,16 +714,162 @@ def run_repressilator(params: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+# Antimony's `import` directive reads files off disk. Verified by execution
+# 2026-09-02: `import "<path>"` at the top of a model successfully pulled in
+# a local file and its contents became part of the compiled model, and a
+# path that exists but is not Antimony returns "Could not open '<path>'",
+# which is a file-existence oracle on its own.
+#
+# So Antimony source is a local-file-read primitive for exactly the same
+# reason an unvalidated sbml_string is, by a different mechanism -- the
+# language has an include facility and the API has no business honouring it
+# for text that arrived over HTTP. There is no legitimate use for it here:
+# a caller cannot know what paths exist on the server, so any import in a
+# submitted model is either a mistake or an attempt.
+#
+# Matched on a line whose first token is `import`, which is where the
+# directive is valid. Comments (`#` or `//`) are stripped first so a
+# commented-out import is not a false positive.
+_ANTIMONY_IMPORT_RE = re.compile(r"^\s*import\b", re.IGNORECASE)
+
+
+def _antimony_to_sbml_for_api(antimony_string: str) -> str:
+    """Validate caller-supplied Antimony and translate it to SBML."""
+    if len(antimony_string) > MAX_API_ANTIMONY_SOURCE_CHARS:
+        raise ValueError(
+            f"antimony source is {len(antimony_string)} characters, which "
+            f"exceeds the API runtime ceiling "
+            f"(MAX_API_ANTIMONY_SOURCE_CHARS) "
+            f"{MAX_API_ANTIMONY_SOURCE_CHARS}"
+        )
+
+    for lineno, raw in enumerate(antimony_string.splitlines(), start=1):
+        line = raw.split("#", 1)[0].split("//", 1)[0]
+        if _ANTIMONY_IMPORT_RE.match(line):
+            raise ValueError(
+                f"antimony 'import' is not permitted (line {lineno}). It "
+                "reads files from the server's filesystem. Inline the "
+                "model instead."
+            )
+
+    try:
+        return terium_engine.antimony_to_sbml(antimony_string)
+    except Exception as exc:
+        # The engine's own parse error names the line and token, which is
+        # the only thing that helps someone fix their model.
+        raise ValueError(f"antimony source could not be parsed: {exc}") from exc
+
+
 def run_sbml(params: Dict[str, Any]) -> Dict[str, Any]:
     """Dispatch for ``simulate_sbml`` -- the raw-SBML escape hatch.
 
     Included so the contract test can require *every* ``simulate_*`` in the
     engine's ``__all__`` to be dispatched, with no exceptions.
+
+    Unlike every other handler here, the cost of this one is driven by a
+    document the caller supplies rather than by parameters this file can
+    reason about, so the ceilings are enforced on the document itself. See
+    the MAX_API_SBML_* block above for the measurements behind each limit
+    and for what they explicitly cannot bound.
     """
     sbml_string = params.get("sbml_string", "")
+    antimony_string = params.get("antimony_string", "")
     start = float(params.get("start", 0.0))
     end = float(params.get("end", 10.0))
     points = int(params.get("points", 51))
+
+    if antimony_string and sbml_string:
+        raise ValueError(
+            "supply either antimony_string or sbml_string, not both"
+        )
+    if not antimony_string and not sbml_string:
+        raise ValueError(
+            "a model is required: supply antimony_string or sbml_string"
+        )
+
+    if antimony_string:
+        sbml_string = _antimony_to_sbml_for_api(antimony_string)
+
+    # SECURITY, and the reason this check exists at all:
+    #
+    # `simulate_sbml` ends at `roadrunner.RoadRunner(sbml_string)`
+    # (Terium/core/utils.py). RoadRunner's constructor does not take SBML
+    # CONTENT -- it takes content OR A FILESYSTEM PATH OR A URL, and it
+    # fetches whichever it is given. Its own error text says so: "could not
+    # open <x> as a file or uri".
+    #
+    # Verified by execution, 2026-09-02, all three through this handler's
+    # own engine call:
+    #   - a bare path      -> read off local disk and simulated
+    #   - "file://..."     -> same
+    #   - "http://..."     -> an OUTBOUND GET to an attacker-chosen URL,
+    #                         observed arriving at a local listener, whose
+    #                         response was then parsed and run
+    #
+    # So an unvalidated `sbml_string` is a local-file-read and a
+    # server-side request forgery primitive, not merely a parsing surface.
+    # On a host with a cloud metadata endpoint (169.254.169.254) or any
+    # internal service reachable by GET, that is the whole attack.
+    #
+    # Requiring the payload to BE an XML document closes it: a path or URL
+    # is not well-formed XML, so it never reaches RoadRunner. This must
+    # stay an explicit, named check. The reaction-counting parse below
+    # happens to reject these too, but relying on that would make the
+    # protection an accident of validation order that a later refactor
+    # could remove without anyone noticing what it was for.
+    stripped = sbml_string.lstrip()
+    if not stripped.startswith("<"):
+        raise ValueError(
+            "model source must be an SBML XML document, not a file path or "
+            "URL. The engine's model loader would fetch a path or URL, "
+            "which would read local files or make requests from the "
+            "server; supply the document itself."
+        )
+
+    # Cheapest remaining check: reject an absurd document before libsbml is
+    # asked to parse it.
+    if len(sbml_string) > MAX_API_SBML_SOURCE_CHARS:
+        raise ValueError(
+            f"model source is {len(sbml_string)} characters, which exceeds "
+            f"the API runtime ceiling (MAX_API_SBML_SOURCE_CHARS) "
+            f"{MAX_API_SBML_SOURCE_CHARS}"
+        )
+
+    if points > MAX_API_SBML_POINTS:
+        raise ValueError(
+            f"points={points} exceeds API runtime ceiling "
+            f"(MAX_API_SBML_POINTS) {MAX_API_SBML_POINTS}"
+        )
+
+    # Counted from the parsed document, not from the source text: the same
+    # model can be written many ways, and a regex over the source would
+    # both miss and over-count. libsbml has already validated structure by
+    # the time these are readable.
+    doc = libsbml.readSBMLFromString(sbml_string)
+    model = doc.getModel()
+    if model is None:
+        errors = "; ".join(
+            doc.getError(i).getMessage().strip()
+            for i in range(min(doc.getNumErrors(), 3))
+        )
+        raise ValueError(
+            "model source could not be parsed as SBML"
+            + (f": {errors}" if errors else "")
+        )
+
+    n_reactions = model.getNumReactions()
+    n_species = model.getNumSpecies()
+    if n_reactions > MAX_API_SBML_REACTIONS:
+        raise ValueError(
+            f"model has {n_reactions} reactions, which exceeds the API "
+            f"runtime ceiling (MAX_API_SBML_REACTIONS) "
+            f"{MAX_API_SBML_REACTIONS}"
+        )
+    if n_species > MAX_API_SBML_SPECIES:
+        raise ValueError(
+            f"model has {n_species} species, which exceeds the API runtime "
+            f"ceiling (MAX_API_SBML_SPECIES) {MAX_API_SBML_SPECIES}"
+        )
 
     result = terium_engine.simulate_sbml(
         sbml_string=sbml_string, start=start, end=end, points=points
