@@ -893,20 +893,66 @@ async function applyVmaxFromKcatResolution(
     enzymeConc: enzymeConcOverride,
   });
 
+  // Each failure below ALSO writes its reason onto vmax's provenance, not
+  // just into `flags`.
+  //
+  // Flags are attached to a successful result. When the bridge fails,
+  // vmax stays origin "default", the hard block throws, and the flags go
+  // with it -- so the system computed a specific, actionable reason and
+  // then discarded it, leaving the user the generic "vmax could not be
+  // resolved from literature". Measured on real queries: lactate
+  // dehydrogenase and catalase both fail here, and neither told the user
+  // which of these three things happened, though they need different
+  // responses.
+  const explainVmax = (
+    reason: "not_found" | "no_locator" | "enzyme_conc_rejected",
+    note: string,
+  ): Record<string, ParameterProvenance> => {
+    const existing = parameterProvenance["vmax"];
+    if (!existing) return parameterProvenance;
+    return {
+      ...parameterProvenance,
+      vmax: { ...existing, unresolvedReason: reason, note },
+    };
+  };
+
   if (!agentResult.found || agentResult.kcat === undefined) {
     flags.push(
       "Could not resolve a real kcat value from BRENDA/KEGG/PubMed; " +
         "Vmax was not bridged from literature.",
     );
-    return { parameters, parameterProvenance, flags };
+    return {
+      parameters,
+      parameterProvenance: explainVmax(
+        "not_found",
+        "Vmax = kcat × [E]0, and your enzyme concentration was read, but " +
+          "BRENDA, KEGG and PubMed hold no kcat for this enzyme — so there " +
+          "is nothing to multiply it by. Supply kcat=<value> (in 1/s) and " +
+          "Vmax is computed from it, or supply vmax=<value> directly. " +
+          "Either way, attach the paper with --cite so the source is " +
+          "recorded rather than lost.",
+      ),
+      flags,
+    };
   }
 
   if (!agentResult.vmaxValidation?.ok || agentResult.vmax === undefined) {
+    const reason = agentResult.vmaxValidation?.reason ?? "enzyme_conc rejected";
     flags.push(
       `Resolved kcat=${agentResult.kcat} 1/s but could not bridge it to a ` +
-        `Vmax: ${agentResult.vmaxValidation?.reason ?? "enzyme_conc rejected"}.`,
+        `Vmax: ${reason}.`,
     );
-    return { parameters, parameterProvenance, flags };
+    return {
+      parameters,
+      parameterProvenance: explainVmax(
+        "enzyme_conc_rejected",
+        `A literature kcat of ${agentResult.kcat} 1/s was found, but the ` +
+          `enzyme concentration it would be multiplied by ` +
+          `(${enzymeConcOverride} mM) was rejected: ${reason}. The kcat is ` +
+          "not the problem here; check the enzyme concentration.",
+      ),
+      flags,
+    };
   }
 
   const located = locatableCitation(agentResult.citation);
@@ -915,7 +961,18 @@ async function applyVmaxFromKcatResolution(
       "Resolved a kcat but its citation carries no locator (ref id or URL); " +
         "not trusted as resolved — Vmax was not bridged from literature.",
     );
-    return { parameters, parameterProvenance, flags };
+    return {
+      parameters,
+      parameterProvenance: explainVmax(
+        "no_locator",
+        `A kcat of ${agentResult.kcat} 1/s was found for this enzyme, but ` +
+          "its citation carries no reference id or URL — nothing a reader " +
+          "could follow to check it. An uncheckable citation is not a " +
+          "citation, so it was not used. Supply kcat=<value> or " +
+          "vmax=<value> with --cite naming a source you can point at.",
+      ),
+      flags,
+    };
   }
   const citation = located.display;
 

@@ -148,6 +148,71 @@ describe("Vmax-from-kcat bridge — ADR 0019", () => {
     expect(resolved.parameterProvenance["vmax"]!.origin).toBe("user");
   });
 
+  // ---- when the bridge fails, say WHICH of the three things happened --
+  //
+  // All three used to push their reason into `flags`. But flags ride on a
+  // SUCCESSFUL result, and a failed bridge means vmax stays origin
+  // "default" and the hard block throws -- taking the flags with it. So
+  // the system computed a specific, actionable reason and then discarded
+  // it, leaving the user the generic "vmax could not be resolved from
+  // literature". Measured on real queries: lactate dehydrogenase and
+  // catalase both fail here, for different reasons, and neither said so.
+
+  it("says the literature holds no kcat, rather than blaming Vmax", async () => {
+    vi.mocked(resolveKineticValue).mockImplementation(async (entities: any) =>
+      entities.quantity === "kcat"
+        ? { found: false, literatureCandidates: [], logs: [] }
+        : KM_RESULT,
+    );
+    const err = await resolveQuery(ACHE_QUERY).catch((e: Error) => e);
+    expect(err).toBeInstanceOf(RequiredParametersMissingError);
+    // Names the actual gap...
+    expect((err as Error).message).toMatch(/no kcat for this enzyme/i);
+    // ...and what to do about it. Promoting this note replaces the
+    // generic "Add vmax=<value>" line, so the note has to carry its own
+    // instruction or the user is left worse off than before.
+    expect((err as Error).message).toMatch(/kcat=<value>/);
+    expect((err as Error).message).toMatch(/--cite/);
+  });
+
+  it("distinguishes a rejected enzyme_conc from a missing one", async () => {
+    // The user HAS stated an enzyme concentration. Telling them to state
+    // one reads as the system not listening; the actionable fact is the
+    // validator's reason.
+    vi.mocked(resolveKineticValue).mockImplementation(async (entities: any) =>
+      entities.quantity === "kcat"
+        ? {
+            ...KCAT_RESULT,
+            vmax: undefined,
+            vmaxValidation: {
+              ok: false,
+              flagged: false,
+              reason: "enzyme_conc is implausibly high for an enzyme",
+            },
+          }
+        : KM_RESULT,
+    );
+    const err = await resolveQuery(ACHE_QUERY).catch((e: Error) => e);
+    expect((err as Error).message).toMatch(/implausibly high/);
+    expect((err as Error).message).toMatch(/kcat is not the problem/i);
+    // It must NOT ask for the thing that was already given.
+    expect((err as Error).message).not.toMatch(/State the enzyme concentration/i);
+  });
+
+  it("says an uncheckable citation was declined, not that nothing was found", async () => {
+    // A kcat WAS found. Refusing it for having no locator is a policy this
+    // code applied, and the generic "could not be resolved from
+    // literature" reports that as the literature being silent.
+    vi.mocked(resolveKineticValue).mockImplementation(async (entities: any) =>
+      entities.quantity === "kcat"
+        ? { ...KCAT_RESULT, citation: { source: "BRENDA" } }
+        : KM_RESULT,
+    );
+    const err = await resolveQuery(ACHE_QUERY).catch((e: Error) => e);
+    expect((err as Error).message).toMatch(/no reference id or URL/i);
+    expect((err as Error).message).toMatch(/6500/); // the value that was found
+  });
+
   it("a rejected enzyme_conc (validation ok=false) does not fabricate a vmax", async () => {
     // vmaxValidation.ok=false must never produce a "resolved" vmax --
     // and with no other way for vmax to resolve in this domain, the

@@ -535,7 +535,29 @@ export interface ParameterProvenance {
      * enzyme itself, and [E]0 is the one thing here Terrium must never
      * guess, because it is the user's experiment.
      */
-    | "enzyme_conc_not_supplied";
+    | "enzyme_conc_not_supplied"
+    /**
+     * [E]0 WAS supplied and the engine's own validator rejected it, so no
+     * Vmax was derived from it.
+     *
+     * Distinct from `enzyme_conc_not_supplied` because the user has
+     * already acted: telling them to state an enzyme concentration they
+     * just stated reads as the system not listening. The actionable fact
+     * is the validator's reason, which this carries.
+     */
+    | "enzyme_conc_rejected"
+    /**
+     * A value was found and declined because its citation carries no
+     * locator — no reference id, no URL, nothing a reader could follow.
+     *
+     * Belongs in this union for the reason all the others do: the generic
+     * sentence says the literature had nothing, and here it had
+     * something. The distinction is the whole point of the refusal — an
+     * uncheckable citation is not a citation, and saying so is what tells
+     * a user the value exists and needs a source they can point at,
+     * rather than that it does not exist.
+     */
+    | "no_locator";
   /**
    * Graded reliability of a RESOLVED value, on three independently
    * reported axes (ADR 0024 Decision 3, on Barbara Bakker's method).
