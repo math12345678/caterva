@@ -433,8 +433,21 @@ describe("POST /api/resolve", () => {
     expect(res.status).toBe(422);
     expect(res.body.domain).toBe("mm");
     expect(res.body.missingKeys).toEqual(
-      expect.arrayContaining(["vmax", "s0", "end", "points"]),
+      expect.arrayContaining(["vmax", "s0", "end"]),
     );
+    // `points` used to be listed here and deliberately is not any more. It
+    // is output-sample count -- display resolution taken from a trajectory
+    // the integrator computes independently -- and it is now exempt from
+    // the hard block (see NON_SCIENTIFIC_KEYS in provenance.ts, which
+    // carries the measurements: varying points over a 500x range moves the
+    // final value by nothing beyond integrator noise, ~9-10 significant
+    // figures of agreement, on both SIR and Michaelis-Menten).
+    //
+    // Asserted explicitly rather than just dropped from the list above, so
+    // the exemption cannot silently widen: if some future change starts
+    // blocking on points again, or the arrayContaining above is relaxed,
+    // this still fails.
+    expect(res.body.missingKeys).not.toContain("points");
     for (const key of res.body.missingKeys) {
       expect(res.body.resolvedParameters).not.toHaveProperty(key);
     }

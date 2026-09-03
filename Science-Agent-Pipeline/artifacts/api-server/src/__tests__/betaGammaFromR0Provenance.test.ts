@@ -9,6 +9,19 @@ import { RequiredParametersMissingError } from "../lib/provenance";
 // boundary -- it spawns the real Python bridge and reads the real
 // Tests/epidemiology_resolver.py registry, so a passing test here is a
 // genuine end-to-end proof, not a fixture replay.
+//
+// TIMEOUTS: these inherit vitest.config.ts's 60s testTimeout and must not
+// override it downward. Every test here was capped at 20000 -- the ONLY
+// file in the suite lowering the limit, applied to the slowest tests in
+// it. Spawning Python and making a live PubMed call measures ~20.01s
+// unloaded, so it missed its own budget by milliseconds before any
+// contention, and failed intermittently under a parallel full-suite run
+// while passing in isolation. That reads as flakiness in the bridge; it
+// was a stopwatch set too short.
+//
+// Raised rather than mocked deliberately: this file's entire value is
+// being unmocked, and a fixture would keep passing if the real bridge
+// broke -- which is the failure it exists to catch.
 
 describe("beta/gamma-from-R0 bridge — ADR 0017 / ADR 0020 (real, unmocked)", () => {
   it("bridges COVID-19's real (R0, infectious period) into beta/gamma", async () => {
@@ -29,7 +42,7 @@ describe("beta/gamma-from-R0 bridge — ADR 0017 / ADR 0020 (real, unmocked)", (
     expect(beta.citation).toContain("33214421"); // Hussein et al. PMID
     expect(beta.note).toContain("3.14");
     expect(beta.note).toContain("5.45");
-  }, 20000);
+  });
 
   it("an unrecognized disease leaves beta/gamma unresolved (hard-blocked)", async () => {
     // "measles outbreak" matches the sir keyword path but not any entry in
@@ -38,7 +51,7 @@ describe("beta/gamma-from-R0 bridge — ADR 0017 / ADR 0020 (real, unmocked)", (
     await expect(resolveQuery(query)).rejects.toBeInstanceOf(
       RequiredParametersMissingError,
     );
-  }, 20000);
+  });
 
   it("an explicit user-supplied beta/gamma always wins over the bridge", async () => {
     const query =
@@ -48,7 +61,7 @@ describe("beta/gamma-from-R0 bridge — ADR 0017 / ADR 0020 (real, unmocked)", (
     expect(resolved.parameters["gamma"]).toBe(0.5);
     expect(resolved.parameterProvenance["beta"]!.origin).toBe("user");
     expect(resolved.parameterProvenance["gamma"]!.origin).toBe("user");
-  }, 20000);
+  });
 
   it("supplying only one of beta/gamma skips the bridge entirely (no mixed sourcing)", async () => {
     // beta is user-supplied, gamma is not -- the bridge must not fill in
@@ -60,5 +73,5 @@ describe("beta/gamma-from-R0 bridge — ADR 0017 / ADR 0020 (real, unmocked)", (
     await expect(resolveQuery(query)).rejects.toBeInstanceOf(
       RequiredParametersMissingError,
     );
-  }, 20000);
+  });
 });

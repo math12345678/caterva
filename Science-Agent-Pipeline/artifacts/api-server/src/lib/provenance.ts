@@ -827,12 +827,52 @@ export function isAllDefaults(
  * literature lookup ("resolved") or the person typing the query ("user");
  * both "default" and "llm" are unverified and are blocked identically.
  */
+/**
+ * Parameters that do not affect the scientific result, and therefore cannot
+ * be fabricated by being defaulted.
+ *
+ * DELIBERATELY A SET OF ONE. This is an exemption from the hard block, so
+ * every member has to earn its place by measurement, not by seeming
+ * harmless. Adding a key here that DOES move the answer would silently
+ * reintroduce exactly the fabrication the block exists to prevent.
+ *
+ * `points` is the number of output samples taken from a trajectory the
+ * integrator computes independently -- it is display resolution, not a
+ * scientific input. Measured 2026-09-02 across a 500x range, same model,
+ * only `points` varied:
+ *
+ *   SIR  (beta 0.576, gamma 0.183, s0 9995, i0 5, end 60)
+ *     points=11    final S = 506.362648332
+ *     points=5001  final S = 506.362650147
+ *   Michaelis-Menten  (km 10.73, vmax 0.25, s0 10, end 60)
+ *     points=11    final S = 4.2305402788
+ *     points=5001  final S = 4.2305402784
+ *
+ * Agreement to ~9-10 significant figures; the residual is integrator
+ * tolerance noise, not a dependence on `points`.
+ *
+ * This is the distinction ADR 0044 already draws and enforces in the UI
+ * guard: "a pre-filled experimental condition is a UI convenience for
+ * something the student chooses; a pre-filled measurement is a
+ * fabrication." Its own mutation table records that pre-filling `s0` is
+ * CORRECTLY NOT FLAGGED. `points` is a weaker case than s0 -- s0 is at
+ * least a real experimental choice that changes the answer, while `points`
+ * changes nothing but the number of rows returned.
+ *
+ * What this does NOT license: s0, i0, r0_recovered, end, and every measured
+ * quantity stay blocked. They are chosen or measured, they move the result,
+ * and demanding them is the product working as intended.
+ */
+const NON_SCIENTIFIC_KEYS = new Set(["points"]);
+
 export function unverifiedOriginKeys(
   parameterProvenance: Record<string, ParameterProvenance>,
 ): string[] {
   return Object.entries(parameterProvenance)
     .filter(
-      ([, p]) => p.origin === "default" || p.origin === "llm",
+      ([key, p]) =>
+        (p.origin === "default" || p.origin === "llm") &&
+        !NON_SCIENTIFIC_KEYS.has(key),
     )
     .map(([key]) => key);
 }
