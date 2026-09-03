@@ -2289,7 +2289,7 @@ function formatResolvedCitation(citation?: {
  * can be extracted that re-finds the source, the value degrades honestly
  * to a default instead of being published as literature-backed.
  */
-function locatableCitation(citation?: {
+export function locatableCitation(citation?: {
   source?: string;
   referenceId?: string | null;
   url?: string | null;

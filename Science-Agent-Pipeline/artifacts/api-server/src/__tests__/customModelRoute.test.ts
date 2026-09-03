@@ -237,4 +237,119 @@ describe("POST /api/simulate/model — a model the caller supplies", () => {
     // is the failure mode this repo has fixed repeatedly elsewhere.
     expect(JSON.stringify(job.error ?? {}).length).toBeGreaterThan(20);
   }, 30_000);
+
+  // ---- literature grounding of the caller's own model -----------------
+  //
+  // Until this existed, a lab that brought its own model got every
+  // parameter stamped origin "user" with no citations -- Terrium's whole
+  // reason to exist switched off at exactly the moment a real lab used
+  // it. See modelAnnotations.ts.
+
+  it("refuses the run when a declaration cannot be read, before spending a lookup", async () => {
+    // A mistyped or incomplete declaration must stop the run. Quietly
+    // resolving nothing would leave the caller believing a parameter was
+    // literature-checked when it was skipped.
+    const create = await submit({
+      antimony: [
+        "model m",
+        "  S -> P; (Vmax * S) / (Km + S);",
+        '  // terrium: km substrate="glucose" unit="mM"',
+        "  Km = 0.15;",
+        "  Vmax = 0.5; S = 10; P = 0;",
+        "end",
+      ].join("\n"),
+      points: 5,
+    });
+    const job = await awaitTerminal(create.body.jobId);
+    expect(job.status).toBe("failed");
+    expect(job.error.message).toMatch(/annotations could not be read/i);
+    expect(job.error.message).toMatch(/enzyme must be named/i);
+  }, 30_000);
+
+  it("refuses to substitute a value it cannot cite, rather than defaulting", async () => {
+    // `resolve` is a request for a literature value. There is no fallback
+    // that would not be the fabrication this project exists to prevent --
+    // so an enzyme nothing holds a Km for must fail the run, not quietly
+    // simulate whatever placeholder was in the source.
+    const create = await submit({
+      antimony: [
+        "model m",
+        "  S -> P; (Vmax * S) / (Km + S);",
+        '  // terrium: km enzyme="not a real enzyme at all" organism="Homo sapiens" unit="mM" resolve',
+        "  Km = ?;",
+        "  Vmax = 0.5; S = 10; P = 0;",
+        "end",
+      ].join("\n"),
+      points: 5,
+    });
+    const job = await awaitTerminal(create.body.jobId, { attempts: 120 });
+    expect(job.status).toBe("failed");
+    expect(job.error.message).toMatch(/will not substitute one it cannot cite/i);
+  }, 180_000);
+
+  it("leaves an unannotated model exactly as it always behaved", async () => {
+    // Grounding is opt-in. A model with no declarations must not acquire
+    // citations, and must not pay for a lookup.
+    const create = await submit({ antimony: FEEDBACK_MODEL, end: 10, points: 3 });
+    const job = await awaitTerminal(create.body.jobId);
+    expect(job.status).toBe("completed");
+    expect(job.result.provenance.modelCitations).toEqual([]);
+    expect(job.result.modelGrounding).toBeUndefined();
+    for (const prov of Object.values(job.result.parameterProvenance) as any[]) {
+      expect(prov.origin).toBe("user");
+    }
+  }, 30_000);
+
+  it("simulates the number it cited, in a model nobody hardcoded", async () => {
+    // The headline capability, unmocked: a model Terrium has never seen,
+    // with a constant it fills from BRENDA and a citation a reader can
+    // follow. This is what "Tellurium, but every number is traceable"
+    // has to mean in practice.
+    //
+    // The trajectory assertion is the load-bearing half. Reporting a
+    // grounded citation while simulating the un-substituted source would
+    // be the worst failure available here -- a real reference attached to
+    // a run that did not use the value. A mutation that ignored the
+    // grounded source passed every other test in this file.
+    const create = await submit({
+      antimony: [
+        "model my_assay",
+        "  S -> P; (Vmax * S) / (Km_hex + S);",
+        '  // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM" resolve',
+        "  Km_hex = ?;",
+        "  Vmax = 0.02;",
+        "  S = 10;",
+        "  P = 0;",
+        "end",
+      ].join("\n"),
+      end: 30,
+      points: 6,
+    });
+    const job = await awaitTerminal(create.body.jobId, { attempts: 120 });
+    expect(job.status).toBe("completed");
+
+    const entry = job.result.modelGrounding[0];
+    expect(entry.status).toBe("grounded");
+    expect(entry.parameter).toBe("Km_hex");
+
+    const prov = job.result.parameterProvenance["Km_hex"];
+    expect(prov.origin).toBe("resolved");
+    // Locators, not just a display string: validateParameterProvenance
+    // requires them on a resolved entry, and a citation nobody can follow
+    // is not a citation.
+    expect(prov.citationLocators.length).toBeGreaterThan(0);
+    expect(job.result.provenance.modelCitations.length).toBeGreaterThan(0);
+
+    // The simulated curve must be the one the cited Km produces.
+    // v(0) = Vmax*S/(Km+S), and over the first step P rises by about that
+    // much. Computed from the REPORTED value rather than a hardcoded one,
+    // so this tests self-consistency and does not break when BRENDA's
+    // holdings change.
+    const km = entry.comparison.literatureInYourUnit;
+    const [t0, t1] = job.result.trajectory;
+    const dt = t1.time - t0.time;
+    const expected = (0.02 * 10) / (km + 10);
+    expect(t1["[P]"] / dt).toBeGreaterThan(expected * 0.9);
+    expect(t1["[P]"] / dt).toBeLessThanOrEqual(expected * 1.0001);
+  }, 180_000);
 });

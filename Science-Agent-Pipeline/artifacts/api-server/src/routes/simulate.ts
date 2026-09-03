@@ -15,6 +15,8 @@ import {
 import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import { resolveQuery } from "../lib/queryResolver";
+import { groundAnnotatedModel } from "../lib/modelGrounding";
+import type { ModelGroundingReport } from "../lib/modelGrounding";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
@@ -995,12 +997,31 @@ async function findCachedSimulation(
  * would mean threading "skip this stage" flags through every step, which is
  * how a pipeline stops being readable.
  *
- * PROVENANCE. Every parameter is origin "user" -- the caller typed each
- * number into the model source. That is not a weaker claim than the preset
- * domains make for an inline `km=2`; it is exactly the same claim. What is
- * deliberately absent is any assertion of literature backing: this endpoint
- * runs the model you gave it and says so, and `modelCitations` stays empty
- * because Terrium did not supply a source and must not imply one.
+ * PROVENANCE. A parameter the caller typed is origin "user" -- not a
+ * weaker claim than the preset domains make for an inline `km=2`, exactly
+ * the same claim. `modelCitations` stays empty because Terrium did not
+ * choose the model's structure and must not imply a source for it.
+ *
+ * LITERATURE GROUNDING. Everything above used to be the whole story, and
+ * it made this endpoint useless for the people it was built for: a lab
+ * brought their own model and Terrium's entire reason to exist -- every
+ * number traceable -- switched off, leaving plain Tellurium with extra
+ * steps. Nothing was checked, nothing was cited.
+ *
+ * A caller can now DECLARE what a parameter is, in a comment:
+ *
+ *     // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM"
+ *     Km_hex = 0.15;
+ *
+ * and Terrium resolves it, reports what the literature says beside what
+ * the model says, and attaches the citation. Adding `resolve` to the
+ * declaration hands the number over entirely: it is filled from
+ * literature, or THE RUN REFUSES -- there is no fallback value, because a
+ * fallback is the fabrication this project exists to prevent.
+ *
+ * Declarations are never inferred. See modelAnnotations.ts for why
+ * reading "hexokinase" out of a parameter named `Km_hex` is the one thing
+ * this must not do.
  */
 async function runCustomModelPipeline(
   jobId: string,
@@ -1019,8 +1040,60 @@ async function runCustomModelPipeline(
     if (queue.isCancelled(jobId)) return;
     queue.updateJob(jobId, { status: "running" });
 
+    // Ground the caller's declarations BEFORE simulating. A `resolve`
+    // annotation changes the model source, so this has to happen first;
+    // and a model whose declarations are wrong should not consume an
+    // engine run at all.
+    //
+    // Antimony only. SBML carries no comments in this sense (its
+    // annotation story is <annotation> RDF, a different and much larger
+    // job), and an SBML caller is told that rather than handed an empty
+    // report that reads as "nothing to check".
+    let grounding: ModelGroundingReport | undefined;
+    let antimony = model.antimony;
+    if (antimony !== undefined) {
+      grounding = await groundAnnotatedModel(antimony);
+
+      if (grounding.problems.length > 0) {
+        queue.setJobError(jobId, {
+          error: "MODEL_ERROR",
+          message:
+            "This model's terrium annotations could not be read:\n" +
+            grounding.problems
+              .map((p) => `  line ${p.line}: ${p.message}`)
+              .join("\n"),
+        });
+        persistJob(queue.getJob(jobId)!).catch(() => {});
+        return;
+      }
+
+      if (grounding.blocking.length > 0) {
+        // A `resolve` declaration is a request for a literature value.
+        // Running anyway would mean simulating with whatever placeholder
+        // was in the source, which is the fabricated number this refuses.
+        queue.setJobError(jobId, {
+          error: "MODEL_ERROR",
+          message:
+            "Terrium could not supply every value you asked it to " +
+            "resolve, and will not substitute one it cannot cite:\n" +
+            grounding.blocking.map((b) => `  ${b}`).join("\n"),
+        });
+        persistJob(queue.getJob(jobId)!).catch(() => {});
+        return;
+      }
+
+      if (grounding.groundedSource !== undefined) {
+        antimony = grounding.groundedSource;
+      }
+    }
+
+    if (queue.isCancelled(jobId)) {
+      queue.setJobCancelled(jobId);
+      return;
+    }
+
     const parameters: Record<string, string | number> = {};
-    if (model.antimony !== undefined) parameters["antimony_string"] = model.antimony;
+    if (antimony !== undefined) parameters["antimony_string"] = antimony;
     if (model.sbml !== undefined) parameters["sbml_string"] = model.sbml;
     if (model.start !== undefined && model.start !== null) {
       parameters["start"] = model.start;
@@ -1047,6 +1120,39 @@ async function runCustomModelPipeline(
       parameterProvenance[key] = { origin: "user" };
     }
 
+    // A grounded parameter is origin "resolved" and carries its citation,
+    // exactly as it would on the query path. A `check` parameter stays
+    // origin "user" -- the caller's number still stands, it has simply
+    // been compared -- but gains the note and the citation, so a reader
+    // sees both numbers and can judge the difference themselves.
+    const grounded = grounding?.entries ?? [];
+    for (const entry of grounded) {
+      if (entry.status !== "grounded") continue;
+      const comparison =
+        entry.comparison === undefined
+          ? entry.comparisonSkipped
+            ? ` Not compared: ${entry.comparisonSkipped}`
+            : ""
+          : ` Literature, in your unit: ` +
+            `${entry.comparison.literatureInYourUnit} ${entry.yourUnit ?? ""}.` +
+            (entry.comparison.foldDifference === undefined
+              ? ""
+              : ` Your model: ${entry.yourValue} ${entry.yourUnit ?? ""} ` +
+                `(${entry.comparison.foldDifference.toFixed(2)}x apart).`);
+
+      parameterProvenance[entry.parameter] = {
+        origin: entry.mode === "resolve" ? "resolved" : "user",
+        citation: entry.citation,
+        citationStatus: entry.crossSpecies ? "flagged" : "verified",
+        citationLocators: entry.citationLocators,
+        note: entry.note + comparison,
+      };
+    }
+
+    const groundedCitations = grounded
+      .filter((e) => e.status === "grounded" && e.citation)
+      .map((e) => e.citation as string);
+
     const result: queue.SimulationResponse = {
       runId: jobId,
       domain: engineResult.domain,
@@ -1055,17 +1161,28 @@ async function runCustomModelPipeline(
       provenance: {
         reasoning:
           "Caller-supplied model, simulated as given. Terrium did not " +
-          "choose the structure or any parameter value, and claims no " +
-          "literature backing for them.",
-        // Empty on purpose. The engine's integrator is cited by the
-        // domains that Terrium itself models; here the model is the
-        // caller's, so there is no source of ours to name.
-        modelCitations: [],
-        flags: engineResult.flagged && engineResult.flagReason
-          ? [engineResult.flagReason]
-          : [],
+          "choose the structure" +
+          (grounded.length > 0
+            ? ", and every parameter value is the caller's except those " +
+              "declared `resolve`, which were taken from the literature " +
+              "cited below."
+            : " or any parameter value, and claims no literature backing " +
+              "for them."),
+        // Citations here name sources for individual PARAMETERS the
+        // caller declared, never for the model structure -- that is the
+        // caller's and Terrium must not imply a source for it.
+        modelCitations: groundedCitations,
+        flags: [
+          ...(engineResult.flagged && engineResult.flagReason
+            ? [engineResult.flagReason]
+            : []),
+          ...grounded
+            .filter((e) => e.status !== "grounded")
+            .map((e) => `${e.parameter}: ${e.note}`),
+        ],
       },
       parameterProvenance,
+      modelGrounding: grounded.length > 0 ? grounded : undefined,
       completedAt: new Date().toISOString(),
     };
 
