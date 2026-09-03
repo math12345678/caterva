@@ -19,7 +19,7 @@ import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
 import { runTerium, type SimulationDomain } from "../lib/teriumRunner";
-import { SimulationParameterSchemas } from "../lib/schemas";
+import { SimulationParameterSchemas, CustomModelBody } from "../lib/schemas";
 import * as queue from "../lib/queue";
 import { findCachedResultByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
@@ -201,6 +201,74 @@ router.get(
  * can poll `GET /simulate/:jobId` or subscribe to `GET /simulate/:jobId/stream`
  * for real-time progress updates.
  */
+/**
+ * POST /api/simulate/model -- simulate a model the caller supplies.
+ *
+ * The engine has always been able to do this: `simulate_sbml` runs any SBML
+ * document through libRoadRunner, and `run_sbml` has been in the dispatch
+ * table (and contract-tested) the whole time. Nothing could reach it. The
+ * API exposed no way to send a model, and `resolveQuery` never yields the
+ * "sbml" domain, so the most general capability in the system was
+ * unreachable from the product -- a lab could pick from fifteen presets or
+ * nothing.
+ *
+ * That exclusion was also load-bearing security, whatever its stated
+ * rationale: `sbml_string` reaches RoadRunner's loader, which accepts a
+ * path or URL as readily as a document. The guards in
+ * terium_runner.run_sbml (path/URL refusal, Antimony `import` refusal, and
+ * the MAX_API_SBML_* ceilings) are what make opening it safe, and they are
+ * enforced engine-side so they hold no matter which caller arrives.
+ */
+router.post(
+  "/simulate/model",
+  simulateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parse = CustomModelBody.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: "BAD_REQUEST",
+          message: parse.error.errors.map((e) => e.message).join("; "),
+        });
+        return;
+      }
+
+      const { antimony, sbml, start, end, points } = parse.data;
+
+      // The job's `query` is a label for a request that has no query. It is
+      // what Recent Runs and the job record display, so it says what the
+      // run WAS rather than repeating the whole model source into a field
+      // sized for a sentence.
+      const label = antimony
+        ? "custom model (antimony)"
+        : "custom model (sbml)";
+      const job = queue.createJob(label);
+
+      runCustomModelPipeline(job.jobId, {
+        antimony,
+        sbml,
+        start,
+        end,
+        points,
+      }).catch((err) => {
+        logger.error(
+          { err, jobId: job.jobId },
+          "Custom-model pipeline threw unexpectedly",
+        );
+        queue.setJobError(job.jobId, {
+          error: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : "Unexpected pipeline failure",
+        });
+      });
+
+      res.status(202).json(job);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
 router.post(
   "/simulate",
   simulateLimiter,
@@ -918,6 +986,109 @@ async function findCachedSimulation(
  * Between each stage we check for cancellation. Jobs that are cancelled
  * mid-flight are marked as cancelled rather than failed.
  */
+/**
+ * Run a caller-supplied model. Deliberately NOT runPipeline().
+ *
+ * runPipeline's stages are resolve -> validate -> run -> persist, and the
+ * first two have nothing to do here: there is no query to classify and no
+ * parameter to look up, because the caller wrote the model. Reusing it
+ * would mean threading "skip this stage" flags through every step, which is
+ * how a pipeline stops being readable.
+ *
+ * PROVENANCE. Every parameter is origin "user" -- the caller typed each
+ * number into the model source. That is not a weaker claim than the preset
+ * domains make for an inline `km=2`; it is exactly the same claim. What is
+ * deliberately absent is any assertion of literature backing: this endpoint
+ * runs the model you gave it and says so, and `modelCitations` stays empty
+ * because Terrium did not supply a source and must not imply one.
+ */
+async function runCustomModelPipeline(
+  jobId: string,
+  model: {
+    antimony?: string | undefined;
+    sbml?: string | undefined;
+    start?: number | null | undefined;
+    end?: number | null | undefined;
+    points?: number | null | undefined;
+  },
+): Promise<void> {
+  const abort = new AbortController();
+  queue.registerAbortController(jobId, abort);
+
+  try {
+    if (queue.isCancelled(jobId)) return;
+    queue.updateJob(jobId, { status: "running" });
+
+    const parameters: Record<string, string | number> = {};
+    if (model.antimony !== undefined) parameters["antimony_string"] = model.antimony;
+    if (model.sbml !== undefined) parameters["sbml_string"] = model.sbml;
+    if (model.start !== undefined && model.start !== null) {
+      parameters["start"] = model.start;
+    }
+    if (model.end !== undefined && model.end !== null) {
+      parameters["end"] = model.end;
+    }
+    if (model.points !== undefined && model.points !== null) {
+      parameters["points"] = model.points;
+    }
+
+    const engineResult = await runTerium("sbml", parameters, abort.signal);
+
+    if (queue.isCancelled(jobId)) {
+      queue.setJobCancelled(jobId);
+      return;
+    }
+
+    // Every value came from the caller. `unverifiedOriginKeys` looks for
+    // origin "default" -- a value nobody chose -- and there are none here
+    // by construction, so the hard rule is satisfied rather than bypassed.
+    const parameterProvenance: Record<string, ParameterProvenance> = {};
+    for (const key of Object.keys(engineResult.parameters)) {
+      parameterProvenance[key] = { origin: "user" };
+    }
+
+    const result: queue.SimulationResponse = {
+      runId: jobId,
+      domain: engineResult.domain,
+      parameters: engineResult.parameters,
+      trajectory: engineResult.trajectory,
+      provenance: {
+        reasoning:
+          "Caller-supplied model, simulated as given. Terrium did not " +
+          "choose the structure or any parameter value, and claims no " +
+          "literature backing for them.",
+        // Empty on purpose. The engine's integrator is cited by the
+        // domains that Terrium itself models; here the model is the
+        // caller's, so there is no source of ours to name.
+        modelCitations: [],
+        flags: engineResult.flagged && engineResult.flagReason
+          ? [engineResult.flagReason]
+          : [],
+      },
+      parameterProvenance,
+      completedAt: new Date().toISOString(),
+    };
+
+    queue.setJobResult(jobId, result);
+    persistJob(queue.getJob(jobId)!).catch(() => {});
+  } catch (err) {
+    if (abort.signal.aborted || queue.isCancelled(jobId)) {
+      queue.setJobCancelled(jobId);
+    } else {
+      // The engine's guards (path/URL refusal, antimony import refusal,
+      // the MAX_API_SBML_* ceilings) all surface as its own message, which
+      // names what to change. MODEL_ERROR rather than PIPELINE_ERROR: this
+      // is fixable by editing the model, which a pipeline error is not.
+      queue.setJobError(jobId, {
+        error: "MODEL_ERROR",
+        message:
+          err instanceof Error ? err.message : "Unexpected model failure",
+      });
+    }
+    persistJob(queue.getJob(jobId)!).catch(() => {});
+  }
+}
+
 async function runPipeline(
   jobId: string,
   query: string,
