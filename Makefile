@@ -227,6 +227,9 @@ guards: require-pytest
 	@"$(PY)" scripts/check_citation_format.py
 	@echo ">> documented counts"
 	@"$(PY)" scripts/check_documented_counts.py
+	@echo ">> landing-page test counts"
+	@"$(PY)" scripts/check_landing_test_counts.py --selftest
+	@"$(PY)" scripts/check_landing_test_counts.py
 	@echo ">> python support claim"
 	@"$(PY)" scripts/check_python_support_claim.py
 	@echo ">> forbidden packages (constitution rules 7 and 8)"
