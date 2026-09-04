@@ -37,8 +37,13 @@ describe("a domain with no resolver says so, instead of blaming the literature",
     expect((err as Error).message).toMatch(/no literature lookup/i);
     expect((err as Error).message).toMatch(/never searched for/i);
     // The actionable half must survive the rewrite: a user still needs to
-    // be told exactly what to type.
-    expect((err as Error).message).toMatch(/Add end=<value>/);
+    // be told exactly what to type. `end` is a choice, not a measurement,
+    // so the hint carries a real starting number -- "Add end=<value>" is
+    // useless for an oscillator in dimensionless time, where a reader
+    // cannot tell whether to type 5 or 5000. See refusalExamples.test.ts
+    // for why a MEASURED constant must never get the same treatment.
+    expect((err as Error).message).toMatch(/Add end=\d/);
+    expect((err as Error).message).toMatch(/illustrative starting points/);
     // And still be pointed at --cite, so a value they go and find in a
     // paper is recorded rather than lost.
     expect((err as Error).message).toMatch(/--cite/);

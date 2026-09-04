@@ -56,13 +56,31 @@ export class RequiredParametersMissingError extends Error {
     missing: string[],
     details: Record<string, string> = {},
     resolvedSoFar: Record<string, number | number[]> = {},
+    /**
+     * Illustrative values, used ONLY to make the "Add key=..." hint
+     * concrete for parameters the user chooses. Filtered through
+     * EXPERIMENTAL_CHOICE_KEYS, so a measured constant never appears here
+     * however the caller populates it. Optional; without it the hint
+     * degrades to the previous `key=<value>` form.
+     */
+    examples: Record<string, number | number[]> = {},
   ) {
     const explained = missing.filter((k) => details[k]);
     const unexplained = missing.filter((k) => !details[k]);
 
     const parts: string[] = [];
     if (unexplained.length > 0) {
-      const example = unexplained.map((k) => `${k}=<value>`).join(" ");
+      const example = unexplained.map((k) => exampleFor(k, examples)).join(" ");
+      // Say what those numbers are, when any of them is a real one. A
+      // concrete `end=200` is only safe if the reader knows it is a
+      // starting point they are expected to replace, not a value Terrium
+      // is vouching for.
+      const illustrative = unexplained.some(
+        (k) => exampleFor(k, examples) !== `${k}=<value>`,
+      )
+        ? " The numbers shown are illustrative starting points for values " +
+          "you choose, not measurements — replace them with your own."
+        : "";
       // "could not be resolved from literature" is a claim about a search
       // that happened. For a domain with no lookup at all, no search
       // happened, and saying otherwise sends a researcher away from a
@@ -80,7 +98,7 @@ export class RequiredParametersMissingError extends Error {
           "searched for, rather than searched for and not found.";
       parts.push(
         `Cannot simulate '${domain}': ${searched}` +
-          ` Add ${example} to your query and try again.` +
+          ` Add ${example} to your query and try again.${illustrative}` +
           // THE SECOND SENTENCE IS THE POINT.
           //
           // Herbert Sauro predicted that a refusing tool makes the
@@ -961,6 +979,82 @@ export function isAllDefaults(
  * and demanding them is the product working as intended.
  */
 const NON_SCIENTIFIC_KEYS = new Set(["points"]);
+
+/**
+ * Parameters a researcher CHOOSES, as opposed to ones they measure.
+ *
+ * This exists so a refusal can show a concrete example. "Add end=<value>"
+ * is useless for a repressilator, whose time is dimensionless and whose
+ * sensible window is a few hundred units -- a reader has no way to tell
+ * whether to type 5 or 5000, so the refusal that is supposed to unblock
+ * them does not. "Add end=200" does.
+ *
+ * WHY THIS IS A WHITELIST AND NOT THE OBVIOUS INVERSE
+ *
+ * The dangerous version of this feature suggests `km=2`. The domain
+ * tables carry illustrative Km and Vmax values that the hard rule exists
+ * to keep out of simulations (ADR 0008; domain-literature.ts calls them
+ * "unverified teaching defaults chosen for legibility"). An error message
+ * that offers one as an example would walk the user into pasting it back
+ * as `origin: "user"` -- laundering a fabricated number through the
+ * person the rule protects, using the message that was meant to protect
+ * them. That is exactly the outcome Herbert Sauro predicted and that the
+ * --cite sentence elsewhere in this file exists to prevent.
+ *
+ * So only quantities that are a CHOICE may carry an example: how long to
+ * run, how many particles, what starting concentration. Anything measured
+ * -- rate constants, kinetic constants, mutation rates, efficiencies --
+ * is absent on purpose, and a key nobody has classified is treated as
+ * measured, because that is the safe default.
+ */
+const EXPERIMENTAL_CHOICE_KEYS = new Set([
+  // time and sampling window
+  "start",
+  "end",
+  "points",
+  "n_steps",
+  "timestep",
+  // initial conditions -- what you put in the tube, or the population
+  "s0",
+  "i0",
+  "e0",
+  "r0_recovered",
+  "n0",
+  "a0",
+  "b0",
+  "p0",
+  "v0",
+  "enzyme_conc",
+  "starting_frequency",
+  "starting_frequencies",
+  // experiment size and setup
+  "cycles",
+  "generations",
+  "population_size",
+  "n_particles",
+  "density",
+  "temperature",
+  "n_samples",
+  "n_replicates",
+  "replicate_runs",
+  "seed",
+]);
+
+/**
+ * Format `key=<value>` hints, using a real illustrative number where the
+ * key is a choice and the caller had one to offer.
+ */
+function exampleFor(
+  key: string,
+  examples: Record<string, number | number[]>,
+): string {
+  const value = examples[key];
+  if (!EXPERIMENTAL_CHOICE_KEYS.has(key) || value === undefined) {
+    return `${key}=<value>`;
+  }
+  if (Array.isArray(value)) return `${key}=<value>`;
+  return `${key}=${value}`;
+}
 
 export function unverifiedOriginKeys(
   parameterProvenance: Record<string, ParameterProvenance>,
