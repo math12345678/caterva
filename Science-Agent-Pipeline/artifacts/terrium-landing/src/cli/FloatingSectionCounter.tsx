@@ -6,7 +6,6 @@ const NAV_ITEMS = [
   "examples",
   "playground",
   "compare",
-  "testimonials",
   "glossary",
   "trust",
   "faq",
@@ -20,6 +19,7 @@ const NAV_ITEMS = [
   "team",
   "pricing",
   "cite",
+  "status",
   "waitlist",
 ] as const;
 
@@ -28,7 +28,6 @@ const LABELS: Record<string, string> = {
   examples: "Examples",
   playground: "Playground",
   compare: "Compare",
-  testimonials: "Testimonials",
   glossary: "Glossary",
   trust: "Trust",
   faq: "FAQ",
@@ -42,6 +41,7 @@ const LABELS: Record<string, string> = {
   team: "Team",
   pricing: "Pricing",
   cite: "Cite",
+  status: "Status",
   waitlist: "Waitlist",
 };
 

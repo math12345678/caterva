@@ -31,7 +31,6 @@ const COMMANDS = [
   "version",
   "glossary",
   "playground",
-  "testimonials",
   "compare",
 ];
 
@@ -61,7 +60,6 @@ function HelpOutput() {
     ["export", "list supported export formats"],
     ["glossary", "open the key terms and definitions reference"],
     ["playground", "open the interactive kinetics & epidemiology demo"],
-    ["testimonials", "see what researchers are saying"],
     ["compare", "compare traditional vs terrium workflow"],
     ["theme", "show current theme"],
     ["ls", "list this page as a filesystem"],
@@ -392,15 +390,6 @@ export default function InteractiveShell({
           </span>,
         );
         onNavigate("playground");
-        break;
-      case "testimonials":
-        push(
-          "output",
-          <span className="text-white/40">
-            scrolling to researcher testimonials...
-          </span>,
-        );
-        onNavigate("testimonials");
         break;
       case "compare":
         push(
