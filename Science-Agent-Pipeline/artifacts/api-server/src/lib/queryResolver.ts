@@ -2548,6 +2548,12 @@ export async function resolveQuery(
         missing,
         missingKeyDetails(missing, parameterProvenance),
         resolvedOnly,
+        // The domain table's own illustrative values, offered ONLY as
+        // "Add end=200" hints. RequiredParametersMissingError filters
+        // them through EXPERIMENTAL_CHOICE_KEYS, so the teaching-default
+        // km/vmax in this same table can never reach the message and be
+        // pasted back as a user value.
+        Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
       );
     }
 
@@ -2822,6 +2828,8 @@ export async function resolveQuery(
       missing,
       missingKeyDetails(missing, parameterProvenance),
       resolvedOnly,
+      // Same as the LLM branch above, same filtering.
+      Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
     );
   }
 
