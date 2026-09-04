@@ -40,6 +40,7 @@ import {
   parseModelAnnotations,
   type AnnotationProblem,
   type ModelAnnotation,
+  type ModelFormat,
 } from "./modelAnnotations";
 
 /** The unit each quantity resolves in. Set by the sources, not by us. */
@@ -285,12 +286,32 @@ function substitute(
   lines: string[],
   entry: GroundedParameter,
   value: number,
+  format: ModelFormat,
 ): boolean {
   const index = entry.line - 1;
   const line = lines[index];
   if (line === undefined) return false;
+  const id = entry.parameter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  if (format === "sbml") {
+    // Rewrite the value attribute of THIS parameter element. Anchored on
+    // the id so a parameter mentioned in a rate law is never touched, and
+    // an element with no value attribute gets one added.
+    const idPattern = new RegExp(`<parameter\\b[^>]*\\bid\\s*=\\s*"${id}"`);
+    if (!idPattern.test(line)) return false;
+    if (/\bvalue\s*=\s*"[^"]*"/.test(line)) {
+      lines[index] = line.replace(/\bvalue\s*=\s*"[^"]*"/, `value="${value}"`);
+    } else {
+      lines[index] = line.replace(
+        /(<parameter\b)/,
+        `$1 value="${value}"`,
+      );
+    }
+    return true;
+  }
+
   const pattern = new RegExp(
-    `^(\\s*${entry.parameter}\\s*=\\s*)(?:\\?|-?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?)(\\s*;?)`,
+    `^(\\s*${id}\\s*=\\s*)(?:\\?|-?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?)(\\s*;?)`,
   );
   if (!pattern.test(line)) return false;
   lines[index] = line.replace(pattern, `$1${value}$2`);
@@ -300,16 +321,22 @@ function substitute(
 /**
  * Ground every annotated parameter in an Antimony source.
  *
- * Antimony only. SBML carries no comments in this sense; its annotation
- * story is `<annotation>` RDF, a different and much larger job. The
- * caller reports that limit rather than returning an empty report, which
- * would read as "nothing to check".
+ * Both formats. SBML carries the same declaration in an XML comment or a
+ * `<notes>` element, naming its parameter explicitly since XML has no
+ * "the line below" to bind to. SBML is what labs actually exchange --
+ * COPASI, CellDesigner and BioModels all speak it -- so Antimony-only
+ * grounding would have meant most labs could not use this at all.
  */
 export async function groundAnnotatedModel(
   source: string,
-  options: { allowCrossSpecies?: boolean; allowVariants?: boolean } = {},
+  options: {
+    allowCrossSpecies?: boolean;
+    allowVariants?: boolean;
+    format?: ModelFormat;
+  } = {},
 ): Promise<ModelGroundingReport> {
-  const { annotations, problems } = parseModelAnnotations(source);
+  const format = options.format ?? "antimony";
+  const { annotations, problems } = parseModelAnnotations(source, format);
   if (problems.length > 0) {
     // Do not spend network calls resolving a model whose declarations are
     // already known to be wrong; the caller has to fix them first.
@@ -352,7 +379,9 @@ export async function groundAnnotatedModel(
       );
       continue;
     }
-    if (!substitute(lines, entry, entry.comparison.literatureInYourUnit)) {
+    if (
+      !substitute(lines, entry, entry.comparison.literatureInYourUnit, format)
+    ) {
       blocking.push(
         `${entry.parameter} (line ${entry.line}): Terrium resolved a value ` +
           "but could not write it into the model source at that line.",

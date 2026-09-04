@@ -116,6 +116,35 @@ export interface ParsedAnnotations {
 const DIRECTIVE_RE = /(?:\/\/|#)\s*terrium\s*:\s*(.+)$/i;
 
 /**
+ * The same directive inside SBML: an XML comment, or free text in a
+ * `<notes>` element.
+ *
+ * SBML is the format labs actually exchange -- COPASI, CellDesigner and
+ * BioModels all speak it -- so Antimony-only grounding would have meant
+ * most labs could not use this at all.
+ *
+ * WHY NOT SBO TERMS, WHICH WOULD NEED NO NEW SYNTAX
+ *
+ * SBML already has a standard way to say "this parameter is a Michaelis
+ * constant": an `sboTerm` attribute. Reading those would be the elegant
+ * answer, and it is deliberately not what this does.
+ *
+ * libsbml 5.21.1 (the version this engine runs) exposes `SBO.intToString`,
+ * which only formats an integer as "SBO:0000027" -- there is no label
+ * lookup, and `SBO.isKineticConstant(27)` returns false while
+ * `isKineticConstant(25)` returns true, which is not enough to establish
+ * what either term MEANS. Identifying parameters from remembered ontology
+ * numbers, with no way to check them here, would attach real citations to
+ * misidentified constants: the precise failure this module exists to
+ * refuse, committed by the code meant to prevent it.
+ *
+ * So SBML uses the same explicit declaration Antimony does. When an SBO
+ * label source can be verified rather than recalled, reading sboTerm
+ * becomes a strict addition to this, not a replacement for it.
+ */
+const XML_DIRECTIVE_RE = /terrium\s*:\s*([^<>]+?)\s*(?:-->|<\/|$)/i;
+
+/**
  * An Antimony scalar assignment: `Km_hex = 0.15;`
  *
  * Only a literal number. An assignment to an expression is not a constant
@@ -139,6 +168,10 @@ const KNOWN_QUANTITIES = new Set<string>(["km", "ki", "kcat"]);
 const FIELD_RE = /(\w+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
 
 const KNOWN_FIELDS = new Set([
+  // SBML only: names the parameter this declaration is about. XML has no
+  // "the line below" to bind to, so the binding is stated rather than
+  // positional -- which is the same reason the enzyme is stated.
+  "parameter",
   "enzyme",
   "ec",
   "substrate",
@@ -155,7 +188,81 @@ const KNOWN_FIELDS = new Set([
  * `auditAnnotations`' caller reports it to SBML callers rather than
  * returning an empty audit that reads as "nothing to check".
  */
-export function parseModelAnnotations(source: string): ParsedAnnotations {
+export type ModelFormat = "antimony" | "sbml";
+
+export function parseModelAnnotations(
+  source: string,
+  format: ModelFormat = "antimony",
+): ParsedAnnotations {
+  return format === "sbml"
+    ? parseSbmlAnnotations(source)
+    : parseAntimonyAnnotations(source);
+}
+
+/**
+ * Validate the body of a directive -- everything after `terrium:`.
+ *
+ * Shared by both formats deliberately. An SBML caller and an Antimony
+ * caller must be held to exactly the same standard, or the weaker one
+ * becomes the way to get an unidentified parameter resolved.
+ */
+function parseDirectiveBody(
+  body: string,
+): { fields: Record<string, string>; quantity: AnnotatedQuantity; mode: AnnotationMode } | { error: string } {
+  // The quantity is the first bare word: "km", "kcat", "ki".
+  const quantityMatch = /^([A-Za-z_]+)/.exec(body);
+  const quantity = quantityMatch?.[1]?.toLowerCase();
+  if (!quantity || !KNOWN_QUANTITIES.has(quantity)) {
+    return {
+      error:
+        `'${quantity ?? body}' is not a quantity Terrium can resolve. ` +
+        `Use one of: ${[...KNOWN_QUANTITIES].join(", ")}.`,
+    };
+  }
+
+  // Unknown keys are reported rather than ignored: a mistyped
+  // `enzmye="..."` would otherwise leave the annotation silently
+  // unidentifiable while looking correct in the source.
+  const fields: Record<string, string> = {};
+  let unknownField: string | undefined;
+  for (const m of body.matchAll(FIELD_RE)) {
+    const key = m[1]!.toLowerCase();
+    if (!KNOWN_FIELDS.has(key)) {
+      unknownField ??= m[1]!;
+      continue;
+    }
+    fields[key] = (m[2] ?? m[3] ?? "").trim();
+  }
+  if (unknownField !== undefined) {
+    return {
+      error:
+        `'${unknownField}' is not a field Terrium understands. ` +
+        `Use: ${[...KNOWN_FIELDS].join(", ")}. To have Terrium supply ` +
+        "the value from literature, add the bare word 'resolve'.",
+    };
+  }
+
+  // Identity is mandatory. This is the whole reason the declaration
+  // exists: without an enzyme or an EC number there is nothing to look
+  // up, and picking one from the parameter's NAME is exactly the guess
+  // this module refuses to make.
+  if (!fields["enzyme"] && !fields["ec"]) {
+    return {
+      error:
+        'an enzyme must be named: add enzyme="..." or ec="1.1.1.27". ' +
+        "Terrium will not infer which enzyme a parameter belongs to from " +
+        "its name.",
+    };
+  }
+
+  return {
+    fields,
+    quantity: quantity as AnnotatedQuantity,
+    mode: /\bresolve\b/i.test(body) ? "resolve" : "check",
+  };
+}
+
+function parseAntimonyAnnotations(source: string): ParsedAnnotations {
   const annotations: ModelAnnotation[] = [];
   const problems: AnnotationProblem[] = [];
   const lines = source.split(/\r?\n/);
@@ -171,53 +278,12 @@ export function parseModelAnnotations(source: string): ParsedAnnotations {
       problems.push({ line, message, source: raw.trim() });
     };
 
-    // The quantity is the first bare word: "km", "kcat", "ki".
-    const quantityMatch = /^([A-Za-z_]+)/.exec(body);
-    const quantity = quantityMatch?.[1]?.toLowerCase();
-    if (!quantity || !KNOWN_QUANTITIES.has(quantity)) {
-      fail(
-        `'${quantity ?? body}' is not a quantity Terrium can resolve. ` +
-          `Use one of: ${[...KNOWN_QUANTITIES].join(", ")}.`,
-      );
+    const parsed = parseDirectiveBody(body);
+    if ("error" in parsed) {
+      fail(parsed.error);
       continue;
     }
-
-    // Fields. Unknown keys are reported rather than ignored: a mistyped
-    // `enzmye="..."` would otherwise leave the annotation silently
-    // unidentifiable while looking correct in the source.
-    const fields: Record<string, string> = {};
-    let unknownField: string | undefined;
-    for (const m of body.matchAll(FIELD_RE)) {
-      const key = m[1]!.toLowerCase();
-      if (!KNOWN_FIELDS.has(key)) {
-        unknownField ??= m[1]!;
-        continue;
-      }
-      fields[key] = (m[2] ?? m[3] ?? "").trim();
-    }
-    if (unknownField !== undefined) {
-      fail(
-        `'${unknownField}' is not a field Terrium understands. ` +
-          `Use: ${[...KNOWN_FIELDS].join(", ")}. To have Terrium supply ` +
-          "the value from literature, add the bare word 'resolve'.",
-      );
-      continue;
-    }
-
-    // Identity is mandatory. This is the whole reason the annotation
-    // exists: without an enzyme or an EC number there is nothing to look
-    // up, and picking one from the parameter's NAME is exactly the guess
-    // this module refuses to make.
-    if (!fields["enzyme"] && !fields["ec"]) {
-      fail(
-        "an enzyme must be named: add enzyme=\"...\" or ec=\"1.1.1.27\". " +
-          "Terrium will not infer which enzyme a parameter belongs to from " +
-          "its name.",
-      );
-      continue;
-    }
-
-    const mode: AnnotationMode = /\bresolve\b/i.test(body) ? "resolve" : "check";
+    const { fields, quantity, mode } = parsed;
 
     // Bind to a parameter: the assignment on THIS line if the directive
     // trails one, otherwise the next assignment below it.
@@ -276,6 +342,19 @@ export function parseModelAnnotations(source: string): ParsedAnnotations {
     });
   }
 
+  return dedupeByParameter(annotations, problems);
+}
+
+/**
+ * Collapse duplicate declarations about one parameter.
+ *
+ * Shared by both formats: an SBML caller must not be able to get two
+ * conflicting claims resolved where an Antimony caller cannot.
+ */
+function dedupeByParameter(
+  annotations: ModelAnnotation[],
+  problems: AnnotationProblem[],
+): ParsedAnnotations {
   // A parameter declared twice is ambiguous about which claim holds, and
   // resolving it twice would attach two different citations to one
   // symbol.
@@ -309,4 +388,88 @@ export function parseModelAnnotations(source: string): ParsedAnnotations {
   }
 
   return { annotations: unique, problems };
+}
+
+
+/** `<parameter id="Km_hex" value="0.15"/>`, in any attribute order. */
+function findSbmlParameter(
+  lines: string[],
+  id: string,
+): { line: number; value?: number; hasValueAttr: boolean } | undefined {
+  const idPattern = new RegExp(`<parameter\\b[^>]*\\bid\\s*=\\s*"${id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`);
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]!;
+    if (!idPattern.test(raw)) continue;
+    const valueMatch = /\bvalue\s*=\s*"([^"]*)"/.exec(raw);
+    if (!valueMatch) return { line: i + 1, hasValueAttr: false };
+    const parsed = Number.parseFloat(valueMatch[1]!);
+    return Number.isFinite(parsed)
+      ? { line: i + 1, value: parsed, hasValueAttr: true }
+      : { line: i + 1, hasValueAttr: true };
+  }
+  return undefined;
+}
+
+function parseSbmlAnnotations(source: string): ParsedAnnotations {
+  const annotations: ModelAnnotation[] = [];
+  const problems: AnnotationProblem[] = [];
+  const lines = source.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i]!;
+    const directive = XML_DIRECTIVE_RE.exec(raw);
+    if (!directive) continue;
+
+    const line = i + 1;
+    const fail = (message: string): void => {
+      problems.push({ line, message, source: raw.trim() });
+    };
+
+    const parsed = parseDirectiveBody(directive[1]!.trim());
+    if ("error" in parsed) {
+      fail(parsed.error);
+      continue;
+    }
+    const { fields, quantity, mode } = parsed;
+
+    const name = fields["parameter"];
+    if (!name) {
+      fail(
+        'an SBML declaration must say which parameter it is about: add ' +
+          'parameter="Km_hex". XML has no line below to bind to.',
+      );
+      continue;
+    }
+
+    const target = findSbmlParameter(lines, name);
+    if (!target) {
+      // A typo here would otherwise silently check nothing at all.
+      fail(`no <parameter id="${name}"> exists in this document.`);
+      continue;
+    }
+
+    if (!target.hasValueAttr && mode === "check") {
+      fail(
+        `<parameter id="${name}"> has no value to check. Either give it a ` +
+          "value, or add 'resolve' to the declaration to have Terrium " +
+          "supply one from literature.",
+      );
+      continue;
+    }
+
+    annotations.push({
+      parameter: name,
+      quantity,
+      mode,
+      ...(target.value !== undefined ? { value: target.value } : {}),
+      ...(fields["enzyme"] ? { enzymeName: fields["enzyme"] } : {}),
+      ...(fields["ec"] ? { ecNumber: fields["ec"] } : {}),
+      ...(fields["substrate"] ? { substrate: fields["substrate"] } : {}),
+      ...(fields["organism"] ? { organism: fields["organism"] } : {}),
+      ...(fields["unit"] ? { unit: fields["unit"] } : {}),
+      line: target.line,
+    });
+  }
+
+  return dedupeByParameter(annotations, problems);
 }

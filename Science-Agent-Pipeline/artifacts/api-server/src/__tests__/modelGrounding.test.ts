@@ -203,4 +203,131 @@ describe("grounding a caller's own model", () => {
     expect(occurrences).toHaveLength(2); // the rate law and the assignment
     expect(report.groundedSource).toContain("(Vmax * S) / (Km_hex + S)");
   });
+
+  // ---- SBML: the format labs actually exchange -------------------------
+
+  const SBML = (paramLine: string, directive: string) =>
+    [
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" level="3" version="1">',
+      '  <model id="m">',
+      "    <listOfParameters>",
+      `      ${directive}`,
+      `      ${paramLine}`,
+      '      <parameter id="Vmax" value="0.5" constant="true"/>',
+      "    </listOfParameters>",
+      "  </model>",
+      "</sbml>",
+    ].join("\n");
+
+  it("checks a value declared in an SBML comment", async () => {
+    vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
+    const report = await groundAnnotatedModel(
+      SBML(
+        '<parameter id="Km_hex" value="0.15" constant="true"/>',
+        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="mM" -->',
+      ),
+      { format: "sbml" },
+    );
+    expect(report.problems).toEqual([]);
+    const entry = report.entries[0]!;
+    expect(entry.parameter).toBe("Km_hex");
+    expect(entry.yourValue).toBe(0.15);
+    expect(entry.literatureValue).toBe(0.12);
+    expect(entry.citation).toContain("715396");
+  });
+
+  it("fills an SBML value attribute in resolve mode, in the model's unit", async () => {
+    vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
+    const report = await groundAnnotatedModel(
+      SBML(
+        '<parameter id="Km_hex" constant="true"/>',
+        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="uM" resolve -->',
+      ),
+      { format: "sbml" },
+    );
+    expect(report.blocking).toEqual([]);
+    // 0.12 mM into a uM model is 120.
+    expect(report.groundedSource).toContain('value="120"');
+    // ...and nothing else was rewritten.
+    expect(report.groundedSource).toContain('<parameter id="Vmax" value="0.5"');
+  });
+
+  it("rewrites only the declared parameter, not another with a similar id", async () => {
+    vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
+    const source = SBML(
+      '<parameter id="Km_hex" value="0.9" constant="true"/>\n      <parameter id="Km_hex_2" value="0.3" constant="true"/>',
+      '<!-- terrium: km parameter="Km_hex_2" enzyme="hexokinase" unit="mM" resolve -->',
+    );
+    const report = await groundAnnotatedModel(source, { format: "sbml" });
+    expect(report.blocking).toEqual([]);
+    expect(report.groundedSource).toContain('<parameter id="Km_hex" value="0.9"');
+    expect(report.groundedSource).toContain('<parameter id="Km_hex_2" value="0.12"');
+  });
+
+  it("reports an SBML declaration naming a parameter that does not exist", async () => {
+    // A typo would otherwise silently check nothing.
+    const report = await groundAnnotatedModel(
+      SBML(
+        '<parameter id="Km_hex" value="0.15" constant="true"/>',
+        '<!-- terrium: km parameter="Km_typo" enzyme="hexokinase" unit="mM" -->',
+      ),
+      { format: "sbml" },
+    );
+    expect(report.entries).toEqual([]);
+    expect(report.problems[0]!.message).toMatch(/no <parameter id="Km_typo">/);
+  });
+
+  it("holds SBML to the same identity rule as Antimony", async () => {
+    // The weaker format must not become the way to get an unidentified
+    // parameter resolved.
+    const report = await groundAnnotatedModel(
+      SBML(
+        '<parameter id="Km_hex" value="0.15" constant="true"/>',
+        '<!-- terrium: km parameter="Km_hex" unit="mM" -->',
+      ),
+      { format: "sbml" },
+    );
+    expect(report.entries).toEqual([]);
+    expect(report.problems[0]!.message).toMatch(/enzyme must be named/i);
+  });
+
+  it("overwrites an EXISTING SBML value, converted into the model's unit", async () => {
+    // Distinct from the placeholder case above, which takes the
+    // add-the-attribute branch. This one takes the replace-the-attribute
+    // branch, and a mutation writing the raw mM value survived every
+    // other test here: the resolve fixture had no value attribute, and
+    // the fixture that did have one used mM, where converted and raw are
+    // identical. uM with an existing value is the case that can tell them
+    // apart.
+    vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
+    const report = await groundAnnotatedModel(
+      SBML(
+        '<parameter id="Km_hex" value="999" constant="true"/>',
+        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="uM" resolve -->',
+      ),
+      { format: "sbml" },
+    );
+    expect(report.blocking).toEqual([]);
+    expect(report.groundedSource).toContain('value="120"');
+    expect(report.groundedSource).not.toContain('value="0.12"');
+    expect(report.groundedSource).not.toContain('value="999"');
+  });
+
+  it("binds an SBML id exactly, even when a longer id comes first", async () => {
+    // A prefix match would bind `Km_hex` to `Km_hex_long`, which appears
+    // FIRST here. The earlier ordering hid this: declaring the longer id
+    // made a prefix match land correctly by accident.
+    vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
+    const report = await groundAnnotatedModel(
+      SBML(
+        '<parameter id="Km_hex_long" value="777" constant="true"/>\n      <parameter id="Km_hex" value="0.9" constant="true"/>',
+        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="mM" resolve -->',
+      ),
+      { format: "sbml" },
+    );
+    expect(report.blocking).toEqual([]);
+    expect(report.groundedSource).toContain('<parameter id="Km_hex_long" value="777"');
+    expect(report.groundedSource).toContain('<parameter id="Km_hex" value="0.12"');
+  });
 });
