@@ -1045,14 +1045,17 @@ async function runCustomModelPipeline(
     // and a model whose declarations are wrong should not consume an
     // engine run at all.
     //
-    // Antimony only. SBML carries no comments in this sense (its
-    // annotation story is <annotation> RDF, a different and much larger
-    // job), and an SBML caller is told that rather than handed an empty
-    // report that reads as "nothing to check".
+    // Both formats. SBML uses the same declaration in an XML comment or
+    // a <notes> element, naming its parameter explicitly. SBML is the
+    // interchange format labs actually use, so Antimony-only grounding
+    // would have shut most of them out of this entirely.
     let grounding: ModelGroundingReport | undefined;
     let antimony = model.antimony;
-    if (antimony !== undefined) {
-      grounding = await groundAnnotatedModel(antimony);
+    let sbml = model.sbml;
+    const declared = antimony ?? sbml;
+    const format = antimony !== undefined ? "antimony" : "sbml";
+    if (declared !== undefined) {
+      grounding = await groundAnnotatedModel(declared, { format });
 
       if (grounding.problems.length > 0) {
         queue.setJobError(jobId, {
@@ -1083,7 +1086,8 @@ async function runCustomModelPipeline(
       }
 
       if (grounding.groundedSource !== undefined) {
-        antimony = grounding.groundedSource;
+        if (format === "antimony") antimony = grounding.groundedSource;
+        else sbml = grounding.groundedSource;
       }
     }
 
@@ -1094,7 +1098,7 @@ async function runCustomModelPipeline(
 
     const parameters: Record<string, string | number> = {};
     if (antimony !== undefined) parameters["antimony_string"] = antimony;
-    if (model.sbml !== undefined) parameters["sbml_string"] = model.sbml;
+    if (sbml !== undefined) parameters["sbml_string"] = sbml;
     if (model.start !== undefined && model.start !== null) {
       parameters["start"] = model.start;
     }
