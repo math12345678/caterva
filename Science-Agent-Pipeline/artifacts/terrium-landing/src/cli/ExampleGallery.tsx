@@ -50,8 +50,18 @@ const EXAMPLES: ExampleCard[] = [
     id: "mm-demo",
     domain: "mm",
     label: "Michaelis-Menten",
+    // "literature-verified" was an overclaim, and specifically the kind
+    // this product exists to refuse. Re-resolved live: the value and the
+    // source are real (BRENDA ref 740253, EC 1.1.1.27, Homo sapiens), but
+    // the pipeline returns citationStatus "flagged", not "verified",
+    // because the source never reported assay temperature and STRENDA
+    // requires it for kinetic data. Terrium's own resolver declines to
+    // call this value verified; the page must not call it verified over
+    // the resolver's head.
     description:
-      "Enzyme kinetics — Km literature-verified (10.73 mM, real BRENDA value), Vmax user-chosen.",
+      "Enzyme kinetics — Km is a real BRENDA value (10.73 mM, EC 1.1.1.27, " +
+      "H. sapiens), flagged rather than verified because the source did not " +
+      "report assay temperature. Vmax is user-chosen.",
     stats: [
       {
         label: "final [S]",
