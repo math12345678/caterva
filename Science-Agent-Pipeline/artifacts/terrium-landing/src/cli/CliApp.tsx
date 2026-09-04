@@ -82,7 +82,6 @@ const NAV_ITEMS = [
   "examples",
   "playground",
   "compare",
-  "testimonials",
   "glossary",
   "trust",
   "faq",
