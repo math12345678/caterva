@@ -6,11 +6,59 @@ import { simulateSIR } from "@/lib/simulate";
 
 import ParamSlider from "@/components/ui/param-slider";
 
+// A disease name on a preset is a claim about that disease.
+//
+// These four contradicted the product's own literature-resolved registry,
+// and one of them contradicted its refusal:
+//
+//   "COVID (mild)"    beta 0.2  gamma 0.07  -> R0 2.86, 14.3-day infectious
+//                     period. The registry (Hussein et al. 2021, PMID
+//                     33214421) gives beta 0.576, gamma 0.183 -- R0 3.14
+//                     over 5.45 days. gamma off by 2.6x.
+//   "Flu (moderate)"  R0 3.0 -> Biggerstaff et al. 2014 gives seasonal
+//                     R0 1.28. Off by 2.3x.
+//   "Measles (high)"  R0 11.25 -> Terrium REFUSES to simulate measles,
+//                     because Guerra et al. 2017 found no single R0 is
+//                     defensible. Shipping a measles preset asserts
+//                     exactly what the resolver declines to assert.
+//   "Ebola (slow)"    not in the registry at all.
+//
+// Named diseases now carry the registry's own values. The two with no
+// registry entry are gone: an unnamed shape is honest, a named one is a
+// claim. See ADR 0017 and ADR 0169.
 const PRESETS = [
-  { label: "Flu (moderate)", beta: 0.3, gamma: 0.1, s0: 990, i0: 10 },
-  { label: "COVID (mild)", beta: 0.2, gamma: 0.07, s0: 990, i0: 10 },
-  { label: "Measles (high)", beta: 0.9, gamma: 0.08, s0: 990, i0: 10 },
-  { label: "Ebola (slow)", beta: 0.15, gamma: 0.05, s0: 950, i0: 50 },
+  {
+    label: "COVID-19",
+    beta: 0.5761,
+    gamma: 0.1835,
+    s0: 990,
+    i0: 10,
+    source: "Hussein et al. 2021, PMID 33214421 (R0 3.14 / 5.45 d)",
+  },
+  {
+    label: "Seasonal flu",
+    beta: 0.5818,
+    gamma: 0.4545,
+    s0: 990,
+    i0: 10,
+    source: "Biggerstaff 2014 + Vink 2014 (R0 1.28 / 2.2 d), flagged composite",
+  },
+  {
+    label: "Faster spread",
+    beta: 0.9,
+    gamma: 0.08,
+    s0: 990,
+    i0: 10,
+    source: "illustrative — not a disease, no literature claim",
+  },
+  {
+    label: "Slower spread",
+    beta: 0.15,
+    gamma: 0.05,
+    s0: 950,
+    i0: 50,
+    source: "illustrative — not a disease, no literature claim",
+  },
 ];
 
 export default function EpiPlayground() {

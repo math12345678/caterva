@@ -148,3 +148,90 @@ describe("the workflow comparison does not invent durations", () => {
     expect(comments).toMatch(/2026-09-05/);
   });
 });
+
+/**
+ * A named enzyme, a named disease, and a sample export are all CLAIMS.
+ *
+ * Three surfaces shipped numbers that contradicted the product's own
+ * resolver, under real names, on the pages that advertise never inventing
+ * a number:
+ *
+ *   KineticsPlayground  LDH Km 0.5 (resolver: 10.73, BRENDA 740253) and
+ *                       hexokinase Km 0.1 (resolver: 6, BRENDA 641068).
+ *                       Off by 21x and 60x.
+ *   EpiPlayground       "COVID (mild)" gamma 0.07 = a 14.3-day infectious
+ *                       period against the registry's 5.45 days; and a
+ *                       "Measles (high)" preset, when the resolver
+ *                       REFUSES measles because Guerra et al. 2017 found
+ *                       no single R0 defensible.
+ *   ExportFormats       a sample export attributing Km 2.0 and Vmax 5.0
+ *                       to BRENDA -- the unverified teaching defaults the
+ *                       hard rule blocks -- plus "PMID:12345678".
+ *
+ * All values are now the ones the product actually resolves, measured
+ * 2026-09-05, or are explicitly labelled as carrying no literature claim.
+ */
+describe("presets and samples do not contradict the resolver", () => {
+  const read = (f: string) =>
+    readFileSync(path.join(__dirname, "..", "cli", f), "utf-8");
+
+  it("enzyme presets carry the Km the resolver returns", () => {
+    const src = read("KineticsPlayground.tsx");
+    expect(src).toMatch(/label: "LDH", km: 10\.73/);
+    expect(src).toMatch(/label: "Hexokinase", km: 6/);
+    // The wrong ones must not come back.
+    expect(src).not.toMatch(/label: "LDH", km: 0\.5/);
+    expect(src).not.toMatch(/label: "Hexokinase", km: 0\.1\b/);
+    // Each named enzyme cites where its Km came from.
+    for (const ref of ["740253", "641068", "649716"]) {
+      expect(src, `missing BRENDA ref ${ref}`).toContain(ref);
+    }
+  });
+
+  it("drops enzyme names with no resolved value rather than inventing one", () => {
+    // Trypsin shipped Km 15 with no source and no resolver value.
+    expect(read("KineticsPlayground.tsx")).not.toMatch(/label: "Trypsin"/);
+  });
+
+  it("ships no measles preset, because the resolver refuses measles", () => {
+    // Shipping one asserts exactly what the resolver declines to assert.
+    const src = read("EpiPlayground.tsx");
+    const rendered = src
+      .split("\n")
+      .filter((l) => !/^\s*(\/\/|\*)/.test(l))
+      .join("\n");
+    expect(rendered).not.toMatch(/measles/i);
+  });
+
+  it("disease presets match the literature registry", () => {
+    const src = read("EpiPlayground.tsx");
+    // Hussein et al. 2021: R0 3.14 / 5.45 d -> gamma 0.1835, beta 0.5761.
+    expect(src).toMatch(/label: "COVID-19",\s*\n\s*beta: 0\.5761,\s*\n\s*gamma: 0\.1835/);
+    expect(src).toContain("33214421");
+    // The old value implied a 14.3-day infectious period.
+    expect(src).not.toMatch(/gamma: 0\.07\b/);
+  });
+
+  it("unnamed shapes carry no literature claim", () => {
+    // Presets that are not diseases must say so, not borrow a name.
+    const src = read("EpiPlayground.tsx");
+    expect(src).toMatch(/Faster spread/);
+    expect(src).toMatch(/no literature claim/);
+  });
+
+  it("the sample export shows real provenance, not teaching defaults", () => {
+    const src = read("ExportFormats.tsx");
+    const rendered = src
+      .split("\n")
+      .filter((l) => !/^\s*(\/\/|\*)/.test(l))
+      .join("\n");
+    // The placeholder PMID and the blocked defaults must be gone.
+    expect(rendered).not.toContain("PMID:12345678");
+    expect(rendered).not.toMatch(/"Km": \{ "value": 2\.0[^}]*"source": "BRENDA"/);
+    expect(rendered).not.toMatch(/"Vmax": \{ "value": 5\.0[^}]*"source": "BRENDA"/);
+    // Real resolved values, with Vmax shown as DERIVED rather than
+    // looked up -- it is not a property of the enzyme alone.
+    expect(rendered).toContain("641068");
+    expect(rendered).toMatch(/"vmax"[\s\S]{0,200}derived: kcat/);
+  });
+});
