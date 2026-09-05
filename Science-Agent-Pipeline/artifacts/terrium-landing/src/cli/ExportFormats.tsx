@@ -71,23 +71,52 @@ const CSV_PREVIEW = `t,S,P
 ...
 3.000000,3.521403,6.478597`;
 
+// A sample export is a claim about what an export contains.
+//
+// This preview showed Km 2.0 and Vmax 5.0 both attributed to "BRENDA",
+// plus "PMID:12345678". All three were invented:
+//
+//   Km 2.0 / Vmax 5.0  are the domain table's UNVERIFIED TEACHING
+//                      DEFAULTS -- the exact values the hard rule (ADR
+//                      0008) blocks from ever reaching a simulation.
+//                      domain-literature.ts calls them "chosen for
+//                      legibility". Attributed here to BRENDA.
+//   PMID:12345678      is a placeholder, not a paper.
+//
+// So the screenshot of "what your provenance looks like" showed
+// fabricated provenance, on the page whose promise is that provenance is
+// never fabricated.
+//
+// Replaced with an actual run, measured through POST /api/simulate on
+// 2026-09-05: "how fast does hexokinase convert glucose at 10 mM with
+// 50 nM enzyme over 30 seconds". Km resolves from BRENDA; Vmax is
+// DERIVED, not looked up -- Vmax is not a property of an enzyme alone
+// (ADR 0013/0019), so its source names the kcat and the enzyme
+// concentration it came from rather than pretending BRENDA holds it.
 const JSON_PREVIEW = `{
   "model": "mm_kinetics",
-  "domain": "enzyme-kinetics",
+  "domain": "mm",
   "parameters": {
-    "Km": { "value": 2.0, "unit": "mM", "source": "BRENDA" },
-    "Vmax": { "value": 5.0, "unit": "mM/s", "source": "BRENDA" }
+    "km": {
+      "value": 6.0, "unit": "mM",
+      "origin": "resolved", "citationStatus": "verified",
+      "source": "BRENDA (ref 641068) - EC 2.7.1.1, Homo sapiens"
+    },
+    "vmax": {
+      "value": 0.002005, "unit": "mM/s",
+      "origin": "resolved", "citationStatus": "verified",
+      "source": "derived: kcat 40.1 1/s (BRENDA ref 739603) x enzyme_conc 5e-5 mM"
+    },
+    "enzyme_conc": {
+      "value": 5e-5, "unit": "mM",
+      "origin": "user", "note": "read from your query: \\"50 nM enzyme\\""
+    }
   },
   "trajectory": [
-    { "t": 0.0, "S": 10.0, "P": 0.0 },
-    { "t": 0.5, "S": 8.08, "P": 1.92 },
-    { "t": 1.0, "S": 6.42, "P": 3.58 }
-  ],
-  "validation": {
-    "residual": 1.23e-14,
-    "conserved": true,
-    "citations": ["PMID:12345678"]
-  }
+    { "time": 0.0, "[S]": 10.0, "[P]": 0.0 },
+    { "time": 0.6, "[S]": 9.999248, "[P]": 0.000752 },
+    { "time": 1.2, "[S]": 9.998496, "[P]": 0.001504 }
+  ]
 }`;
 
 const PREVIEWS: Record<ExportFormat, string> = {

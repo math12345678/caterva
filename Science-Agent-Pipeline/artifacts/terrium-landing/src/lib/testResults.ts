@@ -126,7 +126,7 @@ export const TEST_SUITES: TestSuite[] = [
         file:
           "5 test files -- component rendering, nav/section integrity, " +
           "page-claim accuracy, and disabled-source claims",
-        passed: 30,
+        passed: 36,
         skipped: 0,
         failed: 0,
       },

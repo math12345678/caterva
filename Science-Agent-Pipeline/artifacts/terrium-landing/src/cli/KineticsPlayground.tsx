@@ -6,11 +6,29 @@ import { simulateMichaelisMenten } from "@/lib/simulate";
 
 import ParamSlider from "@/components/ui/param-slider";
 
+// A real enzyme name on a preset is a claim about that enzyme.
+//
+// These Km values were unsourced, and three of the four contradicted the
+// values THIS PRODUCT resolves for the same enzyme:
+//
+//   LDH          shipped 0.5   -> BRENDA gives 10.73 mM  (ref 740253)
+//   Hexokinase   shipped 0.1   -> BRENDA gives 6 mM      (ref 641068)
+//   AChE         shipped 0.09  -> 0.09 mM, correct       (ref 649716)
+//   Trypsin      shipped 15    -> no resolved value; the name is dropped
+//
+// Off by 21x and 60x, under the enzyme's real name, on the page that
+// advertises never inventing a number. A student who clicked "LDH" here
+// and then ran "lactate dehydrogenase with pyruvate" through the actual
+// product got two different Km values from the same page.
+//
+// Km now carries the value Terrium itself resolves, with its BRENDA
+// reference. Vmax and s0 stay illustrative and are labelled as such:
+// Vmax is NEVER literature-resolvable here (it needs [E]0, ADR 0013), so
+// attributing it to anything would be the same defect again.
 const PRESETS = [
-  { label: "LDH", km: 0.5, vmax: 4.5, s0: 10 },
-  { label: "Hexokinase", km: 0.1, vmax: 2.0, s0: 5 },
-  { label: "Trypsin", km: 15, vmax: 8.0, s0: 20 },
-  { label: "AChE", km: 0.09, vmax: 6.0, s0: 3 },
+  { label: "LDH", km: 10.73, vmax: 4.5, s0: 10, kmSource: "BRENDA ref 740253" },
+  { label: "Hexokinase", km: 6, vmax: 2.0, s0: 5, kmSource: "BRENDA ref 641068" },
+  { label: "AChE", km: 0.09, vmax: 6.0, s0: 3, kmSource: "BRENDA ref 649716" },
 ];
 
 export default function KineticsPlayground() {
