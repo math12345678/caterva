@@ -23,7 +23,7 @@ import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
 import { runTerium, type SimulationDomain } from "../lib/teriumRunner";
 import { SimulationParameterSchemas, CustomModelBody } from "../lib/schemas";
 import * as queue from "../lib/queue";
-import { findCachedResultByQuery, persistJob } from "../lib/cache";
+import { findCachedEntryByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
 import {
   RequiredParametersMissingError,
@@ -321,12 +321,25 @@ router.post(
 
       const cached = isDbAvailable()
         ? await findCachedSimulation(normalizedQuery)
-        : findCachedResultByQuery(normalizedQuery);
+        : findCachedEntryByQuery(normalizedQuery);
       if (cached) {
-        logger.info({ query }, "Returning cached simulation result");
+        logger.info(
+          { query, cachedAt: cached.cachedAt },
+          "Returning cached simulation result",
+        );
         const job = queue.createJob(query);
-        queue.setJobResult(job.jobId, cached);
-        guardSerializationProvenance(cached);
+        // A replay must say it is one, and say when the answer was
+        // computed. Until 2026-09-05 a cache hit was returned with the
+        // same 202 and the same body shape as a live run: two people
+        // running the same query a month apart got byte-identical output,
+        // with nothing distinguishing a reproduction from a replay of a
+        // resolution made against literature data that may since have
+        // been recurated.
+        //
+        // Added to the RESPONSE, not to the stored entry, so replaying
+        // does not mutate the cache and the flag cannot accumulate.
+        queue.setJobResult(job.jobId, withReplayProvenance(cached));
+        guardSerializationProvenance(cached.result);
         res.status(202).json(job);
         return;
       }
@@ -945,9 +958,37 @@ function buildAuditReport(
  * naive but effective cache: identical natural-language queries produce the
  * same resolved parameters, so we can short-circuit the engine entirely.
  */
+/**
+ * A cached result, labelled as a replay and dated.
+ *
+ * Returns a COPY. Mutating the stored entry would persist the flag and
+ * accumulate one per replay, so the n-th reader of a popular query would
+ * see n identical notices.
+ */
+function withReplayProvenance(cached: {
+  result: queue.SimulationResponse;
+  cachedAt: string;
+}): queue.SimulationResponse {
+  const { result, cachedAt } = cached;
+  return {
+    ...result,
+    provenance: {
+      ...result.provenance,
+      flags: [
+        ...result.provenance.flags,
+        `served_from_cache: this result was computed on ${cachedAt} and ` +
+          `replayed unchanged. Nothing was re-resolved, so any literature ` +
+          `curated since that date is not reflected here.`,
+      ],
+    },
+  };
+}
+
 async function findCachedSimulation(
   query: string,
-): Promise<queue.SimulationResponse | undefined> {
+): Promise<
+  { result: queue.SimulationResponse; cachedAt: string } | undefined
+> {
   try {
     const db = getDb();
     if (!db) return undefined;
@@ -967,22 +1008,28 @@ async function findCachedSimulation(
     if (!row) return undefined;
 
     return {
-      runId: String(row.id),
-      domain: row.domain,
-      parameters: (row.parameters as Record<string, unknown>) || {},
-      trajectory: (row.trajectory as Record<string, unknown>[]) || [],
-      provenance: (row.provenance as {
-        reasoning: string;
-        modelCitations: string[];
-        flags: string[];
-      }) || {
-        reasoning: "",
-        modelCitations: [],
-        flags: [],
+      // The row's own createdAt, which is also what the replay notice
+      // dates itself by -- one source, so the body and the flag cannot
+      // disagree about when this was computed.
+      cachedAt: row.createdAt.toISOString(),
+      result: {
+        runId: String(row.id),
+        domain: row.domain,
+        parameters: (row.parameters as Record<string, unknown>) || {},
+        trajectory: (row.trajectory as Record<string, unknown>[]) || [],
+        provenance: (row.provenance as {
+          reasoning: string;
+          modelCitations: string[];
+          flags: string[];
+        }) || {
+          reasoning: "",
+          modelCitations: [],
+          flags: [],
+        },
+        parameterProvenance:
+          (row.parameterProvenance as Record<string, ParameterProvenance>) || {},
+        completedAt: row.createdAt.toISOString(),
       },
-      parameterProvenance:
-        (row.parameterProvenance as Record<string, ParameterProvenance>) || {},
-      completedAt: row.createdAt.toISOString(),
     };
   } catch (err) {
     logger.warn({ err }, "Cache lookup failed; continuing without cache");

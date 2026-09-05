@@ -2483,7 +2483,30 @@ export async function resolveQuery(
       ...effectiveOverrides,
     };
     let flags: string[] = [];
-    const modelCitations = [...llmResult.modelCitations];
+    // The model's OWN modelCitations are deliberately NOT carried into
+    // the response.
+    //
+    // `SYSTEM_PROMPT` asks the model for "modelCitations": ["optional
+    // literature reference"], and whatever it returns used to be spread
+    // straight into provenance.modelCitations alongside the curated
+    // domain citation -- same array, same shape, no way for a reader to
+    // tell which one a human had checked.
+    //
+    // auditIntegrity.test.ts already established the principle for the
+    // easy case: the "Domain: <name>" placeholder was "a label shipped to
+    // the client inside the list of citations backing a scientific
+    // result", and was removed. An LLM-authored reference is the same
+    // defect with a better disguise -- a placeholder is obviously not a
+    // citation, whereas an invented reference looks exactly like a real
+    // one. This is also the rule provenance.ts already applies to VALUES,
+    // where an `llm` origin is blocked unless a resolvable citation backs
+    // it; there is no reason a citation should be trusted on terms a
+    // number is not.
+    //
+    // Discarded rather than silently dropped: if the model did offer
+    // something, the response says so in `flags`, so the signal survives
+    // without an unverified reference being published as a citation.
+    const discardedLlmCitations = llmResult.modelCitations.length;
     let parameterProvenance = noteStatedSources(
       buildParameterProvenance(
         parameters,
@@ -2689,11 +2712,23 @@ export async function resolveQuery(
         // `domainCitation` is undefined for a domain with no literature
         // entry (sbml, where the caller supplies the model). Omit it
         // rather than pushing a placeholder into a citations list.
-        modelCitations: [
-          ...modelCitations,
-          ...(domainCitation ? [domainCitation] : []),
-        ],
-        flags,
+        modelCitations: domainCitation ? [domainCitation] : [],
+        // Appended HERE rather than pushed at the point of discard: `flags`
+        // is REASSIGNED further down this function (flags = result.flags,
+        // = vmaxResult.flags, = epiResult.flags, = popgenResult.flags), so
+        // anything pushed earlier is silently dropped on four of the paths
+        // through it.
+        flags:
+          discardedLlmCitations > 0
+            ? [
+                ...flags,
+                `discarded_unverified_model_citation: the language model ` +
+                  `offered ${discardedLlmCitations} reference(s). Terrium ` +
+                  `cites only the curated domain literature, because ` +
+                  `nothing has checked that those references exist or say ` +
+                  `what the model claims.`,
+              ]
+            : flags,
       },
       parameterProvenance,
       assayCoherence: coherence,
