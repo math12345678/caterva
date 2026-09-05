@@ -139,7 +139,16 @@ export const SIR_LITERATURE: DomainLiterature = {
 export const SEIR_LITERATURE: DomainLiterature = {
   name: "seir",
   description:
-    "SEIR compartmental model adds latent period. E (exposed) compartment between S and I. Equations: dS/dt = -β·S·I, dE/dt = β·S·I - σ·E, dI/dt = σ·E - γ·I, dR/dt = γ·I. Sigma = 1/incubation period.",
+    // "Sigma = 1/incubation period" until 2026-09-05, which this entry's
+    // OWN defaultJustification below argues is "directionally wrong, not
+    // merely imprecise" -- sigma is the E→I rate, so it needs the LATENT
+    // period (infection → infectiousness), and for SARS-CoV-2 the latent
+    // period is SHORTER than the incubation period (Alene et al. 2021:
+    // pooled serial interval 5.2 d < pooled incubation 6.5 d; Kang et al.
+    // 2022: latent 3.9 d vs incubation 5.8 d). The description and the
+    // justification contradicted each other in the same object, and the
+    // description is the half that gets rendered.
+    "SEIR compartmental model adds latent period. E (exposed) compartment between S and I. Equations: dS/dt = -β·S·I, dE/dt = β·S·I - σ·E, dI/dt = σ·E - γ·I, dR/dt = γ·I. Sigma = 1/latent period (infection → becoming infectious), which is not the incubation period (infection → symptom onset).",
   references: [
     {
       authors: "Anderson, R. M., & May, R. M.",
@@ -213,7 +222,16 @@ export const WRIGHT_FISHER_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Human mutation rate: ~1.29e-8 per base pair per generation. The value actually resolved at runtime comes from stdpopsim's HomSap mean_mutation_rate (see Tests/popgen_resolver.py), which carries its own bundled citations (International Human Genome Sequencing Consortium 2001; Jonsson et al. 2017); Rahbari et al. (2016) is the pedigree-based germline mutation study backing the order of magnitude. Population size 10,000 (typical for modeling).",
+    // Named "International Human Genome Sequencing Consortium 2001;
+    // Jonsson et al. 2017" as the bundled citations until 2026-09-05.
+    // Both were wrong, checked by running stdpopsim 0.3.0: IHGSC 2001 is
+    // bundled for the GENOME ASSEMBLY (stdpopsim tags each citation with
+    // its reason), and Jónsson et al. is not in the HomSap catalog at
+    // all. The rate's actual bundled source is Tian, Browning & Browning
+    // (2019). popgen_resolver.py was surfacing the assembly paper's DOI
+    // as this value's structured locator for the same reason -- see the
+    // comment there, and ADR 0162 for the defect class.
+    "Human mutation rate: ~1.29e-8 per base pair per generation. The value actually resolved at runtime comes from stdpopsim's HomSap mean_mutation_rate (see Tests/popgen_resolver.py); stdpopsim bundles that rate with Tian, Browning & Browning (2019), Am J Hum Genet 105(5):883-893, which is the citation this resolver surfaces. Rahbari et al. (2016) is an independent pedigree-based germline mutation study backing the order of magnitude. Population size 10,000 (typical for modeling).",
 };
 
 /**
@@ -415,8 +433,16 @@ export const CELL_CYCLE_OSCILLATOR_LITERATURE: DomainLiterature = {
       doi: "10.1073/pnas.88.16.7328",
     },
   ],
+  // "~30-minute oscillations typical of eukaryotic cell cycles" until
+  // 2026-09-05. Two errors in one clause. The period: integrating this
+  // file's own parameter set (kappa=0.015, k6=1, k4=180, k4prime=0.018 --
+  // which matches BIOMD0000000006 exactly) gives ~35.6 min, not ~30. And
+  // the biology: a typical somatic eukaryotic cell cycle runs ~24 hours,
+  // not half an hour. Tyson (1991) associates this spontaneous-oscillation
+  // mode with the rapid division cycles of early embryos, which is what
+  // ~35 minutes actually describes.
   defaultJustification:
-    "Default reaction rate constants from Tyson (1991) cell-cycle model. Produces ~30-minute oscillations typical of eukaryotic cell cycles.",
+    "Default reaction rate constants from Tyson (1991) cell-cycle model. Produces ~35-minute oscillations, comparable to the rapid division cycles of early embryos that Tyson associates with this oscillatory mode — not the ~24-hour cycle of a typical somatic eukaryotic cell.",
 };
 
 /**

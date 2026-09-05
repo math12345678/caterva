@@ -48,6 +48,16 @@
 // --system-site-packages venv and re-running that file: 0 failures. Hence
 // 1201 passed / 4 skipped / 0 failed for a correctly provisioned
 // environment, which is the environment this file's header describes.
+//
+// The api-server suite has the same shape of environment dependency, and
+// the same treatment. python.test.ts refuses to run its two
+// interpreter-selection cases unless a Python 3.10-3.13 with Terrium's
+// dependencies is discoverable (VIRTUAL_ENV, a repo-root .venv, or a
+// versioned python3.1x on PATH). On a machine where none is -- the
+// versioned homebrew pythons here lack roadrunner -- it fails rather than
+// skipping, deliberately: "could not check" is not "checked and fine".
+// Measured 2026-09-05: 744 passed / 2 failed on this machine, 746 passed
+// with a discoverable interpreter, which is the number below.
 
 export interface SuiteFile {
   file: string;
@@ -99,10 +109,10 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "63 test files -- query resolution, parameter provenance, " +
+          "66 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, rate limiting, SSE job routes",
-        passed: 733,
+        passed: 746,
         skipped: 0,
         failed: 0,
       },

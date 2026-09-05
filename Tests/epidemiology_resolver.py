@@ -55,6 +55,18 @@ class EpidemiologyResult(BaseModel):
     citation: Optional[str] = None
     doi: Optional[str] = None
     pmid: Optional[str] = None
+    #: ADR 0169: True when R0 and the serial interval come from two
+    #: different systematic reviews rather than one paper. A composite
+    #: entry must surface as citationStatus "flagged" downstream -- never
+    #: "verified" -- with composite_note naming exactly what was combined.
+    cross_study_composite: bool = False
+    composite_note: Optional[str] = None
+    #: The serial-interval half's own citation, when it differs from the
+    #: R0 half's. Both sources must reach provenance; dropping either
+    #: would present a two-paper number as if one paper supported it.
+    secondary_citation: Optional[str] = None
+    secondary_doi: Optional[str] = None
+    secondary_pmid: Optional[str] = None
     search_log: List[str] = []
 
 
@@ -86,6 +98,93 @@ _DISEASE_REGISTRY: dict[str, dict] = {
         "doi": "10.1097/SLA.0000000000004400",
         "pmid": "33214421",
     },
+    # ---- ADR 0169: cross-study composites -------------------------------
+    #
+    # Both influenza entries pair Biggerstaff et al. (2014)'s meta-analytic
+    # R0 with Vink et al. (2014)'s serial intervals. ADR 0017 rejected an
+    # influenza entry in August because the period source found then (Cori
+    # et al. 2012) measured an SEIR-style latent/infectious decomposition --
+    # a different quantity. Vink is the matched quantity: a MEAN SERIAL
+    # INTERVAL, the same measure the COVID-19 entry above uses for 1/gamma,
+    # re-estimated from raw household-outbreak data with one common method.
+    # Carrat et al. 2008 (mean shedding 4.80 days) was considered and
+    # rejected: shedding is a virological duration, roughly twice the
+    # serial interval for influenza, and using it would have silently
+    # redefined what gamma means mid-registry.
+    #
+    # All four abstracts re-fetched from PubMed on 2026-09-04 and the
+    # numbers transcribed from them, not from memory. See ADR 0169.
+    "influenza-a-h1n1pdm09": {
+        "disease": "Influenza A(H1N1)pdm09 (2009 pandemic)",
+        "r0": 1.46,
+        "r0_ci": "IQR 1.30-1.70 (median of 78 estimates)",
+        "infectious_period_days": 2.8,
+        "infectious_period_ci": None,
+        "infectious_period_measure": (
+            "mean serial interval for A(H1N1)pdm09 (Vink et al. 2014), the "
+            "same generation-time proxy for 1/gamma the COVID-19 entry uses."
+        ),
+        "cross_study_composite": True,
+        "composite_note": (
+            "R0 and serial interval come from two different systematic "
+            "reviews (cross-study composite, ADR 0169). Both halves "
+            "describe the same strain, A(H1N1)pdm09, so the combination is "
+            "strain-matched; it is still weaker than a single-source pair "
+            "and is flagged, not verified."
+        ),
+        "source": "PubMed",
+        "citation": (
+            "Biggerstaff M, Cauchemez S, Reed C, Gambhir M, Finelli L. "
+            "Estimates of the reproduction number for seasonal, pandemic, "
+            "and zoonotic influenza: a systematic review of the literature. "
+            "BMC Infect Dis. 2014;14:480."
+        ),
+        "doi": "10.1186/1471-2334-14-480",
+        "pmid": "25186370",
+        "secondary_citation": (
+            "Vink MA, Bootsma MCJ, Wallinga J. Serial intervals of "
+            "respiratory infectious diseases: a systematic review and "
+            "analysis. Am J Epidemiol. 2014;180(9):865-875."
+        ),
+        "secondary_doi": "10.1093/aje/kwu209",
+        "secondary_pmid": "25294601",
+    },
+    "influenza-seasonal": {
+        "disease": "Seasonal influenza",
+        "r0": 1.28,
+        "r0_ci": "IQR 1.19-1.37 (median of 47 estimates)",
+        "infectious_period_days": 2.2,
+        "infectious_period_ci": None,
+        "infectious_period_measure": (
+            "mean serial interval for influenza A(H3N2) (Vink et al. 2014), "
+            "used as the generation-time proxy for 1/gamma."
+        ),
+        "cross_study_composite": True,
+        "composite_note": (
+            "Composite on TWO axes, both stated (ADR 0169): cross-study "
+            "(R0 from Biggerstaff et al. 2014, serial interval from Vink "
+            "et al. 2014) and cross-strain (Biggerstaff's 'seasonal' pools "
+            "H3N2/H1N1/B, while Vink's 2.2-day serial interval is "
+            "H3N2-specific). Flagged, not verified. For a strain-matched "
+            "pair, ask about the 2009 H1N1 pandemic instead."
+        ),
+        "source": "PubMed",
+        "citation": (
+            "Biggerstaff M, Cauchemez S, Reed C, Gambhir M, Finelli L. "
+            "Estimates of the reproduction number for seasonal, pandemic, "
+            "and zoonotic influenza: a systematic review of the literature. "
+            "BMC Infect Dis. 2014;14:480."
+        ),
+        "doi": "10.1186/1471-2334-14-480",
+        "pmid": "25186370",
+        "secondary_citation": (
+            "Vink MA, Bootsma MCJ, Wallinga J. Serial intervals of "
+            "respiratory infectious diseases: a systematic review and "
+            "analysis. Am J Epidemiol. 2014;180(9):865-875."
+        ),
+        "secondary_doi": "10.1093/aje/kwu209",
+        "secondary_pmid": "25294601",
+    },
 }
 
 # Common alternate spellings/names a query might use, mapped to the
@@ -98,6 +197,19 @@ _ALIASES: dict[str, str] = {
     "sars-cov-2": "covid-19",
     "sars cov 2": "covid-19",
     "coronavirus": "covid-19",
+    # Bare "flu"/"influenza" means the seasonal disease -- that is the
+    # question a teaching lab asks by default. The pandemic strain must be
+    # named to be meant.
+    "flu": "influenza-seasonal",
+    "influenza": "influenza-seasonal",
+    "seasonal flu": "influenza-seasonal",
+    "seasonal influenza": "influenza-seasonal",
+    "h1n1": "influenza-a-h1n1pdm09",
+    "swine flu": "influenza-a-h1n1pdm09",
+    "influenza a(h1n1)pdm09": "influenza-a-h1n1pdm09",
+    "influenza a (h1n1)": "influenza-a-h1n1pdm09",
+    "2009 pandemic influenza": "influenza-a-h1n1pdm09",
+    "pandemic influenza": "influenza-a-h1n1pdm09",
 }
 
 
@@ -147,5 +259,10 @@ def resolve_disease_parameters(disease: str) -> EpidemiologyResult:
         citation=entry["citation"],
         doi=entry["doi"],
         pmid=entry["pmid"],
+        cross_study_composite=entry.get("cross_study_composite", False),
+        composite_note=entry.get("composite_note"),
+        secondary_citation=entry.get("secondary_citation"),
+        secondary_doi=entry.get("secondary_doi"),
+        secondary_pmid=entry.get("secondary_pmid"),
         search_log=log,
     )

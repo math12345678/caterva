@@ -21,6 +21,20 @@ export const DISEASES: DiseaseEntry[] = [
     pattern: /covid-?19|covid|sars-cov-2|coronavirus/i,
     diseaseName: "covid-19",
   },
+  // ADR 0169. Ordered so the SPECIFIC strain wins: "h1n1" and "swine flu"
+  // and "pandemic influenza" must not fall through to the seasonal entry,
+  // because the two carry different numbers (R0 1.46 / SI 2.8 d vs R0
+  // 1.28 / SI 2.2 d) and only the pandemic pair is strain-matched across
+  // its two sources. matchDisease returns the first hit, so this entry
+  // has to precede the seasonal one.
+  {
+    pattern: /h1n1|swine\s*flu|pandemic\s+(?:influenza|flu)|\(h1n1\)pdm09/i,
+    diseaseName: "influenza-a-h1n1pdm09",
+  },
+  {
+    pattern: /influenza|\bflu\b/i,
+    diseaseName: "influenza-seasonal",
+  },
 ];
 
 export function matchDisease(query: string): DiseaseEntry | undefined {
