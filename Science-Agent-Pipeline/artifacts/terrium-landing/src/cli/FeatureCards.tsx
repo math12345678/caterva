@@ -19,7 +19,7 @@ const FEATURES = [
     step: "03",
     icon: "◉",
     title: "Literature-Grounded",
-    desc: "Every parameter traces to BRENDA, KEGG, or PubMed citations. No black-box numbers.",
+    desc: "Every parameter traces to a BRENDA or PubMed citation. No black-box numbers.",
   },
   {
     step: "04",

@@ -615,7 +615,7 @@ export default function CliApp() {
                 {
                   n: "02",
                   title: "We look it up",
-                  desc: "We query BRENDA, KEGG, & PubMed to find real kinetic parameters and literature citations for your system.",
+                  desc: "We query BRENDA and PubMed to find real kinetic parameters and literature citations for your system.",
                 },
                 {
                   n: "03",

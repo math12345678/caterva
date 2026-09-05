@@ -78,7 +78,12 @@ const TRUST_SOURCES = [
   },
   {
     name: "KEGG",
-    desc: "Pathway & genomic data",
+    // Listed as an integration, not as a live source: KEGG is OFF
+    // unless TERRIUM_ENABLE_KEGG is set, because its terms require a
+    // service-provider licence Terrium does not hold (see
+    // Tests/enzyme_lookup.py). It also resolves substrate NAMES, never a
+    // kinetic value, so it never backs a parameter even when enabled.
+    desc: "Pathway data — integrated, disabled pending a licence",
     url: "https://www.genome.jp/kegg/",
   },
   {
@@ -180,7 +185,7 @@ export default function TrustSection() {
               {
                 step: "01",
                 title: "Literature Resolution",
-                desc: "LLM + structured keyword matching against BRENDA, KEGG & PubMed. Every parameter gets a source citation.",
+                desc: "LLM + structured keyword matching against BRENDA & PubMed. Every parameter gets a source citation.",
                 icon: "\u2318",
               },
               {

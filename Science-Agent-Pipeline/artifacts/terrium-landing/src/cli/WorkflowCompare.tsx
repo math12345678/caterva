@@ -14,7 +14,7 @@ const WITHOUT_TERRIUM: Step[] = [
     icon: "\uD83D\uDCDA",
     label: "Literature search",
     detail:
-      "Manually search BRENDA, PubMed, and KEGG for kinetic parameters. Cross-reference papers for consensus Km/Vmax values \u2014 hours of work.",
+      "Manually search BRENDA and PubMed for kinetic parameters. Cross-reference papers for consensus Km/Vmax values \u2014 hours of work.",
   },
   {
     icon: "\uD83D\uDCBB",
@@ -47,7 +47,7 @@ const WITH_TERRIUM: Step[] = [
     icon: "\u2699\uFE0F",
     label: "Automatic pipeline",
     detail:
-      "BRENDA lookup \u2192 KEGG pathway \u2192 PubMed verification \u2192 ODE assembly with conserved-quantity checks. All automated.",
+      "BRENDA lookup \u2192 PubMed citation check \u2192 ODE assembly with conserved-quantity checks. All automated.",
   },
   {
     icon: "\u2705",

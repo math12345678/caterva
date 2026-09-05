@@ -16,11 +16,6 @@ const SERVICES: ServiceStatus[] = [
     description: "Enzyme kinetic parameters (Km, Vmax, kcat)",
   },
   {
-    name: "KEGG",
-    endpoint: "kegg.jp",
-    description: "Pathway & reaction data",
-  },
-  {
     name: "PubMed",
     endpoint: "eutils.ncbi.nlm.nih.gov",
     description: "Literature citations & abstracts",
