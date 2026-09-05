@@ -149,11 +149,25 @@ export function findCachedJob(jobId: string): Job | undefined {
 }
 
 /**
- * Find a completed result by normalized query (for cache hit).
+ * Find a completed result by normalized query, WITH the date it was
+ * computed.
+ *
+ * `createdAt` has been recorded on every entry since this cache was
+ * written and was read by nothing. A cache hit was replayed into a fresh
+ * job and returned with the same 202 and the same shape as a live run, so
+ * a caller could not tell a result resolved a minute ago from one
+ * resolved months ago against a BRENDA snapshot that has since been
+ * recurated.
+ *
+ * That is `check_golden_freshness.py`'s concern one layer up: ground
+ * truth ageing silently while everything downstream keeps reporting
+ * "verified". The date is not decoration here -- two people running the
+ * same query a month apart get byte-identical output, and only this
+ * distinguishes a reproduction from a replay.
  */
-export function findCachedResultByQuery(
+export function findCachedEntryByQuery(
   query: string,
-): SimulationResponse | undefined {
+): { result: SimulationResponse; cachedAt: string } | undefined {
   if (!store) return undefined;
   // Persisted entries are append-only; the newest result must win when a
   // query has been rerun with different explicit parameters such as a seed.
@@ -165,10 +179,22 @@ export function findCachedResultByQuery(
       entry.job.result &&
       normalizeQuery(entry.job.query) === normalizeQuery(query)
     ) {
-      return entry.job.result;
+      return { result: entry.job.result, cachedAt: entry.createdAt };
     }
   }
   return undefined;
+}
+
+/**
+ * Find a completed result by normalized query (for cache hit).
+ *
+ * Kept as the date-free form for callers that do not need it. Defined in
+ * terms of the one above so the two cannot disagree about which entry wins.
+ */
+export function findCachedResultByQuery(
+  query: string,
+): SimulationResponse | undefined {
+  return findCachedEntryByQuery(query)?.result;
 }
 
 /**
