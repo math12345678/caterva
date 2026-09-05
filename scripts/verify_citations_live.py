@@ -130,6 +130,24 @@ DOIS = [
 #: them. Adding a citation to any of these files enrols it automatically.
 DOI_SOURCE_FILES = [
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts",
+    # Added 2026-09-05, and the reason is the paragraph directly above.
+    #
+    # These four publish DOIs straight into live API responses --
+    # /api/dashboard/overview and /api/pipeline/literature both print a
+    # STRENDA citation, and verifiable-metrics.ts is the constant behind
+    # them. None was enrolled, and the DOI they served,
+    # 10.1038/nbt0610-592 attributed to "Gelperin et al. (2010)", did not
+    # exist: doi.org and CrossRef 404, PubMed has no such paper, and
+    # CrossRef's full Nature Biotechnology 28(6) listing has no article
+    # starting at page 592. It was the citation for the standard that
+    # decides whether a resolved Km is reported "verified" or "flagged".
+    #
+    # Exactly the blind spot this list's own comment describes, hit a
+    # second time, on the files whose output a user reads.
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/verifiable-metrics.ts",
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/strenda-validator.ts",
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/dashboard.ts",
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/pipeline.ts",
     ROOT / "Terium/core/data_structures.py",
     ROOT / "Terium/continuous/model_building.py",
     ROOT / "Tests/epidemiology_resolver.py",

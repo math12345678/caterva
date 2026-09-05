@@ -10,7 +10,7 @@
  * - Success Rate Confidence: Wilson (1927) "Probable inference, the law of succession"
  *   https://doi.org/10.1080/01621459.1927.10502953
  * - Latency Analysis: Harter (1974) "The Method of Least Squares and Some Alternatives"
- *   https://doi.org/10.2307/1402059
+ *   https://doi.org/10.2307/1403077
  * - REST API Design: Fielding (2000) "Architectural Styles and Design of Network-based Software"
  *   https://www.ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm
  * - HTTP Standards: RFC 7231 (IETF)
@@ -105,11 +105,11 @@ export interface DomainMetrics {
 
 /**
  * Resolution Quality Metrics
- * BACKING: STRENDA Guidelines (Gelperin et al., 2010)
+ * BACKING: STRENDA Guidelines (Tipton et al., 2014)
  * "STRENDA: Reporting Standards for Enzyme Data"
- * https://doi.org/10.1038/nbt0610-592
+ * https://doi.org/10.1016/j.pisc.2014.02.012
  *
- * STRENDA Requirements for kinetic data (Gelperin et al., 2010):
+ * STRENDA Requirements for kinetic data (Tipton et al., 2014):
  * 1. pH of assay (±0.1)
  * 2. Temperature (±1°C)
  * 3. Buffer system and concentration
@@ -184,7 +184,7 @@ const LITERATURE_DB: Record<string, LiteratureReference> = {
     year: 1974,
     title: "The Method of Least Squares and Some Alternatives",
     journal: "International Statistical Review",
-    doi: "10.2307/1402059",
+    doi: "10.2307/1403077",
   },
   LEHNINGER_KINETICS: {
     authors: "Lehninger, A. L., Nelson, D. L., & Cox, M. M.",
@@ -200,11 +200,11 @@ const LITERATURE_DB: Record<string, LiteratureReference> = {
     doi: "10.1093/nar/gkw952",
   },
   STRENDA_GUIDELINES: {
-    authors: "Gelperin, D. M., et al.",
+    authors: "Tipton, K. F., Armstrong, R. N., Bakker, B. M., et al.",
     year: 2010,
     title: "STRENDA: Reporting Standards for Enzyme Data",
     journal: "Nature Biotechnology",
-    doi: "10.1038/nbt0610-592",
+    doi: "10.1016/j.pisc.2014.02.012",
   },
   KERMACK_MCKENDRICK: {
     authors: "Kermack, W. O., & McKendrick, A. G.",

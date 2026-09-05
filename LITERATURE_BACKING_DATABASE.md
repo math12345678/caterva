@@ -1,6 +1,6 @@
 # Terrium: Complete Literature Backing Database
 
-> **⚠️ CORRECTION (2026-08-10):** the "42 peer-reviewed sources" total asserted near the end of this doc doesn't reconcile with its own per-category counts (which sum to 40). The real, current `domain-literature.ts` (`DOMAIN_LITERATURE_MAP`, 15 domains) contains 24 individual citation entries — a smaller, independently-checkable set that doesn't match either 40 or 42. Core science citations in this doc (STRENDA/Gelperin, Kermack & McKendrick, Gillespie, Lennard-Jones, etc.) are real and correctly used. However, some general-software-engineering statistics cited here read as folklore-precision with no corresponding code tie-in — e.g. "15% reduction in bugs in typed codebases (Hanenberg et al., 2010)" and "40-80% reduction in defect density (Nagappan et al., 2008)" — this repo implements no coverage gate or TDD process that these specific figures could be checked against; treat them as unverified until someone confirms the actual Hanenberg/Nagappan findings support the stated numbers.
+> **⚠️ CORRECTION (2026-08-10):** the "42 peer-reviewed sources" total asserted near the end of this doc doesn't reconcile with its own per-category counts (which sum to 40). The real, current `domain-literature.ts` (`DOMAIN_LITERATURE_MAP`, 15 domains) contains 24 individual citation entries — a smaller, independently-checkable set that doesn't match either 40 or 42. A later pass (2026-09-05) found this sentence itself wrong: the STRENDA citation it vouched for was fabricated, and the Harter DOI pointed at a different paper. Both are corrected below. Kermack & McKendrick, Gillespie and Lennard-Jones were re-verified against CrossRef and are genuine. However, some general-software-engineering statistics cited here read as folklore-precision with no corresponding code tie-in — e.g. "15% reduction in bugs in typed codebases (Hanenberg et al., 2010)" and "40-80% reduction in defect density (Nagappan et al., 2008)" — this repo implements no coverage gate or TDD process that these specific figures could be checked against; treat them as unverified until someone confirms the actual Hanenberg/Nagappan findings support the stated numbers.
 
 **Purpose**: Every architectural decision, algorithm, parameter, and line of code is grounded in peer-reviewed scientific literature.
 
@@ -85,8 +85,10 @@
 
 ### B. STRENDA Guidelines Compliance
 
-**Reference**: Gelperin, D. M., et al. (2010). "STRENDA: Reporting Standards for Enzyme Data." *Nature Biotechnology*, 28(6), 592–593.
-- **Citation**: https://doi.org/10.1038/nbt0610-592
+**Reference**: Tipton, K. F., Armstrong, R. N., Bakker, B. M., et al. (2014). "Standards for Reporting Enzyme Data: The STRENDA Consortium." *Perspectives in Science*, 1, 131–137.
+
+> **⚠️ CORRECTION (2026-09-05):** this entry previously read *"Gelperin, D. M., et al. (2010). 'STRENDA: Reporting Standards for Enzyme Data.' Nature Biotechnology, 28(6), 592–593"* with DOI `10.1038/nbt0610-592`. That reference does not exist. doi.org and CrossRef both return 404; PubMed has no Gelperin STRENDA paper; and CrossRef's complete Nature Biotechnology 28(6) listing contains no article beginning on page 592. Author, title, journal, pages and DOI were all fabricated — for the standard this product uses to decide whether a resolved Km is "verified" or "flagged".
+- **Citation**: https://doi.org/10.1016/j.pisc.2014.02.012 (verified against CrossRef, 2026-09-05)
 - **Requirement 1**: pH of assay
 - **Requirement 2**: Temperature of assay
 - **Requirement 3**: Buffer system
@@ -110,7 +112,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 }
 ```
 
-**Backed By**: Gelperin et al. (2010) STRENDA Guidelines v1.4.0
+**Backed By**: Tipton et al. (2014), the STRENDA Consortium
 
 ---
 
@@ -257,7 +259,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 
 **Measurement Standards**:
 - **Reference**: Harter, H. L. (1974). "The Method of Least Squares and Some Alternatives: Part I." *International Statistical Review*, 42(2), 147–174.
-- **Citation**: https://doi.org/10.2307/1402059
+- **Citation**: https://doi.org/10.2307/1403077 (corrected 2026-09-05: `10.2307/1402059` resolves to Wilks, Kendall & Stuart (1959), "The Advanced Theory of Statistics" — a different paper by different authors. It RESOLVES, so an existence check passes; only reading the metadata catches it. See ADR 0076.)
 - **Metrics**:
   - **Mean**: Central tendency
   - **Median**: Robust to outliers
@@ -476,7 +478,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 | Michaelis-Menten kinetics | Lehninger, Michaelis/Menten | 2 |
 | Competitive inhibition | Copeland | 1 |
 | Parameter resolution | BRENDA, PubMed, CORE, Brown et al. | 4 |
-| Provenance (STRENDA) | Gelperin et al., STRENDA v1.4 | 1 |
+| Provenance (STRENDA) | Tipton et al. (2014), STRENDA Consortium | 1 |
 | SIR/SEIR models | Kermack/McKendrick, Anderson/May | 2 |
 | Wright-Fisher | Fisher, Ewens, Rahbari et al. | 3 |
 | Gillespie SSA | Gillespie, Cao et al. | 2 |
