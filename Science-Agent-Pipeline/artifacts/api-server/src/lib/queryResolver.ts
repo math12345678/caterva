@@ -8,6 +8,7 @@ import {
 import { resolveKineticValue, resolveEpidemiologyParameters, type RelatednessVerdict } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
+import { matchOrganism } from "./organisms";
 import { matchDisease } from "./diseases";
 import { extractStatedQuantities } from "./statedQuantities";
 import {
@@ -2084,6 +2085,26 @@ function guessEnzymeNameFromQuery(query: string): string | undefined {
  * before attempting BRENDA -- see science_agent_runner.py::resolve_ec_number.
  */
 function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
+  // The organism the query NAMES wins over the table's default.
+  //
+  // This function never looked at the query for one. Measured before
+  // organisms.ts existed: "simulate hexokinase in E. coli with glucose"
+  // returned km 6 mM with organism "Homo sapiens", source
+  // "brenda_exact", citationStatus "verified" -- the named species
+  // discarded, and a human value badged as an EXACT MATCH for a species
+  // nobody asked about.
+  //
+  // That is worse than the case ADR 0024 exists for. A real cross-species
+  // value is withheld unless opted into and arrives flagged, because
+  // kinetic constants are species-specific. That machinery never fired
+  // here: from its point of view the requested organism matched, because
+  // the request had been rewritten to match.
+  //
+  // `undefined` from matchOrganism is a real answer -- no organism was
+  // named -- so the existing default stands rather than being replaced by
+  // a guess.
+  const namedOrganism = matchOrganism(query);
+
   const matched = matchEnzyme(query);
   if (matched) {
     const lower = query.toLowerCase();
@@ -2092,7 +2113,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
     return {
       enzymeName: matched.enzymeName,
       substrate,
-      organism: matched.organism,
+      organism: namedOrganism ?? matched.organism,
       ecNumber: matched.ecNumber,
     };
   }
@@ -2102,7 +2123,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   return {
     enzymeName: guess,
     substrate: "",
-    organism: "Homo sapiens",
+    organism: namedOrganism ?? "Homo sapiens",
     ecNumber: undefined,
   };
 }
