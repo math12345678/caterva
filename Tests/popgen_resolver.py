@@ -13,11 +13,19 @@ programmatically without an API key.
 
 Human germline mutation rate: ~1.29e-8 per bp per generation
   Source: stdpopsim HomSap genome mean_mutation_rate
-  Citations:
-    - International Human Genome Sequencing Consortium (2001)
-      Nature 409, 860-921. http://dx.doi.org/10.1038/35057062
-    - Jónsson et al. (2017) Nature 549, 519-522.
-    - and others bundled in the HomSap demographic model.
+  The bundled citation FOR THE RATE (stdpopsim tags each reference with
+  the reason it is bundled; this one's reason is 'mutation rate'):
+    - Tian X, Browning BL, Browning SR (2019). Estimating the Genome-wide
+      Mutation Rate with Three-Way Identity by Descent.
+      Am J Hum Genet 105(5):883-893. https://doi.org/10.1016/j.ajhg.2019.09.012
+
+  The HomSap genome also bundles IHGSC (2001) for the GENOME ASSEMBLY and
+  the HapMap Consortium (2007) for the RECOMBINATION rate. Neither reports
+  a mutation rate, and neither may be surfaced as this value's locator --
+  an earlier version of this file named IHGSC 2001 and Jónsson et al.
+  (2017) as the rate's citations. Verified against stdpopsim 0.3.0 on
+  2026-09-05: IHGSC 2001 is bundled for the assembly, and Jónsson et al.
+  is not bundled in the HomSap catalog at all.
 
 Design: a single pure function — organism name in, mutation_rate out.
 No network access (stdpopsim bundles its data locally). Testable offline
@@ -153,17 +161,39 @@ def resolve_mutation_rate(
 
     rate = species.genome.mean_mutation_rate
 
-    # Build a citation from stdpopsim's bundled references. Each DOI is
-    # normalised to its bare form so the emitted URL is a single resolvable
-    # locator; the first real DOI is surfaced separately for structured
-    # citation handling downstream (science_agent_runner.py).
+    # Build a citation from stdpopsim's bundled references.
+    #
+    # THE STRUCTURED DOI MUST BE THE MUTATION-RATE PAPER, NOT THE FIRST ONE.
+    #
+    # stdpopsim tags every bundled citation with the REASON it is bundled.
+    # For HomSap (stdpopsim 0.3.0, verified by running it) the genome
+    # carries three, in this order:
+    #
+    #   IHGSC 2001                     10.1038/35057062    'genome assembly'
+    #   Tian, Browning & Browning 2019 10.1016/j.ajhg...   'mutation rate'
+    #   HapMap Consortium 2007         10.1038/nature06258 'recombination rate'
+    #
+    # This loop used to keep the FIRST DOI it saw, which is the 2001 human
+    # genome assembly paper. That DOI became the structured locator for
+    # `mutation_rate` -- the link a reader clicks to check 1.29e-8 -- and
+    # that paper reports no such rate. A real reference for a number it
+    # does not report is the precise defect ADR 0162 is named after; this
+    # is the same defect in a second module, and it is worse here because
+    # the correct paper WAS bundled all along, one entry further down.
+    #
+    # So the DOI is chosen by stdpopsim's own `reasons`, never by position.
+    # If no bundled citation claims the mutation rate, none is surfaced:
+    # an absent locator degrades honestly (locatableCitation downstream
+    # then declines to mark the value resolved), whereas a confidently
+    # wrong one does not.
     citations = []
     doi = None
     for c in species.genome.citations[:3]:
         if hasattr(c, "doi") and c.doi:
             clean_doi = _normalise_doi(c.doi)
             if clean_doi:
-                if doi is None:
+                reasons = " ".join(str(r).lower() for r in getattr(c, "reasons", []))
+                if doi is None and "mutation rate" in reasons:
                     doi = clean_doi
                 citations.append(f"https://doi.org/{clean_doi}")
         elif hasattr(c, "author") and c.author:

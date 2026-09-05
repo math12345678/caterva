@@ -103,9 +103,17 @@ DOIS = [
     # mutation rate) and ng.3469 (the actual germline-mutation paper,
     # verified via PubMed PMID 26656846). Nothing in the codebase cites
     # ng.3141: popgen_resolver.py resolves from stdpopsim and carries
-    # stdpopsim's own citations (IHGSC 2001, Jonsson 2017), both of which
-    # the discovery pass below picks up. An unverified DOI in a checker's
-    # own allowlist is the checker asserting something it never checked.
+    # stdpopsim's own bundled citations, which the discovery pass below
+    # picks up. An unverified DOI in a checker's own allowlist is the
+    # checker asserting something it never checked.
+    #
+    # This comment named those bundled citations as "IHGSC 2001, Jonsson
+    # 2017" until 2026-09-05. Checked by running stdpopsim 0.3.0: HomSap
+    # bundles IHGSC 2001 for the GENOME ASSEMBLY, Tian/Browning/Browning
+    # 2019 for the MUTATION RATE, and HapMap 2007 for recombination --
+    # Jonsson is not in the HomSap catalog at all. A citation checker
+    # repeating an unchecked citation claim in its own source is the
+    # failure this script exists to catch, one level up.
     "10.1098/rspa.1927.0118",  # Kermack & McKendrick 1927, Proc. R. Soc. A
 ]
 

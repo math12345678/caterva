@@ -1281,6 +1281,31 @@ async function runPipeline(
       }
     }
 
+    // The reverse direction, which the loop above does not cover: a
+    // parameter the RESOLVER established that the engine does not echo
+    // back. `enzyme_conc` is the live case -- run_mm consumes it to build
+    // Vmax and returns only the engine's own parameter set, so a query
+    // saying "with 50 nM enzyme" produced a response carrying provenance
+    // for enzyme_conc and no enzyme_conc.
+    //
+    // That orphan tripped guardSerializationProvenance on EVERY query
+    // using the kcat bridge, which is the headline enzyme-kinetics path,
+    // and the flag it emitted told the reader nothing.
+    //
+    // Fixed by keeping the value, not by dropping the provenance. [E]0 is
+    // what makes the derived Vmax checkable: without it a reader is asked
+    // to accept Vmax = kcat x [E]0 while being shown neither factor. The
+    // engine's value wins wherever both have the key, since the engine
+    // may normalise; this only restores keys the engine omitted entirely.
+    const responseParameters: Record<string, unknown> = {
+      ...Object.fromEntries(
+        Object.entries(resolved.parameters).filter(
+          ([key]) => key in resolved.parameterProvenance,
+        ),
+      ),
+      ...engineResult.parameters,
+    };
+
     const provenance = {
       reasoning: resolved.provenance.reasoning,
       modelCitations: resolved.provenance.modelCitations,
@@ -1296,7 +1321,7 @@ async function runPipeline(
       await db.insert(simulationsTable).values({
         query,
         domain: engineResult.domain,
-        parameters: engineResult.parameters,
+        parameters: responseParameters,
         trajectory: engineResult.trajectory,
         provenance,
         parameterProvenance,
@@ -1311,7 +1336,7 @@ async function runPipeline(
     const result: queue.SimulationResponse = {
       runId: resolved.runId,
       domain: engineResult.domain,
-      parameters: engineResult.parameters,
+      parameters: responseParameters,
       trajectory: engineResult.trajectory,
       provenance,
       parameterProvenance,
@@ -1406,6 +1431,12 @@ function validateParameters(
  * rows and would otherwise turn a working-but-degraded cache hit into an
  * availability regression (a 500 on every cache read).
  */
+export function guardSerializationProvenanceForTests(
+  result: queue.SimulationResponse,
+): void {
+  guardSerializationProvenance(result);
+}
+
 function guardSerializationProvenance(result: queue.SimulationResponse): void {
   const violations = validateParameterProvenance(
     result.parameters,
@@ -1418,9 +1449,21 @@ function guardSerializationProvenance(result: queue.SimulationResponse): void {
     "SimulationResponse serialized with unsound parameter provenance",
   );
 
+  // Name the violations. "See server log for details" is useless to
+  // anyone using a hosted API -- it tells a reader something is wrong and
+  // then withholds what, which is worse than silence because it costs
+  // trust without buying understanding.
+  //
+  // `violations` is already a list of specific, readable sentences
+  // ("kcat has a parameter value but no provenance"). Nothing in them is
+  // sensitive: they name parameter keys and provenance shape, both of
+  // which the response already carries in parameterProvenance.
+  const detail = violations.slice(0, 5).join("; ");
   const flag =
-    "parameter provenance is incomplete for one or more parameters " +
-    "(see server log for details)";
+    `parameter provenance is incomplete: ${detail}` +
+    (violations.length > 5
+      ? ` (and ${violations.length - 5} more)`
+      : "");
   if (!result.provenance.flags.includes(flag)) {
     result.provenance.flags.push(flag);
   }

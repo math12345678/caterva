@@ -1071,13 +1071,38 @@ async function applyBetaGammaFromR0Resolution(
     // Set directly on beta/gamma (not just a flag, which never reaches
     // the RequiredParametersMissingError response the client actually
     // sees) so missingKeyDetails can promote it into the error message.
+    // Names the registry's ACTUAL contents and, for measles, the specific
+    // paper behind the refusal.
+    //
+    // This said "currently COVID-19 only, per ADR 0017" until ADR 0169
+    // registered the two influenza entries — a refusal that misdescribes
+    // what the system can do is its own small inaccuracy, in the message
+    // a user reads when they are already blocked.
+    //
+    // The measles clause matters more than it looks. Measles is the
+    // disease most people try after COVID, and its refusal is NOT "we
+    // haven't got to it": Vink et al. (2014) supplies a measles serial
+    // interval (11.7 d), so half the pair exists. It is unregistered
+    // because Guerra et al. (2017), the standard R0 systematic review,
+    // concludes estimates "vary more than the often cited range of 12-18"
+    // and endorses no single value. Citing that is the product's own
+    // promise applied to its own gaps.
+    const measlesAsked = /\bmeasles\b/i.test(query);
     const note =
       "No disease name in this query matches Terrium's literature-backed " +
-      "R0 registry (currently COVID-19 only, per ADR 0017 -- other " +
-      "diseases were checked and did not have a compatible-methodology " +
-      "source). This is a gap in what this system has verified so far, " +
-      "not a statement that the literature is silent. Supply beta/gamma " +
-      "directly if you have a source for this disease.";
+      "R0 registry (currently COVID-19, seasonal influenza, and influenza " +
+      "A(H1N1)pdm09 -- see ADR 0017 and ADR 0169). This is a gap in what " +
+      "this system has verified so far, not a statement that the " +
+      "literature is silent. " +
+      (measlesAsked
+        ? "Measles specifically is not registered because Guerra et al. " +
+          "(2017), Lancet Infect Dis 17(12):e420-e428, " +
+          "doi:10.1016/S1473-3099(17)30307-9 -- the standard R0 systematic " +
+          "review -- found that R0 estimates vary far more than the often " +
+          "cited 12-18 range and endorses no single value, so no honest " +
+          "default exists. Supply beta and gamma for YOUR setting. "
+        : "") +
+      "Supply beta/gamma directly if you have a source for this disease.";
     for (const key of ["beta", "gamma"] as const) {
       if (!(key in overrides)) {
         parameterProvenance = {
@@ -1135,18 +1160,50 @@ async function applyBetaGammaFromR0Resolution(
 
   // beta/gamma are not STRENDA-governed (a disease has no assay pH), which
   // buildResolvedKineticProvenance now handles itself via parameterKey —
-  // see ADR 0021. citationStatus is always "verified" here, never
-  // conditionally cross-species like BRENDA lookups: the registry has no
-  // cross-species concept (a disease's R0 does not have an "organism"), so
-  // there is no flagged tier to select between — see ADR 0017.
+  // see ADR 0021.
+  //
+  // citationStatus was unconditionally "verified" here, on the reasoning
+  // that the registry had no flagged tier to select between (ADR 0017,
+  // when COVID-19 was the only entry and both its numbers came from one
+  // paper). ADR 0169 adds that tier: an entry whose R0 and serial
+  // interval come from two different systematic reviews is a CROSS-STUDY
+  // COMPOSITE, and is flagged for the same reason a cross-species BRENDA
+  // Km is — usable and cited, but visibly weaker than a single-source
+  // value. Letting a composite inherit "verified" would erase the only
+  // signal that two methodologies were combined.
+  const composite = agentResult.crossStudyComposite === true;
+  const secondary = locatableCitation(agentResult.secondaryCitation);
+
+  // BOTH papers go in the citation string. A composite that displayed only
+  // the R0 paper would read as single-source at exactly the layer built
+  // for checking.
+  //
+  // The LOCATORS stay primary-only, deliberately. validateParameterProvenance
+  // requires every locator to be findable in the citation string, and
+  // buildCitationLocators emits a PubMed locator whose value is a PMID
+  // while the citation carries a doi.org URL — so the secondary's locators
+  // are not string-matchable here and adding them fails that check. That
+  // check is right and is not being weakened to fit this feature: the
+  // second paper reaches the reader through the citation text and the
+  // note, and the machine-followable set stays honest about what it can
+  // actually verify.
+  const displayCitation =
+    composite && secondary
+      ? `${citation} + serial interval from ${secondary.display}`
+      : citation;
+
+  const fullNote = composite
+    ? `${bridgeNote} ${agentResult.compositeNote ?? ""}`.trim()
+    : bridgeNote;
+
   parameters = { ...parameters, beta: agentResult.beta, gamma: agentResult.gamma };
   const provenanceEntry = buildResolvedKineticProvenance({
     parameterKey: "beta",
     source: agentResult.source ?? "PubMed",
-    citation,
-    citationStatus: "verified",
+    citation: displayCitation,
+    citationStatus: composite ? "flagged" : "verified",
     citationLocators: buildCitationLocators(agentResult.citation),
-    note: bridgeNote,
+    note: fullNote,
   });
   parameterProvenance = {
     ...parameterProvenance,
