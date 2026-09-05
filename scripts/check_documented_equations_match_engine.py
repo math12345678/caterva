@@ -75,6 +75,25 @@ MODEL_BUILDING_PY = REPO_ROOT / "Terium" / "continuous" / "model_building.py"
 GILLESPIE_PY = REPO_ROOT / "Terium" / "discrete" / "gillespie_ssa.py"
 MD_PY = REPO_ROOT / "Terium" / "discrete" / "molecular_dynamics.py"
 
+#: Not documentation in the filing sense -- this is a LIVE SURFACE. Its
+#: `description` strings are served to users through
+#: /api/pipeline/literature and the domain citation endpoints, so a wrong
+#: equation here is read by more people than a wrong equation in the
+#: markdown. Both carried the same PCR decay formula and the same
+#: density-dependent SIR until 2026-09-05; the markdown was audited first
+#: and this file was found only because the fix was checked for
+#: propagation. Corrections that land in one place and not the other are
+#: this repository's oldest recurring shape.
+DOMAIN_LITERATURE_TS = (
+    REPO_ROOT
+    / "Science-Agent-Pipeline"
+    / "artifacts"
+    / "api-server"
+    / "src"
+    / "lib"
+    / "domain-literature.ts"
+)
+
 
 @dataclass
 class Check:
@@ -88,6 +107,13 @@ class Check:
     #: (regex, human description) the document must NOT assert. Checked
     #: against the document with correction blockquotes removed.
     doc_forbidden: List[Tuple[str, str]] = field(default_factory=list)
+    #: Strings the user-facing surface must contain verbatim.
+    surface_required: List[str] = field(default_factory=list)
+    #: (regex, description) the user-facing surface must NOT assert.
+    #: Checked with `//` and `*` comment lines removed, for the same
+    #: reason blockquotes are stripped from the markdown: a comment
+    #: recording what a description USED to say is discussing it.
+    surface_forbidden: List[Tuple[str, str]] = field(default_factory=list)
 
 
 CHECKS: List[Check] = [
@@ -98,6 +124,10 @@ CHECKS: List[Check] = [
         doc_forbidden=[
             # The shipped defect. `N₀ × E^n` with E <= 1 is decay.
             (r"N₀\s*[×x]\s*E\s*\^?\s*n\b", "the decay form `N₀ × E^n`"),
+        ],
+        surface_required=["N(n) = N0 × (1 + E)^n"],
+        surface_forbidden=[
+            (r"N0\s*[×x]\s*E\s*\^\s*n\b", "the decay form `N0 × E^n`"),
         ],
     ),
     Check(
@@ -125,12 +155,21 @@ CHECKS: List[Check] = [
         engine_required=[
             (MODEL_BUILDING_PY, ["J0: S -> I; beta * S * I / N;"]),
         ],
+        surface_required=["dS/dt = -β·S·I/N", "dI/dt = β·S·I/N - γ·I"],
+        surface_forbidden=[
+            (r"dS/dt = -β·S·I(?!/N)", "the density-dependent form `dS/dt = -β·S·I`"),
+        ],
     ),
     Check(
         name="SEIR",
         doc_required=["dS/dt = -β·S·I/N\n  - dE/dt = β·S·I/N - σ·E"],
         engine_required=[
             (MODEL_BUILDING_PY, ["J0: S -> E; beta * S * I / N;"]),
+        ],
+        surface_required=["dE/dt = β·S·I/N - σ·E"],
+        surface_forbidden=[
+            (r"dE/dt = β·S·I(?!/N)",
+             "the density-dependent form `dE/dt = β·S·I`"),
         ],
     ),
     Check(
@@ -172,6 +211,21 @@ def strip_correction_blockquotes(doc: str) -> str:
     )
 
 
+def strip_code_comments(source: str) -> str:
+    """Drop `//` and `*` comment lines from a TypeScript source.
+
+    Same rule as `strip_correction_blockquotes`, for the same reason: a
+    comment recording what a description used to say is discussing the old
+    text, and a guard that fired on it would force the explanation to be
+    deleted to go green.
+    """
+    return "\n".join(
+        line
+        for line in source.splitlines()
+        if not line.lstrip().startswith(("//", "*", "/*"))
+    )
+
+
 def audit(doc: str, engine: Dict[Path, str]) -> List[str]:
     """Return one failure line per mismatch. Empty list means clean.
 
@@ -210,6 +264,30 @@ def audit(doc: str, engine: Dict[Path, str]) -> List[str]:
                     f"the engine does not implement."
                 )
 
+        if not (check.surface_required or check.surface_forbidden):
+            continue
+        surface = engine.get(DOMAIN_LITERATURE_TS)
+        if surface is None:
+            failures.append(
+                f"{check.name}: {DOMAIN_LITERATURE_TS} is missing, so the "
+                f"description served to users was not checked."
+            )
+            continue
+        surface_asserted = strip_code_comments(surface)
+        for needle in check.surface_required:
+            if needle not in surface:
+                failures.append(
+                    f"{check.name}: {DOMAIN_LITERATURE_TS.name} no longer "
+                    f"contains {needle!r} -- the equation SERVED TO USERS "
+                    f"has drifted from the engine."
+                )
+        for pattern, description in check.surface_forbidden:
+            if re.search(pattern, surface_asserted):
+                failures.append(
+                    f"{check.name}: {DOMAIN_LITERATURE_TS.name} serves users "
+                    f"{description}, which the engine does not implement."
+                )
+
     return failures
 
 
@@ -219,6 +297,10 @@ def read_engine() -> Dict[Path, str]:
         for path, _ in check.engine_required:
             if path not in sources and path.is_file():
                 sources[path] = path.read_text(encoding="utf-8")
+    if DOMAIN_LITERATURE_TS.is_file():
+        sources[DOMAIN_LITERATURE_TS] = DOMAIN_LITERATURE_TS.read_text(
+            encoding="utf-8"
+        )
     return sources
 
 
@@ -280,6 +362,29 @@ def selftest() -> int:
                 ),
             },
             "model_building.py",
+        ),
+        (
+            "the PCR description SERVED TO USERS reverted to decay",
+            doc,
+            {
+                **engine,
+                DOMAIN_LITERATURE_TS: engine[DOMAIN_LITERATURE_TS].replace(
+                    "N(n) = N0 × (1 + E)^n", "N(n) = N0 × E^n"
+                ),
+            },
+            "serves users the decay form",
+        ),
+        (
+            "the SIR description SERVED TO USERS reverted to "
+            "density-dependent",
+            doc,
+            {
+                **engine,
+                DOMAIN_LITERATURE_TS: engine[DOMAIN_LITERATURE_TS].replace(
+                    "dS/dt = -β·S·I/N", "dS/dt = -β·S·I"
+                ),
+            },
+            "serves users the density-dependent form",
         ),
         (
             "engine PCR switched to a different recurrence",
@@ -376,10 +481,15 @@ def main() -> int:
 
     checked = sum(
         len(c.doc_required) + sum(len(n) for _, n in c.engine_required)
-        + len(c.doc_forbidden)
+        + len(c.doc_forbidden) + len(c.surface_required)
+        + len(c.surface_forbidden)
         for c in CHECKS
     )
-    print(f"OK: {len(CHECKS)} models, {checked} assertions, "
+    surfaces = sum(
+        len(c.surface_required) + len(c.surface_forbidden) for c in CHECKS
+    )
+    print(f"OK: {len(CHECKS)} models, {checked} assertions "
+          f"({surfaces} against the description served to users), "
           f"documentation matches the engine")
     return 0
 
