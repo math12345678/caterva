@@ -109,10 +109,10 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "66 test files -- query resolution, parameter provenance, " +
+          "67 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, rate limiting, SSE job routes",
-        passed: 749,
+        passed: 755,
         skipped: 0,
         failed: 0,
       },
