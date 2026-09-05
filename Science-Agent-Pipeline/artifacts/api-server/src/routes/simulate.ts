@@ -178,10 +178,26 @@ router.get(
       res.json({
         timestamp: new Date().toISOString(),
         literature: {
-          queueTheory: "Little (1961) - L = λW",
-          confidenceIntervals: "Wilson (1927) - Binomial proportion CI",
-          percentiles: "Harter (1974) - P95 and P99 latency analysis",
-          responseTime: "Nielsen (1993) - User perception thresholds",
+          // Each entry says what the work actually contributes. Until
+          // 2026-09-05 this block named four works of which one was used:
+          // Wilson's interval IS computed here; Little's Law was cited for
+          // a Set's size, Harter for an ordinary sorted-array percentile,
+          // and Nielsen for nothing in this payload at all. Naming a real
+          // paper beside a number it did not produce is the defect this
+          // product exists to refuse.
+          queueTheory:
+            "Little (1961) L = \u03BBW -- the steady-state relation these " +
+            "three metrics can be CHECKED against (activeJobs should " +
+            "approximate completionRate x avgLatency). activeJobs is a " +
+            "direct count, not derived from it.",
+          confidenceIntervals:
+            "Wilson (1927) -- computed here: the binomial proportion " +
+            "interval around successRate, which is why a 1-of-1 sample " +
+            "does not report 100% with no uncertainty.",
+          percentiles:
+            "Empirical order statistics from the sorted latency sample. " +
+            "No estimator or interpolation is applied, so no method " +
+            "citation is claimed.",
         },
         metrics: {
           ...snapshot,

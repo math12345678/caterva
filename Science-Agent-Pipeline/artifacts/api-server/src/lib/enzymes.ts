@@ -69,7 +69,18 @@ export const ENZYMES: EnzymeEntry[] = [
     pattern: /cytochrome c oxidase|cox|complex iv/i,
     enzymeName: "cytochrome c oxidase",
     substrates: ["cytochrome c", "oxygen"],
-    ecNumber: "1.9.3.1",
+    // EC 1.9.3.1 until 2026-09-05. IUBMB TRANSFERRED that number to
+    // 7.1.1.9 when class EC 7 (translocases) was created in 2018 --
+    // cytochrome c oxidase pumps protons, so it is a translocase.
+    // Verified against Expasy the same day: EC/1.9.3.1.txt reads
+    // "Transferred entry: 7.1.1.9", and 7.1.1.9 is "cytochrome-c oxidase".
+    //
+    // A transferred EC still resolves, which is why this survived: it
+    // looks like a working identifier and is silently the wrong one. All
+    // 24 EC numbers in this table were checked against Expasy; this was
+    // the only stale one. Guarded now by
+    // scripts/check_ec_numbers_current.py.
+    ecNumber: "7.1.1.9",
     description: "Terminal enzyme of electron transport chain",
     organism: "Homo sapiens",
   },
@@ -116,7 +127,22 @@ export const ENZYMES: EnzymeEntry[] = [
   {
     pattern: /acetyl.?coa carboxylase|acc/i,
     enzymeName: "acetyl-CoA carboxylase",
-    substrates: ["acetyl-CoA", "biotin"],
+    // "biotin" was listed here as a substrate until 2026-09-05. It is not
+    // one: it is the PROSTHETIC GROUP, covalently attached to the
+    // biotin-carboxyl-carrier-protein domain, which ferries a carboxyl
+    // between the enzyme's two active sites and is never consumed.
+    // Expasy's reaction for EC 6.4.1.2 is
+    //   hydrogencarbonate + acetyl-CoA + ATP = malonyl-CoA + ADP +
+    //   phosphate + H(+)
+    // and biotin does not appear in it at all.
+    //
+    // This was not cosmetic. queryResolver.ts picks the substrate a query
+    // mentions out of THIS list, so "Km of acetyl-CoA carboxylase for
+    // biotin" would have been accepted as a well-formed request and sent
+    // to BRENDA looking for the Km of a cofactor that has none.
+    //
+    // Replaced with the two real co-substrates the old list omitted.
+    substrates: ["acetyl-CoA", "hydrogencarbonate", "ATP"],
     ecNumber: "6.4.1.2",
     description: "Regulates fatty acid synthesis",
     organism: "Homo sapiens",
