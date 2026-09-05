@@ -36,7 +36,7 @@ export default function CookieConsent() {
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] text-white/50 leading-relaxed mb-3">
                   We use essential cookies only — no analytics, no ads. Data
-                  sources (BRENDA, KEGG, PubMed) are queried server-side.
+                  sources (BRENDA, PubMed) are queried server-side.
                   This page does load web fonts from Google, which means
                   Google receives your IP address.
                 </p>
