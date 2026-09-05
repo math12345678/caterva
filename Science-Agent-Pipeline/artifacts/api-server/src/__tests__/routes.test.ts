@@ -674,11 +674,41 @@ describe("GET /api/simulate/metrics/pipeline", () => {
     expect(JSON.stringify(res.body.literature)).toContain("1927");
   });
 
-  it("includes Harter percentiles in metrics", async () => {
+  it("claims no method citation for the latency percentiles", async () => {
+    // This test used to assert the opposite: that the block contained
+    // "Harter" and "1974". It was pinning a name-drop.
+    //
+    // getLatencyPercentiles() sorts the latency sample and indexes into
+    // it -- plain empirical order statistics. Harter (1974) is "The Method
+    // of Least Squares and Some Alternatives" and contributes nothing to
+    // that. Nielsen (1993) was named in the same block for a payload with
+    // no perceptual claim in it anywhere.
+    //
+    // A real paper printed beside a number it did not produce is the
+    // defect this product exists to refuse, so the assertion is inverted:
+    // the endpoint must NOT name works it does not use.
     const res = await request(server).get("/api/simulate/metrics/pipeline");
     expect(res.status).toBe(200);
-    expect(JSON.stringify(res.body.literature)).toContain("Harter");
-    expect(JSON.stringify(res.body.literature)).toContain("1974");
+    const literature = JSON.stringify(res.body.literature);
+
+    expect(literature).not.toContain("Harter");
+    expect(literature).not.toContain("Nielsen");
+
+    // Asserted positively too: deleting the entry outright would satisfy
+    // the two checks above while telling the reader less than the truth.
+    expect(res.body.literature.percentiles).toMatch(/order statistics/i);
+    expect(res.body.literature.percentiles).toMatch(
+      /no (method )?citation is claimed/i,
+    );
+  });
+
+  it("says Little's Law is the check, not the method", async () => {
+    // activeJobs is a Set's size -- a direct count. L = λW is a
+    // steady-state estimator the code has never run. Citing it as the
+    // method described a weaker calculation than the one performed.
+    const res = await request(server).get("/api/simulate/metrics/pipeline");
+    expect(res.body.literature.queueTheory).toContain("Little");
+    expect(res.body.literature.queueTheory).toMatch(/not.*derived from it/i);
   });
 });
 

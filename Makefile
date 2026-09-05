@@ -230,6 +230,9 @@ guards: require-pytest
 	@echo ">> documented equations match the engine"
 	@"$(PY)" scripts/check_documented_equations_match_engine.py --selftest
 	@"$(PY)" scripts/check_documented_equations_match_engine.py
+	@echo ">> EC numbers still current"
+	@"$(PY)" scripts/check_ec_numbers_current.py --selftest
+	@"$(PY)" scripts/check_ec_numbers_current.py
 	@echo ">> landing-page test counts"
 	@"$(PY)" scripts/check_landing_test_counts.py --selftest
 	@"$(PY)" scripts/check_landing_test_counts.py

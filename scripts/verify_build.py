@@ -412,6 +412,26 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_documented_equations_match_engine.py'}"
     ))
 
+    # EC numbers in enzymes.ts must still be the ones IUBMB recognises.
+    # Added 2026-09-05, after cytochrome c oxidase was found shipping
+    # EC 1.9.3.1 -- transferred to 7.1.1.9 in 2018 when class EC 7
+    # (translocases) was created. A transferred EC still resolves, so
+    # nothing 404s; the lookup just silently asks the wrong question, the
+    # same shape as a DOI resolving to the wrong paper (ADR 0076).
+    #
+    # Offline: compares against Tests/fixtures/ec_numbers_verified.json,
+    # so an EC added or edited without being checked fails here. `--live`
+    # re-asks Expasy and lives in the live-citation group, since only that
+    # can catch a transfer made after the snapshot was taken.
+    guards.append(run_guard(
+        "EC Numbers Current Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_ec_numbers_current.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "EC Numbers Current Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_ec_numbers_current.py'}"
+    ))
+
     # Landing-page test counts. Wired here 2026-09-05: it was added earlier
     # the same day to `make guards` ALONE, which check_guard_wiring does not
     # accept as a harness -- correctly, since `make guards` is a target
@@ -1020,7 +1040,15 @@ def run_live_citation_guard() -> List[Tuple[str, bool, str]]:
             "Live Citation Verification",
             f"{PYTHON} {SCRIPTS_DIR / 'verify_citations_live.py'}",
             timeout=180,
-        )
+        ),
+        # Same rationale, different namespace: an EC number can be
+        # transferred by IUBMB after the offline snapshot was taken, and
+        # only asking Expasy can find that out.
+        run_guard(
+            "Live EC Number Verification",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_ec_numbers_current.py'} --live",
+            timeout=180,
+        ),
     ]
 
 

@@ -109,6 +109,10 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # document and four engine modules, so a pytest wrapper would duplicate
     # verify_build for no extra signal.
     "check_documented_equations_match_engine": ("verify_build",),
+    # verify_build, in both its offline and its --live form. Offline it
+    # reads a committed snapshot; --live re-asks Expasy and sits with the
+    # other network checks, which are opt-in for the reason ADR 0028 gives.
+    "check_ec_numbers_current": ("verify_build",),
     # verify_build only, in its default (fast) mode. `--full` runs all four
     # test suites and takes ~40 minutes, which is why the exhaustive form is
     # not in any unasked harness.
