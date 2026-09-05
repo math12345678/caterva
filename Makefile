@@ -227,6 +227,9 @@ guards: require-pytest
 	@"$(PY)" scripts/check_citation_format.py
 	@echo ">> documented counts"
 	@"$(PY)" scripts/check_documented_counts.py
+	@echo ">> documented equations match the engine"
+	@"$(PY)" scripts/check_documented_equations_match_engine.py --selftest
+	@"$(PY)" scripts/check_documented_equations_match_engine.py
 	@echo ">> landing-page test counts"
 	@"$(PY)" scripts/check_landing_test_counts.py --selftest
 	@"$(PY)" scripts/check_landing_test_counts.py

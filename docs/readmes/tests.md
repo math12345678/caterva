@@ -2,7 +2,7 @@
 
 Part of [**Terrium**](https://github.com/Terrium-sim/main) — scientific computing for teaching labs.
 
-The literature layer and its 91 files — 1,116 tests.
+The literature layer and its 91 files — 1,130 tests.
 
 This is what makes Terrium more than a solver: the resolvers that fetch real
 measured kinetic parameters from BRENDA and PubMed, the citation verifier, and the

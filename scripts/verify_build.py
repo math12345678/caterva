@@ -390,6 +390,45 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_documented_counts.py'}"
     ))
 
+    # The equations LITERATURE_BACKING_DATABASE.md documents must be the
+    # ones the engine solves. Added 2026-09-05, after an audit found four
+    # model sections describing maths the engine does not compute: PCR
+    # written as N0 x E^n (a DECAY formula -- 1.2e10 off the implemented
+    # `(1 + efficiency) ** cycle` at 30 cycles), SIR and SEIR written
+    # density-dependent while model_building.py emits beta*S*I/N (R0 wrong
+    # by a factor of N), and Gillespie described as tau-leaping with an
+    # "adaptive tau-selection" implementation that exists nowhere in the
+    # tree. Every one was right in the code and wrong on the page.
+    #
+    # Prose drifts from code silently because nothing reads both. This
+    # reads both, and fails if either side moves alone.
+    guards.append(run_guard(
+        "Documented Equations Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_documented_equations_match_engine.py'}"
+        " --selftest"
+    ))
+    guards.append(run_guard(
+        "Documented Equations Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_documented_equations_match_engine.py'}"
+    ))
+
+    # Landing-page test counts. Wired here 2026-09-05: it was added earlier
+    # the same day to `make guards` ALONE, which check_guard_wiring does not
+    # accept as a harness -- correctly, since `make guards` is a target
+    # someone chooses to run. A guard that only runs when asked is the exact
+    # thing the Stage 4 amendment forbids, and this one shipped that way for
+    # several commits before its own sibling guard caught it.
+    #
+    # Default (fast) mode only. `--full` runs all four suites (~40 min).
+    guards.append(run_guard(
+        "Landing Test Counts Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_landing_test_counts.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Landing Test Counts Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_landing_test_counts.py'}"
+    ))
+
     # Python support window stated consistently across requirements.txt,
     # README, CONTRIBUTING and the Makefile gate. Offline; --online adds a
     # PyPI wheel-coverage check. Added Stage 8 after the stated REASON for
