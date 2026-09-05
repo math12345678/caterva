@@ -79,3 +79,72 @@ describe("example cards do not overstate what the pipeline returns", () => {
     expect(descriptions().length).toBeGreaterThanOrEqual(3);
   });
 });
+
+/**
+ * A comparison page must not invent the thing it compares against.
+ *
+ * WorkflowCompare.tsx claimed the manual alternative takes "2-4 hours"
+ * and "hours of work", with no source, in a file that had zero comment
+ * lines in a repo where every other file documents where its numbers come
+ * from. Nobody here has timed a researcher doing that work.
+ *
+ * A fabricated comparison is the same defect as a fabricated Km, and it
+ * sat on the page advertising that Terrium never fabricates one. Choosing
+ * a smaller, more modest invented number would have been the identical
+ * defect wearing a humbler face.
+ *
+ * The Terrium side keeps a figure because that one was measured
+ * end-to-end (2.0-28.3 s across three queries on 2026-09-05), and the
+ * file records the runs.
+ */
+describe("the workflow comparison does not invent durations", () => {
+  const source = readFileSync(
+    path.join(__dirname, "..", "cli", "WorkflowCompare.tsx"),
+    "utf-8",
+  );
+
+  /** Lines that render, i.e. not comments. */
+  const rendered = source
+    .split("\n")
+    .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+    .join("\n");
+
+  it("makes no unsourced claim about how long the manual workflow takes", () => {
+    // The comment block explaining the removal is allowed to say "2-4
+    // hours"; the rendered copy is not.
+    expect(rendered).not.toMatch(/2\s*[-\u2013]\s*4\s*hours/i);
+    expect(rendered).not.toMatch(/hours of work/i);
+  });
+
+  it("still describes the manual work, rather than deleting the comparison", () => {
+    // The fix must not be "remove the section". A reader should still see
+    // what the alternative involves.
+    expect(rendered).toMatch(/Literature search/i);
+    expect(rendered).toMatch(/Cross-reference papers/i);
+  });
+
+  it("keeps the Terrium figure, which is measured, and labels it so", () => {
+    expect(rendered).toMatch(/under 30 s/i);
+    expect(rendered).toMatch(/measured/i);
+  });
+
+  it("records the measurements behind that figure in the file", () => {
+    // A number is only as good as its recorded basis. If someone changes
+    // the claim they have to change the evidence next to it.
+    //
+    // Asserted against the COMMENT block specifically, per measurement
+    // line. A first version checked the whole file for "28.3 s" and
+    // passed even after that figure was scrubbed from the comment --
+    // because the rendered copy also contains "2.0-28.3 s". The evidence
+    // and the claim have to be checked separately or the evidence check
+    // is really just a second claim check.
+    const comments = source
+      .split("\n")
+      .filter((line) => /^\s*\/\//.test(line))
+      .join("\n");
+    expect(comments).toMatch(/hexokinase[^\n]*28\.3 s/);
+    expect(comments).toMatch(/covid[^\n]*2\.6 s/i);
+    expect(comments).toMatch(/influenza[^\n]*2\.0 s/i);
+    expect(comments).toMatch(/2026-09-05/);
+  });
+});

@@ -1,3 +1,27 @@
+// EVERY NUMBER IN THIS FILE IS EITHER MEASURED OR ABSENT.
+//
+// This file carried "Time: 2-4 hours" for the manual workflow and "3
+// tools", with no source, in a repo where every other file documents
+// where its numbers come from -- it had zero comment lines. A fabricated
+// comparison is the same defect as a fabricated Km, and it sat on the
+// page that advertises never fabricating one.
+//
+// The manual side no longer claims a duration. Nobody here has timed a
+// researcher doing this work, and inventing a smaller, more "modest"
+// number would be the identical defect wearing a humbler face. It
+// describes the WORK instead, which is verifiable by anyone who has done
+// it.
+//
+// The Terrium side keeps a number because that one is measurable, and was
+// measured end-to-end through POST /api/simulate on 2026-09-05:
+//
+//   hexokinase (live BRENDA lookup)        28.3 s
+//   covid-19 SIR (local disease registry)   2.6 s
+//   seasonal influenza                      2.0 s
+//
+// "Under 30 seconds" is stated as the upper bound those runs support, not
+// as a typical figure -- the enzyme path is slow because it makes a real
+// network call to BRENDA, which is the point of it.
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import TerminalWindow from "./TerminalWindow";
@@ -14,7 +38,7 @@ const WITHOUT_TERRIUM: Step[] = [
     icon: "\uD83D\uDCDA",
     label: "Literature search",
     detail:
-      "Manually search BRENDA and PubMed for kinetic parameters. Cross-reference papers for consensus Km/Vmax values \u2014 hours of work.",
+      "Manually search BRENDA and PubMed for kinetic parameters. Cross-reference papers for consensus Km/Vmax values, and record where each one came from.",
   },
   {
     icon: "\uD83D\uDCBB",
@@ -30,9 +54,9 @@ const WITHOUT_TERRIUM: Step[] = [
   },
   {
     icon: "\u23F1\uFE0F",
-    label: "Time: 2\u20134 hours",
+    label: "Time: however long it takes",
     detail:
-      "Per experiment. And students have to learn three different tools just to get one number.",
+      "Per experiment, and students learn several tools before they get one number. Terrium has not timed this, so it does not put a figure on it.",
   },
 ];
 
@@ -57,9 +81,9 @@ const WITH_TERRIUM: Step[] = [
   },
   {
     icon: "\u26A1",
-    label: "Time: 30 seconds",
+    label: "Time: under 30 seconds",
     detail:
-      "From question to citable result. No coding, no hunting through databases, no manual verification.",
+      "From question to citable result. Measured 2.0-28.3 s across enzyme-kinetics and epidemiology queries; the enzyme path is the slow one because it makes a live BRENDA call.",
   },
 ];
 
@@ -196,8 +220,8 @@ export default function WorkflowCompare() {
           >
             <span className="text-white/25 font-mono">
               {activeTab === "without"
-                ? "4 steps \u2022 3 tools \u2022 2\u20134 hours"
-                : "4 steps \u2022 1 tool \u2022 30 seconds"}
+                ? "4 steps \u2022 3 tools"
+                : "4 steps \u2022 1 tool \u2022 under 30 s (measured)"}
             </span>
             <span
               className={`font-mono ${
