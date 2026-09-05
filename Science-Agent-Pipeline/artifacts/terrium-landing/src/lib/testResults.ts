@@ -38,16 +38,21 @@
 // rather than by reading the console summary, which pytest was not
 // emitting through the capture used here.
 //
-// THE ONE DERIVED NUMBER, AND WHY:
-// the engine suite reports 1200 passed / 4 skipped / 1 FAILED on a plain
-// machine, because test_citation_metadata.py::test_the_guard_passes
-// refuses to treat "cffconvert is not installed" as a pass -- correctly:
-// 'could not check' and 'checked and fine' are different facts. cffconvert
-// is declared in requirements-dev.txt, so that failure is a missing
-// dependency and not a defect. Verified by installing it into a
-// --system-site-packages venv and re-running that file: 0 failures. Hence
-// 1201 passed / 4 skipped / 0 failed for a correctly provisioned
-// environment, which is the environment this file's header describes.
+// THE ENGINE NUMBER IS NOW MEASURED, NOT DERIVED (2026-09-05):
+// 1246 passed / 0 skipped / 0 failed, from a direct run of Terium/ alone
+// under the repo's .venv, read out of a junit-xml report rather than off
+// the terminal.
+//
+// It previously read 1201 passed / 4 skipped, and that figure was
+// REASONED rather than run: a plain machine reported 1200 passed /
+// 4 skipped / 1 failed, the failure being
+// test_citation_metadata.py::test_the_guard_passes refusing to treat
+// "cffconvert is not installed" as a pass -- correctly, since 'could not
+// check' and 'checked and fine' are different facts -- and 1201/4/0 was
+// what that implied for a provisioned environment. Sound reasoning, but a
+// derived number on a page whose claim is that every number was checked.
+// The four skips are gone too: they were optional dependencies that
+// `make setup` now installs.
 //
 // The api-server suite has the same shape of environment dependency, and
 // the same treatment. python.test.ts refuses to run its two
@@ -83,8 +88,9 @@ export const TEST_SUITES: TestSuite[] = [
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, and citation/build guards",
-        passed: 1201,
-        skipped: 4,
+        // Measured 2026-09-05, Terium/ run alone under .venv.
+        passed: 1246,
+        skipped: 0,
         failed: 0,
       },
     ],

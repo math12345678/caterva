@@ -54,16 +54,40 @@ procedure (`docs/CONSTITUTION.md` Section 6) and is automated by
 
 - A new contributor or implementer writing a stochastic domain does not
   need to decide which RNG to use; the default is stated.
-- The `numpy.random.default_rng` function returns a `Generator` object
-  using the BitGenerator selected by numpy's version-dependent defaults,
-  which has changed across numpy major versions (e.g., numpy 1.x used
-  PCG64 by default; numpy 2.x moved to Philox). This means reproducibility
-  across numpy versions is *not* guaranteed even with the same seed — only
-  within the same numpy installation. This is accepted as a practical
-  limitation: pinning a specific BitGenerator would add interface
-  complexity (passing a `numpy.random.Generator` object or a
-  `BitGenerator` name) with no clear teaching-lab use case for
-  cross-version reproducibility of simulation internals.
+- `numpy.random.default_rng` returns a `Generator` built on **PCG64**,
+  and always has. Reproducibility across numpy versions is nonetheless
+  *not* guaranteed even with the same seed — only within the same numpy
+  installation — because numpy declines to guarantee it. `Generator`'s
+  own docstring says so under the heading **"No Compatibility
+  Guarantee"**: *"`Generator` does not provide a version compatibility
+  guarantee. In particular, as better algorithms evolve the bit stream
+  may change."* The frozen-stream guarantee belongs to the legacy
+  `RandomState`, which this ADR does not use.
+
+  This is accepted as a practical limitation: pinning a specific
+  BitGenerator would add interface complexity (passing a
+  `numpy.random.Generator` object or a `BitGenerator` name) with no clear
+  teaching-lab use case for cross-version reproducibility of simulation
+  internals.
+
+  > **⚠️ CORRECTION (2026-09-05):** this consequence previously read *"the
+  > BitGenerator selected by numpy's version-dependent defaults, which has
+  > changed across numpy major versions (e.g., numpy 1.x used PCG64 by
+  > default; numpy 2.x moved to Philox)"*. **numpy 2.x did not move to
+  > Philox.** Measured on the pinned interpreter, numpy 2.2.6:
+  > `type(numpy.random.default_rng(0).bit_generator).__name__` is
+  > `PCG64`, and `default_rng`'s docstring reads "Construct a new
+  > Generator with the default BitGenerator (PCG64)". `default_rng` has
+  > returned PCG64 since it was introduced in numpy 1.17.
+  >
+  > The DECISION was right and is unchanged; only its evidence was
+  > invented. A real limitation was justified with a fabricated fact,
+  > which is the more dangerous shape — the conclusion holds up, so
+  > nobody re-reads the premise. The true reason was always available in
+  > numpy's own documentation, and is now quoted instead.
+  >
+  > Pinned by `Terium/tests/test_rng_convention.py`, which asserts both
+  > halves against the installed numpy rather than against this prose.
 - The `default_rng(seed)` call is deterministic given a fixed numpy
   version, which is sufficient for the use case (a student reproducing a
   simulation on the same environment sees the same result).
