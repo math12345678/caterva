@@ -115,10 +115,28 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "67 test files -- query resolution, parameter provenance, " +
+          "69 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, rate limiting, SSE job routes",
-        passed: 755,
+        // Measured 2026-09-05: `69 passed (69) / 762 passed (762)`, run
+        // alone with the repo's .venv/bin first on PATH.
+        //
+        // That PATH is not a thumb on the scale, it is the documented
+        // environment. Two tests in python.test.ts assert that a
+        // TERRIUM_PYTHON given as a BARE NAME resolves through PATH, and
+        // they refuse -- rather than skip -- when no PATH-resolvable
+        // interpreter has Terrium's dependencies installed. Homebrew's
+        // python3.11 and python3.12 are on PATH here but have none of
+        // them, so off a `make setup` shell those two fail for a reason
+        // that is about this machine and not about the code. With
+        // .venv/bin on PATH all 7 pass, which is what CI does.
+        //
+        // The previous entry read `passed: 755, failed: 0` -- but 755 was
+        // the suite TOTAL, of which 753 passed and 2 failed. Reporting a
+        // total in the passed column turns any failure into an invisible
+        // one, which is the specific dishonesty this panel exists to
+        // avoid.
+        passed: 762,
         skipped: 0,
         failed: 0,
       },
