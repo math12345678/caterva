@@ -2599,6 +2599,12 @@ export async function resolveQuery(
     // Stage 4: Validation - Check hard rule and provenance
     const stage4Start = Date.now();
     const missing = unverifiedOriginKeys(parameterProvenance);
+    // Recorded HERE, before the refusal branch below returns, so the
+    // literature hit rate counts queries that failed to resolve as
+    // well as those that succeeded. See recordParameterProvenance.
+    verifiableMetricsCollector.recordParameterProvenance(
+      Object.values(parameterProvenance).map((p) => p.origin),
+    );
     const stage4Duration = Date.now() - stage4Start;
     stageTimings["Validation"] = {
       duration: stage4Duration,
@@ -2885,6 +2891,12 @@ export async function resolveQuery(
   // Stage 4: Validation (fallback path)
   const stage4Start = Date.now();
   const missing = unverifiedOriginKeys(parameterProvenance);
+  // Recorded HERE, before the refusal branch below returns, so the
+  // literature hit rate counts queries that failed to resolve as
+  // well as those that succeeded. See recordParameterProvenance.
+  verifiableMetricsCollector.recordParameterProvenance(
+    Object.values(parameterProvenance).map((p) => p.origin),
+  );
   const stage4Duration = Date.now() - stage4Start;
   stageTimings["Validation"] = {
     duration: stage4Duration,

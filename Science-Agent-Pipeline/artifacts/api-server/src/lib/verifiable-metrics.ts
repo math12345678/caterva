@@ -439,6 +439,45 @@ class VerifiableMetricsCollector {
   }
 
   /**
+   * Record how one query's parameters were sourced.
+   *
+   * Until 2026-09-05 nothing called anything like this. `literatureHits`
+   * and `keywordFallbacks` were initialised to 0, read by
+   * `getSnapshot()`, divided into `literatureHitRate`, and published by
+   * GET /api/metrics -- with NO writer anywhere in the tree. The endpoint
+   * served `literatureHitRate: 0`, `literatureHits: 0` and
+   * `keywordFallbacks: 0` for the life of every process, and they were
+   * indistinguishable from a genuine measurement of a system that had
+   * resolved nothing.
+   *
+   * That is the defect this product exists to refuse, in its own
+   * telemetry: a number presented as measured that nobody measured.
+   *
+   * `origins` is the provenance of every parameter the query needed, so
+   * one call covers the whole query:
+   *   - "resolved" — came from literature (BRENDA / registry / PubMed)
+   *   - "default"  — the keyword/domain fallback, which the hard rule
+   *                  then blocks from being reported as a value
+   *   - "llm", "user" — neither a literature hit nor a keyword fallback,
+   *                  counted as attempts so the rate stays a fraction of
+   *                  everything that was actually sought
+   *
+   * Called on BOTH the resolving and the refusing path. Recording only
+   * successful queries would make the hit rate 100% by construction,
+   * which is the more flattering way to be wrong.
+   */
+  recordParameterProvenance(origins: readonly string[]): void {
+    for (const origin of origins) {
+      this.resolutionMetrics.literatureAttempts++;
+      if (origin === "resolved") {
+        this.resolutionMetrics.literatureHits++;
+      } else if (origin === "default") {
+        this.resolutionMetrics.keywordFallbacks++;
+      }
+    }
+  }
+
+  /**
    * Reset all collected metrics. For test isolation (each test starts from
    * a clean collector) — production code has no reason to call this, since
    * the whole point of the collector is a running total across the

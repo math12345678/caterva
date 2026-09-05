@@ -98,11 +98,12 @@
 
 | Origin | Source | Confidence | Requirement |
 |--------|--------|------------|-------------|
-| **resolved** | BRENDA/PubMed/CORE | High | Citation + assay conditions |
-| **keyword** | Domain defaults + keyword matching | Medium | Flagged for verification |
-| **llm** | LLM-generated suggestion | Low | REQUIRES literature backup |
-| **user** | Direct user input | Varies | Accepted as-is |
-| **default** | System default | None | REJECTED by hard rule |
+| **resolved** | BRENDA / registry / PubMed | High | Citation + assay conditions |
+| **user** | Direct user input | Varies | Accepted as stated, recorded as the user's |
+| **llm** | LLM-generated suggestion | Low | REJECTED by the hard rule unless a resolvable citation backs it |
+| **default** | Domain default (keyword tier) | None | REJECTED by the hard rule |
+
+> **⚠️ CORRECTION (2026-09-05):** this table listed a fifth origin, **`keyword`**, which does not exist. `provenance.ts` declares exactly four: `export type ParameterOrigin = "resolved" | "user" | "llm" | "default"`. The keyword/domain-default tier is the `default` origin, and it is not "Medium confidence, flagged for verification" as this table said — `unverifiedOriginKeys` **blocks** it, the same as `llm`. The table described a system one tier more permissive than the one that ships.
 
 **Reference**: Architecture Decision Record (ADR) 0008: Parameter Provenance Tracking
 **Backed By**: STRENDA Guidelines (see below)
