@@ -39,7 +39,7 @@ Cancel a running job.
 
 #### `GET /api/simulate/:jobId/confidence`
 Per-parameter confidence scores with explanations.
-- **Literature**: Gelperin et al. (2010) - STRENDA reporting standards
+- **Literature**: Tipton et al. (2014) - STRENDA reporting standards
 - **Response**:
 ```json
 {
@@ -133,7 +133,7 @@ Comprehensive literature backing database for all domains.
     "queuing": "Little (1961) - Queue theory L = λW",
     "confidence": "Wilson (1927) - Binomial proportion confidence intervals",
     "metrics": "Harter (1974) - Percentile analysis",
-    "enzyme": "Gelperin et al. (2010) - STRENDA reporting standards",
+    "enzyme": "Tipton et al. (2014) - STRENDA reporting standards",
     "epidemiology": "Kermack & McKendrick (1927) - Mathematical epidemiology"
   }
 }
@@ -186,7 +186,7 @@ Validates all 7 STRENDA requirements:
 6. **Enzyme source/purity** (documented)
 7. **Confidence intervals** (95% CI bounds)
 
-**Literature**: Gelperin et al. (2010) DOI: 10.1038/nbt0610-592
+**Literature**: Tipton et al. (2014) DOI: 10.1016/j.pisc.2014.02.012
 
 ---
 

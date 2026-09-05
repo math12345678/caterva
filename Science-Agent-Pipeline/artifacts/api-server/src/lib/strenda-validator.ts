@@ -1,9 +1,9 @@
 /**
  * STRENDA Compliance Validator
  *
- * BACKING: Gelperin, D. M., et al. (2010)
+ * BACKING: Tipton, K. F., Armstrong, R. N., Bakker, B. M., et al. (2014)
  * "STRENDA: Reporting Standards for Enzyme Data"
- * https://doi.org/10.1038/nbt0610-592
+ * https://doi.org/10.1016/j.pisc.2014.02.012
  *
  * STRENDA requires 7 pieces of information for reporting enzyme kinetic data:
  * 1. pH of assay (±0.1)
@@ -51,7 +51,7 @@ function createViolation(
 
 /**
  * Validate assay conditions against STRENDA requirements
- * BACKING: Gelperin et al. (2010) - STRENDA Requirements 1-3
+ * BACKING: Tipton et al. (2014) - STRENDA Requirements 1-3
  */
 export function validateAssayConditions(
   conditions?: AssayConditions,

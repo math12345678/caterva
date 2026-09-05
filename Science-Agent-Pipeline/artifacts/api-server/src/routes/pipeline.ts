@@ -236,7 +236,7 @@ router.get(
           confidence:
             "Wilson (1927) - Binomial proportion confidence intervals",
           metrics: "Harter (1974) - Percentile analysis",
-          enzyme: "Gelperin et al. (2010) - STRENDA reporting standards",
+          enzyme: "Tipton et al. (2014) - STRENDA reporting standards",
           epidemiology: "Kermack & McKendrick (1927) - Mathematical epidemiology",
         },
       });

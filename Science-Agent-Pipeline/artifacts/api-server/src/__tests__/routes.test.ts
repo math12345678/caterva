@@ -719,7 +719,16 @@ describe("GET /api/dashboard/overview", () => {
     expect(res.body).toHaveProperty("compliance");
     expect(res.body.compliance).toHaveProperty("strenda");
     expect(res.body.compliance.strenda).toHaveProperty("standard");
-    expect(res.body.compliance.strenda.standard).toContain("Gelperin");
+    // Was `toContain("Gelperin")`. That name, its journal, and its DOI
+    // (10.1038/nbt0610-592) were fabricated: doi.org and CrossRef both
+    // 404, PubMed has no Gelperin STRENDA paper, and CrossRef's full
+    // Nature Biotechnology 28(6) listing contains no article starting at
+    // page 592. This assertion is why nothing caught it -- a test
+    // enforcing the fabrication. The real consortium paper is Tipton et
+    // al. (2014), Perspectives in Science 1:131-137, DOI verified
+    // 2026-09-05.
+    expect(res.body.compliance.strenda.standard).toContain("Tipton");
+    expect(res.body.compliance.strenda.doi).toBe("10.1016/j.pisc.2014.02.012");
   });
 
   it("exposes all available API endpoints", async () => {
@@ -782,5 +791,52 @@ describe("GET /api/dashboard/health", () => {
     expect(res.body.checks).toHaveProperty("metrics");
     expect(res.body.checks).toHaveProperty("queue");
     expect(res.body.checks.literature).not.toBe("ok");
+  });
+});
+
+describe("GET /api/dashboard/overview — the status must be able to fail", () => {
+  /**
+   * `system.status` was the literal "healthy", with no probe behind it,
+   * so the endpoint reported the system healthy while Python was missing,
+   * the database was down and every job was failing.
+   *
+   * This was the THIRD occurrence of that defect: routes/metrics.ts had
+   * it and was fixed, /api/dashboard/health had it and was fixed with a
+   * long comment 100 lines below this route in the same file, and this
+   * copy was missed both times. What was missing each time was a test
+   * asserting the signal can take another value.
+   */
+  it("reports no_data rather than healthy when nothing has been observed", async () => {
+    const { verifiableMetricsCollector } = await import("../lib/verifiable-metrics");
+    const snapshot = verifiableMetricsCollector.getSnapshot();
+
+    const res = await request(app).get("/api/dashboard/overview");
+    expect(res.status).toBe(200);
+
+    // Whatever this process has observed, the reported status must be the
+    // one the evidence supports -- never an unconditional "healthy".
+    const expected =
+      snapshot.sampleCount === 0
+        ? "no_data"
+        : snapshot.completedJobs / snapshot.sampleCount > 0.9
+          ? "healthy"
+          : "degraded";
+    expect(res.body.system.status).toBe(expected);
+  });
+
+  it("publishes the sample count behind the status", async () => {
+    // 100%-of-zero and 100%-of-500 must be distinguishable by a caller.
+    const res = await request(app).get("/api/dashboard/overview");
+    expect(res.body.system).toHaveProperty("sampleCount");
+    expect(typeof res.body.system.sampleCount).toBe("number");
+  });
+
+  it("names process uptime as process uptime, not availability", async () => {
+    // It sat under a hardcoded "healthy" where a reader would take it for
+    // service availability. It is how long THIS PROCESS has run, which is
+    // only ever an upper bound on the other.
+    const res = await request(app).get("/api/dashboard/overview");
+    expect(res.body.system).toHaveProperty("processUptimeSeconds");
+    expect(res.body.system).not.toHaveProperty("uptime");
   });
 });

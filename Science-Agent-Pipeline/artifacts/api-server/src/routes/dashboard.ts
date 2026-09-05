@@ -79,9 +79,40 @@ router.get(
 
       res.json({
         timestamp: new Date().toISOString(),
+        // THIRD occurrence of the same defect in this codebase, and the
+        // second in this file.
+        //
+        // `status` was the literal "healthy", with no probe behind it and
+        // no code path able to produce any other value -- so this endpoint
+        // reported the system healthy while Python was missing, the
+        // database was down and every job was failing. A monitoring signal
+        // that cannot fail is worse than none: it actively suppresses the
+        // alarm it exists to raise. That sentence is already written, 100
+        // lines below, about /api/dashboard/health, which was fixed; and
+        // again in routes/metrics.ts, which was fixed before it. Only this
+        // copy was missed, twice.
+        //
+        // Same three-tier shape as the other two. "no_data" is neither
+        // healthy nor degraded: the process IS up and answering, and the
+        // distinction being drawn is between "up with no evidence" and "up
+        // and demonstrably fine".
+        //
+        // `uptime` stays process.uptime() but is NAMED as such. It was
+        // sitting under a hardcoded "healthy" where a reader would take it
+        // for service availability; it is how long this process has been
+        // running, which is a different claim and only ever an upper bound
+        // on the other.
         system: {
-          status: "healthy",
-          uptime: process.uptime(),
+          status:
+            metrics.sampleCount === 0
+              ? "no_data"
+              : metrics.completedJobs / metrics.sampleCount > 0.9
+                ? "healthy"
+                : "degraded",
+          // Published alongside the status so a caller can tell
+          // 100%-of-zero from 100%-of-500.
+          sampleCount: metrics.sampleCount,
+          processUptimeSeconds: process.uptime(),
           version: "literature-backed-v1",
         },
         queue: {
@@ -120,8 +151,8 @@ router.get(
         },
         compliance: {
           strenda: {
-            standard: "Gelperin et al. (2010) - STRENDA Guidelines",
-            doi: "10.1038/nbt0610-592",
+            standard: "Tipton et al. (2014) - STRENDA Guidelines",
+            doi: "10.1016/j.pisc.2014.02.012",
             requirements: 7,
             applicableDomains: [
               "mm",

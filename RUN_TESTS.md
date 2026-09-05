@@ -43,8 +43,8 @@ npm test -- strenda.test.ts
 ```
 
 **Literature Backing:**
-- Gelperin et al. (2010): STRENDA Guidelines
-- DOI: https://doi.org/10.1038/nbt0610-592
+- Tipton et al. (2014): STRENDA Guidelines
+- DOI: https://doi.org/10.1016/j.pisc.2014.02.012
 
 Requirements tested:
 1. pH of assay (±0.1)
@@ -229,9 +229,9 @@ npm test -- literature-backed-e2e.test.ts -t "Complete Pipeline Integration"
 | Metrics (Job tracking) | Little 1961 | ✅ 20+ tests |
 | Metrics (Confidence) | Wilson 1927 | ✅ 20+ tests |
 | Metrics (Percentiles) | Harter 1974 | ✅ 20+ tests |
-| STRENDA (pH) | Gelperin 2010 | ✅ 5 tests |
-| STRENDA (Temperature) | Gelperin 2010 | ✅ 5 tests |
-| STRENDA (Buffer) | Gelperin 2010 | ✅ 5 tests |
+| STRENDA (pH) | Tipton 2014 | ✅ 5 tests |
+| STRENDA (Temperature) | Tipton 2014 | ✅ 5 tests |
+| STRENDA (Buffer) | Tipton 2014 | ✅ 5 tests |
 | STRENDA (CI) | Wilson 1927 | ✅ 5 tests |
 | Verification Levels | ADR 0011 | ✅ 15+ tests |
 | Publication Audit | Domain-specific | ✅ 10+ tests |
@@ -271,7 +271,7 @@ Every line of code traces to literature:
 
 3. **Find STRENDA rules**:
    ```bash
-   grep -n "STRENDA Req\|Gelperin" src/lib/strenda-validator.ts
+   grep -n "STRENDA Req\|Tipton" src/lib/strenda-validator.ts
    ```
 
 4. **Find verification logic**:

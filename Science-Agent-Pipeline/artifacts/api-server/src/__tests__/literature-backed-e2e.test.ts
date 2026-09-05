@@ -4,7 +4,7 @@
  * Verifies that the complete pipeline traces every parameter to literature
  * BACKING: Complete system integration of:
  * - Metrics collection (Little 1961, Wilson 1927, Harter 1974)
- * - STRENDA compliance (Gelperin et al. 2010)
+ * - STRENDA compliance (Tipton et al. 2014)
  * - Literature verification (domain-specific backing)
  */
 
