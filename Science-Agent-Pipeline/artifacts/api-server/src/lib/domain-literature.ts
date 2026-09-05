@@ -110,8 +110,17 @@ export const MM_CI_LITERATURE: DomainLiterature = {
  */
 export const SIR_LITERATURE: DomainLiterature = {
   name: "sir",
+  // Frequency-dependent transmission, matching what the engine integrates:
+  // model_building.py emits `beta * S * I / N`. This description carried
+  // Kermack & McKendrick's original density-dependent `-β·S·I` until
+  // 2026-09-05. The distinction is not cosmetic -- R0 is beta/gamma under
+  // the engine's form but beta*N/gamma under the one described here, so a
+  // reader deriving R0 from this text for the registry's COVID-19
+  // parameters and N = 1000 would have been off by a factor of 1000.
+  //
+  // Guarded by scripts/check_documented_equations_match_engine.py.
   description:
-    "SIR compartmental epidemiological model. Describes disease spread with three compartments: S (susceptible), I (infected), R (recovered). Equations: dS/dt = -β·S·I, dI/dt = β·S·I - γ·I, dR/dt = γ·I",
+    "SIR compartmental epidemiological model. Describes disease spread with three compartments: S (susceptible), I (infected), R (recovered), with N = S + I + R. Equations: dS/dt = -β·S·I/N, dI/dt = β·S·I/N - γ·I, dR/dt = γ·I. Under this frequency-dependent form R₀ = β/γ.",
   references: [
     {
       authors: "Kermack, W. O., & McKendrick, A. G.",
@@ -148,7 +157,7 @@ export const SEIR_LITERATURE: DomainLiterature = {
     // 2022: latent 3.9 d vs incubation 5.8 d). The description and the
     // justification contradicted each other in the same object, and the
     // description is the half that gets rendered.
-    "SEIR compartmental model adds latent period. E (exposed) compartment between S and I. Equations: dS/dt = -β·S·I, dE/dt = β·S·I - σ·E, dI/dt = σ·E - γ·I, dR/dt = γ·I. Sigma = 1/latent period (infection → becoming infectious), which is not the incubation period (infection → symptom onset).",
+    "SEIR compartmental model adds latent period. E (exposed) compartment between S and I, with N = S + E + I + R. Equations: dS/dt = -β·S·I/N, dE/dt = β·S·I/N - σ·E, dI/dt = σ·E - γ·I, dR/dt = γ·I. Sigma = 1/latent period (infection → becoming infectious), which is not the incubation period (infection → symptom onset).",
   references: [
     {
       authors: "Anderson, R. M., & May, R. M.",
@@ -276,8 +285,17 @@ export const GILLESPIE_SSA_LITERATURE: DomainLiterature = {
  */
 export const PCR_LITERATURE: DomainLiterature = {
   name: "pcr",
+  // The formula below said `N(n) = N0 × E^n` until 2026-09-05. With the
+  // efficiency range it states in the same sentence (0.85-1.0), that is a
+  // DECAY curve: at 30 cycles and E = 0.9 it yields 0.042*N0, a PCR
+  // reaction that destroys 96% of its template. Terium/discrete/pcr.py
+  // computes `n0 * (1.0 + efficiency) ** cycle` = 5.2e8*N0 -- a factor of
+  // 1.2e10 apart. The engine was right; this description, which is served
+  // to users through /api/pipeline/literature, was wrong.
+  //
+  // Guarded by scripts/check_documented_equations_match_engine.py.
   description:
-    "PCR amplification model. Exponential amplification over n cycles. Final copy number: N(n) = N0 × E^n where E is per-cycle efficiency (typically 0.85-1.0).",
+    "PCR amplification model. Exponential amplification over n cycles. Final copy number: N(n) = N0 × (1 + E)^n, where E is the fraction of template copied per cycle (typically 0.85-1.0; E = 1 is perfect doubling). Passing a plateau capacity switches to discrete logistic growth toward that capacity.",
   references: [
     {
       authors: "Mullis, K. B., et al.",
