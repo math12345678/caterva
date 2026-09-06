@@ -1081,6 +1081,52 @@ def run_network(params: Dict[str, Any]) -> Dict[str, Any]:
     payload["conservationLaws"] = describe_conservation_laws(network)
     payload["quantitySources"] = provenance_report(network, sources)
     payload["antimony"] = antimony_string
+
+    # Opt-in: which of these numbers is the answer resting on, and how good
+    # is each one?
+    #
+    # Costs two extra integrations per quantity (central differences), so a
+    # caller asks for it rather than paying for it on every run. On by
+    # default would make an interactive request several times slower for a
+    # result most callers do not read.
+    if params.get("audit"):
+        from Terium.core.model_audit import audit as audit_model
+        from Terium.core.sensitivity import analyse
+
+        def _rerun(candidate):
+            return terium_engine.simulate_sbml(
+                sbml_string=terium_engine.antimony_to_sbml(
+                    compile_with_provenance(candidate, sources)
+                ),
+                start=start,
+                end=end,
+                points=points,
+            )
+
+        report = analyse(network, _rerun)
+        result_audit = audit_model(network, report, sources)
+        payload["audit"] = {
+            "summary": result_audit.summary(),
+            "caveats": list(result_audit.caveats),
+            "quantities": [
+                {
+                    "quantity": q.quantity,
+                    "peakRelativeSensitivity": q.sensitivity.peak,
+                    "peakSpecies": q.sensitivity.peak_species,
+                    "peakTime": q.sensitivity.peak_time,
+                    "sourceTier": q.tier,
+                    "citation": q.citation,
+                    "influential": q.influential,
+                    "worthMeasuring": q.worth_measuring,
+                }
+                for q in result_audit.quantities
+            ],
+            "unranked": [
+                {"quantity": q, "reason": why} for q, why in result_audit.unranked
+            ],
+            "toMeasure": [q.quantity for q in result_audit.to_measure],
+        }
+
     return payload
 
 
