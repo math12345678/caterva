@@ -35,17 +35,87 @@ export type SimulationDomain =
   | "repressilator"
   | "sbml";
 
+/**
+ * A domain the runner handles WITHOUT a matching engine `simulate_*`.
+ *
+ * `SimulationDomain` above mirrors terium_runner.py's DISPATCH exactly, and
+ * scripts/check_domain_parity.py enforces that across three files. That
+ * contract is correct and stays intact.
+ *
+ * `network` does not belong to it: it composes three engine calls --
+ * compile_with_provenance, antimony_to_sbml, simulate_sbml -- so there is
+ * no single function for DISPATCH to name. Python declares the same
+ * category as COMPOSED_DOMAINS, and the boundary contract test requires a
+ * composed domain to have a handler and to be reachable. Adding it to
+ * SimulationDomain instead would have forced either a fictional engine
+ * function or a weakened parity check.
+ */
+export type ComposedDomain = "network";
+
+/** Anything the runner will dispatch. */
+export type RunnableDomain = SimulationDomain | ComposedDomain;
+
+/** The composed domains, as values, so the narrowing below cannot drift. */
+export const COMPOSED_DOMAINS: readonly ComposedDomain[] = ["network"] as const;
+
+/**
+ * Narrow a RunnableDomain to a catalogue domain, or throw.
+ *
+ * Used where a value must be a catalogue domain for a reason beyond
+ * typing -- the `simulations` table's `domain` column is a Postgres enum
+ * of the sixteen, and `network` is not one of them.
+ *
+ * A checked narrowing rather than a cast, deliberately. `as
+ * SimulationDomain` would compile and then fail in the database, at
+ * insert time, with an error about an enum value rather than about the
+ * mistake. This fails where the mistake is.
+ */
+export function asSimulationDomain(domain: RunnableDomain): SimulationDomain {
+  if ((COMPOSED_DOMAINS as readonly string[]).includes(domain)) {
+    throw new Error(
+      `${domain} is a composed domain and has no place in the catalogue ` +
+        `domain set; it is not persistable to the simulations table, whose ` +
+        `domain column is an enum of the catalogue domains.`,
+    );
+  }
+  return domain as SimulationDomain;
+}
+
+/**
+ * A model the caller constructed, as sent to the engine.
+ *
+ * Typed as `unknown` deliberately rather than mirrored here: the authority
+ * on a network's shape is `reactionNetwork.ts`'s Zod schema on the way in
+ * and `Terium/core/network.py` at the engine boundary. A third structural
+ * definition in the transport layer would be a third thing to keep in step.
+ */
+export type NetworkPayload = Record<string, unknown>;
+
 export interface TeriumPoint {
   [species: string]: number;
 }
 
 export interface TeriumResult {
   ok: true;
-  domain: SimulationDomain;
+  domain: RunnableDomain;
   parameters: Record<string, number | string | boolean | null | number[]>;
   trajectory: TeriumPoint[];
   flagged: boolean;
   flagReason: string | null;
+  /**
+   * Present only for `network` runs.
+   *
+   * `conservationLaws` are DERIVED from the model's own stoichiometry --
+   * `["S + I + R"]` for an SIR-shaped network -- and `quantitySources`
+   * records what backs each number. Both are things a reader of a
+   * simulation is entitled to and cannot get from a catalogue domain.
+   */
+  conservationLaws?: string[];
+  quantitySources?: Record<
+    string,
+    { origin: string | null; citation: string | null; note: string | null }
+  >;
+  antimony?: string;
 }
 
 interface PythonError {
@@ -164,8 +234,11 @@ export function resolveRunnerTimeoutMs(
  * only transports the request and preserves the engine's stable result shape.
  */
 export async function runTerium(
-  domain: SimulationDomain,
-  parameters: Record<string, number | string | boolean | null | number[]>,
+  domain: RunnableDomain,
+  parameters: Record<
+    string,
+    number | string | boolean | null | number[] | NetworkPayload
+  >,
   signal?: AbortSignal,
 ): Promise<TeriumResult> {
   await ensureRunnerScript();

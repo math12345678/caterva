@@ -85,10 +85,29 @@ def _contract_violations(
             f"DISPATCH domains without a run_* handler: {sorted(unhandled_domains)}"
         )
 
-    stray_handlers = handlers - domains
+    # A handler nobody can reach is dead code, which is what this catches.
+    # COMPOSED_DOMAINS are reachable -- they are gated on _RUNNERS, not on
+    # DISPATCH -- but they have no single engine simulate_* for DISPATCH to
+    # name, so they are excluded here and required to be declared there.
+    composed = set(getattr(runner_module, "COMPOSED_DOMAINS", {}))
+    stray_handlers = handlers - domains - composed
     if stray_handlers:
         issues.append(
-            f"run_* handlers not reachable via DISPATCH: {sorted(stray_handlers)}"
+            f"run_* handlers reachable through neither DISPATCH nor "
+            f"COMPOSED_DOMAINS: {sorted(stray_handlers)}"
+        )
+
+    undeclared = composed - handlers
+    if undeclared:
+        issues.append(
+            f"COMPOSED_DOMAINS declared with no run_* handler: "
+            f"{sorted(undeclared)}"
+        )
+
+    overlap = composed & domains
+    if overlap:
+        issues.append(
+            f"domains in both DISPATCH and COMPOSED_DOMAINS: {sorted(overlap)}"
         )
 
     for domain in domains:
@@ -208,7 +227,11 @@ class TestBoundaryContract:
             runner, "DISPATCH", {k: v for k, v in runner.DISPATCH.items() if k != "pcr"}
         )
         violations = _contract_violations(runner)
-        assert any("not reachable via DISPATCH" in v and "pcr" in v for v in violations)
+        assert any(
+            "reachable through neither DISPATCH nor COMPOSED_DOMAINS" in v
+            and "pcr" in v
+            for v in violations
+        )
 
     def test_drifted_tables_report_a_build_defect_not_a_bad_request(self, monkeypatch):
         """main() must not present an internal drift as the student's mistake."""

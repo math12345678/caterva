@@ -20,12 +20,18 @@ import type { ModelGroundingReport } from "../lib/modelGrounding";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
-import { runTerium, type SimulationDomain } from "../lib/teriumRunner";
+import { asSimulationDomain, runTerium, type SimulationDomain } from "../lib/teriumRunner";
 import { SimulationParameterSchemas, CustomModelBody } from "../lib/schemas";
+import {
+  NetworkRequestSchema,
+  unsourcedQuantityIds,
+  type NetworkRequest,
+} from "../lib/reactionNetwork";
 import * as queue from "../lib/queue";
 import { findCachedEntryByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
 import {
+  PARAMETER_ORIGINS,
   RequiredParametersMissingError,
   UnrecognizedQueryError,
   STRENDA_GOVERNED_FIELDS,
@@ -286,6 +292,181 @@ router.post(
     }
   },
 );
+
+/**
+ * POST /api/simulate/network -- run a model the caller CONSTRUCTED.
+ *
+ * The open path. Every other simulate route asks Terrium to recognise a
+ * system from its catalogue of sixteen; this one accepts the system itself,
+ * as species, parameters, reactions and rate rules, and runs it.
+ *
+ * WHAT KEEPS IT HONEST
+ *
+ * Opening the model surface without opening the provenance surface would
+ * be the whole product given away. Three checks run engine-side, in
+ * `Terium/core/network.py` and `network_provenance.py`, so they hold no
+ * matter which caller arrives:
+ *
+ *   - every symbol in a rate law must resolve to a species or parameter of
+ *     the same network, with no statement syntax and only a fixed list of
+ *     mathematical functions;
+ *   - every quantity -- species initials included, not just rate constants
+ *     -- must carry a source, and a quantity with NO source is refused
+ *     rather than defaulted;
+ *   - `resolved` without a citation is refused.
+ *
+ * The Zod schema here checks shape only, and deliberately does not
+ * re-implement any of that: two enforcers of one rule in two languages
+ * drift into two rules, which is what the four duplicate domain lists in
+ * this codebase already demonstrate.
+ *
+ * The response carries the model's conservation laws, DERIVED from its own
+ * stoichiometry -- `["S + I + R"]` for an SIR-shaped network, nobody having
+ * told it that epidemics conserve people.
+ */
+router.post(
+  "/simulate/network",
+  simulateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parse = NetworkRequestSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: "BAD_REQUEST",
+          message: parse.error.errors
+            .map((e) => `${e.path.join(".") || "body"}: ${e.message}`)
+            .join("; "),
+        });
+        return;
+      }
+
+      const request = parse.data;
+
+      // Answered here rather than after paying for a subprocess. The
+      // ENGINE's refusal is the authoritative one and covers more (blocked
+      // origins, resolved-without-citation); this is the same question
+      // asked early, for the commonest mistake.
+      const missing = unsourcedQuantityIds(request.network, request.sources);
+      if (missing.length > 0) {
+        res.status(400).json({
+          error: "UNSOURCED_QUANTITIES",
+          message:
+            `This model has ${missing.length} quantit` +
+            `${missing.length === 1 ? "y" : "ies"} with no recorded source: ` +
+            `${missing.join(", ")}. Every species initial and every ` +
+            `parameter needs one -- resolve it from literature, or supply ` +
+            `it yourself and it will be recorded as yours.`,
+          unsourced: missing,
+        });
+        return;
+      }
+
+      const job = queue.createJob(`network model: ${request.network.name}`);
+
+      runNetworkPipeline(job.jobId, request).catch((err) => {
+        logger.error(
+          { err, jobId: job.jobId },
+          "Network pipeline threw unexpectedly",
+        );
+        queue.setJobError(job.jobId, {
+          error: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : "Unexpected pipeline failure",
+        });
+      });
+
+      res.status(202).json(job);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+async function runNetworkPipeline(
+  jobId: string,
+  request: NetworkRequest,
+): Promise<void> {
+  try {
+    queue.updateJob(jobId, { status: "running" });
+
+    const engineResult = await runTerium("network", {
+      network: request.network as unknown as Record<string, unknown>,
+      sources: request.sources as unknown as Record<string, unknown>,
+      start: request.start,
+      end: request.end,
+      points: request.points,
+    });
+
+    // Provenance is reported from the ENGINE's report, not from the request
+    // body. The request says what the caller claims; the engine's report is
+    // what actually passed the rule, and echoing the claim back would make
+    // the response agree with the caller by construction.
+    const parameterProvenance: Record<string, ParameterProvenance> = {};
+    for (const [quantity, source] of Object.entries(
+      engineResult.quantitySources ?? {},
+    )) {
+      // Not cast. `ParameterProvenance` has `origin` required and the rest
+      // optional, so the compiler checks this shape -- and the origin is
+      // narrowed by a guard rather than asserted, because the engine's
+      // report is JSON and a cast here would launder an unexpected string
+      // into a typed field.
+      const origin = source.origin ?? "user";
+      if (!PARAMETER_ORIGINS.includes(origin as ParameterProvenance["origin"])) {
+        throw new Error(
+          `engine reported origin "${origin}" for ${quantity}, which is not ` +
+            `a ParameterOrigin. The two enforcers have drifted.`,
+        );
+      }
+      parameterProvenance[quantity] = {
+        origin: origin as ParameterProvenance["origin"],
+        ...(source.citation ? { citation: source.citation } : {}),
+        ...(source.note ? { note: source.note } : {}),
+      };
+    }
+
+    const laws = engineResult.conservationLaws ?? [];
+    const result: queue.SimulationResponse = {
+      runId: jobId,
+      domain: engineResult.domain,
+      parameters: engineResult.parameters,
+      trajectory: engineResult.trajectory,
+      provenance: {
+        reasoning:
+          `Caller-constructed reaction network "${request.network.name}": ` +
+          `${request.network.species.length} species, ` +
+          `${request.network.reactions.length} reaction(s), ` +
+          `${request.network.rateRules.length} rate rule(s). Terrium did ` +
+          `not choose this model; it validated it, required a source for ` +
+          `every quantity, compiled it and ran it.`,
+        modelCitations: [],
+        flags: [
+          ...(laws.length > 0
+            ? [
+                `conservation_laws_derived: ${laws.join("; ")} -- computed ` +
+                  `from this model's stoichiometry, not asserted.`,
+              ]
+            : [
+                "no_conservation_law_derived: this model's rate rules may " +
+                  "change their species by any amount, so no stoichiometric " +
+                  "conservation can be claimed.",
+              ]),
+          ...(engineResult.flagged && engineResult.flagReason
+            ? [engineResult.flagReason]
+            : []),
+        ],
+      },
+      parameterProvenance,
+      completedAt: new Date().toISOString(),
+    };
+
+    queue.setJobResult(jobId, result);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Network simulation failed";
+    queue.setJobError(jobId, { error: "PIPELINE_ERROR", message });
+  }
+}
+
 
 router.post(
   "/simulate",
@@ -1222,7 +1403,9 @@ async function runCustomModelPipeline(
 
     const result: queue.SimulationResponse = {
       runId: jobId,
-      domain: engineResult.domain,
+      // This path only ever runs `sbml`; the narrowing is checked rather
+      // than cast so a future composed domain reaching here fails loudly.
+      domain: asSimulationDomain(engineResult.domain),
       parameters: engineResult.parameters,
       trajectory: engineResult.trajectory,
       provenance: {
@@ -1383,7 +1566,7 @@ async function runPipeline(
     if (db) {
       await db.insert(simulationsTable).values({
         query,
-        domain: engineResult.domain,
+        domain: asSimulationDomain(engineResult.domain),
         parameters: responseParameters,
         trajectory: engineResult.trajectory,
         provenance,
@@ -1398,7 +1581,8 @@ async function runPipeline(
 
     const result: queue.SimulationResponse = {
       runId: resolved.runId,
-      domain: engineResult.domain,
+      // The resolver path yields catalogue domains only. Checked, not cast.
+      domain: asSimulationDomain(engineResult.domain),
       parameters: responseParameters,
       trajectory: engineResult.trajectory,
       provenance,

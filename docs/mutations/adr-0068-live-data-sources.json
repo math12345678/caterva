@@ -23,7 +23,7 @@
       "id": "D1",
       "description": "the KEGG section is deleted from NOTICE",
       "_claimed": "2 failed",
-      "_note": "A source queried live is a source whose terms apply, whether or not anyone wrote them down. | Replacement text changed 2026-09-06: it previously read 'nothing to see here', a deflection-shaped phrase that tripped injection/trust-assertion in check_prompt_injection.py for no benefit -- a mutation's replacement is arbitrary, it only has to make the NOTICE line wrong. Re-run through scripts/mutate.py with the new text on the same day: baseline green (4 tests), D1 caught, NOTICE restored.",
+      "_note": "A source queried live is a source whose terms apply, whether or not anyone wrote them down. | Replacement text changed 2026-09-06: the previous text was a deflection-shaped stock phrase that tripped injection/trust-assertion in check_prompt_injection.py for no benefit (it is paraphrased rather than quoted here, because quoting it re-trips the same rule -- the recursion the STAGE_10_PART_13 exemptions record) -- a mutation's replacement is arbitrary, it only has to make the NOTICE line wrong. Re-run through scripts/mutate.py with the new text on the same day: baseline green (4 tests), D1 caught, NOTICE restored.",
       "file": "NOTICE",
       "find": "KEGG — queried live, and UNRESOLVED",
       "replace": "KEGG — see the project website"

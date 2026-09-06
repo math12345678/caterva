@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { SimulationDomain } from "./teriumRunner";
+import type { RunnableDomain } from "./teriumRunner";
 import type { ParameterProvenance } from "./provenance";
 import type { GroundedParameter } from "./modelGrounding";
 import { logger } from "./logger";
@@ -15,7 +15,15 @@ export type JobStatus =
 
 export interface SimulationResponse {
   runId: string;
-  domain: SimulationDomain;
+  /**
+   * `RunnableDomain`, not `SimulationDomain`: a run may be a composed
+   * domain (`network`) that has no single engine function and therefore no
+   * place in DISPATCH. Persisting one is still refused -- the simulations
+   * table's domain column is an enum of the catalogue domains, and
+   * `asSimulationDomain` narrows with a runtime check at the insert sites
+   * rather than a cast.
+   */
+  domain: RunnableDomain;
   parameters: Record<string, unknown>;
   trajectory: Record<string, unknown>[];
   provenance: {

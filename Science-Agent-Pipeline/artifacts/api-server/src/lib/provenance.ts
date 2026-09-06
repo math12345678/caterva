@@ -201,6 +201,21 @@ export class UnrecognizedQueryError extends Error {
 export type ParameterOrigin = "resolved" | "user" | "llm" | "default";
 
 /**
+ * The same four, as values.
+ *
+ * Needed wherever an origin arrives as data rather than as a typed literal
+ * -- notably the `network` path, where the engine reports provenance back
+ * as JSON. Narrowing that with `as ParameterOrigin` would launder any
+ * string into a typed field, so the runtime check needs a runtime list.
+ */
+export const PARAMETER_ORIGINS: readonly ParameterOrigin[] = [
+  "resolved",
+  "user",
+  "llm",
+  "default",
+] as const;
+
+/**
  * Stage 5 Part 3: the citation-status contract, as distinct from the value
  * contract. A citation that supports a resolved value is either:
  *  - `verified` — exact organism and substrate match from a primary source
