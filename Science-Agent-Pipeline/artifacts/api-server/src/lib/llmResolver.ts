@@ -266,6 +266,87 @@ function supportsJsonResponseFormat(url: string): boolean {
  * the deterministic regex/keyword resolver. This keeps the pipeline runnable
  * locally without requiring LLM credentials.
  */
+
+/**
+ * One request to the configured model, returning parsed JSON or null.
+ *
+ * Extracted 2026-09-06 so the network resolver can reach the same
+ * transport instead of carrying a second copy of it. Endpoint selection,
+ * the JSON response-format quirk, the abort timeout and the non-2xx
+ * handling are all decisions this file already made correctly; a parallel
+ * implementation next door would be one more pair of things to keep equal,
+ * which is the defect the four duplicate domain lists in this codebase
+ * already demonstrate.
+ *
+ * Returns null -- never throws -- for every failure mode: no API key, a
+ * non-2xx reply, an empty body, unparseable JSON. Callers treat null as
+ * "the model did not answer" and fall back.
+ */
+export async function requestJsonCompletion(
+  systemPrompt: string,
+  userContent: string,
+): Promise<unknown | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    return null;
+  }
+
+  const url = getApiUrl();
+  const requestBody: Record<string, unknown> = {
+    model: getModel(),
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ] satisfies OpenAIMessage[],
+    temperature: 0.2,
+  };
+  if (supportsJsonResponseFormat(url)) {
+    requestBody.response_format = { type: "json_object" };
+  }
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(
+    () => abortController.abort(),
+    LLM_REQUEST_TIMEOUT_MS,
+  );
+
+  try {
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(requestBody),
+        signal: abortController.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    if (!response.ok) {
+      logger.warn(
+        { status: response.status, body: await response.text() },
+        "model returned non-2xx response",
+      );
+      return null;
+    }
+
+    const data = (await response.json()) as OpenAIResponse;
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) {
+      logger.warn("model returned empty content");
+      return null;
+    }
+    return JSON.parse(content) as unknown;
+  } catch (err) {
+    logger.warn({ err }, "model request failed");
+    return null;
+  }
+}
+
 export async function resolveQueryWithLLM(
   query: string,
 ): Promise<LLMResolvedSimulation | null> {
