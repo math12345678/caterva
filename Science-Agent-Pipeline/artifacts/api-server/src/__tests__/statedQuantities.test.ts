@@ -301,12 +301,25 @@ describe("unit factors must not drift from src/units.ts", () => {
 });
 
 describe("the hard block stays hard except where measured otherwise", () => {
-  it("exempts only points, and still blocks every scientific parameter", async () => {
+  it("blocks measured constants and permits chosen ones", async () => {
     const { unverifiedOriginKeys } = await import("../lib/provenance");
-    // points is display resolution and provably does not move the result.
-    // Everything else here is chosen or measured and must still block --
-    // an exemption that widened would silently reintroduce the fabrication
-    // the block exists to prevent.
+    // WIDENED DELIBERATELY, 2026-09-06. This test previously required that
+    // ONLY `points` be exempt, warning that "an exemption that widened
+    // would silently reintroduce the fabrication the block exists to
+    // prevent". The warning is right about measurements and was applied to
+    // a list its own comment describes as "chosen OR measured" -- the two
+    // categories treated identically.
+    //
+    // The cost was measured: of twenty queries a lab would type, TWO ran.
+    // "michaelis menten for hexokinase" was refused because it could not
+    // resolve `s0` and `end` from literature -- a starting concentration
+    // and a plot window, for which no literature value exists or ever
+    // will. ADR 0044, quoted in provenance.ts, already says a pre-filled
+    // experimental condition is a UI convenience and a pre-filled
+    // measurement is a fabrication.
+    //
+    // So the split is by CATEGORY now, not by a single key. km and vmax
+    // still block, which is the fabrication this test exists to prevent.
     const blocked = unverifiedOriginKeys({
       points: { origin: "default" },
       s0: { origin: "default" },
@@ -316,10 +329,33 @@ describe("the hard block stays hard except where measured otherwise", () => {
       km: { origin: "default" },
       vmax: { origin: "llm" },
     });
-    expect(blocked).not.toContain("points");
-    expect(blocked.sort()).toEqual(
-      ["end", "i0", "km", "r0_recovered", "s0", "vmax"].sort(),
+    // Chosen: a documented default is allowed.
+    for (const chosen of ["points", "s0", "end", "i0", "r0_recovered"]) {
+      expect(blocked, `${chosen} is a choice, not a measurement`).not.toContain(
+        chosen,
+      );
+    }
+    // Measured: still blocked, and that is the product.
+    expect(blocked.sort()).toEqual(["km", "vmax"]);
+  });
+
+  it("still blocks the one experimental choice that would fabricate a measurement", async () => {
+    const { unverifiedOriginKeys } = await import("../lib/provenance");
+    // enzyme_conc IS a choice, and is deliberately not defaultable:
+    // Vmax = kcat x [E]0, so a defaulted [E]0 manufactures a Vmax and
+    // prints it beside a real literature kcat (ADR 0013). It is the
+    // exception that shows the rule is about consequences, not categories.
+    expect(unverifiedOriginKeys({ enzyme_conc: { origin: "default" } })).toEqual(
+      ["enzyme_conc"],
     );
+  });
+
+  it("still blocks a model-invented value for a key whose default is allowed", async () => {
+    const { unverifiedOriginKeys } = await import("../lib/provenance");
+    // A default is a documented value in this repository, the same for
+    // everyone and auditable. A number a model produced is not a default.
+    expect(unverifiedOriginKeys({ s0: { origin: "llm" } })).toEqual(["s0"]);
+    expect(unverifiedOriginKeys({ end: { origin: "llm" } })).toEqual(["end"]);
   });
 
   it("leaves a user-supplied points alone", async () => {

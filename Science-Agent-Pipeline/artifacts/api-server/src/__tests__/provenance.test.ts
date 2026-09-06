@@ -136,28 +136,41 @@ describe("parameter provenance", () => {
     }
   });
 
-  describe("Target A(unsatisfiable) — the hard rule blocks domains with no override path", () => {
-    // Documents, rather than works around, a real production consequence:
-    // these three domains have at least one parameter that PARAMETER_PATTERN
-    // can never populate from query text (a name mismatch for r0_recovered,
-    // an array for starting_frequencies), so under the new hard rule they
-    // can never return a result through resolveQuery() -- only throw.
-    for (const [domain, query, expectedMissing] of UNSATISFIABLE_DOMAIN_QUERIES) {
-      it(`${domain}: throws RequiredParametersMissingError naming the unreachable key(s)`, async () => {
-        await expect(resolveQuery(query)).rejects.toMatchObject({
-          name: "RequiredParametersMissingError",
-          domain,
-        });
-        try {
-          await resolveQuery(query);
-          expect.unreachable();
-        } catch (err) {
-          expect(err).toBeInstanceOf(RequiredParametersMissingError);
-          const missing = (err as RequiredParametersMissingError).missing;
-          for (const key of expectedMissing) {
-            expect(missing).toContain(key);
-          }
-        }
+  describe("Target A — the domain that used to be permanently unreachable", () => {
+    // THIS TEST RECORDED A DEFECT AND NOW RECORDS ITS FIX (2026-09-06).
+    //
+    // It used to assert that these domains can ONLY throw, and said so:
+    // "Documents, rather than works around, a real production consequence:
+    // these three domains have at least one parameter that
+    // PARAMETER_PATTERN can never populate from query text ... so under the
+    // new hard rule they can never return a result through resolveQuery()
+    // -- only throw."
+    //
+    // The unreachable key was `starting_frequencies` -- an array of allele
+    // frequencies to start a drift simulation from. A scenario choice, not
+    // a measurement, and one no amount of literature searching could ever
+    // supply. The hard rule blocked it anyway, so a whole domain was
+    // permanently unusable and a test was written to record that rather
+    // than to fix it.
+    //
+    // Scenario choices may now carry a documented default, so the domain
+    // resolves. The assertion is inverted, and the measured constants it
+    // still needs (recombination_rate, mutation_rate, supplied inline
+    // above) are unaffected.
+    for (const [domain, query] of UNSATISFIABLE_DOMAIN_QUERIES) {
+      it(`${domain}: now resolves, and labels the defaulted choice as a default`, async () => {
+        const resolved = await resolveQuery(query);
+        expect(resolved.domain).toBe(domain);
+
+        // The value ran, and the caller is told Terrium chose it. A
+        // default that ran SILENTLY would be the fabrication the hard rule
+        // exists to prevent.
+        const provenance = resolved.parameterProvenance["starting_frequencies"];
+        expect(
+          provenance,
+          "starting_frequencies has no provenance entry at all",
+        ).toBeDefined();
+        expect(provenance!.origin).toBe("default");
       });
     }
   });
@@ -774,11 +787,15 @@ describe("Target H — the verified/flagged citation-status contract (Stage 5 Pa
 });
 
 describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5)", () => {
-  it("mm defaults beyond km are blocked by the hard rule", async () => {
-    // Under the hard rule (no origin:"default" may reach the engine), a
-    // query that overrides km but not vmax/s0 cannot be observed as a
-    // result: vmax and s0 would default, so resolveQuery() throws before
-    // any result exists. This pins the hard rule itself.
+  it("mm's measured defaults are blocked; its chosen ones are not", async () => {
+    // NARROWED 2026-09-06. This used to require that BOTH vmax and s0 be
+    // named as missing. `s0` is the substrate concentration you chose to
+    // run your assay at -- a scenario choice with no literature value --
+    // and blocking it refused "michaelis menten for hexokinase" outright.
+    //
+    // `vmax` still blocks, and for a sharper reason than the old rule gave:
+    // Vmax = kcat x [E]0, so it is not a property of the enzyme at all
+    // (ADR 0013). That is the hard rule doing the work it exists for.
     await expect(
       resolveQuery("simulate enzyme kinetics km=2 end=10 points=51"),
     ).rejects.toMatchObject({
@@ -792,7 +809,10 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
       expect(err).toBeInstanceOf(RequiredParametersMissingError);
       const missing = (err as RequiredParametersMissingError).missing;
       expect(missing).toContain("vmax");
-      expect(missing).toContain("s0");
+      // s0 is deliberately absent from this list now: it is the substrate
+      // concentration YOU chose, and refusing over it is what made
+      // "michaelis menten for hexokinase" unanswerable.
+      expect(missing).not.toContain("s0");
     }
   });
 
@@ -1004,24 +1024,25 @@ describe("array-valued query-string overrides", () => {
   });
 
   // Verification target 4: No starting_frequencies override -> RequiredParametersMissingError
-  it("throws RequiredParametersMissingError naming starting_frequencies when absent", async () => {
-    await expect(
-      resolveQuery(
-        "two locus linkage disequilibrium population_size=100 generations=20 " +
-          "recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
-      ),
-    ).rejects.toThrow();
-    try {
-      await resolveQuery(
-        "two locus linkage disequilibrium population_size=100 generations=20 " +
-          "recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
-      );
-      expect.unreachable();
-    } catch (err: unknown) {
-      // The error should name starting_frequencies among the missing keys
-      expect(err).toBeInstanceOf(Error);
-      expect((err as Error).message).toContain("starting_frequencies");
-    }
+  it("resolves with a defaulted starting_frequencies, and labels it", async () => {
+    // INVERTED 2026-09-06, same reason as Target A above. This required a
+    // refusal when `starting_frequencies` was absent -- and because that
+    // key is an ARRAY, no query string could ever supply it through
+    // PARAMETER_PATTERN, so the domain was permanently unreachable and
+    // this test pinned it that way.
+    //
+    // Allele frequencies to start a drift simulation from are a scenario
+    // choice, not a measurement. The measured constants in this same query
+    // (recombination_rate, mutation_rate) are supplied inline and are
+    // still required.
+    const resolved = await resolveQuery(
+      "two locus linkage disequilibrium population_size=100 generations=20 " +
+        "recombination_rate=0.1 mutation_rate=0 replicate_runs=50",
+    );
+    expect(resolved.domain).toBe("two_locus_wright_fisher");
+    const provenance = resolved.parameterProvenance["starting_frequencies"];
+    expect(provenance).toBeDefined();
+    expect(provenance!.origin).toBe("default");
   });
 
   // Verification target 5: existing mm scalar override still works (regression)

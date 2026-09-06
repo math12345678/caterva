@@ -996,6 +996,111 @@ export function isAllDefaults(
 const NON_SCIENTIFIC_KEYS = new Set(["points"]);
 
 /**
+ * Scenario choices that MAY carry a documented default.
+ *
+ * WHY THIS EXISTS, MEASURED
+ * -------------------------
+ * Twenty queries a lab would actually type were run end to end on
+ * 2026-09-06. **Two worked.** Eighteen were refused, and almost none of the
+ * refusals was about a measurement:
+ *
+ *     michaelis menten for hexokinase  ->  s0, end could not be resolved
+ *     lotka volterra predator prey     ->  end was not supplied
+ *     repressilator oscillations       ->  end was not supplied
+ *     monte carlo estimate of pi       ->  n_samples was not supplied
+ *
+ * `end` is how long to integrate. `points` is how many rows to return.
+ * `n_samples` is a compute budget. There is no literature value for any of
+ * them and there never will be, so demanding one refuses the query forever.
+ *
+ * A tool that cannot answer "michaelis menten for hexokinase" is not
+ * strict, it is broken.
+ *
+ * THE CONTRADICTION THIS RESOLVES
+ * -------------------------------
+ * The comment above NON_SCIENTIFIC_KEYS said s0 and end "stay blocked ...
+ * demanding them is the product working as intended". Eight lines earlier
+ * the same file cites ADR 0044 saying the opposite: "a pre-filled
+ * experimental condition is a UI convenience for something the student
+ * chooses; a pre-filled measurement is a fabrication", and records that
+ * pre-filling `s0` is CORRECTLY NOT FLAGGED.
+ *
+ * ADR 0044 is right. The hard rule exists to stop Terrium inventing
+ * MEASUREMENTS OF NATURE. A simulation window is not a measurement of
+ * nature, and refusing to choose one protects nobody.
+ *
+ * WHAT IS NOT ON THIS LIST, AND WHY
+ * ---------------------------------
+ * Every measured constant -- km, vmax, kcat, ki, beta, gamma,
+ * mutation_rate -- is absent and stays hard-blocked. That is the product.
+ *
+ * `enzyme_conc` is deliberately absent even though it IS an experimental
+ * choice, because ADR 0013 makes it load-bearing: Vmax = kcat x [E]0, so a
+ * defaulted [E]0 silently manufactures a Vmax and reports it beside a
+ * literature kcat. It is the one experimental choice whose default would
+ * fabricate a measurement.
+ *
+ * `temperature` is present only because the sole domain that takes it as a
+ * SIMULATION parameter is molecular dynamics, where it is a thermostat
+ * setting in reduced units. Assay temperature -- the STRENDA one, which is
+ * a scientific fact about a measurement -- lives in `assayConditions` and
+ * is untouched by this.
+ *
+ * Enumerated explicitly rather than derived from EXPERIMENTAL_CHOICE_KEYS
+ * minus exclusions, so that adding a key here is a deliberate act someone
+ * has to justify, not a side effect of editing a different list.
+ */
+export const SCENARIO_DEFAULTABLE_KEYS = new Set([
+  // Time and sampling window: pure numerics, no literature value exists.
+  "start",
+  "end",
+  "points",
+  "n_steps",
+  "timestep",
+  // Initial conditions: what you put in the tube, or the population you
+  // are modelling. A choice, and ADR 0044 already says pre-filling one is
+  // not a fabrication.
+  "s0",
+  "i0",
+  "e0",
+  "r0_recovered",
+  "n0",
+  "a0",
+  "b0",
+  "p0",
+  "v0",
+  "starting_frequency",
+  "starting_frequencies",
+  // Experiment size and compute budget.
+  "cycles",
+  "generations",
+  "population_size",
+  "n_particles",
+  "density",
+  "temperature",
+  "n_samples",
+  "n_replicates",
+  "replicate_runs",
+  "seed",
+]);
+
+/**
+ * A default is only acceptable when Terrium CHOSE it and can show it.
+ *
+ * `default` origin means a documented value in this repository, auditable
+ * and identical for every user. `llm` origin means a number a model
+ * produced, which is not a default -- it is an invention wearing one's
+ * clothes, and it stays blocked for scenario keys exactly as it is for
+ * measurements.
+ */
+export function scenarioDefaultAllowed(
+  key: string,
+  origin: ParameterOrigin,
+): boolean {
+  return origin === "default" && SCENARIO_DEFAULTABLE_KEYS.has(key);
+}
+
+/**
  * Parameters a researcher CHOOSES, as opposed to ones they measure.
  *
  * This exists so a refusal can show a concrete example. "Add end=<value>"
@@ -1078,7 +1183,12 @@ export function unverifiedOriginKeys(
     .filter(
       ([key, p]) =>
         (p.origin === "default" || p.origin === "llm") &&
-        !NON_SCIENTIFIC_KEYS.has(key),
+        !NON_SCIENTIFIC_KEYS.has(key) &&
+        // A documented default for a scenario choice is not a fabricated
+        // measurement. See SCENARIO_DEFAULTABLE_KEYS for the measurement
+        // this change came from and for what stays blocked -- every
+        // measured constant, and enzyme_conc.
+        !scenarioDefaultAllowed(key, p.origin),
     )
     .map(([key]) => key);
 }

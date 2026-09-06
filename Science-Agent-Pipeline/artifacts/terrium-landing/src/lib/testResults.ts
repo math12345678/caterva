@@ -121,10 +121,10 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "74 test files -- query resolution, parameter provenance, " +
+          "75 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, rate limiting, SSE job routes",
-        // Measured 2026-09-06: `74 passed (74) / 798 passed (798)`, run
+        // Measured 2026-09-06: `75 passed (75) / 823 passed (823)`, run
         // alone with the repo's .venv/bin first on PATH.
         //
         // That PATH is not a thumb on the scale, it is the documented
@@ -142,7 +142,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 798,
+        passed: 823,
         skipped: 0,
         failed: 0,
       },
