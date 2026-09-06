@@ -84,12 +84,12 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "52 test files -- kinetics & Michaelis-Menten correctness, " +
+          "54 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, and citation/build guards",
-        // Measured 2026-09-05, Terium/ run alone under .venv.
-        passed: 1246,
+        // Measured 2026-09-06, Terium/ run alone under .venv.
+        passed: 1295,
         skipped: 0,
         failed: 0,
       },
