@@ -20,19 +20,51 @@ import { describe, expect, it } from "vitest";
 
 import { resolveQuery } from "../lib/queryResolver";
 import {
+  RequiredParametersMissingError,
   DOMAINS_WITH_LITERATURE_RESOLUTION,
   RESOLVABLE_FIELDS,
   EPIDEMIOLOGY_BRIDGE_DOMAINS,
 } from "../lib/provenance";
 
 describe("a domain with no resolver says so, instead of blaming the literature", () => {
-  it("does not claim the literature was searched for the repressilator", async () => {
+  it("the repressilator now runs, because every quantity it needed was a choice", async () => {
+    // CHANGED 2026-09-06. This used to assert a REFUSAL, and its own
+    // comment below noted that "`end` is a choice, not a measurement".
+    // Every parameter the repressilator needs is a choice -- start, end,
+    // points, in dimensionless time -- so refusing over them made an
+    // oscillator with no measured constants permanently unrunnable.
+    //
+    // The message-quality property this test existed for is preserved in
+    // the test below, exercised against the error type directly rather
+    // than through a query that should now succeed.
+    const resolved = await resolveQuery("simulate the repressilator");
+    expect(resolved.domain).toBe("repressilator");
+    for (const [key, p] of Object.entries(resolved.parameterProvenance)) {
+      // Nothing here may claim to have come from literature: this domain
+      // resolves nothing, which was the original point.
+      expect(p.origin, key).not.toBe("resolved");
+    }
+  }, 60000);
+
+  it("a no-resolver domain never claims the literature was searched", async () => {
     // Nothing in this domain resolves. Elowitz & Leibler's model is cited
     // for the MODEL; its parameters are not looked up anywhere.
-    const err = await resolveQuery("simulate the repressilator").catch(
-      (e: Error) => e,
+    //
+    // Built directly rather than provoked through a query: the
+    // repressilator no longer refuses (see above), and a message-quality
+    // property should not depend on a query continuing to fail.
+    // Empty `details` on purpose: a key with no per-key explanation is
+    // "unexplained" and takes the generic sentence, which is the branch
+    // under test. Passing a detail entry routes it to the per-key list and
+    // the sentence never executes -- which is how a first attempt at this
+    // test asserted against a message it had not produced.
+    const err: Error = new RequiredParametersMissingError(
+      "repressilator",
+      ["end"],
+      {},   // details: empty, so `end` takes the generic sentence
+      {},   // resolvedSoFar
+      { end: 200 },  // examples: gives the hint a real number to show
     );
-    expect(err).toBeInstanceOf(Error);
     expect((err as Error).message).not.toMatch(/could not be resolved from literature/);
     expect((err as Error).message).toMatch(/no literature lookup/i);
     expect((err as Error).message).toMatch(/never searched for/i);

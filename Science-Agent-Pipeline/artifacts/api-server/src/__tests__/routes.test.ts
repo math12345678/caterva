@@ -432,9 +432,15 @@ describe("POST /api/resolve", () => {
       .send({ query: "simulate lactate dehydrogenase with pyruvate km=10.73" });
     expect(res.status).toBe(422);
     expect(res.body.domain).toBe("mm");
-    expect(res.body.missingKeys).toEqual(
-      expect.arrayContaining(["vmax", "s0", "end"]),
-    );
+    expect(res.body.missingKeys).toEqual(expect.arrayContaining([
+        // NARROWED 2026-09-06 from ["vmax", "s0", "end"]. s0 is the
+        // substrate concentration you chose and end is the plot window;
+        // neither has a literature value, and refusing over them made the
+        // commonest enzyme query unanswerable. vmax stays because
+        // Vmax = kcat x [E]0 -- it is not a property of the enzyme alone
+        // (ADR 0013), which is the hard rule doing real work.
+        "vmax",
+      ]));
     // `points` used to be listed here and deliberately is not any more. It
     // is output-sample count -- display resolution taken from a trajectory
     // the integrator computes independently -- and it is now exempt from
