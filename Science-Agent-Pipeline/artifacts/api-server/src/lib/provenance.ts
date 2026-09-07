@@ -198,7 +198,34 @@ export class UnrecognizedQueryError extends Error {
  * It is deliberately NOT `resolved`: nothing was looked up, so it must never
  * be able to carry a citation. `validateParameterProvenance` enforces that.
  */
-export type ParameterOrigin = "resolved" | "user" | "llm" | "default";
+export type ParameterOrigin =
+  | "resolved"
+  | "user"
+  | "llm"
+  | "default"
+  /**
+   * A number Terrium supplied for a quantity that describes the USER'S
+   * setup, not the system's behaviour -- an enzyme concentration, a PCR
+   * efficiency. Distinct from `default`, which is a fabricated measurement
+   * and stays blocked, and from `user`, which claims they said it.
+   *
+   * It is allowed through `unverifiedOriginKeys` and it can never carry a
+   * citation. Every one of them raises a flag naming the key and saying the
+   * value is yours to replace; `resolveGaps` emits that flag as part of
+   * producing the value, so a placeholder cannot reach a response silently.
+   */
+  | "placeholder"
+  /**
+   * A value the requested model FIXES. Neutral genetic drift is
+   * selection_coefficient = 0 -- not a guess Terrium made, but what the
+   * words the user typed mean.
+   *
+   * Deliberately not `user` (they did not say it), not `placeholder` (there
+   * is nothing to replace; a different value would be a different model),
+   * and not `resolved` (nothing was looked up). It carries the definition
+   * it follows from as its note.
+   */
+  | "definitional";
 
 /**
  * The same four, as values.
@@ -213,6 +240,8 @@ export const PARAMETER_ORIGINS: readonly ParameterOrigin[] = [
   "user",
   "llm",
   "default",
+  "placeholder",
+  "definitional",
 ] as const;
 
 /**
@@ -1191,4 +1220,315 @@ export function unverifiedOriginKeys(
         !scenarioDefaultAllowed(key, p.origin),
     )
     .map(([key]) => key);
+}
+
+// ---------------------------------------------------------------------------
+// What to do about a quantity nobody resolved
+// ---------------------------------------------------------------------------
+//
+// MEASURED: on twenty realistic queries the front door answered three. Of the
+// seventeen refusals, fourteen were `RequiredParametersMissingError` -- the
+// domain matched, most parameters resolved, and the whole result was discarded
+// over one gap. "michaelis menten kinetics for hexokinase" resolved km=6, s0,
+// end and points, then threw because `vmax` was missing.
+//
+// Those gaps are not one thing, and treating them as one is the defect:
+//
+//   definitional   the model the user asked for FIXES this value. "Genetic
+//                  drift in a small population" is the neutral Wright-Fisher
+//                  model, and neutral means selection_coefficient = 0. That
+//                  is not a guess to be labelled; it is what the words mean.
+//                  Refusing to simulate neutral drift because we decline to
+//                  assume neutrality is not caution, it is a bug.
+//
+//   your_choice    the quantity describes YOUR setup, not the system's
+//                  behaviour -- an enzyme concentration, a PCR efficiency, a
+//                  simulation window. No literature value exists to find.
+//                  Terrium supplies one, labels it `placeholder`, and says
+//                  plainly that the number is yours to replace.
+//
+//   literature_gap a real measurement that a real search failed to find.
+//                  Measles beta and gamma: the R0 registry holds COVID-19 and
+//                  two influenzas, and measles is genuinely absent. This is
+//                  the only kind that still refuses, and its existing message
+//                  is good -- it names the registry and the reason.
+//
+// The classification is per-quantity and reasoned, not per-domain. There is no
+// branch here for `mm` or `sir`.
+
+/** What Terrium should do about one unresolved quantity. */
+export type GapKind = "definitional" | "your_choice" | "literature_gap";
+
+export interface GapVerdict {
+  kind: GapKind;
+  /** Supplied for `definitional` and `your_choice`; absent for a gap. */
+  value?: number | number[];
+  /** Why this classification. Shown to the user, not only logged. */
+  reason: string;
+}
+
+/**
+ * Quantities whose value the requested model fixes by definition.
+ *
+ * Each entry is a claim about what a phrase MEANS, and each carries the
+ * words that must be absent for the claim to hold -- "genetic drift" is the
+ * neutral model only while the query is not also asking about selection.
+ *
+ * This is deliberately tiny. A definitional zero is a strong statement and
+ * every entry needs an argument someone could dispute; a long list here
+ * would be assumptions wearing a definition's clothes.
+ */
+const DEFINITIONAL: {
+  domain: string;
+  key: string;
+  value: number;
+  /** The claim holds only if NONE of these appear in the query. */
+  contradictedBy: string[];
+  reason: string;
+}[] = [
+  {
+    domain: "wright_fisher",
+    key: "selection_coefficient",
+    value: 0,
+    contradictedBy: ["selection", "selective", "advantage", "fitness",
+                     "beneficial", "deleterious", "adaptive"],
+    reason:
+      "s = 0 because the neutral Wright-Fisher model IS drift without " +
+      "selection. This is what the query asked for, not an assumption " +
+      "Terrium added; a non-zero s would be the unrequested change.",
+  },
+  // NOT `mutation_rate`. It was here, and it was wrong.
+  //
+  // `RESOLVABLE_FIELDS.wright_fisher` is `["mutation_rate"]` -- Terrium
+  // SEARCHES for mutation rates. Declaring one definitionally zero
+  // short-circuits a lookup that can succeed, and `noResolverDomains.test.ts`
+  // caught it by asserting that this domain still says the literature was
+  // genuinely searched.
+  //
+  // The rule that survives: a definitional value is legitimate only for a
+  // quantity Terrium has NO literature path for. Where a path exists, use it
+  // or refuse; a definition must never be a shortcut past a search that
+  // would have worked. `selection_coefficient` qualifies because nothing
+  // resolves it.
+];
+
+/**
+ * Quantities that describe the experiment rather than the system, beyond
+ * the scenario keys `SCENARIO_DEFAULTABLE_KEYS` already covers.
+ *
+ * Each needs its own sentence, because "no literature value exists for
+ * this" has to be true of each one individually. It is true of an enzyme
+ * concentration -- that is what is in your tube. It is NOT true of a Km,
+ * which is why no measured constant appears here.
+ */
+/**
+ * Quantities that describe the experiment rather than the system.
+ *
+ * EMPTY, AND THE EMPTINESS IS THE FINDING.
+ *
+ * This map held `enzyme_conc`, `vmax`, `efficiency` and `k`. Filling them
+ * with labelled placeholders took the twenty-query harness from 3 answered
+ * to 8, and broke twenty-one tests -- including six in
+ * `vmaxFromKcatProvenance.test.ts` whose names are the argument:
+ *
+ *     with no enzyme_conc override, the bridge never fires and vmax stays blocked
+ *     a rejected enzyme_conc (validation ok=false) does not fabricate a vmax
+ *     half a conversion (kcat alone or enzyme_conc alone) is still blocked
+ *
+ * Those tests exist to stop exactly this. ADR 0013 and ADR 0019 hold that a
+ * Vmax without an enzyme concentration must be blocked, and `enzyme_conc` is
+ * deliberately excluded from `SCENARIO_DEFAULTABLE_KEYS` for that reason: a
+ * scenario default sets the WINDOW you look through, while a fabricated Vmax
+ * scales every number on the axis.
+ *
+ * `efficiency` and `k` were removed with them, for consistency rather than
+ * because a test caught them. The rule that survives is simpler than the
+ * list it replaced: **supply nothing that changes the numeric answer.**
+ * A definitional value is not an exception -- s = 0 does not change the
+ * answer, it names which model was asked for.
+ *
+ * The refusal these keys fall back to is not a dead end. `mm`'s message
+ * tells the reader that kcat is resolved and cited, that [E]0 is theirs, and
+ * exactly what to type. That is a better product than a curve whose height
+ * means nothing.
+ */
+const YOUR_CHOICE: Record<string, string> = {};
+
+/**
+ * Classify one unresolved quantity.
+ *
+ * `detail` is the resolver's own explanation when it has one. Its presence
+ * is meaningful: a key with a detail was SEARCHED FOR and the search is
+ * being explained, which is what separates a literature gap from a
+ * quantity nobody ever looks up.
+ */
+export function classifyGap(
+  domain: string,
+  key: string,
+  query: string,
+  detail: string | undefined,
+  example: number | number[] | undefined,
+): GapVerdict {
+  const asked = query.toLowerCase();
+
+  const definitional = DEFINITIONAL.find(
+    (d) =>
+      d.domain === domain &&
+      d.key === key &&
+      !d.contradictedBy.some((word) => asked.includes(word)),
+  );
+  if (definitional) {
+    return {
+      kind: "definitional",
+      value: definitional.value,
+      reason: definitional.reason,
+    };
+  }
+
+  // A measured constant that a real search failed to find. `enzyme_conc`
+  // and `vmax` carry details too (ADR 0013's explanation), so they are
+  // checked first -- the detail there explains a POLICY, not a failed
+  // lookup, and the distinction is the whole point of this branch.
+  const choice = YOUR_CHOICE[key];
+  if (choice !== undefined) {
+    const value =
+      example !== undefined ? example : DEFAULT_PLACEHOLDERS[key];
+    if (value === undefined) {
+      return {
+        kind: "literature_gap",
+        reason:
+          detail ??
+          `${key} is your experimental choice and Terrium has no ` +
+            `illustrative value for it.`,
+      };
+    }
+    return { kind: "your_choice", value, reason: choice };
+  }
+
+  if (SCENARIO_DEFAULTABLE_KEYS.has(key) && example !== undefined) {
+    return {
+      kind: "your_choice",
+      value: example,
+      reason: `${key} is a scenario choice, not a measurement.`,
+    };
+  }
+
+  // NOT a branch here: "the domain has no literature lookup, so the value
+  // is yours".
+  //
+  // It was, briefly. It took the twenty-query harness from 8 answered to 17
+  // -- and gave "SEIR model of measles" a beta of 0.3 labelled "Terrium
+  // performs no literature lookup for beta in this domain, so nothing was
+  // searched and nothing failed."
+  //
+  // Every clause of that sentence is false. There IS an R0 registry; it is
+  // bridged to `sir` and not `seir`. And measles is not an unwired gap at
+  // all: it is unregistered because Guerra et al. (2017), Lancet Infect Dis
+  // 17(12):e420-e428, found R0 estimates vary far more than the cited 12-18
+  // range and endorse no single value -- so no honest default exists. See
+  // `applyBetaGammaFromR0Resolution`, which argues this at length.
+  //
+  // A domain-shaped test cannot see that. A quantity is a free choice
+  // because of what the QUANTITY is, not because of which table happens to
+  // hold a lookup for it today, and `YOUR_CHOICE` above is that judgement
+  // made one key at a time with a sentence attached to each. Anything not
+  // in it falls through to a gap, which is the safe direction.
+
+  return {
+    kind: "literature_gap",
+    reason:
+      detail ??
+      `${key} could not be resolved and Terrium will not supply one: it ` +
+        `describes the system's behaviour, not your setup, so any value ` +
+        `here would be invented.`,
+  };
+}
+
+/**
+ * Illustrative values for choices the domain table had none for.
+ *
+ * Every one is a round number chosen to be OBVIOUSLY a placeholder rather
+ * than a plausible measurement. `enzyme_conc` is 1e-3 mM (1 uM) -- a
+ * commonplace assay concentration, and the curve's height scales linearly
+ * with it, which the reason string says.
+ */
+/** Nothing is filled from here any more; see YOUR_CHOICE. */
+const DEFAULT_PLACEHOLDERS: Record<string, number> = {};
+
+
+/** What `resolveGaps` concluded about every unresolved quantity. */
+export interface GapResolution {
+  /** Values to merge into `parameters`. */
+  filled: Record<string, number | number[]>;
+  /** Provenance for each filled key. */
+  provenance: Record<string, ParameterProvenance>;
+  /** Keys that still have no value. Non-empty means still refuse. */
+  stillMissing: string[];
+  /**
+   * One flag per filled key. Emitted HERE, beside the value, rather than by
+   * the caller: a placeholder whose flag depends on a caller remembering to
+   * add it is a placeholder that will eventually ship unlabelled.
+   */
+  flags: string[];
+}
+
+/**
+ * Decide what to do about every gap, and fill the ones that can be filled.
+ *
+ * Returns `stillMissing` rather than throwing, so the caller keeps the
+ * choice of what a refusal looks like. It refuses on `literature_gap` alone
+ * -- a real measurement a real search did not find.
+ */
+export function resolveGaps(
+  domain: string,
+  query: string,
+  missing: string[],
+  details: Record<string, string>,
+  /**
+   * Illustrative values, from the CURATED DOMAIN TABLE only.
+   *
+   * Never from the merged parameter set. That set has LLM output in it by
+   * this point, and passing it here re-blessed a model-invented number as
+   * an acceptable scenario choice -- laundering the exact origin
+   * `unverifiedOriginKeys` blocks. Caught by
+   * `statedQuantitiesLlmPath.test.ts`, whose whole point is that a number
+   * the user never stated stays `llm` and stays blocked.
+   */
+  examples: Record<string, number | number[]>,
+  /** Current provenance, so an `llm` key can be refused outright. */
+  existing: Record<string, ParameterProvenance> = {},
+): GapResolution {
+  const filled: Record<string, number | number[]> = {};
+  const provenance: Record<string, ParameterProvenance> = {};
+  const stillMissing: string[] = [];
+  const flags: string[] = [];
+
+  for (const key of missing) {
+    // A key the model proposed a number for is never filled, whatever kind
+    // of gap it would otherwise be. Belt and braces with the `examples`
+    // restriction above: that stops the VALUE coming from the LLM, this
+    // stops the key being treated as fillable at all.
+    if (existing[key]?.origin === "llm") {
+      stillMissing.push(key);
+      continue;
+    }
+    const verdict = classifyGap(domain, key, query, details[key], examples[key]);
+    if (verdict.kind === "literature_gap" || verdict.value === undefined) {
+      stillMissing.push(key);
+      continue;
+    }
+    filled[key] = verdict.value;
+    if (verdict.kind === "definitional") {
+      provenance[key] = { origin: "definitional", note: verdict.reason };
+      flags.push(`definitional: ${key} = ${String(verdict.value)}. ${verdict.reason}`);
+    } else {
+      provenance[key] = { origin: "placeholder", note: verdict.reason };
+      flags.push(
+        `placeholder: ${key} = ${String(verdict.value)} is NOT a measurement. ` +
+          verdict.reason,
+      );
+    }
+  }
+
+  return { filled, provenance, stillMissing, flags };
 }
