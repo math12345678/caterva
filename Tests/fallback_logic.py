@@ -220,10 +220,15 @@ class KineticResult(BaseModel):
     #:
     #: The rows carry `assay_ph`, `assay_temperature_c`, `assay_unreported`
     #: and `organism`, which is exactly what `score_reliability` reads. They
-    #: exist only inside the selection function; by the time a caller holds
-    #: a KineticResult they have been collapsed to one value and a list of
-    #: TiedCandidates with no assay fields. Rebuilding them downstream would
-    #: mean resolving the same query twice.
+    #: exist only inside the selection function; rebuilding them downstream
+    #: would mean resolving the same query twice.
+    #:
+    #: The candidate DICTS below keep the winner's whole pool, so a caller
+    #: that holds a KineticResult has everything needed to re-select among
+    #: the rows by assay condition (the agent architecture's `assay_window`
+    #: constraint) without re-parsing BRENDA. Each dict therefore carries
+    #: `ph` and `temperature_c` as well as the raw `conditions` string,
+    #: both taken from the same parsed entry that graded the row.
     #:
     #: Empty when nothing was resolved. An empty list is "no ensemble to
     #: draw", which the caller must report as a resolution failure rather
@@ -733,6 +738,15 @@ def _score_frontier(
             "organism": measured,
             "reference_id": getattr(entry, "reference_id", None),
             "conditions": getattr(entry, "conditions", None),
+            # The row's assay conditions, as PARSED by the existing
+            # condition parser (`_parse_ph` / `_parse_temperature` /
+            # `AssayConditions`) when the entry was built -- the same values
+            # `score_reliability` grades with, one field above. Carried so a
+            # caller can re-select among these rows against a reference
+            # window without re-parsing BRENDA, which would be a second
+            # implementation of one parse.
+            "ph": getattr(entry, "assay_ph", None),
+            "temperature_c": getattr(entry, "assay_temperature_c", None),
             "grades": {
                 "assay_completeness": score.assay_completeness.grade,
                 "condition_proximity": score.condition_proximity.grade,

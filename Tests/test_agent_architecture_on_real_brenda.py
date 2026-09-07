@@ -175,3 +175,52 @@ class TestOnRealMarkup:
             assert resolution.source is not None, quantity
             assert resolution.source.citation, f"{quantity} has no citation"
             assert "brenda-enzymes.org" in resolution.source.citation
+
+    def test_a_real_ph_gap_is_fixed_by_re_selecting_a_real_row(self) -> None:
+        """Not a constructed example, and not a corrected number.
+
+        The lactate Km and the (all-substrate) kcat come from the same
+        committed BRENDA pages, at pH 8.0 and pH 6.0. Km's table has no
+        row at pH 6, so it cannot move and is the reference; kcat's table
+        has a row at pH 8.0 (the 32.0 1/s measurement), so the critic can
+        demand exactly that. The run re-selects it over the resolver's
+        default minimum (21.1) and converges. 32.0 was already in the
+        table; nothing was interpolated, averaged or corrected.
+        """
+        kcat_request = ParameterRequest(
+            quantity="kcat", subject="L-lactate dehydrogenase",
+            substrate="", ec_number=LDH, table="kcat",
+        )
+        search = search_model(
+            network=NETWORK,
+            requests=[REQUESTS[0], kcat_request],
+            resolve=resolve,
+        )
+        first = search.first_pass
+
+        assert first.run.converged
+        assert first.run.round_count == 2
+        window = first.run.constraints.of_kind("assay_window")
+        assert len(window) == 1
+        assert window[0].subject == "kcat"
+        assert window[0].requirement == "pH 8"
+
+        km = first.resolutions["Km"].source
+        assert km.value == 10.73
+        assert km.ph == 8.0
+        # Km is the immovable reference and must not be reported as moved.
+        kcat = first.resolutions["kcat"].source
+        assert kcat.value == 32.0
+        assert kcat.ph == 8.0
+        assert kcat.temperature_c == 25.0
+
+        # The value that was replaced is named, and is the resolver's
+        # default minimum rather than a number nobody saw.
+        rejected = first.rejected_values()
+        assert len(rejected) == 1
+        assert "kcat" in rejected[0]
+        assert "21.1" in rejected[0] and "32" in rejected[0]
+
+        compatibility = first.compatibility
+        assert not any(f.kind == "ph_mismatch" for f in compatibility.findings)
+        assert "assay_window [kcat] must be pH 8" in first.summary()

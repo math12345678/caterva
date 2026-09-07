@@ -91,7 +91,8 @@ log.
 |---|---|---|
 | organism mismatch | **yes** | a scout can search one organism |
 | cross-species value | **yes** | a scout can decline the transfer |
-| pH / temperature / buffer gap | no | `resolve_kinetic_value` selects by evidence rank and exposes no condition filter, so the requirement could not be met |
+| pH / temperature gap | **yes**, when satisfiable | an assay window (ADR 0172): if the other value's frontier holds a row inside its conditions, the critic raises a window and a scout re-selects that measured row — the requirement can be met without inventing a number |
+| buffer gap | no | `resolve_kinetic_value` selects by evidence rank and the frontier carries no buffer axis, so the requirement could not be met |
 | conditions never published | no, permanently | no search finds a number the 1974 paper did not print |
 
 An unactionable constraint is worse than none. It changes the fingerprint,
@@ -162,11 +163,11 @@ that was substituted rather than implying a check that did not happen.
 
 ### What this does not yet do
 
-- The pH and temperature gaps are reported and not actionable, as above.
-  Making them actionable means exposing candidate rows from
-  `_best_evidenced` so a scout could prefer the row whose conditions match
-  the rest of the set. That is the natural next capability and it is not
-  built.
+- The pH and temperature gaps are reported faithfully and — where the
+  literature's own rows allow — made actionable. ADR 0172 is the window that
+  closes that gap. What no decision can close is a **buffer** gap: the
+  frontier carries no buffer axis, so no search could satisfy a requirement
+  on it; a buffer mismatch is a finding, permanently.
 - `resolveQuery` still routes through its own chain. `parameterize` is
   registered in `COMPOSED_DOMAINS`, typed in `teriumRunner.ts`, reachable
   through the runner's stdin/JSON boundary, and carries a chosen model all

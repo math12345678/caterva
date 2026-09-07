@@ -267,6 +267,24 @@ class ModelBuild:
                     f"{quantity}: first resolved in {had.organism}, "
                     f"re-resolved in {has.organism}"
                 )
+            elif (
+                had is not None
+                and has is not None
+                and had.organism == has.organism
+                and had.value != has.value
+                and self.run.constraints.of_kind("assay_window")
+            ):
+                # The same organism, a different value, and an assay window
+                # in force: the only mechanism that replaces a value while
+                # keeping the organism is condition re-selection (ADR 0171).
+                # Reported like the organism move above -- the plain
+                # resolver cannot say this at all.
+                rejected.append(
+                    f"{quantity}: re-selected to {has.value} "
+                    f"{has.unit or ''} at {_conditions_of(has)} under an "
+                    f"assay window, replacing {had.value} {had.unit or ''} "
+                    f"at {_conditions_of(had)}"
+                )
         return tuple(rejected)
 
     def summary(self) -> str:
@@ -499,6 +517,15 @@ class ModelSearch:
                 "organism you choose: " + ", ".join(gaps) + "."
             )
         return " ".join(lines)
+
+
+def _conditions_of(source: Any) -> str:
+    parts = []
+    if getattr(source, "ph", None) is not None:
+        parts.append(f"pH {source.ph:g}")
+    if getattr(source, "temperature_c", None) is not None:
+        parts.append(f"{source.temperature_c:g} C")
+    return ", ".join(parts) or "conditions unstated"
 
 
 def _observed_organisms(build: ModelBuild) -> Tuple[str, ...]:
