@@ -167,6 +167,26 @@ that was substituted rather than implying a check that did not happen.
   `_best_evidenced` so a scout could prefer the row whose conditions match
   the rest of the set. That is the natural next capability and it is not
   built.
-- `resolveQuery` still routes through its own chain; `parameterize` is
-  registered in `COMPOSED_DOMAINS` and reachable through the runner, and
-  the TypeScript front door has not been moved onto it.
+- `resolveQuery` still routes through its own chain. `parameterize` is
+  registered in `COMPOSED_DOMAINS`, typed in `teriumRunner.ts`, reachable
+  through the runner's stdin/JSON boundary, and carries a chosen model all
+  the way to a trajectory -- but no HTTP route posts to it yet, and the
+  web front door still goes through the catalogue.
+
+## Two things found while wiring it
+
+**`COMPOSED_DOMAINS` was declared in both languages and compared by
+nothing.** `DISPATCH` has had `check_domain_parity.py` since ADR 0007; its
+sibling table had no such guard, so adding `parameterize` to Python left the
+TypeScript union rejecting a domain the runner would happily dispatch — a
+runtime 400 on a working feature, with both files individually correct. The
+parity guard now covers it in both directions and refuses to report success
+if either extraction parses zero entries.
+
+**Simulation had to be the end of the loop, not a separate call.** Resolving
+constants and then handing the caller a report leaves the last and most
+error-prone step — putting the numbers back into the model — to whoever
+consumes it. `run_parameterize` substitutes, merges with the caller's own
+sources (under them, not over: someone modelling their own preparation keeps
+their own Km), compiles with provenance and integrates. Anything nobody
+sourced is refused by name.
