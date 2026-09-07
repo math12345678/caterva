@@ -79,21 +79,48 @@ class Executor:
         compatibility = view[COMPATIBILITY_KEY]
         structure = view[STRUCTURE_KEY]
 
-        missing = [
-            q for q in self.quantities
-            if view.has(param_key(q)) and view[param_key(q)].source is None
-        ]
-        if missing:
+        # An ABSENT key counts as missing, not as nothing to check.
+        #
+        # A scout that raised -- a timed-out BRENDA request -- never writes
+        # its key at all. Skipping it here left its constant at the
+        # placeholder the network was constructed with, and the model ran:
+        # the partial-substitution fabrication that `with_resolved_values`
+        # refuses, arriving instead through an outage. The two cases keep
+        # separate wording because they are separate facts, and telling a
+        # researcher that a measurement does not exist when a server was
+        # down is the specific mistake this codebase spends its time not
+        # making.
+        unresolved: List[str] = []
+        never_reported: List[str] = []
+        for quantity in self.quantities:
+            key = param_key(quantity)
+            if not view.has(key):
+                never_reported.append(quantity)
+            elif view[key].source is None:
+                unresolved.append(quantity)
+
+        if unresolved or never_reported:
+            reasons: List[str] = []
+            if unresolved:
+                reasons.append(
+                    f"no measured value for {', '.join(sorted(unresolved))}; "
+                    f"Terrium does not substitute a default for a constant "
+                    f"the literature did not supply"
+                )
+            if never_reported:
+                reasons.append(
+                    f"the search for {', '.join(sorted(never_reported))} did "
+                    f"not complete, so whether a value exists is unknown -- "
+                    f"this is an outage, not a literature gap, and must not "
+                    f"be read as one"
+                )
             return AgentResult(
                 writes={
                     SIMULATION_KEY: {
                         "ran": False,
-                        "refused_because": (
-                            f"{len(missing)} quantity(ies) have no measured "
-                            f"value: {', '.join(sorted(missing))}. Terrium "
-                            f"does not substitute a default for a constant "
-                            f"the literature did not supply."
-                        ),
+                        "refused_because": "; ".join(reasons),
+                        "unresolved": tuple(sorted(unresolved)),
+                        "never_reported": tuple(sorted(never_reported)),
                     }
                 }
             )

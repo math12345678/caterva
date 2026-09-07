@@ -327,3 +327,73 @@ class TestParallelism:
         assert scouts == {"scout:Km", "scout:Ki", "scout:kcat"}
         assert "critic:coherence" in {a.name for a in levels[1]}
         assert "executor" in {a.name for a in levels[2]}
+
+
+class TestAFailedScoutIsNotAGap:
+    """The bug this class was written for, found by re-reading the executor.
+
+    A scout that raises -- a timed-out BRENDA request -- never writes its
+    blackboard key. The executor's missing-check skipped absent keys, so
+    that quantity was not counted as missing, was not passed to
+    `with_resolved_values`, and kept the placeholder value the network was
+    constructed with. The model then simulated.
+
+    That is the partial-substitution fabrication arriving through an outage
+    rather than through a gap, past the guard built to stop it.
+    """
+
+    def test_a_crashed_scout_stops_the_model_rather_than_leaving_a_placeholder(
+        self,
+    ) -> None:
+        def resolve(request, *, organism, allow_cross_species):
+            if request.quantity == "Ki":
+                raise TimeoutError("BRENDA read timed out")
+            return brenda_like({
+                "Km": [(HUMAN, 0.15, 7.4, 37.0, "HEPES")]
+            })(request, organism=organism, allow_cross_species=allow_cross_species)
+
+        simulated = []
+        build = build_model(
+            network=NETWORK, requests=requests_for("Km", "Ki"), resolve=resolve,
+            simulate=lambda net: simulated.append(net) or "trajectory",
+        )
+
+        assert simulated == [], "a model with a placeholder Ki reached the simulator"
+        assert build.simulation["ran"] is False
+        assert build.simulation["never_reported"] == ("Ki",)
+
+    def test_an_outage_and_a_gap_are_worded_differently(self) -> None:
+        # "BRENDA has no human Ki" and "we could not reach BRENDA" lead to
+        # different actions. Reporting the second as the first tells a
+        # researcher a measurement does not exist because a server was down.
+        def crashing(request, *, organism, allow_cross_species):
+            if request.quantity == "Ki":
+                raise TimeoutError("BRENDA read timed out")
+            return brenda_like({"Km": [(HUMAN, 0.15, 7.4, 37.0, "HEPES")]})(
+                request, organism=organism, allow_cross_species=allow_cross_species
+            )
+
+        outage = build_model(
+            network=NETWORK, requests=requests_for("Km", "Ki"), resolve=crashing,
+        ).simulation
+        gap = build_model(
+            network=NETWORK, requests=requests_for("Km", "Ki"),
+            resolve=brenda_like({"Km": [(HUMAN, 0.15, 7.4, 37.0, "HEPES")]}),
+        ).simulation
+
+        assert "outage, not a literature gap" in outage["refused_because"]
+        assert "no measured value for Ki" in gap["refused_because"]
+        assert outage["refused_because"] != gap["refused_because"]
+        assert outage["never_reported"] == ("Ki",) and outage["unresolved"] == ()
+        assert gap["unresolved"] == ("Ki",) and gap["never_reported"] == ()
+
+    def test_the_failure_itself_is_still_reported(self) -> None:
+        # And the underlying exception is not swallowed by the refusal.
+        def crashing(request, *, organism, allow_cross_species):
+            raise TimeoutError("BRENDA read timed out")
+
+        build = build_model(
+            network=NETWORK, requests=requests_for("Km"), resolve=crashing,
+        )
+        assert "BRENDA read timed out" in build.run.summary()
+        assert [f.agent for f in build.run.failures] == ["scout:Km"]
