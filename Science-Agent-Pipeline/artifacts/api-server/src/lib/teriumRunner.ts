@@ -42,6 +42,11 @@ export type SimulationDomain =
  * scripts/check_domain_parity.py enforces that across three files. That
  * contract is correct and stays intact.
  *
+ * `parameterize` composes more still: it resolves every unknown constant
+ * from the literature concurrently, judges whether the resolved set is
+ * mutually usable, re-searches under whatever that judgement requires, and
+ * explores each candidate organism. See ADR 0171.
+ *
  * `network` does not belong to it: it composes three engine calls --
  * compile_with_provenance, antimony_to_sbml, simulate_sbml -- so there is
  * no single function for DISPATCH to name. Python declares the same
@@ -50,13 +55,16 @@ export type SimulationDomain =
  * SimulationDomain instead would have forced either a fictional engine
  * function or a weakened parity check.
  */
-export type ComposedDomain = "network";
+export type ComposedDomain = "network" | "parameterize";
 
 /** Anything the runner will dispatch. */
 export type RunnableDomain = SimulationDomain | ComposedDomain;
 
 /** The composed domains, as values, so the narrowing below cannot drift. */
-export const COMPOSED_DOMAINS: readonly ComposedDomain[] = ["network"] as const;
+export const COMPOSED_DOMAINS: readonly ComposedDomain[] = [
+  "network",
+  "parameterize",
+] as const;
 
 /**
  * Narrow a RunnableDomain to a catalogue domain, or throw.
