@@ -81,6 +81,18 @@ class ParameterRequest:
     #: The organism asked about. Absent means "whatever the resolver's
     #: documented default is", which the resolver states, not this module.
     organism: Optional[str] = None
+    #: EC number, when the quantity resolves through BRENDA. Carried here
+    #: rather than looked up per-scout so one enzyme identification serves
+    #: every constant the model needs from it.
+    ec_number: Optional[str] = None
+    #: Which BRENDA table to read: "km" | "ki" | "kcat". Distinct from
+    #: `quantity`, which is the model's own name for the symbol -- a
+    #: network may call it `Km_glucose` while the table is still "km".
+    table: Optional[str] = None
+    #: The unit the model expects this constant in, when the caller knows.
+    #: Checked at substitution; nothing is converted. Absent means no unit
+    #: check is possible, and the report says so rather than implying one.
+    expected_unit: Optional[str] = None
 
 
 @dataclass(frozen=True)
