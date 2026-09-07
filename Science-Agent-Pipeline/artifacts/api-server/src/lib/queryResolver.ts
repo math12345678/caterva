@@ -17,6 +17,7 @@ import {
   EPIDEMIOLOGY_BRIDGE_DOMAINS,
   RequiredParametersMissingError,
   UnrecognizedQueryError,
+  resolveGaps,
   buildResolvedKineticProvenance,
   unverifiedOriginKeys,
   isAllDefaults,
@@ -2634,7 +2635,31 @@ export async function resolveQuery(
       success: missing.length === 0,
     };
 
-    if (missing.length > 0) {
+    // A gap is not one thing. Before refusing, ask what KIND each one is:
+    // a value the requested model fixes by definition, a quantity that
+    // describes the user's own setup, or a measurement a real search failed
+    // to find. Only the last still refuses. See `resolveGaps`.
+    const gaps = resolveGaps(
+      llmResult.domain,
+      query,
+      missing,
+      missingKeyDetails(missing, parameterProvenance),
+      // The CURATED table, not the merged set -- see `resolveGaps`.
+      Object.fromEntries(
+        missing
+          .filter((k) => domainDefaults.parameters[k] !== undefined)
+          .map((k) => [k, domainDefaults.parameters[k]!]),
+      ),
+      parameterProvenance,
+    );
+    if (Object.keys(gaps.filled).length > 0) {
+      parameters = { ...parameters, ...gaps.filled };
+      parameterProvenance = { ...parameterProvenance, ...gaps.provenance };
+      flags = [...flags, ...gaps.flags];
+    }
+    const stillMissing = gaps.stillMissing;
+
+    if (stillMissing.length > 0) {
       const latencyMs = Date.now() - startTime;
       verifiableMetricsCollector.recordJobFailure(runId);
       // `parameters` is seeded from DOMAIN_DEFAULTS before anything real
@@ -2652,8 +2677,8 @@ export async function resolveQuery(
       );
       throw new RequiredParametersMissingError(
         llmResult.domain,
-        missing,
-        missingKeyDetails(missing, parameterProvenance),
+        stillMissing,
+        missingKeyDetails(stillMissing, parameterProvenance),
         resolvedOnly,
         // The domain table's own illustrative values, offered ONLY as
         // "Add end=200" hints. RequiredParametersMissingError filters
@@ -2938,7 +2963,28 @@ export async function resolveQuery(
     success: missing.length === 0,
   };
 
-  if (missing.length > 0) {
+  // Same classification as the LLM branch above, same reason.
+  const gaps = resolveGaps(
+    best.domain,
+    query,
+    missing,
+    missingKeyDetails(missing, parameterProvenance),
+    // The CURATED table, not the merged set -- see `resolveGaps`.
+    Object.fromEntries(
+      missing
+        .filter((k) => best.parameters[k] !== undefined)
+        .map((k) => [k, best.parameters[k]!]),
+    ),
+    parameterProvenance,
+  );
+  if (Object.keys(gaps.filled).length > 0) {
+    parameters = { ...parameters, ...gaps.filled };
+    parameterProvenance = { ...parameterProvenance, ...gaps.provenance };
+    flags = [...flags, ...gaps.flags];
+  }
+  const stillMissing = gaps.stillMissing;
+
+  if (stillMissing.length > 0) {
     const latencyMs = Date.now() - startTime;
     verifiableMetricsCollector.recordJobFailure(runId);
     // Same filter as the LLM branch above, same reason: `parameters` here
@@ -2950,8 +2996,8 @@ export async function resolveQuery(
     );
     throw new RequiredParametersMissingError(
       best.domain,
-      missing,
-      missingKeyDetails(missing, parameterProvenance),
+      stillMissing,
+      missingKeyDetails(stillMissing, parameterProvenance),
       resolvedOnly,
       // Same as the LLM branch above, same filtering.
       Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
