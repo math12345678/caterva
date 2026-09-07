@@ -1449,6 +1449,127 @@ def _serialise_search(search: Any) -> Dict[str, Any]:
     }
 
 
+def run_compose(params: Dict[str, Any]) -> Dict[str, Any]:
+    """Build a model from a description of its MECHANISM, with no catalogue.
+
+    The third path, and the only one that needs neither a catalogue entry
+    nor a language model. `Terium/compose` recognises a shape -- a cascade,
+    a toggle switch, competition for a substrate -- and composes it from
+    motifs whose rate laws are dimensionally checked before anything runs.
+
+    Measured on the twenty-query benchmark: this builds eleven, and nine of
+    those eleven are queries the catalogue cannot reach at any length,
+    because "three step" becomes "four step" and each would need its own
+    entry.
+
+    It refuses two kinds of thing, and the difference is carried through to
+    the caller: a NAMED PATHWAY needs a pathway database Terrium does not
+    read, and an unrecognised SHAPE needs different words. Collapsing them
+    would send somebody asking about glycolysis away to rephrase forever.
+    """
+    import sys as _sys
+
+    import Terium as _terium_pkg  # noqa: PLC0415
+
+    repo_root = pathlib.Path(_terium_pkg.__file__).resolve().parent.parent
+    for candidate in (repo_root, repo_root / "Tests"):
+        if str(candidate) not in _sys.path:
+            _sys.path.insert(0, str(candidate))
+
+    from Terium.compose.pipeline import UnrecognisedShape, compose
+
+    description = params.get("description") or params.get("query")
+    if not description or not str(description).strip():
+        raise ValueError(
+            "compose needs a `description` of the mechanism -- 'three step "
+            "phosphorylation cascade', 'two enzymes competing for the same "
+            "substrate'. It builds shapes, not named subjects."
+        )
+
+    try:
+        model = compose(
+            str(description),
+            subject=params.get("subject"),
+            name=params.get("name"),
+        )
+    except UnrecognisedShape as exc:
+        # Returned as a RESULT rather than raised, because a refusal here is
+        # an ordinary outcome carrying information the caller needs -- which
+        # of the two refusals it was, and what would work instead.
+        return {
+            "ok": True,
+            "domain": "compose",
+            "built": False,
+            "reason": str(exc),
+            "kind": (
+                "named_pathway" if "named pathway" in str(exc)
+                else "unrecognised_shape"
+            ),
+            "shapes": list(_shapes()),
+        }
+
+    network = model.network
+    unit_findings = model.recognition.composition.unit_findings()
+
+    return {
+        "ok": True,
+        "domain": "compose",
+        "built": True,
+        "rule": model.recognition.rule,
+        "reading": model.recognition.reading,
+        "network": {
+            "name": network.name,
+            "species": [
+                {"id": s.id, "initial": s.initial} for s in network.species
+            ],
+            "parameters": [
+                {"id": p.id, "value": p.value} for p in network.parameters
+            ],
+            "reactions": [
+                {
+                    "id": r.id,
+                    "reactants": dict(r.reactants),
+                    "products": dict(r.products),
+                    "rateLaw": r.rate_law,
+                }
+                for r in network.reactions
+            ],
+        },
+        "conservationLaws": _conservation_law_strings(network),
+        "notes": list(model.recognition.composition.notes),
+        "toResolve": [
+            {
+                "id": q.parameter_id,
+                "motif": q.motif_name,
+                "parameter": q.parameter_name,
+                "unit": q.unit,
+                "table": q.table,
+                "description": q.description,
+            }
+            for q in model.resolvable
+        ],
+        "yourChoice": list(model.chosen),
+        "structureOnly": model.structure_only,
+        "unitFindings": [
+            {"where": f.where, "detail": f.detail, "severity": f.severity}
+            for f in unit_findings
+        ],
+        "summary": model.summary(),
+    }
+
+
+def _shapes() -> Any:
+    from Terium.compose.grammar import shapes
+
+    return shapes()
+
+
+def _conservation_law_strings(network: Any) -> Any:
+    from Terium.core.network import describe_conservation_laws
+
+    return list(describe_conservation_laws(network))
+
+
 DISPATCH: Dict[str, str] = {
     "mm": "simulate_michaelis_menten",
     "mm_competitive_inhibition": "simulate_mm_competitive_inhibition",
@@ -1487,6 +1608,11 @@ DISPATCH: Dict[str, str] = {
 #: The boundary test reads this, so a composed domain is still required to
 #: have a handler and is still not allowed to be unreachable.
 COMPOSED_DOMAINS: Dict[str, str] = {
+    "compose": (
+        "a description of a MECHANISM rather than a named model: the shape "
+        "is recognised deterministically, composed from motifs, and its "
+        "rate laws are dimensionally checked before anything runs"
+    ),
     "parameterize": (
         "a network whose constants are unknown: every one is searched for "
         "concurrently, the set is judged for mutual compatibility, the "
@@ -1517,6 +1643,7 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "cell_cycle_oscillator": run_cell_cycle_oscillator,
     "repressilator": run_repressilator,
     "sbml": run_sbml,
+    "compose": run_compose,
     "parameterize": run_parameterize,
     # The open path. Deliberately absent from DISPATCH: that table
     # maps a domain to an engine `simulate_*` function and is asserted

@@ -1,0 +1,350 @@
+"""Steady states and stability of composed models.
+
+WHY A TRAJECTORY IS NOT AN ANSWER
+---------------------------------
+"Is this toggle switch bistable?" is not answered by one trajectory: a
+bistable system reached from one starting point looks exactly like a
+monostable one, and the second stable state is invisible unless something
+goes and looks for it.
+
+These tests pin the analysis against cases with known answers -- a
+first-order system whose steady state is exactly ks/kd, a symmetric toggle
+whose three fixed points are analytically locatable -- and pin the two
+conclusions it must never draw: that it found everything, and that many
+steady states on many conservation leaves are many attractors.
+"""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from Terium.compose.analysis import (
+    MARGINAL, OSCILLATORY_STABLE, OSCILLATORY_UNSTABLE, SADDLE, STABLE,
+    UNSTABLE, analyse, classify, derivative_function, jacobian,
+)
+from Terium.compose.builder import Composition
+from Terium.compose.grammar import recognise
+from Terium.compose.library import SYNTHESIS_DEGRADATION
+
+
+class TestAgainstAnalyticAnswers:
+    def test_a_first_order_system_settles_at_ks_over_kd(self) -> None:
+        """The one case where the answer is known in closed form.
+
+        dX/dt = ks - kd*X has its steady state at exactly ks/kd, and its
+        single eigenvalue is exactly -kd. If the machinery cannot reproduce
+        that, nothing it says about a harder model is worth reading.
+        """
+        composition = Composition("turnover")
+        composition.add(SYNTHESIS_DEGRADATION, "x")
+        report = analyse(composition.to_network())
+
+        assert len(report.physical_points) == 1
+        point = report.physical_points[0]
+        # Library defaults: ks = 1.0, kd = 0.1.
+        assert point.state["x_X"] == pytest.approx(10.0, rel=1e-6)
+        assert point.classification == STABLE
+        assert point.eigenvalues[0].real == pytest.approx(-0.1, rel=1e-4)
+        # And the settling time is 1/kd.
+        assert point.slowest_timescale == pytest.approx(10.0, rel=1e-3)
+
+    def test_the_jacobian_matches_the_analytic_one(self) -> None:
+        # d/dX (ks - kd*X) = -kd, exactly.
+        composition = Composition("turnover")
+        composition.add(SYNTHESIS_DEGRADATION, "x")
+        rhs, species = derivative_function(composition.to_network())
+        matrix = jacobian(rhs, [10.0])
+        assert matrix == [[pytest.approx(-0.1, rel=1e-5)]]
+
+    def test_the_symmetric_toggle_has_a_saddle_between_two_stable_states(self) -> None:
+        """The textbook shape of a switch.
+
+        Two mutually repressing genes with cooperative repression have three
+        fixed points: a symmetric saddle on the separatrix, and two stable
+        states that are each other's mirror image.
+        """
+        report = analyse(recognise("a toggle switch between two repressors").network())
+        assert len(report.physical_points) == 3
+
+        saddles = [p for p in report.physical_points if p.classification == SADDLE]
+        stables = report.stable_points
+        assert len(saddles) == 1 and len(stables) == 2
+
+        # The saddle is on the diagonal.
+        saddle = saddles[0]
+        assert saddle.state["geneA_X"] == pytest.approx(saddle.state["geneB_X"], rel=1e-6)
+
+        # And the two stable states are mirror images.
+        low, high = sorted(stables, key=lambda p: p.state["geneA_X"])
+        assert low.state["geneA_X"] == pytest.approx(high.state["geneB_X"], rel=1e-4)
+        assert low.state["geneB_X"] == pytest.approx(high.state["geneA_X"], rel=1e-4)
+
+        assert report.at_least_bistable
+        assert "it switches" in report.summary()
+
+
+class TestConservationLaws:
+    def test_a_cascade_has_ONE_steady_state_not_nine(self) -> None:
+        """The error this test exists to prevent, which shipped once.
+
+        A three-tier cascade conserves total protein in each tier, so the
+        state space is foliated and EVERY set of totals has its own steady
+        state. An unconstrained multistart finds a different leaf from every
+        start and reports them as separate attractors -- the first version
+        of this analysis announced "at least 9 stable states were found, so
+        this system switches" about a cascade, which does not switch.
+
+        Constrained to the leaf of the declared initial condition, there is
+        one.
+        """
+        report = analyse(recognise("three step phosphorylation cascade").network())
+        assert len(report.physical_points) == 1
+        assert not report.at_least_bistable
+        assert "switches" not in report.summary()
+
+    def test_the_state_found_lies_on_the_declared_leaf(self) -> None:
+        # Total protein per tier is 1.0 in the declared initial condition,
+        # and the steady state has to respect it.
+        network = recognise("three step phosphorylation cascade").network()
+        point = analyse(network).physical_points[0]
+        for tier in ("tier1", "tier2", "tier3"):
+            total = point.state[f"{tier}_X"] + point.state[f"{tier}_Xp"]
+            assert total == pytest.approx(1.0, rel=1e-6), tier
+
+    def test_a_different_leaf_gives_a_different_state(self) -> None:
+        # The proof that the constraint is doing something: double the
+        # protein and the steady state moves.
+        recognition = recognise("three step phosphorylation cascade")
+        composition = recognition.composition
+        composition.set_initial("tier1_X", 2.0)
+        moved = analyse(composition.to_network()).physical_points[0]
+        assert moved.state["tier1_X"] + moved.state["tier1_Xp"] == pytest.approx(
+            2.0, rel=1e-6
+        )
+
+    def test_structural_zeros_do_not_make_everything_marginal(self) -> None:
+        # Each conservation law contributes a zero eigenvalue. Leaving them
+        # in classifies every conserved system as `marginal`, which says
+        # nothing about whether the state attracts ON its leaf.
+        report = analyse(recognise("three step phosphorylation cascade").network())
+        assert report.physical_points[0].classification != MARGINAL
+
+
+class TestClassification:
+    @pytest.mark.parametrize("eigenvalues,expected", [
+        ((-1 + 0j, -2 + 0j), STABLE),
+        ((1 + 0j, 2 + 0j), UNSTABLE),
+        ((-1 + 0j, 2 + 0j), SADDLE),
+        ((-1 + 3j, -1 - 3j), OSCILLATORY_STABLE),
+        ((1 + 3j, 1 - 3j), OSCILLATORY_UNSTABLE),
+    ])
+    def test_it_names_the_shape_from_the_eigenvalues(self, eigenvalues, expected) -> None:
+        assert classify(eigenvalues) == expected
+
+    def test_a_marginal_eigenvalue_is_reported_as_marginal(self) -> None:
+        # At a bifurcation the linearisation decides nothing, and rounding a
+        # near-zero eigenvalue to one side reports a system as a switch when
+        # it is sitting exactly on the boundary of being one.
+        assert classify((0 + 0j, 1 + 0j, -1 + 0j)) == MARGINAL
+
+    def test_an_empty_spectrum_is_marginal_not_stable(self) -> None:
+        # The safe direction: nothing is known, so nothing is claimed.
+        assert classify(()) == MARGINAL
+
+
+class TestTheCaretBug:
+    def test_a_power_in_a_rate_law_is_exponentiation_not_xor(self) -> None:
+        """A silent wrong answer of exactly the shape this project refuses.
+
+        Antimony and SBML write exponentiation as `^`. Python reads `^` as
+        bitwise XOR, and `2^3` is 1, not 8 -- it does not error, it returns
+        a different number. A Hill term evaluated without translating the
+        operator computes something unrelated and integrates perfectly well.
+        """
+        from Terium.core.network import Parameter, Reaction, ReactionNetwork, Species
+
+        network = ReactionNetwork(
+            name="power",
+            species=(Species("X", 2.0),),
+            parameters=(Parameter("n", 3.0),),
+            reactions=(
+                Reaction(id="r", reactants={}, products={"X": 1}, rate_law="X^n"),
+            ),
+        )
+        rhs, _ = derivative_function(network)
+        # 2**3 = 8. The XOR reading of 2^3 is 1.
+        assert rhs([2.0]) == [pytest.approx(8.0)]
+
+
+class TestWhatItRefusesToConclude:
+    def test_bistability_is_reported_as_at_least_not_as_exactly(self) -> None:
+        # A multistart search reports what it converged to. It cannot prove
+        # there is no third state, nor that it did not miss a second one.
+        report = analyse(recognise("a toggle switch between two repressors").network())
+        assert hasattr(report, "at_least_bistable")
+        assert not hasattr(report, "is_bistable")
+
+    def test_finding_nothing_is_not_reported_as_proof_of_nothing(self) -> None:
+        from Terium.compose.analysis import StabilityReport
+
+        empty = StabilityReport(fixed_points=(), starts_tried=32, species=("X",))
+        assert "not proof there is none" in empty.summary()
+
+    def test_the_number_of_starts_is_reported(self) -> None:
+        # "Found two states" means something different after 8 starts than
+        # after 800.
+        report = analyse(recognise("a toggle switch between two repressors").network())
+        assert f"from {report.starts_tried} starting points" in report.summary()
+
+    def test_it_says_the_results_are_numerical(self) -> None:
+        # The conservation laws are derived exactly over Fraction; these are
+        # what a solver converged to. Flattening that difference is the
+        # thing this codebase spends its time undoing.
+        report = analyse(recognise("a toggle switch between two repressors").network())
+        assert "numerical results from a root find" in report.summary()
+        assert "conservation laws this model reports ARE derived" in report.summary()
+
+    def test_negative_states_are_kept_and_marked_not_hidden(self) -> None:
+        """A negative fixed point is a real property of the equations.
+
+        The first version of this looped over `fixed_points` and asserted
+        only inside `if not point.physical`. On a model with no negative
+        states the loop body never ran, so a mutation marking EVERY state
+        physical survived the whole suite. Asserted directly instead.
+        """
+        from Terium.compose.analysis import FixedPoint, StabilityReport
+
+        negative = FixedPoint(
+            state={"X": -1.5}, residual=0.0, eigenvalues=(-1 + 0j,),
+            classification=STABLE, physical=False,
+        )
+        positive = FixedPoint(
+            state={"X": 2.0}, residual=0.0, eigenvalues=(-1 + 0j,),
+            classification=STABLE, physical=True,
+        )
+        assert "NEGATIVE" in negative.describe()
+        assert "NEGATIVE" not in positive.describe()
+
+        report = StabilityReport(
+            fixed_points=(negative, positive), starts_tried=8, species=("X",),
+        )
+        # Kept in `fixed_points`, excluded from `physical_points`, and the
+        # summary says how many were set aside and why.
+        assert len(report.fixed_points) == 2
+        assert report.physical_points == (positive,)
+        assert "at negative concentrations" in report.summary()
+        assert not report.at_least_bistable
+
+    def test_a_negative_root_is_FOUND_and_marked_by_analyse(self) -> None:
+        """The derivation of `physical`, not just its reporting.
+
+        The previous test constructs FixedPoint objects with physical=False
+        by hand, so it exercises the report and never the line in `analyse`
+        that computes the flag -- and a mutation setting every state
+        physical survived it. None of the library's models have a negative
+        fixed point, so this builds one that does.
+
+        dX/dt = -k(X+0.5)(X-2) has roots at X = -0.5 and X = 2. The first
+        is a real property of the equations and the system cannot reach it.
+
+        The negative root is -0.5 and not -1 on purpose. At -1 exactly, a
+        mutation loosening the tolerance to `value > -1.0` still rejects it
+        -- the boundary coincides -- and the mutation survived. A root
+        strictly inside a plausible wrong threshold is what makes the
+        threshold testable.
+        """
+        from Terium.core.network import Parameter, Reaction, ReactionNetwork, Species
+
+        network = ReactionNetwork(
+            name="two_roots",
+            species=(Species("X", 1.0),),
+            parameters=(Parameter("k", 1.0),),
+            reactions=(
+                Reaction(id="r", reactants={"X": 1}, products={},
+                         rate_law="k * (X + 0.5) * (X - 2)"),
+            ),
+        )
+        report = analyse(network)
+        values = sorted(round(p.state["X"], 6) for p in report.fixed_points)
+        assert values == [-0.5, 2.0], values
+
+        negative = next(p for p in report.fixed_points if p.state["X"] < 0)
+        positive = next(p for p in report.fixed_points if p.state["X"] > 0)
+        assert negative.physical is False
+        assert positive.physical is True
+        assert report.physical_points == (positive,)
+        assert "NEGATIVE" in negative.describe()
+
+    def test_a_species_at_exactly_zero_is_still_physical(self) -> None:
+        """Why the physicality test carries a tolerance rather than `> 0`.
+
+        Autocatalysis runs to completion: S + X -> 2X ends with every
+        substrate converted, and the solver reports that state as
+        `S = -0.0`. Negative zero. Under a strict `value > 0` test it is
+        marked unphysical and filtered out of the report -- and the state
+        removed is the actual end state of the reaction, the one thing
+        anybody running this model wants to see.
+
+        A tolerance is not laxness here. It is the difference between
+        "slightly negative because the equations have a root there" and
+        "zero, arrived at from the other side by floating-point
+        arithmetic".
+        """
+        from Terium.compose.builder import Composition
+        from Terium.compose.library import AUTOCATALYSIS
+
+        composition = Composition("autocatalytic")
+        composition.add(AUTOCATALYSIS, "r")
+        report = analyse(composition.to_network())
+
+        converted = next(
+            p for p in report.fixed_points if p.state["r_X"] > 1.0
+        )
+        assert converted.state["r_S"] == pytest.approx(0.0, abs=1e-9)
+        assert math.copysign(1.0, converted.state["r_S"]) == -1.0, (
+            "this test is only meaningful while the solver returns negative "
+            "zero here; if it stops doing so, the case it guards is gone"
+        )
+        assert converted.physical, "the completed reaction was filtered out"
+        assert converted in report.physical_points
+        assert converted.stable
+
+    def test_a_system_with_no_steady_state_reports_none(self) -> None:
+        """The residual filter, which a mutation removing it survived.
+
+        `least_squares` always returns SOMETHING -- the point minimising the
+        residual norm. For a system with no steady state that point is not a
+        root, and reporting it as one would invent a fixed point for a model
+        that has none. Constant inflow with no removal is exactly that: the
+        species rises forever.
+        """
+        from Terium.compose.library import CONSTANT_INFLOW
+
+        composition = Composition("unbounded")
+        composition.add(CONSTANT_INFLOW, "feed")
+        report = analyse(composition.to_network())
+
+        assert report.fixed_points == ()
+        assert "No steady state was found" in report.summary()
+        assert "not proof there is none" in report.summary()
+
+
+class TestDeterminism:
+    def test_two_runs_agree(self) -> None:
+        # A stability analysis that changed between runs would be
+        # unciteable. The starting points come from a local generator
+        # seeded here, not from global interpreter state.
+        network = recognise("a toggle switch between two repressors").network()
+        first = analyse(network)
+        second = analyse(network)
+        assert [sorted(p.state.items()) for p in first.fixed_points] == [
+            sorted(p.state.items()) for p in second.fixed_points
+        ]
+
+    def test_a_different_seed_may_search_differently(self) -> None:
+        # The seed is a real knob, not decoration: it must change where the
+        # search looks.
+        network = recognise("a toggle switch between two repressors").network()
+        assert analyse(network, seed=1).starts_tried == analyse(network, seed=2).starts_tried
