@@ -59,7 +59,7 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,468 tests (1,317 engine + 1151 literature)
+make test      # runs all 2,514 tests (1,355 engine + 1159 literature)
 ```
 
 ### See what it produces, before anything else
@@ -496,19 +496,19 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,317 tests
+│   └── tests/                1,355 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1151 tests
+│   └── ...                   1159 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    168 decision records (and counting)
+│   └── adr/                    169 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
-├── scripts/                    75 guard scripts + build verification
+├── scripts/                    76 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -590,10 +590,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,468 tests
+make test        # run all 2,514 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (1,317 tests)
-make test-lit    # literature layer only (1151 tests)
-python3 scripts/verify_build.py --quick  # all 75 guard scripts, incl. TypeScript compile
+make test-sim    # simulation engine only (1,355 tests)
+make test-lit    # literature layer only (1159 tests)
+python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```
