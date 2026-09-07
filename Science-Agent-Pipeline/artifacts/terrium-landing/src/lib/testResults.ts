@@ -121,11 +121,17 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "75 test files -- query resolution, parameter provenance, " +
+          "78 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
-          "models, rate limiting, SSE job routes",
-        // Measured 2026-09-06: `75 passed (75) / 823 passed (823)`, run
+          "models, gap classification, front-door coverage, rate limiting, " +
+          "SSE job routes",
+        // Measured 2026-09-07: `78 passed (78) / 839 passed (839)`, run
         // alone with the repo's .venv/bin first on PATH.
+        //
+        // Off that PATH the same run reports 837 passed / 2 failed, and the
+        // two are the python.test.ts cases described below -- which is what
+        // the paragraph after this is for. The number on the page is the
+        // documented environment's, not whichever shell happened to be open.
         //
         // That PATH is not a thumb on the scale, it is the documented
         // environment. Two tests in python.test.ts assert that a
@@ -142,7 +148,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 823,
+        passed: 839,
         skipped: 0,
         failed: 0,
       },
