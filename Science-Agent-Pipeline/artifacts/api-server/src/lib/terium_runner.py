@@ -1211,6 +1211,13 @@ def run_parameterize(
             f"not contain. Its quantities are {sorted(available)}."
         )
 
+    # Quantities the caller is NOT asking the literature for -- their own
+    # bench measurements, and the scenario choices no paper could supply
+    # (an initial concentration, a simulation window). The literature fills
+    # what it can; the caller declares the rest; anything left over is
+    # refused by name, quantity by quantity, exactly as `run_network` does.
+    caller_sources = _sources_from_spec(params.get("sources"))
+
     # `resolve` is keyword-only and `main()` never supplies it, so a
     # request body cannot reach it. It exists so this path can be exercised
     # without BRENDA -- a front door that can only be tested online is a
@@ -1221,7 +1228,151 @@ def run_parameterize(
         resolve=resolve or brenda_resolver(),
         requested_organism=params.get("organism"),
     )
-    return _serialise_search(search)
+
+    payload = _serialise_search(search)
+    payload["simulation"] = _simulate_search(search, caller_sources, params)
+    return payload
+
+
+def _simulate_search(
+    search: Any, caller_sources: Dict[str, Any], params: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Run the chosen model, or say precisely why it was not run.
+
+    The end of the loop: a description goes in, and what comes out is a
+    trajectory computed from constants that are each cited, that were
+    checked against each other, and that all describe the same organism --
+    or a statement of which of those three did not hold.
+
+    Every refusal below is a different fact and keeps its own sentence. A
+    single "could not simulate" would collapse "the literature has no human
+    Ki", "you did not tell us the enzyme concentration" and "these values
+    are from two animals" into one unactionable line.
+    """
+    from Terium.core.network_provenance import (
+        QuantitySource, compile_with_provenance, unsourced_quantities,
+    )
+
+    build = search.build
+    if build is None:
+        return {
+            "ran": False,
+            "because": (
+                "no single model was chosen: "
+                + (
+                    "more than one organism yields a complete model and "
+                    "nothing in the request separates them"
+                    if search.undecided
+                    else "no organism has every constant this model needs"
+                )
+            ),
+        }
+    if build.missing:
+        return {
+            "ran": False,
+            "because": (
+                f"no measured value for {', '.join(build.missing)}; Terrium "
+                f"does not substitute a default for a constant the "
+                f"literature did not supply"
+            ),
+        }
+    compatibility = build.compatibility
+    if compatibility is not None and compatibility.blocking:
+        return {
+            "ran": False,
+            "because": (
+                "the resolved values do not describe one system: "
+                + "; ".join(f.detail for f in compatibility.blocking)
+            ),
+        }
+
+    # Resolved values become `resolved` sources carrying the citation the
+    # scout came back with. Merged UNDER the caller's map, not over it: a
+    # caller who supplied their own measurement for a quantity keeps it,
+    # since their assay is the one they are modelling.
+    sources: Dict[str, Any] = {}
+    for quantity, resolution in build.resolutions.items():
+        source = resolution.source
+        if source is None:
+            continue
+        sources[quantity] = QuantitySource(
+            origin="resolved",
+            citation=source.citation,
+            note=(
+                f"{source.value} {source.unit or ''}".strip()
+                + (f", {source.organism}" if source.organism else "")
+                + (f", pH {source.ph:g}" if source.ph is not None else "")
+                + (
+                    f", {source.temperature_c:g} C"
+                    if source.temperature_c is not None
+                    else ""
+                )
+            ),
+        )
+    sources.update(caller_sources)
+
+    from Terium.agents.adapters import with_resolved_values
+
+    network = with_resolved_values(
+        build.run.blackboard.get("network"), build.resolutions
+    )
+
+    problems = unsourced_quantities(network, sources)
+    if problems:
+        # Names for a caller to act on, sentences for a person to read.
+        # The names come from asking the SAME predicate per quantity rather
+        # than from splitting the sentences, so a reworded message cannot
+        # quietly change which quantities the machine-readable field lists.
+        unsourced = [
+            quantity
+            for quantity in network.quantity_ids()
+            if sources.get(quantity) is None
+            or sources[quantity].problems(quantity)
+        ]
+        return {
+            "ran": False,
+            "because": (
+                f"{len(unsourced)} quantit"
+                f"{'y' if len(unsourced) == 1 else 'ies'} the literature was "
+                f"not asked for and you did not supply: "
+                f"{', '.join(unsourced)}. Send them under `sources` and they "
+                f"will be recorded as yours."
+            ),
+            "unsourced": unsourced,
+            "problems": list(problems),
+        }
+
+    start = float(params.get("start", 0.0))
+    end = float(params.get("end", 10.0))
+    points = int(params.get("points", 51))
+    if points > MAX_API_SBML_POINTS:
+        raise ValueError(
+            f"points={points} exceeds API runtime ceiling "
+            f"(MAX_API_SBML_POINTS) {MAX_API_SBML_POINTS}"
+        )
+
+    antimony_string = compile_with_provenance(network, sources)
+    sbml_string = terium_engine.antimony_to_sbml(antimony_string)
+    result = terium_engine.simulate_sbml(
+        sbml_string=sbml_string, start=start, end=end, points=points
+    )
+    serialised = _serialise_result(
+        result, "parameterize", {"start": start, "end": end, "points": points}
+    )
+    return {
+        "ran": True,
+        "trajectory": serialised.get("trajectory", []),
+        "values": {p.id: p.value for p in network.parameters},
+        "initials": {s.id: s.initial for s in network.species},
+        "quantitySources": {
+            quantity: {
+                "origin": source.origin,
+                "citation": source.citation,
+                "note": source.note,
+            }
+            for quantity, source in sources.items()
+        },
+    }
 
 
 def _serialise_search(search: Any) -> Dict[str, Any]:
