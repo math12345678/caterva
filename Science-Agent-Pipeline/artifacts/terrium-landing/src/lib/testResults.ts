@@ -84,12 +84,12 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "55 test files -- kinetics & Michaelis-Menten correctness, " +
+          "58 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, and citation/build guards",
         // Measured 2026-09-06, Terium/ run alone under .venv.
-        passed: 1317,
+        passed: 1355,
         skipped: 0,
         failed: 0,
       },
@@ -101,7 +101,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "80 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "81 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic",
         // Measured 2026-09-06, running Tests/ alone under .venv (the
         // interpreter these counts are documented against):
@@ -109,7 +109,7 @@ export const TEST_SUITES: TestSuite[] = [
         // these suites are contention-sensitive and a parallel run has
         // already produced a spuriously low figure twice in this file's
         // history.
-        passed: 1151,
+        passed: 1159,
         skipped: 1,
         failed: 0,
       },
