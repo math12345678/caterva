@@ -54,7 +54,7 @@ so they can be argued with rather than buried in a comparison.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 #: A pH difference at or beyond which two kinetic constants should not be
 #: combined without comment.
@@ -111,6 +111,22 @@ class ParameterSource:
     #: Reporting the second as the first sends somebody to the bench over
     #: a regex.
     explicitly_unreported: Tuple[str, ...] = ()
+
+    #: Every alternative row the resolver returned for this quantity, as the
+    #: plain dicts `KineticResult.ensemble_candidates` carries them: value,
+    #: unit, organism, reference_id, conditions, and -- since the assay
+    #: window work -- ph and temperature_c on each row.
+    #:
+    #: Deliberately Optional rather than "falsy and gone": the coercion
+    #: result and the registry row carry no frontier AT ALL, which is a
+    #: different fact from carrying an empty one. A critic can only demand
+    #: that a value match the conditions of another when the first value's
+    #: own literature offers a row at those conditions -- and nothing else
+    #: in this record tells it whether one does. Attaching the pool here
+    #: lets the critic SEE the alternative before it turns a mismatch into
+    #: an actionable constraint, which is the whole difference between a
+    #: constraint and a demotion (ADR 0171).
+    candidates: Tuple[Any, ...] = ()
 
     @property
     def conditions_stated(self) -> bool:

@@ -18,19 +18,43 @@ only value that exists, the scout returns a gap and says which constraint
 closed it. A scout that quietly dropped the organism requirement to come
 back with something would produce exactly the value the critic rejected,
 wearing the critic's approval.
+
+RE-SELECTION IS CHOICE AMONG MEASURED ROWS, NOT INVENTED NUMBERS
+----------------------------------------------------------------
+The one exception to "the resolver's answer stands" is an assay window
+(ADR 0171). The resolver already returns the whole graded frontier of rows
+it considered (`ensemble_candidates`); when a constraint demands that this
+value sit inside another value's conditions, the scout re-selects among
+those SAME rows -- the row that actually sits at the reference. It never
+interpolates, averages or corrects toward the window, because the rows are
+already there and "adjust the number to fit" is the exact fabrication this
+codebase exists to refuse. If no row of the frontier satisfies the window,
+the resolver's choice stands, and the note says so.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Optional, Tuple
+from dataclasses import dataclass, field, replace
+from typing import Any, Callable, List, Optional, Tuple
 
 try:
+    from .assay_window import (
+        candidate_distance,
+        parse_window_requirement,
+        window_requirement,
+        within_window,
+    )
     from .blackboard import View
     from .constraints import ANY_SUBJECT, Constraint
     from .protocol import AgentResult
     from .adapters import to_parameter_source
 except ImportError:  # pragma: no cover - flat import
+    from assay_window import (  # type: ignore[no-redef]
+        candidate_distance,
+        parse_window_requirement,
+        window_requirement,
+        within_window,
+    )
     from blackboard import View  # type: ignore[no-redef]
     from constraints import ANY_SUBJECT, Constraint  # type: ignore[no-redef]
     from protocol import AgentResult  # type: ignore[no-redef]
@@ -44,6 +68,31 @@ PARAM_PREFIX = "param:"
 
 def param_key(quantity: str) -> str:
     return f"{PARAM_PREFIX}{quantity}"
+
+
+def _number(value: Any) -> Optional[float]:
+    """A real numeric row axis, or None for 'not stated'."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def _row_description(source: Any) -> str:
+    """One line naming a row the reader can find again."""
+    parts = []
+    if source.ph is not None:
+        parts.append(f"pH {source.ph:g}")
+    if source.temperature_c is not None:
+        parts.append(f"{source.temperature_c:g} C")
+    conditions = ", ".join(parts) or "conditions unstated"
+    return f"{source.value} {source.unit or ''} @ {conditions}".strip()
+
+
+def _describe_windows(refs: List[Tuple[Optional[float], Optional[float], Any]]) -> str:
+    return "; ".join(
+        window_requirement(ph=ph, temperature_c=temperature_c)
+        for ph, temperature_c, _ in refs
+    )
 
 
 def _resolution_cls():
@@ -91,7 +140,7 @@ class ParameterScout:
         )
         source, reason = to_parameter_source(quantity, result)
 
-        notes: Tuple[str, ...] = ()
+        notes: List[str] = []
         if source is None and organism_constraint is not None:
             # Say which requirement closed the search. Without this the
             # report reads "no Km found", which is false: one was found and
@@ -103,10 +152,18 @@ class ParameterScout:
                 f"{organism_constraint.raised_by or 'an earlier round'})"
             )
         if source is not None and organism_constraint is not None:
-            notes = (
+            notes.append(
                 f"{quantity} re-resolved in {organism} after "
-                f"{organism_constraint.raised_by or 'a critic'} required it",
+                f"{organism_constraint.raised_by or 'a critic'} required it"
             )
+        if source is not None:
+            windows = self._windows(view, quantity)
+            if windows:
+                source, reason, window_note = self._re_select_under_window(
+                    quantity, source, windows, reason
+                )
+                if window_note is not None:
+                    notes.append(window_note)
 
         return AgentResult(
             writes={
@@ -114,7 +171,7 @@ class ParameterScout:
                     request=self.request, source=source, reason=reason
                 )
             },
-            notes=notes,
+            notes=tuple(notes),
         )
 
     def _required_organism(
@@ -132,6 +189,127 @@ class ParameterScout:
         # constraint kind that turns cross-species use on, because that is
         # the user's decision and no critic is entitled to make it.
         return False
+
+    # -- assay windows (ADR 0171) ------------------------------------
+
+    def _windows(self, view: View, quantity: str) -> Tuple[Constraint, ...]:
+        """The assay-window requirements binding this quantity, if any."""
+        return tuple(
+            c for c in view.constraints_for(quantity) if c.kind == "assay_window"
+        )
+
+    def _re_select_under_window(
+        self,
+        quantity: str,
+        source: Any,
+        windows: Tuple[Constraint, ...],
+        reason: Optional[str],
+    ) -> Tuple[Any, Optional[str], Optional[str]]:
+        """Re-choose the frontier row inside the windows, when one exists.
+
+        Returns `(source, reason, note)`. Only rows the resolver itself
+        returned are eligible; only rows inside EVERY window are chosen; the
+        chosen row is the one nearest the reference(s) by the normalised
+        distance metric. When the resolver's default choice is already the
+        nearest inside row, it stands and the note records that the window
+        was satisfied without a change; when no frontier row satisfies the
+        window, the default stands too -- re-selecting an outside row would
+        be manufacturing an answer the literature does not support.
+        """
+        refs = []
+        for window in windows:
+            ph, temperature_c = parse_window_requirement(window.requirement)
+            if ph is None and temperature_c is None:
+                continue
+            refs.append((ph, temperature_c, window))
+        if not refs or not source.candidates:
+            return source, reason, None
+
+        eligible = [
+            candidate
+            for candidate in source.candidates
+            if all(
+                within_window(
+                    candidate,
+                    reference_ph=ph,
+                    reference_temperature_c=temperature_c,
+                )
+                for ph, temperature_c, _ in refs
+            )
+        ]
+        if not eligible:
+            return (
+                source,
+                reason,
+                f"{quantity}: no row the resolver returned satisfies the "
+                f"assay window ({_describe_windows(refs)}), so its choice "
+                f"stands -- re-selecting an outside row would invent a "
+                f"measurement",
+            )
+
+        def rank(candidate: Any) -> float:
+            return max(
+                candidate_distance(
+                    candidate,
+                    reference_ph=ph,
+                    reference_temperature_c=temperature_c,
+                )
+                for ph, temperature_c, _ in refs
+            )
+
+        def value_of(candidate: Any) -> float:
+            return float(candidate["value"])
+
+        # Distance ties are decided by the resolver's own preference (the
+        # smallest value), so a re-selection never behaves differently from
+        # the resolver on the question the window leaves open.
+        best = min(eligible, key=lambda c: (rank(c), value_of(c)))
+
+        if best["value"] == source.value:
+            return (
+                source,
+                reason,
+                f"{quantity} is already the nearest frontier row inside "
+                f"the assay window ({_describe_windows(refs)}), so its "
+                f"choice stands",
+            )
+
+        chosen = replace(
+            source,
+            value=value_of(best),
+            ph=_number(best.get("ph")),
+            temperature_c=_number(best.get("temperature_c")),
+            # The frontier carries no buffer axis, so the re-selected row's
+            # buffer is unknown; None is the honest form of that.
+            buffer=None,
+            citation=(
+                f"reference_id:{best['reference_id']}"
+                if best.get("reference_id")
+                else source.citation
+            ),
+            # The re-selected row is a different measurement; its own
+            # unstated axes travelled with neither the dict nor the winner's
+            # record, so no unreported claim is carried forward for it.
+            explicitly_unreported=(),
+        )
+        row_organism = best.get("organism") or None
+        if row_organism and row_organism != source.organism:
+            chosen = replace(
+                chosen, organism=row_organism, cross_species=True
+            )
+
+        passed_desc = _row_description(source)
+        chosen_desc = _row_description(chosen)
+        new_reason = (
+            f"re-selected {quantity} under the assay window "
+            f"({_describe_windows(refs)}) raised by "
+            f"{refs[0][2].raised_by or 'a critic'}: chose {chosen_desc} "
+            f"(distance {rank(best):g}) over the resolver's default "
+            f"{passed_desc}; {len(source.candidates) - len(eligible)} "
+            f"of {len(source.candidates)} frontier row(s) fall outside the "
+            f"window"
+        )
+        return chosen, new_reason, new_reason
 
 
 def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
