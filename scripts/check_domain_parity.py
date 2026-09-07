@@ -84,6 +84,35 @@ def dispatch_domains() -> set[str]:
     return set(re.findall(r'^\s*"([a-z0-9_]+)"\s*:', match.group(1), re.MULTILINE))
 
 
+def composed_domains_py() -> set[str]:
+    """Keys of COMPOSED_DOMAINS in terium_runner.py."""
+    source = _read(RUNNER_PY)
+    match = re.search(
+        r"^COMPOSED_DOMAINS:\s*Dict\[str,\s*str\]\s*=\s*\{(.*?)^\}",
+        source,
+        re.DOTALL | re.MULTILINE,
+    )
+    if not match:
+        return set()
+    return set(re.findall(r'^\s*"([a-z0-9_]+)"\s*:', match.group(1), re.MULTILINE))
+
+
+def composed_domains_ts() -> set[str]:
+    """Members of the ComposedDomain union in teriumRunner.ts.
+
+    Read from the type rather than the const array so a drift between those
+    two is caught as well: TypeScript would reject a const member missing
+    from the union, but not a union member missing from the const, and the
+    const is what the runtime narrowing reads.
+    """
+    source = _read(RUNNER_TS)
+    match = re.search(r"export type ComposedDomain\s*=(.*?);", source, re.DOTALL)
+    if not match:
+        return set()
+    body = re.sub(r"//[^\n]*", "", match.group(1))
+    return set(re.findall(r'"([a-z0-9_]+)"', body))
+
+
 def simulation_domain_union() -> set[str]:
     """Members of the SimulationDomain union in teriumRunner.ts."""
     source = _read(RUNNER_TS)
@@ -160,6 +189,43 @@ def check() -> list[str]:
     if violations:
         return violations
 
+    # Composed domains are declared in BOTH languages and, until 2026-09-07,
+    # were compared by nothing. `DISPATCH` has had a parity guard since ADR
+    # 0007; its sibling table did not, so adding `parameterize` to Python
+    # left TypeScript rejecting a domain the runner would happily dispatch --
+    # a runtime 400 on a working feature, with both files individually
+    # correct. Found by adding one.
+    composed_py = composed_domains_py()
+    composed_ts = composed_domains_ts()
+    if not composed_py:
+        violations.append(
+            "parsed ZERO domains out of COMPOSED_DOMAINS in terium_runner.py. "
+            "Refusing to report success on an extraction that has broken."
+        )
+    if not composed_ts:
+        violations.append(
+            "parsed ZERO members out of the ComposedDomain union in "
+            "teriumRunner.ts. Refusing to report success on an extraction "
+            "that has broken."
+        )
+    if composed_py and composed_ts and composed_py != composed_ts:
+        only_py = sorted(composed_py - composed_ts)
+        only_ts = sorted(composed_ts - composed_py)
+        if only_py:
+            violations.append(
+                f"composed domain(s) in terium_runner.py's COMPOSED_DOMAINS "
+                f"but not in teriumRunner.ts's ComposedDomain union: "
+                f"{only_py}. The runner would dispatch them; TypeScript will "
+                f"not let a caller ask."
+            )
+        if only_ts:
+            violations.append(
+                f"composed domain(s) in teriumRunner.ts's ComposedDomain "
+                f"union but not in terium_runner.py's COMPOSED_DOMAINS: "
+                f"{only_ts}. TypeScript would accept the request and the "
+                f"runner would refuse it as an unknown domain."
+            )
+
     layers = _layers()
 
     # An empty extraction means the parse broke, not that a layer is empty.
@@ -218,9 +284,12 @@ def main() -> int:
     if not violations:
         layers = _layers()
         teaching = sorted(d for d in dispatch_domains() if d != ESCAPE_HATCH)
+        composed = sorted(composed_domains_py())
         print(
             f"OK: all {len(layers)} layers agree on {len(teaching)} "
-            f"simulation domain(s) + the {ESCAPE_HATCH} escape hatch."
+            f"simulation domain(s) + the {ESCAPE_HATCH} escape hatch, and "
+            f"both languages agree on {len(composed)} composed domain(s) "
+            f"({', '.join(composed)})."
         )
         return 0
 
