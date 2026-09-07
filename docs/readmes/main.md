@@ -10,7 +10,7 @@ git clone --recursive https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 2,468 tests (1,317 engine + 1,151 literature)
+make test      # 2,514 tests (1,355 engine + 1,159 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -59,13 +59,13 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 1,317 tests |
-| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,151 tests |
+| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 1,355 tests |
+| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,159 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
-| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 168 ADRs, API reference |
+| [`documents`](https://github.com/Terrium-sim/documents) | constitution, 169 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
 | [`terrium-site`](https://github.com/Terrium-sim/terrium-site) · [`landing`](https://github.com/Terrium-sim/landing) · [`mule`](https://github.com/Terrium-sim/mule) | the three web front ends |
 | [`advanced-analysis`](https://github.com/Terrium-sim/advanced-analysis) · [`benchmark-results`](https://github.com/Terrium-sim/benchmark-results) | figures and measurements |
