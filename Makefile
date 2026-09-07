@@ -230,6 +230,9 @@ guards: require-pytest
 	@echo ">> documented equations match the engine"
 	@"$(PY)" scripts/check_documented_equations_match_engine.py --selftest
 	@"$(PY)" scripts/check_documented_equations_match_engine.py
+	@echo ">> agent constraints are actionable"
+	@"$(PY)" scripts/check_constraints_are_actionable.py --selftest
+	@"$(PY)" scripts/check_constraints_are_actionable.py
 	@echo ">> EC numbers still current"
 	@"$(PY)" scripts/check_ec_numbers_current.py --selftest
 	@"$(PY)" scripts/check_ec_numbers_current.py

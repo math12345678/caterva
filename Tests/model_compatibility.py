@@ -100,6 +100,18 @@ class ParameterSource:
     #: judged against the literature's conditions -- it is their assay.
     origin: str = "literature"
 
+    #: Fields the source states the original publication did not report,
+    #: as opposed to fields Terrium simply has no value for.
+    #:
+    #: The conclusion is the same either way -- compatibility cannot be
+    #: checked -- but the ACTION is not. "The 1974 paper did not report a
+    #: pH" is permanent and tells a researcher to go and measure it. "We
+    #: have no pH" may be our parser failing on a commentary format, which
+    #: is a bug on our side and would be fixed rather than remeasured.
+    #: Reporting the second as the first sends somebody to the bench over
+    #: a regex.
+    explicitly_unreported: Tuple[str, ...] = ()
+
     @property
     def conditions_stated(self) -> bool:
         return self.ph is not None and self.temperature_c is not None
@@ -160,12 +172,19 @@ class CompatibilityReport:
                 f"{len(serious)} serious: "
                 + "; ".join(f.detail for f in serious)
             )
-        if self.unassessable:
+        # Every unassessable FINDING, not just the unpublished-conditions
+        # ones. There are now two kinds with different meanings -- an assay
+        # condition nobody printed, and an organism nobody recorded -- and
+        # summarising only the first made the second invisible on exactly
+        # the query where it matters most: the one that named no organism.
+        unassessable_findings = [
+            f for f in self.findings if f.severity == "unassessable"
+        ]
+        if unassessable_findings:
             parts.append(
-                f"{len(self.unassessable)} value(s) whose assay conditions "
-                f"were never published, so their compatibility with the rest "
-                f"could not be checked at all: "
-                + ", ".join(self.unassessable)
+                f"{len(unassessable_findings)} thing(s) that could not be "
+                f"checked either way: "
+                + "; ".join(f.detail for f in unassessable_findings)
             )
         if not parts:
             return (
@@ -174,6 +193,20 @@ class CompatibilityReport:
                 f"{PH_UNITS_SERIOUS} pH unit and {TEMPERATURE_C_SERIOUS:g} C."
             )
         return " | ".join(parts)
+
+
+def _named_unreported(source: ParameterSource, field_name: str) -> bool:
+    """Did the source explicitly say the publication omitted this field?
+
+    Matches loosely because BRENDA writes "pH", "temperature" and
+    "temperature not given" in the same list, and a reader who sees
+    "temperature" in the unreported list means the same thing in all three.
+    """
+    wanted = field_name.strip().lower()
+    return any(
+        wanted in str(entry).strip().lower()
+        for entry in source.explicitly_unreported
+    )
 
 
 def _literature(sources: Iterable[ParameterSource]) -> List[ParameterSource]:
@@ -229,6 +262,37 @@ def assess(sources: Sequence[ParameterSource]) -> CompatibilityReport:
                     f"values come from {len(by_organism)} different "
                     f"organisms ({described}). Combining them describes no "
                     f"enzyme in any of them."
+                ),
+            )
+        )
+
+    # A value with no organism recorded is not a value from a matching
+    # organism -- it is one whose organism nobody wrote down.
+    #
+    # Found on real BRENDA data: `resolve_kinetic_value` called with an
+    # empty organism matches every row in the table, returns the minimum
+    # across all species, and reports the organism as "". Two such values
+    # then look identical to this function and pass as compatible, because
+    # there is nothing left to disagree about. That is the
+    # silence-as-compatibility error the `unassessable` category exists to
+    # prevent, appearing one field below where it was first caught.
+    unattributed = [
+        s.quantity for s in literature if not (s.organism or "").strip()
+    ]
+    if unattributed and len(literature) > 1:
+        findings.append(
+            Finding(
+                kind="organism_unattributed",
+                severity="unassessable",
+                quantities=tuple(unattributed),
+                detail=(
+                    f"no organism is recorded for "
+                    f"{', '.join(sorted(unattributed))}, so whether "
+                    f"{'they belong' if len(unattributed) > 1 else 'it belongs'} "
+                    f"with the other values cannot be checked. A kinetic "
+                    f"constant is a property of an enzyme IN an organism; a "
+                    f"value with no organism attached is not a measurement of "
+                    f"anything in particular"
                 ),
             )
         )
@@ -331,16 +395,33 @@ def assess(sources: Sequence[ParameterSource]) -> CompatibilityReport:
             missing.append("pH")
         if source.temperature_c is None:
             missing.append("temperature")
+        stated_absent = [f for f in missing if _named_unreported(source, f)]
+        if stated_absent == missing:
+            attribution = (
+                "which the source states the original publication did not "
+                "report"
+            )
+        elif stated_absent:
+            named = " and ".join(stated_absent)
+            attribution = (
+                f"of which {named} is stated unreported by the publication "
+                f"and the rest is simply absent from the record Terrium read"
+            )
+        else:
+            attribution = (
+                "absent from the record Terrium read, which may mean the "
+                "publication omitted them or that they were not captured"
+            )
         findings.append(
             Finding(
                 kind="conditions_unpublished",
                 severity="unassessable",
                 quantities=(source.quantity,),
                 detail=(
-                    f"{source.quantity}: {' and '.join(missing)} not reported "
-                    f"by the source, so its compatibility with the other "
-                    f"values cannot be checked either way (STRENDA, Tipton "
-                    f"et al. 2014)"
+                    f"{source.quantity}: {' and '.join(missing)} not "
+                    f"available, {attribution}. Its compatibility with the "
+                    f"other values cannot be checked either way (STRENDA, "
+                    f"Tipton et al. 2014)"
                 ),
             )
         )

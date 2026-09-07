@@ -201,7 +201,7 @@ class TestTheThirdCategory:
         report = assess(sources)
         assert report.coherent, "an unchecked condition is not a failure"
         assert report.unassessable, "and it must not vanish either"
-        assert "could not be checked at all" in report.summary()
+        assert "could not be checked either way" in report.summary()
 
 
 class TestUserMeasurements:
@@ -259,3 +259,55 @@ class TestTheRealisticCase:
         report = assess([])
         assert report.findings == ()
         assert "No parameters" in report.summary()
+
+
+class TestAnUnrecordedOrganism:
+    """Found on real BRENDA data, not by inspection.
+
+    `resolve_kinetic_value` called with an empty organism matches every row
+    in the table, returns the minimum across all species, and reports the
+    organism as "". Two such values then agree about the organism trivially
+    -- there is nothing left to disagree about -- and this function passed
+    them as compatible.
+
+    That is the silence-as-compatibility error one field below where it was
+    first caught, and it fires on the commonest query of all: the one that
+    names no organism.
+    """
+
+    def test_values_with_no_organism_are_not_treated_as_agreeing(self) -> None:
+        sources = [
+            ParameterSource("Km", 10.73, "mM", organism="", ph=8.0,
+                            temperature_c=37.0),
+            ParameterSource("Ki", 0.0116, "mM", organism="", ph=8.0,
+                            temperature_c=37.0),
+        ]
+        report = assess(sources)
+        finding = next(
+            f for f in report.findings if f.kind == "organism_unattributed"
+        )
+        assert finding.severity == "unassessable"
+        assert set(finding.quantities) == {"Km", "Ki"}
+        # Not blocking: they may well be the same organism, and claiming
+        # otherwise would be a stronger statement than the evidence carries.
+        assert report.coherent
+
+    def test_it_appears_in_the_summary(self) -> None:
+        # The finding existed before this assertion did and was invisible:
+        # the summary reported only the unpublished-conditions kind.
+        report = assess([
+            ParameterSource("Km", 10.73, "mM", organism="", ph=8.0,
+                            temperature_c=37.0),
+            ParameterSource("Ki", 0.0116, "mM", organism="", ph=8.0,
+                            temperature_c=37.0),
+        ])
+        assert "no organism is recorded" in report.summary()
+
+    def test_a_single_value_with_no_organism_is_not_flagged(self) -> None:
+        # Compatibility is a property of a SET. One value has nothing to be
+        # incompatible with, and flagging it would fire on every
+        # single-constant model.
+        report = assess([ParameterSource("Km", 10.73, "mM", organism="")])
+        assert not any(
+            f.kind == "organism_unattributed" for f in report.findings
+        )

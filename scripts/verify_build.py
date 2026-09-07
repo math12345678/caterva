@@ -412,6 +412,26 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_documented_equations_match_engine.py'}"
     ))
 
+    # Every constraint an agent critic can raise must be honoured by some
+    # agent. Added 2026-09-07 with Terium/agents.
+    #
+    # The failure it catches is silent by construction. A critic that emits
+    # a constraint kind nothing reads still changes the fingerprint, still
+    # re-runs every agent, still deduplicates on the second round and still
+    # converges -- and the report then states that the model was built under
+    # a requirement no search ever applied. Nothing raises, nothing fails,
+    # and the sentence is false. `critics.py` documents which findings are
+    # allowed to become constraints; this enforces it.
+    guards.append(run_guard(
+        "Actionable Constraints Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_constraints_are_actionable.py'}"
+        " --selftest"
+    ))
+    guards.append(run_guard(
+        "Actionable Constraints Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_constraints_are_actionable.py'}"
+    ))
+
     # EC numbers in enzymes.ts must still be the ones IUBMB recognises.
     # Added 2026-09-05, after cytochrome c oxidase was found shipping
     # EC 1.9.3.1 -- transferred to 7.1.1.9 in 2018 when class EC 7

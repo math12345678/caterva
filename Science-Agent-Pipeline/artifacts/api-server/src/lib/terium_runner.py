@@ -1145,6 +1145,159 @@ def run_network(params: Dict[str, Any]) -> Dict[str, Any]:
 # and SimulationDomain in teriumRunner.ts now lists them.
 #
 # lotka_volterra, cell_cycle_oscillator, repressilator: see ADR 0022.
+def run_parameterize(
+    params: Dict[str, Any], *, resolve: Any = None
+) -> Dict[str, Any]:
+    """Build a model from a description by searching the literature for it.
+
+    The open path's other half. `run_network` takes a network whose values
+    the caller already has; this takes a network whose values it does not,
+    and goes and looks for them -- resolving every constant concurrently,
+    judging whether the set composes, re-searching under whatever the
+    judgement requires, and exploring each candidate organism when the
+    literature offers more than one.
+
+    Returns the search, including the branches that did NOT work out. Those
+    are the useful part: "no Ki has been measured in human, though one
+    exists in rabbit" is a result, and a report that showed only the
+    surviving branch would have thrown it away.
+    """
+    # `Tests/` holds the literature layer. Located from the importable
+    # `Terium` package rather than from this file's path, for the reason
+    # given at the model_ensemble import below: the runner is spawned with
+    # a PYTHONPATH the server chooses, and walking up from __file__ breaks
+    # the moment either tree moves.
+    import sys as _sys
+
+    import Terium as _terium_pkg  # noqa: PLC0415
+
+    repo_root = pathlib.Path(_terium_pkg.__file__).resolve().parent.parent
+    for candidate in (repo_root, repo_root / "Tests"):
+        if str(candidate) not in _sys.path:
+            _sys.path.insert(0, str(candidate))
+
+    from Terium.agents.assembly import search_model
+    from Terium.agents.scouts import brenda_resolver
+    from Tests.parameterize import ParameterRequest
+
+    network = _network_from_spec(params.get("network"))
+    raw_requests = params.get("requests") or []
+    if not raw_requests:
+        raise ValueError(
+            "parameterize needs at least one request: the quantities to "
+            "resolve. An empty list would return a model with every "
+            "placeholder value intact."
+        )
+
+    requests = [
+        ParameterRequest(
+            quantity=str(entry["quantity"]),
+            subject=entry.get("subject"),
+            substrate=entry.get("substrate"),
+            organism=entry.get("organism"),
+            ec_number=entry.get("ec_number"),
+            table=entry.get("table"),
+            expected_unit=entry.get("expected_unit"),
+        )
+        for entry in raw_requests
+    ]
+
+    declared = {r.quantity for r in requests}
+    available = set(network.quantity_ids())
+    unknown = declared - available
+    if unknown:
+        raise ValueError(
+            f"asked to resolve {sorted(unknown)}, which this network does "
+            f"not contain. Its quantities are {sorted(available)}."
+        )
+
+    # `resolve` is keyword-only and `main()` never supplies it, so a
+    # request body cannot reach it. It exists so this path can be exercised
+    # without BRENDA -- a front door that can only be tested online is a
+    # front door nobody tests.
+    search = search_model(
+        network=network,
+        requests=requests,
+        resolve=resolve or brenda_resolver(),
+        requested_organism=params.get("organism"),
+    )
+    return _serialise_search(search)
+
+
+def _serialise_search(search: Any) -> Dict[str, Any]:
+    """The search as JSON, branches included."""
+    def source_payload(source: Any) -> Any:
+        if source is None:
+            return None
+        return {
+            "value": source.value,
+            "unit": source.unit,
+            "organism": source.organism,
+            "ph": source.ph,
+            "temperature_c": source.temperature_c,
+            "buffer": source.buffer,
+            "citation": source.citation,
+            "cross_species": source.cross_species,
+            "explicitly_unreported": list(source.explicitly_unreported),
+        }
+
+    def build_payload(build: Any) -> Dict[str, Any]:
+        compatibility = build.compatibility
+        return {
+            "converged": build.run.converged,
+            "rounds": build.run.round_count,
+            "constraints": [
+                {
+                    "kind": c.kind,
+                    "subject": c.subject,
+                    "requirement": c.requirement,
+                    "reason": c.reason,
+                    "raised_by": c.raised_by,
+                }
+                for c in build.run.constraints.all()
+            ],
+            "resolved": {
+                quantity: source_payload(getattr(r, "source", None))
+                for quantity, r in build.resolutions.items()
+            },
+            "missing": {
+                quantity: build.resolutions[quantity].reason
+                for quantity in build.missing
+            },
+            "findings": [
+                {
+                    "kind": f.kind,
+                    "severity": f.severity,
+                    "quantities": list(f.quantities),
+                    "detail": f.detail,
+                }
+                for f in (compatibility.findings if compatibility else ())
+            ],
+            "unassessable": list(compatibility.unassessable) if compatibility else [],
+            "coherent": bool(compatibility.coherent) if compatibility else False,
+            "simulated": bool(build.simulation.get("ran")),
+            "not_simulated_because": build.simulation.get("refused_because"),
+            "summary": build.summary(),
+        }
+
+    chosen = search.build
+    return {
+        "domain": "parameterize",
+        "chosen_organism": search.chosen.organism if search.chosen else None,
+        "undecided_organisms": list(search.undecided),
+        "branches": [
+            {
+                "organism": branch.organism,
+                "complete": branch.complete,
+                "build": build_payload(branch.build),
+            }
+            for branch in search.branches
+        ],
+        "model": build_payload(chosen) if chosen is not None else None,
+        "summary": search.summary(),
+    }
+
+
 DISPATCH: Dict[str, str] = {
     "mm": "simulate_michaelis_menten",
     "mm_competitive_inhibition": "simulate_mm_competitive_inhibition",
@@ -1183,6 +1336,12 @@ DISPATCH: Dict[str, str] = {
 #: The boundary test reads this, so a composed domain is still required to
 #: have a handler and is still not allowed to be unreachable.
 COMPOSED_DOMAINS: Dict[str, str] = {
+    "parameterize": (
+        "a network whose constants are unknown: every one is searched for "
+        "concurrently, the set is judged for mutual compatibility, the "
+        "search re-runs under whatever that judgement requires, and each "
+        "candidate organism is explored rather than chosen between"
+    ),
     "network": (
         "a caller-constructed reaction network: validated, refused if any "
         "quantity is unsourced, then compiled to Antimony and simulated"
@@ -1207,6 +1366,7 @@ _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "cell_cycle_oscillator": run_cell_cycle_oscillator,
     "repressilator": run_repressilator,
     "sbml": run_sbml,
+    "parameterize": run_parameterize,
     # The open path. Deliberately absent from DISPATCH: that table
     # maps a domain to an engine `simulate_*` function and is asserted
     # exhaustive against the engine's __all__ by
