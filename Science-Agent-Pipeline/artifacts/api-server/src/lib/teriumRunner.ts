@@ -42,6 +42,11 @@ export type SimulationDomain =
  * scripts/check_domain_parity.py enforces that across three files. That
  * contract is correct and stays intact.
  *
+ * `compose` composes furthest of all and touches no engine function
+ * directly: it recognises a MECHANISM in a description, builds a reaction
+ * network from motifs, and dimensionally checks every rate law before
+ * anything runs. See ADR 0173.
+ *
  * `parameterize` composes more still: it resolves every unknown constant
  * from the literature concurrently, judges whether the resolved set is
  * mutually usable, re-searches under whatever that judgement requires, and
@@ -55,7 +60,7 @@ export type SimulationDomain =
  * SimulationDomain instead would have forced either a fictional engine
  * function or a weakened parity check.
  */
-export type ComposedDomain = "network" | "parameterize";
+export type ComposedDomain = "network" | "parameterize" | "compose";
 
 /** Anything the runner will dispatch. */
 export type RunnableDomain = SimulationDomain | ComposedDomain;
@@ -64,6 +69,7 @@ export type RunnableDomain = SimulationDomain | ComposedDomain;
 export const COMPOSED_DOMAINS: readonly ComposedDomain[] = [
   "network",
   "parameterize",
+  "compose",
 ] as const;
 
 /**
