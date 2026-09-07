@@ -101,15 +101,15 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "78 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "80 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic",
-        // Measured 2026-09-05, running Tests/ alone under .venv (the
+        // Measured 2026-09-06, running Tests/ alone under .venv (the
         // interpreter these counts are documented against):
         // `1130 passed, 1 skipped in 257.23s`. Run ALONE deliberately --
         // these suites are contention-sensitive and a parallel run has
         // already produced a spuriously low figure twice in this file's
         // history.
-        passed: 1130,
+        passed: 1151,
         skipped: 1,
         failed: 0,
       },
