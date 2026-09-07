@@ -89,7 +89,7 @@ export const TEST_SUITES: TestSuite[] = [
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, and citation/build guards",
         // Measured 2026-09-07, Terium/ run alone under .venv.
-        passed: 1379,
+        passed: 1380,
         skipped: 0,
         failed: 0,
       },

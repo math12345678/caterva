@@ -343,6 +343,43 @@ class TestTheScoutReSelects:
             for r in report.rounds for ar in r.ran if ar.agent == "scout:Km"
         )
 
+    def test_re_selection_keeps_the_chosen_rows_own_provenance(self) -> None:
+        # The re-selected row is a different measurement. The frontier carries
+        # no buffer axis, so the row's buffer is unknown and must become None
+        # (not carry the resolver-winner's buffer forward); the citation must
+        # name the chosen row's reference_id; and cross_species must flip
+        # ONLY when the chosen row actually names a different organism.
+        rows = {
+            "kcat": [
+                # The resolver winner: named organism, buffer stated, etc.
+                row(21.1, 6.0, 25.0, unit="1/s", reference_id="W"),
+                # A row at the reference's pH in a different organism.
+                {
+                    "value": 32.0, "unit": "1/s", "organism": "Escherichia coli",
+                    "reference_id": "D", "conditions": "idem",
+                    "ph": 8.0, "temperature_c": 25.0,
+                    "grades": {"assay_completeness": "good",
+                               "condition_proximity": "good",
+                               "organism_match": "good"},
+                },
+            ],
+        }
+        window = Constraint(
+            kind="assay_window", subject="kcat", requirement="pH 8",
+            reason="test", raised_by="test",
+        )
+        report, _ = self._scout_result(
+            "kcat", windowed_resolver(rows), windows=(window,)
+        )
+        source = report.blackboard.get(param_key("kcat")).source
+        assert source.value == 32.0
+        assert source.buffer is None          # no buffer axis on the frontier
+        assert "reference_id:D" in source.citation
+        assert source.organism == "Escherichia coli"
+        assert source.cross_species is True   # a different organism was chosen
+        assert source.ph == 8.0
+        assert source.temperature_c == 25.0
+
 
 class TestTheWholeLoop:
     def test_km_at_ph_8_pulls_kcat_to_its_pH_8_row(self) -> None:
