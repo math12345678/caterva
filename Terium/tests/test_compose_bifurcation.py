@@ -113,21 +113,38 @@ class TestHonesty:
         """
         network = recognise("a toggle switch between two repressors").network()
         report = sweep(network, "geneA_n", linear_values(1.0, 3.0, 11))
-        if report.barren:
-            assert report.bifurcations, (
-                "a gap silenced the detector: " + report.summary()
-            )
-            assert "spans a value where the root find returned nothing" in (
-                " ".join(b.detail for b in report.bifurcations)
-            )
+
+        # Asserted, not guarded by `if report.barren`. With the condition in
+        # an `if`, a change that stopped producing a gap would skip every
+        # assertion and the test would pass while checking nothing -- which
+        # the repository's Vacuous Test Guard caught. The gap is the
+        # PRECONDITION this test needs, so its absence must fail here rather
+        # than silently disarm it.
+        assert report.barren, (
+            "this sweep no longer has a solver gap, so it cannot test that a "
+            "gap fails to blind the detector. Find a sweep that does, or "
+            "delete this test."
+        )
+        assert report.bifurcations, (
+            "a gap silenced the detector: " + report.summary()
+        )
+        assert "spans a value where the root find returned nothing" in (
+            " ".join(b.detail for b in report.bifurcations)
+        )
 
     def test_the_summary_never_contradicts_its_own_regions(self) -> None:
         network = recognise("a toggle switch between two repressors").network()
         report = sweep(network, "geneA_n", linear_values(1.0, 3.0, 11))
         summary = report.summary()
         distinct = {count for _, _, count in report.regions()}
-        if len(distinct) > 1:
-            assert "No change in the number or stability" not in summary
+
+        # Same correction as above: the multi-region case is what this test
+        # is about, so it is asserted rather than used as a guard.
+        assert len(distinct) > 1, (
+            f"this sweep no longer crosses a transition (regions: {distinct}), "
+            f"so there is no contradiction to check for"
+        )
+        assert "No change in the number or stability" not in summary
 
     def test_a_bifurcation_is_reported_as_an_interval_not_a_point(self) -> None:
         # A sweep locates a transition no more precisely than its own step.
