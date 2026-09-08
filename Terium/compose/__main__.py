@@ -39,6 +39,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="emit Antimony source instead of a report")
     parser.add_argument("--no-analysis", action="store_true",
                         help="skip the steady-state analysis (much faster)")
+    parser.add_argument("--no-simulate", action="store_true",
+                        help="skip the time course")
     parser.add_argument("--sweep", action="append", default=[], metavar="PARAM",
                         help="sweep this parameter and report bifurcations; repeatable")
     parser.add_argument("--sweep-from", type=float, default=0.1)
@@ -83,6 +85,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             args.description,
             subject=args.subject,
             analyse_stability=not args.no_analysis,
+            simulate=not args.no_simulate,
             sweep_parameters=args.sweep,
             sweep_range=(args.sweep_from, args.sweep_to),
             sweep_steps=args.sweep_steps,

@@ -84,12 +84,12 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "63 test files -- kinetics & Michaelis-Menten correctness, " +
+          "64 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, and citation/build guards",
         // Measured 2026-09-07, Terium/ run alone under .venv.
-        passed: 1494,
+        passed: 1509,
         skipped: 0,
         failed: 0,
       },
@@ -121,11 +121,12 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "78 test files -- query resolution, parameter provenance, " +
+          "80 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
-          "SSE job routes",
-        // Measured 2026-09-07: `78 passed (78) / 839 passed (839)`, run
+          "SSE job routes, parameterize bridge, route-level front-door " +
+          "coverage",
+        // Measured 2026-09-07: `80 passed (80) / 852 passed (852)`, run
         // alone with the repo's .venv/bin first on PATH.
         //
         // Off that PATH the same run reports 837 passed / 2 failed, and the
@@ -148,7 +149,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 839,
+        passed: 852,
         skipped: 0,
         failed: 0,
       },

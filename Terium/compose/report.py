@@ -33,6 +33,7 @@ class ModelDossier:
     stability: Optional[Any] = None  # StabilityReport
     sweeps: Tuple[Any, ...] = ()     # SweepReport
     search: Optional[Any] = None     # ModelSearch, when parameters resolved
+    trajectory: Optional[Any] = None  # Trajectory, when the engine is present
 
     # -- sections -----------------------------------------------------
 
@@ -162,6 +163,20 @@ class ModelDossier:
             lines.append(self.placeholder_warning())
         return lines
 
+    def trajectory_section(self) -> List[str]:
+        if self.trajectory is None:
+            return []
+        lines = ["", "## Time course", "", self.trajectory.summary()]
+        if not self.trajectory.sound:
+            lines.append("")
+            lines.append(
+                "**The trajectory above should not be trusted.** A "
+                "conservation law that is exact in the model did not hold "
+                "during the integration, which means the integrator, not the "
+                "model, produced those numbers."
+            )
+        return lines
+
     def sweeps_section(self) -> List[str]:
         if not self.sweeps:
             return []
@@ -212,6 +227,7 @@ class ModelDossier:
         lines += self.units_section()
         lines += self.provenance_section()
         lines += self.behaviour_section()
+        lines += self.trajectory_section()
         lines += self.sweeps_section()
         lines += [
             "",
@@ -231,6 +247,7 @@ def dossier(
     *,
     subject: Optional[str] = None,
     analyse_stability: bool = True,
+    simulate: bool = True,
     sweep_parameters: Sequence[str] = (),
     sweep_range: Tuple[float, float] = (0.1, 10.0),
     sweep_steps: int = 15,
@@ -261,6 +278,23 @@ def dossier(
                 f"stability analysis did not run: {exc}"
             )
 
+    trajectory = None
+    if simulate:
+        try:
+            from .simulate import run as run_simulation
+        except ImportError:  # pragma: no cover - flat import
+            from simulate import run as run_simulation  # type: ignore[no-redef]
+        try:
+            trajectory = run_simulation(model)
+        except Exception as exc:  # noqa: BLE001
+            # The engine is optional. Structure, dimensions, invariants and
+            # steady states are all available without it, and losing the
+            # whole report because a time course could not run would be a
+            # poor trade.
+            model.recognition.composition.note(
+                f"no time course: {exc}"
+            )
+
     sweeps = []
     for parameter in sweep_parameters:
         try:
@@ -275,6 +309,7 @@ def dossier(
 
     return ModelDossier(
         query=query, model=model, stability=stability, sweeps=tuple(sweeps),
+        trajectory=trajectory,
     )
 
 
