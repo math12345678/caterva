@@ -23,6 +23,10 @@
     "NOTE ON THE TEST COMMAND: it deliberately omits -q. Under this repo's pytest configuration -q suppresses the final 'N passed' line entirely, and scripts/mutate.py reads that line to establish the suite actually RAN. With -q the harness correctly refused the whole set -- 'the baseline suite did not execute any tests' -- rather than grading twelve mutations against a count it could not see. That refusal is the harness working, and it is the same failure testResults.ts records from the other direction.",
     "",
     "RESULT, 2026-09-08: 12 caught, 0 not caught, 0 indeterminate. M1-M5 and M7-M12 ran as one set against a green 91-test baseline. M6 was run on its own afterwards because the mutation it applies -- a continuation that re-searches globally at every perturbed evaluation -- makes the suite take roughly twenty minutes rather than ninety seconds. That slowdown is not an inconvenience to work around; it IS the performance half of the decision, reproduced. It is also why the first draft of this module never finished a cascade ranking.",
+    "",
+    "M13-M16 were added after the first table, when ranking every model in the library surfaced four whose sensitivities are exactly zero because a conservation law pins them -- not because they are saturated. The unresolvable/negligible split, introduced for honesty, turned out to be the discriminator. M14 is the important one: it removes the conjunction and lets the LAW alone decide, which reroutes the saturated cascade to the structural caption, because tier3_Xp is conserved too.",
+    "",
+    "M16 WAS ALSO REPLACED, for the same reason as M6 and with the same lesson: the first version was inert, not uncaught. Two of sixteen mutations in this table were inert on the first attempt, which is worth knowing about writing them -- a mutation that looks like it breaks something can be defeated by a detail of the surrounding code (extra_starts being prepended; species names being tokens of the laws that contain them), and the harness reports that as NOT CAUGHT because it cannot tell the two apart. Only reading the code can.",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0175-a-threshold-finer-than-the-method.json"
   ],
   "test": "./.venv/bin/python -m pytest Terium/tests/test_compose_sensitivity.py Terium/tests/test_compose_report.py Terium/tests/test_compose_analysis.py --no-header --tb=no -p no:cacheprovider",
@@ -131,6 +135,42 @@
       "file": "Terium/compose/report.py",
       "find": "        actionable = [\n            s for s in self.sensitivity.sensitivities if not s.negligible\n        ]",
       "replace": "        actionable = list(self.sensitivity.sensitivities)"
+    },
+    {
+      "id": "M13",
+      "description": "an all-zero ranking is captioned as saturation even when a conservation law is what pins it",
+      "_claimed": "caught by test_the_pinned_summary_names_the_law_and_redirects and test_a_conserved_target_gets_the_structural_caption",
+      "_note": "Saturation and conservation produce the same empty priority list and demand opposite advice. This is the plausible-wrong-reason failure attached to a correct number -- the same shape as calling a continuum a set of attractors.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "    law = conservation_pinning(model.network, species, report)\n    return replace(report, conserved_by=law) if law else report",
+      "replace": "    return report"
+    },
+    {
+      "id": "M14",
+      "description": "conservation pinning is decided by the law alone, without requiring the sensitivities to be zero",
+      "_claimed": "caught by test_a_saturated_model_is_not_called_conserved",
+      "_note": "The conjunction is the whole point. tier3_Xp IS in a conservation law -- every phosphorylation tier conserves its total protein -- so a law-only test reroutes the SATURATED cascade to the structural caption. This mutation is why the cascade case is in the tests.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "    if not all(s.unresolvable for s in report.sensitivities):\n        return None",
+      "replace": "    if False:\n        return None"
+    },
+    {
+      "id": "M15",
+      "description": "a binding motif's complex is no longer a fallback target, so binding models get no ranking",
+      "_claimed": "caught by test_a_motif_with_no_product_falls_back_to_its_complex and test_the_dossier_now_ranks_a_binding_model",
+      "_note": "Restores the gap exactly: silence rather than a refusal with a reason.",
+      "file": "Terium/compose/report.py",
+      "find": "    for role in (ROLE_PRODUCT, ROLE_COMPLEX):",
+      "replace": "    for role in (ROLE_PRODUCT,):"
+    },
+    {
+      "id": "M16",
+      "description": "the conservation-law match is a substring test, so tier1_X matches tier1_Xp",
+      "_claimed": "caught by TestLawMentions",
+      "_note": "The first version of this mutation targeted the same rule inline inside conservation_pinning and came back NOT CAUGHT -- correctly, and the mutation was INERT rather than the tests weak. In every law the library currently produces, a species that is a substring of another token is also a token of the same law ('complex_A + complex_AB' names both), so substring and token matching agree on every real input and the distinction could not be exercised through any composable model. A guard indistinguishable from its own bug is not yet a guard, so the rule was split out as law_mentions() and TestLawMentions drives it with the law strings that separate the two rules -- including a test asserting those strings DO separate them, so the class cannot quietly become vacuous.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "    return species in re.findall(r\"[A-Za-z_][A-Za-z0-9_]*\", law)",
+      "replace": "    return species in law"
     }
   ]
 }

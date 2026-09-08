@@ -217,6 +217,20 @@ class ModelDossier:
                 "Measuring the top of this list buys more than measuring "
                 "the bottom of it."
             )
+        elif getattr(self.sensitivity, "conserved_by", None):
+            # An all-zero ranking with a STRUCTURAL cause, not a kinetic
+            # one. Captioning this as saturation would be a plausible wrong
+            # reason attached to a correct number.
+            lines.append(
+                f"**No rate constant influences this answer at all**, and "
+                f"the reason is structural: `{self.sensitivity.conserved_by}` "
+                f"is conserved, which fixes this quantity at the total the "
+                f"initial condition set. The constants decide how FAST the "
+                f"system arrives, never WHERE. Nothing in this table is "
+                f"worth measuring *for this question* — ask instead for the "
+                f"settling time or the time course, which are the things "
+                f"the kinetics do determine."
+            )
         else:
             lines.append(
                 f"**No constant here clears |S| = "
@@ -480,21 +494,32 @@ def _default_target(model: Any) -> Optional[str]:
     the cases the reaction-order rule got wrong: a cascade's bottom tier Xp,
     and a competing enzyme's P rather than the enzyme itself.
 
-    `None` when no motif declares a product, rather than any fallback to a
+    A binding motif declares no product -- it has partners and a COMPLEX --
+    so products are tried first and complexes second. Without that fallback
+    "reversible binding of a ligand to a receptor" got no ranking at all:
+    `complex_AB` is plainly what a reader means by the answer, and returning
+    `None` there was a gap rather than a refusal.
+
+    `None` when no motif declares either, rather than any fallback to a
     first or last species. Ranking against an arbitrary species would put a
     confident ordering next to the wrong question, which is worse than no
     ordering -- and is exactly the failure this function already had once.
     """
     try:
-        from .motifs import ROLE_PRODUCT
+        from .motifs import ROLE_COMPLEX, ROLE_PRODUCT
     except ImportError:  # pragma: no cover - flat import
-        from motifs import ROLE_PRODUCT  # type: ignore[no-redef]
+        from motifs import ROLE_COMPLEX, ROLE_PRODUCT  # type: ignore[no-redef]
 
-    instances = getattr(model.recognition.composition, "instances", ())
-    for instance in reversed(list(instances)):
-        products = instance.motif.ports_with_role(ROLE_PRODUCT)
-        if products:
-            return instance.species_for(products[-1].name)
+    instances = list(getattr(model.recognition.composition, "instances", ()))
+    # Products across all instances first, then complexes across all of
+    # them -- not "product or complex" per instance. A composition whose
+    # LAST motif binds and whose earlier one produces should still rank
+    # against the thing produced.
+    for role in (ROLE_PRODUCT, ROLE_COMPLEX):
+        for instance in reversed(instances):
+            ports = instance.motif.ports_with_role(role)
+            if ports:
+                return instance.species_for(ports[-1].name)
     return None
 
 

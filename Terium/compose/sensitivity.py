@@ -117,6 +117,7 @@ starting points turns "did not find another" into "there is not another".
 from __future__ import annotations
 
 import math
+import re
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
@@ -282,6 +283,21 @@ class SensitivityReport:
     #: The fractional step taken. Reported because it and the resolution are
     #: the two numbers a reader needs to reproduce any row here.
     step: float = RELATIVE_STEP
+    #: The conservation law that fixes this quantity, when one does.
+    #:
+    #: A CLOSED SYSTEM'S DESTINATION IS NOT SET BY ITS KINETICS. Substrate
+    #: inhibition conserves `S + P`; started at S = 1 and P = 0 it ends at
+    #: P = 1 whatever kcat and Km are, so every rate constant has sensitivity
+    #: exactly zero. That is the correct answer and the reason for it is
+    #: structural, not kinetic -- the constants set how FAST the system gets
+    #: there, never WHERE.
+    #:
+    #: Reported because the alternative explanation for an all-zero ranking
+    #: is saturation, and the advice differs completely. Under saturation
+    #: there is nothing to be gained anywhere; under conservation the
+    #: question was simply asked of the wrong quantity, and a settling time
+    #: or a time course answers it.
+    conserved_by: Optional[str] = None
 
     @property
     def ranked(self) -> Tuple[Sensitivity, ...]:
@@ -349,6 +365,21 @@ class SensitivityReport:
                 + ". Measuring those first buys more than measuring the "
                 "others, which is a different statement from saying the "
                 "others do not matter."
+            )
+        elif self.conserved_by:
+            # A DIFFERENT REASON FOR THE SAME EMPTY LIST, and the advice is
+            # the opposite one. Nothing here is saturated; the quantity is
+            # simply not a function of the rate constants at all.
+            lines.append(
+                f"No rate constant influences this answer, and the reason is "
+                f"structural rather than kinetic: `{self.conserved_by}` is "
+                f"conserved, which fixes this quantity at the total the "
+                f"initial condition set. The constants decide how FAST the "
+                f"system arrives, never WHERE -- so no measurement can move "
+                f"this number, and asking a closed system for a "
+                f"steady-state sensitivity is asking the wrong question of "
+                f"it. Ask for the settling time or a time course, which are "
+                f"the things the kinetics do determine."
             )
         elif self.unmeasured:
             # NOT silence. An empty priority list is a finding: at these
@@ -765,12 +796,91 @@ def rank_unmeasured(model: Any, species: str) -> SensitivityReport:
     Takes a `ComposedModel` so the unmeasured set comes from the model's own
     account of what it could not resolve, rather than from the caller
     guessing.
+
+    Also diagnoses an all-zero ranking, which has two possible causes with
+    opposite advice -- see `conservation_pinning`.
     """
-    return analyse(
+    from dataclasses import replace
+
+    report = analyse(
         model.network,
         steady_state_of(species),
         unmeasured=tuple(q.parameter_id for q in model.resolvable),
     )
+    law = conservation_pinning(model.network, species, report)
+    return replace(report, conserved_by=law) if law else report
+
+
+def conservation_pinning(
+    network: Any, species: str, report: SensitivityReport
+) -> Optional[str]:
+    """The conservation law fixing this quantity, if that is why S is zero.
+
+    TWO CAUSES, ONE SYMPTOM. A ranking where nothing clears the act-on
+    threshold can mean the mechanism is saturated -- nothing upstream can
+    push it further -- or that the quantity is not a function of the rate
+    constants at all, because a conservation law fixes it at whatever total
+    the initial condition set.
+
+    The two are told apart by the distinction this module already draws for
+    a different reason. Under saturation the sensitivities are small but
+    REAL: the cascade's sit at 1e-8, four orders above the noise floor.
+    Under conservation they are exactly zero, so every one of them is
+    `unresolvable`. That the honesty threshold turns out to be the
+    diagnostic is a happy accident, but it is the correct test rather than a
+    convenient one -- "measurably small" and "not there" are the two cases,
+    and those are the two words for them.
+
+    Requires BOTH signals. All-unresolvable alone could be a quantity the
+    solver simply cannot move; a law containing the species alone is true of
+    every closed system including ones whose steady state does depend on
+    kinetics. Only together do they mean what this says, and a report with
+    no sensitivities at all is never pinned -- nothing was measured, so
+    nothing was found to be zero.
+    """
+    if not report.sensitivities:
+        return None
+    if not all(s.unresolvable for s in report.sensitivities):
+        return None
+
+    try:
+        from Terium.core.network import describe_conservation_laws
+    except ImportError:  # pragma: no cover - flat import
+        from core.network import describe_conservation_laws  # type: ignore
+
+    try:
+        laws = list(describe_conservation_laws(network))
+    except Exception:  # noqa: BLE001 - a missing law is not a failed report
+        return None
+
+    for law in laws:
+        if law_mentions(law, species):
+            return law
+    return None
+
+
+def law_mentions(law: str, species: str) -> bool:
+    """Whether a conservation law names this species, by whole token.
+
+    `complex_A` must not match `complex_AB`, and `tier1_X` must not match
+    `tier1_Xp`. Naming the wrong law as the reason would be a correct
+    verdict with a fabricated justification -- the reader is told WHICH law
+    pins their quantity, and that is checkable.
+
+    SPLIT OUT SO IT CAN FAIL. A mutation replacing the token match with a
+    plain substring test came back NOT CAUGHT, and inspecting it showed the
+    mutation was inert rather than the test weak: in every law the library
+    currently produces, a species that is a substring of another token is
+    also a token of the same law -- `complex_A + complex_AB` names both. So
+    on real inputs the two rules agree, and the distinction was
+    unfalsifiable where it lived.
+
+    A guard that cannot be distinguished from its own bug is not yet a
+    guard. Here it is separable, and `TestLawMentions` drives it with the
+    law strings that tell the two rules apart -- which are laws no motif in
+    the library happens to generate today, and might tomorrow.
+    """
+    return species in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", law)
 
 
 __all__ = [
@@ -779,5 +889,5 @@ __all__ = [
     "step_for", "resolution_for",
     "MACHINE_PRECISION", "SOLVER_PRECISION", "SAFETY",
     "RELATIVE_STEP", "NEGLIGIBLE", "NEGLIGIBLE_INFLUENCE", "DOMINANT",
-    "STARTS_PER_SPECIES",
+    "STARTS_PER_SPECIES", "conservation_pinning", "law_mentions",
 ]

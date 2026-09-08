@@ -192,6 +192,43 @@ to leave it ungrounded. The earlier version's caption, "measuring the top of
 this list buys more than measuring the bottom", was advice about a list where
 the top was not worth measuring either.
 
+### The two-threshold split turned out to be a diagnostic
+
+Not planned, and worth recording because it is the strongest argument for
+having made the distinction at all.
+
+Ranking every composable model in the library surfaced four whose sensitivities
+are **exactly zero for every constant** — substrate inhibition, competitive
+inhibition, sequential feedback, allosteric activation. The saturation caption
+fitted the shape of that result and was the wrong reason for it. These are
+CLOSED systems: substrate inhibition conserves `S + P`, and started at S = 1,
+P = 0 it ends at P = 1 whatever kcat and Km are. The rate constants set how
+fast it arrives, never where.
+
+Saturation and conservation produce the same empty priority list and demand
+opposite advice. Under saturation nothing is worth measuring anywhere; under
+conservation the question was asked of the wrong quantity and a time course
+answers it. They are told apart by `unresolvable` versus `negligible`:
+
+    cascade (saturated)        |S| = 9e-5 down to 1e-9   real, four orders
+                                                          above the floor
+    substrate inhibition       |S| = 0 exactly            below any floor
+
+`conservation_pinning` requires BOTH signals — every sensitivity unresolvable
+AND the species named in a conservation law — because either alone is wrong.
+All-zero could be a quantity the solver cannot move; a law containing the
+species is true of every closed system, the cascade's own tiers included. The
+cascade is the case that proves the conjunction is needed: `tier3_Xp` IS
+conserved, and a test for the law alone would have rerouted it to the wrong
+caption.
+
+Found in the same sweep: `_default_target` returned `None` for a binding
+motif, which declares partners and a COMPLEX but no product, so "reversible
+binding of a ligand to a receptor" got no ranking at all — silence rather than
+a refusal with a reason. Products are now tried across every instance first,
+complexes second. It ranks `complex_AB` at |S| = 0.16 and points at `kon` and
+`koff`, with the signs the chemistry requires.
+
 ### What this does not fix
 
 The multistability refusal remains a search result. The competition
