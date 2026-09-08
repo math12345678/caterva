@@ -1,0 +1,212 @@
+# ADR 0175: A threshold finer than the method is a distinction that cannot be real
+
+**Status:** Accepted
+
+**Date:** 2026-09-08
+
+**Relates to:** ADR 0173 (the compositional builder this ranks the gaps of),
+ADR 0170 (models are values — why a perturbed network is a new value), ADR
+0028 (a check that fires too broadly stops being read — the same failure
+mode, approached from the other side), ADR 0048 (selection ties).
+
+## Context
+
+`Terium/compose/` builds a three-tier phosphorylation cascade from a
+description and reports that twelve rate constants are unmeasured. "Go and
+measure twelve things" is not advice. `compose/sensitivity.py` was written to
+turn that list into a ranking: the relative sensitivity
+
+    S = (dy/dp) * (p/y)
+
+by central differences, so that the report can say which constants the answer
+actually rests on.
+
+It shipped with three constants chosen by rule of thumb:
+
+```python
+RELATIVE_STEP = 1e-6   # "sqrt of machine epsilon"
+NEGLIGIBLE    = 1e-6   # below this, report as negligible
+DOMINANT      = 1.0    # at or above this, call it dominant
+```
+
+Every one of them was wrong, and each was wrong in a different way that the
+others hid.
+
+### The step assumed an accuracy the quantities do not have
+
+Measured on `dX/dt = ks - kd*X`, where both answers are known in closed form:
+
+| quantity | exact value | worst relative error |
+|---|---|---|
+| steady state | `ks/kd` | 1.8e-16 |
+| settling time | `1/kd` | **1.0e-08** |
+
+The steady state is a root solved to a 1e-14 residual on a rate law that
+evaluates in floating point, so it lands at machine precision. The settling
+time is `1 / |smallest eigenvalue real part|` of a **finite-difference**
+Jacobian, and inherits that approximation's error — eight orders of magnitude
+worse.
+
+Differentiating the settling time with a step of 1e-6 divided a 1e-8 error by
+a 1e-6 step. It reported **S = 0.004 for `ks`**, a parameter the settling time
+does not depend on at all: `1/kd` contains no `ks`. Three orders of magnitude
+above the "negligible" cutoff, so it would have been printed, ranked, and read
+as a real dependency.
+
+The rule of thumb was also misremembered. `sqrt(eps)` is the forward-difference
+step. For a central difference the error is
+
+    (h^2 / 6) * |f'''| + eps_f * |f| / h
+
+which is smallest near `h = cbrt(eps_f)`, and leaves a smallest trustworthy
+sensitivity of about `eps_f ** (2/3)`.
+
+### The dominance threshold was decided by rounding
+
+`|S| = 1` is the commonest exact answer in the subject — every first-order rate
+constant has it. On the turnover model:
+
+    x_ks:  +0.9999999999621   ->  not dominant
+    x_kd:  -1.0000000000510   ->  dominant
+
+Same model, same true answer, opposite classification, decided by a few parts
+in 1e11. A comparison at a threshold the arithmetic cannot resolve is a coin
+flip wearing a decision's clothes.
+
+### The refusal was disarmed by a search set below its own measured default
+
+`steady_state_of` refuses when more than one stable state is found, because a
+derivative through a choice between attractors describes the choice. It passed
+`starts_per_species=4` to be quick — below `analysis.py`'s own measured default
+of 8. Measured, stable states found by search depth:
+
+| model | 4 | 8 | 16 |
+|---|---|---|---|
+| toggle switch | **1** | 2 | 2 |
+| two-enzyme competition | 1 | **1** | 2 |
+
+At 4 the toggle switch reports one stable state when it has two, so the
+refusal never fired and a derivative was taken straight through a bistable
+system without a word. The second row is worse: at the *measured default* a
+real five-species model still reports one state when it has two.
+
+### And one threshold was answering two questions
+
+Fixing the floor exposed a conflation. With the noise floor put where the
+arithmetic actually is — 4e-10 rather than 1e-6 — the saturated cascade's
+eight upstream constants stopped reading as "no measurable influence" and
+turned out to sit at about **1e-8**: two orders of magnitude clear of the
+noise, entirely real, and still not worth a week at the bench.
+
+## Decision
+
+**1. The step and the noise floor are derived from the quantity's declared
+accuracy, not from `float`'s.**
+
+```python
+def step_for(precision):       return precision ** (1/3)
+def resolution_for(precision): return SAFETY * precision ** (2/3)
+```
+
+A `Quantity` declares its own `precision`. `steady_state_of` declares
+`MACHINE_PRECISION`; `settling_time` declares `SOLVER_PRECISION = 1e-8`,
+measured against the analytic `1/kd` and rounded up because the measurement is
+one model's. A plain callable is taken to be exact — it is the caller's own
+function, `precision=` overrides it, and assuming the worst case for everything
+would call real sensitivities noise.
+
+`SensitivityReport.resolution` carries the floor that actually applied and the
+summary prints it. A floor means nothing without saying a floor on what.
+
+**2. Comparisons against `DOMINANT` carry the resolution as slack** — the same
+number, not a second epsilon. A separate one would be a second opinion about
+the same arithmetic, free to drift from the first (ADR 0027's shape).
+
+**3. Two thresholds, because there are two questions.**
+
+| | test | meaning |
+|---|---|---|
+| `unresolvable` | `\|S\| < resolution` | the arithmetic cannot tell this from its own rounding |
+| `negligible` | `\|S\| < NEGLIGIBLE_INFLUENCE` (0.01) | real, measured, and too small to act on |
+
+The first is about floating point and moves with the quantity. The second is a
+judgement about biochemistry and does not: enzyme constants are rarely known
+better than ±20%, so at `|S| = 0.01` a constant wrong by half moves the answer
+by half a percent, under anything an assay would resolve.
+
+Reporting a real 1e-8 as "no measurable influence" overstates what was found.
+Reporting it without saying it is too small to chase understates what the
+reader should do. The summary says both, separately.
+
+**4. The refusal never searches below the analysis module's measured default.**
+`STARTS_PER_SPECIES = 16`, a measured floor for the models in the library and
+not a proof for anything outside it. The module states the competition
+counterexample where the refusal is made, because no number of starting points
+turns "did not find another" into "there is not another".
+
+**5. Perturbed evaluations continue from the base state rather than
+re-searching.** `analysis.analyse` gained `extra_starts`; with
+`starts_per_species=0` they are the only starts. This is a correctness matter
+before it is a speed one: a global multistart makes no promise to return the
+same branch twice, so the quotient of two globally-searched steady states over
+a tiny step is not a derivative of anything. Anchoring makes both halves of a
+central difference provably about one branch.
+
+It is also what makes the feature affordable. Ranking twelve constants costs
+twenty-five evaluations; unanchored at 16 starts per species on a six-species
+cascade, that ran thousands of global solves and did not finish.
+
+A failed continuation **refuses** rather than falling back to a global search.
+A fallback would re-enable the exact failure this exists to prevent, at the
+moment it is most likely — a continuation failing is itself evidence the branch
+is doing something interesting.
+
+## Consequences
+
+The ranking is now reachable: `compose/report.py` orders the table of
+unmeasured constants by influence and prints S in a column, and
+`--rank-against` / `--no-ranking` expose it at the terminal. A capability
+nobody can reach is not a capability (ADR 0090), and this one was in a module
+nothing called.
+
+The cascade's real answer is visible for the first time:
+
+```
+tier3_kcat_kin      S = +9.1e-05
+tier3_kcat_pptase   S = -9.1e-05
+...
+tier2_Km_pptase     S = +1.5e-09
+```
+
+Four orders of magnitude, tier 3 dominating everything upstream, and the
+kinase/phosphatase pairs **exactly opposed** — the cycle's steady state depends
+on their ratio, so `S(kin) = -S(pptase)` for every tier at every value. That is
+now a test, and it is the kind of check the previous thresholds could not have
+supported: at a 1e-6 cutoff, eleven of those twelve numbers did not exist.
+
+The honest consequence is less flattering. **No constant in that table clears
+the act-on threshold**, so the report says measuring any one of them would not
+move the answer — and says that the saturation is itself an artefact of the
+placeholder values, which is a reason to ground the model rather than a licence
+to leave it ungrounded. The earlier version's caption, "measuring the top of
+this list buys more than measuring the bottom", was advice about a list where
+the top was not worth measuring either.
+
+### What this does not fix
+
+The multistability refusal remains a search result. The competition
+counterexample is in the module docstring and in a test, so the limit is stated
+where the claim is made, but it is a limit and not a bound.
+
+`SOLVER_PRECISION` is one model's measurement. A quantity whose Jacobian is
+worse conditioned than a two-species linear system's will carry more error than
+1e-8, and nothing here detects that — it is a declared number, and it is
+declared conservatively, but it is not verified per model.
+
+### Generalisation
+
+The rule this ADR is named for applies past this module. Any threshold in this
+repository that classifies a computed number needs to be coarser than the
+computation's own error, or it classifies noise. The three defects above were
+one defect: constants chosen for how they read rather than derived from the
+method that produces the numbers they judge.

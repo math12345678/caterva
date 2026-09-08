@@ -25,6 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
             "Examples:\n"
             "  python -m Terium.compose 'three step phosphorylation cascade'\n"
             "  python -m Terium.compose 'a toggle switch between two repressors' --sweep geneA_n\n"
+            "  python -m Terium.compose 'three step phosphorylation cascade' --rank-against tier2_Xp\n"
             "  python -m Terium.compose --shapes\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -41,6 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="skip the steady-state analysis (much faster)")
     parser.add_argument("--no-simulate", action="store_true",
                         help="skip the time course")
+    parser.add_argument("--no-ranking", action="store_true",
+                        help=("skip the influence ranking of the unmeasured "
+                              "constants (it re-solves the steady state twice "
+                              "per constant)"))
+    parser.add_argument("--rank-against", metavar="SPECIES",
+                        help=("rank influence on this species instead of the "
+                              "one the last motif declares it produces"))
     parser.add_argument("--sweep", action="append", default=[], metavar="PARAM",
                         help="sweep this parameter and report bifurcations; repeatable")
     parser.add_argument("--sweep-from", type=float, default=0.1)
@@ -89,6 +97,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             sweep_parameters=args.sweep,
             sweep_range=(args.sweep_from, args.sweep_to),
             sweep_steps=args.sweep_steps,
+            rank_unmeasured=not args.no_ranking,
+            rank_against=args.rank_against,
         )
         print(report.markdown())
         return 0

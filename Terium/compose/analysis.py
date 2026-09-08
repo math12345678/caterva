@@ -406,6 +406,7 @@ def analyse(
     starts_per_species: int = DEFAULT_STARTS_PER_SPECIES,
     max_starts: int = 64,
     seed: int = 0,
+    extra_starts: Sequence[Sequence[float]] = (),
 ) -> StabilityReport:
     """Find what steady states a multistart root find converges to.
 
@@ -413,6 +414,20 @@ def analyse(
     linear congruential sequence rather than from the global random module,
     so two runs of the same model give the same report. A stability analysis
     that changed between runs would be unciteable.
+
+    `extra_starts` are tried BEFORE the generated ones, in the order given.
+    They exist for continuation: a caller that already knows where a fixed
+    point sits -- because it is walking a parameter a fraction of a percent
+    at a time -- can hand that state over instead of making the search
+    rediscover it from scratch. With `starts_per_species=0` they are the
+    only starts, which turns a global search into a local one and is the
+    difference between following a branch and re-deciding which branch to be
+    on at every step. See `compose/sensitivity.py`, which needs the former
+    and was getting the latter.
+
+    A start of the wrong length is a caller error and is refused rather than
+    padded: silently reshaping a state would produce a converged answer to a
+    question nobody asked.
     """
     try:
         import numpy as np
@@ -443,9 +458,26 @@ def analyse(
     laws = _conservation_matrix(network, species)
 
     scale = [max(abs(s.initial), 1.0) for s in network.species]
-    starts = _starting_points(
+    for start in extra_starts:
+        if len(start) != len(species):
+            raise AnalysisError(
+                f"an explicit starting point has {len(start)} coordinates "
+                f"but this network has {len(species)} species "
+                f"({', '.join(species)}). A start of the wrong length is not "
+                f"padded, because the solve would converge and answer a "
+                f"different question."
+            )
+    starts = [[float(v) for v in start] for start in extra_starts]
+    starts += _starting_points(
         len(species), scale, starts_per_species, max_starts, seed
     )
+    if not starts:
+        raise AnalysisError(
+            "no starting points: starts_per_species is 0 and no "
+            "extra_starts were given, so the search would look nowhere and "
+            "report no steady states. That would read as 'this model has "
+            "none', which is a different claim entirely."
+        )
 
     # Every start is projected onto the leaf of the DECLARED initial
     # condition, so all of them are asking the same question.
@@ -594,7 +626,15 @@ def _starting_points(
     report does not depend on global interpreter state that another module
     may have seeded. Numerical results that move between runs cannot be
     cited.
+
+    `per_species <= 0` generates nothing, for a caller supplying its own
+    starts. The floor of four otherwise is there so that asking for a search
+    always gets one; it must not override a caller that asked for no search
+    at all, because four arbitrary points added to a continuation step would
+    let it jump to a branch the caller was deliberately not on.
     """
+    if per_species <= 0:
+        return []
     count = min(maximum, max(4, per_species * dimension))
     state = (seed * 6364136223846793005 + 1442695040888963407) & ((1 << 64) - 1)
     points: List[List[float]] = []
