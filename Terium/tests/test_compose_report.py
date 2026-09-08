@@ -454,3 +454,75 @@ class TestTheBindingMotifHasATarget:
         )
         assert report.sensitivity is not None
         assert "| influence |" in report.markdown()
+
+
+class TestTheTableWhenNothingCouldBeMeasured:
+    def _inert(self):
+        from Terium.compose.sensitivity import rank_unmeasured
+
+        model = compose("allosteric activation of an enzyme by its product")
+        return model, rank_unmeasured(model, "regulated_X")
+
+    def test_it_says_nothing_was_measured_rather_than_nothing_matters(
+        self,
+    ) -> None:
+        model, sensitivity = self._inert()
+        assert sensitivity.sensitivities == (), "the premise"
+
+        rendered = "\n".join(
+            ModelDossier(query="q", model=model, sensitivity=sensitivity)
+            .provenance_section()
+        )
+        assert "No influence could be computed for any of these" in rendered
+        assert "nothing was measured" in rendered
+        assert "saturation" not in rendered
+
+    def test_it_does_not_claim_an_ordering_it_did_not_make(self) -> None:
+        # "Ordered by influence on X" above an unranked table is a caption
+        # for a thing that did not happen.
+        model, sensitivity = self._inert()
+        rendered = "\n".join(
+            ModelDossier(query="q", model=model, sensitivity=sensitivity)
+            .provenance_section()
+        )
+        assert "Ordered by influence" not in rendered
+
+    def test_every_row_is_marked_unranked(self) -> None:
+        model, sensitivity = self._inert()
+        rows = [
+            line for line in
+            ModelDossier(query="q", model=model, sensitivity=sensitivity)
+            .provenance_section()
+            if line.startswith("| `")
+        ]
+        assert rows
+        assert all("_not ranked_" in row for row in rows)
+
+
+class TestTheTableExplainsASwitchedQuantity:
+    def _pinned_dossier(self):
+        return dossier(
+            "substrate inhibition at high substrate concentration",
+            analyse_stability=False, simulate=False,
+        )
+
+    def test_it_says_why_it_is_ranking_a_settling_time(self) -> None:
+        """`kcat` at S = -1 with no explanation reads as a claim about
+        where the system lands, which is the opposite of what it means.
+        """
+        rendered = "\n".join(self._pinned_dossier().provenance_section())
+
+        assert "reaction_S + reaction_P" in rendered
+        assert "is conserved" in rendered
+        assert "how fast it arrives" in rendered
+        assert "settling time" in rendered
+
+    def test_it_still_gives_the_ordinary_advice(self) -> None:
+        # The list IS actionable now, unlike the pinned steady-state one.
+        rendered = "\n".join(self._pinned_dossier().provenance_section())
+        assert "Measuring the top of this list" in rendered
+
+    def test_the_column_carries_the_settling_numbers(self) -> None:
+        rendered = "\n".join(self._pinned_dossier().provenance_section())
+        assert "**S = -1**" in rendered
+        assert "**S = +1**" in rendered

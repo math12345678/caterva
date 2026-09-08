@@ -196,13 +196,14 @@ class ModelDossier:
                 f"{_influence_cell(influence.get(quantity.parameter_id))} |"
             )
         lines.append("")
-        lines.append(
-            f"Ordered by influence on **{self.sensitivity.quantity}**: S is "
-            f"the fractional change in it per fractional change in the "
-            f"constant, so S = +2 means a 1% increase raises the answer by "
-            f"2%."
-        )
-        lines.append("")
+        if self.sensitivity.sensitivities:
+            lines.append(
+                f"Ordered by influence on **{self.sensitivity.quantity}**: S "
+                f"is the fractional change in it per fractional change in "
+                f"the constant, so S = +2 means a 1% increase raises the "
+                f"answer by 2%."
+            )
+            lines.append("")
 
         # WHAT THE READER SHOULD DO, which depends on what was found. A
         # table where nothing clears the act-on threshold must not be
@@ -212,10 +213,39 @@ class ModelDossier:
         actionable = [
             s for s in self.sensitivity.sensitivities if not s.negligible
         ]
-        if actionable:
+        law = getattr(self.sensitivity, "conserved_by", None)
+        if law and actionable:
+            # The steady state was pinned, so this ranks the settling time
+            # instead. The reader has to be told, or `kcat` at S = -1 reads
+            # as a claim about where the system lands rather than how fast
+            # it gets there.
+            lines.append(
+                f"The steady state of this model is **not** what the rate "
+                f"constants decide: `{law}` is conserved, so the destination "
+                f"is fixed by the initial condition and every steady-state "
+                f"sensitivity is zero. What the kinetics DO decide is how "
+                f"fast it arrives, so the column above ranks influence on "
+                f"the **{self.sensitivity.quantity}** instead. Measuring the "
+                f"top of this list buys more than measuring the bottom of it."
+            )
+        elif actionable:
             lines.append(
                 "Measuring the top of this list buys more than measuring "
                 "the bottom of it."
+            )
+        elif not self.sensitivity.sensitivities:
+            # Nothing was differentiated, which is not the same as
+            # everything coming back small -- see the summary in
+            # compose/sensitivity.py for the model that reaches this.
+            lines.append(
+                f"**No influence could be computed for any of these.** "
+                f"Every parameter was skipped, so this table is unranked and "
+                f"nothing here has been judged unimportant — nothing was "
+                f"measured. The usual cause is a starting amount left at "
+                f"zero, which leaves the mechanism switched off and its "
+                f"answer at zero, and a relative sensitivity around zero is "
+                f"undefined rather than small. Set the starting amounts "
+                f"under **Yours to set** and ask again."
             )
         elif getattr(self.sensitivity, "conserved_by", None):
             # An all-zero ranking with a STRUCTURAL cause, not a kinetic
@@ -419,6 +449,21 @@ def dossier(
         if target is not None:
             try:
                 sensitivity = rank(model, target)
+                # WHEN THE STEADY STATE IS PINNED, RANK WHAT IS NOT.
+                #
+                # A closed system's destination is fixed by its conservation
+                # law, so every steady-state sensitivity is zero and the
+                # honest advice is "ask for the settling time instead". That
+                # advice pointed at something one call away and did not make
+                # it -- a gap wearing a recommendation's clothes. The
+                # settling time IS determined by the kinetics, and for
+                # substrate inhibition it ranks kcat at -1 and Km at +1,
+                # which is the answer the reader came for.
+                if sensitivity.conserved_by:
+                    sensitivity = (
+                        _settling_ranking(model, sensitivity.conserved_by)
+                        or sensitivity
+                    )
             except Exception as exc:  # noqa: BLE001
                 # Every refusal in that module is a real one -- no unique
                 # stable state, a continuum, a quantity that will not
@@ -444,6 +489,38 @@ def dossier(
         query=query, model=model, stability=stability, sweeps=tuple(sweeps),
         trajectory=trajectory, sensitivity=sensitivity,
     )
+
+
+def _settling_ranking(model: Any, law: str) -> Optional[Any]:
+    """Rank against how fast the system arrives, not where it lands.
+
+    For a closed system the second question is the only one the rate
+    constants answer. Returns `None` rather than raising if the settling
+    time cannot be computed either -- the pinned steady-state report is
+    still worth showing, and it explains itself.
+
+    The returned report carries `conserved_by` forward so the table still
+    says WHY it is ranking a settling time: a reader who sees kcat at -1
+    without that sentence would reasonably think it was the steady state.
+    """
+    try:
+        from .sensitivity import analyse, settling_time
+    except ImportError:  # pragma: no cover - flat import
+        from sensitivity import analyse, settling_time  # type: ignore[no-redef]
+
+    from dataclasses import replace
+
+    try:
+        report = analyse(
+            model.network,
+            settling_time(),
+            unmeasured=tuple(q.parameter_id for q in model.resolvable),
+        )
+    except Exception:  # noqa: BLE001 - the pinned report is still useful
+        return None
+    if not report.sensitivities:
+        return None
+    return replace(report, conserved_by=law)
 
 
 def _negligible_influence() -> float:

@@ -796,3 +796,108 @@ class TestLawMentions:
         for law, species in separating:
             assert species in law, "the substring rule would say yes"
             assert not law_mentions(law, species), "the token rule says no"
+
+
+class TestNothingMeasuredIsNotEverythingSmall:
+    """The claim that must not be made about a measurement never taken.
+
+    The allosteric-activation model's activator starts at zero and is
+    conserved, so it stays zero, the synthesis term is zero, and the answer
+    is zero -- which makes every RELATIVE sensitivity undefined rather than
+    small. Every parameter is skipped and `sensitivities` is empty.
+
+    The summary's other empty-list branches would then say "no constant
+    influences this answer", which reports a finding from a run that found
+    nothing.
+    """
+
+    def test_every_parameter_is_skipped_when_the_answer_is_zero(self) -> None:
+        model = compose("allosteric activation of an enzyme by its product")
+        report = rank_unmeasured(model, "regulated_X")
+
+        assert report.sensitivities == ()
+        assert report.skipped
+        assert any("zero" in reason for reason in report.skipped.values())
+
+    def test_the_summary_says_nothing_was_measured(self) -> None:
+        model = compose("allosteric activation of an enzyme by its product")
+        summary = rank_unmeasured(model, "regulated_X").summary()
+
+        assert "No sensitivity could be computed at all" in summary
+        assert "nothing was measured" in summary
+        # And it does not reach for either of the findings it did not make.
+        assert "saturat" not in summary
+        assert "is conserved" not in summary
+
+    def test_it_points_at_the_starting_amount(self) -> None:
+        # The actionable half. The mechanism is switched off because a
+        # "yours to set" amount is still at its default of zero.
+        model = compose("allosteric activation of an enzyme by its product")
+        summary = rank_unmeasured(model, "regulated_X").summary()
+        assert "starting amount" in summary
+        assert "switched off" in summary
+
+    def test_an_empty_report_is_not_called_conserved(self) -> None:
+        # `regulated_A` IS a conservation law of that model, so a pinning
+        # test that did not require a non-empty report would fire here.
+        model = compose("allosteric activation of an enzyme by its product")
+        assert rank_unmeasured(model, "regulated_X").conserved_by is None
+
+
+class TestAPinnedSteadyStateFallsBackToTheSettlingTime:
+    """"Ask for the settling time" pointed at something one call away.
+
+    Advice a tool could have taken itself is a gap wearing a
+    recommendation's clothes. For a closed system the settling time is the
+    only question the rate constants answer, and it has sharp answers:
+    settling scales as Km/kcat, so S(kcat) = -1 and S(Km) = +1 exactly.
+    """
+
+    def test_the_dossier_ranks_the_settling_time_instead(self) -> None:
+        from Terium.compose.report import dossier
+
+        report = dossier(
+            "substrate inhibition at high substrate concentration",
+            analyse_stability=False, simulate=False,
+        )
+        assert report.sensitivity is not None
+        assert report.sensitivity.quantity == "settling time"
+        assert report.sensitivity.sensitivities
+
+    def test_the_fallback_ranking_is_the_analytic_one(self) -> None:
+        # Settling time scales as Km/kcat for a saturable step, so the two
+        # sensitivities are exactly -1 and +1.
+        from Terium.compose.report import dossier
+
+        report = dossier(
+            "substrate inhibition at high substrate concentration",
+            analyse_stability=False, simulate=False,
+        )
+        by_name = {s.parameter: s.relative for s in report.sensitivity.sensitivities}
+        assert by_name["reaction_kcat"] == pytest.approx(-1.0, rel=1e-3)
+        assert by_name["reaction_Km"] == pytest.approx(1.0, rel=1e-3)
+
+    def test_the_law_is_carried_forward_so_the_switch_can_be_explained(
+        self,
+    ) -> None:
+        """Without this the table shows kcat at -1 with no sign that it is
+        about a rate rather than a destination, which is a worse misreading
+        than the one the fallback fixed.
+        """
+        from Terium.compose.report import dossier
+
+        report = dossier(
+            "substrate inhibition at high substrate concentration",
+            analyse_stability=False, simulate=False,
+        )
+        assert report.sensitivity.conserved_by == "reaction_S + reaction_P"
+
+    def test_a_model_that_is_not_pinned_is_not_switched(self, cascade) -> None:
+        from Terium.compose.report import dossier
+
+        report = dossier(
+            "three step phosphorylation cascade",
+            analyse_stability=False, simulate=False,
+        )
+        assert report.sensitivity.quantity == "steady-state tier3_Xp"
+        assert report.sensitivity.conserved_by is None
