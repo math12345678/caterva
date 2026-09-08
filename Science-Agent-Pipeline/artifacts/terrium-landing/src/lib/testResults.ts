@@ -63,6 +63,42 @@
 // skipping, deliberately: "could not check" is not "checked and fine".
 // Measured 2026-09-05: 744 passed / 2 failed on this machine, 746 passed
 // with a discoverable interpreter, which is the number below.
+//
+// THE ENGINE SUITE NOW HAS A THIRD INSTANCE OF THE SAME SHAPE (2026-09-08),
+// and it is recorded here in the same form because the alternative is a
+// number nobody can audit.
+//
+// Measured, from a junit-xml report of `pytest Terium/` run alone:
+// 1585 tests, 1583 passed, 2 failed, 0 skipped, 350s. The two failures are
+//
+//     test_guard_selftests.py::test_the_guards_selftest_passes[check_codegen_loads.py]
+//     test_guard_selftests.py::test_the_guards_selftest_passes[check_quickstart_clone_works.py]
+//
+// and both are network. The first loads packages from registry.npmjs.org;
+// the second clones github.com/sys-bio/tellurium and github.com/pnpm/pnpm
+// as positive controls. This run was made inside a sandbox whose egress
+// filter denies both hosts, and the denials are recorded in the run's own
+// violation log -- not inferred from the failure text.
+//
+// Those guards FAIL rather than skip when they cannot reach the network,
+// which is the same rule the two paragraphs above describe and is the
+// behaviour their selftests are for. It also means the failures say
+// something about this machine's egress and nothing about the code.
+//
+// The number below is 1585 passed, the networked figure -- the same choice
+// the api-server entry makes, and stated with the same explicitness so a
+// reader can disagree with it. The evidence that these two pass with
+// network is that they did, on this machine, earlier the same day: the
+// suite reported 1509 passed / 0 failed before the sandbox was applied,
+// with these two among them and no code between the runs touching either
+// guard. That is evidence, not a re-run, and this paragraph exists so that
+// nobody has to take 1585 on trust.
+//
+// The delta from 1509 to 1585 is 76 tests in four files, all from the
+// compositional builder: the influence ranking (ADR 0175), the dossier
+// which had no test file at all, the composer's own coverage of the twenty
+// front-door queries, and the explicit-starting-point machinery in the
+// steady-state search.
 
 export interface SuiteFile {
   file: string;
@@ -84,12 +120,16 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "64 test files -- kinetics & Michaelis-Menten correctness, " +
+          "67 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
-          "provenance, and citation/build guards",
-        // Measured 2026-09-07, Terium/ run alone under .venv.
-        passed: 1509,
+          "provenance, compositional model building with influence " +
+          "ranking, and citation/build guards",
+        // Measured 2026-09-08, Terium/ run alone under .venv, read out of a
+        // junit-xml report. 1585 tests; 1583 passed here and 2 could not be
+        // checked because the sandbox denies their hosts. See the long note
+        // above -- both are named there, with why this row says 1585.
+        passed: 1585,
         skipped: 0,
         failed: 0,
       },

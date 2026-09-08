@@ -203,6 +203,37 @@ worse conditioned than a two-species linear system's will carry more error than
 1e-8, and nothing here detects that — it is a declared number, and it is
 declared conservatively, but it is not verified per model.
 
+### Mutation table
+
+`docs/mutations/adr-0175-a-threshold-finer-than-the-method.json`, under
+`scripts/mutate.py`. **12 caught, 0 not caught, 0 indeterminate**, against a
+green 91-test baseline. Each mutation restores one of the original defects
+exactly, because every one of them was a constant that read plausibly and the
+wrong version does not look wrong.
+
+Two things the harness taught while grading it, both worth more than the score:
+
+**The set was refused outright on the first attempt.** The test command ended
+in `-q`, which under this repo's pytest configuration suppresses the final
+`N passed` line entirely — and `mutate.py` reads that line to establish the
+suite actually RAN. Rather than grade twelve mutations against a count it could
+not see, it reported "the baseline suite did not execute any tests" and changed
+nothing. That is the harness's whole purpose working: `0 total` is not
+`0 failed`, and a suite that cannot be counted has judged nothing.
+
+**M6 was replaced, and its first NOT CAUGHT verdict was correct.** That version
+kept `extra_starts=[anchor]` and merely re-enabled the global search alongside
+it — which cannot change the answer, because `extra_starts` are prepended and
+`_continue_from` returns `fixed_points[0]`, so the anchor's root converges first
+and wins by position. An inert mutation reads exactly like an untested claim
+(ADR 0167, F2). The replacement removes the anchor, which is the real defect,
+and is caught. The implementation now records that the anchor wins by position
+rather than by luck, because that was not obvious until a mutation proved it.
+
+Grading the replacement took about twenty minutes against ninety seconds for
+every other mutation, and that slowdown is not an inconvenience: it is the
+performance half of this decision, reproduced on demand.
+
 ### Generalisation
 
 The rule this ADR is named for applies past this module. Any threshold in this

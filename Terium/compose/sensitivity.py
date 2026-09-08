@@ -713,6 +713,16 @@ def _continue_from(network: Any, anchor: Sequence[float]) -> Any:
     function exists to prevent -- landing on another branch -- back on, and
     at exactly the moment it is most likely: the continuation failing is
     itself evidence the branch is doing something interesting.
+
+    THE ANCHOR WINS BY POSITION, WHICH IS WORTH KNOWING. `analysis.analyse`
+    tries `extra_starts` before any generated ones and `found` is built in
+    start order, so the anchor's root is `fixed_points[0]` whenever it
+    converges. That makes the zero here a statement of intent rather than
+    the only thing holding the branch: adding global starts back alongside
+    the anchor would waste time without changing the answer. Found by a
+    mutation that did exactly that and came back NOT CAUGHT -- correctly,
+    because it changed nothing. The mutation that does break this removes
+    the anchor, and is the one recorded against ADR 0175.
     """
     report = _stability_module().analyse(
         network, starts_per_species=0, extra_starts=[list(anchor)]
