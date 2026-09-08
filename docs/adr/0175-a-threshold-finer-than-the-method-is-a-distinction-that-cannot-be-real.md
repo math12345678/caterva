@@ -229,6 +229,29 @@ a refusal with a reason. Products are now tried across every instance first,
 complexes second. It ranks `complex_AB` at |S| = 0.16 and points at `kon` and
 `koff`, with the signs the chemistry requires.
 
+### Two more things the sweep found
+
+**Advice that pointed at nothing.** The pinned caption said "ask for the
+settling time instead" — one function call away, and it did not make the call.
+Advice a tool could have taken itself is a gap wearing a recommendation's
+clothes. `dossier` now falls back to ranking the settling time when the steady
+state is pinned, and the answers are sharp: settling scales as Km/kcat, so
+substrate inhibition ranks `kcat` at exactly −1 and `Km` at +1, and the
+three-step pathway splits the burden evenly at −0.5 per tier. The report
+carries the conservation law forward so the table says WHY it switched — `kcat`
+at −1 with no explanation is a claim about where the system lands, and it means
+how fast it arrives.
+
+**A caption for a measurement nobody took.** The allosteric-activation model's
+activator starts at zero and is conserved, so it stays zero, synthesis is off,
+and the answer is zero — which makes every relative sensitivity *undefined*
+rather than small. All four parameters are skipped and `sensitivities` is
+empty, and the empty list fell through to the saturation branch: "no constant
+influences this answer". That is a finding reported from a run that found
+nothing, which is the worst of the three misreadings in this record. It now
+says nothing was measured, gives the skip reasons, and points at the starting
+amount that left the mechanism switched off.
+
 ### What this does not fix
 
 The multistability refusal remains a search result. The competition
@@ -243,12 +266,12 @@ declared conservatively, but it is not verified per model.
 ### Mutation table
 
 `docs/mutations/adr-0175-a-threshold-finer-than-the-method.json`, under
-`scripts/mutate.py`. **12 caught, 0 not caught, 0 indeterminate**, against a
+`scripts/mutate.py`. **20 caught, 0 not caught, 0 indeterminate**, against a
 green 91-test baseline. Each mutation restores one of the original defects
 exactly, because every one of them was a constant that read plausibly and the
 wrong version does not look wrong.
 
-Two things the harness taught while grading it, both worth more than the score:
+Two things the harness taught while grading, both worth more than the score:
 
 **The set was refused outright on the first attempt.** The test command ended
 in `-q`, which under this repo's pytest configuration suppresses the final

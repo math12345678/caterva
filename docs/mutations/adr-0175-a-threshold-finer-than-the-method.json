@@ -171,6 +171,40 @@
       "file": "Terium/compose/sensitivity.py",
       "find": "    return species in re.findall(r\"[A-Za-z_][A-Za-z0-9_]*\", law)",
       "replace": "    return species in law"
+    },
+    {
+      "id": "M17",
+      "description": "an empty ranking falls through to the saturation caption, claiming a measurement nobody took",
+      "_claimed": "caught by test_the_summary_says_nothing_was_measured and test_it_says_nothing_was_measured_rather_than_nothing_matters",
+      "_note": "The allosteric model's activator starts at zero and is conserved, so the answer is zero and every RELATIVE sensitivity is undefined -- skipped, not small. Reporting 'no constant influences this answer' there is a finding from a run that found nothing.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "        elif not self.sensitivities:",
+      "replace": "        elif False:"
+    },
+    {
+      "id": "M18",
+      "description": "a pinned steady state no longer falls back to the settling time, so the advice points at nothing",
+      "_claimed": "caught by test_the_dossier_ranks_the_settling_time_instead and test_the_fallback_ranking_is_the_analytic_one",
+      "file": "Terium/compose/report.py",
+      "find": "                if sensitivity.conserved_by:",
+      "replace": "                if False:"
+    },
+    {
+      "id": "M19",
+      "description": "the fallback drops the conservation law, so a settling-time ranking reads as a steady-state one",
+      "_claimed": "caught by test_the_law_is_carried_forward_so_the_switch_can_be_explained and test_it_says_why_it_is_ranking_a_settling_time",
+      "_note": "A worse misreading than the one the fallback fixed: kcat at S = -1 with no explanation is a claim about WHERE the system lands, and it means how FAST.",
+      "file": "Terium/compose/report.py",
+      "find": "    return replace(report, conserved_by=law)",
+      "replace": "    return report"
+    },
+    {
+      "id": "M20",
+      "description": "the table captions an unranked list 'Ordered by influence', for an ordering that did not happen",
+      "_claimed": "caught by test_it_does_not_claim_an_ordering_it_did_not_make",
+      "file": "Terium/compose/report.py",
+      "find": "        if self.sensitivity.sensitivities:\n            lines.append(\n                f\"Ordered by influence on **{self.sensitivity.quantity}**: S \"",
+      "replace": "        if True:\n            lines.append(\n                f\"Ordered by influence on **{self.sensitivity.quantity}**: S \""
     }
   ]
 }

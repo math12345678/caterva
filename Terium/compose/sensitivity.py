@@ -366,6 +366,26 @@ class SensitivityReport:
                 "others, which is a different statement from saying the "
                 "others do not matter."
             )
+        elif not self.sensitivities:
+            # NOTHING WAS DIFFERENTIATED. Distinct from "everything came
+            # back small", and the branches below would claim the second.
+            #
+            # The allosteric-activation model reaches this: its activator
+            # starts at zero and is conserved, so it stays zero, the
+            # synthesis term is zero, and the answer is zero -- which makes
+            # every RELATIVE sensitivity undefined rather than small. Saying
+            # "no constant influences this answer" there would report a
+            # measurement that was never taken.
+            reasons = sorted(set(self.skipped.values()))
+            lines.append(
+                f"No sensitivity could be computed at all: every one of the "
+                f"{len(self.skipped)} parameter(s) was skipped. This is not "
+                f"a finding that they do not matter -- nothing was measured. "
+                + (f"Reason(s): {'; '.join(reasons)}. " if reasons else "")
+                + "A base value of zero is the usual cause, and usually "
+                "means a starting amount you have not set yet leaves the "
+                "mechanism switched off."
+            )
         elif self.conserved_by:
             # A DIFFERENT REASON FOR THE SAME EMPTY LIST, and the advice is
             # the opposite one. Nothing here is saturated; the quantity is
