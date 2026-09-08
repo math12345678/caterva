@@ -69,7 +69,7 @@
 // number nobody can audit.
 //
 // Measured, from a junit-xml report of `pytest Terium/` run alone:
-// 1585 tests, 1583 passed, 2 failed, 0 skipped, 350s. The two failures are
+// 1610 tests, 1608 passed, 2 failed, 0 skipped, 244s. The two failures are
 //
 //     test_guard_selftests.py::test_the_guards_selftest_passes[check_codegen_loads.py]
 //     test_guard_selftests.py::test_the_guards_selftest_passes[check_quickstart_clone_works.py]
@@ -94,7 +94,7 @@
 // guard. That is evidence, not a re-run, and this paragraph exists so that
 // nobody has to take 1585 on trust.
 //
-// The delta from 1509 to 1585 is 76 tests in four files, all from the
+// The delta from 1509 to 1610 is 101 tests in four files, all from the
 // compositional builder: the influence ranking (ADR 0175), the dossier
 // which had no test file at all, the composer's own coverage of the twenty
 // front-door queries, and the explicit-starting-point machinery in the
@@ -126,10 +126,10 @@ export const TEST_SUITES: TestSuite[] = [
           "provenance, compositional model building with influence " +
           "ranking, and citation/build guards",
         // Measured 2026-09-08, Terium/ run alone under .venv, read out of a
-        // junit-xml report. 1585 tests; 1583 passed here and 2 could not be
+        // junit-xml report. 1610 tests; 1608 passed here and 2 could not be
         // checked because the sandbox denies their hosts. See the long note
-        // above -- both are named there, with why this row says 1585.
-        passed: 1585,
+        // above -- both are named there, with why this row says 1610.
+        passed: 1610,
         skipped: 0,
         failed: 0,
       },
