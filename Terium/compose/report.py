@@ -34,6 +34,10 @@ class ModelDossier:
     sweeps: Tuple[Any, ...] = ()     # SweepReport
     search: Optional[Any] = None     # ModelSearch, when parameters resolved
     trajectory: Optional[Any] = None  # Trajectory, when the engine is present
+    #: SensitivityReport, when a ranking could be computed. Reported INSIDE
+    #: the provenance table rather than in a section of its own -- see
+    #: `provenance_section`.
+    sensitivity: Optional[Any] = None
 
     # -- sections -----------------------------------------------------
 
@@ -124,14 +128,7 @@ class ModelDossier:
                 "These are the measurements that would complete the model:"
             )
             lines.append("")
-            lines.append("| quantity | what it is | unit | source table |")
-            lines.append("|---|---|---|---|")
-            for quantity in self.model.resolvable:
-                lines.append(
-                    f"| `{quantity.parameter_id}` | "
-                    f"{quantity.description or quantity.parameter_name} | "
-                    f"{quantity.unit} | {quantity.table or '_no table_'} |"
-                )
+            lines += self._resolvable_table()
         elif self.search is None:
             lines.append(
                 f"Subject named (`{self.model.subject}`) but no search was "
@@ -147,6 +144,101 @@ class ModelDossier:
             + ". Starting amounts and any cooperativity — no paper supplies "
             "these, and they are recorded as your choices rather than as "
             "measurements."
+        )
+        return lines
+
+    def _resolvable_table(self) -> List[str]:
+        """The unmeasured constants, ordered by how much the answer moves.
+
+        WHY THE RANKING GOES IN THIS TABLE AND NOT IN A SECTION OF ITS OWN
+        ------------------------------------------------------------------
+        This table used to list twelve constants in construction order, and
+        "go and measure twelve things" is not advice. The ranking is not a
+        separate finding to be read afterwards -- it is the property that
+        turns this table from a list into a plan, and a reader who stops at
+        the table should already have it.
+
+        Without a sensitivity report the table is printed in its old form
+        rather than in a guessed order. An unranked list is honest; a list
+        ordered by something other than what it claims is not.
+        """
+        rows = list(self.model.resolvable)
+        if self.sensitivity is None:
+            lines = ["| quantity | what it is | unit | source table |",
+                     "|---|---|---|---|"]
+            for quantity in rows:
+                lines.append(
+                    f"| `{quantity.parameter_id}` | "
+                    f"{quantity.description or quantity.parameter_name} | "
+                    f"{quantity.unit} | {quantity.table or '_no table_'} |"
+                )
+            return lines
+
+        influence = {s.parameter: s for s in self.sensitivity.sensitivities}
+        # Ranked first, unrankable last -- a constant the sensitivity run
+        # skipped has not been judged unimportant, and must not be sorted as
+        # though it scored zero.
+        rows.sort(
+            key=lambda q: (
+                q.parameter_id not in influence,
+                -abs(getattr(influence.get(q.parameter_id), "relative", 0.0)),
+            )
+        )
+        lines = [
+            "| quantity | what it is | unit | source table | influence |",
+            "|---|---|---|---|---|",
+        ]
+        for quantity in rows:
+            lines.append(
+                f"| `{quantity.parameter_id}` | "
+                f"{quantity.description or quantity.parameter_name} | "
+                f"{quantity.unit} | {quantity.table or '_no table_'} | "
+                f"{_influence_cell(influence.get(quantity.parameter_id))} |"
+            )
+        lines.append("")
+        lines.append(
+            f"Ordered by influence on **{self.sensitivity.quantity}**: S is "
+            f"the fractional change in it per fractional change in the "
+            f"constant, so S = +2 means a 1% increase raises the answer by "
+            f"2%."
+        )
+        lines.append("")
+
+        # WHAT THE READER SHOULD DO, which depends on what was found. A
+        # table where nothing clears the act-on threshold must not be
+        # captioned "measure the top of this list": at saturation the top of
+        # the list is not worth measuring either, and the honest advice is
+        # the opposite one.
+        actionable = [
+            s for s in self.sensitivity.sensitivities if not s.negligible
+        ]
+        if actionable:
+            lines.append(
+                "Measuring the top of this list buys more than measuring "
+                "the bottom of it."
+            )
+        else:
+            lines.append(
+                f"**No constant here clears |S| = "
+                f"{_negligible_influence():g}**, so measuring any single one "
+                f"of them would not move this answer. That is what "
+                f"saturation looks like — the mechanism is running flat out "
+                f"and nothing upstream can push it further — and it is a "
+                f"property of the illustrative values, which are themselves "
+                f"the reason the model sits here. It is a reason to ground "
+                f"the model, not a reason to leave it ungrounded."
+            )
+        lines.append("")
+        lines.append(
+            f"Two things this ordering is not. It is **local** — computed "
+            f"at the library's illustrative values, and a constant that is "
+            f"negligible there can dominate two decades away. And it ranks "
+            f"influence, not **priority**: a constant with high influence "
+            f"that BRENDA already holds is not work, while a modest one "
+            f"nobody has ever measured is. A row marked _below the noise "
+            f"floor_ (|S| < {self.sensitivity.resolution:.1g}) is one the "
+            f"arithmetic could not tell from its own rounding, which is not "
+            f"the same as one measured to be small."
         )
         return lines
 
@@ -251,6 +343,8 @@ def dossier(
     sweep_parameters: Sequence[str] = (),
     sweep_range: Tuple[float, float] = (0.1, 10.0),
     sweep_steps: int = 15,
+    rank_unmeasured: bool = True,
+    rank_against: Optional[str] = None,
 ) -> ModelDossier:
     """Compose a model and assemble everything known about it."""
     try:
@@ -295,6 +389,31 @@ def dossier(
                 f"no time course: {exc}"
             )
 
+    sensitivity = None
+    if rank_unmeasured and model.resolvable:
+        try:
+            from .sensitivity import rank_unmeasured as rank
+        except ImportError:  # pragma: no cover - flat import
+            from sensitivity import rank_unmeasured as rank  # type: ignore[no-redef]
+        # Which species to rank against. The last species of the last
+        # reaction is the one the mechanism produces -- a cascade's bottom
+        # tier, a binding motif's complex -- which is what a reader means by
+        # "the answer". Named explicitly by the caller when that guess is
+        # wrong, and the report says which species it ranked against rather
+        # than leaving the choice implicit.
+        target = rank_against or _default_target(model)
+        if target is not None:
+            try:
+                sensitivity = rank(model, target)
+            except Exception as exc:  # noqa: BLE001
+                # Every refusal in that module is a real one -- no unique
+                # stable state, a continuum, a quantity that will not
+                # evaluate -- and none of them should cost the reader the
+                # rest of the report.
+                model.recognition.composition.note(
+                    f"no influence ranking: {exc}"
+                )
+
     sweeps = []
     for parameter in sweep_parameters:
         try:
@@ -309,8 +428,74 @@ def dossier(
 
     return ModelDossier(
         query=query, model=model, stability=stability, sweeps=tuple(sweeps),
-        trajectory=trajectory,
+        trajectory=trajectory, sensitivity=sensitivity,
     )
+
+
+def _negligible_influence() -> float:
+    try:
+        from .sensitivity import NEGLIGIBLE_INFLUENCE
+    except ImportError:  # pragma: no cover - flat import
+        from sensitivity import NEGLIGIBLE_INFLUENCE  # type: ignore[no-redef]
+    return NEGLIGIBLE_INFLUENCE
+
+
+def _influence_cell(entry: Any) -> str:
+    """One row's influence, in the form that carries the most information.
+
+    THE NUMBER, whenever there is one. An earlier version printed
+    "negligible here" for every row of a saturated cascade, which is true
+    and useless: the twelve constants span four orders of magnitude, from
+    9e-5 down to 1e-9, and that spread IS the ranking. A column that
+    collapses it to one word has thrown away everything the column was for.
+
+    "Negligible" survives as a QUALIFIER on the number rather than as a
+    replacement for it, and the one case with no number to print -- below
+    the run's noise floor -- says so in those words, because there the
+    number really would be meaningless.
+    """
+    if entry is None:
+        return "_not ranked_"
+    if entry.unresolvable:
+        return "_below the noise floor_"
+    if entry.negligible:
+        return f"S = {entry.relative:+.2g} _(negligible)_"
+    return f"**S = {entry.relative:+.2g}**"
+
+
+def _default_target(model: Any) -> Optional[str]:
+    """The species an influence ranking is about, when nobody says.
+
+    THE MOTIF'S OWN DECLARATION, NOT A GUESS FROM THE REACTIONS. The first
+    version of this took the last product of the last reaction, which for a
+    phosphorylation cascade is the DEPHOSPHORYLATED form: the last reaction
+    of the last tier is the phosphatase step, whose product is X, and the
+    answer a reader means is Xp. It produced a confident ranking against the
+    opposite of the question.
+
+    The motifs already say which of their ports is a product -- `Port.role`
+    -- so the last product port of the last motif placed is the deepest
+    thing the mechanism makes. That is a stated property of the library
+    rather than an inference from reaction order, and it reads correctly for
+    the cases the reaction-order rule got wrong: a cascade's bottom tier Xp,
+    and a competing enzyme's P rather than the enzyme itself.
+
+    `None` when no motif declares a product, rather than any fallback to a
+    first or last species. Ranking against an arbitrary species would put a
+    confident ordering next to the wrong question, which is worse than no
+    ordering -- and is exactly the failure this function already had once.
+    """
+    try:
+        from .motifs import ROLE_PRODUCT
+    except ImportError:  # pragma: no cover - flat import
+        from motifs import ROLE_PRODUCT  # type: ignore[no-redef]
+
+    instances = getattr(model.recognition.composition, "instances", ())
+    for instance in reversed(list(instances)):
+        products = instance.motif.ports_with_role(ROLE_PRODUCT)
+        if products:
+            return instance.species_for(products[-1].name)
+    return None
 
 
 __all__ = ["ModelDossier", "dossier"]

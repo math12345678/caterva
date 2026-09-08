@@ -348,3 +348,70 @@ class TestDeterminism:
         # search looks.
         network = recognise("a toggle switch between two repressors").network()
         assert analyse(network, seed=1).starts_tried == analyse(network, seed=2).starts_tried
+
+
+class TestExplicitStartingPoints:
+    """Handing the search a place to start, for continuation.
+
+    A caller walking a parameter a fraction of a percent at a time already
+    knows where the fixed point sits. Making the search rediscover it from
+    scratch is not only slow -- a global multistart makes no promise to
+    return the same branch twice, so the difference between two such answers
+    is not a derivative of anything. See `compose/sensitivity.py`.
+    """
+
+    def test_an_explicit_start_is_tried_first(self) -> None:
+        network = recognise("a toggle switch between two repressors").network()
+        full = analyse(network)
+        assert len(full.stable_points) == 2, "the premise of this test"
+
+        # Continue from ONE of them, with no global search at all.
+        anchor = [full.stable_points[0].state[s.id] for s in network.species]
+        local = analyse(network, starts_per_species=0, extra_starts=[anchor])
+        assert len(local.fixed_points) == 1
+        for name, value in full.stable_points[0].state.items():
+            assert local.fixed_points[0].state[name] == pytest.approx(value, abs=1e-9)
+
+    def test_a_local_solve_does_not_wander_to_the_other_branch(self) -> None:
+        # The whole point. A global search returns both states and no
+        # guarantee about order; a continuation must stay where it was put.
+        network = recognise("a toggle switch between two repressors").network()
+        full = analyse(network)
+        for point in full.stable_points:
+            anchor = [point.state[s.id] for s in network.species]
+            local = analyse(network, starts_per_species=0, extra_starts=[anchor])
+            assert len(local.fixed_points) == 1
+            for name, value in point.state.items():
+                assert local.fixed_points[0].state[name] == pytest.approx(
+                    value, abs=1e-9
+                )
+
+    def test_a_start_of_the_wrong_length_is_refused(self) -> None:
+        # Padding or truncating would produce a converged answer to a
+        # question nobody asked.
+        from Terium.compose.analysis import AnalysisError
+
+        network = recognise("a toggle switch between two repressors").network()
+        with pytest.raises(AnalysisError, match="coordinates"):
+            analyse(network, extra_starts=[[1.0]])
+
+    def test_searching_nowhere_is_refused_rather_than_reported_as_empty(self) -> None:
+        """The check that stops a silent lie.
+
+        Zero starts with no explicit ones would find no steady states and
+        report exactly what a model with none reports. Those are different
+        facts and must not share a rendering.
+        """
+        from Terium.compose.analysis import AnalysisError
+
+        composition = Composition("turnover")
+        composition.add(SYNTHESIS_DEGRADATION, "x")
+        with pytest.raises(AnalysisError, match="would look nowhere"):
+            analyse(composition.to_network(), starts_per_species=0)
+
+    def test_zero_starts_per_species_generates_none(self) -> None:
+        from Terium.compose.analysis import _starting_points
+
+        assert _starting_points(3, [1.0, 1.0, 1.0], 0, 64, 0) == []
+        # ...but asking for a search always gets one, floor of four.
+        assert len(_starting_points(1, [1.0], 1, 64, 0)) == 4
