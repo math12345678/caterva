@@ -18,9 +18,14 @@
     "and untested. TestContinuationStaysOnOneBranch drives `follow` directly",
     "for that reason.",
     "",
+    "",
+    "M6 WAS REPLACED ONCE, and the first version's NOT CAUGHT verdict was correct rather than a test failure: keeping extra_starts and adding global starts back cannot change the answer, because extra_starts are prepended and points[0] is returned. Worth knowing as a property of the implementation -- the anchor wins by position, not by luck -- and worth recording as the shape of mistake this harness catches.",
+    "NOTE ON THE TEST COMMAND: it deliberately omits -q. Under this repo's pytest configuration -q suppresses the final 'N passed' line entirely, and scripts/mutate.py reads that line to establish the suite actually RAN. With -q the harness correctly refused the whole set -- 'the baseline suite did not execute any tests' -- rather than grading twelve mutations against a count it could not see. That refusal is the harness working, and it is the same failure testResults.ts records from the other direction.",
+    "",
+    "RESULT, 2026-09-08: 12 caught, 0 not caught, 0 indeterminate. M1-M5 and M7-M12 ran as one set against a green 91-test baseline. M6 was run on its own afterwards because the mutation it applies -- a continuation that re-searches globally at every perturbed evaluation -- makes the suite take roughly twenty minutes rather than ninety seconds. That slowdown is not an inconvenience to work around; it IS the performance half of the decision, reproduced. It is also why the first draft of this module never finished a cascade ranking.",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0175-a-threshold-finer-than-the-method.json"
   ],
-  "test": "./.venv/bin/python -m pytest Terium/tests/test_compose_sensitivity.py Terium/tests/test_compose_report.py Terium/tests/test_compose_analysis.py --no-header -p no:cacheprovider -q",
+  "test": "./.venv/bin/python -m pytest Terium/tests/test_compose_sensitivity.py Terium/tests/test_compose_report.py Terium/tests/test_compose_analysis.py --no-header --tb=no -p no:cacheprovider",
   "mutations": [
     {
       "id": "M1",
@@ -69,12 +74,12 @@
     },
     {
       "id": "M6",
-      "description": "continuation becomes a global search again, so a perturbed evaluation may return a different branch",
+      "description": "the continuation ignores its anchor and re-searches globally, so it may return a different branch",
       "_claimed": "caught by TestContinuationStaysOnOneBranch",
-      "_note": "Unreachable through analyse -- multistable models refuse at the base point -- which is exactly why those tests drive follow() directly. If this comes back NOT CAUGHT the guarantee is decorative and the ADR must say so.",
+      "_note": "REPLACED after the first attempt came back NOT CAUGHT, and the harness was right. That attempt kept extra_starts=[anchor] and merely re-enabled the global search alongside it -- which is INERT, because extra_starts are prepended and _continue_from returns points[0], so the anchor's branch converges first and wins no matter how many other starts follow. An inert mutation reads exactly like an untested claim (ADR 0167, F2). This version removes the anchor, which is the actual defect: a continuation that re-decides which branch to be on at every step. Unreachable through analyse -- multistable models refuse at the base point -- which is why TestContinuationStaysOnOneBranch drives follow() directly.",
       "file": "Terium/compose/sensitivity.py",
       "find": "        network, starts_per_species=0, extra_starts=[list(anchor)]",
-      "replace": "        network, starts_per_species=STARTS_PER_SPECIES, extra_starts=[list(anchor)]"
+      "replace": "        network, starts_per_species=STARTS_PER_SPECIES"
     },
     {
       "id": "M7",
