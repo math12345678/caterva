@@ -23,19 +23,34 @@ from Terium.compose.pipeline import compose
 from Terium.compose.report import ModelDossier, _default_target, dossier
 
 
-def _model(query: str = "three step phosphorylation cascade"):
-    return compose(query)
+# -- shared, because these are expensive ------------------------------------
+#
+# Building the cascade and ranking its twelve constants costs twenty-five
+# steady-state solves. Twenty-odd tests want the same two values, and
+# recomputing them per test added minutes to the engine suite for no extra
+# coverage. Both are frozen and no test mutates them.
+
+
+@pytest.fixture(scope="module")
+def model():
+    return compose("three step phosphorylation cascade")
+
+
+@pytest.fixture(scope="module")
+def ranking(model):
+    from Terium.compose.sensitivity import rank_unmeasured
+
+    return rank_unmeasured(model, "tier3_Xp")
 
 
 class TestTheUnmeasuredTable:
-    def test_without_a_ranking_it_keeps_its_own_order(self) -> None:
+    def test_without_a_ranking_it_keeps_its_own_order(self, model) -> None:
         """An unranked list is honest; a mis-ranked one is not.
 
         When no sensitivity report is available the table must not invent an
         ordering -- the reader would read the top row as the thing to
         measure first.
         """
-        model = _model()
         report = ModelDossier(query="q", model=model, sensitivity=None)
         rendered = "\n".join(report.provenance_section())
 
@@ -46,9 +61,8 @@ class TestTheUnmeasuredTable:
         ]
         assert order == [q.parameter_id for q in model.resolvable]
 
-    def test_with_a_ranking_the_table_is_sorted_by_influence(self) -> None:
-        model = _model()
-        sensitivity = _rank(model, "tier3_Xp")
+    def test_with_a_ranking_the_table_is_sorted_by_influence(self, model, ranking) -> None:
+        sensitivity = ranking
         report = ModelDossier(query="q", model=model, sensitivity=sensitivity)
         rendered = "\n".join(report.provenance_section())
 
@@ -62,15 +76,14 @@ class TestTheUnmeasuredTable:
         ranked = [s for s in scores if s is not None]
         assert ranked == sorted(ranked, reverse=True)
 
-    def test_an_unrankable_constant_sorts_last_and_says_so(self) -> None:
+    def test_an_unrankable_constant_sorts_last_and_says_so(self, model, ranking) -> None:
         """Not judged is not judged unimportant.
 
         A constant the sensitivity run skipped -- its value is zero, say --
         must not be sorted as though it scored zero, which would put it
         among the ones measured to be negligible.
         """
-        model = _model()
-        sensitivity = _rank(model, "tier3_Xp")
+        sensitivity = ranking
         trimmed = _drop_first(sensitivity)
         missing = sensitivity.sensitivities[0].parameter
 
@@ -81,7 +94,7 @@ class TestTheUnmeasuredTable:
         assert "_not ranked_" in lines[-1]
         assert missing in lines[-1]
 
-    def test_a_negligible_row_keeps_its_number(self) -> None:
+    def test_a_negligible_row_keeps_its_number(self, model, ranking) -> None:
         """The column's whole job is the spread.
 
         An earlier version printed "negligible here" for every row of a
@@ -89,8 +102,7 @@ class TestTheUnmeasuredTable:
         four orders of magnitude, from 9e-5 down to 1e-9, and that spread IS
         the ranking. Collapsing it to one word threw away the column.
         """
-        model = _model()
-        sensitivity = _rank(model, "tier3_Xp")
+        sensitivity = ranking
         assert all(s.negligible for s in sensitivity.sensitivities), "the premise"
 
         rendered = "\n".join(
@@ -126,13 +138,12 @@ class TestTheUnmeasuredTable:
         assert "negligible" not in actionable
 
     def test_the_ranking_is_next_to_the_table_and_not_in_its_own_section(
-        self,
+        self, model, ranking,
     ) -> None:
         # The ordering is the property that turns this table from a list
         # into a plan. A reader who stops at the table must already have it.
-        model = _model()
         report = ModelDossier(
-            query="q", model=model, sensitivity=_rank(model, "tier3_Xp")
+            query="q", model=model, sensitivity=ranking
         )
         provenance = "\n".join(report.provenance_section())
         assert "Ordered by influence" in provenance
@@ -140,16 +151,15 @@ class TestTheUnmeasuredTable:
 
 
 class TestWhatTheRankingMustNotBeReadAs:
-    def test_it_says_the_ordering_is_local(self) -> None:
-        model = _model()
+    def test_it_says_the_ordering_is_local(self, model, ranking) -> None:
         rendered = "\n".join(
-            ModelDossier(query="q", model=model, sensitivity=_rank(model, "tier3_Xp"))
+            ModelDossier(query="q", model=model, sensitivity=ranking)
             .provenance_section()
         )
         assert "local" in rendered
         assert "two decades away" in rendered
 
-    def test_it_distinguishes_influence_from_priority(self) -> None:
+    def test_it_distinguishes_influence_from_priority(self, model, ranking) -> None:
         """The distinction the whole table turns on.
 
         A constant with high influence that BRENDA already holds is not
@@ -157,19 +167,17 @@ class TestWhatTheRankingMustNotBeReadAs:
         calling the result a priority list would send a researcher to the
         bench for a number they could have looked up.
         """
-        model = _model()
         rendered = "\n".join(
-            ModelDossier(query="q", model=model, sensitivity=_rank(model, "tier3_Xp"))
+            ModelDossier(query="q", model=model, sensitivity=ranking)
             .provenance_section()
         )
         assert "influence, not" in rendered
         assert "priority" in rendered
 
     def test_it_names_the_floor_the_negligible_rows_were_judged_against(
-        self,
+        self, model, ranking,
     ) -> None:
-        model = _model()
-        sensitivity = _rank(model, "tier3_Xp")
+        sensitivity = ranking
         rendered = "\n".join(
             ModelDossier(query="q", model=model, sensitivity=sensitivity)
             .provenance_section()
@@ -177,7 +185,7 @@ class TestWhatTheRankingMustNotBeReadAs:
         assert f"{sensitivity.resolution:.1g}" in rendered
 
     def test_a_table_where_nothing_is_actionable_says_the_opposite_advice(
-        self,
+        self, model, ranking,
     ) -> None:
         """"Measure the top of this list" is wrong at saturation.
 
@@ -186,8 +194,7 @@ class TestWhatTheRankingMustNotBeReadAs:
         to say the saturation is itself an artefact of the placeholders --
         otherwise it reads as a licence to leave the model ungrounded.
         """
-        model = _model()
-        sensitivity = _rank(model, "tier3_Xp")
+        sensitivity = ranking
         assert all(s.negligible for s in sensitivity.sensitivities), "the premise"
 
         rendered = "\n".join(
@@ -198,9 +205,8 @@ class TestWhatTheRankingMustNotBeReadAs:
         assert "reason to ground the model, not a reason to leave it" in rendered
         assert "Measuring the top of this list" not in rendered
 
-    def test_a_table_with_an_actionable_row_keeps_the_usual_advice(self) -> None:
-        model = _model()
-        sensitivity = _promote_first(_rank(model, "tier3_Xp"))
+    def test_a_table_with_an_actionable_row_keeps_the_usual_advice(self, model, ranking) -> None:
+        sensitivity = _promote_first(ranking)
         rendered = "\n".join(
             ModelDossier(query="q", model=model, sensitivity=sensitivity)
             .provenance_section()
@@ -208,12 +214,11 @@ class TestWhatTheRankingMustNotBeReadAs:
         assert "Measuring the top of this list" in rendered
         assert "would not move this answer" not in rendered
 
-    def test_it_names_the_quantity_the_ordering_is_about(self) -> None:
+    def test_it_names_the_quantity_the_ordering_is_about(self, model, ranking) -> None:
         # "Influence" with no object is not a claim. The same constant
         # ranks differently against a steady state and against a settling
         # time.
-        model = _model()
-        sensitivity = _rank(model, "tier3_Xp")
+        sensitivity = ranking
         rendered = "\n".join(
             ModelDossier(query="q", model=model, sensitivity=sensitivity)
             .provenance_section()
@@ -223,7 +228,7 @@ class TestWhatTheRankingMustNotBeReadAs:
 
 
 class TestThePlaceholderWarning:
-    def test_it_sits_in_the_behaviour_section(self) -> None:
+    def test_it_sits_in_the_behaviour_section(self, model) -> None:
         """Where the reader forms the belief it qualifies.
 
         A bistability claim means something different when every constant in
@@ -232,17 +237,15 @@ class TestThePlaceholderWarning:
         """
         from Terium.compose.analysis import analyse
 
-        model = _model()
         report = ModelDossier(
             query="q", model=model, stability=analyse(model.network)
         )
         behaviour = "\n".join(report.behaviour_section())
         assert "about the model's SHAPE" in behaviour
 
-    def test_a_grounded_model_gets_no_such_warning(self) -> None:
+    def test_a_grounded_model_gets_no_such_warning(self, model) -> None:
         # The warning is about placeholders. A model with none must not
         # carry it, or it becomes noise that readers learn to skip.
-        model = _model()
         assert model.structure_only, "the premise"
         assert ModelDossier(query="q", model=model).placeholder_warning() is not None
 
@@ -263,11 +266,11 @@ class TestThePlaceholderWarning:
 
 
 class TestTheDefaultTarget:
-    def test_it_is_the_last_thing_the_mechanism_produces(self) -> None:
+    def test_it_is_the_last_thing_the_mechanism_produces(self, model) -> None:
         # A cascade's bottom tier is what a reader means by "the answer".
-        assert _default_target(_model()) == "tier3_Xp"
+        assert _default_target(model) == "tier3_Xp"
 
-    def test_it_is_not_the_last_product_of_the_last_reaction(self) -> None:
+    def test_it_is_not_the_last_product_of_the_last_reaction(self, model) -> None:
         """The bug this rule replaced, pinned so it cannot come back.
 
         A cascade tier's LAST reaction is the phosphatase step, whose
@@ -275,14 +278,14 @@ class TestTheDefaultTarget:
         reaction order therefore ranked every constant against the opposite
         of the question, confidently.
         """
-        network = _model().network
+        network = model.network
         last_product = None
         for reaction in reversed(network.reactions):
             if reaction.products:
                 last_product = list(reaction.products)[-1]
                 break
         assert last_product == "tier3_X"
-        assert _default_target(_model()) != last_product
+        assert _default_target(model) != last_product
 
     def test_it_prefers_a_product_over_an_enzyme(self) -> None:
         # The competition model's last instance declares both. An enzyme is
@@ -353,12 +356,6 @@ class TestAssembly:
 
 
 # -- helpers ---------------------------------------------------------------
-
-
-def _rank(model, species):
-    from Terium.compose.sensitivity import rank_unmeasured
-
-    return rank_unmeasured(model, species)
 
 
 def _drop_first(report):

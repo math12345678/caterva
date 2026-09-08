@@ -24,6 +24,26 @@ from Terium.compose.sensitivity import (
 )
 
 
+# -- shared, because these are expensive ------------------------------------
+#
+# `rank_unmeasured` on the cascade re-solves the steady state twice per
+# constant, twelve times over. Eight tests want the same report, and
+# recomputing it eight times added minutes to the engine suite for no extra
+# coverage. Module-scoped rather than session-scoped so a failure here
+# cannot leak into another file's fixtures, and safe to share because both
+# values are frozen dataclasses that no test mutates.
+
+
+@pytest.fixture(scope="module")
+def cascade():
+    return compose("three step phosphorylation cascade")
+
+
+@pytest.fixture(scope="module")
+def cascade_ranking(cascade):
+    return rank_unmeasured(cascade, "tier3_Xp")
+
+
 class TestAgainstAnAnalyticAnswer:
     def test_a_first_order_steady_state_has_sensitivity_plus_and_minus_one(self) -> None:
         """The case where the answer is exact.
@@ -150,6 +170,109 @@ class TestTheStepIsSetByTheQuantity:
             analyse(composition.to_network(), lambda n: 2.0, precision=5.0)
 
 
+class TestContinuationStaysOnOneBranch:
+    """The property that makes a difference quotient a derivative.
+
+    `analyse` evaluates the quantity at p+h and p-h. If those two searches
+    can return different steady states, their difference over 2h is the gap
+    between two attractors divided by a tiny number -- large, meaningless,
+    and indistinguishable from a real sensitivity.
+
+    Tested on `follow` DIRECTLY rather than through `analyse`, because
+    through `analyse` it currently cannot be violated: the only models with
+    more than one branch are refused at the base point, so no perturbed
+    evaluation ever has a second branch to jump to. Exercising it here keeps
+    the guarantee load-bearing instead of decorative, and keeps it honest --
+    a test that could not fail would be worse than none.
+    """
+
+    def _toggle(self):
+        from Terium.compose.analysis import analyse as analyse_stability
+
+        model = compose("a toggle switch between two repressors")
+        report = analyse_stability(model.network, starts_per_species=STARTS_PER_SPECIES)
+        assert len(report.stable_points) == 2, "the premise"
+        return model.network, report.stable_points
+
+    def test_each_branch_continues_to_itself(self) -> None:
+        network, states = self._toggle()
+        quantity = steady_state_of("geneA_X")
+
+        for point in states:
+            anchor = tuple(point.state[s.id] for s in network.species)
+            assert quantity.follow(network, anchor) == pytest.approx(
+                point.state["geneA_X"], abs=1e-9
+            )
+
+    def test_the_two_branches_do_not_continue_to_the_same_place(self) -> None:
+        # Without this the test above would pass on an implementation that
+        # ignored the anchor and always returned the same state.
+        network, states = self._toggle()
+        quantity = steady_state_of("geneA_X")
+
+        values = [
+            quantity.follow(network, tuple(p.state[s.id] for s in network.species))
+            for p in states
+        ]
+        assert abs(values[0] - values[1]) > 1.0
+
+    def test_a_branch_survives_a_perturbation_of_the_size_analyse_uses(
+        self,
+    ) -> None:
+        """The actual step, not a token one.
+
+        A continuation that only holds for infinitesimal moves would not
+        help: `analyse` moves each parameter by `step_for(precision)` and
+        both halves must land on the branch it started from.
+
+        The assertion is branch IDENTITY, not an unchanged value. The value
+        does move -- by about 6e-5 here, which is the sensitivity being
+        measured and the whole reason for the exercise. What must not happen
+        is landing nearer the other branch, nine units away.
+        """
+        from dataclasses import replace
+
+        network, states = self._toggle()
+        quantity = steady_state_of("geneA_X")
+        step = step_for(MACHINE_PRECISION)
+        target = network.parameters[0].id
+        branches = [p.state["geneA_X"] for p in states]
+
+        for point in states:
+            anchor = tuple(point.state[s.id] for s in network.species)
+            here = point.state["geneA_X"]
+            other = next(v for v in branches if v != here)
+            for direction in (+1.0, -1.0):
+                moved = replace(
+                    network,
+                    parameters=tuple(
+                        replace(p, value=p.value * (1.0 + direction * step))
+                        if p.id == target else p
+                        for p in network.parameters
+                    ),
+                )
+                landed = quantity.follow(moved, anchor)
+                assert abs(landed - here) < abs(landed - other) / 1000
+                # And it moved by something -- a continuation that returned
+                # the anchor unchanged would pass the line above trivially.
+                assert landed != here
+
+    def test_a_continuation_that_fails_refuses_rather_than_searching(self) -> None:
+        """A fallback would re-enable branch-jumping exactly when it is
+        most likely -- a continuation failing is itself evidence the branch
+        is doing something interesting.
+        """
+        network, states = self._toggle()
+        quantity = steady_state_of("geneA_X")
+
+        # An anchor of the wrong shape cannot be continued from. The refusal
+        # must surface, not be papered over by a global search that would
+        # return some other branch and look like success.
+        with pytest.raises(Exception) as caught:
+            quantity.follow(network, (1.0,))
+        assert "coordinates" in str(caught.value)
+
+
 class TestTheDominantThresholdIsNotACoinFlip:
     """|S| = 1 is the commonest exact answer in the subject.
 
@@ -203,7 +326,7 @@ class TestTheDominantThresholdIsNotACoinFlip:
 
 
 class TestTheRanking:
-    def test_a_saturated_cascade_is_insensitive_upstream(self) -> None:
+    def test_a_saturated_cascade_is_insensitive_upstream(self, cascade_ranking) -> None:
         """A correct answer that looks like a broken one.
 
         At the library's default constants a three-tier cascade runs to
@@ -213,8 +336,7 @@ class TestTheRanking:
         saturated cascade and precisely why the report says its numbers are
         local.
         """
-        model = compose("three step phosphorylation cascade")
-        report = rank_unmeasured(model, "tier3_Xp")
+        report = cascade_ranking
 
         assert report.base_value > 0.999, "saturated, which is the premise"
 
@@ -237,7 +359,7 @@ class TestTheRanking:
         assert report.ranked[0].parameter.startswith("tier3_")
 
     def test_the_kinase_and_phosphatase_constants_are_exactly_opposed(
-        self,
+        self, cascade_ranking,
     ) -> None:
         """A free analytic check the ranking must reproduce.
 
@@ -246,8 +368,7 @@ class TestTheRanking:
         equal and opposite -- for every tier, at every value. Numbers that
         merely looked plausible would not do this.
         """
-        model = compose("three step phosphorylation cascade")
-        report = rank_unmeasured(model, "tier3_Xp")
+        report = cascade_ranking
         by_name = {s.parameter: s.relative for s in report.sensitivities}
 
         for tier in ("tier1", "tier2", "tier3"):
@@ -256,7 +377,7 @@ class TestTheRanking:
             assert kinase == pytest.approx(-phosphatase, rel=1e-4), tier
             assert kinase > 0, f"{tier}: more kinase must raise the answer"
 
-    def test_the_summary_reports_an_empty_priority_list_as_a_finding(self) -> None:
+    def test_the_summary_reports_an_empty_priority_list_as_a_finding(self, cascade_ranking) -> None:
         """Silence would read as "the ranking had nothing to say".
 
         The opposite is true: it found that no unmeasured constant moves
@@ -264,8 +385,7 @@ class TestTheRanking:
         saturation is itself an artefact of the placeholder values -- not a
         licence to leave them unmeasured.
         """
-        model = compose("three step phosphorylation cascade")
-        report = rank_unmeasured(model, "tier3_Xp")
+        report = cascade_ranking
         assert not [s for s in report.priorities() if not s.negligible], "premise"
 
         summary = report.summary()
@@ -274,7 +394,7 @@ class TestTheRanking:
         assert "the placeholders themselves that put the model here" in summary
 
     def test_the_upstream_constants_have_real_influence_not_no_influence(
-        self,
+        self, cascade_ranking,
     ) -> None:
         """The finding that split one threshold into two.
 
@@ -284,8 +404,7 @@ class TestTheRanking:
         clear of the noise, and still not worth a week at the bench. Saying
         "no influence" overstated what had been found.
         """
-        model = compose("three step phosphorylation cascade")
-        report = rank_unmeasured(model, "tier3_Xp")
+        report = cascade_ranking
 
         upstream = [
             s for s in report.sensitivities
@@ -301,26 +420,25 @@ class TestTheRanking:
         for entry in measured:
             assert report.resolution < abs(entry.relative) < NEGLIGIBLE_INFLUENCE
 
-    def test_the_summary_keeps_the_two_kinds_of_small_apart(self) -> None:
-        model = compose("three step phosphorylation cascade")
-        summary = rank_unmeasured(model, "tier3_Xp").summary()
+    def test_the_summary_keeps_the_two_kinds_of_small_apart(self, cascade_ranking) -> None:
+        summary = cascade_ranking.summary()
         assert "too little to act on" in summary
         assert "influence is real and was measured" in summary
         # And it does not reach for the word that started the confusion.
         assert "no measurable influence" not in summary
 
-    def test_the_priority_list_holds_only_unmeasured_constants(self) -> None:
-        model = compose("three step phosphorylation cascade")
-        report = rank_unmeasured(model, "tier3_Xp")
-        unmeasured = {q.parameter_id for q in model.resolvable}
+    def test_the_priority_list_holds_only_unmeasured_constants(
+        self, cascade, cascade_ranking,
+    ) -> None:
+        report = cascade_ranking
+        unmeasured = {q.parameter_id for q in cascade.resolvable}
         assert {s.parameter for s in report.priorities()} <= unmeasured
 
-    def test_the_ranking_is_by_absolute_value(self) -> None:
+    def test_the_ranking_is_by_absolute_value(self, cascade_ranking) -> None:
         # A parameter that lowers the answer by 2% per 1% matters as much as
         # one that raises it by 2%, and ranking by signed value would bury
         # every inhibitory constant at the bottom.
-        model = compose("three step phosphorylation cascade")
-        report = rank_unmeasured(model, "tier3_Xp")
+        report = cascade_ranking
         magnitudes = [abs(s.relative) for s in report.ranked]
         assert magnitudes == sorted(magnitudes, reverse=True)
 
@@ -475,15 +593,14 @@ class TestHonesty:
         # And it does not overclaim in the other direction either.
         assert "not the same as having none" in described
 
-    def test_a_real_but_tiny_influence_is_printed_with_its_number(self) -> None:
+    def test_a_real_but_tiny_influence_is_printed_with_its_number(self, cascade_ranking) -> None:
         """The other side of the same distinction.
 
         A saturated cascade's upstream constants sit at 1e-8: far above the
         floor, so the number IS meaningful and is shown, and far below what
         is worth measuring, so it is called negligible in the same breath.
         """
-        model = compose("three step phosphorylation cascade")
-        report = rank_unmeasured(model, "tier3_Xp")
+        report = cascade_ranking
         upstream = next(
             s for s in report.sensitivities if s.parameter == "tier1_kcat_kin"
         )

@@ -1,0 +1,131 @@
+{
+  "_why": [
+    "ADR 0175's mutation table, under scripts/mutate.py.",
+    "",
+    "Every defect in that ADR was a constant that read plausibly. That is the",
+    "hardest kind of thing to keep fixed, because the wrong version does not",
+    "look wrong -- 1e-6 is a perfectly reasonable-looking step and 'negligible",
+    "below 1e-6' is a perfectly reasonable-looking threshold. The only thing",
+    "standing between this module and a quiet return to all three is whether",
+    "the tests added alongside them actually fire. So each mutation here",
+    "restores one of the original defects EXACTLY, and asks the harness.",
+    "",
+    "M6 is the interesting one and it is why the continuation tests exist at",
+    "all. Branch-following cannot be violated through `analyse`: every model",
+    "with more than one branch is refused at the base point, so no perturbed",
+    "evaluation ever has a second branch to jump to. Written only against",
+    "`analyse`, the guarantee would have been decorative -- true, unreachable,",
+    "and untested. TestContinuationStaysOnOneBranch drives `follow` directly",
+    "for that reason.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0175-a-threshold-finer-than-the-method.json"
+  ],
+  "test": "./.venv/bin/python -m pytest Terium/tests/test_compose_sensitivity.py Terium/tests/test_compose_report.py Terium/tests/test_compose_analysis.py --no-header -p no:cacheprovider -q",
+  "mutations": [
+    {
+      "id": "M1",
+      "description": "the step goes back to one fixed 1e-6 for every quantity, ignoring declared precision",
+      "_claimed": "caught by test_the_two_quantities_do_not_get_the_same_step and by the settling-time floor tests",
+      "_note": "The original defect. A settling time accurate to 1e-8 differentiated with a 1e-6 step reported S = 0.004 for a parameter 1/kd does not contain.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "    step = float(step) if step is not None else step_for(precision)",
+      "replace": "    step = float(step) if step is not None else 1e-6"
+    },
+    {
+      "id": "M2",
+      "description": "the noise floor is the precision itself rather than precision ** (2/3)",
+      "_claimed": "caught by test_a_step_from_precision_balances_the_two_error_terms",
+      "_note": "Makes the floor far too fine -- 1e-8 instead of 5e-5 for the settling time -- so method noise reads as signal again.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "    return SAFETY * float(precision) ** (2.0 / 3.0)",
+      "replace": "    return SAFETY * float(precision)"
+    },
+    {
+      "id": "M3",
+      "description": "the dominance test drops the resolution slack, so an exact |S| = 1 is decided by rounding",
+      "_claimed": "caught by test_the_slack_is_the_resolution_and_not_a_second_threshold and test_both_constants_of_a_first_order_turnover_are_dominant",
+      "_note": "The coin-flip defect: ks at +0.9999999999621 not dominant, kd at -1.0000000000510 dominant, same model and same true answer.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "        return abs(self.relative) >= DOMINANT - self.resolution",
+      "replace": "        return abs(self.relative) >= DOMINANT"
+    },
+    {
+      "id": "M4",
+      "description": "the two thresholds are re-conflated: negligible means below the arithmetic's floor again",
+      "_claimed": "caught by test_the_upstream_constants_have_real_influence_not_no_influence and test_the_summary_keeps_the_two_kinds_of_small_apart",
+      "_note": "This is the conflation that hid the cascade's real 1e-8 sensitivities behind the words 'no measurable influence'.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "        return abs(self.relative) < NEGLIGIBLE_INFLUENCE",
+      "replace": "        return abs(self.relative) < self.resolution"
+    },
+    {
+      "id": "M5",
+      "description": "the steady-state search drops back below the analysis module's measured default",
+      "_claimed": "caught by test_the_refusal_searches_at_least_as_hard_as_the_analysis_default and test_a_bistable_model_refuses_a_steady_state_derivative",
+      "_note": "At 4 the toggle switch reports ONE stable state when it has two, so the multistability refusal never fires and a derivative is taken through a bistable system in silence.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "STARTS_PER_SPECIES = 16",
+      "replace": "STARTS_PER_SPECIES = 4"
+    },
+    {
+      "id": "M6",
+      "description": "continuation becomes a global search again, so a perturbed evaluation may return a different branch",
+      "_claimed": "caught by TestContinuationStaysOnOneBranch",
+      "_note": "Unreachable through analyse -- multistable models refuse at the base point -- which is exactly why those tests drive follow() directly. If this comes back NOT CAUGHT the guarantee is decorative and the ADR must say so.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "        network, starts_per_species=0, extra_starts=[list(anchor)]",
+      "replace": "        network, starts_per_species=STARTS_PER_SPECIES, extra_starts=[list(anchor)]"
+    },
+    {
+      "id": "M7",
+      "description": "a search with no starting points reports 'no steady states' instead of refusing",
+      "_claimed": "caught by test_searching_nowhere_is_refused_rather_than_reported_as_empty",
+      "_note": "A model with no steady state and a search that looked nowhere would then render identically, which is the specific silent lie the check exists for.",
+      "file": "Terium/compose/analysis.py",
+      "find": "    if not starts:\n        raise AnalysisError(",
+      "replace": "    if False:\n        raise AnalysisError("
+    },
+    {
+      "id": "M8",
+      "description": "an explicit start of the wrong length is padded instead of refused",
+      "_claimed": "caught by test_a_start_of_the_wrong_length_is_refused",
+      "file": "Terium/compose/analysis.py",
+      "find": "        if len(start) != len(species):",
+      "replace": "        if False and len(start) != len(species):"
+    },
+    {
+      "id": "M9",
+      "description": "zero starts per species still generates the floor of four, so a continuation can jump branches",
+      "_claimed": "caught by test_zero_starts_per_species_generates_none",
+      "file": "Terium/compose/analysis.py",
+      "find": "    if per_species <= 0:\n        return []",
+      "replace": "    if False:\n        return []"
+    },
+    {
+      "id": "M10",
+      "description": "the influence column collapses every negligible row to one word again, discarding the spread",
+      "_claimed": "caught by test_a_negligible_row_keeps_its_number",
+      "_note": "The cascade's twelve constants span four orders of magnitude and that spread IS the ranking. 'negligible here' for all twelve is true and useless.",
+      "file": "Terium/compose/report.py",
+      "find": "        return f\"S = {entry.relative:+.2g} _(negligible)_\"",
+      "replace": "        return \"negligible here\""
+    },
+    {
+      "id": "M11",
+      "description": "the default ranking target goes back to the last product of the last reaction",
+      "_claimed": "caught by test_it_is_the_last_thing_the_mechanism_produces and test_it_is_not_the_last_product_of_the_last_reaction",
+      "_note": "For a cascade that is the DEPHOSPHORYLATED form -- the last reaction of the last tier is the phosphatase step -- so the whole table gets ranked against the opposite of the question.",
+      "file": "Terium/compose/report.py",
+      "find": "    instances = getattr(model.recognition.composition, \"instances\", ())\n    for instance in reversed(list(instances)):\n        products = instance.motif.ports_with_role(ROLE_PRODUCT)\n        if products:\n            return instance.species_for(products[-1].name)\n    return None",
+      "replace": "    for reaction in reversed(model.network.reactions):\n        if reaction.products:\n            return list(reaction.products)[-1]\n    return None"
+    },
+    {
+      "id": "M12",
+      "description": "the table always says 'measure the top of this list', even when nothing on it is worth measuring",
+      "_claimed": "caught by test_a_table_where_nothing_is_actionable_says_the_opposite_advice",
+      "file": "Terium/compose/report.py",
+      "find": "        actionable = [\n            s for s in self.sensitivity.sensitivities if not s.negligible\n        ]",
+      "replace": "        actionable = list(self.sensitivity.sensitivities)"
+    }
+  ]
+}
