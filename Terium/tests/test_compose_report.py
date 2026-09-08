@@ -376,3 +376,81 @@ def _promote_first(report):
     rows = list(report.sensitivities)
     rows[0] = replace(rows[0], relative=2.0)
     return replace(report, sensitivities=tuple(rows))
+
+
+class TestTheCaptionFollowsTheCause:
+    """An all-zero table has two possible causes and opposite advice.
+
+    Saturation: nothing is worth measuring anywhere. Conservation: the
+    question was asked of the wrong quantity, and the kinetics answer a
+    different one. Captioning the second as the first attaches a plausible
+    wrong reason to a correct number.
+    """
+
+    def _pinned(self):
+        from Terium.compose.sensitivity import rank_unmeasured
+
+        model = compose("substrate inhibition at high substrate concentration")
+        return model, rank_unmeasured(model, "reaction_P")
+
+    def test_a_conserved_target_gets_the_structural_caption(self) -> None:
+        model, sensitivity = self._pinned()
+        assert sensitivity.conserved_by, "the premise"
+
+        rendered = "\n".join(
+            ModelDossier(query="q", model=model, sensitivity=sensitivity)
+            .provenance_section()
+        )
+        assert sensitivity.conserved_by in rendered
+        assert "the reason is structural" in rendered
+        assert "how FAST the system arrives, never WHERE" in rendered
+        assert "settling time or the time course" in rendered
+
+    def test_it_does_not_call_a_conserved_target_saturated(self) -> None:
+        model, sensitivity = self._pinned()
+        rendered = "\n".join(
+            ModelDossier(query="q", model=model, sensitivity=sensitivity)
+            .provenance_section()
+        )
+        assert "saturation" not in rendered
+
+    def test_a_saturated_target_still_gets_the_saturation_caption(
+        self, model, ranking
+    ) -> None:
+        # The cascade's target IS in a conservation law, so a weaker
+        # discriminator would reroute it to the structural caption.
+        assert ranking.conserved_by is None, "the premise"
+        rendered = "\n".join(
+            ModelDossier(query="q", model=model, sensitivity=ranking)
+            .provenance_section()
+        )
+        assert "saturation" in rendered
+        assert "the reason is structural" not in rendered
+
+
+class TestTheBindingMotifHasATarget:
+    def test_a_motif_with_no_product_falls_back_to_its_complex(self) -> None:
+        """Previously silence, not a refusal.
+
+        `_default_target` looked only for product ports, so a binding motif
+        -- which declares partners and a complex -- returned None and the
+        dossier simply had no ranking, with nothing saying why.
+        """
+        model = compose("reversible binding of a ligand to a receptor")
+        assert _default_target(model) == "complex_AB"
+
+    def test_a_product_still_wins_over_a_complex(self) -> None:
+        # Products are tried across every instance before complexes are,
+        # so a composition that both produces and binds ranks against the
+        # thing produced.
+        assert _default_target(compose("three step phosphorylation cascade")) == (
+            "tier3_Xp"
+        )
+
+    def test_the_dossier_now_ranks_a_binding_model(self) -> None:
+        report = dossier(
+            "reversible binding of a ligand to a receptor",
+            analyse_stability=False, simulate=False,
+        )
+        assert report.sensitivity is not None
+        assert "| influence |" in report.markdown()

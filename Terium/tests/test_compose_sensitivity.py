@@ -622,3 +622,177 @@ class TestHonesty:
             assert entry.absolute == pytest.approx(
                 entry.relative * report.base_value / entry.value, rel=1e-6
             )
+
+
+class TestAnAllZeroRankingHasTwoCauses:
+    """The same symptom, opposite advice.
+
+    A ranking where nothing clears the act-on threshold can mean the
+    mechanism is saturated -- nothing upstream can push it further -- or
+    that the quantity is not a function of the rate constants at all,
+    because a conservation law fixes it at whatever total the initial
+    condition set. Under saturation there is nothing to gain anywhere;
+    under conservation the question was asked of the wrong quantity, and a
+    time course answers it.
+
+    Reporting the second as the first would attach a plausible wrong reason
+    to a correct number, which is the failure this module has already made
+    once (calling a continuum a set of attractors).
+    """
+
+    def test_a_closed_system_is_pinned_by_its_conservation_law(self) -> None:
+        model = compose("substrate inhibition at high substrate concentration")
+        report = rank_unmeasured(model, "reaction_P")
+
+        assert report.conserved_by == "reaction_S + reaction_P"
+        assert all(s.relative == 0.0 for s in report.sensitivities)
+
+    def test_the_pinned_summary_names_the_law_and_redirects(self) -> None:
+        model = compose("substrate inhibition at high substrate concentration")
+        summary = rank_unmeasured(model, "reaction_P").summary()
+
+        assert "reaction_S + reaction_P" in summary
+        assert "how FAST the system arrives, never WHERE" in summary
+        assert "settling time or a time course" in summary
+        # And it does not reach for the other explanation.
+        assert "saturat" not in summary
+
+    def test_a_saturated_model_is_not_called_conserved(self, cascade_ranking) -> None:
+        """The discriminator, on the case that would fool a weaker one.
+
+        `tier3_Xp` IS in a conservation law -- every phosphorylation tier
+        conserves its own total protein -- so a test for "the species
+        appears in a law" alone would call the cascade pinned. Its
+        sensitivities are 1e-5 and 1e-8: small, but four orders above the
+        noise floor and therefore real. Both signals are required for
+        exactly this case.
+        """
+        assert cascade_ranking.conserved_by is None
+        assert not all(s.unresolvable for s in cascade_ranking.sensitivities)
+        assert "saturat" in cascade_ranking.summary()
+
+    def test_the_species_must_actually_appear_in_the_law(self) -> None:
+        from Terium.compose.sensitivity import conservation_pinning
+
+        model = compose("substrate inhibition at high substrate concentration")
+        report = rank_unmeasured(model, "reaction_P")
+        assert conservation_pinning(model.network, "reaction_E", report) == "reaction_E"
+        assert conservation_pinning(model.network, "nonexistent", report) is None
+
+    def test_the_law_it_names_is_one_that_holds_the_species(self) -> None:
+        from Terium.compose.sensitivity import (
+            Sensitivity, SensitivityReport, conservation_pinning,
+        )
+
+        model = compose("reversible binding of a ligand to a receptor")
+        zeroed = SensitivityReport(
+            quantity="q", base_value=1.0,
+            sensitivities=(Sensitivity("p", 1.0, 0.0, 0.0, NEGLIGIBLE),),
+        )
+        law = conservation_pinning(model.network, "complex_AB", zeroed)
+        assert law is not None
+        assert "complex_AB" in law.split()
+
+    def test_a_report_with_no_sensitivities_is_never_pinned(self) -> None:
+        # Nothing was measured, so nothing was found to be zero. An empty
+        # report satisfies "all unresolvable" vacuously, which is exactly
+        # the shape of check that must not fire.
+        from Terium.compose.sensitivity import conservation_pinning, SensitivityReport
+
+        model = compose("substrate inhibition at high substrate concentration")
+        empty = SensitivityReport(quantity="q", base_value=1.0, sensitivities=())
+        assert conservation_pinning(model.network, "reaction_P", empty) is None
+
+
+class TestTheBindingMotifGetsARankingAtAll:
+    """It declares a COMPLEX, not a product.
+
+    `_default_target` looked only for product ports, so "reversible binding
+    of a ligand to a receptor" produced no ranking whatsoever -- not a
+    refusal with a reason, just silence. `complex_AB` is plainly what a
+    reader means by the answer.
+    """
+
+    def test_the_complex_is_ranked_and_the_ranking_is_real(self) -> None:
+        model = compose("reversible binding of a ligand to a receptor")
+        report = rank_unmeasured(model, "complex_AB")
+
+        assert report.conserved_by is None, "the complex is not pinned"
+        assert report.sensitivities
+        assert max(abs(s.relative) for s in report.sensitivities) > NEGLIGIBLE_INFLUENCE
+
+    def test_on_and_off_rates_are_what_it_points_at(self) -> None:
+        # A binding equilibrium's occupancy depends on kon and koff, and
+        # they are what a reader would go and measure.
+        model = compose("reversible binding of a ligand to a receptor")
+        report = rank_unmeasured(model, "complex_AB")
+        priorities = {s.parameter for s in report.priorities() if not s.negligible}
+        assert {"complex_kon", "complex_koff"} <= priorities
+
+    def test_binding_more_tightly_raises_the_complex(self) -> None:
+        # A sign check the arithmetic must reproduce: more on-rate means
+        # more complex, more off-rate means less.
+        model = compose("reversible binding of a ligand to a receptor")
+        by_name = {
+            s.parameter: s.relative
+            for s in rank_unmeasured(model, "complex_AB").sensitivities
+        }
+        assert by_name["complex_kon"] > 0
+        assert by_name["complex_koff"] < 0
+
+
+class TestLawMentions:
+    """Whole-token matching, tested where it can actually fail.
+
+    A mutation replacing this with a plain substring test came back NOT
+    CAUGHT. Inspecting it showed the mutation was INERT rather than the
+    tests weak: in every law the library currently produces, a species that
+    is a substring of another token is also a token of the same law --
+    `complex_A + complex_AB` names both -- so the two rules agree on real
+    inputs and the distinction could not be exercised through a real model.
+
+    A guard indistinguishable from its own bug is not yet a guard. These
+    drive it with the law strings that separate the rules, which are laws no
+    motif generates today and might generate tomorrow.
+    """
+
+    def test_a_prefix_of_another_token_is_not_a_mention(self) -> None:
+        from Terium.compose.sensitivity import law_mentions
+
+        # The species is a strict substring of every token here and a token
+        # of none of them. A substring test says yes; the truth is no.
+        assert not law_mentions("tier1_Xp + tier1_Xpp", "tier1_X")
+        assert not law_mentions("complex_AB + complex_ABC", "complex_A")
+
+    def test_a_real_token_is_a_mention(self) -> None:
+        from Terium.compose.sensitivity import law_mentions
+
+        assert law_mentions("tier1_X + tier1_Xp", "tier1_X")
+        assert law_mentions("tier1_X + tier1_Xp", "tier1_Xp")
+        assert law_mentions("complex_A + complex_AB", "complex_AB")
+
+    def test_a_coefficient_does_not_hide_a_token(self) -> None:
+        # Laws are rendered with integer coefficients, e.g.
+        # `complex_A + -1 complex_B`. The name is still a whole token.
+        from Terium.compose.sensitivity import law_mentions
+
+        assert law_mentions("complex_A + -1 complex_B", "complex_B")
+        assert not law_mentions("complex_A + -1 complex_B", "complex")
+
+    def test_a_substring_test_would_disagree_on_these(self) -> None:
+        """Pins that these cases actually separate the two rules.
+
+        Without this, the tests above could all pass under a substring
+        implementation and would be checking nothing -- the exact failure
+        that produced them.
+        """
+        from Terium.compose.sensitivity import law_mentions
+
+        separating = [
+            ("tier1_Xp + tier1_Xpp", "tier1_X"),
+            ("complex_AB + complex_ABC", "complex_A"),
+            ("complex_A + -1 complex_B", "complex"),
+        ]
+        for law, species in separating:
+            assert species in law, "the substring rule would say yes"
+            assert not law_mentions(law, species), "the token rule says no"
