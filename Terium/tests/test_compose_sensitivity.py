@@ -555,8 +555,12 @@ class TestRefusals:
         with pytest.raises(KeyError, match="x_ks"):
             analyse(composition.to_network(), lambda n: 1.0, parameters=["nope"])
 
-    def test_a_quantity_that_fails_at_the_base_point_refuses(self) -> None:
-        # Nothing to differentiate.
+    def test_an_opaque_failure_gets_the_context_it_lacks(self) -> None:
+        """A RuntimeError("no") says nothing on its own.
+
+        For an exception carrying no reason of its own, saying where it
+        happened is the whole value of the wrapper.
+        """
         composition = Composition("turnover")
         composition.add(SYNTHESIS_DEGRADATION, "x")
 
@@ -565,6 +569,39 @@ class TestRefusals:
 
         with pytest.raises(SensitivityUnavailable, match="nothing to differentiate"):
             analyse(composition.to_network(), broken)
+
+    def test_a_refusal_that_explains_itself_is_not_re_explained(self) -> None:
+        """The other half, and the one that was wrong.
+
+        The quantities raise SensitivityUnavailable with the precise reason
+        -- two stable states and what each would mean, or no stable state
+        and how hard the search looked. Wrapping that in "the quantity
+        could not be computed at the base point, so there is nothing to
+        differentiate" buried the real reason behind a generic one, and for
+        the open system made one sentence say "differentiate" twice.
+        """
+        model = compose("two enzymes competing for the same substrate")
+        with pytest.raises(SensitivityUnavailable) as caught:
+            analyse(model.network, steady_state_of("enzyme1_P"))
+
+        message = str(caught.value)
+        assert message.startswith("2 stable states")
+        assert "nothing to differentiate" not in message
+
+    def test_the_dossier_note_carries_the_real_reason(self) -> None:
+        # This is where a reader actually meets it.
+        from Terium.compose.report import dossier
+
+        report = dossier(
+            "an open system with constant substrate inflow",
+            analyse_stability=False, simulate=False,
+        )
+        note = next(
+            n for n in report.model.recognition.composition.notes
+            if "influence ranking" in n
+        )
+        assert note.startswith("no influence ranking: no stable steady state")
+        assert note.count("differentiate") == 1
 
 
 class TestHonesty:

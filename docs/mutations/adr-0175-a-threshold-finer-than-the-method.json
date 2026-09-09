@@ -27,6 +27,8 @@
     "M13-M16 were added after the first table, when ranking every model in the library surfaced four whose sensitivities are exactly zero because a conservation law pins them -- not because they are saturated. The unresolvable/negligible split, introduced for honesty, turned out to be the discriminator. M14 is the important one: it removes the conjunction and lets the LAW alone decide, which reroutes the saturated cascade to the structural caption, because tier3_Xp is conserved too.",
     "",
     "M16 WAS ALSO REPLACED, for the same reason as M6 and with the same lesson: the first version was inert, not uncaught. Two of sixteen mutations in this table were inert on the first attempt, which is worth knowing about writing them -- a mutation that looks like it breaks something can be defeated by a detail of the surrounding code (extra_starts being prepended; species names being tokens of the laws that contain them), and the harness reports that as NOT CAUGHT because it cannot tell the two apart. Only reading the code can.",
+    "",
+    "M21 came from a different method and it is worth naming: running the full dossier across all eleven buildable models rather than the one being worked on. That sweep is what found the conservation pinning, the empty-ranking caption, the missing binding target and this. Working one model at a time found none of them.",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0175-a-threshold-finer-than-the-method.json"
   ],
   "test": "./.venv/bin/python -m pytest Terium/tests/test_compose_sensitivity.py Terium/tests/test_compose_report.py Terium/tests/test_compose_analysis.py --no-header --tb=no -p no:cacheprovider",
@@ -205,6 +207,15 @@
       "file": "Terium/compose/report.py",
       "find": "        if self.sensitivity.sensitivities:\n            lines.append(\n                f\"Ordered by influence on **{self.sensitivity.quantity}**: S \"",
       "replace": "        if True:\n            lines.append(\n                f\"Ordered by influence on **{self.sensitivity.quantity}**: S \""
+    },
+    {
+      "id": "M21",
+      "description": "a refusal that already explains itself is wrapped in a generic one, burying the real reason",
+      "_claimed": "caught by test_a_refusal_that_explains_itself_is_not_re_explained and test_the_dossier_note_carries_the_real_reason",
+      "_note": "Found by running the full dossier over every buildable model rather than the one under development. Three of eleven reached a refusal, and each note read 'the quantity could not be computed at the base point, so there is nothing to differentiate: <the actual, precise reason>' -- with the open system's saying 'differentiate' twice in one sentence. The mutation restores the old double-wrapping by inserting a handler AHEAD of the pass-through, rather than by disabling it against a sentinel exception -- a first attempt added a _NeverRaised class to the module for the harness to aim at, which is production code existing to serve its own test and was removed.",
+      "file": "Terium/compose/sensitivity.py",
+      "find": "    except SensitivityUnavailable:\n        # A REFUSAL THAT EXPLAINS ITSELF IS NOT RE-EXPLAINED.",
+      "replace": "    except SensitivityUnavailable as reraise:\n        raise SensitivityUnavailable(\n            f\"the quantity could not be computed at the base point, so \"\n            f\"there is nothing to differentiate: {reraise}\"\n        ) from reraise\n    except SensitivityUnavailable:\n        # A REFUSAL THAT EXPLAINS ITSELF IS NOT RE-EXPLAINED."
     }
   ]
 }

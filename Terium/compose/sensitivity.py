@@ -490,6 +490,20 @@ def analyse(
             base = float(base_value)
         else:
             base, anchor = float(quantity(network)), None
+    except SensitivityUnavailable:
+        # A REFUSAL THAT EXPLAINS ITSELF IS NOT RE-EXPLAINED.
+        #
+        # The quantities raise this with the precise reason -- two stable
+        # states and what each would mean, or no stable state and how hard
+        # the search looked. Wrapping that in "the quantity could not be
+        # computed at the base point, so there is nothing to differentiate"
+        # buried the real reason behind a generic one and, for the open
+        # system, made the sentence say "differentiate" twice.
+        #
+        # The generic message below is for exceptions that carry no such
+        # reason: a KeyError out of a caller's own callable needs saying
+        # where it happened, because on its own it says nothing.
+        raise
     except Exception as exc:  # noqa: BLE001
         raise SensitivityUnavailable(
             f"the quantity could not be computed at the base point, so "
