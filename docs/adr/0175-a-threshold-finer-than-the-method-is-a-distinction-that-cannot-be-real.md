@@ -252,6 +252,29 @@ nothing, which is the worst of the three misreadings in this record. It now
 says nothing was measured, gives the skip reasons, and points at the starting
 amount that left the mechanism switched off.
 
+### The method that found most of this
+
+Four of the defects in this record were found the same way, and none of them by
+working on the module in isolation: **running the whole dossier across every
+buildable model in the library** rather than the one under development. That
+sweep produced the conservation pinning, the empty-ranking caption, the missing
+binding target, and the double-wrapped refusal below. Nine of eleven models
+produced correct documents; the interesting information was entirely in the
+other two and in the four whose numbers were right for a reason the prose got
+wrong.
+
+**A refusal that explains itself was being re-explained.** Three of the eleven
+reach a refusal, and each note read
+
+    no influence ranking: the quantity could not be computed at the base
+    point, so there is nothing to differentiate: <the actual, precise reason>
+
+with the open system's saying "differentiate" twice in one sentence. `analyse`
+now re-raises `SensitivityUnavailable` unchanged and wraps only exceptions that
+carry no reason of their own — a `KeyError` out of a caller's callable does need
+saying where it happened; "2 stable states at these values, so a steady-state
+derivative is undefined" does not.
+
 ### What this does not fix
 
 The multistability refusal remains a search result. The competition
@@ -266,7 +289,7 @@ declared conservatively, but it is not verified per model.
 ### Mutation table
 
 `docs/mutations/adr-0175-a-threshold-finer-than-the-method.json`, under
-`scripts/mutate.py`. **20 caught, 0 not caught, 0 indeterminate**, against a
+`scripts/mutate.py`. **21 caught, 0 not caught, 0 indeterminate**, against a
 green 91-test baseline. Each mutation restores one of the original defects
 exactly, because every one of them was a constant that read plausibly and the
 wrong version does not look wrong.
