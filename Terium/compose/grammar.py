@@ -29,10 +29,46 @@ capability and is named as such in the refusal.
 
 The rule is: recognise a SHAPE, never a SUBJECT. "Cascade" is a shape.
 "Glycolysis" is a subject.
+
+THE EXPANSION LIBRARIES ARE IMPORTED LATE, ON PURPOSE
+-----------------------------------------------------
+`library.py` is the core and is always here. Three further libraries --
+`library_expression`, `library_enzymology`, `library_transport` -- carry the
+motifs for gene expression, the harder enzyme mechanisms, and membrane
+transport. They are written independently of this file and any of them can
+be absent from a checkout.
+
+So every reference to them is a lazy import inside the rule that needs it.
+A module-scope import would take the entire grammar down when one file is
+missing -- including the twenty rules that need nothing from it -- and
+"cannot import grammar" is not a sentence anybody should have to read
+because a transporter library was not written yet. A missing library gives
+a `MissingMotifLibrary` naming the file, the motif, and what CAN be built
+instead; the shape stays recognised either way, which is the difference
+between a capability that is absent and one that was never reachable.
+
+A KEYWORD THAT SWALLOWS ANOTHER RULE'S QUERIES
+----------------------------------------------
+This is the defect class this file has produced twice, and it is silent
+both times. `requires=("compet",)` on the competition rule made
+"competitive inhibition of an enzyme by a substrate analogue" build two
+enzymes sharing a substrate pool: a prefix matched a word it was not about,
+competition outranked inhibition, and a query naming its own mechanism got
+a completely different model with no error.
+
+The same trap sits under the inhibition family. "Uncompetitive" and
+"noncompetitive" both CONTAIN "competitive", and they are three different
+rate laws with three different Lineweaver-Burk signatures. They are told
+apart inside `_inhibition` with `_has`, which anchors on word boundaries,
+and in the order most-specific-first -- and `test_compose_grammar_expansion`
+exists mostly to keep that true. Anyone adding a keyword here should ask
+what OTHER query now contains it as a substring, because `RULES` matching
+is substring matching and will not ask on their behalf.
 """
 
 from __future__ import annotations
 
+import importlib
 import re
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
@@ -105,6 +141,19 @@ NAMED_PATHWAYS = (
     "purine biosynthesis", "pyrimidine biosynthesis",
 )
 
+#: The motif libraries beyond the core, and what each one holds. Keyed by
+#: module name because that is what a refusal has to print: a reader told
+#: "the transport motifs are missing" cannot act, and one told
+#: "Terium/compose/library_transport.py is not in this checkout" can.
+EXPANSION_LIBRARIES: Dict[str, str] = {
+    "library_expression":
+        "transcription, translation, promoters and tagged turnover",
+    "library_enzymology":
+        "multi-substrate, allosteric, channelled and cycling enzymes",
+    "library_transport":
+        "carriers, pumps, coupled transport and receptor internalisation",
+}
+
 
 class UnrecognisedShape(ValueError):
     """The query does not describe a shape this grammar can build."""
@@ -117,6 +166,60 @@ class UnrecognisedShape(ValueError):
         if suggestions:
             message += " Shapes this can build: " + ", ".join(suggestions) + "."
         super().__init__(message)
+
+
+class MissingMotifLibrary(UnrecognisedShape):
+    """The shape was recognised; the motifs that build it are not here.
+
+    A SUBCLASS, so every caller that already handles a refusal keeps
+    working -- `pipeline.compose` and the coverage harness both catch
+    `UnrecognisedShape` and neither needs to change. A DISTINCT TYPE,
+    because the two refusals send a reader to different places: "say which
+    mechanism you mean" is advice to the person typing, and "this file is
+    not in your checkout" is advice to the person installing. Collapsing
+    them would send somebody away to rephrase a query that was already
+    perfectly clear.
+
+    The message never offers to build something adjacent. A symporter is
+    not a facilitated carrier, and quietly substituting one would answer a
+    different question -- the failure mode this whole module exists to
+    avoid. It says what IS reachable and lets the reader decide.
+    """
+
+    def __init__(
+        self,
+        query: str,
+        module: str,
+        motif_name: str,
+        shape: str,
+        instead: str = "",
+        *,
+        module_present: bool = False,
+    ):
+        self.module = module
+        self.motif_name = motif_name
+        #: True when the FILE is here and the motif name is not. Different
+        #: fix -- a rename to chase rather than a file to add -- so the two
+        #: are not flattened into one sentence.
+        self.module_present = module_present
+        holds = EXPANSION_LIBRARIES.get(module, "further motifs")
+        where = f"Terium/compose/{module}.py ({holds})"
+        if module_present:
+            missing = (
+                f"{where} IS in this checkout and defines no {motif_name}, "
+                f"so the name has drifted rather than the file being absent"
+            )
+        else:
+            missing = f"{where} is not in this checkout"
+        reason = (
+            f"{shape!r} is a shape this grammar recognises, but the motif "
+            f"that builds it ({motif_name}) lives in {missing}. Nothing "
+            f"adjacent was substituted: a near-miss mechanism simulates "
+            f"perfectly and answers a different question."
+        )
+        if instead:
+            reason += f" {instead}"
+        super().__init__(query, reason)
 
 
 @dataclass(frozen=True)
@@ -171,6 +274,63 @@ def _as_int(token: str) -> Optional[int]:
 
 def _has(text: str, *words: str) -> bool:
     return any(re.search(r"\b" + re.escape(w) + r"\b", text) for w in words)
+
+
+# ---------------------------------------------------------------------------
+# Reaching the expansion libraries without depending on them
+# ---------------------------------------------------------------------------
+
+
+def _expansion_module(name: str):
+    """Import one of the expansion libraries, or return None if it is absent.
+
+    None means "not in this checkout". It does NOT mean "the library is
+    broken": a `ModuleNotFoundError` naming something other than the library
+    itself is re-raised, because a transport library that fails because
+    `numpy` is missing must not be reported as a transport library nobody
+    wrote. The two need opposite fixes and the error is the only place the
+    difference survives.
+    """
+    package = __package__ or ""
+    candidates = [f"{package}.{name}"] if package else []
+    candidates.append(name)
+
+    for candidate in candidates:
+        try:
+            return importlib.import_module(candidate)
+        except ModuleNotFoundError as absent:
+            if absent.name not in {candidate, name}:
+                raise
+    return None
+
+
+def _expansion_motif(
+    query: str,
+    module: str,
+    names: Sequence[str],
+    *,
+    shape: str,
+    instead: str = "",
+):
+    """The first of `names` the library defines, or a refusal saying so.
+
+    `names` is a sequence rather than one string because these libraries are
+    written alongside this file rather than before it, and the same motif
+    has been reasonably spelled `..._INTERNALIZATION` and
+    `..._INTERNALISATION` by two people on the same afternoon. Accepting
+    both spellings is not guessing at biology -- the motif either exists
+    under one of them or the refusal names every spelling it looked for.
+    """
+    library = _expansion_module(module)
+    if library is None:
+        raise MissingMotifLibrary(query, module, " or ".join(names), shape, instead)
+    for name in names:
+        found = getattr(library, name, None)
+        if found is not None:
+            return found
+    raise MissingMotifLibrary(
+        query, module, " or ".join(names), shape, instead, module_present=True,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -315,6 +475,276 @@ def _repressilator(query: str, name: str) -> Recognition:
         "stable pattern instead of oscillating"
     )
     return Recognition(composition, "repressilator", "three-gene ring")
+
+
+def _gene_expression(query: str, name: str) -> Recognition:
+    """Transcription and translation as two steps, not one.
+
+    The core library has `synthesis_degradation`, which lumps them: protein
+    appears at a constant rate and decays. That is the right model for a lot
+    of questions and the wrong one for any question about TIMING, because
+    the lump has no mRNA and therefore no delay -- the two-stage system's
+    response is second order and the lumped one's is first order, so they
+    disagree about how fast a gene can be switched on no matter how the
+    constants are chosen. It also has no burst: mRNA lifetime is what sets
+    protein noise, and a one-stage model cannot express it at all.
+
+    Which is why this reaches for `library_expression` and refuses rather
+    than quietly handing back the lump.
+    """
+    composition = Composition(name)
+
+    if _has(query, "ssra", "clpxp", "degradation tag", "degradation tagged",
+            "tagged protein", "targeted degradation", "degron"):
+        motif = _expansion_motif(
+            query, "library_expression", ("PROTEIN_DEGRADATION_TAGGED",),
+            shape="tagged protein degradation",
+            instead=(
+                "'saturable degradation' builds Michaelis-Menten removal "
+                "from the core library, which is the same shape without the "
+                "tag being a species of its own."
+            ),
+        )
+        composition.add(motif, "tagged")
+        composition.note(
+            "degradation through a protease that the tag recruits, so "
+            "removal is saturable and competes with everything else "
+            "carrying the tag. First-order decay assumes the protease is "
+            "never busy, and a tagged system is where that assumption fails"
+        )
+        return Recognition(
+            composition, "tagged_degradation", "tag-directed proteolysis"
+        )
+
+    if _has(query, "mrna degradation", "mrna decay", "mrna half-life",
+            "mrna half life", "transcript degradation", "transcript decay"):
+        motif = _expansion_motif(
+            query, "library_expression", ("MRNA_DEGRADATION",),
+            shape="mRNA degradation",
+            instead=(
+                "'a species made and removed' builds first-order turnover "
+                "from the core library without naming it as mRNA."
+            ),
+        )
+        composition.add(motif, "transcript")
+        composition.note(
+            "mRNA turnover on its own. Its rate constant is the one that "
+            "sets how fast a gene can be switched OFF, and in bacteria it is "
+            "minutes against a protein's hours, which is why the two "
+            "lifetimes cannot be lumped into one"
+        )
+        return Recognition(composition, "mrna_degradation", "transcript turnover")
+
+    if _has(query, "repressed promoter", "repressible promoter") or (
+        _has(query, "promoter") and _has(query, "repressed", "repressor")
+    ):
+        motif = _expansion_motif(
+            query, "library_expression", ("REPRESSED_PROMOTER",),
+            shape="repressed promoter",
+            instead=(
+                "'cooperative repression' builds a Hill repression term "
+                "from the core library, which is the same regulation "
+                "without transcription and translation being separate."
+            ),
+        )
+        composition.add(motif, "promoter")
+        composition.note(
+            "transcription initiation under a repressor, as a Hill term on "
+            "the mRNA synthesis rate. The Hill coefficient is a modelling "
+            "choice and is declared as one; it is not a measurement of this "
+            "promoter"
+        )
+        composition.note(
+        "this is transcription ALONE. Nothing here translates the transcript "
+        "or degrades it, so mRNA accumulates without bound -- which is a "
+        "property of a half-model rather than of a promoter, and it is said "
+        "here rather than left to be discovered on the first plot. Compose "
+        "it with mRNA degradation and translation, or ask for two-stage gene "
+        "expression, to close the system"
+    )
+        return Recognition(composition, "repressed_promoter", "repressed transcription")
+
+    if _has(query, "activated promoter", "inducible promoter") or (
+        _has(query, "promoter") and _has(query, "activated", "activator", "induced")
+    ):
+        motif = _expansion_motif(
+            query, "library_expression", ("ACTIVATED_PROMOTER",),
+            shape="activated promoter",
+            instead=(
+                "'cooperative activation' builds a Hill activation term "
+                "from the core library."
+            ),
+        )
+        composition.add(motif, "promoter")
+        composition.note(
+            "transcription initiation under an activator, as a Hill term on "
+            "the mRNA synthesis rate"
+        )
+        composition.note(
+        "this is transcription ALONE. Nothing here translates the transcript "
+        "or degrades it, so mRNA accumulates without bound -- which is a "
+        "property of a half-model rather than of a promoter, and it is said "
+        "here rather than left to be discovered on the first plot. Compose "
+        "it with mRNA degradation and translation, or ask for two-stage gene "
+        "expression, to close the system"
+    )
+        return Recognition(composition, "activated_promoter", "activated transcription")
+
+    if _has(query, "promoter") and not _has(query, "transcription", "translation"):
+        motif = _expansion_motif(
+            query, "library_expression", ("CONSTITUTIVE_PROMOTER",),
+            shape="constitutive promoter",
+            instead=(
+                "'made at a constant rate' builds zero-order synthesis with "
+                "first-order turnover from the core library."
+            ),
+        )
+        composition.add(motif, "promoter")
+        composition.note(
+            "an unregulated promoter: transcription at a fixed rate, with no "
+            "claim that any regulator is absent -- only that none is modelled"
+        )
+        composition.note(
+        "this is transcription ALONE. Nothing here translates the transcript "
+        "or degrades it, so mRNA accumulates without bound -- which is a "
+        "property of a half-model rather than of a promoter, and it is said "
+        "here rather than left to be discovered on the first plot. Compose "
+        "it with mRNA degradation and translation, or ask for two-stage gene "
+        "expression, to close the system"
+    )
+        return Recognition(
+            composition, "constitutive_promoter", "unregulated transcription"
+        )
+
+    if _has(query, "translation", "ribosome") and not _has(
+        query, "transcription", "gene expression", "central dogma"
+    ):
+        motif = _expansion_motif(
+            query, "library_expression", ("TRANSLATION",), shape="translation",
+            instead=(
+                "'two stage gene expression' builds transcription and "
+                "translation together, which is usually what is wanted."
+            ),
+        )
+        composition.add(motif, "translation")
+        composition.note(
+            "protein synthesis from an existing transcript. The mRNA is a "
+            "species and not a parameter, so this composes with whatever "
+            "makes and destroys it rather than assuming it is constant"
+        )
+        return Recognition(composition, "translation", "protein from transcript")
+
+    motif = _expansion_motif(
+        query, "library_expression", ("TWO_STAGE_EXPRESSION",),
+        shape="two-stage gene expression",
+        instead=(
+            "'a species made and removed' builds the LUMPED one-stage "
+            "model from the core library. It is a different model, not a "
+            "rougher one: with no mRNA it has no delay and no burst, so it "
+            "cannot answer a question about how fast a gene switches on or "
+            "how noisy its protein is."
+        ),
+    )
+    composition.add(motif, "gene")
+    composition.note(
+        "transcription and translation as separate steps, with mRNA as a "
+        "species. The second stage is what gives the response its delay: a "
+        "lumped one-stage model relaxes exponentially and this one does not, "
+        "for any choice of constants"
+    )
+    return Recognition(
+        composition, "two_stage_expression", "transcription then translation"
+    )
+
+
+def _autoregulated_gene(query: str, name: str) -> Recognition:
+    """A gene whose own product regulates its promoter.
+
+    Its own rule rather than a branch of `_gene_expression`, because
+    autoregulation is a WIRING claim and not a stage count: the loop is what
+    the query is about. Negative autoregulation speeds the approach to
+    steady state and narrows the protein distribution (Rosenfeld, Elowitz &
+    Alon 2002); positive autoregulation does the opposite and can be
+    bistable. The sign therefore changes the answer, and it is read from the
+    query rather than defaulted.
+    """
+    composition = Composition(name)
+    positive = _has(query, "positive", "positively", "self-activating",
+                    "activates its own", "autoactivation")
+    negative = _has(query, "negative", "negatively", "self-repressing",
+                    "represses its own", "autorepression", "autoinhibition")
+    if positive and negative:
+        raise UnrecognisedShape(
+            query,
+            "This names both positive and negative autoregulation. They are "
+            "opposite models -- negative feedback speeds the approach to "
+            "steady state and narrows the distribution, positive feedback "
+            "slows it and can make the gene bistable -- so there is no "
+            "reading that covers both. Say which loop you mean.",
+        )
+
+    if positive:
+        # Asked for by name, so it is looked for by name. The autorepressing
+        # motif is NOT substituted: it moves the response time in the
+        # opposite direction, so it is the wrong answer rather than a rough
+        # one, and a reader who got it would draw the reverse conclusion
+        # from a model that ran perfectly.
+        motif = _expansion_motif(
+            query, "library_expression",
+            ("POSITIVE_AUTOREGULATION", "AUTOACTIVATED_GENE",
+             "AUTOACTIVATING_GENE"),
+            shape="positive autoregulation",
+            instead=(
+                "AUTOREGULATED_GENE is the NEGATIVE loop and was not "
+                "substituted: negative feedback speeds the approach to "
+                "steady state and positive feedback slows it, so one is not "
+                "an approximation of the other. 'cooperative activation' "
+                "builds a Hill activation term from the core library, but "
+                "its activator is a separate species -- an open loop, not a "
+                "closed one."
+            ),
+        )
+        composition.add(motif, "gene")
+        composition.note(
+            "POSITIVE autoregulation, read from the query: the product "
+            "raises its own synthesis, which SLOWS the approach to steady "
+            "state and, with cooperative binding, admits two stable states"
+        )
+        reading = "positive loop, read from the query"
+    else:
+        motif = _expansion_motif(
+            query, "library_expression", ("AUTOREGULATED_GENE",),
+            shape="autoregulated gene",
+            instead=(
+                "'cooperative repression' builds a Hill repression term "
+                "from the core library, but its repressor is a SEPARATE "
+                "species: there is no loop, so it cannot show the faster "
+                "response autoregulation exists for."
+            ),
+        )
+        composition.add(motif, "gene")
+        # The motif's own words, not a restatement of them. This file does
+        # not own library_expression and should not narrate what it
+        # contains from memory.
+        composition.note(f"the motif used is {motif.name}: {motif.summary}")
+        if negative:
+            composition.note(
+                "NEGATIVE autoregulation, read from the query. The product "
+                "shuts off its own synthesis, which speeds the approach to "
+                "steady state and narrows the protein distribution "
+                "(Rosenfeld, Elowitz & Alon 2002)"
+            )
+            reading = "negative loop, read from the query"
+        else:
+            composition.note(
+                "the query did not say whether the loop is positive or "
+                "negative, so the library's default autoregulation motif "
+                "was used and its summary is quoted above. The sign is not "
+                "a detail: the two move the response time in opposite "
+                "directions. Say 'positive' or 'negative' to pin it"
+            )
+            reading = "sign not stated in the query; library default used"
+    return Recognition(composition, "autoregulated_gene", reading)
 
 
 def _open_system(query: str, name: str) -> Recognition:
@@ -497,8 +927,245 @@ def _bi_substrate(query: str, name: str) -> Recognition:
     )
 
 
-def _transport(query: str, name: str) -> Recognition:
+def _mwc_allostery(query: str, name: str) -> Recognition:
+    """The concerted model, which is not the same claim as a Hill exponent.
+
+    `cooperative_catalysis` already gives a sigmoid, and for fitting a curve
+    that is often enough. It is not the same model. A Hill exponent is a
+    phenomenological summary with no states in it; Monod, Wyman and Changeux
+    (1965) say the enzyme is an oligomer flipping as a unit between a tense
+    and a relaxed conformation, that the ratio of the two at zero ligand is
+    L, and that this is why an ACTIVATOR and an INHIBITOR can shift the same
+    curve in opposite directions without touching the active site.
+
+    The difference is testable rather than aesthetic: MWC forbids negative
+    cooperativity, and a Hill fit with h < 1 will happily report it.
+    """
     composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_enzymology", ("MWC_ALLOSTERY",),
+        shape="MWC concerted allostery",
+        instead=(
+            "'sigmoidal enzyme kinetics' builds the Hill form from the core "
+            "library. It reproduces the same curve and carries no R and T "
+            "states, so it cannot represent an allosteric effector at all."
+        ),
+    )
+    composition.add(motif, "enzyme")
+    composition.note(
+        "the concerted (Monod-Wyman-Changeux) model: every subunit flips "
+        "together, so there are two conformations and no hybrids. L is the "
+        "equilibrium between them with no ligand bound, and Kr and Kt are "
+        "the two conformations' affinities -- three quantities where a Hill "
+        "fit has one, which is why the two models are distinguishable"
+    )
+    composition.note(
+        "no allosteric EFFECTOR is a species in this model. An effector acts "
+        "by changing L, so representing one means a second binding "
+        "equilibrium that this motif does not contain -- state the effector "
+        "and it would need a motif that carries it, rather than L being "
+        "quietly retuned"
+    )
+    composition.note(
+        "MWC cannot produce negative cooperativity: with L > 0 and Kr < Kt "
+        "the curve is sigmoid or hyperbolic and never anti-cooperative. If "
+        "the data show negative cooperativity this is the wrong model, and a "
+        "Hill fit would hide that by reporting h < 1 without complaint"
+    )
+    return Recognition(composition, "mwc_allostery", "concerted two-state allostery")
+
+
+def _futile_cycle(query: str, name: str) -> Recognition:
+    """Two opposing enzymes on the same interconversion.
+
+    The name is a slander that stuck. The cycle spends ATP to go nowhere at
+    steady state, and what it buys is sensitivity: when both enzymes run
+    near saturation, the fraction in each form switches over a much narrower
+    range of stimulus than either enzyme alone could give -- the zero-order
+    ultrasensitivity of Goldbeter and Koshland (1981). That is a property of
+    the CYCLE and disappears if either direction is modelled as first order.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_enzymology", ("FUTILE_CYCLE",), shape="futile cycle",
+        instead=(
+            "'a phosphorylation cycle' is the same shape in the core "
+            "library under a different name -- ask for a two step "
+            "phosphorylation cascade to get one, or for the kinase and "
+            "phosphatase pair directly."
+        ),
+    )
+    composition.add(motif, "cycle")
+    composition.note(
+        "two opposing enzymes interconverting one pool. At steady state the "
+        "net flux is zero and the ATP is still spent, which is what the name "
+        "objects to and also what is bought: near saturation the switch "
+        "between the two forms is far sharper than either enzyme's own "
+        "Michaelis curve (Goldbeter & Koshland 1981)"
+    )
+    composition.note(
+        "the ultrasensitivity is a property of both steps saturating. "
+        "Modelling either direction as first order removes it silently, and "
+        "the model still runs"
+    )
+    return Recognition(composition, "futile_cycle", "two opposing enzymes, one pool")
+
+
+def _substrate_channeling(query: str, name: str) -> Recognition:
+    """Intermediate handed between enzymes without entering the bulk.
+
+    A strong claim, and the reason it is a separate motif: channelling says
+    the intermediate never equilibrates with the cytosolic pool, so its bulk
+    concentration is NOT the concentration the second enzyme sees. Every
+    ordinary two-step model assumes the opposite. Where channelling is real
+    the transit time is shorter than free diffusion allows and a competing
+    enzyme cannot intercept the intermediate -- both of which are
+    measurable, and neither of which a chained pair of catalytic steps can
+    express.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_enzymology", ("SUBSTRATE_CHANNELING",),
+        shape="substrate channelling",
+        instead=(
+            "'a two step enzyme cascade' builds two catalytic steps sharing "
+            "a bulk intermediate from the core library. That is the model "
+            "channelling contradicts, so it is an alternative to consider "
+            "rather than an approximation of this one."
+        ),
+    )
+    composition.add(motif, "complex")
+    composition.note(
+        "the intermediate has two fates: handed straight to the second "
+        "active site, or released into the bulk. Channelling is the RATIO "
+        "of those two rates and not a yes-or-no property, which is why both "
+        "routes are in the model -- a version with only the handover would "
+        "assert perfect channelling, which almost nothing achieves"
+    )
+    composition.note(
+        "where the handover wins, the intermediate's measured cytosolic "
+        "concentration is not what the second enzyme sees. A chained pair of "
+        "catalytic steps assumes the exact opposite, and the two disagree "
+        "most where it matters: on whether a competing enzyme can intercept "
+        "the intermediate"
+    )
+    return Recognition(
+        composition, "substrate_channeling", "intermediate handed over directly"
+    )
+
+
+def _transport(query: str, name: str) -> Recognition:
+    """Carriers, pumps and coupled transport -- and the refusal in the middle.
+
+    The default is the facilitated carrier from the core library, which is
+    always here. The coupled and active forms live in `library_transport`
+    and refuse by name when it does not, because a symporter driven by a
+    sodium gradient and a uniporter running down a concentration gradient
+    are different models: one can move its solute UPHILL and the other
+    cannot, which is the entire reason a cell has both.
+    """
+    composition = Composition(name)
+
+    # "Cotransport" without a direction is refused, on the same grounds as
+    # an unqualified two-substrate query. Symport and antiport are both
+    # cotransport, they differ in the SIGN of the coupled flux, and picking
+    # one would decide which way the driven solute moves.
+    if _has(query, "cotransport", "co-transport", "coupled transport") and not _has(
+        query, "symport", "symporter", "antiport", "antiporter", "exchanger",
+        "same direction", "opposite direction", "exchange",
+    ):
+        raise UnrecognisedShape(
+            query,
+            "Coupled transport is either SYMPORT (both solutes cross the "
+            "same way, as in the sodium-glucose transporter) or ANTIPORT "
+            "(they cross in opposite directions, as in the "
+            "sodium-calcium exchanger). They differ in the sign of one "
+            "stoichiometric coefficient and therefore in which direction "
+            "the driven solute is pushed, so choosing for you would decide "
+            "the answer. Say symport or antiport, and this builds it.",
+        )
+
+    if _has(query, "symport", "symporter"):
+        motif = _expansion_motif(
+            query, "library_transport", ("SYMPORT",), shape="symport",
+            instead=(
+                "'facilitated diffusion' builds a carrier from the core "
+                "library, but it cannot move a solute against its gradient "
+                "and a symporter's whole point is that it can."
+            ),
+        )
+        composition.add(motif, "symporter")
+        composition.note(
+            "two solutes crossing in the SAME direction on one carrier. The "
+            "driving solute's gradient is what lets the driven one move "
+            "uphill, so both concentrations are species and the coupling is "
+            "in the stoichiometry rather than in a rate constant"
+        )
+        return Recognition(composition, "symport", "coupled transport, same direction")
+
+    if _has(query, "antiport", "antiporter", "exchanger", "countertransport"):
+        motif = _expansion_motif(
+            query, "library_transport", ("ANTIPORT",), shape="antiport",
+            instead=(
+                "'facilitated diffusion' builds an uncoupled carrier from "
+                "the core library; it moves one solute and models no "
+                "exchange."
+            ),
+        )
+        composition.add(motif, "antiporter")
+        composition.note(
+            "two solutes crossing in OPPOSITE directions on one carrier. The "
+            "exchange stoichiometry is what makes it electrogenic or not, "
+            "and that is a property of the stoichiometry rather than of any "
+            "rate constant"
+        )
+        return Recognition(composition, "antiport", "coupled transport, opposite directions")
+
+    if _has(query, "primary active", "active transport", "atp-driven",
+            "atp driven", "pump", "atpase"):
+        motif = _expansion_motif(
+            query, "library_transport",
+            ("PRIMARY_ACTIVE_TRANSPORT",), shape="primary active transport",
+            instead=(
+                "'facilitated diffusion' builds a carrier that runs only "
+                "downhill, which is the one thing a pump is defined by not "
+                "doing."
+            ),
+        )
+        composition.add(motif, "pump")
+        composition.note(
+            "hydrolysis coupled directly to translocation. ATP appears as a "
+            "species, not as a constant: a pump that never runs its fuel "
+            "down would move solute uphill forever, which is the failure "
+            "mode of writing the drive as a parameter"
+        )
+        return Recognition(
+            composition, "primary_active_transport", "ATP-driven pumping"
+        )
+
+    if _has(query, "passive leak", "leak", "leakage", "leaky"):
+        motif = _expansion_motif(
+            query, "library_transport", ("PASSIVE_LEAK",), shape="passive leak",
+            instead=(
+                "'facilitated diffusion' builds the saturable carrier, "
+                "which is a different claim: a leak does not saturate."
+            ),
+        )
+        composition.add(motif, "leak")
+        composition.note(
+            "unsaturable, first-order flux down the gradient. A leak is what "
+            "makes a pumped gradient cost something to hold, so a model with "
+            "a pump and no leak reaches a steady state that no cell pays for"
+        )
+        return Recognition(composition, "passive_leak", "non-saturable leak")
+
+    # The CORE motif, deliberately, even where `library_transport` is
+    # present and carries a richer facilitated-diffusion motif of its own.
+    # Preferring whichever library happens to be installed would make the
+    # same query return two different models on two checkouts, silently --
+    # strictly worse than a refusal, which at least announces itself. A
+    # compartment-aware variant should be reached by a query that ASKS for
+    # compartments, not by an import succeeding.
     composition.add(FACILITATED_TRANSPORT, "carrier")
     composition.note(
         "a transporter is an enzyme whose product is the same molecule "
@@ -506,7 +1173,50 @@ def _transport(query: str, name: str) -> Recognition:
         "species, inside and outside, which makes the gradient a state of "
         "the model rather than a parameter of it"
     )
+    composition.note(
+        "the two compartments are treated as having the same volume: the "
+        "solute moving is one molecule leaving Out and one arriving In. "
+        "Where the volumes differ that is wrong by their ratio, and the "
+        "ratio has to be in the model rather than in the reader's head"
+    )
     return Recognition(composition, "facilitated_transport", "carrier-mediated transport")
+
+
+def _receptor_internalisation(query: str, name: str) -> Recognition:
+    """Ligand binding followed by removal of the receptor from the surface.
+
+    Its own rule rather than a branch of `_binding`, because the two make
+    different claims and the difference is the interesting one. Reversible
+    binding conserves receptor: occupancy rises and falls and the total
+    never changes. Internalisation does not -- the receptor leaves the
+    surface pool, so the system desensitises, and that is visible in the
+    conservation laws rather than in any rate law.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_transport",
+        # Two spellings because two people can name the same motif on the
+        # same afternoon; see `_expansion_motif`.
+        ("RECEPTOR_LIGAND_INTERNALIZATION", "RECEPTOR_LIGAND_INTERNALISATION",
+         "RECEPTOR_INTERNALIZATION", "RECEPTOR_INTERNALISATION"),
+        shape="receptor internalisation",
+        instead=(
+            "'reversible binding of a ligand to a receptor' builds the "
+            "binding step alone from the core library. It conserves "
+            "receptor, so it cannot show desensitisation -- which is "
+            "usually the reason somebody asks for internalisation."
+        ),
+    )
+    composition.add(motif, "receptor")
+    composition.note(
+        "the occupied receptor is removed from the surface pool rather than "
+        "only releasing its ligand, so total surface receptor is NOT "
+        "conserved. That non-conservation is the mechanism of "
+        "desensitisation and the network derives it from the stoichiometry"
+    )
+    return Recognition(
+        composition, "receptor_internalisation", "ligand-induced receptor removal"
+    )
 
 
 def _autocatalysis(query: str, name: str) -> Recognition:
@@ -613,9 +1323,31 @@ RULES: Tuple[Rule, ...] = (
          "N phosphorylation cycles, each tier activating the next", 90),
     Rule("repressilator", (), ("repressilator",), _repressilator,
          "three genes repressing each other in a ring", 88),
+    # Above `gene_expression` (85) because a query naming both -- "negative
+    # autoregulation of gene expression" -- is asking about the LOOP, and
+    # the two-stage model without the loop would answer the general question
+    # instead of the specific one. None of these triggers is a bare
+    # "repress": "repressilator" and "two repressors" contain it, and either
+    # would have been swallowed.
+    Rule("autoregulated_gene", (), ("autoregulat", "auto-regulat",
+                                    "self-repressing", "self-activating",
+                                    "represses its own", "activates its own",
+                                    "autorepression", "autoactivation",
+                                    "autoinhibition"),
+         _autoregulated_gene,
+         "a gene whose product regulates its own promoter", 87),
     Rule("toggle_switch", (), ("toggle switch", "bistable switch",
                                "mutual repression"), _toggle_switch,
          "two genes each repressing the other", 86),
+    # "gene expression" and not "expression": `turnover` (72) already owns
+    # "constitutive expression", and a bare "expression" would take it.
+    Rule("gene_expression", (), ("gene expression", "transcription",
+                                 "translation", "central dogma", "promoter",
+                                 "mrna", "messenger rna", "ribosome",
+                                 "ssra", "clpxp", "degron",
+                                 "degradation tag", "tagged protein"),
+         _gene_expression,
+         "transcription and translation as separate stages", 85),
     # `requires` is the full word, not the prefix "compet".
     #
     # It WAS the prefix, and "competitive inhibition of an enzyme by a
@@ -632,9 +1364,27 @@ RULES: Tuple[Rule, ...] = (
     Rule("feedback_inhibition", (), ("feedback inhibition", "end product inhibition",
                                      "sequential feedback"), _feedback_inhibition,
          "a linear pathway, with the feedback point named not guessed", 82),
+    # Above `binding` (60), which triggers on "receptor" and "ligand" and
+    # would otherwise take every internalisation query. Note that none of
+    # these triggers is a bare "receptor": "reversible binding of a ligand
+    # to a receptor" must keep reaching `binding`, and "an allosteric
+    # inhibitor binding to a receptor" must keep reaching `inhibition`.
+    Rule("receptor_internalisation", (), ("internalis", "internaliz",
+                                          "endocytosis", "endocytic",
+                                          "receptor downregulation",
+                                          "receptor down-regulation"),
+         _receptor_internalisation,
+         "ligand-bound receptor removed from the surface pool", 81),
     Rule("enzyme_cascade", (), ("enzyme cascade", "catalytic cascade",
                                 "reaction cascade"), _enzyme_cascade,
          "N catalytic steps, product to substrate", 80),
+    # "futile cycle" and "substrate cycle", never a bare "cycle": "cell
+    # cycle oscillator dynamics" belongs to the catalogue and this path must
+    # keep refusing it, and "a phosphorylation cycle" is a different motif.
+    Rule("futile_cycle", (), ("futile cycle", "futile", "substrate cycle",
+                              "opposing kinase", "kinase and phosphatase"),
+         _futile_cycle,
+         "two opposing enzymes turning one pool over", 79),
     Rule("open_system", (), ("constant inflow", "constant supply", "chemostat",
                              "open system", "continuous feed", "substrate inflow"),
          _open_system, "a fed reactor with no conservation over the fed species", 78),
@@ -642,8 +1392,13 @@ RULES: Tuple[Rule, ...] = (
                               "ping pong", "ping-pong", "ordered sequential"),
          _bi_substrate, "an enzyme with two substrates, ordered or ping-pong", 77),
     Rule("transport", (), ("transport", "transporter", "carrier", "uptake",
-                           "across the membrane", "facilitated diffusion"),
-         _transport, "a saturable carrier moving a solute across a boundary", 76),
+                           "across the membrane", "facilitated diffusion",
+                           "symport", "antiport", "exchanger",
+                           "countertransport", "cotransport", "co-transport",
+                           "coupled transport", "pump", "atpase",
+                           "passive leak", "leak"),
+         _transport,
+         "a carrier, pump or coupled transporter across a boundary", 76),
     Rule("autocatalysis", (), ("autocataly", "self-amplif", "self amplif",
                                "catalyses its own", "catalyzes its own", "prion"),
          _autocatalysis, "a product that catalyses its own formation", 75),
@@ -651,11 +1406,31 @@ RULES: Tuple[Rule, ...] = (
                                  "reversible enzymatic", "reversible michaelis",
                                  "near equilibrium"),
          _reversible_step, "an enzymatic step that runs in both directions", 74),
+    # "channeling"/"channelling" and never "channel": an ion channel is a
+    # different mechanism in a different library, and the prefix would take
+    # every query about one.
+    Rule("substrate_channeling", (), ("channeling", "channelling",
+                                      "metabolon", "handed directly"),
+         _substrate_channeling,
+         "an intermediate passed between enzymes, never entering the bulk", 73),
     Rule("turnover", (), ("saturable degradation", "zero order degradation",
                           "zero-order degradation", "synthesis and degradation",
                           "constitutive expression", "made and degraded",
                           "turnover of"),
          _turnover, "a species made and removed, first-order or saturable", 72),
+    # Above `cooperative_enzyme` (69) and `allosteric` (68), both of which
+    # trigger on words an MWC query contains -- "allosteric" and
+    # "cooperative" are in almost every phrasing of one. The Hill form fits
+    # the same curve with one exponent where MWC has L, Kr and Kt, so
+    # answering an MWC query with it would silently discard the two-state
+    # structure that was the question.
+    Rule("mwc_allostery", (), ("mwc", "monod-wyman-changeux",
+                               "monod wyman changeux", "concerted allosteric",
+                               "concerted transition", "concerted model",
+                               "tense and relaxed", "relaxed and tense",
+                               "two-state allosteric"),
+         _mwc_allostery,
+         "the concerted two-state model of an allosteric enzyme", 71),
     Rule("inhibition", (), ("competitive inhibit", "uncompetitive inhibit",
                             "noncompetitive inhibit", "non-competitive inhibit",
                             "mixed inhibition", "product inhibition",
@@ -739,6 +1514,7 @@ def shapes() -> Tuple[str, ...]:
 
 
 __all__ = [
-    "recognise", "shapes", "Recognition", "UnrecognisedShape", "Rule", "RULES",
-    "NAMED_PATHWAYS", "MAX_INFERRED_STAGES",
+    "recognise", "shapes", "Recognition", "UnrecognisedShape",
+    "MissingMotifLibrary", "Rule", "RULES", "NAMED_PATHWAYS",
+    "MAX_INFERRED_STAGES", "EXPANSION_LIBRARIES",
 ]
