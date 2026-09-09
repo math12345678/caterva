@@ -869,7 +869,25 @@ ZERO_ORDER_DEGRADATION = Motif(
     ),
     ports=(Port("X", ROLE_SUBSTRATE, 1.0),),
     parameters=(
-        MotifParameter("v_max", KIND_RATE_CONSTANT, 0.1, "mM/s"),
+        MotifParameter(
+            "v_max", KIND_RATE_CONSTANT, 0.1, "mM/s",
+            description=(
+                "THE ONE LUMPED PARAMETER IN THIS LIBRARY, and it is lumped "
+                "because the mechanism is. v_max is kcat times the enzyme "
+                "concentration, and ADR 0013 is the rule that Terrium never "
+                "resolves such a product: a paper reporting Vmax = 0.4 mM/s "
+                "measured it at ITS enzyme concentration, and carrying that "
+                "number into a model with a different one is wrong by "
+                "whatever ratio separates them. Every other motif here "
+                "writes kcat and the enzyme out separately for exactly that "
+                "reason, which is what makes them resolvable. This one "
+                "cannot: taking the saturated limit is what absorbed the "
+                "enzyme, and a motif that named it again would not be "
+                "zero-order removal. Resolvable from a paper only ALONGSIDE "
+                "the enzyme concentration it was measured at; use "
+                "catalytic_step if you have kcat"
+            ),
+        ),
     ),
     reactions=(
         ReactionTemplate("degradation", {"X": 1}, {}, "{v_max}"),
