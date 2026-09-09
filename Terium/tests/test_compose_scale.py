@@ -348,3 +348,68 @@ class TestUnitConversion:
         assert not bare.findings
         assert len(bare.unchecked) == len(model.network.parameters)
         assert "core.network.Parameter carries" in next(iter(bare.unchecked.values()))
+
+
+class TestTheOneLumpedParameterSaysSo:
+    """ADR 0013: Terrium never resolves kcat times a concentration.
+
+    Every motif in the library writes kcat and the enzyme out separately,
+    which is what makes composed models MORE resolvable than catalogue ones
+    -- with one exception, because taking the saturated limit is what
+    absorbs the enzyme, and a zero-order motif that named it again would not
+    be zero-order.
+
+    Found by scanning the agent-written libraries for lumped parameters and
+    hitting one in the ORIGINAL library instead. The exception is fine; the
+    exception presented as an ordinary resolvable constant was not.
+    """
+
+    def test_zero_order_degradation_is_the_only_lumped_parameter(self) -> None:
+        import re
+
+        from Terium.compose.library import LIBRARY
+
+        lumped = [
+            f"{motif.name}.{p.name}"
+            for motif in LIBRARY.values()
+            for p in motif.parameters
+            if re.search(r"v_?max", p.name, re.I)
+        ]
+        assert lumped == ["zero_order_degradation.v_max"], lumped
+
+    def test_it_says_it_cannot_be_transferred(self) -> None:
+        from Terium.compose.library import ZERO_ORDER_DEGRADATION
+
+        described = next(
+            p.description for p in ZERO_ORDER_DEGRADATION.parameters
+            if p.name == "v_max"
+        )
+        assert "kcat times the enzyme concentration" in described
+        assert "ADR 0013" in described
+        # And it points at the resolvable alternative.
+        assert "catalytic_step" in described
+
+    def test_no_other_library_ships_a_lumped_parameter(self) -> None:
+        # The five agent-written libraries were scanned for this and are
+        # clean; this pins that they stay clean.
+        import importlib
+        import re
+
+        from Terium.compose.motifs import Motif
+
+        offenders = []
+        for name in (
+            "library_expression", "library_enzymology", "library_transport",
+            "library_signaling", "library_metabolic",
+        ):
+            module = importlib.import_module(f"Terium.compose.{name}")
+            for attribute in dir(module):
+                motif = getattr(module, attribute)
+                if not isinstance(motif, Motif):
+                    continue
+                offenders += [
+                    f"{name}.{motif.name}.{p.name}"
+                    for p in motif.parameters
+                    if re.search(r"v_?max|j_?max", p.name, re.I)
+                ]
+        assert offenders == [], offenders
