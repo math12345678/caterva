@@ -184,6 +184,36 @@ NEW_SHAPES = (
      "receptor_internalisation", "receptor_internalisation", "library_transport"),
     ("receptor internalisation after ligand binding",
      "receptor_internalisation", "receptor_internalisation", "library_transport"),
+
+    # -- signalling and metabolic ------------------------------------------
+    #
+    # Added when `library_signaling` and `library_metabolic` were registered
+    # in `EXPANSION_LIBRARIES`, because
+    # `test_every_registered_library_has_a_query_that_reaches_it` is what
+    # demands it: a library in that mapping with no phrase that reaches it
+    # is a capability nobody can name. One representative row per library is
+    # what that invariant needs; the full sweep over the new shapes, and the
+    # collisions they introduced, live in
+    # `test_compose_grammar_expansion2.py`.
+    ("an incoherent feedforward loop",
+     "feedforward_loop", "incoherent_feedforward", "library_signaling"),
+    ("a coherent feed-forward loop",
+     "feedforward_loop", "coherent_feedforward", "library_signaling"),
+    ("a two component system",
+     "two_component_system", "two_component_system", "library_signaling"),
+    ("a gpcr activation cycle",
+     "gpcr_cycle", "gpcr_activation", "library_signaling"),
+    ("a linear metabolic pathway of four steps",
+     "metabolic_pathway", "linear_metabolic_pathway", "library_metabolic"),
+    ("a branch point where one metabolite feeds two enzymes",
+     "branch_point", "branch_point", "library_metabolic"),
+    ("a moiety conserved cycle",
+     "moiety_cycle", "moiety_conserved_cycle", "library_metabolic"),
+    # Core, deliberately: `library_signaling.ULTRASENSITIVE_CYCLE` is a name
+    # bound to `library.PHOSPHORYLATION_CYCLE` rather than a second
+    # definition, so this shape needs no expansion library to build.
+    ("an ultrasensitive phosphorylation cycle",
+     "ultrasensitive_cycle", "ultrasensitive_cycle", None),
 )
 
 
