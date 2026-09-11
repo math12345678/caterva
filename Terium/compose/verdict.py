@@ -341,6 +341,32 @@ def form(
     concerns += provenance_concerns
     consulted["provenance"] = provenance_note
 
+    try:
+        from .assumptions import check as check_assumptions
+    except ImportError:  # pragma: no cover - flat import
+        from assumptions import check as check_assumptions  # type: ignore[no-redef]
+    try:
+        stated = check_assumptions(model)
+        concerns += [
+            Concern(
+                source="assumptions",
+                severity=BROKEN,
+                detail=finding.describe(),
+                remedy=(
+                    "the rate law still integrates -- it is describing "
+                    "something other than what the motif claims, so either "
+                    "narrow the window or use a motif whose assumption holds"
+                ),
+            )
+            for finding in stated.violated
+        ]
+        consulted["assumptions"] = (
+            f"{len(stated.violated)} violated, {len(stated.undecided)} undecided"
+            if stated.findings else "none checkable"
+        )
+    except Exception as exc:  # noqa: BLE001
+        unavailable["assumptions"] = f"{type(exc).__name__}: {exc}"
+
     if validation is None:
         unavailable["validate"] = "not run"
     else:
