@@ -468,20 +468,37 @@ def units_from_model(model: Any) -> Dict[str, str]:
     the moment the network is built.
 
     That is why `check` on a bare network reports everything unchecked: it
-    is not being cautious, it genuinely has nothing to check against. The
-    right long-term fix is a unit on the IR's Parameter, which is a change
-    to a type the whole catalogue shares and is not this module's to make.
-    Until then a composed model can recover what its own motifs declared,
-    and this does that.
+    is not being cautious, it genuinely has nothing to check against.
+
+    NOW A SHIM OVER `compose/quantities.py`, WHICH KEEPS ALL OF IT
+    --------------------------------------------------------------
+    This function recovered ONE of the five things the builder dropped.
+    `quantities.QuantityTable` recovers the unit, the kind, the motif, the
+    instance and the BRENDA table together, and covers species initials as
+    well as parameters -- which matters because a concentration in a
+    composed model is a species initial and this mapping never held one.
+
+    The signature is unchanged and so is the behaviour, including the
+    tolerance: a model with no composition behind it yields an empty
+    mapping rather than an exception, which `check` renders as "everything
+    unchecked" -- the honest report for a network that has lost this.
+    `QuantityTable.from_model` refuses that case loudly instead, which is
+    right for new callers and would be a behaviour change here.
     """
-    units: Dict[str, str] = {}
     composition = getattr(
         getattr(model, "recognition", None), "composition", None
     )
-    for instance in getattr(composition, "instances", ()):
-        for parameter in instance.motif.parameters:
-            units[instance.parameter_id(parameter.name)] = parameter.unit
-    return units
+    if composition is None or not getattr(composition, "instances", ()):
+        return {}
+
+    try:
+        from .quantities import QuantityTable
+    except ImportError:  # pragma: no cover - flat import
+        from quantities import QuantityTable  # type: ignore[no-redef]
+
+    return QuantityTable.from_composition(
+        composition, network=getattr(model, "network", None)
+    ).parameter_units()
 
 
 def check(

@@ -1254,6 +1254,36 @@ def deficiency_one_verdict(network: Any) -> Verdict:
     )
 
 
+def _grouped_reasons(offenders: Sequence[Any]) -> str:
+    """The offending reactions, with each distinct reason stated ONCE.
+
+    WHY THIS IS NOT COSMETIC. Every reaction in a Michaelis-Menten cascade
+    fails mass action for the same reason, and the reason is a paragraph.
+    Printed per reaction, a six-reaction cascade produced six identical
+    copies inside one refusal -- and the refusal is raised twice, once per
+    theorem, so the document carried eighteen.
+
+    That is ADR 0028's failure in its purest form: the explanation is
+    correct, load-bearing, and unreadable, so nobody reads it and the one
+    line that differs between two models is lost in the repetition. Reactions
+    are grouped by the reason they share and the reason is given once.
+    """
+    by_reason: Dict[str, List[str]] = {}
+    for finding in offenders:
+        by_reason.setdefault(finding.reason, []).append(finding.reaction_id)
+
+    lines = []
+    for reason, reactions in by_reason.items():
+        if len(reactions) == 1:
+            lines.append(f"{reactions[0]}: {reason}")
+        else:
+            lines.append(
+                f"{', '.join(reactions)} ({len(reactions)} reactions, same "
+                f"reason): {reason}"
+            )
+    return "\n  - ".join(lines)
+
+
 def _require_mass_action(network: Any, theorem: str) -> None:
     """Refuse the verdict unless every rate law was proved mass action.
 
@@ -1297,7 +1327,7 @@ def _require_mass_action(network: Any, theorem: str) -> None:
             f"the {theorem} applies to MASS-ACTION kinetics, and "
             f"{len(offenders)} of this model's {len(findings)} reaction(s) do "
             f"not have mass-action rate laws:\n  - "
-            + "\n  - ".join(finding.describe() for finding in offenders)
+            + _grouped_reasons(offenders)
             + "\nThe theorem does not cover these rate laws, so no verdict is "
             "given -- a structural proof about a model the theorem says "
             "nothing about would be worse than no proof at all, because it "
@@ -1382,10 +1412,24 @@ def describe(network: Any) -> str:
         )
     else:
         offenders = [f for f in findings if not f.mass_action]
+        distinct = {f.reason for f in offenders}
+        named = ", ".join(f.reaction_id for f in offenders)
         lines.append(
             f"{len(offenders)} of {len(findings)} rate law(s) are NOT mass "
-            f"action, so no deficiency theorem applies: "
-            + "; ".join(finding.describe() for finding in offenders)
+            f"action, so no deficiency theorem applies. The offenders are "
+            f"{named}. "
+            + (
+                # The reason ONCE, not once per reaction. Every reaction in
+                # a Michaelis-Menten cascade fails for the same paragraph,
+                # and repeating it six times is how a correct explanation
+                # becomes an unread one. The reaction NAMES stay, because a
+                # reader has to know which ones.
+                f"All {len(offenders)} fail for the same reason: "
+                f"{next(iter(distinct))}"
+                if len(distinct) == 1 else
+                f"{len(distinct)} distinct reasons -- "
+                + "; ".join(sorted(distinct))
+            )
             + "."
         )
     return " ".join(lines)

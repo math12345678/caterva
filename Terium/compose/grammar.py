@@ -32,11 +32,12 @@ The rule is: recognise a SHAPE, never a SUBJECT. "Cascade" is a shape.
 
 THE EXPANSION LIBRARIES ARE IMPORTED LATE, ON PURPOSE
 -----------------------------------------------------
-`library.py` is the core and is always here. Three further libraries --
-`library_expression`, `library_enzymology`, `library_transport` -- carry the
-motifs for gene expression, the harder enzyme mechanisms, and membrane
-transport. They are written independently of this file and any of them can
-be absent from a checkout.
+`library.py` is the core and is always here. Five further libraries --
+`library_expression`, `library_enzymology`, `library_transport`,
+`library_signaling`, `library_metabolic` -- carry the motifs for gene
+expression, the harder enzyme mechanisms, membrane transport, signalling
+wiring patterns, and metabolic pathway pieces. They are written
+independently of this file and any of them can be absent from a checkout.
 
 So every reference to them is a lazy import inside the rule that needs it.
 A module-scope import would take the entire grammar down when one file is
@@ -64,6 +65,46 @@ and in the order most-specific-first -- and `test_compose_grammar_expansion`
 exists mostly to keep that true. Anyone adding a keyword here should ask
 what OTHER query now contains it as a substring, because `RULES` matching
 is substring matching and will not ask on their behalf.
+
+THE SAME TRAP, FOUR MORE TIMES
+------------------------------
+Adding the signalling and metabolic libraries meant asking that question
+again for every new word, and it bit four times. Each is written down here
+because the fix is invisible in the rule table -- a trigger chosen to avoid
+a collision looks exactly like one that was not.
+
+  * "coherent" is inside "incoherent", and the two feed-forward loops are
+    opposite computations: the coherent one delays a rising input and the
+    incoherent one turns a step into a pulse. Told apart in
+    `_feedforward_loop` with `_has`, incoherent first, exactly as the
+    inhibition family is.
+
+  * "branched pathway" is inside "unbranched pathway", which is the phrase
+    somebody reaches for when they mean a LINEAR one. Resolved by rank --
+    `metabolic_pathway` (64) outranks `branch_point` (63) -- so "an
+    unbranched pathway" builds a chain and not a split.
+
+  * "transcription" is inside "transcriptional", so "a transcriptional
+    oscillator" is swallowed by `gene_expression` (85). It is therefore NOT
+    a trigger for the oscillator rule; "negative feedback oscillator" and
+    "delayed negative feedback" are.
+
+  * "g protein", spelled with a space, is inside "bindin(g protein)". It is
+    NOT a trigger. "gpcr", "g-protein" and "g protein coupled" are, and "a
+    ligand binding protein" keeps reaching `binding`.
+
+WHAT WAS DELIBERATELY LEFT UNREACHABLE
+--------------------------------------
+`library_metabolic.ALLOSTERIC_FEEDBACK` and
+`library_metabolic.TRANSPORTER_LIMITED_UPTAKE` have no phrase here, and
+that is a decision rather than an omission. Every phrase that reaches the
+first is already owned by `feedback_inhibition` (82), whose deliberate
+refusal to guess WHICH step of a pathway is the committed one is pinned
+behaviour; every phrase that reaches the second is already owned by
+`transport` (76), which sends coupled uptake to
+`library_transport.SYMPORT`. Wiring either would put two motifs behind one
+phrase, and "which of the two ran" is not a question a reader of the
+report could then answer.
 """
 
 from __future__ import annotations
@@ -122,6 +163,12 @@ NUMBER_WORDS: Dict[str, int] = {
 MINIMUM_COPIES: Dict[str, int] = {
     "cascade": 2,
     "competition": 2,
+    #: A pathway of one segment is a reversible enzymatic step, which the
+    #: core library already builds under its own name. The thing a pathway
+    #: is asked about -- where the flux control sits, whether the chain can
+    #: carry the flux the free energy allows -- needs somewhere for control
+    #: to be distributed, and one step has nowhere.
+    "pathway": 2,
 }
 
 #: The most stages this will build without being told a number explicitly.
@@ -152,6 +199,12 @@ EXPANSION_LIBRARIES: Dict[str, str] = {
         "multi-substrate, allosteric, channelled and cycling enzymes",
     "library_transport":
         "carriers, pumps, coupled transport and receptor internalisation",
+    "library_signaling":
+        "feed-forward loops, two-component systems, GPCR cycles, scaffolds "
+        "and feedback oscillators",
+    "library_metabolic":
+        "reversible pathway segments, branch points and conserved cofactor "
+        "pools",
 }
 
 
@@ -701,7 +754,11 @@ def _autoregulated_gene(query: str, name: str) -> Recognition:
                 "an approximation of the other. 'cooperative activation' "
                 "builds a Hill activation term from the core library, but "
                 "its activator is a separate species -- an open loop, not a "
-                "closed one."
+                "closed one. 'a bistable positive feedback loop' reaches "
+                "library_signaling.BISTABLE_POSITIVE_FEEDBACK, which IS a "
+                "closed positive loop -- with ONE stage rather than two, so "
+                "it carries no transcript and no delay, which makes it a "
+                "different model rather than this one with a sign flipped."
             ),
         )
         composition.add(motif, "gene")
@@ -1219,6 +1276,630 @@ def _receptor_internalisation(query: str, name: str) -> Recognition:
     )
 
 
+# ---------------------------------------------------------------------------
+# Signalling wiring patterns
+# ---------------------------------------------------------------------------
+#
+# These differ in kind from everything above them. A Michaelis-Menten motif
+# is a RATE LAW and a feed-forward loop is a WIRING, which is why
+# `library_signaling.py` exists separately and why the sentence that
+# justifies one of these is about structure rather than about an assumption
+# on an enzyme. The consequence for this file is that the interesting claim
+# is almost always "what distinguishes this from the shape a reader might
+# have meant instead", and the notes say it.
+
+
+def _feedforward_loop(query: str, name: str) -> Recognition:
+    """Coherent or incoherent -- and the query has to say which.
+
+    The same treatment `_bi_substrate` gives ordered against ping-pong, and
+    for the same reason: these are not two settings of one model, they are
+    two computations. In the coherent loop X activates Y and X and Y
+    together activate Z, so a rising input is DELAYED by the time Y takes to
+    accumulate while a falling one passes straight through -- a
+    sign-sensitive delay, which is a noise filter. In the incoherent loop X
+    activates Z and also activates its repressor Y, so a step input makes a
+    PULSE that comes back down. One filters and one differentiates.
+
+    Defaulting to either would answer the other question silently, and the
+    two models have the same species and the same species names, so nothing
+    downstream would notice. So an unqualified "feed-forward loop" is
+    refused with the distinction spelled out.
+
+    "coherent" is a substring of "incoherent". They are separated by `_has`,
+    which anchors on word boundaries, and incoherent is tested first -- the
+    inhibition family's arrangement, for the inhibition family's reason.
+    """
+    composition = Composition(name)
+    incoherent = _has(query, "incoherent", "i1-ffl", "i1 ffl", "type 1 incoherent")
+    coherent = _has(query, "coherent", "c1-ffl", "c1 ffl", "type 1 coherent")
+
+    if incoherent and coherent:
+        raise UnrecognisedShape(
+            query,
+            "This names both the coherent and the incoherent feed-forward "
+            "loop. They are opposite computations on the same three genes -- "
+            "the coherent loop delays a rising input and passes a falling "
+            "one straight through, the incoherent loop turns a sustained "
+            "input into a pulse -- so there is no reading that covers both. "
+            "Say which one you mean and this builds it; ask for each in "
+            "turn to compare them.",
+        )
+
+    if incoherent:
+        motif = _expansion_motif(
+            query, "library_signaling", ("INCOHERENT_FEEDFORWARD",),
+            shape="incoherent feed-forward loop",
+            instead=(
+                "'cooperative repression' builds a Hill repression term "
+                "from the core library. It makes the output FALL and hold; "
+                "only the loop makes it rise first and come back, which is "
+                "the behaviour the shape is named for."
+            ),
+        )
+        composition.add(motif, "loop")
+        composition.note(
+            "X activates the output and also activates its repressor, so "
+            "the output overshoots and settles back. The pulse is a "
+            "property of the WIRING and not of any rate constant: no choice "
+            "of constants makes a plain repression pulse, and no choice "
+            "removes the overshoot from this shape entirely"
+        )
+        composition.note(
+            "whether the settled level returns EXACTLY to baseline -- "
+            "perfect adaptation -- depends on the repression being close to "
+            "saturating, which is a regime and not a structural guarantee. "
+            "This model is not claimed to adapt perfectly, only to pulse"
+        )
+        return Recognition(
+            composition, "incoherent_feedforward", "pulse-generating loop"
+        )
+
+    if coherent:
+        motif = _expansion_motif(
+            query, "library_signaling", ("COHERENT_FEEDFORWARD",),
+            shape="coherent feed-forward loop",
+            instead=(
+                "'cooperative activation' builds a Hill activation term "
+                "from the core library. It responds immediately in both "
+                "directions; the delay on the way up, which is what this "
+                "shape is for, comes from the second arm and cannot be "
+                "recovered by tuning the first."
+            ),
+        )
+        composition.add(motif, "loop")
+        composition.note(
+            "X activates Y, and X and Y together activate Z. The AND at the "
+            "output is what makes the delay sign-sensitive: switching ON "
+            "waits for Y to accumulate, switching OFF does not wait for it "
+            "to decay, so a brief input is filtered out and a brief dropout "
+            "is not"
+        )
+        composition.note(
+            "the AND is written into the rate law rather than inferred, "
+            "because an OR-gated coherent loop is a real and different "
+            "circuit -- it delays the fall instead of the rise. Nothing "
+            "here claims which gate a particular promoter uses"
+        )
+        return Recognition(
+            composition, "coherent_feedforward", "sign-sensitive delay"
+        )
+
+    raise UnrecognisedShape(
+        query,
+        "A feed-forward loop is either COHERENT -- X activates Y, and X and "
+        "Y together activate Z, which delays a rising input and passes a "
+        "falling one straight through -- or INCOHERENT, where X activates Z "
+        "and also activates its repressor, which turns a sustained input "
+        "into a pulse. They are opposite computations built from the same "
+        "three genes, and they are told apart by an experiment: only the "
+        "incoherent loop overshoots. Say which, and this builds it.",
+    )
+
+
+def _two_component_system(query: str, name: str) -> Recognition:
+    """A sensor kinase and its response regulator, as a phosphotransfer.
+
+    Not a two-tier phosphorylation cascade, which is the shape a reader
+    might reach for instead. A cascade tier is a kinase acting CATALYTICALLY
+    on a separate substrate pool, so the phosphoryl group comes from ATP at
+    every tier and the upstream kinase is not consumed. A two-component
+    system hands the phosphoryl group ITSELF from the sensor to the
+    regulator: the sensor is a substrate of the transfer as much as a
+    catalyst of it, and the phosphorylated sensor is depleted by the
+    transfer in a way a cascade's kinase never is.
+
+    The difference shows up in the conservation laws, which the network
+    derives from the stoichiometry rather than being told, and it is why
+    this reaches for its own motif instead of chaining two cycles.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_signaling", ("TWO_COMPONENT_SYSTEM",),
+        shape="two-component system",
+        instead=(
+            "'a two step phosphorylation cascade' builds two catalytic "
+            "cycles from the core library. Its upper kinase is a catalyst "
+            "and is not consumed, so it cannot express the phosphoryl "
+            "transfer that defines this mechanism."
+        ),
+    )
+    composition.add(motif, "system")
+    composition.note(
+        "autophosphorylation of the sensor followed by transfer of the "
+        "phosphoryl group to the response regulator. ATP is a species and "
+        "not a rate constant, so the model cannot phosphorylate forever "
+        "without something regenerating it -- which is a property worth "
+        "seeing rather than hiding in a parameter"
+    )
+    composition.note(
+        "the signal enters by modulating the autophosphorylation rate. "
+        "Nothing here claims WHICH stimulus a given sensor responds to, or "
+        "that the sensor is bifunctional: many are also phosphatases for "
+        "their own regulator, which sharpens the response, and asserting "
+        "that without being told would be inventing the mechanism"
+    )
+    return Recognition(
+        composition, "two_component_system", "sensor kinase and response regulator"
+    )
+
+
+def _gpcr_cycle(query: str, name: str) -> Recognition:
+    """Agonist, receptor, and the G protein's nucleotide exchange cycle.
+
+    Its own rule and not a branch of `_binding`, for the reason
+    `_receptor_internalisation` is its own rule: the claim is different.
+    Reversible binding gives occupancy, and occupancy is not the signal. The
+    receptor is an ENZYME here -- one occupied receptor turns over many G
+    proteins -- so the output is a flux and not a fraction, and the gain
+    between them is the thing the model exists to show.
+
+    "g protein" with a space is deliberately not a trigger: it is a
+    substring of "binding protein". "gpcr", "g-protein" and "g protein
+    coupled" are.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_signaling", ("GPCR_ACTIVATION",),
+        shape="GPCR activation cycle",
+        instead=(
+            "'reversible binding of a ligand to a receptor' builds the "
+            "occupancy step alone from the core library. Occupancy is not "
+            "the signal: it saturates at one receptor per ligand, and the "
+            "amplification a GPCR exists for is downstream of it."
+        ),
+    )
+    composition.add(motif, "receptor")
+    composition.note(
+        "the occupied receptor acts catalytically on the G protein's "
+        "nucleotide exchange, so one binding event produces many active G "
+        "subunits. That gain is the reason the receptor is written as an "
+        "enzyme rather than as a partner in a complex"
+    )
+    composition.note(
+        "GTP hydrolysis is what makes this a CYCLE rather than a switch "
+        "that latches. Its rate sets how fast the signal stops, which is a "
+        "separate quantity from how fast it starts -- and a model with no "
+        "hydrolysis term reaches a steady state only because it runs out of "
+        "G protein"
+    )
+    composition.note(
+        "no second messenger is a species here. What the active subunit "
+        "goes on to do -- adenylyl cyclase, phospholipase C, an ion "
+        "channel -- is a fact about the particular receptor and not about "
+        "the shape, so it is left to be composed rather than assumed"
+    )
+    return Recognition(composition, "gpcr_activation", "receptor-catalysed G protein cycle")
+
+
+def _ultrasensitive_cycle(query: str, name: str) -> Recognition:
+    """Goldbeter-Koshland: the CORE phosphorylation cycle, under its own name.
+
+    This deliberately does not reach for `library_signaling`, and the reason
+    is worth stating because it looks like an oversight. The zero-order
+    ultrasensitive cycle IS the phosphorylation cycle -- two opposing
+    Michaelis-Menten arms on one protein pool -- and
+    `library_signaling.ULTRASENSITIVE_CYCLE` is a NAME BOUND TO
+    `library.PHOSPHORYLATION_CYCLE`, not a second definition of it. Reaching
+    through the library would add an import this shape does not need and
+    return the identical object, so the shape would refuse on a checkout
+    without the library for no reason a reader could act on.
+
+    That the alias really is an alias is a claim about another file, so it
+    is pinned by a test rather than asserted here. If it ever became a
+    separate motif, this rule would keep building the core one silently,
+    which is exactly the kind of drift that test exists to catch.
+
+    What is NOT claimed: that this model is ultrasensitive. The sharpness
+    comes from both converter enzymes running SATURATED -- substrate well
+    above Km on both arms -- and that is a regime set by the caller's
+    concentrations, not by the structure. Outside it the same model is a
+    graded, hyperbolic response.
+    """
+    composition = Composition(name)
+    composition.add(PHOSPHORYLATION_CYCLE, "cycle")
+    composition.note(
+        "a kinase and a phosphatase acting on one protein pool. The total "
+        "is conserved and the network derives that from the stoichiometry, "
+        "so the state of the system is the FRACTION modified rather than an "
+        "amount"
+    )
+    composition.note(
+        "zero-order ultrasensitivity is a REGIME, not a structure. It "
+        "appears when both converters are saturated, and then the modified "
+        "fraction switches over a far narrower range of kinase activity "
+        "than either Michaelis curve alone allows (Goldbeter & Koshland "
+        "1981). With the pool small compared with either Km the very same "
+        "model is graded, and nothing in it announces which side it is on"
+    )
+    composition.note(
+        "the motif used is library.PHOSPHORYLATION_CYCLE, which "
+        "library_signaling names ULTRASENSITIVE_CYCLE. One mechanism, one "
+        "definition, two names -- a second copy of these rate laws would be "
+        "two answers to one question"
+    )
+    return Recognition(
+        composition, "ultrasensitive_cycle", "zero-order covalent modification cycle"
+    )
+
+
+def _scaffold_assembly(query: str, name: str) -> Recognition:
+    """A scaffold holding two partners, and the reason more of it is worse.
+
+    The non-monotonic part is the whole point. A scaffold raises the
+    effective concentration of two partners for each other, so activity
+    rises with scaffold -- until there is enough scaffold that most
+    molecules of each partner sit on a scaffold of their OWN, and the
+    ternary complex that actually does the work becomes rarer. Activity
+    falls again. Nothing about a rate law predicts that; it comes out of the
+    binding stoichiometry, which is why the binary complexes are species
+    here rather than being assumed away.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_signaling", ("SCAFFOLD_ASSEMBLY",),
+        shape="scaffold assembly",
+        instead=(
+            "'reversible binding' builds one two-partner complex from the "
+            "core library. With only one binding event there is no ternary "
+            "complex and therefore no optimum, so it cannot show the "
+            "behaviour a scaffold is asked about."
+        ),
+    )
+    composition.add(motif, "scaffold")
+    composition.note(
+        "the ternary complex is the active species and the two binary "
+        "complexes are dead ends. Both are species, which is what lets the "
+        "model show activity falling at high scaffold -- the prozone "
+        "effect -- instead of rising forever"
+    )
+    composition.note(
+        "no claim is made that a scaffold changes the CHEMISTRY of the "
+        "reaction it holds. Here it changes only how often the partners "
+        "meet. Scaffolds that also allosterically activate their partners "
+        "exist, and that is a second mechanism this shape does not contain"
+    )
+    return Recognition(composition, "scaffold_assembly", "scaffold with an optimum")
+
+
+def _negative_feedback_oscillator(query: str, name: str) -> Recognition:
+    """A delayed negative feedback loop, as the general form of a clock.
+
+    A SHAPE and not a subject, which is the line this grammar holds. The
+    circadian clock of a particular organism is a subject -- it has named
+    genes, measured periods and a pathway database behind it -- and is
+    refused like any other named system. "Delayed negative feedback that
+    oscillates" is a shape, and the shape is what has the property:
+    negative feedback plus enough delay plus enough nonlinearity gives a
+    limit cycle, whoever's genes are in it.
+
+    "transcriptional oscillator" is NOT a trigger. "Transcription" is a
+    substring of "transcriptional", so `gene_expression` (85) would take
+    that phrase before this rule ever saw it.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_signaling", ("NEGATIVE_FEEDBACK_OSCILLATOR",),
+        shape="delayed negative feedback oscillator",
+        instead=(
+            "'a negatively autoregulated gene' builds the same loop with "
+            "ONE stage from library_expression. It settles rather than "
+            "oscillating: the delay that a limit cycle needs comes from the "
+            "extra stages, and no choice of constants puts it back."
+        ),
+    )
+    composition.add(motif, "clock")
+    composition.note(
+        "three stages in series with the last repressing the first. The "
+        "stages are the delay, and the delay is what turns negative "
+        "feedback from a stabiliser into an oscillator -- the same loop "
+        "with one stage has a stable steady state for every parameter set"
+    )
+    composition.note(
+        "whether THIS parameter set oscillates is not claimed. A limit "
+        "cycle needs the loop gain above a threshold that depends on the "
+        "repression exponent and on the three rate constants together; the "
+        "library's own description says the exponent default was chosen so "
+        "the shape can exhibit what it is named for, and that is a property "
+        "of a placeholder rather than a measurement of any clock"
+    )
+    return Recognition(
+        composition, "negative_feedback_oscillator", "three-stage delayed loop"
+    )
+
+
+def _bistable_positive_feedback(query: str, name: str) -> Recognition:
+    """One species driving its own production, with two stable levels.
+
+    Distinct from `_toggle_switch`, which gets bistability from two genes
+    repressing each other. This gets it from ONE species and cooperativity,
+    which is a weaker structural claim and a different experiment: a toggle
+    has two species whose levels anticorrelate, and this has one whose
+    history you can read off its level.
+
+    The signature that separates bistability from a very steep graded
+    response is hysteresis, and it is a measurement rather than a picture:
+    the dose-response curve taken upward does not lie on the one taken
+    downward. A model that cannot be asked that question has not
+    demonstrated bistability, and neither has a single simulation from a
+    single initial condition.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_signaling", ("BISTABLE_POSITIVE_FEEDBACK",),
+        shape="bistable positive feedback",
+        instead=(
+            "'cooperative activation' builds a Hill activation term from "
+            "the core library, but its activator is a SEPARATE species: "
+            "there is no loop, so the curve is steep and single-valued "
+            "rather than bistable."
+        ),
+    )
+    composition.add(motif, "loop")
+    composition.note(
+        "a protein that cooperatively raises its own production, with a "
+        "basal leak so the off state is not an absorbing zero. Two stable "
+        "levels with an unstable one between them"
+    )
+    composition.note(
+        "bistability is not asserted for these constants. It requires the "
+        "cooperativity and the ratio of production to removal to sit inside "
+        "a region, and outside it the same model is monostable. The test "
+        "is hysteresis -- sweep the input up and then down and compare -- "
+        "which `continuation` can do and a single trajectory cannot"
+    )
+    return Recognition(
+        composition, "bistable_positive_feedback", "one-species bistable loop"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Metabolic pieces
+# ---------------------------------------------------------------------------
+
+
+def _metabolic_pathway(query: str, name: str) -> Recognition:
+    """N reversible segments in series, parameterised so they run downhill.
+
+    Not `_enzyme_cascade`, which chains the IRREVERSIBLE catalytic step. The
+    difference is the one `library_metabolic.py` is written around: an
+    irreversible chain cannot approach equilibrium, cannot carry a back
+    flux, and cannot be wrong about thermodynamics because it makes no
+    thermodynamic claim at all. A chain of reversible steps CAN be wrong
+    about it, and wrong in the worst way -- it runs, it is smooth, and it
+    has quietly moved a metabolite uphill for free.
+
+    The segment motif is parameterised by Keq rather than by a reverse kcat
+    precisely so that cannot happen: the flux carries the sign of
+    (S - P/Keq) for every value of every parameter. That is the library's
+    property and not this file's, and the reason this reaches for that motif
+    rather than chaining a reversible Michaelis-Menten from the core.
+
+    The wiring is done by the library's own `linear_pathway`, not by a
+    `chain` call here. Which port of a segment is the upstream one is the
+    library's business, and writing it down in two files is how the two
+    drift.
+    """
+    count = _count_before(query, "pathway", "segment", "step")
+    if count is None:
+        raise UnrecognisedShape(
+            query,
+            "A pathway needs a number of steps. 'A linear metabolic pathway "
+            "of four steps' builds; 'a metabolic pathway' does not, because "
+            "the length is the model -- it sets how many enzymes there are, "
+            "how the flux control is distributed between them, and how far "
+            "the chain's overall free energy drop is spread. Terrium will "
+            "not pick a length for you.",
+        )
+    if count < MINIMUM_COPIES["pathway"]:
+        raise UnrecognisedShape(
+            query,
+            f"A pathway of {count} is a single reversible enzymatic step, "
+            f"not a pathway. Ask for 'a reversible enzymatic reaction' if "
+            f"that is what you want; a pathway needs at least "
+            f"{MINIMUM_COPIES['pathway']} steps for there to be anything to "
+            f"distribute control over.",
+        )
+
+    composition = Composition(name)
+    segment = _expansion_motif(
+        query, "library_metabolic", ("LINEAR_PATHWAY_SEGMENT",),
+        shape="linear metabolic pathway",
+        instead=(
+            "'a three step enzyme cascade' chains the IRREVERSIBLE "
+            "catalytic step from the core library. It cannot run backwards "
+            "and so cannot approach equilibrium, which is a different model "
+            "rather than a rougher one."
+        ),
+    )
+    place = _expansion_motif(
+        query, "library_metabolic", ("linear_pathway",),
+        shape="linear metabolic pathway",
+        instead=(
+            "the segment motif is present but the helper that chains it is "
+            "not, and this file deliberately does not hard-code which of "
+            "its ports is upstream."
+        ),
+    )
+    place(composition, count, prefix="step", head_initial=1.0)
+    composition.note(
+        f"{count} reversible segments head to tail, each with its own "
+        f"enzyme. Consecutive steps of a pathway are catalysed by different "
+        f"enzymes, so nothing is shared between them unless asked for"
+    )
+    composition.note(
+        f"each segment is written in the Keq form, so its flux carries the "
+        f"sign of (S - P/Keq) whatever the constants are and no step can "
+        f"run uphill. That is enforced by the algebra rather than by a "
+        f"check somebody has to remember: {segment.name} has no independent "
+        f"reverse kcat to be given a value that contradicts its Keq"
+    )
+    composition.note(
+        "what is NOT enforced is that the chain's overall free energy drop "
+        "is big enough to carry the flux a caller wants, or that the "
+        "pathway is open at either end. With no source and no sink this "
+        "settles to equilibrium, which is the correct behaviour of a closed "
+        "chain and is not what a pathway in a cell does -- compose an "
+        "inflow and an outflow to ask that question"
+    )
+    return Recognition(
+        composition, "linear_metabolic_pathway", f"{count} reversible segments"
+    )
+
+
+def _branch_point(query: str, name: str) -> Recognition:
+    """One metabolite, two enzymes, and the split that follows from their Km.
+
+    The overlap with `_competition` is real and is not hidden: two catalytic
+    steps sharing a substrate is the same network, and `library_metabolic`
+    says so about its own motif. What this adds is named product ports and a
+    basis about flux partitioning; what `_competition` adds is a step count.
+    They are ranked so that a query saying "competing" gets the older rule
+    and a query saying "branch point" gets this one, because those are the
+    words each was written for.
+
+    "branched pathway" is a substring of "unbranched pathway", which is what
+    somebody writes when they mean a LINEAR one. `metabolic_pathway` (64)
+    therefore outranks this rule (63), and "an unbranched pathway of four
+    steps" builds a chain.
+    """
+    composition = Composition(name)
+    motif = _expansion_motif(
+        query, "library_metabolic", ("BRANCH_POINT",), shape="branch point",
+        instead=(
+            "'two enzymes competing for the same substrate' builds the same "
+            "network from the core library, with unnamed products and no "
+            "basis about how the flux divides."
+        ),
+    )
+    composition.add(motif, "branch")
+    composition.note(
+        "one metabolite drawn on by two enzymes with different kinetics. "
+        "The split is not a parameter: it falls out of the two rate laws at "
+        "whatever substrate concentration the system is at, which is why "
+        "the ratio changes as the branch point fills"
+    )
+    composition.note(
+        "at low substrate the enzyme with the lower Km takes most of the "
+        "flux and at high substrate the one with the higher kcat catches "
+        "up, so a branch that is committed one way under starvation can run "
+        "the other way when fed. A model that wrote the split as a fixed "
+        "fraction would lose exactly that, and would still simulate"
+    )
+    composition.note(
+        "nothing here claims either branch is regulated. Real branch points "
+        "usually are -- an end product inhibiting its own branch is the "
+        "commonest arrangement -- and adding that means saying which "
+        "product inhibits which enzyme, which is a fact about the pathway "
+        "rather than about the words"
+    )
+    return Recognition(composition, "branch_point", "one substrate, two fates")
+
+
+def _moiety_cycle(query: str, name: str) -> Recognition:
+    """A conserved cofactor pool, or a step that spends one.
+
+    Two branches because they answer two questions. The CYCLE is the pool
+    itself -- regeneration against demand, with the ratio settling where the
+    two arms balance -- and is what somebody asking about energy charge or
+    the NAD+/NADH ratio means. The COUPLED STEP is one reaction that cannot
+    proceed without spending from such a pool, and is what somebody asking
+    how a reaction is driven means.
+
+    The thing neither branch has is a pool TOTAL. The total is the sum of
+    two initial concentrations, both of them CHOSEN -- no paper reports how
+    much NAD is in your model -- and a `C_total` parameter would be a lumped
+    scenario quantity that could contradict the initials it duplicates. What
+    controls a coupled step is the RATIO, and the ratio is set by the two
+    arms rather than by the total.
+    """
+    composition = Composition(name)
+
+    if _has(query, "cofactor coupled", "cofactor-coupled", "spends",
+            "spending", "consumes", "consuming", "coupled step",
+            "driven by a cofactor"):
+        motif = _expansion_motif(
+            query, "library_metabolic", ("COFACTOR_COUPLED_STEP",),
+            shape="cofactor-coupled step",
+            instead=(
+                "'an ordered bi-bi mechanism' builds a two-substrate enzyme "
+                "from the core library. It has two substrates and two "
+                "products but no conserved pool, so it cannot express the "
+                "spent cofactor coming back."
+            ),
+        )
+        composition.add(motif, "step")
+        composition.note(
+            "the reaction consumes the active form of a cofactor and "
+            "returns the spent form, so the two are linked by the "
+            "stoichiometry and the network derives the conservation law "
+            "from it. Writing the cofactor as a constant instead would let "
+            "the step run forever on a pool that never empties"
+        )
+        composition.note(
+            "no regeneration arm is included here. On its own this step "
+            "runs the pool down and stops, which is the honest behaviour of "
+            "an uncoupled demand -- compose it with a moiety-conserved "
+            "cycle to close the loop"
+        )
+        return Recognition(
+            composition, "cofactor_coupled_step", "a step spending a conserved cofactor"
+        )
+
+    motif = _expansion_motif(
+        query, "library_metabolic", ("MOIETY_CONSERVED_CYCLE",),
+        shape="moiety-conserved cycle",
+        instead=(
+            "'a futile cycle' from library_enzymology is two opposing "
+            "enzymes on one pool and is the same algebra. It is written "
+            "about a protein being modified and back, not about a cofactor "
+            "being spent and regenerated, and its basis says the former."
+        ),
+    )
+    composition.add(motif, "pool")
+    composition.note(
+        "a cofactor pool cycling between an active and a spent form, with "
+        "one enzyme regenerating and one spending. The total is conserved "
+        "and the network derives that from the stoichiometry -- it is not a "
+        "parameter here, and must not become one"
+    )
+    composition.note(
+        "the quantity that matters downstream is the RATIO of the two "
+        "forms, not the total. Doubling the pool at a fixed ratio does not "
+        "double the flux through a step that is saturated in its cofactor, "
+        "so a model tuned by raising the total has changed something other "
+        "than what it meant to"
+    )
+    composition.note(
+        "the two initial amounts are the pool total and are CHOSEN, not "
+        "resolvable: no paper reports how much adenine nucleotide is in "
+        "your model. Nothing here attaches a citation to either"
+    )
+    return Recognition(
+        composition, "moiety_conserved_cycle", "a conserved cofactor pool"
+    )
+
+
 def _autocatalysis(query: str, name: str) -> Recognition:
     composition = Composition(name)
     composition.add(AUTOCATALYSIS, "reaction")
@@ -1321,6 +2002,17 @@ RULES: Tuple[Rule, ...] = (
                                          "mapk", "map kinase", "phosphorelay"),
          _phosphorylation_cascade,
          "N phosphorylation cycles, each tier activating the next", 90),
+    # 89, and it has to be above `gene_expression` (85). The feed-forward
+    # loops were catalogued in TRANSCRIPTION networks, so "an incoherent
+    # feed-forward loop in a transcription network" is an ordinary way to
+    # ask for one -- and the word "transcription" in it would otherwise
+    # hand the query to the two-stage gene model, which has no loop in it
+    # at all. None of these triggers is a bare "feed": `open_system` owns
+    # "continuous feed", and "feedback" contains it too.
+    Rule("feedforward_loop", (), ("feedforward", "feed-forward", "feed forward",
+                                  "ffl"),
+         _feedforward_loop,
+         "a three-node feed-forward loop, coherent or incoherent", 89),
     Rule("repressilator", (), ("repressilator",), _repressilator,
          "three genes repressing each other in a ring", 88),
     # Above `gene_expression` (85) because a query naming both -- "negative
@@ -1444,10 +2136,84 @@ RULES: Tuple[Rule, ...] = (
          _cooperative_enzyme, "sigmoidal kinetics or cooperative ligand binding", 69),
     Rule("allosteric", (), ("allosteric", "cooperative", "hill"),
          _allosteric, "cooperative regulation as a Hill function", 68),
+    # 67. "phosphorelay" is NOT a trigger even though a two-component system
+    # is one: `phosphorylation_cascade` (90) already owns that word, and
+    # taking it would need this rule above 90 and would change what an
+    # existing query builds. "histidine kinase" and "response regulator"
+    # name this mechanism and nothing else.
+    Rule("two_component_system", (), ("two-component", "two component system",
+                                      "histidine kinase", "response regulator",
+                                      "sensor kinase", "phosphotransfer"),
+         _two_component_system,
+         "a sensor kinase handing a phosphoryl group to a regulator", 67),
+    # 66, above `binding` (60), which triggers on "receptor" and would
+    # otherwise take every GPCR query. "g protein" with a SPACE is not a
+    # trigger: it is a substring of "binding protein", and "a ligand
+    # binding protein" must keep reaching `binding`.
+    Rule("gpcr_cycle", (), ("gpcr", "g-protein", "g protein coupled",
+                            "heterotrimeric", "gtpase cycle",
+                            "guanine nucleotide exchange"),
+         _gpcr_cycle,
+         "an agonist-occupied receptor driving a G protein cycle", 66),
+    # 65, BELOW `futile_cycle` (79) on purpose. The two shapes overlap --
+    # zero-order ultrasensitivity is what a futile cycle buys -- and a
+    # query that says "futile cycle" or "kinase and phosphatase" should
+    # keep reaching the rule written for those words. Never a bare "cycle":
+    # the catalogue owns the cell cycle.
+    Rule("ultrasensitive_cycle", (), ("ultrasensitiv", "zero order cycle",
+                                      "zero-order cycle", "goldbeter",
+                                      "phosphorylation cycle",
+                                      "covalent modification cycle"),
+         _ultrasensitive_cycle,
+         "a covalent modification cycle, sharp when both arms saturate", 65),
+    # 64, and it must outrank `branch_point` (63): "branched pathway" is a
+    # substring of "unbranched pathway", so an unbranched query matches
+    # both rules and this one has to win it.
+    Rule("metabolic_pathway", (), ("linear pathway", "metabolic pathway",
+                                   "unbranched pathway", "pathway segment",
+                                   "steps in series", "reversible steps"),
+         _metabolic_pathway,
+         "N reversible segments in series, none able to run uphill", 64),
+    Rule("branch_point", (), ("branch point", "branch-point", "branchpoint",
+                              "branched pathway", "branches into",
+                              "flux split", "two branches"),
+         _branch_point, "one metabolite drawn on by two enzymes", 63),
+    # 62. Never a bare "atp": `transport` (76) owns "atpase" and
+    # "atp-driven", and a pump query must keep reaching it.
+    Rule("moiety_cycle", (), ("moiety", "conserved pool", "cofactor cycle",
+                              "cofactor regeneration", "cofactor coupled",
+                              "cofactor-coupled", "spends a cofactor",
+                              "consumes a cofactor", "atp/adp", "adp/atp",
+                              "nad+/nadh", "nadh/nad", "adenylate pool",
+                              "energy charge"),
+         _moiety_cycle,
+         "a conserved cofactor pool, or a step that spends one", 62),
+    # 61, above `binding` (60): "a scaffold protein and the binding of two
+    # kinases" matches both, and the scaffold is what the query is about.
+    Rule("scaffold_assembly", (), ("scaffold",), _scaffold_assembly,
+         "a scaffold whose activity has an optimum, not a maximum", 61),
     Rule("binding", (), ("reversible binding", "binds to", "binding of",
                          "association", "ligand", "receptor", "dimeris",
                          "dimeriz"), _binding,
          "two partners forming a complex", 60),
+    # 59. "transcriptional oscillator" is NOT a trigger: "transcription" is
+    # a substring of "transcriptional", so `gene_expression` (85) takes the
+    # phrase before this rule is ever a candidate. And no bare "oscillator"
+    # -- "cell cycle oscillator dynamics" belongs to the catalogue and this
+    # path must keep matching nothing for it.
+    Rule("signalling_oscillator", (), ("negative feedback oscillator",
+                                       "delayed negative feedback",
+                                       "goodwin oscillator", "goodwin model"),
+         _negative_feedback_oscillator,
+         "a delayed negative feedback loop, the general form of a clock", 59),
+    # 58, below `toggle_switch` (86), which owns "bistable switch". "a
+    # bistable switch between two repressors" is two genes repressing each
+    # other and must keep reaching that rule; this one is the ONE-species
+    # loop.
+    Rule("bistable_feedback", (), ("bistable", "bistability",
+                                   "positive feedback loop"),
+         _bistable_positive_feedback,
+         "one species driving its own production, with two stable levels", 58),
     Rule("synthesis", (), ("expressed and removed", "made at a constant rate"),
          _synthesis, "one species, made and removed", 50),
     Rule("conversion", (), ("first order conversion", "converts to",

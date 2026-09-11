@@ -368,7 +368,7 @@ class ModelDossier:
 
     # -- assembly -----------------------------------------------------
 
-    def markdown(self) -> str:
+    def markdown(self, *, footer: bool = True) -> str:
         lines = [
             f"# {self.model.network.name}",
             "",
@@ -383,7 +383,20 @@ class ModelDossier:
         lines += self.behaviour_section()
         lines += self.trajectory_section()
         lines += self.sweeps_section()
-        lines += [
+        if footer:
+            lines += self.footer_section()
+        return "\n".join(lines)
+
+    def footer_section(self) -> List[str]:
+        """The provenance footer, separable so it can stay LAST.
+
+        The CLI appends analysis sections after the dossier, and an earlier
+        version printed this in the middle of them -- a document that says
+        "Built by Terrium..." and then carries on for three more pages. The
+        footer is the last thing a reader should meet, so whoever assembles
+        the document decides when to place it.
+        """
+        return [
             "",
             "---",
             "",
@@ -393,7 +406,6 @@ class ModelDossier:
             "Conservation laws are exact; steady states and sweeps are "
             "numerical, and say so where they appear.",
         ]
-        return "\n".join(lines)
 
 
 def dossier(
