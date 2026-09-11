@@ -38,8 +38,25 @@ class ModelDossier:
     #: the provenance table rather than in a section of its own -- see
     #: `provenance_section`.
     sensitivity: Optional[Any] = None
+    #: Verdict, from compose/verdict.py. Rendered FIRST, because the
+    #: judgement a reader needs is whether the model is worth using and for
+    #: what, and that decision needs several sections at once. A reader who
+    #: stops after the first page should have the part that matters.
+    verdict: Optional[Any] = None
 
     # -- sections -----------------------------------------------------
+
+    def verdict_section(self) -> List[str]:
+        """What the model supports, before any of the detail.
+
+        FIRST, not last. A summary at the end is read by whoever finished,
+        and the reader most at risk of over-reading this report is the one
+        who skims. The sections below qualify this page; this page says
+        which of them to read.
+        """
+        if self.verdict is None:
+            return []
+        return ["## Verdict", "", "```", self.verdict.summary(), "```", ""]
 
     def structure_section(self) -> List[str]:
         network = self.model.network
@@ -358,6 +375,7 @@ class ModelDossier:
             f"> {self.query}",
             "",
         ]
+        lines += self.verdict_section()
         lines += self.structure_section()
         lines += self.invariants_section()
         lines += self.units_section()
@@ -485,9 +503,21 @@ def dossier(
         except Exception:  # noqa: BLE001 - one failed sweep is not a failed report
             continue
 
+    verdict = None
+    try:
+        from .verdict import form as form_verdict
+    except ImportError:  # pragma: no cover - flat import
+        from verdict import form as form_verdict  # type: ignore[no-redef]
+    try:
+        verdict = form_verdict(model)
+    except Exception as exc:  # noqa: BLE001
+        # The verdict is a reading of the other sections; losing it must not
+        # cost the sections themselves.
+        model.recognition.composition.note(f"no verdict page: {exc}")
+
     return ModelDossier(
         query=query, model=model, stability=stability, sweeps=tuple(sweeps),
-        trajectory=trajectory, sensitivity=sensitivity,
+        trajectory=trajectory, sensitivity=sensitivity, verdict=verdict,
     )
 
 
