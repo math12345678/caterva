@@ -521,7 +521,11 @@ def dossier(
     except ImportError:  # pragma: no cover - flat import
         from verdict import form as form_verdict  # type: ignore[no-redef]
     try:
-        verdict = form_verdict(model)
+        # The stability report goes in, so the page can say what the model
+        # DOES. Without it every composed model got the same verdict, the
+        # same concern and the same next step -- true of all eleven and
+        # useless for telling any two apart.
+        verdict = form_verdict(model, stability=stability)
     except Exception as exc:  # noqa: BLE001
         # The verdict is a reading of the other sections; losing it must not
         # cost the sections themselves.
