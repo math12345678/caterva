@@ -273,3 +273,96 @@ class TestEveryVerdictHasALicence:
         licence = LICENCE[GROUNDED]
         assert "AT the conditions those constants were measured at" in licence
         assert "other organisms" in licence
+
+
+class TestThePageCanTellTwoModelsApart:
+    """The defect that made this class necessary.
+
+    Swept across the eleven models the composer builds, this page returned
+    an identical verdict for every one: STRUCTURAL, one concern, the same
+    next step. True of all eleven, and useless -- it said the same thing
+    about a toggle switch and about an open system with no steady state at
+    all.
+
+    The package already knew they were different. analysis.analyse reports
+    2 stable states for the toggle, 0 for the open system, and a spiral for
+    the repressilator. The verdict simply never asked.
+    """
+
+    def _behaviour(self, query: str) -> str:
+        from Terium.compose.analysis import analyse
+        from Terium.compose.sensitivity import STARTS_PER_SPECIES
+
+        model = compose(query)
+        stability = analyse(model.network, starts_per_species=STARTS_PER_SPECIES)
+        verdict = form(model, stability=stability)
+        assert verdict.behaviour, query
+        return verdict.behaviour
+
+    def test_a_switch_and_an_open_system_do_not_read_the_same(self) -> None:
+        switch = self._behaviour("a toggle switch between two repressors")
+        open_system = self._behaviour("an open system with constant substrate inflow")
+        assert switch != open_system
+        assert "2 stable states" in switch
+        assert "no steady state was found" in open_system
+
+    def test_an_open_system_says_the_question_is_wrong_for_it(self) -> None:
+        # Not merely "no steady state" -- every steady-state number below it
+        # is the wrong question, and a reader should be told before reading
+        # them rather than after.
+        described = self._behaviour("an open system with constant substrate inflow")
+        assert "runs forever rather than settling" in described
+        assert "wrong question for it" in described
+
+    def test_a_stable_spiral_is_not_reported_as_a_plain_steady_state(self) -> None:
+        """The repressilator at library defaults RINGS AND SETTLES.
+
+        That is a real property of those constants and the most interesting
+        thing this page can say about a mechanism built to oscillate.
+        Reporting only "one stable state" threw it away.
+        """
+        described = self._behaviour("repressilator oscillations")
+        assert "SPIRALS" in described
+        assert "not a sustained one" in described
+        assert "these particular constants do not make it" in described
+
+    def test_a_monotonic_model_is_not_called_a_spiral(self) -> None:
+        # The discriminator has to cut both ways or it is decoration.
+        described = self._behaviour("three step phosphorylation cascade")
+        assert "SPIRALS" not in described
+        assert "one stable state was found" in described
+
+    def test_it_reports_what_the_search_found_not_what_the_system_is(self) -> None:
+        """analysis.py says "at least two stable states were FOUND", never
+        "this system is bistable". This page must not upgrade that on the
+        way past.
+        """
+        switch = self._behaviour("a toggle switch between two repressors")
+        assert "were found" in switch
+        assert "is bistable" not in switch
+
+        cascade = self._behaviour("three step phosphorylation cascade")
+        assert "did not find another" in cascade
+        assert "is monostable" not in cascade
+
+    def test_without_a_stability_report_it_says_so_rather_than_guessing(
+        self, cascade
+    ) -> None:
+        verdict = form(cascade)          # no stability passed
+        assert verdict.behaviour is None
+        assert "stability" in verdict.unavailable
+        assert "cannot say what the model does" in verdict.unavailable["stability"]
+
+    def test_the_summary_leads_with_the_behaviour(self) -> None:
+        # It is the line that differs between two models, so it goes where a
+        # reader meets it first rather than after three paragraphs they have
+        # already read on another model.
+        from Terium.compose.analysis import analyse
+        from Terium.compose.sensitivity import STARTS_PER_SPECIES
+
+        model = compose("a toggle switch between two repressors")
+        stability = analyse(model.network, starts_per_species=STARTS_PER_SPECIES)
+        summary = form(model, stability=stability).summary()
+
+        assert "What this model does:" in summary
+        assert summary.index("What this model does:") < summary.index("concern(s)")

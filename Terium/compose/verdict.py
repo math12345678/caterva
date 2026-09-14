@@ -132,6 +132,10 @@ class Verdict:
     concerns: Tuple[Concern, ...]
     #: The conclusion the robustness run was about, when one was made.
     conclusion: Optional[str] = None
+    #: What the mechanism DOES, from the steady-state search. The one line
+    #: that differs between two models, and the reason this page is worth
+    #: reading rather than merely true -- see `behaviour_of`.
+    behaviour: Optional[str] = None
     #: Module name -> one-line summary of what it found. Reported so the
     #: page can say what it actually looked at, rather than implying it
     #: looked at everything.
@@ -172,6 +176,10 @@ class Verdict:
             "",
             f"What this supports: {LICENCE[self.verdict]}",
         ]
+
+        if self.behaviour:
+            lines.append("")
+            lines.append(f"What this model does: {self.behaviour}")
 
         if self.conclusion:
             lines.append("")
@@ -305,9 +313,81 @@ def _provenance_concerns(model: Any) -> Tuple[List[Concern], str]:
     )
 
 
+def behaviour_of(stability: Any) -> Optional[str]:
+    """What this mechanism DOES, in one clause.
+
+    WHY THE VERDICT NEEDS THIS AT ALL. Swept across the eleven models the
+    composer builds, this page returned an identical verdict for every one
+    of them: STRUCTURAL, one concern, the same next step. True of all
+    eleven, and useless -- it said the same thing about a toggle switch and
+    about an open system that has no steady state whatsoever.
+
+    The package already knew they were different. `analysis.analyse`
+    reports 2 stable states for the toggle, 0 for the open system, and an
+    oscillatory pair for the repressilator. The verdict simply never asked.
+
+    A summary that cannot tell two models apart is not summarising them, so
+    the defining behaviour goes at the top where a reader meets it first.
+    Phrased as what the SEARCH found, never as what the system is --
+    `analysis.py` reports "at least two stable states were found" and this
+    must not upgrade that to "this system is bistable" on the way past.
+    """
+    if stability is None:
+        return None
+    stable = getattr(stability, "stable_points", ())
+    physical = getattr(stability, "physical_points", ())
+    oscillatory = [p for p in physical if getattr(p, "oscillatory", False)]
+
+    if not getattr(stability, "fixed_points", ()):
+        return (
+            "no steady state was found from "
+            f"{getattr(stability, 'starts_tried', '?')} starting points -- an "
+            "open system runs forever rather than settling, so every "
+            "steady-state question below is the wrong question for it"
+        )
+    if len(stable) > 1:
+        return (
+            f"{len(stable)} stable states were found, which is what a switch "
+            f"looks like -- and which of them is reached depends on where the "
+            f"system started, not on the constants alone"
+        )
+    if oscillatory and any(
+        v.real > 0 for p in oscillatory for v in getattr(p, "eigenvalues", ())
+    ):
+        return (
+            "an unstable spiral was found, which is what a sustained "
+            "oscillation looks like in a linearisation"
+        )
+    if len(stable) == 1:
+        settled = stable[0]
+        if getattr(settled, "oscillatory", False):
+            # A STABLE SPIRAL, which is not the same as a sustained
+            # oscillation and not the same as a monotonic approach either.
+            # The repressilator lands here at the library's default
+            # constants: it rings and settles rather than oscillating
+            # forever, which is a real property of those constants and the
+            # single most interesting thing this page can say about it.
+            # Reporting only "one stable state" threw that away.
+            return (
+                "one stable state was found, and the approach to it SPIRALS "
+                "-- a damped oscillation that rings and settles, which is "
+                "not a sustained one. A mechanism built to oscillate is "
+                "telling you these particular constants do not make it"
+            )
+        return (
+            "one stable state was found, and the search did not find another "
+            "-- which is not the same as there being none"
+        )
+    return (
+        f"{len(getattr(stability, 'fixed_points', ()))} fixed point(s) were "
+        f"found and none of them is stable"
+    )
+
+
 def form(
     model: Any,
     *,
+    stability: Optional[Any] = None,
     robustness: Optional[Any] = None,
     validation: Optional[Any] = None,
     conclusion_name: Optional[str] = None,
@@ -392,6 +472,14 @@ def form(
             else f"{len(failures)} disagreement(s)"
         )
 
+    if stability is None:
+        unavailable["stability"] = "not run, so this page cannot say what the model does"
+    else:
+        consulted["stability"] = (
+            f"{len(getattr(stability, 'stable_points', ()))} stable state(s) "
+            f"from {getattr(stability, 'starts_tried', '?')} starting points"
+        )
+
     if robustness is None:
         unavailable["robustness"] = "not run"
     else:
@@ -419,6 +507,7 @@ def form(
 
     return Verdict(
         verdict=verdict,
+        behaviour=behaviour_of(stability),
         concerns=tuple(concerns),
         conclusion=(
             conclusion_name
@@ -431,5 +520,5 @@ def form(
 
 __all__ = [
     "BROKEN", "STRUCTURAL", "GROUNDED", "ROBUST", "VERDICTS", "LICENCE",
-    "Concern", "Verdict", "VerdictError", "form",
+    "Concern", "Verdict", "VerdictError", "form", "behaviour_of",
 ]
