@@ -164,7 +164,7 @@ export default function PricingPlans() {
               Educational discounts available —{" "}
             </span>
             <a
-              href="mailto:hello@terrium.app"
+              href="mailto:admin.terrium@gmail.com"
               className="text-[#1D8A72]/60 hover:text-[#1D8A72] transition-colors"
             >
               contact us

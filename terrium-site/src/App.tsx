@@ -144,7 +144,7 @@ export default function App() {
           <span className="ml-auto flex gap-5">
             <a href="#ledger" className="transition-colors hover:text-ink">Ledger</a>
             <a href="#architecture" className="transition-colors hover:text-ink">Architecture</a>
-            <a href="mailto:hello@terrium.dev" className="transition-colors hover:text-ink">Contact</a>
+            <a href="mailto:admin.terrium@gmail.com" className="transition-colors hover:text-ink">Contact</a>
           </span>
         </div>
       </footer>

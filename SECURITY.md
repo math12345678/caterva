@@ -124,7 +124,7 @@ If you find a security issue in Terrium -- the simulation engine, the
 literature-scraping layer, or the landing page -- please report it
 privately rather than opening a public GitHub issue.
 
-**Email mathlete.world@gmail.com** with:
+**Email admin.terrium@gmail.com** with:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce it

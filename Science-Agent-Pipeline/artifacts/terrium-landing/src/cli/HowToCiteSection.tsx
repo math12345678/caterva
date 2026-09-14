@@ -136,10 +136,10 @@ export default function HowToCiteSection() {
                 <p className="text-white/20">
                   Questions about citation?{" "}
                   <a
-                    href="mailto:hello@terrium.app"
+                    href="mailto:admin.terrium@gmail.com"
                     className="text-[#8B5CF6]/60 hover:text-[#8B5CF6] transition-colors"
                   >
-                    hello@terrium.app
+                    admin.terrium@gmail.com
                   </a>
                 </p>
               </div>
