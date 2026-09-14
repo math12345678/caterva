@@ -267,6 +267,14 @@ class Composition:
                     Parameter(
                         instance.parameter_id(parameter.name),
                         float(parameter.default),
+                        # The unit the motif declared, carried into the
+                        # network rather than dropped here. This line is
+                        # the fix for a gap three modules worked around:
+                        # scale.py reported every parameter unchecked,
+                        # perturbation.py could not tell a rate from an
+                        # affinity, and both had to walk back to the motifs
+                        # to recover what was discarded one line above.
+                        parameter.unit,
                     )
                 )
             substitutions = {
