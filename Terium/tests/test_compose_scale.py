@@ -225,23 +225,49 @@ class TestUncheckedIsNotApproved:
     """
 
     def test_an_unrecognised_unit_is_reported_as_unchecked(self) -> None:
-        # The unit is supplied through the mapping, not set on the Parameter
-        # -- core.network.Parameter has no unit field, which is the gap
-        # units_from_model exists to bridge.
-        network = _network()
-        report = check(
-            network,
-            units={p.id: "furlongs per fortnight" for p in network.parameters},
+        """A unit the module cannot convert leaves the number unexamined.
+
+        Built by hand rather than by the composer: a composed network now
+        carries units the motifs declared, so the only way to hold an
+        unrecognised one is to construct it.
+        """
+        network = replace(
+            _network(),
+            parameters=tuple(
+                replace(p, unit="furlongs per fortnight")
+                for p in _network().parameters
+            ),
         )
+        report = check(network)
         assert not report.findings
         assert len(report.unchecked) == len(network.parameters)
         assert "not one this module recognises" in next(iter(report.unchecked.values()))
 
-    def test_the_summary_says_what_was_not_examined(self) -> None:
-        # No units supplied at all, which is what a bare network gives.
-        summary = check(_network()).summary()
+    def test_a_parameter_with_no_unit_at_all_is_unchecked(self) -> None:
+        # What a network built outside the composer looks like. Silence
+        # about it must not read as approval.
+        network = replace(
+            _network(),
+            parameters=tuple(replace(p, unit="") for p in _network().parameters),
+        )
+        summary = check(network).summary()
         assert "were NOT checked" in summary
         assert "absence of examination, not" in summary
+
+    def test_the_parameters_own_unit_beats_a_supplied_one(self) -> None:
+        """The motif is the authority on what its own constant means.
+
+        Letting an argument silently reinterpret a declared mM as something
+        else would be a worse failure than the gap `units=` was added for.
+        """
+        network = _network()
+        assert all(p.unit for p in network.parameters), "the premise"
+
+        report = check(
+            network,
+            units={p.id: "furlongs per fortnight" for p in network.parameters},
+        )
+        assert not report.unchecked, "the declared units should have won"
 
     def test_a_clean_report_still_says_what_it_compared_against(self) -> None:
         summary = _report(_network()).summary()
@@ -341,13 +367,21 @@ class TestUnitConversion:
         # And with them, nothing is unchecked.
         assert not check_model(model).unchecked
 
-    def test_a_bare_network_checks_nothing_and_says_so(self) -> None:
-        # Not caution -- it genuinely has nothing to check against.
+    def test_a_composed_network_now_describes_itself(self) -> None:
+        """The fix, from the outside.
+
+        This test asserted the opposite until the unit moved onto
+        `core.network.Parameter`: a bare composed network reported EVERY
+        parameter unchecked, because the builder read the motif's unit and
+        dropped it one line later. `units_from_model` was the workaround.
+        Now the network arrives already saying what its numbers mean.
+        """
         model = compose("substrate inhibition at high substrate concentration")
-        bare = check(model.network)
-        assert not bare.findings
-        assert len(bare.unchecked) == len(model.network.parameters)
-        assert "core.network.Parameter carries" in next(iter(bare.unchecked.values()))
+        bare = check(model.network)          # no units= argument
+
+        assert not bare.unchecked, bare.unchecked
+        assert all(p.unit for p in model.network.parameters)
+        assert bare.physically_possible
 
 
 class TestTheOneLumpedParameterSaysSo:

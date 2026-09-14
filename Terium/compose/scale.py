@@ -515,10 +515,17 @@ def check(
     between a report that means something and one that quietly examined
     half of what it claimed to.
 
-    `units` supplies what the IR does not carry -- see `units_from_model`.
-    Without it, a bare network yields a report in which every parameter is
-    unchecked, which is honest and nearly useless; `check_model` is the
-    entry point that has the information.
+    PRECEDENCE: the parameter's OWN unit wins, and `units` fills gaps.
+    `core.network.Parameter` now carries a unit, populated by the builder
+    from the motif that declared it, so a composed network arrives already
+    describing itself. A caller-supplied mapping cannot override that --
+    the motif is the authority on what its own constant means, and letting
+    an argument silently reinterpret a declared mM as something else would
+    be a worse failure than the gap this replaced.
+
+    `units` therefore exists for networks built OUTSIDE the composer, which
+    carry no units at all. Without either, every parameter is reported
+    unchecked -- honest, and nearly useless.
     """
     findings: List[Finding] = []
     unchecked: Dict[str, str] = {}
