@@ -162,10 +162,75 @@ class Species:
 
 @dataclass(frozen=True)
 class Parameter:
-    """A constant of the model: a rate, an affinity, a population size."""
+    """A constant of the model: a rate, an affinity, a population size.
+
+    WHY THE UNIT IS HERE AND NOT SOMEWHERE ELSE
+    -------------------------------------------
+    For most of this IR's life a Parameter was an id and a value, and the
+    unit lived only on the `MotifParameter` the builder read -- so the unit
+    was dropped at the moment the network was constructed. The network
+    carried bare numbers.
+
+    Three modules found that independently, which is how it got fixed:
+
+      compose/scale.py asked whether a Km is physically possible and had to
+        report EVERY parameter unchecked, because mM and M are dimensionally
+        identical and it could not tell which it had;
+      compose/perturbation.py could not tell a rate constant from an
+        affinity, so `catalytically_dead` refused every parameter rather
+        than risk zeroing a Km and making an enzyme infinitely avid;
+      compose/robustness.py could not vary concentrations at all, because a
+        concentration is a species initial and not a Parameter.
+
+    Each of those shipped a workaround through `scale.units_from_model`,
+    which recovers the unit by walking back to the motifs. That function
+    still exists for networks built outside the composer, but it is a
+    workaround for this field's absence and it should not be the only route.
+
+    EMPTY IS A REAL VALUE AND MEANS "NOT RECORDED". It does not mean
+    dimensionless -- `"dimensionless"` means that. A consumer that cannot
+    tell those apart will read a Hill coefficient as a concentration, so
+    the distinction is the field's whole point and `scale.py` keeps them in
+    separate states (`UNKNOWN` versus a checked verdict).
+
+    Optional with a default because this IR is shared with the catalogue
+    models and every existing `Parameter(id, value)` call site -- ninety-one
+    of them -- stays correct. A required field would have been a sweeping
+    edit for a property most of those call sites genuinely do not know.
+
+    WHAT IS DELIBERATELY *NOT* HERE, AND WHY THAT MATTERS
+    -----------------------------------------------------
+    The unit is one of five things the builder used to drop. The others are
+    the KIND (which decides whether the literature may be asked for this
+    number at all), the MOTIF and INSTANCE it came from (the only honest
+    answer to "where did this come from"), and the BRENDA table that serves
+    it (the address a scout would search).
+
+    None of those are here, and adding them would be wrong. The split is
+    not arbitrary:
+
+        this IR carries what you need to READ the number
+        compose/quantities.py carries where the number CAME FROM
+
+    `0.1` cannot be interpreted without its unit -- that is a property of
+    the value itself, which is why it belongs on the value. Kind, motif and
+    source table are provenance, they are meaningless for a network built
+    outside the composer, and they belong in the side table that knows
+    about motifs.
+
+    The danger in a partial fix is that it makes the rest look closed.
+    `compose/quantities.py` argued exactly that against adding this field,
+    and the argument was right about the hazard and wrong about the remedy:
+    the remedy is to say so here. A consumer that needs the kind must go to
+    `QuantityTable`, and finding a unit on this type is not evidence the
+    other four are anywhere.
+    """
 
     id: str
     value: float
+    #: The unit this value is in, e.g. "1/s", "mM", "dimensionless".
+    #: Empty means NOT RECORDED, which is different from dimensionless.
+    unit: str = ""
 
 
 @dataclass(frozen=True)

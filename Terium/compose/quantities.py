@@ -2,9 +2,11 @@
 
 THE GAP THIS CLOSES
 -------------------
-`core.network.Parameter` has an id and a value. That is the whole type. By
-the time a model is a `ReactionNetwork` its numbers are bare floats, and
-three separate modules discovered the same hole independently:
+`core.network.Parameter` carries an id, a value and -- since this module
+argued for it -- a unit. It does not carry the other four things the builder
+drops, and by the time a model is a `ReactionNetwork` its numbers are
+otherwise bare. Three separate modules discovered the same hole
+independently:
 
   * `scale.py` cannot judge a number without its unit, so on a bare network
     it reports every parameter unchecked -- honest, and nearly useless.
@@ -18,24 +20,32 @@ three separate modules discovered the same hole independently:
 `scale.units_from_model` was the workaround: recover the unit from the
 motifs the builder read. It works, and it recovers one field out of five.
 
-WHY A SIDE TABLE AND NOT A FIELD ON `Parameter`
------------------------------------------------
-Two reasons, and the second is the stronger one.
+WHY A SIDE TABLE *AND* A FIELD ON `Parameter`
+----------------------------------------------
+This module first argued that `unit` should NOT go on `core.network.
+Parameter`: adding it closes a fifth of the gap and makes the other four
+fifths look closed, which is worse than leaving the hole plainly open.
 
-`core.network` is shared with the whole catalogue and a dozen modules
-construct `Parameter` positionally. Adding a field there is a change to
-everybody's type to serve one package's need.
+The hazard was right and the conclusion was wrong. The remedy for "a
+partial fix looks total" is to SAY SO at the partial fix, which
+`core.network.Parameter`'s docstring now does -- it states what it does not
+carry and sends a reader here for the rest.
 
-But even granting that change, `unit` alone would be the wrong fix. The
-unit is not the only thing dropped at build time -- the KIND is dropped
-(which decides whether the literature may be asked at all), the MOTIF and
-INSTANCE are dropped (which is the only honest answer to "where did this
-number come from"), and the BRENDA table is dropped (which is the address a
-scout would search). Adding a unit field would close a fifth of the gap and
-make the other four fifths look closed, which is worse than leaving it
-plainly open.
+And there is a real line between the two, which is why this is a split and
+not a compromise:
 
-So: the IR keeps carrying bare numbers, and this carries everything the
+    the IR carries what you need to READ a number     -- the unit
+    this table carries where the number CAME FROM     -- kind, motif,
+                                                        instance, table
+
+`0.1` cannot be interpreted at all without its unit; that is a property of
+the value, and every serialisation format worth the name puts it there
+(SBML does). Kind, motif and source table are provenance, they are
+meaningless for a network built outside the composer, and a field on the
+shared IR that is empty for every catalogue model would be a field that
+teaches readers to ignore it.
+
+So the IR carries the unit, and this carries everything else the
 `MotifParameter` knew, keyed by the same id.
 
 WHY SPECIES INITIALS ARE IN THE SAME TABLE
