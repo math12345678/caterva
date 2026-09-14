@@ -231,10 +231,10 @@ export default function RoadmapSection() {
             <span>
               Have a feature request?{" "}
               <a
-                href="mailto:hello@terrium.app"
+                href="mailto:admin.terrium@gmail.com"
                 className="text-[#3B82F6]/60 hover:text-[#3B82F6] transition-colors"
               >
-                hello@terrium.app
+                admin.terrium@gmail.com
               </a>{" "}
               &mdash; we build in the open.
             </span>

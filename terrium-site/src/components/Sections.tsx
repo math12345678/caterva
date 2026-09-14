@@ -277,7 +277,7 @@ export function Close() {
               </div>
             </div>
             <a
-              href="mailto:hello@terrium.dev"
+              href="mailto:admin.terrium@gmail.com"
               className="group relative overflow-hidden rounded-md bg-verified px-5 py-2.5 font-mono text-[13px] font-medium text-void transition-transform duration-300 hover:scale-[1.02]"
             >
               <span className="relative z-10">Request access →</span>

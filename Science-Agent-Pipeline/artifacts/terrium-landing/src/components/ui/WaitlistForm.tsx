@@ -191,10 +191,10 @@ export const WaitlistForm: React.FC<{
             Terrium is ready. Not shared, not sold, no mailing list, no
             tracking. Email{" "}
             <a
-              href="mailto:mathlete.world@gmail.com"
+              href="mailto:admin.terrium@gmail.com"
               className="underline hover:text-white/50"
             >
-              mathlete.world@gmail.com
+              admin.terrium@gmail.com
             </a>{" "}
             to have it removed. What we collect and what we do not:{" "}
             <a

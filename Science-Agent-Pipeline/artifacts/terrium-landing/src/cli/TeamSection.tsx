@@ -18,7 +18,7 @@ const CONTRIBUTORS: Contributor[] = [
     gradient: "from-[#1D8A72] to-[#0D6B5A]",
     links: [
       { label: "github", href: "https://github.com/smyan" },
-      { label: "email", href: "mailto:smyan@terrium.app" },
+      { label: "email", href: "mailto:admin.terrium@gmail.com" },
     ],
   },
   {

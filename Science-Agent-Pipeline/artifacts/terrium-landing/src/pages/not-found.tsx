@@ -173,10 +173,10 @@ export default function NotFound() {
         <p className="text-center text-[10px] text-white/15 mt-4 font-mono">
           exit code 404 —{" "}
           <a
-            href="mailto:hello@terrium.app"
+            href="mailto:admin.terrium@gmail.com"
             className="text-white/25 hover:text-white/50 transition-colors"
           >
-            hello@terrium.app
+            admin.terrium@gmail.com
           </a>
         </p>
       </motion.div>
