@@ -30,6 +30,7 @@ import math
 import pytest
 
 from Terium.compose.timeseries import (
+    DEPLETION_FRACTION, depletion,
     AGREEMENT_TOLERANCE, DECAYING, ENVELOPE_RESOLUTION, GROWING,
     MINIMUM_CYCLES, MINIMUM_SAMPLES_PER_PERIOD, NYQUIST_SAMPLES_PER_PERIOD,
     RISE_HIGH_FRACTION, RISE_LOW_FRACTION, SETTLING_BAND, SUSTAINED,
@@ -905,3 +906,99 @@ class TestTheRepressilator:
         assert reading.damping.verdict == DECAYING
         assert reading.damping.per_cycle_ratio < 1.0 - SETTLING_BAND
         assert not reading.methods_agree
+
+
+class TestDepletion:
+    """The reading `assumptions.py` asks for and could not take itself.
+
+    That module is structural on purpose: it can see a substrate is
+    consumed and never replenished -- which is what a closed batch assay IS
+    -- and returns UNDECIDED because whether the saturable law still holds
+    depends entirely on the window simulated. Its message said "simulate
+    and look", which was correct and not callable, and it carried the
+    threshold for a check it never ran.
+    """
+
+    @staticmethod
+    def _decaying(rate=0.97, n=101, step=0.1, start=10.0):
+        times = [i * step for i in range(n)]
+        return Series.of(times, [start * rate ** i for i in range(n)], name="S")
+
+    def test_the_crossing_time_matches_the_analytic_one(self) -> None:
+        """10 * 0.97^i = 1 at i = ln(0.1)/ln(0.97).
+
+        Linear interpolation on an exponential lands slightly late, which
+        is why this asserts a tolerance rather than equality -- but it is a
+        tolerance on a number computed independently, not a band drawn
+        around whatever the code returned.
+        """
+        expected = 0.1 * math.log(0.1) / math.log(0.97)
+        reading = depletion(self._decaying(), "S")
+        assert reading.crossed_at == pytest.approx(expected, rel=2e-3)
+
+    def test_a_consumed_pool_is_depleted(self) -> None:
+        reading = depletion(self._decaying(), "S")
+        assert reading.depleted
+        assert reading.remaining_fraction == pytest.approx(0.97 ** 100)
+        assert "wrong by an order of magnitude" in reading.describe()
+
+    def test_a_pool_that_holds_up_is_not(self) -> None:
+        times = [i * 0.1 for i in range(101)]
+        series = Series.of(times, [10.0 - 0.01 * i for i in range(101)], "S")
+        reading = depletion(series, "S")
+        assert not reading.depleted
+        assert reading.crossed_at is None
+        assert reading.remaining_fraction == pytest.approx(0.9)
+
+    def test_a_pool_that_dips_and_recovers_is_not_depleted(self) -> None:
+        """`depleted` reads the END, not the minimum.
+
+        A regenerating pool that dips below the line and comes back has not
+        been consumed, and calling it spent would misreport exactly the
+        systems -- feedback, replenishment -- this package is for. The dip
+        is still reported, as `crossed_at`.
+        """
+        times = [0.0, 1.0, 2.0, 3.0]
+        series = Series.of(times, [10.0, 0.5, 5.0, 9.0], "S")
+        reading = depletion(series, "S")
+        assert not reading.depleted
+        assert reading.crossed_at is not None, "the dip is still reported"
+        assert reading.remaining_fraction == pytest.approx(0.9)
+
+    def test_a_pool_that_started_empty_is_undecidable(self) -> None:
+        # Not "fully depleted": dividing by zero to reach that verdict
+        # would invent a ratio, and a pool that was never there has not
+        # been consumed.
+        reading = depletion(Series.of([0.0, 1.0], [0.0, 0.0], "S"), "S")
+        assert reading.undecidable
+        assert reading.remaining_fraction is None
+        assert not reading.depleted
+        assert "never there" in reading.describe()
+
+    def test_the_fraction_is_reported_next_to_the_verdict(self) -> None:
+        # The verdict is a judgement against a threshold; the fraction is a
+        # measurement. A reader who disagrees with the line needs the
+        # number, and one who only got a boolean cannot argue with it.
+        reading = depletion(self._decaying(), "S")
+        assert reading.remaining_fraction is not None
+        assert reading.threshold == DEPLETION_FRACTION
+        assert f"{100.0 * reading.remaining_fraction:.3g}%" in reading.describe()
+
+    @pytest.mark.parametrize("threshold", [0.0, 1.0, 1.5, -0.1])
+    def test_a_threshold_that_states_nothing_is_refused(self, threshold) -> None:
+        # 0 can never be crossed; 1 or more is crossed by any pool that is
+        # consumed at all. Neither says anything about the trajectory.
+        with pytest.raises(TimeSeriesRefused):
+            depletion(self._decaying(), "S", threshold=threshold)
+
+    def test_the_threshold_is_movable(self) -> None:
+        # Both sides of the same trajectory, which is what makes the
+        # default a choice rather than a constant of nature.
+        series = self._decaying()
+        assert depletion(series, "S", threshold=0.5).depleted
+        assert not depletion(series, "S", threshold=1e-4).depleted
+
+    def test_an_empty_window_is_refused_not_answered(self) -> None:
+        series = self._decaying()
+        with pytest.raises(TimeSeriesRefused):
+            depletion(series, "S", after=1e6)

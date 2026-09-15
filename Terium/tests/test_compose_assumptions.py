@@ -93,7 +93,42 @@ class TestCompositionBreaksWhatIsolationDoesNot:
             f for f in report.findings if f.condition == "substrate_pool_holds"
         )
         assert "closed batch assay" in depletion.detail
-        assert "still well above its Km at the end" in depletion.detail
+        # It names the reading to take, not just the fact that one exists.
+        # "simulate and look" was advice; this is a call, with the species
+        # already filled in.
+        assert "timeseries.depletion(trajectory," in depletion.detail
+        assert "how much of the pool is left" in depletion.detail
+
+    def test_the_named_reading_exists_and_takes_that_species(self) -> None:
+        """The message would be worse than vague if the call were wrong.
+
+        A refusal that names a function nobody can call is a dead end
+        dressed as a next step, and the reader finds out by typing it.
+        """
+        import inspect
+
+        from Terium.compose import timeseries
+
+        assert hasattr(timeseries, "depletion")
+        parameters = inspect.signature(timeseries.depletion).parameters
+        assert list(parameters)[:2] == ["source", "species"], parameters
+
+    def test_this_module_no_longer_exports_a_threshold_it_cannot_apply(
+        self,
+    ) -> None:
+        """DEPLETION_FRACTION lived here and nothing read it.
+
+        A documented, exported threshold that no code applies reads as a
+        rule in force. This module is structural and never simulates, so it
+        could not have applied it; the threshold belongs with the reading
+        that uses it.
+        """
+        from Terium.compose import assumptions, timeseries
+
+        assert not hasattr(assumptions, "DEPLETION_FRACTION")
+        assert "DEPLETION_FRACTION" not in assumptions.__all__
+        assert timeseries.DEPLETION_FRACTION == 0.1
+        assert "DEPLETION_FRACTION" in timeseries.__all__
 
     def test_the_consequence_is_still_stated_for_a_reader(self) -> None:
         # Undecided does not mean unimportant: the reader still needs to
