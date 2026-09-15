@@ -330,9 +330,52 @@ def _as_per_second(value: float, unit: str) -> Optional[float]:
     return None if factor is None else value * factor
 
 
-def _is_second_order(unit: str) -> bool:
+#: Second-order association units, as a (concentration prefix, remainder)
+#: split. `1/(mM*s)` is the form the motif library actually emits, and the
+#: original matcher looked only for the unprefixed molar spellings -- so
+#: the one hard physical law in this module never ran on any model the
+#: composer builds. See `_as_per_molar_per_second`.
+_SECOND_ORDER_SHAPES = (
+    "/{c}/s", "/{c}s", "{c}^-1s^-1", "{c}^-1*s^-1",
+    "1/({c}*s)", "1/({c}s)", "1/{c}/s",
+)
+
+
+def _second_order_concentration(unit: str) -> Optional[str]:
+    """The concentration unit in a second-order rate, or None.
+
+    `1/(mM*s)` -> "mM". Returned rather than a bool because the CALLER
+    has to convert: a limit stated per molar cannot be compared against a
+    value stated per millimolar, and those differ by a thousand -- which
+    is the exact mistake this module exists to catch, made by this module.
+    """
     cleaned = unit.replace(" ", "")
-    return "/M/s" in cleaned or "M^-1s^-1" in cleaned or "1/(M*s)" in cleaned
+    for concentration in _TO_MOLAR:
+        for shape in _SECOND_ORDER_SHAPES:
+            if shape.format(c=concentration) in cleaned:
+                return concentration
+    return None
+
+
+def _as_per_molar_per_second(value: float, unit: str) -> Optional[float]:
+    """A second-order rate in /M/s, whatever concentration unit it used.
+
+    A rate per MILLIMOLAR is a thousand times larger per MOLAR: 1 /(mM*s)
+    is 1e3 /(M*s), because the same rate is being divided by a
+    concentration a thousand times smaller. Getting this backwards turns
+    the diffusion-limit check into one that passes values a thousandfold
+    over it.
+    """
+    concentration = _second_order_concentration(unit)
+    if concentration is None:
+        return None
+    # value / [concentration] / s, expressed per molar: divide by the
+    # factor that converts that concentration TO molar.
+    return value / _TO_MOLAR[concentration]
+
+
+def _is_second_order(unit: str) -> bool:
+    return _second_order_concentration(unit) is not None
 
 
 # ---------------------------------------------------------------------------
@@ -416,8 +459,9 @@ def _check_affinity(name: str, value: float, unit: str) -> List[Finding]:
 def _check_rate(name: str, value: float, unit: str) -> List[Finding]:
     findings: List[Finding] = []
 
-    if _is_second_order(unit):
-        if value > DIFFUSION_LIMIT_PER_MOLAR_PER_SECOND:
+    per_molar_per_second = _as_per_molar_per_second(value, unit)
+    if per_molar_per_second is not None:
+        if per_molar_per_second > DIFFUSION_LIMIT_PER_MOLAR_PER_SECOND:
             findings.append(Finding(
                 parameter=name, value=value, unit=unit, severity=ERROR,
                 against=(
@@ -425,9 +469,10 @@ def _check_rate(name: str, value: float, unit: str) -> List[Finding]:
                     f"~{DIFFUSION_LIMIT_PER_MOLAR_PER_SECOND:g} /M/s"
                 ),
                 detail=(
-                    "faster than two molecules in water can find each "
-                    "other. Nothing associates this fast; the Smoluchowski "
-                    "limit is a property of diffusion, not of the protein"
+                    f"{per_molar_per_second:g} /M/s -- faster than two "
+                    "molecules in water can find each other. Nothing "
+                    "associates this fast; the Smoluchowski limit is a "
+                    "property of diffusion, not of the protein"
                 ),
             ))
         return findings
