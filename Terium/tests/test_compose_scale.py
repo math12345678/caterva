@@ -817,3 +817,115 @@ class TestTheDiffusionLimitActuallyRuns:
         # constant in the library would be measured against diffusion.
         for unit in ("1/s", "/s", "s^-1", "1/min"):
             assert not _is_second_order(unit), unit
+
+
+class TestNegativeIsNotPhysicallyPossible:
+    """`physically_possible` used to answer yes about a negative Km.
+
+    Each check compared against an UPPER bound only, and `_check_rate`
+    returned early on a non-positive value -- so a negative rate constant,
+    a negative concentration and a negative affinity all passed the
+    module whose one job is to say whether a number breaks a physical law.
+    `_check_exponent` already refused a non-positive Hill coefficient, so
+    the bound was in the file; it was applied to one of the four kinds.
+
+    Zero stays allowed. `perturbation.catalytically_dead` produces exactly
+    a zero rate, and an absent species is zero, so a check that refused
+    zero would reject the deliberate experiments this package supports.
+    """
+
+    @staticmethod
+    def _one(value, unit):
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        return check(ReactionNetwork(
+            name="one",
+            species=(Species("X", 0.0),),
+            parameters=(Parameter("k", value, unit),),
+            reactions=(Reaction("r", {}, {"X": 1}, "k * X"),),
+        ))
+
+    @pytest.mark.parametrize("unit", ["1/s", "mM", "1/(mM*s)", "mM/s"])
+    def test_a_negative_value_is_an_error(self, unit) -> None:
+        report = self._one(-5.0, unit)
+        assert not report.physically_possible, unit
+        assert report.errors[0].severity == ERROR
+        assert "negative" in report.errors[0].detail, unit
+
+    def test_a_dimensionless_negative_keeps_the_sharper_message(self) -> None:
+        """`_check_exponent` says something this check cannot.
+
+        A Hill coefficient below ONE is negative cooperativity, which is
+        real, so the interesting boundary for an exponent is one rather
+        than zero. The generic message would be true and less useful, and
+        replacing a specific diagnosis with a generic one is a loss even
+        when both are errors.
+        """
+        report = self._one(-2.0, "dimensionless")
+        assert not report.physically_possible
+        assert "BELOW one, not below zero" in report.errors[0].detail
+
+    def test_it_reaches_units_with_no_converter(self) -> None:
+        """The reason it runs before the unit dispatch.
+
+        `mM/s` is a zero-order synthesis rate and `scale` has no converter
+        for it, so those parameters are reported unchecked. Negativity
+        needs no converter -- the sign of a number is readable without
+        knowing what it measures -- and a check placed after the dispatch
+        would have skipped every one of them.
+        """
+        report = self._one(-1.0, "mM/s")
+        assert not report.physically_possible
+        assert "negative" in report.errors[0].detail
+        assert "k" in report.checked, "it was examined, so say so"
+
+    def test_zero_is_allowed(self) -> None:
+        # A dead mutant IS a zero rate. Refusing zero would reject the
+        # perturbation this package offers.
+        assert self._one(0.0, "1/s").physically_possible
+        assert self._one(0.0, "mM").physically_possible
+
+    def test_a_positive_value_is_unaffected(self) -> None:
+        assert self._one(5.0, "1/s").physically_possible
+        assert self._one(0.1, "mM").physically_possible
+
+    def test_a_hill_coefficient_keeps_its_stricter_rule(self) -> None:
+        # Zero is fine for a rate and wrong for an exponent: a Hill
+        # coefficient of zero makes the response flat, which is not a
+        # weaker version of cooperativity but the absence of a response.
+        assert not self._one(0.0, "dimensionless").physically_possible
+        assert self._one(0.0, "1/s").physically_possible
+
+    def test_a_finding_means_the_parameter_was_examined(self) -> None:
+        """The report must not contradict itself.
+
+        A non-finite parameter produced an error and was not recorded in
+        `checked`, so `coverage` read "nothing was examined" while the
+        error sat in the same report. The partition test did not catch it
+        because it runs over library models, where nothing is non-finite.
+        """
+        for value, unit in (
+            (float("nan"), "1/s"), (-5.0, "1/s"), (-1.0, "mM/s"),
+        ):
+            report = self._one(value, unit)
+            assert report.findings, (value, unit)
+            assert not report.examined_nothing, (
+                value, unit, "a report with a finding examined something",
+            )
+            assert "k" in report.checked, (value, unit)
+
+    def test_no_library_model_is_made_impossible_by_this(self) -> None:
+        # The cry-wolf direction. A bound that fired on real models would
+        # stop being read, and every motif default is positive.
+        for query in (
+            "three step phosphorylation cascade",
+            "repressilator oscillations",
+            "reversible binding of a ligand to a receptor",
+            "an open system with constant substrate inflow",
+        ):
+            report = check_model(compose(query))
+            assert report.physically_possible, (
+                query, [f.describe() for f in report.errors],
+            )

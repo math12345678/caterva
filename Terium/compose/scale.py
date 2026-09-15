@@ -637,11 +637,60 @@ def check(
         )
 
         if not math.isfinite(value):
+            # Recorded as EXAMINED: finding it non-finite is the
+            # examination. Without this the report says "nothing was
+            # examined" while carrying the error it just produced.
+            checked.append(name)
             findings.append(Finding(
                 parameter=name, value=value, unit=unit or "unknown",
                 severity=ERROR,
                 against="the finite numbers",
                 detail="not a finite value, so nothing downstream can use it",
+            ))
+            continue
+
+        if value < 0.0 and unit.strip() != "dimensionless":
+            # NEEDS NO UNIT, WHICH IS WHY IT RUNS BEFORE THE DISPATCH.
+            #
+            # `dimensionless` is excluded because `_check_exponent` already
+            # refuses a non-positive Hill coefficient AND says something
+            # sharper about it -- a Hill coefficient below one is
+            # NEGATIVE cooperativity and a real thing, so the interesting
+            # boundary there is one rather than zero. Intercepting it here
+            # would replace a specific diagnosis with a generic one, which
+            # is a loss even though both are errors.
+            #
+            # Every quantity this module sees is a rate constant, a
+            # concentration, an affinity or an exponent, and none of them
+            # is negative: a rate constant is a proportionality between
+            # non-negative amounts, a concentration is molecules per
+            # volume, and an affinity is a concentration. Zero is allowed
+            # and meaningful -- `perturbation.catalytically_dead` produces
+            # exactly a zero rate, and an absent species is zero.
+            #
+            # `_check_exponent` already refused a non-positive Hill
+            # coefficient. This is that same bound, applied to the other
+            # three kinds, which were letting negatives through silently:
+            # each check compared against an UPPER limit only, and
+            # `_check_rate` returned early on a non-positive value. So
+            # `physically_possible` answered yes about a negative
+            # concentration.
+            #
+            # Placing it before the unit dispatch also means it reaches
+            # parameters whose unit has no converter -- `mM/s` among them
+            # -- which are otherwise reported unchecked entirely.
+            checked.append(name)
+            findings.append(Finding(
+                parameter=name, value=value, unit=unit or "unknown",
+                severity=ERROR,
+                against="zero, below which none of these quantities exists",
+                detail=(
+                    "negative. A rate constant, a concentration and an "
+                    "affinity are all non-negative by what they are; zero "
+                    "is allowed and means absent or inactive. A negative "
+                    "one is a sign error, and it integrates without "
+                    "complaint into a trajectory that runs backwards"
+                ),
             ))
             continue
 
