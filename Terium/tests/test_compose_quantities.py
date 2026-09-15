@@ -667,28 +667,30 @@ class TestScaleStillWorksThroughThis:
             "the premise: something the library writes is still outside "
             "scale's converters"
         )
-        assert set(remaining) == {"mM/s", "1/(mM*s)"}, remaining
+        # `1/(mM*s)` left this set when the diffusion limit was fixed to
+        # recognise prefixed second-order units. `mM/s` -- a zero-order
+        # synthesis rate -- is the remaining gap, and it is a converter
+        # `scale` does not have rather than a unit this table cannot read.
+        assert set(remaining) == {"mM/s"}, remaining
         # Both read perfectly well here, so what is missing over there is a
         # converter and not the provenance.
         assert dimension_of("mM/s") == DIMENSION_CONCENTRATION_PER_TIME
         assert dimension_of("1/(mM*s)") == DIMENSION_PER_CONCENTRATION_PER_TIME
 
-    def test_the_diffusion_limit_never_fires_on_a_library_model(self) -> None:
-        """A defect this work surfaced, RECORDED rather than fixed here.
+    def test_the_diffusion_limit_now_fires_on_a_library_model(self) -> None:
+        """The tripwire that used to sit here has done its job.
 
-        `scale.DIFFUSION_LIMIT_PER_MOLAR_PER_SECOND` is that module's
-        headline physical bound, and `_is_second_order` decides when to
-        apply it by looking for `/M/s`, `M^-1s^-1` or `1/(M*s)` in the unit
-        string. Every second-order constant the motif libraries declare is
-        written `1/(mM*s)`, which matches none of those -- so the constant
-        is reported UNCHECKED and the diffusion limit has never fired on a
-        model this repository can build.
+        It asserted the OPPOSITE -- that `_is_second_order` did not match
+        the `1/(mM*s)` every motif library writes, so the diffusion limit
+        had never fired on any model this repository can build. It carried
+        its own retirement instruction: when it goes red, delete it and
+        assert the bound instead. It went red, and this is the assertion it
+        asked for.
 
-        Not fixed in this commit: it changes what `scale.check` reports and
-        belongs with its own tests in `test_compose_scale.py`. Recorded so
-        that it is visible rather than merely true. WHEN IT IS FIXED THIS
-        TEST GOES RED -- delete it then; it exists to make the gap
-        impossible to forget, not to defend it.
+        Kept in this file rather than moved wholesale to
+        test_compose_scale.py because the point HERE is the one the
+        original made: the unit reads perfectly well through the quantity
+        table, so the gap was never in the provenance.
         """
         from Terium.compose.library import REVERSIBLE_BINDING
         from Terium.compose.scale import _is_second_order, check
@@ -702,11 +704,9 @@ class TestScaleStillWorksThroughThis:
             if q.dimension == DIMENSION_PER_CONCENTRATION_PER_TIME
         ]
         assert second_order, "the premise: this motif has a second-order step"
-        assert not _is_second_order(second_order[0].unit), (
-            "fixed -- delete this test and assert the bound instead"
-        )
+        assert _is_second_order(second_order[0].unit), second_order[0].unit
 
-        # Faster than anything in water can associate, and unremarked.
+        # Faster than anything in water can associate, and now remarked on.
         network = replace(
             composition.to_network(),
             parameters=tuple(
@@ -715,8 +715,9 @@ class TestScaleStillWorksThroughThis:
             ),
         )
         report = check(network, units=table.parameter_units())
-        assert second_order[0].id in report.unchecked
-        assert not report.errors
+        assert second_order[0].id not in report.unchecked
+        assert report.errors, "an impossible association rate went unremarked"
+        assert "diffusion limit" in report.errors[0].against
 
 
 class TestWhatTheTableSaysAboutItself:

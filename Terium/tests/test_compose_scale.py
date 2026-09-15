@@ -29,6 +29,9 @@ from Terium.compose.scale import (
     TOTAL_CELLULAR_PROTEIN_MOLAR, TYPICAL_KCAT_RANGE_PER_SECOND, Finding,
     ScaleReport, check, check_model,
 )
+from Terium.compose.scale import (
+    _as_per_molar_per_second, _check_rate, _is_second_order,
+)
 
 
 #: What the catalytic-step motif declares. Kept explicit so these tests
@@ -734,3 +737,83 @@ class TestTheDimensionalCheckSaysWhatItLookedAt:
             recognition = _Recognition()
 
         return _Model()
+
+
+class TestTheDiffusionLimitActuallyRuns:
+    """The one hard physical law in this module, on no model at all.
+
+    `DIFFUSION_LIMIT_PER_MOLAR_PER_SECOND` is the Smoluchowski bound: two
+    molecules in water cannot find each other faster than diffusion allows,
+    and unlike every other constant in this file that is a property of
+    water rather than an observation about enzymes. It is the strongest
+    claim the module makes.
+
+    It never ran. `_is_second_order` matched `/M/s`, `M^-1s^-1` and
+    `1/(M*s)`, and the motif library emits `1/(mM*s)` -- so the only
+    second-order constant the composer produces fell through to
+    `unchecked`, reported honestly and never examined.
+
+    Underneath that sat a worse one. The comparison comes AFTER the match,
+    and it compared the stated value against a limit expressed per MOLAR
+    with no conversion. A kon in per-millimolar is a thousand times larger
+    per molar, so had the match ever succeeded, the check would have passed
+    values a thousandfold over the limit -- which is the precise error this
+    module was written to catch, committed by this module.
+    """
+
+    def test_the_library_kon_is_recognised(self) -> None:
+        model = compose("reversible binding of a ligand to a receptor")
+        kon = next(
+            p for p in model.network.parameters if p.id.endswith("_kon")
+        )
+        assert kon.unit == "1/(mM*s)", "the library changed its unit"
+        assert _is_second_order(kon.unit)
+
+    def test_the_binding_model_no_longer_skips_its_kon(self) -> None:
+        report = check_model(
+            compose("reversible binding of a ligand to a receptor")
+        )
+        assert not report.unchecked, dict(report.unchecked)
+        assert any(n.endswith("_kon") for n in report.checked)
+
+    def test_a_millimolar_rate_converts_up_by_a_thousand(self) -> None:
+        # 1 /(mM*s) is 1e3 /(M*s): the same rate divided by a concentration
+        # a thousand times smaller. Backwards here is a thousandfold hole.
+        assert _as_per_molar_per_second(1.0, "1/(mM*s)") == pytest.approx(1e3)
+        assert _as_per_molar_per_second(1.0, "1/(uM*s)") == pytest.approx(1e6)
+        assert _as_per_molar_per_second(1.0, "1/(M*s)") == pytest.approx(1.0)
+        assert _as_per_molar_per_second(1.0, "1/s") is None
+
+    def test_an_impossible_kon_in_millimolar_is_caught(self) -> None:
+        """The case that motivated all of this.
+
+        1e8 /(mM*s) is 1e11 /(M*s), ten times the diffusion limit. Before
+        the fix this produced no finding at all -- first because the unit
+        did not match, and then, had it matched, because 1e8 is smaller
+        than the 1e10 limit it would have been compared against.
+        """
+        findings = _check_rate("complex_kon", 1e8, "1/(mM*s)")
+        assert len(findings) == 1
+        assert findings[0].severity == ERROR
+        assert "diffusion limit" in findings[0].against
+        # And it reports the CONVERTED value, so the reader can check it.
+        assert "1e+11" in findings[0].detail
+
+    def test_a_possible_kon_in_millimolar_is_not_caught(self) -> None:
+        # The bound has to let real association constants through, or it
+        # would flag every binding model in the library.
+        assert _check_rate("complex_kon", 1.0, "1/(mM*s)") == []
+        assert _check_rate("complex_kon", 1e6, "1/(mM*s)") == []
+
+    def test_the_molar_spellings_still_work(self) -> None:
+        # The forms that DID match must keep matching, unconverted.
+        for unit in ("1/(M*s)", "/M/s", "M^-1s^-1"):
+            assert _is_second_order(unit), unit
+            assert _check_rate("k", 1e11, unit), unit
+            assert _check_rate("k", 1e6, unit) == [], unit
+
+    def test_a_first_order_rate_is_not_read_as_second_order(self) -> None:
+        # `1/s` must not match any second-order shape, or every rate
+        # constant in the library would be measured against diffusion.
+        for unit in ("1/s", "/s", "s^-1", "1/min"):
+            assert not _is_second_order(unit), unit
