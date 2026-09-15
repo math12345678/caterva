@@ -316,12 +316,23 @@ class TestARefusalDoesNotLoseTheRest:
         assert "E + S -> ES" in saturating_report.out
 
     def test_a_later_section_still_answered(self, saturating_report) -> None:
-        # --scale comes after --crnt and has nothing to do with kinetics.
+        """--scale comes after --crnt and has nothing to do with kinetics.
+
+        The heading alone is not enough: an empty section under a present
+        heading is what a swallowed refusal looks like. So this reads the
+        verdict, and the verdict now carries the COUNT of numbers examined
+        -- `scale.summary()` refuses a clean sentence over a model nothing
+        looked at, and a heading followed by "nothing was examined" would
+        be the failure this test is here to catch.
+        """
+        import re
+
         assert "## Physical scale" in saturating_report.out
-        assert (
-            "Every checked number is physically possible"
-            in saturating_report.out
-        )
+        assert re.search(
+            r"All \d+ of the numbers examined are physically possible",
+            saturating_report.out,
+        ), "the scale section produced no verdict"
+        assert "NOTHING WAS EXAMINED" not in saturating_report.out
 
     def test_the_last_section_still_answered(self, saturating_report) -> None:
         # --validate runs after --stochastic declined. If a refusal aborted

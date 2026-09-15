@@ -689,10 +689,12 @@ def dose_unit_of(model: Any) -> Optional[str]:
     """The unit a dose -- and so an EC50 fitted to it -- is in.
 
     RECOVERED, NOT ASSUMED, from two places because neither is sufficient.
-    `core.network.Species` carries an amount and no unit at all, and
-    `core.network.Parameter` carries a value and no unit either: a motif
-    declares the unit on its `MotifParameter` and the builder drops it when
-    it emits the network. `scale.units_from_model` is what gets it back.
+    `core.network.Species` carries an amount and no unit at all -- a dose
+    IS a species concentration, so that gap is the one that matters here.
+    `core.network.Parameter` DOES carry its unit now, populated by the
+    builder from the motif that declared it, so a composed network
+    describes its own constants; `scale.units_from_model` remains the
+    fallback for a network built outside the composer, which carries none.
 
     The composition declares one concentration unit for the whole model and
     that is the authority for a dose, because a dose IS a species

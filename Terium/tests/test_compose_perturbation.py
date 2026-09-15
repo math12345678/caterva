@@ -365,3 +365,87 @@ class TestMultistabilityIsRefusedRatherThanAveraged:
         effect = effect_on(perturbation, network, "geneA_X")
         assert effect.fold_change is None
         assert "stable states" in effect.note
+
+
+class TestNoUnitIsNotTheWrongUnit:
+    """`Parameter.unit` defaults to "", which means NOT RECORDED.
+
+    `catalytically_dead` tested `unit is None` and an empty string is not
+    None, so a composed parameter carrying no unit fell past that check
+    into the rate test and came back as:
+
+        k has unit '', which is not a rate
+
+    That tells the author their unit is the wrong one when the truth is
+    that there isn't one, and the two need different fixes -- record the
+    unit, versus perturb a different parameter. It also made the correct
+    message unreachable for every network the composer produces, since
+    those all carry the field.
+    """
+
+    @staticmethod
+    def _network(unit=None):
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        parameter = (
+            Parameter("k", 1.0) if unit is None else Parameter("k", 1.0, unit)
+        )
+        return ReactionNetwork(
+            name="one_step",
+            species=(Species("X", 1.0),),
+            parameters=(parameter,),
+            reactions=(Reaction("r", {}, {"X": 1}, "k * X"),),
+        )
+
+    def test_an_unrecorded_unit_says_it_was_not_recorded(self) -> None:
+        from Terium.compose.perturbation import (
+            PerturbationRefused, catalytically_dead,
+        )
+
+        with pytest.raises(PerturbationRefused) as raised:
+            catalytically_dead(self._network(), "k")
+        message = str(raised.value)
+        assert "no unit is recorded" in message
+        assert "which is not a rate" not in message, (
+            "an absent unit was reported as a wrong one"
+        )
+
+    def test_a_whitespace_unit_is_also_not_recorded(self) -> None:
+        from Terium.compose.perturbation import (
+            PerturbationRefused, catalytically_dead,
+        )
+
+        with pytest.raises(PerturbationRefused) as raised:
+            catalytically_dead(self._network("   "), "k")
+        assert "no unit is recorded" in str(raised.value)
+
+    def test_a_wrong_unit_still_says_it_is_wrong(self) -> None:
+        # The other half. Collapsing both into "not recorded" would be the
+        # same defect facing the other way.
+        from Terium.compose.perturbation import (
+            PerturbationRefused, catalytically_dead,
+        )
+
+        with pytest.raises(PerturbationRefused) as raised:
+            catalytically_dead(self._network("mM"), "k")
+        message = str(raised.value)
+        assert "has unit 'mM'" in message
+        assert "no unit is recorded" not in message
+
+    def test_a_rate_is_accepted(self) -> None:
+        # And the refusals must not have become unconditional.
+        from Terium.compose.perturbation import catalytically_dead
+
+        assert catalytically_dead(self._network("1/s"), "k") is not None
+
+    def test_the_docstring_no_longer_says_the_ir_lacks_units(self) -> None:
+        """It was true when written and stopped being true today."""
+        from Terium.compose.perturbation import catalytically_dead
+
+        prose = " ".join((catalytically_dead.__doc__ or "").split())
+        assert "has an id and a value and no unit" not in prose
+        assert "carries one now" in prose
+        assert "NOT RECORDED, which is a different thing from dimensionless" \
+            in prose
