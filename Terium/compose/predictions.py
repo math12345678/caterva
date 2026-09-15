@@ -83,6 +83,22 @@ class PredictionRefused(RuntimeError):
 #: would be the module approving what it never read.
 UNEXAMINED = "unexamined"
 
+#: How negative a predicted amount must be before it is a NEGATIVE amount
+#: rather than a zero the root finder reached from below.
+#:
+#: A root finder converging on a species at zero lands at -7e-43 as readily
+#: as at +7e-43, and the first sweep of this module across the library
+#: reported one of those as "the integrator stepped past zero" -- true, and
+#: useless, and exactly the cry-wolf failure ADR 0028 names. A check that
+#: fires on every model with an absent species stops being read.
+#:
+#: The value is `analysis.STATE_DISTINCT_TOLERANCE`, which is what that
+#: module already uses to decide `FixedPoint.physical`, and it is applied
+#: in the STATED unit for the same reason it is there. Duplicated rather
+#: than imported so this module stays free of the analysis stack, with
+#: `test_the_two_tolerances_have_not_drifted` holding them together.
+NEGATIVE_TOLERANCE = 1e-6
+
 POSSIBLE = "possible"
 IMPOSSIBLE = "impossible"
 QUESTIONABLE = "questionable"
@@ -131,6 +147,18 @@ class PredictionReport:
     #: species -> why it was not compared. A state in a unit this module
     #: does not recognise is UNEXAMINED, never assumed to be molar.
     unexamined: Mapping[str, str] = field(default_factory=dict)
+    #: True when `analysis` had ALREADY marked this fixed point
+    #: non-physical -- it has a negative coordinate and that module keeps
+    #: it deliberately, because a negative root is a real property of the
+    #: equations and hiding it makes the positive ones look like the whole
+    #: story.
+    #:
+    #: Carried so a caller can avoid announcing as a new discovery
+    #: something the analysis above it already said. A root finder over a
+    #: competitive-inhibition model returns nineteen fixed points and most
+    #: of them are non-physical; reporting each as a fresh impossibility
+    #: is the wall of findings ADR 0028 warns about.
+    already_flagged_nonphysical: bool = False
 
     @property
     def impossible(self) -> Tuple[Excess, ...]:
@@ -248,7 +276,7 @@ def _one_species(
     if molar is None:
         return None, False
 
-    if value < 0.0:
+    if value < -NEGATIVE_TOLERANCE:
         return Excess(
             species=name, value=value, unit=unit, molar=molar, severity=ERROR,
             against="zero, below which a concentration does not exist",
@@ -275,6 +303,13 @@ def _one_species(
             ),
             at_time=at_time,
         ), True
+
+    if value < 0.0:
+        # Between -NEGATIVE_TOLERANCE and zero: a root finder's zero.
+        # Examined and found fine, NOT reported -- and deliberately not
+        # passed to the sub-molecular check below either, which would
+        # otherwise flag every absent species in every model.
+        return None, True
 
     if 0.0 < molar < ONE_MOLECULE_PER_BACTERIUM_MOLAR:
         molecules = molar / ONE_MOLECULE_PER_BACTERIUM_MOLAR
@@ -370,14 +405,25 @@ def check_steady_states(
             "searched, not to this module."
         )
 
-    return tuple(
-        check_state(
+    reports: List[PredictionReport] = []
+    for index, point in enumerate(points):
+        flagged = not getattr(point, "physical", True)
+        suffix = (
+            " (already non-physical per the analysis)" if flagged else ""
+        )
+        base = check_state(
             getattr(point, "state", {}) or {},
             unit=unit,
-            subject=f"steady state {index + 1} of {len(points)}",
+            subject=f"steady state {index + 1} of {len(points)}{suffix}",
         )
-        for index, point in enumerate(points)
-    )
+        reports.append(PredictionReport(
+            subject=base.subject,
+            findings=base.findings,
+            examined=base.examined,
+            unexamined=base.unexamined,
+            already_flagged_nonphysical=flagged,
+        ))
+    return tuple(reports)
 
 
 def check_trajectory(
@@ -488,4 +534,5 @@ __all__ = [
     "Excess", "PredictionRefused", "PredictionReport",
     "check_state", "check_steady_states", "check_trajectory",
     "IMPOSSIBLE", "POSSIBLE", "QUESTIONABLE", "UNEXAMINED", "VERDICTS",
+    "NEGATIVE_TOLERANCE",
 ]
