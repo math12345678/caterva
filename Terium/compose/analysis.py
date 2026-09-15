@@ -429,39 +429,46 @@ def _search_scale(network: Any) -> List[float]:
     the failure was silent: not a refusal, a confident "no stable state
     was found from N starting points".
 
-    WHERE THE SCALE COMES FROM, IN ORDER
+    ONE SCALE FOR THE WHOLE MODEL, NOT ONE PER SPECIES.
 
-    A species' own initial amount, when it has one. That is the user's own
-    statement about the size of the thing.
+    The first version of this fix used each species' OWN initial amount,
+    and a test caught it: in the library toggle switch geneB starts at 0.1
+    and settles at 1.995, so a search anchored at 0.1 never reached the
+    state. An initial amount is where a species STARTS. It is not an
+    estimate of where it ends up, and treating it as one is a worse error
+    than the floor it replaced -- the old `max(initial, 1.0)` at least
+    bracketed both states by accident.
 
-    Otherwise the model's concentration-valued PARAMETERS -- a Km, a Kd, a
-    half-repression constant. Those set the scale of whatever species
-    appears beside them in a rate law: a Hill term is `K^n / (K^n + R^n)`,
-    so R is interesting exactly where it is comparable to K. This is the
-    reason `core.network.Parameter` carries a unit at all; without it the
-    network could not say which of its constants were concentrations.
+    So every species is searched at the same magnitude: the largest
+    concentration the model states anywhere. Starts are spread over
+    decades around it, and overshooting costs far less than undershooting
+    -- undershooting is the failure this whole function exists to fix.
+
+    WHAT COUNTS AS THE MODEL STATING A CONCENTRATION
+
+    Species initial amounts, and concentration-valued PARAMETERS: a Km, a
+    Kd, a half-repression constant. Those set the scale of whatever
+    species sits beside them in a rate law -- a Hill term is
+    `K^n / (K^n + R^n)`, so R matters exactly where it is comparable to K.
+    This is what `core.network.Parameter` carrying a unit is FOR; without
+    it the network cannot say which of its constants are concentrations.
 
     Only then 1.0, and only because a model that states no concentration
     anywhere has given nothing better to go on.
     """
-    initials = [abs(float(getattr(s, "initial", 0.0))) for s in network.species]
+    stated: List[float] = [
+        abs(float(getattr(s, "initial", 0.0))) for s in network.species
+    ]
 
-    declared: List[float] = []
     for parameter in getattr(network, "parameters", ()):
         unit = str(getattr(parameter, "unit", "") or "").strip()
         value = abs(float(getattr(parameter, "value", 0.0)))
         if unit in _CONCENTRATION_UNITS and value > 0.0:
-            declared.append(value)
+            stated.append(value)
 
-    # The largest declared concentration, not the mean: a steady state can
-    # sit well above the affinity that shapes it, and a search anchored at
-    # the smallest constant would never reach it. Starts are spread over
-    # decades around this anyway, so overshooting costs less than
-    # undershooting.
-    from_parameters = max(declared) if declared else None
-
-    floor = from_parameters if from_parameters is not None else 1.0
-    return [initial if initial > 0.0 else floor for initial in initials]
+    positive = [value for value in stated if value > 0.0]
+    magnitude = max(positive) if positive else 1.0
+    return [magnitude] * len(network.species)
 
 
 def analyse(
