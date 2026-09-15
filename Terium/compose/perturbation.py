@@ -273,25 +273,36 @@ def catalytically_dead(
     zero makes an enzyme infinitely avid rather than inactive, which is the
     opposite of the intended perturbation.
 
-    THE UNIT HAS TO COME FROM SOMEWHERE, AND THE IR DOES NOT CARRY IT.
-    `core.network.Parameter` has an id and a value and no unit, so the
-    network alone cannot say whether a constant is a rate or an affinity --
-    the same gap `compose/scale.py` documents. Pass `unit=`, or use
-    `dead_mutant` which recovers it from the model's own motifs. Guessing
-    from the name would be the fabrication this project refuses: a model
-    whose author called a rate constant `Kcat_app` and an affinity `k_m`
-    would get the opposite perturbation, silently.
+    THE UNIT HAS TO COME FROM SOMEWHERE. `core.network.Parameter` carries
+    one now, populated by the builder from the motif that declared it, so a
+    COMPOSED network answers this itself. A network built outside the
+    composer does not, and neither does a parameter whose unit was never
+    recorded -- the field's empty string means NOT RECORDED, which is a
+    different thing from dimensionless. For those, pass `unit=` or use
+    `dead_mutant`, which recovers it from the model's own motifs.
+
+    Guessing from the name would be the fabrication this project refuses: a
+    model whose author called a rate constant `Kcat_app` and an affinity
+    `k_m` would get the opposite perturbation, silently.
     """
     target = _require_parameter(network, parameter)
     unit = unit if unit is not None else getattr(target, "unit", None)
+    # An empty unit is NOT RECORDED, not "recorded as something unusable".
+    # Without this, a composed parameter with no unit fell through to the
+    # rate check below and was told `has unit '', which is not a rate` --
+    # which states that its unit is the wrong one when the truth is that it
+    # has none, and which made the message below unreachable for every
+    # network the composer produces.
+    if unit is not None and not str(unit).strip():
+        unit = None
     if unit is None:
         raise PerturbationRefused(
             f"no unit is recorded for {parameter}, and this perturbation is "
             f"only meaningful on a rate constant -- zeroing an affinity "
             f"makes an enzyme infinitely avid, which is the opposite "
-            f"experiment. core.network.Parameter carries no unit, so pass "
-            f"unit= or use dead_mutant(model, {parameter!r}), which reads it "
-            f"from the motif that declared it."
+            f"experiment. Pass unit= or use dead_mutant(model, "
+            f"{parameter!r}), which reads it from the motif that declared "
+            f"it."
         )
     unit = str(unit)
     if "/s" not in unit.replace(" ", ""):
