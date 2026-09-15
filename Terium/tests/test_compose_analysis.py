@@ -512,21 +512,74 @@ class TestTheSearchLooksWhereTheModelLives:
         )
         assert _search_scale(network) == [2e-5]
 
-    def test_a_species_with_an_initial_keeps_it(self) -> None:
-        # The user's own statement about the size of the thing wins over
-        # anything inferred from the parameters.
+    def test_the_scale_is_the_same_for_every_species(self) -> None:
+        # One magnitude for the model, not one per species. A search that
+        # used a different scale per coordinate would find a species where
+        # it started rather than where it settles.
         from Terium.compose.analysis import _search_scale
         from Terium.core.network import (
             Parameter, Reaction, ReactionNetwork, Species,
         )
 
         network = ReactionNetwork(
-            name="tiny",
-            species=(Species("X", 7.0),),
+            name="three",
+            species=(
+                Species("A", 0.0), Species("B", 0.001), Species("C", 2.0),
+            ),
+            parameters=(Parameter("Km", 0.5, "mM"),),
+            reactions=(Reaction("r", {}, {"A": 1}, "Km"),),
+        )
+        scale = _search_scale(network)
+        assert len(scale) == 3
+        assert len(set(scale)) == 1, scale
+        assert scale[0] == 2.0, "the largest stated concentration"
+
+    def test_an_initial_amount_is_not_a_per_species_scale(self) -> None:
+        """THE BUG THE FIRST VERSION OF THIS FIX HAD.
+
+        It scaled each species by its OWN initial amount, and the library
+        toggle caught it: geneB starts at 0.1 and settles at 1.995, so a
+        search anchored at 0.1 never reached the state. An initial is
+        where a species STARTS; it is not an estimate of where it ends up.
+
+        Every species is searched at the same magnitude -- the largest
+        concentration the model states anywhere -- so a species that
+        starts small can still be found where it settles large.
+        """
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="two",
+            species=(Species("X", 7.0), Species("Y", 0.1)),
             parameters=(Parameter("Km", 2e-5, "mM"),),
             reactions=(Reaction("r", {}, {"X": 1}, "Km"),),
         )
-        assert _search_scale(network) == [7.0]
+        assert _search_scale(network) == [7.0, 7.0], (
+            "the small species got its own narrow scale"
+        )
+
+    def test_the_library_toggle_is_still_found_at_every_depth(self) -> None:
+        """The regression the per-species version caused, pinned.
+
+        This model's states are at 1.995 and 0.005 while its species start
+        at 1.0 and 0.1. Any scheme that searches geneB near its own
+        starting amount loses one of the two states at shallow depth.
+        """
+        from Terium.compose.pipeline import compose as _compose
+
+        network = _compose(
+            "a toggle switch between two repressors"
+        ).network
+        for depth in (4, 8, 16):
+            stable = [
+                p for p in analyse(
+                    network, starts_per_species=depth
+                ).fixed_points if p.stable
+            ]
+            assert len(stable) == 2, (depth, len(stable))
 
     def test_the_largest_declared_concentration_wins(self) -> None:
         """Not the smallest, and the asymmetry is deliberate.
