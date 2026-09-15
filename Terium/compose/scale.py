@@ -723,10 +723,55 @@ def check(
         else:
             unchecked[name] = f"unit {unit!r} is not one this module recognises"
 
+    # SPECIES GET THE SAME THREE STATES AS PARAMETERS, AND USED NOT TO.
+    #
+    # This loop was `if initial > 0.0:` and nothing else, which is False for
+    # a NEGATIVE amount and False for NaN. Both were skipped entirely --
+    # not checked, not reported unchecked, not counted -- so a species
+    # starting at -5 mM came back `physically_possible == True` from the
+    # module whose one job is to say whether a number breaks a physical
+    # law. A concentration is molecules per volume; there is no such thing
+    # as a negative one, and an integrator handed one propagates it into
+    # every rate law that reads it.
     for species in getattr(network, "species", ()):
         initial = float(getattr(species, "initial", 0.0))
-        if initial > 0.0:
+
+        if not math.isfinite(initial):
             checked.append(species.id)
+            findings.append(Finding(
+                parameter=species.id, value=initial, unit=species_unit,
+                severity=ERROR,
+                against="the finite numbers",
+                detail=(
+                    "not a finite starting amount, so the first step of the "
+                    "integration is undefined and every value after it is "
+                    "too"
+                ),
+            ))
+            continue
+
+        if initial < 0.0:
+            checked.append(species.id)
+            findings.append(Finding(
+                parameter=species.id, value=initial, unit=species_unit,
+                severity=ERROR,
+                against="zero, below which a concentration does not exist",
+                detail=(
+                    "a negative starting amount. A concentration is "
+                    "molecules per volume and cannot be less than none; "
+                    "the integrator will carry it forward without "
+                    "complaint into every rate law that reads this species"
+                ),
+            ))
+            continue
+
+        # Zero is a REAL state -- an absent species, which is most of what a
+        # knockout or a dose-response baseline is -- so it is examined and
+        # found fine rather than skipped. `_check_concentration` has
+        # nothing to say about zero, and recording it here is what keeps
+        # `coverage` from understating what was looked at.
+        checked.append(species.id)
+        if initial > 0.0:
             findings += _check_concentration(species.id, initial, species_unit)
 
     return ScaleReport(

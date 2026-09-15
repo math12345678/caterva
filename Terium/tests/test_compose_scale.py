@@ -929,3 +929,94 @@ class TestNegativeIsNotPhysicallyPossible:
             assert report.physically_possible, (
                 query, [f.describe() for f in report.errors],
             )
+
+
+class TestSpeciesGetTheSameBoundsAsParameters:
+    """A species at -5 mM was physically possible.
+
+    The species loop was `if initial > 0.0:` and nothing else. That is
+    False for a negative amount and False for NaN, so both were skipped
+    ENTIRELY -- not checked, not reported unchecked, not counted in
+    coverage. The module whose one job is to say whether a number breaks a
+    physical law returned True for a concentration below zero.
+
+    The parameters loop had just been given this bound. The species loop
+    sits twenty lines below it and did not.
+    """
+
+    @staticmethod
+    def _with(initial):
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        return check(ReactionNetwork(
+            name="one",
+            species=(Species("X", initial),),
+            parameters=(Parameter("k", 1.0, "1/s"),),
+            reactions=(Reaction("r", {}, {"X": 1}, "k * X"),),
+        ))
+
+    def test_a_negative_starting_amount_is_an_error(self) -> None:
+        report = self._with(-5.0)
+        assert not report.physically_possible
+        assert report.errors[0].parameter == "X"
+        assert "cannot be less than none" in report.errors[0].detail
+
+    def test_a_non_finite_starting_amount_is_an_error(self) -> None:
+        report = self._with(float("nan"))
+        assert not report.physically_possible
+        assert report.errors[0].parameter == "X"
+        assert "first step of the integration is undefined" in (
+            report.errors[0].detail
+        )
+
+    def test_an_absent_species_is_examined_not_skipped(self) -> None:
+        """Zero is a real state, not a missing one.
+
+        A knockout is a species at zero, and so is the baseline of every
+        dose-response. Skipping them made `coverage` understate what had
+        been looked at -- and a report that undercounts its own examination
+        is the same defect as one that overcounts it, facing the other way.
+        """
+        report = self._with(0.0)
+        assert report.physically_possible
+        assert "X" in report.checked
+        assert not report.findings
+
+    def test_a_normal_species_still_passes(self) -> None:
+        report = self._with(1.0)
+        assert report.physically_possible
+        assert "X" in report.checked
+
+    def test_every_library_species_is_counted(self) -> None:
+        """Across the eleven models, no species falls out of the report.
+
+        The partition that already holds for parameters, now for species:
+        each one is examined or skipped, never neither. The old loop
+        dropped any species at zero, which several library models have.
+        """
+        for query in (
+            "three step phosphorylation cascade",
+            "repressilator oscillations",
+            "a toggle switch between two repressors",
+            "reversible binding of a ligand to a receptor",
+            "sequential feedback inhibition in amino acid synthesis",
+        ):
+            model = compose(query)
+            report = check_model(model)
+            names = {s.id for s in model.network.species}
+            missing = names - set(report.checked) - set(report.unchecked)
+            assert not missing, (query, sorted(missing))
+
+    def test_no_library_model_is_made_impossible(self) -> None:
+        # The cry-wolf direction: every library initial is non-negative.
+        for query in (
+            "three step phosphorylation cascade",
+            "repressilator oscillations",
+            "an open system with constant substrate inflow",
+        ):
+            report = check_model(compose(query))
+            assert report.physically_possible, (
+                query, [f.describe() for f in report.errors],
+            )
