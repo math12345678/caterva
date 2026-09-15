@@ -180,6 +180,42 @@ class ScaleReport:
     #: parameter whose unit this module does not recognise is unexamined,
     #: and silence about it would read as approval.
     unchecked: Mapping[str, str] = field(default_factory=dict)
+    #: Names this module actually compared against a bound. The other half
+    #: of the distinction `unchecked` was added for, and the half that was
+    #: missing: `unchecked` records what was SKIPPED, so a report with
+    #: neither findings nor skips is silent about whether it examined
+    #: twelve parameters and found nothing wrong, or examined none at all.
+    #:
+    #: Those are the two most different states this module can be in, and
+    #: until this field existed they printed identically. A composed
+    #: three-tier cascade -- twelve parameters, every unit recognised,
+    #: every value plausible -- returned `ScaleReport(findings=(),
+    #: unchecked={})`, which is byte-for-byte what a `check` over an empty
+    #: network returns.
+    checked: Tuple[str, ...] = ()
+
+    @property
+    def examined_nothing(self) -> bool:
+        """Nothing reached a bound, for any reason.
+
+        Ask this BEFORE `physically_possible`, which is also True here: a
+        report over nothing breaks no law. A clean verdict over an empty
+        examination is the most misleading output this module can produce,
+        and it is the one a caller is least likely to suspect.
+        """
+        return not self.checked and not self.unchecked
+
+    @property
+    def coverage(self) -> str:
+        """One line a caller can print instead of inferring the above."""
+        if self.examined_nothing:
+            return "nothing was examined"
+        if not self.unchecked:
+            return f"{len(self.checked)} examined, none skipped"
+        return (
+            f"{len(self.checked)} examined, {len(self.unchecked)} skipped "
+            "for want of a recognised unit"
+        )
 
     @property
     def errors(self) -> Tuple[Finding, ...]:
@@ -196,15 +232,31 @@ class ScaleReport:
         Deliberately NOT called `valid`. A model can be physically possible
         and biologically absurd, and this says only that nothing in it
         breaks a law.
+
+        It also says nothing about COVERAGE. A report that examined no
+        parameter at all is physically possible, vacuously -- so ask
+        `examined_nothing` first. That is not a hypothetical: before
+        `checked` existed, a twelve-parameter cascade and an empty network
+        produced the same clean report.
         """
         return not self.errors
 
     def summary(self) -> str:
         lines = []
-        if not self.findings:
+        if self.examined_nothing:
+            # The clean sentence below would be true and worthless here.
+            # Saying "every checked number is fine" when none were checked
+            # is the sentence a reader is least equipped to doubt.
             lines.append(
-                f"Every checked number is physically possible and within the "
-                f"ranges these constants describe."
+                "NOTHING WAS EXAMINED. No parameter carried a unit this "
+                "module recognises, so there is no clean bill of health "
+                "here -- only an absence of examination."
+            )
+        elif not self.findings:
+            lines.append(
+                f"All {len(self.checked)} of the numbers examined are "
+                f"physically possible and within the ranges these constants "
+                f"describe."
             )
         else:
             if self.errors:
@@ -529,6 +581,7 @@ def check(
     """
     findings: List[Finding] = []
     unchecked: Dict[str, str] = {}
+    checked: List[str] = []
     supplied = dict(units or {})
 
     for parameter in network.parameters:
@@ -555,8 +608,10 @@ def check(
             continue
 
         if unit == "dimensionless":
+            checked.append(name)
             findings += _check_exponent(name, value)
         elif _is_second_order(unit) or _as_per_second(value, unit) is not None:
+            checked.append(name)
             findings += _check_rate(name, value, unit)
         elif _as_molar(value, unit) is not None:
             # Affinities and concentrations share a unit, so both apply: an
@@ -565,6 +620,7 @@ def check(
             # unit slip. The NAME is the only signal available for which is
             # which, and guessing from it would be worse than running both
             # -- so both run, and each says what it compared against.
+            checked.append(name)
             lowered = name.lower()
             if any(k in lowered for k in ("_km", "_kd", "_ki", "_ksi", "_k")):
                 findings += _check_affinity(name, value, unit)
@@ -576,9 +632,14 @@ def check(
     for species in getattr(network, "species", ()):
         initial = float(getattr(species, "initial", 0.0))
         if initial > 0.0:
+            checked.append(species.id)
             findings += _check_concentration(species.id, initial, species_unit)
 
-    return ScaleReport(findings=tuple(findings), unchecked=unchecked)
+    return ScaleReport(
+        findings=tuple(findings),
+        unchecked=unchecked,
+        checked=tuple(checked),
+    )
 
 
 def check_model(model: Any, **kwargs: Any) -> ScaleReport:

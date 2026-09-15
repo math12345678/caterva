@@ -275,10 +275,22 @@ def _scale_concerns(model: Any) -> Tuple[List[Concern], str]:
         )
         for finding in report.errors
     ]
-    note = (
-        f"{len(report.errors)} impossible, {len(report.questions)} unusual"
-        if report.findings else "every number physically possible"
-    )
+    # "every number physically possible" is true of a model whose numbers
+    # were never looked at, which is the one case a reader cannot tell from
+    # the outside. So coverage leads, and the clean phrasing is reserved
+    # for a check that actually ran.
+    if report.examined_nothing:
+        note = (
+            "no number was examined -- no parameter carried a unit this "
+            "module recognises, so this is silence, not approval"
+        )
+    elif report.findings:
+        note = (
+            f"{len(report.errors)} impossible, {len(report.questions)} "
+            f"unusual, of {len(report.checked)} examined"
+        )
+    else:
+        note = f"all {len(report.checked)} numbers examined are possible"
     if report.unchecked:
         note += f", {len(report.unchecked)} unchecked"
     return concerns, note

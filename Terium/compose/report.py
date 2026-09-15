@@ -119,14 +119,23 @@ class ModelDossier:
         return lines
 
     def units_section(self) -> List[str]:
-        findings = self.model.recognition.composition.unit_findings()
+        examined, findings = self.model.recognition.composition.unit_check()
         lines = ["", "## Dimensions", ""]
+        if not examined:
+            # "Every rate law balances" over zero rate laws is true and
+            # reads as a clean bill of health. This section is one of the
+            # places a reader looks to decide whether to trust the model.
+            lines.append(
+                "No rate law was checked -- this composition declares none. "
+                "That is an absence of examination, not a clean result."
+            )
+            return lines
         if not findings:
             lines.append(
-                "Every rate law balances, in dimension and in scale. Checked "
-                "before compilation: a law with the wrong dimensions "
-                "integrates perfectly well and is wrong by whatever factor "
-                "the mistake introduced."
+                f"All {examined} rate laws balance, in dimension and in "
+                "scale. Checked before compilation: a law with the wrong "
+                "dimensions integrates perfectly well and is wrong by "
+                "whatever factor the mistake introduced."
             )
             return lines
         lines.append(f"**{len(findings)} problem(s):**")

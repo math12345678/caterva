@@ -88,7 +88,15 @@ def _competition() -> Composition:
 
 @pytest.fixture(scope="module")
 def partly_measured():
-    return provenance_of(
+    """A model with BOTH a measured parameter and unmeasured ones.
+
+    The premise is asserted here rather than assumed, because five tests
+    below are of the form "every placeholder is marked" and each one is a
+    filter asserted empty. A model with no placeholders would satisfy all
+    five while the marking code was entirely broken -- they would be green
+    in precisely the case they exist to rule out.
+    """
+    composition = provenance_of(
         _competition(),
         measured={
             "e1_Km": Measurement(
@@ -105,6 +113,20 @@ def partly_measured():
             )
         },
     )
+    measured = [
+        p for p in composition.network.parameters
+        if composition.origin_of(p.id).origin == ORIGIN_MEASURED
+    ]
+    placeholders = [
+        p for p in composition.network.parameters
+        if composition.origin_of(p.id).origin != ORIGIN_MEASURED
+    ]
+    assert measured, "nothing was measured, so 'measured' means nothing below"
+    assert placeholders, (
+        "nothing is a placeholder, so every 'marks every placeholder' test "
+        "below would pass without the marking code running at all"
+    )
+    return composition
 
 
 @pytest.fixture(scope="module")

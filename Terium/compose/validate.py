@@ -1470,7 +1470,7 @@ def dimension_findings(composition: Any) -> Tuple[Finding, ...]:
     cannot tell them apart.
     """
     try:
-        findings = composition.unit_findings()
+        examined, findings = composition.unit_check()
     except Exception as exc:  # noqa: BLE001
         return (
             Finding(
@@ -1481,6 +1481,23 @@ def dimension_findings(composition: Any) -> Tuple[Finding, ...]:
             ),
         )
 
+    if not examined:
+        # AGREE here would be a cross-check reporting agreement between
+        # itself and nothing. UNCHECKED is the same answer this function
+        # already gives when the check raises, and for the same reason.
+        return (
+            Finding(
+                check=CHECK_DIMENSIONS,
+                severity=UNCHECKED,
+                subject=getattr(composition, "name", "this composition"),
+                detail=(
+                    "no rate law was examined -- this composition declares "
+                    "none, so the dimensional check had nothing to run "
+                    "against and agreement would mean nothing"
+                ),
+            ),
+        )
+
     if not findings:
         return (
             Finding(
@@ -1488,8 +1505,9 @@ def dimension_findings(composition: Any) -> Tuple[Finding, ...]:
                 severity=AGREE,
                 subject=getattr(composition, "name", "this composition"),
                 detail=(
-                    "every rate law evaluates to an amount per volume per "
-                    "time, in the unit the composition declares, with the "
+                    f"all {examined} rate laws evaluate to an amount per "
+                    "volume per time, in the unit the composition declares, "
+                    "with the "
                     "units its motifs declare for their own constants. "
                     "Dimensions and SCALE both: mM and uM have the same "
                     "dimensions and differ by a thousand, so a check that "

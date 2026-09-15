@@ -346,11 +346,12 @@ def _scale_section(sections: Sections, model: Any) -> None:
         report = check_model(model)
         return (
             report.summary()
-            + "\n\nThe units these numbers were checked against came from "
-            "the motifs that declared them, not from the network: "
-            "`core.network.Parameter` carries a value and no unit, so a "
-            "bare network reports every parameter unchecked. See "
-            "`scale.units_from_model`."
+            + "\n\nThe units came from the motifs that declared them. "
+            "`core.network.Parameter` carries the unit through, so a "
+            "COMPOSED network describes itself; a network built outside "
+            "the composer carries none, and every parameter in it is "
+            "reported unchecked rather than assumed to be a "
+            "concentration. See `scale.units_from_model`."
         )
 
     sections.attempt("Physical scale", (ScaleError,), produce)
