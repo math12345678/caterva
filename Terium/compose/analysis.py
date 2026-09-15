@@ -400,6 +400,70 @@ def classify(eigenvalues: Sequence[complex]) -> str:
 # ---------------------------------------------------------------------------
 
 
+#: Units `core.network.Parameter` may carry that denote a concentration.
+#:
+#: Duplicated from `scale._TO_MOLAR`'s keys rather than imported, so the
+#: root finder does not depend on the physical-bounds module to decide
+#: where to look. `test_the_concentration_units_have_not_drifted` holds the
+#: two lists together.
+_CONCENTRATION_UNITS = frozenset({"M", "mM", "uM", "µM", "nM", "pM"})
+
+
+def _search_scale(network: Any) -> List[float]:
+    """The magnitude each species' concentration actually lives at.
+
+    THE BUG THIS REPLACES. This was `max(abs(s.initial), 1.0)` per species,
+    and the floor of 1.0 is the whole problem: for any model whose
+    concentrations sit below one in its own unit, the multistart looked
+    at order 1 and the fixed points were orders of magnitude below that.
+
+    A toggle switch scaled to realistic transcription-factor
+    concentrations -- around a micromolar, which in the library's mM is
+    1e-3 -- returned ONE fixed point and no stable states. The same model
+    at the library's default values returns three points and two stable
+    ones. The mathematics is identical: scaling every synthesis rate and
+    every affinity by the same factor scales the steady states by that
+    factor and changes nothing else. Only the search moved.
+
+    That is the concentration range real regulatory biology occupies, and
+    the failure was silent: not a refusal, a confident "no stable state
+    was found from N starting points".
+
+    WHERE THE SCALE COMES FROM, IN ORDER
+
+    A species' own initial amount, when it has one. That is the user's own
+    statement about the size of the thing.
+
+    Otherwise the model's concentration-valued PARAMETERS -- a Km, a Kd, a
+    half-repression constant. Those set the scale of whatever species
+    appears beside them in a rate law: a Hill term is `K^n / (K^n + R^n)`,
+    so R is interesting exactly where it is comparable to K. This is the
+    reason `core.network.Parameter` carries a unit at all; without it the
+    network could not say which of its constants were concentrations.
+
+    Only then 1.0, and only because a model that states no concentration
+    anywhere has given nothing better to go on.
+    """
+    initials = [abs(float(getattr(s, "initial", 0.0))) for s in network.species]
+
+    declared: List[float] = []
+    for parameter in getattr(network, "parameters", ()):
+        unit = str(getattr(parameter, "unit", "") or "").strip()
+        value = abs(float(getattr(parameter, "value", 0.0)))
+        if unit in _CONCENTRATION_UNITS and value > 0.0:
+            declared.append(value)
+
+    # The largest declared concentration, not the mean: a steady state can
+    # sit well above the affinity that shapes it, and a search anchored at
+    # the smallest constant would never reach it. Starts are spread over
+    # decades around this anyway, so overshooting costs less than
+    # undershooting.
+    from_parameters = max(declared) if declared else None
+
+    floor = from_parameters if from_parameters is not None else 1.0
+    return [initial if initial > 0.0 else floor for initial in initials]
+
+
 def analyse(
     network: Any,
     *,
@@ -457,7 +521,7 @@ def analyse(
     # solve can tell the difference.
     laws = _conservation_matrix(network, species)
 
-    scale = [max(abs(s.initial), 1.0) for s in network.species]
+    scale = _search_scale(network)
     for start in extra_starts:
         if len(start) != len(species):
             raise AnalysisError(

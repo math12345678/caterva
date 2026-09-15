@@ -296,6 +296,112 @@ def _scale_concerns(model: Any) -> Tuple[List[Concern], str]:
     return concerns, note
 
 
+def _concentration_unit_of(model: Any) -> Optional[str]:
+    """The unit the model's species amounts are in, from the model itself.
+
+    NOT ASSUMED. A state of {"X": 1.0} is 1 M, 1 mM or 1 nM depending on
+    the composition, and those differ by a factor of a billion -- so a
+    bound compared against the wrong one is the unit slip this package
+    exists to catch, made while checking for unit slips. The composition
+    declares one concentration unit for the whole model; when there is no
+    composition to ask, this returns None and the caller reports the
+    check as unavailable rather than guessing.
+    """
+    composition = getattr(
+        getattr(model, "recognition", None), "composition", None
+    )
+    unit = getattr(composition, "concentration_unit", None)
+    return str(unit) if unit else None
+
+
+def _prediction_concerns(
+    stability: Any, *, unit: str,
+) -> Tuple[List[Concern], str]:
+    """What the model PREDICTS, against what a cell can hold.
+
+    Separate from `_scale_concerns` because it asks a different question.
+    That one checks the numbers the model was GIVEN; this checks the
+    numbers it PRODUCES, and a model can pass the first and fail the
+    second -- each parameter plausible, their combination not. Checking
+    the inputs cannot catch that, by construction.
+
+    Runs off the stability report the caller already computed, so it costs
+    nothing beyond the comparison.
+    """
+    try:
+        from .predictions import UNEXAMINED, check_steady_states
+    except ImportError:  # pragma: no cover - flat import
+        from predictions import (  # type: ignore[no-redef]
+            UNEXAMINED, check_steady_states,
+        )
+
+    reports = check_steady_states(stability, unit=unit)
+    concerns: List[Concern] = []
+    for report in reports:
+        if report.already_flagged_nonphysical:
+            # `analysis` keeps negative roots on purpose -- they are a real
+            # property of the equations -- and already labels them. Raising
+            # each one again here as a BROKEN concern would fill the page
+            # with the same fact in different words: a root finder over a
+            # competitive-inhibition model returns twenty-odd points and
+            # several are non-physical by construction.
+            continue
+        concerns += [
+            Concern(
+                source="predictions",
+                severity=BROKEN,
+                detail=f"{report.subject}: {excess.describe()}",
+                remedy=(
+                    "the parameters behind this are each plausible and "
+                    "their combination is not -- the ratio that sets this "
+                    "steady state is what to look at, not any one constant"
+                ),
+            )
+            for excess in report.impossible
+        ]
+
+    judged = [r for r in reports if not r.already_flagged_nonphysical]
+    skipped = len(reports) - len(judged)
+    examined = sum(len(r.examined) for r in judged)
+    impossible = sum(len(r.impossible) for r in judged)
+    questionable = sum(len(r.questionable) for r in judged)
+
+    if not judged:
+        return concerns, (
+            f"{len(reports)} steady state(s) found and every one was "
+            f"already marked non-physical by the analysis, so this check "
+            f"had nothing left of its own to say"
+        )
+
+    aside = (
+        f" ({skipped} already non-physical, not re-counted here)"
+        if skipped else ""
+    )
+    if all(r.verdict == UNEXAMINED for r in judged):
+        note = (
+            f"{len(judged)} steady state(s) found, none examined -- no "
+            f"species carried a concentration unit this module recognises, "
+            f"so this is silence and not approval{aside}"
+        )
+    elif impossible:
+        note = (
+            f"{impossible} species cannot exist at the amount predicted, "
+            f"across {len(judged)} steady state(s){aside}"
+        )
+    elif questionable:
+        note = (
+            f"all {examined} predicted amounts are possible; "
+            f"{questionable} sit below one molecule per cell, where the "
+            f"deterministic model stops applying{aside}"
+        )
+    else:
+        note = (
+            f"all {examined} predicted amounts across {len(judged)} steady "
+            f"state(s) are amounts a cell could hold{aside}"
+        )
+    return concerns, note
+
+
 def _provenance_concerns(model: Any) -> Tuple[List[Concern], str]:
     """Placeholders are not a fault. They are a limit on the question.
 
@@ -428,6 +534,30 @@ def form(
         consulted["scale"] = scale_note
     except Exception as exc:  # noqa: BLE001
         unavailable["scale"] = f"{type(exc).__name__}: {exc}"
+
+    prediction_unit = _concentration_unit_of(model)
+    if stability is None:
+        unavailable["predictions"] = (
+            "no stability report was passed, so there is no predicted "
+            "steady state to check"
+        )
+    elif prediction_unit is None:
+        # Guessing mM here would compare a bound in molar against numbers
+        # that might be anything. UNAVAILABLE is the honest state.
+        unavailable["predictions"] = (
+            "this model declares no concentration unit, so a predicted "
+            "amount cannot be compared against what a cell can hold "
+            "without assuming one"
+        )
+    else:
+        try:
+            prediction_concerns, prediction_note = _prediction_concerns(
+                stability, unit=prediction_unit
+            )
+            concerns += prediction_concerns
+            consulted["predictions"] = prediction_note
+        except Exception as exc:  # noqa: BLE001
+            unavailable["predictions"] = f"{type(exc).__name__}: {exc}"
 
     provenance_concerns, provenance_note = _provenance_concerns(model)
     concerns += provenance_concerns

@@ -141,6 +141,26 @@ class RobustnessReport:
     #: placeholder cannot be sampled log-uniformly and is listed here rather
     #: than silently dropped.
     fixed: Mapping[str, str] = field(default_factory=dict)
+    #: Starting points per species each draw was judged at, or None when
+    #: the conclusion does not run a steady-state search.
+    #:
+    #: REPORTED BECAUSE THE FRACTION IS MEANINGLESS WITHOUT IT. A conclusion
+    #: about how many stable states exist is an answer from a search, and a
+    #: shallower search finds fewer. This module's docstring says its whole
+    #: value is that the distribution is stated rather than implied; the
+    #: search depth was the one term in that contract left unstated, and a
+    #: caller that chose its conclusion from a different depth produced a
+    #: fraction that was partly a measure of the two searches disagreeing.
+    starts_per_species: Optional[int] = None
+    #: Whether the conclusion held at the model's OWN values -- the centre
+    #: of the box every draw perturbs around. None when evaluating it there
+    #: raised.
+    #:
+    #: A fraction built around a centre where the conclusion is FALSE is
+    #: not a measure of robustness. It is the rate at which a random
+    #: perturbation moved the model into a regime it was not in, which is
+    #: a different quantity wearing the same percentage sign.
+    held_at_centre: Optional[bool] = None
 
     @property
     def evaluated(self) -> Tuple[Sample, ...]:
@@ -205,6 +225,36 @@ class RobustnessReport:
             f"over +/-{self.spread_decades:g} decade(s) around the model's "
             f"current values (seed {self.seed})."
         ]
+
+        if self.held_at_centre is False:
+            lines.append(
+                f"WARNING: '{self.conclusion}' is FALSE at the model's own "
+                f"values, which is the centre of the box every draw "
+                f"perturbs around. The figure above is therefore not a "
+                f"measure of how robust this conclusion is -- it is the "
+                f"rate at which a random perturbation moved the model into "
+                f"a regime it was not in to begin with. If that is the "
+                f"question you meant to ask, the number stands; if the "
+                f"conclusion was chosen from an earlier analysis, that "
+                f"analysis and this one disagree and the disagreement is "
+                f"the finding."
+            )
+        elif self.held_at_centre is None:
+            lines.append(
+                "The conclusion could not be evaluated at the model's own "
+                "values, so whether the box is centred on a region where it "
+                "holds is UNKNOWN -- which is not the same as centred well."
+            )
+
+        if self.starts_per_species is not None:
+            lines.append(
+                f"Every draw was judged by a steady-state search from "
+                f"{self.starts_per_species} starting point(s) per species. "
+                f"A conclusion about how many stable states exist is an "
+                f"answer from a search, and a shallower one finds fewer -- "
+                f"so a fraction produced at one depth cannot be compared "
+                f"against a headline produced at another."
+            )
 
         if self.failed:
             lines.append(
@@ -307,8 +357,17 @@ def assess(
     samples: int = DEFAULT_SAMPLES,
     spread_decades: float = SPREAD_DECADES,
     seed: int = 0,
+    starts_per_species: Optional[int] = None,
 ) -> RobustnessReport:
     """How often `conclusion(network)` survives resampling the parameters.
+
+    `starts_per_species` is RECORDED, not used here: this function calls
+    whatever predicate it was handed and cannot know what depth that
+    predicate searches at. Pass the same value given to the conclusion
+    factory -- `is_bistable(starts_per_species=N)` -- and the report will
+    state it. Passing one here and a different one there would produce a
+    report that misdescribes its own evidence, which is worse than one
+    that says nothing.
 
     `conclusion` is a predicate rather than a fixed vocabulary so this can
     ask about anything the rest of the module can compute -- bistability,
@@ -375,6 +434,29 @@ def assess(
             f"resulting fraction would be 0 or 1 by construction"
         )
 
+    # THE BOX CENTRE, EVALUATED ONCE, BEFORE ANY DRAW.
+    #
+    # The cheapest thing this module can do and the one it was not doing.
+    # Every draw is a perturbation AROUND the model's own values, so if the
+    # conclusion is false THERE, the fraction is not measuring how robust
+    # the conclusion is -- it is measuring how often a random perturbation
+    # happens to move the model into a regime it was not in to begin with.
+    #
+    # That is not hypothetical. The CLI chose which conclusion to resample
+    # from a search at one depth and had every draw judged at another, and
+    # the conclusion it picked was false at the centre. The printed
+    # percentage looked like fragility and was an artefact of two searches
+    # disagreeing.
+    #
+    # NOT a refusal. "Does this become bistable somewhere nearby?" is a
+    # real question about a conclusion that is false at the centre. It is
+    # recorded instead, and `summary()` says so plainly, because the one
+    # thing that must not happen is for it to pass unremarked.
+    try:
+        held_at_centre: Optional[bool] = bool(conclusion(network))
+    except Exception:  # noqa: BLE001 - a failed centre is not a false one
+        held_at_centre = None
+
     draws = _sample_values(known, sampled, spread_decades, samples, seed)
 
     results: List[Sample] = []
@@ -394,6 +476,8 @@ def assess(
         spread_decades=spread_decades,
         seed=seed,
         fixed=fixed,
+        starts_per_species=starts_per_species,
+        held_at_centre=held_at_centre,
     )
 
 
@@ -402,19 +486,41 @@ def assess(
 # ---------------------------------------------------------------------------
 
 
-def _stability(network: Any) -> Any:
-    try:
-        from . import analysis
-    except ImportError:  # pragma: no cover - flat import
-        import analysis  # type: ignore[no-redef]
+def default_search_depth() -> int:
+    """Starting points per species used to judge every resampled draw.
+
+    `sensitivity.STARTS_PER_SPECIES`, which is a MEASURED floor: that
+    module records the depth at which each library model stops changing
+    its answer, including a two-enzyme competition that reports the wrong
+    number of stable states at 8 and the right one at 16.
+
+    Exposed as a function rather than a constant so a caller can ask what
+    depth a report was produced at and search at the SAME depth when
+    choosing which conclusion to resample. That was the bug: the CLI chose
+    a conclusion from `analysis.analyse`'s own default of 8 and then had
+    every draw judged here at 16, so the fraction it printed was partly a
+    measure of the two searches disagreeing with each other.
+    """
     try:
         from .sensitivity import STARTS_PER_SPECIES
     except ImportError:  # pragma: no cover - flat import
         from sensitivity import STARTS_PER_SPECIES  # type: ignore[no-redef]
-    return analysis.analyse(network, starts_per_species=STARTS_PER_SPECIES)
+    return int(STARTS_PER_SPECIES)
 
 
-def is_bistable() -> Callable[[Any], bool]:
+def _stability(network: Any, starts_per_species: Optional[int] = None) -> Any:
+    try:
+        from . import analysis
+    except ImportError:  # pragma: no cover - flat import
+        import analysis  # type: ignore[no-redef]
+    depth = (
+        default_search_depth() if starts_per_species is None
+        else int(starts_per_species)
+    )
+    return analysis.analyse(network, starts_per_species=depth)
+
+
+def is_bistable(*, starts_per_species: Optional[int] = None) -> Callable[[Any], bool]:
     """More than one stable steady state was FOUND.
 
     Named for what the search establishes rather than for what a reader
@@ -424,12 +530,12 @@ def is_bistable() -> Callable[[Any], bool]:
     support at every one of two hundred samples instead of once.
     """
     def conclusion(network: Any) -> bool:
-        return len(_stability(network).stable_points) > 1
+        return len(_stability(network, starts_per_species).stable_points) > 1
 
     return conclusion
 
 
-def is_monostable() -> Callable[[Any], bool]:
+def is_monostable(*, starts_per_species: Optional[int] = None) -> Callable[[Any], bool]:
     """Exactly one stable steady state was found.
 
     NOT the negation of `is_bistable`: a sample where the search found NO
@@ -437,12 +543,12 @@ def is_monostable() -> Callable[[Any], bool]:
     a model with no steady state as a model with one.
     """
     def conclusion(network: Any) -> bool:
-        return len(_stability(network).stable_points) == 1
+        return len(_stability(network, starts_per_species).stable_points) == 1
 
     return conclusion
 
 
-def oscillates() -> Callable[[Any], bool]:
+def oscillates(*, starts_per_species: Optional[int] = None) -> Callable[[Any], bool]:
     """Some fixed point has eigenvalues with a non-zero imaginary part and a
     positive real part -- an unstable spiral, which is what a sustained
     oscillation looks like in a linearisation.
@@ -452,7 +558,7 @@ def oscillates() -> Callable[[Any], bool]:
     of the real part and it is the whole content of the question.
     """
     def conclusion(network: Any) -> bool:
-        report = _stability(network)
+        report = _stability(network, starts_per_species)
         for point in report.physical_points:
             if point.oscillatory and any(v.real > 0 for v in point.eigenvalues):
                 return True
@@ -461,7 +567,9 @@ def oscillates() -> Callable[[Any], bool]:
     return conclusion
 
 
-def settles_within(seconds: float) -> Callable[[Any], bool]:
+def settles_within(
+    seconds: float, *, starts_per_species: Optional[int] = None,
+) -> Callable[[Any], bool]:
     """The slowest timescale of the unique stable state is under `seconds`.
 
     The practical question behind "can I see this on a plate reader in an
@@ -469,7 +577,7 @@ def settles_within(seconds: float) -> Callable[[Any], bool]:
     machinery above.
     """
     def conclusion(network: Any) -> bool:
-        stable = _stability(network).stable_points
+        stable = _stability(network, starts_per_species).stable_points
         if len(stable) != 1:
             raise RobustnessError(
                 f"{len(stable)} stable states at this draw, so there is no "
@@ -483,7 +591,10 @@ def settles_within(seconds: float) -> Callable[[Any], bool]:
     return conclusion
 
 
-def exceeds(species: str, threshold: float) -> Callable[[Any], bool]:
+def exceeds(
+    species: str, threshold: float, *,
+    starts_per_species: Optional[int] = None,
+) -> Callable[[Any], bool]:
     """A species' steady-state concentration clears a threshold.
 
     Refuses on more than one stable state rather than picking: "does the
@@ -491,7 +602,7 @@ def exceeds(species: str, threshold: float) -> Callable[[Any], bool]:
     which one it reaches depends on where it started.
     """
     def conclusion(network: Any) -> bool:
-        stable = _stability(network).stable_points
+        stable = _stability(network, starts_per_species).stable_points
         if len(stable) != 1:
             raise RobustnessError(
                 f"{len(stable)} stable states at this draw, so '{species} "

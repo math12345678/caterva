@@ -165,6 +165,13 @@ def build_parser() -> argparse.ArgumentParser:
               "limit, the tightest measured Kd, one molecule per bacterium"),
     )
     analyses.add_argument(
+        "--predictions", action="store_true",
+        help=("is what the model PREDICTS physically possible -- a steady "
+              "state or transient above the cell's total protein content, "
+              "or below one molecule. Different from --scale, which checks "
+              "the numbers going in: each can pass while the other fails"),
+    )
+    analyses.add_argument(
         "--robustness", nargs="?", type=int, const=SAMPLES_UNSTATED,
         default=None, metavar="N",
         help=("does the conclusion survive resampling the placeholders. N "
@@ -357,6 +364,57 @@ def _scale_section(sections: Sections, model: Any) -> None:
     sections.attempt("Physical scale", (ScaleError,), produce)
 
 
+def _predictions_section(sections: Sections, model: Any) -> None:
+    """What the model produces, against what a cell can hold.
+
+    A SEPARATE SECTION FROM "Physical scale", NOT AN EXTENSION OF IT. That
+    one reads the numbers the model was given; this reads the numbers it
+    produces. A model passes one and fails the other routinely -- every
+    parameter inside its measured range, their ratio predicting more of one
+    species than the cell contains of all protein together -- and folding
+    them together would let a reader think one clean section covered both.
+    """
+    from Terium.compose.analysis import analyse
+    from Terium.compose.predictions import (
+        PredictionRefused, check_steady_states, check_trajectory,
+    )
+
+    def produce() -> str:
+        parts: list[str] = []
+
+        stability = analyse(model.network)
+        for report in check_steady_states(stability):
+            parts.append(report.summary())
+
+        # The transient is the reading that earns this section: a run can
+        # pass through an impossible state and settle somewhere fine, and
+        # the steady-state check above sees nothing.
+        try:
+            from Terium.compose.simulate import run
+
+            parts.append("")
+            parts.append(check_trajectory(
+                run(model), subject="the simulated run"
+            ).summary())
+        except Exception as exc:  # noqa: BLE001
+            parts.append("")
+            parts.append(
+                f"The transient was NOT checked: {type(exc).__name__}: {exc}. "
+                f"The steady states above still stand; a run that never "
+                f"happened has not been found possible."
+            )
+
+        parts.append("")
+        parts.append(
+            "These are bounds on what a cell can hold, not on whether the "
+            "model is right. A prediction inside them has not been shown "
+            "correct; it has not been ruled out on grounds of capacity."
+        )
+        return "\n".join(parts)
+
+    sections.attempt("Predicted amounts", (PredictionRefused,), produce)
+
+
 def _crnt_section(sections: Sections, model: Any) -> None:
     """Deficiency theory, in the order the facts build on each other.
 
@@ -513,24 +571,43 @@ def _robustness_section(sections: Sections, model: Any, samples: int) -> None:
 
     With no steady state found there is no conclusion to resample, and this
     refuses rather than inventing one.
+
+    THE CONCLUSION AND ITS RESAMPLING USE ONE SEARCH DEPTH. They did not.
+    This function chose the conclusion from `analyse`'s own default of 8
+    starting points per species, and `robustness` judged every draw at
+    `sensitivity.STARTS_PER_SPECIES`, which is 16. Those depths are
+    documented to disagree -- sensitivity.py records a library model that
+    reports the wrong number of stable states at 8 and the right one at 16
+    -- so the printed percentage was partly a measure of two searches
+    contradicting each other, and the conclusion chosen could be FALSE at
+    the exact centre of the box being sampled.
     """
     from Terium.compose.analysis import AnalysisError, analyse
     from Terium.compose.robustness import (
-        DEFAULT_SAMPLES, RobustnessError, assess_model, is_bistable,
-        is_monostable, oscillates,
+        DEFAULT_SAMPLES, RobustnessError, assess_model, default_search_depth,
+        is_bistable, is_monostable, oscillates,
     )
 
     title = "Robustness to the placeholders"
 
     def produce() -> str:
-        report = analyse(model.network)
+        depth = default_search_depth()
+        report = analyse(model.network, starts_per_species=depth)
         stable = report.stable_points
         if len(stable) > 1:
-            conclusion, name = is_bistable(), "at least two stable states"
+            conclusion, name = (
+                is_bistable(starts_per_species=depth),
+                "at least two stable states",
+            )
         elif len(stable) == 1:
-            conclusion, name = is_monostable(), "exactly one stable state"
+            conclusion, name = (
+                is_monostable(starts_per_species=depth),
+                "exactly one stable state",
+            )
         elif report.any_oscillatory:
-            conclusion, name = oscillates(), "sustained oscillation"
+            conclusion, name = (
+                oscillates(starts_per_species=depth), "sustained oscillation",
+            )
         else:
             raise RobustnessError(
                 f"the steady-state search found no stable state and no "
@@ -541,7 +618,8 @@ def _robustness_section(sections: Sections, model: Any, samples: int) -> None:
             )
         count = DEFAULT_SAMPLES if samples == SAMPLES_UNSTATED else samples
         assessment = assess_model(
-            model, conclusion, conclusion_name=name, samples=count
+            model, conclusion, conclusion_name=name, samples=count,
+            starts_per_species=depth,
         )
         return (
             assessment.summary()
@@ -860,6 +938,8 @@ def _analyses(args: Any, model: Any) -> int:
         _crnt_section(sections, model)
     if args.scale:
         _scale_section(sections, model)
+    if args.predictions:
+        _predictions_section(sections, model)
     if args.reduction:
         _reduction_section(sections, model)
     if args.identifiability:

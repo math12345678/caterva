@@ -378,3 +378,200 @@ class TestTheStatedConstants:
     def test_a_sample_count_below_one_is_refused(self) -> None:
         with pytest.raises(RobustnessError, match="not a sample"):
             assess(_turnover(), lambda n: True, samples=0)
+
+
+class TestTheSearchDepthIsPartOfTheContract:
+    """One report told the reader three different things.
+
+    `__main__._robustness_section` chose which conclusion to resample from
+    `analysis.analyse`'s own default of 8 starting points per species, and
+    `robustness._stability` judged every draw at
+    `sensitivity.STARTS_PER_SPECIES`, which is 16. Those depths are
+    documented to disagree -- sensitivity.py tabulates a two-enzyme
+    competition reporting the wrong number of stable states at 8 and the
+    right one at 16 -- so the percentage printed was partly a measure of
+    two searches contradicting each other, and the conclusion chosen could
+    be FALSE at the exact centre of the box being sampled.
+
+    This module's docstring says its whole value is that the distribution
+    is stated rather than implied. The search depth was the one term in
+    that contract left unstated.
+    """
+
+    def test_the_two_depths_really_do_differ(self) -> None:
+        """The premise. If these ever converge, the rest is about nothing."""
+        from Terium.compose.analysis import DEFAULT_STARTS_PER_SPECIES
+        from Terium.compose.robustness import default_search_depth
+        from Terium.compose.sensitivity import STARTS_PER_SPECIES
+
+        assert default_search_depth() == STARTS_PER_SPECIES
+        assert STARTS_PER_SPECIES > DEFAULT_STARTS_PER_SPECIES, (
+            "sensitivity's measured floor is no longer deeper than "
+            "analysis's default, so the mismatch this guards is gone"
+        )
+
+    def test_the_depth_is_recorded_on_the_report(self) -> None:
+        from Terium.compose.robustness import (
+            assess_model, default_search_depth, is_monostable,
+        )
+
+        depth = default_search_depth()
+        report = assess_model(
+            compose("enzyme kinetics with a competitive inhibitor"),
+            is_monostable(starts_per_species=depth),
+            conclusion_name="exactly one stable state",
+            samples=3, starts_per_species=depth,
+        )
+        assert report.starts_per_species == depth
+
+    def test_the_summary_states_the_depth(self) -> None:
+        # A fraction about how many stable states exist is an answer from a
+        # search. Printing it without the depth invites comparison against
+        # a headline produced at a different one.
+        from Terium.compose.robustness import (
+            assess_model, default_search_depth, is_monostable,
+        )
+
+        depth = default_search_depth()
+        report = assess_model(
+            compose("enzyme kinetics with a competitive inhibitor"),
+            is_monostable(starts_per_species=depth),
+            conclusion_name="exactly one stable state",
+            samples=3, starts_per_species=depth,
+        )
+        assert f"{depth} starting point(s) per species" in report.summary()
+
+    def test_a_conclusion_factory_honours_the_depth_it_is_given(self) -> None:
+        """The thread has to reach `_stability`, or the argument is a lie.
+
+        A depth accepted and ignored would be worse than none: the report
+        would state a number that had nothing to do with how the draws
+        were judged.
+
+        SPIES ON `analysis.analyse`, NOT ON `_stability`. The first version
+        of this test wrapped `_stability` and asserted it RECEIVED 5 -- and
+        a mutation that made `_stability` ignore its argument and use the
+        default passed it untouched, because the argument still arrived.
+        Watching the far end of the chain is the only version of this test
+        that means anything.
+        """
+        from Terium.compose import analysis, robustness
+
+        seen = []
+        original = analysis.analyse
+
+        def _spy(network, **kwargs):
+            seen.append(kwargs.get("starts_per_species"))
+            return original(network, **kwargs)
+
+        analysis.analyse = _spy
+        try:
+            model = compose("enzyme kinetics with a competitive inhibitor")
+            robustness.is_monostable(starts_per_species=5)(model.network)
+        finally:
+            analysis.analyse = original
+
+        assert seen == [5], (
+            f"the search actually ran at {seen}, not the 5 it was given"
+        )
+
+    def test_omitting_the_depth_uses_the_measured_default(self) -> None:
+        # And the other direction: no argument must not mean "whatever
+        # analysis.analyse defaults to", which is the shallower 8.
+        from Terium.compose import analysis, robustness
+
+        seen = []
+        original = analysis.analyse
+
+        def _spy(network, **kwargs):
+            seen.append(kwargs.get("starts_per_species"))
+            return original(network, **kwargs)
+
+        analysis.analyse = _spy
+        try:
+            model = compose("enzyme kinetics with a competitive inhibitor")
+            robustness.is_monostable()(model.network)
+        finally:
+            analysis.analyse = original
+
+        assert seen == [robustness.default_search_depth()], seen
+
+
+class TestTheBoxCentreIsEvaluated:
+    """A fraction around a centre where the conclusion is false is not
+    a measure of robustness.
+
+    Every draw perturbs around the model's own values. If the conclusion
+    is false THERE, the percentage is the rate at which a random
+    perturbation moved the model into a regime it was not in -- a
+    different quantity wearing the same percentage sign.
+    """
+
+    def test_a_conclusion_true_at_the_centre_is_recorded_as_such(self) -> None:
+        from Terium.compose.robustness import (
+            assess_model, default_search_depth, is_monostable,
+        )
+
+        depth = default_search_depth()
+        report = assess_model(
+            compose("enzyme kinetics with a competitive inhibitor"),
+            is_monostable(starts_per_species=depth),
+            conclusion_name="exactly one stable state",
+            samples=3, starts_per_species=depth,
+        )
+        assert report.held_at_centre is True
+        assert "WARNING" not in report.summary()
+
+    def test_a_conclusion_false_at_the_centre_is_flagged(self) -> None:
+        from Terium.compose.robustness import (
+            assess_model, default_search_depth, is_bistable,
+        )
+
+        depth = default_search_depth()
+        report = assess_model(
+            compose("enzyme kinetics with a competitive inhibitor"),
+            is_bistable(starts_per_species=depth),
+            conclusion_name="at least two stable states",
+            samples=3, starts_per_species=depth,
+        )
+        assert report.held_at_centre is False
+        text = report.summary()
+        assert "FALSE at the model's own values" in text
+        assert "not a measure of how robust" in text
+
+    def test_it_is_recorded_and_not_refused(self) -> None:
+        """"Does this become bistable nearby?" is a real question.
+
+        Refusing a conclusion false at the centre would forbid it. The
+        report says what it is instead, because the one thing that must
+        not happen is for it to pass unremarked.
+        """
+        from Terium.compose.robustness import (
+            assess_model, default_search_depth, is_bistable,
+        )
+
+        depth = default_search_depth()
+        report = assess_model(
+            compose("enzyme kinetics with a competitive inhibitor"),
+            is_bistable(starts_per_species=depth),
+            conclusion_name="at least two stable states",
+            samples=3, starts_per_species=depth,
+        )
+        assert report.samples, "the assessment still ran"
+        assert "the number stands" in report.summary()
+
+    def test_a_centre_that_raises_is_unknown_not_false(self) -> None:
+        # The three-state rule: could-not-evaluate is not did-not-hold.
+        from Terium.compose.robustness import assess
+
+        def _explodes(network):
+            raise ValueError("no")
+
+        model = compose("enzyme kinetics with a competitive inhibitor")
+        report = assess(
+            model.network, _explodes, conclusion_name="x",
+            vary=[p.id for p in model.network.parameters], samples=2,
+        )
+        assert report.held_at_centre is None
+        assert "UNKNOWN" in report.summary()
+        assert "not the same as centred well" in report.summary()
