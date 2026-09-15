@@ -415,3 +415,231 @@ class TestExplicitStartingPoints:
         assert _starting_points(3, [1.0, 1.0, 1.0], 0, 64, 0) == []
         # ...but asking for a search always gets one, floor of four.
         assert len(_starting_points(1, [1.0], 1, 64, 0)) == 4
+
+
+class TestTheSearchLooksWhereTheModelLives:
+    """The multistart was anchored at order 1 for every model.
+
+    `scale` was `max(abs(s.initial), 1.0)` per species. The floor is the
+    whole bug: for any model whose concentrations sit below one in its own
+    unit, the search looked at order 1 and the fixed points were orders of
+    magnitude below that.
+
+    A toggle switch at realistic transcription-factor concentrations --
+    around a micromolar, which in the library's mM is 1e-3 -- returned ONE
+    fixed point and NO stable states. The same model at the library's
+    default values returns three points and two stable ones, and the
+    mathematics is identical: scaling every synthesis rate and affinity by
+    one factor scales the steady states by that factor and changes nothing
+    else. Only the search moved.
+
+    That is the concentration range real regulatory biology occupies, and
+    the failure was silent -- a confident "no steady state was found",
+    not a refusal.
+    """
+
+    @staticmethod
+    def _scaled_toggle(factor):
+        """The toggle switch with every concentration scaled by `factor`.
+
+        ks and K are the two concentration-carrying constants; scaling both
+        with the species initials leaves the dimensionless dynamics exactly
+        invariant, so any change in the reported number of stable states is
+        the SEARCH changing its answer, not the model.
+        """
+        from dataclasses import replace
+
+        from Terium.compose.pipeline import compose
+
+        model = compose("a toggle switch between two repressors")
+        parameters = tuple(
+            replace(p, value=p.value * factor)
+            if (p.id.endswith("_ks") or p.id.endswith("_K")) else p
+            for p in model.network.parameters
+        )
+        species = tuple(
+            replace(s, initial=s.initial * factor)
+            for s in model.network.species
+        )
+        return replace(model.network, parameters=parameters, species=species)
+
+    @pytest.mark.parametrize("factor", [1.0, 1e-2, 1e-4, 1e-6])
+    def test_bistability_survives_a_change_of_scale(self, factor) -> None:
+        report = analyse(self._scaled_toggle(factor))
+        stable = [p for p in report.fixed_points if p.stable]
+        assert len(stable) == 2, (
+            factor,
+            f"{len(report.fixed_points)} point(s), {len(stable)} stable -- "
+            f"the same model at a different concentration scale",
+        )
+
+    def test_the_states_scale_with_the_model(self) -> None:
+        """Not just the COUNT: the values track the scaling exactly.
+
+        A search that found two stable states at the wrong magnitudes
+        would pass the count test above and still be wrong.
+        """
+        reference = sorted(
+            max(p.state.values())
+            for p in analyse(self._scaled_toggle(1.0)).fixed_points
+            if p.stable
+        )
+        scaled = sorted(
+            max(p.state.values())
+            for p in analyse(self._scaled_toggle(1e-4)).fixed_points
+            if p.stable
+        )
+        assert len(reference) == len(scaled) == 2
+        for one, other in zip(reference, scaled):
+            assert other == pytest.approx(one * 1e-4, rel=1e-3)
+
+    def test_the_scale_comes_from_a_declared_concentration(self) -> None:
+        # The mechanism, directly: a species with no initial takes its
+        # scale from the model's concentration-valued parameters.
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="tiny",
+            species=(Species("X", 0.0),),
+            parameters=(
+                Parameter("Km", 2e-5, "mM"),
+                Parameter("k", 3.0, "1/s"),
+            ),
+            reactions=(Reaction("r", {}, {"X": 1}, "k"),),
+        )
+        assert _search_scale(network) == [2e-5]
+
+    def test_a_species_with_an_initial_keeps_it(self) -> None:
+        # The user's own statement about the size of the thing wins over
+        # anything inferred from the parameters.
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="tiny",
+            species=(Species("X", 7.0),),
+            parameters=(Parameter("Km", 2e-5, "mM"),),
+            reactions=(Reaction("r", {}, {"X": 1}, "Km"),),
+        )
+        assert _search_scale(network) == [7.0]
+
+    def test_the_largest_declared_concentration_wins(self) -> None:
+        """Not the smallest, and the asymmetry is deliberate.
+
+        A steady state can sit well above the affinity that shapes it -- a
+        pool of 10 uM regulated by a 10 nM binding constant is ordinary --
+        so anchoring the search at the smallest constant would put it three
+        decades below where the answer is. Overshooting costs less than
+        undershooting, because starts are spread over decades around this
+        anyway and the failure this whole class exists for was an
+        undershoot.
+
+        A mutation from max to min passed every other test here, because
+        every model used above has one distinct concentration value.
+        """
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="tiny",
+            species=(Species("X", 0.0),),
+            parameters=(
+                Parameter("Kd", 1e-5, "mM"),
+                Parameter("pool", 1e-2, "mM"),
+                Parameter("k", 3.0, "1/s"),
+            ),
+            reactions=(Reaction("r", {}, {"X": 1}, "k"),),
+        )
+        assert _search_scale(network) == [1e-2], (
+            "the search anchored on the smallest concentration, three "
+            "decades below the pool it should be looking at"
+        )
+
+    def test_units_are_compared_in_one_scale_not_mixed(self) -> None:
+        """A bare `max` over mixed units would pick the biggest NUMBER.
+
+        1 nM and 0.5 M are not comparable as floats -- 1 beats 0.5 and is
+        a billion times smaller. Recorded here as a known limitation
+        rather than left to be discovered: the library writes every
+        concentration in mM, so mixing does not arise in a composed model,
+        and a network built by hand with mixed units gets a scale drawn
+        from whichever number is largest.
+
+        WHEN THIS STOPS BEING TRUE THIS TEST GOES RED. Convert through
+        `scale._TO_MOLAR` before comparing, and delete it.
+        """
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="mixed",
+            species=(Species("X", 0.0),),
+            parameters=(
+                Parameter("big", 0.5, "M"),
+                Parameter("small", 1.0, "nM"),
+            ),
+            reactions=(Reaction("r", {}, {"X": 1}, "big"),),
+        )
+        assert _search_scale(network) == [1.0], (
+            "mixed units are now converted -- good; delete this test"
+        )
+
+    def test_a_rate_constant_is_not_read_as_a_concentration(self) -> None:
+        """`1/s` must not set the search scale.
+
+        A model with a fast rate constant and no stated concentration
+        would otherwise be searched at the magnitude of a rate, which is
+        a different quantity entirely and would be a unit confusion
+        inside the module that finds the answers.
+        """
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="tiny",
+            species=(Species("X", 0.0),),
+            parameters=(Parameter("k", 5000.0, "1/s"),),
+            reactions=(Reaction("r", {}, {"X": 1}, "k"),),
+        )
+        assert _search_scale(network) == [1.0], (
+            "a rate constant set the concentration scale"
+        )
+
+    def test_a_network_with_no_units_falls_back_to_one(self) -> None:
+        # A network built outside the composer carries no units, and 1.0
+        # is the honest answer when the model has stated nothing better.
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="tiny",
+            species=(Species("X", 0.0),),
+            parameters=(Parameter("k", 5.0),),
+            reactions=(Reaction("r", {}, {"X": 1}, "k"),),
+        )
+        assert _search_scale(network) == [1.0]
+
+    def test_the_concentration_units_have_not_drifted(self) -> None:
+        """Duplicated from scale.py, held together here.
+
+        The root finder must not depend on the physical-bounds module to
+        decide where to look, so the unit list is copied. A copy nobody
+        checks is a copy that diverges.
+        """
+        from Terium.compose.analysis import _CONCENTRATION_UNITS
+        from Terium.compose.scale import _TO_MOLAR
+
+        assert _CONCENTRATION_UNITS == frozenset(_TO_MOLAR)

@@ -381,3 +381,212 @@ class TestWhatThisDoesNotClaim:
         # else that reads as approval.
         assert UNEXAMINED in VERDICTS
         assert len(set(VERDICTS)) == 4
+
+
+class TestTheCaseTheInputCheckCannotCatch:
+    """The module's whole reason for existing, end to end on a real network.
+
+    Not a unit test of a bound: a network built the way a user would build
+    one, run through BOTH checks, where the first says possible and the
+    second says impossible. If this ever passes both, the module has
+    stopped earning its place.
+    """
+
+    @staticmethod
+    def _leaky_pool(synthesis=1.0, decay=1e-5):
+        """X made at a constant rate, lost first-order. Steady state ks/kd.
+
+        1 mM/s of synthesis and 1e-5 /s of decay are both ordinary numbers
+        -- a protein made steadily and turned over slowly. Their ratio is
+        100 M.
+        """
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        return ReactionNetwork(
+            name="leaky_pool",
+            species=(Species("X", 0.0),),
+            parameters=(
+                Parameter("ks", synthesis, "mM/s"),
+                Parameter("kd", decay, "1/s"),
+            ),
+            reactions=(
+                Reaction("make", {}, {"X": 1}, "ks"),
+                Reaction("decay", {"X": 1}, {}, "kd * X"),
+            ),
+        )
+
+    def test_the_input_check_passes_it(self) -> None:
+        """Both parameters are inside every range scale.py knows.
+
+        This is the premise. If scale.py ever starts refusing these, the
+        contrast below stops being the point and this test should say so
+        rather than quietly agreeing with whatever changed.
+        """
+        from Terium.compose.scale import check
+
+        report = check(self._leaky_pool())
+        assert report.physically_possible, [
+            f.describe() for f in report.errors
+        ]
+
+    def test_the_output_check_refuses_it(self) -> None:
+        from Terium.compose.analysis import analyse
+
+        reports = check_steady_states(analyse(self._leaky_pool()), unit="mM")
+        assert len(reports) == 1
+        assert reports[0].verdict == IMPOSSIBLE
+        excess = reports[0].impossible[0]
+        assert excess.species == "X"
+        # ks/kd = 1.0 / 1e-5 = 1e5 mM = 100 M, analytically.
+        assert excess.molar == pytest.approx(100.0, rel=1e-3)
+
+    def test_the_two_checks_disagree_and_that_is_the_point(self) -> None:
+        from Terium.compose.analysis import analyse
+        from Terium.compose.scale import check
+
+        network = self._leaky_pool()
+        assert check(network).physically_possible
+        assert check_steady_states(
+            analyse(network), unit="mM"
+        )[0].verdict == IMPOSSIBLE
+
+    def test_a_sensible_ratio_passes_both(self) -> None:
+        """The cry-wolf direction, on the same network shape.
+
+        Same two reactions, a decay rate four orders of magnitude faster:
+        steady state 1e-2 mM, an ordinary intracellular concentration.
+        Without this, a module that returned IMPOSSIBLE unconditionally
+        would pass every test above.
+        """
+        from Terium.compose.analysis import analyse
+        from Terium.compose.scale import check
+
+        network = self._leaky_pool(synthesis=1e-4, decay=1e-2)
+        assert check(network).physically_possible
+        report = check_steady_states(analyse(network), unit="mM")[0]
+        assert report.verdict == POSSIBLE, report.summary()
+
+
+class TestEveryLibraryModelPredictsSomethingPossible:
+    """The sweep, across every model the composer builds.
+
+    Worth pinning for the reason the cross-module agreement sweep is: the
+    value is entirely in the day it stops being true. A library model that
+    starts predicting an impossible amount is a defect in the library's
+    default constants, and it would otherwise be found by a user.
+    """
+
+    BUILDABLE = (
+        "enzyme kinetics with a competitive inhibitor",
+        "repressilator oscillations",
+        "three step phosphorylation cascade",
+        "a MAP kinase cascade with negative feedback",
+        "reversible binding of a ligand to a receptor",
+        "substrate inhibition at high substrate concentration",
+        "two enzymes competing for the same substrate",
+        "a toggle switch between two repressors",
+        "sequential feedback inhibition in amino acid synthesis",
+        "allosteric activation of an enzyme by its product",
+    )
+
+    def test_no_steady_state_is_impossible(self) -> None:
+        from Terium.compose.analysis import analyse
+
+        checked = 0
+        for query in self.BUILDABLE:
+            try:
+                reports = check_steady_states(analyse(compose(query).network))
+            except PredictionRefused:
+                # No fixed point is a finding about the model, not about
+                # its predicted amounts. Counted as not-checked rather
+                # than silently passed.
+                continue
+            for report in reports:
+                if report.already_flagged_nonphysical:
+                    # A negative root the analysis already labelled. Real
+                    # mathematics, kept there on purpose, and not this
+                    # module's discovery to announce.
+                    continue
+                assert report.verdict != IMPOSSIBLE, (query, report.summary())
+                checked += 1
+        assert checked, (
+            "no model produced a steady state to check, so this sweep "
+            "asserted nothing"
+        )
+
+    def test_the_sweep_would_notice(self) -> None:
+        """The assertion above passes over an empty set of reports.
+
+        Every sweep in this suite carries one of these, because a sweep
+        that finds nothing and a sweep that checks nothing are the same
+        green. This drives the same comparison with a state that IS
+        impossible.
+        """
+        report = check_state({"X": 100.0}, unit="M")
+        assert report.verdict == IMPOSSIBLE
+
+
+class TestTheVerdictDoesNotRepeatTheAnalysis:
+    """Two modules saying the same thing in different words is noise.
+
+    `analysis` keeps negative roots deliberately -- they are a real
+    property of the equations, and hiding them makes the positive ones
+    look like the whole story -- and it already labels them
+    `physical=False`. A root find over a competitive-inhibition model
+    returns twenty-odd points and several are non-physical by
+    construction.
+
+    The verdict page raised each one again as a BROKEN concern. On "two
+    enzymes competing for the same substrate" that read "5 species cannot
+    exist at the amount predicted, across 26 steady state(s)" -- a
+    sentence that sounds like a model defect and is a restatement of
+    something the section above it already said.
+    """
+
+    def test_a_flagged_point_is_not_raised_again(self) -> None:
+        from Terium.compose.analysis import analyse
+        from Terium.compose.verdict import form
+
+        model = compose("two enzymes competing for the same substrate")
+        stability = analyse(model.network)
+        assert any(
+            not p.physical for p in stability.fixed_points
+        ), "the premise: this model has non-physical roots"
+
+        verdict = form(model, stability=stability)
+        assert not [c for c in verdict.concerns if c.source == "predictions"]
+
+    def test_the_note_says_how_many_it_set_aside(self) -> None:
+        # Set aside, not silently dropped: a reader who wants to know why
+        # the counts do not add up gets told.
+        from Terium.compose.analysis import analyse
+        from Terium.compose.verdict import form
+
+        model = compose("two enzymes competing for the same substrate")
+        note = form(
+            model, stability=analyse(model.network)
+        ).consulted["predictions"]
+        assert "already non-physical, not re-counted here" in note
+
+    def test_a_genuinely_impossible_point_is_still_raised(self) -> None:
+        """The cry-wolf direction, and the one that matters.
+
+        Skipping already-flagged points must not become skipping
+        everything. A point the analysis calls physical, predicting more
+        than the cell can hold, is exactly what this check exists for.
+        """
+        from Terium.compose.verdict import _prediction_concerns
+
+        class _Point:
+            physical = True
+            state = {"X": 100.0}
+
+        class _Stability:
+            fixed_points = (_Point(),)
+
+        concerns, note = _prediction_concerns(_Stability(), unit="M")
+        assert len(concerns) == 1
+        assert concerns[0].source == "predictions"
+        assert "cannot exist at the amount predicted" in note
