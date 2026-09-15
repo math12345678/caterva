@@ -72,14 +72,16 @@ from typing import (
 #: micromolar enzyme meets millimolar substrate.
 QSSA_RATIO = 100.0
 
-#: Below this fraction of its initial amount, a substrate has been consumed
-#: rather than merely drawn down, and any approximation that assumed a
-#: roughly constant substrate pool has stopped applying.
-#:
-#: A JUDGEMENT. At 10% remaining the free-substrate approximation is wrong
-#: by an order of magnitude in the denominator of every saturable rate law
-#: in the model.
-DEPLETION_FRACTION = 0.1
+# DEPLETION_FRACTION USED TO LIVE HERE, AND NOTHING READ IT.
+#
+# It was a threshold for a DYNAMIC check -- below a tenth of its starting
+# amount a pool has been consumed rather than drawn down -- and this module
+# is structural on purpose and never simulates. Exported and documented as
+# though it were in force, it read as a rule this module applies. It does
+# not; it cannot.
+#
+# It is now `timeseries.DEPLETION_FRACTION`, next to `timeseries.depletion`,
+# which is the reading the UNDECIDED verdict below asks the reader to take.
 
 #: Verdicts, ordered worst-first.
 VIOLATED = "violated"
@@ -334,13 +336,15 @@ def _substrate_not_exhausted(instance: Any, network: Any) -> Tuple[str, str]:
             f"{substrate.id} is consumed and never replenished, which is "
             f"what a closed batch assay is. The saturable form is good "
             f"while substrate remains and wrong near exhaustion, so this "
-            f"depends on the window: simulate and check whether "
-            f"{substrate.id} is still well above its Km at the end"
+            f"depends on the window: simulate, then call "
+            f"timeseries.depletion(trajectory, {substrate.id!r}) to see how "
+            f"much of the pool is left at the end"
         )
     if consumed and produced:
         return UNDECIDED, (
             f"{substrate.id} is both produced and consumed, so whether the "
-            f"pool holds up depends on the rates -- simulate and look"
+            f"pool holds up depends on the rates -- simulate, then "
+            f"timeseries.depletion(trajectory, {substrate.id!r})"
         )
     return HELD, f"{substrate.id} is not consumed by this instance"
 
@@ -467,7 +471,7 @@ def check(model: Any) -> AssumptionReport:
 
 __all__ = [
     "VIOLATED", "UNDECIDED", "HELD", "NOT_CHECKABLE", "VERDICTS",
-    "QSSA_RATIO", "DEPLETION_FRACTION",
+    "QSSA_RATIO",
     "AssumptionError", "AssumptionReport", "Condition", "Finding",
     "CONDITIONS", "check",
 ]

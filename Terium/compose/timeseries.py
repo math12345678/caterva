@@ -1537,13 +1537,163 @@ def step_response(
     )
 
 
+
+# ---------------------------------------------------------------------------
+# Depletion: the reading `assumptions.py` tells the reader to take
+# ---------------------------------------------------------------------------
+#
+# `assumptions._substrate_not_exhausted` is structural, on purpose -- it can
+# see that a substrate is consumed and never replenished, which is what a
+# closed batch assay IS, and it returns UNDECIDED because whether the
+# saturable law still applies depends entirely on the window simulated. Its
+# message ends "simulate and check whether S is still well above its Km at
+# the end", which is correct advice and was not a callable thing.
+#
+# It also carried the threshold for that check -- DEPLETION_FRACTION, ten
+# percent, documented as a judgement -- in a module that never simulates and
+# never read it. A documented, exported threshold that nothing applies reads
+# as a rule in force. It lives here now, where a trajectory exists.
+
+#: Below this fraction of its starting amount, a pool has been CONSUMED
+#: rather than merely drawn down, and any law that assumed a roughly
+#: constant pool has stopped describing the system.
+#:
+#: A JUDGEMENT, and the reason it is one: at a tenth remaining, the
+#: denominator of every saturable rate law in the model is wrong by an
+#: order of magnitude, and it is wrong fastest exactly where the curve is
+#: most interesting. Ten percent is not derived from anything -- it is the
+#: point past which the approximation is not worth defending.
+DEPLETION_FRACTION = 0.1
+
+
+@dataclass(frozen=True)
+class Depletion:
+    """How much of a pool is left, and whether that is still a pool.
+
+    Deliberately reports the FRACTION alongside the verdict, because the
+    verdict is a judgement against `DEPLETION_FRACTION` and the fraction is
+    a measurement. A reader who disagrees with the threshold can use the
+    number; a reader who only got a boolean cannot.
+    """
+
+    species: str
+    initial: float
+    final: float
+    #: `final / initial`, or None when `initial` is zero -- a pool that
+    #: started empty has not been depleted, it was never there, and
+    #: dividing to find out would invent a ratio.
+    remaining_fraction: Optional[float]
+    #: The first time the series fell below the threshold, interpolated,
+    #: or None if it never did.
+    crossed_at: Optional[float]
+    threshold: float
+
+    @property
+    def depleted(self) -> bool:
+        """Below the threshold at the END of the window.
+
+        Not "ever went below": a pool that dips and is replenished has not
+        been consumed, and reporting it as depleted would call a
+        regenerating system a spent one.
+        """
+        return (
+            self.remaining_fraction is not None
+            and self.remaining_fraction < self.threshold
+        )
+
+    @property
+    def undecidable(self) -> bool:
+        """Started at zero, so there is no fraction to take."""
+        return self.remaining_fraction is None
+
+    def describe(self) -> str:
+        if self.undecidable:
+            return (
+                f"{self.species} started at zero, so there is no fraction "
+                f"remaining to report -- it was not depleted, it was never "
+                f"there"
+            )
+        percent = 100.0 * (self.remaining_fraction or 0.0)
+        if self.depleted:
+            when = (
+                f", first crossing at t={self.crossed_at:g}"
+                if self.crossed_at is not None else ""
+            )
+            return (
+                f"{self.species} ended at {percent:.3g}% of its starting "
+                f"amount{when}. Below {100.0 * self.threshold:g}% any "
+                f"saturable law reading it is wrong by an order of "
+                f"magnitude in its denominator"
+            )
+        return (
+            f"{self.species} ended at {percent:.3g}% of its starting "
+            f"amount, above the {100.0 * self.threshold:g}% below which a "
+            f"pool stops behaving like one"
+        )
+
+
+def depletion(
+    source: Any,
+    species: str,
+    *,
+    threshold: float = DEPLETION_FRACTION,
+    after: Optional[float] = None,
+) -> Depletion:
+    """Whether a pool was consumed over the window, and by how much.
+
+    THE READING `assumptions.py` ASKS FOR. That module can tell you a
+    substrate is consumed and never replenished; only a trajectory can tell
+    you whether that mattered over the window you ran.
+
+    Takes the threshold as an argument with the module default, so a reader
+    who thinks a tenth is the wrong line can move it without editing this
+    file -- and so a test can drive both sides of it.
+    """
+    if not 0.0 < threshold < 1.0:
+        raise TimeSeriesRefused(
+            f"threshold={threshold!r} is not a fraction between 0 and 1. A "
+            f"threshold of 0 can never be crossed and one of 1 or more is "
+            f"crossed by every pool that is consumed at all, so neither "
+            f"states anything about this trajectory."
+        )
+
+    times, values = read(source, species, after=after)
+    if not values:
+        raise TimeSeriesRefused(
+            f"{species} has no samples over this window, so there is no "
+            f"starting amount to take a fraction of."
+        )
+
+    initial, final = float(values[0]), float(values[-1])
+    if initial == 0.0:
+        return Depletion(
+            species=species, initial=initial, final=final,
+            remaining_fraction=None, crossed_at=None, threshold=threshold,
+        )
+
+    fraction = final / initial
+    level = threshold * initial
+    # `_level_crossing` interpolates and already takes crossings in either
+    # direction, which matters here: the sample grid is the integrator's,
+    # not the chemistry's, so reporting the first sample BELOW the line as
+    # the crossing time would be off by up to one step.
+    crossed = _level_crossing(times, values, level)
+    return Depletion(
+        species=species, initial=initial, final=final,
+        remaining_fraction=fraction, crossed_at=crossed, threshold=threshold,
+    )
+
+
 __all__ = [
-    "Adaptation", "Damping", "Oscillation", "Series", "StepResponse",
+    "Adaptation", "Damping", "Depletion", "Oscillation", "Series",
+    "StepResponse",
     "TimeSeriesRefused", "TurningPoint",
-    "adaptation", "autocorrelation", "damping", "mean_crossings",
+    "adaptation", "autocorrelation", "damping", "depletion",
+    "mean_crossings",
     "oscillation", "read", "sample_spacing", "step_response",
     "turning_points",
-    "AGREEMENT_TOLERANCE", "DAMPING_VERDICTS", "DECAYING", "ENVELOPE_RESOLUTION",
+    "AGREEMENT_TOLERANCE", "DAMPING_VERDICTS", "DECAYING",
+    "DEPLETION_FRACTION", "ENVELOPE_RESOLUTION",
     "EXCURSION_FLOOR", "FALLING", "GROWING", "MINIMUM_CYCLES",
     "MINIMUM_SAMPLES_PER_PERIOD", "NYQUIST_SAMPLES_PER_PERIOD",
     "RISE_HIGH_FRACTION", "RISE_LOW_FRACTION", "RISING", "SETTLING_BAND",
