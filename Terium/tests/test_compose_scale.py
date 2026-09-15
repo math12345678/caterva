@@ -15,6 +15,7 @@ UNCHECKED rather than passing silently.
 
 from __future__ import annotations
 
+import pathlib
 from dataclasses import replace
 
 import pytest
@@ -26,13 +27,15 @@ from Terium.compose.scale import (
     DIFFUSION_LIMIT_PER_MOLAR_PER_SECOND, ERROR, ONE_MOLECULE_PER_BACTERIUM_MOLAR,
     PLAUSIBLE_HILL_RANGE, QUESTION, ScaleError, TIGHTEST_MEASURED_KD_MOLAR,
     TOTAL_CELLULAR_PROTEIN_MOLAR, TYPICAL_KCAT_RANGE_PER_SECOND, Finding,
-    check, check_model,
+    ScaleReport, check, check_model,
 )
 
 
-#: What the catalytic-step motif declares. Recovered rather than assumed --
-#: `units_from_model` exists because core.network.Parameter has no unit
-#: field, so a bare network cannot say what its own numbers mean.
+#: What the catalytic-step motif declares. Kept explicit so these tests
+#: drive `check` directly on a bare network, which is the path that still
+#: has no units of its own: `core.network.Parameter` now carries a unit and
+#: the builder populates it, so a COMPOSED network describes itself, but a
+#: network assembled by hand here does not.
 _CATALYTIC_UNITS = {"reaction_kcat": "1/s", "reaction_Km": "mM"}
 
 
@@ -447,3 +450,287 @@ class TestTheOneLumpedParameterSaysSo:
                     if re.search(r"v_?max|j_?max", p.name, re.I)
                 ]
         assert offenders == [], offenders
+
+
+class TestCleanIsNotTheSameAsUnexamined:
+    """The two states a `findings=()` report used to conflate.
+
+    `unchecked` was added so that "no findings" could not be read as
+    "everything is fine" when half the parameters had no recognised unit.
+    It only ever recorded the SKIPS, though, so the case where nothing was
+    looked at AT ALL still printed as a clean report -- and a composed
+    three-tier cascade, twelve parameters with every unit recognised,
+    returned a value byte-for-byte identical to a check over an empty
+    network.
+
+    A caller cannot tell those apart from the outside, and the one it would
+    get wrong is the one that matters.
+    """
+
+    class _EmptyNetwork:
+        parameters = ()
+        species = ()
+
+    def test_an_empty_network_says_it_examined_nothing(self) -> None:
+        report = check(self._EmptyNetwork())
+        assert report.examined_nothing
+        assert report.coverage == "nothing was examined"
+
+    def test_a_real_model_does_not(self) -> None:
+        report = check_model(compose("three step phosphorylation cascade"))
+        assert not report.examined_nothing
+        assert report.checked, "a twelve-parameter model examined nothing"
+
+    def test_every_parameter_is_either_examined_or_skipped(self) -> None:
+        """The partition, which is the real invariant.
+
+        The weaker form of this test asserted only that `checked` was
+        non-empty -- and a mutation that stopped recording PARAMETERS
+        entirely still passed it, because the species loop kept appending
+        and five species names were enough to satisfy "non-empty". An
+        assertion that looks specific and is not.
+
+        Every parameter must land in exactly one of the two sets. That is
+        what makes the counts mean something, and it is what makes
+        `examined_nothing` trustworthy rather than merely present.
+        """
+        for query in (
+            "three step phosphorylation cascade",
+            "repressilator oscillations",
+            "enzyme kinetics with a competitive inhibitor",
+        ):
+            model = compose(query)
+            report = check_model(model)
+            names = {p.id for p in model.network.parameters}
+            examined = names & set(report.checked)
+            skipped = names & set(report.unchecked)
+
+            assert examined | skipped == names, (
+                query,
+                "parameters in neither set: "
+                f"{sorted(names - examined - skipped)}",
+            )
+            assert not (examined & skipped), (
+                query, sorted(examined & skipped),
+            )
+            assert examined, (query, "no PARAMETER was examined")
+
+    def test_species_are_recorded_separately_from_parameters(self) -> None:
+        # `checked` holds both, which is only safe because the names cannot
+        # collide. If they ever could, the partition above would go quiet.
+        model = compose("three step phosphorylation cascade")
+        parameters = {p.id for p in model.network.parameters}
+        species = {s.id for s in model.network.species}
+        assert not (parameters & species), sorted(parameters & species)
+
+    def test_the_two_reports_are_distinguishable(self) -> None:
+        """The whole point. Before `checked`, this assertion was false.
+
+        Both are clean, both have no findings, both have nothing skipped.
+        The only thing that separates them is what was looked at.
+        """
+        empty = check(self._EmptyNetwork())
+        real = check_model(compose("three step phosphorylation cascade"))
+
+        assert empty.findings == real.findings == ()
+        assert dict(empty.unchecked) == dict(real.unchecked) == {}
+        assert empty.physically_possible and real.physically_possible
+        # ...and yet:
+        assert empty.examined_nothing is not real.examined_nothing
+        assert empty.coverage != real.coverage
+
+    def test_physically_possible_is_true_over_nothing(self) -> None:
+        """Vacuously, and the docstring now says so.
+
+        Left as-is rather than made to return False: a network with no
+        parameters genuinely breaks no physical law, and a bound that
+        answered "impossible" for an empty model would be stating something
+        untrue in order to be cautious. The honest fix is the separate
+        question, not a corrupted answer to this one.
+        """
+        assert check(self._EmptyNetwork()).physically_possible
+
+        prose = " ".join(ScaleReport.physically_possible.__doc__.split())
+        assert "says nothing about COVERAGE" in prose
+        assert "examined_nothing" in prose
+
+    def test_a_skipped_parameter_is_not_counted_as_examined(self) -> None:
+        # The repressilator carries Hill exponents and rates this module
+        # recognises, plus units it does not. The two sets must not overlap.
+        report = check_model(compose("repressilator oscillations"))
+        assert report.unchecked, "expected some unrecognised units here"
+        assert not (set(report.checked) & set(report.unchecked)), (
+            "a parameter was reported both examined and skipped"
+        )
+        assert report.coverage.endswith("for want of a recognised unit")
+
+    def test_coverage_counts_match_the_fields(self) -> None:
+        # A summary line that disagreed with the fields it summarises would
+        # be worse than not having one.
+        report = check_model(compose("repressilator oscillations"))
+        assert str(len(report.checked)) in report.coverage
+        assert str(len(report.unchecked)) in report.coverage
+
+
+class TestTheCleanSentenceIsEarned:
+    """Three places printed a clean verdict over an unexamined model.
+
+    `summary()` said "every checked number is physically possible", the
+    verdict page said "every number physically possible", and the CLI
+    explained the gap with a sentence about the architecture that had
+    stopped being true. All three are read by someone deciding whether to
+    trust a number, and all three read as approval.
+    """
+
+    class _EmptyNetwork:
+        parameters = ()
+        species = ()
+
+    def test_the_summary_refuses_a_clean_bill_over_nothing(self) -> None:
+        text = check(self._EmptyNetwork()).summary()
+        assert "NOTHING WAS EXAMINED" in text
+        assert "physically possible and within the ranges" not in text
+        assert "absence of examination" in text
+
+    def test_the_summary_says_how_many_it_examined(self) -> None:
+        report = check_model(compose("three step phosphorylation cascade"))
+        text = report.summary()
+        assert f"All {len(report.checked)} of the numbers examined" in text
+        assert "NOTHING WAS EXAMINED" not in text
+
+    def test_the_verdict_note_leads_with_coverage(self) -> None:
+        from Terium.compose.verdict import _scale_concerns
+
+        _, note = _scale_concerns(compose("three step phosphorylation cascade"))
+        assert "examined" in note
+        # The bare claim, with no count attached, is what this replaces.
+        assert note != "every number physically possible"
+
+    def test_the_cli_no_longer_claims_parameter_carries_no_unit(self) -> None:
+        """The sentence went stale when `Parameter` gained a unit field.
+
+        It is the kind of prose nobody re-reads: an explanation of a
+        limitation, printed under a section, that outlived the limitation.
+        A reader would conclude the composer cannot check its own units.
+        """
+        source = (
+            pathlib.Path(__file__).resolve().parents[1]
+            / "compose" / "__main__.py"
+        ).read_text(encoding="utf-8")
+        assert "carries a value and no unit" not in source
+        assert "COMPOSED network describes itself" in source
+
+
+class TestTheDimensionalCheckSaysWhatItLookedAt:
+    """`unit_findings() == ()` conflated "all balanced" with "none existed".
+
+    Three callers printed a verdict from that empty tuple: the dossier's
+    Dimensions section said "Every rate law balances", `validate` returned
+    AGREE, and both are read as a clean result. A composition with no
+    instances, or whose motifs declare no reactions, produced the same
+    empty tuple as one whose every law balanced.
+    """
+
+    class _NoReactions:
+        """A composition that declares nothing to check."""
+
+        name = "empty"
+        concentration_unit = "mM"
+        _instances: tuple = ()
+
+        def unit_environment(self):
+            return {}
+
+    def _empty(self):
+        from Terium.compose.builder import Composition
+
+        empty = self._NoReactions()
+        # Borrow the real implementation rather than reimplementing it,
+        # so this cannot drift from what the production path does.
+        empty.unit_check = Composition.unit_check.__get__(empty)
+        return empty
+
+    def test_a_real_composition_reports_what_it_examined(self) -> None:
+        composition = compose(
+            "three step phosphorylation cascade"
+        ).recognition.composition
+        examined, findings = composition.unit_check()
+        assert examined > 0
+        assert findings == ()
+        # The old API still answers the old question.
+        assert composition.unit_findings() == findings
+
+    def test_examining_nothing_is_unchecked_not_agreement(self) -> None:
+        from Terium.compose.validate import (
+            AGREE, CHECK_DIMENSIONS, UNCHECKED, dimension_findings,
+        )
+
+        findings = dimension_findings(self._empty())
+        assert len(findings) == 1
+        assert findings[0].check == CHECK_DIMENSIONS
+        assert findings[0].severity == UNCHECKED, (
+            "agreement between a check and nothing is not agreement"
+        )
+        assert findings[0].severity != AGREE
+        assert "nothing to run against" in findings[0].detail
+
+    def test_a_real_composition_still_agrees(self) -> None:
+        # The check must not have been turned into a permanent UNCHECKED.
+        from Terium.compose.validate import AGREE, dimension_findings
+
+        composition = compose(
+            "three step phosphorylation cascade"
+        ).recognition.composition
+        findings = dimension_findings(composition)
+        assert len(findings) == 1
+        assert findings[0].severity == AGREE
+        assert "rate laws evaluate to an amount" in findings[0].detail
+
+    def test_the_dossier_section_does_not_claim_a_clean_check(self) -> None:
+        """Run, not read.
+
+        The first version of this test scanned report.py for the honest
+        wording. It passed against a mutation that made that wording
+        unreachable -- `if not examined:` changed to `if False:` left every
+        string in place. A phrase in a source file that no input can reach
+        is not a behaviour, and a test that only reads the file cannot tell
+        the difference.
+        """
+        from Terium.compose.report import ModelDossier
+
+        dossier = ModelDossier.__new__(ModelDossier)
+        object.__setattr__(
+            dossier, "model", self._model_with_no_rate_laws(),
+        )
+        lines = "\n".join(dossier.units_section())
+
+        assert "No rate law was checked" in lines
+        assert "absence of examination" in lines
+        assert "Every rate law balances" not in lines
+
+    def test_the_dossier_section_states_the_count_when_it_is_clean(
+        self,
+    ) -> None:
+        from Terium.compose.report import ModelDossier
+
+        model = compose("three step phosphorylation cascade")
+        examined, _ = model.recognition.composition.unit_check()
+
+        dossier = ModelDossier.__new__(ModelDossier)
+        object.__setattr__(dossier, "model", model)
+        lines = "\n".join(dossier.units_section())
+
+        assert f"All {examined} rate laws balance" in lines
+        assert "No rate law was checked" not in lines
+
+    def _model_with_no_rate_laws(self):
+        """A model whose composition declares nothing to check."""
+        empty = self._empty()
+
+        class _Recognition:
+            composition = empty
+
+        class _Model:
+            recognition = _Recognition()
+
+        return _Model()

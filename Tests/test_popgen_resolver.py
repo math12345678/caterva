@@ -199,8 +199,24 @@ class TestNormaliseDoi:
         assert _normalise_doi("") is None
 
 
-class TestMutationRateMutationTest:
-    """Mutation test: break the resolver and confirm test catches it."""
+class TestMutationRateIsBiologicallySane:
+    """Bounds on a resolved rate, checked when stdpopsim supplies one.
+
+    NOT a mutation test, despite what this class was called. Nothing here
+    perturbs the resolver and confirms a test goes red; the name promised
+    the strongest evidence in this repository's vocabulary and delivered
+    two range checks. In a suite whose central discipline is mutation
+    testing, a class claiming to be one is worse than an unnamed one --
+    an auditor counting coverage would count this.
+
+    Both assertions are conditional on `found`, and that is recorded in
+    `scripts/check_no_vacuous_tests.py`'s PYTHON_BASELINE rather than
+    hidden: the module skips entirely without stdpopsim, so they do not
+    pass silently, but when stdpopsim IS present and the resolver reports
+    not-found they check nothing. Making them unconditional needs a run
+    with stdpopsim installed to confirm `Homo sapiens` resolves, which is
+    not available here -- so the gap is written down instead of guessed at.
+    """
 
     def test_mutation_rate_is_positive(self):
         """All mutation rates must be positive (biological constraint)."""

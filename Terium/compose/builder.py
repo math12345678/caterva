@@ -343,6 +343,21 @@ class Composition:
         wrong rate law integrates perfectly well and produces a smooth curve
         that is wrong by whatever factor the mistake introduced, and there
         is no later point at which that becomes visible.
+
+        An empty result means every law balanced OR that there were no laws
+        to check -- see `unit_check`, which returns both halves. Callers
+        that print a verdict must use that one: "every rate law balances"
+        over zero rate laws is a true sentence and a misleading one.
+        """
+        return self.unit_check()[1]
+
+    def unit_check(self) -> Tuple[int, Tuple[object, ...]]:
+        """(rate laws examined, findings).
+
+        The count exists because `unit_findings() == ()` conflates the two
+        states a reader most needs told apart. A composition with no
+        instances, or whose motifs declare no reactions, produces exactly
+        the same empty tuple as one whose every law balances.
         """
         try:
             from .units import check_rate_law, parse_unit, rate_unit_for
@@ -355,6 +370,7 @@ class Composition:
         expected = rate_unit_for(parse_unit(self.concentration_unit))
 
         findings: List[object] = []
+        examined = 0
         for instance in self._instances:
             substitutions = {
                 port.name: instance.species_for(port.name)
@@ -368,6 +384,7 @@ class Composition:
             )
             for template in instance.motif.reactions:
                 label = f"{instance.prefix}_{template.name}"
+                examined += 1
                 _, produced = check_rate_law(
                     template.rate_law.format(**substitutions),
                     environment,
@@ -375,7 +392,7 @@ class Composition:
                     label=label,
                 )
                 findings.extend(produced)
-        return tuple(findings)
+        return examined, tuple(findings)
 
 
 # ---------------------------------------------------------------------------

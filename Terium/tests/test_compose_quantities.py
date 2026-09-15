@@ -620,6 +620,20 @@ class TestScaleStillWorksThroughThis:
             assert report.physically_possible, (
                 query, [f.describe() for f in report.errors]
             )
+            # The filter is a substring match on a message. If that message
+            # is ever reworded, `unitless` goes empty and this assertion
+            # starts passing for the wrong reason -- so the wording is
+            # pinned where it is produced, in scale.py's own tests, and the
+            # source is pinned non-empty here.
+            # The filter below is a substring match on a message, over a
+            # map that is empty in the healthy case. Without this, it would
+            # report clean for a model check_model never looked at -- which
+            # is how the `checked` field came to exist: a twelve-parameter
+            # cascade returned a report identical to one over an empty
+            # network, and this assertion is what noticed.
+            assert not report.examined_nothing, (
+                query, report.coverage,
+            )
             unitless = [
                 name for name, reason in report.unchecked.items()
                 if "no unit is recorded" in reason

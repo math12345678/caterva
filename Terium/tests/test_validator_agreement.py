@@ -83,6 +83,9 @@ def test_shim_defines_no_implementations() -> None:
     shadowing that made the half-finished split invisible to the suite.
     """
     source = (_TERIUM_DIR / "terium_engine.py").read_text(encoding="utf-8")
+    # An empty or unreadable shim would pass the scan below having checked
+    # nothing, which is the state this test is least able to tolerate.
+    assert source.strip(), "terium_engine.py is empty; nothing was scanned"
     offenders = [
         line.split("(")[0].replace("def ", "").strip()
         for line in source.splitlines()
