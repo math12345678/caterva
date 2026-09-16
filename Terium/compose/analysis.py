@@ -741,11 +741,24 @@ def analyse(
     # and so include points well away from equilibrium. A model whose
     # every flux is zero at every start has no dynamics to converge, and
     # for it the absolute bar is kept rather than dividing by nothing.
+    #
+    # PROBED AWAY FROM EQUILIBRIUM, NOT ONLY AT THE STARTS. A caller
+    # passing one explicit start placed AT the root -- which is what a
+    # local solve is -- would otherwise measure the reference flux at the
+    # root itself, get something near machine precision, and set a bar a
+    # million times tighter than any solver can meet. Two of this file's
+    # own tests did exactly that and found nothing. So the probes at the
+    # search scale, and at a decade either side of it, are always included:
+    # a model that is at equilibrium at all three has no dynamics to speak
+    # of, and the absolute bar is kept for it.
+    probes = list(starts)
+    for factor in (0.1, 1.0, 10.0):
+        probes.append([factor * value for value in scale])
     reference_flux = 0.0
-    for start in starts:
+    for probe in probes:
         try:
-            rates = rhs(start)
-        except Exception:  # noqa: BLE001 - a start that raises is not a scale
+            rates = rhs(probe)
+        except Exception:  # noqa: BLE001 - a probe that raises is not a scale
             continue
         largest = max((abs(v) for v in rates if math.isfinite(v)), default=0.0)
         reference_flux = max(reference_flux, largest)
