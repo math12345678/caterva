@@ -298,6 +298,22 @@ class DoseResponse:
         return max(self.points, key=lambda p: p.response)
 
     @property
+    def extreme(self) -> DosePoint:
+        """The dose at which the readout is FURTHEST from its baseline.
+
+        Not `peak`. For a rising curve the two coincide; for a FALLING one
+        -- an inhibitor titrated against a readout it suppresses -- the
+        peak is the lowest dose, where nothing has happened yet, and the
+        extreme is the highest, where the most has. `emax` and
+        `dynamic_range` used to read `peak`, so an inhibitor's maximal
+        effect was reported as its vehicle control and its dynamic range
+        as exactly zero. Emax is maximal EFFECT, and for an inhibitor the
+        effect is the fall.
+        """
+        baseline = self.baseline
+        return max(self.points, key=lambda p: abs(p.response - baseline))
+
+    @property
     def trough(self) -> DosePoint:
         return min(self.points, key=lambda p: p.response)
 
@@ -679,9 +695,12 @@ def curve_for_model(model: Any, *args: Any, **kwargs: Any) -> DoseResponse:
     are silent, and both change what the number means.
     """
     kwargs.setdefault("dose_unit", dose_unit_of(model))
-    kwargs.setdefault(
-        "unmeasured", tuple(q.parameter_id for q in getattr(model, "resolvable", ()))
-    )
+    # `model.unmeasured`, not `model.resolvable`. A ProvenancedModel has no
+    # `resolvable` -- it has origins -- so the old getattr defaulted to ()
+    # and a curve over placeholders reported that none of its constants
+    # were placeholders. Both model classes answer `unmeasured` from what
+    # they actually carry.
+    kwargs.setdefault("unmeasured", tuple(getattr(model, "unmeasured", ()) or ()))
     return curve(model.network, *args, **kwargs)
 
 
@@ -1118,8 +1137,14 @@ def emax(response: DoseResponse) -> float:
     Defined for a biphasic curve, where it is the peak, and returned for one
     without complaint. Only the EC50 assumes a shape substrate inhibition
     does not have.
+
+    FOR A FALLING CURVE THIS IS THE LOWEST RESPONSE, not the highest. Emax
+    is maximal effect. An inhibitor's maximal effect is its maximal
+    suppression, and the first version of this read `peak` -- the largest
+    response -- which for an inhibitor is the untreated baseline. That
+    reported the vehicle control as the drug's Emax.
     """
-    return response.peak.response
+    return response.extreme.response
 
 
 def dynamic_range(response: DoseResponse) -> float:
@@ -1136,8 +1161,15 @@ def dynamic_range(response: DoseResponse) -> float:
     the lowest dose is already active this understates the range, and
     `DoseResponse.summary` prints the dose it was measured from so that is
     visible rather than assumed.
+
+    SIGNED. Positive for a rising curve, negative for a falling one, and
+    the sign is the direction of the effect -- an activator raises the
+    readout and an inhibitor lowers it, and a reader given only the
+    magnitude has to look elsewhere to learn which. The first version
+    read `peak - baseline`, which for a falling curve is `baseline -
+    baseline`: every inhibitor had a dynamic range of exactly zero.
     """
-    return response.peak.response - response.baseline
+    return response.extreme.response - response.baseline
 
 
 __all__ = [

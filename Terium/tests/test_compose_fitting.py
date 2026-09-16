@@ -650,3 +650,81 @@ class TestHonesty:
         assert RANK_TOLERANCE == pytest.approx(
             10.0 * PREDICTION_PRECISION / LOG_STEP, rel=1e-9
         )
+
+
+class TestTheStructuralCheckActuallyRuns:
+    """Every FitReport said "the structural identifiability check did not run".
+
+    `identifiability.analyse(network, quantities, *, parameters=...)` takes
+    the observables second and the parameters by keyword. `structural_note`
+    called it as `entry(network, parameters)`, so every parameter name was
+    handed over as an observable, the module raised, and the note reported
+    the failure -- honestly, and for the wrong reason. The check was fine.
+    The call was not. A capability nothing can reach is not one.
+
+    The observations now go in as what they are: one callable per
+    observation, the model's prediction for it as a function of the
+    network. That is the structural question -- could THESE observations
+    determine THESE parameters from perfect data -- asked with the
+    observations.
+    """
+
+    def test_the_note_reports_a_rank_not_a_failure(self) -> None:
+        report = fit(turnover(1.0, 0.1), time_course(sigma=SIGMA), ["x_ks", "x_kd"])
+        note = report.structural or ""
+        assert "did not run" not in note, note
+        assert "was not asked" not in note, note
+        assert "rank 2" in note
+        assert "separately identifiable" in note
+
+    def test_steady_states_alone_identify_only_the_ratio(self) -> None:
+        """The textbook case, from identifiability.py's own docstring.
+
+        A steady state of synthesis-and-decay is ks/kd. Two steady-state
+        readings, however different their starting amounts, both report
+        that ratio and nothing else: rank 1 of 2. The local rank test in
+        `fit` refuses this as underdetermined -- correctly -- so the
+        structural note is read off `structural_note` directly, which is
+        what `fit` calls once it has a fit to report.
+        """
+        from Terium.compose.fitting import predict_states, structural_note
+
+        observations = [
+            Observation("x_X", Condition("empty", initials={"x_X": 0.0}),
+                        TRUE_KS / TRUE_KD, SIGMA),
+            Observation("x_X", Condition("preloaded", initials={"x_X": 10.0}),
+                        TRUE_KS / TRUE_KD, SIGMA),
+        ]
+        note = structural_note(
+            turnover(1.0, 0.1), ["x_ks", "x_kd"], observations, predict_states,
+        ) or ""
+        assert "rank 1" in note, note
+        assert "1 are not" in note or "1 is not" in note, note
+
+    def test_adding_a_transient_reading_makes_both_identifiable(self) -> None:
+        # The same two steady states plus one reading at t = 2, which sees
+        # the approach and so sees kd on its own. This is the fixture the
+        # local test above already uses; the structural note now agrees.
+        from Terium.compose.fitting import predict_states, structural_note
+
+        observations = [
+            Observation("x_X", Condition("empty", initials={"x_X": 0.0}),
+                        TRUE_KS / TRUE_KD, SIGMA),
+            Observation("x_X", Condition("preloaded", initials={"x_X": 10.0}),
+                        TRUE_KS / TRUE_KD, SIGMA),
+            Observation("x_X", Condition("t=2", time=2.0), analytic(2.0), SIGMA),
+        ]
+        note = structural_note(
+            turnover(1.0, 0.1), ["x_ks", "x_kd"], observations, predict_states,
+        ) or ""
+        assert "rank 2" in note, note
+
+    def test_without_observations_it_says_it_was_not_asked(self) -> None:
+        # The three-state rule: not asked is not failed and not passed.
+        from Terium.compose.fitting import structural_note
+
+        note = structural_note(turnover(1.0, 0.1), ["x_ks", "x_kd"]) or ""
+        assert "was not asked" in note
+        assert "rank 1" not in note and "rank 2" not in note, (
+            "a rank was reported for a check that was never asked"
+        )

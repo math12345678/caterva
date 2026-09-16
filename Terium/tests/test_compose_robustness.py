@@ -587,3 +587,64 @@ class TestTheBoxCentreIsEvaluated:
         assert report.held_at_centre is None
         assert "UNKNOWN" in report.summary()
         assert "not the same as centred well" in report.summary()
+
+
+class TestAPartlyMeasuredModelVariesItsPlaceholders:
+    """`_resolvable_ids` read `resolvable`, which a ProvenancedModel lacks.
+
+    So `assess_model` on a partly-measured model -- exactly the model whose
+    remaining placeholders the placeholder question is ABOUT -- found
+    nothing to vary and refused. Both model classes now answer `unmeasured`
+    from what they carry, and this reads that.
+    """
+
+    def _partly(self):
+        from Terium.compose.export import Measurement, provenance_of
+
+        model = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        return provenance_of(model, measured={
+            "reaction_kcat": Measurement(
+                value=100.0, unit="1/s", citation="c", organism="H",
+                source="b", citation_source="p", reference_id="1",
+            ),
+        })
+
+    def test_the_placeholders_are_what_gets_varied(self) -> None:
+        from Terium.compose.robustness import _resolvable_ids
+
+        assert set(_resolvable_ids(self._partly())) == {"reaction_Km", "reaction_Ki"}
+
+    def test_the_measured_constant_is_held_fixed(self) -> None:
+        from Terium.compose.robustness import assess_model, is_monostable
+
+        report = assess_model(
+            self._partly(), is_monostable(),
+            conclusion_name="one stable state", samples=2,
+        )
+        assert set(report.varied) == {"reaction_Km", "reaction_Ki"}
+        assert "reaction_kcat" not in report.varied, (
+            "a measured constant was resampled as though it were a placeholder"
+        )
+
+    def test_a_fully_measured_model_still_refuses(self) -> None:
+        # Nothing left unmeasured means nothing to vary, and that stays a
+        # refusal with the dose question offered instead.
+        from Terium.compose.export import Measurement, provenance_of
+        from Terium.compose.robustness import (
+            RobustnessError, assess_model, is_monostable,
+        )
+
+        def m(v, u):
+            return Measurement(value=v, unit=u, citation="c", organism="H",
+                               source="b", citation_source="p", reference_id="1")
+
+        full = provenance_of(
+            compose("enzyme kinetics with a competitive inhibitor",
+                    subject="hexokinase"),
+            measured={"reaction_kcat": m(100.0, "1/s"),
+                      "reaction_Km": m(0.1, "mM"), "reaction_Ki": m(0.5, "mM")},
+        )
+        with pytest.raises(RobustnessError, match="no unresolved constants"):
+            assess_model(full, is_monostable(), conclusion_name="x", samples=2)

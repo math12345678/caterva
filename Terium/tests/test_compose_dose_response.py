@@ -31,7 +31,7 @@ from Terium.compose.bifurcation import logarithmic_values
 from Terium.compose.builder import Composition
 from Terium.compose.dose_response import (
     FLAT_TOLERANCE, MINIMUM_DOSES, MONOTONIC_TOLERANCE, PLATEAU_FRACTION,
-    STARTS_PER_SPECIES, DoseResponse, DoseResponseUnavailable, HillFit,
+    STARTS_PER_SPECIES, DosePoint, DoseResponse, DoseResponseUnavailable, HillFit,
     NotMonotonic, clamped, curve, curve_for_model, dose_unit_of,
     dynamic_range, ec50, emax, fit_hill, hill_response,
 )
@@ -909,3 +909,60 @@ class TestTheCurveRefusesQuestionsWithNoAnswer:
         with pytest.raises(DoseResponseUnavailable) as caught:
             curve(network, "e_S", "e_Q", DOSES)
         assert "no species 'e_Q' to read out" in str(caught.value)
+
+
+class TestAnInhibitorHasAnEmax:
+    """`emax` and `dynamic_range` read the PEAK, the largest response.
+
+    For a rising curve that is the maximal effect. For a falling one --
+    an inhibitor titrated against a readout it suppresses -- the largest
+    response is at the lowest dose, where nothing has happened yet. So an
+    inhibitor's Emax was reported as its vehicle control, and its dynamic
+    range as `baseline - baseline`: exactly zero, for every inhibitor,
+    always. Emax is maximal EFFECT, and for an inhibitor the effect is the
+    fall.
+    """
+
+    @staticmethod
+    def _curve(responses):
+        points = tuple(
+            DosePoint(dose=float(i), response=float(r), residual=0.0, starts_tried=8)
+            for i, r in enumerate(responses)
+        )
+        return DoseResponse(input_species="I", readout="P", points=points)
+
+    def test_a_falling_curve_has_a_negative_dynamic_range(self) -> None:
+        falling = self._curve([1.0, 0.8, 0.5, 0.2, 0.1])
+        assert dynamic_range(falling) == pytest.approx(-0.9)
+        assert dynamic_range(falling) != 0.0, "every inhibitor's range was zero"
+
+    def test_a_falling_curve_emax_is_its_lowest_response(self) -> None:
+        falling = self._curve([1.0, 0.8, 0.5, 0.2, 0.1])
+        assert emax(falling) == pytest.approx(0.1)
+        assert emax(falling) != falling.baseline, (
+            "the vehicle control was reported as the drug's Emax"
+        )
+
+    def test_a_rising_curve_is_unchanged(self) -> None:
+        rising = self._curve([0.1, 0.3, 0.6, 0.9, 1.0])
+        assert emax(rising) == pytest.approx(1.0)
+        assert dynamic_range(rising) == pytest.approx(0.9)
+        assert rising.extreme is rising.peak
+
+    def test_the_sign_is_the_direction(self) -> None:
+        assert dynamic_range(self._curve([0.1, 1.0])) > 0
+        assert dynamic_range(self._curve([1.0, 0.1])) < 0
+
+    def test_a_biphasic_curve_still_reports_its_peak(self) -> None:
+        # Substrate inhibition rises then falls; the extreme is wherever the
+        # readout got furthest from where it started, which here is the peak.
+        biphasic = self._curve([0.1, 0.6, 1.0, 0.7, 0.4])
+        assert emax(biphasic) == pytest.approx(1.0)
+        assert biphasic.extreme is biphasic.peak
+
+    def test_a_biphasic_curve_that_ends_below_its_start(self) -> None:
+        # ...and when the fall goes further than the rise, the extreme is
+        # the fall. Whichever effect is larger is the maximal one.
+        overshoot = self._curve([0.5, 0.7, 0.6, 0.2, 0.0])
+        assert emax(overshoot) == pytest.approx(0.0)
+        assert dynamic_range(overshoot) == pytest.approx(-0.5)
