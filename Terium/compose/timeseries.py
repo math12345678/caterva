@@ -339,11 +339,13 @@ class Series:
 
     DELIBERATELY NOT A `Trajectory`. A Trajectory carries conservation checks
     and a window basis, and `Trajectory.sound` is True when no law was
-    checked. Wrapping measured data, or an array written down to check the
-    arithmetic against an analytic answer, in a Trajectory would have it
-    report that an integration it never underwent came out sound. The point
-    of this class is to be readable by the same functions while claiming
-    none of that.
+    checked -- `Trajectory.checked` now says whether one was, but a wrapped
+    measurement would have `checked == False` and `sound == True`, which is
+    a true statement about nothing. Wrapping measured data, or an array
+    written down to check the arithmetic against an analytic answer, in a
+    Trajectory would have it carry properties that describe an integration
+    it never underwent. The point of this class is to be readable by the
+    same functions while claiming none of that.
     """
 
     times: Tuple[float, ...]

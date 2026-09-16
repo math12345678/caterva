@@ -259,3 +259,83 @@ class TestAgreementWithTheAnalysis:
         trajectory = run(compose("a toggle switch between two repressors"))
         assert trajectory.unmeasured
         assert "not measurements" in trajectory.summary()
+
+
+class TestSoundIsNotTheSameAsChecked:
+    """`Trajectory.sound` was True having checked nothing.
+
+    `all(check.held for check in ())` is True, so a network with no
+    conservation law -- pure synthesis and decay, say -- reported its
+    integration sound without any law having been compared against it.
+    The summary printed nothing beside the final state, and nothing beside
+    a final state reads as verified. `timeseries.py` had written this down
+    as the reason to keep measured data out of the class; it was a reason
+    to fix the class.
+    """
+
+    @staticmethod
+    def _no_laws():
+        """Synthesis and first-order decay of one species: nothing conserved."""
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        return ReactionNetwork(
+            name="leaky",
+            species=(Species("X", 0.0),),
+            parameters=(
+                Parameter("ks", 1.0, "mM/s"), Parameter("kd", 0.1, "1/s"),
+            ),
+            reactions=(
+                Reaction("make", {}, {"X": 1}, "ks"),
+                Reaction("decay", {"X": 1}, {}, "kd * X"),
+            ),
+        )
+
+    def _trajectory(self):
+        from Terium.compose.simulate import Trajectory, check_invariants
+
+        network = self._no_laws()
+        invariants = check_invariants(network, {"X": (0.0, 5.0, 9.0)})
+        return Trajectory(
+            times=(0.0, 1.0, 2.0), columns={"X": (0.0, 5.0, 9.0)},
+            end=2.0, points=3, window_basis="test",
+            invariants=invariants,
+        )
+
+    def test_a_network_with_no_law_is_unchecked(self) -> None:
+        trajectory = self._trajectory()
+        assert not trajectory.invariants, "the premise: nothing is conserved"
+        assert not trajectory.checked
+        # And `sound` is still vacuously True -- that is not the bug, the
+        # missing distinction was.
+        assert trajectory.sound
+
+    def test_the_summary_says_so_rather_than_nothing(self) -> None:
+        text = self._trajectory().summary()
+        assert "no conservation law" in text
+        assert "nothing has confirmed them" in text
+        assert "survived the integration" not in text
+
+    def test_a_network_with_a_law_is_checked(self) -> None:
+        from Terium.compose.pipeline import compose
+        from Terium.compose.simulate import run
+
+        trajectory = run(compose("three step phosphorylation cascade"))
+        assert trajectory.checked
+        assert trajectory.invariants
+
+    def test_the_dossier_distinguishes_the_two(self) -> None:
+        from Terium.compose.report import ModelDossier
+
+        class _Model:
+            recognition = None
+
+        dossier = ModelDossier.__new__(ModelDossier)
+        object.__setattr__(dossier, "model", _Model())
+        object.__setattr__(dossier, "trajectory", self._trajectory())
+        text = "\n".join(dossier.trajectory_section())
+        assert "No independent check on this integration was possible" in text
+        assert "should not be trusted" not in text, (
+            "unchecked was reported as broken"
+        )

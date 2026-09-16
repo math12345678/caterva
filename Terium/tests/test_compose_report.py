@@ -607,3 +607,91 @@ class TestTheTimeCourseIsCheckedForPlausibility:
         lines = "\n".join(self._dossier_with(run).trajectory_section())
         assert "should not be trusted" not in lines  # conservation held
         assert "cannot exist at the predicted amount" in lines  # but impossible
+
+
+class TestNamingASubjectDoesNotLaunderPlaceholders:
+    """Typing an enzyme's name removed every warning that nothing was measured.
+
+    `structure_only` means "no subject was named". Three readers treated
+    its negation as "the constants were measured": the verdict graded the
+    model GROUNDED, the trajectory reported zero unmeasured constants, and
+    this dossier dropped its "SHAPE, not a real system" caveat. No search
+    had run. Every constant was still the library's placeholder.
+
+    The question all three needed is `model.unmeasured`, which both model
+    classes now answer from what they actually carry.
+    """
+
+    def test_the_caveat_survives_a_named_subject(self) -> None:
+        from Terium.compose.report import dossier
+
+        # The caveat qualifies the Behaviour section, so stability runs.
+        text = dossier(
+            "enzyme kinetics with a competitive inhibitor",
+            subject="hexokinase", simulate=False, rank_unmeasured=False,
+        ).markdown()
+        assert "SHAPE, not about any real system" in text
+        assert "because no search has been run for 'hexokinase'" in text
+        assert "All 3 rate constants" in text
+
+    def test_the_caveat_says_no_enzyme_when_none_was_named(self) -> None:
+        from Terium.compose.report import dossier
+
+        text = dossier(
+            "enzyme kinetics with a competitive inhibitor",
+            simulate=False, rank_unmeasured=False,
+        ).markdown()
+        assert "because no enzyme was named" in text
+
+    def test_a_partly_measured_model_says_how_many(self) -> None:
+        from Terium.compose.export import Measurement, provenance_of
+        from Terium.compose.pipeline import compose
+        from Terium.compose.report import ModelDossier
+
+        model = provenance_of(
+            compose("enzyme kinetics with a competitive inhibitor",
+                    subject="hexokinase"),
+            measured={"reaction_kcat": Measurement(
+                value=1.0, unit="1/s", citation="c", organism="H",
+                source="b", citation_source="p", reference_id="1",
+            )},
+        )
+        dossier = ModelDossier.__new__(ModelDossier)
+        object.__setattr__(dossier, "model", model)
+        caveat = dossier.placeholder_warning()
+        assert caveat is not None
+        assert "2 of the 3 rate constants" in caveat
+        assert "did not find them" in caveat
+
+    def test_a_fully_measured_model_has_no_caveat(self) -> None:
+        from Terium.compose.export import Measurement, provenance_of
+        from Terium.compose.pipeline import compose
+        from Terium.compose.report import ModelDossier
+
+        def m(v, u):
+            return Measurement(value=v, unit=u, citation="c", organism="H",
+                               source="b", citation_source="p", reference_id="1")
+
+        model = provenance_of(
+            compose("enzyme kinetics with a competitive inhibitor",
+                    subject="hexokinase"),
+            measured={"reaction_kcat": m(1.0, "1/s"),
+                      "reaction_Km": m(0.1, "mM"),
+                      "reaction_Ki": m(0.5, "mM")},
+        )
+        dossier = ModelDossier.__new__(ModelDossier)
+        object.__setattr__(dossier, "model", model)
+        assert dossier.placeholder_warning() is None
+
+    def test_the_trajectory_carries_every_placeholder(self) -> None:
+        from Terium.compose.pipeline import compose
+        from Terium.compose.simulate import run
+
+        named = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        trajectory = run(named)
+        assert set(trajectory.unmeasured) == set(named.unmeasured)
+        assert len(trajectory.unmeasured) == 3, (
+            "naming a subject emptied the trajectory's unmeasured list"
+        )

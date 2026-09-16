@@ -381,9 +381,11 @@ def _predictions_section(sections: Sections, model: Any) -> None:
 
     def produce() -> str:
         parts: list[str] = []
+        composition = model.recognition.composition
+        proteins = tuple(sorted(composition.protein_species()))
 
         stability = analyse(model.network)
-        for report in check_steady_states(stability):
+        for report in check_steady_states(stability, proteins=proteins):
             parts.append(report.summary())
 
         # The transient is the reading that earns this section: a run can
@@ -394,7 +396,7 @@ def _predictions_section(sections: Sections, model: Any) -> None:
 
             parts.append("")
             parts.append(check_trajectory(
-                run(model), subject="the simulated run"
+                run(model), subject="the simulated run", proteins=proteins,
             ).summary())
         except Exception as exc:  # noqa: BLE001
             parts.append("")
@@ -558,89 +560,107 @@ def _design_section(sections: Sections, model: Any) -> None:
     )
 
 
-def _robustness_section(sections: Sections, model: Any, samples: int) -> None:
-    """Does the conclusion survive resampling the placeholders.
+def _robustness_assessment(model: Any, samples: int) -> Tuple[Any, str]:
+    """(the RobustnessReport, the conclusion's name), or a refusal.
+
+    THE COMPUTATION, SEPARATED FROM THE PRINTING, so it can run BEFORE the
+    dossier and be handed to the verdict page. The dossier used to print a
+    verdict saying "robustness: not run" and then this section ran
+    underneath it -- one report whose headline contradicted its body. Now
+    `main` computes this first, the verdict reads it, and the section
+    prints the same object rather than computing a second time.
 
     WHICH CONCLUSION IS NOT CHOSEN BY THIS FILE. It is read off the
-    steady-state analysis that has already run: a model the search found two
-    stable states in is asked whether it stays bistable, and one it found
-    exactly one in is asked whether it stays monostable. Picking a fixed
-    conclusion -- "is it bistable" for everything -- would report a
-    monostable model as 0% robust, which is a true number answering a
-    question nobody asked.
+    steady-state analysis: a model the search found two stable states in
+    is asked whether it stays bistable, and one it found exactly one in is
+    asked whether it stays monostable. Picking a fixed conclusion would
+    report a monostable model as 0% robust, which is a true number
+    answering a question nobody asked.
 
-    With no steady state found there is no conclusion to resample, and this
-    refuses rather than inventing one.
-
-    THE CONCLUSION AND ITS RESAMPLING USE ONE SEARCH DEPTH. They did not.
-    This function chose the conclusion from `analyse`'s own default of 8
-    starting points per species, and `robustness` judged every draw at
-    `sensitivity.STARTS_PER_SPECIES`, which is 16. Those depths are
-    documented to disagree -- sensitivity.py records a library model that
-    reports the wrong number of stable states at 8 and the right one at 16
-    -- so the printed percentage was partly a measure of two searches
-    contradicting each other, and the conclusion chosen could be FALSE at
-    the exact centre of the box being sampled.
+    THE CONCLUSION AND ITS RESAMPLING USE ONE SEARCH DEPTH. They did not:
+    this chose from `analyse`'s default and `robustness` judged every draw
+    at a deeper one, so the printed percentage was partly a measure of two
+    searches disagreeing and the conclusion could be FALSE at the centre
+    of the box being sampled. One depth, by reference, everywhere.
     """
-    from Terium.compose.analysis import AnalysisError, analyse
+    from Terium.compose.analysis import analyse
     from Terium.compose.robustness import (
         DEFAULT_SAMPLES, RobustnessError, assess_model, default_search_depth,
         is_bistable, is_monostable, oscillates,
     )
 
+    depth = default_search_depth()
+    report = analyse(model.network, starts_per_species=depth)
+    stable = report.stable_points
+    if len(stable) > 1:
+        conclusion, name = (
+            is_bistable(starts_per_species=depth),
+            "at least two stable states",
+        )
+    elif len(stable) == 1:
+        conclusion, name = (
+            is_monostable(starts_per_species=depth),
+            "exactly one stable state",
+        )
+    elif report.any_oscillatory:
+        conclusion, name = (
+            oscillates(starts_per_species=depth), "sustained oscillation",
+        )
+    elif getattr(report, "on_a_continuum", False):
+        # A line of equilibria is a real finding and there IS a conclusion
+        # to resample: "the system has no isolated attractor". But that
+        # conclusion is structural -- it follows from the substrate being
+        # consumed and nothing replenishing it -- and resampling rate
+        # constants cannot move it. The honest answer is to say what the
+        # finding is and why a fraction would be 100% by construction,
+        # rather than print the 100%.
+        points = len(getattr(report, "continuum_points", ()))
+        raise RobustnessError(
+            f"the steady-state search found a LINE of equilibria "
+            f"({points} points on it) and no isolated attractor. That "
+            f"is a structural property -- the substrate is consumed and "
+            f"nothing replenishes it, so once the rates reach zero every "
+            f"split of the products is an equilibrium -- and resampling "
+            f"rate constants cannot change it. A robustness fraction "
+            f"here would be 100% by construction and would say nothing. "
+            f"Ask for a time course from your actual starting amounts "
+            f"instead; where on the line the system stops is the "
+            f"question this model actually poses."
+        )
+    else:
+        raise RobustnessError(
+            f"the steady-state search found no stable state and no "
+            f"unstable spiral from {report.starts_tried} starting "
+            f"points, so there is no conclusion to resample. "
+            f"Robustness is a question about a finding, and this model "
+            f"has not produced one to ask about."
+        )
+    count = DEFAULT_SAMPLES if samples == SAMPLES_UNSTATED else samples
+    assessment = assess_model(
+        model, conclusion, conclusion_name=name, samples=count,
+        starts_per_species=depth,
+    )
+    return assessment, name
+
+
+def _robustness_section(
+    sections: Sections, model: Any, samples: int,
+    precomputed: Optional[Tuple[Any, str]] = None,
+) -> None:
+    """Does the conclusion survive resampling the placeholders.
+
+    Prints `precomputed` when `main` already ran the assessment for the
+    verdict page; computes it only when called without one.
+    """
+    from Terium.compose.analysis import AnalysisError
+    from Terium.compose.robustness import RobustnessError
+
     title = "Robustness to the placeholders"
 
     def produce() -> str:
-        depth = default_search_depth()
-        report = analyse(model.network, starts_per_species=depth)
-        stable = report.stable_points
-        if len(stable) > 1:
-            conclusion, name = (
-                is_bistable(starts_per_species=depth),
-                "at least two stable states",
-            )
-        elif len(stable) == 1:
-            conclusion, name = (
-                is_monostable(starts_per_species=depth),
-                "exactly one stable state",
-            )
-        elif report.any_oscillatory:
-            conclusion, name = (
-                oscillates(starts_per_species=depth), "sustained oscillation",
-            )
-        elif getattr(report, "on_a_continuum", False):
-            # A line of equilibria is a real finding and there IS a
-            # conclusion to resample: "the system has no isolated
-            # attractor". But that conclusion is structural -- it follows
-            # from the substrate being consumed and nothing replenishing it
-            # -- and resampling rate constants cannot move it. The honest
-            # answer is to say what the finding is and why a fraction
-            # would be 100% by construction, rather than print the 100%.
-            points = len(getattr(report, "continuum_points", ()))
-            raise RobustnessError(
-                f"the steady-state search found a LINE of equilibria "
-                f"({points} points on it) and no isolated attractor. That "
-                f"is a structural property -- the substrate is consumed and "
-                f"nothing replenishes it, so once the rates reach zero every "
-                f"split of the products is an equilibrium -- and resampling "
-                f"rate constants cannot change it. A robustness fraction "
-                f"here would be 100% by construction and would say nothing. "
-                f"Ask for a time course from your actual starting amounts "
-                f"instead; where on the line the system stops is the "
-                f"question this model actually poses."
-            )
-        else:
-            raise RobustnessError(
-                f"the steady-state search found no stable state and no "
-                f"unstable spiral from {report.starts_tried} starting "
-                f"points, so there is no conclusion to resample. "
-                f"Robustness is a question about a finding, and this model "
-                f"has not produced one to ask about."
-            )
-        count = DEFAULT_SAMPLES if samples == SAMPLES_UNSTATED else samples
-        assessment = assess_model(
-            model, conclusion, conclusion_name=name, samples=count,
-            starts_per_species=depth,
+        assessment, name = (
+            precomputed if precomputed is not None
+            else _robustness_assessment(model, samples)
         )
         return (
             assessment.summary()
@@ -755,7 +775,10 @@ def _stochastic_section(
     sections.write(title, "\n".join(parts).rstrip())
 
 
-def _validate_section(sections: Sections, model: Any, species: Optional[str]) -> None:
+def _validate_section(
+    sections: Sections, model: Any, species: Optional[str],
+    precomputed: Any = None,
+) -> None:
     """Cross-module consistency, with the quantity named by the caller.
 
     `species` is passed through rather than defaulted. `validate.validate`
@@ -768,7 +791,10 @@ def _validate_section(sections: Sections, model: Any, species: Optional[str]) ->
     from Terium.compose.validate import ValidationError, validate
 
     def produce() -> str:
-        report = validate(model, species=species)
+        report = (
+            precomputed if precomputed is not None
+            else validate(model, species=species)
+        )
         tail = (
             ""
             if species
@@ -915,7 +941,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             print(compile_to_antimony(model.network))
             return 0
 
+        from Terium.compose.pipeline import compose
         from Terium.compose.report import dossier
+
+        # COMPOSE ONCE, AND RUN THE VERDICT'S INPUTS BEFORE THE VERDICT.
+        #
+        # The dossier's verdict page reports whether `validate` and
+        # `robustness` ran. It used to be formed before either had, so a
+        # run with `--validate --robustness` printed "validate: not run,
+        # robustness: not run" at the top and then ran both underneath --
+        # one report whose headline contradicted its own body. Both are
+        # computed here when asked for, handed to the dossier so the
+        # verdict can read them, and printed by their sections afterwards
+        # without being computed a second time.
+        model = compose(args.description, subject=args.subject)
+        precomputed = _precompute_for_verdict(args, model)
 
         report = dossier(
             args.description,
@@ -927,13 +967,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             sweep_steps=args.sweep_steps,
             rank_unmeasured=not args.no_ranking,
             rank_against=args.rank_against,
+            model=model,
+            validation=precomputed.validation,
+            robustness=precomputed.robustness,
+            conclusion_name=precomputed.conclusion_name,
         )
         # Footer withheld until the analysis sections have run: a document
         # that says "Built by Terrium..." and then carries on for three more
         # pages has put its last word in the middle.
         print(report.markdown(footer=False))
 
-        code = _analyses(args, report.model)
+        code = _analyses(args, report.model, precomputed)
         print("\n".join(report.footer_section()))
         return code
 
@@ -944,7 +988,44 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return 3
 
 
-def _analyses(args: Any, model: Any) -> int:
+class _Precomputed:
+    """What `main` ran ahead of the dossier so the verdict could read it.
+
+    Each is None when its flag was absent OR when it refused; the section
+    that prints it re-raises the refusal in the latter case, so the reason
+    lands under the right heading rather than being swallowed here.
+    """
+
+    def __init__(self) -> None:
+        self.validation: Any = None
+        self.robustness: Any = None
+        self.conclusion_name: Optional[str] = None
+        self.robustness_pair: Optional[Tuple[Any, str]] = None
+
+
+def _precompute_for_verdict(args: Any, model: Any) -> _Precomputed:
+    out = _Precomputed()
+    if args.validate:
+        try:
+            from Terium.compose.validate import validate
+
+            out.validation = validate(model, species=args.rank_against)
+        except Exception:  # noqa: BLE001 - the section will re-raise and print it
+            out.validation = None
+    if args.robustness is not None:
+        try:
+            assessment, name = _robustness_assessment(model, args.robustness)
+            out.robustness = assessment
+            out.conclusion_name = name
+            out.robustness_pair = (assessment, name)
+        except Exception:  # noqa: BLE001 - the section will re-raise and print it
+            out.robustness = None
+    return out
+
+
+def _analyses(
+    args: Any, model: Any, precomputed: Optional[_Precomputed] = None,
+) -> int:
     """Run every analysis asked for, and return the exit code.
 
     Order is structure first, then the numbers, then the cross-checks --
@@ -968,7 +1049,10 @@ def _analyses(args: Any, model: Any) -> int:
     if args.design:
         _design_section(sections, model)
     if args.robustness is not None:
-        _robustness_section(sections, model, args.robustness)
+        _robustness_section(
+            sections, model, args.robustness,
+            precomputed=precomputed.robustness_pair if precomputed else None,
+        )
     if args.knockout or args.overexpress or args.screen:
         _perturbation_section(
             sections, model, args.knockout, args.overexpress, args.screen,
@@ -981,7 +1065,10 @@ def _analyses(args: Any, model: Any) -> int:
             else args.stochastic_seed,
         )
     if args.validate:
-        _validate_section(sections, model, args.rank_against)
+        _validate_section(
+            sections, model, args.rank_against,
+            precomputed=precomputed.validation if precomputed else None,
+        )
 
     if not sections.refused:
         return 0

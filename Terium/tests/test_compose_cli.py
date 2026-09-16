@@ -686,3 +686,89 @@ class TestAContinuumIsNotResampled:
         section = out[out.index("Robustness to the placeholders"):]
         assert "'at least two stable states' held in" in section
         assert "LINE of equilibria" not in section
+
+
+class TestTheVerdictKnowsWhatRanBelowIt:
+    """One report, and its headline disagreed with its own body.
+
+    The dossier's verdict page reports whether `validate` and `robustness`
+    ran. It was formed before either had, so `--validate --robustness`
+    printed "validate: not run, robustness: not run" at the top and then
+    ran both underneath. `main` now composes once, runs what was asked for,
+    hands the results to the dossier so the verdict can read them, and the
+    sections print the same objects rather than computing them again.
+    """
+
+    @pytest.fixture(scope="class")
+    def both(self) -> Run:
+        return run(
+            "enzyme kinetics with a competitive inhibitor",
+            "--validate", "--robustness", "3", "--no-simulate", "--no-ranking",
+        )
+
+    def test_the_verdict_reports_validate_as_consulted(self, both) -> None:
+        checked = next(l for l in both.out.splitlines() if l.startswith("Checked:"))
+        assert "validate (" in checked
+        assert "validate: not run" not in both.out
+
+    def test_the_verdict_reports_robustness_as_consulted(self, both) -> None:
+        checked = next(l for l in both.out.splitlines() if l.startswith("Checked:"))
+        assert "robustness (" in checked
+
+    def test_neither_is_listed_as_unavailable(self, both) -> None:
+        # The line that used to carry the contradiction. Collected first
+        # and asserted outside the loop: an assertion inside `if` over a
+        # loop is one the loop can skip entirely.
+        unavailable_lines = [
+            line for line in both.out.splitlines()
+            if line.startswith("Not consulted") or "did NOT run" in line
+        ]
+        offenders = [
+            line for line in unavailable_lines
+            if "validate" in line or "robustness" in line
+        ]
+        assert not offenders, offenders
+        # The sweep above passes vacuously when nothing is unavailable --
+        # which on this run is the CORRECT outcome, everything asked for
+        # ran. The non-vacuous anchor is that the page was produced and
+        # both checks appear on its consulted line.
+        checked = next(l for l in both.out.splitlines() if l.startswith("Checked:"))
+        assert "validate (" in checked and "robustness (" in checked
+
+    def test_the_sections_still_print(self, both) -> None:
+        assert "## Cross-checks" in both.out
+        assert "## Robustness to the placeholders" in both.out
+        assert "held in every one of the 3 sample(s)" in both.out
+
+    def test_without_the_flags_they_are_reported_unavailable(self) -> None:
+        # The other direction: not asking for them must still say so.
+        out = run(
+            "enzyme kinetics with a competitive inhibitor",
+            "--no-simulate", "--no-ranking",
+        ).out
+        assert "## Cross-checks" not in out
+        assert "validate" in out  # named as unavailable on the verdict page
+        checked = next(l for l in out.splitlines() if l.startswith("Checked:"))
+        assert "validate (" not in checked
+
+    def test_the_assessment_is_computed_once(self) -> None:
+        """Handing it to the verdict must not mean running it twice."""
+        from Terium.compose import __main__ as cli
+
+        calls = []
+        original = cli._robustness_assessment
+
+        def _spy(model, samples):
+            calls.append(samples)
+            return original(model, samples)
+
+        cli._robustness_assessment = _spy
+        try:
+            run(
+                "enzyme kinetics with a competitive inhibitor",
+                "--robustness", "2", "--no-simulate", "--no-ranking",
+                "--no-analysis",
+            )
+        finally:
+            cli._robustness_assessment = original
+        assert calls == [2], f"the assessment ran {len(calls)} time(s)"

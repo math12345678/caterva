@@ -498,6 +498,21 @@ class ProvenancedModel:
         return tuple(o for o in self.origins if o.measured)
 
     @property
+    def unmeasured(self) -> Tuple[str, ...]:
+        """Identifiers of every PARAMETER still a placeholder.
+
+        The same name as `ComposedModel.unmeasured`, so a caller holding
+        either can ask the one question that decides whether a number is
+        the library's or the literature's, without knowing which class it
+        has. Species starting amounts are excluded: they are scenario
+        choices, not constants a search would return.
+        """
+        return tuple(
+            o.identifier for o in self.origins
+            if o.origin == ORIGIN_PLACEHOLDER and o.role == "parameter"
+        )
+
+    @property
     def placeholders(self) -> Tuple[ParameterOrigin, ...]:
         return tuple(o for o in self.origins if o.placeholder)
 

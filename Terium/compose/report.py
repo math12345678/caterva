@@ -329,7 +329,19 @@ class ModelDossier:
         if self.trajectory is None:
             return []
         lines = ["", "## Time course", "", self.trajectory.summary()]
-        if not self.trajectory.sound:
+        if not getattr(self.trajectory, "checked", True):
+            # `sound` is vacuously True here, and this section used to say
+            # nothing -- which beside a final state reads as verified. An
+            # open system has no law to check; the reader is told so.
+            lines.append("")
+            lines.append(
+                "**No independent check on this integration was possible.** "
+                "The network has no conservation law, so nothing exact "
+                "exists to compare the integrator's numbers against. This "
+                "is not a fault in the run; it is the absence of the one "
+                "thing that would have confirmed it."
+            )
+        elif not self.trajectory.sound:
             lines.append("")
             lines.append(
                 "**The trajectory above should not be trusted.** A "
@@ -370,9 +382,13 @@ class ModelDossier:
                 "would be a guess.",
             ]
 
+        proteins = ()
+        if hasattr(composition, "protein_species"):
+            proteins = tuple(sorted(composition.protein_species()))
         try:
             report = check_trajectory(
-                self.trajectory, unit=str(unit), subject="this time course"
+                self.trajectory, unit=str(unit), subject="this time course",
+                proteins=proteins,
             )
         except Exception as exc:  # noqa: BLE001
             return [
@@ -415,15 +431,34 @@ class ModelDossier:
         in provenance, because that is where a reader forms the belief it
         qualifies.
         """
-        if not self.model.structure_only:
-            return None
-        count = len(self.model.resolvable)
+        unmeasured = tuple(getattr(self.model, "unmeasured", ()) or ())
+        count = len(unmeasured)
         if not count:
             return None
+        # The denominator: a ComposedModel knows its resolvable set; a
+        # ProvenancedModel knows what it measured, and the two sum.
+        measured = getattr(self.model, "measured", None)
+        if measured is not None:
+            total = count + sum(
+                1 for o in measured if getattr(o, "role", "") == "parameter"
+            )
+        else:
+            total = len(getattr(self.model, "resolvable", ()) or ()) or count
+        subject = getattr(self.model, "subject", None)
+        # The caveat used to vanish the moment a subject was NAMED, with no
+        # search run -- so a query mentioning an enzyme lost the one line
+        # telling the reader its constants were still placeholders.
+        why = (
+            "because no enzyme was named" if not subject
+            else f"because no search has been run for {subject!r}"
+            if count == total
+            else f"the search for {subject!r} did not find them"
+        )
+        scope = f"All {count}" if count == total else f"{count} of the {total}"
         return (
             f"**These conclusions are about the model's SHAPE, not about any "
-            f"real system.** All {count} rate constants are the motif "
-            f"library's illustrative values, because no enzyme was named. "
+            f"real system.** {scope} rate constants are the motif "
+            f"library's illustrative values, {why}. "
             f"Whether a real instance of this mechanism behaves this way "
             f"depends on its actual constants, and this says nothing about "
             f"that. What it does say is what the mechanism CAN do — which is "
@@ -483,8 +518,23 @@ def dossier(
     sweep_steps: int = 15,
     rank_unmeasured: bool = True,
     rank_against: Optional[str] = None,
+    model: Any = None,
+    validation: Any = None,
+    robustness: Any = None,
+    conclusion_name: Optional[str] = None,
 ) -> ModelDossier:
-    """Compose a model and assemble everything known about it."""
+    """Compose a model and assemble everything known about it.
+
+    `model`, `validation` and `robustness` EXIST BECAUSE THE VERDICT WAS
+    CONTRADICTING THE SECTIONS BELOW IT. The CLI printed this dossier --
+    whose verdict page said "validate: not run, robustness: not run" --
+    and then ran `--validate` and `--robustness` as sections underneath
+    it. One report, and its headline disagreed with its own body about
+    what had happened. The verdict is formed here, so the only way for it
+    to know is for the caller to compute those first and pass them in;
+    `model` lets the caller compose once and hand the same object to
+    both, rather than composing twice.
+    """
     try:
         from .analysis import analyse
         from .bifurcation import logarithmic_values, sweep as run_sweep
@@ -496,7 +546,8 @@ def dossier(
         )
         from pipeline import compose  # type: ignore[no-redef]
 
-    model = compose(query, subject=subject)
+    if model is None:
+        model = compose(query, subject=subject)
 
     stability = None
     if analyse_stability:
@@ -589,7 +640,10 @@ def dossier(
         # DOES. Without it every composed model got the same verdict, the
         # same concern and the same next step -- true of all eleven and
         # useless for telling any two apart.
-        verdict = form_verdict(model, stability=stability)
+        verdict = form_verdict(
+            model, stability=stability, validation=validation,
+            robustness=robustness, conclusion_name=conclusion_name,
+        )
     except Exception as exc:  # noqa: BLE001
         # The verdict is a reading of the other sections; losing it must not
         # cost the sections themselves.
