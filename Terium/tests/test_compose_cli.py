@@ -640,3 +640,49 @@ class TestTheParser:
         # mistake argparse can catch.
         args = build_parser().parse_args([BINDING, "--stochastic", "1e-15"])
         assert args.stochastic == pytest.approx(1e-15)
+
+
+class TestAContinuumIsNotResampled:
+    """The robustness section names a line of equilibria for what it is.
+
+    Before `continuum` was a classification, the two-enzyme competition
+    reported nineteen stable states and the robustness section resampled
+    "at least two stable states" -- a conclusion that was true of every
+    draw because it was a property of substrate being consumed, not of any
+    constant. 100% robust, and meaningless.
+
+    Now those points are not stable, so the section reached the "found
+    nothing" refusal instead, which is worse: a reader would think the
+    model failed. It found something real, and the section has to say so.
+    """
+
+    @pytest.fixture(scope="class")
+    def competition(self) -> Run:
+        return run(
+            "two enzymes competing for the same substrate",
+            "--robustness", "3", "--no-simulate", "--no-ranking",
+            "--no-analysis",
+        )
+
+    def test_the_refusal_names_the_line(self, competition) -> None:
+        out = competition.out
+        section = out[out.index("Robustness to the placeholders"):]
+        assert "LINE of equilibria" in section
+        assert "100% by construction" in section
+        assert "found no stable state and no unstable spiral" not in section
+
+    def test_it_says_what_to_ask_instead(self, competition) -> None:
+        out = competition.out
+        section = out[out.index("Robustness to the placeholders"):]
+        assert "time course from your actual starting amounts" in section
+
+    def test_a_real_switch_is_still_resampled(self) -> None:
+        # The cry-wolf direction: the toggle must still get a fraction.
+        out = run(
+            "a toggle switch between two repressors",
+            "--robustness", "3", "--no-simulate", "--no-ranking",
+            "--no-analysis",
+        ).out
+        section = out[out.index("Robustness to the placeholders"):]
+        assert "'at least two stable states' held in" in section
+        assert "LINE of equilibria" not in section

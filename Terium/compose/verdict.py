@@ -455,6 +455,17 @@ def behaviour_of(stability: Any) -> Optional[str]:
     stable = getattr(stability, "stable_points", ())
     physical = getattr(stability, "physical_points", ())
     oscillatory = [p for p in physical if getattr(p, "oscillatory", False)]
+    # Counted over ALL fixed points, not just the physical ones. A line of
+    # equilibria is established by every point the search landed on it,
+    # and most of the line usually lies outside the physical region --
+    # two enzymes competing for one substrate put 18 of 19 points at
+    # negative product. The physical count says how much of the line the
+    # cell can occupy; the total says the line is there.
+    continuum = [
+        p for p in getattr(stability, "fixed_points", ())
+        if getattr(p, "classification", "") == "continuum"
+    ]
+    continuum_physical = [p for p in continuum if getattr(p, "physical", True)]
 
     if not getattr(stability, "fixed_points", ()):
         return (
@@ -462,6 +473,31 @@ def behaviour_of(stability: Any) -> Optional[str]:
             f"{getattr(stability, 'starts_tried', '?')} starting points -- an "
             "open system runs forever rather than settling, so every "
             "steady-state question below is the wrong question for it"
+        )
+    if continuum and not stable:
+        # A LINE OF EQUILIBRIA, NOT A SWITCH. Every point found is
+        # attracting in all directions but one, and along that one the
+        # dynamics do not move. The system reaches the line and stops;
+        # WHERE on the line is set by the transient. Two enzymes competing
+        # for one substrate produce it -- once the substrate is gone, any
+        # split of product is an equilibrium -- and before `CONTINUUM`
+        # existed as a classification this page read "19 stable states
+        # were found, which is what a switch looks like". It is not what a
+        # switch looks like; a switch has discrete attractors with
+        # repellors between them.
+        #
+        # THE COUNT IS NOT THE FINDING. How many points the search lands on
+        # a line is an artefact of where the starts fell -- one run found
+        # 23 here and another 19 -- so it is stated as a count of samples,
+        # not as a number of states.
+        return (
+            f"a LINE of equilibria was found ({len(continuum)} points on it, "
+            f"{len(continuum_physical)} physically reachable), none of them "
+            f"an attractor on its own -- the system reaches the line and "
+            f"stops, and where on it is decided by the transient rather than "
+            f"by the constants. That is not a switch, and 'which state' has "
+            f"no answer here; a time course from your actual starting "
+            f"amounts does"
         )
     if len(stable) > 1:
         return (

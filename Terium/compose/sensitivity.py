@@ -721,6 +721,29 @@ def _the_one_stable_point(network: Any) -> Any:
         network, starts_per_species=STARTS_PER_SPECIES
     )
     stable = report.stable_points
+    if getattr(report, "on_a_continuum", False):
+        # A LINE OF EQUILIBRIA, NAMED AS SUCH.
+        #
+        # This message used to hedge: "either genuine multistability or a
+        # continuum", because continuum points were classified `stable`
+        # and this function could not tell the two apart. `analysis` now
+        # classifies them `continuum`, so the hedge is gone and the reader
+        # gets the actual case. A derivative of "the steady state" with
+        # respect to a constant is undefined on a line not because there
+        # are several attractors but because there is no attractor: the
+        # state the system rests at is a function of where it started,
+        # and a constant moved by a hair moves the WHOLE line.
+        points = getattr(report, "continuum_points", ())
+        raise SensitivityUnavailable(
+            f"a line of equilibria at these values ({len(points)} points "
+            f"found on it), so a steady-state derivative is undefined -- "
+            f"not because there are several attractors but because there "
+            f"is none. The system stops wherever the transient leaves it, "
+            f"and a constant moved by a hair moves the whole line rather "
+            f"than one point on it. This is what a model that consumes "
+            f"its substrate completely has. Ask for a time course from "
+            f"your actual starting amounts instead."
+        )
     if not stable:
         raise SensitivityUnavailable(
             f"no stable steady state at these values, from "
@@ -728,28 +751,16 @@ def _the_one_stable_point(network: Any) -> Any:
             f"steady-state quantity to differentiate"
         )
     if len(stable) > 1:
-        # Two possibilities, and the message must not pick one.
-        #
-        # Genuine multistability -- a toggle switch -- where the states are
-        # separated by a saddle and the system rests in one of them. Or a
-        # CONTINUUM: the competition model consumes its substrate
-        # completely, after which both rates are zero and every split of the
-        # products summing to the conserved total is a fixed point. The
-        # second is not a choice between attractors at all; it is a line of
-        # them, and which point is reached is decided by the transient
-        # rather than by the equations at rest.
-        #
-        # Either way a derivative is undefined, and calling the second one
-        # "attractors" would describe the wrong thing.
+        # Genuine multistability: states separated by a saddle, and the
+        # system rests in one of them. The continuum case that used to
+        # share this branch is caught above, so this one no longer hedges.
         raise SensitivityUnavailable(
             f"{len(stable)} stable states at these values, so a "
-            f"steady-state derivative is undefined. This is either "
-            f"genuine multistability -- states separated by a saddle -- "
-            f"or a continuum, which is what a model that consumes its "
-            f"substrate completely has: once the rates are zero every "
-            f"split of the products is a fixed point, and which one is "
-            f"reached is decided by the transient rather than by the "
-            f"equations at rest. Ask for a time course instead."
+            f"steady-state derivative is undefined: the quantity depends "
+            f"on WHICH state, and that is decided by where the system "
+            f"started rather than by the constants. Ask for a time course "
+            f"from a stated starting point, or rank against one named "
+            f"state."
         )
     return stable[0]
 

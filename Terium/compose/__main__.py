@@ -608,6 +608,27 @@ def _robustness_section(sections: Sections, model: Any, samples: int) -> None:
             conclusion, name = (
                 oscillates(starts_per_species=depth), "sustained oscillation",
             )
+        elif getattr(report, "on_a_continuum", False):
+            # A line of equilibria is a real finding and there IS a
+            # conclusion to resample: "the system has no isolated
+            # attractor". But that conclusion is structural -- it follows
+            # from the substrate being consumed and nothing replenishing it
+            # -- and resampling rate constants cannot move it. The honest
+            # answer is to say what the finding is and why a fraction
+            # would be 100% by construction, rather than print the 100%.
+            points = len(getattr(report, "continuum_points", ()))
+            raise RobustnessError(
+                f"the steady-state search found a LINE of equilibria "
+                f"({points} points on it) and no isolated attractor. That "
+                f"is a structural property -- the substrate is consumed and "
+                f"nothing replenishes it, so once the rates reach zero every "
+                f"split of the products is an equilibrium -- and resampling "
+                f"rate constants cannot change it. A robustness fraction "
+                f"here would be 100% by construction and would say nothing. "
+                f"Ask for a time course from your actual starting amounts "
+                f"instead; where on the line the system stops is the "
+                f"question this model actually poses."
+            )
         else:
             raise RobustnessError(
                 f"the steady-state search found no stable state and no "

@@ -526,3 +526,84 @@ class TestTheTableExplainsASwitchedQuantity:
         rendered = "\n".join(self._pinned_dossier().provenance_section())
         assert "**S = -1**" in rendered
         assert "**S = +1**" in rendered
+
+
+class TestTheTimeCourseIsCheckedForPlausibility:
+    """The dossier checked whether the INTEGRATOR behaved, not the MODEL.
+
+    The time-course section said "should not be trusted" when a
+    conservation law drifted, and nothing when the run overshot to fifty
+    molar on its way to a sensible micromolar. That spike is what a
+    student plots and tries to interpret, and the steady-state check on
+    the verdict page sees nothing wrong with it because where the system
+    ENDED is fine.
+    """
+
+    @staticmethod
+    def _dossier_with(trajectory, unit="mM"):
+        """A ModelDossier around a stand-in model carrying `trajectory`."""
+        from Terium.compose.report import ModelDossier
+
+        class _Composition:
+            concentration_unit = unit
+
+        class _Recognition:
+            composition = _Composition()
+
+        class _Model:
+            recognition = _Recognition()
+
+        dossier = ModelDossier.__new__(ModelDossier)
+        object.__setattr__(dossier, "model", _Model())
+        object.__setattr__(dossier, "trajectory", trajectory)
+        return dossier
+
+    @staticmethod
+    def _run(values, sound=True):
+        """A stand-in with the four attributes the section reads.
+
+        `times` and `columns` for the plausibility check, `summary()` and
+        `sound` for the section itself. Not a `Series`: that is frozen and
+        carries neither of the last two.
+        """
+        class _Run:
+            times = tuple(float(i) for i in range(len(values)))
+            columns = {"X": tuple(float(v) for v in values)}
+
+            def summary(self):
+                return "a stand-in time course"
+
+        run = _Run()
+        run.sound = sound
+        return run
+
+    def test_an_overshoot_is_reported(self) -> None:
+        run = self._run([1e-3, 5e4, 1e-2, 1e-3])  # 5e4 mM = 50 M, briefly
+        lines = "\n".join(self._dossier_with(run).trajectory_section())
+        assert "Physical plausibility of the run" in lines
+        assert "cannot exist at the predicted amount" in lines
+        assert "at t=1" in lines
+
+    def test_a_clean_run_gets_one_line(self) -> None:
+        # Not a paragraph. A clean result a reader has to scan past to
+        # reach the sweeps is a cost with no return.
+        run = self._run([1e-3, 2e-3, 3e-3, 3e-3])
+        lines = self._dossier_with(run).trajectory_section()
+        matching = [l for l in lines if "inside what a cell can hold" in l]
+        assert len(matching) == 1
+        assert "not a claim the curve is right" in matching[0]
+
+    def test_no_unit_means_not_checked_not_clean(self) -> None:
+        run = self._run([1e-3, 5e4, 1e-3])
+        lines = "\n".join(self._dossier_with(run, unit=None).trajectory_section())
+        assert "was NOT checked" in lines
+        assert "declares no concentration unit" in lines
+        assert "inside what a cell can hold for the whole run" not in lines
+
+    def test_conservation_and_plausibility_are_separate_verdicts(self) -> None:
+        # A run can conserve every total exactly and still be impossible,
+        # and the two messages must not be merged into one "trust" flag.
+        run = self._run([1e-3, 5e4, 1e-3], sound=True)
+        lines = "\n".join(self._dossier_with(run).trajectory_section())
+        assert "should not be trusted" not in lines  # conservation held
+        assert "cannot exist at the predicted amount" in lines  # but impossible

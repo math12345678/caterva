@@ -89,6 +89,18 @@ STABLE = "stable"
 UNSTABLE = "unstable"
 SADDLE = "saddle"
 MARGINAL = "marginal"
+#: One point on a LINE of equilibria: attracting in every direction but
+#: one, and along that one the dynamics do not move at all. The system
+#: reaches the line and stops; WHERE on the line is decided by the
+#: transient, not by the equations at rest.
+#:
+#: Not `stable`, because it is not an attractor -- a nudge along the line
+#: is never undone. Not `marginal`, because that word sends a reader to a
+#: bifurcation diagram and this is not a bifurcation; it is a degenerate
+#: family that exists at every parameter value. Two enzymes competing for
+#: one substrate produce it: once the substrate is gone, every split of
+#: product is an equilibrium.
+CONTINUUM = "continuum"
 OSCILLATORY_STABLE = "stable spiral"
 OSCILLATORY_UNSTABLE = "unstable spiral"
 
@@ -191,6 +203,28 @@ class StabilityReport:
     def any_oscillatory(self) -> bool:
         return any(p.oscillatory for p in self.physical_points)
 
+    @property
+    def continuum_points(self) -> Tuple[FixedPoint, ...]:
+        """Every point the search landed on a line of equilibria.
+
+        Over ALL fixed points, not the physical ones: the line is
+        established by every point on it, and most of a line usually lies
+        outside the physical region. Two enzymes competing for one
+        substrate put 18 of 19 points at negative product.
+        """
+        return tuple(p for p in self.fixed_points if p.classification == CONTINUUM)
+
+    @property
+    def on_a_continuum(self) -> bool:
+        """The search found a line of equilibria and no isolated attractor.
+
+        Deliberately conjunctive. A model can have a continuum AND a
+        genuine stable state elsewhere in its state space; that is a
+        stranger object than either alone and is not summarised by this
+        flag. This is the plain case, and the one the library produces.
+        """
+        return bool(self.continuum_points) and not self.stable_points
+
     def summary(self) -> str:
         if not self.fixed_points:
             return (
@@ -217,7 +251,23 @@ class StabilityReport:
         for point in self.physical_points:
             lines.append("  - " + point.describe())
 
-        if self.at_least_bistable:
+        if self.on_a_continuum:
+            physical = [p for p in self.continuum_points if p.physical]
+            lines.append(
+                f"A LINE of equilibria: {len(self.continuum_points)} point(s) "
+                f"were found on it, {len(physical)} physically reachable, and "
+                f"none is an attractor on its own -- each is attracting in "
+                f"every direction but one, and along that one the dynamics "
+                f"do not move. The system reaches the line and stops; where "
+                f"on it is decided by the transient, not by the constants. "
+                f"This is NOT a switch. A switch has discrete states with "
+                f"repellors between them; here every point on the line is "
+                f"an equilibrium and 'which state' has no answer -- a time "
+                f"course from your actual starting amounts does. How many "
+                f"points land on the line is an artefact of where the "
+                f"starts fell, not a property of the model."
+            )
+        elif self.at_least_bistable:
             lines.append(
                 f"At least {len(self.stable_points)} stable states were "
                 f"found, so this system can rest in more than one place: it "
@@ -376,16 +426,33 @@ def classify(eigenvalues: Sequence[complex]) -> str:
     oscillatory = any(abs(value.imag) > MARGINAL_EIGENVALUE for value in eigenvalues)
 
     if any(abs(real) <= MARGINAL_EIGENVALUE for real in reals):
-        # A zero eigenvalue usually means a conservation law: the dynamics
-        # do not move along that direction at all. That is not marginality
-        # in the bifurcation sense, so it is worth distinguishing -- but
-        # doing so needs the conservation laws, which `analyse` has and this
-        # function does not. It reports what it can see.
+        # A ZERO THAT REACHES HERE IS REAL.
+        #
+        # The first version of this branch ignored the zero and classified
+        # on the remaining eigenvalues, reasoning that a zero "usually means
+        # a conservation law". Both callers -- `analyse` and
+        # `continuation` -- strip exactly as many structural zeros as there
+        # are conservation laws BEFORE calling this, so by the time a zero
+        # arrives it is not a law. It is a direction the dynamics do not
+        # restore along: the point sits on a LINE of equilibria, and which
+        # point on the line the system reaches is decided by the transient.
+        #
+        # Two enzymes competing for one substrate is the plain case. Once
+        # substrate is exhausted, every split of product between them is an
+        # equilibrium. The old branch called nineteen points on that line
+        # "stable", and the verdict page turned nineteen stable states into
+        # "this system switches". It does not switch. A switch has discrete
+        # attractors with repellors between them; this has a continuum.
+        #
+        # So a remaining zero is CONTINUUM when every other direction is
+        # attracting -- the line is reached and then not left -- and
+        # MARGINAL otherwise, which is the bifurcation reading the docstring
+        # above describes. The distinction is worth a constant of its own
+        # because a reader asked to interpret "marginal" reaches for a
+        # bifurcation diagram, and this is not that.
         others = [real for real in reals if abs(real) > MARGINAL_EIGENVALUE]
         if others and all(real < 0 for real in others):
-            return OSCILLATORY_STABLE if oscillatory else STABLE
-        if others and all(real > 0 for real in others):
-            return OSCILLATORY_UNSTABLE if oscillatory else UNSTABLE
+            return CONTINUUM
         return MARGINAL
 
     if all(real < 0 for real in reals):
@@ -739,7 +806,7 @@ def _starting_points(
 __all__ = [
     "FixedPoint", "StabilityReport", "AnalysisError",
     "analyse", "classify", "jacobian", "derivative_function",
-    "STABLE", "UNSTABLE", "SADDLE", "MARGINAL",
+    "STABLE", "UNSTABLE", "SADDLE", "MARGINAL", "CONTINUUM",
     "OSCILLATORY_STABLE", "OSCILLATORY_UNSTABLE",
     "RESIDUAL_TOLERANCE", "STATE_DISTINCT_TOLERANCE", "MARGINAL_EIGENVALUE",
     "JACOBIAN_STEP", "DEFAULT_STARTS_PER_SPECIES",
