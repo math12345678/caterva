@@ -224,8 +224,14 @@ class TestTheRobustnessPath:
 
     def test_a_grounded_model_whose_conclusion_always_held_is_robust(self) -> None:
         class _Grounded:
+            # Grounded the way the verdict now understands it: provenance
+            # present, everything measured, nothing a placeholder. The old
+            # stand-in said `structure_only = False`, which was the flag
+            # the bug read -- naming a subject was enough to be "grounded".
             structure_only = False
             resolvable = ()
+            measured = ("kcat",)
+            placeholders = ()
 
             class recognition:
                 class composition:
@@ -366,3 +372,172 @@ class TestThePageCanTellTwoModelsApart:
 
         assert "What this model does:" in summary
         assert summary.index("What this model does:") < summary.index("concern(s)")
+
+
+class TestUnitsBalancedIsEarned:
+    """The page said "units: balanced" about a check that never ran.
+
+    `_dimensional_concerns` swallowed every exception into an empty list,
+    with a comment saying the failure was "reported elsewhere". It was
+    not; the caller wrote "balanced" over the empty list. And it read
+    `unit_findings()`, which is also empty for a composition that declares
+    no rate law -- "balanced" across zero laws. Two ways for a check that
+    examined nothing to be printed as a check that passed.
+    """
+
+    def test_a_real_model_says_how_many_laws_balance(self) -> None:
+        from Terium.compose.verdict import form
+
+        verdict = form(compose("three step phosphorylation cascade"))
+        note = verdict.consulted["units"]
+        assert note != "balanced", "the bare word, with no count behind it"
+        assert "rate law(s) balance" in note
+        assert "units" not in verdict.unavailable
+
+    def test_a_raise_is_unavailable_not_balanced(self) -> None:
+        from Terium.compose.verdict import form
+
+        verdict = form(object())  # no composition to ask at all
+        assert "units" in verdict.unavailable
+        assert "units" not in verdict.consulted
+        assert "AttributeError" in verdict.unavailable["units"]
+
+    def test_zero_rate_laws_is_unavailable_not_balanced(self) -> None:
+        from Terium.compose.verdict import _dimensional_concerns
+
+        class _Empty:
+            class recognition:
+                class composition:
+                    @staticmethod
+                    def unit_check():
+                        return 0, ()
+
+        concerns, note, failure = _dimensional_concerns(_Empty())
+        assert not concerns
+        assert note is None
+        assert failure is not None
+        assert "declares no rate law" in failure
+
+    def test_a_problem_is_counted_against_the_laws_examined(self) -> None:
+        from Terium.compose.verdict import _dimensional_concerns
+
+        class _Finding:
+            severity = "blocking"
+            where = "r1"
+            detail = "left side is mM/s, right side is mM"
+
+        class _Bad:
+            class recognition:
+                class composition:
+                    @staticmethod
+                    def unit_check():
+                        return 3, (_Finding(),)
+
+        concerns, note, failure = _dimensional_concerns(_Bad())
+        assert len(concerns) == 1
+        assert failure is None
+        assert note == "1 problem(s) across 3 rate law(s)"
+
+
+class TestGroundedIsEarnedByProvenance:
+    """Typing an enzyme's name flipped the page to GROUNDED.
+
+    The verdict read `structure_only`, which means "no subject was named",
+    and treated its negation as "constants resolved". So a query naming
+    hexokinase -- no search run, every constant the library's placeholder
+    -- was graded "grounded in measured constants, with the provenance to
+    show it". This is the one claim the package exists never to make, made
+    at the top of the page.
+
+    GROUNDED now requires a model that carries provenance and whose every
+    resolvable constant is measured. A bare `ComposedModel` carries none.
+    """
+
+    def _measurement(self, value, unit):
+        from Terium.compose.export import Measurement
+
+        return Measurement(
+            value=value, unit=unit, citation="c", organism="Homo sapiens",
+            source="brenda", citation_source="pubmed", reference_id="1",
+        )
+
+    def test_a_named_subject_with_no_search_is_structural(self) -> None:
+        named = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        verdict = form(named)
+        assert verdict.verdict == STRUCTURAL
+        assert verdict.verdict != GROUNDED
+
+    def test_and_the_note_says_no_search_was_run(self) -> None:
+        named = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        note = form(named).consulted["provenance"]
+        assert "'hexokinase' named, no search run" in note
+        assert "resolved" not in note
+
+    def test_the_remedy_names_the_search(self) -> None:
+        named = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        remedy = form(named).next_step()
+        assert remedy is not None
+        assert "literature search for 'hexokinase'" in remedy
+
+    def test_no_subject_is_structural_as_before(self) -> None:
+        verdict = form(compose("enzyme kinetics with a competitive inhibitor"))
+        assert verdict.verdict == STRUCTURAL
+        assert "no enzyme was named" in verdict.concerns[0].detail
+
+    def test_full_provenance_is_grounded(self) -> None:
+        from Terium.compose.export import provenance_of
+
+        model = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        measured = {
+            "reaction_kcat": self._measurement(100.0, "1/s"),
+            "reaction_Km": self._measurement(0.1, "mM"),
+            "reaction_Ki": self._measurement(0.5, "mM"),
+        }
+        verdict = form(provenance_of(model, measured=measured))
+        assert verdict.verdict == GROUNDED
+        assert "all 3 constant(s) measured, with provenance" in (
+            verdict.consulted["provenance"]
+        )
+
+    def test_partial_provenance_is_still_structural(self) -> None:
+        """One measured out of three is not grounded.
+
+        The licence for GROUNDED is "questions about the system whose
+        constants these are"; with two placeholders the constants are not
+        that system's, and the count is what the reader needs.
+        """
+        from Terium.compose.export import provenance_of
+
+        model = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        verdict = form(provenance_of(
+            model, measured={"reaction_kcat": self._measurement(100.0, "1/s")}
+        ))
+        assert verdict.verdict == STRUCTURAL
+        assert "1 measured, 2 unmeasured" in verdict.consulted["provenance"]
+
+    def test_robust_still_requires_grounded(self) -> None:
+        # A perfect robustness fraction on an unmeasured model must not
+        # reach ROBUST via the old route either.
+        class _Perfect:
+            fraction = 1.0
+            held_count = 40
+            evaluated = tuple(range(40))
+            conclusion = "one stable state"
+
+        named = compose(
+            "enzyme kinetics with a competitive inhibitor", subject="hexokinase"
+        )
+        verdict = form(named, robustness=_Perfect())
+        assert verdict.verdict == STRUCTURAL, (
+            "100% robust placeholders were graded ROBUST"
+        )

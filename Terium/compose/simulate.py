@@ -100,7 +100,29 @@ class Trajectory:
     unmeasured: Tuple[str, ...] = ()
 
     @property
+    def checked(self) -> bool:
+        """Whether any conservation law existed to check the integration.
+
+        The distinction `sound` cannot make on its own. An open system has
+        no conservation law, so `invariants` is empty and `all([])` is
+        True: the trajectory reports itself sound having been checked
+        against nothing. `timeseries.py` documented that as a reason to
+        keep measured data OUT of this class; it is the same three-state
+        rule everything else in the package keeps -- "could not check" is
+        not "checked and fine" -- and the dossier reads this one first.
+        """
+        return bool(self.invariants)
+
+    @property
     def sound(self) -> bool:
+        """No CHECKED conservation law was violated.
+
+        Vacuously True when there was nothing to check. That is not a bug
+        in this property -- an integration that violated no law has
+        violated no law -- but it is a reason to read `checked` first: a
+        caller treating `sound` as "verified" on an open system is trusting
+        a check that never ran.
+        """
         return all(check.held for check in self.invariants)
 
     def final_state(self) -> Dict[str, float]:
@@ -118,7 +140,17 @@ class Trajectory:
             + "."
         )
 
-        if self.invariants:
+        if not self.invariants:
+            # SAID, NOT SKIPPED. The old version printed nothing here, and
+            # nothing beside a final state reads as a clean result. An open
+            # system has no law the integrator could have broken, which is
+            # a fact about the model and not a check that passed.
+            lines.append(
+                "This network has no conservation law, so there is no "
+                "independent check on the integration here: the numbers "
+                "above are the integrator's and nothing has confirmed them."
+            )
+        else:
             broken = [check for check in self.invariants if not check.held]
             if broken:
                 lines.append(
@@ -298,9 +330,12 @@ def run(
         points=points,
         window_basis=basis,
         invariants=check_invariants(network, columns),
-        unmeasured=tuple(
-            quantity.parameter_id for quantity in model.resolvable
-        ) if model.structure_only else (),
+        # Asked of the model, not inferred from whether a subject was
+        # named. `structure_only` is False the moment a query names an
+        # enzyme, and this used to return () for that case -- a trajectory
+        # over the library's placeholders claiming none of its constants
+        # were placeholders, because someone typed "hexokinase".
+        unmeasured=tuple(getattr(model, "unmeasured", ()) or ()),
     )
 
 

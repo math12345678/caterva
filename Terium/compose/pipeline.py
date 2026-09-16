@@ -67,6 +67,25 @@ class ComposedModel:
         """True when nothing can be searched for, because nothing was named."""
         return self.subject is None
 
+    @property
+    def unmeasured(self) -> Tuple[str, ...]:
+        """Every resolvable constant, because this model carries no provenance.
+
+        THE QUESTION `structure_only` WAS BEING ASKED TO ANSWER, AND COULD
+        NOT. Three modules -- the verdict, the trajectory, the dossier's
+        behaviour caveat -- tested `structure_only` to decide whether the
+        constants were placeholders. It says whether a SUBJECT was named.
+        Naming one runs no search; a `ComposedModel` has no way to carry a
+        measured value at all. So every resolvable constant here is
+        unmeasured, subject or not, and the three readers that thought
+        otherwise were laundering the library's placeholders into
+        apparently-measured constants on the strength of a name typed
+        into the query.
+
+        A `ProvenancedModel` overrides this with its actual placeholders.
+        """
+        return tuple(q.parameter_id for q in self.resolvable)
+
     def parameter_requests(self) -> List[Any]:
         """`ParameterRequest`s for `Terium/agents`, or an empty list.
 

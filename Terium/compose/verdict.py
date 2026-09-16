@@ -232,17 +232,40 @@ class Verdict:
 # ---------------------------------------------------------------------------
 
 
-def _dimensional_concerns(model: Any) -> List[Concern]:
-    """A rate law whose sides disagree is wrong, not unvalidated.
+def _dimensional_concerns(
+    model: Any,
+) -> Tuple[List[Concern], Optional[str], Optional[str]]:
+    """(concerns, what was consulted, or why it could not be).
 
-    It integrates perfectly well and is wrong by whatever factor the
-    mistake introduced, which is why this is BROKEN rather than a note.
+    A rate law whose sides disagree is wrong, not unvalidated. It
+    integrates perfectly well and is wrong by whatever factor the mistake
+    introduced, which is why this is BROKEN rather than a note.
+
+    THREE RETURNS, NOT ONE. The first version returned a bare list and
+    swallowed every exception into an empty one, with a comment saying the
+    check not running was "reported elsewhere". It was not; the caller
+    wrote `consulted["units"] = "balanced"` over the empty list, so a
+    check that RAISED was printed as a check that passed. And it read
+    `unit_findings()`, which is also empty when a composition declares no
+    rate law at all -- "balanced" over zero laws. Either way the page said
+    the units were fine about a check that had examined nothing.
+
+    Now: a raise is UNAVAILABLE with the reason; zero laws examined is
+    UNAVAILABLE with that reason; and "balanced" is said only with the
+    count of laws it is balanced across.
     """
     try:
-        findings = list(model.recognition.composition.unit_findings())
-    except Exception:  # noqa: BLE001 - the check not running is reported elsewhere
-        return []
-    return [
+        examined, findings = model.recognition.composition.unit_check()
+    except Exception as exc:  # noqa: BLE001
+        return [], None, f"{type(exc).__name__}: {exc}"
+
+    if not examined:
+        return [], None, (
+            "this composition declares no rate law, so there is nothing "
+            "whose dimensions could balance or fail to"
+        )
+
+    concerns = [
         Concern(
             source="units",
             severity=BROKEN,
@@ -254,6 +277,11 @@ def _dimensional_concerns(model: Any) -> List[Concern]:
         )
         for finding in findings
     ]
+    note = (
+        f"all {examined} rate law(s) balance" if not concerns
+        else f"{len(concerns)} problem(s) across {examined} rate law(s)"
+    )
+    return concerns, note, None
 
 
 def _scale_concerns(model: Any) -> Tuple[List[Concern], str]:
@@ -314,8 +342,24 @@ def _concentration_unit_of(model: Any) -> Optional[str]:
     return str(unit) if unit else None
 
 
+def _protein_species_of(model: Any) -> Tuple[str, ...]:
+    """Which species the composition wires as enzymes or regulators.
+
+    The protein bound -- five millimolar -- is right for those and wrong
+    by a factor of twenty for a metabolite. A model with no composition
+    to ask gets an empty set, which sends every species to the weaker
+    solute bound: the conservative direction.
+    """
+    composition = getattr(
+        getattr(model, "recognition", None), "composition", None
+    )
+    if composition is None or not hasattr(composition, "protein_species"):
+        return ()
+    return tuple(sorted(composition.protein_species()))
+
+
 def _prediction_concerns(
-    stability: Any, *, unit: str,
+    stability: Any, *, unit: str, proteins: Sequence[str] = (),
 ) -> Tuple[List[Concern], str]:
     """What the model PREDICTS, against what a cell can hold.
 
@@ -335,7 +379,7 @@ def _prediction_concerns(
             UNEXAMINED, check_steady_states,
         )
 
-    reports = check_steady_states(stability, unit=unit)
+    reports = check_steady_states(stability, unit=unit, proteins=proteins)
     concerns: List[Concern] = []
     for report in reports:
         if report.already_flagged_nonphysical:
@@ -402,6 +446,35 @@ def _prediction_concerns(
     return concerns, note
 
 
+def _grounding(model: Any) -> Tuple[int, int, bool]:
+    """(measured, unmeasured, whether the model carries provenance at all).
+
+    THE ONLY WAY TO KNOW WHETHER A CONSTANT WAS MEASURED IS TO ASK THE
+    PROVENANCE. The verdict used to ask `structure_only` instead, which
+    means "no subject was named" -- and so typing an enzyme's name into the
+    query, with no search run and every constant still the library's
+    placeholder, flipped the page to GROUNDED: "grounded in measured
+    constants, with the provenance to show it". Nothing had been measured.
+    The provenance note said "constants resolved". This is the single
+    claim the package exists never to make, made at the top of the page by
+    the module whose job is to say what the evidence supports.
+
+    A `ProvenancedModel` (from `export.provenance_of`) carries `measured`
+    and `placeholders`. A bare `ComposedModel` carries neither, and a model
+    with no provenance has had nothing resolved, whatever its query said.
+    """
+    measured = getattr(model, "measured", None)
+    placeholders = getattr(model, "placeholders", None)
+    if measured is None or placeholders is None:
+        resolvable = list(getattr(model, "resolvable", ()))
+        return 0, len(resolvable), False
+    try:
+        return len(measured), len(placeholders), True
+    except TypeError:
+        resolvable = list(getattr(model, "resolvable", ()))
+        return 0, len(resolvable), False
+
+
 def _provenance_concerns(model: Any) -> Tuple[List[Concern], str]:
     """Placeholders are not a fault. They are a limit on the question.
 
@@ -409,25 +482,58 @@ def _provenance_concerns(model: Any) -> Tuple[List[Concern], str]:
     scold the reader for it -- but it must say plainly that the conclusions
     are about the mechanism rather than about their system.
     """
-    resolvable = list(getattr(model, "resolvable", ()))
-    if not getattr(model, "structure_only", False):
-        return [], "constants resolved"
-    if not resolvable:
-        return [], "nothing left to resolve"
+    measured, unmeasured, has_provenance = _grounding(model)
+    subject = getattr(model, "subject", None)
+
+    if unmeasured == 0 and measured > 0:
+        return [], f"all {measured} constant(s) measured, with provenance"
+    if unmeasured == 0 and measured == 0:
+        return [], "nothing to resolve"
+
+    if measured:
+        detail = (
+            f"{measured} constant(s) measured and {unmeasured} still the "
+            f"motif library's illustrative values"
+        )
+        note = f"{measured} measured, {unmeasured} unmeasured"
+    elif subject and not has_provenance:
+        # THE CASE THAT USED TO READ AS GROUNDED. A subject was named, so a
+        # search could be run -- and has not been. Say exactly that.
+        detail = (
+            f"all {unmeasured} rate constant(s) are the motif library's "
+            f"illustrative values. {subject!r} was named, so a literature "
+            f"search is possible, but none has been run and no value here "
+            f"comes from one"
+        )
+        note = (
+            f"{unmeasured} constant(s) unmeasured -- {subject!r} named, "
+            f"no search run"
+        )
+    elif subject:
+        detail = (
+            f"all {unmeasured} rate constant(s) are still placeholders: "
+            f"the search for {subject!r} found nothing it could use"
+        )
+        note = f"{unmeasured} constant(s) unmeasured after searching"
+    else:
+        detail = (
+            f"all {unmeasured} rate constant(s) are the motif library's "
+            f"illustrative values, because no enzyme was named"
+        )
+        note = f"{unmeasured} constant(s) unmeasured"
+
+    remedy = (
+        f"run the literature search for {subject!r}, or supply the "
+        f"constants the provenance table lists -- start with the top of "
+        f"its influence ranking"
+        if subject else
+        "name the enzyme, or supply the constants the provenance table "
+        "lists -- start with the top of its influence ranking"
+    )
     return (
-        [Concern(
-            source="provenance",
-            severity=STRUCTURAL,
-            detail=(
-                f"all {len(resolvable)} rate constant(s) are the motif "
-                f"library's illustrative values, because no enzyme was named"
-            ),
-            remedy=(
-                f"name the enzyme, or supply the constants the provenance "
-                f"table lists -- start with the top of its influence ranking"
-            ),
-        )],
-        f"{len(resolvable)} constant(s) unmeasured",
+        [Concern(source="provenance", severity=STRUCTURAL,
+                 detail=detail, remedy=remedy)],
+        note,
     )
 
 
@@ -559,10 +665,12 @@ def form(
     consulted: Dict[str, str] = {}
     unavailable: Dict[str, str] = {}
 
-    concerns += _dimensional_concerns(model)
-    consulted["units"] = (
-        "balanced" if not concerns else f"{len(concerns)} problem(s)"
-    )
+    unit_concerns, unit_note, unit_failure = _dimensional_concerns(model)
+    concerns += unit_concerns
+    if unit_failure is not None:
+        unavailable["units"] = unit_failure
+    else:
+        consulted["units"] = unit_note or "consulted"
 
     try:
         scale_concerns, scale_note = _scale_concerns(model)
@@ -588,7 +696,8 @@ def form(
     else:
         try:
             prediction_concerns, prediction_note = _prediction_concerns(
-                stability, unit=prediction_unit
+                stability, unit=prediction_unit,
+                proteins=_protein_species_of(model),
             )
             concerns += prediction_concerns
             consulted["predictions"] = prediction_note
@@ -626,7 +735,10 @@ def form(
         unavailable["assumptions"] = f"{type(exc).__name__}: {exc}"
 
     if validation is None:
-        unavailable["validate"] = "not run"
+        unavailable["validate"] = (
+            "not run -- pass --validate (or `validation=`) for the "
+            "cross-module consistency check"
+        )
     else:
         failures = [
             f for f in getattr(validation, "findings", ())
@@ -659,7 +771,10 @@ def form(
         )
 
     if robustness is None:
-        unavailable["robustness"] = "not run"
+        unavailable["robustness"] = (
+            "not run -- pass --robustness (or `robustness=`) to resample "
+            "the placeholders"
+        )
     else:
         fraction = getattr(robustness, "fraction", None)
         if fraction is None:
@@ -674,9 +789,16 @@ def form(
     # name it rather than to blend it into a middling grade.
     concerns.sort(key=lambda c: VERDICTS.index(c.severity))
 
+    # GROUNDED IS EARNED BY PROVENANCE, NOT BY NAMING A SUBJECT. This
+    # used to read `structure_only`, so a query that named an enzyme --
+    # with no search run and every constant a placeholder -- was graded
+    # "grounded in measured constants, with the provenance to show it".
+    measured, unmeasured, _ = _grounding(model)
+    grounded = unmeasured == 0 and measured > 0
+
     if any(c.severity == BROKEN for c in concerns):
         verdict = BROKEN
-    elif getattr(model, "structure_only", False):
+    elif not grounded:
         verdict = STRUCTURAL
     elif robustness is not None and getattr(robustness, "fraction", None) == 1.0:
         verdict = ROBUST
