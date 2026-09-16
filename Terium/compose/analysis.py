@@ -347,6 +347,45 @@ def derivative_function(
         expression = _compile_rate_law(reaction.rate_law, reaction.id)
         compiled.append((expression, {k: v for k, v in net.items() if v}))
 
+    # RATE RULES ARE DYNAMICS TOO, AND WERE BEING DROPPED.
+    #
+    # `core.network.RateRule` exists because Lotka-Volterra, Tyson's
+    # cell-cycle oscillator and the catalogue's repressilator are written
+    # as X' = expression rather than as reactions -- its own docstring says
+    # an IR without them "would quietly leave the interesting three
+    # behind". This function built the right-hand side from reactions
+    # alone, so on any such model it returned zero for every rate-ruled
+    # species, `analyse` found fixed points of the wrong system, and
+    # reported them with residuals near zero. The simulator honoured the
+    # rules; the analysis did not; and nothing compared the two.
+    #
+    # A rate rule contributes its whole expression to its target's
+    # derivative, coefficient one. The IR forbids a species being both
+    # rate-ruled and in a reaction, so there is no double counting.
+    for rule in getattr(network, "rate_rules", ()):
+        target = getattr(rule, "target", None)
+        if target in index_of:
+            expression = _compile_rate_law(
+                getattr(rule, "expression", ""), f"rate rule for {target}",
+            )
+            compiled.append((expression, {target: 1}))
+
+    # Assignment rules are derived quantities, not state: recomputed from
+    # the current environment before any rate is evaluated, in declaration
+    # order so one may use another. An assigned name that is also a species
+    # has no dynamics of its own, which the IR's `problems` already forbids.
+    assignments: List[Tuple[str, Any]] = [
+        (
+            getattr(rule, "target", ""),
+            _compile_rate_law(
+                getattr(rule, "expression", ""),
+                f"assignment rule for {getattr(rule, 'target', '')}",
+            ),
+        )
+        for rule in getattr(network, "assignment_rules", ())
+        if getattr(rule, "target", None)
+    ]
+
     safe_builtins: Dict[str, Any] = {
         "abs": abs, "min": min, "max": max, "pow": pow,
         "exp": math.exp, "ln": math.log, "log": math.log,
@@ -358,6 +397,14 @@ def derivative_function(
         environment = dict(parameters)
         for name, position in index_of.items():
             environment[name] = float(state[position])
+        for target, expression in assignments:
+            try:
+                environment[target] = float(eval(
+                    expression, {"__builtins__": {}},
+                    {**safe_builtins, **environment},
+                ))
+            except ZeroDivisionError:
+                environment[target] = float("inf")
         derivatives = [0.0] * len(species_order)
         for expression, net in compiled:
             try:
@@ -541,21 +588,36 @@ def _search_scale(network: Any) -> List[float]:
     This is what `core.network.Parameter` carrying a unit is FOR; without
     it the network cannot say which of its constants are concentrations.
 
-    Only then 1.0, and only because a model that states no concentration
-    anywhere has given nothing better to go on.
+    WHEN THE PARAMETERS SAY NOTHING, THE FLOOR OF ONE STAYS. A network
+    built by hand with unitless constants gives no concentration evidence
+    beyond its starting amounts -- and a starting amount is where a species
+    STARTS, which this function's own history shows is a poor guide to
+    where it settles. The second version of this dropped the floor for
+    every network, and a hand-built switch starting at X = 0.1 with its
+    stable state at X = 3.2 lost that state at shallow depth: the search
+    was anchored at 0.1 and only a third of its starts fell in the basin.
+    So the floor is dropped only when a declared concentration -- a Km, a
+    Kd, a half-repression constant -- gives a real reason to; otherwise
+    order unity is the honest default for a model that has said nothing.
     """
-    stated: List[float] = [
+    initials: List[float] = [
         abs(float(getattr(s, "initial", 0.0))) for s in network.species
     ]
 
+    declared: List[float] = []
     for parameter in getattr(network, "parameters", ()):
         unit = str(getattr(parameter, "unit", "") or "").strip()
         value = abs(float(getattr(parameter, "value", 0.0)))
         if unit in _CONCENTRATION_UNITS and value > 0.0:
-            stated.append(value)
+            declared.append(value)
 
-    positive = [value for value in stated if value > 0.0]
-    magnitude = max(positive) if positive else 1.0
+    positive_initials = [value for value in initials if value > 0.0]
+    if declared:
+        # A declared concentration is evidence about scale; the floor goes.
+        magnitude = max(declared + positive_initials)
+    else:
+        # Only starting amounts, which are not: keep the floor.
+        magnitude = max(positive_initials + [1.0])
     return [magnitude] * len(network.species)
 
 
@@ -662,6 +724,36 @@ def analyse(
             values.append(sum(row[i] * x[i] for i in range(len(x))) - total)
         return values
 
+    # THE CONVERGENCE BAR IS RELATIVE TO THE MODEL'S OWN FLUXES.
+    #
+    # `RESIDUAL_TOLERANCE` is 1e-9 and was compared against the residual
+    # as an absolute number. On a model at nanomolar concentrations with
+    # rates to match, every flux is around 1e-7 and a residual of 5e-10 is
+    # not a converged root -- it is a point a few percent away from one,
+    # with everything small. A two-stage expression model returned THREE
+    # "stable states" that were one state, found imprecisely from three
+    # starts, each passing the absolute bar. The search-scale fix exposed
+    # this: the search used to start far above such a model and never
+    # reached the flat region where the bar was too easy.
+    #
+    # So the bar is 1e-9 of the largest flux the model shows across the
+    # starting points, which are spread over four decades around its scale
+    # and so include points well away from equilibrium. A model whose
+    # every flux is zero at every start has no dynamics to converge, and
+    # for it the absolute bar is kept rather than dividing by nothing.
+    reference_flux = 0.0
+    for start in starts:
+        try:
+            rates = rhs(start)
+        except Exception:  # noqa: BLE001 - a start that raises is not a scale
+            continue
+        largest = max((abs(v) for v in rates if math.isfinite(v)), default=0.0)
+        reference_flux = max(reference_flux, largest)
+    residual_bar = (
+        RESIDUAL_TOLERANCE * reference_flux if reference_flux > 0.0
+        else RESIDUAL_TOLERANCE
+    )
+
     found: List[FixedPoint] = []
     for start in starts:
         try:
@@ -677,7 +769,7 @@ def analyse(
         # conservation rows are satisfied by construction and including them
         # would flatter the residual.
         residual = max(abs(value) for value in rhs(solution))
-        if not math.isfinite(residual) or residual > RESIDUAL_TOLERANCE:
+        if not math.isfinite(residual) or residual > residual_bar:
             continue
         state = {name: float(value) for name, value in zip(species, solution)}
         if _already_found(state, found):

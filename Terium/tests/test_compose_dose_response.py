@@ -470,17 +470,20 @@ class TestADoseWithNoSingleReadoutIsNamedNotDropped:
     def test_the_search_is_as_deep_as_the_refusal_needs(self) -> None:
         """A refusal about multiplicity is only as good as the search.
 
-        `sensitivity.py` measured that the analysis module's own default
-        misses the second state of a real bistable model, which is why this
-        module searches at STARTS_PER_SPECIES instead. A shallower search is
-        available and visibly shallower.
+        This used to assert `STARTS_PER_SPECIES > DEFAULT_STARTS_PER_SPECIES`
+        on the strength of a measurement that the analysis default missed
+        a second state. That measurement was of continuum points, not
+        stable states, and once they were classified correctly the two
+        depths were unified by reference. What is still worth holding: this
+        module searches at the package's one depth, and a caller can go
+        shallower and see that it did.
         """
         network = _readout_network(CATALYTIC_STEP)
         deep = curve(network, "e_S", "e_P", [0.1, 1.0])
         shallow = curve(network, "e_S", "e_P", [0.1, 1.0], starts_per_species=2)
 
         assert deep.starts_per_species == STARTS_PER_SPECIES
-        assert STARTS_PER_SPECIES > DEFAULT_STARTS_PER_SPECIES
+        assert STARTS_PER_SPECIES == DEFAULT_STARTS_PER_SPECIES
         assert deep.points[0].starts_tried > shallow.points[0].starts_tried
 
 

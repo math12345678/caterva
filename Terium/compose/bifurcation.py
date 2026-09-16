@@ -96,6 +96,30 @@ class SweepPoint:
             p.oscillatory and not p.stable for p in self.report.physical_points
         )
 
+    @property
+    def behaviour(self) -> str:
+        """What the model DOES here, as a label -- not just how many attractors.
+
+        `stable_count` alone cannot tell a sustained oscillation from an
+        open system that runs away: both have zero stable states. The
+        repressilator's whole interesting range -- where it oscillates --
+        was being labelled "no steady state", which is false (there is
+        one, an unstable spiral) and points the reader at the wrong
+        diagnosis. A line of equilibria is a third zero-stable case with
+        its own meaning.
+        """
+        if self.stable_count == 0 and self.unstable_spiral:
+            return "sustained oscillation"
+        if getattr(self.report, "on_a_continuum", False):
+            return "a line of equilibria"
+        if self.total_count == 0:
+            return "no steady state"
+        if self.stable_count == 0:
+            return "no stable state"
+        if self.stable_count == 1:
+            return "one stable state"
+        return f"{self.stable_count} stable states"
+
 
 @dataclass(frozen=True)
 class Bifurcation:
@@ -140,6 +164,26 @@ class SweepReport:
             len(self.points) - 1
         )
 
+    def behaviours(self) -> Tuple[Tuple[float, float, str], ...]:
+        """(from, to, behaviour label) for each stretch where it holds.
+
+        The richer sibling of `regions`, which groups by stable-state
+        count alone and so cannot tell "oscillates" from "runs away" --
+        both are zero. `regions` is kept for callers that want the count;
+        the summary reads this one.
+        """
+        if not self.points:
+            return ()
+        out: List[Tuple[float, float, str]] = []
+        start = self.points[0]
+        current = start.behaviour
+        for point in self.points[1:]:
+            if point.behaviour != current:
+                out.append((start.value, point.value, current))
+                start, current = point, point.behaviour
+        out.append((start.value, self.points[-1].value, current))
+        return tuple(out)
+
     def regions(self) -> Tuple[Tuple[float, float, int], ...]:
         """(from, to, stable-state count) for each stretch of constant behaviour."""
         if not self.points:
@@ -165,12 +209,7 @@ class SweepReport:
             + "."
         ]
 
-        for start, end, count in self.regions():
-            word = (
-                "no steady state" if count == 0
-                else "one stable state" if count == 1
-                else f"{count} stable states"
-            )
+        for start, end, word in self.behaviours():
             lines.append(f"{self.parameter} {start:.4g} to {end:.4g}: {word}.")
 
         if self.bifurcations:
