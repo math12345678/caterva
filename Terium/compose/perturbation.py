@@ -182,20 +182,130 @@ def knockout(network: Any, species: str) -> Perturbation:
     """
     target = _require_species(network, species)
     before = float(target.initial)
-    if before == KNOCKOUT_LEVEL:
+
+    # A KNOCKOUT REMOVES THE GENE, NOT JUST TODAY'S PROTEIN.
+    #
+    # This function used to set the starting amount to zero and stop. On a
+    # species with its own synthesis -- a repressor in a toggle switch, a
+    # protein under a promoter -- that is a wash-out, not a knockout: the
+    # gene is still there, the promoter still fires, and the "knocked-out"
+    # species regrows. Run on the toggle switch, geneA came back to
+    # 0.049 mM and the switch was still bistable. Every conclusion drawn
+    # from that comparison would have been about a dilution experiment
+    # nobody performed.
+    #
+    # So the synthesis is silenced too. The reactions stay in the network
+    # with a rate law of zero rather than being deleted, because deleting
+    # them changes the stoichiometry every downstream comparison lines up
+    # on; a reaction that never fires is what a silenced promoter IS.
+    forms, complexes = _gene_product_of(network, species)
+    synthesis = [
+        r for r in network.reactions
+        if not r.reactants and any(f in r.products for f in forms)
+    ]
+
+    # WHAT IS BEING REMOVED, AND HOW IT IS KNOWN.
+    #
+    # `forms` is every species this one interconverts with through
+    # one-in-one-out reactions, in either direction: X and Xp, a protein
+    # and its cleaved form. They are one gene product wearing different
+    # modifications, and a knockout of the gene removes all of them.
+    # `complexes` is every species this one binds INTO -- A in AB -- which
+    # a gene never expressed could not have formed. Both come from the
+    # stoichiometry alone, which is the only thing the network records.
+    #
+    # The first version of this zeroed one starting amount and stopped. On
+    # a repressor with its own promoter that is a wash-out, not a knockout:
+    # the gene still fires and the species regrows -- it came back to
+    # 0.049 mM and the toggle switch was still bistable. Every conclusion
+    # from that comparison would have been about a dilution nobody did.
+    removed = sorted(forms | complexes)
+    if all(
+        float(next(sp for sp in network.species if sp.id == name).initial)
+        == KNOCKOUT_LEVEL
+        for name in removed
+    ) and not synthesis:
         raise PerturbationRefused(
-            f"{species} is already at {KNOCKOUT_LEVEL:g}, so knocking it out "
-            f"changes nothing and the comparison would report a null result "
-            f"for a perturbation that was never applied. If the model is "
-            f"meant to start with some, set its initial amount first."
+            f"{species} and everything it is a form of "
+            f"({', '.join(removed)}) are already at {KNOCKOUT_LEVEL:g}, and "
+            f"nothing synthesises any of them, so knocking it out changes "
+            f"nothing and the comparison would report a null result for a "
+            f"perturbation that was never applied. If the model is meant to "
+            f"start with some, set its initial amount first."
         )
+
+    silenced = replace(
+        network,
+        reactions=tuple(
+            replace(r, rate_law="0") if r in synthesis else r
+            for r in network.reactions
+        ),
+    )
+    for name in removed:
+        silenced = _with_initial(silenced, name, KNOCKOUT_LEVEL)
+
+    parts = [f"{species} knocked out"]
+    others = [n for n in removed if n != species]
+    if others:
+        parts.append(
+            f"together with {', '.join(others)} "
+            f"({'forms of the same gene product' if others and all(n in forms for n in others) else 'forms and complexes of it'})"
+        )
+    parts.append("starting amounts set to zero")
+    if synthesis:
+        parts.append(
+            f"{len(synthesis)} synthesis reaction(s) silenced "
+            f"({', '.join(r.id for r in synthesis)})"
+        )
+    else:
+        parts.append("nothing in this model synthesises it, so nothing can bring it back")
+    what = "; ".join(parts)
+
+    changes: Dict[str, Tuple[Any, Any]] = {}
+    for name in removed:
+        before_n = float(next(sp for sp in network.species if sp.id == name).initial)
+        changes[name] = (before_n, KNOCKOUT_LEVEL)
+    for r in synthesis:
+        changes[r.id] = ("rate law " + r.rate_law, "0")
     return Perturbation(
         kind="knockout",
         target=species,
-        description=f"{species} knocked out (removed from the model)",
-        network=_with_initial(network, species, KNOCKOUT_LEVEL),
-        changes={species: (before, KNOCKOUT_LEVEL)},
+        description=what,
+        network=silenced,
+        changes=changes,
     )
+
+
+def _gene_product_of(network: Any, species: str) -> Tuple[set, set]:
+    """(every form of this gene product, every complex it is bound into).
+
+    FROM STOICHIOMETRY ALONE, because that is all the network records. A
+    reaction with one reactant and one product converts a species between
+    forms -- X to Xp, a protein to its cleaved product -- and the two are
+    one gene product. A reaction with two or more reactants and one product
+    binds them into a complex, which contains each of them. Following the
+    first kind transitively, in both directions, gives the forms; the
+    products of the second kind, from any form, give the complexes.
+
+    A gene knockout removes all of the first set and, since a protein never
+    expressed never bound anything, all of the second.
+    """
+    forms = {species}
+    frontier = [species]
+    while frontier:
+        current = frontier.pop()
+        for r in network.reactions:
+            if len(r.reactants) == 1 and len(r.products) == 1:
+                (a,), (b,) = tuple(r.reactants), tuple(r.products)
+                for x, y in ((a, b), (b, a)):
+                    if x == current and y not in forms:
+                        forms.add(y)
+                        frontier.append(y)
+    complexes = set()
+    for r in network.reactions:
+        if len(r.reactants) >= 2 and any(f in r.reactants for f in forms):
+            complexes.update(r.products)
+    return forms, complexes - forms
 
 
 def knockdown(network: Any, species: str, remaining_fraction: float) -> Perturbation:
