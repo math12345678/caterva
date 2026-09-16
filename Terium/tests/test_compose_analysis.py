@@ -1254,6 +1254,28 @@ class TestConvergenceIsRelativeToTheModel:
         )
         assert report.fixed_points[0].state["X"] == pytest.approx(3.0, rel=1e-6)
 
+    def test_a_local_solve_from_the_root_still_converges(self) -> None:
+        """One explicit start placed AT the root, no others.
+
+        The first relative bar measured the reference flux at the starts
+        alone. With a single start at the root, that reference was the
+        residual at the root -- near machine precision -- and the bar
+        became a million times tighter than any solver can meet. Two
+        local-solve tests in this file found nothing. The reference is now
+        also probed at the search scale and a decade either side, which a
+        model at equilibrium at all three has no dynamics to speak of.
+        """
+        from Terium.compose.pipeline import compose as _compose
+
+        model = _compose("a toggle switch between two repressors")
+        known = analyse(model.network).stable_points[0]
+        start = [known.state[name] for name in analyse(model.network).species]
+        local = analyse(model.network, starts_per_species=0, extra_starts=[start])
+        assert len(local.fixed_points) == 1, (
+            "a solve started at a known root found nothing"
+        )
+        assert local.fixed_points[0].stable
+
     def test_the_expression_model_has_one_state(self) -> None:
         """The model that surfaced this, from the library."""
         from Terium.compose.builder import Composition
