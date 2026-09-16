@@ -646,6 +646,39 @@ class TestTheSearchLooksWhereTheModelLives:
             "mixed units are now converted -- good; delete this test"
         )
 
+    def test_a_unitless_network_keeps_the_floor(self) -> None:
+        """No declared concentration means no reason to drop the floor.
+
+        A hand-built switch with unitless constants starts X at 0.1 and
+        rests at 3.2. The second version of `_search_scale` used the
+        initial alone, anchored the search at 0.1, and lost the state at
+        shallow depth -- only a third of the starts fell in its basin.
+        Starting amounts are where a species STARTS; without a declared
+        Km or K to say otherwise, order unity is the honest default.
+        """
+        from Terium.compose.analysis import _search_scale
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        switch = ReactionNetwork(
+            name="switch",
+            species=(Species("X", 0.1),),
+            parameters=(
+                Parameter("v", 1.0), Parameter("K", 1.0),
+                Parameter("kd", 0.3), Parameter("inducer", 0.05),
+            ),
+            reactions=(
+                Reaction("induction", {}, {"X": 1}, "inducer"),
+                Reaction("feedback", {}, {"X": 1}, "v * X^2 / (K^2 + X^2)"),
+                Reaction("removal", {"X": 1}, {}, "kd * X"),
+            ),
+        )
+        assert _search_scale(switch) == [1.0]
+        stable = analyse(switch).stable_points
+        assert len(stable) == 1
+        assert stable[0].state["X"] == pytest.approx(3.204, abs=1e-3)
+
     def test_a_rate_constant_is_not_read_as_a_concentration(self) -> None:
         """`1/s` must not set the search scale.
 
@@ -956,18 +989,26 @@ class TestTheSearchDepthIsOneNumber:
         from Terium.compose import sensitivity
 
         tree = ast.parse(inspect.getsource(sensitivity))
-        for node in tree.body:
+        assignments = [
+            node for node in tree.body
             if isinstance(node, ast.Assign) and any(
                 isinstance(t, ast.Name) and t.id == "STARTS_PER_SPECIES"
                 for t in node.targets
-            ):
-                assert isinstance(node.value, ast.Name), (
-                    "STARTS_PER_SPECIES is a literal again; it must reference "
-                    "analysis.DEFAULT_STARTS_PER_SPECIES"
-                )
-                assert node.value.id == "DEFAULT_STARTS_PER_SPECIES"
-                return
-        raise AssertionError("STARTS_PER_SPECIES is no longer assigned in sensitivity.py")
+            )
+        ]
+        # Found first, asserted outside any branch: the vacuous-test guard
+        # is right that an assertion inside an `if` over a loop is one the
+        # loop can skip.
+        assert len(assignments) == 1, (
+            "STARTS_PER_SPECIES is no longer assigned exactly once in "
+            "sensitivity.py"
+        )
+        value = assignments[0].value
+        assert isinstance(value, ast.Name), (
+            "STARTS_PER_SPECIES is a literal again; it must reference "
+            "analysis.DEFAULT_STARTS_PER_SPECIES"
+        )
+        assert value.id == "DEFAULT_STARTS_PER_SPECIES"
 
     def test_the_library_is_depth_independent_from_four(self) -> None:
         """The measurement the default rests on, run rather than quoted.
@@ -1012,3 +1053,213 @@ class TestTheSearchDepthIsOneNumber:
             "the toggle no longer finds both states at 4; the search "
             "regressed and DEFAULT_STARTS_PER_SPECIES needs re-measuring"
         )
+
+
+class TestRateRulesAreDynamics:
+    """`derivative_function` built the right-hand side from reactions alone.
+
+    `core.network.RateRule` exists because Lotka-Volterra, Tyson's
+    cell-cycle oscillator and the catalogue's repressilator are written as
+    X' = expression rather than as reactions; the IR's own docstring says
+    leaving them out "would quietly leave the interesting three behind".
+    The analysis left them out. On any such model it returned zero for
+    every rate-ruled species, found fixed points of the wrong system, and
+    reported them with residuals near zero. The simulator honoured the
+    rules; nothing compared the two.
+
+    Logistic growth is the test: dX/dt = r X (1 - X/K) has fixed points at
+    exactly 0 (unstable) and K (stable), by hand.
+    """
+
+    @staticmethod
+    def _logistic(r=1.0, K=3.0):
+        from Terium.core.network import (
+            Parameter, RateRule, ReactionNetwork, Species,
+        )
+
+        return ReactionNetwork(
+            name="logistic",
+            species=(Species("X", 0.5),),
+            parameters=(Parameter("r", r, "1/s"), Parameter("K", K, "mM")),
+            rate_rules=(RateRule("X", "r * X * (1 - X / K)"),),
+        )
+
+    def test_the_derivative_is_the_rule(self) -> None:
+        from Terium.compose.analysis import derivative_function
+
+        rhs, order = derivative_function(self._logistic())
+        assert order == ("X",)
+        # r X (1 - X/K) at X = 1.5, r = 1, K = 3: 1.5 * 0.5 = 0.75.
+        assert rhs([1.5]) == pytest.approx([0.75])
+        # The old version returned [0.0] here, having seen no reactions.
+        assert rhs([1.5]) != [0.0]
+
+    def test_the_fixed_points_are_zero_and_k(self) -> None:
+        from Terium.compose.analysis import STABLE, UNSTABLE
+
+        report = analyse(self._logistic(K=3.0))
+        by_value = {round(p.state["X"], 6): p.classification for p in report.fixed_points}
+        assert by_value == {0.0: UNSTABLE, 3.0: STABLE}, by_value
+
+    def test_k_moves_the_stable_point(self) -> None:
+        # Not a coincidence of the default: the stable point tracks K.
+        for K in (1.0, 7.5, 0.02):
+            report = analyse(self._logistic(K=K))
+            stable = [p for p in report.fixed_points if p.stable]
+            assert len(stable) == 1, K
+            assert stable[0].state["X"] == pytest.approx(K, rel=1e-6)
+
+    def test_an_assignment_rule_feeds_a_rate_rule(self) -> None:
+        """Assignments are recomputed before any rate, in order.
+
+        Tyson's model uses `alpha := k4prime / k4` inside its rate rules.
+        An assignment ignored is a NameError at best and a stale value at
+        worst; here it is the carrying capacity, so getting it wrong moves
+        the fixed point.
+        """
+        from Terium.core.network import (
+            AssignmentRule, Parameter, RateRule, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="logistic_assigned",
+            species=(Species("X", 0.5),),
+            parameters=(
+                Parameter("r", 1.0, "1/s"),
+                Parameter("K_half", 1.5, "mM"),
+            ),
+            rate_rules=(RateRule("X", "r * X * (1 - X / K)"),),
+            assignment_rules=(AssignmentRule("K", "2 * K_half"),),
+        )
+        report = analyse(network)
+        stable = [p for p in report.fixed_points if p.stable]
+        assert len(stable) == 1
+        assert stable[0].state["X"] == pytest.approx(3.0, rel=1e-6)
+
+    def test_the_simulator_and_the_analysis_now_agree(self) -> None:
+        """The two routes to the same fact, compared for the first time.
+
+        The simulator always honoured rate rules. Integrating logistic
+        growth to its plateau and asking the analysis where the plateau is
+        must give the same number, or one of them is wrong.
+        """
+        from Terium.compose.simulate import Trajectory, check_invariants
+        from Terium.compose.analysis import derivative_function
+
+        network = self._logistic(K=3.0)
+        rhs, _ = derivative_function(network)
+        # A crude forward-Euler integration, independent of both modules'
+        # own machinery, so the comparison is not a module checking itself.
+        x, dt = 0.5, 1e-3
+        for _ in range(20000):
+            x += dt * rhs([x])[0]
+        stable = next(p for p in analyse(network).fixed_points if p.stable)
+        assert x == pytest.approx(stable.state["X"], rel=1e-4)
+
+    def test_a_reaction_network_is_unchanged(self) -> None:
+        # The cry-wolf direction: adding rule support must not perturb a
+        # model that has none.
+        from Terium.compose.pipeline import compose as _compose
+
+        report = analyse(_compose("a toggle switch between two repressors").network)
+        assert len(report.stable_points) == 2
+
+
+class TestConvergenceIsRelativeToTheModel:
+    """An absolute residual bar is met by a model that does nothing.
+
+    `RESIDUAL_TOLERANCE` is 1e-9 and was compared against the residual as
+    an absolute number. On a model at nanomolar concentrations every flux
+    is around 1e-7, and a residual of 5e-10 is a point a few percent from
+    the root, not the root. A two-stage expression model returned THREE
+    "stable states" that were one state found imprecisely from three
+    starts. The search-scale fix exposed it: the search used to start far
+    above such a model and never reached the flat region where the
+    absolute bar was too easy.
+
+    The bar is now 1e-9 of the largest flux seen across the starting
+    points. `test_compose_library_expression` already did exactly this in
+    its own analytic check, with the comment "any absolute bound would be
+    met by a model that did nothing at all". The analysis now agrees.
+    """
+
+    @staticmethod
+    def _tiny(scale=1e-6):
+        """Synthesis and decay at `scale`: unique steady state at ks/kd."""
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        return ReactionNetwork(
+            name="tiny",
+            species=(Species("X", scale),),
+            parameters=(
+                Parameter("ks", 3.0 * scale, "mM/s"),
+                Parameter("kd", 1.0, "1/s"),
+            ),
+            reactions=(
+                Reaction("make", {}, {"X": 1}, "ks"),
+                Reaction("decay", {"X": 1}, {}, "kd * X"),
+            ),
+        )
+
+    @pytest.mark.parametrize("scale", [1.0, 1e-3, 1e-6, 1e-9])
+    def test_one_state_at_every_scale(self, scale) -> None:
+        report = analyse(self._tiny(scale))
+        stable = report.stable_points
+        assert len(stable) == 1, (
+            scale,
+            [(p.state["X"], p.residual) for p in report.fixed_points],
+        )
+        assert stable[0].state["X"] == pytest.approx(3.0 * scale, rel=1e-6)
+
+    def test_the_found_root_is_converged_relative_to_its_fluxes(self) -> None:
+        # The residual at the reported root is tiny COMPARED TO the model's
+        # flux, not merely tiny.
+        from Terium.compose.analysis import RESIDUAL_TOLERANCE, derivative_function
+
+        network = self._tiny(1e-6)
+        rhs, _ = derivative_function(network)
+        point = analyse(network).stable_points[0]
+        flux_scale = abs(rhs([0.0])[0])  # ks alone, at X = 0
+        assert flux_scale == pytest.approx(3e-6)
+        assert point.residual <= RESIDUAL_TOLERANCE * flux_scale
+
+    def test_a_slow_model_has_one_root_not_one_per_start(self) -> None:
+        """X' = k (K - X) with k = 1e-12: the flux is below 1e-9 EVERYWHERE.
+
+        Under an absolute bar of 1e-9, every starting point satisfies the
+        convergence test before the solver has moved, and the search
+        reported EIGHT fixed points -- one per start, at X = 0, 3, 0.08,
+        7.9, 1.2, 1.03, 5.3 and 0.06 -- for a model with exactly one, at K.
+        That is the failure the expression model showed in miniature,
+        isolated from everything else.
+        """
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        network = ReactionNetwork(
+            name="slow",
+            species=(Species("X", 0.5),),
+            parameters=(
+                Parameter("k", 1e-12, "1/s"), Parameter("K", 3.0, "mM"),
+            ),
+            reactions=(Reaction("relax", {}, {"X": 1}, "k * (K - X)"),),
+        )
+        report = analyse(network)
+        assert len(report.fixed_points) == 1, (
+            f"{len(report.fixed_points)} roots for a model with one: "
+            f"{[round(p.state['X'], 3) for p in report.fixed_points]}"
+        )
+        assert report.fixed_points[0].state["X"] == pytest.approx(3.0, rel=1e-6)
+
+    def test_the_expression_model_has_one_state(self) -> None:
+        """The model that surfaced this, from the library."""
+        from Terium.compose.builder import Composition
+        from Terium.compose.library_expression import TWO_STAGE_EXPRESSION
+
+        composition = Composition("expression")
+        composition.add(TWO_STAGE_EXPRESSION, "gene")
+        report = analyse(composition.to_network())
+        assert len(report.stable_points) == 1, report.summary()
