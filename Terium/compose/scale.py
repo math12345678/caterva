@@ -100,6 +100,29 @@ ONE_MOLECULE_PER_BACTERIUM_MOLAR = 1.7e-9
 #: more of itself than the cell contains of all protein together.
 TOTAL_CELLULAR_PROTEIN_MOLAR = 5e-3
 
+#: The most any single dissolved species reaches in a cytoplasm, in molar,
+#: order of magnitude. The same figure `WEAKEST_MEANINGFUL_KD_MOLAR` rests
+#: on and for the same reason: above about a molar the solution is no
+#: longer a cytoplasm -- total cytoplasmic osmolarity is a few hundred
+#: milliosmolar, and one solute past a molar has displaced the water. A
+#: hard bound for anything, protein or not.
+MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR = 1.0
+
+#: The most abundant intracellular metabolite measured, in molar, order of
+#: magnitude. Glutamate in E. coli sits near a tenth of a molar; ATP, the
+#: next tier, near a hundredth. A non-protein species above this is not
+#: impossible -- it is above everything that has been measured, which is a
+#: QUESTION and not an ERROR.
+#:
+#: WHY THIS EXISTS BESIDE THE PROTEIN BOUND. `TOTAL_CELLULAR_PROTEIN_MOLAR`
+#: was applied to every species, so glutamate at its measured concentration
+#: came back "physically impossible" -- a false alarm on the most abundant
+#: metabolite there is. The protein bound is right for a protein and wrong
+#: by a factor of twenty for a metabolite; which a species is comes from
+#: the composition's port roles (`Composition.protein_species`), and a
+#: species whose kind is not decidable gets this bound rather than that one.
+MOST_ABUNDANT_METABOLITE_MOLAR = 0.1
+
 # ---------------------------------------------------------------------------
 # Empirical ranges -- summaries of what has been observed. Outside is a
 # question, not an error.
@@ -403,20 +426,62 @@ def _is_second_order(unit: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
-def _check_concentration(name: str, value: float, unit: str) -> List[Finding]:
+def _check_concentration(
+    name: str, value: float, unit: str, *, protein: Optional[bool] = None,
+) -> List[Finding]:
+    """One species' amount against what a cell can hold.
+
+    `protein` is THREE-VALUED. True gets the protein bound; False and None
+    both get the solute bound, because "not known to be a protein" and
+    "known not to be" call for the same caution -- the weaker bound -- and
+    differ only in what the finding says. The old version applied the
+    protein bound to everything, which called measured glutamate and ATP
+    impossible.
+    """
     molar = _as_molar(value, unit)
     if molar is None:
         return []
     findings: List[Finding] = []
 
-    if molar > TOTAL_CELLULAR_PROTEIN_MOLAR:
+    if protein and molar > TOTAL_CELLULAR_PROTEIN_MOLAR:
         findings.append(Finding(
             parameter=name, value=value, unit=unit, severity=ERROR,
             against=f"total cellular protein, ~{TOTAL_CELLULAR_PROTEIN_MOLAR:g} M",
             detail=(
-                "a single species at more than the cell's entire protein "
+                "a single protein at more than the cell's entire protein "
                 "content. Almost always a unit slip -- mM read as M is "
                 "exactly this factor"
+            ),
+        ))
+    elif not protein and molar > MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR:
+        findings.append(Finding(
+            parameter=name, value=value, unit=unit, severity=ERROR,
+            against=(
+                f"the most any solute reaches in a cytoplasm, "
+                f"~{MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR:g} M"
+            ),
+            detail=(
+                "a single species past a molar has displaced the water; "
+                "this is not a cytoplasm. Almost always a unit slip"
+            ),
+        ))
+    elif not protein and molar > MOST_ABUNDANT_METABOLITE_MOLAR:
+        kind = (
+            "not known to be a protein" if protein is None
+            else "not a protein"
+        )
+        findings.append(Finding(
+            parameter=name, value=value, unit=unit, severity=QUESTION,
+            against=(
+                f"the most abundant measured metabolite, "
+                f"~{MOST_ABUNDANT_METABOLITE_MOLAR:g} M"
+            ),
+            detail=(
+                f"above every intracellular metabolite that has been "
+                f"measured -- glutamate, the highest, sits near a tenth of "
+                f"a molar. This species is {kind}, so the protein bound "
+                f"does not apply; if it IS one, it is twenty times over "
+                f"that bound and this should be an error"
             ),
         ))
     elif 0.0 < molar < ONE_MOLECULE_PER_BACTERIUM_MOLAR:
@@ -623,6 +688,7 @@ def check(
     *,
     units: Optional[Mapping[str, str]] = None,
     species_unit: str = LIBRARY_CONCENTRATION_UNIT,
+    proteins: Sequence[str] = (),
 ) -> ScaleReport:
     """Every parameter, against the bounds and ranges above.
 
@@ -643,11 +709,19 @@ def check(
     `units` therefore exists for networks built OUTSIDE the composer, which
     carry no units at all. Without either, every parameter is reported
     unchecked -- honest, and nearly useless.
+
+    `proteins` names the species the PROTEIN bound applies to. A bare
+    network cannot say which of its species are proteins, and the bound on
+    total cellular protein -- about five millimolar -- is wrong by a factor
+    of twenty for a metabolite: glutamate is measured near a hundred. So a
+    species not named here gets the solute bound instead, and
+    `check_model` fills this in from the composition's port roles.
     """
     findings: List[Finding] = []
     unchecked: Dict[str, str] = {}
     checked: List[str] = []
     supplied = dict(units or {})
+    protein_set = frozenset(proteins)
 
     for parameter in network.parameters:
         name = parameter.id
@@ -792,7 +866,10 @@ def check(
         # `coverage` from understating what was looked at.
         checked.append(species.id)
         if initial > 0.0:
-            findings += _check_concentration(species.id, initial, species_unit)
+            findings += _check_concentration(
+                species.id, initial, species_unit,
+                protein=True if species.id in protein_set else None,
+            )
 
     return ScaleReport(
         findings=tuple(findings),
@@ -808,6 +885,20 @@ def check_model(model: Any, **kwargs: Any) -> ScaleReport:
     know what its numbers mean, because the IR does not record it.
     """
     kwargs.setdefault("units", units_from_model(model))
+    composition = getattr(
+        getattr(model, "recognition", None), "composition", None
+    )
+    if composition is not None and hasattr(composition, "protein_species"):
+        kwargs.setdefault("proteins", tuple(composition.protein_species()))
+    # The species unit too. This function filled in the parameter units
+    # and the protein set from the composition and left the species unit
+    # at the library default, so a composition declared in uM would have
+    # had every starting amount checked as though it were mM -- the
+    # thousandfold slip the module exists to catch, on its own input.
+    # Every library composition is mM, which is why nothing noticed.
+    declared = getattr(composition, "concentration_unit", None)
+    if declared:
+        kwargs.setdefault("species_unit", str(declared))
     return check(model.network, **kwargs)
 
 

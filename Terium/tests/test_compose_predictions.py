@@ -35,7 +35,10 @@ from Terium.compose.timeseries import Series
 
 class TestTheBoundThatWasMissing:
     def test_a_steady_state_above_total_protein_is_impossible(self) -> None:
-        report = check_state({"X": 100.0}, unit="M")
+        # X is named a protein: the bound on total cellular protein reaches
+        # only species the caller says are proteins, because applying it
+        # to everything called measured glutamate impossible.
+        report = check_state({"X": 100.0}, unit="M", proteins=("X",))
         assert report.verdict == IMPOSSIBLE
         assert len(report.impossible) == 1
         assert report.impossible[0].severity == ERROR
@@ -47,7 +50,7 @@ class TestTheBoundThatWasMissing:
         A reader deciding whether to believe this needs to be able to redo
         the division, which means seeing both numbers and the ratio.
         """
-        report = check_state({"X": 100.0}, unit="M")
+        report = check_state({"X": 100.0}, unit="M", proteins=("X",))
         detail = report.impossible[0].detail
         expected = 100.0 / TOTAL_CELLULAR_PROTEIN_MOLAR
         assert f"{expected:.3g}x" in detail
@@ -56,7 +59,9 @@ class TestTheBoundThatWasMissing:
     def test_it_names_why_the_input_check_missed_it(self) -> None:
         # The point a professor would ask about: scale.py passed every
         # parameter, so why is this wrong?
-        detail = check_state({"X": 100.0}, unit="M").impossible[0].detail
+        detail = check_state(
+            {"X": 100.0}, unit="M", proteins=("X",)
+        ).impossible[0].detail
         assert "their combination is not" in detail
         assert "checking the inputs did not catch it" in detail
 
@@ -71,7 +76,9 @@ class TestTheBoundThatWasMissing:
     def test_the_boundary_is_not_flagged(self) -> None:
         # Exactly at the bound is not above it. A strict comparison keeps
         # the check from firing on the number it was derived from.
-        report = check_state({"X": TOTAL_CELLULAR_PROTEIN_MOLAR}, unit="M")
+        report = check_state(
+            {"X": TOTAL_CELLULAR_PROTEIN_MOLAR}, unit="M", proteins=("X",)
+        )
         assert report.verdict == POSSIBLE
 
 
@@ -590,3 +597,59 @@ class TestTheVerdictDoesNotRepeatTheAnalysis:
         assert len(concerns) == 1
         assert concerns[0].source == "predictions"
         assert "cannot exist at the amount predicted" in note
+
+
+class TestTheProteinBoundIsScopedHereToo:
+    """The same false alarm, in this module's own copy of the bound.
+
+    `check_state` applied the protein bound to every species, so a steady
+    state predicting glutamate at its measured concentration was
+    IMPOSSIBLE. `proteins` names the species it applies to; the rest get
+    the solute bound and, above the most abundant measured metabolite, a
+    question rather than an error.
+    """
+
+    def test_measured_glutamate_is_a_possible_prediction(self) -> None:
+        assert check_state({"glutamate": 96.0}, unit="mM").verdict == POSSIBLE
+
+    def test_a_named_protein_keeps_the_protein_bound(self) -> None:
+        report = check_state({"TF": 9.6}, unit="mM", proteins=("TF",))
+        assert report.verdict == IMPOSSIBLE
+        assert "this one protein" in report.impossible[0].detail
+
+    def test_an_unnamed_species_at_ten_millimolar_is_possible(self) -> None:
+        assert check_state({"X": 9.6}, unit="mM").verdict == POSSIBLE
+
+    def test_above_measured_metabolites_is_questionable(self) -> None:
+        report = check_state({"X": 150.0}, unit="mM")
+        assert report.verdict == QUESTIONABLE
+        # And it says what the protein bound WOULD have said, so a reader
+        # who knows X is a protein can read it as the error it would be.
+        assert "over that bound" in report.questionable[0].detail
+
+    def test_past_a_molar_is_impossible_for_anything(self) -> None:
+        report = check_state({"X": 1500.0}, unit="mM")
+        assert report.verdict == IMPOSSIBLE
+        assert "displaced the water" in report.impossible[0].detail
+
+    def test_the_verdict_page_names_the_proteins(self) -> None:
+        from Terium.compose.verdict import _protein_species_of
+
+        model = compose("a toggle switch between two repressors")
+        named = _protein_species_of(model)
+        assert set(named) == set(model.recognition.composition.protein_species())
+        assert named, "the premise: repressors are proteins"
+
+    def test_a_model_with_no_composition_names_none(self) -> None:
+        # The conservative direction: with nothing to ask, every species
+        # gets the weaker bound rather than a guessed protein bound.
+        from Terium.compose.verdict import _protein_species_of
+
+        assert _protein_species_of(object()) == ()
+
+    def test_the_trajectory_check_threads_them(self) -> None:
+        series = Series.of([0.0, 1.0], [1e-3, 9.6], "TF")
+        as_protein = check_trajectory(series, unit="mM", proteins=("TF",))
+        as_unknown = check_trajectory(series, unit="mM")
+        assert as_protein.verdict == IMPOSSIBLE
+        assert as_unknown.verdict == POSSIBLE
