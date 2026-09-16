@@ -71,15 +71,36 @@ JACOBIAN_STEP = 1.4901161193847656e-08  # sqrt(2^-52)
 
 #: How many starting points a multistart search uses per species.
 #:
-#: MEASURED, not chosen for tidiness. At 4 the symmetric toggle switch
-#: found one of its two stable states and reported "one stable state ... the
-#: system settles to the same place from anywhere it can reach" -- a
-#: confidently wrong answer about the single property the model exists to
-#: show. At 8 it finds both, and 16 and 32 find nothing further.
+#: MEASURED, and re-measured when the measurement changed. The first
+#: version of this note said the toggle switch found one of its two stable
+#: states at 4 and both at 8. That was true when the search was anchored
+#: at order 1 for every model; since `_search_scale` anchors it where the
+#: model's concentrations actually are, the toggle finds both at 4.
 #:
-#: Set to 8 rather than to the largest number tried: more starts cost a root
-#: find each and bought nothing here, and a default that is slow for no
-#: measured benefit gets turned down by the first person in a hurry.
+#: The current table, every model the composer builds, stable states found
+#: (and, for the one model on a line of equilibria, points on the line):
+#:
+#:     depth                      4      8     16     32
+#:     ten models with attractors    identical at every depth
+#:     two-enzyme competition     0/11   0/19   0/27   0/27
+#:
+#: Nothing changes from 4 upward except how many points land on the
+#: continuum, which is not a property of the model. `sensitivity.py` used
+#: to justify a deeper search of its own -- 16 -- by that model reporting
+#: "1 stable state at 8 and 2 at 16". Those were continuum points; neither
+#: was a stable state, and once they were classified correctly the only
+#: evidence for 16 disappeared with them.
+#:
+#: 8 is kept rather than dropped to 4 because the library is not the
+#: world: a user's model with narrower basins gets a margin, at the cost
+#: of a root find per extra start. It is not raised to 16 because nothing
+#: measured asks for it, and a default that is slow for no measured
+#: benefit gets turned down by the first person in a hurry. A caller who
+#: needs more passes `starts_per_species`, which every consumer of this
+#: module now threads through.
+#:
+#: `test_the_library_is_depth_independent_from_four` holds this table live,
+#: so the next time the search changes the note cannot go stale quietly.
 #:
 #: This does not make the search exhaustive and nothing here claims it is.
 #: See `StabilityReport.at_least_bistable` for what the evidence supports.

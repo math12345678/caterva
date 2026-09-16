@@ -398,16 +398,28 @@ class TestTheSearchDepthIsPartOfTheContract:
     that contract left unstated.
     """
 
-    def test_the_two_depths_really_do_differ(self) -> None:
-        """The premise. If these ever converge, the rest is about nothing."""
+    def test_the_depths_have_converged(self) -> None:
+        """The premise, inverted from the first version of this test.
+
+        This used to assert the two depths DIFFERED, on the grounds that
+        the mismatch was the bug being guarded. The mismatch was the
+        symptom; the bug was that 16 had no evidence behind it -- its
+        justification was a count of continuum points misread as stable
+        states -- and the fix was to make sensitivity read the analysis
+        default by reference. So the depths are now one number, and the
+        thing this file guards is that they STAY one number: the CLI
+        choosing its conclusion at one depth and grading it at another is
+        impossible when there is only one depth to choose from.
+        """
         from Terium.compose.analysis import DEFAULT_STARTS_PER_SPECIES
         from Terium.compose.robustness import default_search_depth
         from Terium.compose.sensitivity import STARTS_PER_SPECIES
 
         assert default_search_depth() == STARTS_PER_SPECIES
-        assert STARTS_PER_SPECIES > DEFAULT_STARTS_PER_SPECIES, (
-            "sensitivity's measured floor is no longer deeper than "
-            "analysis's default, so the mismatch this guards is gone"
+        assert STARTS_PER_SPECIES == DEFAULT_STARTS_PER_SPECIES, (
+            "sensitivity and analysis disagree on the search depth again; "
+            "the CLI can once more pick a conclusion at one depth and grade "
+            "it at another"
         )
 
     def test_the_depth_is_recorded_on_the_report(self) -> None:

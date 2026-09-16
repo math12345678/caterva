@@ -542,11 +542,13 @@ class TestRefusals:
     def test_a_single_stable_state_is_a_search_result_not_a_proof(self) -> None:
         """The honest limit of the refusal, stated where it is made.
 
-        At 8 starting points per species -- the analysis module's measured
-        default -- the five-species competition model still reports one
-        stable state when it has two. No number of starting points turns
-        "did not find another" into "there is not another", and the module
-        must not read as though it did.
+        This docstring used to cite the five-species competition model as
+        "reporting one stable state when it has two" at the default depth.
+        It has none: those were points on a continuum, misclassified. The
+        limit it illustrated is still real and still stated -- no number
+        of starting points turns "did not find another" into "there is not
+        another" -- it just no longer has that example to lean on, and the
+        module must not read as though a single stable state were a proof.
         """
         from Terium.compose import sensitivity
 

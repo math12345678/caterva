@@ -101,17 +101,23 @@ WHAT THE MULTISTABILITY REFUSAL IS AND IS NOT
 ---------------------------------------------
 `steady_state_of` refuses when the search finds more than one stable state,
 because a derivative through a choice between attractors describes the
-choice. That refusal is only as good as the search, and this is measured,
-not assumed. Stable states found, by starting points per species:
+choice. That refusal is only as good as the search, and the depth is
+`analysis.DEFAULT_STARTS_PER_SPECIES` -- one depth for the whole package.
 
-    toggle switch         4 -> 1 (WRONG, it is bistable)   8 -> 2
-    two-enzyme competition   8 -> 1 (WRONG)               16 -> 2
+IT USED TO BE DEEPER HERE, AND THE REASON WAS A MISREADING. This module
+searched at 16 on the strength of a table that said the two-enzyme
+competition model reports "1 stable state at 8 and 2 at 16". Those were
+points on a LINE of equilibria, which the classifier of the day called
+stable; neither depth had found a stable state, and once `analysis`
+classified them as `continuum` the only evidence for 16 went with them.
+The current measurement -- every library model, stable states at 4, 8, 16
+and 32 -- is identical at every depth, and it is held live by a test in
+the analysis suite rather than restated here where it could go stale.
 
-The first row is why these quantities no longer search below the analysis
-module's measured default. The second is why the report says a single stable
-state is a search result rather than a proof: at the default depth a real
-five-species model still reports one state when it has two, and no number of
-starting points turns "did not find another" into "there is not another".
+What survives from the old table is the honest half: a single stable state
+is a search result rather than a proof. No number of starting points turns
+"did not find another" into "there is not another", and the refusal reports
+the depth it searched instead of implying a guarantee.
 """
 
 from __future__ import annotations
@@ -121,6 +127,11 @@ import re
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
+
+try:
+    from .analysis import DEFAULT_STARTS_PER_SPECIES
+except ImportError:  # pragma: no cover - flat import
+    from analysis import DEFAULT_STARTS_PER_SPECIES  # type: ignore[no-redef]
 
 #: Relative accuracy of a quantity that evaluates in floating point with no
 #: iteration behind it. The floor nothing can beat.
@@ -592,18 +603,20 @@ def _with(network: Any, parameter: str, value: float) -> Any:
 # ---------------------------------------------------------------------------
 
 #: Starting points per species for the steady-state search behind these
-#: quantities. MEASURED. The analysis module's own default is 8, and these
-#: quantities previously passed 4 to be quick, which cost the refusal below
-#: its meaning: at 4 the toggle switch reports ONE stable state when it has
-#: two, so a derivative would have been taken straight through a bistable
-#: system without a word. At 8 the toggle is right and the five-species
-#: competition model is still wrong; at 16 both are right.
+#: quantities. THE ANALYSIS MODULE'S OWN DEFAULT, by reference, so the two
+#: cannot drift apart again.
 #:
-#: 16 is therefore a measured floor for the models in the library, not a
-#: proof for models outside it. Nothing here can turn "did not find another"
-#: into "there is not another", which is why `steady_state_of` reports the
-#: depth it searched instead of implying a guarantee.
-STARTS_PER_SPECIES = 16
+#: This was 16, justified by a table in which the two-enzyme competition
+#: model reported the wrong number of stable states at 8 and the right one
+#: at 16. Both numbers were counts of points on a continuum -- the model
+#: has no stable state at any depth -- and the justification dissolved
+#: when they were classified correctly. See the note on
+#: `analysis.DEFAULT_STARTS_PER_SPECIES` for the current measurement.
+#:
+#: Kept as a name rather than removed, because `robustness` and the CLI
+#: read it, and because a caller who needs a deeper search for a model
+#: outside the library has one place to change.
+STARTS_PER_SPECIES = DEFAULT_STARTS_PER_SPECIES
 
 
 @dataclass(frozen=True)

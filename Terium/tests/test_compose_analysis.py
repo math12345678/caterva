@@ -904,3 +904,111 @@ class TestTheClassificationVocabularyIsShared:
                     assert analysis.classify(eigen) in declared, (
                         signs, imag, analysis.classify(eigen),
                     )
+
+
+class TestTheSearchDepthIsOneNumber:
+    """Two constants, two docstrings, two stale measurements.
+
+    `analysis.DEFAULT_STARTS_PER_SPECIES` said the toggle found one state
+    at 4 and both at 8; `sensitivity.STARTS_PER_SPECIES` said the
+    two-enzyme competition was wrong at 8 and right at 16. The first
+    stopped being true when the search was re-anchored at the model's own
+    scale. The second was never a count of stable states -- both numbers
+    were points on a continuum -- and dissolved when those were classified
+    correctly.
+
+    A justification that lives only in a docstring goes stale the moment
+    the code it describes moves. These hold the measurement live.
+    """
+
+    LIBRARY = (
+        "enzyme kinetics with a competitive inhibitor",
+        "repressilator oscillations",
+        "three step phosphorylation cascade",
+        "a MAP kinase cascade with negative feedback",
+        "reversible binding of a ligand to a receptor",
+        "substrate inhibition at high substrate concentration",
+        "two enzymes competing for the same substrate",
+        "a toggle switch between two repressors",
+        "sequential feedback inhibition in amino acid synthesis",
+        "an open system with constant substrate inflow",
+        "allosteric activation of an enzyme by its product",
+    )
+
+    def test_the_package_uses_one_depth(self) -> None:
+        from Terium.compose.analysis import DEFAULT_STARTS_PER_SPECIES
+        from Terium.compose.robustness import default_search_depth
+        from Terium.compose.sensitivity import STARTS_PER_SPECIES
+
+        assert STARTS_PER_SPECIES == DEFAULT_STARTS_PER_SPECIES
+        assert default_search_depth() == DEFAULT_STARTS_PER_SPECIES
+
+    def test_sensitivity_reads_it_by_reference(self) -> None:
+        """Not a copy that happens to be equal today.
+
+        Two constants with the same value drift apart the first time one
+        is edited. The sensitivity module's constant must BE the analysis
+        module's, not a literal 8 beside it.
+        """
+        import ast
+        import inspect
+
+        from Terium.compose import sensitivity
+
+        tree = ast.parse(inspect.getsource(sensitivity))
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(t, ast.Name) and t.id == "STARTS_PER_SPECIES"
+                for t in node.targets
+            ):
+                assert isinstance(node.value, ast.Name), (
+                    "STARTS_PER_SPECIES is a literal again; it must reference "
+                    "analysis.DEFAULT_STARTS_PER_SPECIES"
+                )
+                assert node.value.id == "DEFAULT_STARTS_PER_SPECIES"
+                return
+        raise AssertionError("STARTS_PER_SPECIES is no longer assigned in sensitivity.py")
+
+    def test_the_library_is_depth_independent_from_four(self) -> None:
+        """The measurement the default rests on, run rather than quoted.
+
+        Every library model reports the same number of stable states at 4,
+        8 and 16 starting points per species. Continuum points are excluded
+        from the comparison on purpose: how many land on a line IS
+        depth-dependent and is not a property of the model.
+
+        If this goes red, the search has changed and the note on
+        `DEFAULT_STARTS_PER_SPECIES` needs re-measuring, not re-wording.
+        """
+        from Terium.compose.pipeline import compose as _compose
+
+        disagreements = {}
+        for query in self.LIBRARY:
+            network = _compose(query).network
+            counts = {
+                depth: len(analyse(network, starts_per_species=depth).stable_points)
+                for depth in (4, 8, 16)
+            }
+            if len(set(counts.values())) != 1:
+                disagreements[query] = counts
+        assert not disagreements, disagreements
+
+    def test_the_measurement_covers_the_whole_library(self) -> None:
+        # The sweep above is vacuous over an empty or shrunken list. Pinned
+        # against the coverage suite's own count so the two cannot diverge.
+        from Terium.tests import test_compose_agreement
+
+        assert set(self.LIBRARY) == set(test_compose_agreement.BUILDABLE)
+
+    def test_the_toggle_is_found_at_four(self) -> None:
+        # The specific claim the old docstring made in the other direction.
+        from Terium.compose.pipeline import compose as _compose
+
+        report = analyse(
+            _compose("a toggle switch between two repressors").network,
+            starts_per_species=4,
+        )
+        assert len(report.stable_points) == 2, (
+            "the toggle no longer finds both states at 4; the search "
+            "regressed and DEFAULT_STARTS_PER_SPECIES needs re-measuring"
+        )
