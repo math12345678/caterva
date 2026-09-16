@@ -696,3 +696,211 @@ class TestTheSearchLooksWhereTheModelLives:
         from Terium.compose.scale import _TO_MOLAR
 
         assert _CONCENTRATION_UNITS == frozenset(_TO_MOLAR)
+
+
+class TestAContinuumIsNotAStableState:
+    """Nineteen points on a line were reported as nineteen switches.
+
+    `classify` ignored a zero eigenvalue and classified on the rest,
+    reasoning that a zero "usually means a conservation law". Both callers
+    strip exactly as many structural zeros as there are laws BEFORE calling
+    it, so a zero that arrives is not a law -- it is a direction the
+    dynamics do not restore along. The point sits on a LINE of equilibria.
+
+    Two enzymes competing for one substrate is the plain case. Once the
+    substrate is gone, every split of product between them is an
+    equilibrium. The verdict page turned nineteen of those into "this
+    system switches". It does not: a switch has discrete attractors with
+    repellors between them, and this has a line.
+    """
+
+    def test_a_remaining_zero_with_attracting_others_is_a_continuum(self) -> None:
+        from Terium.compose.analysis import CONTINUUM, classify
+
+        assert classify([0.0, -2.0]) == CONTINUUM
+        assert classify([0.0, -2.0, -0.5]) == CONTINUUM
+        assert classify([1e-10, -1.0]) == CONTINUUM  # within MARGINAL_EIGENVALUE
+
+    def test_a_remaining_zero_with_a_repelling_other_is_marginal(self) -> None:
+        # The bifurcation reading, kept apart: a zero next to a positive
+        # eigenvalue is a point the linearisation cannot place, not a line
+        # the system settles onto.
+        from Terium.compose.analysis import CONTINUUM, MARGINAL, classify
+
+        assert classify([0.0, +2.0]) == MARGINAL
+        assert classify([0.0, -1.0, +1.0]) == MARGINAL
+        assert classify([0.0]) == MARGINAL
+        assert classify([0.0, +2.0]) != CONTINUUM
+
+    def test_a_continuum_point_is_not_stable(self) -> None:
+        from Terium.compose.analysis import CONTINUUM, FixedPoint
+
+        point = FixedPoint(
+            state={"X": 0.5}, residual=0.0,
+            eigenvalues=(0.0, -2.0), classification=CONTINUUM,
+        )
+        assert not point.stable, (
+            "a point that can be nudged along a line and never return is "
+            "not an attractor"
+        )
+
+    def test_the_two_enzyme_model_has_no_stable_state(self) -> None:
+        """The model that motivated this, at the depth the CLI uses.
+
+        Nineteen points on one line, one of them physical, zero stable,
+        and NOT bistable. The old classifier called every one of them
+        stable and `at_least_bistable` was True.
+        """
+        from Terium.compose.pipeline import compose as _compose
+
+        report = analyse(
+            _compose("two enzymes competing for the same substrate").network
+        )
+        assert report.on_a_continuum
+        assert not report.at_least_bistable
+        assert not report.stable_points
+        assert len(report.continuum_points) >= 2, (
+            "the premise: the search landed on the line more than once"
+        )
+
+    def test_the_line_really_is_a_line(self) -> None:
+        """Every point found shares S = 0 and P1 + P2 = the conserved total.
+
+        Otherwise 'continuum' would be a label on a set of unrelated roots.
+        This checks the geometry the classification claims.
+        """
+        from Terium.compose.pipeline import compose as _compose
+
+        model = _compose("two enzymes competing for the same substrate")
+        report = analyse(model.network)
+        totals = set()
+        for point in report.continuum_points:
+            assert abs(point.state["enzyme1_S"]) < 1e-6, point.state
+            totals.add(round(point.state["enzyme1_P"] + point.state["enzyme2_P"], 6))
+        assert len(totals) == 1, (
+            f"the points do not share one conserved total: {sorted(totals)}"
+        )
+
+    def test_the_toggle_switch_is_unaffected(self) -> None:
+        # The cry-wolf direction. A genuine switch has NO zero eigenvalue
+        # at its stable states, so this change must not touch it.
+        from Terium.compose.analysis import SADDLE, STABLE
+        from Terium.compose.pipeline import compose as _compose
+
+        report = analyse(
+            _compose("a toggle switch between two repressors").network
+        )
+        assert report.at_least_bistable
+        assert len(report.stable_points) == 2
+        assert not report.on_a_continuum
+        classes = {p.classification for p in report.fixed_points}
+        assert classes == {STABLE, SADDLE}, classes
+
+    def test_the_summary_says_it_is_not_a_switch(self) -> None:
+        from Terium.compose.pipeline import compose as _compose
+
+        text = analyse(
+            _compose("two enzymes competing for the same substrate").network
+        ).summary()
+        assert "A LINE of equilibria" in text
+        assert "This is NOT a switch" in text
+        assert "it switches" not in text.replace("NOT a switch", "")
+        # And it says the count is not the finding.
+        assert "artefact of where the starts fell" in text
+
+    def test_on_a_continuum_is_conjunctive(self) -> None:
+        """A continuum plus a real attractor is neither case.
+
+        The flag is for the plain case. Reporting a model with a line AND
+        an isolated stable state as "on a continuum" would hide the
+        attractor, which is the more interesting half.
+        """
+        from Terium.compose.analysis import (
+            CONTINUUM, STABLE, FixedPoint, StabilityReport,
+        )
+
+        line = FixedPoint(
+            state={"X": 0.5}, residual=0.0,
+            eigenvalues=(0.0, -1.0), classification=CONTINUUM,
+        )
+        attractor = FixedPoint(
+            state={"X": 3.0}, residual=0.0,
+            eigenvalues=(-1.0, -2.0), classification=STABLE,
+        )
+        both = StabilityReport(
+            fixed_points=(line, attractor), starts_tried=8, species=("X",),
+        )
+        assert not both.on_a_continuum
+        assert both.continuum_points == (line,)
+        only_line = StabilityReport(
+            fixed_points=(line,), starts_tried=8, species=("X",),
+        )
+        assert only_line.on_a_continuum
+
+    def test_the_verdict_page_does_not_say_switch(self) -> None:
+        from Terium.compose.pipeline import compose as _compose
+        from Terium.compose.verdict import behaviour_of
+
+        model = _compose("two enzymes competing for the same substrate")
+        line = behaviour_of(analyse(model.network))
+        assert line is not None
+        assert "LINE of equilibria" in line
+        assert "not a switch" in line
+        assert "what a switch looks like" not in line
+        assert "physically reachable" in line
+
+
+class TestTheClassificationVocabularyIsShared:
+    """`continuation.BranchPoint.stable` spells the stable classes by hand.
+
+    It reads `("stable", "stable spiral")` from a literal tuple rather than
+    from `analysis`, so a rename there would leave every branch point
+    reporting itself unstable with no test going red. Held together here.
+    """
+
+    def test_continuation_agrees_on_what_stable_means(self) -> None:
+        from Terium.compose.analysis import (
+            CONTINUUM, OSCILLATORY_STABLE, STABLE,
+        )
+        from Terium.compose.continuation import BranchPoint
+
+        def _point(classification):
+            return BranchPoint(
+                parameter=1.0, state={"X": 1.0}, arclength=0.0,
+                tangent_state={"X": 0.0}, tangent_parameter=1.0,
+                residual=0.0, classification=classification,
+            )
+
+        assert _point(STABLE).stable
+        assert _point(OSCILLATORY_STABLE).stable
+        assert not _point(CONTINUUM).stable, (
+            "a branch point on a line of equilibria is not an attractor"
+        )
+        assert not _point("marginal").stable
+
+    def test_every_classification_classify_can_return_is_declared(self) -> None:
+        """No classifier output escapes the constants.
+
+        A string returned from `classify` that is not one of the module's
+        named constants would be one that every `in (...)` check silently
+        misses -- which is what a continuum was before it had a name.
+        """
+        import itertools
+
+        from Terium.compose import analysis
+
+        declared = {
+            analysis.STABLE, analysis.UNSTABLE, analysis.SADDLE,
+            analysis.MARGINAL, analysis.CONTINUUM,
+            analysis.OSCILLATORY_STABLE, analysis.OSCILLATORY_UNSTABLE,
+        }
+        # Every sign pattern over up to three eigenvalues, with and without
+        # an imaginary part, so every branch of classify runs.
+        reals = (-1.0, 0.0, 1.0)
+        for n in (0, 1, 2, 3):
+            for signs in itertools.product(reals, repeat=n):
+                for imag in (0.0, 0.5):
+                    eigen = [complex(r, imag) for r in signs]
+                    assert analysis.classify(eigen) in declared, (
+                        signs, imag, analysis.classify(eigen),
+                    )

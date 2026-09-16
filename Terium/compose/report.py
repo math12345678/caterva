@@ -337,7 +337,62 @@ class ModelDossier:
                 "during the integration, which means the integrator, not the "
                 "model, produced those numbers."
             )
+        lines += self._trajectory_plausibility()
         return lines
+
+    def _trajectory_plausibility(self) -> List[str]:
+        """Whether the run passed through a state a cell cannot be in.
+
+        The conservation check above says whether the INTEGRATOR behaved.
+        This says whether the MODEL did: a run can conserve every total
+        exactly and still overshoot to fifty molar on its way to a
+        sensible micromolar, and that spike is what a student will try to
+        interpret. The steady-state check on the verdict page sees nothing
+        wrong with it, because where the system ended is fine.
+        """
+        try:
+            from .predictions import UNEXAMINED, check_trajectory
+        except ImportError:  # pragma: no cover - flat import
+            from predictions import (  # type: ignore[no-redef]
+                UNEXAMINED, check_trajectory,
+            )
+
+        composition = getattr(
+            getattr(self.model, "recognition", None), "composition", None
+        )
+        unit = getattr(composition, "concentration_unit", None)
+        if not unit:
+            return [
+                "",
+                "Whether this run stays inside what a cell can hold was NOT "
+                "checked: the model declares no concentration unit, and a "
+                "bound in molar compared against numbers in an unknown unit "
+                "would be a guess.",
+            ]
+
+        try:
+            report = check_trajectory(
+                self.trajectory, unit=str(unit), subject="this time course"
+            )
+        except Exception as exc:  # noqa: BLE001
+            return [
+                "",
+                f"Whether this run stays inside what a cell can hold was NOT "
+                f"checked: {type(exc).__name__}: {exc}",
+            ]
+
+        if report.verdict == UNEXAMINED:
+            return ["", report.summary()]
+        if not report.findings:
+            # Said briefly. A clean result is worth one line, not a
+            # paragraph a reader has to scan past to reach the sweeps.
+            return [
+                "",
+                f"Every species stays inside what a cell can hold for the "
+                f"whole run ({report.coverage}). A capacity check, not a "
+                f"claim the curve is right.",
+            ]
+        return ["", "**Physical plausibility of the run:**", "", report.summary()]
 
     def sweeps_section(self) -> List[str]:
         if not self.sweeps:

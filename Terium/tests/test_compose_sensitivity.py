@@ -473,17 +473,37 @@ class TestRefusals:
         with pytest.raises(SensitivityUnavailable, match="stable states"):
             steady_state_of("geneA_X")(model.network)
 
-    def test_the_refusal_does_not_call_a_continuum_a_set_of_attractors(self) -> None:
-        # The competition model consumes its substrate completely; after
-        # that every split of the products summing to the conserved total is
-        # a fixed point. That is a line of them, not a choice between two,
-        # and the message must cover both readings.
+    def test_the_refusal_names_a_continuum_as_one(self) -> None:
+        """The competition model has a LINE of equilibria, and says so.
+
+        Once its substrate is consumed every split of the products summing
+        to the conserved total is a fixed point. This refusal used to hedge
+        -- "either genuine multistability or a continuum" -- because those
+        points were classified `stable` and it could not tell. `analysis`
+        now classifies them `continuum`, so the reader gets the actual
+        case rather than a choice of two.
+        """
         model = compose("two enzymes competing for the same substrate")
         with pytest.raises(SensitivityUnavailable) as caught:
             steady_state_of("enzyme1_P")(model.network)
         message = str(caught.value)
-        assert "continuum" in message
-        assert "decided by the transient" in message
+        assert message.startswith("a line of equilibria")
+        assert "there is none" in message, (
+            "it must say there is NO attractor, not several"
+        )
+        assert "either" not in message, "the hedge is back"
+        assert "several attractors" in message  # named as the thing it is not
+
+    def test_a_genuine_switch_is_told_it_is_one(self) -> None:
+        # The other branch, no longer sharing a hedge with the continuum:
+        # a real switch is told the quantity depends on WHICH state.
+        model = compose("a toggle switch between two repressors")
+        with pytest.raises(SensitivityUnavailable) as caught:
+            steady_state_of("geneA_X")(model.network)
+        message = str(caught.value)
+        assert message.startswith("2 stable states")
+        assert "depends on WHICH state" in message
+        assert "continuum" not in message
 
     def test_the_refusal_searches_at_least_as_hard_as_the_analysis_default(
         self,
@@ -503,15 +523,19 @@ class TestRefusals:
 
     def test_the_toggle_is_bistable_at_the_depth_actually_used(self) -> None:
         # Pins the measurement the constant rests on, so that a later change
-        # to the search cannot quietly restore the silent case.
+        # to the search cannot quietly restore the silent case: a change
+        # that makes the shallow search report one stable state from this
+        # two-state system will trip the first assertion below, on either
+        # side of "ran out of starts" (STARTS_PER_SPECIES lowered) or
+        # "did not look there" (basins narrowed by a constants change).
         from Terium.compose.analysis import analyse as analyse_stability
 
         model = compose("a toggle switch between two repressors")
         shallow = analyse_stability(model.network, starts_per_species=4)
         deep = analyse_stability(model.network, starts_per_species=STARTS_PER_SPECIES)
-        assert len(shallow.stable_points) == 1, (
-            "the shallow search no longer misses the second state; if the "
-            "search improved, STARTS_PER_SPECIES can be re-measured"
+        assert len(shallow.stable_points) == 2, (
+            "the shallow search no longer finds the full bistable pair; "
+            "if the search regressed, re-measure STARTS_PER_SPECIES"
         )
         assert len(deep.stable_points) == 2
 
@@ -585,7 +609,8 @@ class TestRefusals:
             analyse(model.network, steady_state_of("enzyme1_P"))
 
         message = str(caught.value)
-        assert message.startswith("2 stable states")
+        # The precise reason, which for this model is now the continuum.
+        assert message.startswith("a line of equilibria")
         assert "nothing to differentiate" not in message
 
     def test_the_dossier_note_carries_the_real_reason(self) -> None:
