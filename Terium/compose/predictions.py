@@ -62,12 +62,14 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 try:
     from .scale import (
-        ERROR, LIBRARY_CONCENTRATION_UNIT, ONE_MOLECULE_PER_BACTERIUM_MOLAR,
+        ERROR, LIBRARY_CONCENTRATION_UNIT, MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR,
+        MOST_ABUNDANT_METABOLITE_MOLAR, ONE_MOLECULE_PER_BACTERIUM_MOLAR,
         QUESTION, TOTAL_CELLULAR_PROTEIN_MOLAR, _as_molar,
     )
 except ImportError:  # pragma: no cover - flat import
     from scale import (  # type: ignore[no-redef]
-        ERROR, LIBRARY_CONCENTRATION_UNIT, ONE_MOLECULE_PER_BACTERIUM_MOLAR,
+        ERROR, LIBRARY_CONCENTRATION_UNIT, MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR,
+        MOST_ABUNDANT_METABOLITE_MOLAR, ONE_MOLECULE_PER_BACTERIUM_MOLAR,
         QUESTION, TOTAL_CELLULAR_PROTEIN_MOLAR, _as_molar,
     )
 
@@ -257,9 +259,18 @@ class PredictionReport:
 
 
 def _one_species(
-    name: str, value: float, unit: str, at_time: Optional[float] = None
+    name: str, value: float, unit: str, at_time: Optional[float] = None,
+    *, protein: Optional[bool] = None,
 ) -> Tuple[Optional[Excess], bool]:
-    """(finding or None, whether it was examined at all)."""
+    """(finding or None, whether it was examined at all).
+
+    `protein` is three-valued, as in `scale._check_concentration`. True
+    gets the protein bound; False and None get the solute bound, because
+    "not known to be a protein" and "known not to be" call for the same
+    caution and differ only in what the finding says. The first version
+    applied the protein bound to everything and called measured glutamate
+    impossible.
+    """
     if not math.isfinite(value):
         return Excess(
             species=name, value=value, unit=unit, molar=None, severity=ERROR,
@@ -288,7 +299,7 @@ def _one_species(
             at_time=at_time,
         ), True
 
-    if molar > TOTAL_CELLULAR_PROTEIN_MOLAR:
+    if protein and molar > TOTAL_CELLULAR_PROTEIN_MOLAR:
         factor = molar / TOTAL_CELLULAR_PROTEIN_MOLAR
         return Excess(
             species=name, value=value, unit=unit, molar=molar, severity=ERROR,
@@ -296,10 +307,45 @@ def _one_species(
                 f"total cellular protein, ~{TOTAL_CELLULAR_PROTEIN_MOLAR:g} M"
             ),
             detail=(
-                f"{factor:.3g}x more of this one species than the cell "
+                f"{factor:.3g}x more of this one protein than the cell "
                 f"contains of all protein together. Each parameter behind "
                 f"this may be plausible on its own; their combination is "
                 f"not, which is why checking the inputs did not catch it"
+            ),
+            at_time=at_time,
+        ), True
+
+    if not protein and molar > MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR:
+        return Excess(
+            species=name, value=value, unit=unit, molar=molar, severity=ERROR,
+            against=(
+                f"the most any solute reaches in a cytoplasm, "
+                f"~{MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR:g} M"
+            ),
+            detail=(
+                f"{molar / MAXIMUM_INTRACELLULAR_SOLUTE_MOLAR:.3g}x past a "
+                f"molar: this species has displaced the water and the "
+                f"cytoplasm is no longer one. Each parameter behind this "
+                f"may be plausible on its own; their combination is not"
+            ),
+            at_time=at_time,
+        ), True
+
+    if not protein and molar > MOST_ABUNDANT_METABOLITE_MOLAR:
+        kind = "not known to be a protein" if protein is None else "not a protein"
+        return Excess(
+            species=name, value=value, unit=unit, molar=molar,
+            severity=QUESTION,
+            against=(
+                f"the most abundant measured metabolite, "
+                f"~{MOST_ABUNDANT_METABOLITE_MOLAR:g} M"
+            ),
+            detail=(
+                f"above every intracellular metabolite that has been "
+                f"measured. This species is {kind}, so the protein bound "
+                f"was not applied; if it is one, this is "
+                f"{molar / TOTAL_CELLULAR_PROTEIN_MOLAR:.3g}x over that "
+                f"bound and should be read as an error"
             ),
             at_time=at_time,
         ), True
@@ -337,6 +383,7 @@ def check_state(
     *,
     unit: str = LIBRARY_CONCENTRATION_UNIT,
     subject: str = "this state",
+    proteins: Sequence[str] = (),
 ) -> PredictionReport:
     """Every species in one predicted state, against what a cell can hold.
 
@@ -356,9 +403,13 @@ def check_state(
     findings: List[Excess] = []
     examined: List[str] = []
     unexamined: Dict[str, str] = {}
+    protein_set = frozenset(proteins)
 
     for name in sorted(state):
-        finding, was_examined = _one_species(name, float(state[name]), unit)
+        finding, was_examined = _one_species(
+            name, float(state[name]), unit,
+            protein=True if name in protein_set else None,
+        )
         if was_examined:
             examined.append(name)
             if finding is not None:
@@ -381,6 +432,7 @@ def check_steady_states(
     stability: Any,
     *,
     unit: str = LIBRARY_CONCENTRATION_UNIT,
+    proteins: Sequence[str] = (),
 ) -> Tuple[PredictionReport, ...]:
     """One report per fixed point the analysis found.
 
@@ -415,6 +467,7 @@ def check_steady_states(
             getattr(point, "state", {}) or {},
             unit=unit,
             subject=f"steady state {index + 1} of {len(points)}{suffix}",
+            proteins=proteins,
         )
         reports.append(PredictionReport(
             subject=base.subject,
@@ -431,6 +484,7 @@ def check_trajectory(
     *,
     unit: str = LIBRARY_CONCENTRATION_UNIT,
     subject: str = "this trajectory",
+    proteins: Sequence[str] = (),
 ) -> PredictionReport:
     """The whole run, not just where it ended.
 
@@ -463,6 +517,7 @@ def check_trajectory(
     findings: List[Excess] = []
     examined: List[str] = []
     unexamined: Dict[str, str] = {}
+    protein_set = frozenset(proteins)
 
     for name in sorted(columns):
         values = columns[name]
@@ -485,6 +540,7 @@ def check_trajectory(
             finding, was_examined = _one_species(
                 name, float(values[candidate_index]), unit,
                 at_time=float(times[candidate_index]),
+                protein=True if name in protein_set else None,
             )
             if not was_examined:
                 unexamined[name] = (

@@ -89,6 +89,10 @@ def _report(network, **kwargs):
     own test in TestUncheckedIsNotApproved.
     """
     kwargs.setdefault("units", _CATALYTIC_UNITS)
+    # The catalytic step's E is an enzyme -- a protein -- and the protein
+    # bound now reaches only species named as such. `check_model` reads
+    # this off the composition; a bare network has to be told.
+    kwargs.setdefault("proteins", ("reaction_E",))
     return check(network, **kwargs)
 
 
@@ -1051,3 +1055,172 @@ class TestSpeciesGetTheSameBoundsAsParameters:
             assert report.physically_possible, (
                 query, [f.describe() for f in report.errors],
             )
+
+
+class TestTheProteinBoundReachesOnlyProteins:
+    """Glutamate at its measured concentration was physically impossible.
+
+    `TOTAL_CELLULAR_PROTEIN_MOLAR` is about five millimolar and was applied
+    to every species. Bennett et al. (2009, Nat Chem Biol) put glutamate in
+    E. coli near a hundred millimolar and ATP near ten -- the two most
+    abundant metabolites there are, both measured, both reported as
+    impossible. That is the cry-wolf failure ADR 0028 names, on a metabolic
+    model's most ordinary numbers.
+
+    The bound is right for a protein and wrong by a factor of twenty for a
+    metabolite. Which a species is comes from the composition's port
+    roles: an enzyme or a Hill regulator is a protein without exception,
+    and every other role is left undecided and given the weaker bound.
+    """
+
+    @staticmethod
+    def _species(name, mM, proteins=()):
+        from Terium.core.network import (
+            Parameter, Reaction, ReactionNetwork, Species,
+        )
+
+        return check(ReactionNetwork(
+            name="one",
+            species=(Species(name, mM),),
+            parameters=(Parameter("k", 1.0, "1/s"),),
+            reactions=(Reaction("r", {name: 1}, {}, f"k * {name}"),),
+        ), proteins=proteins)
+
+    def test_measured_glutamate_is_possible(self) -> None:
+        report = self._species("glutamate", 96.0)
+        assert report.physically_possible, [f.describe() for f in report.errors]
+
+    def test_measured_atp_is_possible(self) -> None:
+        assert self._species("ATP", 9.6).physically_possible
+
+    def test_a_protein_at_ten_millimolar_is_still_impossible(self) -> None:
+        # The cry-wolf fix must not have switched the bound off.
+        report = self._species("kinase", 9.6, proteins=("kinase",))
+        assert not report.physically_possible
+        assert "total cellular protein" in report.errors[0].against
+        assert "a single protein" in report.errors[0].detail
+
+    def test_a_solute_past_a_molar_is_impossible(self) -> None:
+        # The bound a non-protein DOES get: past a molar it has displaced
+        # the water and the cytoplasm is not one.
+        report = self._species("NaCl", 1500.0)
+        assert not report.physically_possible
+        assert "displaced the water" in report.errors[0].detail
+
+    def test_above_every_measured_metabolite_is_a_question(self) -> None:
+        # 150 mM: above glutamate, below a molar. Unusual, not impossible.
+        report = self._species("X", 150.0)
+        assert report.physically_possible
+        assert len(report.questions) == 1
+        assert "not known to be a protein" in report.questions[0].detail
+
+    def test_not_known_and_known_not_say_different_things(self) -> None:
+        # Three-valued on purpose: the two get the same bound and different
+        # words, because "we could not tell" and "we could tell" differ.
+        from Terium.compose.scale import _check_concentration
+
+        unknown = _check_concentration("X", 150.0, "mM", protein=None)
+        known = _check_concentration("X", 150.0, "mM", protein=False)
+        assert "not known to be a protein" in unknown[0].detail
+        assert "not a protein" in known[0].detail
+        assert "not known" not in known[0].detail
+
+    def test_the_composition_names_its_proteins(self) -> None:
+        from Terium.compose.motifs import ROLE_ENZYME, ROLE_REGULATOR
+
+        composition = compose(
+            "three step phosphorylation cascade"
+        ).recognition.composition
+        proteins = composition.protein_species()
+        assert proteins, "the premise: a cascade has kinases"
+        # Everything in the set was wired as an enzyme or a regulator.
+        for instance in composition.instances:
+            for port in instance.motif.ports:
+                species = instance.species_for(port.name)
+                if port.role in (ROLE_ENZYME, ROLE_REGULATOR):
+                    assert species in proteins, (instance.prefix, port.name)
+
+    def test_check_model_uses_the_composition(self) -> None:
+        """The wiring, end to end: a library protein over the bound errors,
+        the same amount on a non-protein species does not."""
+        from dataclasses import replace
+
+        model = compose("a toggle switch between two repressors")
+        proteins = model.recognition.composition.protein_species()
+        target = sorted(proteins)[0]
+        raised = replace(model.network, species=tuple(
+            replace(s, initial=20.0) if s.id == target else s
+            for s in model.network.species
+        ))
+        report = check_model(replace(model, network=raised))
+        assert not report.physically_possible, "a repressor at 20 mM passed"
+
+    def test_no_library_model_is_made_impossible(self) -> None:
+        for query in (
+            "three step phosphorylation cascade",
+            "a toggle switch between two repressors",
+            "enzyme kinetics with a competitive inhibitor",
+            "sequential feedback inhibition in amino acid synthesis",
+        ):
+            report = check_model(compose(query))
+            assert report.physically_possible, (
+                query, [f.describe() for f in report.errors],
+            )
+
+
+class TestCheckModelUsesTheDeclaredSpeciesUnit:
+    """`check_model` left `species_unit` at the library default.
+
+    It filled in the parameter units and the protein set from the
+    composition and not the species unit, so a composition declared in
+    uM would have had every starting amount checked as though it were mM.
+    Every library composition is mM, which is why nothing noticed.
+    """
+
+    def test_a_micromolar_composition_is_checked_in_micromolar(self) -> None:
+        from dataclasses import replace
+
+        model = compose("a toggle switch between two repressors")
+        composition = model.recognition.composition
+        # A species at 500 in uM is 0.5 mM: fine for a protein. Read as
+        # 500 mM it would be a hundred times over the protein bound.
+        target = sorted(composition.protein_species())[0]
+        network = replace(model.network, species=tuple(
+            replace(s, initial=500.0) if s.id == target else s
+            for s in model.network.species
+        ))
+        composition.concentration_unit = "uM"
+        try:
+            report = check_model(replace(model, network=network))
+        finally:
+            composition.concentration_unit = "mM"
+        assert report.physically_possible, [
+            f.describe() for f in report.errors
+        ]
+
+    def test_the_same_amount_in_millimolar_is_not(self) -> None:
+        # The other side: 500 mM of a repressor is impossible, and must
+        # still be caught when the composition really is in mM.
+        from dataclasses import replace
+
+        model = compose("a toggle switch between two repressors")
+        target = sorted(model.recognition.composition.protein_species())[0]
+        network = replace(model.network, species=tuple(
+            replace(s, initial=500.0) if s.id == target else s
+            for s in model.network.species
+        ))
+        assert not check_model(replace(model, network=network)).physically_possible
+
+    def test_an_explicit_species_unit_still_wins(self) -> None:
+        # setdefault, not override: a caller who names the unit is trusted.
+        from dataclasses import replace
+
+        model = compose("a toggle switch between two repressors")
+        target = sorted(model.recognition.composition.protein_species())[0]
+        network = replace(model.network, species=tuple(
+            replace(s, initial=500.0) if s.id == target else s
+            for s in model.network.species
+        ))
+        assert check_model(
+            replace(model, network=network), species_unit="uM"
+        ).physically_possible

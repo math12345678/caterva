@@ -40,12 +40,14 @@ from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 try:
     from .motifs import (
         CHOSEN_KINDS, KIND_CONCENTRATION, Motif, MotifError, MotifParameter,
-        Port, RESOLVABLE_KINDS, ROLE_PRODUCT, ROLE_SUBSTRATE,
+        Port, RESOLVABLE_KINDS, ROLE_ENZYME, ROLE_PRODUCT, ROLE_REGULATOR,
+        ROLE_SUBSTRATE,
     )
 except ImportError:  # pragma: no cover - flat import
     from motifs import (  # type: ignore[no-redef]
         CHOSEN_KINDS, KIND_CONCENTRATION, Motif, MotifError, MotifParameter,
-        Port, RESOLVABLE_KINDS, ROLE_PRODUCT, ROLE_SUBSTRATE,
+        Port, RESOLVABLE_KINDS, ROLE_ENZYME, ROLE_PRODUCT, ROLE_REGULATOR,
+        ROLE_SUBSTRATE,
     )
 
 
@@ -350,6 +352,38 @@ class Composition:
         over zero rate laws is a true sentence and a misleading one.
         """
         return self.unit_check()[1]
+
+    def protein_species(self) -> frozenset:
+        """Species this composition wires as an ENZYME or a REGULATOR.
+
+        Those two roles are proteins without exception: an enzyme is one
+        by definition and a Hill regulator is a transcription factor. The
+        other roles are not decidable from the wiring -- a kinase's
+        SUBSTRATE is a protein and a hexokinase's is glucose, and both are
+        `ROLE_SUBSTRATE` -- so they are not claimed.
+
+        WHY IT EXISTS. `scale.py` carries a bound on how much of one
+        species a cell can hold, derived from total cellular PROTEIN, about
+        five millimolar. It was applied to every species. Glutamate sits
+        near a hundred millimolar in E. coli and ATP near ten, both
+        measured, and both came back "physically impossible" -- a false
+        alarm on the two most abundant metabolites there are, which is the
+        cry-wolf failure that gets a check switched off. The protein bound
+        now reaches only the species this method returns; the rest get a
+        bound that is defensible for a solute.
+
+        A species wired as an enzyme in one instance and a substrate in
+        another is a protein: it is in the set if ANY binding says so.
+        """
+        proteins = set()
+        for instance in self._instances:
+            for port in instance.motif.ports:
+                if port.role in (ROLE_ENZYME, ROLE_REGULATOR):
+                    try:
+                        proteins.add(instance.species_for(port.name))
+                    except CompositionError:
+                        continue
+        return frozenset(proteins)
 
     def unit_check(self) -> Tuple[int, Tuple[object, ...]]:
         """(rate laws examined, findings).
