@@ -449,3 +449,145 @@ class TestNoUnitIsNotTheWrongUnit:
         assert "carries one now" in prose
         assert "NOT RECORDED, which is a different thing from dimensionless" \
             in prose
+
+
+class TestAKnockoutRemovesTheGene:
+    """The knocked-out repressor came back.
+
+    `knockout` set one starting amount to zero and stopped. On a species
+    with its own synthesis -- every repressor in the toggle switch -- the
+    promoter still fired and the "knocked-out" protein regrew to 0.049 mM.
+    The switch was still bistable. Every conclusion drawn from that
+    comparison would have been about a dilution experiment nobody ran.
+
+    A gene knockout removes every FORM of the gene product and every
+    COMPLEX it was bound into, and silences its synthesis. All three come
+    from stoichiometry, which is the only thing the network records.
+    """
+
+    def test_a_synthesised_species_stays_at_zero(self) -> None:
+        from dataclasses import replace
+
+        from Terium.compose.perturbation import knockout
+        from Terium.compose.simulate import run
+
+        model = compose("a toggle switch between two repressors")
+        knocked = knockout(model.network, "geneA_X")
+        final = run(replace(model, network=knocked.network)).final_state()
+        assert final["geneA_X"] == 0.0, (
+            f"the knocked-out gene regrew to {final['geneA_X']:.3g}"
+        )
+
+    def test_the_synthesis_reaction_is_silenced_not_deleted(self) -> None:
+        # Deleting it would change the stoichiometry every downstream
+        # comparison lines up on; a reaction that never fires is what a
+        # silenced promoter IS.
+        from Terium.compose.perturbation import knockout
+
+        model = compose("a toggle switch between two repressors")
+        knocked = knockout(model.network, "geneA_X")
+        ids = [r.id for r in knocked.network.reactions]
+        assert ids == [r.id for r in model.network.reactions]
+        silenced = next(
+            r for r in knocked.network.reactions
+            if r.id == "geneA_repressed_synthesis"
+        )
+        assert silenced.rate_law == "0"
+        assert "geneA_repressed_synthesis" in knocked.changes
+
+    def test_the_switch_stops_being_a_switch(self) -> None:
+        # The biology: with one repressor gone the other is unopposed and
+        # the system has exactly one place to rest.
+        from Terium.compose.analysis import analyse
+        from Terium.compose.perturbation import knockout
+
+        model = compose("a toggle switch between two repressors")
+        assert analyse(model.network).at_least_bistable, "the premise"
+        knocked = knockout(model.network, "geneA_X")
+        assert not analyse(knocked.network).at_least_bistable
+
+    def test_a_modified_form_takes_its_other_forms_with_it(self) -> None:
+        """Xp is not a gene. X is, and Xp is X wearing a phosphate.
+
+        Knocking out the gene removes both, because there is no Xp without
+        X to make it from. The first version of this refused Xp outright;
+        the honest answer is that Xp and X are one gene product.
+        """
+        from dataclasses import replace
+
+        from Terium.compose.perturbation import _gene_product_of, knockout
+        from Terium.compose.simulate import run
+
+        model = compose("three step phosphorylation cascade")
+        forms, complexes = _gene_product_of(model.network, "tier1_Xp")
+        assert forms == {"tier1_X", "tier1_Xp"}
+        assert not complexes
+
+        knocked = knockout(model.network, "tier1_Xp")
+        assert set(knocked.changes) >= {"tier1_X", "tier1_Xp"}
+        final = run(replace(model, network=knocked.network)).final_state()
+        assert final["tier1_X"] == 0.0 and final["tier1_Xp"] == 0.0
+
+    def test_a_bound_species_takes_its_complex_with_it(self) -> None:
+        """A never expressed never bound B, so AB never formed."""
+        from dataclasses import replace
+
+        from Terium.compose.perturbation import _gene_product_of, knockout
+        from Terium.compose.simulate import run
+
+        model = compose("reversible binding of a ligand to a receptor")
+        forms, complexes = _gene_product_of(model.network, "complex_A")
+        assert forms == {"complex_A"}
+        assert complexes == {"complex_AB"}
+
+        knocked = knockout(model.network, "complex_A")
+        final = run(replace(model, network=knocked.network)).final_state()
+        assert final["complex_A"] == 0.0
+        assert final["complex_AB"] == 0.0
+        # And the partner is untouched: knocking out A is not knocking out B.
+        assert final["complex_B"] > 0.0
+
+    def test_the_description_says_what_went(self) -> None:
+        from Terium.compose.perturbation import knockout
+
+        model = compose("three step phosphorylation cascade")
+        text = knockout(model.network, "tier1_Xp").description
+        assert "together with tier1_X" in text
+        assert "forms of the same gene product" in text
+
+    def test_binding_partners_are_not_forms(self) -> None:
+        # A + B -> AB is two in, one out: binding, not conversion. B must
+        # not be swept into A's gene product.
+        from Terium.compose.perturbation import _gene_product_of
+
+        model = compose("reversible binding of a ligand to a receptor")
+        forms, _ = _gene_product_of(model.network, "complex_A")
+        assert "complex_B" not in forms
+
+    def test_already_absent_everywhere_is_refused(self) -> None:
+        from dataclasses import replace
+
+        from Terium.compose.perturbation import PerturbationRefused, knockout
+
+        model = compose("reversible binding of a ligand to a receptor")
+        empty = replace(model.network, species=tuple(
+            replace(s, initial=0.0) if s.id in ("complex_A", "complex_AB") else s
+            for s in model.network.species
+        ))
+        with pytest.raises(PerturbationRefused, match="already at 0"):
+            knockout(empty, "complex_A")
+
+    def test_already_absent_but_synthesised_is_not_refused(self) -> None:
+        # At zero now, but the gene is on: knocking it out still changes
+        # the model, because the promoter would otherwise bring it back.
+        from dataclasses import replace
+
+        from Terium.compose.perturbation import knockout
+
+        model = compose("a toggle switch between two repressors")
+        zeroed = replace(model.network, species=tuple(
+            replace(s, initial=0.0) if s.id == "geneA_X" else s
+            for s in model.network.species
+        ))
+        knocked = knockout(zeroed, "geneA_X")
+        assert "geneA_repressed_synthesis" in knocked.changes
