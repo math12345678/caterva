@@ -350,10 +350,30 @@ def _second_order_concentration(unit: str) -> Optional[str]:
     is the exact mistake this module exists to catch, made by this module.
     """
     cleaned = unit.replace(" ", "")
-    for concentration in _TO_MOLAR:
+    # LONGEST CONCENTRATION UNIT FIRST, AND THE MATCH MUST START AT A
+    # BOUNDARY. `M^-1s^-1` is a substring of `mM^-1s^-1`, and the first
+    # version of this iterated `_TO_MOLAR` in declaration order -- bare
+    # molar first -- so a rate stated per millimolar was read as per molar
+    # and its diffusion-limit comparison was wrong by a thousand. For a
+    # rate per micromolar, a million. That is the precise error this
+    # function exists to prevent, surviving inside it for every spelling
+    # the library happens not to use.
+    #
+    # Two defences, and mutation testing shows EITHER alone is enough for
+    # every unit in `_TO_MOLAR`: longest-first means "mM" is tried before
+    # "M", and the boundary check rejects an "M" preceded by a letter.
+    # Both are kept. A thousandfold error in the one hard physical bound
+    # this module has is worth two locks, and the day a new prefix is
+    # added that breaks one, the other still holds.
+    for concentration in sorted(_TO_MOLAR, key=len, reverse=True):
         for shape in _SECOND_ORDER_SHAPES:
-            if shape.format(c=concentration) in cleaned:
-                return concentration
+            candidate = shape.format(c=concentration)
+            at = cleaned.find(candidate)
+            while at != -1:
+                before = cleaned[at - 1] if at > 0 else ""
+                if not before.isalpha():
+                    return concentration
+                at = cleaned.find(candidate, at + 1)
     return None
 
 

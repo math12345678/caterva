@@ -812,6 +812,37 @@ class TestTheDiffusionLimitActuallyRuns:
             assert _check_rate("k", 1e11, unit), unit
             assert _check_rate("k", 1e6, unit) == [], unit
 
+    @pytest.mark.parametrize("unit,expected", [
+        ("mM^-1s^-1", 1e3), ("mM^-1*s^-1", 1e3), ("/mM/s", 1e3),
+        ("uM^-1s^-1", 1e6), ("µM^-1s^-1", 1e6), ("nM^-1s^-1", 1e9),
+        ("M^-1s^-1", 1.0), ("1/(M*s)", 1.0),
+    ])
+    def test_a_prefixed_caret_spelling_keeps_its_prefix(self, unit, expected) -> None:
+        """`M^-1s^-1` is a substring of `mM^-1s^-1`.
+
+        The first version of the matcher iterated the concentration units
+        in declaration order -- bare molar first -- and returned "M" for a
+        rate stated per millimolar, so the conversion was a factor of one
+        where it should have been a thousand. For per-micromolar, a
+        million. That is the error the matcher exists to prevent,
+        surviving inside it for every spelling the library does not use;
+        the library writes `1/(mM*s)`, which happened to work.
+
+        Longest unit first, and the match must start at a boundary.
+        """
+        assert _as_per_molar_per_second(1.0, unit) == pytest.approx(expected)
+
+    def test_the_boundary_check_is_not_fooled_by_a_bare_M_inside(self) -> None:
+        # A rate written per millimolar must never resolve to molar even
+        # if a later shape would match the trailing "M...". The boundary
+        # check is what enforces that, independent of iteration order.
+        from Terium.compose.scale import _second_order_concentration
+
+        assert _second_order_concentration("mM^-1s^-1") == "mM"
+        assert _second_order_concentration("nM^-1*s^-1") == "nM"
+        # And a genuine bare-molar spelling still resolves to molar.
+        assert _second_order_concentration("M^-1s^-1") == "M"
+
     def test_a_first_order_rate_is_not_read_as_second_order(self) -> None:
         # `1/s` must not match any second-order shape, or every rate
         # constant in the library would be measured against diffusion.
