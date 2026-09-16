@@ -912,7 +912,7 @@ def fit(
         directions=directions,
         correlations=correlations,
         notes=(),
-        structural=structural_note(network, names),
+        structural=structural_note(network, names, observations, predictor),
     )
 
 
@@ -1457,8 +1457,28 @@ def _upper_gamma(a: float, x: float, iterations: int = 500) -> Optional[float]:
 # ---------------------------------------------------------------------------
 
 
-def structural_note(network: Any, parameters: Sequence[str]) -> Optional[str]:
+def structural_note(
+    network: Any,
+    parameters: Sequence[str],
+    observations: Sequence[Any] = (),
+    predictor: Optional[Callable[..., Sequence[float]]] = None,
+) -> Optional[str]:
     """What `compose/identifiability.py` says, if it is installed.
+
+    IT HAD NEVER ONCE RUN. `identifiability.analyse(network, quantities,
+    *, parameters=...)` takes the OBSERVABLES as its second argument and
+    the parameters by keyword; this called it as `entry(network,
+    parameters)`, so every parameter name was handed over as an observable,
+    the module raised, and every FitReport carried "the structural
+    identifiability check did not run". True, and the wrong reason -- the
+    check was fine, the call was not -- and a capability that nothing can
+    reach is not a capability (ADR 0090).
+
+    The structural question is "could THESE observations determine THESE
+    parameters from perfect data?", so the observations go in as what they
+    are: one callable per observation, the model's prediction for it as a
+    function of the network. `observations` and `predictor` are what `fit`
+    already has in hand at the point it asks.
 
     IMPORTED LAZILY AND CALLED DEFENSIVELY, for a reason beyond the usual
     one about optional dependencies. This module does not own that module's
@@ -1501,8 +1521,27 @@ def structural_note(network: Any, parameters: Sequence[str]) -> Optional[str]:
             "and is not a substitute for it."
         )
 
+    if not observations or predictor is None:
+        return (
+            "The structural identifiability check was not asked: it needs "
+            "the observations the fit was made against, and none were "
+            "handed to it. The rank test above is local and numerical and "
+            "is not a substitute."
+        )
+
+    quantities = [
+        (lambda net, _obs=observation: float(predictor(net, [_obs])[0]))
+        for observation in observations
+    ]
+    names = [
+        getattr(o, "species", None) or f"observation {i + 1}"
+        for i, o in enumerate(observations)
+    ]
     try:
-        result = entry(network, list(parameters))
+        result = entry(
+            network, quantities, parameters=list(parameters),
+            quantity_names=names,
+        )
     except Exception as exc:  # noqa: BLE001 - another module's failure is not this one's answer
         return (
             f"The structural identifiability check did not run "

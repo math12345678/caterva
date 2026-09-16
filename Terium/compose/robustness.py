@@ -345,7 +345,15 @@ def _with_values(network: Any, values: Mapping[str, float]) -> Any:
 
 
 def _resolvable_ids(model: Any) -> Tuple[str, ...]:
-    return tuple(q.parameter_id for q in getattr(model, "resolvable", ()))
+    """The constants still unmeasured, from either model class.
+
+    Read `unmeasured` rather than `resolvable`: a ProvenancedModel has no
+    `resolvable` attribute, so `assess_model` on a partly-measured model
+    used to find nothing to vary and refuse -- when the point of a partly
+    measured model is that some constants are still placeholders and those
+    are exactly what the placeholder question is about.
+    """
+    return tuple(getattr(model, "unmeasured", ()) or ())
 
 
 def assess(
