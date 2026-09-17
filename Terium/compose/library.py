@@ -345,9 +345,17 @@ HILL_REPRESSION = Motif(
         Port("R", ROLE_REGULATOR, 0.0, description="the repressor"),
     ),
     parameters=(
-        MotifParameter("ks", KIND_RATE_CONSTANT, 1.0, "mM/s",
+        #: ks and K are scaled TOGETHER (same factor) on purpose: the
+        #: qualitative behaviour depends only on ks/kd/K in combination, so
+        #: rescaling all three leaves the dynamics unchanged up to a scale
+        #: factor. The unscaled pair (ks = 1 mM/s, K = 0.5 mM) gave an
+        #: unrepressed steady state of ks/kd = 10 mM -- TWICE the ~5 mM of
+        #: total protein in a cell, which `compose/predictions.py` correctly
+        #: refused. These give a 2 mM steady state, inside the cell's
+        #: capacity and still far above K for a sharp switch.
+        MotifParameter("ks", KIND_RATE_CONSTANT, 0.2, "mM/s",
                        description="maximal synthesis rate, with no repressor"),
-        MotifParameter("K", KIND_AFFINITY, 0.5, "mM",
+        MotifParameter("K", KIND_AFFINITY, 0.1, "mM",
                        description="repressor concentration for half repression"),
         MotifParameter("n", KIND_EXPONENT, 2.0, "dimensionless",
                        description="Hill coefficient; cooperativity"),

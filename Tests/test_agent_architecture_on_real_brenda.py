@@ -18,11 +18,18 @@ Two things, neither of which was a hypothesis first:
     5.5). Both are real values with real references, and multiplying them
     into one model is the defect this whole subsystem exists to catch.
 
-  * `resolve_kinetic_value` called with an EMPTY organism matches every row
-    in the table, returns the minimum across all species, and reports the
-    organism as "". Two such values agree about the organism trivially,
-    which passed as compatibility until `organism_unattributed` was added.
-    That is the commonest query a student types.
+  * `resolve_kinetic_value` called with an EMPTY organism used to match
+    every row in the table, return the cross-species minimum, and report
+    the organism as "". That is the commonest query a student types. The
+    loss was not "between parse and result": the parser treated "" as a
+    real organism filter (an empty string is a substring of every row) and
+    then OVERWROTE each row's organism label with the requested "", so the
+    resolver had no organism to report. ADR 0174 fixed it at the parser:
+    "" now means "any organism" (exactly like `None`), every row keeps its
+    real organism label, and the values below carry the organism of the row
+    they came from. `organism_unattributed` therefore no longer appears on
+    the real chain -- and the set-compiler's cross-species complaint does,
+    because two animals really were measured.
 """
 
 from __future__ import annotations
@@ -116,33 +123,53 @@ class TestOnRealMarkup:
         assert "2.5 pH units apart" in finding.detail
         assert "pH 8" in finding.detail and "pH 5.5" in finding.detail
 
-    def test_an_unnamed_organism_yields_values_attributed_to_nothing(self) -> None:
-        """The defect this test was written after discovering.
+    def test_unnamed_organism_values_carry_their_own_organism(self) -> None:
+        """The empty-organism bug fixed (ADR 0174).
 
-        With no organism, the resolver matches every row and returns the
-        minimum across all species. The values are real; what they are a
-        measurement OF is not recorded. Two of them must not read as
-        agreeing about the organism.
+        An empty organism means "any organism", not "an organism whose name
+        is ''". The resolver scans the whole table and returns the
+        best-evidenced value WITH the organism of the row it came from, so
+        the number is never detached from its subject. The two values here
+        come from two different animals; the set-judge reports that as a
+        blocking organism mismatch, and the silence-as-compatibility error
+        (`organism_unattributed` on a set that "agreed" by having no
+        organism at all) is gone because the resolver no longer produces it.
         """
         search = build()
+
         organisms = {
             r.source.organism for r in search.first_pass.resolutions.values()
         }
-        assert organisms == {""}, "the fixture behaviour this test pins changed"
+        assert organisms == {"Homo sapiens", "Cryptosporidium parvum"}
+
+        # The values themselves do not move: this fix is about attribution,
+        # not about picking a different number from a different row.
+        resolutions = search.first_pass.resolutions
+        assert resolutions["Km"].source.value == 10.73
+        assert resolutions["Ki"].source.value == 0.0116
+        assert resolutions["Km"].source.organism == HUMAN
+        assert resolutions["Ki"].source.organism == "Cryptosporidium parvum"
 
         compatibility = search.first_pass.compatibility
-        finding = next(
-            f for f in compatibility.findings if f.kind == "organism_unattributed"
+        assert not any(
+            f.kind == "organism_unattributed" for f in compatibility.findings
         )
-        assert finding.severity == "unassessable"
-        assert set(finding.quantities) == {"Km", "Ki"}
-        assert "no organism is recorded" in compatibility.summary()
+        mismatch = next(
+            f for f in compatibility.findings if f.kind == "organism_mismatch"
+        )
+        assert mismatch.severity == "blocking"
+        assert set(mismatch.quantities) == {"Km", "Ki"}
+
+        # The architecture responds as designed: one unconstrained pass plus
+        # one run inside each organism the literature actually offered.
+        assert len(search.branches) == 3
 
     def test_naming_the_organism_changes_which_value_is_returned(self) -> None:
         """The constraint reaches the resolver, and the answer moves.
 
-        Unconstrained, the Ki is 0.0116 -- the minimum over every organism
-        in the table. Inside Homo sapiens it is 0.0014, a different
+        Unconstrained, the Ki is 0.0116 -- the best-evidenced row across
+        every organism in the table, which is a Cryptosporidium parvum
+        measurement. Inside Homo sapiens it is 0.0014, a different
         measurement from a different row. If the constraint were merely
         recorded and not applied, both runs would return the same number,
         which is precisely what a report claiming to have "searched under"
@@ -152,7 +179,7 @@ class TestOnRealMarkup:
         human = build(requested_organism=HUMAN).first_pass.resolutions
 
         assert unconstrained["Ki"].source.value == 0.0116
-        assert unconstrained["Ki"].source.organism == ""
+        assert unconstrained["Ki"].source.organism == "Cryptosporidium parvum"
 
         assert human["Ki"].source.value == 0.0014
         assert human["Ki"].source.organism == HUMAN

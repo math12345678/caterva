@@ -525,6 +525,8 @@ def _conditions_of(source: Any) -> str:
         parts.append(f"pH {source.ph:g}")
     if getattr(source, "temperature_c", None) is not None:
         parts.append(f"{source.temperature_c:g} C")
+    if getattr(source, "buffer", None):
+        parts.append(f"in {getattr(source, 'buffer')}")
     return ", ".join(parts) or "conditions unstated"
 
 

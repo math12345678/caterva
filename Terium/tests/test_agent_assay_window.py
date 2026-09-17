@@ -55,7 +55,7 @@ class FakeKineticResult:
         self.cross_species_organisms_available = kw.get("available", [])
 
 
-def row(value, ph, temperature_c=None, *, unit="mM", reference_id="R"):
+def row(value, ph, temperature_c=None, *, unit="mM", reference_id="R", buffer=None):
     """One frontier row, exactly the dict `_score_frontier` produces."""
     return {
         "value": float(value),
@@ -65,6 +65,7 @@ def row(value, ph, temperature_c=None, *, unit="mM", reference_id="R"):
         "conditions": "idem",
         "ph": ph,
         "temperature_c": temperature_c,
+        "buffer": buffer,
         "grades": {
             "assay_completeness": "good",
             "condition_proximity": "good",
@@ -96,6 +97,7 @@ def windowed_resolver(rows):
             citation=type("C", (), {"reference": "ref:test"})(),
             assay_ph=winner.get("ph"),
             assay_temperature_c=winner.get("temperature_c"),
+            assay_buffer=winner.get("buffer"),
             ensemble_candidates=[dict(c) for c in table],
         )
     return resolve
@@ -116,17 +118,41 @@ class TestTheWindowText:
         # never deduplicates them and the run never converges.
         text = window_requirement(ph=8.0, temperature_c=25.0)
         assert text == "pH 8; temperature 25"
-        assert parse_window_requirement(text) == (8.0, 25.0)
+        assert parse_window_requirement(text) == (8.0, 25.0, None)
 
         # An axis the reference does not state is simply absent, and parses
         # back to None rather than to a guessed number.
         ph_only = window_requirement(ph=8.0, temperature_c=None)
         assert ph_only == "pH 8"
-        assert parse_window_requirement(ph_only) == (8.0, None)
+        assert parse_window_requirement(ph_only) == (8.0, None, None)
+        no_axes = window_requirement(ph=None, temperature_c=None)
+        assert no_axes == ""
+        assert parse_window_requirement(no_axes) == (None, None, None)
 
     def test_a_negative_temperature_round_trips(self) -> None:
         text = window_requirement(ph=None, temperature_c=-25.0)
-        assert parse_window_requirement(text) == (None, -25.0)
+        assert parse_window_requirement(text) == (None, -25.0, None)
+
+    def test_a_buffer_axis_round_trips_and_is_canonical(self) -> None:
+        # The buffer names the reference's own buffer (ADR 0175). Parsed
+        # buffer text is whitespace-collapsed, so two spellings of one
+        # buffer render identically and deduplicate as one constraint.
+        text = window_requirement(
+            ph=7.4, temperature_c=37.0, buffer="0.1 M MOPS buffer"
+        )
+        assert text == "pH 7.4; temperature 37; buffer 0.1 M MOPS buffer"
+        assert parse_window_requirement(text) == (7.4, 37.0, "0.1 M MOPS buffer")
+
+        padded = window_requirement(
+            ph=7.4, temperature_c=37.0, buffer="  0.1 M  MOPS buffer "
+        )
+        assert padded == text
+
+        # A reference that states no buffer demands none: the axis is
+        # absent from the text, exactly like an unstated pH.
+        no_buffer = window_requirement(ph=7.4, temperature_c=37.0)
+        assert "buffer" not in no_buffer
+        assert parse_window_requirement(no_buffer) == (7.4, 37.0, None)
 
 
 class TestTheDistanceMetric:
@@ -168,6 +194,72 @@ class TestTheDistanceMetric:
         assert within_window(
             row(1.0, 7.0, 25.0), reference_ph=8.0, reference_temperature_c=25.0
         )
+
+
+class TestTheBufferAxis:
+    """The buffer is a categorical gate, not a distance (ADR 0175).
+
+    A buffer has no `*_SERIOUS` half-width -- two buffers are either the
+    same identity or they are not. `within_window` enforces that as a hard
+    gate on top of the numeric distance, and the rule it uses is the one the
+    model judge already uses to report a `buffer_mismatch`, so a window and
+    the judge never disagree about which rows could fix a mismatch.
+    """
+
+    def test_a_different_buffer_is_outside_no_matter_how_close(self) -> None:
+        # Distance 0 (the row sits exactly on the reference's pH and
+        # temperature) is still outside when the buffer differs: closeness
+        # on the numbers is not closeness on an identity.
+        assert not within_window(
+            row(1.0, 7.4, 37.0, buffer="Tris"),
+            reference_ph=7.4,
+            reference_temperature_c=37.0,
+            reference_buffer="0.1 M MOPS buffer",
+        )
+
+    def test_an_equivalent_buffer_is_inside(self) -> None:
+        # Same normalized string -- the judge's rule -- is inside.
+        assert within_window(
+            row(1.0, 7.4, 37.0, buffer="0.1 M MOPS buffer"),
+            reference_ph=7.4,
+            reference_temperature_c=37.0,
+            reference_buffer="0.1 M MOPS buffer",
+        )
+
+    def test_silence_on_a_demanded_buffer_is_not_compliance(self) -> None:
+        # The row states a pH and temperature but no buffer. Claiming it
+        # satisfies "must be in 0.1 M MOPS buffer" would be reporting
+        # silence as proximity, the error this module exists to refuse.
+        assert not within_window(
+            row(1.0, 7.4, 37.0, buffer=None),
+            reference_ph=7.4,
+            reference_temperature_c=37.0,
+            reference_buffer="0.1 M MOPS buffer",
+        )
+
+    def test_a_window_that_names_no_buffer_demands_none(self) -> None:
+        # No reference buffer -> no buffer axis -> a buffer-silent row is
+        # judged on its numbers alone, exactly as before ADR 0175.
+        assert within_window(
+            row(1.0, 7.4, 37.0, buffer=None),
+            reference_ph=7.4,
+            reference_temperature_c=37.0,
+            reference_buffer=None,
+        )
+
+    def test_the_window_rule_is_the_judge_rule(self) -> None:
+        # model_compatibility.assess builds its `buffer_mismatch` from
+        # distinct case-collapsed strings; the window must come to the same
+        # verdict on the same pair, or a window could "resolve" a mismatch
+        # the judge still sees (ADR 0027).
+        from Tests.assay_conditions import buffers_equivalent
+
+        assert buffers_equivalent("0.1 M MOPS buffer", "0.1 M MOPS buffer")
+        assert buffers_equivalent("HEPES", "hepes")
+        assert not buffers_equivalent("0.5 M Tris-HCl", "500 mM Tris")
+        assert not buffers_equivalent("0.1 M MOPS buffer", None)
+        assert not buffers_equivalent(None, None)
+        assert not buffers_equivalent("0.1 M MOPS buffer", "Tris")
 
 
 class TestTheCriticDecidesWhen:
@@ -234,6 +326,56 @@ class TestTheCriticDecidesWhen:
         build = build_model(
             network=NETWORK,
             requests=[request("Km", "km"), request("Ki", "ki")],
+            resolve=windowed_resolver(rows),
+        )
+        assert build.run.constraints.of_kind(WINDOW_KIND) == ()
+        assert any("no re-search could remove" in n for n in self._notes(build))
+
+    def test_a_buffer_mismatch_becomes_a_window_when_a_row_states_it(
+        self,
+    ) -> None:
+        """The gap ADR 0172 left open, now closed (ADR 0175).
+
+        Two values sit at the SAME pH and temperature, so neither pH nor
+        temperature mismatch fires; they differ only in buffer -- which used
+        to be permanently non-actionable because the frontier carried no
+        buffer axis. kcat's own frontier holds a row really measured in
+        Km's buffer, so the buffer mismatch becomes a window naming that
+        buffer, and only kcat can move.
+        """
+        rows = {
+            "Km": [
+                row(10.73, 7.4, 37.0, buffer="HEPES"),
+                row(21.78, 7.4, 37.0, buffer="HEPES"),
+            ],
+            "kcat": [
+                row(21.1, 7.4, 37.0, unit="1/s", buffer="Tris"),
+                row(35.0, 7.4, 37.0, unit="1/s", buffer="HEPES"),
+            ],
+        }
+        build = build_model(
+            network=NETWORK,
+            requests=[request("Km", "km"), request("kcat", "kcat")],
+            resolve=windowed_resolver(rows),
+        )
+        windows = build.run.constraints.of_kind(WINDOW_KIND)
+        assert len(windows) == 1
+        assert windows[0].subject == "kcat"
+        assert "buffer HEPES" in windows[0].requirement
+
+    def test_a_buffer_mismatch_without_a_matching_row_stays_a_finding(
+        self,
+    ) -> None:
+        # Neither value's frontier holds a row stating the other's buffer,
+        # so no re-search could satisfy a buffer window; emitting one would
+        # be unactionable. It stays a finding with the reason stated.
+        rows = {
+            "Km": [row(10.73, 7.4, 37.0, buffer="HEPES")],
+            "kcat": [row(21.1, 7.4, 37.0, unit="1/s", buffer="Tris")],
+        }
+        build = build_model(
+            network=NETWORK,
+            requests=[request("Km", "km"), request("kcat", "kcat")],
             resolve=windowed_resolver(rows),
         )
         assert build.run.constraints.of_kind(WINDOW_KIND) == ()
@@ -343,12 +485,53 @@ class TestTheScoutReSelects:
             for r in report.rounds for ar in r.ran if ar.agent == "scout:Km"
         )
 
+    def test_it_chooses_the_row_that_states_the_reference_buffer(
+        self,
+    ) -> None:
+        """Buffer beats numeric proximity, because buffer is not a distance.
+
+        A numerically closer row in the wrong buffer (or in no stated
+        buffer) is outside the window; the chosen row is the one the
+        literature really measured in the reference's buffer.
+        """
+        rows = {
+            "kcat": [
+                row(21.1, 6.0, 25.0, unit="1/s", buffer=None),
+                row(33.0, 8.0, 25.0, unit="1/s", buffer="Tris"),
+                row(40.0, 8.0, 25.0, unit="1/s",
+                    buffer="0.1 M MOPS buffer"),
+            ],
+        }
+        window = Constraint(
+            kind="assay_window",
+            subject="kcat",
+            requirement="pH 8; buffer 0.1 M MOPS buffer",
+            reason="test",
+            raised_by="test",
+        )
+        report, _ = self._scout_result(
+            "kcat", windowed_resolver(rows), windows=(window,)
+        )
+        source = report.blackboard.get(param_key("kcat")).source
+        assert source.value == 40.0
+        assert source.buffer == "0.1 M MOPS buffer"
+        assert source.ph == 8.0
+
+        note = next(
+            n for r in report.rounds for ar in r.ran
+            if ar.agent == "scout:kcat" for n in ar.notes
+        )
+        assert "in 0.1 M MOPS buffer" in note
+        assert "over the resolver's default 21.1 1/s @ pH 6, 25 C" in note
+        assert "2 of 3 frontier row(s) fall outside" in note
+
     def test_re_selection_keeps_the_chosen_rows_own_provenance(self) -> None:
-        # The re-selected row is a different measurement. The frontier carries
-        # no buffer axis, so the row's buffer is unknown and must become None
-        # (not carry the resolver-winner's buffer forward); the citation must
-        # name the chosen row's reference_id; and cross_species must flip
-        # ONLY when the chosen row actually names a different organism.
+        # The re-selected row is a different measurement. Its buffer is the
+        # one the frontier carries for THAT row (here the row states none,
+        # so None is honest -- not the resolver-winner's buffer carried
+        # forward); the citation must name the chosen row's reference_id;
+        # and cross_species must flip ONLY when the chosen row actually
+        # names a different organism.
         rows = {
             "kcat": [
                 # The resolver winner: named organism, buffer stated, etc.
@@ -373,7 +556,7 @@ class TestTheScoutReSelects:
         )
         source = report.blackboard.get(param_key("kcat")).source
         assert source.value == 32.0
-        assert source.buffer is None          # no buffer axis on the frontier
+        assert source.buffer is None          # this row states no buffer
         assert "reference_id:D" in source.citation
         assert source.organism == "Escherichia coli"
         assert source.cross_species is True   # a different organism was chosen
@@ -440,3 +623,44 @@ class TestTheWholeLoop:
         assert search.run.converged
         assert search.run.round_count == 1
         assert search.run.constraints.all() == ()
+
+    def test_same_numeric_conditions_still_resolve_a_buffer_gap(self) -> None:
+        """The buffer flagship: identical pH/temperature, different buffers.
+
+        Round 1 resolves Km (pH 7.4/37, HEPES) and kcat (pH 7.4/37, Tris) at
+        identical numbers, so no pH or temperature gap exists -- only the
+        buffer differs. Round 2 honours the window naming Km's buffer and
+        kcat is re-selected to the row really measured in HEPES. The
+        re-selected number was already in kcat's table; nothing was invented.
+        """
+        rows = {
+            "Km": [
+                row(10.73, 7.4, 37.0, buffer="HEPES"),
+                row(21.78, 7.4, 37.0, buffer="HEPES"),
+            ],
+            "kcat": [
+                row(21.1, 7.4, 37.0, unit="1/s", buffer="Tris"),
+                row(35.0, 7.4, 37.0, unit="1/s", buffer="HEPES"),
+                row(94.7, 7.4, 37.0, unit="1/s", buffer="HEPES"),
+            ],
+        }
+        search = build_model(
+            network=NETWORK,
+            requests=[request("Km", "km"), request("kcat", "kcat")],
+            resolve=windowed_resolver(rows),
+        )
+
+        assert search.run.converged
+        assert search.run.round_count == 2
+
+        kcat = search.resolutions["kcat"].source
+        assert kcat.value == 35.0
+        assert kcat.buffer == "HEPES"
+        assert kcat.ph == 7.4
+
+        rejected = search.rejected_values()
+        assert len(rejected) == 1
+        assert "kcat" in rejected[0]
+        assert "35.0" in rejected[0] and "21.1" in rejected[0]
+
+        assert "buffer HEPES" in search.summary()
