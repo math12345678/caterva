@@ -334,6 +334,21 @@ def _has(text: str, *words: str) -> bool:
 # ---------------------------------------------------------------------------
 
 
+def _package_path_missing(exc: ModuleNotFoundError) -> bool:
+    """Whether `exc` says the Terium package path itself is unavailable.
+
+    Inlined for the same reason `terium_engine.py` inlines its copy: this
+    guards the import machinery, so it cannot import the helper from
+    `Terium/core/import_mode.py` to do its job. A flat-mode retry is only
+    the right response to the package path being unavailable; any other
+    missing module -- a `numpy` inside an expansion library -- must re-raise,
+    or a missing dependency is reported as a missing internal module (the
+    exact error `Terium/core/import_mode.py` exists to kill).
+    """
+    name = getattr(exc, "name", None)
+    return bool(name) and (name == "Terium" or name.startswith("Terium."))
+
+
 def _expansion_module(name: str):
     """Import one of the expansion libraries, or return None if it is absent.
 
@@ -352,7 +367,14 @@ def _expansion_module(name: str):
         try:
             return importlib.import_module(candidate)
         except ModuleNotFoundError as absent:
-            if absent.name not in {candidate, name}:
+            # Only a package-path miss means flat mode can help. A library
+            # whose own dependency is missing must surface that instead of
+            # falling back to "not in this checkout"; a bare-name miss inside
+            # a package candidate still falls through to the flat candidate
+            # below, exactly as before.
+            if not _package_path_missing(absent) and absent.name not in {
+                candidate, name,
+            }:
                 raise
     return None
 

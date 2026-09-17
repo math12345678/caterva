@@ -747,6 +747,7 @@ def _score_frontier(
             # implementation of one parse.
             "ph": getattr(entry, "assay_ph", None),
             "temperature_c": getattr(entry, "assay_temperature_c", None),
+            "buffer": getattr(entry, "assay_buffer", None),
             "grades": {
                 "assay_completeness": score.assay_completeness.grade,
                 "condition_proximity": score.condition_proximity.grade,

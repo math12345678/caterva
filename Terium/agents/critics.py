@@ -26,8 +26,15 @@ what keeps the loop honest:
                          re-search could fix); when rows are inside BOTH,
                          it stays a finding too (two values could move and
                          neither is privileged to choose).
-  buffer mismatch     -> finding only. The frontier carries no buffer axis,
-                         so no re-selection could satisfy a buffer window.
+  buffer mismatch     -> CONSTRAINT by the same test, once the frontier
+                         carries the buffer axis (ADR 0175). A window can
+                         name the reference's buffer and a frontier row
+                         that really was measured in it can satisfy it. A
+                         row silent on the demanded buffer is NOT accepted
+                         -- claiming compliance on an unstated buffer is
+                         the silence-as-proximity error -- so a window is
+                         emitted only when some row actually states it.
+                         When none does, the mismatch stays a finding.
   unpublished
   conditions          -> finding only, and permanently so. No search finds a
                          number the 1974 paper did not print.
@@ -147,13 +154,17 @@ class CoherenceCritic:
                         constraints.append(constraint)
 
         for finding in report.findings:
-            if finding.kind in ("ph_mismatch", "temperature_mismatch"):
+            if finding.kind in (
+                "ph_mismatch",
+                "temperature_mismatch",
+                "buffer_mismatch",
+            ):
                 constraint, note = self._condition_constraint(sources, finding)
                 if constraint is not None and constraint not in view.constraints:
                     constraints.append(constraint)
                 if note is not None:
                     notes.append(note)
-            elif finding.kind in ("buffer_mismatch", "conditions_unpublished"):
+            elif finding.kind == "conditions_unpublished":
                 notes.append(str(finding))
 
         return AgentResult(
@@ -183,6 +194,7 @@ class CoherenceCritic:
                 candidate,
                 reference_ph=anchor.ph,
                 reference_temperature_c=anchor.temperature_c,
+                reference_buffer=anchor.buffer,
             )
             for candidate in getattr(source, "candidates", ()) or ()
         )
@@ -220,7 +232,9 @@ class CoherenceCritic:
 
         if mover_moves and not anchor_moves:
             requirement = window_requirement(
-                ph=a_is_anchor.ph, temperature_c=a_is_anchor.temperature_c
+                ph=a_is_anchor.ph,
+                temperature_c=a_is_anchor.temperature_c,
+                buffer=a_is_anchor.buffer,
             )
             return (
                 Constraint(
@@ -240,7 +254,9 @@ class CoherenceCritic:
             )
         if anchor_moves and not mover_moves:
             requirement = window_requirement(
-                ph=b_is_anchor.ph, temperature_c=b_is_anchor.temperature_c
+                ph=b_is_anchor.ph,
+                temperature_c=b_is_anchor.temperature_c,
+                buffer=b_is_anchor.buffer,
             )
             return (
                 Constraint(

@@ -11,7 +11,9 @@ WHY A "NOT FOUND" NEEDS SIX DIFFERENT SENTENCES
 `KineticResult.source` distinguishes six outcomes and they are not
 interchangeable to the person reading the report:
 
-    brenda_exact             found, in the organism asked for
+    brenda_exact             found, in the organism asked for (or, when no
+                             organism was asked for, the best-evidenced row
+                             of any, named with its real organism)
     brenda_cross_species     found, in another organism, opted into
     cross_species_withheld   exists, in another organism, NOT opted into
     cross_species_too_distant exists, too far away to offer

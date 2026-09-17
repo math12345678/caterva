@@ -10,6 +10,8 @@ gap as a change in behaviour.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from Terium.compose.bifurcation import (
@@ -80,7 +82,9 @@ class TestTheToggleSwitch:
 
 
 class TestHonesty:
-    def test_a_solver_gap_is_not_reported_as_a_bifurcation(self) -> None:
+    def test_a_solver_gap_is_not_reported_as_a_bifurcation(
+        self, monkeypatch: Any,
+    ) -> None:
         """A barren sample is a failure to converge, not a change.
 
         Manufacturing a bifurcation out of a solver failure would put a
@@ -92,17 +96,51 @@ class TestHonesty:
         2.0)`, which cannot occur -- barren values are derived FROM points
         -- so it tested a shape the code never produces and failed on an
         early return it should never have reached.
+
+        The gap is now injected rather than waited for. The original
+        constants' scale (a 10 mM steady state, above the cell's ~5 mM of
+        total protein) made the root find fail at a sample right on the
+        fold; the corrected scale does not, and pinning a real solver
+        failure would be asserting the fix did not happen. So `analyse` is
+        replaced at exactly one sampled value with the report shape a failed
+        root find produces -- no fixed points -- and left genuinely real
+        everywhere else. Barren is still derived from a point the sweep
+        itself produced, which is the invariant the hand-made version
+        violated.
         """
+        from Terium.compose import bifurcation as module
+        from Terium.compose.analysis import DEFAULT_STARTS_PER_SPECIES
+        from Terium.compose.analysis import StabilityReport
+
+        values = linear_values(1.0, 3.0, 11)
+        gap = values[1]  # 1.2, the lattice point sitting on the fold
+        real_analyse = module.analyse
+
+        def analyse_with_gap(network: Any, /, **kw: Any) -> Any:
+            n = next(p.value for p in network.parameters if p.id == "geneA_n")
+            if n == pytest.approx(gap):
+                return StabilityReport(
+                    fixed_points=(),
+                    starts_tried=kw.get(
+                        "starts_per_species", DEFAULT_STARTS_PER_SPECIES
+                    ),
+                    species=tuple(s.id for s in network.species),
+                )
+            return real_analyse(network, **kw)
+
+        monkeypatch.setattr(module, "analyse", analyse_with_gap)
         network = recognise("a toggle switch between two repressors").network()
-        report = sweep(network, "geneA_n", linear_values(1.0, 3.0, 11))
-        assert report.barren, "this sweep is expected to have a solver gap"
+        report = sweep(network, "geneA_n", values)
+        assert report.barren, "the injected gap was not recorded as barren"
         assert "not a bifurcation and is not counted as one" in report.summary()
         # And every barren value really is one the search found nothing at.
         for value in report.barren:
             point = next(p for p in report.points if p.value == value)
             assert point.total_count == 0
 
-    def test_a_gap_does_not_blind_the_detector_either(self) -> None:
+    def test_a_gap_does_not_blind_the_detector_either(
+        self, monkeypatch: Any,
+    ) -> None:
         """The other half, and the bug this test was written for.
 
         A barren sample used to break the comparison on BOTH sides of
@@ -110,9 +148,35 @@ class TestHonesty:
         bistable across exactly such a gap, and the report listed regions
         with different stable-state counts while announcing in the next
         sentence that no change had been seen.
+
+        The gap is the same injected `analyse` emptiness as the sibling
+        test, for the same reason: the corrected constants no longer trip
+        the solver at the fold, and the honesty path must stay exercised
+        deterministically rather than by asserting on the bug's absence.
         """
+        from Terium.compose import bifurcation as module
+        from Terium.compose.analysis import DEFAULT_STARTS_PER_SPECIES
+        from Terium.compose.analysis import StabilityReport
+
+        values = linear_values(1.0, 3.0, 11)
+        gap = values[1]
+        real_analyse = module.analyse
+
+        def analyse_with_gap(network: Any, /, **kw: Any) -> Any:
+            n = next(p.value for p in network.parameters if p.id == "geneA_n")
+            if n == pytest.approx(gap):
+                return StabilityReport(
+                    fixed_points=(),
+                    starts_tried=kw.get(
+                        "starts_per_species", DEFAULT_STARTS_PER_SPECIES
+                    ),
+                    species=tuple(s.id for s in network.species),
+                )
+            return real_analyse(network, **kw)
+
+        monkeypatch.setattr(module, "analyse", analyse_with_gap)
         network = recognise("a toggle switch between two repressors").network()
-        report = sweep(network, "geneA_n", linear_values(1.0, 3.0, 11))
+        report = sweep(network, "geneA_n", values)
 
         # Asserted, not guarded by `if report.barren`. With the condition in
         # an `if`, a change that stopped producing a gap would skip every
@@ -121,9 +185,8 @@ class TestHonesty:
         # PRECONDITION this test needs, so its absence must fail here rather
         # than silently disarm it.
         assert report.barren, (
-            "this sweep no longer has a solver gap, so it cannot test that a "
-            "gap fails to blind the detector. Find a sweep that does, or "
-            "delete this test."
+            "the injected solver gap was not recorded as barren, so it "
+            "cannot test that a gap fails to blind the detector"
         )
         assert report.bifurcations, (
             "a gap silenced the detector: " + report.summary()

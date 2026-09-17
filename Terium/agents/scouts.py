@@ -84,14 +84,18 @@ def _row_description(source: Any) -> str:
         parts.append(f"pH {source.ph:g}")
     if source.temperature_c is not None:
         parts.append(f"{source.temperature_c:g} C")
+    if getattr(source, "buffer", None):
+        parts.append(f"in {source.buffer}")
     conditions = ", ".join(parts) or "conditions unstated"
     return f"{source.value} {source.unit or ''} @ {conditions}".strip()
 
 
-def _describe_windows(refs: List[Tuple[Optional[float], Optional[float], Any]]) -> str:
+def _describe_windows(
+    refs: List[Tuple[Optional[float], Optional[float], Optional[str], Any]],
+) -> str:
     return "; ".join(
-        window_requirement(ph=ph, temperature_c=temperature_c)
-        for ph, temperature_c, _ in refs
+        window_requirement(ph=ph, temperature_c=temperature_c, buffer=buffer)
+        for ph, temperature_c, buffer, _ in refs
     )
 
 
@@ -218,10 +222,13 @@ class ParameterScout:
         """
         refs = []
         for window in windows:
-            ph, temperature_c = parse_window_requirement(window.requirement)
+            ph, temperature_c, buffer = parse_window_requirement(window.requirement)
             if ph is None and temperature_c is None:
+                # A window with no numeric axis is unsatisfiable by
+                # construction (distance needs one) and is never emitted by
+                # the critic; a hand-authored one would just loop forever.
                 continue
-            refs.append((ph, temperature_c, window))
+            refs.append((ph, temperature_c, buffer, window))
         if not refs or not source.candidates:
             return source, reason, None
 
@@ -233,8 +240,9 @@ class ParameterScout:
                     candidate,
                     reference_ph=ph,
                     reference_temperature_c=temperature_c,
+                    reference_buffer=buffer,
                 )
-                for ph, temperature_c, _ in refs
+                for ph, temperature_c, buffer, _ in refs
             )
         ]
         if not eligible:
@@ -254,7 +262,7 @@ class ParameterScout:
                     reference_ph=ph,
                     reference_temperature_c=temperature_c,
                 )
-                for ph, temperature_c, _ in refs
+                for ph, temperature_c, _, _ in refs
             )
 
         def value_of(candidate: Any) -> float:
@@ -279,17 +287,20 @@ class ParameterScout:
             value=value_of(best),
             ph=_number(best.get("ph")),
             temperature_c=_number(best.get("temperature_c")),
-            # The frontier carries no buffer axis, so the re-selected row's
-            # buffer is unknown; None is the honest form of that.
-            buffer=None,
+            # The row's own parsed buffer, exactly as the frontier carries it
+            # (ADR 0175). None when the row states no buffer -- the honest
+            # form of "the window matched on pH, and this row's buffer is
+            # unknown" -- rather than the old winner's buffer carried forward.
+            buffer=best.get("buffer") or None,
             citation=(
                 f"reference_id:{best['reference_id']}"
                 if best.get("reference_id")
                 else source.citation
             ),
-            # The re-selected row is a different measurement; its own
-            # unstated axes travelled with neither the dict nor the winner's
-            # record, so no unreported claim is carried forward for it.
+            # The re-selected row is a different measurement; the frontier
+            # dict carries the conditions axes (ph, temperature_c, buffer)
+            # but not the winner's explicitly_unreported claims, so none are
+            # carried forward for it.
             explicitly_unreported=(),
         )
         row_organism = best.get("organism") or None
@@ -303,7 +314,7 @@ class ParameterScout:
         new_reason = (
             f"re-selected {quantity} under the assay window "
             f"({_describe_windows(refs)}) raised by "
-            f"{refs[0][2].raised_by or 'a critic'}: chose {chosen_desc} "
+            f"{refs[0][3].raised_by or 'a critic'}: chose {chosen_desc} "
             f"(distance {rank(best):g}) over the resolver's default "
             f"{passed_desc}; {len(source.candidates) - len(eligible)} "
             f"of {len(source.candidates)} frontier row(s) fall outside the "
