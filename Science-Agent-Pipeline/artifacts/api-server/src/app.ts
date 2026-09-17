@@ -60,6 +60,14 @@ class GlobalRateLimiter {
 const app: Express = express();
 const globalLimiter = new GlobalRateLimiter(GLOBAL_RATE_LIMIT, GLOBAL_RATE_WINDOW_MS);
 
+// The simulate limiter keys on req.ip. Behind a proxy every client would
+// present the proxy's address and the per-IP cap would collapse into a
+// global one -- so a proxied deployment must establish how many proxy hops
+// are trusted. "loopback" trusts only a proxy on 127.0.0.1, the safe
+// default: a loopback nginx/Caddy front keeps per-client identity without
+// opening the limiter to X-Forwarded-For spoofing from arbitrary hosts.
+app.set("trust proxy", "loopback");
+
 app.use(
   pinoHttp({
     logger,
@@ -80,7 +88,14 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
+// The engine's own ceilings admit a 400,000-character SBML source and a
+// model of up to 200 reactions whose rate laws each run to 1,000 characters
+// -- over 100 KB in JSON, which is express's default body limit. A request
+// the engine's measurements allow must reach it, so the transport limit is
+// 1 MB with the reasoning spelled out; oversized bodies are refused by
+// body-parser as 413 and reported as such by the error handler below, not
+// flattened into a 500.
+app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(globalLimiter.middleware());
 
@@ -182,14 +197,38 @@ app.get("/", (_req: Request, res: Response) => {
 
 // Global error handler. Keeps the response shape consistent with the
 // OpenAPI ErrorResponse schema and ensures pino always has a log line.
+// Body-parser signals malformed JSON (400) and payloads over the transport
+// limit (413) through `err.status`/`statusCode`; flattening those client
+// errors into a 500 would hide a user-correctable condition behind an
+// internal error, so the middleware honors 4xx statuses when present.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  const status =
+    typeof (err as { status?: unknown }).status === "number"
+      ? (err as { status: number }).status
+      : typeof (err as { statusCode?: unknown }).statusCode === "number"
+        ? (err as { statusCode: number }).statusCode
+        : 500;
+
+  if (status >= 400 && status < 500) {
+    logger.warn({ err, status }, "Request rejected by the client-facing boundary");
+    const message = err instanceof Error ? err.message : "Bad request";
+    res.status(status).json({
+      error: status === 413 ? "REQUEST_TOO_LARGE" : "BAD_REQUEST",
+      message,
+    });
+    return;
+  }
+
   logger.error({ err }, "Unhandled error in request handler");
 
-  const message = err instanceof Error ? err.message : "Internal server error";
+  // Do not echo handler errors to the caller -- 500 errs can carry
+  // internals (paths, service names, exception text). The detail belongs
+  // in the log line above; the client gets a stable, schema-conforming
+  // body.
   res.status(500).json({
     error: "INTERNAL_SERVER_ERROR",
-    message,
+    message: "Internal server error",
   });
 });
 

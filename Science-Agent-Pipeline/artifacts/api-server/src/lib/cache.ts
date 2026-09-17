@@ -15,6 +15,14 @@ function cacheFile(): string {
 
 const SCHEMA_VERSION = 1;
 
+// The cache is append-only and whole-file rewritten per job, so it must be
+// capped or a long-lived process grows cache.json without bound and pays
+// O(n^2) rewrites. Lookups scan newest-first, so trimming the oldest
+// entries never drops the winning result. 250 entries at up to ~1 MB of
+// JSON each is a few hundred MB worst case -- beyond the demo door's needs
+// but well short of unbounded.
+const MAX_CACHE_ENTRIES = 250;
+
 interface CacheEntry {
   schemaVersion: number;
   createdAt: string;
@@ -112,7 +120,7 @@ function isPersistable(job: Job): boolean {
 export function persistJob(job: Job | undefined): Promise<void> {
   if (!job || !isPersistable(job)) return Promise.resolve();
 
-  const operation = mutationQueue.then(async () => {
+const operation = mutationQueue.then(async () => {
     try {
       const s = await ensureStoreLoaded();
       s.entries.push({
@@ -120,6 +128,11 @@ export function persistJob(job: Job | undefined): Promise<void> {
         createdAt: new Date().toISOString(),
         job,
       });
+      // Newest result must remain findable, so evict from the oldest end.
+      const excess = s.entries.length - MAX_CACHE_ENTRIES;
+      if (excess > 0) {
+        s.entries.splice(0, excess);
+      }
       await saveStore(s);
     } catch (err) {
       logger.warn(

@@ -20,13 +20,23 @@ import type { ModelGroundingReport } from "../lib/modelGrounding";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
-import { asSimulationDomain, runTerium, type SimulationDomain } from "../lib/teriumRunner";
+import { asSimulationDomain, runTerium, type SimulationDomain, type TeriumResult } from "../lib/teriumRunner";
 import { SimulationParameterSchemas, CustomModelBody } from "../lib/schemas";
 import {
   NetworkRequestSchema,
   unsourcedQuantityIds,
+  ParameterizeRequestSchema,
+  unknownRequestIds,
   type NetworkRequest,
+  type ParameterizeRequest,
 } from "../lib/reactionNetwork";
+import {
+  toCompositionReport,
+  toLiteratureSearchReport,
+  type CompositionRefusal,
+  type CompositionReport,
+  type ParameterizePayload,
+} from "../lib/literatureSearch";
 import * as queue from "../lib/queue";
 import { findCachedEntryByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
@@ -463,6 +473,158 @@ async function runNetworkPipeline(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Network simulation failed";
+    queue.setJobError(jobId, { error: "PIPELINE_ERROR", message });
+  }
+}
+
+router.post(
+  "/simulate/parameterize",
+  simulateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parse = ParameterizeRequestSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: "BAD_REQUEST",
+          message: parse.error.errors
+            .map((e) => `${e.path.join(".") || "body"}: ${e.message}`)
+            .join("; "),
+        });
+        return;
+      }
+
+      const request = parse.data;
+
+      // Same question the engine asks (a `ValueError` on declared minus
+      // available) asked early, so a typo'd quantity never pays for a
+      // subprocess or a literature search. This is a sanity check, not the
+      // authoritative refusal: unlike the network route, sourcing is the
+      // POINT of this route, so blockers like "unsourced" are not checked
+      // here at all.
+      const unknown = unknownRequestIds(request.network, request.requests);
+      if (unknown.length > 0) {
+        res.status(400).json({
+          error: "UNKNOWN_REQUEST_QUANTITIES",
+          message:
+            `These requested quantities do not exist in the network: ` +
+            `${unknown.join(", ")}. Every request must name a constant ` +
+            `the model declares.`,
+          unknown,
+        });
+        return;
+      }
+
+      const job = queue.createJob(
+        `parameterize network: ${request.network.name}`,
+      );
+
+      runParameterizePipeline(job.jobId, request).catch((err) => {
+        logger.error(
+          { err, jobId: job.jobId },
+          "Parameterize pipeline threw unexpectedly",
+        );
+        queue.setJobError(job.jobId, {
+          error: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : "Unexpected pipeline failure",
+        });
+      });
+
+      res.status(202).json(job);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+async function runParameterizePipeline(
+  jobId: string,
+  request: ParameterizeRequest,
+): Promise<void> {
+  try {
+    queue.updateJob(jobId, { status: "running" });
+
+    // `requests` is an array of records, which the transport's parameter
+    // union does not declare (it has `NetworkPayload` for single objects and
+    // `number[]` for vectors). The payload is JSON across the bridge either
+    // way; this widens at the transport boundary, same as `network` above.
+    const engineResult = (await runTerium(
+      "parameterize",
+      {
+        network: request.network as unknown as Record<string, unknown>,
+        requests: request.requests,
+        sources: request.sources as unknown as Record<string, unknown>,
+        ...(request.organism ? { organism: request.organism } : {}),
+        start: request.start,
+        end: request.end,
+        points: request.points,
+      } as unknown as Parameters<typeof runTerium>[1],
+    )) as unknown as ParameterizePayload;
+
+    const search = toLiteratureSearchReport(engineResult);
+    const simulation = search.simulation;
+
+    // When the search ran, the engine reports where each resolved value
+    // came from (origin/citation/note). That IS the per-parameter
+    // provenance: mirroring the network route's mapping, so the values in
+    // `parameters` are never left un-tagged for
+    // guardSerializationProvenance. When the search did NOT run there is
+    // nothing resolved and nothing to tag.
+    const parameterProvenance: Record<string, ParameterProvenance> = {};
+    for (const [quantity, source] of Object.entries(
+      simulation.quantitySources ?? {},
+    )) {
+      const origin = source.origin ?? "user";
+      if (!PARAMETER_ORIGINS.includes(origin as ParameterProvenance["origin"])) {
+        throw new Error(
+          `engine reported origin "${origin}" for ${quantity}, which is not ` +
+            `a ParameterOrigin. The two enforcers have drifted.`,
+        );
+      }
+      parameterProvenance[quantity] = {
+        origin: origin as ParameterProvenance["origin"],
+        ...(source.citation ? { citation: source.citation } : {}),
+        ...(source.note ? { note: source.note } : {}),
+      };
+    }
+
+    const result: queue.SimulationResponse = {
+      runId: jobId,
+      domain: engineResult.domain,
+      parameters: simulation.values ?? {},
+      trajectory: simulation.trajectory ?? [],
+      provenance: {
+        reasoning:
+          `Network "${request.network.name}" with ` +
+          `${request.requests.length} constant(s) to resolve` +
+          `${request.organism ? ` under organism "${request.organism}"` : ""}. ` +
+          `${search.summary} ` +
+          (simulation.ran
+            ? "The resolved set was simulated."
+            : "The resolved set was not simulated."),
+        modelCitations: [],
+        flags: [
+          ...(search.chosenOrganism
+            ? [`chosen_organism: ${search.chosenOrganism}`]
+            : ["no_organism_chosen: the search did not settle on one."]),
+          ...(search.undecidedOrganisms.length > 0
+            ? [
+                `undecided_organisms: ${search.undecidedOrganisms.join(", ")} ` +
+                  `-- the request did not separate these from the winner.`,
+              ]
+            : []),
+          ...(simulation.ran ? [] : [`not_simulated: ${simulation.because}`]),
+        ],
+      },
+      parameterProvenance,
+      literatureSearch: search,
+      completedAt: new Date().toISOString(),
+    };
+
+    queue.setJobResult(jobId, result);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Parameterize simulation failed";
     queue.setJobError(jobId, { error: "PIPELINE_ERROR", message });
   }
 }
@@ -1604,14 +1766,22 @@ async function runPipeline(
         message: err.message,
       });
     } else if (err instanceof UnrecognizedQueryError) {
-      // Same distinction as above, one step earlier: the query never
-      // matched a domain at all, so there's nothing to run the engine on.
-      // Also fixable by editing the query -- naming a domain directly, or
-      // using vocabulary closer to the fifteen supported domains.
-      queue.setJobError(jobId, {
-        error: "UNRECOGNIZED_QUERY",
-        message: err.message,
-      });
+      // The catalogue gave up, but the composer may not have. Try to
+      // compose the mechanism described before answering "unrecognized":
+      // a practitioner who types a mechanism and is told "try vocabulary
+      // closer to the fifteen supported domains" has been served worse than
+      // they deserve, and has no idea whether the sentence itself was at
+      // fault -- any grammar can only answer for the shapes it knows.
+      const handled = await fallThroughToComposition(jobId, query, abort.signal);
+      if (!handled) {
+        // Not fixable by composition, or composition itself failed: keep the
+        // resolver's refusal verbatim -- it is the one that explains the
+        // fifteen domains.
+        queue.setJobError(jobId, {
+          error: "UNRECOGNIZED_QUERY",
+          message: err.message,
+        });
+      }
     } else {
       queue.setJobError(jobId, {
         error: "PIPELINE_ERROR",
@@ -1621,6 +1791,160 @@ async function runPipeline(
     }
     persistJob(queue.getJob(jobId)!).catch(() => {});
   }
+}
+
+/**
+ * Answer an unrecognized query through the composer, when the catalogue
+ * cannot.
+ *
+ * Returns whether the job reached a terminal state. True when compose
+ * built a mechanism (the job completes with a `composition` report) or
+ * refused to build one (the job fails with a precise refusal message).
+ * False when the composer could not run at all, so the caller keeps the
+ * resolver's original refusal.
+ *
+ * A composed result is necessarily structure-only from this door: the
+ * composer does not infer a subject enzyme from prose, and with no enzyme
+ * named nothing is searched for. The honest answer is the mechanism and
+ * the constants it needs (`composition.toResolve`), with `parameters`
+ * deliberately empty and `trajectory` empty -- scaffold values are not
+ * literature-resolved numbers, and a confidently wrong number is worse
+ * than a refusal.
+ */
+async function fallThroughToComposition(
+  jobId: string,
+  query: string,
+  signal: AbortSignal,
+): Promise<boolean> {
+  if (queue.isCancelled(jobId)) return true;
+
+  await queue.acquireRunnerSlot();
+  let engineResult: TeriumResult;
+  try {
+    engineResult = await runTerium("compose", { description: query }, signal);
+  } catch (err) {
+    if (signal.aborted || queue.isCancelled(jobId)) {
+      // The request owner walked away while the composer was working. That
+      // is not a refusal -- the mechanism may well be right -- so mark the
+      // job cancelled instead of answering "unrecognized".
+      queue.setJobCancelled(jobId);
+      return true;
+    }
+    logger.warn(
+      { err, jobId },
+      "Composition fallthrough failed; keeping the resolver's refusal",
+    );
+    return false;
+  } finally {
+    queue.releaseRunnerSlot();
+  }
+
+  if (queue.isCancelled(jobId)) return true;
+
+  // The compose payload's mechanism keys (rule/reading/structureOnly/
+  // network/...) are not declared on `TeriumResult`; they exist on the
+  // JSON it parsed. Widening here is not a cast-of-convenience -- the
+  // shape is checked by `toCompositionReport`, which is this module's
+  // guard that the engine's report reached us in the form it promised.
+  const payload = engineResult as unknown as {
+    ok: boolean;
+    built?: boolean;
+    kind?: string;
+    reason?: string;
+    shapes?: string[];
+    rule?: string;
+    reading?: string;
+    structureOnly?: boolean;
+    network?: CompositionReport["network"];
+    conservationLaws?: string[];
+    notes?: string[];
+    toResolve?: CompositionReport["toResolve"];
+    yourChoice?: string[];
+    unitFindings?: CompositionReport["unitFindings"];
+    summary?: string;
+  };
+
+  if (!payload.ok || payload.built === undefined) return false;
+
+  if (payload.built !== true) {
+    const refusal: CompositionRefusal = {
+      kind:
+        payload.kind === "named_pathway"
+          ? "named_pathway"
+          : "unrecognised_shape",
+      reason:
+        payload.reason ??
+        "compose declined to build this mechanism from the description",
+      shapes: payload.shapes ?? [],
+    };
+    queue.setJobError(jobId, {
+      error: "UNRECOGNIZED_QUERY",
+      message: describeCompositionRefusal(refusal),
+    });
+    return true;
+  }
+
+  const composition = toCompositionReport(payload);
+  const laws = payload.conservationLaws ?? [];
+
+  const result: queue.SimulationResponse = {
+    runId: jobId,
+    domain: "compose",
+    // Empty on purpose: nothing was resolved or simulated. The constants
+    // this mechanism needs are listed in composition.toResolve.
+    parameters: {},
+    trajectory: [],
+    provenance: {
+      reasoning:
+        payload.summary ??
+        `Terium built a mechanism for "${query}".`,
+      modelCitations: [],
+      flags: [
+        ...(payload.structureOnly
+          ? [
+              "structure_only: no enzyme was named, so nothing was " +
+                "searched for; the constants this mechanism requires are " +
+                "listed in composition.toResolve.",
+            ]
+          : []),
+        ...(laws.length > 0
+          ? [
+              `conservation_laws_derived: ${laws.join("; ")} -- computed ` +
+                `from the composed mechanism's stoichiometry, not asserted.`,
+            ]
+          : []),
+      ],
+    },
+    parameterProvenance: {},
+    composition,
+    completedAt: new Date().toISOString(),
+  };
+
+  queue.setJobResult(jobId, result);
+  return true;
+}
+
+/**
+ * A compose refusal is a result, not an exception, and the two refusal
+ * kinds are different failures: a named pathway needs a pathway database
+ * (editing the sentence won't help), an unrecognised shape means the
+ * description disagreed with every shape the grammar knows (it might).
+ * Say which.
+ */
+function describeCompositionRefusal(refusal: CompositionRefusal): string {
+  const heading =
+    refusal.kind === "named_pathway"
+      ? "This names a pathway the composer does not hold. A named pathway "
+        + "needs a pathway database to expand; editing the sentence will "
+        + "not change the answer."
+      : "The description did not match a mechanism shape the composer "
+        + "knows how to build.";
+  return (
+    `${heading} ${refusal.reason}` +
+    (refusal.shapes.length > 0
+      ? ` -- recognised shapes were: ${refusal.shapes.join(", ")}`
+      : "")
+  );
 }
 
 /**
