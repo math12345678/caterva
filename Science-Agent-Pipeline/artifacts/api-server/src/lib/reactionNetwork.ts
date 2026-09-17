@@ -149,9 +149,56 @@ export const NetworkRequestSchema = z.object({
   points: z.number().int().positive().max(100_000).default(51),
 });
 
+/**
+ * One quantity the literature is asked to supply, for `parameterize`.
+ *
+ * The `quantity` must be an identifier of the network; `subject` is the
+ * enzyme the value belongs to. The rest narrow the lookup: which table,
+ * which expected unit, which organism, which substrate, and for the
+ * enzyme's EC number. None of them are required -- a request with only a
+ * quantity and a subject is a legitimate one -- but each that IS present
+ * must be a valid identifier-shaped value, because they become lookup
+ * fields, not free text.
+ */
+export const ParameterRequestSchema = z.object({
+  quantity: Identifier,
+  subject: z.string().max(2_000).optional(),
+  substrate: z.string().max(2_000).optional(),
+  organism: z.string().max(2_000).optional(),
+  ec_number: z.string().max(2_000).optional(),
+  table: z.string().max(2_000).optional(),
+  expected_unit: z.string().max(2_000).optional(),
+});
+
+/**
+ * The body of `POST /api/simulate/parameterize`: a network whose constants
+ * the caller does NOT already have, and the quantities to look up.
+ *
+ * The network's values are placeholders -- the structure is what matters,
+ * and the literature fills the constants. Physical validation stays in the
+ * engine, exactly as `NetworkRequestSchema` keeps it there (see that
+ * schema's header: two enforcers of one rule in two languages become two
+ * rules).
+ */
+export const ParameterizeRequestSchema = z.object({
+  network: ReactionNetworkSchema,
+  requests: z.array(ParameterRequestSchema).min(1, {
+    message: "at least one quantity to resolve",
+  }),
+  sources: z.record(Identifier, QuantitySourceSchema).default({}),
+  /** The organism the literature should be searched under. Optional: the
+   * search explores every candidate organism when none is named. */
+  organism: z.string().max(2_000).optional(),
+  start: z.number().finite().default(0),
+  end: z.number().finite().positive().default(10),
+  points: z.number().int().positive().max(100_000).default(51),
+});
+
 export type ReactionNetwork = z.infer<typeof ReactionNetworkSchema>;
 export type QuantitySource = z.infer<typeof QuantitySourceSchema>;
 export type NetworkRequest = z.infer<typeof NetworkRequestSchema>;
+export type ParameterRequest = z.infer<typeof ParameterRequestSchema>;
+export type ParameterizeRequest = z.infer<typeof ParameterizeRequestSchema>;
 
 /**
  * Every number a network needs, in declaration order.
@@ -185,4 +232,25 @@ export function unsourcedQuantityIds(
   sources: Record<string, QuantitySource>,
 ): string[] {
   return quantityIds(network).filter((id) => !(id in sources));
+}
+
+/**
+ * Requested quantities the network does not declare, in request order.
+ *
+ * A request to parameterize says "resolve these constants for me"; each
+ * must name a quantity that actually exists in the network. The engine's
+ * `ValueError` on `declared - available` is authoritative, but the same
+ * sanity check asked here, before the subprocess and the literature search,
+ * is the commonest-mistake early refusal -- exactly as
+ * `unsourcedQuantityIds` is for the network route.
+ */
+export function unknownRequestIds(
+  network: ReactionNetwork,
+  requests: ParameterRequest[],
+): string[] {
+  const known = new Set(quantityIds(network));
+  return requests
+    .map((request) => request.quantity)
+    .filter((quantity) => !known.has(quantity))
+    .filter((quantity, index, all) => all.indexOf(quantity) === index);
 }

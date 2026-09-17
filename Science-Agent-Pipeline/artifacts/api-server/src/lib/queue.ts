@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 import type { RunnableDomain } from "./teriumRunner";
 import type { ParameterProvenance } from "./provenance";
 import type { GroundedParameter } from "./modelGrounding";
+import type {
+  CompositionReport,
+  LiteratureSearchReport,
+} from "./literatureSearch";
 import { logger } from "./logger";
 
 export type JobStatus =
@@ -43,6 +47,26 @@ export interface SimulationResponse {
    * string would make the numbers unreadable by anything but a human.
    */
   modelGrounding?: GroundedParameter[];
+  /**
+   * The literature search behind a `parameterize` run, losing branches
+   * included.
+   *
+   * Present only for `POST /simulate/parameterize`. Where `modelGrounding`
+   * reports what the literature said about a value the caller supplied,
+   * this reports what the literature alone supplied: the branch-by-branch
+   * search, the winning organism next to the undecided ones, and why the
+   * chosen model did or did not run.
+   */
+  literatureSearch?: LiteratureSearchReport;
+  /**
+   * The mechanism `compose` built, when a query was answered with a
+   * structure rather than a simulation.
+   *
+   * Present for the front-door fallthrough when the catalogue has no match
+   * and compose builds `structure_only` output: the network shape and the
+   * constants it needs, with nothing presented as resolved.
+   */
+  composition?: CompositionReport;
   completedAt: string;
 }
 
@@ -164,6 +188,10 @@ export function createJob(query: string): Job {
     if (oldest) {
       jobs.delete(oldest.jobId);
       listeners.delete(oldest.jobId);
+      // A terminal job can no longer be cancelled, so its abort controller
+      // is dead weight; dropping it keeps abortControllers bounded the same
+      // way the jobs map is.
+      abortControllers.delete(oldest.jobId);
     }
   }
 
@@ -291,6 +319,11 @@ export function subscribe(jobId: string, listener: Listener): () => void {
  */
 export function cleanupJob(jobId: string): void {
   listeners.delete(jobId);
+  // The job reached a terminal state; cancelJob returns early on terminal
+  // statuses without touching the controller, so it can never be needed
+  // again. Dropping it prevents abortControllers from growing without
+  // bound alongside a jobs map that IS pruned.
+  abortControllers.delete(jobId);
 }
 
 export function listJobs(): Job[] {
