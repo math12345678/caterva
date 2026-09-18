@@ -201,13 +201,17 @@ app.get("/", (_req: Request, res: Response) => {
 // limit (413) through `err.status`/`statusCode`; flattening those client
 // errors into a 500 would hide a user-correctable condition behind an
 // internal error, so the middleware honors 4xx statuses when present.
+// Casting through `unknown` is deliberate: Express handlers may receive
+// anything (including body-parser errors with a numeric `status`), so the
+// number-guard below does the real work and the casts only name the shape.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  const errShape = err as unknown as { status?: unknown; statusCode?: unknown };
   const status =
-    typeof (err as { status?: unknown }).status === "number"
-      ? (err as { status: number }).status
-      : typeof (err as { statusCode?: unknown }).statusCode === "number"
-        ? (err as { statusCode: number }).statusCode
+    typeof errShape.status === "number"
+      ? errShape.status
+      : typeof errShape.statusCode === "number"
+        ? errShape.statusCode
         : 500;
 
   if (status >= 400 && status < 500) {
