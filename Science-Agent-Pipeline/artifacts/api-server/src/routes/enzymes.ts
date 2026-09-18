@@ -6,7 +6,6 @@ import {
   type NextFunction,
 } from "express";
 import { ENZYMES } from "../lib/enzymes";
-import { resolveQuery } from "../lib/queryResolver";
 import {
   RequiredParametersMissingError,
   UnrecognizedQueryError,
@@ -36,6 +35,10 @@ router.post(
     try {
       const { query } = req.body as { query: string };
       logger.info({ query }, "Resolving query for preview");
+      // queryResolver pulls in the whole resolution graph (LLM resolver,
+      // science agent, citation helpers). It is only needed once a resolve
+      // request arrives, so load it here rather than at route registration.
+      const { resolveQuery } = await import("../lib/queryResolver");
       const resolved = await resolveQuery(query);
 
       res.json({
