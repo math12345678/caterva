@@ -84,7 +84,7 @@ router.get(
           fileExists(path.join(scriptsDir, "terium_runner.py")),
           fileExists(path.join(scriptsDir, "science_agent_runner.py")),
           checkPython3(),
-          Promise.resolve(isDbAvailable()),
+          isDbAvailable(),
         ]);
 
       const subsystems: SubsystemStatus[] = [

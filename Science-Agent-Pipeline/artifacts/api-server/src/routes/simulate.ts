@@ -5,17 +5,14 @@ import {
   type Response,
   type NextFunction,
 } from "express";
-import { desc, sql } from "drizzle-orm";
 import {
   RunSimulationBody,
   type SimulationRequest as RunSimulationRequest,
   GetSimulationJobParams,
   StreamSimulationJobParams,
 } from "@workspace/api-zod";
-import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
+import { getDb, isDbAvailable } from "@workspace/db";
 import { logger } from "../lib/logger";
-import { resolveQuery } from "../lib/queryResolver";
-import { groundAnnotatedModel } from "../lib/modelGrounding";
 import type { ModelGroundingReport } from "../lib/modelGrounding";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
@@ -662,7 +659,7 @@ router.post(
         "Enqueuing simulation job",
       );
 
-      const cached = isDbAvailable()
+      const cached = (await isDbAvailable())
         ? await findCachedSimulation(normalizedQuery)
         : findCachedEntryByQuery(normalizedQuery);
       if (cached) {
@@ -1333,8 +1330,16 @@ async function findCachedSimulation(
   { result: queue.SimulationResponse; cachedAt: string } | undefined
 > {
   try {
-    const db = getDb();
+    const db = await getDb();
     if (!db) return undefined;
+
+    // The query builder, its SQL helpers, and the table schema are loaded
+    // only when a database query is actually possible, so route modules
+    // that never touch the database never evaluate Drizzle.
+    const [{ desc, sql }, { simulationsTable }] = await Promise.all([
+      import("drizzle-orm"),
+      import("@workspace/db/schema"),
+    ]);
 
     const rows = await db
       .select()
@@ -1461,6 +1466,9 @@ async function runCustomModelPipeline(
     const declared = antimony ?? sbml;
     const format = antimony !== undefined ? "antimony" : "sbml";
     if (declared !== undefined) {
+      // modelGrounding pulls in queryResolver and the resolution graph;
+      // load it only when a custom model actually needs grounding.
+      const { groundAnnotatedModel } = await import("../lib/modelGrounding");
       grounding = await groundAnnotatedModel(declared, { format });
 
       if (grounding.problems.length > 0) {
@@ -1632,6 +1640,9 @@ async function runPipeline(
     if (queue.isCancelled(jobId)) return;
 
     queue.updateJob(jobId, { status: "resolving" });
+    // Deferred: the resolution graph is large and only needed once a job
+    // actually starts resolving.
+    const { resolveQuery } = await import("../lib/queryResolver");
     const resolved = await resolveQuery(query, {
       allowCrossSpecies,
       allowVariants,
@@ -1724,8 +1735,9 @@ async function runPipeline(
           : []),
       ],
     };
-    const db = getDb();
+    const db = await getDb();
     if (db) {
+      const { simulationsTable } = await import("@workspace/db/schema");
       await db.insert(simulationsTable).values({
         query,
         domain: asSimulationDomain(engineResult.domain),
