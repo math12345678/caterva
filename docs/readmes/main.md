@@ -10,7 +10,7 @@ git clone --recursive https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 2,756 tests (1,591 engine + 1,165 literature)
+make test      # 4,429 tests (3,264 engine + 1,165 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -59,7 +59,7 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 1,591 tests |
+| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 3,264 tests |
 | [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,165 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |

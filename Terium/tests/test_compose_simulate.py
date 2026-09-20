@@ -293,7 +293,7 @@ class TestSoundIsNotTheSameAsChecked:
         )
 
     def _trajectory(self):
-        from Terium.compose.simulate import Trajectory, check_invariants
+        from Terium.compose.simulate import Trajectory
 
         network = self._no_laws()
         invariants = check_invariants(network, {"X": (0.0, 5.0, 9.0)})

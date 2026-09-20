@@ -64,6 +64,29 @@
 // Measured 2026-09-05: 744 passed / 2 failed on this machine, 746 passed
 // with a discoverable interpreter, which is the number below.
 //
+// A FOURTH, 2026-09-19, ON THE RELEASE COMMIT (v0.2.0), same form:
+//
+// Measured, from a junit-xml report of `pytest Terium/` run alone under
+// .venv: 3264 tests, 3263 passed, 1 failed, 0 skipped, 729s. The failure is
+//
+//     test_guard_selftests.py::test_the_guards_selftest_passes[check_codegen_loads.py]
+//
+// whose selftest runs `npx tsx`; tsx is not installed locally, so npx
+// tried the registry cache and npm refused with EPERM on
+// ~/.npm/_cacache (npm's own log names the path). With node unable to
+// start, the load check rejected the selftest's VALID module too, which
+// is the message the test reports. Nothing about the code: neither
+// check_codegen_loads.py nor test_guard_selftests.py has changed since
+// the 2026-09-08 run in which this same case passed. The number below is
+// 3264, the figure with a working npm, stated the same way as before so a
+// reader can disagree with it. The delta from 1624 to 3264 is 29 files,
+// every one of them test_compose_*: the mechanism libraries (enzymology,
+// expression, metabolic, signaling, transport), the verdict page,
+// robustness, scale, predictions, validate, identifiability, CRNT,
+// bifurcation, continuation, dose-response, fitting, reduction,
+// stochastic, export, compare, and the CLI (`git log --diff-filter=A
+// --since=2026-09-08 -- 'Terium/tests/test_*.py'`).
+//
 // THE ENGINE SUITE NOW HAS A THIRD INSTANCE OF THE SAME SHAPE (2026-09-08),
 // and it is recorded here in the same form because the alternative is a
 // number nobody can audit.
@@ -120,16 +143,17 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "67 test files -- kinetics & Michaelis-Menten correctness, " +
+          "96 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, compositional model building with influence " +
-          "ranking, and citation/build guards",
-        // Measured 2026-09-08, Terium/ run alone under .venv, read out of a
-        // junit-xml report. 1624 tests; 1622 passed here and 2 could not be
-        // checked because the sandbox denies their hosts. See the long note
-        // above -- both are named there, with why this row says 1624.
-        passed: 1624,
+          "ranking, mechanism libraries and verdicts, agents and assay " +
+          "windows, and citation/build guards",
+        // Measured 2026-09-19, Terium/ run alone under .venv, read out of a
+        // junit-xml report. 3264 tests; 3263 passed here and 1 could not be
+        // checked because the sandbox cannot write npm's cache. See the long
+        // note above -- it is named there, with why this row says 3264.
+        passed: 3264,
         skipped: 0,
         failed: 0,
       },

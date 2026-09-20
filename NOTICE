@@ -130,6 +130,45 @@ THE TRIGGER THAT CHANGES THIS
   and it has not been done.
 
 
+WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.2.0 (2026-09-19), THE FIRST BUILT RELEASE
+
+  The section above was written when nothing was published. Something is
+  now: a source distribution and a pure-Python wheel of Terrium itself,
+  attached to a tagged GitHub release. This records what that does and does
+  not convey, so the reasoning above is applied rather than left as a
+  hypothetical.
+
+  The wheel and sdist contain Terrium's own code (Apache-2.0), LICENSE, and
+  this NOTICE. They contain NO third-party library. They NAME python-libsbml
+  (LGPL-2.1-or-later) as a dependency in their metadata, and pip fetches it
+  from PyPI onto the user's machine at install time — exactly as
+  `requirements.txt` did before. Distributing a package that names a
+  dependency is not conveying the dependency; the LGPL-2.1 conveyance
+  obligations (notice, and the recipient's ability to relink against a
+  modified libSBML) therefore do not attach to these artifacts. Verified by
+  listing the wheel: 82 Python files, all under `Terium/`, no `.so`, no
+  vendored source. `scripts/build_release.py` performs that listing on
+  every build and refuses to write a wheel that fails it.
+
+  stdpopsim (GPL-3.0-or-later) is not named by the wheel at all. It stays
+  opt-in through `requirements-popgen.txt` (ADR 0058), and the release
+  artifacts neither install nor depend on it.
+
+  No container image is published. The image analysis above still stands as
+  the task to do before one is.
+
+  If a future release ever BUNDLES libSBML — a fat wheel, a PyInstaller
+  binary, an image — this paragraph becomes false and the obligations above
+  attach. That is not hypothetical: PR #21 ("first DMG release") froze
+  python-libsbml into a onefile binary and shipped this NOTICE, unchanged,
+  inside it. It was reviewed and not merged. A desktop bundle that satisfies
+  LGPL-2.1 §6 needs libSBML as a separate, replaceable shared object (a
+  onedir freeze, not onefile) and a paragraph here saying so; whether to
+  ship one is the owner's decision. `scripts/check_release_artifacts.py`
+  watches CI for that; a release built by hand is outside its view, which
+  is why this is written where a person building one will read it.
+
+
 stdpopsim — GPL-3.0-or-later, and why it is not installed by default
 --------------------------------------------------------------------
 
