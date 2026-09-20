@@ -7,15 +7,149 @@
 > - **"TypeScript test suite: 111 -> 224 tests (16 files)"**: `Science-Agent-Pipeline/artifacts/api-server` now has **433** test cases across **32** `*.test.ts` files (`npx vitest list`).
 > This is ordinary changelog staleness (the Unreleased section wasn't updated as later work landed, and later work was logged in `OVERNIGHT_LOG.md` instead — see that file's own correction banner for the same underlying drift), not fabrication.
 
-No versioned releases exist yet -- there's no published package, no tagged
-release, just an active `main` branch. Entries below are grouped by real
-date from git history, not semantic version numbers, because assigning
-version numbers to a pre-release research tool would imply a release
-process that doesn't exist yet. This file should switch to
-[Semantic Versioning](https://semver.org/) once there's an actual first
-release to version.
+This file follows [Semantic Versioning](https://semver.org/) from 0.1.0
+onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
+Entries before 0.1.0 are grouped by date, because that is how the work was
+done: there was no release to version.
 
-Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
+## [0.2.0] - 2026-09-19
+
+The first release with built artifacts. A source distribution, a
+pure-Python wheel, and two installed commands. 0.1.0 (below) was a tag and
+a source archive; this is the version you can `pip install`. Everything
+under the `Unreleased` heading further down was already in the tree; this
+entry records what makes 0.2.0 an installable release rather than a
+checkout.
+
+### Added
+- **Installable package.** `pip install terrium-0.2.0-py3-none-any.whl`
+  installs `Terium` (engine, composer, agents; 82 modules) with pinned
+  dependencies. Verified by installing the wheel into an empty directory
+  and building a model from there with nothing of the repository on the
+  path.
+- **Two commands.** `terium` (the simulation engine: `wf`, `kimura`, `ne`,
+  `sweep`, `scenarios`, `ld`, `ssa`) and `terium-compose` (the model
+  builder and its analyses). Before this the composer was reachable only
+  as `python -m Terium.compose` from a checkout.
+- **A version.** `Terium.__version__` is the single source; `pyproject.toml`
+  reads it, and `CITATION.cff` and `package.json` are kept equal to it.
+  `terium-compose` and the package metadata cannot disagree.
+- **`scripts/build_release.py`.** Builds the sdist, then the wheel from
+  the extracted sdist, checks the wheel against what the release notes
+  claim (no tests, no conftest, LICENSE and NOTICE inside, every module
+  under `Terium/`), and writes `SHA256SUMS`. With `SOURCE_DATE_EPOCH`
+  pinned to the tagged commit the wheel is byte-reproducible; the sdist is
+  content-identical but not byte-identical (setuptools writes fresh
+  mtimes into `PKG-INFO`), and the script says so rather than hiding it.
+- **A conveyance section in NOTICE** stating what the artifacts do and do
+  not distribute: Terrium's own code only; python-libsbml (LGPL-2.1) is
+  named as a dependency and not bundled, so its conveyance obligations do
+  not attach. (This is also why there is no frozen desktop bundle in this
+  release: PR #21's onefile DMG froze libSBML in, and that changes the
+  obligations. See NOTICE.)
+
+### Fixed
+- **Packaging built nothing.** Setuptools' flat-layout discovery saw
+  `Terium/` beside `Tests/`, `Business/`, `node_modules/` and a dozen more,
+  and an editable install registered `dist-info` and no code: `import
+  Terium` failed from any directory but the repository root. Packages are
+  now named explicitly. The sdist also swept the whole `Tests/` tree in
+  through a case-folded `tests/` glob; a `MANIFEST.in` prunes it.
+- **A wheel built straight from the tree carried `Terium/conftest.py`.**
+  `MANIFEST.in` governs the sdist and `exclude-package-data` governs data
+  files; neither excludes a module from a wheel built directly. Building
+  the wheel from the sdist does, which is what the build script enforces.
+- **ADR 0176's mutation table had no set file.** Seven mutations across
+  four files, run through `scripts/mutate.py`, all caught.
+- Everything under `Unreleased` below, which this release ships.
+
+### Known limits, stated
+- **Literature search needs the source checkout.** `Terium.agents` reaches
+  into `Tests/` (the BRENDA resolvers) lazily; those modules are not part
+  of the package. From the wheel, `terium-compose ... --subject <enzyme>`
+  builds the model and the verdict page says, correctly, that no search
+  was run. Running the search means cloning the repository.
+- **The api-server and landing site are not in this release.** They are
+  TypeScript, deploy separately, and their test suite could not be run in
+  the environment this release was built in (port binding is sandboxed).
+  They are unversioned until they can be verified.
+- **0.2.0, not 1.0.0.** The public API has not been frozen and the
+  composer's library is eleven mechanisms. The number says "usable,
+  changing," which is true.
+
+## [0.1.0] - 2026-08-29
+
+Tagged and released as a source archive only, deliberately: the licence
+position rested on distributing nothing that contains libSBML, and a
+source archive contains none. `pyproject.toml` said 0.1.0 but its
+packaging built an empty install (see 0.2.0, Fixed), so this version was
+never `pip install`-able. The record of the release and its measured
+figures is in `docs/EXPERT_FEEDBACK.md` ("Seventy-ninth pass").
+
+## Unreleased` section's counts are stale — the repo has moved well past the state they describe:
+> - **"11 guard scripts"**: running `python3 scripts/verify_build.py --quick` today shows the Guard Wiring Guard reporting **"all 22 guards run in at least one harness"** — 22 guards now exist, not 11.
+> - **"Engine test suite: 715 -> 883 tests"**: `python3 -m pytest --collect-only` in `Terium/` now collects **1,014** tests.
+> - **"Literature test suite: 182 -> 214 tests"**: `Tests/` now collects **277** tests.
+> - **"TypeScript test suite: 111 -> 224 tests (16 files)"**: `Science-Agent-Pipeline/artifacts/api-server` now has **433** test cases across **32** `*.test.ts` files (`npx vitest list`).
+> This is ordinary changelog staleness (the Unreleased section wasn't updated as later work landed, and later work was logged in `OVERNIGHT_LOG.md` instead — see that file's own correction banner for the same underlying drift), not fabrication.
+
+This file follows [Semantic Versioning](https://semver.org/) from 0.1.0
+onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
+Entries before 0.1.0 are grouped by date, because that is how the work was
+done: there was no release to version. The paragraph that used to sit here
+said this file "should switch to Semantic Versioning once there's an actual
+first release to version." This is that release.
+
+## [0.1.0] - 2026-09-19
+
+The first release. A version number, a git tag, a source distribution and
+a pure-Python wheel, and two installed commands. Everything below the
+`Unreleased` heading further down was already in the tree; this entry
+records what makes 0.1.0 a release rather than a checkout.
+
+### Added
+- **Installable package.** `pip install terrium-0.1.0-py3-none-any.whl`
+  installs `Terium` (engine, composer, agents; 83 modules) with pinned
+  dependencies. Verified by installing the wheel into an empty directory
+  and building a model from there with nothing of the repository on the
+  path.
+- **Two commands.** `terium` (the simulation engine: `wf`, `kimura`, `ne`,
+  `sweep`, `scenarios`, `ld`, `ssa`) and `terium-compose` (the model
+  builder and its analyses). Before this the composer was reachable only
+  as `python -m Terium.compose` from a checkout.
+- **A version.** `Terium.__version__` is the single source; `pyproject.toml`
+  reads it. `terium-compose` and the package metadata cannot disagree.
+- **A conveyance section in NOTICE** stating what the artifacts do and do
+  not distribute: Terrium's own code only; python-libsbml (LGPL-2.1) is
+  named as a dependency and not bundled, so its conveyance obligations do
+  not attach.
+
+### Fixed
+- **Packaging built nothing.** Setuptools' flat-layout discovery saw
+  `Terium/` beside `Tests/`, `Business/`, `node_modules/` and a dozen more,
+  and an editable install registered `dist-info` and no code: `import
+  Terium` failed from any directory but the repository root. Packages are
+  now named explicitly. The sdist also swept the whole `Tests/` tree in
+  through a case-folded `tests/` glob; a `MANIFEST.in` prunes it.
+- Everything under `Unreleased` below, which this release ships.
+
+### Known limits, stated
+- **Literature search needs the source checkout.** `Terium.agents` reaches
+  into `Tests/` (the BRENDA resolvers) lazily; those modules are not part
+  of the package. From the wheel, `terium-compose ... --subject <enzyme>`
+  builds the model and the verdict page says, correctly, that no search
+  was run. Running the search means cloning the repository.
+- **The api-server and landing site are not in this release.** They are
+  TypeScript, deploy separately, and their test suite could not be run in
+  the environment this release was built in (port binding is sandboxed).
+  They are unversioned until they can be verified.
+- **`Terium/conftest.py` ships in the wheel.** It is the repository's own
+  test-path shim, inert unless pytest collects from inside site-packages,
+  which nothing does. Setuptools cannot exclude a single module from a
+  named package without restructuring the test loader; deferred.
+- **0.1.0, not 1.0.0.** The public API has not been frozen and the
+  composer's library is eleven mechanisms. The number says "usable,
+  changing," which is true.
 
 ## Unreleased
 

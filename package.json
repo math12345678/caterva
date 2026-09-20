@@ -1,6 +1,6 @@
 {
   "name": "terrium-scientific-backend",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Production-ready scientific validation and reproducibility framework. Unaffiliated with Tellurium.",
   "main": "src/integration/scientificPipeline.ts",
   "bin": {

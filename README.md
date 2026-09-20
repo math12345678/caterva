@@ -59,7 +59,20 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,756 tests (1,591 engine + 1165 literature)
+make test      # runs all 4,429 tests (3,264 engine + 1165 literature)
+```
+
+### Or install the release
+
+Since v0.2.0 (2026-09-19) there is a wheel. It carries the engine, the
+composer and the agents; the literature search stays in the checkout,
+and the release notes say what else does not ship
+([`docs/releases/v0.2.0.md`](docs/releases/v0.2.0.md)). The same access
+caveat applies: the release is attached to a private repository.
+
+```bash
+pip install terrium-0.2.0-py3-none-any.whl     # from the v0.2.0 release assets
+terium-compose "a toggle switch between two repressors"
 ```
 
 ### See what it produces, before anything else
@@ -496,7 +509,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,591 tests
+│   └── tests/                3,264 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -590,9 +603,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,756 tests
+make test        # run all 4,429 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (1,591 tests)
+make test-sim    # simulation engine only (3,264 tests)
 make test-lit    # literature layer only (1165 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches
