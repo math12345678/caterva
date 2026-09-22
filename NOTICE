@@ -156,29 +156,53 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
   2. THE APP FOLDER, ONE PER PLATFORM (since v0.3.0). `terrium-<version>-
   <os>-<arch>.tar.gz` / `.zip` is a PyInstaller ONEDIR freeze of the
   released wheel: the Python runtime, Terrium, and every library Terrium
-  imports, including python-libsbml. This artifact CONVEYS libSBML, and
-  the obligations attach. They are met as follows, and
-  `scripts/build_app.py` refuses to write the archive if any of it is not so:
+  imports. This artifact CONVEYS libSBML, and not once: python-libsbml's
+  extension is the library as a separate file, and libroadrunner's
+  `_roadrunner` extension and Antimony's `libantimony` shared library each
+  carry their OWN statically linked copy, put there by their upstream
+  projects (measured on the build machine: 5.21.1, 5.20.4 and 5.20.2).
+  `scripts/build_app.py` scans every binary it collects for the library,
+  writes each copy, its version and whether it is replaceable into the
+  folder's README.txt and beside the archive, and refuses the folder if
+  python-libsbml's copy is not a separate file. The obligations, and how
+  each is met:
 
-    notice        The folder's README.txt names libSBML, its licence, and
-                  the file that is the LGPL work. licenses/python-libsbml/
-                  carries libSBML's own LICENSE.txt (its copyright and
-                  distribution terms) and the full text of the GNU LGPL
-                  v2.1, which that file refers to and the wheel omits.
-                  Source: https://github.com/sbmlteam/libsbml and the
-                  python-libsbml sdist on PyPI.
+    notice        README.txt names libSBML, its licence, and every file
+                  that carries it. licenses/python-libsbml/ carries
+                  libSBML's own LICENSE.txt (copyright and distribution
+                  terms) and the full text of the GNU LGPL v2.1, which that
+                  file refers to and the wheel omits.
 
-    relinking     The freeze is ONEDIR, never onefile. libSBML's extension
-                  (`_libsbml.<abi>.so` / `.pyd`) is a single separate file
-                  under `_internal/libsbml/`, loaded at run time by the
+    relinking     The freeze is ONEDIR, never onefile. python-libsbml's
+                  extension (`_libsbml.<abi>.so` / `.pyd`) is one separate
+                  file under `_internal/libsbml/`, loaded at run time by the
                   interpreter's import mechanism, not compiled into the
-                  executable. A recipient replaces it by putting an
-                  interface-compatible build of python-libsbml for the same
-                  Python version and platform at the same path; README.txt
-                  says exactly where. That is the "suitable shared library
-                  mechanism" of LGPL-2.1 §6(b), and it is the difference
-                  between this folder and PR #21's onefile DMG, which
-                  packed the object inside the binary and was not merged.
+                  executable; a recipient replaces it by putting an
+                  interface-compatible build for the same Python version
+                  and platform at the same path, which README.txt names.
+                  That is the second half of what LGPL-2.1 §6(b) asks (the
+                  work "will operate properly with a modified version of
+                  the library"); it is NOT the first half (a copy "already
+                  present on the user's computer system"), because this
+                  folder is what puts the copy there. The copies inside
+                  `_roadrunner` and `libantimony` are not separately
+                  replaceable at all. So the project does not rest on
+                  §6(b). It rests on offering the corresponding source from
+                  the same place (§4, §6(d)): the release workflow fetches
+                  the source archive of every libSBML version the folders
+                  report, and of libroadrunner and Antimony at the pinned
+                  versions, and attaches them to the release page beside
+                  the folders, covered by the same SHA256SUMS. A folder is
+                  not published if a source download fails.
+
+                  Whether a shipped-but-replaceable copy is a §6(b)
+                  mechanism, and whether upstream source attached to the
+                  same page satisfies "same place" for copies that
+                  upstream wheels embed, are the two questions to put to
+                  counsel; the folder is built so that the answer to either
+                  does not have to be yes for the obligations to be met.
+
+    signing       Not signed, not notarised (below).
 
   The folder conveys other software too, each under its own terms, each
   with its licence file in licenses/ and listed in licenses/README.txt:
@@ -195,8 +219,10 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
 
   Not signed, not notarised. The folders carry no Apple Developer ID or
   Windows Authenticode signature; README.txt in each says what the
-  operating system will ask on first run. Signing needs a certificate the
-  repository does not hold and is the owner's to obtain.
+  operating system will do on first run and the exact command that clears
+  it (on macOS, `xattr -dr com.apple.quarantine .` inside the folder, since
+  "Open Anyway" approves one file and not the libraries). Signing needs a
+  certificate the repository does not hold and is the owner's to obtain.
 
   3. THE SOURCE ARCHIVES GitHub attaches to every release are copies of the
   tagged tree: Terrium's own files only, no dependency.

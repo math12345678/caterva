@@ -18,9 +18,14 @@
 #               supported window, and `terium-compose` simulates a model to
 #               a VERDICT with nothing of the repository on the path
 #   app         scripts/build_app.py freezes the INSTALLED wheel into a
-#               one-folder app per platform, keeps libSBML (LGPL-2.1) as a
-#               separate replaceable file, carries every third-party
-#               licence, and runs the frozen binary from an empty directory
+#               one-folder app per platform, keeps python-libsbml's copy of
+#               libSBML (LGPL-2.1) as a separate replaceable file, records
+#               the copies compiled into libroadrunner and Antimony, carries
+#               every third-party licence, and runs the frozen binary from
+#               an empty directory
+#   sources     the corresponding source of every libSBML version the
+#               folders carry, and of the two libraries that embed it, is
+#               fetched from upstream and attached beside the folders
 #   publish     only after all of the above: `gh release create` with the
 #               notes from docs/releases/<tag>.md, every artifact, and one
 #               SHA256SUMS covering all of them
@@ -238,6 +243,7 @@ jobs:
           name: app-${{ matrix.label }}
           path: |
             dist/app/terrium-*
+            dist/app/libsbml-copies-*.tsv
           if-no-files-found: error
 
   publish:
@@ -254,14 +260,39 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: staged
+      - name: Corresponding source for every libSBML copy the folders carry (LGPL-2.1 s4 / s6d)
+        shell: bash
+        # Each app folder reports the libSBML versions inside it (python-libsbml's
+        # own, plus the copies libroadrunner and Antimony compile in). The
+        # release page must offer the source of each from the same place, and
+        # the source of the two libraries that embed it. A download that fails
+        # fails the release: a promise the page cannot keep is not made.
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cat staged/app-*/libsbml-copies-*.tsv | tee libsbml-copies.tsv
+          versions="$(cut -f2 libsbml-copies.tsv | grep -E '^5\.[0-9]+\.[0-9]+$' | sort -u)"
+          [ -n "$versions" ] || { echo "::error::no libSBML versions reported by the app folders"; exit 1; }
+          for v in $versions; do
+            curl -fsSL --retry 3 -o "release/libsbml-$v-source.tar.gz" "https://github.com/sbmlteam/libsbml/archive/refs/tags/v$v.tar.gz"
+            echo "libsbml $v source: $(stat -c %s "release/libsbml-$v-source.tar.gz") bytes"
+          done
+          rr="$(sed -n 's/^libroadrunner==//p' requirements.txt)"; ant="$(sed -n 's/^antimony==//p' requirements.txt)"
+          curl -fsSL --retry 3 -o "release/roadrunner-$rr-source.tar.gz" "https://github.com/sys-bio/roadrunner/archive/refs/tags/v$rr.tar.gz"
+          curl -fsSL --retry 3 -o "release/antimony-$ant-source.tar.gz" "https://github.com/sys-bio/antimony/archive/refs/tags/v$ant.tar.gz"
+          pip download --no-deps --no-binary :all: --dest release "python-libsbml==$(sed -n 's/^python-libsbml==//p' requirements.txt)"
+          cp libsbml-copies.tsv release/libsbml-copies.tsv
+          ls -la release
       - name: One SHA256SUMS for everything on the page
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p release
           find staged -type f \( -name '*.whl' -o -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
           cd release
-          sha256sum -- * | sort -k2 > SHA256SUMS
+          # Named inputs, not `*`: the redirect can create SHA256SUMS before
+          # the glob expands, and the file then lists itself with the digest
+          # of an empty file.
+          sha256sum -- *.whl *.tar.gz *.zip *.tsv | sort -k2 > SHA256SUMS
           # The wheel/sdist lines must equal the tested build's own sums.
           grep -E '  terrium-[0-9][0-9.]*(-py3-none-any\.whl|\.tar\.gz)$' SHA256SUMS | diff - <(sort -k2 ../staged/python-artifacts/SHA256SUMS)
           cat SHA256SUMS

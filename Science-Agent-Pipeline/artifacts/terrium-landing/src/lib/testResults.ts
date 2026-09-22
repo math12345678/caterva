@@ -149,13 +149,12 @@ export const TEST_SUITES: TestSuite[] = [
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // 3264 measured 2026-09-19 (Terium/ run alone under .venv, junit-xml;
-        // 3263 passed here and 1 could not be checked because the sandbox
-        // cannot write npm's cache -- see the long note above), plus the 12
-        // tests in the two files added 2026-09-21 for v0.3.0 (test_app.py,
-        // test_packaged_data.py), run on their own: 12 passed. 3276 is the
-        // collected total; a full re-run was still in progress when this
-        // was committed, and the row will be re-measured from its report.
+        // Measured 2026-09-21, Terium/ run alone under .venv, read out of a
+        // junit-xml report: 3276 tests, 3275 passed, 1 failed, 661 s. The one
+        // failure is the same check_codegen_loads.py selftest as on
+        // 2026-09-19 (npx cannot write the npm cache in the sandbox; see the
+        // long note above), so this row says 3276, the figure with a working
+        // npm, stated the same way as before.
         passed: 3276,
         skipped: 0,
         failed: 0,

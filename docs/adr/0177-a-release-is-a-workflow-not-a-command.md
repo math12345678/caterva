@@ -96,13 +96,23 @@ freeze that fails then costs a candidate number, never a broken final tag.
 dispatches `terrium compose ...` and `terrium sim ...` to the two existing
 `main(argv)` functions unchanged, so the bundle's surface cannot drift from
 the wheel's and the dispatch is tested from a checkout, where the freeze
-itself cannot be. The folder conveys libSBML, and NOTICE now says so in a
-section that distinguishes the three artifacts and states how each LGPL
-obligation is met: notice (README.txt, libSBML's own terms, and the LGPL
-text, which `third_party_licenses/LGPL-2.1.txt` supplies because the
-python-libsbml wheel refers to it without carrying it) and relinking (the
-extension is one separate file under `_internal/libsbml/`, loaded by the
-import mechanism, swappable at a stated path). The folder also carries
+itself cannot be. The folder conveys libSBML three times, not once:
+python-libsbml's extension, and copies statically linked into
+libroadrunner's `_roadrunner` and Antimony's `libantimony` by their
+upstream projects (5.21.1, 5.20.4, 5.20.2 on the build machine; found by
+scanning the binaries, which `build_app.py` now does on every build and
+writes into README.txt). NOTICE says so in a section that distinguishes
+the three artifacts and states how each LGPL obligation is met: notice
+(README.txt, libSBML's own terms, and the LGPL text, which
+`third_party_licenses/LGPL-2.1.txt` supplies because the python-libsbml
+wheel refers to it without carrying it), and source: because only one of
+the three copies is separately replaceable, and because the folder is
+what puts even that copy on the recipient's machine, the project does not
+rest on §6(b)'s "shared library mechanism"; the release workflow attaches
+the corresponding source of every libSBML version the folders report and
+of libroadrunner and Antimony to the release page beside the folders
+(§4, §6(d)), and refuses to publish if a fetch fails. NOTICE names the two
+questions that remain for counsel. The folder also carries
 libRoadRunner's Apache-2.0 files, an MIT notice for Antimony (whose wheel
 ships none), NumPy's and SciPy's BSD notices, CPython's licence, and
 PyInstaller's COPYING.txt with the Bootloader Exception.

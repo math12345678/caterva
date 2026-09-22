@@ -74,7 +74,8 @@ caveat applies: the repository, and so its Releases page, is private.
 
 ```bash
 tar xzf terrium-0.3.0-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
-./terrium/terrium compose "a toggle switch between two repressors"
+cd terrium && xattr -dr com.apple.quarantine .   # macOS only, once (unsigned folder)
+./terrium compose "a toggle switch between two repressors"
 ```
 
 ```bash
@@ -82,8 +83,10 @@ pip install terrium-0.3.0-py3-none-any.whl     # the wheel, from the same page
 terium-compose "a toggle switch between two repressors"
 ```
 
-The folders are not code-signed; macOS and Windows ask once before the
-first run, and `README.txt` inside each folder says what to do.
+The folders are not code-signed; macOS quarantines the folder and Windows
+SmartScreen asks once, and `README.txt` inside each folder gives the exact
+step for its platform (on Windows, run `.\terrium.exe` from a terminal in
+the folder).
 
 ### See what it produces, before anything else
 

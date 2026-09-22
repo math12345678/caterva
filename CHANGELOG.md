@@ -33,9 +33,13 @@ and run everything it is about to attach (ADR 0177).
   <arch>.tar.gz` / `.zip`, Linux x86_64, macOS arm64, Windows x86_64):
   one executable, `terrium`, with `terrium compose "..."` and
   `terrium sim ...`. No Python, no install. Built from the released wheel
-  by `scripts/build_app.py`, which refuses the folder unless libSBML's
-  extension is a separate replaceable file, every conveyed component's
-  licence is inside, and the frozen binary runs from an empty directory.
+  by `scripts/build_app.py`, which refuses the folder unless python-
+  libsbml's extension is a separate replaceable file, every conveyed
+  component's licence is inside, and the frozen binary runs from an empty
+  directory. libSBML is in the folder three times (python-libsbml's copy
+  and the copies libroadrunner and Antimony compile in); the script finds
+  and lists them, and the release page carries the corresponding source
+  of every version, and of the two libraries, beside the folders.
 - **`terrium`, a single entry point.** `Terium/app.py` dispatches to the
   two existing commands unchanged (`python -m Terium.app` from the wheel;
   the executable in the folder). 83 modules in the wheel, up from 82.

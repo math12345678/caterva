@@ -72,7 +72,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     import importlib
 
     module = importlib.import_module(COMMANDS[command][0])
-    return int(module.main(rest) or 0)
+    # The command names itself the way the user typed it, so its --help and
+    # examples show `terrium compose ...`, not a python invocation the folder
+    # cannot run.
+    return int(module.main(rest, prog=f"terrium {command}") or 0)
 
 
 if __name__ == "__main__":

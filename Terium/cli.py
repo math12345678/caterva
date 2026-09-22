@@ -478,10 +478,12 @@ def _cmd_ssa(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    """Run the Terium CLI."""
+def main(argv: Sequence[str] | None = None, prog: str | None = None) -> int:
+    """Run the Terium CLI. `prog` is how the caller is invoked (`terium`
+    from the wheel, `terrium sim` from the app folder); default is the
+    module form."""
     parser = argparse.ArgumentParser(
-        prog="Terium.cli",
+        prog=prog or "Terium.cli",
         description="Terium simulation engine command line")
     sub = parser.add_subparsers(dest="command", required=True,
                                 metavar="{wf,kimura,ne,sweep,scenarios,ld,ssa}")
@@ -498,5 +500,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     return args.func(args)  # type: ignore[return-value]
 
 
+def console_main() -> int:
+    """Entry point of the `terium` console script; `--help` says `terium`."""
+    return main(prog="terium")
+
+
 if __name__ == "__main__":
     sys.exit(main())
+
