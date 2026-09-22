@@ -129,7 +129,10 @@ PERMISSION: dict[str, tuple[str, str]] = {
     "pyinstaller": (
         "GPL-2.0-or-later WITH Bootloader-exception",
         "Read from pyinstaller-6.22.2.dist-info/licenses/COPYING.txt in the "
-        "installed wheel, not from the package index. The GPL alone would be "
+        "installed wheel by the session on branch "
+        "claude/terrium-orientation-setup-c1310b (PR #21), which installed "
+        "it; the machine that recorded this entry could not reach PyPI and "
+        "carries the text over from that record. The GPL alone would be "
         "a problem: the downloadable app folder embeds PyInstaller's "
         "bootloader, and copyleft on that would reach the whole folder. The "
         "Bootloader Exception is what makes it lawful: the authors give "

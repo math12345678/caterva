@@ -100,9 +100,13 @@ ANALYSIS_FLAGS = (
 )
 
 
-def build_parser() -> argparse.ArgumentParser:
+def build_parser(prog: str = "python -m Terium.compose") -> argparse.ArgumentParser:
+    """`prog` is how the caller is invoked: the module form from a checkout,
+    `terium-compose` from the wheel's console script, `terrium compose` from
+    the app folder's one executable. The examples follow it, so `--help`
+    never shows a command the user cannot type (ADR 0177)."""
     parser = argparse.ArgumentParser(
-        prog="python -m Terium.compose",
+        prog=prog,
         description=(
             "Build a mechanistic model from a description of its mechanism. "
             "Recognises shapes -- a cascade, a toggle switch, competition "
@@ -110,13 +114,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Examples:\n"
-            "  python -m Terium.compose 'three step phosphorylation cascade'\n"
-            "  python -m Terium.compose 'a toggle switch between two repressors' --sweep geneA_n\n"
-            "  python -m Terium.compose 'three step phosphorylation cascade' --rank-against tier2_Xp\n"
-            "  python -m Terium.compose 'reversible binding of a ligand to a receptor' --crnt --scale\n"
-            "  python -m Terium.compose 'two enzymes competing for the same substrate' --screen\n"
-            "  python -m Terium.compose 'reversible binding of a ligand to a receptor' --export sbml > model.xml\n"
-            "  python -m Terium.compose --shapes\n"
+            f"  {prog} 'three step phosphorylation cascade'\n"
+            f"  {prog} 'a toggle switch between two repressors' --sweep geneA_n\n"
+            f"  {prog} 'three step phosphorylation cascade' --rank-against tier2_Xp\n"
+            f"  {prog} 'reversible binding of a ligand to a receptor' --crnt --scale\n"
+            f"  {prog} 'two enzymes competing for the same substrate' --screen\n"
+            f"  {prog} 'reversible binding of a ligand to a receptor' --export sbml > model.xml\n"
+            f"  {prog} --shapes\n"
             "\n"
             "Exit codes: 0 produced everything asked for, 2 the question was "
             "not well formed, 3 something refused and said why (the report "
@@ -895,8 +899,8 @@ def _check_combination(parser: argparse.ArgumentParser, args: Any) -> None:
         )
 
 
-def main(argv: Optional[Sequence[str]] = None) -> int:
-    parser = build_parser()
+def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> int:
+    parser = build_parser(prog) if prog else build_parser()
     args = parser.parse_args(argv)
 
     from Terium.compose.grammar import UnrecognisedShape, shapes
@@ -1095,6 +1099,12 @@ def _analyses(
 
 
 __all__ = ["Sections", "build_parser", "main"]
+
+
+
+def console_main() -> int:
+    """Entry point of the `terium-compose` console script."""
+    return main(prog="terium-compose")
 
 
 if __name__ == "__main__":

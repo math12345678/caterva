@@ -24,11 +24,21 @@ did (reviewed, not merged; see NOTICE). In a onedir freeze the object stays
 an ordinary file, `_internal/libsbml/_libsbml.<abi>.so` (or `.pyd`), loaded
 at run time by the interpreter's import mechanism, and a recipient can swap
 it for an interface-compatible build. This script REFUSES to package a
-folder in which that file is not a separate file. It also copies, for every
-component the folder conveys, the licence files that component's own wheel
-declares, plus the LGPL-2.1 text (which python-libsbml's wheel points at but
-does not include), and lists them in licenses/README.txt. NOTICE says what
-this means; this script makes sure the folder matches what NOTICE says.
+folder in which that file is not a separate file.
+
+That is not the only libSBML in the folder. libroadrunner's `_roadrunner`
+extension and Antimony's `libantimony` library each carry their own
+statically linked copy (measured on this machine: 5.20.4 and 5.20.2, beside
+python-libsbml's 5.21.1), put there by their upstream projects, and those a
+recipient cannot swap. So the script scans every binary it collected for
+libSBML, writes each copy, its version and whether it is replaceable into
+README.txt and into a `libsbml-copies-<platform>.tsv` beside the archive,
+and the release workflow attaches the corresponding source for every
+version listed. It also copies, for every component the folder conveys, the
+licence files that component's own wheel declares, keeping their paths,
+plus the LGPL-2.1 text (which python-libsbml's wheel points at but does not
+include), and lists them in licenses/README.txt. NOTICE says what this
+means; this script makes sure the folder matches what NOTICE says.
 
 WHAT IT CHECKS BEFORE IT WRITES THE ARCHIVE
 -------------------------------------------
@@ -60,6 +70,7 @@ import importlib
 import importlib.metadata as md
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -122,7 +133,10 @@ def _run_pyinstaller(launcher: Path, work: Path, stage: Path) -> None:
         "--workpath", str(work / "build"),
         "--distpath", str(stage),
         "--specpath", str(work),
-        "--collect-submodules", "Terium",
+        # --collect-all, not --collect-submodules: the two JSON files under
+        # Terium/core/data/ are package data, and submodule collection alone
+        # would leave them out of _internal/, failing the SBML export smoke.
+        "--collect-all", "Terium",
     ]
     for pkg in COLLECT_ALL:
         cmd += ["--collect-all", pkg]
@@ -145,12 +159,38 @@ def _prune(bundle: Path) -> list[str]:
     return removed
 
 
-def _libsbml_object(bundle: Path) -> Path:
-    hits = sorted((bundle / "_internal").rglob("_libsbml*"))
-    hits = [h for h in hits if h.is_file() and h.suffix in (".so", ".pyd", ".dylib")]
-    if len(hits) != 1:
-        _fail(f"expected exactly one libSBML extension as a separate file under _internal/, found {hits}")
-    return hits[0]
+#: A binary that mentions libSBML this often has the library compiled in.
+#: Measured: _roadrunner.so 20,582 mentions, libantimony.dylib 20,051,
+#: _libsbml.*.so 7,902; numpy's largest extension 0.
+_LIBSBML_MENTIONS = 1000
+_LIBSBML_VERSION = re.compile(rb"\x00(5\.\d{1,2}\.\d{1,2})\x00")
+
+
+def _libsbml_copies(bundle: Path) -> list[tuple[Path, str, bool]]:
+    """Every binary in the folder that carries libSBML: (path, version, replaceable).
+
+    python-libsbml's extension is the LGPL library as a separate, loadable,
+    swappable file. libroadrunner's `_roadrunner` extension and Antimony's
+    `libantimony` shared library each carry their OWN statically linked
+    copy of libSBML (measured here: 5.20.4 and 5.20.2 against
+    python-libsbml's 5.21.1), which a recipient cannot replace without
+    rebuilding those libraries. NOTICE and README.txt must say all of this,
+    so this function finds every copy rather than assuming one.
+    """
+    found = []
+    for path in sorted((bundle / "_internal").rglob("*")):
+        if not path.is_file() or path.suffix not in (".so", ".pyd", ".dylib", ".dll"):
+            continue
+        data = path.read_bytes()
+        if len(re.findall(rb"libsbml", data, re.I)) < _LIBSBML_MENTIONS:
+            continue
+        versions = sorted({m.decode() for m in _LIBSBML_VERSION.findall(data)})
+        version = versions[0] if len(versions) == 1 else "unknown (" + ", ".join(versions) + ")"
+        replaceable = path.name.startswith("_libsbml")
+        found.append((path, version, replaceable))
+    if not any(r for _, _, r in found):
+        _fail(f"python-libsbml's extension is not a separate file under _internal/; found {[(str(p), v) for p, v, _ in found]}")
+    return found
 
 
 def _licence_files(dist_name: str) -> list[Path]:
@@ -280,9 +320,19 @@ def _write_licences(bundle: Path) -> None:
             continue
         if not files:
             _fail(f"{dist_name} {version} declares no licence file; the folder would convey it without its terms")
+        copied = []
         for f in files:
-            shutil.copy2(f, target / f.name)
-        lines.append(f"{dist_name} {version}: " + ", ".join(f"licenses/{dist_name}/{f.name}" for f in files))
+            # numpy ships two files named LICENSE.txt (its own, carrying the
+            # OpenBLAS and libgfortran notices, and one under licenses/);
+            # a flat copy would overwrite the one NOTICE says is retained.
+            info = next(parent for parent in f.parents if parent.name.endswith(".dist-info"))
+            dest = target / f.relative_to(info)
+            if dest.exists():
+                _fail(f"{dist_name}: two licence files would land at {dest}")
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(f, dest)
+            copied.append(dest.relative_to(bundle).as_posix())
+        lines.append(f"{dist_name} {version}: " + ", ".join(copied))
     # The LGPL text python-libsbml's LICENSE.txt refers to but does not carry.
     lgpl = ROOT / "third_party_licenses" / "LGPL-2.1.txt"
     if not lgpl.is_file():
@@ -298,41 +348,73 @@ def _write_licences(bundle: Path) -> None:
     (out / "README.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _write_readme(bundle: Path, version: str, libsbml: Path, tag: str) -> None:
-    rel = libsbml.relative_to(bundle).as_posix()
-    exe = "terrium.exe" if platform.system() == "Windows" else "./terrium"
+def _first_run_text() -> str:
+    system = platform.system()
+    if system == "Darwin":
+        return """FIRST RUN ON macOS
+    This folder is not signed with an Apple Developer ID, so macOS quarantines
+    every file in it after download and refuses the first run ("cannot be
+    opened because the developer cannot be verified"). "Open Anyway" in
+    System Settings approves ONE file and will not unblock the libraries under
+    _internal/, so use this instead, once, from a terminal INSIDE this folder:
+
+        xattr -dr com.apple.quarantine .
+
+    (from the folder above it: xattr -dr com.apple.quarantine terrium/)
+"""
+    if system == "Windows":
+        return """FIRST RUN ON WINDOWS
+    This folder is not code-signed. Run it from a terminal (PowerShell or
+    cmd) inside this folder as  .\\terrium.exe  -- PowerShell does not run a
+    program from the current directory without the  .\\  prefix. If
+    SmartScreen shows "Windows protected your PC", choose More info > Run
+    anyway. Some antivirus products quarantine freshly built PyInstaller
+    programs; if terrium.exe disappears after extraction, restore it from
+    the quarantine and add an exclusion for this folder.
+"""
+    return ""
+
+
+def _write_readme(bundle: Path, version: str, copies: list[tuple[Path, str, bool]], tag: str) -> None:
+    windows = platform.system() == "Windows"
+    exe = ".\\terrium.exe" if windows else "./terrium"
+    rows = "\n".join(
+        f"        {p.relative_to(bundle).as_posix():60s} libSBML {v}  "
+        + ("separate file, replaceable" if r else "compiled into this library, not separately replaceable")
+        for p, v, r in copies
+    )
     text = f"""Terrium {version} ({tag})
 
 Unaffiliated with Tellurium. See NOTICE.
 
-RUN
+RUN (from a terminal, inside this folder)
     {exe} compose "a toggle switch between two repressors"
     {exe} sim wf --help
     {exe} --version
 
-Run it from a terminal, inside this folder or with its full path. Nothing is
-installed, nothing is written outside the directory you run it in, and no
-network connection is made.
+Nothing is installed, nothing is written outside the directory you run it
+in, and no network connection is made. `{exe} compose --help` lists the
+options with examples.
 
-macOS: this folder is not signed with an Apple Developer ID, so the first
-run is blocked with "cannot be opened because the developer cannot be
-verified". Either allow it once under System Settings > Privacy & Security,
-or remove the download flag:  xattr -dr com.apple.quarantine <this folder>
-
+{_first_run_text()}
 WHAT IS INSIDE, AND THE LGPL
     _internal/ holds the Python runtime, Terrium, and the libraries Terrium
-    uses. One of them, libSBML (python-libsbml), is licensed under the GNU
-    LGPL v2.1. It is the single file
+    uses. libSBML (GNU LGPL v2.1) is in this folder {len(copies)} times:
 
-        {rel}
+{rows}
 
-    loaded at run time as a separate file, not compiled into the executable.
-    You may replace it with your own interface-compatible build of
-    python-libsbml for this Python version and platform; put the new file at
-    the same path. Its terms are in licenses/python-libsbml/, with the LGPL
-    text. Every other component's licence is in licenses/ too, listed in
-    licenses/README.txt. Source for libSBML: https://github.com/sbmlteam/libsbml
-    and https://pypi.org/project/python-libsbml/ (sdist).
+    The python-libsbml copy is one separate file loaded at run time; you may
+    replace it with your own interface-compatible build of python-libsbml
+    for this Python version and platform by putting the new file at the same
+    path. The other copies are compiled into libroadrunner and Antimony by
+    their upstream projects and cannot be swapped without rebuilding those
+    libraries; the corresponding source for every version listed above is
+    attached to the release page this folder came from, beside this archive
+    (libsbml-<version>-source.tar.gz, and the roadrunner and antimony
+    sources), and at https://github.com/sbmlteam/libsbml/releases.
+    libSBML's own terms and the LGPL text are in licenses/python-libsbml/.
+    Every other component's licence is in licenses/ too, listed in
+    licenses/README.txt.
 
 WHAT THIS FOLDER DOES NOT DO
     The literature search (BRENDA resolvers) is not included; `--subject`
@@ -429,18 +511,23 @@ def main(argv: list[str] | None = None) -> int:
             _fail(f"PyInstaller did not produce {bundle}")
 
         pruned = _prune(bundle)
-        libsbml = _libsbml_object(bundle)
+        copies = _libsbml_copies(bundle)
         _write_licences(bundle)
-        _write_readme(bundle, version, libsbml, tag)
+        _write_readme(bundle, version, copies, tag)
         _smoke(bundle, version)
 
         archive = _archive(bundle, out_dir, version, tag)
         size = sum(p.stat().st_size for p in bundle.rglob("*") if p.is_file())
+        copy_lines = [f"{p.relative_to(bundle).as_posix()}\t{v}\t{'replaceable' if r else 'embedded'}" for p, v, r in copies]
 
     digest = _sha256(archive)
     (out_dir / (archive.name + ".sha256")).write_text(f"{digest}  {archive.name}\n", encoding="utf-8")
+    # The publish job attaches the corresponding source for every libSBML
+    # version any folder carries; this is how it learns which.
+    (out_dir / f"libsbml-copies-{tag}.tsv").write_text("\n".join(copy_lines) + "\n", encoding="utf-8")
     print(f"folder : {size / 1e6:.0f} MB unpacked; pruned {pruned or 'nothing'}")
-    print(f"libsbml: {libsbml.relative_to(bundle).as_posix()} (separate file, replaceable)")
+    for line in copy_lines:
+        print(f"libsbml: {line}")
     print(f"archive: {archive}")
     print(f"sha256 : {digest}")
     return 0

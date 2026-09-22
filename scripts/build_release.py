@@ -43,9 +43,11 @@ changed a byte cannot be shipped.
 WHAT IT CHECKS BEFORE IT WRITES SHA256SUMS
 ------------------------------------------
 The wheel is opened and its file list is held to what the release notes
-claim: every module under `Terium/`, LICENSE and NOTICE present, and no
-test, conftest or pytest configuration inside. A wheel that fails a check
-is deleted, not shipped with a caveat.
+and NOTICE claim: every member under `Terium/` or the dist-info, LICENSE and
+NOTICE present, no test, conftest or pytest configuration inside, and no
+native object (`.so`, `.pyd`, `.dylib`, `.dll`), because NOTICE says the
+wheel conveys no third-party library. A wheel that fails a check is
+deleted, not shipped with a caveat.
 
 Usage:
     python3 scripts/build_release.py            # writes dist/
@@ -74,6 +76,12 @@ FORBIDDEN_IN_WHEEL = (
     "/Tests/",
     ".coverage",
     "__pycache__",
+    # NOTICE says the wheel conveys no third-party library. A native object
+    # in it would make that false, and the pure-Python tag would be a lie.
+    ".so",
+    ".pyd",
+    ".dylib",
+    ".dll",
 )
 
 #: Files the release notes say are inside the wheel.
@@ -123,9 +131,10 @@ def _check_wheel(wheel: Path) -> list[str]:
         if not any(m.endswith("/" + required) or m == required for m in names):
             problems.append(f"missing {required}")
     modules = [m for m in names if m.endswith(".py")]
-    outside = [m for m in modules if not m.startswith("Terium/")]
+    # Every member is Terrium's package or its own metadata; nothing else.
+    outside = [m for m in names if not (m.startswith("Terium/") or ".dist-info/" in m)]
     if outside:
-        problems.append(f"modules outside Terium/: {outside[:5]}")
+        problems.append(f"members outside Terium/ and the dist-info: {outside[:5]}")
     if not modules:
         problems.append("no Python modules at all")
     return problems
