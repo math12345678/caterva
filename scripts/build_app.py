@@ -429,9 +429,22 @@ def _smoke(bundle: Path, version: str) -> None:
         _fail(f"executable missing: {exe}")
     with tempfile.TemporaryDirectory(prefix="terrium-smoke-") as empty:
         env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME")}
+        # The report contains non-ASCII (em dashes, degree signs). On Windows
+        # the frozen program writes them in the console code page unless
+        # told otherwise, and reading that as UTF-8 raised inside
+        # subprocess's reader thread and returned stdout=None (rc.2, the
+        # Windows leg). So: ask the child for UTF-8, and decode what comes
+        # back leniently. Every marker checked below is ASCII.
+        env["PYTHONUTF8"] = "1"
+        env["PYTHONIOENCODING"] = "utf-8"
 
         def run(*args: str, timeout: int = 900) -> subprocess.CompletedProcess:
-            return subprocess.run([str(exe), *args], cwd=empty, env=env, capture_output=True, text=True, timeout=timeout)
+            raw = subprocess.run([str(exe), *args], cwd=empty, env=env, capture_output=True, timeout=timeout)
+            return subprocess.CompletedProcess(
+                raw.args, raw.returncode,
+                raw.stdout.decode("utf-8", errors="replace"),
+                raw.stderr.decode("utf-8", errors="replace"),
+            )
 
         r = run("--version", timeout=120)
         if r.returncode != 0 or r.stdout.strip() != f"terrium {version}":
