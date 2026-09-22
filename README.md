@@ -59,7 +59,7 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,441 tests (3,276 engine + 1165 literature)
+make test      # runs all 4,473 tests (3,308 engine + 1165 literature)
 ```
 
 ### Or download the release
@@ -69,17 +69,17 @@ repository's Releases page by CI, after it has rebuilt, reinstalled and
 run what it attaches. Each release carries one folder per platform that
 runs without Python, and a wheel. The literature search stays in the
 checkout; the release notes say what else does not ship
-([`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md)). The same access
+([`docs/releases/v0.3.1.md`](docs/releases/v0.3.1.md)). The same access
 caveat applies: the repository, and so its Releases page, is private.
 
 ```bash
-tar xzf terrium-0.3.0-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
+tar xzf terrium-0.3.1-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
 cd terrium && xattr -dr com.apple.quarantine .   # macOS only, once (unsigned folder)
 ./terrium compose "a toggle switch between two repressors"
 ```
 
 ```bash
-pip install terrium-0.3.0-py3-none-any.whl     # the wheel, from the same page
+pip install terrium-0.3.1-py3-none-any.whl     # the wheel, from the same page
 terium-compose "a toggle switch between two repressors"
 ```
 
@@ -87,6 +87,12 @@ The folders are not code-signed; macOS quarantines the folder and Windows
 SmartScreen asks once, and `README.txt` inside each folder gives the exact
 step for its platform (on Windows, run `.\terrium.exe` from a terminal in
 the folder).
+
+**New to it? [`docs/USING_TERRIUM.md`](docs/USING_TERRIUM.md)** is the guide:
+what to type first, how to read a report, and a recipe for each question a
+lab actually asks (which step matters, what to measure next, does the
+conclusion survive not knowing the constants). Running `terrium` with no
+arguments prints the same quick start.
 
 ### See what it produces, before anything else
 
@@ -522,7 +528,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                3,276 tests
+│   └── tests/                3,308 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -616,9 +622,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,441 tests
+make test        # run all 4,473 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,276 tests)
+make test-sim    # simulation engine only (3,308 tests)
 make test-lit    # literature layer only (1165 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches
