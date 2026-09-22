@@ -32,5 +32,5 @@ repository-code: "https://github.com/Terrium-sim/terrium"
 # 0.1.0 was the source-only release of that date; 0.2.0 the first with
 # built artifacts (2026-09-19); 0.3.0 the first on GitHub's Releases page
 # with app folders (2026-09-21); 0.3.1 adds the user's guide (2026-09-22).
-version: 0.3.1
+version: 0.3.2
 date-released: 2026-09-22

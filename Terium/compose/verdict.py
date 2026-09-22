@@ -475,7 +475,40 @@ def _grounding(model: Any) -> Tuple[int, int, bool]:
         return 0, len(resolvable), False
 
 
-def _provenance_concerns(model: Any) -> Tuple[List[Concern], str]:
+def _influence_is_informative(influence: Any) -> Optional[bool]:
+    """Does the influence ranking single anything out? None = no ranking.
+
+    WHY THE VERDICT HAS TO ASK
+    --------------------------
+    The provenance concern's remedy used to end "start with the top of its
+    influence ranking" unconditionally. On a saturated model that advice
+    contradicts the same report's own provenance section, which says "No
+    constant here clears |S| = 0.01, so measuring any single one of them
+    would not move this answer" -- the reader is told to act on a ranking
+    the document has just called uninformative, in the one line labelled
+    "Do this next".
+
+    This is the same defect `_settling_ranking` was written for (a ranking
+    pinned to zero by a conservation law) in its other form: there the
+    ranking was empty because the question was asked of the wrong quantity,
+    here because the mechanism is running flat out. Both were advice
+    pointing at nothing.
+    """
+    if influence is None:
+        return None
+    try:
+        from .sensitivity import NEGLIGIBLE_INFLUENCE
+    except ImportError:  # pragma: no cover - flat import
+        from sensitivity import NEGLIGIBLE_INFLUENCE  # type: ignore[no-redef]
+    entries = getattr(influence, "sensitivities", None)
+    if not entries:
+        return None
+    return any(abs(getattr(e, "relative", 0.0)) >= NEGLIGIBLE_INFLUENCE for e in entries)
+
+
+def _provenance_concerns(
+    model: Any, influence: Any = None,
+) -> Tuple[List[Concern], str]:
     """Placeholders are not a fault. They are a limit on the question.
 
     This is the commonest state of a composed model and the report must not
@@ -522,14 +555,29 @@ def _provenance_concerns(model: Any) -> Tuple[List[Concern], str]:
         )
         note = f"{unmeasured} constant(s) unmeasured"
 
-    remedy = (
+    source = (
         f"run the literature search for {subject!r}, or supply the "
-        f"constants the provenance table lists -- start with the top of "
-        f"its influence ranking"
+        f"constants the provenance table lists"
         if subject else
-        "name the enzyme, or supply the constants the provenance table "
-        "lists -- start with the top of its influence ranking"
+        "name the enzyme, or supply the constants the provenance table lists"
     )
+    informative = _influence_is_informative(influence)
+    if informative is True:
+        remedy = f"{source} -- start with the top of its influence ranking"
+    elif informative is False:
+        # Saying "start with the top of the ranking" here would contradict
+        # the provenance section, which has just reported that nothing in
+        # the ranking clears the noise. Ground the model first: the ranking
+        # is computed AT the placeholder values, and it is those values that
+        # put the model where nothing moves it.
+        remedy = (
+            f"{source} -- not in the influence ranking's order, which at "
+            f"these values singles nothing out: every constant is below the "
+            f"threshold because the placeholders have the mechanism running "
+            f"flat out. Ground it first and the ranking becomes meaningful"
+        )
+    else:
+        remedy = f"{source} (no influence ranking was computed for this model)"
     return (
         [Concern(source="provenance", severity=STRUCTURAL,
                  detail=detail, remedy=remedy)],
@@ -650,6 +698,7 @@ def form(
     stability: Optional[Any] = None,
     robustness: Optional[Any] = None,
     validation: Optional[Any] = None,
+    influence: Optional[Any] = None,
     conclusion_name: Optional[str] = None,
 ) -> Verdict:
     """Read the other modules' reports and say what the model supports.
@@ -704,7 +753,7 @@ def form(
         except Exception as exc:  # noqa: BLE001
             unavailable["predictions"] = f"{type(exc).__name__}: {exc}"
 
-    provenance_concerns, provenance_note = _provenance_concerns(model)
+    provenance_concerns, provenance_note = _provenance_concerns(model, influence)
     concerns += provenance_concerns
     consulted["provenance"] = provenance_note
 

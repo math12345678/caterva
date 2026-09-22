@@ -15,12 +15,14 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Terrium"
 	@echo ""
 	@echo "  make demo       SEE A REAL REPORT -- 30s, no network, no account"
+	@echo "  make cite       REAL CONSTANTS WITH CITATIONS, for your own enzyme:"
+	@echo "                  make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM=\"Homo sapiens\""
 	@echo "  make setup      create .venv and install everything"
 	@echo "  make doctor     diagnose a setup that will not work"
 	@echo "  make check      verify the environment actually works"
@@ -365,6 +367,14 @@ release-app: check-python
 
 demo: check-python
 	@"$(PY)" scripts/demo.py
+
+# Real constants from the literature, with the citation beside each one.
+# `make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"`
+cite: check-python
+	@"$(PY)" scripts/cite.py --ec "$(EC)" --substrate "$(SUBSTRATE)" \
+		$(if $(ORGANISM),--organism "$(ORGANISM)",) \
+		$(if $(QUANTITY),--quantity "$(QUANTITY)",) \
+		$(if $(FIXTURE),--fixture "$(FIXTURE)",)
 
 cli: check-python
 	@"$(PY)" -m Terium.cli --help

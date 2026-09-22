@@ -70,6 +70,19 @@ COMMANDS
   terrium <command> --help   every option, with examples
   terrium --version          the version and exit
 
+REAL CONSTANTS, WITH REAL CITATIONS
+
+  compose builds STRUCTURE: every constant is the motif library's
+  illustrative placeholder, and the report says so on every page. Measured
+  values with the paper that measured them come from the literature layer,
+  which needs the source checkout, not this folder:
+
+      make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"
+      -> km = 0.03 mM, from BRENDA ref 286469
+
+  See docs/USING_TERRIUM.md. Joining the two -- a composed mechanism whose
+  constants are sourced -- is not wired yet; ADR 0178 says what it needs.
+
 MORE
 
   Analyses to add to compose: --screen (which species matters), --robustness
