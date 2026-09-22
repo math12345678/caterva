@@ -28,7 +28,7 @@ def _run(args):
 def test_no_arguments_prints_usage_and_fails():
     rc, out, _ = _run([])
     assert rc == 2
-    assert out.startswith("usage: terrium <command>")
+    assert out.startswith("terrium ")
     for name in COMMANDS:
         assert f"\n  {name} " in out
 
@@ -36,7 +36,41 @@ def test_no_arguments_prints_usage_and_fails():
 @pytest.mark.parametrize("flag", ["-h", "--help"])
 def test_help_prints_usage_and_succeeds(flag):
     rc, out, _ = _run([flag])
-    assert rc == 0 and out.startswith("usage: terrium <command>")
+    assert rc == 0 and out.startswith("terrium ")
+
+
+def test_the_usage_teaches_the_one_rule_and_a_real_first_command():
+    """The first thing a lost user types must answer 'what do I type'.
+
+    Not a style check: the shape/subject rule is the cause of most
+    refusals, and a usage message that omits it sends people to the
+    tracker. The shape COUNT is read from the grammar, so this also
+    catches the message claiming a number the builder does not have.
+    """
+    from Terium.compose.grammar import shapes
+
+    _, out, _ = _run(["--help"])
+    assert "--shapes" in out
+    assert f"The {len(shapes())} mechanisms" in out
+    assert "never a subject" in out.lower()
+    # A copy-pasteable command, not a placeholder.
+    assert 'terrium compose "a toggle switch between two repressors"' in out
+
+
+def test_the_usage_never_fails_even_if_the_grammar_will_not_import(monkeypatch):
+    """A usage message that raises is worse than one that says 'many'."""
+    import builtins
+
+    real_import = builtins.__import__
+
+    def explode(name, *args, **kwargs):
+        if name == "Terium.compose.grammar":
+            raise RuntimeError("grammar is broken")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", explode)
+    rc, out, _ = _run(["--help"])
+    assert rc == 0 and "The many mechanisms" in out
 
 
 @pytest.mark.parametrize("flag", ["-V", "--version"])
@@ -48,7 +82,11 @@ def test_version_is_the_package_version(flag):
 def test_unknown_command_is_refused_on_stderr():
     rc, out, err = _run(["bogus"])
     assert rc == 2 and out == ""
-    assert "unknown command 'bogus'" in err and "usage: terrium" in err
+    # The refusal carries the usage with it: someone who mistyped a command
+    # is exactly the person who needs to see the list of real ones.
+    assert "unknown command 'bogus'" in err
+    for name in COMMANDS:
+        assert f"\n  {name} " in err
 
 
 def test_sim_dispatches_to_the_engine_cli_unchanged():

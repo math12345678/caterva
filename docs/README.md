@@ -8,6 +8,7 @@ that makes no sense.
 
 | document | read it when |
 |---|---|
+| [`USING_TERRIUM.md`](USING_TERRIUM.md) | you want to USE Terrium: what to type first, how to read a report, a recipe per question |
 | [`CONSTITUTION.md`](CONSTITUTION.md) | you want the engineering rules in full, stated once |
 | [`adr/`](adr/README.md) | you want to know *why* a specific design is the way it is |
 | [`EXPERT_FEEDBACK.md`](EXPERT_FEEDBACK.md) | you want to know what reviewers outside the project said and what changed because of it |

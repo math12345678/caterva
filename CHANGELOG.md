@@ -12,6 +12,38 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## [0.3.1] - 2026-09-22
+
+Nobody could tell what to type. The release worked and explained nothing,
+which is a product nobody adopts.
+
+### Added
+- **`docs/USING_TERRIUM.md`**, the user's guide: the one rule that explains
+  most refusals (it recognises a *shape*, never a *subject*), what to type
+  in the first three minutes, how to read a report section by section, and
+  a recipe for each question a lab actually asks -- which step matters
+  (`--screen`), what to measure next (`--design`), does the conclusion
+  survive not knowing the constants (`--robustness`), is it physically
+  possible in and out (`--scale`, `--predictions`). Every command in it was
+  executed before it was written down.
+- **`Terium/tests/test_using_terrium_guide.py`** pins the guide to the
+  code: every flag it names must exist in the parser, every shape must be
+  recognised by the grammar, every export format must be offered, every
+  `sim` subcommand must exist, and the stated mechanism count must equal
+  the grammar's. Verified by mutation: a renamed flag, a misspelt shape, a
+  withdrawn export format and a stale count each fail it.
+
+### Changed
+- **`terrium` with no arguments is now the first lesson**, not a six-line
+  usage: three commands worth typing in order, the shape-versus-subject
+  rule, the flags that answer real questions, and the exit codes. The
+  mechanism count in it is read from the grammar, so the message cannot
+  claim a number the builder does not have.
+- **The app folder's `README.txt`** carries the same quick start, because
+  somebody who downloads a folder has no repository to read.
+- README, `START_HERE.md`, the docs index and the v0.3.0 release notes
+  point at the guide.
+
 ## [0.3.0] - 2026-09-21
 
 The first release that reaches GitHub's Releases page, and the first that

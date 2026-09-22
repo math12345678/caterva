@@ -387,14 +387,53 @@ def _write_readme(bundle: Path, version: str, copies: list[tuple[Path, str, bool
 
 Unaffiliated with Tellurium. See NOTICE.
 
-RUN (from a terminal, inside this folder)
+WHAT TO TYPE FIRST (from a terminal, inside this folder)
+
     {exe} compose "a toggle switch between two repressors"
-    {exe} sim wf --help
-    {exe} --version
+
+        Builds a model from the shape of a mechanism and reports on it.
+        Read the VERDICT at the top -- what the model supports and the worst
+        thing wrong with it -- then "Where the numbers come from", which
+        says which constants are measurements and which are placeholders
+        nobody measured.
+
+    {exe} compose --shapes
+
+        Every mechanism it can build, one line each. Describe any of them in
+        your own words.
+
+    {exe} compose "Michaelis-Menten with a competitive inhibitor" --design
+
+        Which measurement to make next, and what it would newly pin down.
+
+    {exe}
+        the quick start, whenever you are lost
+    {exe} compose --help
+        every option on the model builder, with examples
+    {exe} sim --help
+        the population-genetics engine: drift, selection, migration,
+        Gillespie SSA
+
+IT RECOGNISES A SHAPE, NEVER A SUBJECT
+    "two genes repressing each other" builds. "glycolysis" does not, and
+    says why: naming a pathway needs a pathway database, and guessing one
+    would be worse than refusing. Most refusals you meet are this.
+
+USEFUL FLAGS ON compose
+    --screen        knock out every species in turn and rank the effects
+    --robustness N  does the conclusion survive resampling the placeholders
+    --scale         are the numbers going IN physically possible
+    --predictions   are the numbers coming OUT physically possible
+    --sweep PARAM   where the behaviour changes qualitatively
+    --export FORMAT methods | csv | sbml | antimony, written to stdout
+    --no-ranking    skip the slowest step when you just want the structure
 
 Nothing is installed, nothing is written outside the directory you run it
-in, and no network connection is made. `{exe} compose --help` lists the
-options with examples.
+in, and no network connection is made.
+
+The full guide, with worked examples, is docs/USING_TERRIUM.md in the
+repository, and the release notes for this version are on the release page
+you downloaded this from.
 
 {_first_run_text()}
 WHAT IS INSIDE, AND THE LGPL

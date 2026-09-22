@@ -39,19 +39,66 @@ COMMANDS = {
     "sim": ("Terium.cli", "the simulation engine: wf, kimura, ne, sweep, scenarios, ld, ssa"),
 }
 
-USAGE = """usage: terrium <command> [args...]
+USAGE = """terrium {version} -- mechanistic models whose every number says where it came from.
 
-commands:
+QUICK START, in the order that teaches the most
+
+  terrium compose "a toggle switch between two repressors"
+      Build a model from the shape of a mechanism and report on it. Read the
+      VERDICT at the top: what the model supports, and the worst thing wrong
+      with it. Then "Where the numbers come from": which constants are
+      measurements and which are placeholders nobody measured.
+
+  terrium compose --shapes
+      The {shapes} mechanisms it can build, each in one line. Describe any of
+      them in your own words.
+
+  terrium compose "Michaelis-Menten with a competitive inhibitor" --design
+      Which measurement to make next, and what it would newly pin down.
+
+IT RECOGNISES A SHAPE, NEVER A SUBJECT
+
+  "two genes repressing each other"  builds.  "glycolysis" does not, and says
+  why: that needs a pathway database, and guessing one would be worse than
+  refusing. Most refusals are this.
+
+COMMANDS
+
   compose   {compose}
   sim       {sim}
 
-  terrium <command> --help   for that command's options
-  terrium --version          print the version and exit
+  terrium <command> --help   every option, with examples
+  terrium --version          the version and exit
+
+MORE
+
+  Analyses to add to compose: --screen (which species matters), --robustness
+  (does the conclusion survive not knowing the constants), --scale and
+  --predictions (is it physically possible, in and out), --sweep (where it
+  switches), --stochastic (single-molecule noise).
+  Exports: --export methods | csv | sbml | antimony.
+  Exit codes: 0 all good, 2 malformed question, 3 something refused and said
+  why (the report still printed), 1 a crash.
+  The full guide is docs/USING_TERRIUM.md in the repository.
 """
 
 
 def _usage() -> str:
-    return USAGE.format(**{k: v[1] for k, v in COMMANDS.items()})
+    from Terium import __version__
+
+    # The shape count is read from the grammar rather than written here, so
+    # this text cannot claim a number the builder does not have.
+    try:
+        from Terium.compose.grammar import shapes
+
+        count = str(len(shapes()))
+    except Exception:  # noqa: BLE001 - a usage message must never fail to print
+        count = "many"
+    return USAGE.format(
+        version=__version__,
+        shapes=count,
+        **{k: v[1] for k, v in COMMANDS.items()},
+    )
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
