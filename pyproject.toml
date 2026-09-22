@@ -160,6 +160,11 @@ exclude = ["Terium.tests", "Terium.tests.*"]
 # (it edits sys.path to find the flat `terium_engine`). It is not part of
 # the software and must not ship: installed into site-packages it would,
 # if pytest ever loaded it, put site-packages' PARENT on sys.path.
+[tool.setuptools.package-data]
+# Two data files the engine reads at import (docs/data-sources.json and the
+# identifiers.org capture) as packaged copies; see Terium/core/data/README.md.
+Terium = ["core/data/*.json", "core/data/README.md"]
+
 [tool.setuptools.exclude-package-data]
 Terium = ["conftest.py", "pytest.ini", ".coverage"]
 

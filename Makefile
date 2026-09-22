@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean release-artifacts release-app
 
 help:
 	@echo "Terrium"
@@ -36,6 +36,8 @@ help:
 	@echo ""
 	@echo "  make publish-check   all offline checks before going public"
 	@echo "  make evidence        measured figures, for writing about Terrium"
+	@echo "  make release-artifacts  wheel + sdist into dist/, as CI builds them"
+	@echo "  make release-app        the one-folder app (needs requirements-release.txt)"
 	@echo ""
 	@echo "First time here? Run: make setup && make demo"
 	@echo "About to open a PR? Run: make pr"
@@ -352,6 +354,14 @@ evidence: check-python
 
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
+
+# The release artifacts, exactly as .github/workflows/release.yml builds them
+# (ADR 0177). `release-app` needs PyInstaller: pip install -r requirements-release.txt
+release-artifacts: check-python
+	@"$(PY)" scripts/build_release.py
+
+release-app: check-python
+	@"$(PY)" scripts/build_app.py
 
 demo: check-python
 	@"$(PY)" scripts/demo.py

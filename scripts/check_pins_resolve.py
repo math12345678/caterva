@@ -117,6 +117,9 @@ REQUIREMENTS = [
     # globbed, keeping the property the comment above asks for.
     REPO_ROOT / "requirements-popgen.txt",
     REPO_ROOT / "advanced_analysis" / "requirements.txt",
+    # The release workflow's freezer (ADR 0177). Same rule: a pin nobody
+    # resolves is a pin nobody checked.
+    REPO_ROOT / "requirements-release.txt",
 ]
 
 #: A requirement naming a distribution, whatever the operator -- `==`,

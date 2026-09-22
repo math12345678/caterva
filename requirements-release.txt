@@ -1,0 +1,7 @@
+# Tools for building the downloadable app folder (scripts/build_app.py).
+# Installed only by .github/workflows/release.yml, never by `make setup`:
+# nothing at run time imports PyInstaller. Its licence is GPL-2.0-or-later
+# WITH the Bootloader Exception, which is what permits embedding its
+# bootloader in a frozen application under any licence; the exception text
+# ships in the app folder under licenses/pyinstaller/ (see NOTICE).
+pyinstaller==6.22.2

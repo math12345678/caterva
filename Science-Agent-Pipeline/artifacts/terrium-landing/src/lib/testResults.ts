@@ -143,17 +143,20 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "96 test files -- kinetics & Michaelis-Menten correctness, " +
+          "98 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // Measured 2026-09-19, Terium/ run alone under .venv, read out of a
-        // junit-xml report. 3264 tests; 3263 passed here and 1 could not be
-        // checked because the sandbox cannot write npm's cache. See the long
-        // note above -- it is named there, with why this row says 3264.
-        passed: 3264,
+        // 3264 measured 2026-09-19 (Terium/ run alone under .venv, junit-xml;
+        // 3263 passed here and 1 could not be checked because the sandbox
+        // cannot write npm's cache -- see the long note above), plus the 12
+        // tests in the two files added 2026-09-21 for v0.3.0 (test_app.py,
+        // test_packaged_data.py), run on their own: 12 passed. 3276 is the
+        // collected total; a full re-run was still in progress when this
+        // was committed, and the row will be re-measured from its report.
+        passed: 3276,
         skipped: 0,
         failed: 0,
       },

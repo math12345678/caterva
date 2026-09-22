@@ -25,12 +25,20 @@ avoids it on 3.11+. Not needing the package avoids it on every version.)
 REPRODUCIBILITY, STATED EXACTLY
 -------------------------------
 With `SOURCE_DATE_EPOCH` set, two runs of this script on the same commit
-produce byte-identical WHEELS (measured: same sha256 on consecutive runs).
-The script sets it to the HEAD commit's timestamp when the caller has not,
-so "check out the tag and run the script" is enough to reproduce the wheel's
-checksum. The SDIST is content-identical between runs but not byte-identical:
+produce byte-identical artifacts, both of them. The script sets it to the
+HEAD commit's timestamp when the caller has not, so "check out the tag and
+run the script" is enough to reproduce both checksums.
+
+The wheel is reproducible as setuptools writes it. The sdist is not:
 setuptools regenerates `PKG-INFO` and `*.egg-info/` with fresh mtimes inside
-the tar, and this script does not rewrite the archive to hide that.
+the tar, and gzip stores a timestamp of its own. So the sdist is rewritten
+after the build (`_normalize_sdist`): same members, same bytes per member,
+members in sorted order, every mtime set to the epoch, uid/gid 0, empty
+owner names, gzip mtime 0 and no embedded filename. That is the
+reproducible-builds.org recipe; `python -m build` does not apply it. The
+rewritten archive is then re-opened and its member list and contents
+compared with the original's before it is kept, so a rewrite that lost or
+changed a byte cannot be shipped.
 
 WHAT IT CHECKS BEFORE IT WRITES SHA256SUMS
 ------------------------------------------
@@ -137,6 +145,48 @@ def _head_commit_epoch() -> str | None:
     return out or None
 
 
+def _normalize_sdist(sdist: Path, epoch: int) -> None:
+    """Rewrite the sdist so its bytes depend only on its contents and `epoch`.
+
+    The archive setuptools produced is read completely, its members sorted
+    by name with mtime/uid/gid/owner names normalised, and written back
+    through gzip with mtime=0 and no filename field. Contents are untouched.
+    The result is re-read and compared member-by-member with the original
+    before it replaces it; any difference in names or bytes raises.
+    """
+    import gzip
+    import io
+    import os
+
+    with tarfile.open(sdist, "r:gz") as tar:
+        original = [(m, tar.extractfile(m).read() if m.isfile() else None) for m in tar.getmembers()]
+    original.sort(key=lambda md: md[0].name)
+
+    raw = io.BytesIO()
+    with tarfile.open(fileobj=raw, mode="w", format=tarfile.PAX_FORMAT) as out:
+        for member, data in original:
+            # A PAX archive carries a second copy of mtime (sub-second, as a
+            # header string) that wins over the field on write; drop it, or
+            # the "normalised" archive keeps the build machine's clock.
+            member.pax_headers = {}
+            member.mtime = int(epoch)
+            member.uid = member.gid = 0
+            member.uname = member.gname = ""
+            out.addfile(member, io.BytesIO(data) if data is not None else None)
+
+    rewritten = sdist.with_name(sdist.name + ".normalized")
+    with rewritten.open("wb") as fh, gzip.GzipFile(filename="", mode="wb", fileobj=fh, mtime=0) as gz:
+        gz.write(raw.getvalue())
+
+    with tarfile.open(rewritten, "r:gz") as tar:
+        check = {m.name: (tar.extractfile(m).read() if m.isfile() else None) for m in tar.getmembers()}
+    expected = {m.name: data for m, data in original}
+    if check != expected:
+        rewritten.unlink()
+        raise RuntimeError("sdist normalisation changed the archive's contents; refusing to keep it")
+    os.replace(rewritten, sdist)
+
+
 def _sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as fh:
@@ -177,6 +227,8 @@ def main(argv: list[str] | None = None) -> int:
         final_wheel = out_dir / wheel.name
         shutil.copy2(sdist, final_sdist)
         shutil.copy2(wheel, final_wheel)
+        if epoch:
+            _normalize_sdist(final_sdist, int(epoch))
 
     sums = out_dir / "SHA256SUMS"
     with sums.open("w", encoding="utf-8") as fh:
@@ -190,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
           f"  ({module_count} modules, all under Terium/)")
     print(f"sums  : {sums.relative_to(ROOT) if sums.is_relative_to(ROOT) else sums}")
     print(f"epoch : SOURCE_DATE_EPOCH={os.environ.get('SOURCE_DATE_EPOCH', '(unset)')}"
-          "  (wheel is byte-reproducible under this value; sdist is content-identical)")
+          "  (both artifacts are byte-reproducible under this value)")
     return 0
 
 
