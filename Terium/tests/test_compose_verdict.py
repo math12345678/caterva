@@ -541,3 +541,69 @@ class TestGroundedIsEarnedByProvenance:
         assert verdict.verdict == STRUCTURAL, (
             "100% robust placeholders were graded ROBUST"
         )
+
+
+def test_the_verdict_does_not_recommend_a_ranking_that_singles_nothing_out():
+    """The 'Do this next' line must not contradict the provenance section.
+
+    THE DEFECT THIS COMES FROM
+    --------------------------
+    A three-step phosphorylation cascade at the library's placeholder values
+    is saturated: tiers 2 and 3 sit at 99.99% phosphorylated, so every
+    sensitivity falls below NEGLIGIBLE_INFLUENCE. The provenance section said
+    so -- "No constant here clears |S| = 0.01, so measuring any single one of
+    them would not move this answer" -- while the verdict's single most
+    actionable line said "start with the top of its influence ranking".
+
+    The reader was told, in the one sentence labelled "Do this next", to act
+    on a ranking the same document had just called uninformative. This is the
+    defect `_settling_ranking` was written for in its other form.
+    """
+    from Terium.compose.sensitivity import NEGLIGIBLE_INFLUENCE
+    from Terium.compose.verdict import _influence_is_informative
+
+    class _S:
+        def __init__(self, relative):
+            self.relative = relative
+
+    class _Report:
+        def __init__(self, values):
+            self.sensitivities = [_S(v) for v in values]
+
+    assert _influence_is_informative(None) is None
+    assert _influence_is_informative(_Report([])) is None
+    saturated = _Report([1e-5, -9.1e-5, 8.3e-6, 1.5e-9])
+    assert _influence_is_informative(saturated) is False
+    informative = _Report([1e-5, NEGLIGIBLE_INFLUENCE, -2.0])
+    assert _influence_is_informative(informative) is True
+    # Exactly at the threshold counts as informative: report.py's own text
+    # says "clears |S| = 0.01", and the two must not disagree by an epsilon.
+    assert _influence_is_informative(_Report([NEGLIGIBLE_INFLUENCE])) is True
+
+
+def test_the_remedy_text_follows_the_ranking():
+    """Each of the three states produces advice a reader can act on."""
+    from Terium.compose import verdict as V
+    # _grounding reads the model, so this uses the real cascade rather than
+    # a stub: the point is the advice a reader actually receives.
+    from Terium.compose.pipeline import compose
+
+    model = compose("three step phosphorylation cascade")
+
+    class _S:
+        def __init__(self, relative):
+            self.relative = relative
+
+    class _Report:
+        def __init__(self, values):
+            self.sensitivities = [_S(v) for v in values]
+
+    saturated, _ = V._provenance_concerns(model, _Report([1e-9, -1e-8]))
+    assert "singles nothing out" in saturated[0].remedy
+    assert "start with the top" not in saturated[0].remedy
+
+    useful, _ = V._provenance_concerns(model, _Report([2.0, 1e-9]))
+    assert "start with the top of its influence ranking" in useful[0].remedy
+
+    none, _ = V._provenance_concerns(model, None)
+    assert "no influence ranking was computed" in none[0].remedy

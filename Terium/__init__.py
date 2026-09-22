@@ -52,7 +52,7 @@ from .terium_engine import *  # noqa: F401,F403
 #: (`dynamic = ["version"]`), so a release cannot ship with the package and
 #: the metadata disagreeing about what it is -- which is the first thing a
 #: bug report would have to establish and the easiest thing to get wrong.
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 
 __all__ = [*terium_engine.__all__, "terium_engine", "__version__"]
 

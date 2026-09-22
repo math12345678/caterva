@@ -44,6 +44,41 @@ which is a product nobody adopts.
 - README, `START_HERE.md`, the docs index and the v0.3.0 release notes
   point at the guide.
 
+## [0.3.2] - 2026-09-22
+
+The product's central claim -- every number traces to its source -- was
+true of the code and unreachable from anything a person types.
+
+### Added
+- **`scripts/cite.py` and `make cite`: real constants with real
+  citations**, in one command.
+  `make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"`
+  returns `km = 0.03 mM` from `BRENDA ref 286469`, the papers that
+  disagree and by how much, the conditions the value was measured under,
+  and `--` for anything nothing measured. `--fixture` keeps the offline
+  route. It re-implements none of the resolution, ranking or rendering:
+  it builds `report_lab.py`'s payload and hands it over. Verified live on
+  three enzymes (ADR 0178).
+- **ADR 0178**, recording why it was unreachable: `compose --subject`
+  never called `compose_and_parameterise`; that function failed every
+  scout with `ModuleNotFoundError: fallback_logic` **while reporting
+  `converged=True`**; with the path repaired it failed again because
+  `parameter_requests()` never filled the `ec_number`, `substrate` and
+  `organism` fields BRENDA requires; and the working entry point read a
+  six-key JSON payload on stdin. The ADR lists the four things that would
+  let `compose` search, and the guide says plainly that it does not.
+
+### Fixed
+- **The verdict recommended a ranking it had just called worthless.** On a
+  saturated model -- a three-step cascade at the library's placeholder
+  values sits at 99.99% phosphorylated, so every sensitivity falls below
+  the threshold -- the provenance section said "No constant here clears
+  |S| = 0.01" while the one line labelled "Do this next" said "start with
+  the top of its influence ranking". The remedy was a fixed string that
+  never read the ranking. It now reads it, and says so when nothing is
+  singled out. This is the defect `_settling_ranking` was written for
+  (a ranking zeroed by a conservation law) in its other form.
+
 ## [0.3.0] - 2026-09-21
 
 The first release that reaches GitHub's Releases page, and the first that

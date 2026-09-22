@@ -174,15 +174,18 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "81 test files -- BRENDA/KEGG parsing, table scoping, " +
-          "organism resolution, citation formatting, fallback logic",
-        // Measured 2026-09-06, running Tests/ alone under .venv (the
-        // interpreter these counts are documented against):
-        // `1130 passed, 1 skipped in 257.23s`. Run ALONE deliberately --
-        // these suites are contention-sensitive and a parallel run has
-        // already produced a spuriously low figure twice in this file's
-        // history.
-        passed: 1160,
+          "82 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "organism resolution, citation formatting, fallback logic, and " +
+          "the `cite` command that puts a measured constant and its " +
+          "reference in front of a reader",
+        // Re-measured 2026-09-22, running Tests/ alone under .venv, read
+        // out of a junit-xml report: 1172 tests, 1171 passed, 0 failed,
+        // 1 skipped (test_popgen_resolver, collection skipped), 377 s.
+        // The delta from 1160 is the v0.3.2 work (ADR 0178): the six
+        // tests pinning scripts/cite.py. Run ALONE deliberately -- these
+        // suites are contention-sensitive and a parallel run has already
+        // produced a spuriously low figure twice in this file's history.
+        passed: 1171,
         skipped: 1,
         failed: 0,
       },

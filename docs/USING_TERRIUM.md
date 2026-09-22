@@ -359,26 +359,60 @@ parameter value, as a table).
 
 ---
 
-## Getting real numbers into a model
+## Real constants, with real citations
 
-This is the honest part, and worth understanding before you plan a class
-around it.
-
-**What the app folder does:** builds structure, checks it, simulates it,
-and labels every constant as a placeholder. It ships no literature search.
-`--subject "lactate dehydrogenase"` records the subject and the report says
-plainly: *"Subject named but no search was run in this report."*
-
-**What the source checkout adds:** the literature layer — BRENDA, KEGG and
-PubMed resolvers that find measured constants, rank them by how well
-evidenced they are, and carry the disagreement between papers through the
-model. To see one of those documents without a network or an account:
+**This is what Terrium is for.** It needs the source checkout, not the app
+folder, and one command:
 
 ```bash
-git clone <this repository> && cd terrium
-make setup            # a virtualenv and dependencies, 2-5 minutes
-make demo             # a full literature-backed report, from a saved page
+make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"
 ```
+
+```
+| parameter | value     | origin     | source            |
+|-----------|-----------|------------|-------------------|
+| km        | 0.03 mM   | literature | BRENDA ref 286469 |
+| s0        | 10 mM     | **yours**  | chosen for this run |
+| vmax      | 0.25 mM/s | **yours**  | chosen for this run |
+```
+
+That is a live BRENDA lookup: a measured Km, the reference that measured
+it, and — under it — a section naming the papers that disagree and what the
+disagreement does to your answer. The same command, for human
+acetylcholinesterase, returns `km = 0.0714 mM` from BRENDA ref 713996,
+tells you it was measured at **pH 7.4, 37 °C, in 0.1 M MOPS buffer**, and
+reports `kcat` as **not sourced** rather than filling it in.
+
+More than one quantity, or the full flag set:
+
+```bash
+python3 scripts/cite.py --ec 3.1.1.7 --organism "Homo sapiens" \
+    --substrate acetylcholine --quantity km --quantity kcat
+```
+
+**A name is not an enzyme.** `--enzyme "lactate dehydrogenase"` is refused,
+naming all six EC numbers it could mean, because a wrong EC number is a
+citation for the wrong protein rather than merely a wrong value. Ask
+UniProt, pick one, pass `--ec`.
+
+**No network, no account:** `--fixture Tests/fixtures/brenda_ldh_fixture.html`
+reads a saved page, and the document then says no search was run. `make
+demo` is that path end to end.
+
+### The gap you should know about
+
+`terrium compose` does **not** run this search. `compose --subject
+"lactate dehydrogenase"` records the subject and the report says plainly
+*"Subject named but no search was run in this report."* So today the two
+halves are separate: `compose` gives you a checked mechanism with
+placeholder constants, `cite` gives you measured constants with citations,
+and joining them is manual — export to SBML or Antimony and substitute, or
+read the constants off the `cite` document.
+
+The machinery to join them exists (`compose_and_parameterise`, the scouts,
+`with_resolved_values`); what is missing is the wiring, and ADR 0178
+records exactly what it would take. Until then, do not read a `compose`
+report as though its numbers came from anywhere.
 
 That prints a document with real BRENDA values, and — this is the part worth
 showing students — a section on **what the literature disagrees about**:

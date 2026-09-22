@@ -642,7 +642,8 @@ def dossier(
         # useless for telling any two apart.
         verdict = form_verdict(
             model, stability=stability, validation=validation,
-            robustness=robustness, conclusion_name=conclusion_name,
+            robustness=robustness, influence=sensitivity,
+            conclusion_name=conclusion_name,
         )
     except Exception as exc:  # noqa: BLE001
         # The verdict is a reading of the other sections; losing it must not
