@@ -104,9 +104,16 @@ that "almost certainly" is not a licence, and this project does not accept
 ## Dependencies with a condition worth knowing
 
 **libSBML — LGPL 2.1.** The condition is that a recipient can replace the
-library. Terrium installs it as an ordinary Python package, does not vendor
-it, does not modify it and does not statically link it, so replacement is a
-`pip install` away. No source-disclosure obligation attaches to Terrium.
+library. From the wheel and sdist, Terrium installs it as an ordinary Python
+package, does not vendor it, does not modify it and does not statically
+link it, so replacement is a `pip install` away and nothing is conveyed. The
+downloadable app folder (since v0.3.0, ADR 0177) is different: it contains
+libSBML, so it conveys it. The folder is a one-directory freeze in which
+libSBML's extension stays a single separate file a recipient can swap, and
+it carries libSBML's own terms and the LGPL text beside it; NOTICE states
+the position artifact by artifact and `scripts/build_app.py` refuses to
+write a folder that does not match it. No source-disclosure obligation
+attaches to Terrium's own code in either case.
 
 **stdpopsim — GPL 3.0.** Optional and never redistributed. Imported at
 runtime only if the user installed it themselves; the population-genetics

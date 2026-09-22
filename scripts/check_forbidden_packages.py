@@ -82,6 +82,7 @@ MANIFESTS = [
     REPO_ROOT / "requirements.txt",
     REPO_ROOT / "requirements-dev.txt",
     REPO_ROOT / "requirements-popgen.txt",
+    REPO_ROOT / "requirements-release.txt",
     REPO_ROOT / "pyproject.toml",
 ]
 

@@ -29,7 +29,8 @@ repository-code: "https://github.com/Terrium-sim/terrium"
 # The version matches Terium.__version__ (which pyproject.toml reads) and
 # package.json, kept equal to the release tag so "cite the version you
 # used" resolves to a real tag. package.json said 1.0.0 until 2026-08-29;
-# 0.1.0 was the source-only release of that date; 0.2.0 is the first
-# release with built artifacts (2026-09-19).
-version: 0.2.0
-date-released: 2026-09-19
+# 0.1.0 was the source-only release of that date; 0.2.0 the first with
+# built artifacts (2026-09-19); 0.3.0 the first on GitHub's Releases page
+# with app folders (2026-09-21).
+version: 0.3.0
+date-released: 2026-09-21

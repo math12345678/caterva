@@ -15,3 +15,4 @@ prune Terium/.pytest_cache
 prune Terium/.hypothesis
 exclude Terium/conftest.py Terium/pytest.ini Terium/.coverage
 global-exclude __pycache__ *.py[cod] .DS_Store
+include Terium/core/data/*.json Terium/core/data/README.md

@@ -8,17 +8,33 @@ interface Release {
   desc: string;
 }
 
-// Pulled from this repo's own CHANGELOG.md -- real dates from git history,
-// not semantic version numbers, because assigning version numbers to a
-// pre-release research tool (no tagged release, no published package)
-// would imply a release process that doesn't exist yet. See CHANGELOG.md's
-// own header for why: "grouped by real date from git history... because
-// assigning version numbers to a pre-release research tool would imply a
-// release process that doesn't exist yet." This used to be a fabricated
-// version-numbered history (v0.4.0 "Private Alpha Launch" with a "pilot
-// cohort" and 3 nonexistent database backends) -- removed entirely rather
-// than corrected, since none of it happened.
+// Pulled from this repo's own CHANGELOG.md. Entries before 2026-08-29 carry
+// real dates from git history and no version number, because there was no
+// release to version then; CHANGELOG.md follows Semantic Versioning from
+// 0.1.0 (2026-08-29) onward and the three tagged versions are listed as
+// such. This used to be a fabricated version-numbered history (v0.4.0
+// "Private Alpha Launch" with a "pilot cohort" and 3 nonexistent database
+// backends) -- removed entirely rather than corrected, since none of it
+// happened. Every line below names something CHANGELOG.md records.
 const RELEASES: Release[] = [
+  {
+    date: "September 21, 2026",
+    tag: "feature",
+    title: "v0.3.0: on the Releases page, downloadable as an app",
+    desc: "A CI workflow publishes each tag after rebuilding, reinstalling and running what it attaches. One folder per platform (macOS arm64, Linux, Windows) runs without Python; libSBML stays a separate replaceable file and every licence rides inside. Wheel and sdist byte-reproducible from the tag.",
+  },
+  {
+    date: "September 19, 2026",
+    tag: "feature",
+    title: "v0.2.0: the first installable wheel",
+    desc: "Packaging that built an empty install now builds Terrium; two commands, terium and terium-compose; a NOTICE that says what the artifacts convey. Verified from an empty directory.",
+  },
+  {
+    date: "August 29, 2026",
+    tag: "improvement",
+    title: "v0.1.0: the first tag",
+    desc: "A source archive only, deliberately: nothing that contains libSBML was distributed. Its packaging could not produce an installable package; 0.2.0 fixed that.",
+  },
   {
     date: "July 25, 2026",
     tag: "feature",

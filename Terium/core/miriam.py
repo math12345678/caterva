@@ -78,13 +78,18 @@ from pathlib import Path
 #: Where the dated capture lives. Read at import; a missing or malformed
 #: file is a hard error rather than a fallback to built-in defaults --
 #: built-in defaults are how a stale pattern survives a deleted fixture.
-_FIXTURE = (
+_CHECKOUT_COPY = (
     Path(__file__).resolve().parent.parent.parent
     / "Tests"
     / "fixtures"
     / "identifiers"
     / "identifiers_org_namespaces.json"
 )
+#: An installed wheel and the app folder have no `Tests/`; the same capture
+#: ships inside the package, kept identical by `test_packaged_data.py`
+#: (ADR 0177).
+_PACKAGED_COPY = Path(__file__).resolve().parent / "data" / "identifiers_org_namespaces.json"
+_FIXTURE = _CHECKOUT_COPY if _CHECKOUT_COPY.is_file() else _PACKAGED_COPY
 
 BASE = "https://identifiers.org"
 
@@ -98,8 +103,8 @@ class Namespace:
     sample_id: str
 
 
-def _load() -> tuple[dict[str, Namespace], str]:
-    raw = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+def _load_from(path: Path) -> tuple[dict[str, Namespace], str]:
+    raw = json.loads(path.read_text(encoding="utf-8"))
     out: dict[str, Namespace] = {}
     for prefix, spec in raw["namespaces"].items():
         out[prefix] = Namespace(
@@ -110,6 +115,10 @@ def _load() -> tuple[dict[str, Namespace], str]:
             sample_id=spec["sampleId"],
         )
     return out, raw["_captured_on"]
+
+
+def _load() -> tuple[dict[str, Namespace], str]:
+    return _load_from(_FIXTURE)
 
 
 NAMESPACES, PATTERNS_CAPTURED_ON = _load()

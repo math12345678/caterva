@@ -59,21 +59,31 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,429 tests (3,264 engine + 1165 literature)
+make test      # runs all 4,441 tests (3,276 engine + 1165 literature)
 ```
 
-### Or install the release
+### Or download the release
 
-Since v0.2.0 (2026-09-19) there is a wheel. It carries the engine, the
-composer and the agents; the literature search stays in the checkout,
-and the release notes say what else does not ship
-([`docs/releases/v0.2.0.md`](docs/releases/v0.2.0.md)). The same access
-caveat applies: the release is attached to a private repository.
+Since v0.3.0 (2026-09-21) every tagged version is published on the
+repository's Releases page by CI, after it has rebuilt, reinstalled and
+run what it attaches. Each release carries one folder per platform that
+runs without Python, and a wheel. The literature search stays in the
+checkout; the release notes say what else does not ship
+([`docs/releases/v0.3.0.md`](docs/releases/v0.3.0.md)). The same access
+caveat applies: the repository, and so its Releases page, is private.
 
 ```bash
-pip install terrium-0.2.0-py3-none-any.whl     # from the v0.2.0 release assets
+tar xzf terrium-0.3.0-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
+./terrium/terrium compose "a toggle switch between two repressors"
+```
+
+```bash
+pip install terrium-0.3.0-py3-none-any.whl     # the wheel, from the same page
 terium-compose "a toggle switch between two repressors"
 ```
+
+The folders are not code-signed; macOS and Windows ask once before the
+first run, and `README.txt` inside each folder says what to do.
 
 ### See what it produces, before anything else
 
@@ -509,7 +519,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                3,264 tests
+│   └── tests/                3,276 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -519,7 +529,7 @@ Terrium/
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    174 decision records (and counting)
+│   └── adr/                    175 decision records (and counting)
 ├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    76 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
@@ -603,9 +613,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,429 tests
+make test        # run all 4,441 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,264 tests)
+make test-sim    # simulation engine only (3,276 tests)
 make test-lit    # literature layer only (1165 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches
