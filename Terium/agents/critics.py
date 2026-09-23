@@ -79,7 +79,8 @@ def _assess():
         from Tests.model_compatibility import assess  # type: ignore
         return assess
     except ImportError:
-        from model_compatibility import assess  # type: ignore
+        from Terium.checkout import literature_module
+        assess = literature_module("model_compatibility").assess
         return assess
 
 

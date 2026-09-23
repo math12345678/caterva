@@ -84,7 +84,9 @@ def _buffers_equivalent() -> Callable[[Optional[str], Optional[str]], bool]:
         from Tests.assay_conditions import buffers_equivalent  # type: ignore
         return buffers_equivalent
     except ImportError:  # pragma: no cover - flat import
-        from assay_conditions import buffers_equivalent  # type: ignore[no-redef]
+        from Terium.checkout import literature_module
+        buffers_equivalent = literature_module(
+            "assay_conditions").buffers_equivalent
         return buffers_equivalent
 
 
@@ -104,10 +106,10 @@ def _thresholds() -> Tuple[float, float]:
         )
         return PH_UNITS_SERIOUS, TEMPERATURE_C_SERIOUS
     except ImportError:  # pragma: no cover - flat import
-        from model_compatibility import (  # type: ignore
-            PH_UNITS_SERIOUS,
-            TEMPERATURE_C_SERIOUS,
-        )
+        from Terium.checkout import literature_module
+        _compat = literature_module("model_compatibility")
+        PH_UNITS_SERIOUS = _compat.PH_UNITS_SERIOUS
+        TEMPERATURE_C_SERIOUS = _compat.TEMPERATURE_C_SERIOUS
         return PH_UNITS_SERIOUS, TEMPERATURE_C_SERIOUS
 
 

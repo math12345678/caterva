@@ -471,7 +471,7 @@ def _phosphorylation_cascade(query: str, name: str) -> Recognition:
 
 
 def _enzyme_cascade(query: str, name: str) -> Recognition:
-    count = _count_before(query, "cascade", "cascade") or 0
+    count = _count_before(query, "cascade", "enzyme") or 0
     if not count:
         raise UnrecognisedShape(
             query,

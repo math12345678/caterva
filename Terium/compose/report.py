@@ -155,6 +155,12 @@ class ModelDossier:
             )
             lines.append("")
             lines += self._resolvable_table()
+        elif getattr(self.model, "searched", False):
+            # A SEARCH RAN AND THIS IS WHAT IT RETURNED (ADR 0178).
+            # Measured and still-placeholder are listed in the same section,
+            # because the one thing a reader must not have to work out is
+            # which of the numbers below a paper stands behind.
+            lines += self._measured_table()
         elif self.search is None:
             lines.append(
                 f"Subject named (`{self.model.subject}`) but no search was "
@@ -171,6 +177,54 @@ class ModelDossier:
             "these, and they are recorded as your choices rather than as "
             "measurements."
         )
+        return lines
+
+    def _measured_table(self) -> List[str]:
+        """What the literature returned, and what it did not.
+
+        Every measured row carries its citation. A value without one is not
+        a measurement as far as any artefact here is concerned, which is why
+        `Measurement` requires the field and this table can print it
+        unconditionally.
+        """
+        measured = dict(getattr(self.model, "measured", {}) or {})
+        by_id = {q.parameter_id: q for q in self.model.resolvable}
+        lines = [
+            f"**{len(measured)} of {len(self.model.resolvable)} constant(s) "
+            f"came from the literature**, searched for "
+            f"`{self.model.subject}`"
+            + (f" in {self.model.organism}" if self.model.organism else "")
+            + (f", substrate {self.model.substrate}" if self.model.substrate else "")
+            + ".",
+            "",
+            "| quantity | value | origin | source |",
+            "|---|---|---|---|",
+        ]
+        for identifier in sorted(measured):
+            record = measured[identifier]
+            organism = f" ({record.organism})" if getattr(record, "organism", None) else ""
+            lines.append(
+                f"| `{identifier}` | {record.value} {record.unit} | literature"
+                f"{organism} | {record.citation} |"
+            )
+        for identifier in self.model.unmeasured:
+            quantity = by_id.get(identifier)
+            table = (quantity.table if quantity else None) or "no table"
+            lines.append(
+                f"| `{identifier}` | "
+                f"{quantity.placeholder if quantity else '?'} "
+                f"{quantity.unit if quantity else ''} | **placeholder** | "
+                f"searched the {table} table and found nothing |"
+            )
+        if self.model.unmeasured:
+            lines += [
+                "",
+                f"The {len(self.model.unmeasured)} placeholder(s) above were "
+                f"looked for and not found, which is a different fact from "
+                f"their not having been looked for. Any conclusion that "
+                f"rests on one of them is a statement about the motif "
+                f"library's illustrative value, not about this enzyme.",
+            ]
         return lines
 
     def _resolvable_table(self) -> List[str]:
