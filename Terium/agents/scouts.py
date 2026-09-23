@@ -104,7 +104,13 @@ def _resolution_cls():
         from Tests.parameterize import ParameterRequest, Resolution  # type: ignore
         return ParameterRequest, Resolution
     except ImportError:
-        from parameterize import ParameterRequest, Resolution  # type: ignore
+        # Neither form resolves from an ordinary interpreter; the helper
+        # puts the checkout's Tests/ on the path and says so when it cannot
+        # (ADR 0178).
+        from Terium.checkout import literature_module
+        _module = literature_module("parameterize")
+        ParameterRequest = _module.ParameterRequest
+        Resolution = _module.Resolution
         return ParameterRequest, Resolution
 
 
@@ -334,7 +340,11 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
         try:
             from Tests.fallback_logic import resolve_kinetic_value  # type: ignore
         except ImportError:
-            from fallback_logic import resolve_kinetic_value  # type: ignore
+            # Neither form resolves from an ordinary interpreter; the
+            # checkout's Tests/ has to be put on the path (ADR 0178).
+            from Terium.checkout import literature_module
+            resolve_kinetic_value = literature_module(
+                "fallback_logic").resolve_kinetic_value
 
         if not request.ec_number:
             raise ValueError(

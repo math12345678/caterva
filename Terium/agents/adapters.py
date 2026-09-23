@@ -40,7 +40,8 @@ def _parameter_source_cls():
         from Tests.model_compatibility import ParameterSource  # type: ignore
         return ParameterSource
     except ImportError:
-        from model_compatibility import ParameterSource  # type: ignore
+        from Terium.checkout import literature_module
+        ParameterSource = literature_module("model_compatibility").ParameterSource
         return ParameterSource
 
 
@@ -69,15 +70,47 @@ FOUND_SOURCES = frozenset({"brenda_exact", "brenda_cross_species"})
 def citation_text(citation: Any) -> Optional[str]:
     """A one-line human-readable citation, or None.
 
+    THE FIELD NAME THAT WAS NEVER THERE (ADR 0178)
+    ----------------------------------------------
+    This tried `reference` first and `Citation` declares `reference_id`
+    (`Tests/citation.py`). The attribute never existed, so every BRENDA
+    citation fell through to `url` and every artefact built from the agent
+    stack printed
+
+        url:https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27
+
+    which names the ENZYME PAGE and not the reference. Two different
+    measurements from two different papers produced the identical string,
+    and BRENDA has no working per-reference deep link (`citation.py` says
+    so at length, having live-checked it), so the reference_id is the only
+    thing that identifies which row a number came from. It was the one
+    field being dropped.
+
+    The form matches `Tests/lab_report.py`'s, which had it right all along:
+    "BRENDA ref 286469". The two are deliberately the same so a reader
+    cannot tell from a citation which of Terrium's two paths produced it.
+
     Kept tolerant: `Citation` has grown fields over time and a formatting
     change there must not break model assembly.
     """
     if citation is None:
         return None
-    for attribute in ("reference", "pmid", "doi", "url", "title"):
+
+    source = getattr(citation, "source", None)
+    reference = getattr(citation, "reference_id", None) or getattr(citation, "reference", None)
+    if source and reference:
+        text = f"{source} ref {reference}"
+        title = getattr(citation, "title", None)
+        return f"{text} — “{title}”" if title else text
+    if reference:
+        return f"ref {reference}"
+
+    for attribute in ("pmid", "doi", "url", "title"):
         value = getattr(citation, attribute, None)
         if value:
             return f"{attribute}:{value}"
+    if source:
+        return str(source)
     return str(citation)
 
 

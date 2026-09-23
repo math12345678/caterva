@@ -71,6 +71,8 @@ named, and the sections say so where it changes what they mean.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import argparse
 import sys
 from typing import Any, Callable, List, Optional, Sequence, Tuple
@@ -131,7 +133,18 @@ def build_parser(prog: str = "python -m Terium.compose") -> argparse.ArgumentPar
     parser.add_argument("description", nargs="?",
                         help="the mechanism to build")
     parser.add_argument("--subject",
-                        help="the enzyme these constants belong to, if named")
+                        help="the enzyme these constants belong to: an EC number "
+                             "(1.1.1.27) searches the literature; a name is "
+                             "resolved through UniProt and refused if it means "
+                             "more than one enzyme")
+    parser.add_argument("--organism",
+                        help="the organism the constants should belong to, e.g. "
+                             "'Homo sapiens'. Only used when --subject names one")
+    parser.add_argument("--substrate",
+                        help="the substrate a Km or Ki belongs to. A motif knows "
+                             "it needs a Km; it cannot know what the Km is FOR, "
+                             "and BRENDA's km and ki tables cannot be read "
+                             "without it")
     parser.add_argument("--shapes", action="store_true",
                         help="list every shape this can build, and exit")
     parser.add_argument("--antimony", action="store_true",
@@ -820,7 +833,97 @@ def _validate_section(
 # ---------------------------------------------------------------------------
 
 
-def _export(description: str, subject: Optional[str], fmt: str) -> int:
+def _search_the_literature(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
+    """Resolve this model's constants from the literature. `(model, note)`.
+
+    Returns the model with whatever the search returned substituted in, and
+    a note for the report when something could not be done. EVERY failure
+    here is a note rather than an exception: a literature search that could
+    not run must not cost the reader the structure, the invariants, the
+    dimensions and the behaviour, all of which are true regardless (ADR
+    0178). What it must never do is leave the reader unable to tell that no
+    search happened, which is why every branch returns a sentence.
+
+    A NAME IS NOT AN ENZYME. `--subject "lactate dehydrogenase"` is six EC
+    numbers; the resolver refuses and names all six rather than picking,
+    because a wrong EC number is a citation for the wrong protein rather
+    than merely a wrong value.
+    """
+    from Terium.checkout import LiteratureLayerUnavailable, literature_module
+
+    subject = args.subject
+    ec = model.ec_number
+    if ec is None:
+        try:
+            lookup = literature_module("enzyme_lookup")
+        except LiteratureLayerUnavailable as exc:
+            return model, str(exc)
+        try:
+            ec = lookup.ec_number_for_name(subject)
+        except Exception as exc:  # noqa: BLE001 - the refusal names the candidates
+            return model, (
+                f"No search was run: {exc}"
+            )
+        model = replace(model, subject=ec)
+
+    needs_substrate = sorted(
+        q.table for q in model.resolvable
+        if q.table in ("km", "ki") and q.table is not None
+    )
+    if needs_substrate and not args.substrate:
+        return model, (
+            f"No search was run: this model needs {', '.join(sorted(set(needs_substrate)))} "
+            f"from BRENDA, and those tables are per-substrate. A motif knows "
+            f"it needs a Km; it cannot know what the Km is FOR. Re-run with "
+            f"--substrate NAME."
+        )
+
+    try:
+        from Terium.compose.export import measured_from_search
+        from Terium.compose.pipeline import compose_and_parameterise
+        _, search = compose_and_parameterise(
+            model.query, subject=ec, organism=args.organism,
+            substrate=args.substrate,
+        )
+    except LiteratureLayerUnavailable as exc:
+        return model, str(exc)
+    except Exception as exc:  # noqa: BLE001 - a failed search is a note, not a crash
+        return model, f"The literature search failed: {type(exc).__name__}: {exc}"
+
+    if search is None:
+        return model, "No search was run: this model has nothing a database could supply."
+
+    measured = measured_from_search(search)
+    failures = [
+        run for branch in getattr(search, "branches", ())
+        for record in getattr(branch.build.run, "rounds", ())
+        for run in getattr(record, "ran", ())
+        if getattr(run, "failed", False)
+    ]
+    sourced = model.with_measured(measured)
+    if not measured:
+        why = "; ".join(sorted({r.failure for r in failures})) if failures else (
+            "every table was searched and none held a value for this "
+            "enzyme, organism and substrate"
+        )
+        return sourced, f"The search returned no measured value: {why}"
+
+    note = (
+        f"{len(measured)} constant(s) resolved from the literature: "
+        + ", ".join(sorted(measured))
+    )
+    still = sourced.unmeasured
+    if still:
+        note += (
+            f". {len(still)} still the motif library's placeholder "
+            f"({', '.join(still)}): the search ran and returned nothing for "
+            f"them, which is different from their not having been looked for"
+        )
+    return sourced, note
+
+
+def _export(description: str, subject: Optional[str], fmt: str,
+            args: Any = None) -> int:
     """Write one artefact to stdout, or a refusal to stderr.
 
     NOTHING ELSE GOES TO STDOUT. A CSV with a markdown report in front of it
@@ -841,7 +944,15 @@ def _export(description: str, subject: Optional[str], fmt: str) -> int:
         "methods": to_methods_paragraph,
     }
     try:
-        provenanced = provenance_of(compose(description, subject=subject))
+        model = compose(description, subject=subject,
+                        organism=getattr(args, "organism", None),
+                        substrate=getattr(args, "substrate", None))
+        if subject and args is not None:
+            # An export that quietly carried placeholders while the report
+            # beside it carried measurements would be the disagreement the
+            # provenance machinery exists to prevent.
+            model, _ = _search_the_literature(model, args)
+        provenanced = provenance_of(model, measured=dict(model.measured) or None)
         print(writers[fmt](provenanced))
     except ExportRefused as exc:
         print(f"Not exported.\n\n{exc}", file=sys.stderr)
@@ -935,7 +1046,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
 
     try:
         if args.export is not None:
-            return _export(args.description, args.subject, args.export)
+            return _export(args.description, args.subject, args.export, args)
 
         if args.antimony:
             from Terium.compose.pipeline import compose
@@ -958,7 +1069,14 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         # computed here when asked for, handed to the dossier so the
         # verdict can read them, and printed by their sections afterwards
         # without being computed a second time.
-        model = compose(args.description, subject=args.subject)
+        model = compose(args.description, subject=args.subject,
+                        organism=args.organism, substrate=args.substrate)
+        search_note = None
+        if args.subject:
+            # The search runs BEFORE the analyses, so every section below --
+            # stability, sensitivity, the time course, the verdict -- reads
+            # the literature's numbers rather than the library's (ADR 0178).
+            model, search_note = _search_the_literature(model, args)
         precomputed = _precompute_for_verdict(args, model)
 
         report = dossier(
@@ -979,6 +1097,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         # Footer withheld until the analysis sections have run: a document
         # that says "Built by Terrium..." and then carries on for three more
         # pages has put its last word in the middle.
+        if search_note:
+            model.recognition.composition.note(search_note)
         print(report.markdown(footer=False))
 
         code = _analyses(args, report.model, precomputed)

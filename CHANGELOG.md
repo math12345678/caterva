@@ -44,12 +44,28 @@ which is a product nobody adopts.
 - README, `START_HERE.md`, the docs index and the v0.3.0 release notes
   point at the guide.
 
-## [0.3.2] - 2026-09-22
+## [0.3.3] - 2026-09-22
 
 The product's central claim -- every number traces to its source -- was
 true of the code and unreachable from anything a person types.
 
 ### Added
+- **`compose` searches the literature.**
+  `terrium compose "..." --subject 1.1.1.27 --organism "Homo sapiens"
+  --substrate pyruvate` returns a model whose constants are BRENDA's, each
+  with its reference, and every section below -- stability, the influence
+  ranking, the time course, the verdict -- runs on those numbers. The
+  exports carry them too, so an SBML file and the report beside it cannot
+  disagree. A partial result stays partial: constants the search did not
+  find keep the motif library's placeholder and are listed as
+  *searched and not found*, which is a different fact from *not looked
+  for*. Four pieces (ADR 0178): `Terium/checkout.py` makes the literature
+  layer importable outside pytest; `ComposedModel` carries `organism` and
+  `substrate` and fills the `ec_number`, `substrate` and `organism` fields
+  BRENDA requires; `with_measured()` substitutes through
+  `export.provenance_of`, the one place that decides an origin; and the
+  CLI runs the search before the analyses, turning every failure into a
+  note on the report rather than an error instead of it.
 - **`scripts/cite.py` and `make cite`: real constants with real
   citations**, in one command.
   `make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"`
@@ -69,6 +85,15 @@ true of the code and unreachable from anything a person types.
   let `compose` search, and the guide says plainly that it does not.
 
 ### Fixed
+- **Every BRENDA citation was being degraded to a bare enzyme-page URL.**
+  `citation_text` looked for an attribute called `reference`; `Citation`
+  declares `reference_id`. The attribute never existed, so every citation
+  fell through to `url` and two measurements from two different papers
+  produced the identical string. The same model's two constants now cite
+  `BRENDA ref 286469` and `BRENDA ref 739793` -- different papers, as they
+  always were. BRENDA has no working per-reference deep link, so the
+  reference id was the only thing identifying which row a number came
+  from, and it was the one field being dropped.
 - **The verdict recommended a ranking it had just called worthless.** On a
   saturated model -- a three-step cascade at the library's placeholder
   values sits at 99.99% phosphorylated, so every sensitivity falls below

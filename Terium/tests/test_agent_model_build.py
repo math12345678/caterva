@@ -73,7 +73,16 @@ def brenda_like(rows):
         org, value, ph, temp, buf = candidates[0]
         return FakeKineticResult(
             found=True, value=value, unit="mM", organism=org, source="brenda_exact",
-            citation=type("C", (), {"reference": f"BRENDA {request.quantity}"})(),
+            # The REAL `Citation` (Tests/citation.py) declares `source` and
+            # `reference_id`. This fixture used to invent a field called
+            # `reference`, and `citation_text` used to look for exactly that
+            # invented name -- so the stub and the bug agreed with each other
+            # and the suite passed while every real BRENDA citation was being
+            # degraded to a bare enzyme-page URL (ADR 0178). A fixture whose
+            # shape no production object has is a test of nothing.
+            citation=type("C", (), {
+                "source": "BRENDA", "reference_id": request.quantity,
+            })(),
             assay_ph=ph, assay_temperature_c=temp, assay_buffer=buf,
         )
 

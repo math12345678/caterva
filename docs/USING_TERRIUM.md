@@ -399,20 +399,55 @@ UniProt, pick one, pass `--ec`.
 reads a saved page, and the document then says no search was run. `make
 demo` is that path end to end.
 
-### The gap you should know about
+### A model whose constants are sourced
 
-`terrium compose` does **not** run this search. `compose --subject
-"lactate dehydrogenase"` records the subject and the report says plainly
-*"Subject named but no search was run in this report."* So today the two
-halves are separate: `compose` gives you a checked mechanism with
-placeholder constants, `cite` gives you measured constants with citations,
-and joining them is manual — export to SBML or Antimony and substitute, or
-read the constants off the `cite` document.
+`compose` searches too. Give it the enzyme, the organism and the substrate
+a Km belongs to:
 
-The machinery to join them exists (`compose_and_parameterise`, the scouts,
-`with_resolved_values`); what is missing is the wiring, and ADR 0178
-records exactly what it would take. Until then, do not read a `compose`
-report as though its numbers came from anywhere.
+```bash
+terrium compose "Michaelis-Menten with a competitive inhibitor" \
+    --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate
+```
+
+and "Where the numbers come from" is no longer a list of things to measure:
+
+```
+**2 of 3 constant(s) came from the literature**, searched for `1.1.1.27`
+in Homo sapiens, substrate pyruvate.
+
+| quantity        | value      | origin                    | source            |
+|-----------------|------------|---------------------------|-------------------|
+| `reaction_Ki`   | 0.00059 mM | literature (Homo sapiens) | BRENDA ref 739793 |
+| `reaction_Km`   | 0.03 mM    | literature (Homo sapiens) | BRENDA ref 286469 |
+| `reaction_kcat` | 100.0 1/s  | **placeholder**           | searched the kcat table and found nothing |
+```
+
+Every section below it — stability, the influence ranking, the time course,
+the verdict — then runs on those numbers rather than the library's. The
+exports carry them too, so an SBML file and the report beside it cannot
+disagree about what was measured.
+
+**Read the third row.** A partial result is the normal case: BRENDA has a
+Km for acetylcholinesterase and no kcat. The constants the search did not
+find keep the library's placeholder and are listed as such, with the
+distinction that matters — *searched and not found* is not *not looked
+for*. Any conclusion resting on one of them is a statement about the motif
+library, and the report says so.
+
+**Three things it will refuse**, each for the same reason:
+
+- `--subject "lactate dehydrogenase"` without an EC number, if the name
+  means more than one enzyme. It names all six.
+- A search with no `--substrate` when the model needs a Km or Ki. Those
+  BRENDA tables are per-substrate, and a motif knows it needs a Km but not
+  what the Km is *for*.
+- Running at all from the app folder rather than the checkout: the
+  resolvers live in `Tests/`, which the wheel does not ship. It says so
+  rather than failing obscurely.
+
+None of those costs you the report. The structure, the invariants, the
+dimensions and the behaviour are true regardless, and the refusal arrives
+as a note on the document rather than an error instead of it.
 
 That prints a document with real BRENDA values, and — this is the part worth
 showing students — a section on **what the literature disagrees about**:

@@ -59,7 +59,7 @@ git clone https://github.com/Terrium-sim/main.git
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,481 tests (3,310 engine + 1171 literature)
+make test      # runs all 4,499 tests (3,328 engine + 1171 literature)
 ```
 
 ### Or download the release
@@ -69,17 +69,17 @@ repository's Releases page by CI, after it has rebuilt, reinstalled and
 run what it attaches. Each release carries one folder per platform that
 runs without Python, and a wheel. The literature search stays in the
 checkout; the release notes say what else does not ship
-([`docs/releases/v0.3.2.md`](docs/releases/v0.3.2.md)). The same access
+([`docs/releases/v0.3.3.md`](docs/releases/v0.3.3.md)). The same access
 caveat applies: the repository, and so its Releases page, is private.
 
 ```bash
-tar xzf terrium-0.3.2-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
+tar xzf terrium-0.3.3-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
 cd terrium && xattr -dr com.apple.quarantine .   # macOS only, once (unsigned folder)
 ./terrium compose "a toggle switch between two repressors"
 ```
 
 ```bash
-pip install terrium-0.3.2-py3-none-any.whl     # the wheel, from the same page
+pip install terrium-0.3.3-py3-none-any.whl     # the wheel, from the same page
 terium-compose "a toggle switch between two repressors"
 ```
 
@@ -88,11 +88,13 @@ SmartScreen asks once, and `README.txt` inside each folder gives the exact
 step for its platform (on Windows, run `.\terrium.exe` from a terminal in
 the folder).
 
-**Real constants with real citations** need the checkout, not the folder:
+**Real constants with real citations** need the checkout, not the folder.
 `make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"` returns
 `km = 0.03 mM` from `BRENDA ref 286469`, with the papers that disagree and
-the conditions it was measured under. `compose` builds structure with
-placeholder constants and says so; ADR 0178 records what joining them needs.
+the conditions it was measured under; and `compose --subject 1.1.1.27
+--organism "Homo sapiens" --substrate pyruvate` builds the mechanism with
+those constants already in it, each row naming its reference and any
+constant the search could not find still marked a placeholder (ADR 0178).
 
 **New to it? [`docs/USING_TERRIUM.md`](docs/USING_TERRIUM.md)** is the guide:
 what to type first, how to read a report, and a recipe for each question a
@@ -534,7 +536,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                3,310 tests
+│   └── tests/                3,328 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -628,9 +630,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,481 tests
+make test        # run all 4,499 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,310 tests)
+make test-sim    # simulation engine only (3,328 tests)
 make test-lit    # literature layer only (1171 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches

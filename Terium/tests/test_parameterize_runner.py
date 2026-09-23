@@ -83,7 +83,7 @@ class TestTheContract:
         assert km == {
             "value": 0.15, "unit": "mM", "organism": HUMAN, "ph": 7.4,
             "temperature_c": 37.0, "buffer": "HEPES",
-            "citation": "reference:BRENDA Km", "cross_species": False,
+            "citation": "BRENDA ref Km", "cross_species": False,
             "explicitly_unreported": [],
         }
 

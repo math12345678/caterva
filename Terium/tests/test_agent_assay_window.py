@@ -94,7 +94,7 @@ def windowed_resolver(rows):
             unit=winner["unit"],
             organism=winner.get("organism") or "",
             source="brenda_exact",
-            citation=type("C", (), {"reference": "ref:test"})(),
+            citation=type("C", (), {"source": "BRENDA", "reference_id": "test"})(),
             assay_ph=winner.get("ph"),
             assay_temperature_c=winner.get("temperature_c"),
             assay_buffer=winner.get("buffer"),
@@ -469,7 +469,7 @@ class TestTheScoutReSelects:
             return FakeKineticResult(
                 found=True, value=0.15, unit="mM", organism="",
                 source="brenda_exact",
-                citation=type("C", (), {"reference": "ref:test"})(),
+                citation=type("C", (), {"source": "BRENDA", "reference_id": "test"})(),
                 assay_ph=7.4, assay_temperature_c=37.0,
             )
 

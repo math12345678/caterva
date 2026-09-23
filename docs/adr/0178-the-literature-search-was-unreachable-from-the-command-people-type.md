@@ -74,35 +74,82 @@ hexokinase (EC 2.7.1.1) Km 6 mM, BRENDA ref 641068. An ambiguous name is
 refused with every candidate named, because a wrong EC number is a citation
 for the wrong protein rather than merely a wrong value.
 
-## What was NOT done, and what it would take
+## The four things, and how each was done (2026-09-22, same day)
 
-**`compose` still does not search.** The two halves remain separate:
-`compose` gives a checked mechanism with placeholder constants, `cite`
-gives measured constants with citations, and joining them is manual. The
-guide says so where a reader will hit it.
+`compose` now searches:
 
-Joining them needs four things, none of them speculative:
+```bash
+terrium compose "Michaelis-Menten with a competitive inhibitor" \
+    --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate
+```
 
-1. `ComposedModel.parameter_requests()` to fill `ec_number` (accepting an EC
-   directly, or resolving a name through `Tests/enzyme_lookup.py`'s
-   `ec_number_for_name`, which already refuses ambiguity), `substrate` and
-   `organism`. The substrate is not on `Quantity` and would have to come
-   from the user — a motif knows it needs a Km, not what it is a Km *for*.
-2. `compose` and its CLI to accept `--organism` and `--substrate`, and to
-   call `compose_and_parameterise` when a subject is named.
-3. A decision about partial resolution. `with_resolved_values` raises
-   rather than substituting some constants and leaving others at
-   placeholders, which is the right default and exactly the case that
-   occurs in practice: for acetylcholinesterase, Km resolves and kcat does
-   not. A composed model that is half measured needs the report to carry
-   the origin per constant, which the CSV export already does and the
-   network does not.
-4. The scouts' `Tests/` import to work outside pytest, or those resolvers
-   to move into the package. This is the same limit ADR 0177 recorded for
-   the app folder, and it is why `cite` needs the checkout.
+returns a model whose Km and Ki are BRENDA's, each with its reference, and
+whose kcat is still the motif library's placeholder and says so:
 
-Until then, **a `compose` report's numbers came from nowhere and the report
-says so on every page.**
+    **2 of 3 constant(s) came from the literature**, searched for
+    `1.1.1.27` in Homo sapiens, substrate pyruvate.
+
+    | `reaction_Ki`   | 0.00059 mM | literature (Homo sapiens) | BRENDA ref 739793 |
+    | `reaction_Km`   | 0.03 mM    | literature (Homo sapiens) | BRENDA ref 286469 |
+    | `reaction_kcat` | 100.0 1/s  | **placeholder**           | searched the kcat table and found nothing |
+
+The four things it needed, and what each turned out to be:
+
+**1. `Terium/checkout.py`.** One helper, `literature_module(name)`, used by
+all seven sites that reach into `Tests/`. It tries the package form, the
+flat form, then puts the checkout's `Tests/` on `sys.path` and retries, and
+raises `LiteratureLayerUnavailable` naming the reason when there is no such
+directory -- which is the honest state from a wheel or the app folder, and
+a fact a caller can report rather than a traceback three frames away.
+
+**2. `ComposedModel` carries `organism` and `substrate`**, and
+`parameter_requests()` fills `ec_number`, `substrate` and `organism`. The
+EC number is resolved ONCE on the model rather than per scout, which is
+what `ParameterRequest.ec_number`'s own comment always said it was for. A
+subject that is already an EC number is used as given; a NAME returns
+`None` from `ComposedModel.ec_number` and the CLI asks the literature
+layer's `ec_number_for_name`, which refuses ambiguity by naming every
+candidate.
+
+**3. `ComposedModel.with_measured()`** returns a new model with the
+literature's values substituted and the measurements recorded, and
+`unmeasured` subtracts them. The network is rebuilt by
+`export.provenance_of`, already the one place that decides an origin, so
+the numbers a report simulates and the numbers its audit trail prints
+cannot disagree. **A partial result stays partial**: the strictness of
+`with_resolved_values` (which refuses to substitute some and leave others)
+is right for the agent path and wrong here, because partial is the normal
+case -- BRENDA has a Km for acetylcholinesterase and no kcat. The report
+lists the measured and the still-placeholder in one table and says of the
+latter that they were "searched ... and found nothing, which is a different
+fact from their not having been looked for".
+
+**4. The CLI** gained `--organism` and `--substrate`, and
+`_search_the_literature` runs the search before the analyses, so stability,
+sensitivity, the time course and the verdict all read the literature's
+numbers. Every failure there is a NOTE on the report rather than an
+exception: a search that could not run must not cost the reader the
+structure, the invariants and the dimensions, which are true regardless.
+Exports search too, so an SBML file and the report beside it cannot
+disagree about what was measured.
+
+## A fifth thing, found on the way
+
+`citation_text` in `Terium/agents/adapters.py` looked for an attribute
+called `reference`. `Citation` declares **`reference_id`**. The attribute
+never existed, so every BRENDA citation fell through to `url` and every
+artefact built from the agent stack printed
+
+    url:https://www.brenda-enzymes.org/enzyme.php?ecno=1.1.1.27
+
+which names the enzyme page, not the reference. Two measurements from two
+different papers produced the identical string. Measured after the fix, the
+same model's two constants cite `BRENDA ref 286469` and `BRENDA ref
+739793` -- different papers, as they always were. BRENDA has no working
+per-reference deep link (`Tests/citation.py` establishes this at length,
+having live-checked it), so the reference id was the only thing that
+identified which row a number came from, and it was the one field being
+dropped.
 
 ## Consequences
 

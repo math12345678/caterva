@@ -34,8 +34,8 @@ exactly what to go and measure, in a model that is already correct in shape.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from dataclasses import dataclass, field, replace
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 try:
     from .builder import Composition, ResolvableQuantity
@@ -61,6 +61,21 @@ class ComposedModel:
     #: The enzyme named in the query, when one was. `None` means the model
     #: is a mechanism rather than a claim about a particular protein.
     subject: Optional[str] = None
+    #: The organism the constants should belong to. Absent means "whatever
+    #: the resolver's documented default is", which the resolver states.
+    organism: Optional[str] = None
+    #: The substrate a kinetic constant belongs to. A motif knows it needs
+    #: a Km; it cannot know what the Km is FOR, so this is the caller's
+    #: (ADR 0178). Without it BRENDA's km and ki tables cannot be read.
+    substrate: Optional[str] = None
+    #: What a literature search actually returned, parameter id ->
+    #: `Measurement`. Empty until `with_measured` is called, which is the
+    #: only way a value in this model comes from anywhere but the motif
+    #: library. A partial result is the normal case and is kept partial:
+    #: for acetylcholinesterase BRENDA has a Km and no kcat, and a model
+    #: that quietly substituted one and left the other at a placeholder
+    #: would simulate, plot, and look exactly like a sourced one.
+    measured: Mapping[str, Any] = field(default_factory=dict)
 
     @property
     def structure_only(self) -> bool:
@@ -82,9 +97,37 @@ class ComposedModel:
         apparently-measured constants on the strength of a name typed
         into the query.
 
-        A `ProvenancedModel` overrides this with its actual placeholders.
+        A `ProvenancedModel` overrides this with its actual placeholders,
+        and `with_measured` fills `measured` here so this model can answer
+        the same question after a search (ADR 0178).
         """
-        return tuple(q.parameter_id for q in self.resolvable)
+        return tuple(
+            q.parameter_id for q in self.resolvable
+            if q.parameter_id not in self.measured
+        )
+
+    @property
+    def searched(self) -> bool:
+        """True when a literature search was run over this model."""
+        return bool(self.measured)
+
+    def with_measured(self, measured: Mapping[str, Any]) -> "ComposedModel":
+        """This model with the literature's values substituted in.
+
+        The network is rebuilt by `export.provenance_of`, which is already
+        the one place that decides an origin and substitutes a measured
+        value, so the numbers a report simulates and the numbers its audit
+        trail prints cannot disagree. Constants the search did not return
+        keep the motif library's placeholder and stay in `unmeasured`.
+        """
+        if not measured:
+            return self
+        try:
+            from .export import provenance_of
+        except ImportError:  # pragma: no cover - flat layout
+            from export import provenance_of  # type: ignore[no-redef]
+        provenanced = provenance_of(self, measured=dict(measured))
+        return replace(self, network=provenanced.network, measured=dict(measured))
 
     def parameter_requests(self) -> List[Any]:
         """`ParameterRequest`s for `Terium/agents`, or an empty list.
@@ -98,18 +141,49 @@ class ComposedModel:
         try:
             from Tests.parameterize import ParameterRequest  # type: ignore
         except ImportError:  # pragma: no cover - flat layout
-            from parameterize import ParameterRequest  # type: ignore
+            from Terium.checkout import literature_module
+            ParameterRequest = literature_module("parameterize").ParameterRequest
 
+        # THE THREE FIELDS THAT USED TO BE LEFT EMPTY (ADR 0178).
+        # `ParameterRequest` declares ec_number, substrate and organism and
+        # BRENDA requires them; this method built a request without any of
+        # them, so every scout failed with "needs an EC number ... none was
+        # identified" even after the imports were repaired. The EC number is
+        # resolved once here rather than per scout, which is what the field's
+        # own comment says it is for.
+        ec_number = self.ec_number
         return [
             ParameterRequest(
                 quantity=quantity.parameter_id,
                 subject=self.subject,
+                substrate=self.substrate,
+                organism=self.organism,
+                ec_number=ec_number,
                 table=quantity.table,
                 expected_unit=quantity.unit,
             )
             for quantity in self.resolvable
             if quantity.table is not None
         ]
+
+    @property
+    def ec_number(self) -> Optional[str]:
+        """The subject as an EC number, or None when it is not one.
+
+        An EC number given directly is used as given. A NAME is not resolved
+        here: "lactate dehydrogenase" is EC 1.1.1.27 and 1.1.1.28 and four
+        more, and picking one would attach a citation to the wrong protein.
+        The caller resolves a name through the literature layer's
+        `ec_number_for_name`, which refuses ambiguity by naming every
+        candidate, and passes the answer as the subject.
+        """
+        if self.subject is None:
+            return None
+        text = self.subject.strip()
+        parts = text.split(".")
+        if len(parts) == 4 and all(p.strip() and (p.strip().isdigit() or p.strip() == "-") for p in parts):
+            return text
+        return None
 
     def summary(self) -> str:
         lines = [
@@ -209,6 +283,8 @@ def compose(
     query: str,
     *,
     subject: Optional[str] = None,
+    organism: Optional[str] = None,
+    substrate: Optional[str] = None,
     name: Optional[str] = None,
 ) -> ComposedModel:
     """Recognise a shape and build the model, or raise `UnrecognisedShape`.
@@ -240,6 +316,8 @@ def compose(
         resolvable=composition.quantities_to_resolve(),
         chosen=composition.chosen_quantities(),
         subject=subject,
+        organism=organism,
+        substrate=substrate,
     )
 
 
@@ -249,6 +327,7 @@ def compose_and_parameterise(
     subject: Optional[str] = None,
     resolve: Optional[Callable[..., Any]] = None,
     organism: Optional[str] = None,
+    substrate: Optional[str] = None,
     simulate: Optional[Callable[[Any], Any]] = None,
 ) -> Tuple[ComposedModel, Any]:
     """Compose, then run the agent architecture over the result.
@@ -258,7 +337,7 @@ def compose_and_parameterise(
     `ModelSearch` would report a completed search over zero quantities as
     though the model were parameterised.
     """
-    model = compose(query, subject=subject)
+    model = compose(query, subject=subject, organism=organism, substrate=substrate)
     requests = model.parameter_requests()
     if not requests:
         return model, None
