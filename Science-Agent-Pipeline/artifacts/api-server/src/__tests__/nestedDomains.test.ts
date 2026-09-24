@@ -148,7 +148,7 @@ describe("promotion needs a term the parent does not also have", () => {
    *
    * Measured: no declared pair shares a single term, so the filter removes
    * nothing and changes no classification. The mutation that deletes it is
-   * reported NOT CAUGHT in ADR 0169 for exactly this reason, rather than
+   * reported NOT CAUGHT in ADR 0194 for exactly this reason, rather than
    * being made catchable by inventing an overlap no classifier needs.
    *
    * It is kept because it costs nothing and is correct whatever the table

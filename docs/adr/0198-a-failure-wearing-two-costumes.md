@@ -1,4 +1,4 @@
-# ADR 0173: A failure wearing two costumes
+# ADR 0198: A failure wearing two costumes
 
 **Status:** Accepted
 
@@ -105,7 +105,7 @@ from a passing one in the summary line.
 Fixed by asking `importlib.metadata` directly for the precondition. A test's
 guard clause must not route through the code under test.
 
-Mutations, `docs/mutations/adr-0173-dev-dependencies.json`, **3 caught, 0 not
+Mutations, `docs/mutations/adr-0198-dev-dependencies.json`, **3 caught, 0 not
 caught** after that fix:
 
 | id | mutation | caught |

@@ -1,4 +1,4 @@
-# ADR 0174: The failure that hid the others
+# ADR 0199: The failure that hid the others
 
 **Status:** Accepted
 
@@ -24,7 +24,7 @@ on as such.
 Running them individually found, immediately:
 
 - A **guard wiring violation introduced by me**, that same session.
-  `check_dev_dependencies.py` (ADR 0173) had no `EXPECTED_WIRING` entry, and
+  `check_dev_dependencies.py` (ADR 0198) had no `EXPECTED_WIRING` entry, and
   the repository's Stage 4 amendment is that a guard is not delivered until
   something runs it unasked. Nothing had told me, because
   `check_guard_wiring.py` runs *after* the guard that was failing.
@@ -86,7 +86,7 @@ repository's code:
 
 1. Three of them are the same two ADR index entries — `0146` and `0150` —
    linking files another agent has not yet committed.
-2. The fourth is ADR 0173's missing dependencies wearing a **third costume**.
+2. The fourth is ADR 0198's missing dependencies wearing a **third costume**.
    All five skips are `could not import 'cffconvert'` and `could not import
    'libsedml'` — the exact two packages `make deps-check` names. A guard
    whose subject is silent skips, failing for a reason that has nothing to do
@@ -127,7 +127,7 @@ traces to another agent's in-flight work or to two uninstalled packages.
   fix that. Nineteen of its twenty-one error lines are missing `node_modules`
   in four workspaces. Whether those workspaces should be installed, or the
   guard should distinguish "no dependencies" from "does not compile" the way
-  ADR 0173's checker does, is a separate decision.
+  ADR 0198's checker does, is a separate decision.
 - **The one-character fix was not reviewed by whoever wrote that comment.**
   It restores a JSX comment to what it plainly intended to be, and nothing
   about the page's content changed — but it is a change to another author's

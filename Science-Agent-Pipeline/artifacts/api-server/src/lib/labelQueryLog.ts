@@ -9,7 +9,7 @@
  * automate it is exactly why it is worth stating. Labelling the queries with
  * an LLM would produce a set on which the LLM classifier scores ~100% by
  * construction, and on which the keyword classifier's score would measure
- * agreement-with-an-LLM rather than correctness. ADR 0170 hit the shared-
+ * agreement-with-an-LLM rather than correctness. ADR 0195 hit the shared-
  * author failure one level down; using a model as the labeller would be the
  * same mistake one level down again. So the labeller is a human, and this
  * file's job is to make that as short as possible rather than to avoid it.

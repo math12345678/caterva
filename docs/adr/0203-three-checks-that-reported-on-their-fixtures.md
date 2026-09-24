@@ -1,4 +1,4 @@
-# ADR 0178: Three checks that reported on their fixtures
+# ADR 0203: Three checks that reported on their fixtures
 
 **Status:** Accepted, implemented
 
@@ -8,7 +8,7 @@
 `docs/mutations/adr-0133-lab-report.json`,
 `docs/mutations/adr-0144-documented-citations.json`
 
-**Follows:** ADR 0151 (whose mutation table this makes re-runnable), ADR 0173
+**Follows:** ADR 0151 (whose mutation table this makes re-runnable), ADR 0198
 (the dev-dependency guard this reuses), ADR 0069 (the mutation harness)
 
 ## Context

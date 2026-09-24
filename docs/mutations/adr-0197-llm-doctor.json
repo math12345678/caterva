@@ -1,8 +1,8 @@
 {
   "_why": [
-    "ADR 0172's mutation table, re-derived under scripts/mutate.py.",
+    "ADR 0197's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "ADR 0172 adds a check that says which LLM providers actually work. The",
+    "ADR 0197 adds a check that says which LLM providers actually work. The",
     "mutations target the distinctions that make it worth running rather than",
     "the request itself.",
     "",
@@ -30,7 +30,7 @@
     "the same refusal differently falls through to the raw HTTP line, which",
     "is honest but unhelpful, and nothing tests that path.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0172-llm-doctor.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0197-llm-doctor.json"
   ],
   "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/llmDoctor.test.ts",
   "mutations": [

@@ -1,4 +1,4 @@
-# ADR 0172: Three ways to say no
+# ADR 0197: Three ways to say no
 
 **Status:** Accepted
 
@@ -101,7 +101,7 @@ Also fixed: the abort timer was never cleared, so each probe held the event
 loop open for its full 20-second timeout. A six-provider run now takes 4
 seconds.
 
-Mutations, `docs/mutations/adr-0172-llm-doctor.json`, **4 caught, 0 not
+Mutations, `docs/mutations/adr-0197-llm-doctor.json`, **4 caught, 0 not
 caught**:
 
 | id | mutation | caught |

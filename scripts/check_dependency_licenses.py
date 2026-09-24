@@ -156,7 +156,7 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "permission to link or embed compiled bootloader and related files "
         "into combinations with other programs, and to distribute those "
         "combinations without any restriction'. Build-time only otherwise: "
-        "nothing imports it and nothing at runtime needs it (ADR 0176).",
+        "nothing imports it and nothing at runtime needs it (ADR 0201).",
     ),
     "ruff": (
         "MIT",

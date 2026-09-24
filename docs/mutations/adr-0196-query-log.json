@@ -1,8 +1,8 @@
 {
   "_why": [
-    "ADR 0171's mutation table, re-derived under scripts/mutate.py.",
+    "ADR 0196's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "ADR 0171 adds the first thing in this repository that records what a",
+    "ADR 0196 adds the first thing in this repository that records what a",
     "person typed. The mutations therefore target the promises that make",
     "that acceptable, not the feature.",
     "",
@@ -30,7 +30,7 @@
     "patterns are sufficient. They are three crude regexes, the ADR says so,",
     "and nothing tests text they were not written for.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0171-query-log.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0196-query-log.json"
   ],
   "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/queryLog.test.ts src/__tests__/labelQueryLog.test.ts",
   "mutations": [

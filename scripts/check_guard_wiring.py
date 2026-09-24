@@ -150,7 +150,7 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # is what makes it enforcing; the make target is what makes it usable.
     "check_ci_reproducible_locally": ("pytest",),
     "check_doc_paths_resolve": ("pytest",),
-    # Wired 2026-08-23 (ADR 0173). pytest only, on purpose. This guard names
+    # Wired 2026-08-23 (ADR 0198). pytest only, on purpose. This guard names
     # the declared dependencies that are not installed, and the machine most
     # likely to be missing them is a contributor's -- which is where pytest
     # runs. Deliberately NOT in verify_build or CI: CI installs from the

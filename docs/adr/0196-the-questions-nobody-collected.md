@@ -1,4 +1,4 @@
-# ADR 0171: The questions nobody collected
+# ADR 0196: The questions nobody collected
 
 **Status:** Accepted
 
@@ -8,7 +8,7 @@
 
 Five labelled query sets exist. No student wrote a line of any of them.
 
-ADR 0191 said so. ADR 0169 said so. ADR 0170 said so and then closed off the
+ADR 0191 said so. ADR 0194 said so. ADR 0195 said so and then closed off the
 last route that avoided the problem: vocabulary proposed by a model is fluent
 invention — *"buzzing genes"*, *"gene pendulum"* — and 97% of it never
 matched a real query.
@@ -58,7 +58,7 @@ behind, and it reloads on the next run so nobody labels the same query twice.
 Labelling with an LLM was the obvious shortcut and is the one thing that
 would destroy the result: the LLM classifier would score ~100% on such a set
 by construction, and the keyword classifier's score would measure
-agreement-with-a-model rather than correctness. ADR 0170 hit the shared-author
+agreement-with-a-model rather than correctness. ADR 0195 hit the shared-author
 failure one level down; a model labeller would be the same mistake one level
 down again.
 
@@ -94,7 +94,7 @@ log. "Nobody has collected any" and "a rate of zero" are different facts.
 `Error 3`, so a human sees the distinction, and a caller needing the code
 runs the script directly. Said here because the Makefile cannot preserve it.)
 
-Mutations, `docs/mutations/adr-0171-query-log.json`, **5 caught, 0 not
+Mutations, `docs/mutations/adr-0196-query-log.json`, **5 caught, 0 not
 caught**:
 
 | id | mutation | caught |

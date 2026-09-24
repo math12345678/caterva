@@ -7,11 +7,11 @@
 **Context:** `Tests/lab_report.py`, `scripts/report_lab.py`,
 `release/app/lesson.js`, `release/test_lesson.mjs`, `Tests/test_lab_report.py`
 
-**Closes a gap named in:** [ADR 0177](0177-ask-before-you-tell.md)
+**Closes a gap named in:** [ADR 0202](0202-ask-before-you-tell.md)
 
 ## Context
 
-ADR 0177 built the lesson layer and listed, among the things it did not
+ADR 0202 built the lesson layer and listed, among the things it did not
 check:
 
 > **The mechanism sentence assumes Michaelis-Menten.** It is only reached
@@ -117,6 +117,6 @@ next person will make it too.
 - **Only Michaelis-Menten has an explanation.** Every other rate law gets an
   honest refusal, not a lesson. Hill kinetics has a perfectly good story
   about cooperativity and nothing tells it.
-- **Still nobody has taken the lesson.** ADR 0177's first named gap is
+- **Still nobody has taken the lesson.** ADR 0202's first named gap is
   unchanged: screen recording is unavailable here, so the panel is verified
   by tests and never by a human reading it.

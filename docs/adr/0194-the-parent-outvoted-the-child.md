@@ -1,4 +1,4 @@
-# ADR 0169: The parent outvoted the child
+# ADR 0194: The parent outvoted the child
 
 **Status:** Accepted
 
@@ -74,7 +74,7 @@ occur.** Across all 228 fixture queries, the number of parent queries wrongly
 given the child model is **zero**. Two things bound it: the negation handling,
 and the requirement that the promoting term be one the parent does not share.
 
-Mutations, `docs/mutations/adr-0169-nested-domains.json`:
+Mutations, `docs/mutations/adr-0194-nested-domains.json`:
 
 | id | mutation | caught |
 |---|---|---|

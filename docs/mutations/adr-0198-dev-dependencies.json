@@ -1,8 +1,8 @@
 {
   "_why": [
-    "ADR 0173's mutation table, re-derived under scripts/mutate.py.",
+    "ADR 0198's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "ADR 0173 adds a check that names the declared dependencies which are not",
+    "ADR 0198 adds a check that names the declared dependencies which are not",
     "installed, because two failing tests had been blaming the wrong files for",
     "a whole session.",
     "",
@@ -25,7 +25,7 @@
     "selftest and reading what it needed. Nothing verifies that a second",
     "Python guard does not quietly depend on a different node_modules.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0173-dev-dependencies.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0198-dev-dependencies.json"
   ],
   "test": "cd Terium && python3 -m pytest tests/test_dev_dependencies_guard.py --no-header -p no:cacheprovider",
   "mutations": [

@@ -1,8 +1,8 @@
 {
   "_why": [
-    "ADR 0169's mutation table, re-derived under scripts/mutate.py.",
+    "ADR 0194's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "ADR 0169 fixed the classifier's blindness to nested domains: SEIR",
+    "ADR 0194 fixed the classifier's blindness to nested domains: SEIR",
     "contains SIR, bimolecular Gillespie contains Gillespie, and summed",
     "keyword scoring let the parent's non-discriminating vocabulary outvote",
     "the child's one decisive phrase.",
@@ -25,7 +25,7 @@
     "NOT a refinement of cell_cycle_oscillator; that judgement is argued in",
     "the ADR and asserted nowhere.",
     "",
-    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0169-nested-domains.json"
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0194-nested-domains.json"
   ],
   "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/nestedDomains.test.ts src/__tests__/negatedKeywords.test.ts src/__tests__/classifierEval.test.ts src/__tests__/llmAuthoredQueries.test.ts",
   "mutations": [

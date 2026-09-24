@@ -1,4 +1,4 @@
-# ADR 0177: Ask before you tell
+# ADR 0202: Ask before you tell
 
 **Status:** Accepted
 
@@ -116,7 +116,7 @@ disagree, and whether that disagreement reaches the answer.
   saturation argument that does not apply to it. Listed here as a
   limitation, which 0180 corrects — it was a defect.
 - **No notion of a learner.** No progress, no second question, no record of
-  what was answered. `queryLog.ts` (ADR 0171) could carry that and does not.
+  what was answered. `queryLog.ts` (ADR 0196) could carry that and does not.
 - **The four bands are chosen, not derived.** 1.2×, 2×, and 0.6 of the
   parameter spread are judgement calls about what "noticeably different"
   means. Nothing measures whether they are the right cuts.

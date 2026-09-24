@@ -84,7 +84,7 @@ types-PyYAML==6.0.12.20260815
 mypy==1.15.0
 
 # Freezes scripts/report_lab.py into the binary inside Terrium.app
-# (release/build_dmg.sh, ADR 0176). Build-time only: nothing imports it, and
+# (release/build_dmg.sh, ADR 0201). Build-time only: nothing imports it, and
 # nothing at runtime needs it.
 #
 # GPL-2.0-with-exception -- the exception explicitly permits distributing

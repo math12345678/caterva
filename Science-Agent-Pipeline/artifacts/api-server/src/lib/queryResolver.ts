@@ -1929,7 +1929,7 @@ function distinctiveTerms(child: DomainDefaults, parent: DomainDefaults): string
  * inhibitor only in passing gets the inhibition model. Two things bound it
  * -- the negation handling of ADR 0192, which is why "no inhibitor involved"
  * does not promote, and the requirement that the term be distinctive. What
- * remains is measured in ADR 0169 rather than argued here.
+ * remains is measured in ADR 0194 rather than argued here.
  */
 function resolveNesting(
   winner: DomainDefaults,

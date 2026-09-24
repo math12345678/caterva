@@ -13556,7 +13556,7 @@ exits 3; the benchmark names empty fixtures instead of scoring them.
 
 ---
 
-## Pass: the parent outvoted the child (ADR 0169)
+## Pass: the parent outvoted the child (ADR 0194)
 
 You asked me to take the nesting problem. The first thing measuring it did
 was correct the framing I gave you.
@@ -13619,7 +13619,7 @@ produced would have meant nothing.
 
 ---
 
-## Pass: fluent invention is not usage (ADR 0170) — a rejected approach
+## Pass: fluent invention is not usage (ADR 0195) — a rejected approach
 
 This pass produced no working code, and that is the result rather than a
 failure to report around.
@@ -13674,10 +13674,10 @@ evidence that nothing reads, with the prompt recorded so it can be redone.
 
 ---
 
-## Pass: the questions nobody collected (ADR 0171)
+## Pass: the questions nobody collected (ADR 0196)
 
 Three records in a row have ended on the same sentence: five labelled query
-sets exist and no student wrote a line of any of them. ADR 0170 closed off
+sets exist and no student wrote a line of any of them. ADR 0195 closed off
 the last route that avoided the problem — model-proposed vocabulary is fluent
 invention, and 97% of it never matched a real query.
 
@@ -13710,7 +13710,7 @@ never held them cannot leak them.
 rejected rather than resolved to its first match. Labelling with an LLM was
 the obvious shortcut and would have destroyed the result: the LLM classifier
 scores ~100% on such a set by construction, and the keyword score would
-measure agreement rather than correctness. That is ADR 0170's failure one
+measure agreement rather than correctness. That is ADR 0195's failure one
 level down again, and I could see it coming this time.
 
 ### The number that costs nothing
@@ -13731,7 +13731,7 @@ collected any* and *a rate of zero* are different facts.
 
 ---
 
-## Pass: three ways to say no (ADR 0172)
+## Pass: three ways to say no (ADR 0197)
 
 Your original question was "is the AI agent pipeline working?". Answering it
 took me an afternoon of manual `curl`, and the answer was three separate
@@ -13789,7 +13789,7 @@ for its full 20-second timeout. Six providers now take 4 seconds.
 
 ---
 
-## Pass: a failure wearing two costumes (ADR 0173)
+## Pass: a failure wearing two costumes (ADR 0198)
 
 I flagged the same two failing tests **five times** as "pre-existing, not
 mine" and never once looked at what they were. This pass looked.
@@ -13844,7 +13844,7 @@ not route through the code under test.**
 
 ---
 
-## Pass: the failure that hid the others (ADR 0174)
+## Pass: the failure that hid the others (ADR 0199)
 
 I have been reporting the state of this repository incorrectly all session,
 and this pass found out why.
@@ -13863,7 +13863,7 @@ result. I made it in my own reporting while writing records about it.
 
 ### What was hiding back there
 
-**A guard wiring violation I introduced that same session.** ADR 0173's new
+**A guard wiring violation I introduced that same session.** ADR 0198's new
 checker had no `EXPECTED_WIRING` entry — the repo's rule is that a guard is
 not delivered until something runs it unasked. Nothing told me, because
 `check_guard_wiring.py` runs *after* the guard that was failing.
@@ -13880,7 +13880,7 @@ got there.
 
 `make guards-all`: **37 ok, 4 failed**, 793 seconds. All four failures reduce
 to two causes and neither is a defect in this code — three are those same two
-ADR links, and the fourth is ADR 0173's missing dependencies in a **third
+ADR links, and the fourth is ADR 0198's missing dependencies in a **third
 costume**: all five skips are `could not import cffconvert` and `libsedml`,
 making a guard about silent skips fail for a reason unrelated to skipping.
 
@@ -13906,10 +13906,10 @@ revealed" is what happened.
 
 ---
 
-## Pass: a package nobody declared (ADR 0175)
+## Pass: a package nobody declared (ADR 0200)
 
-You installed the dev requirements. ADR 0173's two failures went away and
-three different ones appeared — which is not a regression, it is ADR 0174's
+You installed the dev requirements. ADR 0198's two failures went away and
+three different ones appeared — which is not a regression, it is ADR 0199's
 masking one level up. `make test` runs the engine suite then the literature
 suite and stops at the first. While engine was red, **the literature suite
 had never run at all.**
@@ -13962,7 +13962,7 @@ fail, then restored byte-identical.
 
 ---
 
-## Pass: the first release (ADR 0176)
+## Pass: the first release (ADR 0201)
 
 `make dmg` produces a signed, verified **84 MB `Terrium.dmg`** containing an
 app that runs on a Mac with nothing installed — no Python, no Node, no

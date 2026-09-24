@@ -1,4 +1,4 @@
-# ADR 0170: Fluent invention is not usage
+# ADR 0195: Fluent invention is not usage
 
 **Status:** Accepted — recording a rejected approach
 
@@ -6,7 +6,7 @@
 
 ## Context
 
-After ADR 0169 the classifier's largest remaining error was no longer
+After ADR 0194 the classifier's largest remaining error was no longer
 scoring. It was **coverage**: 37 queries across the three independent
 fixtures matched no keyword at all and were answered `mm` by fallback — 21 of
 72 in one fixture alone.
@@ -71,7 +71,7 @@ is notable given that the same model, asked to *be* a student and write a
 query, produces usable text: **generating an instance works, describing the
 distribution does not.**
 
-Also measured, since ADR 0169 promised to re-check it before any vocabulary
+Also measured, since ADR 0194 promised to re-check it before any vocabulary
 widening: **over-promotion remained zero** across all 228 queries with the
 251 terms merged. That risk did not materialise. It is simply that the terms
 never fired.
@@ -80,10 +80,10 @@ never fired.
 
 `generateDomainVocabulary.ts` and the merge in `queryResolver.ts` are
 deleted. The generated file is kept at
-`docs/measurements/adr-0170-generated-vocabulary.json`, marked REJECTED, with
+`docs/measurements/adr-0195-generated-vocabulary.json`, marked REJECTED, with
 the prompt recorded so the measurement can be redone. **Nothing reads it.**
 
-Classifier behaviour is unchanged from ADR 0169: 89.7% / 76.9% / 56.9%, 696
+Classifier behaviour is unchanged from ADR 0194: 89.7% / 76.9% / 56.9%, 696
 tests passing. This record adds no code. It exists so the next person to
 notice the coverage gap does not spend the same afternoon on the same idea.
 

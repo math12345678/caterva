@@ -6,7 +6,7 @@ implemented.** The choice it informs is the owner's.
 **Date:** 2026-08-28
 
 **Context:** [ADR 0181](0181-what-seven-people-who-build-this-said.md),
-[ADR 0177](0177-ask-before-you-tell.md),
+[ADR 0202](0202-ask-before-you-tell.md),
 [ADR 0180](0180-the-equation-the-document-never-named.md)
 
 ## The disagreement, restated
@@ -62,7 +62,7 @@ interactive artefacts are how the field teaches them.
 
 This is the part that changes the shape of the question.
 
-The lesson layer (ADR 0177) takes the disagreement Terrium found in the
+The lesson layer (ADR 0202) takes the disagreement Terrium found in the
 literature, runs the model at each value, and asks the student to predict
 the result before showing it:
 
@@ -112,7 +112,7 @@ summary of two emails.
   parameters directly.** The search returned identifiability and estimation
   methods; the connection to Terrium's question is mine, and it is an
   argument rather than a citation.
-- **Nobody has taught with Terrium.** ADR 0177's first named gap is
+- **Nobody has taught with Terrium.** ADR 0202's first named gap is
   unchanged: no human has taken the lesson it already has, so "Terrium
   teaches this well" is a claim about a design, not an observation.
 - **The sweep is a sketch.** Nothing here checks that a spread over a range
