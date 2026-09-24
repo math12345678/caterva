@@ -362,7 +362,23 @@ parameter value, as a table).
 ## Real constants, with real citations
 
 **This is what Terrium is for.** It needs the source checkout, not the app
-folder, and one command:
+folder: the resolvers that read BRENDA are not shipped in the download.
+
+**Getting the checkout, once** (about five minutes, most of it downloading
+dependencies). Put it somewhere iCloud does not sync — *not* under
+`~/Desktop` or `~/Documents` on a Mac with iCloud Drive, which silently
+breaks the `terrium` command (`make doctor` detects this and says so):
+
+```bash
+mkdir -p ~/Code && cd ~/Code
+git clone https://github.com/math12345678/terrium.git
+cd terrium
+make setup
+source .venv/bin/activate
+```
+
+From then on, in a new terminal: `cd ~/Code/terrium && source
+.venv/bin/activate`, and `terrium` works. Then, one command:
 
 ```bash
 make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"

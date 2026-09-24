@@ -33,4 +33,4 @@ repository-code: "https://github.com/Terrium-sim/terrium"
 # built artifacts (2026-09-19); 0.3.0 the first on GitHub's Releases page
 # with app folders (2026-09-21); 0.3.1 adds the user's guide (2026-09-22).
 version: 0.3.3
-date-released: 2026-09-22
+date-released: 2026-09-24

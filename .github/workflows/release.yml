@@ -197,6 +197,7 @@ jobs:
           grep -q '<sbml' model.xml
           terium-compose "two stage gene expression" --no-analysis --no-simulate --no-ranking | grep -q '^VERDICT:'
           python -m Terium.app --version
+          terrium --version   # the console script every document teaches
 
   app:
     name: app folder ${{ matrix.os }}

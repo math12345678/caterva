@@ -44,6 +44,10 @@ Changelog = "https://github.com/math12345678/terrium/blob/main/CHANGELOG.md"
 #   terium          the simulation engine (Wright-Fisher, Kimura, LD, SSA ...)
 #   terium-compose  the compositional model builder and its analyses
 [project.scripts]
+# `terrium` is the one command every document teaches, and the name of the
+# executable in the downloadable app folder. It dispatches to the two below,
+# which stay for anyone already using them.
+terrium = "Terium.app:main"
 terium = "Terium.cli:console_main"
 terium-compose = "Terium.compose.__main__:console_main"
 

@@ -34,6 +34,8 @@ Two things, neither of which was a hypothesis first:
 
 from __future__ import annotations
 
+import re
+
 import pathlib
 import sys
 
@@ -201,7 +203,10 @@ class TestOnRealMarkup:
         for quantity, resolution in search.first_pass.resolutions.items():
             assert resolution.source is not None, quantity
             assert resolution.source.citation, f"{quantity} has no citation"
-            assert "brenda-enzymes.org" in resolution.source.citation
+            # Since v0.3.3 the citation names the paper ("BRENDA ref 740253"),
+            # not the database's home page, which identified nothing.
+            assert re.search(r"BRENDA ref \d+", resolution.source.citation), (
+                quantity, resolution.source.citation)
 
     def test_a_real_ph_gap_is_fixed_by_re_selecting_a_real_row(self) -> None:
         """Not a constructed example, and not a corrected number.
