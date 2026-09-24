@@ -50,6 +50,17 @@ The product's central claim -- every number traces to its source -- was
 true of the code and unreachable from anything a person types.
 
 ### Added
+- **A composed model reports the conditions its values were measured
+  under, and whether they can be mixed.** pH, temperature and buffer decide
+  whether two constants belong in one model; `Measurement` has carried
+  them since it was written and the CSV printed them, while the report a
+  person actually reads did not. It now lists them per constant, names any
+  source that stated none ("a fact about the paper, not a gap in the
+  search"), and compares the ones that can be compared against
+  `model_compatibility`'s own thresholds (1 pH unit, 10 °C), saying
+  plainly when a model would describe an experiment nobody ran. With one
+  constant it makes no comparison claim, because a reassurance about
+  nothing reads like a check that passed.
 - **A composed model reports what the evidence did not settle.** Where the
   resolver ranked more than one row equal, the report names the spread
   instead of presenting the pick as the answer: for EC 1.1.1.27 and

@@ -149,10 +149,10 @@ export const TEST_SUITES: TestSuite[] = [
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // Re-measured 2026-09-24 after the literature wiring and the
-        // disagreement reporting (ADR 0178), Terium/ run alone under .venv,
-        // read out of a junit-xml report: 3335 tests, 3334 passed, 1 failed,
-        // 333 s. The one
+        // Re-measured 2026-09-24 after the literature wiring, the
+        // disagreement reporting and the assay conditions (ADR 0178),
+        // Terium/ run alone under .venv, read out of a junit-xml report:
+        // 3343 tests, 3342 passed, 1 failed, 419 s. The one
         // failure is the same check_codegen_loads.py selftest as on
         // 2026-09-19 and 2026-09-21 (npx cannot write the npm cache in the
         // sandbox; see the long note above), so this row says 3308, the

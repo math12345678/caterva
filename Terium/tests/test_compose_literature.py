@@ -308,3 +308,103 @@ class TestTheRowsTheResolverDidNotPick:
             "conversion, or the report has nothing to disagree about"
         )
         assert record.disagreement == (0.03, 0.398)
+
+
+class TestTheConditionsAValueWasMeasuredUnder:
+    """pH, temperature and buffer decide whether two values may be mixed.
+
+    Lisa Jeske (BRENDA curation, DSMZ) named exactly this as what makes a
+    resolved value meaningless without it, and `Measurement` has carried the
+    three axes since it was written -- the CSV prints them in columns of
+    their own. The composed report, the artefact a person actually reads,
+    did not, so a model could pull a Km measured at pH 5 and a Ki measured
+    at pH 8 into one simulation and describe an experiment nobody ran.
+    """
+
+    @staticmethod
+    def _measured(**by_name):
+        out = {}
+        for name, fields in by_name.items():
+            out[name] = Measurement(
+                value=fields.pop("value", 0.03), unit=fields.pop("unit", "mM"),
+                citation=fields.pop("citation", "BRENDA ref 1"),
+                organism="Homo sapiens", **fields,
+            )
+        return out
+
+    def _section(self, measured):
+        from Terium.compose.report import dossier
+
+        model = compose(QUERY, subject="1.1.1.27", organism="Homo sapiens",
+                        substrate="pyruvate").with_measured(measured)
+        report = dossier(QUERY, subject="1.1.1.27", model=model,
+                         analyse_stability=False, simulate=False,
+                         rank_unmeasured=False)
+        return "\n".join(report.provenance_section())
+
+    def test_the_conditions_are_printed(self):
+        text = self._section(self._measured(reaction_Km=dict(
+            assay_ph=7.4, assay_temperature_c=37.0,
+            assay_buffer="0.1 M MOPS buffer",
+        )))
+        assert "conditions these were measured under" in text
+        assert "pH 7.4" in text and "37 °C" in text and "0.1 M MOPS buffer" in text
+
+    def test_a_source_that_stated_none_is_named_as_such(self):
+        """'The paper did not report a pH' is not 'Terrium has no pH'."""
+        text = self._section(self._measured(
+            reaction_Km=dict(assay_ph=7.4, assay_temperature_c=37.0),
+            reaction_Ki=dict(value=0.5),
+        ))
+        assert "the source stated no conditions" in text
+        assert "a fact about the paper, not a gap in the search" in text
+
+    def test_conditions_the_source_explicitly_withheld_are_repeated(self):
+        text = self._section(self._measured(reaction_Km=dict(
+            assay_ph=7.4, assay_unreported=("temperature",),
+        )))
+        assert "did not report: temperature" in text
+
+    def test_two_constants_from_incompatible_assays_are_flagged(self):
+        """The thing the conditions are FOR."""
+        text = self._section(self._measured(
+            reaction_Km=dict(assay_ph=5.0, assay_temperature_c=25.0),
+            reaction_Ki=dict(value=0.5, assay_ph=8.0, assay_temperature_c=45.0),
+        ))
+        assert "were not measured under the same conditions" in text
+        assert "3 pH unit(s)" in text and "20 °C" in text
+        assert "describes an experiment nobody ran" in text
+
+    def test_conditions_within_the_thresholds_are_not_flagged(self):
+        text = self._section(self._measured(
+            reaction_Km=dict(assay_ph=7.4, assay_temperature_c=37.0),
+            reaction_Ki=dict(value=0.5, assay_ph=7.5, assay_temperature_c=37.0),
+        ))
+        assert "were not measured under the same conditions" not in text
+        assert "can be read as describing comparable experiments" in text
+
+    def test_one_constant_makes_no_comparison_claim(self):
+        """A check that cannot fail must not print where one that did would.
+
+        With a single measured constant there is nothing to compare, and
+        'the measured constants can be read as describing comparable
+        experiments' would be a reassurance about nothing.
+        """
+        text = self._section(self._measured(reaction_Km=dict(
+            assay_ph=7.4, assay_temperature_c=37.0,
+        )))
+        assert "pH 7.4" in text, "the conditions themselves are still worth printing"
+        assert "comparable experiments" not in text
+
+    def test_buffers_alone_are_not_a_comparison(self):
+        """Two buffer strings do not establish that two assays are alike."""
+        text = self._section(self._measured(
+            reaction_Km=dict(assay_buffer="MOPS"),
+            reaction_Ki=dict(value=0.5, assay_buffer="Tris"),
+        ))
+        assert "MOPS" in text and "Tris" in text
+        assert "comparable experiments" not in text
+
+    def test_nothing_is_printed_when_no_source_stated_anything(self):
+        text = self._section(self._measured(reaction_Km=dict()))
+        assert "conditions these were measured under" not in text
