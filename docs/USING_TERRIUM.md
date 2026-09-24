@@ -466,8 +466,26 @@ says whether they can be mixed, against this project's own thresholds
 in rate). If they clash it says so: *a model built from them describes an
 experiment nobody ran.*
 
-**Read the placeholder row.** A partial result is the normal case: BRENDA
-has a Km for acetylcholinesterase and no kcat. The constants the search did not
+**Read the placeholder rows especially.** They say what the search
+actually met, which is very often not "nothing":
+
+```
+| `reaction_kcat` | 100.0 1/s | **placeholder** | no value in the organism
+  requested; measurements exist in other organisms and cross-species use was
+  not opted into -- available in: Cimex lectularius, Drosophila
+  melanogaster, Macroptilium atropurpureum, Mus musculus |
+
+| `reaction_Ki`   | 0.5 mM    | **placeholder** | no database value;
+  candidate papers were found but a number was not extracted from free text |
+```
+
+Four different outcomes, four different next actions: the value exists in
+another species and you can decide to accept it; it exists only in distant
+ones; papers exist and nobody extracted the number, so go and read them; or
+there is genuinely nothing. Only the last means stop looking.
+
+A partial result is the normal case: BRENDA has a Km for
+acetylcholinesterase and no kcat. The constants the search did not
 find keep the library's placeholder and are listed as such, with the
 distinction that matters — *searched and not found* is not *not looked
 for*. Any conclusion resting on one of them is a statement about the motif
@@ -534,7 +552,7 @@ If you find Terrium doing any of these, that is a bug worth reporting.
 | `Not built.` + a list of shapes | You named a subject, not a mechanism. Describe the mechanism, or pick from `--shapes`. |
 | `Not built.` + "is a named pathway" | Needs a pathway database Terrium does not read. Describe the steps you want. |
 | `Not exported.` | The export refused and the reason is printed above it. The report still ran. |
-| Exit code 3 | Something refused and said why; the rest of the report is still there and still valid. |
+| Exit code 3 | Something refused and said why; the rest of the report is still there and still valid. A **refused literature search** is one of these: an enzyme name that means more than one enzyme, or a model needing a Km with no `--substrate`. A search that ran and found nothing is *not* a refusal — it produced its answer, and the provenance table states it per constant. |
 | Exit code 2 | The question was not well formed. |
 | macOS: "cannot be opened because the developer cannot be verified" | The folder is unsigned. `xattr -dr com.apple.quarantine .` inside the folder. "Open Anyway" in System Settings clears one file, not the libraries, so it will not work. |
 | Windows: "Windows protected your PC" | SmartScreen. More info > Run anyway. Run `.\terrium.exe` from a terminal. |

@@ -76,6 +76,13 @@ class ComposedModel:
     #: that quietly substituted one and left the other at a placeholder
     #: would simulate, plot, and look exactly like a sourced one.
     measured: Mapping[str, Any] = field(default_factory=dict)
+    #: Why each quantity the search could not resolve came back empty, in
+    #: the resolver's words. "The value exists in another organism and was
+    #: not substituted" and "nothing anywhere" are different facts with
+    #: different next actions, and a report that prints one sentence for
+    #: both tells a reader to stop looking for a number that is in the
+    #: database (ADR 0178).
+    not_found: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def structure_only(self) -> bool:
@@ -109,9 +116,13 @@ class ComposedModel:
     @property
     def searched(self) -> bool:
         """True when a literature search was run over this model."""
-        return bool(self.measured)
+        return bool(self.measured) or bool(self.not_found)
 
-    def with_measured(self, measured: Mapping[str, Any]) -> "ComposedModel":
+    def with_measured(
+        self,
+        measured: Mapping[str, Any],
+        not_found: Optional[Mapping[str, str]] = None,
+    ) -> "ComposedModel":
         """This model with the literature's values substituted in.
 
         The network is rebuilt by `export.provenance_of`, which is already
@@ -120,14 +131,21 @@ class ComposedModel:
         trail prints cannot disagree. Constants the search did not return
         keep the motif library's placeholder and stay in `unmeasured`.
         """
-        if not measured:
+        if not measured and not not_found:
             return self
+        if not measured:
+            # A search that resolved nothing still ran, and why it found
+            # nothing is the whole of what it has to report.
+            return replace(self, not_found=dict(not_found or {}))
         try:
             from .export import provenance_of
         except ImportError:  # pragma: no cover - flat layout
             from export import provenance_of  # type: ignore[no-redef]
         provenanced = provenance_of(self, measured=dict(measured))
-        return replace(self, network=provenanced.network, measured=dict(measured))
+        return replace(
+            self, network=provenanced.network, measured=dict(measured),
+            not_found=dict(not_found or {}),
+        )
 
     def parameter_requests(self) -> List[Any]:
         """`ParameterRequest`s for `Terium/agents`, or an empty list.

@@ -159,12 +159,12 @@ class ParameterScout:
             reason = (
                 f"{reason} (searched under the requirement that "
                 f"{organism_constraint}, raised by "
-                f"{organism_constraint.raised_by or 'an earlier round'})"
+                f"{self._who_raised(organism_constraint, 'an earlier round')})"
             )
         if source is not None and organism_constraint is not None:
             notes.append(
                 f"{quantity} re-resolved in {organism} after "
-                f"{organism_constraint.raised_by or 'a critic'} required it"
+                f"{self._who_raised(organism_constraint, 'a critic')} required it"
             )
         if source is not None:
             windows = self._windows(view, quantity)
@@ -191,6 +191,18 @@ class ParameterScout:
             if constraint.kind == "organism":
                 return constraint.requirement, constraint
         return self.request.organism, None
+
+    @staticmethod
+    def _who_raised(constraint: Any, default: str) -> str:
+        """Whose requirement this was, in words a reader recognises.
+
+        `<input>` is the blackboard's label for a constraint that came from
+        what the caller typed (`assembly.py`). It is exactly right inside
+        the agent set and reads as leaked machinery on a page a researcher
+        is reading, where the honest translation is "you asked for it".
+        """
+        raised_by = getattr(constraint, "raised_by", None) or default
+        return "your own request" if raised_by == "<input>" else raised_by
 
     def _cross_species_allowed(self, view: View, quantity: str) -> bool:
         # Default is False: ADR 0024's position is that a value from

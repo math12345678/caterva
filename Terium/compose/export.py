@@ -789,6 +789,42 @@ def measured_from_search(search: Any) -> Dict[str, Measurement]:
     return out
 
 
+def unresolved_from_search(search: Any) -> Dict[str, str]:
+    """Why each quantity the search could NOT resolve came back empty.
+
+    WHY "NOT FOUND" IS FOUR DIFFERENT FACTS
+    ---------------------------------------
+    `Terium/agents/adapters.py` distinguishes them, and the actions differ
+    completely:
+
+      cross_species_withheld     the value EXISTS, measured in another
+                                 organism, and was not substituted (ADR
+                                 0024: offered, never substituted). The
+                                 reader can go and accept it.
+      cross_species_too_distant  it exists, but only in organisms too
+                                 distant to offer.
+      literature_candidates      papers were found and no number could be
+                                 extracted from their free text. The reader
+                                 can go and read them.
+      not_found                  nothing, anywhere.
+
+    Collapsing these into "found nothing" is not a summary, it is wrong for
+    two of the four: something was found, and the reader is told to stop
+    looking.
+    """
+    build = search if hasattr(search, "resolutions") else getattr(search, "build", None)
+    if build is None:
+        return {}
+    out: Dict[str, str] = {}
+    for quantity, resolution in getattr(build, "resolutions", {}).items():
+        if getattr(resolution, "source", None) is not None:
+            continue
+        reason = getattr(resolution, "reason", None)
+        if reason:
+            out[quantity] = str(reason)
+    return out
+
+
 def _unpack(source: Any) -> Tuple[Any, Any, Optional[str], Optional[str]]:
     """(composition, network, query, subject) from whatever was passed."""
     composition = getattr(getattr(source, "recognition", None), "composition", None)
