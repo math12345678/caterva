@@ -42,7 +42,7 @@
   "test": "cd Tests && python3 -m pytest test_lab_report.py --no-header -p no:cacheprovider",
   "covers": [
     "0151",
-    "0178"
+    "0203"
   ],
   "mutations": [
     {

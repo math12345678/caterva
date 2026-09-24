@@ -25,7 +25,7 @@
   "test": "cd Tests && python3 -m pytest test_documented_citations_guard.py --no-header -p no:cacheprovider",
   "covers": [
     "0151",
-    "0178"
+    "0203"
   ],
   "mutations": [
     {
