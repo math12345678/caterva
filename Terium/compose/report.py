@@ -207,23 +207,39 @@ class ModelDossier:
                 f"| `{identifier}` | {record.value} {record.unit} | literature"
                 f"{organism} | {record.citation} |"
             )
+        reasons = dict(getattr(self.model, "not_found", {}) or {})
         for identifier in self.model.unmeasured:
             quantity = by_id.get(identifier)
             table = (quantity.table if quantity else None) or "no table"
+            # THE RESOLVER'S OWN WORDS, NOT A SUMMARY OF THEM. It
+            # distinguishes four outcomes -- the value exists in another
+            # organism and was not substituted, it exists only in distant
+            # ones, papers were found and no number extracted, or nothing
+            # anywhere -- and "found nothing" is FALSE for two of them,
+            # telling a reader to stop looking for a number that is in the
+            # database.
+            why = reasons.get(identifier) or f"searched the {table} table and found nothing"
             lines.append(
                 f"| `{identifier}` | "
                 f"{quantity.placeholder if quantity else '?'} "
                 f"{quantity.unit if quantity else ''} | **placeholder** | "
-                f"searched the {table} table and found nothing |"
+                f"{why} |"
             )
         if self.model.unmeasured:
+            # NOT "looked for and not found". The reasons column above may
+            # say the value exists in four other species, or that papers
+            # were found and no number extracted -- in which case something
+            # WAS found, and a summary saying otherwise contradicts the
+            # table it sits under.
             lines += [
                 "",
-                f"The {len(self.model.unmeasured)} placeholder(s) above were "
-                f"looked for and not found, which is a different fact from "
-                f"their not having been looked for. Any conclusion that "
-                f"rests on one of them is a statement about the motif "
-                f"library's illustrative value, not about this enzyme.",
+                f"The {len(self.model.unmeasured)} placeholder(s) above are "
+                f"the motif library's illustrative values, kept because the "
+                f"search did not return one. The reason column says what "
+                f"the search actually met, which is not always \"nothing\": "
+                f"read it before concluding the measurement does not exist. "
+                f"Any conclusion resting on one of these is a statement "
+                f"about the library's value, not about this enzyme.",
             ]
         lines += self._condition_lines(measured)
         lines += self._disagreement_lines(measured)

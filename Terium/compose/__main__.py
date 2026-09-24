@@ -833,8 +833,27 @@ def _validate_section(
 # ---------------------------------------------------------------------------
 
 
-def _search_the_literature(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
-    """Resolve this model's constants from the literature. `(model, note)`.
+def _search_the_literature(
+    model: Any, args: Any,
+) -> Tuple[Any, Optional[str], bool]:
+    """Resolve this model's constants from the literature.
+
+    Returns `(model, note, refused)`. `refused` is True when the search
+    could not be RUN -- an ambiguous enzyme name, a missing substrate, no
+    literature layer, a crash -- and False when it ran, whatever it found.
+
+    THE DISTINCTION THE EXIT CODE NEEDS
+    -----------------------------------
+    This CLI's contract, stated in its own `--help`, is "0 produced
+    everything asked for, 3 something refused and said why (the report is
+    still printed)". Passing `--subject "lactate dehydrogenase"` asks for a
+    search; the resolver refuses because that name is six enzymes; and the
+    report said so in prose while exiting 0. A script could not tell, which
+    is the whole reason the three-state convention exists here.
+
+    A search that RAN and found nothing is not a refusal. It produced its
+    answer, and the answer is that the database has no value -- which the
+    provenance table now states per constant, in the resolver's words.
 
     Returns the model with whatever the search returned substituted in, and
     a note for the report when something could not be done. EVERY failure
@@ -857,13 +876,11 @@ def _search_the_literature(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
         try:
             lookup = literature_module("enzyme_lookup")
         except LiteratureLayerUnavailable as exc:
-            return model, str(exc)
+            return model, str(exc), True
         try:
             ec = lookup.ec_number_for_name(subject)
         except Exception as exc:  # noqa: BLE001 - the refusal names the candidates
-            return model, (
-                f"No search was run: {exc}"
-            )
+            return model, f"No search was run: {exc}", True
         model = replace(model, subject=ec)
 
     needs_substrate = sorted(
@@ -876,37 +893,40 @@ def _search_the_literature(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
             f"from BRENDA, and those tables are per-substrate. A motif knows "
             f"it needs a Km; it cannot know what the Km is FOR. Re-run with "
             f"--substrate NAME."
-        )
+        ), True
 
     try:
-        from Terium.compose.export import measured_from_search
+        from Terium.compose.export import (
+            measured_from_search, unresolved_from_search,
+        )
         from Terium.compose.pipeline import compose_and_parameterise
         _, search = compose_and_parameterise(
             model.query, subject=ec, organism=args.organism,
             substrate=args.substrate,
         )
     except LiteratureLayerUnavailable as exc:
-        return model, str(exc)
+        return model, str(exc), True
     except Exception as exc:  # noqa: BLE001 - a failed search is a note, not a crash
-        return model, f"The literature search failed: {type(exc).__name__}: {exc}"
+        return model, f"The literature search failed: {type(exc).__name__}: {exc}", True
 
     if search is None:
-        return model, "No search was run: this model has nothing a database could supply."
+        return model, "No search was run: this model has nothing a database could supply.", False
 
     measured = measured_from_search(search)
+    not_found = unresolved_from_search(search)
     failures = [
         run for branch in getattr(search, "branches", ())
         for record in getattr(branch.build.run, "rounds", ())
         for run in getattr(record, "ran", ())
         if getattr(run, "failed", False)
     ]
-    sourced = model.with_measured(measured)
+    sourced = model.with_measured(measured, not_found=not_found)
     if not measured:
         why = "; ".join(sorted({r.failure for r in failures})) if failures else (
             "every table was searched and none held a value for this "
             "enzyme, organism and substrate"
         )
-        return sourced, f"The search returned no measured value: {why}"
+        return sourced, f"The search returned no measured value: {why}", False
 
     note = (
         f"{len(measured)} constant(s) resolved from the literature: "
@@ -919,7 +939,7 @@ def _search_the_literature(model: Any, args: Any) -> Tuple[Any, Optional[str]]:
             f"({', '.join(still)}): the search ran and returned nothing for "
             f"them, which is different from their not having been looked for"
         )
-    return sourced, note
+    return sourced, note, False
 
 
 def _export(description: str, subject: Optional[str], fmt: str,
@@ -951,7 +971,7 @@ def _export(description: str, subject: Optional[str], fmt: str,
             # An export that quietly carried placeholders while the report
             # beside it carried measurements would be the disagreement the
             # provenance machinery exists to prevent.
-            model, _ = _search_the_literature(model, args)
+            model, _, _ = _search_the_literature(model, args)
         provenanced = provenance_of(model, measured=dict(model.measured) or None)
         print(writers[fmt](provenanced))
     except ExportRefused as exc:
@@ -1072,11 +1092,12 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         model = compose(args.description, subject=args.subject,
                         organism=args.organism, substrate=args.substrate)
         search_note = None
+        search_refused = False
         if args.subject:
             # The search runs BEFORE the analyses, so every section below --
             # stability, sensitivity, the time course, the verdict -- reads
             # the literature's numbers rather than the library's (ADR 0178).
-            model, search_note = _search_the_literature(model, args)
+            model, search_note, search_refused = _search_the_literature(model, args)
         precomputed = _precompute_for_verdict(args, model)
 
         report = dossier(
@@ -1102,6 +1123,16 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         print(report.markdown(footer=False))
 
         code = _analyses(args, report.model, precomputed)
+        if search_refused and code == 0:
+            # The reason is already in the report, beside what it is about.
+            # This says only that a script should look (the same shape the
+            # analysis refusals use).
+            print(
+                "1 refusal(s) in 1 section(s), each explained where it "
+                "belongs in the report: the literature search.",
+                file=sys.stderr,
+            )
+            code = 3
         print("\n".join(report.footer_section()))
         return code
 

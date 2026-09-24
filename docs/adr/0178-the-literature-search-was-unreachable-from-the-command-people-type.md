@@ -202,6 +202,82 @@ Two details worth keeping:
   comparable experiments" over a single constant -- a check that cannot
   fail, in the position a reader takes for one that did.
 
+## An eighth: "not found" is four facts, and the page printed one
+
+`adapters.NOT_FOUND_REASONS` distinguishes four outcomes:
+
+    cross_species_withheld     the value EXISTS, in another organism, and
+                               was not substituted (ADR 0024).
+    cross_species_too_distant  it exists, only in organisms too distant.
+    literature_candidates      papers were found, no number extracted.
+    not_found                  nothing, anywhere.
+
+The composed report printed one sentence for all four -- and the sentence
+was mine, invented at the rendering layer: "searched the km table and found
+nothing". That is not a summary. It is FALSE for the first three, and the
+action it implies -- stop looking -- is wrong for all of them. Measured
+live on EC 3.1.1.7 in *Homo sapiens*, the two constants BRENDA did not
+supply came back "available in: Cimex lectularius, Drosophila
+melanogaster, Macroptilium atropurpureum, Mus musculus" and "candidate
+papers were found but a number was not extracted from free text".
+
+`unresolved_from_search` now carries the resolver's own words to the model
+and the report prints them per row. The summary underneath, which said the
+placeholders "were looked for and not found", was contradicting the table
+above it the moment the table learned to say otherwise, and now points at
+it instead.
+
+An aside with a general form: `<input>` is the blackboard's label for a
+constraint that came from what the caller typed. It is exactly right inside
+the agent set and reads as leaked machinery on a page a researcher is
+reading ("raised by <input>"). It is translated to "your own request" at
+the edge, in the scout, rather than by changing a label the rest of the
+agent set depends on.
+
+## A ninth, of a different kind: the exit code
+
+The first eight were one defect -- the resolver knew and a conversion
+dropped it. This one is a contract broken rather than a fact silenced, and
+it is worth keeping separate.
+
+`terrium compose --subject "lactate dehydrogenase"` asks for a search. The
+resolver refuses, correctly, because the name is six enzymes. The report
+says so, at length, in the right place. And the process exited **0**, while
+this CLI's own `--help` promises "3 something refused and said why (the
+report is still printed)". Every refusal in the analysis sections reaches
+the exit code through `Sections.refused`; the literature search was added
+later and was only ever a note.
+
+The line drawn: a search that could not be RUN is a refusal (ambiguous
+name, missing `--substrate`, no literature layer, a crash); a search that
+ran and found nothing is an ANSWER, and the answer is the provenance
+table's per-constant reason. So `--subject` on an unreachable enzyme exits
+3 and `--subject` on an enzyme BRENDA has nothing for exits 0.
+
+The testing note repeats the lesson one level up. A unit test on
+`_search_the_literature` caught a mutation of its returned flag. Then the
+CALLER was mutated to ignore that flag -- and every unit test stayed green
+while the process exited 0 again. Testing the function is not testing the
+contract; a subprocess test now runs the real CLI and asserts on the real
+exit status, using the missing-substrate case because it refuses before any
+network call.
+
+## The shape the first eight findings share
+
+The citation (fifth), the rows not picked (sixth), the conditions
+(seventh), and the reason for absence (eighth) are one defect wearing four
+faces: **the resolver knew, and a conversion dropped it.** Each field was
+present in `ParameterSource` or the `Resolution` and absent from the object
+the report reads, and in every case the report then said something more
+confident than the evidence supported -- a number with no rival, a citation
+that could not name its paper, a value with no conditions, an absence with
+no reason.
+
+Anyone adding a field to the resolver should assume the same gap exists
+until they have looked. `Terium/tests/test_compose_literature.py` audits
+`Measurement`'s fields against what the report renders, which is the cheap
+version of that check.
+
 ## A fifth thing, found on the way
 
 `citation_text` in `Terium/agents/adapters.py` looked for an attribute

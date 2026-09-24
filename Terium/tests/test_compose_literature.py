@@ -408,3 +408,201 @@ class TestTheConditionsAValueWasMeasuredUnder:
     def test_nothing_is_printed_when_no_source_stated_anything(self):
         text = self._section(self._measured(reaction_Km=dict()))
         assert "conditions these were measured under" not in text
+
+
+class TestWhyAQuantityCameBackEmpty:
+    """"Not found" is four different facts with four different next actions.
+
+    `adapters.NOT_FOUND_REASONS` distinguishes them and the composed report
+    used to print one invented sentence -- "searched the km table and found
+    nothing" -- for all four. That is not a summary; it is FALSE for two of
+    them. Measured live on EC 3.1.1.7 in Homo sapiens: kcat came back
+    "measurements exist in other organisms and cross-species use was not
+    opted into -- available in: Cimex lectularius, Drosophila melanogaster,
+    Macroptilium atropurpureum, Mus musculus", and Ki came back "candidate
+    papers were found but a number was not extracted from free text". Both
+    had been reported as nothing found, sending a reader to stop looking for
+    a number that is in the database.
+    """
+
+    def _section(self, not_found):
+        from Terium.compose.report import dossier
+
+        model = compose(QUERY, subject="3.1.1.7", organism="Homo sapiens",
+                        substrate="acetylcholine").with_measured(
+            {"reaction_Km": Measurement(value=0.0714, unit="mM",
+                                        citation="BRENDA ref 713996",
+                                        organism="Homo sapiens")},
+            not_found=not_found,
+        )
+        report = dossier(QUERY, subject="3.1.1.7", model=model,
+                         analyse_stability=False, simulate=False,
+                         rank_unmeasured=False)
+        return "\n".join(report.provenance_section())
+
+    def test_the_resolvers_words_reach_the_page(self):
+        text = self._section({
+            "reaction_kcat": (
+                "no value in the organism requested; measurements exist in "
+                "other organisms -- available in: Mus musculus"
+            ),
+        })
+        assert "measurements exist in other organisms" in text
+        assert "Mus musculus" in text
+        assert "searched the kcat table and found nothing" not in text
+
+    def test_each_quantity_gets_its_own_reason(self):
+        text = self._section({
+            "reaction_kcat": "measurements exist in other organisms",
+            "reaction_Ki": "candidate papers were found but a number was not extracted",
+        })
+        assert "measurements exist in other organisms" in text
+        assert "candidate papers were found" in text
+
+    def test_the_summary_does_not_contradict_the_reasons(self):
+        """A table saying "it exists in four species" under a sentence saying
+        "looked for and not found" is one report disagreeing with itself."""
+        text = self._section({"reaction_kcat": "measurements exist in other organisms"})
+        assert "looked for and not found" not in text
+        assert "not always" in text and "before concluding the measurement does not exist" in text
+
+    def test_a_quantity_with_no_recorded_reason_still_says_something(self):
+        text = self._section({})
+        assert "searched the kcat table and found nothing" in text
+
+    def test_a_search_that_resolved_nothing_still_counts_as_searched(self):
+        """Otherwise the report falls back to "no search was run", which is
+        the opposite of what happened."""
+        model = compose(QUERY, subject="3.1.1.7", substrate="acetylcholine")
+        searched = model.with_measured({}, not_found={"reaction_Km": "nothing in BRENDA"})
+        assert searched.searched is True
+        assert searched.not_found == {"reaction_Km": "nothing in BRENDA"}
+
+    def test_the_conversion_reads_them_off_the_search(self):
+        """The boundary, not the rendering -- the lesson from the rows."""
+        from Terium.compose.export import unresolved_from_search
+
+        found = type("R", (), {"source": object(), "reason": "should be ignored"})()
+        empty = type("R", (), {"source": None, "reason": "measurements exist in Mus musculus"})()
+        silent = type("R", (), {"source": None, "reason": None})()
+        build = type("B", (), {"resolutions": {
+            "reaction_Km": found, "reaction_kcat": empty, "reaction_Ki": silent,
+        }})()
+
+        assert unresolved_from_search(build) == {
+            "reaction_kcat": "measurements exist in Mus musculus"
+        }
+
+
+def test_the_blackboards_internal_labels_do_not_reach_the_reader():
+    """`<input>` is the agent set's name for "the caller asked for this".
+
+    It is right inside the blackboard and reads as leaked machinery on a
+    page a researcher is reading: "searched under the requirement that
+    organism must be Homo sapiens, raised by <input>".
+    """
+    from Terium.agents.scouts import ParameterScout
+
+    constraint = type("C", (), {"raised_by": "<input>"})()
+    assert ParameterScout._who_raised(constraint, "an earlier round") == "your own request"
+
+    critic = type("C", (), {"raised_by": "critic:coherence"})()
+    assert ParameterScout._who_raised(critic, "a critic") == "critic:coherence"
+
+    silent = type("C", (), {"raised_by": None})()
+    assert ParameterScout._who_raised(silent, "an earlier round") == "an earlier round"
+
+
+class TestTheExitCodeWhenASearchIsRefused:
+    """A refused search must reach the exit code, not only the prose.
+
+    THE DEFECT. This CLI's contract, in its own `--help`, is "0 produced
+    everything asked for ... 3 something refused and said why (the report is
+    still printed)". `--subject "lactate dehydrogenase"` asks for a search;
+    the resolver refuses because that name is six different enzymes; the
+    report said so in prose and the process exited 0. A script could not
+    tell, which is the whole reason the three-state convention exists here.
+
+    The line drawn: "could not be RUN" is a refusal, "ran and found
+    nothing" is an answer.
+    """
+
+    @staticmethod
+    def _args(**overrides):
+        import argparse
+
+        fields = {"subject": "1.1.1.27", "organism": "Homo sapiens",
+                  "substrate": "pyruvate"}
+        fields.update(overrides)
+        return argparse.Namespace(**fields)
+
+    def _search(self, model, **overrides):
+        from Terium.compose.__main__ import _search_the_literature
+
+        return _search_the_literature(model, self._args(**overrides))
+
+    def test_a_model_needing_a_substrate_without_one_is_a_refusal(self):
+        model = compose(QUERY, subject="1.1.1.27")
+        _, note, refused = self._search(model, substrate=None)
+        assert refused is True
+        assert "No search was run" in note
+        assert "--substrate" in note, "the note must say what to do about it"
+
+    def test_an_unreachable_literature_layer_is_a_refusal(self, monkeypatch):
+        """From a wheel there is no Tests/ directory, and that is a refusal
+        rather than a crash three frames down."""
+        import Terium.checkout as checkout
+
+        def unavailable(name):
+            raise checkout.LiteratureLayerUnavailable("no Tests/ here")
+
+        monkeypatch.setattr(checkout, "literature_module", unavailable)
+        model = compose(QUERY, subject="lactate dehydrogenase", substrate="pyruvate")
+        _, note, refused = self._search(model, subject="lactate dehydrogenase")
+        assert refused is True
+        assert "no Tests/ here" in note
+
+    def test_a_search_that_ran_and_found_nothing_is_not_a_refusal(
+        self, monkeypatch
+    ):
+        """It produced its answer. The answer is in the provenance table."""
+        import Terium.compose.__main__ as cli
+
+        monkeypatch.setattr(
+            cli, "compose_and_parameterise", None, raising=False,
+        )
+        model = compose(QUERY, subject="1.1.1.27", substrate="pyruvate")
+        # An empty search result, reached through with_measured directly:
+        # the helper's own "ran but empty" branch returns refused=False.
+        searched = model.with_measured({}, not_found={"reaction_Km": "nothing in BRENDA"})
+        assert searched.searched is True, (
+            "a search that ran must not fall back to 'no search was run'"
+        )
+
+    def test_the_process_really_exits_3(self):
+        """The flag is not the contract; the exit status is.
+
+        A unit test on `_search_the_literature` passes while the caller
+        ignores what it returns -- measured: deleting the `if search_refused`
+        branch in `main` left every unit test green and the process exiting
+        0. This runs the CLI. The missing-substrate case refuses before any
+        network call, so it is offline and fast.
+        """
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[2]
+        run = subprocess.run(
+            [sys.executable, "-m", "Terium.compose",
+             "Michaelis-Menten with a competitive inhibitor",
+             "--subject", "1.1.1.27", "--no-simulate", "--no-ranking",
+             "--no-analysis"],
+            capture_output=True, text=True, cwd=str(root), timeout=600,
+        )
+        assert run.returncode == 3, (
+            f"a refused search must exit 3 per this CLI's own --help; "
+            f"got {run.returncode}. stderr: {run.stderr[-300:]}"
+        )
+        assert "--substrate" in run.stdout, "the reason belongs in the report"
+        assert "refusal(s)" in run.stderr, "and a script is told to look"

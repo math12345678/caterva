@@ -49,7 +49,35 @@ which is a product nobody adopts.
 The product's central claim -- every number traces to its source -- was
 true of the code and unreachable from anything a person types.
 
+### Fixed
+- **A refused literature search exited 0.** This CLI's contract, in its own
+  `--help`, is "0 produced everything asked for ... 3 something refused and
+  said why (the report is still printed)". `--subject "lactate
+  dehydrogenase"` asks for a search, the resolver refuses because that name
+  is six different enzymes, and the report said so in prose while the
+  process exited 0 — a script could not tell the search never ran. A search
+  that could not be RUN (ambiguous name, missing `--substrate`, no
+  literature layer, a crash) is now a refusal and exits 3; a search that
+  ran and found nothing is an answer and exits 0, the answer being in the
+  provenance table.
+
 ### Added
+- **A placeholder now says what the search actually met.** The resolver
+  distinguishes four outcomes and the report printed one invented sentence,
+  "searched the km table and found nothing", for all of them -- which is
+  not a summary but FALSE for two: the value may exist in other organisms
+  and not have been substituted (ADR 0024: offered, never substituted), or
+  papers may have been found with no number extractable from their free
+  text. Measured live on EC 3.1.1.7 in *Homo sapiens*: kcat is "available
+  in: Cimex lectularius, Drosophila melanogaster, Macroptilium
+  atropurpureum, Mus musculus" and Ki is "candidate papers were found but a
+  number was not extracted". Both had been reported as nothing found,
+  sending a reader to stop looking for a number that is in the database.
+  The summary sentence underneath no longer says "looked for and not
+  found", which contradicted the table it sat under. `<input>`, the
+  blackboard's label for a constraint the caller raised, is translated to
+  "your own request" at the edge rather than leaking into a page a
+  researcher is reading.
 - **A composed model reports the conditions its values were measured
   under, and whether they can be mixed.** pH, temperature and buffer decide
   whether two constants belong in one model; `Measurement` has carried
