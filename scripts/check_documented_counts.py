@@ -109,6 +109,28 @@ HISTORICAL_DOCS_NOT_CHECKED = [
 ]
 
 # Suites `make test` runs, in the order it runs them.
+#: THE DOCUMENTED NUMBERS ARE CI'S, AND THE LITERATURE ONE DEPENDS ON AN
+#: OPTIONAL PACKAGE.
+#:
+#: `Tests/test_popgen_resolver.py` opens with
+#: `pytest.importorskip("stdpopsim")`, and stdpopsim is declared ONLY in
+#: requirements-popgen.txt -- which `make setup` and CI both skip, because it
+#: is GPL-3.0 and kept separate from Apache-2.0 Terrium on purpose (see that
+#: file). So the literature suite collects 1,180 tests where stdpopsim is
+#: absent and 1,201 where it is present: the same command, two honest
+#: answers, 21 apart.
+#:
+#: README records CI's figure, because CI is where this guard decides the
+#: build. If you have installed requirements-popgen.txt and this guard tells
+#: you the literature count is 21 short, that is why, and the README is not
+#: wrong -- your environment is a superset of the documented one. Do not
+#: "fix" it by writing 1,201; that reddens CI for everyone else.
+#:
+#: Learned the hard way, 2026-09-24: these counts were measured on a machine
+#: missing python-libsedml (which HIDES tests) and carrying stdpopsim (which
+#: ADDS them). The engine number came out exactly right and the literature
+#: number was 21 too high, because the search was for things absent HERE and
+#: never for things absent THERE.
 SUITES = [
     ("engine", REPO_ROOT / "Terium" / "tests"),
     ("literature", REPO_ROOT / "Tests"),
