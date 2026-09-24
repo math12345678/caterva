@@ -105,6 +105,21 @@ DELIBERATE_OMISSIONS = {
 #: here; the guard-wiring check will tell you so.
 EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_citation_format": ("verify_build", "ci", "pytest"),
+    # verify_build only. Offline and fast, but it reads both a markdown
+    # document and four engine modules, so a pytest wrapper would duplicate
+    # verify_build for no extra signal.
+    "check_documented_equations_match_engine": ("verify_build",),
+    # verify_build only, same reasoning: it parses the AST of every module
+    # under Terium/agents, which a pytest wrapper would re-do identically.
+    "check_constraints_are_actionable": ("verify_build",),
+    # verify_build, in both its offline and its --live form. Offline it
+    # reads a committed snapshot; --live re-asks Expasy and sits with the
+    # other network checks, which are opt-in for the reason ADR 0028 gives.
+    "check_ec_numbers_current": ("verify_build",),
+    # verify_build only, in its default (fast) mode. `--full` runs all four
+    # test suites and takes ~40 minutes, which is why the exhaustive form is
+    # not in any unasked harness.
+    "check_landing_test_counts": ("verify_build",),
     # CI and `make guards`. NOT a pytest wrapper: it asks PyPI whether each
     # pinned version exists, and a wrapper would turn every offline test run
     # red — which is how a guard earns the habit of being skipped (ADR 0028).

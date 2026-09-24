@@ -79,6 +79,26 @@ export interface ScienceAgentResult {
   disease?: string;
   r0?: number;
   infectiousPeriodDays?: number;
+  /**
+   * ADR 0169: true when R0 and the serial interval come from two
+   * different systematic reviews rather than one paper.
+   *
+   * A composite MUST reach provenance as citationStatus "flagged", never
+   * "verified" — the same tier a cross-species BRENDA Km gets. Inheriting
+   * COVID-19's verified status would erase the only signal telling a
+   * reader that two methodologies were combined.
+   */
+  crossStudyComposite?: boolean;
+  /** What exactly was combined, in the entry's own words. */
+  compositeNote?: string;
+  /**
+   * The serial-interval half's citation, when it differs from the R0
+   * half's. Both must reach the user: surfacing only the first would
+   * present a two-paper number as if one paper supported it — the same
+   * shape as the popgen defect where a genome-assembly DOI stood in for a
+   * mutation rate.
+   */
+  secondaryCitation?: Citation;
   beta?: number;
   gamma?: number;
   betaGammaValidation?: {

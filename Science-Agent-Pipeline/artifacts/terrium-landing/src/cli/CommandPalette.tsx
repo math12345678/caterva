@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { Command } from "cmdk";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -31,6 +31,7 @@ export default function CommandPalette({
   onQuery: (q: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -39,10 +40,22 @@ export default function CommandPalette({
         setOpen((prev) => !prev);
       }
       if (e.key === "Escape") setOpen(false);
+      // cmdk keeps DOM focus pinned to the input and never wires Tab, so without this
+      // Tab escapes the dialog onto obscured background controls.
+      if (open && e.key === "Tab") e.preventDefault();
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
-  }, []);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) {
+      previousFocusRef.current = document.activeElement as HTMLElement | null;
+    } else {
+      previousFocusRef.current?.focus?.();
+      previousFocusRef.current = null;
+    }
+  }, [open]);
 
   const handleSelect = useCallback(
     (value: string) => {
@@ -86,6 +99,9 @@ export default function CommandPalette({
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
             className="relative w-full max-w-lg rounded-xl border border-white/[0.08] bg-[#0a0f0c] shadow-2xl shadow-[#1D8A72]/[0.03] overflow-hidden glass-deep"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Command palette"
           >
             <Command label="Command palette">
               <Command.Input
@@ -105,6 +121,7 @@ export default function CommandPalette({
                     <Command.Item
                       key={item.id}
                       value={`nav:${item.id}`}
+                      keywords={[item.label]}
                       onSelect={handleSelect}
                       className="flex items-center gap-3 px-2 py-2 text-[12px] text-white/60 rounded-lg cursor-pointer aria-selected:bg-white/[0.04] aria-selected:text-white/90 transition-colors"
                     >

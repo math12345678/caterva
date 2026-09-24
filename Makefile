@@ -15,12 +15,14 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all dmg setup-js
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all dmg setup-js cite release-artifacts release-app
 
 help:
 	@echo "Terrium"
 	@echo ""
 	@echo "  make demo       SEE A REAL REPORT -- 30s, no network, no account"
+	@echo "  make cite       REAL CONSTANTS WITH CITATIONS, for your own enzyme:"
+	@echo "                  make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM=\"Homo sapiens\""
 	@echo "  make setup      create .venv and install everything"
 	@echo "  make doctor     diagnose a setup that will not work"
 	@echo "  make check      verify the environment actually works"
@@ -36,6 +38,8 @@ help:
 	@echo ""
 	@echo "  make publish-check   all offline checks before going public"
 	@echo "  make evidence        measured figures, for writing about Terrium"
+	@echo "  make release-artifacts  wheel + sdist into dist/, as CI builds them"
+	@echo "  make release-app        the one-folder app (needs requirements-release.txt)"
 	@echo ""
 	@echo "First time here? Run: make setup && make demo"
 	@echo "About to open a PR? Run: make pr"
@@ -52,7 +56,9 @@ setup: check-python
 	@echo "   connection. pip prints nothing while it resolves; that is"
 	@echo "   normal and not a hang."
 	@echo ""
-	@$(BIN)/pip install -r requirements-dev.txt || { \
+	@$(BIN)/pip install -r requirements-dev.txt && \
+		$(BIN)/pip install --quiet --no-deps -e . && \
+		{ [ "$$(uname)" != Darwin ] || chflags nohidden $(VENV)/lib/python*/site-packages/*.pth 2>/dev/null || true; } || { \
 		echo ""; \
 		echo "Dependency install FAILED. Read pip's last error above -- the"; \
 		echo "line that matters is usually 20 lines up, not the last one."; \
@@ -250,6 +256,18 @@ guards: require-pytest
 	@"$(PY)" scripts/check_citation_format.py
 	@echo ">> documented counts"
 	@"$(PY)" scripts/check_documented_counts.py
+	@echo ">> documented equations match the engine"
+	@"$(PY)" scripts/check_documented_equations_match_engine.py --selftest
+	@"$(PY)" scripts/check_documented_equations_match_engine.py
+	@echo ">> agent constraints are actionable"
+	@"$(PY)" scripts/check_constraints_are_actionable.py --selftest
+	@"$(PY)" scripts/check_constraints_are_actionable.py
+	@echo ">> EC numbers still current"
+	@"$(PY)" scripts/check_ec_numbers_current.py --selftest
+	@"$(PY)" scripts/check_ec_numbers_current.py
+	@echo ">> landing-page test counts"
+	@"$(PY)" scripts/check_landing_test_counts.py --selftest
+	@"$(PY)" scripts/check_landing_test_counts.py
 	@echo ">> python support claim"
 	@"$(PY)" scripts/check_python_support_claim.py
 	@echo ">> forbidden packages (constitution rules 7 and 8)"
@@ -448,9 +466,24 @@ classifier-bench:
 	@cd Science-Agent-Pipeline/artifacts/api-server && \
 		node "$$(ls -d ../../node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs | head -1)" \
 		src/lib/runKeywordBenchmark.ts
+# The release artifacts, exactly as .github/workflows/release.yml builds them
+# (ADR 0177). `release-app` needs PyInstaller: pip install -r requirements-release.txt
+release-artifacts: check-python
+	@"$(PY)" scripts/build_release.py
+
+release-app: check-python
+	@"$(PY)" scripts/build_app.py
 
 demo: check-python
 	@"$(PY)" scripts/demo.py
+
+# Real constants from the literature, with the citation beside each one.
+# `make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"`
+cite: check-python
+	@"$(PY)" scripts/cite.py --ec "$(EC)" --substrate "$(SUBSTRATE)" \
+		$(if $(ORGANISM),--organism "$(ORGANISM)",) \
+		$(if $(QUANTITY),--quantity "$(QUANTITY)",) \
+		$(if $(FIXTURE),--fixture "$(FIXTURE)",)
 
 cli: check-python
 	@"$(PY)" -m Terium.cli --help

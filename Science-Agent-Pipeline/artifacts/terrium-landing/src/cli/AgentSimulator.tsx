@@ -245,6 +245,80 @@ export default function AgentSimulator({
         const err = await response
           .json()
           .catch(() => ({ message: "Resolve failed" }));
+
+        // A missing experimental condition (s0, end, points -- values
+        // nobody can look up, because they describe the experiment, not
+        // the enzyme) is not a failure to explain in prose and stop. The
+        // server already sends back exactly what a labeled input form
+        // needs: which domain, which keys are missing, and everything
+        // else it already resolved. This used to be thrown as a plain
+        // Error, landing on the SAME "Failed" screen as a genuine
+        // pipeline error, telling the user to type CLI flags
+        // (`vmax=<value> s0=<value>...`) into the same free-text box --
+        // in a product whose own pitch is "no syntax to learn". The
+        // labeled-field form a few lines below already existed for the
+        // success path; it was simply unreachable from here.
+        if (
+          err.error === "RequiredParametersMissingError" &&
+          typeof err.domain === "string" &&
+          Array.isArray(err.missingKeys)
+        ) {
+          const domain = err.domain as string;
+          const resolved: Record<string, number | number[]> =
+            err.resolvedParameters ?? {};
+          const fields = DOMAIN_PARAMS[domain] ?? [];
+
+          // Blank for anything truly missing -- nothing invented, not
+          // even the field's own documentation-example default. Filled
+          // in for anything the resolver already established (a
+          // literature Km, or a value the user already typed), so
+          // re-submitting does not mean re-typing what already worked.
+          const seeded = Object.fromEntries(
+            fields.map((f) => [
+              f.key,
+              f.key in resolved ? String(resolved[f.key]) : "",
+            ]),
+          );
+          // A resolved value outside the known field list is still
+          // real and must not be dropped just because this UI has no
+          // labeled slot for it -- computed and not delivered is the
+          // one failure mode this project treats as worse than any
+          // error message.
+          for (const [key, value] of Object.entries(resolved)) {
+            if (!(key in seeded)) seeded[key] = String(value);
+          }
+
+          setResolvedDomain(domain);
+          setEditableParams(seeded);
+          setParamErrors(validateParams(domain, seeded));
+          setReasoning("");
+          setModelCitations([]);
+          setFlags([]);
+          setError(
+            `${err.missingKeys.join(", ")} ${
+              err.missingKeys.length > 1 ? "are" : "is"
+            } yours to choose, not something the literature reports — fill ${
+              err.missingKeys.length > 1 ? "them" : "it"
+            } in below.`,
+          );
+          setStage("idle");
+          return;
+        }
+
+        // The keyword classifier used to silently guess "mm" (Michaelis-
+        // Menten) for any query it couldn't match to a domain -- a
+        // predator-prey or population-genetics question would silently
+        // come back as an enzyme-kinetics simulation. Now it refuses
+        // honestly instead, and the backend message already lists the
+        // real available domains and how to rephrase -- surface that
+        // directly rather than routing it into the generic "Failed" dead
+        // end below, which offered no way forward.
+        if (err.error === "UnrecognizedQueryError") {
+          setError(err.message || "Could not match this query to a domain.");
+          setStage("idle");
+          return;
+        }
+
         throw new Error(err.message || "Resolve failed");
       }
       const data = await response.json();
@@ -317,7 +391,7 @@ export default function AgentSimulator({
     const MAX_POLL_RETRIES = 15;
 
     const startPollingFallback = (jobId: string) => {
-      pollInterval = window.setInterval(() => {
+      const tick = () => {
         loadJob(jobId)
           .then((data) => {
             pollRetries = 0;
@@ -333,7 +407,32 @@ export default function AgentSimulator({
               setStage("failed");
             }
           });
-      }, 1000);
+      };
+
+      // Fire once immediately, THEN every 1000ms. A job can complete
+      // before a 1000ms setInterval would ever check for the first time --
+      // measured directly: an immediate call to `tick()` reached a job
+      // that was still "pending" at that exact instant, moments after
+      // creation.
+      tick();
+      pollInterval = window.setInterval(tick, 1000);
+
+      // A backgrounded tab throttles or fully suspends `setInterval` --
+      // standard browser power-saving behaviour, not something a page
+      // should fight. Measured directly: with the tab hidden, the interval
+      // above did not tick even once in 52 seconds, while a job that
+      // completes in under a second sat finished and unseen the whole
+      // time. Re-checking the instant the tab becomes visible again closes
+      // exactly that gap -- the user submits, switches tabs while it
+      // resolves, comes back, and sees the answer immediately rather than
+      // waiting for a throttled timer to notice.
+      const onVisible = () => {
+        if (document.visibilityState === "visible") tick();
+      };
+      document.addEventListener("visibilitychange", onVisible);
+      abortController.signal.addEventListener("abort", () =>
+        document.removeEventListener("visibilitychange", onVisible),
+      );
     };
 
     try {
@@ -372,8 +471,28 @@ export default function AgentSimulator({
 
       es.onerror = () => {
         es.close();
-        startPollingFallback(jobId);
       };
+
+      // Polling runs ALONGSIDE the stream from the start, not only after
+      // `es.onerror` fires. It used to be onerror-only, and that leaves a
+      // real completed simulation permanently invisible: `EventSource`
+      // does not fire `onerror` when a connection is closed deliberately
+      // (our own `abortController` cleanup, a StrictMode remount, a dev
+      // proxy recycling an idle connection) -- only on an actual transport
+      // failure. Measured: submitting a real query, the stream opened,
+      // was aborted within the same tick (`net::ERR_ABORTED` in the
+      // network log, no `onerror`), and the job -- which had genuinely
+      // completed server-side inside a second, real BRENDA citation and
+      // trajectory included -- stayed on "Queued 0%" for the rest of the
+      // page's life. No error, no retry, nothing: the answer existed and
+      // never reached the screen.
+      //
+      // `applyJobUpdate` is idempotent (setting the same status/progress
+      // twice does nothing), and `finish()` already tears down whichever
+      // channel is still open the moment either one reports a terminal
+      // state, so running both is a pure safety net, not a race to
+      // resolve.
+      startPollingFallback(jobId);
     } catch (err) {
       if (abortController.signal.aborted) return;
       if (err && typeof err === "object" && "message" in err) {
@@ -566,7 +685,7 @@ export default function AgentSimulator({
             </div>
 
             {reasoning && (
-              <p className="text-[11px] text-white/30 italic mb-2 leading-relaxed border-l-2 border-[#1D8A72]/20 pl-3">
+              <p className="text-[11px] text-white/30 italic mb-2 leading-relaxed">
                 {reasoning}
               </p>
             )}
@@ -669,6 +788,8 @@ export default function AgentSimulator({
                   domain={result.domain}
                   runId={result.runId}
                   parameters={result.parameters as Record<string, unknown>}
+                  citationCount={result.provenance.modelCitations?.length ?? 0}
+                  hasFlags={(result.provenance.flags?.length ?? 0) > 0}
                 />
                 <ExportButtons
                   trajectory={

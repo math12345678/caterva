@@ -48,7 +48,13 @@ from .terium_engine import *  # noqa: F401,F403
 
 #: Mirrors the engine exactly. `list(...)` copies so that a caller mutating
 #: `Terium.__all__` cannot reach through and corrupt the engine's own.
-__all__ = [*terium_engine.__all__, "terium_engine"]
+#: The one place the version lives. `pyproject.toml` reads it from here
+#: (`dynamic = ["version"]`), so a release cannot ship with the package and
+#: the metadata disagreeing about what it is -- which is the first thing a
+#: bug report would have to establish and the easiest thing to get wrong.
+__version__ = "0.3.3"
+
+__all__ = [*terium_engine.__all__, "terium_engine", "__version__"]
 
 # A star-import only binds names the source module's __all__ advertises, so
 # the two agree by construction. This assertion states that dependency out

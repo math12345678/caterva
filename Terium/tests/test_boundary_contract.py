@@ -85,10 +85,29 @@ def _contract_violations(
             f"DISPATCH domains without a run_* handler: {sorted(unhandled_domains)}"
         )
 
-    stray_handlers = handlers - domains
+    # A handler nobody can reach is dead code, which is what this catches.
+    # COMPOSED_DOMAINS are reachable -- they are gated on _RUNNERS, not on
+    # DISPATCH -- but they have no single engine simulate_* for DISPATCH to
+    # name, so they are excluded here and required to be declared there.
+    composed = set(getattr(runner_module, "COMPOSED_DOMAINS", {}))
+    stray_handlers = handlers - domains - composed
     if stray_handlers:
         issues.append(
-            f"run_* handlers not reachable via DISPATCH: {sorted(stray_handlers)}"
+            f"run_* handlers reachable through neither DISPATCH nor "
+            f"COMPOSED_DOMAINS: {sorted(stray_handlers)}"
+        )
+
+    undeclared = composed - handlers
+    if undeclared:
+        issues.append(
+            f"COMPOSED_DOMAINS declared with no run_* handler: "
+            f"{sorted(undeclared)}"
+        )
+
+    overlap = composed & domains
+    if overlap:
+        issues.append(
+            f"domains in both DISPATCH and COMPOSED_DOMAINS: {sorted(overlap)}"
         )
 
     for domain in domains:
@@ -208,7 +227,11 @@ class TestBoundaryContract:
             runner, "DISPATCH", {k: v for k, v in runner.DISPATCH.items() if k != "pcr"}
         )
         violations = _contract_violations(runner)
-        assert any("not reachable via DISPATCH" in v and "pcr" in v for v in violations)
+        assert any(
+            "reachable through neither DISPATCH nor COMPOSED_DOMAINS" in v
+            and "pcr" in v
+            for v in violations
+        )
 
     def test_drifted_tables_report_a_build_defect_not_a_bad_request(self, monkeypatch):
         """main() must not present an internal drift as the student's mistake."""
@@ -309,6 +332,133 @@ class TestRunnerExecution:
     # rounded up to 5324). Measured before the fix: 800 particles at 200
     # steps -- 4% of the step ceiling -- already cost 9.94s, and 5000
     # particles at the step ceiling is roughly six hours.
+
+    # ---- raw-SBML ceilings ---------------------------------------------
+    #
+    # run_sbml had no ceilings at all. Survivable only because nothing could
+    # reach it (the API exposes no way to supply a model), but its cost is
+    # driven by a caller-supplied document rather than by parameters the
+    # runner can reason about, so it needs its own limits before any path
+    # exposes it. See the MAX_API_SBML_* block in terium_runner.py for the
+    # measurements.
+
+    @staticmethod
+    def _sbml_chain(n: int) -> str:
+        """SBML for a linear chain S0 -> S1 -> ... -> Sn (n reactions)."""
+        from Terium.continuous.model_building import antimony_to_sbml
+
+        species = ", ".join(f"S{i}" for i in range(n + 1))
+        lines = [
+            f"model chain{n}",
+            "  compartment c = 1.0;",
+            f"  species {species} in c;",
+            "  S0 = 100.0;",
+        ]
+        lines += [f"  S{i} = 0.0;" for i in range(1, n + 1)]
+        lines.append("  k = 0.5;")
+        lines += [f"  J{i}: S{i} -> S{i+1}; c * k * S{i};" for i in range(n)]
+        lines.append("end")
+        return antimony_to_sbml("\n".join(lines))
+
+    def test_sbml_rejects_points_over_ceiling(self):
+        with pytest.raises(ValueError, match="MAX_API_SBML_POINTS"):
+            runner.run_sbml(
+                {
+                    "sbml_string": self._sbml_chain(1),
+                    "points": runner.MAX_API_SBML_POINTS + 1,
+                }
+            )
+
+    def test_sbml_rejects_too_many_reactions(self):
+        with pytest.raises(ValueError, match="MAX_API_SBML_REACTIONS"):
+            runner.run_sbml(
+                {
+                    "sbml_string": self._sbml_chain(
+                        runner.MAX_API_SBML_REACTIONS + 1
+                    ),
+                    "points": 51,
+                }
+            )
+
+    def test_sbml_rejects_absurd_source_length(self):
+        # Must start with "<" to get PAST the path/URL guard, which runs
+        # first (cheapest security check before any sizing question). A
+        # payload of plain "x" characters is rejected as a path, not for
+        # its length, and would not exercise this ceiling at all.
+        oversized = "<" + "x" * runner.MAX_API_SBML_SOURCE_CHARS
+        with pytest.raises(ValueError, match="MAX_API_SBML_SOURCE_CHARS"):
+            runner.run_sbml({"sbml_string": oversized, "points": 51})
+
+    def test_sbml_rejects_unparseable_document_with_a_reason(self):
+        """Not a crash and not a bare 'failed' -- libsbml's own complaint."""
+        with pytest.raises(ValueError, match="could not be parsed as SBML"):
+            runner.run_sbml({"sbml_string": "<not-sbml/>", "points": 51})
+
+    # ---- sbml_string is a fetch primitive, not just a string -----------
+    #
+    # simulate_sbml ends at roadrunner.RoadRunner(sbml_string), whose
+    # constructor accepts SBML content OR a filesystem path OR a URL, and
+    # fetches whichever it gets. Verified by execution: a bare path and a
+    # file:// URI were both read off local disk, and an http:// URL produced
+    # a real outbound GET to a chosen address whose response was parsed and
+    # run. Unvalidated, this parameter is a local-file-read and an SSRF.
+    #
+    # These pin the explicit guard. The reaction-counting parse rejects
+    # these too, so a regression here would NOT show up as a test failure
+    # elsewhere -- which is exactly why the protection must not rest on
+    # that parse, and why these tests name the vectors directly.
+
+    @pytest.mark.parametrize(
+        ("label", "payload"),
+        [
+            ("bare filesystem path", "/etc/hostname"),
+            ("file URI", "file:///etc/hostname"),
+            ("http URL", "http://127.0.0.1:9/model.xml"),
+            ("cloud metadata endpoint", "http://169.254.169.254/latest/meta-data/"),
+            ("https URL", "https://example.invalid/model.xml"),
+            ("leading whitespace before a path", "   /etc/hostname"),
+        ],
+    )
+    def test_sbml_refuses_paths_and_urls(self, label, payload):
+        """A non-document payload must never reach the engine's loader."""
+        with pytest.raises(ValueError, match="not a file path or URL"):
+            runner.run_sbml({"sbml_string": payload, "points": 5})
+
+    def test_sbml_guard_keys_on_first_non_space_character(self):
+        """The guard lstrips before testing, so padding cannot smuggle a
+        path past it.
+
+        Note it is only ever the REJECTING direction that whitespace
+        matters for. A real SBML document opens with an XML declaration,
+        and XML forbids anything -- including whitespace -- before it
+        ("XML declaration not permitted in this location"), so there is no
+        such thing as a valid document with leading blanks to protect.
+        """
+        with pytest.raises(ValueError, match="not a file path or URL"):
+            runner.run_sbml(
+                {"sbml_string": "\n\t  file:///etc/hostname", "points": 5}
+            )
+
+    def test_sbml_source_ceiling_does_not_shadow_the_reaction_ceiling(self):
+        """The reaction limit must be the binding constraint, not dead code.
+
+        SBML XML runs ~15x the length of the Antimony it came from, and the
+        first version of MAX_API_SBML_SOURCE_CHARS was sized against the
+        Antimony figures. At 100,000 it sat BELOW the ~151 KB a legitimate
+        200-reaction model occupies: legal models were rejected for length,
+        and MAX_API_SBML_REACTIONS could never be reached. A model at the
+        reaction ceiling must fit inside the source ceiling with room over.
+        """
+        at_ceiling = self._sbml_chain(runner.MAX_API_SBML_REACTIONS)
+        assert len(at_ceiling) < runner.MAX_API_SBML_SOURCE_CHARS
+
+    def test_sbml_accepts_a_substantial_but_legal_model(self):
+        """A ceiling that rejects ordinary work is miscalibrated."""
+        result = runner.run_sbml(
+            {"sbml_string": self._sbml_chain(150), "points": 51}
+        )
+        assert result["ok"] is True
+        assert len(result["trajectory"]) == 51
 
     def test_md_pair_step_budget_rejects_large_particle_counts(self):
         """A request under every scalar ceiling but quadratically huge."""

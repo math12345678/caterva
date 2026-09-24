@@ -133,6 +133,32 @@ def collect_count(path: Path) -> int | None:
         print(f"  ! could not collect {path.name}: {exc}")
         return None
 
+    # A COLLECTION ERROR IS NOT A COUNT.
+    #
+    # pytest exits 2 when some files fail to import and others succeed, and
+    # it still prints per-file counts for the survivors. Summing those gives
+    # a confident, specific, WRONG total -- and `--write` would then paste it
+    # into the README as the measured figure.
+    #
+    # Measured here: under an interpreter whose pydantic cannot evaluate
+    # `str | None`, `pytest Tests --collect-only` exits 2 with 41 collection
+    # errors and reports "511 tests collected". The true figure is much
+    # larger. The guard read 511, called it the literature suite's size, and
+    # offered to write it down.
+    #
+    # That is the exact failure this script exists to prevent, in the script
+    # itself: a number nobody could actually check, reported as one that was.
+    # None means "could not establish", and every caller already handles it.
+    if proc.returncode not in (0, 1):
+        errors = len(re.findall(r"^ERROR ", proc.stdout, re.MULTILINE))
+        print(
+            f"  ! collection FAILED under {path.name} "
+            f"(pytest exit {proc.returncode}, {errors} collection error(s)). "
+            f"Refusing to report a partial count -- the files that did "
+            f"collect are not the suite."
+        )
+        return None
+
     # `-q` prints "path/to/test_file.py: N" per file, then a summary line.
     total = 0
     seen = False
@@ -731,6 +757,44 @@ def selftest() -> int:
     if overlap:
         failures.append(f"a doc is in both lists: {sorted(overlap)}")
 
+    # A PARTIAL COLLECTION MUST NOT BECOME A COUNT.
+    #
+    # pytest exits 2 when some files fail to import and others succeed, and
+    # still prints per-file counts for the survivors. Summing those gives a
+    # specific, confident, wrong total -- and --write would paste it into
+    # the README as the measured figure.
+    #
+    # Measured before this check existed: `pytest Tests --collect-only`
+    # under an interpreter whose pydantic cannot evaluate `str | None`
+    # exited 2 with 41 collection errors and printed "511 tests collected".
+    # The guard read 511 and offered to write it down.
+    #
+    # Driven through a stub rather than a real pytest run, because the case
+    # that matters is the one this machine cannot reproduce on demand.
+    class _Result:
+        def __init__(self, returncode: int, stdout: str) -> None:
+            self.returncode = returncode
+            self.stdout = stdout
+
+    partial = _Result(2, "Tests/a.py: 300\nTests/b.py: 211\nERROR Tests/c.py\n")
+    clean = _Result(0, "Tests/a.py: 300\nTests/b.py: 211\n")
+
+    original = subprocess.run
+    try:
+        subprocess.run = lambda *a, **k: partial  # type: ignore[assignment]
+        if collect_count(REPO_ROOT / "Tests") is not None:
+            failures.append(
+                "a pytest exit of 2 produced a count; a partial collection "
+                "is not the suite"
+            )
+        subprocess.run = lambda *a, **k: clean  # type: ignore[assignment]
+        if collect_count(REPO_ROOT / "Tests") != 511:
+            failures.append(
+                "a clean collection did not sum its per-file counts"
+            )
+    finally:
+        subprocess.run = original  # type: ignore[assignment]
+
     if failures:
         print("SELFTEST FAILED:")
         for failure in failures:
@@ -741,7 +805,7 @@ def selftest() -> int:
         f"SELFTEST OK: {len(guard_cases)} guard-count, {len(adr_cases)} "
         f"ADR-count and {len(mangle_cases)} welded-number forms matched as "
         "intended; rewrite() changed digits and nothing else; the two doc "
-        "lists are disjoint."
+        "lists are disjoint; a partial collection refuses to become a count."
     )
     return 0
 
@@ -1047,8 +1111,31 @@ def main() -> int:
         return 1
 
     if skipped:
-        print("OK (partial): every count that could be collected matches README.")
-        return 0
+        # EXIT 2: COULD NOT VERIFY. Distinct from 0 (checked, matches) and
+        # 1 (checked, wrong), for the same reason this guard exists at all.
+        #
+        # Returning 0 here meant a green `make guards` on a tree whose
+        # README counts had never been read. That is "could not check"
+        # rendered as "checked and fine" -- the exact substitution this
+        # script was written to catch in the README, performed by the
+        # script on itself.
+        #
+        # 2 rather than 1 because the two call for different actions: 1
+        # means edit the README, 2 means fix the environment and run again.
+        # A caller that genuinely does not care -- a laptop missing an
+        # optional dependency -- can treat 2 as a warning; CI should not.
+        print(
+            "COULD NOT VERIFY: some counts were not collectable, so the "
+            "README's test counts are UNCHECKED rather than confirmed. "
+            "The counts that could be collected match."
+        )
+        print(
+            "\nThis is not a pass. Every claim that could not be checked is "
+            "listed above with the reason. Fix the collection and re-run:"
+        )
+        print("  make setup    # the interpreter these counts are documented against")
+        print("  make guards   # then this guard can actually read them")
+        return 2
 
     print("OK: README test counts and domain counts match the repository.")
     return 0

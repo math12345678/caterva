@@ -1,0 +1,43 @@
+{
+  "_why": [
+    "ADR 0174's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The fix was in the parser (Tests/brenda_client.py) and the catcher is the",
+    "rewritten sensor test test_unnamed_organism_values_carry_their_own_organism:",
+    "the empty-organism call must mean 'any organism', so the value that comes",
+    "back keeps the organism of the row it came from, and the set-judge's",
+    "organism_mismatch, not silence, reports two animals really measured.",
+    "",
+    "Both mutations are restores of the defect, exactly as ADR 0174 describes:",
+    "O1 reverts the gate to `is not None`, which turns the any-organism call",
+    "back into an exact-organism call matching every row and blanking every",
+    "label; O2 deletes the per-row extraction, so no row keeps an organism in",
+    "the any-organism branch and the set's organisms collapse to nothing.",
+    "",
+    "The named-organism test is included in the set's `test` command because",
+    "ADR 0174 is not only about the sensor: the guard demands every suite the",
+    "record cites, and the record explicitly names both tests that moved",
+    "(the sensor test rewritten, the named-organism assertion re-pointed).",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0174-the-empty-organism-lookup-reported-a-cross-species-minimum.json"
+  ],
+  "test": "cd Tests && python3 -m pytest test_agent_architecture_on_real_brenda.py::TestOnRealMarkup::test_unnamed_organism_values_carry_their_own_organism test_agent_architecture_on_real_brenda.py::TestOnRealMarkup::test_naming_the_organism_changes_which_value_is_returned --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "O1",
+      "description": "the any-organism gate is reverted to `is not None`",
+      "_claimed": "caught by test_unnamed_organism_values_carry_their_own_organism",
+      "file": "Tests/brenda_client.py",
+      "find": "        if target_organism:\n            if target_organism not in full_text:\n                continue\n            row_organism = target_organism\n",
+      "replace": "        if target_organism is not None:\n            if target_organism not in full_text:\n                continue\n            row_organism = target_organism\n"
+    },
+    {
+      "id": "O2",
+      "description": "the per-row organism extraction in the any-organism branch is deleted",
+      "_claimed": "caught by test_unnamed_organism_values_carry_their_own_organism",
+      "file": "Tests/brenda_client.py",
+      "find": "        else:\n            row_organism = None\n            for cell in cell_texts:\n                cell_clean = cell.strip()\n                if GENERIC_ORGANISM_PATTERN.fullmatch(cell_clean):\n                    row_organism = cell_clean\n                    break\n            if row_organism is None:\n                continue\n",
+      "replace": "        else:\n            row_organism = None\n            if row_organism is None:\n                continue\n"
+    }
+  ]
+}

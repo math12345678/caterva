@@ -1,0 +1,25 @@
+
+FRONT DOOR COVERAGE, AT THE ROUTE (no LLM key -- the keyword path)
+==============================================================================
+REFUSED      michaelis menten kinetics for hexokinase         -> MISSING_REQUIRED_INPUT
+REFUSED      enzyme kinetics with a competitive inhibitor     -> MISSING_REQUIRED_INPUT
+REFUSED      SIR model of a measles outbreak in a school      -> MISSING_REQUIRED_INPUT
+REFUSED      SEIR epidemic with an exposed class              -> MISSING_REQUIRED_INPUT
+REFUSED      genetic drift in a small population              -> MISSING_REQUIRED_INPUT
+OK           predator prey population cycles                  -> lotka_volterra
+REFUSED      stochastic simulation of a chemical reaction     -> MISSING_REQUIRED_INPUT
+REFUSED      PCR amplification over 30 cycles                 -> MISSING_REQUIRED_INPUT
+OK           repressilator oscillations                       -> repressilator
+OK           cell cycle oscillator dynamics                   -> cell_cycle_oscillator
+STRUCTURE    three step phosphorylation cascade               -> compose
+REFUSED      glycolysis in yeast                              -> UNRECOGNIZED_QUERY
+REFUSED      a MAP kinase cascade with negative feedback      -> MISSING_REQUIRED_INPUT
+REFUSED      reversible binding of a ligand to a receptor     -> MISSING_REQUIRED_INPUT
+REFUSED      substrate inhibition at high substrate concent   -> MISSING_REQUIRED_INPUT
+REFUSED      two enzymes competing for the same substrate     -> MISSING_REQUIRED_INPUT
+STRUCTURE    a toggle switch between two repressors           -> compose
+REFUSED      sequential feedback inhibition in amino acid s   -> MISSING_REQUIRED_INPUT
+REFUSED      an open system with constant substrate inflow    -> MISSING_REQUIRED_INPUT
+REFUSED      allosteric activation of an enzyme by its prod   -> MISSING_REQUIRED_INPUT
+==============================================================================
+completed 5/20 (incl. 2 composed structure(s)), correct model 3/20

@@ -10,7 +10,7 @@
  * - Success Rate Confidence: Wilson (1927) "Probable inference, the law of succession"
  *   https://doi.org/10.1080/01621459.1927.10502953
  * - Latency Analysis: Harter (1974) "The Method of Least Squares and Some Alternatives"
- *   https://doi.org/10.2307/1402059
+ *   https://doi.org/10.2307/1403077
  * - REST API Design: Fielding (2000) "Architectural Styles and Design of Network-based Software"
  *   https://www.ics.uci.edu/~fielding/pubs/dissertation/rest_arch_style.htm
  * - HTTP Standards: RFC 7231 (IETF)
@@ -47,15 +47,24 @@ interface VerifiableMetric<T> {
 
 /**
  * Queue-Based Job Tracking
- * BACKING: Little (1961) - L = λW (queue length = arrival rate × wait time)
  *
- * Little's Law (1961): The average number of customers in a stable system
- * L = λW where:
- *   L = average number of jobs in system
- *   λ = arrival rate (jobs/second)
- *   W = average time in system
+ * `activeJobs` is a DIRECT COUNT: the size of a Set that gains an id when a
+ * job starts and loses it when the job finishes. It is not estimated, and
+ * nothing here computes L = λW.
  *
- * Application: activeJobs ≈ (jobCompletionRate) × (avgLatency)
+ * That distinction used to be blurred. This block read "Application:
+ * activeJobs ≈ (jobCompletionRate) × (avgLatency)", and exportWithCitations
+ * attached Little (1961) to the value with the explanation "Queue theory:
+ * L = λW" -- a citation for an arithmetic the code has never performed. A
+ * direct count is strictly BETTER than Little's Law here: the law estimates
+ * a long-run average for a stationary system, whereas the Set knows exactly
+ * how many jobs are in flight right now. Claiming the weaker method was the
+ * only thing wrong.
+ *
+ * Little's Law remains the right reference for the RELATIONSHIP between
+ * these three metrics -- a reader can check activeJobs against
+ * completionRate x avgLatency and expect rough agreement in steady state --
+ * and that is the claim now made, in exportWithCitations, and nothing more.
  */
 export interface JobMetrics {
   activeJobs: VerifiableMetric<number>;
@@ -98,18 +107,27 @@ export interface DomainMetrics {
   // For sir/seir: Epidemiological compartments
   // BACKING: Kermack & McKendrick (1927), Anderson & May (1991)
   // For wright_fisher: Population genetics
-  // BACKING: Rahbari et al. (2016) "Variation and heritability of recombination"
+  // BACKING: Rahbari et al. (2016) "Timing, rates and spectra of human
+  // germline mutation", Nat Genet 48(2), 126-133, doi 10.1038/ng.3469.
+  // Corrected 2026-09-05. This read "Variation and heritability of
+  // recombination" -- a title belonging to doi 10.1038/ng.3285, which
+  // CrossRef records as Polderman et al. (2015), a twin-studies
+  // heritability meta-analysis: not Rahbari, not recombination, and not a
+  // mutation rate. domain-literature.ts was fixed on 2026-08-09; this copy
+  // was missed, because verify_citations_live.py skips comment lines (a
+  // DOI in prose is being discussed, not asserted) and this comment names
+  // no DOI for the title check to catch it by.
   // For gillespie_ssa: Stochastic simulation
   // BACKING: Gillespie (1976) "General method for stochastic reactions"
 }
 
 /**
  * Resolution Quality Metrics
- * BACKING: STRENDA Guidelines (Gelperin et al., 2010)
+ * BACKING: STRENDA Guidelines (Tipton et al., 2014)
  * "STRENDA: Reporting Standards for Enzyme Data"
- * https://doi.org/10.1038/nbt0610-592
+ * https://doi.org/10.1016/j.pisc.2014.02.012
  *
- * STRENDA Requirements for kinetic data (Gelperin et al., 2010):
+ * STRENDA Requirements for kinetic data (Tipton et al., 2014):
  * 1. pH of assay (±0.1)
  * 2. Temperature (±1°C)
  * 3. Buffer system and concentration
@@ -119,8 +137,14 @@ export interface DomainMetrics {
  * 7. Confidence intervals for all reported values
  */
 export interface ResolutionMetrics {
-  // LLM Classification - Brown et al. (2020) "Language models are unsupervised multitask learners"
-  // https://arxiv.org/abs/1912.01703
+  // LLM Classification - Brown et al. (2020) "Language Models are Few-Shot
+  // Learners", https://arxiv.org/abs/2005.14165
+  //
+  // Corrected 2026-09-05. This cited arXiv:1912.01703, which is "PyTorch:
+  // An Imperative Style, High-Performance Deep Learning Library" (Paszke
+  // et al.) -- an unrelated framework paper -- under a title belonging to
+  // the GPT-2 report (Radford et al. 2019, no arXiv id) and an author-year
+  // belonging to GPT-3. Four fields, four sources, no such paper.
   llmClassificationAttempts: VerifiableMetric<number>;
   llmClassificationSuccesses: VerifiableMetric<number>;
   llmSuccessRate: VerifiableMetric<number>;
@@ -184,7 +208,7 @@ const LITERATURE_DB: Record<string, LiteratureReference> = {
     year: 1974,
     title: "The Method of Least Squares and Some Alternatives",
     journal: "International Statistical Review",
-    doi: "10.2307/1402059",
+    doi: "10.2307/1403077",
   },
   LEHNINGER_KINETICS: {
     authors: "Lehninger, A. L., Nelson, D. L., & Cox, M. M.",
@@ -200,11 +224,11 @@ const LITERATURE_DB: Record<string, LiteratureReference> = {
     doi: "10.1093/nar/gkw952",
   },
   STRENDA_GUIDELINES: {
-    authors: "Gelperin, D. M., et al.",
+    authors: "Tipton, K. F., Armstrong, R. N., Bakker, B. M., et al.",
     year: 2010,
     title: "STRENDA: Reporting Standards for Enzyme Data",
     journal: "Nature Biotechnology",
-    doi: "10.1038/nbt0610-592",
+    doi: "10.1016/j.pisc.2014.02.012",
   },
   KERMACK_MCKENDRICK: {
     authors: "Kermack, W. O., & McKendrick, A. G.",
@@ -403,13 +427,53 @@ class VerifiableMetricsCollector {
 
   /**
    * Record an LLM classification attempt
-   * BACKING: Brown et al. (2020) "Language models are unsupervised multitask
-   * learners" (arxiv.org/abs/1912.01703)
+   * BACKING: Brown et al. (2020) "Language Models are Few-Shot Learners"
+   * (arxiv.org/abs/2005.14165) -- see the note on ResolutionMetrics for
+   * what this reference was before 2026-09-05 and why it was wrong.
    */
   recordLLMClassification(success: boolean): void {
     this.resolutionMetrics.llmAttempts++;
     if (success) {
       this.resolutionMetrics.llmSuccesses++;
+    }
+  }
+
+  /**
+   * Record how one query's parameters were sourced.
+   *
+   * Until 2026-09-05 nothing called anything like this. `literatureHits`
+   * and `keywordFallbacks` were initialised to 0, read by
+   * `getSnapshot()`, divided into `literatureHitRate`, and published by
+   * GET /api/metrics -- with NO writer anywhere in the tree. The endpoint
+   * served `literatureHitRate: 0`, `literatureHits: 0` and
+   * `keywordFallbacks: 0` for the life of every process, and they were
+   * indistinguishable from a genuine measurement of a system that had
+   * resolved nothing.
+   *
+   * That is the defect this product exists to refuse, in its own
+   * telemetry: a number presented as measured that nobody measured.
+   *
+   * `origins` is the provenance of every parameter the query needed, so
+   * one call covers the whole query:
+   *   - "resolved" — came from literature (BRENDA / registry / PubMed)
+   *   - "default"  — the keyword/domain fallback, which the hard rule
+   *                  then blocks from being reported as a value
+   *   - "llm", "user" — neither a literature hit nor a keyword fallback,
+   *                  counted as attempts so the rate stays a fraction of
+   *                  everything that was actually sought
+   *
+   * Called on BOTH the resolving and the refusing path. Recording only
+   * successful queries would make the hit rate 100% by construction,
+   * which is the more flattering way to be wrong.
+   */
+  recordParameterProvenance(origins: readonly string[]): void {
+    for (const origin of origins) {
+      this.resolutionMetrics.literatureAttempts++;
+      if (origin === "resolved") {
+        this.resolutionMetrics.literatureHits++;
+      } else if (origin === "default") {
+        this.resolutionMetrics.keywordFallbacks++;
+      }
     }
   }
 
@@ -656,7 +720,14 @@ class VerifiableMetricsCollector {
       activeJobs: {
         value: this.jobMetrics.activeJobs.size,
         literature: LITERATURE_DB.LITTLES_LAW,
-        explanation: "Queue theory: L = λW (Little, 1961)",
+        // Measured directly (Set size), NOT derived from L = λW. Little's
+        // Law is cited for the invariant a reader can check this against --
+        // in steady state activeJobs should approximate completionRate x
+        // avgLatency -- not as the method used to produce the number.
+        explanation:
+          "Direct count of in-flight jobs. Little's Law (1961), L = λW, " +
+          "is the steady-state relation this can be checked against; it is " +
+          "not how the value is computed.",
       },
       successRate: {
         // null, not "100.00", when nothing has been observed. This read

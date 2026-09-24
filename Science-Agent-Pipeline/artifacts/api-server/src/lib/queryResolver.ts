@@ -8,10 +8,16 @@ import {
 import { resolveKineticValue, resolveEpidemiologyParameters, type RelatednessVerdict } from "./scienceAgent";
 import { buildCitationLocators, type CitationLocator } from "./citeVerify";
 import { matchEnzyme } from "./enzymes";
+import { matchOrganism } from "./organisms";
 import { matchDisease } from "./diseases";
+import { extractStatedQuantities } from "./statedQuantities";
 import {
   RESOLVABLE_FIELDS,
+  DOMAINS_WITH_LITERATURE_RESOLUTION,
+  EPIDEMIOLOGY_BRIDGE_DOMAINS,
   RequiredParametersMissingError,
+  UnrecognizedQueryError,
+  resolveGaps,
   buildResolvedKineticProvenance,
   unverifiedOriginKeys,
   isAllDefaults,
@@ -842,11 +848,44 @@ async function applyVmaxFromKcatResolution(
   if ("vmax" in overrides) {
     return { parameters, parameterProvenance, flags };
   }
-  const enzymeConcOverride = overrides["enzyme_conc"];
-  if (typeof enzymeConcOverride !== "number") {
+  if (!entities?.ecNumber && !entities?.enzymeName) {
     return { parameters, parameterProvenance, flags };
   }
-  if (!entities?.ecNumber && !entities?.enzymeName) {
+  const enzymeConcOverride = overrides["enzyme_conc"];
+  if (typeof enzymeConcOverride !== "number") {
+    // Say WHY, instead of returning in silence.
+    //
+    // Silence here left the refusal to the generic sentence, which told
+    // the user "vmax could not be resolved from literature. Add
+    // vmax=<value>" — advice that is both wrong about the literature and
+    // wrong about the science. A Vmax copied from a paper was measured at
+    // that paper's [E]0, and dropping it into a run at a different [E]0 is
+    // wrong by the ratio of the two, invisibly. See the
+    // `enzyme_conc_not_supplied` doc comment in provenance.ts.
+    //
+    // We know an enzyme was identified (checked just above), so the kcat
+    // route genuinely exists for this query. It is not promised to
+    // succeed — if BRENDA holds no kcat, the flag above says so — only
+    // offered, which is the honest shape.
+    const existing = parameterProvenance["vmax"];
+    if (existing) {
+      parameterProvenance = {
+        ...parameterProvenance,
+        vmax: {
+          ...existing,
+          unresolvedReason: "enzyme_conc_not_supplied",
+          note:
+            "Vmax is not a property of the enzyme on its own — it is " +
+            "kcat × [E]0, so it depends on how much enzyme is in YOUR " +
+            "assay. Terrium resolves kcat from literature, but [E]0 is " +
+            "your experimental choice and is never guessed (ADR 0013). " +
+            "State the enzyme concentration — e.g. \"with 50 nM enzyme\" " +
+            "or enzyme_conc=0.00005 (mM) — and Vmax is derived and cited " +
+            "for you. Copying a Vmax out of a paper instead would import " +
+            "that paper's enzyme concentration along with it.",
+        },
+      };
+    }
     return { parameters, parameterProvenance, flags };
   }
 
@@ -856,20 +895,66 @@ async function applyVmaxFromKcatResolution(
     enzymeConc: enzymeConcOverride,
   });
 
+  // Each failure below ALSO writes its reason onto vmax's provenance, not
+  // just into `flags`.
+  //
+  // Flags are attached to a successful result. When the bridge fails,
+  // vmax stays origin "default", the hard block throws, and the flags go
+  // with it -- so the system computed a specific, actionable reason and
+  // then discarded it, leaving the user the generic "vmax could not be
+  // resolved from literature". Measured on real queries: lactate
+  // dehydrogenase and catalase both fail here, and neither told the user
+  // which of these three things happened, though they need different
+  // responses.
+  const explainVmax = (
+    reason: "not_found" | "no_locator" | "enzyme_conc_rejected",
+    note: string,
+  ): Record<string, ParameterProvenance> => {
+    const existing = parameterProvenance["vmax"];
+    if (!existing) return parameterProvenance;
+    return {
+      ...parameterProvenance,
+      vmax: { ...existing, unresolvedReason: reason, note },
+    };
+  };
+
   if (!agentResult.found || agentResult.kcat === undefined) {
     flags.push(
       "Could not resolve a real kcat value from BRENDA/KEGG/PubMed; " +
         "Vmax was not bridged from literature.",
     );
-    return { parameters, parameterProvenance, flags };
+    return {
+      parameters,
+      parameterProvenance: explainVmax(
+        "not_found",
+        "Vmax = kcat × [E]0, and your enzyme concentration was read, but " +
+          "BRENDA, KEGG and PubMed hold no kcat for this enzyme — so there " +
+          "is nothing to multiply it by. Supply kcat=<value> (in 1/s) and " +
+          "Vmax is computed from it, or supply vmax=<value> directly. " +
+          "Either way, attach the paper with --cite so the source is " +
+          "recorded rather than lost.",
+      ),
+      flags,
+    };
   }
 
   if (!agentResult.vmaxValidation?.ok || agentResult.vmax === undefined) {
+    const reason = agentResult.vmaxValidation?.reason ?? "enzyme_conc rejected";
     flags.push(
       `Resolved kcat=${agentResult.kcat} 1/s but could not bridge it to a ` +
-        `Vmax: ${agentResult.vmaxValidation?.reason ?? "enzyme_conc rejected"}.`,
+        `Vmax: ${reason}.`,
     );
-    return { parameters, parameterProvenance, flags };
+    return {
+      parameters,
+      parameterProvenance: explainVmax(
+        "enzyme_conc_rejected",
+        `A literature kcat of ${agentResult.kcat} 1/s was found, but the ` +
+          `enzyme concentration it would be multiplied by ` +
+          `(${enzymeConcOverride} mM) was rejected: ${reason}. The kcat is ` +
+          "not the problem here; check the enzyme concentration.",
+      ),
+      flags,
+    };
   }
 
   const located = locatableCitation(agentResult.citation);
@@ -878,7 +963,18 @@ async function applyVmaxFromKcatResolution(
       "Resolved a kcat but its citation carries no locator (ref id or URL); " +
         "not trusted as resolved — Vmax was not bridged from literature.",
     );
-    return { parameters, parameterProvenance, flags };
+    return {
+      parameters,
+      parameterProvenance: explainVmax(
+        "no_locator",
+        `A kcat of ${agentResult.kcat} 1/s was found for this enzyme, but ` +
+          "its citation carries no reference id or URL — nothing a reader " +
+          "could follow to check it. An uncheckable citation is not a " +
+          "citation, so it was not used. Supply kcat=<value> or " +
+          "vmax=<value> with --cite naming a source you can point at.",
+      ),
+      flags,
+    };
   }
   const citation = located.display;
 
@@ -951,7 +1047,12 @@ async function applyBetaGammaFromR0Resolution(
   parameterProvenance: Record<string, ParameterProvenance>;
   flags: string[];
 }> {
-  if (domain !== "sir") {
+  // The domain list lives in provenance.ts beside RESOLVABLE_FIELDS, so
+  // that DOMAINS_WITH_LITERATURE_RESOLUTION can be derived from it rather
+  // than restating which domains have a resolver. A hardcoded
+  // `domain !== "sir"` here would be a second copy of that fact, and the
+  // two would drift the way the enzyme and domain-keyword lists did.
+  if (!EPIDEMIOLOGY_BRIDGE_DOMAINS.has(domain)) {
     return { parameters, parameterProvenance, flags };
   }
   if ("beta" in overrides || "gamma" in overrides) {
@@ -959,6 +1060,64 @@ async function applyBetaGammaFromR0Resolution(
   }
   const disease = matchDisease(query);
   if (!disease) {
+    // Not "literature has nothing for this disease" -- this system only
+    // recognizes disease NAMES it has a verified, methodology-compatible
+    // (R0, infectious period) source for in the first place (see
+    // diseases.ts and ADR 0017), so a name outside that short list never
+    // even reaches the literature lookup below. Previously silent: a
+    // query naming a real disease (measles, influenza, ...) that
+    // correctly reaches the sir domain would refuse on missing beta/gamma
+    // via the generic "could not be resolved from literature" sentence --
+    // false by omission for a real, well-studied disease that simply
+    // isn't registered here yet, not one the literature has nothing on.
+    // Set directly on beta/gamma (not just a flag, which never reaches
+    // the RequiredParametersMissingError response the client actually
+    // sees) so missingKeyDetails can promote it into the error message.
+    // Names the registry's ACTUAL contents and, for measles, the specific
+    // paper behind the refusal.
+    //
+    // This said "currently COVID-19 only, per ADR 0017" until ADR 0169
+    // registered the two influenza entries — a refusal that misdescribes
+    // what the system can do is its own small inaccuracy, in the message
+    // a user reads when they are already blocked.
+    //
+    // The measles clause matters more than it looks. Measles is the
+    // disease most people try after COVID, and its refusal is NOT "we
+    // haven't got to it": Vink et al. (2014) supplies a measles serial
+    // interval (11.7 d), so half the pair exists. It is unregistered
+    // because Guerra et al. (2017), the standard R0 systematic review,
+    // concludes estimates "vary more than the often cited range of 12-18"
+    // and endorses no single value. Citing that is the product's own
+    // promise applied to its own gaps.
+    const measlesAsked = /\bmeasles\b/i.test(query);
+    const note =
+      "No disease name in this query matches Terrium's literature-backed " +
+      "R0 registry (currently COVID-19, seasonal influenza, and influenza " +
+      "A(H1N1)pdm09 -- see ADR 0017 and ADR 0169). This is a gap in what " +
+      "this system has verified so far, not a statement that the " +
+      "literature is silent. " +
+      (measlesAsked
+        ? "Measles specifically is not registered because Guerra et al. " +
+          "(2017), Lancet Infect Dis 17(12):e420-e428, " +
+          "doi:10.1016/S1473-3099(17)30307-9 -- the standard R0 systematic " +
+          "review -- found that R0 estimates vary far more than the often " +
+          "cited 12-18 range and endorses no single value, so no honest " +
+          "default exists. Supply beta and gamma for YOUR setting. "
+        : "") +
+      "Supply beta/gamma directly if you have a source for this disease.";
+    for (const key of ["beta", "gamma"] as const) {
+      if (!(key in overrides)) {
+        parameterProvenance = {
+          ...parameterProvenance,
+          [key]: {
+            ...parameterProvenance[key],
+            origin: parameterProvenance[key]?.origin ?? "default",
+            unresolvedReason: "disease_not_registered",
+            note,
+          },
+        };
+      }
+    }
     return { parameters, parameterProvenance, flags };
   }
 
@@ -1003,18 +1162,50 @@ async function applyBetaGammaFromR0Resolution(
 
   // beta/gamma are not STRENDA-governed (a disease has no assay pH), which
   // buildResolvedKineticProvenance now handles itself via parameterKey —
-  // see ADR 0021. citationStatus is always "verified" here, never
-  // conditionally cross-species like BRENDA lookups: the registry has no
-  // cross-species concept (a disease's R0 does not have an "organism"), so
-  // there is no flagged tier to select between — see ADR 0017.
+  // see ADR 0021.
+  //
+  // citationStatus was unconditionally "verified" here, on the reasoning
+  // that the registry had no flagged tier to select between (ADR 0017,
+  // when COVID-19 was the only entry and both its numbers came from one
+  // paper). ADR 0169 adds that tier: an entry whose R0 and serial
+  // interval come from two different systematic reviews is a CROSS-STUDY
+  // COMPOSITE, and is flagged for the same reason a cross-species BRENDA
+  // Km is — usable and cited, but visibly weaker than a single-source
+  // value. Letting a composite inherit "verified" would erase the only
+  // signal that two methodologies were combined.
+  const composite = agentResult.crossStudyComposite === true;
+  const secondary = locatableCitation(agentResult.secondaryCitation);
+
+  // BOTH papers go in the citation string. A composite that displayed only
+  // the R0 paper would read as single-source at exactly the layer built
+  // for checking.
+  //
+  // The LOCATORS stay primary-only, deliberately. validateParameterProvenance
+  // requires every locator to be findable in the citation string, and
+  // buildCitationLocators emits a PubMed locator whose value is a PMID
+  // while the citation carries a doi.org URL — so the secondary's locators
+  // are not string-matchable here and adding them fails that check. That
+  // check is right and is not being weakened to fit this feature: the
+  // second paper reaches the reader through the citation text and the
+  // note, and the machine-followable set stays honest about what it can
+  // actually verify.
+  const displayCitation =
+    composite && secondary
+      ? `${citation} + serial interval from ${secondary.display}`
+      : citation;
+
+  const fullNote = composite
+    ? `${bridgeNote} ${agentResult.compositeNote ?? ""}`.trim()
+    : bridgeNote;
+
   parameters = { ...parameters, beta: agentResult.beta, gamma: agentResult.gamma };
   const provenanceEntry = buildResolvedKineticProvenance({
     parameterKey: "beta",
     source: agentResult.source ?? "PubMed",
-    citation,
-    citationStatus: "verified",
+    citation: displayCitation,
+    citationStatus: composite ? "flagged" : "verified",
     citationLocators: buildCitationLocators(agentResult.citation),
-    note: bridgeNote,
+    note: fullNote,
   });
   parameterProvenance = {
     ...parameterProvenance,
@@ -1135,6 +1326,65 @@ export interface ResolvedSimulation {
   assayCoherence: CoherenceReport;
 }
 
+/**
+ * Splits text into lowercase word tokens for keyword matching. Kept
+ * separate from `extractParameterOverrides`'s tokenizer above: that one
+ * preserves punctuation meaningful to key=value syntax, this one only
+ * needs plain words.
+ */
+function tokenizeForMatching(text: string): string[] {
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 0);
+}
+
+/**
+ * Deliberately not a real stemmer (no Porter algorithm, no dictionary) --
+ * just enough suffix-stripping that a plural doesn't silently miss a
+ * singular keyword, or vice versa. "allele frequencies" failing to match
+ * the keyword "allele frequency" is the exact bug this exists to close:
+ * every other part of the query was right, only the word ending differed.
+ */
+function lightStem(word: string): string {
+  if (word.length > 4 && word.endsWith("ies")) return word.slice(0, -3) + "y";
+  if (word.length > 4 && word.endsWith("es")) return word.slice(0, -2);
+  if (word.length > 3 && word.endsWith("s") && !word.endsWith("ss")) {
+    return word.slice(0, -1);
+  }
+  return word;
+}
+
+/**
+ * Whether `keyword` matches the query, tried two ways:
+ *
+ * 1. Exact substring (the original, stricter check) -- keeps every
+ *    existing single-word keyword and deliberately-phrased multi-word
+ *    keyword ("lennard-jones") working exactly as before.
+ * 2. Word-set match: every word in the keyword phrase appears SOMEWHERE
+ *    among the query's tokens (order-independent, lightly stemmed). This
+ *    is what makes "predator and prey" match the keyword "predator prey"
+ *    and "allele frequencies in a population" match "allele frequency" --
+ *    real phrasings that failed the old exact-substring check for no
+ *    reason connected to whether the query was actually about that domain.
+ *
+ * A single-word keyword with no match in either query token set correctly
+ * fails both checks; word-set matching only helps once a keyword has two
+ * or more words to spread across the query.
+ */
+function keywordMatches(
+  lowerQuery: string,
+  queryTokens: Set<string>,
+  keyword: string,
+): boolean {
+  if (lowerQuery.includes(keyword)) return true;
+  const keywordWords = tokenizeForMatching(keyword);
+  return (
+    keywordWords.length > 0 &&
+    keywordWords.every((w) => queryTokens.has(lightStem(w)))
+  );
+}
+
 interface DomainDefaults {
   domain: SimulationDomain;
   parameters: Record<string, number | number[]>;
@@ -1235,6 +1485,13 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "trypsin",
       "rubisco",
       "kinase",
+      "kinetics",
+      "enzymatic",
+      "catalyze",
+      "catalyzes",
+      "catalyzed",
+      "reaction rate",
+      "turnover",
     ],
     reasoning:
       "Keywords related to enzyme kinetics were found; defaulting to a Michaelis-Menten simulation.",
@@ -1271,18 +1528,57 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       points: 101,
     },
     keywords: [
+      "sir",
+      "infection",
+      "epidemic",
+      "virus",
+      "disease",
+      "outbreak",
+      "pandemic",
+      "spread",
       "contagious",
+      "infectious",
+      // Named diseases, so a query naming one directly ("model measles in
+      // a school") still reaches the SIR domain even without also saying
+      // "outbreak" or "epidemic". Only "covid" resolves an actual R0 from
+      // literature today (see diseases.ts / ADR 0017) -- the rest still
+      // correctly refuse rather than invent an R0, but at least refuse
+      // from the right domain instead of silently running as if the
+      // question had been about enzyme kinetics.
+      "covid",
+      "coronavirus",
+      "sars-cov-2",
+      "measles",
+      "influenza",
+      "flu",
+      "mumps",
+      "rubella",
+      "chickenpox",
+      "varicella",
+      "smallpox",
+      "pertussis",
+      "whooping cough",
+      "tuberculosis",
+      "cholera",
+      "ebola",
+      "mpox",
+      "monkeypox",
+      "norovirus",
+          // Compartment and outcome vocabulary: a query can describe an
+      // outbreak entirely in SIR terms ("how many stay susceptible",
+      // "herd immunity threshold") without ever writing "epidemic".
       "susceptible",
       "recovered",
       "immunity",
       "immune",
+      "infected",
+      "illness",
       "transmission",
       "spreads",
       "attack rate",
       "herd immunity",
-      "infected",
-      "illness",
-      "wave","sir", "infection", "epidemic", "virus", "disease", "outbreak"],
+      "wave",
+    ],
     reasoning:
       "Keywords related to infectious disease spread were found; defaulting to an SIR epidemic simulation.",
     modelCitations: [
@@ -1630,6 +1926,23 @@ const PARAMETER_PATTERN = new RegExp(
   `^(${PARAMETER_NAMES})\\s*[=:]?\\s*([0-9]+(?:\\.[0-9]+)?(?:e[+-]?[0-9]+)?)$`,
   "i",
 );
+
+/**
+ * A token that is a known parameter name and NOTHING else -- no digits, no
+ * `=`/`:` attached. Used to detect "km 5" style pairs, where the name and
+ * the value are two SEPARATE whitespace-split tokens.
+ *
+ * `PARAMETER_PATTERN` above already makes its `[=:]?` optional, which reads
+ * as if it were meant to catch this shape -- and its own "Fallback" comment
+ * gives "km 5" as the worked example. It cannot: `query.split(/\s+/)`
+ * yields "km" and "5" as two independent tokens, and a regex tested against
+ * one token can never see the next one. No amount of rewriting that single
+ * regex fixes this; the extraction loop has to look at the PAIR.
+ */
+const BARE_PARAMETER_NAME_PATTERN = new RegExp(`^(${PARAMETER_NAMES})$`, "i");
+
+/** A bare numeric token: "5", "0.4", "1e-3" -- no key, no unit suffix. */
+const BARE_NUMBER_PATTERN = /^[0-9]+(?:\.[0-9]+)?(?:e[+-]?[0-9]+)?$/i;
 
 /**
  * Validation errors for malformed array overrides.
@@ -1993,28 +2306,79 @@ export function refinementPairs(): {
 }
 
 export function classifyDomainByKeyword(query: string): KeywordClassification {
-  let best: { defaults: DomainDefaults; score: number } | undefined;
+  // Strip explicit parameter-override tokens ("km=2", "vmax=5", ...)
+  // before classifying. "km" and "vmax" are themselves mm keywords
+  // (someone writing "the km of this reaction" IS naming enzyme kinetics
+  // vocabulary) -- but every fully-specified mm/mm_competitive_inhibition
+  // query ALSO writes "km=<value>" as parameter syntax, which would
+  // otherwise inflate mm's score by 1-2 points purely from bookkeeping
+  // that has nothing to do with which of the two domains is meant. That
+  // let mm silently outscore mm_competitive_inhibition on a query that
+  // explicitly said "competitive inhibition", just because it also
+  // supplied km=/vmax= inline -- classification must run on what the
+  // query SAYS, not on which parameter names it happens to assign.
+  const classificationText = query
+    .split(/\s+/)
+    .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token))
+    .join(" ");
+  const lower = classificationText.toLowerCase();
+  const queryTokens = new Set(
+    tokenizeForMatching(classificationText).map(lightStem),
+  );
 
+  // `matchEnzyme` already recognizes ~25 specific enzymes by name (with a
+  // verified EC number, no network round trip) for the entity-extraction
+  // step below -- but classification never consulted it, so a query
+  // naming one of those exact enzymes (e.g. "citrate synthase kinetics",
+  // "chymotrypsin activity") could still fail to reach "mm" if the enzyme
+  // itself wasn't ALSO separately hardcoded into the mm keyword list. That
+  // is the same class of bug as the domain-classification gap above, just
+  // one layer down: two independent lists of the same enzymes, silently
+  // drifting apart. Treating a real `matchEnzyme` hit as a strong
+  // classification signal removes the second list rather than growing it.
+  const enzymeMatch = matchEnzyme(query);
+
+  let best: DomainDefaults | undefined;
+  let bestScore = 0;
   for (const candidate of DOMAIN_DEFAULTS) {
-    let score = 0;
-    for (const keyword of candidate.keywords) {
-      if (matchesTerm(query, keyword)) {
-        score += keyword.length;
-      }
+    let score = candidate.keywords.filter((keyword) =>
+      keywordMatches(lower, queryTokens, keyword),
+    ).length;
+    // Naming a real enzyme is generic evidence for "this is an enzyme-
+    // kinetics question" -- it should land on plain mm by default, so mm
+    // gets the larger share (+2). mm_competitive_inhibition gets a smaller
+    // share (+1) rather than none: giving both the same boost made them
+    // tie on any plain enzyme-kinetics query with no inhibitor language,
+    // with array order (mm_competitive_inhibition is declared first)
+    // silently deciding the wrong one every time. With the smaller share,
+    // mm wins outright when nothing else distinguishes them, but a query
+    // that ALSO says "inhibitor"/"competitive"/"inhibition" adds enough on
+    // top (mm_competitive_inhibition's own keyword score) to still win --
+    // inhibition is a real, additional claim the query has to make, not
+    // the default assumption for every enzyme mentioned.
+    if (enzymeMatch && candidate.domain === "mm") {
+      score += 2;
+    } else if (enzymeMatch && candidate.domain === "mm_competitive_inhibition") {
+      score += 1;
     }
-    // Strictly greater: the first domain in the table wins a tie, which is
-    // exactly the old behaviour for equally-specific matches.
-    if (score > 0 && (best === undefined || score > best.score)) {
-      best = { defaults: candidate, score };
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
     }
   }
 
   if (best !== undefined) {
     // Scoring picked the best-evidenced domain; nesting then asks whether
     // the query named a special case of it. See `resolveNesting`.
-    return { defaults: resolveNesting(best.defaults, query), matched: true };
+    return { defaults: resolveNesting(best, query), matched: true };
   }
 
+  // Nothing matched. Report that rather than deciding here: callers that
+  // resolve a query turn this into an UnrecognizedQueryError refusal, while
+  // callers that only want to record what was asked need a domain-shaped
+  // answer and must not be made to throw. `matched: false` is the whole
+  // signal -- the returned defaults are a placeholder, not a guess anyone
+  // is entitled to run.
   const fallback =
     DOMAIN_DEFAULTS.find((d) => d.domain === "mm") ?? DOMAIN_DEFAULTS[0]!;
   return { defaults: fallback, matched: false };
@@ -2053,7 +2417,9 @@ export function extractParameterOverrides(
   // Keys already captured as arrays are skipped so a partial token
   // (e.g. `starting_frequencies=0.5,` from a space-split list) cannot
   // overwrite the validated array with a scalar.
-  for (const token of query.split(/\s+/)) {
+  const tokens = query.split(/\s+/);
+  for (let tokenIdx = 0; tokenIdx < tokens.length; tokenIdx++) {
+    const token = tokens[tokenIdx]!;
     // Try key=value or key:value pattern first
     const kvMatch = PARAMETER_TOKEN_PATTERN.exec(token);
     if (kvMatch) {
@@ -2098,7 +2464,8 @@ export function extractParameterOverrides(
       }
     }
 
-    // Fallback: try scalar match without explicit delimiter (e.g. "km 5")
+    // Fallback: try scalar match without explicit delimiter (e.g. "km5",
+    // glued with no space at all).
     const scalarMatch = PARAMETER_PATTERN.exec(token);
     if (scalarMatch) {
       const key = scalarMatch[1]!.toLowerCase();
@@ -2106,6 +2473,35 @@ export function extractParameterOverrides(
       const value = Number.parseFloat(scalarMatch[2]!);
       if (Number.isFinite(value)) {
         overrides[key] = value;
+      }
+      continue;
+    }
+
+    // Fallback: "km 5" -- name and value as two separate tokens, the shape
+    // this function's own docstring and the "Fallback" comment above both
+    // promised and neither could deliver, because a single-token regex
+    // cannot see the next token. Consuming the pair here is what makes it
+    // real. Only a BARE name (no `=`/`:`/digits already on it -- ruled out
+    // by every branch above reaching here) followed by a BARE number
+    // qualifies, so "km=5 10" or "beta: x" cannot accidentally pair with
+    // an unrelated neighboring number.
+    if (BARE_PARAMETER_NAME_PATTERN.test(token) && tokenIdx + 1 < tokens.length) {
+      const key = token.toLowerCase();
+      const nextToken = tokens[tokenIdx + 1]!;
+      if (!arrayKeys.has(key) && BARE_NUMBER_PATTERN.test(nextToken)) {
+        if (ARRAY_VALIDATORS[key] === undefined) {
+          const value = Number.parseFloat(nextToken);
+          if (Number.isFinite(value)) {
+            overrides[key] = value;
+            tokenIdx++; // consume the value token so it is not re-scanned
+          }
+        }
+        // An array parameter named bare ("starting_frequencies 0.5") is
+        // left unmatched here rather than rejected: unlike `key=0.5`,
+        // typing the name and a lone number with a space is at least as
+        // likely to be prose ("starting_frequencies 0.5 each" is not
+        // natural) as an attempted override, so silence is safer than an
+        // error a plain sentence could trigger by coincidence.
       }
     }
   }
@@ -2178,6 +2574,26 @@ function guessEnzymeNameFromQuery(query: string): string | undefined {
  * before attempting BRENDA -- see science_agent_runner.py::resolve_ec_number.
  */
 function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
+  // The organism the query NAMES wins over the table's default.
+  //
+  // This function never looked at the query for one. Measured before
+  // organisms.ts existed: "simulate hexokinase in E. coli with glucose"
+  // returned km 6 mM with organism "Homo sapiens", source
+  // "brenda_exact", citationStatus "verified" -- the named species
+  // discarded, and a human value badged as an EXACT MATCH for a species
+  // nobody asked about.
+  //
+  // That is worse than the case ADR 0024 exists for. A real cross-species
+  // value is withheld unless opted into and arrives flagged, because
+  // kinetic constants are species-specific. That machinery never fired
+  // here: from its point of view the requested organism matched, because
+  // the request had been rewritten to match.
+  //
+  // `undefined` from matchOrganism is a real answer -- no organism was
+  // named -- so the existing default stands rather than being replaced by
+  // a guess.
+  const namedOrganism = matchOrganism(query);
+
   const matched = matchEnzyme(query);
   if (matched) {
     const lower = query.toLowerCase();
@@ -2186,7 +2602,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
     return {
       enzymeName: matched.enzymeName,
       substrate,
-      organism: matched.organism,
+      organism: namedOrganism ?? matched.organism,
       ecNumber: matched.ecNumber,
     };
   }
@@ -2196,7 +2612,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   return {
     enzymeName: guess,
     substrate: "",
-    organism: "Homo sapiens",
+    organism: namedOrganism ?? "Homo sapiens",
     ecNumber: undefined,
   };
 }
@@ -2237,11 +2653,91 @@ function buildParameterProvenance(
         origin: "default",
         note: `No literature lookup exists for ${key}; only ${resolvable.join(", ")} is resolved from literature in this domain.`,
       };
+    } else if (!DOMAINS_WITH_LITERATURE_RESOLUTION.has(domain)) {
+      // The whole domain has no lookup, so there is no "only X is
+      // resolved" to point at. Say the true thing instead of nothing:
+      // silence here is what let the refusal claim a search had happened.
+      //
+      // No `unresolvedReason` on purpose. Setting one would promote this
+      // into the per-key detail list, which drops the generic sentence
+      // AND the "Add key=<value>" instruction that goes with it — the
+      // regression missingKeyDetails' own comment records. The refusal
+      // sentence is corrected at its source instead.
+      provenance[key] = {
+        origin: "default",
+        note:
+          `No literature lookup exists for any parameter in the ` +
+          `'${domain}' domain; every value must be supplied in the query.`,
+      };
     } else {
       provenance[key] = { origin: "default" };
     }
   }
   return provenance;
+}
+
+/**
+ * Quantities the user stated in words rather than as key=value.
+ *
+ * "model a covid-19 outbreak in a town of 10000 people" contains the
+ * population. Before this existed, only CLI syntax was read, so that
+ * number was invisible and the refusal asked the user to supply s0 -- a
+ * number they had already given, in the same sentence. Reading it is not
+ * inventing it; the difference between "a town of 10000 people" and
+ * "s0=10000" is grammar, not provenance, and both are origin "user".
+ *
+ * An explicit key=value ALWAYS wins over prose. Someone who writes
+ * "s0=500" after describing a town of 10000 is correcting themselves, and
+ * the more precise statement is the one they meant.
+ *
+ * Shared by both resolution paths on purpose. This started life inline in
+ * the keyword fallback only, which meant the entire natural-language
+ * capability switched off the moment an LLM key was configured: the LLM
+ * path built provenance from `overrides` alone, so prose numbers arrived
+ * as origin "llm" (ADR 0011) at best and were hard-blocked, leaving a
+ * plain question failing on one deployment and working on another for
+ * reasons no user could see.
+ */
+function readStatedQuantities(
+  query: string,
+  domain: SimulationDomain,
+  overrides: Record<string, number | number[]>,
+): {
+  effectiveOverrides: Record<string, number | number[]>;
+  statedPhrases: Record<string, string>;
+} {
+  const statedPhrases: Record<string, string> = {};
+  const statedValues: Record<string, number> = {};
+  for (const stated of extractStatedQuantities(query, domain)) {
+    if (stated.key in overrides) continue;
+    statedValues[stated.key] = stated.value;
+    statedPhrases[stated.key] = stated.sourcePhrase;
+  }
+  return {
+    effectiveOverrides: { ...statedValues, ...overrides },
+    statedPhrases,
+  };
+}
+
+/**
+ * Record WHICH WORDS produced each stated value.
+ *
+ * This is what makes a misreading catchable: without it, a wrong binding
+ * is discoverable only from the trajectory, which is exactly the
+ * invisible-failure shape this project treats as worse than an error.
+ */
+function noteStatedSources(
+  provenance: Record<string, ParameterProvenance>,
+  statedPhrases: Record<string, string>,
+): Record<string, ParameterProvenance> {
+  const out = { ...provenance };
+  for (const [key, phrase] of Object.entries(statedPhrases)) {
+    const entry = out[key];
+    if (entry) {
+      out[key] = { ...entry, note: `Read from your query: "${phrase}".` };
+    }
+  }
+  return out;
 }
 
 function provenanceViolations(
@@ -2360,7 +2856,7 @@ function formatResolvedCitation(citation?: {
  * can be extracted that re-finds the source, the value degrades honestly
  * to a default instead of being published as literature-backed.
  */
-function locatableCitation(citation?: {
+export function locatableCitation(citation?: {
   source?: string;
   referenceId?: string | null;
   url?: string | null;
@@ -2457,23 +2953,62 @@ export async function resolveQuery(
     const domainDefaults =
       DOMAIN_DEFAULTS.find((d) => d.domain === llmResult.domain) ||
       DOMAIN_DEFAULTS[0]!;
+    // Prose quantities outrank the LLM's own extraction, and sit below an
+    // explicit key=value. A number read deterministically out of the
+    // user's sentence, carrying the phrase that produced it, is the user
+    // stating it; the same number produced by a model from a prompt is
+    // origin "llm" and hard-blocked (ADR 0011). Ordering them the other
+    // way round would let model output shadow what the user actually
+    // wrote, and then block the query for containing model output.
+    const { effectiveOverrides, statedPhrases } = readStatedQuantities(
+      query,
+      llmResult.domain,
+      overrides,
+    );
+
     let parameters = {
       ...domainDefaults.parameters,
       ...llmResult.parameters,
-      ...overrides,
+      ...effectiveOverrides,
     };
     let flags: string[] = [];
-    const modelCitations = [...llmResult.modelCitations];
-    let parameterProvenance = buildParameterProvenance(
-      parameters,
-      overrides,
-      llmResult.parameters,
-      llmResult.domain,
+    // The model's OWN modelCitations are deliberately NOT carried into
+    // the response.
+    //
+    // `SYSTEM_PROMPT` asks the model for "modelCitations": ["optional
+    // literature reference"], and whatever it returns used to be spread
+    // straight into provenance.modelCitations alongside the curated
+    // domain citation -- same array, same shape, no way for a reader to
+    // tell which one a human had checked.
+    //
+    // auditIntegrity.test.ts already established the principle for the
+    // easy case: the "Domain: <name>" placeholder was "a label shipped to
+    // the client inside the list of citations backing a scientific
+    // result", and was removed. An LLM-authored reference is the same
+    // defect with a better disguise -- a placeholder is obviously not a
+    // citation, whereas an invented reference looks exactly like a real
+    // one. This is also the rule provenance.ts already applies to VALUES,
+    // where an `llm` origin is blocked unless a resolvable citation backs
+    // it; there is no reason a citation should be trusted on terms a
+    // number is not.
+    //
+    // Discarded rather than silently dropped: if the model did offer
+    // something, the response says so in `flags`, so the signal survives
+    // without an unverified reference being published as a citation.
+    const discardedLlmCitations = llmResult.modelCitations.length;
+    let parameterProvenance = noteStatedSources(
+      buildParameterProvenance(
+        parameters,
+        effectiveOverrides,
+        llmResult.parameters,
+        llmResult.domain,
+      ),
+      statedPhrases,
     );
 
     const resolvableForDomain = RESOLVABLE_FIELDS[llmResult.domain] ?? [];
     const hasUnoverriddenKinetic = resolvableForDomain.some(
-      (k) => !(k in overrides),
+      (k) => !(k in effectiveOverrides),
     );
     if (
       (llmResult.domain === "mm" ||
@@ -2483,7 +3018,7 @@ export async function resolveQuery(
     ) {
       const result = await applyKineticResolution(
         llmResult.entities,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         allowCrossSpecies,
         allowVariants,
@@ -2502,7 +3037,7 @@ export async function resolveQuery(
     {
       const vmaxResult = await applyVmaxFromKcatResolution(
         llmResult.entities,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         parameters,
         parameterProvenance,
@@ -2518,7 +3053,7 @@ export async function resolveQuery(
     {
       const epiResult = await applyBetaGammaFromR0Resolution(
         query,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         parameters,
         parameterProvenance,
@@ -2533,7 +3068,7 @@ export async function resolveQuery(
     if (llmResult.domain === "wright_fisher" || llmResult.domain === "two_locus_wright_fisher") {
       const popgenResult = await applyPopgenResolution(
         llmResult.entities,
-        overrides,
+        effectiveOverrides,
         llmResult.domain,
         parameters,
         parameterProvenance,
@@ -2545,13 +3080,13 @@ export async function resolveQuery(
     }
 
     if (
-      Object.keys(overrides).length === 0 &&
+      Object.keys(effectiveOverrides).length === 0 &&
       Object.keys(llmResult.parameters).length === 0
     ) {
       flags.push(
         "No parameters were extracted from the query; using defaults.",
       );
-    } else if (Object.keys(overrides).length > 0) {
+    } else if (Object.keys(effectiveOverrides).length > 0) {
       flags.push("Applied parameter overrides found in the query string.");
     }
     const violations = provenanceViolations(parameters, parameterProvenance);
@@ -2576,19 +3111,69 @@ export async function resolveQuery(
     // Stage 4: Validation - Check hard rule and provenance
     const stage4Start = Date.now();
     const missing = unverifiedOriginKeys(parameterProvenance);
+    // Recorded HERE, before the refusal branch below returns, so the
+    // literature hit rate counts queries that failed to resolve as
+    // well as those that succeeded. See recordParameterProvenance.
+    verifiableMetricsCollector.recordParameterProvenance(
+      Object.values(parameterProvenance).map((p) => p.origin),
+    );
     const stage4Duration = Date.now() - stage4Start;
     stageTimings["Validation"] = {
       duration: stage4Duration,
       success: missing.length === 0,
     };
 
-    if (missing.length > 0) {
+    // A gap is not one thing. Before refusing, ask what KIND each one is:
+    // a value the requested model fixes by definition, a quantity that
+    // describes the user's own setup, or a measurement a real search failed
+    // to find. Only the last still refuses. See `resolveGaps`.
+    const gaps = resolveGaps(
+      llmResult.domain,
+      query,
+      missing,
+      missingKeyDetails(missing, parameterProvenance),
+      // The CURATED table, not the merged set -- see `resolveGaps`.
+      Object.fromEntries(
+        missing
+          .filter((k) => domainDefaults.parameters[k] !== undefined)
+          .map((k) => [k, domainDefaults.parameters[k]!]),
+      ),
+      parameterProvenance,
+    );
+    if (Object.keys(gaps.filled).length > 0) {
+      parameters = { ...parameters, ...gaps.filled };
+      parameterProvenance = { ...parameterProvenance, ...gaps.provenance };
+      flags = [...flags, ...gaps.flags];
+    }
+    const stillMissing = gaps.stillMissing;
+
+    if (stillMissing.length > 0) {
       const latencyMs = Date.now() - startTime;
       verifiableMetricsCollector.recordJobFailure(runId);
+      // `parameters` is seeded from DOMAIN_DEFAULTS before anything real
+      // overlays it (see the `let parameters = {...domainDefaults.parameters,
+      // ...}` above), so an unresolved key can still hold that seed's
+      // illustrative number even while `missing` correctly says nobody
+      // verified it. Filtering by `missing` is what keeps a caller of this
+      // error from receiving a fabricated value labeled as resolved --
+      // exactly the "confident wrong number" this project exists to refuse.
+      // Caught by testing this feature end to end: without the filter, a
+      // caller reasonably reads "resolvedSoFar.vmax === 5" as a real,
+      // literature-grounded number.
+      const resolvedOnly = Object.fromEntries(
+        Object.entries(parameters).filter(([key]) => !missing.includes(key)),
+      );
       throw new RequiredParametersMissingError(
         llmResult.domain,
-        missing,
-        missingKeyDetails(missing, parameterProvenance),
+        stillMissing,
+        missingKeyDetails(stillMissing, parameterProvenance),
+        resolvedOnly,
+        // The domain table's own illustrative values, offered ONLY as
+        // "Add end=200" hints. RequiredParametersMissingError filters
+        // them through EXPERIMENTAL_CHOICE_KEYS, so the teaching-default
+        // km/vmax in this same table can never reach the message and be
+        // pasted back as a user value.
+        Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
       );
     }
 
@@ -2640,26 +3225,61 @@ export async function resolveQuery(
         // `domainCitation` is undefined for a domain with no literature
         // entry (sbml, where the caller supplies the model). Omit it
         // rather than pushing a placeholder into a citations list.
-        modelCitations: [
-          ...modelCitations,
-          ...(domainCitation ? [domainCitation] : []),
-        ],
-        flags,
+        modelCitations: domainCitation ? [domainCitation] : [],
+        // Appended HERE rather than pushed at the point of discard: `flags`
+        // is REASSIGNED further down this function (flags = result.flags,
+        // = vmaxResult.flags, = epiResult.flags, = popgenResult.flags), so
+        // anything pushed earlier is silently dropped on four of the paths
+        // through it.
+        flags:
+          discardedLlmCitations > 0
+            ? [
+                ...flags,
+                `discarded_unverified_model_citation: the language model ` +
+                  `offered ${discardedLlmCitations} reference(s). Terrium ` +
+                  `cites only the curated domain literature, because ` +
+                  `nothing has checked that those references exist or say ` +
+                  `what the model claims.`,
+              ]
+            : flags,
       },
       parameterProvenance,
       assayCoherence: coherence,
     };
   }
 
-  const { defaults: best } = classifyDomainByKeyword(query);
+  const { defaults: best, matched } = classifyDomainByKeyword(query);
+  if (!matched) {
+    // Previously fell through to `mm` (Michaelis-Menten) unconditionally --
+    // whatever domain happened to sit first in DOMAIN_DEFAULTS when nothing
+    // else matched. That is a worse failure than refusing: a query about
+    // "the spread of measles in a school" or "predator and prey
+    // populations" would silently receive an enzyme-kinetics simulation,
+    // with the domain mismatch invisible anywhere in the response. See
+    // UnrecognizedQueryError's own doc comment for the full reasoning.
+    //
+    // The refusal lives here rather than inside classifyDomainByKeyword
+    // because that function is also called just to record what a query
+    // looked like (see routes/simulate.ts) -- logging what was asked must
+    // not itself throw. The classifier reports "nothing matched"; this,
+    // the resolution path, is what turns that into a refusal.
+    throw new UnrecognizedQueryError(
+      query,
+      DOMAIN_DEFAULTS.map((d) => d.domain),
+    );
+  }
 
-  let parameters = { ...best.parameters, ...overrides };
-  let flags: string[] = [];
-  let parameterProvenance = buildParameterProvenance(
-    parameters,
-    overrides,
-    {},
+  const { effectiveOverrides, statedPhrases } = readStatedQuantities(
+    query,
     best.domain,
+    overrides,
+  );
+
+  let parameters = { ...best.parameters, ...effectiveOverrides };
+  let flags: string[] = [];
+  let parameterProvenance = noteStatedSources(
+    buildParameterProvenance(parameters, effectiveOverrides, {}, best.domain),
+    statedPhrases,
   );
 
   // If this looks like an enzyme query and no LLM is available, try the
@@ -2667,7 +3287,7 @@ export async function resolveQuery(
   const fallbackEntities = extractEntitiesFromQuery(query);
   const resolvableForDomain = RESOLVABLE_FIELDS[best.domain] ?? [];
   const hasUnoverriddenKinetic = resolvableForDomain.some(
-    (k) => !(k in overrides),
+    (k) => !(k in effectiveOverrides),
   );
   if (
     (best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
@@ -2676,7 +3296,7 @@ export async function resolveQuery(
   ) {
     const result = await applyKineticResolution(
       fallbackEntities,
-      overrides,
+      effectiveOverrides,
       best.domain,
       allowCrossSpecies,
       allowVariants,
@@ -2692,10 +3312,16 @@ export async function resolveQuery(
 
   // ADR 0019: bridge a literature kcat to Vmax, but only when the query
   // itself supplied enzyme_conc — never resolved, never defaulted.
+  //
+  // `effectiveOverrides`, not `overrides`: an [E]0 stated in words ("with
+  // 50 nM enzyme") is supplied by the query just as much as
+  // "enzyme_conc=0.00005" is, and reading it while passing only the
+  // key=value map here would have extracted the number and then dropped
+  // it on the floor one call later.
   {
     const vmaxResult = await applyVmaxFromKcatResolution(
       fallbackEntities,
-      overrides,
+      effectiveOverrides,
       best.domain,
       parameters,
       parameterProvenance,
@@ -2711,7 +3337,7 @@ export async function resolveQuery(
   {
     const epiResult = await applyBetaGammaFromR0Resolution(
       query,
-      overrides,
+      effectiveOverrides,
       best.domain,
       parameters,
       parameterProvenance,
@@ -2726,7 +3352,7 @@ export async function resolveQuery(
   if (best.domain === "wright_fisher" || best.domain === "two_locus_wright_fisher") {
     const popgenResult = await applyPopgenResolution(
       fallbackEntities,
-      overrides,
+      effectiveOverrides,
       best.domain,
       parameters,
       parameterProvenance,
@@ -2737,7 +3363,7 @@ export async function resolveQuery(
     flags = popgenResult.flags;
   }
 
-  flags.push(...buildParameterExtractionFlags(overrides));
+  flags.push(...buildParameterExtractionFlags(effectiveOverrides));
   const violations = provenanceViolations(parameters, parameterProvenance);
   if (violations.length > 0) {
     throw new Error(
@@ -2759,19 +3385,56 @@ export async function resolveQuery(
   // Stage 4: Validation (fallback path)
   const stage4Start = Date.now();
   const missing = unverifiedOriginKeys(parameterProvenance);
+  // Recorded HERE, before the refusal branch below returns, so the
+  // literature hit rate counts queries that failed to resolve as
+  // well as those that succeeded. See recordParameterProvenance.
+  verifiableMetricsCollector.recordParameterProvenance(
+    Object.values(parameterProvenance).map((p) => p.origin),
+  );
   const stage4Duration = Date.now() - stage4Start;
   stageTimings["Validation"] = {
     duration: stage4Duration,
     success: missing.length === 0,
   };
 
-  if (missing.length > 0) {
+  // Same classification as the LLM branch above, same reason.
+  const gaps = resolveGaps(
+    best.domain,
+    query,
+    missing,
+    missingKeyDetails(missing, parameterProvenance),
+    // The CURATED table, not the merged set -- see `resolveGaps`.
+    Object.fromEntries(
+      missing
+        .filter((k) => best.parameters[k] !== undefined)
+        .map((k) => [k, best.parameters[k]!]),
+    ),
+    parameterProvenance,
+  );
+  if (Object.keys(gaps.filled).length > 0) {
+    parameters = { ...parameters, ...gaps.filled };
+    parameterProvenance = { ...parameterProvenance, ...gaps.provenance };
+    flags = [...flags, ...gaps.flags];
+  }
+  const stillMissing = gaps.stillMissing;
+
+  if (stillMissing.length > 0) {
     const latencyMs = Date.now() - startTime;
     verifiableMetricsCollector.recordJobFailure(runId);
+    // Same filter as the LLM branch above, same reason: `parameters` here
+    // is seeded `{...best.parameters, ...overrides}` and an unresolved key
+    // can still carry that seed's placeholder number even though `missing`
+    // correctly flags it as unverified.
+    const resolvedOnly = Object.fromEntries(
+      Object.entries(parameters).filter(([key]) => !missing.includes(key)),
+    );
     throw new RequiredParametersMissingError(
       best.domain,
-      missing,
-      missingKeyDetails(missing, parameterProvenance),
+      stillMissing,
+      missingKeyDetails(stillMissing, parameterProvenance),
+      resolvedOnly,
+      // Same as the LLM branch above, same filtering.
+      Object.fromEntries(missing.map((k) => [k, parameters[k]!])),
     );
   }
 

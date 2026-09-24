@@ -41,7 +41,7 @@ more, checked in `src/routes/waitlist.ts`.
 a gap, stated rather than glossed: as written, an address stays until
 somebody removes it by hand.
 
-**How to get yours removed:** email mathlete.world@gmail.com. There is no
+**How to get yours removed:** email admin.terrium@gmail.com. There is no
 automated unsubscribe and no self-service deletion.
 
 ## Fonts and scripts the pages load from other people's servers

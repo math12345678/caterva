@@ -1,0 +1,18 @@
+# What the source distribution carries beyond the package itself.
+#
+# Setuptools' defaults swept the whole literature layer in: its sdist glob
+# includes `tests/`, and on a case-folding filesystem that matched `Tests/`
+# -- 81 files that are not part of the installable package and whose
+# fixtures are covered by a licence carve-out (see LICENSE) that a
+# redistributed copy would have to carry with it. Pruned explicitly, in
+# both spellings, so the result does not depend on the filesystem the
+# build ran on.
+include LICENSE NOTICE README.md CHANGELOG.md CITATION.cff pyproject.toml
+prune Tests
+prune tests
+prune Terium/tests
+prune Terium/.pytest_cache
+prune Terium/.hypothesis
+exclude Terium/conftest.py Terium/pytest.ini Terium/.coverage
+global-exclude __pycache__ *.py[cod] .DS_Store
+include Terium/core/data/*.json Terium/core/data/README.md

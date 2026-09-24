@@ -118,9 +118,31 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "LGPL-2.1",
         "Caltech, EMBL-EBI, University of Heidelberg and others. LGPL "
         "permits use and distribution of a work that links the library; the "
-        "condition is that recipients can replace the library. Terrium "
-        "imports it as a separately-installed Python package and does not "
-        "vendor, modify or statically link it, so replacement is automatic.",
+        "condition is that recipients can replace the library. In the wheel "
+        "and sdist Terrium names it as a dependency and does not vendor, "
+        "modify or statically link it, so replacement is a pip install. In "
+        "the downloadable app folder (ADR 0177) it IS conveyed, as one "
+        "separate file the recipient can swap, with the LGPL text and "
+        "libSBML's own terms beside it; NOTICE states the position.",
+    ),
+    # --- The app folder's freezer (requirements-release.txt only) ----------
+    "pyinstaller": (
+        "GPL-2.0-or-later WITH Bootloader-exception",
+        "Read from pyinstaller-6.22.2.dist-info/licenses/COPYING.txt in the "
+        "installed wheel by the session on branch "
+        "claude/terrium-orientation-setup-c1310b (PR #21), which installed "
+        "it; the machine that recorded this entry could not reach PyPI and "
+        "carries the text over from that record. The GPL alone would be "
+        "a problem: the downloadable app folder embeds PyInstaller's "
+        "bootloader, and copyleft on that would reach the whole folder. The "
+        "Bootloader Exception is what makes it lawful: the authors give "
+        "'unlimited permission to link or embed compiled bootloader and "
+        "related files into combinations with other programs, and to "
+        "distribute those combinations without any restriction'. Build-time "
+        "only: nothing imports it and nothing at run time needs it; it is "
+        "pinned in requirements-release.txt, which only the release workflow "
+        "installs (ADR 0177). The COPYING.txt with the exception ships in the "
+        "folder under licenses/pyinstaller/.",
     ),
     # --- Numerics ---------------------------------------------------------
     "numpy": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),

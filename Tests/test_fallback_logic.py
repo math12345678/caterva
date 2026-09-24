@@ -312,6 +312,32 @@ class TestAssayConditionsReachTheResult:
         assert result.assay_ph is None
         assert result.assay_temperature_c is None
 
+    def test_a_real_buffer_survives_to_the_result_and_the_frontier(
+        self, ache_provider
+    ):
+        """AChE: 'in 0.1 M MOPS buffer (pH 7.4), at 37°C'. The buffer must
+        reach the KineticResult AND every candidate dict the frontier emits
+        (ADR 0175) -- the assay window re-selects from those dicts without
+        a second parse, so dropping 'buffer' here would silently delete the
+        only axis that can close a buffer mismatch."""
+        result = resolve_kinetic_value(
+            "3.1.1.7",
+            "Homo sapiens",
+            "acetylcholine",
+            html_provider=ache_provider,
+            uniprot_provider=fake_uniprot_provider,
+            taxon_id_provider=fake_taxon_id_provider,
+            search_literature=False,
+        )
+        assert result.found is True
+        assert result.value == 0.0714
+        assert result.assay_ph == 7.4
+        assert result.assay_temperature_c == 37.0
+        assert result.assay_buffer == "0.1 M MOPS buffer"
+        frontier_buffers = [c.get("buffer") for c in result.ensemble_candidates]
+        assert "0.1 M MOPS buffer" in frontier_buffers
+        assert all(b is None or isinstance(b, str) for b in frontier_buffers)
+
     def test_cross_species_result_also_carries_conditions(self, ldh_provider):
         """The cross-species path is a separate construction site, so it
         can drop the fields independently of the exact path. The Sus

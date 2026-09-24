@@ -5,28 +5,43 @@ import {
   type Response,
   type NextFunction,
 } from "express";
-import { desc, sql } from "drizzle-orm";
 import {
   RunSimulationBody,
   type SimulationRequest as RunSimulationRequest,
   GetSimulationJobParams,
   StreamSimulationJobParams,
 } from "@workspace/api-zod";
-import { getDb, isDbAvailable, simulationsTable } from "@workspace/db";
+import { getDb, isDbAvailable } from "@workspace/db";
 import { logger } from "../lib/logger";
-import { resolveQuery } from "../lib/queryResolver";
-import { classifyDomainByKeyword } from "../lib/queryResolver";
+import type { ModelGroundingReport } from "../lib/modelGrounding";
 import { recordQuery } from "../lib/queryLog";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
-import { runTerium, type SimulationDomain } from "../lib/teriumRunner";
-import { SimulationParameterSchemas } from "../lib/schemas";
+import { asSimulationDomain, runTerium, type SimulationDomain, type TeriumResult } from "../lib/teriumRunner";
+import { SimulationParameterSchemas, CustomModelBody } from "../lib/schemas";
+import {
+  NetworkRequestSchema,
+  unsourcedQuantityIds,
+  ParameterizeRequestSchema,
+  unknownRequestIds,
+  type NetworkRequest,
+  type ParameterizeRequest,
+} from "../lib/reactionNetwork";
+import {
+  toCompositionReport,
+  toLiteratureSearchReport,
+  type CompositionRefusal,
+  type CompositionReport,
+  type ParameterizePayload,
+} from "../lib/literatureSearch";
 import * as queue from "../lib/queue";
-import { findCachedResultByQuery, persistJob } from "../lib/cache";
+import { findCachedEntryByQuery, persistJob } from "../lib/cache";
 import { simulateLimiter } from "../lib/rateLimit";
 import {
+  PARAMETER_ORIGINS,
   RequiredParametersMissingError,
+  UnrecognizedQueryError,
   STRENDA_GOVERNED_FIELDS,
   validateParameterProvenance,
   type ParameterProvenance,
@@ -177,10 +192,26 @@ router.get(
       res.json({
         timestamp: new Date().toISOString(),
         literature: {
-          queueTheory: "Little (1961) - L = λW",
-          confidenceIntervals: "Wilson (1927) - Binomial proportion CI",
-          percentiles: "Harter (1974) - P95 and P99 latency analysis",
-          responseTime: "Nielsen (1993) - User perception thresholds",
+          // Each entry says what the work actually contributes. Until
+          // 2026-09-05 this block named four works of which one was used:
+          // Wilson's interval IS computed here; Little's Law was cited for
+          // a Set's size, Harter for an ordinary sorted-array percentile,
+          // and Nielsen for nothing in this payload at all. Naming a real
+          // paper beside a number it did not produce is the defect this
+          // product exists to refuse.
+          queueTheory:
+            "Little (1961) L = \u03BBW -- the steady-state relation these " +
+            "three metrics can be CHECKED against (activeJobs should " +
+            "approximate completionRate x avgLatency). activeJobs is a " +
+            "direct count, not derived from it.",
+          confidenceIntervals:
+            "Wilson (1927) -- computed here: the binomial proportion " +
+            "interval around successRate, which is why a 1-of-1 sample " +
+            "does not report 100% with no uncertainty.",
+          percentiles:
+            "Empirical order statistics from the sorted latency sample. " +
+            "No estimator or interpolation is applied, so no method " +
+            "citation is claimed.",
         },
         metrics: {
           ...snapshot,
@@ -202,6 +233,401 @@ router.get(
  * can poll `GET /simulate/:jobId` or subscribe to `GET /simulate/:jobId/stream`
  * for real-time progress updates.
  */
+/**
+ * POST /api/simulate/model -- simulate a model the caller supplies.
+ *
+ * The engine has always been able to do this: `simulate_sbml` runs any SBML
+ * document through libRoadRunner, and `run_sbml` has been in the dispatch
+ * table (and contract-tested) the whole time. Nothing could reach it. The
+ * API exposed no way to send a model, and `resolveQuery` never yields the
+ * "sbml" domain, so the most general capability in the system was
+ * unreachable from the product -- a lab could pick from fifteen presets or
+ * nothing.
+ *
+ * That exclusion was also load-bearing security, whatever its stated
+ * rationale: `sbml_string` reaches RoadRunner's loader, which accepts a
+ * path or URL as readily as a document. The guards in
+ * terium_runner.run_sbml (path/URL refusal, Antimony `import` refusal, and
+ * the MAX_API_SBML_* ceilings) are what make opening it safe, and they are
+ * enforced engine-side so they hold no matter which caller arrives.
+ */
+router.post(
+  "/simulate/model",
+  simulateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parse = CustomModelBody.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: "BAD_REQUEST",
+          message: parse.error.errors.map((e) => e.message).join("; "),
+        });
+        return;
+      }
+
+      const { antimony, sbml, start, end, points } = parse.data;
+
+      // The job's `query` is a label for a request that has no query. It is
+      // what Recent Runs and the job record display, so it says what the
+      // run WAS rather than repeating the whole model source into a field
+      // sized for a sentence.
+      const label = antimony
+        ? "custom model (antimony)"
+        : "custom model (sbml)";
+      const job = queue.createJob(label);
+
+      runCustomModelPipeline(job.jobId, {
+        antimony,
+        sbml,
+        start,
+        end,
+        points,
+      }).catch((err) => {
+        logger.error(
+          { err, jobId: job.jobId },
+          "Custom-model pipeline threw unexpectedly",
+        );
+        queue.setJobError(job.jobId, {
+          error: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : "Unexpected pipeline failure",
+        });
+      });
+
+      res.status(202).json(job);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+/**
+ * POST /api/simulate/network -- run a model the caller CONSTRUCTED.
+ *
+ * The open path. Every other simulate route asks Terrium to recognise a
+ * system from its catalogue of sixteen; this one accepts the system itself,
+ * as species, parameters, reactions and rate rules, and runs it.
+ *
+ * WHAT KEEPS IT HONEST
+ *
+ * Opening the model surface without opening the provenance surface would
+ * be the whole product given away. Three checks run engine-side, in
+ * `Terium/core/network.py` and `network_provenance.py`, so they hold no
+ * matter which caller arrives:
+ *
+ *   - every symbol in a rate law must resolve to a species or parameter of
+ *     the same network, with no statement syntax and only a fixed list of
+ *     mathematical functions;
+ *   - every quantity -- species initials included, not just rate constants
+ *     -- must carry a source, and a quantity with NO source is refused
+ *     rather than defaulted;
+ *   - `resolved` without a citation is refused.
+ *
+ * The Zod schema here checks shape only, and deliberately does not
+ * re-implement any of that: two enforcers of one rule in two languages
+ * drift into two rules, which is what the four duplicate domain lists in
+ * this codebase already demonstrate.
+ *
+ * The response carries the model's conservation laws, DERIVED from its own
+ * stoichiometry -- `["S + I + R"]` for an SIR-shaped network, nobody having
+ * told it that epidemics conserve people.
+ */
+router.post(
+  "/simulate/network",
+  simulateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parse = NetworkRequestSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: "BAD_REQUEST",
+          message: parse.error.errors
+            .map((e) => `${e.path.join(".") || "body"}: ${e.message}`)
+            .join("; "),
+        });
+        return;
+      }
+
+      const request = parse.data;
+
+      // Answered here rather than after paying for a subprocess. The
+      // ENGINE's refusal is the authoritative one and covers more (blocked
+      // origins, resolved-without-citation); this is the same question
+      // asked early, for the commonest mistake.
+      const missing = unsourcedQuantityIds(request.network, request.sources);
+      if (missing.length > 0) {
+        res.status(400).json({
+          error: "UNSOURCED_QUANTITIES",
+          message:
+            `This model has ${missing.length} quantit` +
+            `${missing.length === 1 ? "y" : "ies"} with no recorded source: ` +
+            `${missing.join(", ")}. Every species initial and every ` +
+            `parameter needs one -- resolve it from literature, or supply ` +
+            `it yourself and it will be recorded as yours.`,
+          unsourced: missing,
+        });
+        return;
+      }
+
+      const job = queue.createJob(`network model: ${request.network.name}`);
+
+      runNetworkPipeline(job.jobId, request).catch((err) => {
+        logger.error(
+          { err, jobId: job.jobId },
+          "Network pipeline threw unexpectedly",
+        );
+        queue.setJobError(job.jobId, {
+          error: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : "Unexpected pipeline failure",
+        });
+      });
+
+      res.status(202).json(job);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+async function runNetworkPipeline(
+  jobId: string,
+  request: NetworkRequest,
+): Promise<void> {
+  try {
+    queue.updateJob(jobId, { status: "running" });
+
+    const engineResult = await runTerium("network", {
+      network: request.network as unknown as Record<string, unknown>,
+      sources: request.sources as unknown as Record<string, unknown>,
+      start: request.start,
+      end: request.end,
+      points: request.points,
+    });
+
+    // Provenance is reported from the ENGINE's report, not from the request
+    // body. The request says what the caller claims; the engine's report is
+    // what actually passed the rule, and echoing the claim back would make
+    // the response agree with the caller by construction.
+    const parameterProvenance: Record<string, ParameterProvenance> = {};
+    for (const [quantity, source] of Object.entries(
+      engineResult.quantitySources ?? {},
+    )) {
+      // Not cast. `ParameterProvenance` has `origin` required and the rest
+      // optional, so the compiler checks this shape -- and the origin is
+      // narrowed by a guard rather than asserted, because the engine's
+      // report is JSON and a cast here would launder an unexpected string
+      // into a typed field.
+      const origin = source.origin ?? "user";
+      if (!PARAMETER_ORIGINS.includes(origin as ParameterProvenance["origin"])) {
+        throw new Error(
+          `engine reported origin "${origin}" for ${quantity}, which is not ` +
+            `a ParameterOrigin. The two enforcers have drifted.`,
+        );
+      }
+      parameterProvenance[quantity] = {
+        origin: origin as ParameterProvenance["origin"],
+        ...(source.citation ? { citation: source.citation } : {}),
+        ...(source.note ? { note: source.note } : {}),
+      };
+    }
+
+    const laws = engineResult.conservationLaws ?? [];
+    const result: queue.SimulationResponse = {
+      runId: jobId,
+      domain: engineResult.domain,
+      parameters: engineResult.parameters,
+      trajectory: engineResult.trajectory,
+      provenance: {
+        reasoning:
+          `Caller-constructed reaction network "${request.network.name}": ` +
+          `${request.network.species.length} species, ` +
+          `${request.network.reactions.length} reaction(s), ` +
+          `${request.network.rateRules.length} rate rule(s). Terrium did ` +
+          `not choose this model; it validated it, required a source for ` +
+          `every quantity, compiled it and ran it.`,
+        modelCitations: [],
+        flags: [
+          ...(laws.length > 0
+            ? [
+                `conservation_laws_derived: ${laws.join("; ")} -- computed ` +
+                  `from this model's stoichiometry, not asserted.`,
+              ]
+            : [
+                "no_conservation_law_derived: this model's rate rules may " +
+                  "change their species by any amount, so no stoichiometric " +
+                  "conservation can be claimed.",
+              ]),
+          ...(engineResult.flagged && engineResult.flagReason
+            ? [engineResult.flagReason]
+            : []),
+        ],
+      },
+      parameterProvenance,
+      completedAt: new Date().toISOString(),
+    };
+
+    queue.setJobResult(jobId, result);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Network simulation failed";
+    queue.setJobError(jobId, { error: "PIPELINE_ERROR", message });
+  }
+}
+
+router.post(
+  "/simulate/parameterize",
+  simulateLimiter,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parse = ParameterizeRequestSchema.safeParse(req.body);
+      if (!parse.success) {
+        res.status(400).json({
+          error: "BAD_REQUEST",
+          message: parse.error.errors
+            .map((e) => `${e.path.join(".") || "body"}: ${e.message}`)
+            .join("; "),
+        });
+        return;
+      }
+
+      const request = parse.data;
+
+      // Same question the engine asks (a `ValueError` on declared minus
+      // available) asked early, so a typo'd quantity never pays for a
+      // subprocess or a literature search. This is a sanity check, not the
+      // authoritative refusal: unlike the network route, sourcing is the
+      // POINT of this route, so blockers like "unsourced" are not checked
+      // here at all.
+      const unknown = unknownRequestIds(request.network, request.requests);
+      if (unknown.length > 0) {
+        res.status(400).json({
+          error: "UNKNOWN_REQUEST_QUANTITIES",
+          message:
+            `These requested quantities do not exist in the network: ` +
+            `${unknown.join(", ")}. Every request must name a constant ` +
+            `the model declares.`,
+          unknown,
+        });
+        return;
+      }
+
+      const job = queue.createJob(
+        `parameterize network: ${request.network.name}`,
+      );
+
+      runParameterizePipeline(job.jobId, request).catch((err) => {
+        logger.error(
+          { err, jobId: job.jobId },
+          "Parameterize pipeline threw unexpectedly",
+        );
+        queue.setJobError(job.jobId, {
+          error: "INTERNAL_SERVER_ERROR",
+          message:
+            err instanceof Error ? err.message : "Unexpected pipeline failure",
+        });
+      });
+
+      res.status(202).json(job);
+    } catch (err) {
+      next(err);
+    }
+  },
+);
+
+async function runParameterizePipeline(
+  jobId: string,
+  request: ParameterizeRequest,
+): Promise<void> {
+  try {
+    queue.updateJob(jobId, { status: "running" });
+
+    // `requests` is an array of records, which the transport's parameter
+    // union does not declare (it has `NetworkPayload` for single objects and
+    // `number[]` for vectors). The payload is JSON across the bridge either
+    // way; this widens at the transport boundary, same as `network` above.
+    const engineResult = (await runTerium(
+      "parameterize",
+      {
+        network: request.network as unknown as Record<string, unknown>,
+        requests: request.requests,
+        sources: request.sources as unknown as Record<string, unknown>,
+        ...(request.organism ? { organism: request.organism } : {}),
+        start: request.start,
+        end: request.end,
+        points: request.points,
+      } as unknown as Parameters<typeof runTerium>[1],
+    )) as unknown as ParameterizePayload;
+
+    const search = toLiteratureSearchReport(engineResult);
+    const simulation = search.simulation;
+
+    // When the search ran, the engine reports where each resolved value
+    // came from (origin/citation/note). That IS the per-parameter
+    // provenance: mirroring the network route's mapping, so the values in
+    // `parameters` are never left un-tagged for
+    // guardSerializationProvenance. When the search did NOT run there is
+    // nothing resolved and nothing to tag.
+    const parameterProvenance: Record<string, ParameterProvenance> = {};
+    for (const [quantity, source] of Object.entries(
+      simulation.quantitySources ?? {},
+    )) {
+      const origin = source.origin ?? "user";
+      if (!PARAMETER_ORIGINS.includes(origin as ParameterProvenance["origin"])) {
+        throw new Error(
+          `engine reported origin "${origin}" for ${quantity}, which is not ` +
+            `a ParameterOrigin. The two enforcers have drifted.`,
+        );
+      }
+      parameterProvenance[quantity] = {
+        origin: origin as ParameterProvenance["origin"],
+        ...(source.citation ? { citation: source.citation } : {}),
+        ...(source.note ? { note: source.note } : {}),
+      };
+    }
+
+    const result: queue.SimulationResponse = {
+      runId: jobId,
+      domain: engineResult.domain,
+      parameters: simulation.values ?? {},
+      trajectory: simulation.trajectory ?? [],
+      provenance: {
+        reasoning:
+          `Network "${request.network.name}" with ` +
+          `${request.requests.length} constant(s) to resolve` +
+          `${request.organism ? ` under organism "${request.organism}"` : ""}. ` +
+          `${search.summary} ` +
+          (simulation.ran
+            ? "The resolved set was simulated."
+            : "The resolved set was not simulated."),
+        modelCitations: [],
+        flags: [
+          ...(search.chosenOrganism
+            ? [`chosen_organism: ${search.chosenOrganism}`]
+            : ["no_organism_chosen: the search did not settle on one."]),
+          ...(search.undecidedOrganisms.length > 0
+            ? [
+                `undecided_organisms: ${search.undecidedOrganisms.join(", ")} ` +
+                  `-- the request did not separate these from the winner.`,
+              ]
+            : []),
+          ...(simulation.ran ? [] : [`not_simulated: ${simulation.because}`]),
+        ],
+      },
+      parameterProvenance,
+      literatureSearch: search,
+      completedAt: new Date().toISOString(),
+    };
+
+    queue.setJobResult(jobId, result);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Parameterize simulation failed";
+    queue.setJobError(jobId, { error: "PIPELINE_ERROR", message });
+  }
+}
+
+
 router.post(
   "/simulate",
   simulateLimiter,
@@ -234,14 +660,27 @@ router.post(
         "Enqueuing simulation job",
       );
 
-      const cached = isDbAvailable()
+      const cached = (await isDbAvailable())
         ? await findCachedSimulation(normalizedQuery)
-        : findCachedResultByQuery(normalizedQuery);
+        : findCachedEntryByQuery(normalizedQuery);
       if (cached) {
-        logger.info({ query }, "Returning cached simulation result");
+        logger.info(
+          { query, cachedAt: cached.cachedAt },
+          "Returning cached simulation result",
+        );
         const job = queue.createJob(query);
-        queue.setJobResult(job.jobId, cached);
-        guardSerializationProvenance(cached);
+        // A replay must say it is one, and say when the answer was
+        // computed. Until 2026-09-05 a cache hit was returned with the
+        // same 202 and the same body shape as a live run: two people
+        // running the same query a month apart got byte-identical output,
+        // with nothing distinguishing a reproduction from a replay of a
+        // resolution made against literature data that may since have
+        // been recurated.
+        //
+        // Added to the RESPONSE, not to the stored entry, so replaying
+        // does not mutate the cache and the flag cannot accumulate.
+        queue.setJobResult(job.jobId, withReplayProvenance(cached));
+        guardSerializationProvenance(cached.result);
         res.status(202).json(job);
         return;
       }
@@ -860,12 +1299,48 @@ function buildAuditReport(
  * naive but effective cache: identical natural-language queries produce the
  * same resolved parameters, so we can short-circuit the engine entirely.
  */
+/**
+ * A cached result, labelled as a replay and dated.
+ *
+ * Returns a COPY. Mutating the stored entry would persist the flag and
+ * accumulate one per replay, so the n-th reader of a popular query would
+ * see n identical notices.
+ */
+function withReplayProvenance(cached: {
+  result: queue.SimulationResponse;
+  cachedAt: string;
+}): queue.SimulationResponse {
+  const { result, cachedAt } = cached;
+  return {
+    ...result,
+    provenance: {
+      ...result.provenance,
+      flags: [
+        ...result.provenance.flags,
+        `served_from_cache: this result was computed on ${cachedAt} and ` +
+          `replayed unchanged. Nothing was re-resolved, so any literature ` +
+          `curated since that date is not reflected here.`,
+      ],
+    },
+  };
+}
+
 async function findCachedSimulation(
   query: string,
-): Promise<queue.SimulationResponse | undefined> {
+): Promise<
+  { result: queue.SimulationResponse; cachedAt: string } | undefined
+> {
   try {
-    const db = getDb();
+    const db = await getDb();
     if (!db) return undefined;
+
+    // The query builder, its SQL helpers, and the table schema are loaded
+    // only when a database query is actually possible, so route modules
+    // that never touch the database never evaluate Drizzle.
+    const [{ desc, sql }, { simulationsTable }] = await Promise.all([
+      import("drizzle-orm"),
+      import("@workspace/db/schema"),
+    ]);
 
     const rows = await db
       .select()
@@ -882,22 +1357,28 @@ async function findCachedSimulation(
     if (!row) return undefined;
 
     return {
-      runId: String(row.id),
-      domain: row.domain,
-      parameters: (row.parameters as Record<string, unknown>) || {},
-      trajectory: (row.trajectory as Record<string, unknown>[]) || [],
-      provenance: (row.provenance as {
-        reasoning: string;
-        modelCitations: string[];
-        flags: string[];
-      }) || {
-        reasoning: "",
-        modelCitations: [],
-        flags: [],
+      // The row's own createdAt, which is also what the replay notice
+      // dates itself by -- one source, so the body and the flag cannot
+      // disagree about when this was computed.
+      cachedAt: row.createdAt.toISOString(),
+      result: {
+        runId: String(row.id),
+        domain: row.domain,
+        parameters: (row.parameters as Record<string, unknown>) || {},
+        trajectory: (row.trajectory as Record<string, unknown>[]) || [],
+        provenance: (row.provenance as {
+          reasoning: string;
+          modelCitations: string[];
+          flags: string[];
+        }) || {
+          reasoning: "",
+          modelCitations: [],
+          flags: [],
+        },
+        parameterProvenance:
+          (row.parameterProvenance as Record<string, ParameterProvenance>) || {},
+        completedAt: row.createdAt.toISOString(),
       },
-      parameterProvenance:
-        (row.parameterProvenance as Record<string, ParameterProvenance>) || {},
-      completedAt: row.createdAt.toISOString(),
     };
   } catch (err) {
     logger.warn({ err }, "Cache lookup failed; continuing without cache");
@@ -919,6 +1400,233 @@ async function findCachedSimulation(
  * Between each stage we check for cancellation. Jobs that are cancelled
  * mid-flight are marked as cancelled rather than failed.
  */
+/**
+ * Run a caller-supplied model. Deliberately NOT runPipeline().
+ *
+ * runPipeline's stages are resolve -> validate -> run -> persist, and the
+ * first two have nothing to do here: there is no query to classify and no
+ * parameter to look up, because the caller wrote the model. Reusing it
+ * would mean threading "skip this stage" flags through every step, which is
+ * how a pipeline stops being readable.
+ *
+ * PROVENANCE. A parameter the caller typed is origin "user" -- not a
+ * weaker claim than the preset domains make for an inline `km=2`, exactly
+ * the same claim. `modelCitations` stays empty because Terrium did not
+ * choose the model's structure and must not imply a source for it.
+ *
+ * LITERATURE GROUNDING. Everything above used to be the whole story, and
+ * it made this endpoint useless for the people it was built for: a lab
+ * brought their own model and Terrium's entire reason to exist -- every
+ * number traceable -- switched off, leaving plain Tellurium with extra
+ * steps. Nothing was checked, nothing was cited.
+ *
+ * A caller can now DECLARE what a parameter is, in a comment:
+ *
+ *     // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM"
+ *     Km_hex = 0.15;
+ *
+ * and Terrium resolves it, reports what the literature says beside what
+ * the model says, and attaches the citation. Adding `resolve` to the
+ * declaration hands the number over entirely: it is filled from
+ * literature, or THE RUN REFUSES -- there is no fallback value, because a
+ * fallback is the fabrication this project exists to prevent.
+ *
+ * Declarations are never inferred. See modelAnnotations.ts for why
+ * reading "hexokinase" out of a parameter named `Km_hex` is the one thing
+ * this must not do.
+ */
+async function runCustomModelPipeline(
+  jobId: string,
+  model: {
+    antimony?: string | undefined;
+    sbml?: string | undefined;
+    start?: number | null | undefined;
+    end?: number | null | undefined;
+    points?: number | null | undefined;
+  },
+): Promise<void> {
+  const abort = new AbortController();
+  queue.registerAbortController(jobId, abort);
+
+  try {
+    if (queue.isCancelled(jobId)) return;
+    queue.updateJob(jobId, { status: "running" });
+
+    // Ground the caller's declarations BEFORE simulating. A `resolve`
+    // annotation changes the model source, so this has to happen first;
+    // and a model whose declarations are wrong should not consume an
+    // engine run at all.
+    //
+    // Both formats. SBML uses the same declaration in an XML comment or
+    // a <notes> element, naming its parameter explicitly. SBML is the
+    // interchange format labs actually use, so Antimony-only grounding
+    // would have shut most of them out of this entirely.
+    let grounding: ModelGroundingReport | undefined;
+    let antimony = model.antimony;
+    let sbml = model.sbml;
+    const declared = antimony ?? sbml;
+    const format = antimony !== undefined ? "antimony" : "sbml";
+    if (declared !== undefined) {
+      // modelGrounding pulls in queryResolver and the resolution graph;
+      // load it only when a custom model actually needs grounding.
+      const { groundAnnotatedModel } = await import("../lib/modelGrounding");
+      grounding = await groundAnnotatedModel(declared, { format });
+
+      if (grounding.problems.length > 0) {
+        queue.setJobError(jobId, {
+          error: "MODEL_ERROR",
+          message:
+            "This model's terrium annotations could not be read:\n" +
+            grounding.problems
+              .map((p) => `  line ${p.line}: ${p.message}`)
+              .join("\n"),
+        });
+        persistJob(queue.getJob(jobId)!).catch(() => {});
+        return;
+      }
+
+      if (grounding.blocking.length > 0) {
+        // A `resolve` declaration is a request for a literature value.
+        // Running anyway would mean simulating with whatever placeholder
+        // was in the source, which is the fabricated number this refuses.
+        queue.setJobError(jobId, {
+          error: "MODEL_ERROR",
+          message:
+            "Terrium could not supply every value you asked it to " +
+            "resolve, and will not substitute one it cannot cite:\n" +
+            grounding.blocking.map((b) => `  ${b}`).join("\n"),
+        });
+        persistJob(queue.getJob(jobId)!).catch(() => {});
+        return;
+      }
+
+      if (grounding.groundedSource !== undefined) {
+        if (format === "antimony") antimony = grounding.groundedSource;
+        else sbml = grounding.groundedSource;
+      }
+    }
+
+    if (queue.isCancelled(jobId)) {
+      queue.setJobCancelled(jobId);
+      return;
+    }
+
+    const parameters: Record<string, string | number> = {};
+    if (antimony !== undefined) parameters["antimony_string"] = antimony;
+    if (sbml !== undefined) parameters["sbml_string"] = sbml;
+    if (model.start !== undefined && model.start !== null) {
+      parameters["start"] = model.start;
+    }
+    if (model.end !== undefined && model.end !== null) {
+      parameters["end"] = model.end;
+    }
+    if (model.points !== undefined && model.points !== null) {
+      parameters["points"] = model.points;
+    }
+
+    const engineResult = await runTerium("sbml", parameters, abort.signal);
+
+    if (queue.isCancelled(jobId)) {
+      queue.setJobCancelled(jobId);
+      return;
+    }
+
+    // Every value came from the caller. `unverifiedOriginKeys` looks for
+    // origin "default" -- a value nobody chose -- and there are none here
+    // by construction, so the hard rule is satisfied rather than bypassed.
+    const parameterProvenance: Record<string, ParameterProvenance> = {};
+    for (const key of Object.keys(engineResult.parameters)) {
+      parameterProvenance[key] = { origin: "user" };
+    }
+
+    // A grounded parameter is origin "resolved" and carries its citation,
+    // exactly as it would on the query path. A `check` parameter stays
+    // origin "user" -- the caller's number still stands, it has simply
+    // been compared -- but gains the note and the citation, so a reader
+    // sees both numbers and can judge the difference themselves.
+    const grounded = grounding?.entries ?? [];
+    for (const entry of grounded) {
+      if (entry.status !== "grounded") continue;
+      const comparison =
+        entry.comparison === undefined
+          ? entry.comparisonSkipped
+            ? ` Not compared: ${entry.comparisonSkipped}`
+            : ""
+          : ` Literature, in your unit: ` +
+            `${entry.comparison.literatureInYourUnit} ${entry.yourUnit ?? ""}.` +
+            (entry.comparison.foldDifference === undefined
+              ? ""
+              : ` Your model: ${entry.yourValue} ${entry.yourUnit ?? ""} ` +
+                `(${entry.comparison.foldDifference.toFixed(2)}x apart).`);
+
+      parameterProvenance[entry.parameter] = {
+        origin: entry.mode === "resolve" ? "resolved" : "user",
+        citation: entry.citation,
+        citationStatus: entry.crossSpecies ? "flagged" : "verified",
+        citationLocators: entry.citationLocators,
+        note: entry.note + comparison,
+      };
+    }
+
+    const groundedCitations = grounded
+      .filter((e) => e.status === "grounded" && e.citation)
+      .map((e) => e.citation as string);
+
+    const result: queue.SimulationResponse = {
+      runId: jobId,
+      // This path only ever runs `sbml`; the narrowing is checked rather
+      // than cast so a future composed domain reaching here fails loudly.
+      domain: asSimulationDomain(engineResult.domain),
+      parameters: engineResult.parameters,
+      trajectory: engineResult.trajectory,
+      provenance: {
+        reasoning:
+          "Caller-supplied model, simulated as given. Terrium did not " +
+          "choose the structure" +
+          (grounded.length > 0
+            ? ", and every parameter value is the caller's except those " +
+              "declared `resolve`, which were taken from the literature " +
+              "cited below."
+            : " or any parameter value, and claims no literature backing " +
+              "for them."),
+        // Citations here name sources for individual PARAMETERS the
+        // caller declared, never for the model structure -- that is the
+        // caller's and Terrium must not imply a source for it.
+        modelCitations: groundedCitations,
+        flags: [
+          ...(engineResult.flagged && engineResult.flagReason
+            ? [engineResult.flagReason]
+            : []),
+          ...grounded
+            .filter((e) => e.status !== "grounded")
+            .map((e) => `${e.parameter}: ${e.note}`),
+        ],
+      },
+      parameterProvenance,
+      modelGrounding: grounded.length > 0 ? grounded : undefined,
+      completedAt: new Date().toISOString(),
+    };
+
+    queue.setJobResult(jobId, result);
+    persistJob(queue.getJob(jobId)!).catch(() => {});
+  } catch (err) {
+    if (abort.signal.aborted || queue.isCancelled(jobId)) {
+      queue.setJobCancelled(jobId);
+    } else {
+      // The engine's guards (path/URL refusal, antimony import refusal,
+      // the MAX_API_SBML_* ceilings) all surface as its own message, which
+      // names what to change. MODEL_ERROR rather than PIPELINE_ERROR: this
+      // is fixable by editing the model, which a pipeline error is not.
+      queue.setJobError(jobId, {
+        error: "MODEL_ERROR",
+        message:
+          err instanceof Error ? err.message : "Unexpected model failure",
+      });
+    }
+    persistJob(queue.getJob(jobId)!).catch(() => {});
+  }
+}
+
 async function runPipeline(
   jobId: string,
   query: string,
@@ -933,6 +1641,13 @@ async function runPipeline(
     if (queue.isCancelled(jobId)) return;
 
     queue.updateJob(jobId, { status: "resolving" });
+    // Deferred: the resolution graph is large and only needed once a job
+    // actually starts resolving. classifyDomainByKeyword lives in the same
+    // module, so it is taken from the same deferred import rather than a
+    // static one, which would pull the graph back in at module load.
+    const { resolveQuery, classifyDomainByKeyword } = await import(
+      "../lib/queryResolver"
+    );
 
     // Record the question as asked, if this deployment opted in.
     //
@@ -1011,6 +1726,31 @@ async function runPipeline(
       }
     }
 
+    // The reverse direction, which the loop above does not cover: a
+    // parameter the RESOLVER established that the engine does not echo
+    // back. `enzyme_conc` is the live case -- run_mm consumes it to build
+    // Vmax and returns only the engine's own parameter set, so a query
+    // saying "with 50 nM enzyme" produced a response carrying provenance
+    // for enzyme_conc and no enzyme_conc.
+    //
+    // That orphan tripped guardSerializationProvenance on EVERY query
+    // using the kcat bridge, which is the headline enzyme-kinetics path,
+    // and the flag it emitted told the reader nothing.
+    //
+    // Fixed by keeping the value, not by dropping the provenance. [E]0 is
+    // what makes the derived Vmax checkable: without it a reader is asked
+    // to accept Vmax = kcat x [E]0 while being shown neither factor. The
+    // engine's value wins wherever both have the key, since the engine
+    // may normalise; this only restores keys the engine omitted entirely.
+    const responseParameters: Record<string, unknown> = {
+      ...Object.fromEntries(
+        Object.entries(resolved.parameters).filter(
+          ([key]) => key in resolved.parameterProvenance,
+        ),
+      ),
+      ...engineResult.parameters,
+    };
+
     const provenance = {
       reasoning: resolved.provenance.reasoning,
       modelCitations: resolved.provenance.modelCitations,
@@ -1021,12 +1761,13 @@ async function runPipeline(
           : []),
       ],
     };
-    const db = getDb();
+    const db = await getDb();
     if (db) {
+      const { simulationsTable } = await import("@workspace/db/schema");
       await db.insert(simulationsTable).values({
         query,
-        domain: engineResult.domain,
-        parameters: engineResult.parameters,
+        domain: asSimulationDomain(engineResult.domain),
+        parameters: responseParameters,
         trajectory: engineResult.trajectory,
         provenance,
         parameterProvenance,
@@ -1040,8 +1781,9 @@ async function runPipeline(
 
     const result: queue.SimulationResponse = {
       runId: resolved.runId,
-      domain: engineResult.domain,
-      parameters: engineResult.parameters,
+      // The resolver path yields catalogue domains only. Checked, not cast.
+      domain: asSimulationDomain(engineResult.domain),
+      parameters: responseParameters,
       trajectory: engineResult.trajectory,
       provenance,
       parameterProvenance,
@@ -1061,6 +1803,23 @@ async function runPipeline(
         error: "MISSING_REQUIRED_INPUT",
         message: err.message,
       });
+    } else if (err instanceof UnrecognizedQueryError) {
+      // The catalogue gave up, but the composer may not have. Try to
+      // compose the mechanism described before answering "unrecognized":
+      // a practitioner who types a mechanism and is told "try vocabulary
+      // closer to the fifteen supported domains" has been served worse than
+      // they deserve, and has no idea whether the sentence itself was at
+      // fault -- any grammar can only answer for the shapes it knows.
+      const handled = await fallThroughToComposition(jobId, query, abort.signal);
+      if (!handled) {
+        // Not fixable by composition, or composition itself failed: keep the
+        // resolver's refusal verbatim -- it is the one that explains the
+        // fifteen domains.
+        queue.setJobError(jobId, {
+          error: "UNRECOGNIZED_QUERY",
+          message: err.message,
+        });
+      }
     } else {
       queue.setJobError(jobId, {
         error: "PIPELINE_ERROR",
@@ -1070,6 +1829,160 @@ async function runPipeline(
     }
     persistJob(queue.getJob(jobId)!).catch(() => {});
   }
+}
+
+/**
+ * Answer an unrecognized query through the composer, when the catalogue
+ * cannot.
+ *
+ * Returns whether the job reached a terminal state. True when compose
+ * built a mechanism (the job completes with a `composition` report) or
+ * refused to build one (the job fails with a precise refusal message).
+ * False when the composer could not run at all, so the caller keeps the
+ * resolver's original refusal.
+ *
+ * A composed result is necessarily structure-only from this door: the
+ * composer does not infer a subject enzyme from prose, and with no enzyme
+ * named nothing is searched for. The honest answer is the mechanism and
+ * the constants it needs (`composition.toResolve`), with `parameters`
+ * deliberately empty and `trajectory` empty -- scaffold values are not
+ * literature-resolved numbers, and a confidently wrong number is worse
+ * than a refusal.
+ */
+async function fallThroughToComposition(
+  jobId: string,
+  query: string,
+  signal: AbortSignal,
+): Promise<boolean> {
+  if (queue.isCancelled(jobId)) return true;
+
+  await queue.acquireRunnerSlot();
+  let engineResult: TeriumResult;
+  try {
+    engineResult = await runTerium("compose", { description: query }, signal);
+  } catch (err) {
+    if (signal.aborted || queue.isCancelled(jobId)) {
+      // The request owner walked away while the composer was working. That
+      // is not a refusal -- the mechanism may well be right -- so mark the
+      // job cancelled instead of answering "unrecognized".
+      queue.setJobCancelled(jobId);
+      return true;
+    }
+    logger.warn(
+      { err, jobId },
+      "Composition fallthrough failed; keeping the resolver's refusal",
+    );
+    return false;
+  } finally {
+    queue.releaseRunnerSlot();
+  }
+
+  if (queue.isCancelled(jobId)) return true;
+
+  // The compose payload's mechanism keys (rule/reading/structureOnly/
+  // network/...) are not declared on `TeriumResult`; they exist on the
+  // JSON it parsed. Widening here is not a cast-of-convenience -- the
+  // shape is checked by `toCompositionReport`, which is this module's
+  // guard that the engine's report reached us in the form it promised.
+  const payload = engineResult as unknown as {
+    ok: boolean;
+    built?: boolean;
+    kind?: string;
+    reason?: string;
+    shapes?: string[];
+    rule?: string;
+    reading?: string;
+    structureOnly?: boolean;
+    network?: CompositionReport["network"];
+    conservationLaws?: string[];
+    notes?: string[];
+    toResolve?: CompositionReport["toResolve"];
+    yourChoice?: string[];
+    unitFindings?: CompositionReport["unitFindings"];
+    summary?: string;
+  };
+
+  if (!payload.ok || payload.built === undefined) return false;
+
+  if (payload.built !== true) {
+    const refusal: CompositionRefusal = {
+      kind:
+        payload.kind === "named_pathway"
+          ? "named_pathway"
+          : "unrecognised_shape",
+      reason:
+        payload.reason ??
+        "compose declined to build this mechanism from the description",
+      shapes: payload.shapes ?? [],
+    };
+    queue.setJobError(jobId, {
+      error: "UNRECOGNIZED_QUERY",
+      message: describeCompositionRefusal(refusal),
+    });
+    return true;
+  }
+
+  const composition = toCompositionReport(payload);
+  const laws = payload.conservationLaws ?? [];
+
+  const result: queue.SimulationResponse = {
+    runId: jobId,
+    domain: "compose",
+    // Empty on purpose: nothing was resolved or simulated. The constants
+    // this mechanism needs are listed in composition.toResolve.
+    parameters: {},
+    trajectory: [],
+    provenance: {
+      reasoning:
+        payload.summary ??
+        `Terium built a mechanism for "${query}".`,
+      modelCitations: [],
+      flags: [
+        ...(payload.structureOnly
+          ? [
+              "structure_only: no enzyme was named, so nothing was " +
+                "searched for; the constants this mechanism requires are " +
+                "listed in composition.toResolve.",
+            ]
+          : []),
+        ...(laws.length > 0
+          ? [
+              `conservation_laws_derived: ${laws.join("; ")} -- computed ` +
+                `from the composed mechanism's stoichiometry, not asserted.`,
+            ]
+          : []),
+      ],
+    },
+    parameterProvenance: {},
+    composition,
+    completedAt: new Date().toISOString(),
+  };
+
+  queue.setJobResult(jobId, result);
+  return true;
+}
+
+/**
+ * A compose refusal is a result, not an exception, and the two refusal
+ * kinds are different failures: a named pathway needs a pathway database
+ * (editing the sentence won't help), an unrecognised shape means the
+ * description disagreed with every shape the grammar knows (it might).
+ * Say which.
+ */
+function describeCompositionRefusal(refusal: CompositionRefusal): string {
+  const heading =
+    refusal.kind === "named_pathway"
+      ? "This names a pathway the composer does not hold. A named pathway "
+        + "needs a pathway database to expand; editing the sentence will "
+        + "not change the answer."
+      : "The description did not match a mechanism shape the composer "
+        + "knows how to build.";
+  return (
+    `${heading} ${refusal.reason}` +
+    (refusal.shapes.length > 0
+      ? ` -- recognised shapes were: ${refusal.shapes.join(", ")}`
+      : "")
+  );
 }
 
 /**
@@ -1127,6 +2040,12 @@ function validateParameters(
  * rows and would otherwise turn a working-but-degraded cache hit into an
  * availability regression (a 500 on every cache read).
  */
+export function guardSerializationProvenanceForTests(
+  result: queue.SimulationResponse,
+): void {
+  guardSerializationProvenance(result);
+}
+
 function guardSerializationProvenance(result: queue.SimulationResponse): void {
   const violations = validateParameterProvenance(
     result.parameters,
@@ -1139,9 +2058,21 @@ function guardSerializationProvenance(result: queue.SimulationResponse): void {
     "SimulationResponse serialized with unsound parameter provenance",
   );
 
+  // Name the violations. "See server log for details" is useless to
+  // anyone using a hosted API -- it tells a reader something is wrong and
+  // then withholds what, which is worse than silence because it costs
+  // trust without buying understanding.
+  //
+  // `violations` is already a list of specific, readable sentences
+  // ("kcat has a parameter value but no provenance"). Nothing in them is
+  // sensitive: they name parameter keys and provenance shape, both of
+  // which the response already carries in parameterProvenance.
+  const detail = violations.slice(0, 5).join("; ");
   const flag =
-    "parameter provenance is incomplete for one or more parameters " +
-    "(see server log for details)";
+    `parameter provenance is incomplete: ${detail}` +
+    (violations.length > 5
+      ? ` (and ${violations.length - 5} more)`
+      : "");
   if (!result.provenance.flags.includes(flag)) {
     result.provenance.flags.push(flag);
   }

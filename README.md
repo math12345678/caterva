@@ -62,7 +62,48 @@ gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 2,375 tests (1,253 engine + 1122 literature)```
+make test      # runs all 4,528 tests (3,354 engine + 1174 literature)
+```
+
+### Or download the release
+
+Since v0.3.0 (2026-09-21) every tagged version is published on the
+repository's Releases page by CI, after it has rebuilt, reinstalled and
+run what it attaches. Each release carries one folder per platform that
+runs without Python, and a wheel. The literature search stays in the
+checkout; the release notes say what else does not ship
+([`docs/releases/v0.3.3.md`](docs/releases/v0.3.3.md)). The same access
+caveat applies: the repository, and so its Releases page, is private.
+
+```bash
+tar xzf terrium-0.3.3-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
+cd terrium && xattr -dr com.apple.quarantine .   # macOS only, once (unsigned folder)
+./terrium compose "a toggle switch between two repressors"
+```
+
+```bash
+pip install terrium-0.3.3-py3-none-any.whl     # the wheel, from the same page
+terium-compose "a toggle switch between two repressors"
+```
+
+The folders are not code-signed; macOS quarantines the folder and Windows
+SmartScreen asks once, and `README.txt` inside each folder gives the exact
+step for its platform (on Windows, run `.\terrium.exe` from a terminal in
+the folder).
+
+**Real constants with real citations** need the checkout, not the folder.
+`make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"` returns
+`km = 0.03 mM` from `BRENDA ref 286469`, with the papers that disagree and
+the conditions it was measured under; and `compose --subject 1.1.1.27
+--organism "Homo sapiens" --substrate pyruvate` builds the mechanism with
+those constants already in it, each row naming its reference and any
+constant the search could not find still marked a placeholder (ADR 0178).
+
+**New to it? [`docs/USING_TERRIUM.md`](docs/USING_TERRIUM.md)** is the guide:
+what to type first, how to read a report, and a recipe for each question a
+lab actually asks (which step matters, what to measure next, does the
+conclusion survive not knowing the constants). Running `terrium` with no
+arguments prints the same quick start.
 
 ### See what it produces, before anything else
 
@@ -498,17 +539,19 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                1,253 tests
+│   └── tests/                3,354 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1122 tests├── Science-Agent-Pipeline/     API server, database layer, landing page
+│   └── ...                   1174 tests
+├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
-│   └── adr/                    191 decision records (and counting)├── Business/                   build stages, roadmap, fundraising
-├── scripts/                    74 guard scripts + build verification
+│   └── adr/                    201 decision records (and counting)
+├── Business/                   build stages, roadmap, fundraising
+├── scripts/                    78 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
 │   └── ...                     see scripts/README.md for the full list
@@ -590,9 +633,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 2,375 tests
+make test        # run all 4,528 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (1,253 tests)
-make test-lit    # literature layer only (1122 tests)
-python3 scripts/verify_build.py --quick  # all 74 guard scripts, incl. TypeScript compilemake clean       # remove caches
+make test-sim    # simulation engine only (3,354 tests)
+make test-lit    # literature layer only (1174 tests)
+python3 scripts/verify_build.py --quick  # all 78 guard scripts, incl. TypeScript compile
+make clean       # remove caches
 ```

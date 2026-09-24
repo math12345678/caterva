@@ -96,7 +96,62 @@ A documented mechanism that does not exist is worse than an undocumented
 gap, for the same reason a guard that reports OK on a failed parse is worse
 than no guard: it is trusted.
 
-CURRENT EXEMPTIONS (3, all one sentence)
+THE SEVERITY COMPARISON WAS AN EQUALITY TEST (fixed 2026-09-06)
+
+This guard asks trojan-scan for `--severity high`. The tool treats that as
+a floor and answers with high AND critical. The guard then compared each
+finding's severity for EQUALITY against "high" and skipped anything else --
+so every critical finding was discarded in silence, for as long as this
+guard has existed.
+
+Critical is where `injection/instruction-override`,
+`injection/exfiltration` and `injection/tool-abuse` live. The three most
+serious rules the scanner has were the three it could not report.
+
+Proved rather than argued: a file holding one sentence of the
+discard-your-instructions form was written to the repository root.
+trojan-scan rated it critical and nothing else. The guard ran, printed the
+same four unrelated false positives it had been printing for weeks, and
+never mentioned the file. After the fix, the same file is named at its
+line. It was then removed.
+
+Part 13's proof-of-catch could not have found this. Its payload also
+tripped a high rule, so the run went red for the right file and the wrong
+reason, and the missed critical sat invisible behind a passing proof. That
+is the sharpest form of the shape this codebase keeps meeting: not a check
+that cannot fail, but a check that passes its own test while blind to the
+thing it exists for.
+
+`--selftest` now hands `triage()` findings directly and asserts what it
+does with each one, including a critical. Restoring the equality test
+fails three of its seven cases.
+
+CURRENT EXEMPTIONS (12; the verdicts live in trojan-baseline.json)
+
+Six were added on 2026-09-06, once the criticals became visible. Three of
+them are RECURSIVE -- the stage record that triaged the first scan quotes
+the phrases that scan flagged, so recording a false positive reproduces
+it. Two are this codebase's standard phrasing for ADR 0028's cry-wolf
+reasoning, which argues that a warning firing too broadly stops being
+read: it asks for more attention to a warning, not less, which is the
+opposite of the rule that matches it. One is START_HERE.md's routing table
+row pointing agents at their brief -- a signpost, not an instruction, and
+`docs/AGENT_BRIEF.md` was read in full before that verdict.
+
+Two findings were FIXED rather than exempted, because neither needed the
+text that tripped the rule:
+
+  * `STAGE_10_PART_13.md` quoted the synthetic attack payload verbatim.
+    A probe someone composed has no documentary value in its exact
+    wording, unlike real tool output, and the literal string was live
+    injection text in a file other agents read. Paraphrased, with the
+    edit recorded in the file.
+  * `adr-0068-live-data-sources.json` used a deflection-shaped phrase as
+    a mutation's replacement text. A mutation's replacement is arbitrary;
+    it only has to make the NOTICE line wrong. Reworded.
+
+The three original exemptions, all one sentence
+
 
 The CLI prints a cross-species warning when a resolved parameter was
 measured in a different organism than the one asked about, cautioning the
@@ -127,6 +182,7 @@ import os
 import pathlib
 import shutil
 import subprocess
+import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -134,6 +190,40 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 #: tier is dominated by docs that legitimately name an AI agent, and this
 #: repository's docs discuss agents constantly by nature.
 FAIL_SEVERITY = "high"
+
+#: Severity is a THRESHOLD, not a label to match.
+#:
+#: This guard used to test `severity != FAIL_SEVERITY` and `continue`. It
+#: asks trojan-scan for `--severity high`, which the tool correctly treats
+#: as a floor and answers with high AND critical -- and then the guard threw
+#: every critical finding away. `injection/instruction-override`,
+#: `injection/exfiltration` and `injection/tool-abuse` are all rated
+#: critical, so the three most serious classes the scanner detects were the
+#: three it could not report.
+#:
+#: Demonstrated on 2026-09-06 rather than reasoned about: a file holding one
+#: sentence of the discard-your-instructions form was written to the
+#: repository root. trojan-scan rated it `critical`, and nothing else. The
+#: guard then ran, printed the same four unrelated false positives it had
+#: been printing for weeks, and never mentioned the file at all.
+#:
+#: The earlier proof-of-catch (Part 13) could not reveal this. Its payload
+#: combined an instruction override with a stay-quiet clause, and the second
+#: of those is rated high. The guard caught the high finding, the run went
+#: red, and the critical finding beside it was never noticed -- so a passing
+#: proof concealed a blind spot in the very thing it was proving.
+#:
+#: Both payloads are PARAPHRASED here on purpose. Quoting either verbatim
+#: makes this file trip the rules it exists to enforce, which is what
+#: happened on the first attempt at this comment, and is the same trap the
+#: commandResolve.ts baseline entry records.
+SEVERITY_RANK = {
+    "info": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+    "critical": 4,
+}
 
 #: Generous: the scan walks ~750 files and took 27s on a slow mount.
 SCAN_TIMEOUT_S = 300
@@ -251,6 +341,80 @@ def _files_under_root() -> int:
             if count >= _MIN_FILES:
                 break          # the floor is a threshold, not a census
     return count
+def triage(
+    findings: list, baseline: dict[str, dict[str, str]]
+) -> tuple[list[str], list[str]]:
+    """Split scanner findings into violations and reviewed exemptions.
+
+    Lifted out of `check()` on 2026-09-06 so it can be exercised without a
+    scan. It used to be an inline loop, and the severity comparison inside
+    it -- an equality test against "high" -- discarded every `critical`
+    finding for as long as this guard has existed. Nothing could have
+    caught that: there was no way to hand this logic a finding and ask what
+    it did with it. `--selftest` now does exactly that.
+
+    Returns (violations, exempted); the caller decides what to print.
+    """
+    violations: list[str] = []
+    exempted: list[str] = []
+
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        severity = str(finding.get("severity", "")).lower()
+        rank = SEVERITY_RANK.get(severity)
+        if rank is None:
+            # An unrecognised severity is not a quiet skip. The tool may
+            # have added a level, and silently dropping it is how the
+            # critical findings were lost in the first place.
+            violations.append(
+                f"{finding.get('file', '?')}:{finding.get('line', '?')} "
+                f"reported severity {severity!r}, which this guard does not "
+                f"recognise. Refusing to decide it is safe. Add it to "
+                f"SEVERITY_RANK once someone has read the tool's docs."
+            )
+            continue
+        if rank < SEVERITY_RANK[FAIL_SEVERITY]:
+            continue
+        location = str(finding.get("file") or finding.get("path") or "?")
+        line = finding.get("line", "?")
+        # trojan-scan 0.2.0 emits `ruleId`. The original code looked for
+        # `rule` and `id`, so EVERY finding this guard has ever printed said
+        # `[?]` where the rule name belongs -- and a baseline keyed on that
+        # name could never have matched anything.
+        rule = str(
+            finding.get("ruleId")
+            or finding.get("rule")
+            or finding.get("id")
+            or "?"
+        )
+        fingerprint = str(finding.get("fingerprint", ""))
+        message = finding.get("message") or finding.get("title") or ""
+
+        entry = baseline.get(fingerprint)
+        if entry is not None:
+            if entry["file"] != location.lstrip("./"):
+                # The verdict was reached about a different file. Exempting
+                # on a stale record would silence a finding nobody reviewed.
+                violations.append(
+                    f"{location}:{line} [{rule}] is exempted by a baseline "
+                    f"entry recorded against {entry['file']}. Re-review it "
+                    "and update the entry, or remove it."
+                )
+                continue
+            exempted.append(f"{location}:{line} [{rule}] -- {entry['reason']}")
+            continue
+
+        violations.append(
+            f"{location}:{line} [{rule}] {message} -- text aimed at an AI "
+            "reader rather than a human one. Several agents commit to this "
+            "repository and read each other's files, so prose is an "
+            "execution surface here."
+        )
+
+
+    return violations, exempted
+
 
 
 def check() -> list[str]:
@@ -337,49 +501,7 @@ def check() -> list[str]:
     if baseline_problems:
         return baseline_problems
 
-    violations: list[str] = []
-    exempted: list[str] = []
-
-    for finding in findings:
-        if not isinstance(finding, dict):
-            continue
-        if str(finding.get("severity", "")).lower() != FAIL_SEVERITY:
-            continue
-        location = str(finding.get("file") or finding.get("path") or "?")
-        line = finding.get("line", "?")
-        # trojan-scan 0.2.0 emits `ruleId`. The original code looked for
-        # `rule` and `id`, so EVERY finding this guard has ever printed said
-        # `[?]` where the rule name belongs -- and a baseline keyed on that
-        # name could never have matched anything.
-        rule = str(
-            finding.get("ruleId")
-            or finding.get("rule")
-            or finding.get("id")
-            or "?"
-        )
-        fingerprint = str(finding.get("fingerprint", ""))
-        message = finding.get("message") or finding.get("title") or ""
-
-        entry = baseline.get(fingerprint)
-        if entry is not None:
-            if entry["file"] != location.lstrip("./"):
-                # The verdict was reached about a different file. Exempting
-                # on a stale record would silence a finding nobody reviewed.
-                violations.append(
-                    f"{location}:{line} [{rule}] is exempted by a baseline "
-                    f"entry recorded against {entry['file']}. Re-review it "
-                    "and update the entry, or remove it."
-                )
-                continue
-            exempted.append(f"{location}:{line} [{rule}] -- {entry['reason']}")
-            continue
-
-        violations.append(
-            f"{location}:{line} [{rule}] {message} -- text aimed at an AI "
-            "reader rather than a human one. Several agents commit to this "
-            "repository and read each other's files, so prose is an "
-            "execution surface here."
-        )
+    violations, exempted = triage(findings, baseline)
 
     # Printed every run, never silently dropped. A baseline that disappears
     # from the output is indistinguishable from no findings at all, which
@@ -393,7 +515,119 @@ def check() -> list[str]:
     return violations
 
 
+
+def selftest() -> int:
+    """Hand `triage()` findings and check what it does with them.
+
+    Written on 2026-09-06 because the defect it pins was undetectable
+    before it existed. The severity comparison was an equality test against
+    "high", so every `critical` finding -- instruction-override,
+    exfiltration, tool-abuse, the three most serious rules the scanner has
+    -- was skipped in silence. A real payload was planted in the repository
+    root to confirm it: trojan-scan rated it critical, and this guard
+    reported the same four unrelated findings it had been reporting for
+    weeks without ever naming the file.
+
+    The August proof-of-catch could not have found this. Its payload also
+    tripped a `high` rule, so the run went red for the wrong reason and the
+    missed critical was invisible behind a passing proof.
+    """
+    def finding(**kw):
+        base = {
+            "severity": "high",
+            "file": "some/file.md",
+            "line": 1,
+            "ruleId": "injection/trust-assertion",
+            "fingerprint": "f" * 16,
+            "message": "m",
+        }
+        base.update(kw)
+        return base
+
+    baseline = {
+        "abc123": {"file": "some/file.md", "reason": "reviewed and benign"},
+    }
+
+    cases: list[tuple[str, list, dict, bool, str]] = [
+        # (label, findings, baseline, expect_violation, needle)
+        (
+            "a critical finding is reported",
+            [finding(severity="critical", ruleId="injection/instruction-override")],
+            {},
+            True,
+            "instruction-override",
+        ),
+        (
+            "a high finding is reported",
+            [finding(severity="high")],
+            {},
+            True,
+            "trust-assertion",
+        ),
+        (
+            "a medium finding is not",
+            [finding(severity="medium")],
+            {},
+            False,
+            "",
+        ),
+        (
+            "an unrecognised severity is reported, not skipped",
+            [finding(severity="catastrophic")],
+            {},
+            True,
+            "does not recognise",
+        ),
+        (
+            "a reviewed exemption suppresses its own finding",
+            [finding(fingerprint="abc123")],
+            baseline,
+            False,
+            "",
+        ),
+        (
+            "an exemption recorded against another file does NOT suppress",
+            [finding(fingerprint="abc123", file="a/different/file.md")],
+            baseline,
+            True,
+            "recorded against",
+        ),
+        (
+            "a critical finding is not suppressed by severity alone",
+            [finding(severity="critical", ruleId="injection/exfiltration")],
+            baseline,
+            True,
+            "exfiltration",
+        ),
+    ]
+
+    ok = True
+    for label, findings, base, expect_violation, needle in cases:
+        violations, exempted = triage(findings, base)
+        got = bool(violations)
+        matched = (not needle) or any(needle in v for v in violations)
+        passed = got == expect_violation and matched
+        print(f"  {'ok    ' if passed else 'FAILED'} {label}")
+        if not passed:
+            ok = False
+            print(
+                f"           expected violation={expect_violation}"
+                + (f" mentioning {needle!r}" if needle else "")
+                + f"; got violations={violations!r} exempted={exempted!r}",
+                file=sys.stderr,
+            )
+
+    if ok:
+        print(f"selftest OK: {len(cases)} cases")
+        return 0
+    print("SELFTEST FAILED", file=sys.stderr)
+    return 1
+
+
 def main() -> int:
+    if "--selftest" in sys.argv[1:]:
+        return selftest()
+
     violations = check()
     if not violations:
         print(

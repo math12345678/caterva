@@ -140,9 +140,13 @@ class DataSource:
 #: `NOTICE` stays authoritative prose; every field here is transcribed from
 #: it, and `scripts/check_data_source_attribution.py` fails when the two
 #: disagree.
-SOURCES_FILE = (
-    pathlib.Path(__file__).resolve().parents[2] / "docs" / "data-sources.json"
-)
+#: The checkout's copy, when there is a checkout. An installed wheel and the
+#: app folder have no `docs/`, so the same table ships inside the package
+#: (`Terium/core/data/`, kept identical by `test_packaged_data.py`). Before
+#: v0.3.0 the wheel had neither and `--export sbml` crashed (ADR 0177).
+_CHECKOUT_COPY = pathlib.Path(__file__).resolve().parents[2] / "docs" / "data-sources.json"
+_PACKAGED_COPY = pathlib.Path(__file__).resolve().parent / "data" / "data-sources.json"
+SOURCES_FILE = _CHECKOUT_COPY if _CHECKOUT_COPY.is_file() else _PACKAGED_COPY
 
 
 def _load_sources(path: pathlib.Path | None = None) -> tuple[DataSource, ...]:

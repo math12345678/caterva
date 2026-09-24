@@ -1,0 +1,188 @@
+# LiteLLM proxy configuration for Terrium's LLM waterfall.
+#
+# WHAT THIS IS FOR, AND WHAT IT MUST NOT BE USED FOR
+# ---------------------------------------------------
+# Terrium's API server calls a language model for ENTITY EXTRACTION and DOMAIN
+# CLASSIFICATION: turning "michaelis menten kinetics for hexokinase" into an
+# enzyme name, a substrate, an organism and a domain label. Those are language
+# tasks and a language model is the right tool.
+#
+# It is NEVER used to supply a parameter VALUE. ADR 0011 ("An LLM-supplied
+# parameter is its own origin, not a `default`", amended 2026-08-06: "resolver
+# now hard-blocks `llm`") is the rule, and it is the reason anyone would trust
+# this project: a Km that came out of a language model is not a measurement,
+# and labelling it `default` -- which is what the code used to do -- is a false
+# statement at the API surface.
+#
+# So this gateway makes the language tasks more reliable. It does not widen
+# what an LLM is allowed to decide. Adding a model here does not change that,
+# and no amount of capacity in this file makes an invented number acceptable.
+#
+# HOW IT IS WIRED IN
+# ------------------
+# The API server already supports a generic OpenAI-compatible endpoint, so no
+# application code changes:
+#
+#     LLM_API_URL=http://127.0.0.1:4000/v1/chat/completions
+#     LLM_API_KEY=$LITELLM_MASTER_KEY
+#     LLM_MODEL=terrium-extract
+#
+# Run it with:
+#
+#     litellm --config Science-Agent-Pipeline/artifacts/llm-gateway/config.yaml
+#
+# litellm is NOT in requirements.txt and is not needed for anything else in
+# this repository. Install it where the gateway runs:
+#
+#     pip install 'litellm[proxy]'
+#
+# THE ORDER OF THE FALLBACK CHAIN
+# -------------------------------
+# Every deployment below is a free tier, so they all cost the same zero and a
+# "cheapest first" ordering would be arbitrary. The order here is a static
+# default; `quota.py` computes the live order from what each provider reports
+# about its own remaining quota, and `chain()` there is what a caller should
+# use when it can. This file's order is the fallback for when nothing has been
+# measured yet -- most-generous-documented-tier first, and the two providers
+# whose rate-limit documentation was actually read come before the three whose
+# was not.
+#
+# NO RATE LIMIT IS WRITTEN IN THIS FILE. rpm/tpm are deliberately absent:
+# every value would be a number nobody here measured, it would go stale
+# silently when a provider changes its free tier, and it would be wrong in the
+# worst direction -- the proxy believing it has headroom it does not. litellm
+# discovers the limit the only reliable way, by being told 429, and `quota.py`
+# records what the provider said alongside it.
+
+model_list:
+  # ---------------------------------------------------------------------
+  # The name the application asks for. Every deployment below answers to
+  # `terrium-extract`, so litellm treats them as one logical model with
+  # several backends and fails over between them.
+  # ---------------------------------------------------------------------
+
+  # Groq. Rate-limit headers documented at
+  # https://console.groq.com/docs/rate-limits -- it reports
+  # x-ratelimit-remaining-requests / -tokens and reset timers on every call,
+  # which makes it the one provider whose headroom is known before it fails.
+  - model_name: terrium-extract
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+    model_info:
+      id: groq-llama-3.3-70b
+      mode: chat
+
+  # OpenRouter free tier. Limits documented at
+  # https://openrouter.ai/docs/api-reference/limits -- 20 requests/minute and
+  # 50/day without credit purchased, 1000/day with $10 lifetime. It sends
+  # X-RateLimit-* on ERROR responses rather than every call, so its headroom
+  # is unknown until something 429s.
+  - model_name: terrium-extract
+    litellm_params:
+      model: openrouter/meta-llama/llama-3.3-70b-instruct:free
+      api_key: os.environ/OPENROUTER_API_KEY
+    model_info:
+      id: openrouter-llama-3.3-70b-free
+      mode: chat
+
+  # Mistral. Free tier exists; its rate-limit headers were NOT read for this
+  # file, so `quota.py` holds no header names for it and treats its headroom
+  # as UNKNOWN rather than guessing that it copies Groq's scheme.
+  - model_name: terrium-extract
+    litellm_params:
+      model: mistral/mistral-small-latest
+      api_key: os.environ/MISTRAL_API_KEY
+    model_info:
+      id: mistral-small
+      mode: chat
+
+  # SiliconFlow. OpenAI-compatible, so addressed through the openai provider
+  # with an explicit api_base. Note the API server's own provider table
+  # records supportsJsonMode: false for this one -- see llmResolver.ts. The
+  # gateway does not change that: a model that cannot honour
+  # response_format:json_object still cannot, and the caller's existing
+  # handling applies.
+  - model_name: terrium-extract
+    litellm_params:
+      model: openai/Qwen/Qwen2.5-7B-Instruct
+      api_base: https://api.siliconflow.com/v1
+      api_key: os.environ/SILICONFLOW_API_KEY
+    model_info:
+      id: siliconflow-qwen2.5-7b
+      mode: chat
+
+  # TokenRouter. Itself a router over other providers, which makes it the
+  # sensible last link: when it fails, everything behind it has failed too.
+  - model_name: terrium-extract
+    litellm_params:
+      model: openai/auto
+      api_base: https://api.tokenrouter.io/v1
+      api_key: os.environ/TOKENROUTER_API_KEY
+    model_info:
+      id: tokenrouter-auto
+      mode: chat
+
+litellm_settings:
+  # Ordered fallback across every deployment above. litellm tries them in
+  # model_list order for a given model_name; this states the chain explicitly
+  # so a reader does not have to infer it from file order.
+  fallbacks:
+    - terrium-extract:
+        - terrium-extract
+
+  # Retries WITHIN a deployment before moving to the next. Two, not more: a
+  # provider that failed twice in a row is more likely out of quota than
+  # unlucky, and the next provider is free.
+  num_retries: 2
+
+  # A provider is rested after this many failures, for this long.
+  #
+  # BOTH ARE CHOICES, not measurements, and they are here rather than
+  # buried in code so they can be argued with. 3 strikes is enough to stop
+  # hammering a provider that is up and failing for some other reason -- a
+  # retired model, a rotated key -- and few enough that one flaky response
+  # does not cost it its place. 60s is short because these are free tiers
+  # whose per-minute windows are short.
+  allowed_fails: 3
+  cooldown_time: 60
+
+  # Per-exception retry policy. A 429 is not a malfunction and does not
+  # deserve the same treatment as a 500: being out of quota is the system
+  # working as designed, and the right response is to move on rather than to
+  # retry into a wall.
+  retry_policy:
+    RateLimitErrorRetries: 0
+    InternalServerErrorRetries: 2
+    TimeoutErrorRetries: 2
+    ContentPolicyViolationErrorRetries: 0
+    AuthenticationErrorRetries: 0
+
+  # A request that has not answered in this long has cost more than the
+  # fallback would have. Entity extraction is a short prompt and a short
+  # reply; 30 seconds is generous for that and still bounded.
+  request_timeout: 30
+
+  # Never log prompts or responses. Terrium's queries can contain a
+  # researcher's unpublished subject, and a gateway that wrote them to disk
+  # would be a disclosure the rest of the project is careful to avoid.
+  turn_off_message_logging: true
+
+router_settings:
+  # simple-shuffle, which is litellm's recommendation for production, and
+  # NOT one of the cost- or usage-based strategies. Those need every
+  # deployment's price or limit declared to rank them, and this file declares
+  # neither -- see the header. The live ordering by measured headroom is
+  # `quota.py`'s job, and a strategy here ranking by numbers nobody measured
+  # would compete with it while looking authoritative.
+  routing_strategy: simple-shuffle
+
+  # Filter out a deployment whose context window is too small for the
+  # request before spending a call on it.
+  enable_pre_call_checks: true
+
+general_settings:
+  # The proxy's own key, so an open port on a laptop is not an open relay to
+  # five upstream accounts. Required, with no default -- a master key with a
+  # default value is a master key everybody has.
+  master_key: os.environ/LITELLM_MASTER_KEY

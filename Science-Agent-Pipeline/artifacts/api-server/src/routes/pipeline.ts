@@ -85,7 +85,7 @@ router.get(
           fileExists(path.join(scriptsDir, "terium_runner.py")),
           fileExists(path.join(scriptsDir, "science_agent_runner.py")),
           checkPython3(),
-          Promise.resolve(isDbAvailable()),
+          isDbAvailable(),
         ]);
 
       const subsystems: SubsystemStatus[] = [
@@ -246,17 +246,51 @@ router.get(
 
       res.json({
         timestamp: new Date().toISOString(),
+        // "All parameters in Terrium are backed by peer-reviewed
+        // scientific literature. Every domain has primary references with
+        // DOI." -- what this said until 2026-09-05. Both halves were
+        // false, and the second is checkable in one pass over this very
+        // file's data: mm_competitive_inhibition, seir, lotka_volterra and
+        // monte_carlo_pi have NO reference carrying a DOI, because their
+        // primary sources are books and pre-DOI papers (Copeland 2013,
+        // Anderson & May 1991, Lotka 1925).
+        //
+        // The first half was false BY DESIGN, which is worse. Parameters
+        // carry an origin: "resolved" came from literature, "user" came
+        // from the person asking, and "llm"/"default" are BLOCKED rather
+        // than reported. A product whose selling point is refusing to
+        // invent numbers should not advertise that every number is
+        // literature-backed -- the refusals are the feature.
         message:
-          "All parameters in Terrium are backed by peer-reviewed scientific literature. Every domain has primary references with DOI.",
+          "Every simulation domain here carries at least one primary " +
+          "reference. Not all of them have a DOI: several primary sources " +
+          "are books or predate DOI assignment. This does NOT mean every " +
+          "parameter is literature-backed -- parameters carry a separate " +
+          "provenance origin, and values that are neither resolved from " +
+          "literature nor supplied by you are refused rather than filled " +
+          "in.",
         totalDomainsCovered: domains.length,
         domains: domainLiterature,
         literature: {
-          queuing: "Little (1961) - Queue theory L = λW",
+          // Same correction as the metrics endpoints: each line now says
+          // what the work contributes, and the two that contributed
+          // nothing are gone.
+          queuing:
+            "Little (1961) L = \u03BBW -- the steady-state relation the job " +
+            "metrics can be checked against, not the method used to " +
+            "produce them.",
           confidence:
-            "Wilson (1927) - Binomial proportion confidence intervals",
-          metrics: "Harter (1974) - Percentile analysis",
-          enzyme: "Gelperin et al. (2010) - STRENDA reporting standards",
-          epidemiology: "Kermack & McKendrick (1927) - Mathematical epidemiology",
+            "Wilson (1927) -- computed: the binomial proportion interval " +
+            "around the success rate.",
+          enzyme:
+            "Tipton et al. (2014) -- STRENDA reporting standards, applied: " +
+            "a resolved kinetic value whose source omits pH or temperature " +
+            "is reported flagged rather than verified.",
+          epidemiology:
+            "Kermack & McKendrick (1927) -- the compartmental model. Note " +
+            "the engine integrates the frequency-dependent form " +
+            "(\u03B2\u00B7S\u00B7I/N), not the density-dependent one in the " +
+            "1927 paper.",
         },
       });
     } catch (err) {

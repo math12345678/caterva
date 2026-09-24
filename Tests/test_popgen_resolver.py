@@ -3,8 +3,12 @@
 Golden tuple: Homo sapiens mutation_rate
 - Value: ~1.29e-8 per bp per generation (stdpopsim HomSap)
 - Source: stdpopsim catalog (compiled from published literature)
-- Citations: International Human Genome Sequencing Consortium (2001),
-  Jónsson et al. (2017), and others bundled in HomSap demographic model
+- Citation FOR THE RATE: Tian, Browning & Browning (2019),
+  Am J Hum Genet 105(5):883-893, doi 10.1016/j.ajhg.2019.09.012 --
+  the HomSap citation stdpopsim tags with reason 'mutation rate'.
+  This docstring previously named IHGSC (2001) and Jónsson et al. (2017);
+  checked against stdpopsim 0.3.0 on 2026-09-05, IHGSC is bundled for the
+  GENOME ASSEMBLY and Jónsson is not in the HomSap catalog at all.
 
 This test suite follows the Constitution's Section 6 verification procedure:
 1. Golden tuple test: verify exact value against hand-verified citation
@@ -61,6 +65,53 @@ class TestMutationRateGoldenTuple:
         result = resolve_mutation_rate("Homo sapiens")
         assert result.found is True
         assert result.source == "stdpopsim"
+
+    def test_structured_doi_is_the_paper_that_reports_the_rate(self):
+        """The locator must point at the mutation-rate paper.
+
+        This resolver used to surface the FIRST bundled DOI, which for
+        HomSap is IHGSC (2001) -- bundled by stdpopsim for the GENOME
+        ASSEMBLY, and reporting no mutation rate anywhere. That DOI became
+        the structured locator for `mutation_rate`: the link a reader
+        clicks to check 1.29e-8, landing them on a paper that does not
+        contain it. "A real reference for a number it does not report" is
+        the defect ADR 0162 is named after; this pins the second module it
+        appeared in.
+
+        Asserted both ways on purpose. Checking only that the DOI is
+        Tian et al. would still pass if the selection logic were replaced
+        by a hardcoded string, so the assembly paper is named explicitly
+        as something the locator must NOT be.
+        """
+        result = resolve_mutation_rate("Homo sapiens")
+        assert result.found is True
+        # Tian, Browning & Browning (2019) -- stdpopsim's 'mutation rate'
+        # citation for HomSap.
+        assert result.doi == "10.1016/j.ajhg.2019.09.012"
+        # IHGSC (2001), bundled for 'genome assembly'.
+        assert result.doi != "10.1038/35057062"
+        # HapMap (2007), bundled for 'recombination rate'.
+        assert result.doi != "10.1038/nature06258"
+
+    def test_doi_is_chosen_by_reason_not_by_position(self):
+        """The mutation-rate citation is not first in stdpopsim's list.
+
+        If it were, position-based selection would pass the test above by
+        accident and the guard would prove nothing. This asserts the
+        ordering that makes the previous test meaningful: the assembly
+        paper genuinely comes first.
+        """
+        import stdpopsim
+
+        citations = stdpopsim.get_species("HomSap").genome.citations
+        assert len(citations) >= 2, "HomSap should bundle several citations"
+        first_reasons = " ".join(str(r).lower() for r in citations[0].reasons)
+        assert "mutation rate" not in first_reasons, (
+            "stdpopsim's first HomSap citation now IS the mutation-rate "
+            "paper, so this guard no longer distinguishes reason-based "
+            "selection from first-wins. Re-point it at a species where it "
+            "still does."
+        )
 
 
 class TestMutationRateOtherOrganisms:
@@ -148,8 +199,24 @@ class TestNormaliseDoi:
         assert _normalise_doi("") is None
 
 
-class TestMutationRateMutationTest:
-    """Mutation test: break the resolver and confirm test catches it."""
+class TestMutationRateIsBiologicallySane:
+    """Bounds on a resolved rate, checked when stdpopsim supplies one.
+
+    NOT a mutation test, despite what this class was called. Nothing here
+    perturbs the resolver and confirms a test goes red; the name promised
+    the strongest evidence in this repository's vocabulary and delivered
+    two range checks. In a suite whose central discipline is mutation
+    testing, a class claiming to be one is worse than an unnamed one --
+    an auditor counting coverage would count this.
+
+    Both assertions are conditional on `found`, and that is recorded in
+    `scripts/check_no_vacuous_tests.py`'s PYTHON_BASELINE rather than
+    hidden: the module skips entirely without stdpopsim, so they do not
+    pass silently, but when stdpopsim IS present and the resolver reports
+    not-found they check nothing. Making them unconditional needs a run
+    with stdpopsim installed to confirm `Homo sapiens` resolves, which is
+    not available here -- so the gap is written down instead of guessed at.
+    """
 
     def test_mutation_rate_is_positive(self):
         """All mutation rates must be positive (biological constraint)."""

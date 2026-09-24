@@ -104,10 +104,20 @@ export function Ledger() {
 
 const STATES = [
   {
+    // Was `Km = 0.12 mM` / `EC 1.1.1.27`. EC 1.1.1.27 is lactate
+    // dehydrogenase, for which this product resolves Km = 10.73 mM -- and
+    // reports it FLAGGED, not verified, because the source does not state
+    // an assay temperature. So the VERIFIED example was a number the
+    // product does not produce, for an enzyme it declines to call
+    // verified.
+    //
+    // Replaced with a real one, measured 2026-09-05: hexokinase Km
+    // resolves to 6 mM from BRENDA ref 641068 with citationStatus
+    // "verified".
     tone: 'verified' as const,
     label: 'VERIFIED',
-    value: 'Km = 0.12 mM',
-    source: 'BRENDA · EC 1.1.1.27',
+    value: 'Km = 6 mM',
+    source: 'BRENDA ref 641068 · EC 2.7.1.1',
     note: 'checked against the source. the simulation runs.',
   },
   {
@@ -267,7 +277,7 @@ export function Close() {
               </div>
             </div>
             <a
-              href="mailto:hello@terrium.dev"
+              href="mailto:admin.terrium@gmail.com"
               className="group relative overflow-hidden rounded-md bg-verified px-5 py-2.5 font-mono text-[13px] font-medium text-void transition-transform duration-300 hover:scale-[1.02]"
             >
               <span className="relative z-10">Request access →</span>

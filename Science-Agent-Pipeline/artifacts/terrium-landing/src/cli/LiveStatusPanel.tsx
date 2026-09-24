@@ -6,8 +6,6 @@ import Reveal from "./Reveal";
 interface ServiceStatus {
   name: string;
   endpoint: string;
-  ok: boolean;
-  latency: number; // ms
   description: string;
 }
 
@@ -15,61 +13,24 @@ const SERVICES: ServiceStatus[] = [
   {
     name: "BRENDA",
     endpoint: "brenda-enzymes.org",
-    ok: true,
-    latency: 142,
     description: "Enzyme kinetic parameters (Km, Vmax, kcat)",
-  },
-  {
-    name: "KEGG",
-    endpoint: "kegg.jp",
-    ok: true,
-    latency: 287,
-    description: "Pathway & reaction data",
   },
   {
     name: "PubMed",
     endpoint: "eutils.ncbi.nlm.nih.gov",
-    ok: true,
-    latency: 95,
     description: "Literature citations & abstracts",
   },
   {
     name: "Terium",
     endpoint: "terium.analogmachine.org",
-    ok: true,
-    latency: 12,
     description: "ODE engine (RK4 integration)",
   },
   {
     name: "API Server",
     endpoint: "api.terrium.app",
-    ok: true,
-    latency: 34,
     description: "Agent pipeline & SSE streaming",
   },
 ];
-
-function LatencyBar({ ms, maxMs }: { ms: number; maxMs: number }) {
-  const pct = Math.min((ms / maxMs) * 100, 100);
-  const color = ms < 50 ? "#1D8A72" : ms < 200 ? "#F59E0B" : "#EF4444";
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1 bg-white/[0.04] rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="h-full rounded-full"
-          style={{ backgroundColor: color }}
-        />
-      </div>
-      <span className="text-[10px] text-white/30 font-mono tabular-nums w-10 text-right">
-        {ms}ms
-      </span>
-    </div>
-  );
-}
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
 
@@ -93,9 +54,6 @@ export default function LiveStatusPanel() {
     return () => controller.abort();
   }, []);
 
-  const maxLatency = Math.max(...SERVICES.map((s) => s.latency), 100);
-  const allOk = SERVICES.every((s) => s.ok);
-
   return (
     <section
       className="max-w-3xl mx-auto px-4 md:px-6 py-10 section-bg-blue"
@@ -108,28 +66,24 @@ export default function LiveStatusPanel() {
           </span>
           <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
         </div>
-        <h2 className="section-header">System status</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-md">
-          Real-time health of data sources and compute infrastructure.
+        <h2 className="section-header">System architecture</h2>
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-md">
+          Data sources and compute infrastructure behind the pipeline.
         </p>
 
-        <TerminalWindow path="~ — terrium status --live" glow>
+        <TerminalWindow path="~ — terrium status --all" glow>
           <div className="mb-4 text-white/90">
             <span className="text-[#1D8A72]">$</span>{" "}
             <span className="font-mono text-[12px]">
-              terrium status --all --live
+              terrium status --all
             </span>
           </div>
 
-          {/* Overall health */}
+          {/* static reference, not a live check */}
           <div className="flex items-center gap-3 mb-5 p-3 rounded-lg border border-white/[0.04] bg-white/[0.01]">
-            <motion.div
-              animate={{ scale: [1, 1.15, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className={`w-2.5 h-2.5 rounded-full ${allOk ? "bg-[#1D8A72]" : "bg-[#F59E0B]"}`}
-            />
+            <div className="w-2.5 h-2.5 rounded-full bg-[#1D8A72]" />
             <span className="text-[12px] text-white/70 font-sans">
-              {allOk ? "All systems operational" : "Some services degraded"}
+              Data sources & infrastructure
             </span>
             {uptime !== null && (
               <>
@@ -159,11 +113,7 @@ export default function LiveStatusPanel() {
                 transition={{ duration: 0.4, delay: i * 0.06 }}
                 className="flex items-start gap-3 p-2.5 rounded-lg border border-white/[0.03] hover:border-white/[0.06] transition-all group"
               >
-                <motion.span
-                  animate={{ opacity: svc.ok ? [1, 0.6, 1] : 1 }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className={`shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full ${svc.ok ? "bg-[#1D8A72]" : "bg-[#EF4444]"}`}
-                />
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-[#1D8A72]" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className="text-[12px] text-white/70 font-sans font-medium">
@@ -173,18 +123,17 @@ export default function LiveStatusPanel() {
                       {svc.endpoint}
                     </span>
                   </div>
-                  <p className="text-[10px] text-white/30 mb-1.5">
+                  <p className="text-[10px] text-white/30">
                     {svc.description}
                   </p>
-                  <LatencyBar ms={svc.latency} maxMs={maxLatency} />
                 </div>
               </motion.div>
             ))}
           </div>
 
           <div className="mt-4 pt-3 border-t border-white/[0.04] text-[9px] text-white/15 font-mono flex items-center justify-between">
-            <span>refreshed just now</span>
-            <span>{SERVICES.length} services monitored</span>
+            <span>static reference</span>
+            <span>{SERVICES.length} services listed</span>
           </div>
         </TerminalWindow>
       </Reveal>

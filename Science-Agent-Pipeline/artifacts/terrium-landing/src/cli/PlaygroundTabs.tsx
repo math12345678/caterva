@@ -44,7 +44,7 @@ export default function PlaygroundTabs() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
         </div>
         <h2 className="section-header">Interactive playground</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-2 -mt-2 max-w-md">
+        <p className="font-sans text-[13px] text-white/50 mb-2 -mt-2 max-w-md">
           Tweak real parameters and watch the full ODE trajectory update in real
           time. No backend.
         </p>

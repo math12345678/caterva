@@ -25,9 +25,8 @@ const MILESTONES: Milestone[] = [
   {
     id: "pcr-domain",
     title: "PCR Amplification Domain",
-    desc: "Full support for PCR cycle simulation — primer design, annealing temps, and amplification curves.",
-    status: "in-progress",
-    eta: "Q4 2026",
+    desc: "PCR cycle simulation — exact closed-form growth, plateau modeling, mutation-verified.",
+    status: "live",
     icon: "\u{1F9EC}",
     color: "#3B82F6",
   },
@@ -43,18 +42,16 @@ const MILESTONES: Milestone[] = [
   {
     id: "monte-carlo",
     title: "Monte Carlo / Stochastic Solver",
-    desc: "Beyond deterministic ODEs — Gillespie algorithm and stochastic simulation for small-number regimes.",
-    status: "planned",
-    eta: "Q2 2027",
+    desc: "Gillespie SSA (decay, bimolecular association, replicate ensembles) and Monte Carlo estimation — stochastic simulation for small-number regimes.",
+    status: "live",
     icon: "\u{1F3B2}",
     color: "#8B5CF6",
   },
   {
     id: "population-genetics",
     title: "Population Genetics Domain",
-    desc: "Allele frequency drift, selection coefficients, and Hardy-Weinberg equilibrium modeling.",
-    status: "planned",
-    eta: "Q2 2027",
+    desc: "Wright-Fisher drift and selection, plus two-locus linkage disequilibrium.",
+    status: "live",
     icon: "\u{1F9EC}",
     color: "#EC4899",
   },
@@ -78,8 +75,8 @@ const MILESTONES: Milestone[] = [
   {
     id: "molecular-dynamics",
     title: "Molecular Dynamics Setup",
-    desc: "Natural-language configuration of MD simulations — force fields, solvation, and equilibration from plain English.",
-    status: "exploring",
+    desc: "Natural-language configuration of MD simulations — force fields, solvation, and equilibration, already live for Lennard-Jones clusters.",
+    status: "live",
     icon: "\u269B",
     color: "#10B981",
   },
@@ -129,7 +126,7 @@ export default function RoadmapSection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
         </div>
         <h2 className="section-header">What's coming next</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           Our public roadmap. Everything we're building, in the open.
         </p>
 
@@ -234,10 +231,10 @@ export default function RoadmapSection() {
             <span>
               Have a feature request?{" "}
               <a
-                href="mailto:hello@terrium.app"
+                href="mailto:admin.terrium@gmail.com"
                 className="text-[#3B82F6]/60 hover:text-[#3B82F6] transition-colors"
               >
-                hello@terrium.app
+                admin.terrium@gmail.com
               </a>{" "}
               &mdash; we build in the open.
             </span>

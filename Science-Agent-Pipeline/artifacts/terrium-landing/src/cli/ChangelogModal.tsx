@@ -2,55 +2,68 @@ import { useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Release {
-  version: string;
   date: string;
-  tag: "feature" | "fix" | "improvement" | "launch";
+  tag: "feature" | "fix" | "improvement";
   title: string;
   desc: string;
 }
 
+// Pulled from this repo's own CHANGELOG.md. Entries before 2026-08-29 carry
+// real dates from git history and no version number, because there was no
+// release to version then; CHANGELOG.md follows Semantic Versioning from
+// 0.1.0 (2026-08-29) onward and the three tagged versions are listed as
+// such. This used to be a fabricated version-numbered history (v0.4.0
+// "Private Alpha Launch" with a "pilot cohort" and 3 nonexistent database
+// backends) -- removed entirely rather than corrected, since none of it
+// happened. Every line below names something CHANGELOG.md records.
 const RELEASES: Release[] = [
   {
-    version: "v0.7.0",
-    date: "July 24, 2026",
+    date: "September 24, 2026",
     tag: "feature",
-    title: "PCR Amplification Engine",
-    desc: "Added primer annealing & extension kinetics, gel-electrophoresis output preview, and Tm calculator. Full support for 2-step and 3-step PCR protocols.",
+    title: "v0.3.3: a model whose constants are sourced",
+    desc: "compose searches BRENDA and every constant names its reference. The report also says what the evidence did not settle (two papers 13-fold apart on one Km), the pH and temperature each value was measured under, and why a missing constant is missing: most often it exists in another organism.",
   },
   {
-    version: "v0.6.3",
-    date: "July 10, 2026",
+    date: "September 22, 2026",
     tag: "improvement",
-    title: "BRENDA Parser v2",
-    desc: "Rewrote BRENDA HTML scraper with structured sub-row extraction. Km/Vmax now include organism, pH, temperature metadata. 3× more parameters per enzyme.",
+    title: "v0.3.1: a guide, and a first run that teaches",
+    desc: "docs/USING_TERRIUM.md, written from commands run before they were written down, and pinned to the code by a test. Running terrium with no arguments prints the quick start.",
   },
   {
-    version: "v0.6.0",
-    date: "June 28, 2026",
+    date: "September 21, 2026",
     tag: "feature",
-    title: "Live ODE Simulator",
-    desc: "Browser-side RK4 integration with real-time parameter sliders. Export CSV, PNG charts, and SBML stub. Conserved-quantity checks on every step.",
+    title: "v0.3.0: on the Releases page, downloadable as an app",
+    desc: "A CI workflow publishes each tag after rebuilding, reinstalling and running what it attaches. One folder per platform (macOS arm64, Linux, Windows) runs without Python; libSBML stays a separate replaceable file and every licence rides inside. Wheel and sdist byte-reproducible from the tag.",
   },
   {
-    version: "v0.5.2",
-    date: "June 15, 2026",
-    tag: "fix",
-    title: "Citation Provenance Chain",
-    desc: "Fixed PubMed abstract fetching pipeline. Now every simulation parameter links directly to its source paper via DOI — from BRENDA ID → PubMed ID → abstract text.",
-  },
-  {
-    version: "v0.5.0",
-    date: "June 1, 2026",
+    date: "September 19, 2026",
     tag: "feature",
-    title: "SEIR Epidemiology Domain",
-    desc: "Added exposed-compartment modeling with latent period. Configurable R₀, incubation, and recovery rates with population conservation validation.",
+    title: "v0.2.0: the first installable wheel",
+    desc: "Packaging that built an empty install now builds Terrium; two commands, terium and terium-compose; a NOTICE that says what the artifacts convey. Verified from an empty directory.",
   },
   {
-    version: "v0.4.0",
-    date: "May 15, 2026",
-    tag: "launch",
-    title: "Private Alpha Launch",
-    desc: "First pilot cohort onboarded. Michaelis-Menten kinetics + SIR epidemiology fully operational. 48 tests passing, 3 database backends integrated.",
+    date: "August 29, 2026",
+    tag: "improvement",
+    title: "v0.1.0: the first tag",
+    desc: "A source archive only, deliberately: nothing that contains libSBML was distributed. Its packaging could not produce an installable package; 0.2.0 fixed that.",
+  },
+  {
+    date: "July 25, 2026",
+    tag: "feature",
+    title: "PCR amplification",
+    desc: "Third live simulation domain: exact closed-form exponential growth with an optional discrete-logistic plateau mode. 32 new tests, mutation-verified.",
+  },
+  {
+    date: "July 23, 2026",
+    tag: "feature",
+    title: "Terium simulation engine",
+    desc: "Michaelis-Menten enzyme kinetics and SIR/SEIR epidemiology, built on antimony/roadrunner. 258-test suite verified against exact closed-form solutions, an independent scipy solver, and property-based tests.",
+  },
+  {
+    date: "July 21-22, 2026",
+    tag: "feature",
+    title: "Literature-scraping layer",
+    desc: "Initial BRENDA/KEGG/PubMed parsing layer -- 124 tests -- so simulation parameters can be resolved to a real citation instead of a hardcoded default.",
   },
 ];
 
@@ -75,12 +88,6 @@ const TAG_STYLES: Record<
     text: "text-[#3B82F6]",
     icon: "▲",
     dotColor: "#3B82F6",
-  },
-  launch: {
-    bg: "bg-[#8B5CF6]/15",
-    text: "text-[#8B5CF6]",
-    icon: "★",
-    dotColor: "#8B5CF6",
   },
 };
 
@@ -145,7 +152,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                 </span>
                 <button
                   onClick={onClose}
-                  className="text-white/25 hover:text-white/60 transition-colors p-0.5"
+                  className="text-white/25 hover:text-white/60 transition-colors p-2.5 -m-2.5"
                   aria-label="Close changelog"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
@@ -180,7 +187,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                       const style = TAG_STYLES[rel.tag];
                       return (
                         <motion.div
-                          key={rel.version}
+                          key={rel.date + rel.title}
                           initial={{ opacity: 0, x: -8 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ duration: 0.3, delay: i * 0.05 }}
@@ -200,9 +207,6 @@ export default function ChangelogModal({ open, onClose }: Props) {
                           {/* Card */}
                           <div className="flex-1 min-w-0 pb-4 border-b border-white/[0.03] last:border-b-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                              <span className="text-[10px] font-mono text-white/25">
-                                {rel.version}
-                              </span>
                               <span
                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide ${style.bg} ${style.text}`}
                               >
@@ -216,7 +220,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                             <h3 className="text-[13px] font-sans font-medium text-white/70 mb-1">
                               {rel.title}
                             </h3>
-                            <p className="text-[11px] text-white/35 leading-relaxed">
+                            <p className="text-[11px] text-white/50 leading-relaxed">
                               {rel.desc}
                             </p>
                           </div>
@@ -228,15 +232,12 @@ export default function ChangelogModal({ open, onClose }: Props) {
 
                 {/* Footer */}
                 <div className="mt-6 pt-3 border-t border-white/[0.04] flex items-center justify-between text-[10px] text-white/20">
-                  <span>6 releases shown</span>
-                  <a
-                    href="https://github.com/smyan/terrium/blob/main/CHANGELOG.md"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#1D8A72]/50 hover:text-[#1D8A72] transition-colors"
-                  >
-                    Full changelog →
-                  </a>
+                  <span>{RELEASES.length} releases shown</span>
+                  {/* Full history lives in CHANGELOG.md -- not linked here
+                      because the repository isn't public yet, and a link
+                      to a private repo is a dead link for every visitor
+                      who isn't already a collaborator. */}
+                  <span>Full history in CHANGELOG.md</span>
                 </div>
               </div>
             </div>

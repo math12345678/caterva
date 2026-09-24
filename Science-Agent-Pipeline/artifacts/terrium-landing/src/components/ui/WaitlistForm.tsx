@@ -128,7 +128,9 @@ export const WaitlistForm: React.FC<{
               }}
               placeholder="Enter your email"
               aria-label="Email address"
-              aria-describedby="waitlist-privacy"
+              aria-describedby={
+                error ? "waitlist-error waitlist-privacy" : "waitlist-privacy"
+              }
               disabled={loading}
               className={`w-full rounded-lg border bg-white/[0.02] px-4 py-3 text-[13px] font-mono text-white/80 outline-none placeholder:text-white/15 transition-all duration-200 ${
                 error ? "border-red-500/30" : "border-white/[0.06]"
@@ -139,6 +141,8 @@ export const WaitlistForm: React.FC<{
             <AnimatePresence>
               {error && (
                 <motion.p
+                  id="waitlist-error"
+                  role="alert"
                   className="absolute -bottom-5 left-0 text-[8px] text-red-400/60 tracking-wide"
                   initial={{ opacity: 0, y: -4 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -187,10 +191,10 @@ export const WaitlistForm: React.FC<{
             Terrium is ready. Not shared, not sold, no mailing list, no
             tracking. Email{" "}
             <a
-              href="mailto:mathlete.world@gmail.com"
+              href="mailto:admin.terrium@gmail.com"
               className="underline hover:text-white/50"
             >
-              mathlete.world@gmail.com
+              admin.terrium@gmail.com
             </a>{" "}
             to have it removed. What we collect and what we do not:{" "}
             <a

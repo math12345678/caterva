@@ -11,12 +11,12 @@ const FAQS = [
   {
     id: "what-is-terrium",
     q: "What is Terrium?",
-    a: 'Terrium is a scientific computing platform built for teaching labs. You describe a biological system in plain language — "lactate dehydrogenase with pyruvate" or "SIR outbreak with beta 0.3" — and Terrium resolves real kinetic parameters from BRENDA, KEGG, and PubMed, then runs a verified ODE simulation with full provenance. Every number traces back to a citation.',
+    a: 'Terrium is a scientific computing platform built for teaching labs. You describe a biological system in plain language — "lactate dehydrogenase with pyruvate" or "SIR outbreak with beta 0.3" — and Terrium resolves real kinetic parameters from BRENDA, with PubMed for supporting citations, then runs a verified ODE simulation with full provenance. Every number traces back to a citation.',
   },
   {
     id: "how-accurate",
     q: "How accurate are the simulations?",
-    a: "Every domain is checked against something that is not the solver itself: an exact closed-form solution, an independent integrator (scipy's solve_ivp, which shares no code with roadrunner), or a physical invariant tested across the input space with Hypothesis. Tolerances vary by domain, from 1e-10 on the analytic cases to 1e-4 where a stochastic method makes anything tighter meaningless. Parameters are sourced exclusively from peer-reviewed literature — BRENDA for enzyme kinetics, KEGG for pathway data, and PubMed for supporting citations. We flag low-confidence values and never fabricate numbers. The RK4 integrator checks conserved quantities (population, mass) at every timestep.",
+    a: "Every domain is checked against something that is not the solver itself: an exact closed-form solution, an independent integrator (scipy's solve_ivp, which shares no code with roadrunner), or a physical invariant tested across the input space with Hypothesis. Tolerances vary by domain, from 1e-10 on the analytic cases to 1e-4 where a stochastic method makes anything tighter meaningless. Parameters are sourced exclusively from peer-reviewed literature — BRENDA for enzyme kinetics (Km, Ki, kcat) and PubMed for supporting citations. KEGG support is implemented but disabled by default: KEGG's terms require a licence for service providers and Terrium does not hold one, so no query reaches it unless an operator sets TERRIUM_ENABLE_KEGG. Even enabled, it resolves substrate NAMES, never a kinetic value. We flag low-confidence values and never fabricate numbers. The RK4 integrator checks conserved quantities (population, mass) at every timestep.",
   },
   {
     id: "no-code",
@@ -36,12 +36,12 @@ const FAQS = [
   {
     id: "data-sources",
     q: "Where do the parameters come from?",
-    a: "Parameters are sourced from BRENDA (the world's most comprehensive enzyme database), KEGG (Kyoto Encyclopedia of Genes and Genomes), and PubMed. Every resolved value includes a citation trail — you can trace any number back to its source paper. No black-box AI hallucinations here.",
+    a: "Parameters are sourced from BRENDA (the world's most comprehensive enzyme database) and PubMed. KEGG is integrated but off by default pending a licence, and supplies substrate names rather than parameter values. Every resolved value includes a citation trail — you can trace any number back to its source paper. No black-box AI hallucinations here.",
   },
   {
     id: "self-host",
     q: "Can I run Terrium on my own infrastructure?",
-    a: "Yes. The Terium engine and literature layer are open-source and runnable locally. The landing page simulator even runs RK4 integration directly in your browser — no server required for basic exploration. The full pipeline (agent + SSE streaming) requires the API server.",
+    a: "Not yet — the repository isn't public. The engine and literature layer are built to run locally and will ship Apache-2.0 licensed once it is; join the waitlist to hear when. In the meantime, the landing page simulator runs RK4 integration directly in your browser — no server required for basic exploration. The full pipeline (agent + SSE streaming) requires the API server.",
   },
   {
     id: "compare",
@@ -64,7 +64,7 @@ export default function FAQSection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
         </div>
         <h2 className="section-header">Frequently asked questions</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           Everything you need to know about verified scientific simulation.
         </p>
 

@@ -1,0 +1,328 @@
+# Release: a pushed `v*` tag becomes a GitHub Release with tested artifacts.
+#
+# WHY A WORKFLOW AND NOT A COMMAND
+# The first two tags (v0.1.0, v0.2.0) were cut by hand. v0.2.0's artifacts
+# were built and verified, but the Release page itself needed a GitHub
+# token, and the machine that built them had none that worked, so the tag
+# sat on the remote with nothing attached. A release that depends on one
+# person's keychain is not a release procedure. This workflow uses the
+# token GitHub issues to the run; nothing is stored anywhere.
+#
+# WHAT IT PROVES BEFORE IT PUBLISHES
+#   artifacts   wheel + sdist by scripts/build_release.py, which refuses a
+#               wheel carrying tests or lacking LICENSE/NOTICE
+#   reproduce   a second, independent build of the same commit must give
+#               byte-identical SHA256SUMS, or nothing is published
+#   verify      the wheel installs into a fresh interpreter on Linux, macOS
+#               and Windows at the floor (3.10) and ceiling (3.13) of the
+#               supported window, and `terium-compose` simulates a model to
+#               a VERDICT with nothing of the repository on the path
+#   app         scripts/build_app.py freezes the INSTALLED wheel into a
+#               one-folder app per platform, keeps python-libsbml's copy of
+#               libSBML (LGPL-2.1) as a separate replaceable file, records
+#               the copies compiled into libroadrunner and Antimony, carries
+#               every third-party licence, and runs the frozen binary from
+#               an empty directory
+#   sources     the corresponding source of every libSBML version the
+#               folders carry, and of the two libraries that embed it, is
+#               fetched from upstream and attached beside the folders
+#   publish     only after all of the above: `gh release create` with the
+#               notes from docs/releases/<tag>.md, every artifact, and one
+#               SHA256SUMS covering all of them
+#
+# WHAT IT DOES NOT DO
+# It does not upload to PyPI (a separate, unmade decision: NOTICE, the
+# release notes). It does not sign or notarise the macOS folder: that needs
+# an Apple Developer ID the repository does not hold, and README.txt inside
+# the folder says what a user must do instead. It does not run the test
+# suites; tests.yml does that on every push, and this workflow builds only
+# what a tag already names.
+#
+# Guards that read this file: scripts/check_release_artifacts.py (a publish
+# marker here requires NOTICE to state the LGPL-2.1 conveyance position, and
+# it does) and scripts/check_ci_toolchain.py (valid YAML; no pnpm here).
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build and publish (e.g. v0.2.0)"
+        required: true
+        type: string
+      publish:
+        description: "Create/update the GitHub Release (false = build and verify only)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  # The tag being released, whichever event brought us here. A tag with a
+  # suffix after the version (v0.3.0-rc.1) is a release candidate: it runs
+  # the whole pipeline and publishes a PRE-release, so a failure never
+  # leaves a broken final tag behind. The version inside the package stays
+  # the plain one; the notes are the plain tag's.
+  RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  # Same toolchain in every build job, so two builds of one commit agree.
+  SETUPTOOLS_PIN: "setuptools==84.0.0"
+  PYTHONUTF8: "1"
+
+jobs:
+  artifacts:
+    name: wheel + sdist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The tag names the version the package carries
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Read, not imported: importing Terium needs the engine's dependencies.
+          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' Terium/__init__.py)"
+          base="${RELEASE_TAG%%-*}"        # v0.3.0-rc.1 -> v0.3.0
+          echo "package version: $version   tag: $RELEASE_TAG   base: $base"
+          [ "v$version" = "$base" ] || { echo "::error::tag $RELEASE_TAG does not match Terium.__version__ $version"; exit 1; }
+          [ -f "docs/releases/$base.md" ] || { echo "::error::docs/releases/$base.md is missing; a release has notes"; exit 1; }
+      - name: Build
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip "$SETUPTOOLS_PIN"
+          python scripts/build_release.py --out dist
+          cat dist/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-artifacts
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+
+  reproduce:
+    # An independent second build of the same commit. Its checksums must
+    # equal the first build's, byte for byte, or the release does not happen.
+    name: reproducibility check
+    runs-on: ubuntu-latest
+    needs: artifacts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Rebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip "$SETUPTOOLS_PIN"
+          python scripts/build_release.py --out rebuild
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-artifacts
+          path: first
+      - name: Compare
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "--- first build ---";  cat first/SHA256SUMS
+          echo "--- rebuild ---";      cat rebuild/SHA256SUMS
+          diff first/SHA256SUMS rebuild/SHA256SUMS && echo "byte-identical: wheel and sdist"
+
+  verify:
+    name: install ${{ matrix.os }} py${{ matrix.python }}
+    needs: artifacts
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10", "3.13"]
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-artifacts
+          path: dist
+      - name: Install the wheel into a fresh interpreter (dependencies from PyPI)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install dist/terrium-*.whl
+      - name: Run it from an empty directory, with no checkout anywhere
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import Terium, pathlib
+          p = pathlib.Path(Terium.__file__).resolve()
+          assert "site-packages" in p.parts, p
+          print("import Terium ->", p, "| version", Terium.__version__)
+          PY
+          terium --help > /dev/null
+          terium-compose --help > /dev/null
+          # A VERDICT alone is not proof: a failed simulation becomes the note
+          # "no time course" and still exits 0. Require the integration line,
+          # a real SBML export (libsbml + the packaged data files), and a
+          # shape from an expansion library (imported dynamically).
+          terium-compose "reversible binding of a ligand to a receptor" --no-ranking | tee compose.out
+          grep -q '^VERDICT:' compose.out
+          grep -q 'Integrated to t=' compose.out
+          # Not `! grep`: bash's errexit ignores a negated command, so that
+          # form could never fail the step.
+          if grep -q 'no time course' compose.out; then echo "::error::the simulation did not run"; exit 1; fi
+          terium-compose "reversible binding of a ligand to a receptor" --export sbml | head -c 20000 > model.xml
+          grep -q '<sbml' model.xml
+          terium-compose "two stage gene expression" --no-analysis --no-simulate --no-ranking | grep -q '^VERDICT:'
+          python -m Terium.app --version
+          terrium --version   # the console script every document teaches
+
+  app:
+    name: app folder ${{ matrix.os }}
+    needs: [artifacts, verify]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            label: linux-x86_64
+          - os: macos-latest
+            label: macos-arm64
+          - os: windows-latest
+            label: windows-x86_64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-artifacts
+          path: dist
+      - name: Install the released wheel and the freezer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install dist/terrium-*.whl -r requirements-release.txt
+      - name: Freeze, check, smoke-test, archive
+        shell: bash
+        # Run from outside the checkout so the analysis cannot pick the
+        # source tree over the installed wheel; the script refuses if it did.
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          python "$GITHUB_WORKSPACE/scripts/build_app.py" --out "$GITHUB_WORKSPACE/dist/app"
+          ls -la "$GITHUB_WORKSPACE/dist/app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-${{ matrix.label }}
+          path: |
+            dist/app/terrium-*
+            dist/app/libsbml-copies-*.tsv
+          if-no-files-found: error
+
+  publish:
+    name: GitHub Release
+    needs: [artifacts, reproduce, verify, app]
+    if: ${{ github.event_name == 'push' || github.event.inputs.publish == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: staged
+      - name: Corresponding source for every libSBML copy the folders carry (LGPL-2.1 s4 / s6d)
+        shell: bash
+        # Each app folder reports the libSBML versions inside it (python-libsbml's
+        # own, plus the copies libroadrunner and Antimony compile in). The
+        # release page must offer the source of each from the same place, and
+        # the source of the two libraries that embed it. A download that fails
+        # fails the release: a promise the page cannot keep is not made.
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          cat staged/app-*/libsbml-copies-*.tsv | tee libsbml-copies.tsv
+          versions="$(cut -f2 libsbml-copies.tsv | grep -E '^5\.[0-9]+\.[0-9]+$' | sort -u)"
+          [ -n "$versions" ] || { echo "::error::no libSBML versions reported by the app folders"; exit 1; }
+          # Upstream tag spellings differ: libsbml and roadrunner tag v5.21.1
+          # / v2.8.0, Antimony tags 2.14.0 as v2.14 (rc.3 failed on that).
+          # Try each spelling; fail only when none exists.
+          fetch_source() {  # <owner/repo> <version> <out file>
+            local repo="$1" ver="$2" out="$3" short="${2%.0}" tag
+            for tag in "v$ver" "$ver" "v$short" "$short"; do
+              if curl -fsSL --retry 3 -o "$out" "https://github.com/$repo/archive/refs/tags/$tag.tar.gz"; then
+                echo "$repo $ver: tag $tag, $(stat -c %s "$out") bytes"; return 0
+              fi
+            done
+            echo "::error::no source archive for $repo $ver under any of v$ver $ver v$short $short"; return 1
+          }
+          for v in $versions; do fetch_source sbmlteam/libsbml "$v" "release/libsbml-$v-source.tar.gz"; done
+          rr="$(sed -n 's/^libroadrunner==//p' requirements.txt)"; ant="$(sed -n 's/^antimony==//p' requirements.txt)"
+          fetch_source sys-bio/roadrunner "$rr" "release/roadrunner-$rr-source.tar.gz"
+          fetch_source sys-bio/antimony "$ant" "release/antimony-$ant-source.tar.gz"
+          pip download --no-deps --no-binary :all: --dest release "python-libsbml==$(sed -n 's/^python-libsbml==//p' requirements.txt)"
+          cp libsbml-copies.tsv release/libsbml-copies.tsv
+          ls -la release
+      - name: One SHA256SUMS for everything on the page
+        shell: bash
+        run: |
+          set -euo pipefail
+          find staged -type f \( -name '*.whl' -o -name '*.tar.gz' -o -name '*.zip' \) -exec cp {} release/ \;
+          cd release
+          # Named inputs, not `*`: the redirect can create SHA256SUMS before
+          # the glob expands, and the file then lists itself with the digest
+          # of an empty file.
+          sha256sum -- *.whl *.tar.gz *.zip *.tsv | sort -k2 > SHA256SUMS
+          # The wheel/sdist lines must equal the tested build's own sums.
+          grep -E '  terrium-[0-9][0-9.]*(-py3-none-any\.whl|\.tar\.gz)$' SHA256SUMS | diff - <(sort -k2 ../staged/python-artifacts/SHA256SUMS)
+          cat SHA256SUMS
+      - name: Create or update the Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          base="${RELEASE_TAG%%-*}"
+          notes="docs/releases/$base.md"
+          prerelease=""
+          case "$RELEASE_TAG" in *-*) prerelease="--prerelease" ;; esac
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "release $RELEASE_TAG exists; replacing its assets and notes"
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "Terrium $RELEASE_TAG" --notes-file "$notes" $prerelease
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber release/*
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
+              --title "Terrium $RELEASE_TAG" --notes-file "$notes" $prerelease release/*
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets \
+            --jq '"\(.url)\n" + (.assets | map("  " + .name + "  " + (.size|tostring) + " bytes") | join("\n"))'

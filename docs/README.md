@@ -8,6 +8,8 @@ that makes no sense.
 
 | document | read it when |
 |---|---|
+| [`OWNER_CHECKLIST.md`](OWNER_CHECKLIST.md) | you own this repository and want the exact steps left on your side: a clean copy, checking a build, publishing a release |
+| [`USING_TERRIUM.md`](USING_TERRIUM.md) | you want to USE Terrium: what to type first, how to read a report, a recipe per question |
 | [`CONSTITUTION.md`](CONSTITUTION.md) | you want the engineering rules in full, stated once |
 | [`adr/`](adr/README.md) | you want to know *why* a specific design is the way it is |
 | [`EXPERT_FEEDBACK.md`](EXPERT_FEEDBACK.md) | you want to know what reviewers outside the project said and what changed because of it |
@@ -16,6 +18,8 @@ that makes no sense.
 | [`AGENT_BRIEF.md`](AGENT_BRIEF.md) | you are an AI agent working on this repo, or setting one going |
 | [`ARCHITECTURE_RIGOR.md`](ARCHITECTURE_RIGOR.md) | you want the long-form argument for the verification approach |
 | [`PUBLISHING.md`](PUBLISHING.md), [`INFRASTRUCTURE_DECISION.md`](INFRASTRUCTURE_DECISION.md), [`ARCHIVE_TRIAGE.md`](ARCHIVE_TRIAGE.md) | narrower, one-topic records |
+| [`releases/`](releases/v0.3.0.md) | you want to know what a tagged version contains, and what it does not |
+| [`status/`](status/2026-09-21.md) | you want a dated snapshot of where the repository stands: figures, open problems, next steps, and what going public still needs |
 
 ## The ADRs
 

@@ -26,8 +26,34 @@ describe("extractParameterOverrides", () => {
       expect(result).toEqual({ km: 5 });
     });
 
-    it("does not extract space-separated key value (no delimiter)", () => {
+    it("extracts space-separated key value ('km 5'), correcting a real product bug", () => {
+      // This test used to assert the OPPOSITE and named it "no
+      // delimiter" as if that were the rule -- it wasn't a rule, it was
+      // a gap the function's own docstring and its own "Fallback"
+      // comment both said should already work, giving "km 5" as the
+      // worked example. `query.split(/\s+/)` yields "km" and "5" as two
+      // separate tokens, and no single-token regex can see across that
+      // space; the extraction loop had to look at the PAIR, which it now
+      // does.
+      //
+      // This was not a hypothetical: every homepage example on the
+      // landing page's own "Try the agent" panel used this exact
+      // space-separated form ("enzyme kinetics km 5 vmax 10", "model an
+      // outbreak with beta 0.4 and gamma 0.1"), and every one of them
+      // 422'd, reporting km/vmax/beta/gamma as "could not be resolved"
+      // when the user had typed them plainly. Measured live against the
+      // running app before this fix.
       const result = extractParameterOverrides("km 5");
+      expect(result).toEqual({ km: 5 });
+    });
+
+    it("does not pair a bare parameter name with a non-numeric neighbor", () => {
+      // The other direction of the same fix. "km" followed by a word
+      // that is not a number must not be treated as an override --
+      // otherwise ordinary prose containing a parameter name ("the km
+      // reading was inconclusive") could silently inject a value from
+      // an adjacent number that has nothing to do with it.
+      const result = extractParameterOverrides("km unknown 5");
       expect(result).toEqual({});
     });
 
@@ -203,22 +229,20 @@ describe("resolveQuery — two_locus_wright_fisher array overrides", () => {
   });
 
   // Test 4: Absent starting_frequencies → RequiredParametersMissingError
-  it("test 4: absent starting_frequencies triggers RequiredParametersMissingError", async () => {
-    await expect(
-      resolveQuery(
-        "linkage disequilibrium two locus population_size=200 generations=30 recombination_rate=0.1 mutation_rate=0.001 replicate_runs=100",
-      ),
-    ).rejects.toThrow(RequiredParametersMissingError);
-    try {
-      await resolveQuery(
-        "linkage disequilibrium two locus population_size=200 generations=30 recombination_rate=0.1 mutation_rate=0.001 replicate_runs=100",
-      );
-    } catch (e) {
-      expect(e).toBeInstanceOf(RequiredParametersMissingError);
-      expect((e as RequiredParametersMissingError).missing).toContain(
-        "starting_frequencies",
-      );
-    }
+  it("test 4: absent starting_frequencies now takes a labelled default", async () => {
+    // INVERTED 2026-09-06. `starting_frequencies` is an array of allele
+    // frequencies to start a drift run from -- a scenario choice, and one
+    // no query string could supply through PARAMETER_PATTERN, so refusing
+    // over it left this domain permanently unreachable.
+    const resolved = await resolveQuery(
+      "linkage disequilibrium two locus population_size=200 generations=30 recombination_rate=0.1 mutation_rate=0.001 replicate_runs=100",
+    );
+    expect(resolved.domain).toBe("two_locus_wright_fisher");
+    const provenance = resolved.parameterProvenance["starting_frequencies"];
+    expect(provenance).toBeDefined();
+    expect(provenance!.origin).toBe("default");
+    // The measured constants in this query stay the user's, not defaults.
+    expect(resolved.parameterProvenance["mutation_rate"]!.origin).toBe("user");
   });
 });
 

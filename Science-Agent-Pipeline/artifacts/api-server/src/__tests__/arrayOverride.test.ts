@@ -83,24 +83,23 @@ describe("array-valued parameter overrides", () => {
   });
 
   // Test 4: No starting_frequencies override -> RequiredParametersMissingError names it
-  it("throws RequiredParametersMissingError naming starting_frequencies when absent", async () => {
+  it("resolves with a defaulted starting_frequencies, and labels it", async () => {
+    // INVERTED 2026-09-06: `starting_frequencies` is an array of allele
+    // frequencies to start from -- a scenario choice, and one no query
+    // string could ever supply through PARAMETER_PATTERN, so refusing
+    // over it made this domain permanently unreachable. It now takes a
+    // documented default, labelled as one. The measured constants in the
+    // query (recombination_rate, mutation_rate) are still required.
     const query =
       "linkage disequilibrium two locus " +
       "population_size=100 generations=20 recombination_rate=0.1 " +
       "mutation_rate=0 replicate_runs=50";
 
-    await expect(resolveQuery(query)).rejects.toMatchObject({
-      name: "RequiredParametersMissingError",
-      domain: "two_locus_wright_fisher",
-    });
-    try {
-      await resolveQuery(query);
-      expect.unreachable();
-    } catch (err) {
-      expect(err).toBeInstanceOf(RequiredParametersMissingError);
-      const missing = (err as RequiredParametersMissingError).missing;
-      expect(missing).toContain("starting_frequencies");
-    }
+    const resolved = await resolveQuery(query);
+    expect(resolved.domain).toBe("two_locus_wright_fisher");
+    const provenance = resolved.parameterProvenance["starting_frequencies"];
+    expect(provenance).toBeDefined();
+    expect(provenance!.origin).toBe("default");
   });
 
   // Additional: Test with spaces after commas

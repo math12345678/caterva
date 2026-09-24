@@ -1,8 +1,25 @@
 [project]
 name = "terrium"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Scientific computing for teaching labs. Unaffiliated with Tellurium."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 requires-python = ">=3.10,<3.14"
+authors = [{ name = "Terrium contributors" }]
+keywords = ["systems-biology", "enzyme-kinetics", "sbml", "simulation", "teaching"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "libroadrunner==2.8.0",
     "antimony==2.14.0",
@@ -15,6 +32,24 @@ dependencies = [
     "httpx==0.28.1",
     "pydantic==2.13.4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/math12345678/terrium"
+Repository = "https://github.com/math12345678/terrium"
+Issues = "https://github.com/math12345678/terrium/issues"
+Changelog = "https://github.com/math12345678/terrium/blob/main/CHANGELOG.md"
+
+# The app. Two commands, because the repository has two front doors and a
+# capability nobody can reach is not a capability (ADR 0090):
+#   terium          the simulation engine (Wright-Fisher, Kimura, LD, SSA ...)
+#   terium-compose  the compositional model builder and its analyses
+[project.scripts]
+# `terrium` is the one command every document teaches, and the name of the
+# executable in the downloadable app folder. It dispatches to the two below,
+# which stay for anyone already using them.
+terrium = "Terium.app:main"
+terium = "Terium.cli:console_main"
+terium-compose = "Terium.compose.__main__:console_main"
 
 [project.optional-dependencies]
 dev = [
@@ -105,15 +140,37 @@ addopts = "-v --tb=short"
 # inside a test. Reproduced directly, not from a report.
 python_files = ["test_*.py"]
 
-[tool.setuptools]
-# Declared rather than left to setuptools' default glob, which happens to
-# include NOTICE* today (verified: dist.py patterns are LICEN[CS]E*,
-# COPYING*, NOTICE*, AUTHORS*). Apache 2.0 section 4(d) requires NOTICE to
-# travel with any redistribution, and relying on a default for a licence
-# obligation means a setuptools change or an explicit license-files entry
-# added later could drop it silently. This is the one file where "it works
-# by default" is not a good enough answer.
-license-files = ["LICENSE", "NOTICE"]
+[tool.setuptools.dynamic]
+version = { attr = "Terium.__version__" }
+
+# NAMED, NOT DISCOVERED. This repository is flat: Terium/ sits beside
+# Tests/, Business/, landing/, node_modules/, benchmark_results/ and a dozen
+# more, and setuptools' flat-layout discovery picked up all of them --
+# verified with FlatLayoutPackageFinder on 2026-09-19. The result was an
+# editable install that registered dist-info and nothing else: `import
+# Terium` failed from any directory but the repository root, and a wheel
+# built from it would have been an empty release.
+#
+# Terium.tests is excluded because it is not a package (no __init__.py) and
+# a test tree is not part of the thing a user installs. Tests/ -- the
+# literature layer -- is excluded because it is not a package either; the
+# few call sites in Terium.agents that reach into it do so lazily and are
+# documented as needing the source checkout.
+[tool.setuptools.packages.find]
+include = ["Terium", "Terium.*"]
+exclude = ["Terium.tests", "Terium.tests.*"]
+
+# `Terium/conftest.py` exists to make the repository's own test tree import
+# (it edits sys.path to find the flat `terium_engine`). It is not part of
+# the software and must not ship: installed into site-packages it would,
+# if pytest ever loaded it, put site-packages' PARENT on sys.path.
+[tool.setuptools.package-data]
+# Two data files the engine reads at import (docs/data-sources.json and the
+# identifiers.org capture) as packaged copies; see Terium/core/data/README.md.
+Terium = ["core/data/*.json", "core/data/README.md"]
+
+[tool.setuptools.exclude-package-data]
+Terium = ["conftest.py", "pytest.ini", ".coverage"]
 
 [build-system]
 requires = ["setuptools>=61.0"]

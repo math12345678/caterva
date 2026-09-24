@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
-import type { SimulationDomain } from "./teriumRunner";
+import type { RunnableDomain } from "./teriumRunner";
 import type { ParameterProvenance } from "./provenance";
+import type { GroundedParameter } from "./modelGrounding";
+import type {
+  CompositionReport,
+  LiteratureSearchReport,
+} from "./literatureSearch";
 import { logger } from "./logger";
 
 export type JobStatus =
@@ -14,7 +19,15 @@ export type JobStatus =
 
 export interface SimulationResponse {
   runId: string;
-  domain: SimulationDomain;
+  /**
+   * `RunnableDomain`, not `SimulationDomain`: a run may be a composed
+   * domain (`network`) that has no single engine function and therefore no
+   * place in DISPATCH. Persisting one is still refused -- the simulations
+   * table's domain column is an enum of the catalogue domains, and
+   * `asSimulationDomain` narrows with a runtime check at the insert sites
+   * rather than a cast.
+   */
+  domain: RunnableDomain;
   parameters: Record<string, unknown>;
   trajectory: Record<string, unknown>[];
   provenance: {
@@ -23,6 +36,37 @@ export interface SimulationResponse {
     flags: string[];
   };
   parameterProvenance: Record<string, ParameterProvenance>;
+  /**
+   * Per-parameter literature audit for a caller-supplied model.
+   *
+   * Present only for `POST /simulate/model` with `terrium:` declarations.
+   * Separate from `parameterProvenance` because it carries what
+   * provenance has no field for and a reader needs most: the caller's
+   * value AND the literature's, side by side, in the caller's own unit,
+   * with the fold difference between them. Folding it into the note
+   * string would make the numbers unreadable by anything but a human.
+   */
+  modelGrounding?: GroundedParameter[];
+  /**
+   * The literature search behind a `parameterize` run, losing branches
+   * included.
+   *
+   * Present only for `POST /simulate/parameterize`. Where `modelGrounding`
+   * reports what the literature said about a value the caller supplied,
+   * this reports what the literature alone supplied: the branch-by-branch
+   * search, the winning organism next to the undecided ones, and why the
+   * chosen model did or did not run.
+   */
+  literatureSearch?: LiteratureSearchReport;
+  /**
+   * The mechanism `compose` built, when a query was answered with a
+   * structure rather than a simulation.
+   *
+   * Present for the front-door fallthrough when the catalogue has no match
+   * and compose builds `structure_only` output: the network shape and the
+   * constants it needs, with nothing presented as resolved.
+   */
+  composition?: CompositionReport;
   completedAt: string;
 }
 
@@ -144,6 +188,10 @@ export function createJob(query: string): Job {
     if (oldest) {
       jobs.delete(oldest.jobId);
       listeners.delete(oldest.jobId);
+      // A terminal job can no longer be cancelled, so its abort controller
+      // is dead weight; dropping it keeps abortControllers bounded the same
+      // way the jobs map is.
+      abortControllers.delete(oldest.jobId);
     }
   }
 
@@ -271,6 +319,11 @@ export function subscribe(jobId: string, listener: Listener): () => void {
  */
 export function cleanupJob(jobId: string): void {
   listeners.delete(jobId);
+  // The job reached a terminal state; cancelJob returns early on terminal
+  // statuses without touching the controller, so it can never be needed
+  // again. Dropping it prevents abortControllers from growing without
+  // bound alongside a jobs map that IS pruned.
+  abortControllers.delete(jobId);
 }
 
 export function listJobs(): Job[] {

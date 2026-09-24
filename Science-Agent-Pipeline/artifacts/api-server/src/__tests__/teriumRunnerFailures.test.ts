@@ -21,7 +21,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { resolvePythonExecutable } from "../lib/python";
-import { REPO_ROOT, runTerium } from "../lib/teriumRunner";
+import {
+  REPO_ROOT,
+  runTerium,
+  resolveRunnerTimeoutMs,
+} from "../lib/teriumRunner";
 
 const PARAMETERS = { km: 1, vmax: 1, s0: 1 };
 
@@ -48,6 +52,11 @@ beforeAll(() => {
       "  killed) kill -9 $$ ;;",
       '  noisy) echo "boom: model build failed" >&2; exit 3 ;;',
       "  quiet_failure) exit 4 ;;",
+      // Never terminates on its own, and deliberately ignores SIGTERM, so
+      // the only thing that can end it is the runner's own SIGKILL on
+      // timeout. A wrapper that merely slept would also pass against a
+      // SIGTERM-based implementation and could not tell the two apart.
+      '  hang) trap "" TERM; while true; do sleep 1; done ;;',
       "  *) exit 0 ;;",
       "esac",
     ].join("\n"),
@@ -56,10 +65,17 @@ beforeAll(() => {
   chmodSync(wrapper, 0o755);
 });
 
+const originalTimeout = process.env["TERIUM_RUNNER_TIMEOUT_MS"];
+
 afterEach(() => {
   delete process.env["TERIUM_TEST_MODE"];
   if (originalPython === undefined) delete process.env["TERRIUM_PYTHON"];
   else process.env["TERRIUM_PYTHON"] = originalPython;
+  if (originalTimeout === undefined) {
+    delete process.env["TERIUM_RUNNER_TIMEOUT_MS"];
+  } else {
+    process.env["TERIUM_RUNNER_TIMEOUT_MS"] = originalTimeout;
+  }
 });
 
 function useWrapper(mode: string): void {
@@ -167,5 +183,48 @@ describe("runTerium failure reporting", () => {
     }
 
     expect(uncaught.map((e) => e.message)).toEqual([]);
+  });
+
+  // There was no time limit at all before this: `spawn` carried no
+  // `timeout`, and the only thing that ever killed the child was the
+  // AbortSignal, which fires on explicit job cancellation and never on a
+  // clock. A wedged engine held its queue slot indefinitely. The fifteen
+  // preset domains masked it -- terium_runner.py's MAX_API_* ceilings bound
+  // the work so a legitimate run cannot last -- but those ceilings are
+  // per-domain and keyed to specific counters, so nothing covered a run
+  // whose cost is not one of them.
+  it("kills a runner that exceeds the time limit, and says so", async () => {
+    useWrapper("hang");
+    process.env["TERIUM_RUNNER_TIMEOUT_MS"] = "1500";
+
+    const started = Date.now();
+    const message = await failureMessage();
+    const elapsed = Date.now() - started;
+
+    expect(message).toMatch(/exceeded the 1500ms time limit/);
+    // The limit is what ended it, and the message must say something the
+    // reader can act on.
+    expect(message).toMatch(/TERIUM_RUNNER_TIMEOUT_MS/);
+    // Must NOT inherit the generic signal-kill explanation, which blames
+    // the OS reclaiming memory -- true for an unexplained SIGKILL, and
+    // exactly wrong here. Sending someone to look for a memory problem
+    // they do not have is worse than saying nothing.
+    expect(message).not.toMatch(/reclaiming memory/);
+    // It really waited for the timer rather than failing for some other
+    // reason that happened to produce a rejection.
+    expect(elapsed).toBeGreaterThanOrEqual(1400);
+  }, 15_000);
+
+  it("falls back to the default limit rather than disabling it on a bad value", async () => {
+    // A non-positive or unparseable override must not read as "no limit".
+    // Silently disabling the only backstop because someone typed `0` is the
+    // failure mode this guards.
+    for (const bad of ["0", "-1", "not-a-number", ""]) {
+      process.env["TERIUM_RUNNER_TIMEOUT_MS"] = bad;
+      expect(resolveRunnerTimeoutMs()).toBe(120_000);
+    }
+    delete process.env["TERIUM_RUNNER_TIMEOUT_MS"];
+    expect(resolveRunnerTimeoutMs()).toBe(120_000);
+    expect(resolveRunnerTimeoutMs({ TERIUM_RUNNER_TIMEOUT_MS: "500" })).toBe(500);
   });
 });

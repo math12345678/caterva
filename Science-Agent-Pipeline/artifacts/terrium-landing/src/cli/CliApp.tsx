@@ -42,6 +42,7 @@ import BackToTop from "@/components/ui/back-to-top";
 import { WaitlistForm } from "@/components/ui/WaitlistForm";
 import FooterMetrics from "@/components/ui/footer-metrics";
 import WaitlistCounter from "@/components/ui/waitlist-counter";
+import { totals } from "@/lib/testResults";
 
 const FAQSection = lazy(() => import("./FAQSection"));
 const TrustSection = lazy(() => import("./TrustSection"));
@@ -81,7 +82,6 @@ const NAV_ITEMS = [
   "examples",
   "playground",
   "compare",
-  "testimonials",
   "glossary",
   "trust",
   "faq",
@@ -99,11 +99,19 @@ const NAV_ITEMS = [
   "waitlist",
 ] as const;
 
+// Fifteen real domains, grouped into eight rows for a scannable list.
+// Source of truth: src/cli/domainCatalogue.ts, reconciled against the
+// engine's own DISPATCH table (ADR 0122 -- "fifteen domains nobody could
+// find"). Every one of these is routed end-to-end (LLM/keyword resolver ->
+// zod schema -> Python engine -> ODE/discrete integration), independently
+// re-verified for this list. `sbml` is deliberately not listed: it's a
+// generic model-ingest path with no API field to reach it, not a teaching
+// domain a query can resolve to (same exclusion the catalogue makes).
 const DOMAINS = [
   {
     id: "enzyme-kinetics",
     status: "live",
-    desc: "Michaelis-Menten kinetics, literature-verified Km/Vmax",
+    desc: "Michaelis-Menten kinetics, plain and competitively-inhibited — Km/Ki literature-verified, Vmax user-supplied",
   },
   {
     id: "sir-seir-epidemiology",
@@ -112,23 +120,33 @@ const DOMAINS = [
   },
   {
     id: "pcr-amplification",
-    status: "planned",
-    desc: "PCR cycle simulation with primer/template parameters",
+    status: "live",
+    desc: "PCR amplification, exact closed-form growth model, mutation-verified",
   },
   {
     id: "monte-carlo",
-    status: "planned",
-    desc: "Stochastic simulation for systems without closed forms",
+    status: "live",
+    desc: "Monte Carlo estimation of pi, 1/sqrt(N) convergence verified",
   },
   {
     id: "population-genetics",
-    status: "planned",
-    desc: "Allele frequency drift and selection modeling",
+    status: "live",
+    desc: "Wright-Fisher drift & selection, plus two-locus linkage disequilibrium",
   },
   {
-    id: "molecular-dynamics-setup",
-    status: "planned",
-    desc: "MD run configuration from natural-language input",
+    id: "stochastic-kinetics",
+    status: "live",
+    desc: "Gillespie SSA stochastic kinetics — decay, bimolecular association, replicate ensembles",
+  },
+  {
+    id: "molecular-dynamics",
+    status: "live",
+    desc: "Lennard-Jones molecular dynamics, energy-conserved",
+  },
+  {
+    id: "ode-oscillators",
+    status: "live",
+    desc: "Lotka-Volterra predator-prey, the Tyson (1991) cell-cycle clock, and the Elowitz & Leibler (2000) repressilator",
   },
 ];
 
@@ -375,7 +393,7 @@ export default function CliApp() {
 
           <button
             onClick={() => setMobileMenu(!mobileMenu)}
-            className="md:hidden flex flex-col gap-1 p-2 text-white/40 hover:text-white/70 transition-colors"
+            className="md:hidden flex flex-col gap-1 p-3.5 -m-1.5 text-white/40 hover:text-white/70 transition-colors"
             aria-label={mobileMenu ? "Close menu" : "Open menu"}
             aria-expanded={mobileMenu}
           >
@@ -452,7 +470,7 @@ export default function CliApp() {
                   lines={[
                     {
                       text: "Ask a question.",
-                      className: "text-gradient-white hero-heading-strong",
+                      className: "text-white hero-heading-strong",
                       delayOffset: 0.1,
                     },
                     {
@@ -583,7 +601,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-white/[0.06] to-transparent" />
           </div>
           <h2 className="section-header">How it works</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-10 -mt-2 max-w-sm">
+          <p className="font-sans text-[13px] text-white/50 mb-10 -mt-2 max-w-sm">
             Three steps from question to verified result.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -597,7 +615,7 @@ export default function CliApp() {
                 {
                   n: "02",
                   title: "We look it up",
-                  desc: "We query BRENDA, KEGG, & PubMed to find real kinetic parameters and literature citations for your system.",
+                  desc: "We query BRENDA and PubMed to find real kinetic parameters and literature citations for your system.",
                 },
                 {
                   n: "03",
@@ -671,7 +689,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
           </div>
           <h2 className="section-header">See it in action</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Pre-computed examples. No backend required.
           </p>
           <ExampleGallery onTryQuery={setRerunQuery} />
@@ -723,8 +741,10 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
           </div>
           <h2 className="section-header">Supported domains</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
-            Enzyme kinetics, epidemiology, PCR, and beyond.
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
+            Enzyme kinetics, epidemiology, PCR, population genetics,
+            stochastic kinetics, molecular dynamics, and classic ODE
+            oscillators.
           </p>
           <TerminalWindow path="~ &mdash; terrium domains --list" glow>
             <div className="mb-4 text-white/90">
@@ -772,8 +792,9 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
           </div>
           <h2 className="section-header">Test suite</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
-            48 tests across the full stack — every one passing.
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
+            {totals().passed.toLocaleString()} tests across the full stack
+            — zero failures.
           </p>
           <TerminalWindow path="~ &mdash; terrium test --run --no-skip -v" glow>
             <TestPanelBody />
@@ -791,7 +812,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
           </div>
           <h2 className="section-header">Try the agent</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Describe your experiment. We handle the rest.
           </p>
           <AgentSimulator
@@ -812,7 +833,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
           </div>
           <h2 className="section-header">Recent runs</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Your past simulations, ready to re-run or export.
           </p>
           <RecentRuns onReRun={setRerunQuery} />
@@ -829,7 +850,7 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
           </div>
           <h2 className="section-header">Live simulator</h2>
-          <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2">
+          <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2">
             Browser-side ODE solver. Tune parameters in real time.
           </p>
           <SimulatorPanel domain={simDomain} onDomainChange={setSimDomain} />

@@ -27,22 +27,22 @@
       "fingerprint": "7f929c4d38a01305",
       "file": "START_HERE.md",
       "rule": "injection/agent-targeting",
-      "reviewed": "2026-08-24",
-      "reason": "A row in the 'where to look next' table: a label naming the machine half of the audience, beside a link to docs/AGENT_BRIEF.md. The rule is right that the label branches the reader by whether they are a person or a model -- it is a signpost, not an instruction, and changes no behaviour by itself. Exempted because a repository several agents commit to needs a documented way to brief them, and deleting the signpost hides the brief rather than removing it. (Described without reproducing the label: quoting it verbatim makes THIS file trip the same rule, which it did on the first attempt -- the same trap the commandResolve.ts entry below records.) NOTE FOR THE NEXT READER: this exempts the pointer, not its target. docs/AGENT_BRIEF.md is an instruction surface and deserves its own review; nothing here has assessed it."
+      "reviewed": "2026-09-06",
+      "reason": "A signpost, not an instruction. The line is one row of START_HERE.md's routing table -- 'where do I go for X' -- and its cell is a link to docs/AGENT_BRIEF.md. It branches the reader by audience the way the rows above it branch by topic, and it tells the reader nothing except which file to open. AGENT_BRIEF.md was read in full before this verdict: it is the project's standing brief for coding agents, and its content pushes in the opposite direction to an injection -- it requires verification against sources outside the codebase, and states that a failing guard must not be reported as success. A repository several agents commit to concurrently has to be able to address them; the rule cannot tell a table of contents from a payload."
     },
     {
       "fingerprint": "6db4c580e8076837",
       "file": "Tests/enzyme_preparation.py",
       "rule": "injection/trust-assertion",
-      "reviewed": "2026-08-24",
-      "reason": "A module docstring explaining why the recombinant/native threshold sits where it does. The rule fires on reassurance offered in place of explanation; this docstring is explanation, and it volunteers its own failure modes in both directions -- too strict and it excludes most of the corpus while desensitising the reader to the flag (ADR 0028's cry-wolf reasoning), too loose and a tagged construct passes as native, which is the defect the file was written to fix. Prose that names what it could get wrong is not steering anyone away from looking. Same reasoning as the commandResolve.ts entry. (Paraphrased on purpose. Quoting the docstring verbatim made THIS file trip the same rule: the source sentence contains a phrase the scanner treats as an instruction to disregard an alert, which is precisely the trap the commandResolve.ts entry below already records.)"
+      "reviewed": "2026-09-06",
+      "reason": "The same house idiom as the adr-0037 entry above, and the module docstring even cites ADR 0028 by name on the same line. It explains why classifying every recombinant preparation as modified would be wrong: it would exclude most of the BRENDA corpus and make the modified-enzyme warning fire so often that a reader stops reading it. Reasoning about when a warning should NOT fire, in a file whose job is deciding when it should."
     },
     {
       "fingerprint": "c52a9a047fed2b35",
       "file": "docs/mutations/adr-0037-organism-column.json",
       "rule": "injection/trust-assertion",
-      "reviewed": "2026-08-24",
-      "reason": "The '_note' on a mutation entry, describing that mutation as the strongest row in its table and saying why: grouping across species turns every multi-organism pool into a 'mixed sources' finding, which is both wrong and loud enough to train a reader to ignore it. That is a claim about a MUTATION's diagnostic power, not a claim that any code is safe. A set file's notes exist to be read by whoever re-runs it."
+      "reviewed": "2026-09-06",
+      "reason": "House idiom, not an assertion of safety. The flagged phrase is this repository's standard way of stating ADR 0028's cry-wolf reasoning: a check that fires too broadly teaches its reader to stop attending to it. Here it is the rationale field of a MUTATION-TABLE entry, explaining why grouping pooled measurements across species rather than within each one is a strong mutation to test -- it argues that a warning would become NOISIER and therefore less heeded. It asks for more attention to a warning, not less, which is the opposite of what the rule detects. The same idiom recurs across this codebase and will keep producing this finding."
     },
     {
       "fingerprint": "c883b1af96e517ba",
@@ -78,6 +78,27 @@
       "rule": "injection/trust-assertion",
       "reviewed": "2026-08-11",
       "reason": "The flagged text is the CLI's cross-species warning, printed to a human scientist when a resolved parameter was measured in a DIFFERENT organism than the one asked about. It cautions the reader against attributing the value to the queried species. The scanner's rule looks for instructions to stay quiet; this is the opposite -- it surfaces a caveat that would otherwise be buried, and the clause immediately before it affirms the value is real and citable. The warning exists because a cross-species Km presented as an exact match is how a number ends up in a paper credited to the wrong organism. (Worded here without quoting the line verbatim: reproducing it would make this exemption file trip the same rule, which it did on the first attempt.)"
+    },
+    {
+      "fingerprint": "07c312fc3822b0c2",
+      "file": "Tests/test_runner_contract.py",
+      "rule": "injection/exfiltration",
+      "reviewed": "2026-09-06",
+      "reason": "The scanner read the word 'token' as a credential. The flagged text is a code comment distinguishing 'nothing found' from 'nothing checked' for ADR 0039's pool-source classification, where a token is a parsed unit of substrate text that failed to resolve to a known compound -- there is no credential, no secret, and no destination anywhere in this file. Nothing is sent anywhere: the surrounding literal is an exact-equality contract fixture for the runner's JSON shape."
+    },
+    {
+      "fingerprint": "960ae51f4a9b0a1e",
+      "file": "Business/build-stages/STAGE_10_PART_13.md",
+      "rule": "injection/tool-abuse",
+      "reviewed": "2026-09-06",
+      "reason": "Recursive false positive. This line is a row of the triage table in the stage record that examined the FIRST prompt-injection scan, and it quotes a to-do item from CODE_QUALITY_IMPROVEMENTS.md about adding a typed parameter registry to prevent key mismatches -- a TypeScript refactor note. The rule that fires looks for shell-profile and install-hook modification; nothing here touches either. The record exists to say that string was benign, and reproducing it to say so re-trips the rule."
+    },
+    {
+      "fingerprint": "02711b332996b1d0",
+      "file": "Business/build-stages/STAGE_10_PART_13.md",
+      "rule": "injection/exfiltration",
+      "reviewed": "2026-09-06",
+      "reason": "The same recursion, one rule over. The line quotes SECURITY_HARDENING.md's former wording about secrets being taken from the process environment at point of use, in the course of explaining that a concurrent agent had since rephrased it. Describing where a program obtains its configuration is a security disclosure, not an instruction to collect anything or send it anywhere -- the original finding was triaged as a false positive in August 2026 for exactly that reason, and quoting the sentence to record the verdict reproduces the match."
     }
   ]
 }

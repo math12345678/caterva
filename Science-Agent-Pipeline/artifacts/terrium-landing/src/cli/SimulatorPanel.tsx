@@ -35,7 +35,12 @@ function Field({
         value={value}
         step={step}
         min={min}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => {
+          const v = Number(e.target.value);
+          // min is a physical floor (e.g. Km > 0) -- the HTML min attribute
+          // doesn't stop typed/pasted/cleared values from reaching the integrator.
+          onChange(Number.isFinite(v) ? Math.max(min, v) : min);
+        }}
         className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-white/80 text-[12px] outline-none transition-all duration-200 focus:border-[#1D8A72]/30 focus:shadow-[0_0_12px_rgba(29,138,114,0.06)]"
       />
     </label>

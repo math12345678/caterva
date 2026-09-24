@@ -110,8 +110,17 @@ export const MM_CI_LITERATURE: DomainLiterature = {
  */
 export const SIR_LITERATURE: DomainLiterature = {
   name: "sir",
+  // Frequency-dependent transmission, matching what the engine integrates:
+  // model_building.py emits `beta * S * I / N`. This description carried
+  // Kermack & McKendrick's original density-dependent `-β·S·I` until
+  // 2026-09-05. The distinction is not cosmetic -- R0 is beta/gamma under
+  // the engine's form but beta*N/gamma under the one described here, so a
+  // reader deriving R0 from this text for the registry's COVID-19
+  // parameters and N = 1000 would have been off by a factor of 1000.
+  //
+  // Guarded by scripts/check_documented_equations_match_engine.py.
   description:
-    "SIR compartmental epidemiological model. Describes disease spread with three compartments: S (susceptible), I (infected), R (recovered). Equations: dS/dt = -β·S·I, dI/dt = β·S·I - γ·I, dR/dt = γ·I",
+    "SIR compartmental epidemiological model. Describes disease spread with three compartments: S (susceptible), I (infected), R (recovered), with N = S + I + R. Equations: dS/dt = -β·S·I/N, dI/dt = β·S·I/N - γ·I, dR/dt = γ·I. Under this frequency-dependent form R₀ = β/γ.",
   references: [
     {
       authors: "Kermack, W. O., & McKendrick, A. G.",
@@ -120,7 +129,7 @@ export const SIR_LITERATURE: DomainLiterature = {
       doi: "10.1098/rspa.1927.0118",
     },
     {
-      authors: "Heesterbeek, H., Britton, T., et al.",
+      authors: "Heesterbeek, H., Anderson, R. M., et al.",
       year: 2015,
       title: "Modeling infectious disease dynamics in the complex landscape of global health",
       doi: "10.1126/science.aaa4339",
@@ -139,7 +148,16 @@ export const SIR_LITERATURE: DomainLiterature = {
 export const SEIR_LITERATURE: DomainLiterature = {
   name: "seir",
   description:
-    "SEIR compartmental model adds latent period. E (exposed) compartment between S and I. Equations: dS/dt = -β·S·I, dE/dt = β·S·I - σ·E, dI/dt = σ·E - γ·I, dR/dt = γ·I. Sigma = 1/incubation period.",
+    // "Sigma = 1/incubation period" until 2026-09-05, which this entry's
+    // OWN defaultJustification below argues is "directionally wrong, not
+    // merely imprecise" -- sigma is the E→I rate, so it needs the LATENT
+    // period (infection → infectiousness), and for SARS-CoV-2 the latent
+    // period is SHORTER than the incubation period (Alene et al. 2021:
+    // pooled serial interval 5.2 d < pooled incubation 6.5 d; Kang et al.
+    // 2022: latent 3.9 d vs incubation 5.8 d). The description and the
+    // justification contradicted each other in the same object, and the
+    // description is the half that gets rendered.
+    "SEIR compartmental model adds latent period. E (exposed) compartment between S and I, with N = S + E + I + R. Equations: dS/dt = -β·S·I/N, dE/dt = β·S·I/N - σ·E, dI/dt = σ·E - γ·I, dR/dt = γ·I. Sigma = 1/latent period (infection → becoming infectious), which is not the incubation period (infection → symptom onset).",
   references: [
     {
       authors: "Anderson, R. M., & May, R. M.",
@@ -213,7 +231,16 @@ export const WRIGHT_FISHER_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Human mutation rate: ~1.29e-8 per base pair per generation. The value actually resolved at runtime comes from stdpopsim's HomSap mean_mutation_rate (see Tests/popgen_resolver.py), which carries its own bundled citations (International Human Genome Sequencing Consortium 2001; Jonsson et al. 2017); Rahbari et al. (2016) is the pedigree-based germline mutation study backing the order of magnitude. Population size 10,000 (typical for modeling).",
+    // Named "International Human Genome Sequencing Consortium 2001;
+    // Jonsson et al. 2017" as the bundled citations until 2026-09-05.
+    // Both were wrong, checked by running stdpopsim 0.3.0: IHGSC 2001 is
+    // bundled for the GENOME ASSEMBLY (stdpopsim tags each citation with
+    // its reason), and Jónsson et al. is not in the HomSap catalog at
+    // all. The rate's actual bundled source is Tian, Browning & Browning
+    // (2019). popgen_resolver.py was surfacing the assembly paper's DOI
+    // as this value's structured locator for the same reason -- see the
+    // comment there, and ADR 0162 for the defect class.
+    "Human mutation rate: ~1.29e-8 per base pair per generation. The value actually resolved at runtime comes from stdpopsim's HomSap mean_mutation_rate (see Tests/popgen_resolver.py); stdpopsim bundles that rate with Tian, Browning & Browning (2019), Am J Hum Genet 105(5):883-893, which is the citation this resolver surfaces. Rahbari et al. (2016) is an independent pedigree-based germline mutation study backing the order of magnitude. Population size 10,000 (typical for modeling).",
 };
 
 /**
@@ -258,8 +285,17 @@ export const GILLESPIE_SSA_LITERATURE: DomainLiterature = {
  */
 export const PCR_LITERATURE: DomainLiterature = {
   name: "pcr",
+  // The formula below said `N(n) = N0 × E^n` until 2026-09-05. With the
+  // efficiency range it states in the same sentence (0.85-1.0), that is a
+  // DECAY curve: at 30 cycles and E = 0.9 it yields 0.042*N0, a PCR
+  // reaction that destroys 96% of its template. Terium/discrete/pcr.py
+  // computes `n0 * (1.0 + efficiency) ** cycle` = 5.2e8*N0 -- a factor of
+  // 1.2e10 apart. The engine was right; this description, which is served
+  // to users through /api/pipeline/literature, was wrong.
+  //
+  // Guarded by scripts/check_documented_equations_match_engine.py.
   description:
-    "PCR amplification model. Exponential amplification over n cycles. Final copy number: N(n) = N0 × E^n where E is per-cycle efficiency (typically 0.85-1.0).",
+    "PCR amplification model. Exponential amplification over n cycles. Final copy number: N(n) = N0 × (1 + E)^n, where E is the fraction of template copied per cycle (typically 0.85-1.0; E = 1 is perfect doubling). Passing a plateau capacity switches to discrete logistic growth toward that capacity.",
   references: [
     {
       authors: "Mullis, K. B., et al.",
@@ -274,7 +310,9 @@ export const PCR_LITERATURE: DomainLiterature = {
 
 /**
  * MOLECULAR_DYNAMICS Domain: Lennard-Jones Simulation
- * BACKING: Lennard-Jones, J. E. (1924)
+ * BACKING: Jones, J. E. (1924) -- published before his 1925 marriage, after
+ * which he adopted "Lennard-Jones." The potential is still named for him
+ * under that later name; the paper's own byline is not.
  * "On the determination of molecular fields"
  */
 export const MOLECULAR_DYNAMICS_LITERATURE: DomainLiterature = {
@@ -283,7 +321,13 @@ export const MOLECULAR_DYNAMICS_LITERATURE: DomainLiterature = {
     "Molecular dynamics using Lennard-Jones potential. V(r) = 4ε[(σ/r)¹² - (σ/r)⁶]. Simulates particle interactions with repulsive (r¹²) and attractive (r⁶) terms.",
   references: [
     {
-      authors: "Lennard-Jones, J. E.",
+      // Published as "Jones, J. E." -- he married Kathleen Lennard in 1925
+      // and adopted "Lennard-Jones" afterward, so the 1924 byline itself
+      // reads "Jones," not "Lennard-Jones" (confirmed against CrossRef's
+      // metadata for this DOI). The potential is still correctly called
+      // "Lennard-Jones" today; that's the model's later, eponymous name,
+      // not what's actually printed on this specific paper.
+      authors: "Jones, J. E.",
       year: 1924,
       title: "On the determination of molecular fields",
       doi: "10.1098/rspa.1924.0082",
@@ -407,8 +451,16 @@ export const CELL_CYCLE_OSCILLATOR_LITERATURE: DomainLiterature = {
       doi: "10.1073/pnas.88.16.7328",
     },
   ],
+  // "~30-minute oscillations typical of eukaryotic cell cycles" until
+  // 2026-09-05. Two errors in one clause. The period: integrating this
+  // file's own parameter set (kappa=0.015, k6=1, k4=180, k4prime=0.018 --
+  // which matches BIOMD0000000006 exactly) gives ~35.6 min, not ~30. And
+  // the biology: a typical somatic eukaryotic cell cycle runs ~24 hours,
+  // not half an hour. Tyson (1991) associates this spontaneous-oscillation
+  // mode with the rapid division cycles of early embryos, which is what
+  // ~35 minutes actually describes.
   defaultJustification:
-    "Default reaction rate constants from Tyson (1991) cell-cycle model. Produces ~30-minute oscillations typical of eukaryotic cell cycles.",
+    "Default reaction rate constants from Tyson (1991) cell-cycle model. Produces ~35-minute oscillations, comparable to the rapid division cycles of early embryos that Tyson associates with this oscillatory mode — not the ~24-hour cycle of a typical somatic eukaryotic cell.",
 };
 
 /**

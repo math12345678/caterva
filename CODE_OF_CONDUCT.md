@@ -44,7 +44,7 @@ representing the project.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to mathlete.world@gmail.com. All complaints will be reviewed and
+reported to admin.terrium@gmail.com. All complaints will be reviewed and
 investigated promptly and fairly.
 
 Given the current team size, enforcement is currently handled directly by

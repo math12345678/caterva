@@ -74,11 +74,23 @@ class TestUnknownDiseaseNeverFabricates:
     def test_unrecognised_disease_is_not_found(self):
         """Regression guard for the one failure mode that matters most
         here: an unrecognised disease must never fall back to a plausible-
-        looking invented R0. Measles and influenza are real, well-studied
-        diseases NOT yet in this registry (see the ADR for why -- no
-        single matched-methodology source was found for either), so they
-        are exactly the right names to prove this with."""
-        for name in ("measles", "influenza", "a made-up disease xyz123"):
+        looking invented R0.
+
+        Measles is the right name to prove this with. It is a real,
+        extremely well-studied disease that is still NOT registered, and
+        for a reason that survives having a serial interval available:
+        Vink et al. (2014) reports 11.7 days for measles, but Guerra et
+        al. (2017) -- the standard R0 systematic review -- concludes R0
+        "estimates vary more than the often cited range of 12-18" and
+        endorses no single value. Half a pair is not a pair.
+
+        Influenza was in this list until ADR 0169 registered it as an
+        explicitly-flagged cross-study composite; see
+        TestCrossStudyComposites below, which asserts it can never surface
+        as "verified". Removing a name from this guard is a decision that
+        needs an ADR, which is why the ADR exists.
+        """
+        for name in ("measles", "a made-up disease xyz123", "rabies"):
             result = resolve_disease_parameters(name)
             assert result.found is False, f"'{name}' unexpectedly resolved"
             assert result.r0 is None
@@ -154,3 +166,98 @@ class TestNoLatentPeriodIsOffered:
             "in the literature and the distinction changes the model."
         )
         assert "latent" not in measure or "not" in measure
+
+
+class TestCrossStudyComposites:
+    """ADR 0169: a two-paper entry must say so, and must never read as verified.
+
+    ADR 0017 registered only COVID-19, whose R0 and serial interval come
+    from ONE paper (Hussein et al. 2021), and deferred the question of
+    whether a cross-study pair could ever be admitted. ADR 0169 admits one
+    -- influenza -- under a strictly weaker tier, mirroring how a
+    cross-species BRENDA Km is admitted: usable, cited, and visibly not
+    the same thing as a single-source value.
+
+    The failure this class exists to prevent is a composite quietly
+    inheriting COVID-19's "verified" status, which would erase the only
+    signal telling a reader that two methodologies were combined.
+    """
+
+    def test_covid_is_not_a_composite(self):
+        """The single-source entry must not be mislabelled as one."""
+        result = resolve_disease_parameters("covid-19")
+        assert result.found is True
+        assert result.cross_study_composite is False
+        assert result.composite_note is None
+        assert result.secondary_pmid is None
+
+    def test_influenza_entries_are_marked_composite(self):
+        for name in ("influenza", "h1n1"):
+            result = resolve_disease_parameters(name)
+            assert result.found is True, f"'{name}' did not resolve"
+            assert result.cross_study_composite is True, (
+                f"'{name}' resolved but is not marked as a cross-study "
+                "composite -- it would surface as verified"
+            )
+            assert result.composite_note, f"'{name}' has no composite note"
+
+    def test_both_sources_are_carried_not_just_the_r0_one(self):
+        """A two-paper number must show both papers.
+
+        The R0 half (Biggerstaff 2014) and the serial-interval half (Vink
+        2014) are different PMIDs. Surfacing only the first would present
+        a composite as if one paper supported both halves -- the same
+        shape as the popgen defect where the genome-assembly DOI stood in
+        for a mutation rate.
+        """
+        result = resolve_disease_parameters("influenza")
+        assert result.pmid == "25186370"  # Biggerstaff et al. 2014, R0
+        assert result.secondary_pmid == "25294601"  # Vink et al. 2014, SI
+        assert result.doi == "10.1186/1471-2334-14-480"
+        assert result.secondary_doi == "10.1093/aje/kwu209"
+        assert result.pmid != result.secondary_pmid
+
+    def test_composite_note_names_the_actual_mismatch(self):
+        """The note must say WHAT was combined, not merely that something was.
+
+        Seasonal influenza is composite on two axes and both are stated:
+        cross-study, and cross-strain (Biggerstaff's "seasonal" pools
+        H3N2/H1N1/B; Vink's 2.2-day serial interval is H3N2-specific).
+        """
+        seasonal = resolve_disease_parameters("influenza")
+        note = seasonal.composite_note.lower()
+        assert "cross-study" in note
+        assert "strain" in note
+
+        # The pandemic entry IS strain-matched, so it must not claim a
+        # strain mismatch it does not have.
+        pdm09 = resolve_disease_parameters("h1n1")
+        assert "strain-matched" in pdm09.composite_note.lower()
+
+    def test_values_match_the_published_numbers(self):
+        """Transcribed from the PubMed abstracts on 2026-09-04.
+
+        Biggerstaff et al. 2014 (PMID 25186370): median R0 1.28 seasonal,
+        1.46 for the 2009 pandemic. Vink et al. 2014 (PMID 25294601): mean
+        serial interval 2.2 d for A(H3N2), 2.8 d for A(H1N1)pdm09.
+        """
+        seasonal = resolve_disease_parameters("influenza")
+        assert seasonal.r0 == 1.28
+        assert seasonal.infectious_period_days == 2.2
+
+        pdm09 = resolve_disease_parameters("h1n1")
+        assert pdm09.r0 == 1.46
+        assert pdm09.infectious_period_days == 2.8
+
+    def test_serial_interval_measure_is_stated_not_assumed(self):
+        """Every entry must say what its period figure actually measures.
+
+        Carrat et al. (2008) reports 4.80 days of viral SHEDDING for
+        influenza -- roughly twice the serial interval, and a different
+        physical quantity. It was considered and rejected for these
+        entries. If a future edit swaps a shedding duration in, this
+        assertion is what makes the substitution visible.
+        """
+        for name in ("influenza", "h1n1"):
+            result = resolve_disease_parameters(name)
+            assert "serial interval" in result.infectious_period_measure.lower()

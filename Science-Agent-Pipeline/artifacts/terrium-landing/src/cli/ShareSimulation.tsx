@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "@/hooks/use-toast";
 import { TEAL } from "@/lib/constants";
@@ -8,6 +8,8 @@ interface ShareSimulationProps {
   domain: string;
   runId?: string;
   parameters?: Record<string, unknown>;
+  citationCount?: number;
+  hasFlags?: boolean;
   className?: string;
 }
 
@@ -91,13 +93,14 @@ function LinkedInIcon() {
 export default function ShareSimulation({
   query,
   domain,
-  runId,
-  parameters,
+  citationCount = 0,
+  hasFlags = false,
   className = "",
 }: ShareSimulationProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedEmbed, setCopiedEmbed] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const showToast = (message: string) => {
     toast({
@@ -106,23 +109,49 @@ export default function ShareSimulation({
     });
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
   const { shareUrl, shareText, embedMarkdown } = useMemo(() => {
-    const params = new URLSearchParams();
-    params.set("q", query.slice(0, 200));
-    if (domain) params.set("domain", domain);
-    if (runId) params.set("run", runId);
-    if (parameters && Object.keys(parameters).length > 0) {
-      params.set("params", JSON.stringify(parameters).slice(0, 200));
-    }
-    const base = `${window.location.origin}${window.location.pathname}`;
-    const url = `${base}?${params.toString()}`;
+    // No route in the app reads q/domain/run/params back from location.search,
+    // so a query string here would just be a dead link to the plain homepage.
+    const url = `${window.location.origin}${window.location.pathname}`;
 
-    const text = `I just ran a ${domain} simulation on Terrium: "${query}". Verified ODE results with full provenance. ${url}`;
+    // Only claim literature-verified provenance when the run actually has
+    // citations and no unresolved caveats — matches the gating AgentSimulator
+    // uses to show the provenance flags/citations panel.
+    const isVerified = citationCount > 0 && !hasFlags;
+    const provenanceClaim = isVerified
+      ? "Verified ODE results with full provenance."
+      : "Simulation run on Terrium.";
+    const embedProvenanceClaim = isVerified
+      ? "verified scientific simulations with full provenance"
+      : "scientific simulations";
 
-    const embed = `[![Terrium Simulation](https://terrium.app/og.png)](https://terrium.app)\n\n**${domain} simulation**: ${query}\n\n> Run on [Terrium](https://terrium.app) — verified scientific simulations with full provenance.`;
+    const text = `I just ran a ${domain} simulation on Terrium: "${query}". ${provenanceClaim} ${url}`;
+
+    const embed = `[![Terrium Simulation](https://terrium.app/og.png)](https://terrium.app)\n\n**${domain} simulation**: ${query}\n\n> Run on [Terrium](https://terrium.app) — ${embedProvenanceClaim}.`;
 
     return { shareUrl: url, shareText: text, embedMarkdown: embed };
-  }, [query, domain, runId, parameters]);
+  }, [query, domain, citationCount, hasFlags]);
 
   const handleCopy = () => {
     navigator.clipboard
@@ -161,7 +190,10 @@ export default function ShareSimulation({
   };
 
   return (
-    <div className={`relative inline-flex items-center ${className}`}>
+    <div
+      ref={containerRef}
+      className={`relative inline-flex items-center ${className}`}
+    >
       <motion.button
         onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-[11px] text-white/40 hover:text-[#1D8A72] hover:border-[#1D8A72]/25 hover:bg-[#1D8A72]/[0.04] transition-all duration-300"
@@ -189,7 +221,7 @@ export default function ShareSimulation({
               </span>
               <button
                 onClick={() => setOpen(false)}
-                className="text-white/20 hover:text-white/50 transition-colors"
+                className="text-white/20 hover:text-white/50 transition-colors p-2.5 -m-2.5"
                 aria-label="Close share panel"
               >
                 <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">

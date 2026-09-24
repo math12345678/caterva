@@ -254,9 +254,23 @@ describe("POST /api/simulate/:jobId/cancel", () => {
   });
 
   it("cancels a pending job", async () => {
+    // Was "to cancel" -- an unrecognized query. That used to silently
+    // resolve to "mm" with full default parameters (see the domain-
+    // classification fix in queryResolver.ts) and run a real simulation,
+    // which took just long enough for this test's cancel request to land
+    // while the job was still pending. Now an unrecognized query throws
+    // UnrecognizedQueryError immediately instead of running the wrong
+    // simulation, so the job reaches a terminal state before the cancel
+    // request arrives (409, not 200) -- a race this test lost only because
+    // the system got faster at refusing nonsense, which is the point of
+    // that fix. Using a real, fully-specified query here instead, so the
+    // cancellation window comes from genuine simulation work, not from an
+    // accident of how slowly a bad query used to fail.
     const create = await request(server)
       .post("/api/simulate")
-      .send({ query: "to cancel" });
+      .send({
+        query: "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51",
+      });
     const { jobId } = create.body;
 
     const res = await request(server).post(`/api/simulate/${jobId}/cancel`);
@@ -392,6 +406,61 @@ describe("POST /api/resolve", () => {
     expect(res.status).toBe(422);
     expect(res.body.error).toBe("RequiredParametersMissingError");
     expect(res.body.missingKeys).toContain("gamma");
+  });
+
+  it("names the domain on a 422, and never labels a missing key's fallback number as resolved", async () => {
+    // `domain` and `resolvedParameters` exist so a UI can render a
+    // labeled-field form for exactly what is missing, pre-filled with
+    // whatever already resolved. `resolvedParameters` is the load-bearing
+    // half of this test: `parameters` internally is seeded from
+    // DOMAIN_DEFAULTS before anything real overlays it (mm's illustrative
+    // vmax=5, s0=10, end=10, points=51), so an UNFILTERED pass-through
+    // would report those exact placeholder numbers as if BRENDA or the
+    // user had supplied them -- a fabricated value presented as resolved,
+    // which is the one thing this project treats as worse than an error
+    // message. This is a real regression this test caught once already:
+    // the first version of this response attached the raw, unfiltered
+    // map, and `resolvedParameters.vmax` came back `5`.
+    //
+    // `km=10.73` is supplied inline rather than left to resolve from
+    // BRENDA, matching this file's own convention (see "resolves an MM
+    // query" above, `km=2` inline) -- a test asserting on the SHAPE of a
+    // refusal should not also depend on a live literature lookup for its
+    // one resolved key.
+    const res = await request(server)
+      .post("/api/resolve")
+      .send({ query: "simulate lactate dehydrogenase with pyruvate km=10.73" });
+    expect(res.status).toBe(422);
+    expect(res.body.domain).toBe("mm");
+    expect(res.body.missingKeys).toEqual(expect.arrayContaining([
+        // NARROWED 2026-09-06 from ["vmax", "s0", "end"]. s0 is the
+        // substrate concentration you chose and end is the plot window;
+        // neither has a literature value, and refusing over them made the
+        // commonest enzyme query unanswerable. vmax stays because
+        // Vmax = kcat x [E]0 -- it is not a property of the enzyme alone
+        // (ADR 0013), which is the hard rule doing real work.
+        "vmax",
+      ]));
+    // `points` used to be listed here and deliberately is not any more. It
+    // is output-sample count -- display resolution taken from a trajectory
+    // the integrator computes independently -- and it is now exempt from
+    // the hard block (see NON_SCIENTIFIC_KEYS in provenance.ts, which
+    // carries the measurements: varying points over a 500x range moves the
+    // final value by nothing beyond integrator noise, ~9-10 significant
+    // figures of agreement, on both SIR and Michaelis-Menten).
+    //
+    // Asserted explicitly rather than just dropped from the list above, so
+    // the exemption cannot silently widen: if some future change starts
+    // blocking on points again, or the arrayContaining above is relaxed,
+    // this still fails.
+    expect(res.body.missingKeys).not.toContain("points");
+    for (const key of res.body.missingKeys) {
+      expect(res.body.resolvedParameters).not.toHaveProperty(key);
+    }
+    // The one key that DID resolve (the user-supplied km) must still be
+    // there -- filtering missing keys must not also filter out what
+    // legitimately resolved.
+    expect(res.body.resolvedParameters.km).toBe(10.73);
   });
 
   it("resolves an MM query", async () => {
@@ -611,11 +680,41 @@ describe("GET /api/simulate/metrics/pipeline", () => {
     expect(JSON.stringify(res.body.literature)).toContain("1927");
   });
 
-  it("includes Harter percentiles in metrics", async () => {
+  it("claims no method citation for the latency percentiles", async () => {
+    // This test used to assert the opposite: that the block contained
+    // "Harter" and "1974". It was pinning a name-drop.
+    //
+    // getLatencyPercentiles() sorts the latency sample and indexes into
+    // it -- plain empirical order statistics. Harter (1974) is "The Method
+    // of Least Squares and Some Alternatives" and contributes nothing to
+    // that. Nielsen (1993) was named in the same block for a payload with
+    // no perceptual claim in it anywhere.
+    //
+    // A real paper printed beside a number it did not produce is the
+    // defect this product exists to refuse, so the assertion is inverted:
+    // the endpoint must NOT name works it does not use.
     const res = await request(server).get("/api/simulate/metrics/pipeline");
     expect(res.status).toBe(200);
-    expect(JSON.stringify(res.body.literature)).toContain("Harter");
-    expect(JSON.stringify(res.body.literature)).toContain("1974");
+    const literature = JSON.stringify(res.body.literature);
+
+    expect(literature).not.toContain("Harter");
+    expect(literature).not.toContain("Nielsen");
+
+    // Asserted positively too: deleting the entry outright would satisfy
+    // the two checks above while telling the reader less than the truth.
+    expect(res.body.literature.percentiles).toMatch(/order statistics/i);
+    expect(res.body.literature.percentiles).toMatch(
+      /no (method )?citation is claimed/i,
+    );
+  });
+
+  it("says Little's Law is the check, not the method", async () => {
+    // activeJobs is a Set's size -- a direct count. L = λW is a
+    // steady-state estimator the code has never run. Citing it as the
+    // method described a weaker calculation than the one performed.
+    const res = await request(server).get("/api/simulate/metrics/pipeline");
+    expect(res.body.literature.queueTheory).toContain("Little");
+    expect(res.body.literature.queueTheory).toMatch(/not.*derived from it/i);
   });
 });
 
@@ -656,7 +755,16 @@ describe("GET /api/dashboard/overview", () => {
     expect(res.body).toHaveProperty("compliance");
     expect(res.body.compliance).toHaveProperty("strenda");
     expect(res.body.compliance.strenda).toHaveProperty("standard");
-    expect(res.body.compliance.strenda.standard).toContain("Gelperin");
+    // Was `toContain("Gelperin")`. That name, its journal, and its DOI
+    // (10.1038/nbt0610-592) were fabricated: doi.org and CrossRef both
+    // 404, PubMed has no Gelperin STRENDA paper, and CrossRef's full
+    // Nature Biotechnology 28(6) listing contains no article starting at
+    // page 592. This assertion is why nothing caught it -- a test
+    // enforcing the fabrication. The real consortium paper is Tipton et
+    // al. (2014), Perspectives in Science 1:131-137, DOI verified
+    // 2026-09-05.
+    expect(res.body.compliance.strenda.standard).toContain("Tipton");
+    expect(res.body.compliance.strenda.doi).toBe("10.1016/j.pisc.2014.02.012");
   });
 
   it("exposes all available API endpoints", async () => {
@@ -719,5 +827,52 @@ describe("GET /api/dashboard/health", () => {
     expect(res.body.checks).toHaveProperty("metrics");
     expect(res.body.checks).toHaveProperty("queue");
     expect(res.body.checks.literature).not.toBe("ok");
+  });
+});
+
+describe("GET /api/dashboard/overview — the status must be able to fail", () => {
+  /**
+   * `system.status` was the literal "healthy", with no probe behind it,
+   * so the endpoint reported the system healthy while Python was missing,
+   * the database was down and every job was failing.
+   *
+   * This was the THIRD occurrence of that defect: routes/metrics.ts had
+   * it and was fixed, /api/dashboard/health had it and was fixed with a
+   * long comment 100 lines below this route in the same file, and this
+   * copy was missed both times. What was missing each time was a test
+   * asserting the signal can take another value.
+   */
+  it("reports no_data rather than healthy when nothing has been observed", async () => {
+    const { verifiableMetricsCollector } = await import("../lib/verifiable-metrics");
+    const snapshot = verifiableMetricsCollector.getSnapshot();
+
+    const res = await request(app).get("/api/dashboard/overview");
+    expect(res.status).toBe(200);
+
+    // Whatever this process has observed, the reported status must be the
+    // one the evidence supports -- never an unconditional "healthy".
+    const expected =
+      snapshot.sampleCount === 0
+        ? "no_data"
+        : snapshot.completedJobs / snapshot.sampleCount > 0.9
+          ? "healthy"
+          : "degraded";
+    expect(res.body.system.status).toBe(expected);
+  });
+
+  it("publishes the sample count behind the status", async () => {
+    // 100%-of-zero and 100%-of-500 must be distinguishable by a caller.
+    const res = await request(app).get("/api/dashboard/overview");
+    expect(res.body.system).toHaveProperty("sampleCount");
+    expect(typeof res.body.system.sampleCount).toBe("number");
+  });
+
+  it("names process uptime as process uptime, not availability", async () => {
+    // It sat under a hardcoded "healthy" where a reader would take it for
+    // service availability. It is how long THIS PROCESS has run, which is
+    // only ever an upper bound on the other.
+    const res = await request(app).get("/api/dashboard/overview");
+    expect(res.body.system).toHaveProperty("processUptimeSeconds");
+    expect(res.body.system).not.toHaveProperty("uptime");
   });
 });

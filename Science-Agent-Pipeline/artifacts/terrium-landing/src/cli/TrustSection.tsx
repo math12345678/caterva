@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import Reveal from "./Reveal";
 import TerminalWindow from "./TerminalWindow";
+import { totals } from "@/lib/testResults";
 
 interface CounterProps {
   target: number;
@@ -77,7 +78,12 @@ const TRUST_SOURCES = [
   },
   {
     name: "KEGG",
-    desc: "Pathway & genomic data",
+    // Listed as an integration, not as a live source: KEGG is OFF
+    // unless TERRIUM_ENABLE_KEGG is set, because its terms require a
+    // service-provider licence Terrium does not hold (see
+    // Tests/enzyme_lookup.py). It also resolves substrate NAMES, never a
+    // kinetic value, so it never backs a parameter even when enabled.
+    desc: "Pathway data — integrated, disabled pending a licence",
     url: "https://www.genome.jp/kegg/",
   },
   {
@@ -111,7 +117,7 @@ export default function TrustSection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
         </div>
         <h2 className="section-header">Built on real science</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           Every number is traceable. Every simulation is verified. No black
           boxes.
         </p>
@@ -119,17 +125,19 @@ export default function TrustSection() {
         {/* Metrics Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-10">
           <AnimatedMetric
-            target={304}
-            suffix="+"
+            target={totals().passed}
             label="tests passing"
             delay={0}
           />
-          <AnimatedMetric target={6} label="simulation domains" delay={200} />
+          <AnimatedMetric
+            target={15}
+            label="simulation domains"
+            delay={200}
+          />
           <AnimatedMetric target={3} label="literature sources" delay={400} />
           <AnimatedMetric
-            target={100}
-            suffix="%"
-            label="open-source engine"
+            target={72}
+            label="correctness guards"
             delay={600}
           />
         </div>
@@ -177,7 +185,7 @@ export default function TrustSection() {
               {
                 step: "01",
                 title: "Literature Resolution",
-                desc: "LLM + structured keyword matching against BRENDA, KEGG & PubMed. Every parameter gets a source citation.",
+                desc: "LLM + structured keyword matching against BRENDA & PubMed. Every parameter gets a source citation.",
                 icon: "\u2318",
               },
               {
@@ -215,7 +223,7 @@ export default function TrustSection() {
                       {item.title}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/35 leading-relaxed">
+                  <p className="text-[11px] text-white/50 leading-relaxed">
                     {item.desc}
                   </p>
                 </div>

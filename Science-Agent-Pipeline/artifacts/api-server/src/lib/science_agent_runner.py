@@ -611,6 +611,26 @@ def main() -> None:
                     "url": f"https://doi.org/{epi_result.doi}" if epi_result.doi else None,
                     "title": epi_result.citation,
                 },
+                # ADR 0169: a cross-study composite carries BOTH sources
+                # and must surface flagged, never verified. The secondary
+                # citation is the serial-interval half; omitting it would
+                # present a two-paper number as if one paper supported it.
+                "crossStudyComposite": epi_result.cross_study_composite,
+                "compositeNote": epi_result.composite_note,
+                "secondaryCitation": (
+                    {
+                        "source": epi_result.source,
+                        "referenceId": epi_result.secondary_pmid,
+                        "url": (
+                            f"https://doi.org/{epi_result.secondary_doi}"
+                            if epi_result.secondary_doi
+                            else None
+                        ),
+                        "title": epi_result.secondary_citation,
+                    }
+                    if epi_result.secondary_pmid
+                    else None
+                ),
                 "betaGammaValidation": {
                     "ok": bg_ok,
                     "flagged": bg_flagged,

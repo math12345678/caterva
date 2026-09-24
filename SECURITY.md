@@ -124,7 +124,7 @@ If you find a security issue in Terrium -- the simulation engine, the
 literature-scraping layer, or the landing page -- please report it
 privately rather than opening a public GitHub issue.
 
-**Email mathlete.world@gmail.com** with:
+**Email admin.terrium@gmail.com** with:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce it
@@ -159,10 +159,12 @@ Given the current state of the project:
 
 ## Supported versions
 
-There are no released/versioned builds yet -- `main` is the only branch
-that matters right now. Once there's an actual release process (see
-`CHANGELOG.md`), this section should specify which versions receive
-security fixes.
+Releases are tagged `vX.Y.Z` and published by `.github/workflows/release.yml`
+(ADR 0177). Security fixes go into the newest minor version only, as a
+patch release; there is no long-term-support line. As of 2026-09-21 that
+is 0.3.x. Earlier tags (v0.1.0, a source archive; v0.2.0, a wheel never
+attached to a Release) receive no fixes; upgrade. `main` between tags is
+unsupported in the same sense as any unreleased commit.
 
 ## Disclosure
 

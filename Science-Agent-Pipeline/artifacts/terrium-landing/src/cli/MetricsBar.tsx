@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import AnimatedCounter from "@/components/ui/animated-counter";
+import { totals } from "@/lib/testResults";
 
 interface MetricItem {
   key: string;
@@ -10,17 +11,21 @@ interface MetricItem {
   color: string;
 }
 
+// "tests" reads from testResults.ts's own totals() rather than repeating
+// the count as a second hardcoded literal -- two copies of the same fact
+// is exactly how the count this replaced (304) went stale in the first
+// place while testResults.ts had already moved on.
 const METRICS: MetricItem[] = [
   {
     key: "tests",
-    target: 304,
-    suffix: "+",
+    target: totals().passed,
+    suffix: "",
     label: "tests passing",
     color: "#1D8A72",
   },
   {
     key: "domains",
-    target: 6,
+    target: 15,
     suffix: "",
     label: "simulation domains",
     color: "#3B82F6",
@@ -33,10 +38,10 @@ const METRICS: MetricItem[] = [
     color: "#F59E0B",
   },
   {
-    key: "opensource",
-    target: 100,
-    suffix: "%",
-    label: "open source",
+    key: "guards",
+    target: 72,
+    suffix: "",
+    label: "correctness guards",
     color: "#8B5CF6",
   },
 ];

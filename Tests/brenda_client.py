@@ -393,7 +393,17 @@ def parse_brenda_km_html(
         cell_texts = [c.get_text(strip=True) for c in cells]
         full_text = " | ".join(cell_texts)
 
-        if target_organism is not None:
+        # A falsy target_organism is "any organism", exactly like None. An
+        # empty string MUST NOT be treated as a filter: "" is a substring of
+        # every row, so `if target_organism not in full_text` would match
+        # everything, and then assigning `row_organism = target_organism`
+        # would overwrite every row's real organism label with "" -- the
+        # empty-organism call into `resolve_kinetic_value` returned a
+        # cross-species minimum wearing a brenda_exact badge and no
+        # organism. This is the organism twin of the documented "" substrate
+        # pitfall below ("require_substrate_match = bool(substrate)").
+        # Deeper rationale: ADR 0174.
+        if target_organism:
             if target_organism not in full_text:
                 continue
             row_organism = target_organism

@@ -417,6 +417,85 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_documented_counts.py'}"
     ))
 
+    # The equations LITERATURE_BACKING_DATABASE.md documents must be the
+    # ones the engine solves. Added 2026-09-05, after an audit found four
+    # model sections describing maths the engine does not compute: PCR
+    # written as N0 x E^n (a DECAY formula -- 1.2e10 off the implemented
+    # `(1 + efficiency) ** cycle` at 30 cycles), SIR and SEIR written
+    # density-dependent while model_building.py emits beta*S*I/N (R0 wrong
+    # by a factor of N), and Gillespie described as tau-leaping with an
+    # "adaptive tau-selection" implementation that exists nowhere in the
+    # tree. Every one was right in the code and wrong on the page.
+    #
+    # Prose drifts from code silently because nothing reads both. This
+    # reads both, and fails if either side moves alone.
+    guards.append(run_guard(
+        "Documented Equations Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_documented_equations_match_engine.py'}"
+        " --selftest"
+    ))
+    guards.append(run_guard(
+        "Documented Equations Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_documented_equations_match_engine.py'}"
+    ))
+
+    # Every constraint an agent critic can raise must be honoured by some
+    # agent. Added 2026-09-07 with Terium/agents.
+    #
+    # The failure it catches is silent by construction. A critic that emits
+    # a constraint kind nothing reads still changes the fingerprint, still
+    # re-runs every agent, still deduplicates on the second round and still
+    # converges -- and the report then states that the model was built under
+    # a requirement no search ever applied. Nothing raises, nothing fails,
+    # and the sentence is false. `critics.py` documents which findings are
+    # allowed to become constraints; this enforces it.
+    guards.append(run_guard(
+        "Actionable Constraints Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_constraints_are_actionable.py'}"
+        " --selftest"
+    ))
+    guards.append(run_guard(
+        "Actionable Constraints Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_constraints_are_actionable.py'}"
+    ))
+
+    # EC numbers in enzymes.ts must still be the ones IUBMB recognises.
+    # Added 2026-09-05, after cytochrome c oxidase was found shipping
+    # EC 1.9.3.1 -- transferred to 7.1.1.9 in 2018 when class EC 7
+    # (translocases) was created. A transferred EC still resolves, so
+    # nothing 404s; the lookup just silently asks the wrong question, the
+    # same shape as a DOI resolving to the wrong paper (ADR 0076).
+    #
+    # Offline: compares against Tests/fixtures/ec_numbers_verified.json,
+    # so an EC added or edited without being checked fails here. `--live`
+    # re-asks Expasy and lives in the live-citation group, since only that
+    # can catch a transfer made after the snapshot was taken.
+    guards.append(run_guard(
+        "EC Numbers Current Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_ec_numbers_current.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "EC Numbers Current Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_ec_numbers_current.py'}"
+    ))
+
+    # Landing-page test counts. Wired here 2026-09-05: it was added earlier
+    # the same day to `make guards` ALONE, which check_guard_wiring does not
+    # accept as a harness -- correctly, since `make guards` is a target
+    # someone chooses to run. A guard that only runs when asked is the exact
+    # thing the Stage 4 amendment forbids, and this one shipped that way for
+    # several commits before its own sibling guard caught it.
+    #
+    # Default (fast) mode only. `--full` runs all four suites (~40 min).
+    guards.append(run_guard(
+        "Landing Test Counts Guard (self-check)",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_landing_test_counts.py'} --selftest"
+    ))
+    guards.append(run_guard(
+        "Landing Test Counts Guard",
+        f"{PYTHON} {SCRIPTS_DIR / 'check_landing_test_counts.py'}"
+    ))
+
     # Python support window stated consistently across requirements.txt,
     # README, CONTRIBUTING and the Makefile gate. Offline; --online adds a
     # PyPI wheel-coverage check. Added Stage 8 after the stated REASON for
@@ -1008,7 +1087,15 @@ def run_live_citation_guard() -> List[Tuple[str, bool, str]]:
             "Live Citation Verification",
             f"{PYTHON} {SCRIPTS_DIR / 'verify_citations_live.py'}",
             timeout=180,
-        )
+        ),
+        # Same rationale, different namespace: an EC number can be
+        # transferred by IUBMB after the offline snapshot was taken, and
+        # only asking Expasy can find that out.
+        run_guard(
+            "Live EC Number Verification",
+            f"{PYTHON} {SCRIPTS_DIR / 'check_ec_numbers_current.py'} --live",
+            timeout=180,
+        ),
     ]
 
 

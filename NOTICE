@@ -80,10 +80,13 @@ which is the whole point of the "Lesser" in its name. Its obligations —
 notice, and the ability for a recipient to relink against a modified
 libSBML — attach when you convey the library itself.
 
-Terrium does not convey it. Nothing here bundles libSBML, and no build
-artifact containing it is published: as of 2026-08-15 this repository has
-exactly one CI workflow, `tests.yml`, and it publishes nothing. No Docker
-image is pushed, no wheel is uploaded, no release artifact is produced.
+Whether Terrium conveys it depends on which artifact you hold, and the
+section "WHAT IS ACTUALLY DISTRIBUTED" below says so artifact by artifact.
+From 2026-08-15 to 2026-09-19 the answer was "never": one CI workflow,
+`tests.yml`, publishing nothing. Since v0.2.0 the wheel and sdist name
+libSBML without containing it. Since v0.3.0 (2026-09-21) a second workflow,
+`release.yml`, publishes a downloadable app folder that DOES contain it, and
+the obligations are met in the way that section describes.
 
 THE TRIGGER THAT CHANGES THIS
 
@@ -128,6 +131,114 @@ THE TRIGGER THAT CHANGES THIS
   /usr/share/doc/*/copyright'` on the Debian one, and Alpine's
   `/lib/apk/db/installed` on the other. That is a real task, not a formality,
   and it has not been done.
+
+
+WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
+
+  The section above was first written when nothing was published. Three
+  kinds of artifact are published now, by `.github/workflows/release.yml`
+  on every `v*` tag, and they do not all convey the same things. This
+  records each, so the reasoning above is applied rather than left as a
+  hypothetical.
+
+  1. THE WHEEL AND THE SDIST (since v0.2.0). They contain Terrium's own
+  code (Apache-2.0), LICENSE, and this NOTICE. They contain NO third-party
+  library. They NAME python-libsbml (LGPL-2.1-or-later) as a dependency in
+  their metadata, and pip fetches it from PyPI onto the user's machine at
+  install time, exactly as `requirements.txt` did before. Distributing a
+  package that names a dependency is not conveying the dependency; the
+  LGPL-2.1 conveyance obligations (notice, and the recipient's ability to
+  relink against a modified libSBML) therefore do not attach to these two
+  artifacts. Verified on every build by `scripts/build_release.py`, which
+  lists the wheel and refuses one containing a `.so`, a test, or anything
+  outside `Terium/`.
+
+  2. THE APP FOLDER, ONE PER PLATFORM (since v0.3.0). `terrium-<version>-
+  <os>-<arch>.tar.gz` / `.zip` is a PyInstaller ONEDIR freeze of the
+  released wheel: the Python runtime, Terrium, and every library Terrium
+  imports. This artifact CONVEYS libSBML, and not once: python-libsbml's
+  extension is the library as a separate file, and libroadrunner's
+  `_roadrunner` extension and Antimony's `libantimony` shared library each
+  carry their OWN statically linked copy, put there by their upstream
+  projects (measured on the build machine: 5.21.1, 5.20.4 and 5.20.2).
+  `scripts/build_app.py` scans every binary it collects for the library,
+  writes each copy, its version and whether it is replaceable into the
+  folder's README.txt and beside the archive, and refuses the folder if
+  python-libsbml's copy is not a separate file. The obligations, and how
+  each is met:
+
+    notice        README.txt names libSBML, its licence, and every file
+                  that carries it. licenses/python-libsbml/ carries
+                  libSBML's own LICENSE.txt (copyright and distribution
+                  terms) and the full text of the GNU LGPL v2.1, which that
+                  file refers to and the wheel omits.
+
+    relinking     The freeze is ONEDIR, never onefile. python-libsbml's
+                  extension (`_libsbml.<abi>.so` / `.pyd`) is one separate
+                  file under `_internal/libsbml/`, loaded at run time by the
+                  interpreter's import mechanism, not compiled into the
+                  executable; a recipient replaces it by putting an
+                  interface-compatible build for the same Python version
+                  and platform at the same path, which README.txt names.
+                  That is the second half of what LGPL-2.1 §6(b) asks (the
+                  work "will operate properly with a modified version of
+                  the library"); it is NOT the first half (a copy "already
+                  present on the user's computer system"), because this
+                  folder is what puts the copy there. The copies inside
+                  `_roadrunner` and `libantimony` are not separately
+                  replaceable at all. So the project does not rest on
+                  §6(b). It rests on offering the corresponding source from
+                  the same place (§4, §6(d)): the release workflow fetches
+                  the source archive of every libSBML version the folders
+                  report, and of libroadrunner and Antimony at the pinned
+                  versions, and attaches them to the release page beside
+                  the folders, covered by the same SHA256SUMS. A folder is
+                  not published if a source download fails.
+
+                  Whether a shipped-but-replaceable copy is a §6(b)
+                  mechanism, and whether upstream source attached to the
+                  same page satisfies "same place" for copies that
+                  upstream wheels embed, are the two questions to put to
+                  counsel; the folder is built so that the answer to either
+                  does not have to be yes for the obligations to be met.
+
+    signing       Not signed, not notarised (below).
+
+  The folder conveys other software too, each under its own terms, each
+  with its licence file in licenses/ and listed in licenses/README.txt:
+  libRoadRunner (Apache-2.0; its LICENSE.txt, NOTICE.txt and AUTHORS.txt
+  accompany it, as its terms require), Antimony (MIT; its wheel carries no
+  licence file, so the build supplies the MIT notice with the copyright
+  holder the package metadata names, or the project's own LICENSE.txt when
+  it can be fetched), NumPy and SciPy (BSD-3-Clause, notices retained,
+  including the libgfortran and OpenBLAS binaries their wheels bundle), the
+  CPython runtime (PSF licence), and PyInstaller's bootloader (GPL-2.0-or-
+  later WITH the Bootloader Exception, whose text is in
+  licenses/pyinstaller/COPYING.txt and whose exception is what permits
+  embedding the bootloader in a program under any licence).
+
+  Not signed, not notarised. The folders carry no Apple Developer ID or
+  Windows Authenticode signature; README.txt in each says what the
+  operating system will do on first run and the exact command that clears
+  it (on macOS, `xattr -dr com.apple.quarantine .` inside the folder, since
+  "Open Anyway" approves one file and not the libraries). Signing needs a
+  certificate the repository does not hold and is the owner's to obtain.
+
+  3. THE SOURCE ARCHIVES GitHub attaches to every release are copies of the
+  tagged tree: Terrium's own files only, no dependency.
+
+  stdpopsim (GPL-3.0-or-later) is in none of the three. It stays opt-in
+  through `requirements-popgen.txt` (ADR 0058); the wheel does not name it
+  and `scripts/build_app.py` does not collect it.
+
+  No container image is published. The image analysis above still stands
+  as the task to do before one is.
+
+  Not published: anything on PyPI. That is a separate decision, and this
+  NOTICE will say so the day it changes. `scripts/check_release_artifacts.py`
+  watches the workflows for publish steps; a release built by hand is
+  outside its view, which is why this is written where a person building
+  one will read it.
 
 
 stdpopsim — GPL-3.0-or-later, and why it is not installed by default
@@ -208,8 +319,10 @@ libSBML  --  LGPL 2.1
   Japan Science and Technology Agency.
 
 SBML validation. The LGPL condition is that a recipient be able to replace
-the library; Terrium installs it as an ordinary Python package and neither
-vendors nor statically links it, so replacement is a `pip install` away.
+the library. From the wheel, Terrium installs it as an ordinary Python
+package and neither vendors nor statically links it, so replacement is a
+`pip install` away. In the app folder it is one separate file the
+recipient can swap; see "WHAT IS ACTUALLY DISTRIBUTED" above.
 
 TERRIUM IS NOT TELLURIUM
 

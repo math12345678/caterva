@@ -58,15 +58,13 @@ function seriesForComparison(a: SimulationJob, b: SimulationJob) {
   return { data, series, allKeys };
 }
 
-function computeRmsdMetrics(
-  aTraj: Record<string, number>[],
-  bTraj: Record<string, number>[],
-  keys: string[],
-) {
+function computeRmsdMetrics(data: Record<string, number>[], keys: string[]) {
+  // data is the already-resampled chart series, so A/B are compared at
+  // matched positions even when the two runs have different point counts.
   const metrics: { key: string; value: number }[] = [];
   for (const key of keys) {
-    const aVals = aTraj.map((p) => Number(p[key] ?? 0));
-    const bVals = bTraj.map((p) => Number(p[key] ?? 0));
+    const aVals = data.map((p) => Number(p[`${key} (A)`] ?? 0));
+    const bVals = data.map((p) => Number(p[`${key} (B)`] ?? 0));
     metrics.push({ key, value: rmsd(aVals, bVals) });
   }
   return metrics;
@@ -89,16 +87,18 @@ export default function ComparePanel({ runs, onClear }: Props) {
   const aTraj = (a.result.trajectory ?? []) as Record<string, number>[];
   const bTraj = (b.result.trajectory ?? []) as Record<string, number>[];
 
-  const rmsdMetrics = sameDomain
-    ? computeRmsdMetrics(aTraj, bTraj, allKeys)
-    : [];
+  const rmsdMetrics = sameDomain ? computeRmsdMetrics(data, allKeys) : [];
 
   const extractStats = (traj: Record<string, number>[]) => {
-    const peakI =
-      traj.length > 0 ? Math.max(...traj.map((p) => Number(p.I ?? 0))) : null;
+    const hasI = traj.length > 0 && "I" in traj[0]!;
+    const peakI = hasI
+      ? Math.max(...traj.map((p) => Number(p.I ?? 0)))
+      : null;
     const finalS = traj.length > 0 ? traj[traj.length - 1]?.S : null;
-    const peakR =
-      traj.length > 0 ? Math.max(...traj.map((p) => Number(p.R ?? 0))) : null;
+    const hasR = traj.length > 0 && "R" in traj[0]!;
+    const peakR = hasR
+      ? Math.max(...traj.map((p) => Number(p.R ?? 0)))
+      : null;
     const finalE = traj.length > 0 ? traj[traj.length - 1]?.E : null;
     return {
       peakI: peakI as number | null,

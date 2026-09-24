@@ -23,6 +23,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
 from assay_conditions import (  # noqa: E402
     AssayConditions,
+    buffers_equivalent,
     parse_assay_conditions,
 )
 
@@ -214,3 +215,40 @@ class TestMatchesTypescriptContract:
     def test_completeness_truth_table(self, ph, temp, expected):
         c = AssayConditions(ph=ph, temperature_c=temp)
         assert c.strenda_complete is expected
+
+
+class TestBuffersEquivalent:
+    """The buffer identity rule the assay window and the judge share (ADR
+    0175, ADR 0027).
+
+    Buffer is a categorical identity, not a scalar: either two buffers are
+    the same or they are not. The rule is case/whitespace-insensitive text
+    equality -- deliberately NOT molarity-aware chemical identity, so the
+    window and model_compatibility's `buffer_mismatch` never disagree.
+    """
+
+    def test_exact_and_case_insensitive(self):
+        assert buffers_equivalent("0.1 M MOPS buffer", "0.1 M MOPS buffer")
+        assert buffers_equivalent("HEPES", "hepes")
+        assert buffers_equivalent("Tris-HCl", "  tris-hcl ")
+
+    def test_collapsed_whitespace_is_equivalent_only_for_padding(
+        self
+    ):
+        # Leading/trailing padding is ignored (strip, like the judge), but
+        # an internal run of spaces is NOT -- the strict direction is the
+        # safe one, because this rule must never call two buffers equal
+        # where model_compatibility reports a buffer_mismatch (ADR 0027).
+        # The window's canonical RENDERING collapses runs via
+        # window_requirement, so both spellings still deduplicate there.
+        assert buffers_equivalent(" 0.1 M MOPS buffer ", "0.1 M MOPS buffer")
+        assert not buffers_equivalent("0.1 M  MOPS buffer", "0.1 M MOPS buffer")
+
+    def test_different_buffers_are_not_equivalent(self):
+        assert not buffers_equivalent("0.1 M MOPS buffer", "Tris")
+        assert not buffers_equivalent("0.5 M Tris-HCl", "500 mM Tris")
+
+    def test_never_equivalent_to_absent(self):
+        assert not buffers_equivalent("0.1 M MOPS buffer", None)
+        assert not buffers_equivalent(None, "0.1 M MOPS buffer")
+        assert not buffers_equivalent(None, None)

@@ -205,3 +205,39 @@ export const SimulationParameterSchemas: Record<
     points: integer.nullish(),
   }),
 };
+
+/**
+ * Body for POST /api/simulate/model -- a caller-supplied model, rather than
+ * a natural-language query to be resolved into one of the preset domains.
+ *
+ * WHY THIS IS A SEPARATE ENDPOINT, not a field on /api/simulate:
+ * /api/simulate takes a `query` and runs the whole resolution pipeline --
+ * classify the domain, look parameters up in the literature, block anything
+ * unverified. None of that applies here. The caller has written the model,
+ * so there is no domain to classify and no structure to resolve; the two
+ * requests share a queue and a result shape but almost nothing else.
+ *
+ * ON PROVENANCE, which is the question this project cares about most:
+ * every number in a submitted model was typed by the person submitting it,
+ * so every parameter is origin "user" by construction. That is the same
+ * status a value supplied inline as `km=2` already has today. The hard rule
+ * ("no value nobody chose and nothing verified reaches the engine") is
+ * satisfied trivially here -- there is nothing for Terrium to invent,
+ * because Terrium supplies nothing. What this endpoint does NOT do is claim
+ * literature backing for those numbers; it cannot, and it does not.
+ */
+export const CustomModelBody = z
+  .object({
+    /** Antimony source -- the human-writable DSL. Preferred. */
+    antimony: z.string().min(1).max(40_000).optional(),
+    /** An SBML document, for callers exporting from other tools. */
+    sbml: z.string().min(1).max(400_000).optional(),
+    start: optionalNumeric,
+    end: optionalNumeric,
+    points: integer.min(2).max(100_000).nullish(),
+  })
+  .refine((v) => Boolean(v.antimony) !== Boolean(v.sbml), {
+    message: "supply exactly one of 'antimony' or 'sbml'",
+  });
+
+export type CustomModelRequest = z.infer<typeof CustomModelBody>;

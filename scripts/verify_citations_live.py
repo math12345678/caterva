@@ -103,9 +103,17 @@ DOIS = [
     # mutation rate) and ng.3469 (the actual germline-mutation paper,
     # verified via PubMed PMID 26656846). Nothing in the codebase cites
     # ng.3141: popgen_resolver.py resolves from stdpopsim and carries
-    # stdpopsim's own citations (IHGSC 2001, Jonsson 2017), both of which
-    # the discovery pass below picks up. An unverified DOI in a checker's
-    # own allowlist is the checker asserting something it never checked.
+    # stdpopsim's own bundled citations, which the discovery pass below
+    # picks up. An unverified DOI in a checker's own allowlist is the
+    # checker asserting something it never checked.
+    #
+    # This comment named those bundled citations as "IHGSC 2001, Jonsson
+    # 2017" until 2026-09-05. Checked by running stdpopsim 0.3.0: HomSap
+    # bundles IHGSC 2001 for the GENOME ASSEMBLY, Tian/Browning/Browning
+    # 2019 for the MUTATION RATE, and HapMap 2007 for recombination --
+    # Jonsson is not in the HomSap catalog at all. A citation checker
+    # repeating an unchecked citation claim in its own source is the
+    # failure this script exists to catch, one level up.
     "10.1098/rspa.1927.0118",  # Kermack & McKendrick 1927, Proc. R. Soc. A
 ]
 
@@ -122,10 +130,41 @@ DOIS = [
 #: them. Adding a citation to any of these files enrols it automatically.
 DOI_SOURCE_FILES = [
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts",
+    # Added 2026-09-05, and the reason is the paragraph directly above.
+    #
+    # These four publish DOIs straight into live API responses --
+    # /api/dashboard/overview and /api/pipeline/literature both print a
+    # STRENDA citation, and verifiable-metrics.ts is the constant behind
+    # them. None was enrolled, and the DOI they served,
+    # 10.1038/nbt0610-592 attributed to "Gelperin et al. (2010)", did not
+    # exist: doi.org and CrossRef 404, PubMed has no such paper, and
+    # CrossRef's full Nature Biotechnology 28(6) listing has no article
+    # starting at page 592. It was the citation for the standard that
+    # decides whether a resolved Km is reported "verified" or "flagged".
+    #
+    # Exactly the blind spot this list's own comment describes, hit a
+    # second time, on the files whose output a user reads.
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/verifiable-metrics.ts",
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/strenda-validator.ts",
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/dashboard.ts",
+    ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/pipeline.ts",
     ROOT / "Terium/core/data_structures.py",
     ROOT / "Terium/continuous/model_building.py",
     ROOT / "Tests/epidemiology_resolver.py",
     ROOT / "Tests/popgen_resolver.py",
+    # Added 2026-09-05. This list held only .ts and .py sources, so the one
+    # document in the repository whose entire purpose is to enumerate
+    # Terrium's citations was the one file the citation checker never read.
+    #
+    # That gap has a measured cost. `domain-literature.ts` was corrected on
+    # 2026-08-09 from doi 10.1038/ng.3285 -- which CrossRef records as
+    # Polderman et al. (2015), a twin-studies heritability meta-analysis --
+    # to Rahbari's actual germline-mutation paper, 10.1038/ng.3469.
+    # Business/build-stages/STAGE_10_PART_06.md then named "the ng.3285
+    # citation surviving in two markdown files after the code was fixed" as
+    # a known symptom. It survived in THIS file for another month, because
+    # nothing read it.
+    ROOT / "LITERATURE_BACKING_DATABASE.md",
 ]
 
 #: A DOI is `10.<registrant>/<suffix>`. The suffix is deliberately not
@@ -163,9 +202,40 @@ def _trim_doi(doi: str) -> str:
 #: fixed.
 _COMMENT_PREFIXES = ("#", "//", "*", "/*")
 
+#: The same rule, for markdown. A `>` blockquote is this repository's
+#: house style for "here is what this entry USED to say and why it was
+#: wrong" -- see the correction notes throughout
+#: LITERATURE_BACKING_DATABASE.md -- so it is the markdown equivalent of a
+#: comment: discussion, not assertion.
+#:
+#: Note that `*` is deliberately NOT reused here even though it appears in
+#: _COMMENT_PREFIXES: in C-family sources it continues a block comment, but
+#: in markdown it opens a bullet, and treating every `* ` bullet as prose
+#: would silently exclude whole reference lists from the check.
+_MARKDOWN_PROSE_PREFIXES = (">",)
 
-def _is_prose_line(line: str) -> bool:
+#: In markdown, a DOI is ASSERTED only when written as a resolvable link.
+#: A bare or backticked DOI in running text is being named, usually to
+#: record that it was wrong: LITERATURE_BACKING_DATABASE.md's Harter entry
+#: cites `https://doi.org/10.2307/1403077` and, on the very same line,
+#: backticks `10.2307/1402059` to say that DOI resolves to a different
+#: paper. A line-level prose rule cannot separate those two; the link form
+#: can.
+MARKDOWN_DOI_PATTERN = re.compile(
+    r"https?://(?:dx\.)?doi\.org/(10\.\d{4,9}/[^\s\"'<>,\]}`]+)"
+)
+
+
+def _is_prose_line(line: str, *, markdown: bool = False) -> bool:
+    if markdown:
+        return line.lstrip().startswith(_MARKDOWN_PROSE_PREFIXES)
     return line.lstrip().startswith(_COMMENT_PREFIXES)
+
+
+def _dois_asserted_in(line: str, *, markdown: bool = False) -> list[str]:
+    """The DOIs this line CITES, as opposed to merely mentions."""
+    pattern = MARKDOWN_DOI_PATTERN if markdown else DOI_PATTERN
+    return [_trim_doi(m.group(1)) for m in pattern.finditer(line)]
 
 
 def discovered_dois() -> dict[str, list[str]]:
@@ -190,11 +260,11 @@ def discovered_dois() -> dict[str, list[str]]:
                 "moved; a missing source must not shrink the checked set in "
                 "silence."
             )
+        markdown = path.suffix.lower() == ".md"
         for line in path.read_text(encoding="utf-8").splitlines():
-            if _is_prose_line(line):
+            if _is_prose_line(line, markdown=markdown):
                 continue
-            for match in DOI_PATTERN.finditer(line):
-                doi = _trim_doi(match.group(1))
+            for doi in _dois_asserted_in(line, markdown=markdown):
                 found.setdefault(doi, []).append(path.name)
     return found
 

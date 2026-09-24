@@ -18,7 +18,7 @@ const CONTRIBUTORS: Contributor[] = [
     gradient: "from-[#1D8A72] to-[#0D6B5A]",
     links: [
       { label: "github", href: "https://github.com/smyan" },
-      { label: "email", href: "mailto:smyan@terrium.app" },
+      { label: "email", href: "mailto:admin.terrium@gmail.com" },
     ],
   },
   {
@@ -26,7 +26,10 @@ const CONTRIBUTORS: Contributor[] = [
     name: "You?",
     role: "Contributor — join us",
     gradient: "from-[#8B5CF6] to-[#6D28D9]",
-    links: [{ label: "contribute", href: "https://github.com/smyan/terrium" }],
+    // The repository isn't public yet (see README.md's own "Not public
+    // yet" notice), so a "contribute" link to it would be a dead end for
+    // every visitor. The waitlist is the real, working way in today.
+    links: [{ label: "join waitlist", href: "#waitlist" }],
   },
 ];
 
@@ -82,7 +85,7 @@ export default function TeamSection() {
           <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
         </div>
         <h2 className="section-header">Built by humans, for humans</h2>
-        <p className="font-sans text-[13px] text-white/30 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
           A small team building big things. Open source, open science.
         </p>
 
@@ -119,7 +122,7 @@ export default function TeamSection() {
                   <h3 className="text-[14px] font-sans font-medium text-white/80 group-hover:text-white transition-colors">
                     {c.name}
                   </h3>
-                  <p className="text-[11px] text-white/35 mt-0.5 mb-2">
+                  <p className="text-[11px] text-white/50 mt-0.5 mb-2">
                     {c.role}
                   </p>
                   {c.links && (
@@ -218,16 +221,15 @@ export default function TeamSection() {
               </svg>
             </span>
             <span className="text-white/30">
-              Terrium is open source.{" "}
+              Terrium will be Apache-2.0 licensed. The repository isn&apos;t
+              public yet &mdash;{" "}
               <a
-                href="https://github.com/smyan/terrium"
-                target="_blank"
-                rel="noopener noreferrer"
+                href="#waitlist"
                 className="text-[#8B5CF6]/60 hover:text-[#8B5CF6] transition-colors"
               >
-                Star us on GitHub
+                join the waitlist
               </a>{" "}
-              &mdash; contributions welcome.
+              to hear when it is.
             </span>
           </div>
         </TerminalWindow>

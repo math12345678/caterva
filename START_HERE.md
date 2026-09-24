@@ -5,6 +5,8 @@ stranger who found this on GitHub. This is the only document you have to
 read before you do something useful. Everything else is linked from here and
 can wait until you need it.
 
+**Want to use Terrium rather than work on it?** [`docs/USING_TERRIUM.md`](docs/USING_TERRIUM.md) is the user's guide; this file is for people changing the code.
+
 ## What Terrium is, in one paragraph
 
 A simulation engine for teaching labs. A student asks a question in plain

@@ -7,15 +7,322 @@
 > - **"TypeScript test suite: 111 -> 224 tests (16 files)"**: `Science-Agent-Pipeline/artifacts/api-server` now has **433** test cases across **32** `*.test.ts` files (`npx vitest list`).
 > This is ordinary changelog staleness (the Unreleased section wasn't updated as later work landed, and later work was logged in `OVERNIGHT_LOG.md` instead — see that file's own correction banner for the same underlying drift), not fabrication.
 
-No versioned releases exist yet -- there's no published package, no tagged
-release, just an active `main` branch. Entries below are grouped by real
-date from git history, not semantic version numbers, because assigning
-version numbers to a pre-release research tool would imply a release
-process that doesn't exist yet. This file should switch to
-[Semantic Versioning](https://semver.org/) once there's an actual first
-release to version.
+This file follows [Semantic Versioning](https://semver.org/) from 0.1.0
+onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
+Entries before 0.1.0 are grouped by date, because that is how the work was
+done: there was no release to version.
 
-Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
+## [0.3.1] - 2026-09-22
+
+Nobody could tell what to type. The release worked and explained nothing,
+which is a product nobody adopts.
+
+### Added
+- **`docs/USING_TERRIUM.md`**, the user's guide: the one rule that explains
+  most refusals (it recognises a *shape*, never a *subject*), what to type
+  in the first three minutes, how to read a report section by section, and
+  a recipe for each question a lab actually asks -- which step matters
+  (`--screen`), what to measure next (`--design`), does the conclusion
+  survive not knowing the constants (`--robustness`), is it physically
+  possible in and out (`--scale`, `--predictions`). Every command in it was
+  executed before it was written down.
+- **`Terium/tests/test_using_terrium_guide.py`** pins the guide to the
+  code: every flag it names must exist in the parser, every shape must be
+  recognised by the grammar, every export format must be offered, every
+  `sim` subcommand must exist, and the stated mechanism count must equal
+  the grammar's. Verified by mutation: a renamed flag, a misspelt shape, a
+  withdrawn export format and a stale count each fail it.
+
+### Changed
+- **`terrium` with no arguments is now the first lesson**, not a six-line
+  usage: three commands worth typing in order, the shape-versus-subject
+  rule, the flags that answer real questions, and the exit codes. The
+  mechanism count in it is read from the grammar, so the message cannot
+  claim a number the builder does not have.
+- **The app folder's `README.txt`** carries the same quick start, because
+  somebody who downloads a folder has no repository to read.
+- README, `START_HERE.md`, the docs index and the v0.3.0 release notes
+  point at the guide.
+
+## [0.3.3] - 2026-09-22
+
+The product's central claim -- every number traces to its source -- was
+true of the code and unreachable from anything a person types.
+
+### Fixed
+- **A refused literature search exited 0.** This CLI's contract, in its own
+  `--help`, is "0 produced everything asked for ... 3 something refused and
+  said why (the report is still printed)". `--subject "lactate
+  dehydrogenase"` asks for a search, the resolver refuses because that name
+  is six different enzymes, and the report said so in prose while the
+  process exited 0 — a script could not tell the search never ran. A search
+  that could not be RUN (ambiguous name, missing `--substrate`, no
+  literature layer, a crash) is now a refusal and exits 3; a search that
+  ran and found nothing is an answer and exits 0, the answer being in the
+  provenance table.
+
+### Added
+- **`terrium` is the command everywhere.** The wheel installs it beside
+  `terium` and `terium-compose`, and `make setup` now installs the package
+  itself, so in a checkout `terrium compose ...` works from any directory
+  instead of `./.venv/bin/python -m Terium.app compose ...` from the root.
+- **`make doctor` detects the macOS + iCloud failure** that makes it
+  vanish. Python 3.13 skips `.pth` files carrying the macOS `hidden` flag,
+  and iCloud Drive sets that flag on files inside `.venv` when the checkout
+  is under `~/Desktop` or `~/Documents`. Measured on the owner's machine:
+  `terrium --version` worked right after install and minutes later failed
+  with `No module named 'Terium'` from the same interpreter. Nothing in that
+  error points at iCloud, so the doctor names it and gives the fix.
+- **`docs/OWNER_CHECKLIST.md`**: the owner's remaining steps, copy and
+  paste, each with what you should see and what to do if you don't.
+- **A placeholder now says what the search actually met.** The resolver
+  distinguishes four outcomes and the report printed one invented sentence,
+  "searched the km table and found nothing", for all of them -- which is
+  not a summary but FALSE for two: the value may exist in other organisms
+  and not have been substituted (ADR 0024: offered, never substituted), or
+  papers may have been found with no number extractable from their free
+  text. Measured live on EC 3.1.1.7 in *Homo sapiens*: kcat is "available
+  in: Cimex lectularius, Drosophila melanogaster, Macroptilium
+  atropurpureum, Mus musculus" and Ki is "candidate papers were found but a
+  number was not extracted". Both had been reported as nothing found,
+  sending a reader to stop looking for a number that is in the database.
+  The summary sentence underneath no longer says "looked for and not
+  found", which contradicted the table it sat under. `<input>`, the
+  blackboard's label for a constraint the caller raised, is translated to
+  "your own request" at the edge rather than leaking into a page a
+  researcher is reading.
+- **A composed model reports the conditions its values were measured
+  under, and whether they can be mixed.** pH, temperature and buffer decide
+  whether two constants belong in one model; `Measurement` has carried
+  them since it was written and the CSV printed them, while the report a
+  person actually reads did not. It now lists them per constant, names any
+  source that stated none ("a fact about the paper, not a gap in the
+  search"), and compares the ones that can be compared against
+  `model_compatibility`'s own thresholds (1 pH unit, 10 °C), saying
+  plainly when a model would describe an experiment nobody ran. With one
+  constant it makes no comparison claim, because a reassurance about
+  nothing reads like a check that passed.
+- **A composed model reports what the evidence did not settle.** Where the
+  resolver ranked more than one row equal, the report names the spread
+  instead of presenting the pick as the answer: for EC 1.1.1.27 and
+  pyruvate, *"2 sources report 2 values (BRENDA ref 286442, 286469),
+  spanning 0.03 to 0.398 mM (13.3-fold). The model carries 0.03 — the
+  resolver's pick, not a verdict"*. The rows were being dropped at the
+  `Measurement` boundary, so a 13-fold disagreement arrived downstream as
+  one confident cited number, which looks more settled than a placeholder
+  rather than less. It distinguishes several papers disagreeing from one
+  paper reporting several rows, because sending a reader to one paper to
+  adjudicate itself is not advice. The lab-report path has printed this
+  since it was written; this is the composed model catching up.
+- **`compose` searches the literature.**
+  `terrium compose "..." --subject 1.1.1.27 --organism "Homo sapiens"
+  --substrate pyruvate` returns a model whose constants are BRENDA's, each
+  with its reference, and every section below -- stability, the influence
+  ranking, the time course, the verdict -- runs on those numbers. The
+  exports carry them too, so an SBML file and the report beside it cannot
+  disagree. A partial result stays partial: constants the search did not
+  find keep the motif library's placeholder and are listed as
+  *searched and not found*, which is a different fact from *not looked
+  for*. Four pieces (ADR 0178): `Terium/checkout.py` makes the literature
+  layer importable outside pytest; `ComposedModel` carries `organism` and
+  `substrate` and fills the `ec_number`, `substrate` and `organism` fields
+  BRENDA requires; `with_measured()` substitutes through
+  `export.provenance_of`, the one place that decides an origin; and the
+  CLI runs the search before the analyses, turning every failure into a
+  note on the report rather than an error instead of it.
+- **`scripts/cite.py` and `make cite`: real constants with real
+  citations**, in one command.
+  `make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"`
+  returns `km = 0.03 mM` from `BRENDA ref 286469`, the papers that
+  disagree and by how much, the conditions the value was measured under,
+  and `--` for anything nothing measured. `--fixture` keeps the offline
+  route. It re-implements none of the resolution, ranking or rendering:
+  it builds `report_lab.py`'s payload and hands it over. Verified live on
+  three enzymes (ADR 0178).
+- **ADR 0178**, recording why it was unreachable: `compose --subject`
+  never called `compose_and_parameterise`; that function failed every
+  scout with `ModuleNotFoundError: fallback_logic` **while reporting
+  `converged=True`**; with the path repaired it failed again because
+  `parameter_requests()` never filled the `ec_number`, `substrate` and
+  `organism` fields BRENDA requires; and the working entry point read a
+  six-key JSON payload on stdin. The ADR lists the four things that would
+  let `compose` search, and the guide says plainly that it does not.
+
+### Fixed
+- **Every BRENDA citation was being degraded to a bare enzyme-page URL.**
+  `citation_text` looked for an attribute called `reference`; `Citation`
+  declares `reference_id`. The attribute never existed, so every citation
+  fell through to `url` and two measurements from two different papers
+  produced the identical string. The same model's two constants now cite
+  `BRENDA ref 286469` and `BRENDA ref 739793` -- different papers, as they
+  always were. BRENDA has no working per-reference deep link, so the
+  reference id was the only thing identifying which row a number came
+  from, and it was the one field being dropped.
+- **The verdict recommended a ranking it had just called worthless.** On a
+  saturated model -- a three-step cascade at the library's placeholder
+  values sits at 99.99% phosphorylated, so every sensitivity falls below
+  the threshold -- the provenance section said "No constant here clears
+  |S| = 0.01" while the one line labelled "Do this next" said "start with
+  the top of its influence ranking". The remedy was a fixed string that
+  never read the ranking. It now reads it, and says so when nothing is
+  singled out. This is the defect `_settling_ranking` was written for
+  (a ranking zeroed by a conservation law) in its other form.
+
+## [0.3.0] - 2026-09-21
+
+The first release that reaches GitHub's Releases page, and the first that
+is downloadable as an app. v0.2.0 built and verified a wheel; the Release
+itself needed a token the machine did not have, so the tag sat on the
+remote with nothing attached. From this version a pushed tag is published
+by a workflow with the run's own token, after it has rebuilt, reinstalled
+and run everything it is about to attach (ADR 0177).
+
+### Added
+- **A release workflow.** `.github/workflows/release.yml`: on a `v*` tag
+  (or by hand for an existing tag), builds the wheel and sdist, rebuilds
+  them independently and fails if the checksums differ, installs the wheel
+  into a fresh interpreter on Linux, macOS and Windows at Python 3.10 and
+  3.13 and runs `terium-compose` to a `VERDICT:` from an empty directory,
+  freezes the app folders, and only then creates the Release with the
+  notes, every artifact and one `SHA256SUMS`.
+- **A downloadable app folder per platform** (`terrium-<version>-<os>-
+  <arch>.tar.gz` / `.zip`, Linux x86_64, macOS arm64, Windows x86_64):
+  one executable, `terrium`, with `terrium compose "..."` and
+  `terrium sim ...`. No Python, no install. Built from the released wheel
+  by `scripts/build_app.py`, which refuses the folder unless python-
+  libsbml's extension is a separate replaceable file, every conveyed
+  component's licence is inside, and the frozen binary runs from an empty
+  directory. libSBML is in the folder three times (python-libsbml's copy
+  and the copies libroadrunner and Antimony compile in); the script finds
+  and lists them, and the release page carries the corresponding source
+  of every version, and of the two libraries, beside the folders.
+- **`terrium`, a single entry point.** `Terium/app.py` dispatches to the
+  two existing commands unchanged (`python -m Terium.app` from the wheel;
+  the executable in the folder). 83 modules in the wheel, up from 82.
+- **`third_party_licenses/LGPL-2.1.txt`.** The LGPL text python-libsbml's
+  wheel refers to but does not carry; the app folder ships it.
+- **`requirements-release.txt`** pins PyInstaller for the release workflow
+  only, with its licence (GPL-2.0-or-later WITH Bootloader-exception)
+  recorded in the dependency-licence guard.
+
+### Changed
+- **Both artifacts are byte-reproducible from the commit.** The sdist is
+  normalised after the build (sorted members, epoch mtimes, gzip mtime 0);
+  0.2.0's notes said the wheel was and the sdist was not. Measured:
+  identical `SHA256SUMS` from two independent checkouts of the tag.
+- **NOTICE now states the licence position artifact by artifact.** The
+  wheel and sdist name libSBML and do not convey it; the app folder does,
+  and the section says how each LGPL-2.1 obligation is met (notice, and a
+  separate replaceable file). The sentence "this repository has exactly
+  one CI workflow and it publishes nothing" was true from 2026-08-15 to
+  2026-09-19 and is replaced with that history. `docs/LICENSING.md` and the
+  dependency-licence guard no longer say replacement is "a pip install
+  away" without qualification.
+- `SECURITY.md` names which versions receive fixes; it said there were no
+  released builds.
+
+### Fixed
+- **`terium-compose --export sbml` and `--export antimony` crashed from
+  every installed copy of 0.2.0** with `FileNotFoundError`: two files the
+  engine reads at import, `docs/data-sources.json` and
+  `Tests/fixtures/identifiers/identifiers_org_namespaces.json`, were
+  resolved relative to the checkout and shipped in neither the wheel nor
+  the sdist. Copies now live in `Terium/core/data/`; the loaders read the
+  checkout's original when it exists and the packaged copy otherwise, and
+  `Terium/tests/test_packaged_data.py` fails if a copy and its original
+  ever differ. Proved from an installed wheel in an empty directory. The
+  0.2.0 notes' "Known limits" did not record this; it was found by reading
+  every `Path(__file__)` in the package for the app folder.
+- `CHANGELOG.md` carried a duplicated, truncated block (a second correction
+  banner and a stale `[0.1.0] - 2026-09-19` section) introduced by the
+  0.2.0 commit's edit anchoring on the wrong `## Unreleased`. Removed.
+
+### Known limits, stated
+- **Not on PyPI.** A separate decision; the name has not been checked.
+- **Not signed.** The macOS and Windows folders carry no code signature;
+  each folder's `README.txt` says what the operating system asks on first
+  run. Signing needs certificates the repository does not hold.
+- **No Intel-Mac folder.** Intel Mac users install the wheel.
+- **The repository is still private**, so the Release is visible to
+  collaborators. Going public is blocked by owner decisions listed in
+  `docs/status/2026-09-21.md`, not by anything in this release.
+- **The freeze could not be run where this was written** (no PyPI in the
+  sandbox). The workflow's first run is the first real freeze; it verifies
+  the folder by running it, and publishes nothing if that fails.
+
+## [0.2.0] - 2026-09-19
+
+The first release with built artifacts. A source distribution, a
+pure-Python wheel, and two installed commands. 0.1.0 (below) was a tag and
+a source archive; this is the version you can `pip install`. Everything
+under the `Unreleased` heading further down was already in the tree; this
+entry records what makes 0.2.0 an installable release rather than a
+checkout.
+
+### Added
+- **Installable package.** `pip install terrium-0.2.0-py3-none-any.whl`
+  installs `Terium` (engine, composer, agents; 82 modules) with pinned
+  dependencies. Verified by installing the wheel into an empty directory
+  and building a model from there with nothing of the repository on the
+  path.
+- **Two commands.** `terium` (the simulation engine: `wf`, `kimura`, `ne`,
+  `sweep`, `scenarios`, `ld`, `ssa`) and `terium-compose` (the model
+  builder and its analyses). Before this the composer was reachable only
+  as `python -m Terium.compose` from a checkout.
+- **A version.** `Terium.__version__` is the single source; `pyproject.toml`
+  reads it, and `CITATION.cff` and `package.json` are kept equal to it.
+  `terium-compose` and the package metadata cannot disagree.
+- **`scripts/build_release.py`.** Builds the sdist, then the wheel from
+  the extracted sdist, checks the wheel against what the release notes
+  claim (no tests, no conftest, LICENSE and NOTICE inside, every module
+  under `Terium/`), and writes `SHA256SUMS`. With `SOURCE_DATE_EPOCH`
+  pinned to the tagged commit the wheel is byte-reproducible; the sdist is
+  content-identical but not byte-identical (setuptools writes fresh
+  mtimes into `PKG-INFO`), and the script says so rather than hiding it.
+- **A conveyance section in NOTICE** stating what the artifacts do and do
+  not distribute: Terrium's own code only; python-libsbml (LGPL-2.1) is
+  named as a dependency and not bundled, so its conveyance obligations do
+  not attach. (This is also why there is no frozen desktop bundle in this
+  release: PR #21's onefile DMG froze libSBML in, and that changes the
+  obligations. See NOTICE.)
+
+### Fixed
+- **Packaging built nothing.** Setuptools' flat-layout discovery saw
+  `Terium/` beside `Tests/`, `Business/`, `node_modules/` and a dozen more,
+  and an editable install registered `dist-info` and no code: `import
+  Terium` failed from any directory but the repository root. Packages are
+  now named explicitly. The sdist also swept the whole `Tests/` tree in
+  through a case-folded `tests/` glob; a `MANIFEST.in` prunes it.
+- **A wheel built straight from the tree carried `Terium/conftest.py`.**
+  `MANIFEST.in` governs the sdist and `exclude-package-data` governs data
+  files; neither excludes a module from a wheel built directly. Building
+  the wheel from the sdist does, which is what the build script enforces.
+- **ADR 0176's mutation table had no set file.** Seven mutations across
+  four files, run through `scripts/mutate.py`, all caught.
+- Everything under `Unreleased` below, which this release ships.
+
+### Known limits, stated
+- **Literature search needs the source checkout.** `Terium.agents` reaches
+  into `Tests/` (the BRENDA resolvers) lazily; those modules are not part
+  of the package. From the wheel, `terium-compose ... --subject <enzyme>`
+  builds the model and the verdict page says, correctly, that no search
+  was run. Running the search means cloning the repository.
+- **The api-server and landing site are not in this release.** They are
+  TypeScript, deploy separately, and their test suite could not be run in
+  the environment this release was built in (port binding is sandboxed).
+  They are unversioned until they can be verified.
+- **0.2.0, not 1.0.0.** The public API has not been frozen and the
+  composer's library is eleven mechanisms. The number says "usable,
+  changing," which is true.
+
+## [0.1.0] - 2026-08-29
+
+Tagged and released as a source archive only, deliberately: the licence
+position rested on distributing nothing that contains libSBML, and a
+source archive contains none. `pyproject.toml` said 0.1.0 but its
+packaging built an empty install (see 0.2.0, Fixed), so this version was
+never `pip install`-able. The record of the release and its measured
+figures is in `docs/EXPERT_FEEDBACK.md` ("Seventy-ninth pass").
 
 ## Unreleased
 

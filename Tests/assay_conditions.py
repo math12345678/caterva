@@ -166,6 +166,34 @@ def _parse_buffer(text: str) -> str | None:
     return " ".join(match.group(1).split())
 
 
+def buffers_equivalent(a: str | None, b: str | None) -> bool:
+    """Whether two stated buffers count as the same assay condition.
+
+    ONE RULE, SHARED WITH THE MODEL JUDGE. `model_compatibility.assess`
+    reports a `buffer_mismatch` when the distinct normalized buffer strings
+    across the set number more than one -- its notion of "different" is
+    exactly this case-and-whitespace normalization. The assay window (ADR
+    0172) asks the same question when it decides whether a frontier row
+    satisfies a buffer-naming window, and it must come to the same answer
+    the judge would: a window that accepted a row the judge would call a
+    different buffer could "resolve" a mismatch the judge still sees, which
+    is two implementations of one judgement drifting apart (ADR 0027).
+
+    Deliberately NOT the molarity-agnostic identity that
+    `buffer_identity.py` resolves against PubChem: that is a second,
+    network-dependent equivalence. Wiring it into the window would let a
+    window claim "0.5 M Tris-HCl" and "500 mM Tris" are the same while the
+    judge still reports them as different buffers -- the drift ADR 0027
+    names. The judge's own (over)strict rule is the one this reuses.
+
+    `None` means "no buffer stated", which is a distinct fact from any
+    string and never compares equal to one.
+    """
+    if a is None or b is None:
+        return False
+    return a.strip().lower() == b.strip().lower()
+
+
 def parse_assay_conditions(commentary: str | None) -> AssayConditions:
     """Parse a BRENDA commentary string into structured assay conditions.
 

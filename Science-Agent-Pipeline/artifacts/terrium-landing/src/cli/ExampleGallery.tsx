@@ -14,8 +14,13 @@ interface ExampleCard {
   query: string;
 }
 
+// km is the real BRENDA-resolved value for this exact query ("lactate
+// dehydrogenase with pyruvate"), confirmed live against the running
+// pipeline -- not a placeholder. vmax has no literature-resolution path
+// in this system (it's always user-supplied), so it stays illustrative;
+// the description below reflects that split rather than claiming both.
 const MM_EXAMPLE = simulateMichaelisMenten({
-  km: 2,
+  km: 10.73,
   vmax: 5,
   s0: 10,
   end: 3,
@@ -29,7 +34,9 @@ const SIR_EXAMPLE = simulateSIR({
   end: 100,
   points: 101,
 });
-const SEIR_EXAMPLE = simulateSIR({
+// Same SIR integrator as SIR_EXAMPLE, just higher beta / lower gamma --
+// there is no E compartment here, so this must not be labeled SEIR.
+const SIR_HIGH_R0_EXAMPLE = simulateSIR({
   beta: 0.35,
   gamma: 0.05,
   s0: 990,
@@ -43,7 +50,18 @@ const EXAMPLES: ExampleCard[] = [
     id: "mm-demo",
     domain: "mm",
     label: "Michaelis-Menten",
-    description: "Enzyme kinetics with literature-verified Km and Vmax values.",
+    // "literature-verified" was an overclaim, and specifically the kind
+    // this product exists to refuse. Re-resolved live: the value and the
+    // source are real (BRENDA ref 740253, EC 1.1.1.27, Homo sapiens), but
+    // the pipeline returns citationStatus "flagged", not "verified",
+    // because the source never reported assay temperature and STRENDA
+    // requires it for kinetic data. Terrium's own resolver declines to
+    // call this value verified; the page must not call it verified over
+    // the resolver's head.
+    description:
+      "Enzyme kinetics — Km is a real BRENDA value (10.73 mM, EC 1.1.1.27, " +
+      "H. sapiens), flagged rather than verified because the source did not " +
+      "report assay temperature. Vmax is user-chosen.",
     stats: [
       {
         label: "final [S]",
@@ -83,20 +101,20 @@ const EXAMPLES: ExampleCard[] = [
     query: "model an outbreak with beta 0.3 and gamma 0.1",
   },
   {
-    id: "seir-demo",
+    id: "sir-high-r0-demo",
     domain: "sir",
-    label: "SEIR Model",
+    label: "SIR (High R\u2080)",
     description:
-      "Extended epidemiology with incubation period and higher transmission.",
+      "Same SIR model with higher transmission and slower recovery, giving a higher R\u2080.",
     stats: [
       {
         label: "peak infected",
-        value: Math.max(...SEIR_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
+        value: Math.max(...SIR_HIGH_R0_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
       },
       { label: "R\u2080", value: (0.35 / 0.05).toFixed(2) },
     ],
     chart: {
-      data: SEIR_EXAMPLE.trajectory,
+      data: SIR_HIGH_R0_EXAMPLE.trajectory,
       series: [
         { key: "S", color: "#3B82F6" },
         { key: "I", color: "#EF4444" },
@@ -156,7 +174,14 @@ export default function ExampleGallery({ onTryQuery }: ExampleGalleryProps) {
             </div>
 
             <motion.button
-              onClick={() => onTryQuery(example.query)}
+              onClick={() => {
+                onTryQuery(example.query);
+                setTimeout(() => {
+                  document
+                    .getElementById("agent")
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }, 100);
+              }}
               className="w-full rounded-md border border-[#1D8A72]/15 text-[10px] text-[#1D8A72]/60 py-1.5 transition-all duration-200 hover:bg-[#1D8A72]/[0.06] hover:text-[#1D8A72]"
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
