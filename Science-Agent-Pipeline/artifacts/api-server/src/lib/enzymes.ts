@@ -9,7 +9,7 @@ export interface EnzymeEntry {
 
 export const ENZYMES: EnzymeEntry[] = [
   {
-    pattern: /lactate dehydrogenase|ldh/i,
+    pattern: /\blactate dehydrogenase\b|\bldh\b/i,
     enzymeName: "lactate dehydrogenase",
     substrates: ["lactate", "pyruvate"],
     ecNumber: "1.1.1.27",
@@ -17,7 +17,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /hexokinase|hk\d?/i,
+    pattern: /\bhexokinase\b|\bhk\d?\b/i,
     enzymeName: "hexokinase",
     substrates: ["glucose", "ATP"],
     ecNumber: "2.7.1.1",
@@ -25,7 +25,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /acetylcholinesterase|ache/i,
+    pattern: /\bacetylcholinesterase\b|\bache\b/i,
     enzymeName: "acetylcholinesterase",
     substrates: ["acetylcholine", "acetylthiocholine"],
     ecNumber: "3.1.1.7",
@@ -33,7 +33,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /trypsin/i,
+    pattern: /\btrypsin\b/i,
     enzymeName: "trypsin",
     substrates: ["protein"],
     ecNumber: "3.4.21.4",
@@ -42,7 +42,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /chymotrypsin/i,
+    pattern: /\bchymotrypsin\b/i,
     enzymeName: "chymotrypsin",
     substrates: ["protein"],
     ecNumber: "3.4.21.1",
@@ -50,7 +50,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /alcohol dehydrogenase|adh/i,
+    pattern: /\balcohol dehydrogenase\b|\badh\b/i,
     enzymeName: "alcohol dehydrogenase",
     substrates: ["ethanol", "acetaldehyde"],
     ecNumber: "1.1.1.1",
@@ -58,7 +58,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /catalase/i,
+    pattern: /\bcatalase\b/i,
     enzymeName: "catalase",
     substrates: ["hydrogen peroxide", "H2O2"],
     ecNumber: "1.11.1.6",
@@ -66,7 +66,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /cytochrome c oxidase|cox|complex iv/i,
+    pattern: /\bcytochrome c oxidase\b|\bcox\b|\bcomplex iv\b/i,
     enzymeName: "cytochrome c oxidase",
     substrates: ["cytochrome c", "oxygen"],
     // EC 1.9.3.1 until 2026-09-05. IUBMB TRANSFERRED that number to
@@ -85,7 +85,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /dna polymerase|dna pol/i,
+    pattern: /\bdna polymerase\b|\bdna pol\b/i,
     enzymeName: "DNA polymerase",
     substrates: ["dNTPs", "DNA template"],
     ecNumber: "2.7.7.7",
@@ -93,7 +93,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Escherichia coli",
   },
   {
-    pattern: /phosphofructokinase|pfk/i,
+    pattern: /\bphosphofructokinase\b|\bpfk\b/i,
     enzymeName: "phosphofructokinase-1",
     substrates: ["fructose-6-phosphate", "ATP"],
     ecNumber: "2.7.1.11",
@@ -101,7 +101,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /pyruvate kinase|pklr?/i,
+    pattern: /\bpyruvate kinase\b|\bpklr?\b/i,
     enzymeName: "pyruvate kinase",
     substrates: ["phosphoenolpyruvate", "ADP"],
     ecNumber: "2.7.1.40",
@@ -109,7 +109,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /superoxide dismutase|sod/i,
+    pattern: /\bsuperoxide dismutase\b|\bsod\b/i,
     enzymeName: "superoxide dismutase",
     substrates: ["superoxide"],
     ecNumber: "1.15.1.1",
@@ -117,7 +117,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /ribulose.?bisphosphate carboxylase|rubisco/i,
+    pattern: /ribulose.?bisphosphate carboxylase|\brubisco\b/i,
     enzymeName: "RuBisCO",
     substrates: ["ribulose-1,5-bisphosphate", "CO2"],
     ecNumber: "4.1.1.39",
@@ -125,7 +125,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Arabidopsis thaliana",
   },
   {
-    pattern: /acetyl.?coa carboxylase|acc/i,
+    pattern: /acetyl.?coa carboxylase|\bacc\b/i,
     enzymeName: "acetyl-CoA carboxylase",
     // "biotin" was listed here as a substrate until 2026-09-05. It is not
     // one: it is the PROSTHETIC GROUP, covalently attached to the
@@ -148,7 +148,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /hiv.?1 protease|hiv protease/i,
+    pattern: /hiv.?1 protease|\bhiv protease\b/i,
     enzymeName: "HIV-1 protease",
     substrates: ["Gag-Pol polyprotein"],
     ecNumber: "3.4.23.16",
@@ -170,7 +170,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /pepsin/i,
+    pattern: /\bpepsin\b/i,
     enzymeName: "pepsin",
     substrates: ["protein"],
     ecNumber: "3.4.23.1",
@@ -178,7 +178,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /lysozyme/i,
+    pattern: /\blysozyme\b/i,
     enzymeName: "lysozyme",
     substrates: ["peptidoglycan"],
     ecNumber: "3.2.1.17",
@@ -186,7 +186,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Gallus gallus",
   },
   {
-    pattern: /carbonic anhydrase/i,
+    pattern: /\bcarbonic anhydrase\b/i,
     enzymeName: "carbonic anhydrase",
     substrates: ["carbon dioxide", "water"],
     ecNumber: "4.2.1.1",
@@ -194,7 +194,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /beta[\s-]?galactosidase|lactase/i,
+    pattern: /beta[\s-]?galactosidase|\blactase\b/i,
     enzymeName: "beta-galactosidase",
     substrates: ["lactose"],
     ecNumber: "3.2.1.23",
@@ -202,7 +202,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Escherichia coli",
   },
   {
-    pattern: /glucose oxidase/i,
+    pattern: /\bglucose oxidase\b/i,
     enzymeName: "glucose oxidase",
     substrates: ["glucose", "oxygen"],
     ecNumber: "1.1.3.4",
@@ -210,7 +210,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Aspergillus niger",
   },
   {
-    pattern: /urease/i,
+    pattern: /\burease\b/i,
     enzymeName: "urease",
     substrates: ["urea"],
     ecNumber: "3.5.1.5",
@@ -226,7 +226,7 @@ export const ENZYMES: EnzymeEntry[] = [
     organism: "Homo sapiens",
   },
   {
-    pattern: /glucose-?6-?phosphate dehydrogenase|g6pd/i,
+    pattern: /glucose-?6-?phosphate dehydrogenase|\bg6pd\b/i,
     enzymeName: "glucose-6-phosphate dehydrogenase",
     substrates: ["glucose-6-phosphate", "NADP+"],
     ecNumber: "1.1.1.49",

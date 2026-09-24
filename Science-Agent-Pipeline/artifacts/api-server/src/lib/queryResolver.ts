@@ -2305,18 +2305,67 @@ export function refinementPairs(): {
   });
 }
 
+/**
+ * How much evidence one keyword gives for a domain, in characters.
+ *
+ * Three things had to survive the same function, and each was measured
+ * fixing a defect the others did not:
+ *
+ *  - LENGTH, not a count (ADR 0190/0191). A domain that matches "gillespie"
+ *    has said more than one matching three short generic words. Counting
+ *    matches let "a random trajectory for A + B to C using the Gillespie
+ *    approach" land on molecular_dynamics, which owns "trajectory".
+ *  - NEGATION (ADR 0192). "no inhibitor involved" contains "inhibitor".
+ *    Scoring it undoes the negation work outright: measured, that one query
+ *    classified as mm_competitive_inhibition.
+ *  - STEMMING. "measles spreads" must reach the keyword "spread".
+ *
+ * Negation is testable only where the term literally occurs, because that
+ * is the only case with a position to look behind. A stem-only match has no
+ * such position and is accepted; that is the honest limit of the check, not
+ * an oversight.
+ */
+function keywordEvidence(
+  lowerQuery: string,
+  queryTokens: Set<string>,
+  keyword: string,
+): number {
+  const occurrences = termOccurrences(lowerQuery, keyword);
+  if (occurrences.length > 0) {
+    return occurrences.some((index) => !isNegatedAt(lowerQuery, index))
+      ? keyword.length
+      : 0;
+  }
+  const keywordWords = tokenizeForMatching(keyword);
+  if (
+    keywordWords.length > 0 &&
+    keywordWords.every((w) => queryTokens.has(lightStem(w)))
+  ) {
+    // Half credit. A stem match is real evidence -- "measles spreads" is
+    // about the keyword "spread" -- but it is weaker than the query having
+    // actually written the term, and scoring the two the same inverts
+    // classifications on the difference. Measured: molecular_dynamics lists
+    // "trajectories" (12) and gillespie_ssa lists "gillespie" (9), so "a
+    // random trajectory ... using the Gillespie approach" scored as
+    // molecular dynamics on a stemmed plural, over a domain the query had
+    // named outright.
+    return keyword.length / 2;
+  }
+  return 0;
+}
+
 export function classifyDomainByKeyword(query: string): KeywordClassification {
-  // Strip explicit parameter-override tokens ("km=2", "vmax=5", ...)
-  // before classifying. "km" and "vmax" are themselves mm keywords
-  // (someone writing "the km of this reaction" IS naming enzyme kinetics
-  // vocabulary) -- but every fully-specified mm/mm_competitive_inhibition
-  // query ALSO writes "km=<value>" as parameter syntax, which would
-  // otherwise inflate mm's score by 1-2 points purely from bookkeeping
-  // that has nothing to do with which of the two domains is meant. That
-  // let mm silently outscore mm_competitive_inhibition on a query that
-  // explicitly said "competitive inhibition", just because it also
-  // supplied km=/vmax= inline -- classification must run on what the
-  // query SAYS, not on which parameter names it happens to assign.
+  // Strip explicit parameter-override tokens ("km=2", "vmax=5", ...) before
+  // classifying. "km" and "vmax" are themselves mm keywords -- someone
+  // writing "the km of this reaction" IS naming enzyme kinetics vocabulary
+  // -- but every fully-specified mm/mm_competitive_inhibition query ALSO
+  // writes "km=<value>" as parameter syntax, which would otherwise inflate
+  // mm purely from bookkeeping that has nothing to do with which of the two
+  // domains is meant. That let mm silently outscore
+  // mm_competitive_inhibition on a query that explicitly said "competitive
+  // inhibition", just because it also supplied km=/vmax= inline.
+  // Classification must run on what the query SAYS, not on which parameter
+  // names it happens to assign.
   const classificationText = query
     .split(/\s+/)
     .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token))
@@ -2326,41 +2375,44 @@ export function classifyDomainByKeyword(query: string): KeywordClassification {
     tokenizeForMatching(classificationText).map(lightStem),
   );
 
-  // `matchEnzyme` already recognizes ~25 specific enzymes by name (with a
-  // verified EC number, no network round trip) for the entity-extraction
-  // step below -- but classification never consulted it, so a query
-  // naming one of those exact enzymes (e.g. "citrate synthase kinetics",
-  // "chymotrypsin activity") could still fail to reach "mm" if the enzyme
-  // itself wasn't ALSO separately hardcoded into the mm keyword list. That
-  // is the same class of bug as the domain-classification gap above, just
-  // one layer down: two independent lists of the same enzymes, silently
-  // drifting apart. Treating a real `matchEnzyme` hit as a strong
-  // classification signal removes the second list rather than growing it.
+  // `matchEnzyme` recognises ~25 specific enzymes by name (with a verified
+  // EC number, no network round trip) for the entity-extraction step
+  // below -- but classification never consulted it, so a query naming one
+  // of those exact enzymes ("citrate synthase kinetics") could fail to
+  // reach "mm" unless the enzyme was ALSO hardcoded into the mm keyword
+  // list. Treating a real hit as a classification signal removes the second
+  // list rather than growing it.
   const enzymeMatch = matchEnzyme(query);
 
   let best: DomainDefaults | undefined;
   let bestScore = 0;
   for (const candidate of DOMAIN_DEFAULTS) {
-    let score = candidate.keywords.filter((keyword) =>
-      keywordMatches(lower, queryTokens, keyword),
-    ).length;
-    // Naming a real enzyme is generic evidence for "this is an enzyme-
-    // kinetics question" -- it should land on plain mm by default, so mm
-    // gets the larger share (+2). mm_competitive_inhibition gets a smaller
-    // share (+1) rather than none: giving both the same boost made them
-    // tie on any plain enzyme-kinetics query with no inhibitor language,
-    // with array order (mm_competitive_inhibition is declared first)
-    // silently deciding the wrong one every time. With the smaller share,
-    // mm wins outright when nothing else distinguishes them, but a query
-    // that ALSO says "inhibitor"/"competitive"/"inhibition" adds enough on
-    // top (mm_competitive_inhibition's own keyword score) to still win --
-    // inhibition is a real, additional claim the query has to make, not
-    // the default assumption for every enzyme mentioned.
-    if (enzymeMatch && candidate.domain === "mm") {
-      score += 2;
-    } else if (enzymeMatch && candidate.domain === "mm_competitive_inhibition") {
-      score += 1;
+    let score = 0;
+    for (const keyword of candidate.keywords) {
+      score += keywordEvidence(lower, queryTokens, keyword);
     }
+    // Naming a real enzyme is generic evidence for "this is an enzyme-
+    // kinetics question", so it should land on plain mm by default. The
+    // credit is the enzyme name's own length, because that is the unit
+    // every other score is in -- naming "lactate dehydrogenase" IS matching
+    // a long, specific term. mm takes it whole and
+    // mm_competitive_inhibition half, keeping the 2:1 ratio: giving both
+    // the same share made them tie on any plain enzyme-kinetics query with
+    // no inhibitor language, with array order silently deciding. With the
+    // smaller share mm wins outright when nothing else distinguishes them,
+    // while a query that also says "competitive"/"inhibitor" still wins on
+    // its own keywords -- inhibition is an additional claim the query has
+    // to make, not the default assumption for every enzyme mentioned.
+    if (enzymeMatch && candidate.domain === "mm") {
+      score += enzymeMatch.enzymeName.length;
+    } else if (
+      enzymeMatch &&
+      candidate.domain === "mm_competitive_inhibition"
+    ) {
+      score += enzymeMatch.enzymeName.length / 2;
+    }
+    // Strictly greater: the first domain in the table wins a tie, which is
+    // the old behaviour for equally-specific matches.
     if (score > bestScore) {
       best = candidate;
       bestScore = score;
