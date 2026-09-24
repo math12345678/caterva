@@ -5,3 +5,18 @@
 # bootloader in a frozen application under any licence; the exception text
 # ships in the app folder under licenses/pyinstaller/ (see NOTICE).
 pyinstaller==6.22.2
+
+# The PEP 517 build backend scripts/build_release.py calls to produce the
+# wheel (`from setuptools import build_meta`, imported lazily at the two
+# call sites). Declared here rather than in requirements.txt because
+# nothing at run time imports it, and here rather than nowhere because
+# check_dependencies_declared.py globs every requirements*.txt and was
+# correctly reporting it undeclared: setuptools is present in most
+# environments by accident of the installer, which is exactly the kind of
+# ambient dependency that works everywhere until a fresh install does not.
+#
+# A floor, not a pin: this is a build backend whose interface here is the
+# stable PEP 517 one, and pinning it exactly would fight pip's own
+# bootstrapping. 70 is the floor verified working; 80.9.0 is what built the
+# current artifacts.
+setuptools>=70
