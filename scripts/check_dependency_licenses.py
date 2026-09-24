@@ -168,6 +168,27 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "from PyYAML-6.0.2.dist-info/LICENSE in the installed wheel. Use, "
         "copy, modify, merge, publish, distribute, sublicense, sell.",
     ),
+    "setuptools": (
+        "MIT",
+        "The PEP 517 build backend scripts/build_release.py calls to produce "
+        "the wheel; build-time only, and nothing at run time imports it. "
+        "Declared in requirements-release.txt, which only the release "
+        "workflow installs.\n"
+        "      NOT read from a shipped licence FILE, because setuptools "
+        "80.9.0 does not ship one: its installed metadata directory contains "
+        "PKG-INFO, SOURCES.txt, dependency_links.txt, entry_points.txt, "
+        "requires.txt and top_level.txt, and no LICENSE. The licence is read "
+        "instead from `License-Expression: MIT` in that PKG-INFO -- which is "
+        "this table's actual rule rather than an exception to it: the point "
+        "of the rule is to read what travels with the code rather than a "
+        "summary on a package index, and PKG-INFO travels with the code. "
+        "Checked with importlib.metadata against the installed 80.9.0.\n"
+        "      MIT grants use, copy, modify, merge, publish, distribute, "
+        "sublicense and sell, on condition the copyright and permission "
+        "notice are retained. The setuptools tree also vendors packages that "
+        "carry their own LICENSE files; none of them is redistributed by "
+        "Terrium, which ships no setuptools code at all.",
+    ),
     "pyinstaller": (
         "GPL-2.0-or-later WITH Bootloader-exception",
         "Read from pyinstaller-6.22.2.dist-info/licenses/COPYING.txt in the "
