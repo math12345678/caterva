@@ -211,6 +211,53 @@ def check_venv():
     return interpreter
 
 
+def check_hidden_pth():
+    """Catch the macOS + iCloud failure that makes `terrium` vanish.
+
+    WHY THIS EXISTS (2026-09-24)
+    ----------------------------
+    `make setup` installs Terrium in editable mode, which works through a
+    `.pth` file in site-packages. Python 3.13's `site.py` skips any `.pth`
+    file carrying the macOS `hidden` flag, deliberately. When the checkout
+    lives under ~/Desktop or ~/Documents with iCloud Drive's "Desktop &
+    Documents" sync on, iCloud sets that flag on files inside `.venv`.
+
+    Measured on the owner's machine: `terrium --version` worked immediately
+    after install; minutes later the same command from outside the
+    repository failed with `ModuleNotFoundError: No module named 'Terium'`.
+    Both `.pth` files had acquired the flag. Clearing it restored the
+    command, including the full literature search. Nothing in the error
+    points anywhere near iCloud, which is why this check names it.
+    """
+    print("\nHidden .pth files (macOS + iCloud)")
+    if sys.platform != "darwin":
+        _record("hidden .pth", "PASS", "not macOS; the flag does not exist here")
+        return
+    found = sorted(VENV.glob("lib/python*/site-packages/*.pth")) if VENV.is_dir() else []
+    if not found:
+        _record("hidden .pth", "PASS", "no .pth files in .venv to check")
+        return
+    import stat
+
+    hidden = [p for p in found if getattr(p.lstat(), "st_flags", 0) & stat.UF_HIDDEN]
+    if not hidden:
+        _record("hidden .pth", "PASS", "{} .pth file(s), none hidden".format(len(found)))
+        return
+    icloud = any(part in ("Desktop", "Documents") for part in REPO_ROOT.parts)
+    _record(
+        "hidden .pth", "FAIL",
+        "{} of {} .pth file(s) carry the macOS hidden flag, so Python skips "
+        "them and `terrium` cannot find its own package{}".format(
+            len(hidden), len(found),
+            " -- this checkout is under ~/{}, which iCloud Drive syncs".format(
+                next(part for part in REPO_ROOT.parts if part in ("Desktop", "Documents")))
+            if icloud else ""),
+        "chflags nohidden .venv/lib/python*/site-packages/*.pth   "
+        "(and move the checkout out of iCloud, or it will come back: "
+        "see docs/OWNER_CHECKLIST.md)",
+    )
+
+
 # --------------------------------------------------------------------------
 # 4. Packages
 # --------------------------------------------------------------------------
@@ -405,6 +452,7 @@ def main():
     check_platform()
     check_interpreters()
     interpreter = check_venv()
+    check_hidden_pth()
     check_packages(interpreter)
     check_stdpopsim(interpreter)
     check_node()

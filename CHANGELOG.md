@@ -62,6 +62,19 @@ true of the code and unreachable from anything a person types.
   provenance table.
 
 ### Added
+- **`terrium` is the command everywhere.** The wheel installs it beside
+  `terium` and `terium-compose`, and `make setup` now installs the package
+  itself, so in a checkout `terrium compose ...` works from any directory
+  instead of `./.venv/bin/python -m Terium.app compose ...` from the root.
+- **`make doctor` detects the macOS + iCloud failure** that makes it
+  vanish. Python 3.13 skips `.pth` files carrying the macOS `hidden` flag,
+  and iCloud Drive sets that flag on files inside `.venv` when the checkout
+  is under `~/Desktop` or `~/Documents`. Measured on the owner's machine:
+  `terrium --version` worked right after install and minutes later failed
+  with `No module named 'Terium'` from the same interpreter. Nothing in that
+  error points at iCloud, so the doctor names it and gives the fix.
+- **`docs/OWNER_CHECKLIST.md`**: the owner's remaining steps, copy and
+  paste, each with what you should see and what to do if you don't.
 - **A placeholder now says what the search actually met.** The resolver
   distinguishes four outcomes and the report printed one invented sentence,
   "searched the km table and found nothing", for all of them -- which is

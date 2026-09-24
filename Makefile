@@ -56,7 +56,9 @@ setup: check-python
 	@echo "   connection. pip prints nothing while it resolves; that is"
 	@echo "   normal and not a hang."
 	@echo ""
-	@$(BIN)/pip install -r requirements-dev.txt || { \
+	@$(BIN)/pip install -r requirements-dev.txt && \
+		$(BIN)/pip install --quiet --no-deps -e . && \
+		{ [ "$$(uname)" != Darwin ] || chflags nohidden $(VENV)/lib/python*/site-packages/*.pth 2>/dev/null || true; } || { \
 		echo ""; \
 		echo "Dependency install FAILED. Read pip's last error above -- the"; \
 		echo "line that matters is usually 20 lines up, not the last one."; \
