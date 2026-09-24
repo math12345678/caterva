@@ -1872,7 +1872,10 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "blinks",
       "shutting off the next",
       "turns the next one off",
-      "e. coli",
+      // NOT "e. coli". It is the organism the Elowitz-Leibler circuit was
+      // built in, not evidence that a question is about that circuit:
+      // measured, "how fast does E. coli grow in glucose" classified as a
+      // repressilator. A host organism is not a mechanism.
       "repressilator",
       "synthetic",
       "genetic circuit",
@@ -2306,6 +2309,39 @@ export function refinementPairs(): {
 }
 
 /**
+ * Is the occurrence at `index` a whole word, rather than a fragment of a
+ * longer one?
+ *
+ * The same defect as ADR 0205's enzyme patterns, one layer up. The
+ * repressilator lists the keyword "repress", which occurs inside
+ * "repressors" -- so "a toggle switch between two repressors" scored as a
+ * repressilator and never reached the compositional fallthrough that is
+ * supposed to answer it. "ring" has the same shape and occurs inside
+ * "bring".
+ *
+ * A keyword is meant as a word. Where the query inflects it ("spreads" for
+ * "spread") the stem path below still finds it, at half credit, which is
+ * the right relative weight anyway.
+ */
+function isWholeWordAt(text: string, index: number, term: string): boolean {
+  const before = index > 0 ? text[index - 1]! : "";
+  const afterIndex = index + term.length;
+  const after = afterIndex < text.length ? text[afterIndex]! : "";
+  const wordish = /[a-z0-9]/;
+  if (before !== "" && wordish.test(before) && wordish.test(term[0]!)) {
+    return false;
+  }
+  if (
+    after !== "" &&
+    wordish.test(after) &&
+    wordish.test(term[term.length - 1]!)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * How much evidence one keyword gives for a domain, in characters.
  *
  * Three things had to survive the same function, and each was measured
@@ -2330,7 +2366,9 @@ function keywordEvidence(
   queryTokens: Set<string>,
   keyword: string,
 ): number {
-  const occurrences = termOccurrences(lowerQuery, keyword);
+  const occurrences = termOccurrences(lowerQuery, keyword).filter((index) =>
+    isWholeWordAt(lowerQuery, index, keyword),
+  );
   if (occurrences.length > 0) {
     return occurrences.some((index) => !isNegatedAt(lowerQuery, index))
       ? keyword.length

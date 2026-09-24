@@ -137,9 +137,10 @@ export interface TestSuite {
 }
 
 // FILE COUNTS ONLY, 2026-09-24. The two figures above were corrected --
-// engine 100 -> 101, api-server 81 -> 90 -- after merging main, which
+// engine 100 -> 101, api-server 81 -> 91 -- after merging main, which
 // brought a batch of new api-server suites, plus one added here
-// (enzymePatternBoundaries.test.ts, ADR 0205). Both were measured by
+// (enzymePatternBoundaries.test.ts, ADR 0205; keywordsAreWords.test.ts,
+// ADR 0206). Both were measured by
 // check_landing_test_counts.py against the filesystem, which is what that
 // guard compares by default.
 //
@@ -220,7 +221,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "90 test files -- query resolution, parameter provenance, " +
+          "91 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
