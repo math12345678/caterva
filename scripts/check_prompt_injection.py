@@ -126,7 +126,30 @@ thing it exists for.
 does with each one, including a critical. Restoring the equality test
 fails three of its seven cases.
 
-CURRENT EXEMPTIONS (12; the verdicts live in trojan-baseline.json)
+CURRENT EXEMPTIONS (13 recorded; the verdicts live in trojan-baseline.json)
+
+TWO MORE ARRIVED WITH A MERGE, 2026-09-24, and both are the same cry-wolf
+idiom as the two below. Verdicts, reached by reading each in full:
+
+  * `Terium/compose/timeseries.py` -- a comment explaining why the
+    cross-correlation sums elementwise instead of going through BLAS: on
+    macOS Accelerate the matmul sets floating-point flags from inside its
+    own kernels, numpy attributes them to the caller, and every run printed
+    RuntimeWarnings about arithmetic the function never performed. The
+    flagged sentence says a warning that is not about the data teaches a
+    reader to ignore warnings. It is an argument for keeping warnings
+    meaningful, in a comment whose subject is a real numerical detail.
+  * `Terium/tests/test_compose_library_signaling.py` -- a class docstring
+    for the motif unit-checker, saying a motif that shipped with a standing
+    finding would train a reader to ignore findings. Same idiom, same
+    direction: it justifies why every motif must balance at composition
+    time, since a dimensionally wrong rate law still integrates and still
+    draws a smooth curve.
+
+Neither asserts that any code is safe, which is what the rule
+`injection/trust-assertion` is looking for; both argue for MORE attention to
+a warning. This idiom is house style here and will keep producing this
+finding -- it is the plainest way the codebase has to state ADR 0028.
 
 Six were added on 2026-09-06, once the criticals became visible. Three of
 them are RECURSIVE -- the stage record that triaged the first scan quotes
@@ -405,8 +428,17 @@ def triage(
             exempted.append(f"{location}:{line} [{rule}] -- {entry['reason']}")
             continue
 
+        # The fingerprint is PRINTED, because the sentence below tells the
+        # reader to record a verdict in trojan-baseline.json and that file is
+        # keyed on exactly this value. Without it the instruction cannot be
+        # followed: the only other way to obtain a fingerprint is to re-run
+        # the scanner and read its raw JSON, which is precisely what someone
+        # reading a CI log cannot do. Measured 2026-09-24: two findings
+        # arrived with a merge, both benign, and clearing them needed a
+        # round trip through CI purely to learn two hex strings.
         violations.append(
-            f"{location}:{line} [{rule}] {message} -- text aimed at an AI "
+            f"{location}:{line} [{rule}] fingerprint={fingerprint or '?'} "
+            f"{message} -- text aimed at an AI "
             "reader rather than a human one. Several agents commit to this "
             "repository and read each other's files, so prose is an "
             "execution surface here."
