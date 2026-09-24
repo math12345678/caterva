@@ -99,15 +99,47 @@ ALLOWED_SKIP_REQUIRES_MODULE: dict[str, str] = {
 }
 
 
+#: The same idea for a skip whose real condition is the operating system.
+#:
+#: Maps a test to the platform it is ABOUT. The exemption holds everywhere
+#: else, and expires on that platform: a macOS-only test skipping ON macOS is
+#: a skip nothing explains, which is exactly the case worth catching.
+#: Without this the entry would have to be unconditional, and an exemption
+#: that cannot expire is the rubber stamp this file argues against two
+#: comments above.
+ALLOWED_SKIP_REQUIRES_PLATFORM: dict[str, str] = {
+    "test_doctor_hidden_pth": "darwin",
+}
+
+
 def _allowed_reason_still_holds(key: str) -> bool:
-    """False when the named module is installed and the test skipped anyway."""
+    """False when the skip's stated cause is absent and it skipped anyway.
+
+    Two causes, checked the same way: a package that turns out to be
+    installed, or a platform-specific test skipping on its own platform.
+    """
     module = ALLOWED_SKIP_REQUIRES_MODULE.get(key)
-    if module is None:
-        return True
-    return importlib.util.find_spec(module) is None
+    if module is not None and importlib.util.find_spec(module) is not None:
+        return False
+    platform = ALLOWED_SKIP_REQUIRES_PLATFORM.get(key)
+    if platform is not None and sys.platform == platform:
+        return False
+    return True
 
 
 ALLOWED_SKIPS: dict[str, str] = {
+    "test_doctor_hidden_pth": (
+        "Tests the macOS-only failure where iCloud sets the UF_HIDDEN flag "
+        "on a .pth inside .venv and Python 3.13 then skips it, so `terrium` "
+        "vanishes with `No module named 'Terium'`. The module is "
+        "`skipif(sys.platform != 'darwin')` because UF_HIDDEN is a macOS "
+        "flag with no Linux counterpart -- hiding on Linux is a leading dot, "
+        "which Python does not treat specially. CI is ubuntu-latest, so "
+        "these three skip on every run. Expected OFF darwin only: on macOS "
+        "this entry expires and a skip there goes red, because on the one "
+        "platform the test is about, not running is not a fact about the "
+        "operating system."
+    ),
     "test_popgen_resolver": (
         "Needs `stdpopsim`, which lives in the optional "
         "requirements-popgen.txt. `make setup` installs requirements-dev.txt "
