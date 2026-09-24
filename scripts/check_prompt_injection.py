@@ -126,7 +126,7 @@ thing it exists for.
 does with each one, including a critical. Restoring the equality test
 fails three of its seven cases.
 
-CURRENT EXEMPTIONS (13 recorded; the verdicts live in trojan-baseline.json)
+CURRENT EXEMPTIONS (15; the verdicts live in trojan-baseline.json)
 
 TWO MORE ARRIVED WITH A MERGE, 2026-09-24, and both are the same cry-wolf
 idiom as the two below. Verdicts, reached by reading each in full:
@@ -136,15 +136,22 @@ idiom as the two below. Verdicts, reached by reading each in full:
     macOS Accelerate the matmul sets floating-point flags from inside its
     own kernels, numpy attributes them to the caller, and every run printed
     RuntimeWarnings about arithmetic the function never performed. The
-    flagged sentence says a warning that is not about the data teaches a
-    reader to ignore warnings. It is an argument for keeping warnings
-    meaningful, in a comment whose subject is a real numerical detail.
+    flagged clause gives the reason that matters: spurious warnings cost a
+    reader's attention to the real ones. It argues for keeping warnings
+    meaningful, in a comment whose subject is a concrete numerical detail.
   * `Terium/tests/test_compose_library_signaling.py` -- a class docstring
-    for the motif unit-checker, saying a motif that shipped with a standing
-    finding would train a reader to ignore findings. Same idiom, same
-    direction: it justifies why every motif must balance at composition
-    time, since a dimensionally wrong rate law still integrates and still
-    draws a smooth curve.
+    for the motif unit-checker, making the same point about a library that
+    ships with a standing finding against it. Same idiom, same direction:
+    it justifies why every motif must balance at composition time, since a
+    dimensionally wrong rate law still integrates and still draws a smooth
+    curve.
+
+    Both are described here rather than quoted. Reproducing the wording to
+    explain it re-trips the rule -- this guard's notes already record that
+    happening three times, and writing this section is the fourth: the two
+    sentences above were quoted verbatim on the first attempt and CI came
+    back with four findings instead of two, the extra pair being these very
+    lines.
 
 Neither asserts that any code is safe, which is what the rule
 `injection/trust-assertion` is looking for; both argue for MORE attention to

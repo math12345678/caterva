@@ -99,6 +99,20 @@
       "rule": "injection/exfiltration",
       "reviewed": "2026-09-06",
       "reason": "The same recursion, one rule over. The line quotes SECURITY_HARDENING.md's former wording about secrets being taken from the process environment at point of use, in the course of explaining that a concurrent agent had since rephrased it. Describing where a program obtains its configuration is a security disclosure, not an instruction to collect anything or send it anywhere -- the original finding was triaged as a false positive in August 2026 for exactly that reason, and quoting the sentence to record the verdict reproduces the match."
+    },
+    {
+      "fingerprint": "178237af29100ee6",
+      "file": "Terium/compose/timeseries.py",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-09-24",
+      "reason": "The cry-wolf idiom, in a comment about a real numerical detail: the cross-correlation sums elementwise rather than using the matmul because BLAS on macOS Accelerate sets divide-by-zero and overflow flags inside its own vectorised kernels, numpy attributes them to the caller, and every run printed RuntimeWarnings about arithmetic this function never performs -- which a suite that turns warnings into errors would have failed on. The flagged clause gives the reason that matters: spurious warnings cost a reader's attention to the real ones. The rule looks for text asserting that code is safe; this asserts nothing about safety and asks for MORE attention to warnings, not less. Same verdict and same idiom as the adr-0037 and enzyme_preparation entries. Worded here without quoting the line, because reproducing it re-trips the rule."
+    },
+    {
+      "fingerprint": "dd923bac4151fea2",
+      "file": "Terium/tests/test_compose_library_signaling.py",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-09-24",
+      "reason": "The same idiom in a class docstring, explaining why every motif in the signalling library must balance at composition time: a dimensionally wrong rate law still integrates and still produces a smooth curve, so there is no later point at which the error becomes visible, and a library shipping with a standing finding against it costs the reader's attention to findings generally. An argument for the unit checker existing, not a claim that any code is safe. Described rather than quoted, for the same reason as the entry above."
     }
   ]
 }
