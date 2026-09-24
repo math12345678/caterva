@@ -301,6 +301,44 @@ class Measurement:
     #: the bench; "Terrium has no pH" may be a parser bug on our side. The
     #: conclusion is the same and the action is not.
     assay_unreported: Tuple[str, ...] = ()
+    #: Every OTHER row the resolver ranked for this quantity, as the plain
+    #: dicts `ensemble_candidates` carries: value, unit, organism,
+    #: reference_id, and the assay axes.
+    #:
+    #: WHY A MODEL MUST CARRY THE ROWS IT DID NOT PICK
+    #: -----------------------------------------------
+    #: BRENDA holds two equally well evidenced values of Km for EC 1.1.1.27
+    #: and pyruvate in Homo sapiens: 0.03 mM and 0.398 mM, a 13-fold range.
+    #: The resolver picks the lower, says the evidence does not justify
+    #: picking, and hands back both. A model that printed
+    #:
+    #:     reaction_Km | 0.03 mM | literature | BRENDA ref 286469
+    #:
+    #: and stopped there would present one paper's number as THE value while
+    #: its own resolver had just reported a tie -- the laundering this module
+    #: exists to prevent, one layer up from the placeholder case. The lab
+    #: report path has printed the disagreement since it was written; this is
+    #: how the composed model gets it too.
+    #:
+    #: NOT an uncertainty estimate. The spread is bounded by which papers
+    #: happen to be in BRENDA, not by any statement about the true value, and
+    #: every artefact that prints it says so.
+    alternatives: Tuple[Any, ...] = ()
+
+    @property
+    def disagreement(self) -> Optional[Tuple[float, float]]:
+        """`(low, high)` across every ranked row, or None when they agree."""
+        values = [float(self.value)]
+        for row in self.alternatives:
+            candidate = row.get("value") if isinstance(row, dict) else getattr(row, "value", None)
+            if candidate is None:
+                continue
+            try:
+                values.append(float(candidate))
+            except (TypeError, ValueError):
+                continue
+        low, high = min(values), max(values)
+        return None if low == high else (low, high)
 
     def __post_init__(self) -> None:
         if not str(self.citation).strip():
@@ -743,6 +781,10 @@ def measured_from_search(search: Any) -> Dict[str, Measurement]:
             assay_unreported=tuple(
                 getattr(source, "explicitly_unreported", ()) or ()
             ),
+            # The rows the resolver ranked and did not pick. Dropping them
+            # here is how a 13-fold disagreement became a single confident
+            # number three layers downstream.
+            alternatives=tuple(getattr(source, "candidates", ()) or ()),
         )
     return out
 

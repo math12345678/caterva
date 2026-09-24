@@ -133,6 +133,46 @@ structure, the invariants and the dimensions, which are true regardless.
 Exports search too, so an SBML file and the report beside it cannot
 disagree about what was measured.
 
+## A sixth: the rows the resolver did not pick
+
+Wiring the search surfaced the gap it was hiding. BRENDA holds two equally
+well evidenced values of Km for EC 1.1.1.27 and pyruvate in *Homo sapiens*,
+0.03 mM and 0.398 mM, and the resolver picks the lower while saying the
+evidence does not justify picking. `ParameterSource.candidates` carries
+both. `measured_from_search` read value, unit, organism, citation,
+cross-species and the three assay axes, and not that field, so the model
+received one number with one citation.
+
+A cited number presented alone reads as MORE settled than a placeholder,
+not less. The first composed report to carry real data therefore made a
+13-fold disagreement invisible, which is the laundering this project exists
+to refuse, one layer up from the placeholder case. The lab-report path had
+printed the disagreement since it was written, so the two halves of Terrium
+disagreed about how honest to be.
+
+`Measurement` now carries `alternatives` and a `disagreement` property, and
+the report prints a section naming the span, the fold range and the
+references. It distinguishes two cases the wording must not blur:
+
+- **Several sources, several values.** "which one is right is a question
+  about the papers."
+- **One source, several rows.** BRENDA's two Ki rows for this enzyme are
+  both reference 739793: one publication, two measurements, usually
+  different conditions or a different inhibitor. Calling that "the
+  literature disagrees" would invent a controversy, and telling the reader
+  to decide which paper to believe would send them to one paper to
+  adjudicate itself.
+
+A note on the tests, which is the more general lesson. Three mutations were
+run against this work: drop the rows at the conversion, call one paper two
+papers, and skip the section. The second and third failed a test; **the
+first, which is the actual defect, failed none** -- every test built a
+`Measurement` by hand with `alternatives=` already set and so pinned the
+rendering rather than the wiring. That is the same shape as the fixture
+problem in the fifth item above: a test that constructs the state it means
+to verify can only confirm the code's mistakes back to it. A test that goes
+through `measured_from_search` was added, and the mutation fails now.
+
 ## A fifth thing, found on the way
 
 `citation_text` in `Terium/agents/adapters.py` looked for an attribute

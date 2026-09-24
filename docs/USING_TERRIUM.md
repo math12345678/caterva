@@ -427,8 +427,28 @@ the verdict — then runs on those numbers rather than the library's. The
 exports carry them too, so an SBML file and the report beside it cannot
 disagree about what was measured.
 
-**Read the third row.** A partial result is the normal case: BRENDA has a
-Km for acetylcholinesterase and no kcat. The constants the search did not
+**And it tells you what the evidence did not settle.** Where more than one
+row was ranked equal, the report says so rather than presenting the
+resolver's pick as the answer:
+
+```
+### Where the evidence did not settle on one value
+
+- `reaction_Km`: 2 sources report 2 values (BRENDA ref 286442, 286469),
+  spanning **0.03 to 0.398 mM** (13.3-fold). The model carries 0.03 — the
+  resolver's pick, not a verdict; which one is right is a question about
+  the papers.
+```
+
+A 13-fold spread on the constant your conclusion rests on is the most
+important thing on the page, and a citation beside a single number hides
+it. Note that it distinguishes *two papers disagreeing* from *one paper
+reporting two rows* — the second is usually different conditions or a
+different substrate, and sending you to one paper to adjudicate itself
+would be nonsense.
+
+**Read the placeholder row.** A partial result is the normal case: BRENDA
+has a Km for acetylcholinesterase and no kcat. The constants the search did not
 find keep the library's placeholder and are listed as such, with the
 distinction that matters — *searched and not found* is not *not looked
 for*. Any conclusion resting on one of them is a statement about the motif

@@ -225,7 +225,86 @@ class ModelDossier:
                 f"rests on one of them is a statement about the motif "
                 f"library's illustrative value, not about this enzyme.",
             ]
+        lines += self._disagreement_lines(measured)
         return lines
+
+    def _disagreement_lines(self, measured: dict) -> List[str]:
+        """The rows the resolver ranked equal and did not pick.
+
+        WHY THIS IS NOT OPTIONAL
+        ------------------------
+        BRENDA holds two equally well evidenced values of Km for EC 1.1.1.27
+        and pyruvate in Homo sapiens: 0.03 mM and 0.398 mM. The resolver
+        picks the lower and says the evidence does not justify picking. A
+        report that printed the winner with its citation and stopped would
+        present one paper's number as THE value while its own resolver had
+        just reported a tie -- and it would look more authoritative than the
+        placeholder case, not less, because it carries a reference.
+
+        The lab-report path has printed this since it was written. The
+        composed model did not until ADR 0178, which is the gap this closes.
+        """
+        disagreements = []
+        for identifier in sorted(measured):
+            record = measured[identifier]
+            span = getattr(record, "disagreement", None)
+            if span is None:
+                continue
+            low, high = span
+            fold = high / low if low else float("inf")
+            rows = [r for r in getattr(record, "alternatives", ()) if isinstance(r, dict)]
+            values = {r.get("value") for r in rows if r.get("value") is not None}
+            references = sorted({
+                str(r["reference_id"]) for r in rows if r.get("reference_id")
+            })
+
+            # ONE PAPER REPORTING TWO VALUES IS NOT TWO PAPERS DISAGREEING.
+            # BRENDA's Ki rows for EC 1.1.1.27 are both reference 739793:
+            # the same publication, two measurements, most often different
+            # conditions or a different inhibitor. Calling that "the
+            # literature disagrees" would invent a controversy, and telling
+            # the reader to decide "which paper you believe" would send them
+            # to one paper to adjudicate itself.
+            if len(references) == 1:
+                what = (
+                    f"one source (BRENDA ref {references[0]}) reports "
+                    f"{len(values)} values"
+                )
+                why = (
+                    "two rows from one publication usually differ in the "
+                    "conditions or the exact substrate, so read that paper "
+                    "before choosing"
+                )
+            else:
+                what = (
+                    f"{len(references)} sources report {len(values)} values"
+                    + (f" (BRENDA ref {', '.join(references)})" if references else "")
+                )
+                why = "which one is right is a question about the papers"
+
+            disagreements.append(
+                f"- `{identifier}`: {what}, spanning **{low:g} to {high:g} "
+                f"{record.unit}** ({fold:.3g}-fold). The model carries "
+                f"{record.value:g} — the resolver's pick, not a verdict; "
+                f"{why}."
+            )
+        if not disagreements:
+            return []
+        return [
+            "",
+            # Not "the literature disagrees": one of these cases is a single
+            # paper reporting two rows, which is not a controversy.
+            "### Where the evidence did not settle on one value",
+            "",
+            *disagreements,
+            "",
+            "These spreads are carried through to the model rather than "
+            "averaged away. They are **not an uncertainty estimate**: the "
+            "range is bounded by which rows happen to be in the database, "
+            "not by any statement about the true value. A conclusion that "
+            "changes across one of these ranges rests on a choice the "
+            "evidence did not make for you.",
+        ]
 
     def _resolvable_table(self) -> List[str]:
         """The unmeasured constants, ordered by how much the answer moves.
