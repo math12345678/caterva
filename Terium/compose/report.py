@@ -225,8 +225,139 @@ class ModelDossier:
                 f"rests on one of them is a statement about the motif "
                 f"library's illustrative value, not about this enzyme.",
             ]
+        lines += self._condition_lines(measured)
         lines += self._disagreement_lines(measured)
         return lines
+
+    def _condition_lines(self, measured: dict) -> List[str]:
+        """The pH, temperature and buffer each value was measured under.
+
+        WHY A CITED NUMBER WITHOUT THESE IS NOT ENOUGH
+        ----------------------------------------------
+        Lisa Jeske (BRENDA curation, DSMZ) named exactly this as what makes
+        a resolved value meaningless without it: pH, temperature and buffer
+        decide whether two values from two papers may be mixed at all. The
+        `Measurement` record has carried them since it was written and the
+        CSV export prints them in columns of their own; the composed
+        report, the artefact a person actually reads, did not.
+
+        It also checks the thing the conditions are FOR. Two constants
+        pulled from two papers and put in one model describe an experiment
+        nobody ran, and the project already has thresholds for when that
+        matters -- `PH_UNITS_SERIOUS` (1.0) and `TEMPERATURE_C_SERIOUS`
+        (10.0 C, from a Q10 of 2-3) in `model_compatibility`. They are read
+        from there rather than restated, so one judgement does not become
+        two.
+        """
+        stated = {
+            identifier: record for identifier, record in measured.items()
+            if record.assay_ph is not None
+            or record.assay_temperature_c is not None
+            or record.assay_buffer
+        }
+        if not stated:
+            return []
+
+        lines = ["", "### The conditions these were measured under", ""]
+        for identifier in sorted(stated):
+            record = stated[identifier]
+            parts = []
+            if record.assay_ph is not None:
+                parts.append(f"pH {record.assay_ph:g}")
+            if record.assay_temperature_c is not None:
+                parts.append(f"{record.assay_temperature_c:g} °C")
+            if record.assay_buffer:
+                parts.append(f"in {record.assay_buffer}")
+            unreported = getattr(record, "assay_unreported", ()) or ()
+            suffix = (
+                f" The source states it did not report: {', '.join(unreported)}."
+                if unreported else ""
+            )
+            lines.append(f"- `{identifier}` — measured at {', '.join(parts)}.{suffix}")
+
+        silent = sorted(set(measured) - set(stated))
+        if silent:
+            lines.append(
+                f"- {', '.join(f'`{name}`' for name in silent)} — the source "
+                f"stated no conditions. That is a fact about the paper, not "
+                f"a gap in the search, and it cannot be assumed to match the "
+                f"rows above."
+            )
+
+        lines += self._mixing_lines(stated)
+        return lines
+
+    def _mixing_lines(self, stated: dict) -> List[str]:
+        """Whether the measured constants describe one experiment or several."""
+        try:
+            from Terium.checkout import literature_module
+
+            compatibility = literature_module("model_compatibility")
+            ph_serious = compatibility.PH_UNITS_SERIOUS
+            temperature_serious = compatibility.TEMPERATURE_C_SERIOUS
+        except Exception:  # noqa: BLE001 - a missing layer is not a wrong answer
+            return []
+
+        names = sorted(stated)
+        if len(names) < 2:
+            # Nothing to compare. Saying "the measured constants can be read
+            # as describing comparable experiments" about a single constant
+            # is a check that cannot fail, printed where a reader would take
+            # it for one that did.
+            return []
+
+        clashes = []
+        for i, first in enumerate(names):
+            for second in names[i + 1:]:
+                a, b = stated[first], stated[second]
+                if a.assay_ph is not None and b.assay_ph is not None:
+                    gap = abs(a.assay_ph - b.assay_ph)
+                    if gap >= ph_serious:
+                        clashes.append(
+                            f"`{first}` and `{second}` differ by {gap:g} pH "
+                            f"unit(s) ({a.assay_ph:g} against {b.assay_ph:g})"
+                        )
+                if (a.assay_temperature_c is not None
+                        and b.assay_temperature_c is not None):
+                    gap = abs(a.assay_temperature_c - b.assay_temperature_c)
+                    if gap >= temperature_serious:
+                        clashes.append(
+                            f"`{first}` and `{second}` differ by {gap:g} °C "
+                            f"({a.assay_temperature_c:g} against "
+                            f"{b.assay_temperature_c:g})"
+                        )
+        comparable = sum(
+            1 for name in names
+            if stated[name].assay_ph is not None
+            or stated[name].assay_temperature_c is not None
+        )
+        if not clashes:
+            if comparable < 2:
+                # Conditions are stated, but not the axes that can be
+                # compared: two buffers alone do not make a comparison.
+                return []
+            return [
+                "",
+                f"No two of the {comparable} constants above differ by more "
+                f"than the thresholds this project treats as serious "
+                f"({ph_serious:g} pH unit, {temperature_serious:g} °C), so "
+                "they can be read as describing comparable experiments. That "
+                "is a check on the conditions the sources STATED, not a "
+                "claim that the assays were otherwise alike.",
+            ]
+        return [
+            "",
+            "**These were not measured under the same conditions:**",
+            "",
+            *[f"- {clash}" for clash in clashes],
+            "",
+            f"A model built from them describes an experiment nobody ran. "
+            f"The thresholds ({ph_serious:g} pH unit, {temperature_serious:g} "
+            f"°C) are this project's stated judgements, in "
+            f"`model_compatibility`; Q10 for enzyme-catalysed rates is "
+            f"typically 2-3, so ten degrees is roughly a factor of two in "
+            f"rate.",
+        ]
 
     def _disagreement_lines(self, measured: dict) -> List[str]:
         """The rows the resolver ranked equal and did not pick.

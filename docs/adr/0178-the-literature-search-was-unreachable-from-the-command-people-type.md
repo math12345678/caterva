@@ -173,6 +173,35 @@ problem in the fifth item above: a test that constructs the state it means
 to verify can only confirm the code's mistakes back to it. A test that goes
 through `measured_from_search` was added, and the mutation fails now.
 
+## A seventh: the conditions, and what they are for
+
+The same shape as the sixth, one field along. `Measurement` carries
+`assay_ph`, `assay_temperature_c`, `assay_buffer` and `assay_unreported`;
+its own comment quotes Lisa Jeske (BRENDA curation, DSMZ) naming exactly
+these as what makes a resolved value meaningless without them, and the CSV
+export prints them in columns of their own. The composed report did not.
+
+So the report now lists them per constant, and does the thing they are for:
+it compares the constants that state comparable axes and says whether a
+model built from them describes one experiment or several, against
+`model_compatibility`'s own `PH_UNITS_SERIOUS` (1.0) and
+`TEMPERATURE_C_SERIOUS` (10.0 °C, from a Q10 of 2-3). The thresholds are
+read from that module rather than restated, so one judgement does not
+become two that can drift apart.
+
+Two details worth keeping:
+
+- **A source that stated no conditions is named**, in those words. "The
+  paper did not report a pH" is permanent and sends a researcher to the
+  bench; "Terrium has no pH" may be a parser bug. Measured on EC 1.1.1.27:
+  the Ki row states pH 7.5 and 37 °C and the Km row states nothing, so the
+  two cannot be checked against each other, and the report says so instead
+  of comparing what it has and calling it clean.
+- **With fewer than two comparable constants nothing is claimed.** An
+  earlier draft printed "the measured constants can be read as describing
+  comparable experiments" over a single constant -- a check that cannot
+  fail, in the position a reader takes for one that did.
+
 ## A fifth thing, found on the way
 
 `citation_text` in `Terium/agents/adapters.py` looked for an attribute

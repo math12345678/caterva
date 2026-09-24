@@ -447,6 +447,25 @@ reporting two rows* — the second is usually different conditions or a
 different substrate, and sending you to one paper to adjudicate itself
 would be nonsense.
 
+**And the conditions each value was measured under**, because pH,
+temperature and buffer decide whether two constants may be put in one model
+at all:
+
+```
+### The conditions these were measured under
+
+- `reaction_Ki` — measured at pH 7.5, 37 °C.
+- `reaction_Km` — the source stated no conditions. That is a fact about the
+  paper, not a gap in the search, and it cannot be assumed to match the
+  rows above.
+```
+
+When two constants *do* state conditions, the report compares them and
+says whether they can be mixed, against this project's own thresholds
+(1 pH unit, 10 °C — a Q10 of 2-3 makes ten degrees roughly a factor of two
+in rate). If they clash it says so: *a model built from them describes an
+experiment nobody ran.*
+
 **Read the placeholder row.** A partial result is the normal case: BRENDA
 has a Km for acetylcholinesterase and no kcat. The constants the search did not
 find keep the library's placeholder and are listed as such, with the
