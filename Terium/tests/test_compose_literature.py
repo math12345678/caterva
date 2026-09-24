@@ -193,3 +193,118 @@ class TestTheCitationTheAgentStackProduces:
 
         assert citation_text(self._citation(url="https://example.org")) == "url:https://example.org"
         assert citation_text(None) is None
+
+
+class TestTheRowsTheResolverDidNotPick:
+    """A model must carry the values its own resolver ranked equal.
+
+    THE GAP (found after the wiring landed). BRENDA holds two equally well
+    evidenced values of Km for EC 1.1.1.27 and pyruvate in Homo sapiens:
+    0.03 mM and 0.398 mM, a 13-fold range. The resolver picks the lower and
+    says the evidence does not justify picking. The composed report printed
+    the winner with its citation and stopped -- presenting one paper's
+    number as THE value, with a reference attached to make it look more
+    settled than the placeholder case, not less.
+
+    The lab-report path had printed this since it was written. These pin
+    that the composed model does too, and that it does not invent a
+    controversy where one paper reports two rows.
+    """
+
+    @staticmethod
+    def _measurement(value, alternatives, unit="mM"):
+        return Measurement(
+            value=value, unit=unit, citation="BRENDA ref 286469",
+            organism="Homo sapiens", alternatives=tuple(alternatives),
+        )
+
+    def test_agreement_is_not_reported_as_disagreement(self):
+        assert self._measurement(0.03, []).disagreement is None
+        assert self._measurement(
+            0.03, [{"value": 0.03, "reference_id": "1"}]
+        ).disagreement is None
+
+    def test_the_span_covers_the_chosen_value_and_every_alternative(self):
+        record = self._measurement(0.03, [
+            {"value": 0.03, "reference_id": "286469"},
+            {"value": 0.398, "reference_id": "286442"},
+        ])
+        assert record.disagreement == (0.03, 0.398)
+
+    def test_a_malformed_row_does_not_lose_the_others(self):
+        """A resolver row with no value must not silence the disagreement."""
+        record = self._measurement(0.03, [
+            {"organism": "Homo sapiens"},
+            {"value": "not a number"},
+            {"value": 0.398, "reference_id": "286442"},
+        ])
+        assert record.disagreement == (0.03, 0.398)
+
+    def _section(self, measured):
+        from Terium.compose.report import dossier
+
+        model = compose(QUERY, subject="1.1.1.27", organism="Homo sapiens",
+                        substrate="pyruvate").with_measured(measured)
+        report = dossier(QUERY, subject="1.1.1.27", model=model,
+                         analyse_stability=False, simulate=False,
+                         rank_unmeasured=False)
+        return "\n".join(report.provenance_section())
+
+    def test_two_papers_are_reported_as_two_papers(self):
+        text = self._section({"reaction_Km": self._measurement(0.03, [
+            {"value": 0.03, "reference_id": "286469"},
+            {"value": 0.398, "reference_id": "286442"},
+        ])})
+        assert "did not settle on one value" in text
+        assert "2 sources report 2 values" in text
+        assert "0.03 to 0.398 mM" in text and "13.3-fold" in text
+        assert "not an uncertainty estimate" in text
+        assert "286442" in text and "286469" in text
+
+    def test_one_paper_with_two_rows_is_not_called_a_disagreement(self):
+        """Sending a reader to one paper to adjudicate itself is nonsense."""
+        text = self._section({"reaction_Km": self._measurement(0.00059, [
+            {"value": 0.00059, "reference_id": "739793"},
+            {"value": 0.00252, "reference_id": "739793"},
+        ])})
+        assert "one source (BRENDA ref 739793) reports 2 values" in text
+        assert "which one is right is a question about the papers" not in text
+        assert "read that paper before choosing" in text
+
+    def test_a_settled_value_gets_no_section_at_all(self):
+        text = self._section({"reaction_Km": self._measurement(0.03, [])})
+        assert "did not settle on one value" not in text
+        assert "BRENDA ref 286469" in text, "the measurement is still reported"
+
+    def test_the_conversion_carries_them_off_the_resolver(self):
+        """The boundary the rows were actually being dropped at.
+
+        Every other test in this class builds a `Measurement` by hand with
+        `alternatives=` already set, so they pin the RENDERING and would all
+        pass with the conversion returning nothing -- which is precisely the
+        defect. Measured: emptying `alternatives` in `measured_from_search`
+        failed none of them. This one goes through the conversion.
+        """
+        from Terium.compose.export import measured_from_search
+
+        rows = (
+            {"value": 0.03, "unit": "mM", "organism": "Homo sapiens", "reference_id": "286469"},
+            {"value": 0.398, "unit": "mM", "organism": "Homo sapiens", "reference_id": "286442"},
+        )
+        source = type("ParameterSource", (), {
+            "value": 0.03, "unit": "mM", "organism": "Homo sapiens",
+            "citation": "BRENDA ref 286469", "origin": "literature",
+            "cross_species": False, "ph": None, "temperature_c": None,
+            "buffer": None, "explicitly_unreported": (),
+            "candidates": rows,
+        })()
+        resolution = type("Resolution", (), {"source": source})()
+        build = type("Build", (), {"resolutions": {"reaction_Km": resolution}})()
+
+        measured = measured_from_search(build)
+        record = measured["reaction_Km"]
+        assert record.alternatives == rows, (
+            "the rows the resolver ranked and did not pick must survive the "
+            "conversion, or the report has nothing to disagree about"
+        )
+        assert record.disagreement == (0.03, 0.398)

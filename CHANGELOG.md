@@ -50,6 +50,18 @@ The product's central claim -- every number traces to its source -- was
 true of the code and unreachable from anything a person types.
 
 ### Added
+- **A composed model reports what the evidence did not settle.** Where the
+  resolver ranked more than one row equal, the report names the spread
+  instead of presenting the pick as the answer: for EC 1.1.1.27 and
+  pyruvate, *"2 sources report 2 values (BRENDA ref 286442, 286469),
+  spanning 0.03 to 0.398 mM (13.3-fold). The model carries 0.03 — the
+  resolver's pick, not a verdict"*. The rows were being dropped at the
+  `Measurement` boundary, so a 13-fold disagreement arrived downstream as
+  one confident cited number, which looks more settled than a placeholder
+  rather than less. It distinguishes several papers disagreeing from one
+  paper reporting several rows, because sending a reader to one paper to
+  adjudicate itself is not advice. The lab-report path has printed this
+  since it was written; this is the composed model catching up.
 - **`compose` searches the literature.**
   `terrium compose "..." --subject 1.1.1.27 --organism "Homo sapiens"
   --substrate pyruvate` returns a model whose constants are BRENDA's, each
