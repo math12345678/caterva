@@ -515,6 +515,19 @@ def _influence_is_informative(influence: Any) -> Optional[bool]:
     return any(abs(getattr(e, "relative", 0.0)) >= NEGLIGIBLE_INFLUENCE for e in entries)
 
 
+def _database_could_supply(model: Any) -> bool:
+    """True when any unmeasured constant has a BRENDA table to be read from.
+
+    A motif parameter declares its table (`km`, `kcat`, `ki`) where one
+    exists. None do for a gene circuit, and there "name the enzyme" is
+    advice with no enzyme to name. Unknown models keep the old wording.
+    """
+    resolvable = getattr(model, "resolvable", None)
+    if not resolvable:
+        return True
+    return any(getattr(q, "table", None) for q in resolvable)
+
+
 def _provenance_concerns(
     model: Any, influence: Any = None,
 ) -> Tuple[List[Concern], str]:
@@ -588,6 +601,13 @@ def _provenance_concerns(
         f"constants the provenance table lists"
         if subject else
         "name the enzyme, or supply the constants the provenance table lists"
+        if _database_could_supply(model) else
+        # A gene circuit's synthesis rates and repression thresholds are in
+        # no enzyme database, and "name the enzyme" sent the reader to look
+        # for one in a model that has none (found 2026-09-25).
+        "supply the constants the provenance table lists, from your own "
+        "measurements or a paper: this mechanism's constants are not kept "
+        "in an enzyme database, so naming an enzyme would not find them"
     )
     informative = _influence_is_informative(influence)
     if informative is True:

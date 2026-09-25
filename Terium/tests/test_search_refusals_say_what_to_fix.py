@@ -73,3 +73,18 @@ def test_an_incomplete_ec_number_is_named_as_one() -> None:
     _, note, refused = _search_the_literature(model, args)
     assert refused
     assert "incomplete EC number" in note and "2.7.1.1" in note
+
+
+def test_a_gene_circuit_is_not_told_to_name_an_enzyme() -> None:
+    from Terium.compose.pipeline import compose
+
+    concerns, _ = _provenance_concerns(compose("two genes repressing each other"))
+    assert "name the enzyme" not in concerns[0].remedy
+    assert "not kept in an enzyme database" in concerns[0].remedy
+
+
+def test_an_enzyme_shape_still_is() -> None:
+    from Terium.compose.pipeline import compose
+
+    concerns, _ = _provenance_concerns(compose("Michaelis Menten"))
+    assert concerns[0].remedy.startswith("name the enzyme")

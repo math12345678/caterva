@@ -149,15 +149,13 @@ export const TEST_SUITES: TestSuite[] = [
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // Re-measured 2026-09-25 for v0.3.4-rc.2 (every shape building
-        // from its own description, organism reading, refusal reasons),
+        // Re-measured 2026-09-25 for v0.3.4-rc.3, on the final code,
         // Terium/ run alone under .venv, read out of a junit-xml report:
-        // 3467 tests, 3466 passed, 1 failed, 559 s. The failure is the
+        // 3469 tests, 3468 passed, 1 failed, 642 s. The failure is the
         // check_codegen_loads.py selftest, which needs npx and cannot write
         // the npm cache in the sandbox (see the long note above); it passes
-        // where npm works, as in CI. One robustness test's wording was
-        // updated after that run and re-run alone (45 passed).
-        passed: 3467,
+        // where npm works, as in CI.
+        passed: 3469,
         skipped: 0,
         failed: 0,
       },
