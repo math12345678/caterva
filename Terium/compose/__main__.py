@@ -72,6 +72,7 @@ named, and the sections say so where it changes what they mean.
 from __future__ import annotations
 
 from dataclasses import replace
+import re
 
 import argparse
 import sys
@@ -138,8 +139,10 @@ def build_parser(prog: str = "python -m Terium.compose") -> argparse.ArgumentPar
                              "resolved through UniProt and refused if it means "
                              "more than one enzyme")
     parser.add_argument("--organism",
-                        help="the organism the constants should belong to, e.g. "
-                             "'Homo sapiens'. Only used when --subject names one")
+                        help="the organism the constants should belong to: "
+                             "'Homo sapiens', or a common name such as human, "
+                             "mouse, yeast or 'E. coli'. Only used when "
+                             "--subject names one")
     parser.add_argument("--substrate",
                         help="the substrate a Km or Ki belongs to. A motif knows "
                              "it needs a Km; it cannot know what the Km is FOR, "
@@ -872,6 +875,14 @@ def _search_the_literature(
 
     subject = args.subject
     ec = model.ec_number
+    if ec is None and re.fullmatch(r"\s*\d+(\.\d+){0,2}\.?\s*", subject or ""):
+        # "2.7.1" is an EC class, not an enzyme, and looking it up in
+        # UniProt as a NAME produced "no reviewed enzyme named '2.7.1'".
+        return model, (
+            f"No search was run: {subject.strip()!r} is an incomplete EC "
+            f"number, which names a class of enzymes rather than one. A full "
+            f"EC number has four parts, like 2.7.1.1 (hexokinase)"
+        ), True
     if ec is None:
         try:
             lookup = literature_module("enzyme_lookup")
@@ -921,6 +932,20 @@ def _search_the_literature(
         if getattr(run, "failed", False)
     ]
     sourced = model.with_measured(measured, not_found=not_found)
+    if not measured and failures and not not_found:
+        # Every scout failed and none reported an absence: the search did
+        # not run, whatever the HTTP layer called it. A 404 from BRENDA's
+        # enzyme page means the EC number is not one BRENDA has.
+        text = "; ".join(sorted({str(r.failure) for r in failures}))
+        if "404" in text:
+            why = (
+                f"BRENDA has no enzyme {ec}. Check the EC number: search "
+                f"the enzyme's name on https://www.brenda-enzymes.org and "
+                f"copy the number at the top of its page"
+            )
+        else:
+            why = f"the literature search could not run: {text}"
+        return replace(model, search_refused=why), why, True
     if not measured:
         why = "; ".join(sorted({r.failure for r in failures})) if failures else (
             "every table was searched and none held a value for this "
@@ -932,6 +957,19 @@ def _search_the_literature(
         f"{len(measured)} constant(s) resolved from the literature: "
         + ", ".join(sorted(measured))
     )
+    if not args.organism:
+        # Nobody asked for an organism, so the resolver's default chose one
+        # -- for hexokinase and glucose, a chicken parasite. Legitimate and
+        # cited, and not what someone modelling their own system expects to
+        # read past without being told.
+        chosen = sorted({m.organism for m in measured.values()
+                         if getattr(m, "organism", None)})
+        if chosen:
+            note += (
+                f". No --organism was given, so these come from "
+                f"{', '.join(chosen)}, which the search chose; pass "
+                f"--organism to choose it yourself"
+            )
     still = sourced.unmeasured
     if still:
         note += (
@@ -1064,6 +1102,12 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
 
     _check_combination(parser, args)
 
+    from Terium.compose.organisms import normalise_organism
+
+    # "human" and "homo sapiens" searched for an organism BRENDA does not
+    # spell that way, and reported the absence as a fact about the science.
+    args.organism, organism_note = normalise_organism(args.organism)
+
     try:
         if args.export is not None:
             return _export(args.description, args.subject, args.export, args)
@@ -1098,6 +1142,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
             # stability, sensitivity, the time course, the verdict -- reads
             # the literature's numbers rather than the library's (ADR 0178).
             model, search_note, search_refused = _search_the_literature(model, args)
+            if search_refused and not model.searched and model.search_refused is None:
+                model = replace(model, search_refused=search_note)
         precomputed = _precompute_for_verdict(args, model)
 
         report = dossier(
@@ -1118,6 +1164,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         # Footer withheld until the analysis sections have run: a document
         # that says "Built by Terrium..." and then carries on for three more
         # pages has put its last word in the middle.
+        if organism_note and args.subject:
+            model.recognition.composition.note(organism_note)
         if search_note:
             model.recognition.composition.note(search_note)
         print(report.markdown(footer=False))

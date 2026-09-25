@@ -1250,10 +1250,16 @@ def resolve_kinetic_value(
             f"Found {len(candidates)} candidate paper(s) total; numeric "
             f"{quantity_upper} NOT auto-extracted, needs manual review"
         )
+        # Papers exist, but the database miss may still be a spelling: a
+        # typo'd substrate ("glucoze") reached here and read as "no
+        # database value" while BRENDA held D-glucose. Diagnosed into a
+        # separate log so this path's last line is still its verdict.
         return KineticResult(
             found=False,
             source="literature_candidates",
             literature_candidates=candidates,
+            substrates_available=_nothing_matched(
+                enzyme_ec, substrate, html_provider, table_label, []),
             search_log=log,
         )
 

@@ -83,6 +83,11 @@ class ComposedModel:
     #: both tells a reader to stop looking for a number that is in the
     #: database (ADR 0178).
     not_found: Mapping[str, str] = field(default_factory=dict)
+    #: Why a search that was asked for could not run at all -- an EC number
+    #: BRENDA does not have, an incomplete one, a missing substrate. Without
+    #: it the verdict could only say "none has been run" and advise running
+    #: one, which is circular when running one is what just failed.
+    search_refused: Optional[str] = None
 
     @property
     def structure_only(self) -> bool:

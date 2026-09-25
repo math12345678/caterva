@@ -138,6 +138,19 @@ def to_parameter_source(
         available = list(getattr(result, "cross_species_organisms_available", []) or [])
         if available:
             reason += f" -- available in: {', '.join(sorted(available))}"
+        # The resolver lists the substrate labels BRENDA's table DOES carry
+        # when the one asked for is absent. It was computed and dropped
+        # here, so "glucoze" read as "nothing found in BRENDA" -- a fact
+        # about the literature, when it was a fact about spelling.
+        substrates = list(getattr(result, "substrates_available", []) or [])
+        if substrates:
+            shown = substrates[:12]
+            more = f" and {len(substrates) - 12} more" if len(substrates) > 12 else ""
+            reason += (
+                f" -- BRENDA has no row for that substrate name here; it "
+                f"lists: {', '.join(shown)}{more}. Re-run with --substrate "
+                f"set to the one you meant"
+            )
         return None, reason
 
     return (

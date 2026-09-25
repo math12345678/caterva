@@ -18,10 +18,13 @@ Your run also showed two real problems, and both are fixed in **v0.3.4**:
 - On a model whose constants all came from the literature, the verdict at
   the top said "no search has been run", directly above the table of
   citations. It now says **GROUNDED**.
-- Plain "Michaelis Menten" was refused. It now builds, for any enzyme
-  (see "Try it on your own enzyme" below).
+- It only worked with certain wordings. Plain "Michaelis Menten" was
+  refused, and so were 21 of the 36 shapes described in their own words.
+  All 36 now build (see "Try it on your own enzyme" below).
+- `--organism human` found nothing, and typos gave unhelpful answers. It
+  now reads common names and tells you what to fix.
 
-The release candidate `v0.3.4-rc.1` is on GitHub and building.
+The release candidate `v0.3.4-rc.2` is on GitHub and building.
 
 **What's left for you: update your copy (1 minute), then Steps 2 and 3
 again with the new name (3 minutes).**
@@ -134,7 +137,8 @@ it three things:
    page (hexokinase is `2.7.1.1`).
 2. **The substrate**, as BRENDA names it (`glucose`, `ethanol`,
    `acetylcholine`).
-3. **The organism**, in Latin (`Homo sapiens`, `Saccharomyces cerevisiae`).
+3. **The organism**: Latin (`Homo sapiens`) or a common name (`human`,
+   `mouse`, `yeast`, `E. coli`). The report says how it read it.
 
 ```bash
 terrium compose "Michaelis Menten" --subject 2.7.1.1 --organism "Homo sapiens" --substrate glucose
@@ -151,6 +155,18 @@ These were each run once, unscripted, on 2026-09-24:
 
 When a number doesn't exist for your organism, it keeps a placeholder
 and tells you which organisms *do* have one. It never makes one up.
+
+If you mistype something, it tells you what to fix:
+
+| you type | it says |
+|---|---|
+| `--substrate glucoze` | the substrates BRENDA holds for this enzyme, e.g. `D-glucose` |
+| `--subject 9.9.9.9` | BRENDA has no enzyme 9.9.9.9, and how to look one up |
+| `--subject 2.7.1` | that's an incomplete EC number; a full one has four parts |
+| no `--substrate` | Km tables are per substrate, so add `--substrate` |
+
+To see every shape it can build: `terrium compose --shapes`. Each line
+there is something you can type as-is.
 
 ### If something goes wrong
 
@@ -180,7 +196,7 @@ Then `terrium` works. That's the only thing to remember.
 Only you can see this page; it needs your GitHub login.
 
 1. Open **https://github.com/math12345678/terrium/actions/workflows/release.yml**
-2. Find the row labelled **`v0.3.4-rc.1`** (the newest one, at the top).
+2. Find the row labelled **`v0.3.4-rc.2`** (the newest one, at the top).
 3. Look at the icon on the left of that row:
 
 | you see | it means | do this |
@@ -201,11 +217,11 @@ Only after Step 2 shows a **green tick**. In the Terminal from Step 1:
 ```bash
 cd ~/Code/terrium
 git fetch --tags
-git tag -a v0.3.4 "v0.3.4-rc.1^{}" -m "Terrium v0.3.4"
+git tag -a v0.3.4 "v0.3.4-rc.2^{}" -m "Terrium v0.3.4"
 git push origin v0.3.4
 ```
 
-The quotes around `"v0.3.4-rc.1^{}"` matter — zsh treats `^` and `{}`
+The quotes around `"v0.3.4-rc.2^{}"` matter — zsh treats `^` and `{}`
 specially without them. The last line prints `* [new tag] v0.3.4 ->
 v0.3.4`.
 
