@@ -20,8 +20,8 @@ const RELEASES: Release[] = [
   {
     date: "September 24, 2026",
     tag: "fix",
-    title: "v0.3.4: the verdict reads the search, and plain Michaelis-Menten builds",
-    desc: "A fully sourced model is graded GROUNDED instead of 'no search run'. \"Michaelis Menten\" and \"simple enzyme kinetics\" build; human hexokinase, yeast alcohol dehydrogenase and bovine chymotrypsin each come back with a cited Km and kcat.",
+    title: "v0.3.4: every shape builds from its own words, and the verdict reads the search",
+    desc: "All 36 shapes build from the one-line description --shapes prints (21 did not). A fully sourced model is graded GROUNDED. --organism human works, a misspelt substrate lists what BRENDA holds, and an unknown EC number says so.",
   },
   {
     date: "September 24, 2026",

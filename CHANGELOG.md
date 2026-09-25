@@ -50,6 +50,9 @@ The first clean-checkout run of 0.3.3 read like a demo: a sourced model's
 verdict said no search had run, and plain Michaelis-Menten was refused.
 
 ### Fixed
+- **`"3 step phosphorylation cascade"` crashed** (any description
+  starting with a digit gave an invalid model name).
+- **The Hill-function trigger matched "uphill" and "downhill".**
 - **The verdict read only one kind of provenance.** A model sourced by the
   literature search was graded STRUCTURAL with "none has been run", above
   a table of BRENDA citations. It now reads the search's results; a fully
@@ -60,6 +63,17 @@ verdict said no search had run, and plain Michaelis-Menten was refused.
   to re-run with `--organism` set to an organism that has a measurement.
 
 ### Added
+- **Every shape builds from its own `--shapes` description** (21 of 36 did
+  not), and every example in the usage message and the guide builds.
+  `Terium/tests/test_every_shape_builds_from_its_own_words.py`.
+- **`--organism` reads common names and lower case** (`human`, `yeast`,
+  `homo sapiens`) and says how it read them; `make cite` does the same.
+  `Terium/compose/organisms.py`.
+- **A misspelt substrate lists what BRENDA holds**; an unknown or
+  incomplete EC number says so and exits 3; the verdict's remedy is the
+  reason the search could not run.
+- With no `--organism`, the report names the organism the search chose.
+
 - **Plain Michaelis-Menten**, the `michaelis_menten` rule, at priority 45
   so every enzyme shape with more structure still wins.
   `Terium/tests/test_grammar_michaelis_menten.py`. The composer now builds

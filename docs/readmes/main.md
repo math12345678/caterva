@@ -17,7 +17,7 @@ gh repo clone Terrium-sim/main -- --recursive
 cd main
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 4,574 tests (3,394 engine + 1,180 literature)
+make test      # 4,672 tests (3,492 engine + 1,180 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -66,7 +66,7 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 3,394 tests |
+| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 3,492 tests |
 | [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,180 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |

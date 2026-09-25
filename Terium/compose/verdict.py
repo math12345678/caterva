@@ -532,6 +532,22 @@ def _provenance_concerns(
     if unmeasured == 0 and measured == 0:
         return [], "nothing to resolve"
 
+    refused = getattr(model, "search_refused", None)
+    if refused and not measured:
+        # The search was asked for and could not run. Advising the reader
+        # to "run the literature search" would send them back to the step
+        # that just failed; the reason is the remedy.
+        detail = (
+            f"all {unmeasured} rate constant(s) are the motif library's "
+            f"illustrative values, because the literature search for "
+            f"{subject!r} could not run"
+        )
+        note = f"{unmeasured} constant(s) unmeasured -- the search could not run"
+        return (
+            [Concern(source="provenance", severity=STRUCTURAL, detail=detail,
+                     remedy=str(refused).rstrip("."))],
+            note,
+        )
     if measured:
         detail = (
             f"{measured} constant(s) measured and {unmeasured} still the "
@@ -831,7 +847,19 @@ def form(
             f"from {getattr(stability, 'starts_tried', '?')} starting points"
         )
 
-    if robustness is None:
+    _measured_now, _unmeasured_now, _ = _grounding(model)
+    if robustness is None and _unmeasured_now == 0 and _measured_now > 0:
+        # Robustness resamples the placeholders, and a grounded model has
+        # none. Listing it as a check that "did NOT run -- pass
+        # --robustness" told people who had just passed --robustness to
+        # pass it. The literature's own spread is reported in the
+        # provenance section instead.
+        consulted["robustness"] = (
+            "nothing to resample: every constant is measured (the spread "
+            "between published values is under 'Where the evidence did not "
+            "settle on one value')"
+        )
+    elif robustness is None:
         unavailable["robustness"] = (
             "not run -- pass --robustness (or `robustness=`) to resample "
             "the placeholders"

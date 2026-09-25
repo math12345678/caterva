@@ -132,6 +132,15 @@ def main(argv: list[str] | None = None) -> int:
     if not args.quantity:
         args.quantity = ["km"]
 
+    # The same reading `terrium compose` applies: "human" is Homo sapiens,
+    # and saying so beats a search for an organism nobody spells that way.
+    sys.path.insert(0, str(ROOT))
+    from Terium.compose.organisms import normalise_organism
+
+    args.organism, organism_note = normalise_organism(args.organism)
+    if organism_note:
+        print(organism_note, file=sys.stderr)
+
     payload = build_payload(args)
     report_lab = ROOT / "scripts" / "report_lab.py"
     if not report_lab.is_file():

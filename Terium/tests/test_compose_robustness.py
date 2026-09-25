@@ -646,5 +646,5 @@ class TestAPartlyMeasuredModelVariesItsPlaceholders:
             measured={"reaction_kcat": m(100.0, "1/s"),
                       "reaction_Km": m(0.1, "mM"), "reaction_Ki": m(0.5, "mM")},
         )
-        with pytest.raises(RobustnessError, match="no unresolved constants"):
+        with pytest.raises(RobustnessError, match="every constant in this model is measured"):
             assess_model(full, is_monostable(), conclusion_name="x", samples=2)

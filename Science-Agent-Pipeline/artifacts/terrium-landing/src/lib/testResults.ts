@@ -137,7 +137,7 @@ export interface TestSuite {
 }
 
 // FILE COUNTS ONLY, 2026-09-24. The two figures above were corrected --
-// engine 100 -> 103, api-server 81 -> 91 -- across two merges of main, which
+// engine 100 -> 106, api-server 81 -> 91 -- across three merges of main, which
 // brought a batch of new api-server suites, plus one added here
 // (enzymePatternBoundaries.test.ts, ADR 0205; keywordsAreWords.test.ts,
 // ADR 0206). Both were measured by
@@ -162,21 +162,21 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "103 test files -- kinetics & Michaelis-Menten correctness, " +
+          "106 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // Re-measured 2026-09-24 for v0.3.4 (the verdict reading the
-        // search, and the michaelis_menten rule), Terium/ run alone under
-        // .venv, read out of a junit-xml report: 3369 tests, 3368 passed,
-        // 1 failed, 348 s. The failure is the check_codegen_loads.py
-        // selftest, which needs npx and cannot write the npm cache in the
-        // sandbox (see the long note above); it passes where npm works,
-        // as in CI. This row previously showed 3308 beside a comment that
-        // measured 3354: the comment was updated and the figure was not.
-        passed: 3369,
+        // Re-measured 2026-09-25 for v0.3.4-rc.2 (every shape building
+        // from its own description, organism reading, refusal reasons),
+        // Terium/ run alone under .venv, read out of a junit-xml report:
+        // 3467 tests, 3466 passed, 1 failed, 559 s. The failure is the
+        // check_codegen_loads.py selftest, which needs npx and cannot write
+        // the npm cache in the sandbox (see the long note above); it passes
+        // where npm works, as in CI. One robustness test's wording was
+        // updated after that run and re-run alone (45 passed).
+        passed: 3467,
         skipped: 0,
         failed: 0,
       },

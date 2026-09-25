@@ -491,7 +491,7 @@ def _single_enzyme(query: str, name: str) -> Recognition:
 
 
 def _enzyme_cascade(query: str, name: str) -> Recognition:
-    count = _count_before(query, "cascade", "enzyme") or 0
+    count = _count_before(query, "cascade", "enzyme", "catalytic step") or 0
     if not count:
         raise UnrecognisedShape(
             query,
@@ -1742,7 +1742,7 @@ def _metabolic_pathway(query: str, name: str) -> Recognition:
     library's business, and writing it down in two files is how the two
     drift.
     """
-    count = _count_before(query, "pathway", "segment", "step")
+    count = _count_before(query, "pathway", "segment", "step", "reversible segment", "reversible step")
     if count is None:
         raise UnrecognisedShape(
             query,
@@ -2040,7 +2040,7 @@ class Rule:
 
 
 RULES: Tuple[Rule, ...] = (
-    Rule("phosphorylation_cascade", (), ("phosphorylation cascade", "kinase cascade",
+    Rule("phosphorylation_cascade", (), ("each tier activating", "phosphorylation cascade", "kinase cascade",
                                          "mapk", "map kinase", "phosphorelay"),
          _phosphorylation_cascade,
          "N phosphorylation cycles, each tier activating the next", 90),
@@ -2055,7 +2055,9 @@ RULES: Tuple[Rule, ...] = (
                                   "ffl"),
          _feedforward_loop,
          "a three-node feed-forward loop, coherent or incoherent", 89),
-    Rule("repressilator", (), ("repressilator",), _repressilator,
+    Rule("repressilator", (), ("repressilator", "in a ring", "ring of three",
+                               "ring of repressors", "three genes repressing",
+                               "three repressors"), _repressilator,
          "three genes repressing each other in a ring", 88),
     # Above `gene_expression` (85) because a query naming both -- "negative
     # autoregulation of gene expression" -- is asking about the LOOP, and
@@ -2063,15 +2065,22 @@ RULES: Tuple[Rule, ...] = (
     # instead of the specific one. None of these triggers is a bare
     # "repress": "repressilator" and "two repressors" contain it, and either
     # would have been swallowed.
-    Rule("autoregulated_gene", (), ("autoregulat", "auto-regulat",
+    Rule("autoregulated_gene", (), ("its own promoter", "autoregulat", "auto-regulat",
                                     "self-repressing", "self-activating",
                                     "represses its own", "activates its own",
                                     "autorepression", "autoactivation",
                                     "autoinhibition"),
          _autoregulated_gene,
          "a gene whose product regulates its own promoter", 87),
+    # "repressing each other" was advertised as the first example in the
+    # usage message and the guide, and refused (found 2026-09-25). The
+    # three-gene ring (88) outranks this, so "three genes repressing each
+    # other in a ring" still reaches the repressilator.
     Rule("toggle_switch", (), ("toggle switch", "bistable switch",
-                               "mutual repression"), _toggle_switch,
+                               "mutual repression", "mutually repress",
+                               "repressing each other", "repress each other",
+                               "repressing the other", "repress one another",
+                               "repressing one another"), _toggle_switch,
          "two genes each repressing the other", 86),
     # "gene expression" and not "expression": `turnover` (72) already owns
     # "constitutive expression", and a bare "expression" would take it.
@@ -2092,34 +2101,34 @@ RULES: Tuple[Rule, ...] = (
     # writing the test that proves priority decides between two matching
     # rules -- the ordering was right and the matching was not.
     Rule("competition", ("competing",), ("substrate", "enzyme"), _competition,
-         "several enzymes drawing on one substrate pool", 84),
+         "several enzymes competing for one substrate pool", 84),
     Rule("competition_noun", ("competition",), ("substrate", "enzyme"),
-         _competition, "several enzymes drawing on one substrate pool", 83),
+         _competition, "competition between several enzymes for one substrate", 83),
     Rule("feedback_inhibition", (), ("feedback inhibition", "end product inhibition",
                                      "sequential feedback"), _feedback_inhibition,
-         "a linear pathway, with the feedback point named not guessed", 82),
+         "feedback inhibition of a linear pathway, with the feedback point named not guessed", 82),
     # Above `binding` (60), which triggers on "receptor" and "ligand" and
     # would otherwise take every internalisation query. Note that none of
     # these triggers is a bare "receptor": "reversible binding of a ligand
     # to a receptor" must keep reaching `binding`, and "an allosteric
     # inhibitor binding to a receptor" must keep reaching `inhibition`.
-    Rule("receptor_internalisation", (), ("internalis", "internaliz",
+    Rule("receptor_internalisation", (), ("removed from the surface", "internalis", "internaliz",
                                           "endocytosis", "endocytic",
                                           "receptor downregulation",
                                           "receptor down-regulation"),
          _receptor_internalisation,
          "ligand-bound receptor removed from the surface pool", 81),
-    Rule("enzyme_cascade", (), ("enzyme cascade", "catalytic cascade",
+    Rule("enzyme_cascade", (), ("catalytic steps", "enzyme cascade", "catalytic cascade",
                                 "reaction cascade"), _enzyme_cascade,
          "N catalytic steps, product to substrate", 80),
     # "futile cycle" and "substrate cycle", never a bare "cycle": "cell
     # cycle oscillator dynamics" belongs to the catalogue and this path must
     # keep refusing it, and "a phosphorylation cycle" is a different motif.
-    Rule("futile_cycle", (), ("futile cycle", "futile", "substrate cycle",
+    Rule("futile_cycle", (), ("opposing enzymes", "futile cycle", "futile", "substrate cycle",
                               "opposing kinase", "kinase and phosphatase"),
          _futile_cycle,
          "two opposing enzymes turning one pool over", 79),
-    Rule("open_system", (), ("constant inflow", "constant supply", "chemostat",
+    Rule("open_system", (), ("fed reactor", "constant inflow", "constant supply", "chemostat",
                              "open system", "continuous feed", "substrate inflow"),
          _open_system, "a fed reactor with no conservation over the fed species", 78),
     Rule("bi_substrate", (), ("two substrate", "two-substrate", "bi-bi", "bi bi",
@@ -2136,18 +2145,18 @@ RULES: Tuple[Rule, ...] = (
     Rule("autocatalysis", (), ("autocataly", "self-amplif", "self amplif",
                                "catalyses its own", "catalyzes its own", "prion"),
          _autocatalysis, "a product that catalyses its own formation", 75),
-    Rule("reversible_step", (), ("reversible reaction", "runs both ways",
+    Rule("reversible_step", (), ("both directions", "reversible reaction", "runs both ways",
                                  "reversible enzymatic", "reversible michaelis",
                                  "near equilibrium"),
          _reversible_step, "an enzymatic step that runs in both directions", 74),
     # "channeling"/"channelling" and never "channel": an ion channel is a
     # different mechanism in a different library, and the prefix would take
     # every query about one.
-    Rule("substrate_channeling", (), ("channeling", "channelling",
+    Rule("substrate_channeling", (), ("passed between enzymes", "channeling", "channelling",
                                       "metabolon", "handed directly"),
          _substrate_channeling,
          "an intermediate passed between enzymes, never entering the bulk", 73),
-    Rule("turnover", (), ("saturable degradation", "zero order degradation",
+    Rule("turnover", (), ("made and removed", "saturable degradation", "zero order degradation",
                           "zero-order degradation", "synthesis and degradation",
                           "constitutive expression", "made and degraded",
                           "turnover of"),
@@ -2158,7 +2167,7 @@ RULES: Tuple[Rule, ...] = (
     # the same curve with one exponent where MWC has L, Kr and Kt, so
     # answering an MWC query with it would silently discard the two-state
     # structure that was the question.
-    Rule("mwc_allostery", (), ("mwc", "monod-wyman-changeux",
+    Rule("mwc_allostery", (), ("concerted two-state", "two-state model", "mwc", "monod-wyman-changeux",
                                "monod wyman changeux", "concerted allosteric",
                                "concerted transition", "concerted model",
                                "tense and relaxed", "relaxed and tense",
@@ -2176,7 +2185,9 @@ RULES: Tuple[Rule, ...] = (
                                     "haemoglobin", "hemoglobin",
                                     "phosphofructokinase"),
          _cooperative_enzyme, "sigmoidal kinetics or cooperative ligand binding", 69),
-    Rule("allosteric", (), ("allosteric", "cooperative", "hill"),
+    Rule("allosteric", (), ("allosteric", "cooperative", "hill function",
+                          "hill equation", "hill coefficient", "hill kinetics",
+                          "hill-type", "hill type", "hill model"),
          _allosteric, "cooperative regulation as a Hill function", 68),
     # 67. "phosphorelay" is NOT a trigger even though a two-component system
     # is one: `phosphorylation_cascade` (90) already owns that word, and
@@ -2192,7 +2203,7 @@ RULES: Tuple[Rule, ...] = (
     # otherwise take every GPCR query. "g protein" with a SPACE is not a
     # trigger: it is a substring of "binding protein", and "a ligand
     # binding protein" must keep reaching `binding`.
-    Rule("gpcr_cycle", (), ("gpcr", "g-protein", "g protein coupled",
+    Rule("gpcr_cycle", (), ("g protein cycle", "gpcr", "g-protein", "g protein coupled",
                             "heterotrimeric", "gtpase cycle",
                             "guanine nucleotide exchange"),
          _gpcr_cycle,
@@ -2211,18 +2222,18 @@ RULES: Tuple[Rule, ...] = (
     # 64, and it must outrank `branch_point` (63): "branched pathway" is a
     # substring of "unbranched pathway", so an unbranched query matches
     # both rules and this one has to win it.
-    Rule("metabolic_pathway", (), ("linear pathway", "metabolic pathway",
+    Rule("metabolic_pathway", (), ("segments in series", "linear pathway", "metabolic pathway",
                                    "unbranched pathway", "pathway segment",
                                    "steps in series", "reversible steps"),
          _metabolic_pathway,
          "N reversible segments in series, none able to run uphill", 64),
-    Rule("branch_point", (), ("branch point", "branch-point", "branchpoint",
+    Rule("branch_point", (), ("drawn on by two", "branch point", "branch-point", "branchpoint",
                               "branched pathway", "branches into",
                               "flux split", "two branches"),
          _branch_point, "one metabolite drawn on by two enzymes", 63),
     # 62. Never a bare "atp": `transport` (76) owns "atpase" and
     # "atp-driven", and a pump query must keep reaching it.
-    Rule("moiety_cycle", (), ("moiety", "conserved pool", "cofactor cycle",
+    Rule("moiety_cycle", (), ("cofactor pool", "moiety", "conserved pool", "cofactor cycle",
                               "cofactor regeneration", "cofactor coupled",
                               "cofactor-coupled", "spends a cofactor",
                               "consumes a cofactor", "atp/adp", "adp/atp",
@@ -2234,7 +2245,7 @@ RULES: Tuple[Rule, ...] = (
     # kinases" matches both, and the scaffold is what the query is about.
     Rule("scaffold_assembly", (), ("scaffold",), _scaffold_assembly,
          "a scaffold whose activity has an optimum, not a maximum", 61),
-    Rule("binding", (), ("reversible binding", "binds to", "binding of",
+    Rule("binding", (), ("forming a complex", "form a complex", "reversible binding", "binds to", "binding of",
                          "association", "ligand", "receptor", "dimeris",
                          "dimeriz"), _binding,
          "two partners forming a complex", 60),
@@ -2252,12 +2263,12 @@ RULES: Tuple[Rule, ...] = (
     # bistable switch between two repressors" is two genes repressing each
     # other and must keep reaching that rule; this one is the ONE-species
     # loop.
-    Rule("bistable_feedback", (), ("bistable", "bistability",
+    Rule("bistable_feedback", (), ("two stable levels", "bistable", "bistability",
                                    "positive feedback loop"),
          _bistable_positive_feedback,
          "one species driving its own production, with two stable levels", 58),
     Rule("synthesis", (), ("expressed and removed", "made at a constant rate"),
-         _synthesis, "one species, made and removed", 50),
+         _synthesis, "one species, expressed and removed", 50),
     Rule("michaelis_menten", (), ("michaelis", "menten", "enzyme kinetics",
                                   "single enzyme", "one enzyme",
                                   "catalytic step", "enzyme-catalysed",
@@ -2267,7 +2278,7 @@ RULES: Tuple[Rule, ...] = (
                                   "enzyme turning", "enzyme that converts"),
          _single_enzyme,
          "one enzyme turning one substrate into one product", 45),
-    Rule("conversion", (), ("first order conversion", "converts to",
+    Rule("conversion", (), ("no catalyst", "a -> b", "first order conversion", "converts to",
                             "uncatalysed"), _simple_conversion,
          "A -> B with no catalyst", 40),
 )
@@ -2322,6 +2333,11 @@ def recognise(query: str, *, name: Optional[str] = None) -> Recognition:
 
     best = max(candidates, key=lambda rule: rule.priority)
     model_name = name or re.sub(r"[^a-z0-9]+", "_", lowered)[:48].strip("_")
+    # SBML ids cannot start with a digit, and "3 step phosphorylation
+    # cascade" crashed with an AssertionError three frames down (found
+    # 2026-09-25). The name is a label, so prefixing it changes nothing.
+    if model_name[:1].isdigit():
+        model_name = f"model_{model_name}"
     return best.build(lowered, model_name or "composed_model")
 
 

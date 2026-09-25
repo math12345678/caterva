@@ -658,10 +658,12 @@ def assess_model(
             vary = list(_resolvable_ids(model))
             if not vary:
                 raise RobustnessError(
-                    "this model has no unresolved constants to vary, so there "
-                    "is no placeholder uncertainty to measure. Pass "
-                    "include_concentrations=True to ask the dose question "
-                    "instead, or name parameters explicitly."
+                    "every constant in this model is measured, so there is "
+                    "no placeholder uncertainty to measure. The spread "
+                    "between published values is reported under 'Where the "
+                    "evidence did not settle on one value'. (From Python, "
+                    "include_concentrations=True asks the dose question "
+                    "instead, or name parameters explicitly.)"
                 )
     return assess(
         model.network, conclusion,
