@@ -487,8 +487,9 @@ actually met, which is very often not "nothing":
 
 ```
 | `reaction_kcat` | 100.0 1/s | **placeholder** | no value in the organism
-  requested; measurements exist in other organisms and cross-species use was
-  not opted into -- available in: Cimex lectularius, Drosophila
+  requested; measurements exist in other organisms, and one is never
+  substituted for yours (ADR 0024) -- re-run with --organism set to one of
+  them to build the model there -- available in: Cimex lectularius, Drosophila
   melanogaster, Macroptilium atropurpureum, Mus musculus |
 
 | `reaction_Ki`   | 0.5 mM    | **placeholder** | no database value;

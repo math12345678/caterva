@@ -52,7 +52,8 @@ def _parameter_source_cls():
 NOT_FOUND_REASONS = {
     "cross_species_withheld": (
         "no value in the organism requested; measurements exist in other "
-        "organisms and cross-species use was not opted into"
+        "organisms, and one is never substituted for yours (ADR 0024) -- "
+        "re-run with --organism set to one of them to build the model there"
     ),
     "cross_species_too_distant": (
         "values exist only in organisms too distantly related to offer"

@@ -16,7 +16,7 @@ settings), and those say so.
   GitHub.
 - GitHub's `main` branch has been brought up to date with it, so anyone
   who clones the repository gets everything.
-- A release candidate, `v0.3.3-rc.2`, is building on GitHub right now.
+- A release candidate, `v0.3.3-rc.3`, is building on GitHub right now.
 
 **What's left for you: three steps, about fifteen minutes, all copy and
 paste.** Then some decisions for later, which block nothing today.
@@ -99,6 +99,17 @@ in Homo sapiens, substrate pyruvate.
 
 That is the whole point of Terrium, working on your machine.
 
+The `placeholder` on kcat is correct, not a failure: nobody has measured
+it in human LDH, and Terrium never borrows another species' number without
+you asking. To ask, name one of the organisms it lists:
+
+```bash
+terrium compose "Michaelis-Menten with a competitive inhibitor" --subject 1.1.1.27 --organism "Oryctolagus cuniculus" --substrate pyruvate
+```
+
+Now all three constants are measured, in rabbit, and all three come from
+one paper (`BRENDA ref 741355`).
+
 ### If something goes wrong
 
 Run this and read the lines marked `FAIL` — each one prints its own fix:
@@ -127,7 +138,7 @@ Then `terrium` works. That's the only thing to remember.
 Only you can see this page; it needs your GitHub login.
 
 1. Open **https://github.com/math12345678/terrium/actions/workflows/release.yml**
-2. Find the row labelled **`v0.3.3-rc.2`** (the newest one, at the top).
+2. Find the row labelled **`v0.3.3-rc.3`** (the newest one, at the top).
 3. Look at the icon on the left of that row:
 
 | you see | it means | do this |
@@ -148,11 +159,11 @@ Only after Step 2 shows a **green tick**. In the Terminal from Step 1:
 ```bash
 cd ~/Code/terrium
 git fetch --tags
-git tag -a v0.3.3 "v0.3.3-rc.2^{}" -m "Terrium v0.3.3"
+git tag -a v0.3.3 "v0.3.3-rc.3^{}" -m "Terrium v0.3.3"
 git push origin v0.3.3
 ```
 
-The quotes around `"v0.3.3-rc.2^{}"` matter — zsh treats `^` and `{}`
+The quotes around `"v0.3.3-rc.3^{}"` matter — zsh treats `^` and `{}`
 specially without them. The last line prints `* [new tag] v0.3.3 ->
 v0.3.3`.
 
