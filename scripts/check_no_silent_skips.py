@@ -107,8 +107,13 @@ ALLOWED_SKIP_REQUIRES_MODULE: dict[str, str] = {
 #: Without this the entry would have to be unconditional, and an exemption
 #: that cannot expire is the rubber stamp this file argues against two
 #: comments above.
+#: Keyed by TEST NAME, not module: `_skip_key` returns the half after "::",
+#: because a collection-level skip has an empty file half. The stdpopsim
+#: entry looks like a module name only because that module skips whole.
 ALLOWED_SKIP_REQUIRES_PLATFORM: dict[str, str] = {
-    "test_doctor_hidden_pth": "darwin",
+    "test_a_hidden_pth_is_a_named_failure": "darwin",
+    "test_a_visible_pth_passes": "darwin",
+    "test_the_terrium_command_is_declared": "darwin",
 }
 
 
@@ -127,19 +132,25 @@ def _allowed_reason_still_holds(key: str) -> bool:
     return True
 
 
+#: One reason, three tests: they are the whole of
+#: Tests/test_doctor_hidden_pth.py, skipped together by one module-level
+#: `pytestmark`.
+_HIDDEN_PTH_SKIP = (
+    "Tests the macOS-only failure where iCloud sets the UF_HIDDEN flag on a "
+    ".pth inside .venv and Python 3.13 then skips it, so `terrium` vanishes "
+    "with `No module named 'Terium'`. The module is "
+    "`skipif(sys.platform != 'darwin')` because UF_HIDDEN is a macOS flag "
+    "with no Linux counterpart -- hiding on Linux is a leading dot, which "
+    "Python does not treat specially. CI is ubuntu-latest, so these three "
+    "skip on every run. Expected OFF darwin only: on macOS this entry "
+    "expires and a skip there goes red, because on the one platform the "
+    "test is about, not running is not a fact about the operating system."
+)
+
 ALLOWED_SKIPS: dict[str, str] = {
-    "test_doctor_hidden_pth": (
-        "Tests the macOS-only failure where iCloud sets the UF_HIDDEN flag "
-        "on a .pth inside .venv and Python 3.13 then skips it, so `terrium` "
-        "vanishes with `No module named 'Terium'`. The module is "
-        "`skipif(sys.platform != 'darwin')` because UF_HIDDEN is a macOS "
-        "flag with no Linux counterpart -- hiding on Linux is a leading dot, "
-        "which Python does not treat specially. CI is ubuntu-latest, so "
-        "these three skip on every run. Expected OFF darwin only: on macOS "
-        "this entry expires and a skip there goes red, because on the one "
-        "platform the test is about, not running is not a fact about the "
-        "operating system."
-    ),
+    "test_a_hidden_pth_is_a_named_failure": _HIDDEN_PTH_SKIP,
+    "test_a_visible_pth_passes": _HIDDEN_PTH_SKIP,
+    "test_the_terrium_command_is_declared": _HIDDEN_PTH_SKIP,
     "test_popgen_resolver": (
         "Needs `stdpopsim`, which lives in the optional "
         "requirements-popgen.txt. `make setup` installs requirements-dev.txt "
@@ -327,7 +338,20 @@ def main() -> int:
 
         # An allowance whose skip stopped happening is stale, and a baseline
         # that only ever grows records a problem instead of fixing it.
-        stale = sorted(set(ALLOWED_SKIPS) - allowed_seen)
+        # An entry whose stated cause does not apply HERE is not stale: the
+        # test ran, which is what should happen. Only an entry whose cause
+        # still holds and which nonetheless stopped skipping is stale.
+        #
+        # Without this the conditional entries invert into a trap. On macOS
+        # the three UF_HIDDEN tests run, and on any machine with stdpopsim
+        # installed test_popgen_resolver runs -- and each would be reported
+        # as a stale allowance that should be deleted, which would delete
+        # the record that CI needs it.
+        stale = sorted(
+            key
+            for key in set(ALLOWED_SKIPS) - allowed_seen
+            if _allowed_reason_still_holds(key)
+        )
         if stale:
             print(
                 f"\nFAIL: {len(stale)} entr(y/ies) in ALLOWED_SKIPS no longer "
