@@ -470,6 +470,26 @@ def _phosphorylation_cascade(query: str, name: str) -> Recognition:
     return Recognition(composition, "phosphorylation_cascade", reading)
 
 
+def _single_enzyme(query: str, name: str) -> Recognition:
+    """One enzyme, one substrate, one product: plain Michaelis-Menten.
+
+    The commonest model in enzymology had no rule. The motif was in the
+    library and the cascade refusal told people to "ask for that
+    directly", but "Michaelis Menten", "michaelis-menten kinetics" and
+    "simple enzyme kinetics" were all refused (found 2026-09-24 by trying
+    unscripted queries). Priority 45 keeps it below every enzyme shape with
+    more structure, so a query naming an inhibitor, reversibility or
+    cooperativity still reaches the rule written for that.
+    """
+    composition = Composition(name)
+    composition.add(CATALYTIC_STEP, "reaction")
+    composition.note(
+        "one enzyme turning one substrate into one product, under the "
+        "quasi-steady-state assumption"
+    )
+    return Recognition(composition, "michaelis_menten", "Michaelis-Menten")
+
+
 def _enzyme_cascade(query: str, name: str) -> Recognition:
     count = _count_before(query, "cascade", "enzyme") or 0
     if not count:
@@ -2238,6 +2258,15 @@ RULES: Tuple[Rule, ...] = (
          "one species driving its own production, with two stable levels", 58),
     Rule("synthesis", (), ("expressed and removed", "made at a constant rate"),
          _synthesis, "one species, made and removed", 50),
+    Rule("michaelis_menten", (), ("michaelis", "menten", "enzyme kinetics",
+                                  "single enzyme", "one enzyme",
+                                  "catalytic step", "enzyme-catalysed",
+                                  "enzyme-catalyzed", "enzyme catalysed",
+                                  "enzyme catalyzed", "enzymatic reaction",
+                                  "enzyme reaction", "enzyme converting",
+                                  "enzyme turning", "enzyme that converts"),
+         _single_enzyme,
+         "one enzyme turning one substrate into one product", 45),
     Rule("conversion", (), ("first order conversion", "converts to",
                             "uncatalysed"), _simple_conversion,
          "A -> B with no catalyst", 40),

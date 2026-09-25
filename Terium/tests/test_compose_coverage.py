@@ -73,16 +73,20 @@ _TS_HARNESS = (
     / "frontDoorCoverage.test.ts"
 )
 
-#: The nine the composer does not build, and why each is correct.
+#: The eight the composer does not build, and why each is correct.
 #:
-#: Eight are the catalogue's OWN domains -- an epidemic, genetic drift, a
+#: "michaelis menten kinetics for hexokinase" left this list on 2026-09-24,
+#: when plain Michaelis-Menten got a rule: it is one reaction motif, not a
+#: catalogue domain, and the command line (which has no catalogue) was
+#: refusing it. On the web the catalogue still answers it first.
+#:
+#: Seven are the catalogue's OWN domains -- an epidemic, genetic drift, a
 #: Gillespie run, PCR. Those are not compositions of reaction motifs and the
 #: composer has no business claiming them; the catalogue answers them or
 #: nothing does. The ninth is glycolysis, refused because a named pathway
 #: needs a pathway database (ADR 0173): a plausible wrong glycolysis is worse
 #: than a refusal that names KEGG.
 EXPECTED_REFUSALS = {
-    "michaelis menten kinetics for hexokinase": "catalogue domain",
     "SIR model of a measles outbreak in a school": "catalogue domain",
     "SEIR epidemic with an exposed class": "catalogue domain",
     "genetic drift in a small population": "catalogue domain",

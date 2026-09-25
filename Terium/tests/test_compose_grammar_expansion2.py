@@ -217,7 +217,7 @@ NEW_SHAPES = (
 #: other's failure, and the whole value of a pinned table is that it says
 #: which change broke it.
 UNCHANGED = {
-    "michaelis menten kinetics for hexokinase": None,
+    "michaelis menten kinetics for hexokinase": "michaelis_menten",
     "enzyme kinetics with a competitive inhibitor": "inhibition",
     "SIR model of a measles outbreak in a school": None,
     "SEIR epidemic with an exposed class": None,

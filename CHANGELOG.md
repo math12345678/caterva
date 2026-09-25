@@ -44,6 +44,29 @@ which is a product nobody adopts.
 - README, `START_HERE.md`, the docs index and the v0.3.0 release notes
   point at the guide.
 
+## [0.3.4] - 2026-09-24
+
+The first clean-checkout run of 0.3.3 read like a demo: a sourced model's
+verdict said no search had run, and plain Michaelis-Menten was refused.
+
+### Fixed
+- **The verdict read only one kind of provenance.** A model sourced by the
+  literature search was graded STRUCTURAL with "none has been run", above
+  a table of BRENDA citations. It now reads the search's results; a fully
+  sourced model is GROUNDED. The behaviour caveat's count was wrong for
+  the same reason. `Terium/tests/test_verdict_after_search.py`, which fails
+  without the fix.
+- **A withheld constant named an option that does not exist.** It now says
+  to re-run with `--organism` set to an organism that has a measurement.
+
+### Added
+- **Plain Michaelis-Menten**, the `michaelis_menten` rule, at priority 45
+  so every enzyme shape with more structure still wins.
+  `Terium/tests/test_grammar_michaelis_menten.py`. The composer now builds
+  12 of the twenty coverage questions, not 11.
+- **"Try it on your own enzyme"** in `docs/OWNER_CHECKLIST.md`, with four
+  enzymes run unscripted.
+
 ## [0.3.3] - 2026-09-22
 
 The product's central claim -- every number traces to its source -- was

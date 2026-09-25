@@ -718,7 +718,11 @@ class ModelDossier:
         # The denominator: a ComposedModel knows its resolvable set; a
         # ProvenancedModel knows what it measured, and the two sum.
         measured = getattr(self.model, "measured", None)
-        if measured is not None:
+        if isinstance(measured, dict):
+            # A ComposedModel's search results: id -> Measurement. Iterating
+            # it yields ids, which have no `role`, and counted zero.
+            total = count + len(measured)
+        elif measured is not None:
             total = count + sum(
                 1 for o in measured if getattr(o, "role", "") == "parameter"
             )
@@ -731,6 +735,8 @@ class ModelDossier:
         why = (
             "because no enzyme was named" if not subject
             else f"because no search has been run for {subject!r}"
+            if count == total and not getattr(self.model, "searched", False)
+            else f"because the search for {subject!r} did not find them"
             if count == total
             else f"the search for {subject!r} did not find them"
         )

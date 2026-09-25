@@ -56,7 +56,7 @@ says what to do next. Then:
 ./terrium compose --shapes
 ```
 
-All 35 mechanisms it can build, each with a one-line description. This is
+All 36 mechanisms it can build, each with a one-line description. This is
 the menu. Describe any of them in your own words and it will recognise
 them.
 
