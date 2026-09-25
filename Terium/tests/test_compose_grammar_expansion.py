@@ -222,7 +222,7 @@ NEW_SHAPES = (
 # the catalogue's own domains -- an epidemic, genetic drift, PCR -- is the
 # correct answer and the one a new trigger word is most likely to break.
 UNCHANGED = {
-    "michaelis menten kinetics for hexokinase": None,
+    "michaelis menten kinetics for hexokinase": "michaelis_menten",
     "enzyme kinetics with a competitive inhibitor": "inhibition",
     "SIR model of a measles outbreak in a school": None,
     "SEIR epidemic with an exposed class": None,

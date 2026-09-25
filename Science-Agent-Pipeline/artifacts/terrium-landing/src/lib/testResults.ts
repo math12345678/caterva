@@ -137,7 +137,7 @@ export interface TestSuite {
 }
 
 // FILE COUNTS ONLY, 2026-09-24. The two figures above were corrected --
-// engine 100 -> 101, api-server 81 -> 91 -- after merging main, which
+// engine 100 -> 103, api-server 81 -> 91 -- across two merges of main, which
 // brought a batch of new api-server suites, plus one added here
 // (enzymePatternBoundaries.test.ts, ADR 0205; keywordsAreWords.test.ts,
 // ADR 0206). Both were measured by
@@ -162,29 +162,21 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "101 test files -- kinetics & Michaelis-Menten correctness, " +
+          "103 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // Re-measured 2026-09-24 after the literature wiring, the
-        // disagreement reporting, the assay conditions, the not-found
-        // reasons and the refusal exit code (ADR 0178), Terium/ run alone
-        // under .venv, read out of a junit-xml report: 3354 tests, 3353
-        // passed, 1 failed, 546 s. The one
-        // failure is the same check_codegen_loads.py selftest as on
-        // 2026-09-19 and 2026-09-21 (npx cannot write the npm cache in the
-        // sandbox; see the long note above), so this row says 3308, the
-        // figure with a working npm, stated the same way as before. The
-        // delta from 3276 is the v0.3.1 guide work: tests that pin the
-        // user's guide to the parser and the grammar, one parametrised case
-        // per command the guide prints. An earlier run of this same suite
-        // reported 3302, before the guide gained its worked example; the
-        // figure here is from a run made after the guide was final, because
-        // adding the delta by hand is the derivation this file's long note
-        // above exists to refuse.
-        passed: 3308,
+        // Re-measured 2026-09-24 for v0.3.4 (the verdict reading the
+        // search, and the michaelis_menten rule), Terium/ run alone under
+        // .venv, read out of a junit-xml report: 3369 tests, 3368 passed,
+        // 1 failed, 348 s. The failure is the check_codegen_loads.py
+        // selftest, which needs npx and cannot write the npm cache in the
+        // sandbox (see the long note above); it passes where npm works,
+        // as in CI. This row previously showed 3308 beside a comment that
+        // measured 3354: the comment was updated and the figure was not.
+        passed: 3369,
         skipped: 0,
         failed: 0,
       },

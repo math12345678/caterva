@@ -9,24 +9,37 @@ settings), and those say so.
 
 ## Where things stand
 
-**Already done for you:**
+**You've already done the hard part.** On 2026-09-24 you cloned into
+`~/Code/terrium`, ran `make setup`, got real cited constants, and published
+**v0.3.3**.
 
-- All the work — releases v0.3.0 to v0.3.3, the user's guide, the
-  literature search in `compose`, and every fix — is committed and on
-  GitHub.
-- GitHub's `main` branch has been brought up to date with it, so anyone
-  who clones the repository gets everything.
-- A release candidate, `v0.3.3-rc.2`, is building on GitHub right now.
+Your run also showed two real problems, and both are fixed in **v0.3.4**:
 
-**What's left for you: three steps, about fifteen minutes, all copy and
-paste.** Then some decisions for later, which block nothing today.
+- On a model whose constants all came from the literature, the verdict at
+  the top said "no search has been run", directly above the table of
+  citations. It now says **GROUNDED**.
+- Plain "Michaelis Menten" was refused. It now builds, for any enzyme
+  (see "Try it on your own enzyme" below).
 
-You do not need to fix the `gh` login, install anything new, or touch your
-old folder.
+The release candidate `v0.3.4-rc.1` is on GitHub and building.
+
+**What's left for you: update your copy (1 minute), then Steps 2 and 3
+again with the new name (3 minutes).**
+
+### Update your copy
+
+```bash
+cd ~/Code/terrium && source .venv/bin/activate
+git pull
+terrium --version
+```
+
+You should see `terrium 0.3.4`. You don't need `make setup` again.
+Then re-run the rabbit command below: the verdict now says GROUNDED.
 
 ---
 
-## Step 1 — Get a clean copy, outside iCloud (about 10 minutes)
+## Step 1 — Get a clean copy, outside iCloud (done ✅)
 
 ### Why
 
@@ -73,7 +86,7 @@ terrium --version
 You should see:
 
 ```
-terrium 0.3.3
+terrium 0.3.4
 ```
 
 The `(base)` in your prompt from Anaconda doesn't matter — `source
@@ -98,6 +111,46 @@ in Homo sapiens, substrate pyruvate.
 ```
 
 That is the whole point of Terrium, working on your machine.
+
+The `placeholder` on kcat is correct, not a failure: nobody has measured
+it in human LDH, and Terrium never borrows another species' number without
+you asking. To ask, name one of the organisms it lists:
+
+```bash
+terrium compose "Michaelis-Menten with a competitive inhibitor" --subject 1.1.1.27 --organism "Oryctolagus cuniculus" --substrate pyruvate
+```
+
+Now all three constants are measured, in rabbit, and all three come from
+one paper (`BRENDA ref 741355`), and the verdict at the top says
+**GROUNDED**.
+
+### Try it on your own enzyme
+
+It is not limited to lactate dehydrogenase. Any enzyme works, if you give
+it three things:
+
+1. **The EC number**: search the enzyme's name on
+   https://www.brenda-enzymes.org, and the number is at the top of its
+   page (hexokinase is `2.7.1.1`).
+2. **The substrate**, as BRENDA names it (`glucose`, `ethanol`,
+   `acetylcholine`).
+3. **The organism**, in Latin (`Homo sapiens`, `Saccharomyces cerevisiae`).
+
+```bash
+terrium compose "Michaelis Menten" --subject 2.7.1.1 --organism "Homo sapiens" --substrate glucose
+```
+
+These were each run once, unscripted, on 2026-09-24:
+
+| enzyme | organism | result |
+|---|---|---|
+| hexokinase `2.7.1.1`, glucose | human | Km 6.0 mM and kcat 40.1 1/s, both cited: **GROUNDED** |
+| alcohol dehydrogenase `1.1.1.1`, ethanol | yeast | Km 5.7 mM and kcat 143 1/s, both cited: **GROUNDED** |
+| chymotrypsin `3.4.21.1`, N-acetyl-L-tyrosine ethyl ester | cow | Km 1.17 mM and kcat 119.5 1/s, one paper: **GROUNDED** |
+| acetylcholinesterase `3.1.1.7`, acetylcholine | human | Km cited; kcat never measured in human, so it says so |
+
+When a number doesn't exist for your organism, it keeps a placeholder
+and tells you which organisms *do* have one. It never makes one up.
 
 ### If something goes wrong
 
@@ -127,7 +180,7 @@ Then `terrium` works. That's the only thing to remember.
 Only you can see this page; it needs your GitHub login.
 
 1. Open **https://github.com/math12345678/terrium/actions/workflows/release.yml**
-2. Find the row labelled **`v0.3.3-rc.2`** (the newest one, at the top).
+2. Find the row labelled **`v0.3.4-rc.1`** (the newest one, at the top).
 3. Look at the icon on the left of that row:
 
 | you see | it means | do this |
@@ -141,29 +194,29 @@ broken release on the page, so there's nothing to undo.
 
 ---
 
-## Step 3 — Publish v0.3.3 (1 minute)
+## Step 3 — Publish v0.3.4 (1 minute)
 
 Only after Step 2 shows a **green tick**. In the Terminal from Step 1:
 
 ```bash
 cd ~/Code/terrium
 git fetch --tags
-git tag -a v0.3.3 "v0.3.3-rc.2^{}" -m "Terrium v0.3.3"
-git push origin v0.3.3
+git tag -a v0.3.4 "v0.3.4-rc.1^{}" -m "Terrium v0.3.4"
+git push origin v0.3.4
 ```
 
-The quotes around `"v0.3.3-rc.2^{}"` matter — zsh treats `^` and `{}`
-specially without them. The last line prints `* [new tag] v0.3.3 ->
-v0.3.3`.
+The quotes around `"v0.3.4-rc.1^{}"` matter — zsh treats `^` and `{}`
+specially without them. The last line prints `* [new tag] v0.3.4 ->
+v0.3.4`.
 
 Wait about five minutes, then open
 **https://github.com/math12345678/terrium/releases**. You should see
-**Terrium v0.3.3** at the top with downloads for Mac, Linux and Windows.
+**Terrium v0.3.4** at the top with downloads for Mac, Linux and Windows.
 
-To try the Mac download: download `terrium-0.3.3-macos-arm64.tar.gz`, then
+To try the Mac download: download `terrium-0.3.4-macos-arm64.tar.gz`, then
 
 ```bash
-cd ~/Downloads && tar xzf terrium-0.3.3-macos-arm64.tar.gz && cd terrium
+cd ~/Downloads && tar xzf terrium-0.3.4-macos-arm64.tar.gz && cd terrium
 xattr -dr com.apple.quarantine .
 ./terrium compose "a toggle switch between two repressors"
 ```

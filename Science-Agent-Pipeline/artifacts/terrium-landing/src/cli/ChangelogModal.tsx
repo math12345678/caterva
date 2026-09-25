@@ -19,6 +19,12 @@ interface Release {
 const RELEASES: Release[] = [
   {
     date: "September 24, 2026",
+    tag: "fix",
+    title: "v0.3.4: the verdict reads the search, and plain Michaelis-Menten builds",
+    desc: "A fully sourced model is graded GROUNDED instead of 'no search run'. \"Michaelis Menten\" and \"simple enzyme kinetics\" build; human hexokinase, yeast alcohol dehydrogenase and bovine chymotrypsin each come back with a cited Km and kcat.",
+  },
+  {
+    date: "September 24, 2026",
     tag: "feature",
     title: "v0.3.3: a model whose constants are sourced",
     desc: "compose searches BRENDA and every constant names its reference. The report also says what the evidence did not settle (two papers 13-fold apart on one Km), the pH and temperature each value was measured under, and why a missing constant is missing: most often it exists in another organism.",

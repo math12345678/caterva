@@ -465,6 +465,15 @@ def _grounding(model: Any) -> Tuple[int, int, bool]:
     """
     measured = getattr(model, "measured", None)
     placeholders = getattr(model, "placeholders", None)
+    if isinstance(measured, Mapping) and placeholders is None:
+        # A `ComposedModel` after `with_measured`: the search's values are
+        # a mapping and its `unmeasured` is what the search left. This
+        # branch was missing, so a model with every constant sourced was
+        # graded "no search run" at the top of the same page whose table
+        # listed three citations (reported 2026-09-24, rabbit LDH).
+        unmeasured = tuple(getattr(model, "unmeasured", ()) or ())
+        return len(measured), len(unmeasured), bool(
+            getattr(model, "searched", False))
     if measured is None or placeholders is None:
         resolvable = list(getattr(model, "resolvable", ()))
         return 0, len(resolvable), False
@@ -556,6 +565,9 @@ def _provenance_concerns(
         note = f"{unmeasured} constant(s) unmeasured"
 
     source = (
+        f"re-run with --organism set to one the provenance table lists as "
+        f"holding a measurement, or supply the constants yourself"
+        if subject and has_provenance else
         f"run the literature search for {subject!r}, or supply the "
         f"constants the provenance table lists"
         if subject else

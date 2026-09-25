@@ -2,7 +2,7 @@
 
 Part of [**Terrium**](https://github.com/Terrium-sim/main) — scientific computing for teaching labs.
 
-The simulation engine. 64 files, 38 test modules, 3,379 engine tests.
+The simulation engine. 64 files, 38 test modules, 3,394 engine tests.
 
 Fifteen domains: Michaelis-Menten (plain and competitively inhibited),
 SIR/SEIR epidemiology, PCR amplification, Monte Carlo, Wright-Fisher
