@@ -24,7 +24,7 @@ Your run also showed two real problems, and both are fixed in **v0.3.4**:
 - `--organism human` found nothing, and typos gave unhelpful answers. It
   now reads common names and tells you what to fix.
 
-The release candidate `v0.3.4-rc.3` is on GitHub and building.
+The release candidate `v0.3.4-rc.4` is on GitHub and building.
 
 **What's left for you: update your copy (1 minute), then Steps 2 and 3
 again with the new name (3 minutes).**
@@ -196,7 +196,7 @@ Then `terrium` works. That's the only thing to remember.
 Only you can see this page; it needs your GitHub login.
 
 1. Open **https://github.com/math12345678/terrium/actions/workflows/release.yml**
-2. Find the row labelled **`v0.3.4-rc.3`** (the newest one, at the top).
+2. Find the row labelled **`v0.3.4-rc.4`** (the newest one, at the top).
 3. Look at the icon on the left of that row:
 
 | you see | it means | do this |
@@ -217,11 +217,11 @@ Only after Step 2 shows a **green tick**. In the Terminal from Step 1:
 ```bash
 cd ~/Code/terrium
 git fetch --tags
-git tag -a v0.3.4 "v0.3.4-rc.3^{}" -m "Terrium v0.3.4"
+git tag -a v0.3.4 "v0.3.4-rc.4^{}" -m "Terrium v0.3.4"
 git push origin v0.3.4
 ```
 
-The quotes around `"v0.3.4-rc.3^{}"` matter — zsh treats `^` and `{}`
+The quotes around `"v0.3.4-rc.4^{}"` matter — zsh treats `^` and `{}`
 specially without them. The last line prints `* [new tag] v0.3.4 ->
 v0.3.4`.
 

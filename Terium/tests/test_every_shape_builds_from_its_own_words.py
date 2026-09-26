@@ -76,6 +76,31 @@ def _advertised_examples() -> list[str]:
     return sorted({q for q in found if "..." not in q})
 
 
+def _help_examples() -> list[str]:
+    """Every example line `terrium compose --help` prints, as argv."""
+    import shlex
+
+    from Terium.compose.__main__ import build_parser
+
+    epilog = build_parser("terrium compose").epilog or ""
+    lines = [l.strip() for l in epilog.splitlines()
+             if l.strip().startswith("terrium compose ")]
+    return [shlex.split(l.split(" > ")[0])[2:] for l in lines]
+
+
+@pytest.mark.parametrize("argv", _help_examples(), ids=lambda a: " ".join(a)[:60])
+def test_every_help_example_parses_and_builds(argv) -> None:
+    from Terium.compose.__main__ import build_parser
+
+    args = build_parser("terrium compose").parse_args(argv)
+    if args.description:
+        compose(args.description)
+
+
+def test_the_help_examples_were_found() -> None:
+    assert len(_help_examples()) >= 6
+
+
 def test_the_advertised_examples_were_found() -> None:
     assert "two genes repressing each other" in _advertised_examples()
 
@@ -89,3 +114,19 @@ def test_every_advertised_example_builds_or_refuses_on_purpose(query) -> None:
         # must refuse for the stated reason, a named pathway, never for
         # want of a trigger.
         assert "No shape in this grammar matches" not in str(refusal), query
+
+
+def test_the_guide_counts_the_scenario_presets_correctly() -> None:
+    """The guide said "twelve teaching presets"; there were thirteen."""
+    import subprocess
+    import sys
+
+    words = {10: "ten", 11: "eleven", 12: "twelve", 13: "thirteen",
+             14: "fourteen", 15: "fifteen", 16: "sixteen"}
+    listed = subprocess.run(
+        [sys.executable, "-m", "Terium.app", "sim", "scenarios"],
+        capture_output=True, text=True, cwd=ROOT, check=True,
+    ).stdout
+    count = sum(1 for line in listed.splitlines() if line[:1].isalpha())
+    guide = (ROOT / "docs" / "USING_TERRIUM.md").read_text()
+    assert f"# {words[count]} teaching presets" in guide

@@ -35,34 +35,39 @@ cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
 ## Quick start
 
-> **Not public.** The command below needs access: every `Terrium-sim`
-> repository is private, and a plain `git ls-remote` on any of them prompts
-> for a username. If you are reading this without a GitHub account that has
-> been added, **line one is as far as you get** — that is a fact about the
-> repository, not a mistake you made.
+> **Not public.** Not "not yet" either: every `Terrium-sim` repository is
+> private and is staying that way (ADR 0179), so the command below needs
+> access. A plain `git clone` or `git ls-remote` URL stops at a username
+> prompt; `gh repo clone` uses your GitHub credentials and is the command
+> that works. If you are reading this without an account that has been added,
+> **line one is as far as you get** — that is a fact about the repository,
+> not a mistake you made.
 >
-> (Removed 2026-08-23 on a probe that had silently authenticated
-> through a developer keychain; restored 2026-08-29 after CI — which
-> holds no credentials — and an unauthenticated API check both said
-> private. The probe now strips credential helpers so this cannot
+> (This notice was removed 2026-08-23 on a probe that had silently
+> authenticated through a developer keychain, and restored 2026-08-29 after
+> CI — which holds no credentials — and an unauthenticated API check both
+> said private. The probe now strips credential helpers so it cannot
 > recur.)
 >
-> `scripts/check_quickstart_clone_works.py` checks that no document promises
-> a stranger anonymous access it does not have
+> `scripts/check_quickstart_clone_works.py` reports this on every CI run and
+> lets no document promise a stranger anonymous access it does not have
 > ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md),
-> [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md)). This> notice is checked in the other direction too: publish the repositories and
-> `check_availability_notice_matches_reality.py` fails until it is deleted,
-> so it cannot outlive the thing it describes.
+> [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md)). It is
+> checked in the other direction too: publish the repositories and
+> `check_availability_notice_matches_reality.py` fails until this notice is
+> deleted, so it cannot outlive the thing it describes.
 
 > **Private repository.** These repositories are private and are staying
 > that way, so `gh repo clone` — which uses your GitHub credentials — is
 > the command that works. A plain `git clone` URL stops at a username
-> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).```bash
+> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).
+
+```bash
 gh repo clone Terrium-sim/main
 cd main
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,674 tests (3,494 engine + 1,180 literature)
+make test      # runs all 4,691 tests (3,511 engine + 1,180 literature)
 ```
 
 ### Or download the release
@@ -539,7 +544,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Terrium/
 ├── Terium/                  simulation engine (ODE + discrete/stochastic)
 │   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                3,494 tests
+│   └── tests/                3,511 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -633,9 +638,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,674 tests
+make test        # run all 4,691 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,494 tests)
+make test-sim    # simulation engine only (3,511 tests)
 make test-lit    # literature layer only (1180 tests)
 python3 scripts/verify_build.py --quick  # all 78 guard scripts, incl. TypeScript compile
 make clean       # remove caches

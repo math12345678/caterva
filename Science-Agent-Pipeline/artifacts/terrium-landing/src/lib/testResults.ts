@@ -137,7 +137,7 @@ export interface TestSuite {
 }
 
 // FILE COUNTS ONLY, 2026-09-24. The two figures above were corrected --
-// engine 100 -> 106, api-server 81 -> 91 -- across three merges of main, which
+// engine 100 -> 107, api-server 81 -> 91 -- across five merges of main, which
 // brought a batch of new api-server suites, plus one added here
 // (enzymePatternBoundaries.test.ts, ADR 0205; keywordsAreWords.test.ts,
 // ADR 0206). Both were measured by
@@ -162,19 +162,19 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "106 test files -- kinetics & Michaelis-Menten correctness, " +
+          "107 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // Re-measured 2026-09-25 for v0.3.4-rc.3, on the final code,
+        // Re-measured 2026-09-26 for v0.3.4-rc.4, on the final code,
         // Terium/ run alone under .venv, read out of a junit-xml report:
-        // 3469 tests, 3468 passed, 1 failed, 642 s. The failure is the
+        // 3486 tests, 3485 passed, 1 failed, 590 s. The failure is the
         // check_codegen_loads.py selftest, which needs npx and cannot write
         // the npm cache in the sandbox (see the long note above); it passes
         // where npm works, as in CI.
-        passed: 3469,
+        passed: 3486,
         skipped: 0,
         failed: 0,
       },

@@ -117,6 +117,7 @@ def build_parser(prog: str = "python -m Terium.compose") -> argparse.ArgumentPar
         ),
         epilog=(
             "Examples:\n"
+            f"  {prog} 'Michaelis Menten' --subject 2.7.1.1 --organism human --substrate glucose\n"
             f"  {prog} 'three step phosphorylation cascade'\n"
             f"  {prog} 'a toggle switch between two repressors' --sweep geneA_n\n"
             f"  {prog} 'three step phosphorylation cascade' --rank-against tier2_Xp\n"

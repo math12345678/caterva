@@ -11,7 +11,7 @@ binary, `terrium`, and this module is what it runs: the first argument
 picks the command and the rest is passed through unchanged.
 
     terrium compose "a toggle switch between two repressors"
-    terrium sim wf --N 100 --generations 50
+    terrium sim wf --population-size 100 --generations 50
     terrium --version
 
 `python -m Terium.app ...` runs the same code from a checkout or a wheel,
@@ -53,6 +53,9 @@ QUICK START, in the order that teaches the most
       The {shapes} mechanisms it can build, each in one line. Describe any of
       them in your own words.
 
+  terrium compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose
+      The same, with real measured constants from BRENDA, each cited.
+
   terrium compose "Michaelis-Menten with a competitive inhibitor" --design
       Which measurement to make next, and what it would newly pin down.
 
@@ -72,16 +75,18 @@ COMMANDS
 
 REAL CONSTANTS, WITH REAL CITATIONS
 
-  compose builds STRUCTURE: every constant is the motif library's
-  illustrative placeholder, and the report says so on every page. Measured
-  values with the paper that measured them come from the literature layer,
-  which needs the source checkout, not this folder:
+  Name the enzyme (its EC number), the organism and the substrate, and
+  compose searches BRENDA and puts the measured values in the model, each
+  with the reference it came from:
 
-      make cite EC=1.1.1.27 SUBSTRATE=pyruvate ORGANISM="Homo sapiens"
-      -> km = 0.03 mM, from BRENDA ref 286469
+      terrium compose "Michaelis Menten" --subject 2.7.1.1 --organism human --substrate glucose
+      -> Km 6.0 mM (BRENDA ref 641068), kcat 40.1 1/s (BRENDA ref 739603)
 
-  See docs/USING_TERRIUM.md. Joining the two -- a composed mechanism whose
-  constants are sourced -- is not wired yet; ADR 0178 says what it needs.
+  A value nobody measured stays a labelled placeholder, and the report says
+  why: most often it exists in another organism, which it names. Find an
+  EC number by searching the enzyme on https://www.brenda-enzymes.org.
+  The search needs the source checkout (git clone, then make setup); the
+  downloaded app folder builds and simulates but cannot search, and says so.
 
 MORE
 
