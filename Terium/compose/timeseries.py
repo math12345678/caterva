@@ -538,7 +538,7 @@ def autocorrelation(values: Sequence[float], *, max_lag: Optional[int] = None) -
         # those flags to the caller, so every run printed RuntimeWarnings
         # about arithmetic this function never performed -- and a suite that
         # turns warnings into errors would have failed on them. A warning
-        # that is not about the data teaches a reader to ignore warnings.
+        # that is not about the data teaches a reader to stop reading them.
         scale = math.sqrt(
             float(np.sum(left * left)) * float(np.sum(right * right))
         )

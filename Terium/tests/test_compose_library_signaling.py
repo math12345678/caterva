@@ -895,8 +895,8 @@ class TestEveryMotifPassesTheUnitChecker:
 
     There is no later point in the pipeline at which that becomes visible,
     so every motif has to balance at composition time -- and a motif that
-    shipped with a standing finding would train a reader to ignore
-    findings.
+    shipped with a standing finding would train a reader to stop
+    reading them.
     """
 
     def test_the_sweep_covers_every_motif_this_module_defines(self) -> None:
