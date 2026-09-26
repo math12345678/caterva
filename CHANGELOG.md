@@ -50,6 +50,13 @@ The first clean-checkout run of 0.3.3 read like a demo: a sourced model's
 verdict said no search had run, and plain Michaelis-Menten was refused.
 
 ### Fixed
+- **The bare `terrium` screen said sourced constants were "not wired
+  yet"**, false since 0.3.3; it now shows the command. `compose --help`
+  leads with a `--subject` example, and every help example is tested.
+- **Naming the inhibited step did nothing** despite the note promising
+  it. `feedback_inhibition` now wires the end product to the named step.
+  `Terium/tests/test_feedback_inhibition_named_step.py`.
+- The guide said twelve scenario presets; there are thirteen (now tested).
 - **`"3 step phosphorylation cascade"` crashed** (any description
   starting with a digit gave an invalid model name).
 - **The Hill-function trigger matched "uphill" and "downhill".**

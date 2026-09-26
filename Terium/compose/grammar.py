@@ -949,24 +949,92 @@ def _allosteric(query: str, name: str) -> Recognition:
     return Recognition(composition, "allosteric_repression", "Hill repression")
 
 
+#: Words that name which step the end product inhibits.
+_ORDINALS = {"first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5,
+             "sixth": 6, "last": -1, "final": -1}
+
+
+def _inhibited_step(query: str, count: int) -> Optional[int]:
+    """The step the end product inhibits, when the words say; else None.
+
+    "step 2", "the first step", "the second enzyme", "the committed step"
+    (read as the first, which is what "committed" means in a linear pathway
+    with no branch). Nothing else is guessed: which step a real pathway
+    regulates is a fact about that pathway.
+    """
+    match = re.search(r"\bstep\s+(\d+)\b", query)
+    if match:
+        step = int(match.group(1))
+    else:
+        match = re.search(
+            r"\b(" + "|".join(_ORDINALS) + r")\s+(?:committed\s+)?(?:step|enzyme|reaction)\b",
+            query,
+        )
+        if match:
+            step = _ORDINALS[match.group(1)]
+        elif re.search(r"\bcommitted\s+step\b", query):
+            step = 1
+        else:
+            return None
+    if step == -1:
+        step = count
+    return step if 1 <= step <= count else None
+
+
 def _feedback_inhibition(query: str, name: str) -> Recognition:
     count = _count_before(query, "step", "steps", "reactions") or 3
+    target = _inhibited_step(query, count)
     composition = Composition(name)
-    steps = chain(
-        composition, CATALYTIC_STEP, count,
-        prefix="step", upstream_port="P", downstream_port="S",
-        head_initial=1.0,
-    )
+    if target is None:
+        chain(
+            composition, CATALYTIC_STEP, count,
+            prefix="step", upstream_port="P", downstream_port="S",
+            head_initial=1.0,
+        )
+        composition.note(
+            f"{count} catalytic steps in sequence. The end product inhibiting "
+            f"the first committed step is the canonical pattern (Umbarger "
+            f"1956, threonine deaminase), but the INHIBITION ITSELF was not "
+            f"wired: which step is inhibited is a fact about the pathway "
+            f"rather than about the words. Say which one -- 'the end product "
+            f"inhibits the first step', or 'step 2' -- and it is added."
+        )
+        return Recognition(
+            composition, "sequential_pathway", f"{count} steps, feedback noted not wired"
+        )
+
+    # The end product is created by the LAST step, but a binding must name
+    # a species that already exists. So the inhibited step creates the
+    # inhibitor species (starting at zero, as an end product does) and the
+    # last step's product is bound to it: one species, both roles.
+    inhibitor = None
+    previous = None
+    for index in range(1, count + 1):
+        prefix = f"step{index}"
+        bindings = {}
+        if previous is not None:
+            bindings["S"] = previous
+        if index == count and inhibitor is not None:
+            bindings["P"] = inhibitor
+        if index == target and index == count:
+            motif = PRODUCT_INHIBITION
+        elif index == target:
+            motif = COMPETITIVE_INHIBITION
+        else:
+            motif = CATALYTIC_STEP
+        initials = {"S": 1.0} if index == 1 else None
+        instance = composition.add(motif, prefix, bindings, initials)
+        if index == target and index != count:
+            inhibitor = instance.species_for("I")
+        previous = instance.species_for("P")
     composition.note(
-        f"{count} catalytic steps in sequence. The end product inhibiting "
-        f"the first committed step is the canonical pattern (Umbarger 1956, "
-        f"threonine deaminase), but the INHIBITION ITSELF was not wired: "
-        f"that needs the first step to be competitive rather than plain, and "
-        f"which step is 'committed' is a fact about the pathway rather than "
-        f"about the words. Say which step to inhibit and it can be added."
+        f"{count} catalytic steps in sequence, the end product competitively "
+        f"inhibiting step {target} (Umbarger 1956): the pathway's output "
+        f"throttles its own supply"
     )
     return Recognition(
-        composition, "sequential_pathway", f"{count} steps, feedback noted not wired"
+        composition, "feedback_inhibition",
+        f"{count} steps, end product inhibiting step {target}",
     )
 
 

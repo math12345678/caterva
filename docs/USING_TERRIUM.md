@@ -330,7 +330,7 @@ The same executable carries a simulation engine that has nothing to do with
 the model builder.
 
 ```bash
-terrium sim scenarios                 # twelve teaching presets, listed
+terrium sim scenarios                 # thirteen teaching presets, listed
 terrium sim wf --scenario bottleneck --seed 42
 terrium sim kimura --p0 0.1 --s 0.01 --population-size 100
 ```
