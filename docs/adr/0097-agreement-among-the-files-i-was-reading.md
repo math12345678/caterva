@@ -8,16 +8,16 @@
 
 ADR 0093 found the clone URL stated three different ways and made
 `README.md`, `START_HERE.md` and `CONTRIBUTING.md` agree. It picked
-`Terrium-sim/terrium` because that is what `README.md` happened to say, and
+`math12345678/caterva` because that is what `README.md` happened to say, and
 closed with the claim that the entry points now agreed.
 
 They did. The repository did not.
 
 | spelling | references |
 |---|---|
-| `Terrium-sim/main` | **126** |
-| `Terrium-sim/terrium` | 3 (all three written by that repair) |
-| `math12345678/terrium` | 1 (`git remote get-url origin`) |
+| `math12345678/caterva` | **126** |
+| `math12345678/caterva` | 3 (all three written by that repair) |
+| `math12345678/caterva` | 1 (`git remote get-url origin`) |
 
 **The repair normalised onto the minority spelling and left the repository
 more inconsistent than it found it**, while reporting the problem as fixed.
@@ -33,7 +33,7 @@ The 126 include the two surfaces that matter most:
   would-be contributor reaches that page **before cloning anything**, and
   every one of those links 404s if the repo is not where they say.
 - **`docs/REPO_MAP.md`** — still carrying
-  `git clone --recursive https://github.com/Terrium-sim/main.git`: both
+  `git clone --recursive https://github.com/math12345678/caterva.git`: both
   halves of the defect ADR 0093 had just fixed, including the `--recursive`
   flag removed for doing nothing, in a document
   `DOCUMENTATION_INDEX.md` offers as *"find my way around the tree"*.
@@ -56,16 +56,16 @@ is backwards. A stale number in an internal document costs a contributor an
 hour. A stale number in a published README is the first paragraph a
 stranger reads.
 
-`docs/REPO_MAP.md` had a second defect of the same kind: it opened *"Terrium
+`docs/REPO_MAP.md` had a second defect of the same kind: it opened *"Caterva
 **is** published as 18 repositories"*, present tense, for a split that has
 not happened. A newcomer looking for `backend-main` goes hunting for a
 repository that does not exist and concludes they have lost it.
 
 ## Decision
 
-**`https://github.com/Terrium-sim/main` is the published location**,
+**`https://github.com/math12345678/caterva` is the published location**,
 confirmed by the owner. Every self-reference says so. `origin` remains
-`math12345678/terrium`; both are true at once, and `START_HERE.md` says so
+`math12345678/caterva`; both are true at once, and `START_HERE.md` says so
 rather than leaving a newcomer to find the difference in `git remote -v`.
 
 **A self-reference is identified by evidence, not by name.** A
@@ -86,7 +86,7 @@ have turned one hand-edit into eighteen — the barrier ADR 0095 removed,
 reintroduced by widening the check.
 
 **Test counts are checked without guessing which suite they mean.**
-`docs/readmes/terium.md` says `1,014 tests.` with no antecedent on the line.
+`docs/readmes/caterva.md` says `1,014 tests.` with no antecedent on the line.
 The rule is that a figure must match *some* current suite; a number matching
 none is stale whatever it referred to. `--write` does not correct these
 outside the README, because picking a suite would be inventing an
@@ -114,7 +114,7 @@ Two things that must not be flagged, both real sentences in the tree:
 
 ### What this does not fix
 
-Whether `Terrium-sim/main` resolves is still unverifiable from here — no
+Whether `math12345678/caterva` resolves is still unverifiable from here — no
 network. What is now checked is that the repository has one answer, and that
 the answer is the one the owner gave.
 

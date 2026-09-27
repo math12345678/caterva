@@ -12,7 +12,7 @@
 The Tellurium non-affiliation notice lived in exactly two files: `README.md`
 and `NOTICE`. Both stay in the repository.
 
-Someone who runs `pip install terrium` never sees either. Nor does a
+Someone who runs `pip install caterva` never sees either. Nor does a
 reference manager ingesting `CITATION.cff`, nor someone copying a BibTeX
 entry off the landing page — which is precisely the moment a person decides
 whose name goes in a paper.
@@ -33,7 +33,7 @@ with the software or is read by someone deciding what to credit:
 | `CITATION.cff` | what a citation manager ingests |
 | `pyproject.toml` | what PyPI displays |
 | `package.json` | what npm displays |
-| `Terium/__init__.py` | what `help(Terium)` prints — travels with the *installed* package, which a README does not |
+| `caterva/__init__.py` | what `help(Caterva)` prints — travels with the *installed* package, which a README does not |
 | `HowToCiteSection.tsx` | the landing page, where a reader picks whose name to write down |
 
 `scripts/check_non_affiliation_notice.py` fails when any of them stops
@@ -46,17 +46,17 @@ guard that shrugs at a missing file rewards exactly that.
 The guard requires two different things, and conflating them was the design
 mistake worth recording.
 
-**Disclaiming** — "Terrium is not Tellurium, and is unaffiliated with it" —
-is Terrium's own problem. It protects the Sauro lab from being credited
-with work that is not theirs, and protects Terrium from looking like it is
+**Disclaiming** — "Caterva is not Tellurium, and is unaffiliated with it" —
+is Caterva's own problem. It protects the Sauro lab from being credited
+with work that is not theirs, and protects Caterva from looking like it is
 claiming otherwise.
 
-**Attributing** — "Terrium runs on libRoadRunner (Apache 2.0, University of
+**Attributing** — "Caterva runs on libRoadRunner (Apache 2.0, University of
 Washington) and generates Antimony (MIT)" — is what those licences actually
 ask for.
 
 A surface that does only the first looks compliant and is not. It says who
-Terrium is *not* built by while staying silent on who it *is* built on.
+Caterva is *not* built by while staying silent on who it *is* built on.
 `MUST_CREDIT` requires libRoadRunner to be named alongside the disclaimer on
 the five surfaces with room for a sentence; the two one-line package
 descriptions carry the disclaimer only, because a PyPI summary field is not

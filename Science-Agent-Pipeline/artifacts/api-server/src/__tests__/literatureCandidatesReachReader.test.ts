@@ -1,5 +1,5 @@
 /**
- * The papers Terrium found are offered to the student who needs them.
+ * The papers Caterva found are offered to the student who needs them.
  *
  * WHY THIS EXISTS
  * ---------------
@@ -120,7 +120,7 @@ describe("candidate papers are offered rather than discarded", () => {
   });
 
   /**
-   * The offer must not read as a resolution. Terrium does not extract
+   * The offer must not read as a resolution. Caterva does not extract
    * numbers from full text, and a flag listing papers beside a defaulted
    * value could easily be read as "we used these".
    */

@@ -49,7 +49,7 @@ def test_the_demo_produces_a_document_with_real_provenance():
     done = run_demo()
     assert done.returncode == 0, f"make demo failed:\n{done.stdout[-800:]}\n{done.stderr[-800:]}"
 
-    for heading in ("## Parameters", "## Result", "## What Terrium would not do"):
+    for heading in ("## Parameters", "## Result", "## What Caterva would not do"):
         assert heading in done.stdout, f"the demo output has no {heading!r}"
 
     # A literature value with a real reference — not a supplied number, not

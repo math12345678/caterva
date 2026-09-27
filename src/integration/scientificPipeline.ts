@@ -19,9 +19,9 @@ import { LiteratureService } from '../literature/literatureService';
 import { ReproducibilityService } from '../reproducibility/reproducibilityEngine';
 import {
   extractSeries,
-  runTerium,
+  runCaterva,
   type EngineParameterValue
-} from '../engine/teriumBridge';
+} from '../engine/catervaBridge';
 import { convertConcentration, vmaxInSubstrateUnitsPerSecond } from '../units';
 import {
   INHIBITION_MODELS,
@@ -1006,7 +1006,7 @@ ${integrityReport}
   }
 
   /**
-   * Run the simulation in the real Terium engine.
+   * Run the simulation in the real Caterva engine.
    *
    * This used to be a hand-rolled forward-Euler Michaelis-Menten loop with
    * `parameters.km?.value || 5.0`, `|| 10.0` and `|| 1.0` fallbacks. Those
@@ -1017,7 +1017,7 @@ ${integrityReport}
    * integrator and a `Math.max(0, ...)` clamp that hid step-size error
    * behind a plausible-looking curve.
    *
-   * It now spawns the same `terium_runner.py` the production api-server
+   * It now spawns the same `caterva_runner.py` the production api-server
    * uses. Missing parameters raise MissingParameterError rather than being
    * defaulted, and physical validity is decided by the engine.
    */
@@ -1105,7 +1105,7 @@ ${integrityReport}
    *
    * WHAT THE ENGINE GIVES BACK
    * --------------------------
-   * Measured rather than assumed, by driving `terium_runner.py` directly:
+   * Measured rather than assumed, by driving `caterva_runner.py` directly:
    * `{"time", "[S]", "[I]", "[R]"}` per point, from `beta, gamma, s0, i0,
    * end, points`. It also echoes `r0_recovered`, which the request does not
    * send -- an ADDED key, which the bridge's echo check tolerates because
@@ -1158,7 +1158,7 @@ ${integrityReport}
       // Reached only if validation let it through; stated rather than
       // coerced, because `?? 0` here would run the model on a made-up zero.
       throw new Error(
-        `${model} inhibition needs km, vmax and s0 as numbers. Terrium does ` +
+        `${model} inhibition needs km, vmax and s0 as numbers. Caterva does ` +
         'not substitute a default for a parameter it was not given.'
       );
     }
@@ -1231,7 +1231,7 @@ ${integrityReport}
       points: ScientificPipeline.SIMULATION_POINTS,
     };
 
-    const result = await runTerium('sir', engineParameters, {
+    const result = await runCaterva('sir', engineParameters, {
       required: ['beta', 'gamma', 's0', 'i0'],
     });
 
@@ -1345,7 +1345,7 @@ ${integrityReport}
     // THE DOMAIN REACHES THE EXECUTOR, AND ANYTHING ELSE IS REFUSED.
     //
     // This function took `(parameters, conditions)` and called
-    // `runTerium('mm', ...)`. The domain was classified, validated against,
+    // `runCaterva('mm', ...)`. The domain was classified, validated against,
     // used to pick literature recommendations -- and then dropped on the
     // floor one step before the model ran.
     //
@@ -1372,14 +1372,14 @@ ${integrityReport}
         `it over HTTP: only ` +
         `${ScientificPipeline.DISPATCHABLE_DOMAINS.join(', ')} is dispatched ` +
         `here today. The engine does implement ${domain}, and it is ` +
-        `reachable from the CLI — see \`scientific domains\`. Terrium will ` +
+        `reachable from the CLI — see \`scientific domains\`. Caterva will ` +
         `not substitute a model you did not ask for.`
       );
     }
 
     // Unwrap the {value, unit, source, ...} envelope this tree carries.
     // No `||` fallbacks: an absent parameter stays absent so that
-    // runTerium's `required` check can refuse the run.
+    // runCaterva's `required` check can refuse the run.
     const numeric = (name: string): number | undefined => {
       const raw = parameters[name];
       if (raw === undefined || raw === null) return undefined;
@@ -1432,17 +1432,17 @@ ${integrityReport}
       km: kmConverted ?? null,
       vmax: vmaxConverted ?? null,
       s0: s0Raw ?? null,
-      // `end` and `points` are the names terium_runner.py actually
+      // `end` and `points` are the names caterva_runner.py actually
       // reads. This first sent `t_end`/`n_points`, which the runner
       // ignores -- and the mistake was nearly invisible, because the
       // runner's default `end` is also 10.0, so the window looked correct
       // while the resolution silently stayed at the default 51. See the
-      // echo check in runTerium, which now catches this class of error.
+      // echo check in runCaterva, which now catches this class of error.
       end: this.integrationWindowFor(parameters),
       points: ScientificPipeline.SIMULATION_POINTS
     };
 
-    const result = await runTerium('mm', engineParameters, {
+    const result = await runCaterva('mm', engineParameters, {
       required: ['km', 'vmax', 's0']
     });
 
@@ -1714,7 +1714,7 @@ ${integrityReport}
   /**
    * The domains this pipeline can actually DISPATCH, as opposed to name.
    *
-   * `runSimulation` calls `runTerium('mm', ...)` with the domain nowhere in
+   * `runSimulation` calls `runCaterva('mm', ...)` with the domain nowhere in
    * scope. So `sir` was classifiable, validatable, and undispatchable — the
    * table said one thing and the executor did another, which is the same
    * three-copies-of-the-truth problem `namesAKnownDomain` was written to

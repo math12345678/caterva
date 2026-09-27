@@ -18,7 +18,7 @@
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0167-flag-and-scope.json"
   ],
-  "test": "cd Terium && python3 -m pytest tests/test_no_typescript_flag_only_skips_typescript.py --no-header -p no:cacheprovider",
+  "test": "cd Caterva && python3 -m pytest tests/test_no_typescript_flag_only_skips_typescript.py --no-header -p no:cacheprovider",
   "mutations": [
     {
       "id": "F1",
@@ -34,7 +34,7 @@
       "description": "the guard-call extractor returns nothing, so the comparison is between two empty sets",
       "_claimed": "caught by both tests in the file",
       "_note": "The failure mode of a structural test is locating its subject, extracting nothing, and reporting a clean match. test_the_finder_would_notice_if_the_branch_disappeared exists for that and this is what proves it fires. The second attempt at this mutation was itself a no-op -- `return set() or {...}` evaluates to the set literal, because an empty set is falsy -- and the harness reported NOT CAUGHT for it too. Twice correct about a mutation that changed nothing.",
-      "file": "Terium/tests/test_no_typescript_flag_only_skips_typescript.py",
+      "file": "caterva/tests/test_no_typescript_flag_only_skips_typescript.py",
       "find": "def _guard_calls(node: ast.If) -> set[str]:\n    return {",
       "replace": "def _guard_calls(node: ast.If) -> set[str]:\n    return set()\n    return {"
     }

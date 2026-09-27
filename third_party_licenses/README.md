@@ -1,8 +1,8 @@
 # Third-party licence texts
 
 Texts that a downloadable bundle must carry and that no installed package
-provides on its own. Terrium's own licence is `../LICENSE` (Apache-2.0);
-what Terrium conveys, and under which terms, is `../NOTICE`.
+provides on its own. Caterva's own licence is `../LICENSE` (Apache-2.0);
+what Caterva conveys, and under which terms, is `../NOTICE`.
 
 | file | why it is here |
 |---|---|

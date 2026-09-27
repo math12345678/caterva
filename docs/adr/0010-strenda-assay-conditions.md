@@ -29,22 +29,22 @@ The community standard states this as a hard requirement:
 STRENDA (Standards for Reporting Enzymology Data) is registered in
 FAIRsharing and recommended to authors by more than 60 international
 biochemistry journals. It is the reporting standard for exactly the data
-Terrium resolves.
+Caterva resolves.
 
 Two further facts made this a defect rather than a limitation:
 
 1. **The data was available and being discarded.** BRENDA — the source
-   Terrium resolves from — stores pH optimum, temperature optimum, and an
+   Caterva resolves from — stores pH optimum, temperature optimum, and an
    experimental-conditions commentary alongside every Km entry (Schomburg
-   *et al.*, *Nucleic Acids Research*). Terrium's `ParameterProvenance` had no
+   *et al.*, *Nucleic Acids Research*). Caterva's `ParameterProvenance` had no
    field for any of them.
-2. **The value was still being labelled `verified`.** So Terrium was
+2. **The value was still being labelled `verified`.** So Caterva was
    presenting, as independently checked, a number that by the standard
    governing its own source was incompletely reported.
 
 This is the FAIR principle R1.2 — *data are associated with detailed
 provenance* (Wilkinson *et al.* 2016) — applied to the one field where
-Terrium's product claim actually rests.
+Caterva's product claim actually rests.
 
 ## Decision
 
@@ -67,7 +67,7 @@ citation tier rather than being silently tolerated.**
    perfect conditions is still cross-species; completeness cannot buy a tier.
 
 `pressure` is deliberately omitted. STRENDA requires it only when other than
-atmospheric, and no Terrium path resolves a non-atmospheric measurement.
+atmospheric, and no Caterva path resolves a non-atmospheric measurement.
 Adding it later is a field addition, not a contract change.
 
 ## Why degrade rather than reject
@@ -86,7 +86,7 @@ absent.
 
 - Every currently-resolved Km degrades to `flagged` until an assay-conditions
   extraction path exists in the BRENDA client. **This is the honest state:**
-  Terrium does not presently capture pH or temperature, so it cannot claim
+  Caterva does not presently capture pH or temperature, so it cannot claim
   those values are verified. The status quo was not better — it was the same
   situation, labelled `verified`.
 - `Tests/brenda_client.py` needs to extract pH and temperature from the

@@ -52,7 +52,7 @@ let cached: {
  * rejected here rather than failing later inside a child-process bridge.
  */
 export function resolvePythonExecutable(repoRoot: string): string {
-  const configured = process.env["TERRIUM_PYTHON"];
+  const configured = process.env["CATERVA_PYTHON"];
   const virtualEnv = process.env["VIRTUAL_ENV"];
   const environmentPath = process.env["PATH"];
   const pythonPath = process.env["PYTHONPATH"];
@@ -91,7 +91,7 @@ export function resolvePythonExecutable(repoRoot: string): string {
           // But refusing `python3` entirely rejects working environments over
           // a filename. Many containers ship exactly one interpreter, at
           // /usr/bin/python3, with every dependency installed and no
-          // python3.NN symlink anywhere — and Terrium told them to "install
+          // python3.NN symlink anywhere — and Caterva told them to "install
           // Python 3.12" when 3.12 was already there under a different name.
           //
           // This is safe because `canRunSupportedPython` checks
@@ -116,12 +116,12 @@ export function resolvePythonExecutable(repoRoot: string): string {
   }
 
   throw new Error(
-    "No supported Python 3.10–3.13 interpreter with Terrium dependencies found. " +
-      "Set TERRIUM_PYTHON or install Python 3.12 with requirements-dev.txt.",
+    "No supported Python 3.10–3.13 interpreter with Caterva dependencies found. " +
+      "Set CATERVA_PYTHON or install Python 3.12 with requirements-dev.txt.",
   );
 }
 
-/** Return whether a version is inside Terrium's supported interpreter range. */
+/** Return whether a version is inside Caterva's supported interpreter range. */
 export function isSupportedPythonMinor(minor: number): boolean {
   return SUPPORTED_MINOR_VERSIONS.has(minor);
 }

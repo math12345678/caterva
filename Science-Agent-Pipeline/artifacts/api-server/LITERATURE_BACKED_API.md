@@ -1,4 +1,4 @@
-# Terrium Literature-Backed API Reference
+# Caterva Literature-Backed API Reference
 
 Every parameter, every metric, every decision backed by peer-reviewed scientific literature.
 

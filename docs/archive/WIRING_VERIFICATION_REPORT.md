@@ -1,8 +1,8 @@
-# Terrium AI Architecture: Complete Wiring Verification
+# Caterva AI Architecture: Complete Wiring Verification
 
 > **⚠️ CORRECTION (2026-08-12):** several specifics in this report are stale/wrong against the current code:
-> - **"13 previously failing tests" / "13/13 domains" / "Domain coverage: 13"**: the real `SimulationDomain` union (`Science-Agent-Pipeline/artifacts/api-server/src/lib/teriumRunner.ts:11-38`) and the Python table it must match (`terium_runner.py:646-666`) now have **16** domains — the code comment says "15 core scientific domains + SBML escape hatch". Three (`lotka_volterra`, `cell_cycle_oscillator`, `repressilator`) were added after this report was written.
-> - **"Python Dispatch" — `DISPATCHER: Dict[str, Callable]` at `terium_runner.py` lines 585-586**: no object named `DISPATCHER` exists. The real table is `DISPATCH: Dict[str, str]` at `terium_runner.py:646`, and its values are handler **name strings** (e.g. `"mm": "simulate_michaelis_menten"`), not callables — the callables live in a separate `_RUNNERS` dict. `ARCHITECTURE_QUICK_REFERENCE.md`'s own correction banner already documents this same DISPATCHER→DISPATCH drift.
+> - **"13 previously failing tests" / "13/13 domains" / "Domain coverage: 13"**: the real `SimulationDomain` union (`Science-Agent-Pipeline/artifacts/api-server/src/lib/catervaRunner.ts:11-38`) and the Python table it must match (`caterva_runner.py:646-666`) now have **16** domains — the code comment says "15 core scientific domains + SBML escape hatch". Three (`lotka_volterra`, `cell_cycle_oscillator`, `repressilator`) were added after this report was written.
+> - **"Python Dispatch" — `DISPATCHER: Dict[str, Callable]` at `caterva_runner.py` lines 585-586**: no object named `DISPATCHER` exists. The real table is `DISPATCH: Dict[str, str]` at `caterva_runner.py:646`, and its values are handler **name strings** (e.g. `"mm": "simulate_michaelis_menten"`), not callables — the callables live in a separate `_RUNNERS` dict. `ARCHITECTURE_QUICK_REFERENCE.md`'s own correction banner already documents this same DISPATCHER→DISPATCH drift.
 > - **"Validation Logic (lines 262-275)" in `llmResolver.ts`**: the real domain-validation check is now at `llmResolver.ts:320-329` (`!SUPPORTED_DOMAINS.includes(parsed.domain ...)`, an array constant defined at line 104), not an inline `![...].includes(parsed.domain)` literal at 262-275.
 > - What's still true: `llmResolver.ts:40` does list `"mm_competitive_inhibition"` in the SYSTEM_PROMPT domain union, and `RESOLVABLE_FIELDS.mm_competitive_inhibition` (`provenance.ts:85`) does resolve both `km` and `ki` independently — the core wiring claim isn't fabricated, just several line numbers and the "13 domains"/"DISPATCHER" specifics are.
 > - Running the three cited test files via `vitest` (not the root `jest`, which can't find them — see the correction in `BUILD_STATUS_SUMMARY.md`) currently passes all 59 tests.
@@ -148,7 +148,7 @@ if ((best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
 ### Stage 5: Python Dispatch
 
 #### 5a. Type Definition
-✅ **File**: `teriumRunner.ts` (lines 8-25)
+✅ **File**: `catervaRunner.ts` (lines 8-25)
 ```typescript
 export type SimulationDomain =
   | "mm"
@@ -159,7 +159,7 @@ export type SimulationDomain =
 ```
 
 #### 5b. Dispatcher Routing
-✅ **File**: `terium_runner.py` (lines 585-586)
+✅ **File**: `caterva_runner.py` (lines 585-586)
 ```python
 DISPATCHER: Dict[str, Callable] = {
   "mm": run_mm,
@@ -169,7 +169,7 @@ DISPATCHER: Dict[str, Callable] = {
 ```
 
 #### 5c. Python Docstring Consistency ⚠️ **FIX APPLIED**
-✅ **File**: `terium_runner.py` (lines 13-16)
+✅ **File**: `caterva_runner.py` (lines 13-16)
 
 **Fix #3 — Docstring Update**:
 ```python
@@ -182,7 +182,7 @@ DISPATCHER: Dict[str, Callable] = {
 **Impact**: Ensures Python and TypeScript documentation stay in sync for maintainability.
 
 #### 5d. Simulator Implementation
-✅ **File**: `terium_runner.py` (lines 227-257)
+✅ **File**: `caterva_runner.py` (lines 227-257)
 ```python
 def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
     km = float(params.get("km", 2.0))
@@ -191,7 +191,7 @@ def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
     s0 = float(params.get("s0", 10.0))
     i0 = float(params.get("i0", 0.0))
     
-    result = terium_engine.simulate_mm_competitive_inhibition(
+    result = caterva_engine.simulate_mm_competitive_inhibition(
         km=km, vmax=vmax, ki=ki, s0=s0, i=i0, end=end, points=points
     )
     return _serialise_result(result, "mm_competitive_inhibition", reported)
@@ -206,7 +206,7 @@ def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
 ## Cross-Boundary Type Contracts
 
 ### TypeScript ↔ JSON
-✅ **Verified**: `SimulationDomain` type exported from `teriumRunner.ts` is used by:
+✅ **Verified**: `SimulationDomain` type exported from `catervaRunner.ts` is used by:
 - `schemas.ts` (Zod validation)
 - `queryResolver.ts` (domain routing)
 - `llmResolver.ts` (LLM response validation)
@@ -263,8 +263,8 @@ Each domain has its own:
 - **Default parameters** (queryResolver.ts:236-555)
 - **Resolvable fields** (provenance.ts:72-86)
 - **Keyword matchers** (queryResolver.ts:DOMAIN_DEFAULTS)
-- **Python handler** (terium_runner.py:DISPATCHER)
-- **Engine function** (terium_engine module)
+- **Python handler** (caterva_runner.py:DISPATCHER)
+- **Engine function** (caterva_engine module)
 
 **Status**: ✅ No cross-domain contamination
 
@@ -301,7 +301,7 @@ Three error classes:
 |------|---------|-------|-----|--------|
 | llmResolver.ts | 40 | LLM domain union missing mm_competitive_inhibition | Added to union type | Enables domain detection |
 | llmResolver.ts | 54-55 | Domain description missing | Added docs | Improves LLM classification |
-| terium_runner.py | 13-16 | Python docstring inconsistent | Updated to match TS | Maintainability |
+| caterva_runner.py | 13-16 | Python docstring inconsistent | Updated to match TS | Maintainability |
 
 **Total changes**: 3 lines across 2 files  
 **Root cause**: Single-point failure in LLM system prompt domain list  
@@ -320,7 +320,7 @@ Three error classes:
 - ✅ Tests written and expected to pass
 
 ### Known Limitations
-1. **Python environment**: Tests requiring terium simulator need Python 3.12+ (environmental setup issue, not architectural)
+1. **Python environment**: Tests requiring caterva simulator need Python 3.12+ (environmental setup issue, not architectural)
 2. **Rate limits**: Groq API 429 errors during concurrent test runs (expected under load)
 3. **LLM availability**: System degrades gracefully to keyword matching when no API key
 
@@ -347,7 +347,7 @@ Three error classes:
 
 ## Conclusion
 
-The Terrium science agent pipeline is **architecturally sound** with **zero structural errors**. All three critical fixes have been applied:
+The Caterva science agent pipeline is **architecturally sound** with **zero structural errors**. All three critical fixes have been applied:
 
 1. ✅ LLM domain recognition fixed
 2. ✅ Parameter resolution wiring verified

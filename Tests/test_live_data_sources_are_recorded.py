@@ -1,10 +1,10 @@
-"""Every database Terrium calls at runtime must be recorded in NOTICE.
+"""Every database Caterva calls at runtime must be recorded in NOTICE.
 
 WHAT THIS COMES FROM
 --------------------
 `resolve_substrate_from_kegg()` has been calling `https://rest.kegg.jp`
 from the server, on the live resolution path, since it was written. KEGG
-appeared in neither `NOTICE` nor `Terium/core/data_sources.py`.
+appeared in neither `NOTICE` nor `caterva/core/data_sources.py`.
 
 KEGG's own terms say it "is not a public database", that non-academic use
 "requires a commercial license", and that even academic users providing a

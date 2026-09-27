@@ -11,7 +11,7 @@
 Every recent pass has been correctness infrastructure. This one started by
 running the CLI as a student would, following the pitch:
 
-> A student asks a question in plain language; Terrium finds the real
+> A student asks a question in plain language; Caterva finds the real
 > parameters in the scientific literature, runs the simulation, and shows
 > where every number came from.
 
@@ -48,7 +48,7 @@ literature was consulted, and then the tool printed *Resolving
 parameters… / Validating against literature…* and reported "no literature
 match" for every parameter.
 
-A reader can only conclude Terrium looked and found nothing. That is false,
+A reader can only conclude Caterva looked and found nothing. That is false,
 and it is false in the direction that makes the product look **empty rather
 than misconfigured** — a student's reasonable next thought is "this database
 has nothing in it," when in fact the search never ran.
@@ -84,7 +84,7 @@ Nothing in `suggestResolveCommand.ts` resolves, cites, or runs. It prints a
 command:
 
 ```
-Your question names a system, so Terrium can look these up — it
+Your question names a system, so Caterva can look these up — it
 just will not guess them out of a sentence. Run this and it will:
 
   scientific simulate "michaelis menten" --resolve \

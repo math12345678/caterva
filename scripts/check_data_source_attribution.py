@@ -4,7 +4,7 @@
 WHY THIS EXISTS
 ---------------
 `NOTICE` states BRENDA's licence in prose, for a human reading the
-repository. `Terium/core/data_sources.py` states it in a table, to be
+repository. `caterva/core/data_sources.py` states it in a table, to be
 written into every exported model.
 
 Two statements of one fact drift. ADR 0003 exists because two copies of a
@@ -48,8 +48,8 @@ import sys
 REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 
-from Terium.core.data_sources import SOURCES, attribution_lines  # noqa: E402
-from Terium.core.model_provenance import (  # noqa: E402
+from caterva.core.data_sources import SOURCES, attribution_lines  # noqa: E402
+from caterva.core.model_provenance import (  # noqa: E402
     ParameterProvenance,
     annotate_antimony,
 )
@@ -163,7 +163,7 @@ def main() -> int:
 
     if not SOURCES:
         print(
-            "Terium/core/data_sources.py describes no sources. Either the "
+            "caterva/core/data_sources.py describes no sources. Either the "
             "table was emptied or this reader is broken; refusing to report "
             "success on an empty set."
         )
@@ -199,7 +199,7 @@ def main() -> int:
                 problems.append(
                     f"{name} is licensed under {source.licence} but the table "
                     "records no modifications. CC BY 4.0 3(a)(1)(B) requires "
-                    "modification to be indicated, and Terrium does modify "
+                    "modification to be indicated, and Caterva does modify "
                     "what it extracts."
                 )
 
@@ -264,7 +264,7 @@ def main() -> int:
     # Values, not clause references: the modules discuss 3(a)(1) and 2(a)(6)
     # in comments, which is documentation, not a second source of truth.
     renderers = {
-        "Terium/core/data_sources.py": REPO / "Terium/core/data_sources.py",
+        "caterva/core/data_sources.py": REPO / "caterva/core/data_sources.py",
         "dataSources.ts": (
             REPO
             / "Science-Agent-Pipeline/artifacts/api-server/src/lib/dataSources.ts"
@@ -312,7 +312,7 @@ def main() -> int:
             print(f"  - {problem}")
         print()
         print(
-            "NOTICE and Terium/core/data_sources.py must say the same thing "
+            "NOTICE and caterva/core/data_sources.py must say the same thing "
             "about the same licence. Fix whichever is wrong -- do not delete "
             "the check."
         )

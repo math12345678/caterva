@@ -9,14 +9,14 @@
 `make guards` exited 1 on this:
 
 ```
-Docw/terrium_full.docx                    also: claims "Tellurium integration"
+Docw/caterva_full.docx                    also: claims "Tellurium integration"
 ```
 
 That line is in `docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md` — the plan for
 removing those files. It names the offending phrase so somebody can find it.
 `check_no_tellurium_integration_claims.py` matched `tellurium integration`,
 found no denial word on the line, and reported the document as claiming
-Terrium is built on Tellurium.
+Caterva is built on Tellurium.
 
 **The document planning the cleanup was the one blocking CI.** The only way
 to go green without a code change would have been to describe the offending
@@ -82,7 +82,7 @@ unasked.*
 
 ### What this does not fix
 
-`Docw/terrium_spec.docx` and `Docw/terrium_full.docx` remain in `HISTORICAL`
+`Docw/caterva_spec.docx` and `Docw/caterva_full.docx` remain in `HISTORICAL`
 — dated records that assign "Tellurium integration" to a named engineer.
 Whether they should stay published is the author's call, unchanged by this,
 and `Business/LEGAL_BRIEF_NAMING.md` 3a is where it is argued.

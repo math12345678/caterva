@@ -19,7 +19,7 @@ user would recognise.
 
 - **v0.1.0 (2026-08-29)** was a tag and GitHub's automatic source archive.
   `pyproject.toml` said 0.1.0, but its packaging built an empty install
-  (setuptools' flat-layout discovery saw `Terium/` beside `Tests/`,
+  (setuptools' flat-layout discovery saw `caterva/` beside `Tests/`,
   `Business/` and `node_modules/` and registered `dist-info` and no code).
 - **v0.2.0 (2026-09-19)** fixed the packaging, built a wheel and an sdist,
   verified both from an empty directory, and pushed the tag. The Release
@@ -30,7 +30,7 @@ user would recognise.
   could not perform."
 
 Separately, **PR #21 ("first DMG release")** on the branch
-`claude/terrium-orientation-setup-c1310b` had frozen `scripts/report_lab.py`
+`claude/caterva-orientation-setup-c1310b` had frozen `scripts/report_lab.py`
 with `PyInstaller --onefile`, which packs python-libsbml's shared object
 inside the executable, and shipped this repository's NOTICE, unchanged,
 saying "Nothing here bundles libSBML", inside the artifact that bundled it.
@@ -61,7 +61,7 @@ made available. Three facts constrain how:
 using the token GitHub issues to the run.** No person's credential is on
 the path. The workflow:
 
-1. checks that the tag names the version in `Terium/__init__.py` and that
+1. checks that the tag names the version in `caterva/__init__.py` and that
    `docs/releases/<tag>.md` exists;
 2. builds the wheel and sdist with `scripts/build_release.py`, which
    refuses a wheel carrying tests or lacking LICENSE/NOTICE, and now
@@ -71,12 +71,12 @@ the path. The workflow:
 3. rebuilds them in a second job and fails the release if the checksums
    differ;
 4. installs the wheel into a fresh interpreter on Linux, macOS and Windows
-   at Python 3.10 and 3.13 and, from an empty directory with `Terium`
+   at Python 3.10 and 3.13 and, from an empty directory with `caterva`
    imported from `site-packages`, integrates a time course (the line
    `Integrated to t=` must appear and `no time course` must not, because
    the report turns a failed simulation into a note and still exits 0),
    exports SBML (libsbml, lxml and the two data files now packaged under
-   `Terium/core/data/`, without which `--export sbml` crashed from every
+   `caterva/core/data/`, without which `--export sbml` crashed from every
    installed copy of 0.2.0), and builds a shape from an expansion library
    (reached only through `importlib`, invisible to static analysis);
 5. freezes the INSTALLED wheel into a one-folder app per platform with
@@ -92,8 +92,8 @@ A tag with a suffix (`v0.3.0-rc.1`) runs the same pipeline and publishes a
 plain tag on the same commit once the candidate's run is green. A first
 freeze that fails then costs a candidate number, never a broken final tag.
 
-**The app folder is ONEDIR, one executable, `terrium`.** `Terium/app.py`
-dispatches `terrium compose ...` and `terrium sim ...` to the two existing
+**The app folder is ONEDIR, one executable, `caterva`.** `caterva/app.py`
+dispatches `caterva compose ...` and `caterva sim ...` to the two existing
 `main(argv)` functions unchanged, so the bundle's surface cannot drift from
 the wheel's and the dispatch is tested from a checkout, where the freeze
 itself cannot be. The folder conveys libSBML three times, not once:
@@ -127,7 +127,7 @@ and an app folder, not a change to the science.
 
 ## What was not done, and why
 
-- **No PyPI upload.** A separate, unmade decision; the name `terrium` has
+- **No PyPI upload.** A separate, unmade decision; the name `caterva` has
   not been checked for availability. NOTICE says so.
 - **No code signing or notarisation.** Needs an Apple Developer ID and a
   Windows certificate the repository does not hold; the folder's README.txt
@@ -143,7 +143,7 @@ and an app folder, not a change to the science.
 - **The freeze was not run on this machine.** PyPI is unreachable from the
   sandbox, so `scripts/build_app.py` was exercised only through its helper
   functions (licence discovery, platform tag, the installed-wheel refusal)
-  and through `python -m Terium.app` end to end. The first real freeze is
+  and through `python -m caterva.app` end to end. The first real freeze is
   the workflow's first run; that is why the workflow verifies the folder
   by running it rather than trusting the build, and why v0.3.0 is
   published by the workflow rather than by hand.

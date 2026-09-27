@@ -1,4 +1,4 @@
-# Terrium: Complete Literature-Backed Integration Guide
+# Caterva: Complete Literature-Backed Integration Guide
 
 > **⚠️ CORRECTION (2026-08-10):** several code snippets in this guide, though presented as taken from the repo, do not match the real source. Step 2's `DOMAIN_LITERATURE` object (claimed to live in `artifacts/api-server/src/lib/llmResolver.ts`) is not in that file — llmResolver.ts only has provider configs. The real domain→literature mapping is `DOMAIN_LITERATURE_MAP` in `src/lib/domain-literature.ts`, with a different shape (`{name, description, references: [{authors, year, title, doi?, chapter?}], defaultJustification}`, not the `authors/year/title/chapter` fields shown in this guide's snippet). Step 6's `calculatePercentiles()` (returning p50/p95/p99/mean) doesn't exist; the real file only has a single-value `calculateP95()`. The Harter (1974) citation given here (a DOI-bearing "The Method of Least Squares and Some Alternatives: Part I") conflicts with the title given for the same citation in `LITERATURE_BACKED_SYSTEM.md` ("The use of order statistics in estimation of parameters of continuous distributions") — both are real Harter papers, but the two docs disagree on which one actually backs the P95 code, so neither attribution should be treated as verified without checking the actual code comment in `verifiable-metrics.ts`.
 
@@ -37,7 +37,7 @@ User Query (Natural Language)
     └─ Ensure Wilson (1927) confidence intervals
     ↓
 [Simulation Output] ← Domain-specific engine
-    └─ Terium for kinetics (Michaelis-Menten backend)
+    └─ Caterva for kinetics (Michaelis-Menten backend)
     └─ NumPy for ODEs (SIR/SEIR)
     └─ Numpy random for stochastic (Gillespie)
     ↓

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Every EC number Terrium ships must still be the current one.
+"""Every EC number Caterva ships must still be the current one.
 
 WHAT THIS COMES FROM
 --------------------

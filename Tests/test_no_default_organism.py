@@ -14,7 +14,7 @@ thermophile's measurement as that row's protein identity.
 That is the three-outcome rule broken at the point it matters most — "could
 not look" collapsed into a confident wrong answer — inside the codebase whose
 headline behaviour is refusing to substitute one organism's value for
-another's. Terrium would refuse a cross-species *Km* while silently attaching
+another's. Caterva would refuse a cross-species *Km* while silently attaching
 a cross-species *accession* to it.
 
 These tests are offline. They stub the taxonomy lookup to fail, which is

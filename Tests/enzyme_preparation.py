@@ -6,7 +6,7 @@ Was this constant measured on the enzyme, or on a *preparation* of it?
 WHY THIS EXISTS
 ---------------
 `docs/commentary-residue-baseline.txt` — the record of BRENDA commentary
-Terrium cannot read — carries one group marked **OPEN FINDING**:
+Caterva cannot read — carries one group marked **OPEN FINDING**:
 
     acrylodan
     attachment polyethylene glycol side chains lysine residues does not
@@ -33,7 +33,7 @@ Through the real resolver, for human LDH:
       -> search log: "BRENDA exact: 1.1.1.27, Homo sapiens, NADH (ki)"
 
 That row's commentary reads *"competitive versus NADH, pH 7.5, 37°C,
-**recombinant His-tagged enzyme**"*. Terrium returns a His-tagged enzyme's
+**recombinant His-tagged enzyme**"*. Caterva returns a His-tagged enzyme's
 inhibition constant as the human LDH inhibition constant, and nothing
 anywhere says so. The fact is parsed — it sits in `conditions` — and never
 reaches the reader. The same "computed and not delivered" shape as ADR 0027

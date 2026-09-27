@@ -1,4 +1,4 @@
-# Standing brief for coding agents on Terrium
+# Standing brief for coding agents on Caterva
 
 Paste this into any agent working on this repository. It is short on
 purpose. Everything here was written after an agent got it wrong.

@@ -4,9 +4,9 @@
 > - This guide's `GET /api/metrics` example (line ~52) shows `"successRate": 96.67` and its field table calls `successRate` unconditionally "% of successful runs," but the real code at `src/storage/metrics-collector.ts:47` (`AggregatedMetrics.successRate: number | null`) and `:125-136` returns `successRate: null` — not a number, and not omitted — when zero jobs have ever run. A caller doing `jq '.successRate'` on a fresh server gets `null`, not a percentage.
 > - Similarly, the reproducibility example (line ~125) shows `"isReproducible": true` as if the field is always a boolean, but `src/storage/metrics-collector.ts:84` and `:272-286` show `isReproducible` starts `null` and stays `null` until a parameter hash has been run at least twice (`runCount >= 2`) — a single observation makes no claim about reproducibility yet.
 > - `GET /api/metrics/percentile` (line ~229) is documented as always returning a number, but `metrics-collector.ts:331-343` (`getPercentile()`) returns `null` when there are no successful executions to compute a percentile from.
-> - Throughout this guide, "Convergence" / `convergenceSteps` is described as "Number of steps to converge" / "Mean steps to convergence," and slow/outlier sections treat a high value as a sign of "numerical instability" or a model being "hard to solve." The real field is not that: `metrics-collector.ts:14-20` documents it explicitly as the **trajectory output point count** ("Terrium's engine ... is not an iterative solver reporting a real convergence count -- there is no such number to measure"), and the real call site (`src/web/server.ts:198`, `convergenceSteps: response.results?.trajectory?.length ?? 0`) confirms it is fed the trajectory length, not a solver iteration count. A high value means the simulation produced more output points (e.g. longer time span / finer step size), not that it struggled to converge.
+> - Throughout this guide, "Convergence" / `convergenceSteps` is described as "Number of steps to converge" / "Mean steps to convergence," and slow/outlier sections treat a high value as a sign of "numerical instability" or a model being "hard to solve." The real field is not that: `metrics-collector.ts:14-20` documents it explicitly as the **trajectory output point count** ("Caterva's engine ... is not an iterative solver reporting a real convergence count -- there is no such number to measure"), and the real call site (`src/web/server.ts:198`, `convergenceSteps: response.results?.trajectory?.length ?? 0`) confirms it is fed the trajectory length, not a solver iteration count. A high value means the simulation produced more output points (e.g. longer time span / finer step size), not that it struggled to converge.
 
-Terrium tracks execution performance, reproducibility, and convergence for every simulation to help researchers:
+Caterva tracks execution performance, reproducibility, and convergence for every simulation to help researchers:
 
 - ✅ Identify performance bottlenecks
 - ✅ Verify reproducibility across runs
@@ -516,7 +516,7 @@ Planned metrics features:
 
 ## Summary
 
-Terrium's metrics system provides:
+Caterva's metrics system provides:
 
 ✅ **Performance tracking** — Identify bottlenecks  
 ✅ **Reproducibility verification** — Ensure scientific validity  

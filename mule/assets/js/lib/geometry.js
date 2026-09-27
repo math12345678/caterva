@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — architectural geometry
+   caterva — architectural geometry
    Faceted shells, routed pathways, and the illustrative curve.
    Nothing here is decorative: each generator maps to a structure.
    ============================================================ */

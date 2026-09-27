@@ -152,7 +152,7 @@ function intoCallerUnit(
   if (mmPerCallerUnit === undefined) {
     return {
       skipped:
-        `'${unit}' is not a concentration unit Terrium knows ` +
+        `'${unit}' is not a concentration unit Caterva knows ` +
         `(${Object.keys(CONCENTRATION_TO_MM).join(", ")}), so no ` +
         "comparison was made.",
     };
@@ -198,7 +198,7 @@ async function groundOne(
       ...base,
       status: "not_found",
       note:
-        "no organism was declared and this enzyme is not in Terrium's " +
+        "no organism was declared and this enzyme is not in Caterva's " +
         "table, so there is no species to look up. Kinetic constants are " +
         'species-specific; add organism="..." to the annotation.',
     };
@@ -383,7 +383,7 @@ export async function groundAnnotatedModel(
       !substitute(lines, entry, entry.comparison.literatureInYourUnit, format)
     ) {
       blocking.push(
-        `${entry.parameter} (line ${entry.line}): Terrium resolved a value ` +
+        `${entry.parameter} (line ${entry.line}): Caterva resolved a value ` +
           "but could not write it into the model source at that line.",
       );
       continue;

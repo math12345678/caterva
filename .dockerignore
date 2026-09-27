@@ -14,7 +14,7 @@ node_modules/
 
 # 93 MB of marketing site, plus build output that either image would only
 # rebuild. Nothing here is importable by the engine or the API server.
-terrium-site/
+caterva-site/
 dist/
 coverage/
 
@@ -30,7 +30,7 @@ venv/
 .DS_Store
 
 Docw/
-terrium_pitch_deck.pptx
+caterva_pitch_deck.pptx
 Logo.png
 Screenshot*.png
 Business/

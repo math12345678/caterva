@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""The importable package is `Terium`. The product is `Terrium`. One r, two r.
+"""The importable package is `caterva`. The product is `Caterva`. One r, two r.
 
 WHY THIS EXISTS
 ---------------
 This repository ships two spellings of its own name, and they are not
 interchangeable:
 
-    Terium      the Python package you import  -- Terium/, python -m Terium.cli
-    Terrium     the product, the repo, the org, the site, the docs
+    Caterva      the Python package you import  -- caterva/, python -m caterva.cli
+    Caterva     the product, the repo, the org, the site, the docs
 
 Both are correct in their place. `docs/RENAME_PLAN.md` counts 767
 occurrences of the first and 1,470 of the second across 452 tracked files.
 
 For anyone already here that is a quirk. For a newcomer it is a trap with no
-signpost: `import Terrium` is the spelling they have read everywhere, it
-raises `ModuleNotFoundError: No module named 'Terrium'`, and nothing in the
+signpost: `import Caterva` is the spelling they have read everywhere, it
+raises `ModuleNotFoundError: No module named 'Caterva'`, and nothing in the
 error or the repository explains that the package deliberately drops a
 letter. The natural conclusion is that their environment is broken -- which
 sends them to `make doctor`, which will report a perfectly healthy install.
@@ -25,21 +25,21 @@ is the cost this guard exists to prevent, and it is the same reason
 
 WHAT IT CHECKS
 --------------
-No Python file imports the two-r spelling. `import Terrium`,
-`from Terrium.core import x`, `importlib.import_module("Terrium")` are all
+No Python file imports the two-r spelling. `import Caterva`,
+`from Caterva.core import x`, `importlib.import_module("Caterva")` are all
 errors, always -- there is no module by that name and there never has been.
 
 This is not a style rule. Every match is a guaranteed runtime failure.
 
 WHAT IT DELIBERATELY DOES NOT CHECK
 -----------------------------------
-**Prose.** "Terrium resolves parameters from the literature" is correct and
+**Prose.** "Caterva resolves parameters from the literature" is correct and
 appears thousands of times. A guard that policed the product name in
 sentences would fire constantly and be muted within a day.
 
-**Paths in documentation.** `Terrium/` as a repository-root reference is
+**Paths in documentation.** `Caterva/` as a repository-root reference is
 correct in some contexts (the folder on a contributor's disk is often called
-`Terrium`) and wrong in others. Deciding which needs to read intent, and a
+`Caterva`) and wrong in others. Deciding which needs to read intent, and a
 guard that guesses at intent produces exactly the false positives that teach
 people to ignore it. `check_doc_paths_resolve.py` covers the case that is
 mechanically checkable: a path that does not exist.
@@ -69,21 +69,21 @@ REPO = Path(__file__).resolve().parent.parent
 #: Roots that ship Python. Globbed, not enumerated file by file: an
 #: enumeration fails open, which is the defect four separate guards in this
 #: repository were found to have on 2026-08-15.
-SCAN_ROOTS = ["Terium", "Tests", "scripts", "examples"]
+SCAN_ROOTS = ["caterva", "Tests", "scripts", "examples"]
 
 SKIP_PARTS = {"node_modules", ".venv", "venv", "__pycache__", ".git", "build", "dist"}
 
-#: `import Terrium`, `from Terrium import x`, `from Terrium.core import y`,
+#: `import Caterva`, `from Caterva import x`, `from Caterva.core import y`,
 #: and the string form used by importlib.
 #:
-#: Anchored on the two-r spelling followed by a word boundary, so `Terrium`
+#: Anchored on the two-r spelling followed by a word boundary, so `Caterva`
 #: as part of a longer identifier is not matched -- the failure mode to
 #: avoid is a guard that fires on something legitimate.
 PATTERNS: List[Tuple[re.Pattern[str], str]] = [
-    (re.compile(r"^\s*import\s+Terrium\b"), "import Terrium"),
-    (re.compile(r"^\s*from\s+Terrium(\.\w+)*\s+import\b"), "from Terrium import"),
-    (re.compile(r"""import_module\(\s*["']Terrium\b"""), 'import_module("Terrium")'),
-    (re.compile(r"""__import__\(\s*["']Terrium\b"""), '__import__("Terrium")'),
+    (re.compile(r"^\s*import\s+Caterva\b"), "import Caterva"),
+    (re.compile(r"^\s*from\s+Caterva(\.\w+)*\s+import\b"), "from Caterva import"),
+    (re.compile(r"""import_module\(\s*["']Caterva\b"""), 'import_module("Caterva")'),
+    (re.compile(r"""__import__\(\s*["']Caterva\b"""), '__import__("Caterva")'),
 ]
 
 
@@ -93,7 +93,7 @@ def offending_lines(text: str) -> List[Tuple[int, str, str]]:
     for number, line in enumerate(text.splitlines(), start=1):
         stripped = line.strip()
         # A comment describing the mistake is not the mistake. This file and
-        # the ADRs quote `import Terrium` on purpose.
+        # the ADRs quote `import Caterva` on purpose.
         if stripped.startswith("#"):
             continue
         for pattern, label in PATTERNS:
@@ -161,27 +161,27 @@ def selftest() -> int:
     day, and a muted guard is worse than none.
     """
     must_flag = [
-        "import Terrium",
-        "    import Terrium",
-        "from Terrium import terium_engine",
-        "from Terrium.core import validation",
-        "from Terrium.core.validation import vmax_from_kcat",
-        'importlib.import_module("Terrium")',
-        "__import__('Terrium')",
+        "import Caterva",
+        "    import Caterva",
+        "from Caterva import caterva_engine",
+        "from Caterva.core import validation",
+        "from Caterva.core.validation import vmax_from_kcat",
+        'importlib.import_module("Caterva")',
+        "__import__('Caterva')",
     ]
     must_pass = [
         # The correct spelling, which is the whole point.
-        "import Terium",
-        "from Terium import terium_engine",
-        "from Terium.core.validation import vmax_from_kcat",
+        "import caterva",
+        "from caterva import caterva_engine",
+        "from caterva.core.validation import vmax_from_kcat",
         # Prose and identifiers. A guard that flags these is unusable.
-        '"""Terrium resolves parameters from the literature."""',
-        "# import Terrium is wrong -- the package is Terium",
-        "TERRIUM_ROOT = Path(__file__).parent",
-        'parser = argparse.ArgumentParser(description="Terrium build check")',
-        "print('Terrium is not Tellurium')",
+        '"""Caterva resolves parameters from the literature."""',
+        "# import Caterva is wrong -- the package is Caterva",
+        "CATERVA_ROOT = Path(__file__).parent",
+        'parser = argparse.ArgumentParser(description="Caterva build check")',
+        "print('Caterva is not Tellurium')",
         # A path string, not an import. check_doc_paths_resolve covers these.
-        'path = Path("Terrium/docs")',
+        'path = Path("Caterva/docs")',
     ]
 
     failures: List[str] = []
@@ -217,11 +217,11 @@ def main() -> int:
         for finding in findings:
             print(f"  {finding}")
         print(
-            "\nThe importable package is `Terium` — one r. `Terrium` is the"
+            "\nThe importable package is `caterva` — one r. `Caterva` is the"
             "\nproduct, the repository and the organisation, and there is no"
             "\nPython module by that name.\n"
             "\nEvery line above raises ModuleNotFoundError at runtime. Change"
-            "\nthe import to `Terium`.\n"
+            "\nthe import to `caterva`.\n"
             "\nIf you are new and this is confusing: it is, and you are not"
             "\nlost. See the note in START_HERE.md."
         )
@@ -237,8 +237,9 @@ def main() -> int:
         return 1
 
     print(
-        f"OK: {scan.files_read} Python file(s) read; none imports `Terrium`. "
-        "The package is spelled `Terium` everywhere it is imported."
+        f"OK: {scan.files_read} Python file(s) read; none imports "
+        "`Caterva`. The package is spelled `caterva` everywhere it is "
+        "imported."
     )
     return 0
 

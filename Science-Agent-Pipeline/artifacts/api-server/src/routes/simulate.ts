@@ -18,7 +18,7 @@ import { recordQuery } from "../lib/queryLog";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
-import { asSimulationDomain, runTerium, type SimulationDomain, type TeriumResult } from "../lib/teriumRunner";
+import { asSimulationDomain, runCaterva, type SimulationDomain, type CatervaResult } from "../lib/catervaRunner";
 import { SimulationParameterSchemas, CustomModelBody } from "../lib/schemas";
 import {
   NetworkRequestSchema,
@@ -247,7 +247,7 @@ router.get(
  * That exclusion was also load-bearing security, whatever its stated
  * rationale: `sbml_string` reaches RoadRunner's loader, which accepts a
  * path or URL as readily as a document. The guards in
- * terium_runner.run_sbml (path/URL refusal, Antimony `import` refusal, and
+ * caterva_runner.run_sbml (path/URL refusal, Antimony `import` refusal, and
  * the MAX_API_SBML_* ceilings) are what make opening it safe, and they are
  * enforced engine-side so they hold no matter which caller arrives.
  */
@@ -304,7 +304,7 @@ router.post(
 /**
  * POST /api/simulate/network -- run a model the caller CONSTRUCTED.
  *
- * The open path. Every other simulate route asks Terrium to recognise a
+ * The open path. Every other simulate route asks Caterva to recognise a
  * system from its catalogue of sixteen; this one accepts the system itself,
  * as species, parameters, reactions and rate rules, and runs it.
  *
@@ -312,7 +312,7 @@ router.post(
  *
  * Opening the model surface without opening the provenance surface would
  * be the whole product given away. Three checks run engine-side, in
- * `Terium/core/network.py` and `network_provenance.py`, so they hold no
+ * `caterva/core/network.py` and `network_provenance.py`, so they hold no
  * matter which caller arrives:
  *
  *   - every symbol in a rate law must resolve to a species or parameter of
@@ -397,7 +397,7 @@ async function runNetworkPipeline(
   try {
     queue.updateJob(jobId, { status: "running" });
 
-    const engineResult = await runTerium("network", {
+    const engineResult = await runCaterva("network", {
       network: request.network as unknown as Record<string, unknown>,
       sources: request.sources as unknown as Record<string, unknown>,
       start: request.start,
@@ -443,7 +443,7 @@ async function runNetworkPipeline(
           `Caller-constructed reaction network "${request.network.name}": ` +
           `${request.network.species.length} species, ` +
           `${request.network.reactions.length} reaction(s), ` +
-          `${request.network.rateRules.length} rate rule(s). Terrium did ` +
+          `${request.network.rateRules.length} rate rule(s). Caterva did ` +
           `not choose this model; it validated it, required a source for ` +
           `every quantity, compiled it and ran it.`,
         modelCitations: [],
@@ -546,7 +546,7 @@ async function runParameterizePipeline(
     // union does not declare (it has `NetworkPayload` for single objects and
     // `number[]` for vectors). The payload is JSON across the bridge either
     // way; this widens at the transport boundary, same as `network` above.
-    const engineResult = (await runTerium(
+    const engineResult = (await runCaterva(
       "parameterize",
       {
         network: request.network as unknown as Record<string, unknown>,
@@ -556,7 +556,7 @@ async function runParameterizePipeline(
         start: request.start,
         end: request.end,
         points: request.points,
-      } as unknown as Parameters<typeof runTerium>[1],
+      } as unknown as Parameters<typeof runCaterva>[1],
     )) as unknown as ParameterizePayload;
 
     const search = toLiteratureSearchReport(engineResult);
@@ -1078,7 +1078,7 @@ interface ParameterAudit {
   strendaCompliant?: boolean;
   /** STRENDA requirement numbers not met. Requirement 7 (confidence
    * intervals) is expected here for every resolved value: no upstream
-   * source Terrium reads supplies per-value intervals. */
+   * source Caterva reads supplies per-value intervals. */
   strendaUnmetRequirements?: number[];
   requiresReview: boolean;
   message: string;
@@ -1093,7 +1093,7 @@ interface AuditReport {
    *
    * `publicationReady` is a green light for putting these numbers in a
    * paper, and this report said nothing about the obligations that come
-   * with doing so -- while NOTICE states that citing Terrium is not a
+   * with doing so -- while NOTICE states that citing Caterva is not a
    * substitute for citing BRENDA. Empty when no described source
    * contributed. See dataSources.ts and ADR 0081.
    */
@@ -1102,7 +1102,7 @@ interface AuditReport {
   overallConfidence: number;
   parameterAudits: ParameterAudit[];
   /** Absent for a domain with no literature entry (sbml: the caller
-   * supplies the model, so there is nothing for Terrium to cite). */
+   * supplies the model, so there is nothing for Caterva to cite). */
   domainCitation?: string;
   timestamp: string;
 }
@@ -1393,7 +1393,7 @@ async function findCachedSimulation(
  * Stages:
  *   1. Resolve domain and parameters (keyword/regex or LLM fallback).
  *   2. Validate parameters.
- *   3. Run the Terium engine (with concurrency limit).
+ *   3. Run the Caterva engine (with concurrency limit).
  *   4. Persist to PostgreSQL for provenance.
  *   5. Mark job completed (or failed).
  *
@@ -1411,21 +1411,21 @@ async function findCachedSimulation(
  *
  * PROVENANCE. A parameter the caller typed is origin "user" -- not a
  * weaker claim than the preset domains make for an inline `km=2`, exactly
- * the same claim. `modelCitations` stays empty because Terrium did not
+ * the same claim. `modelCitations` stays empty because Caterva did not
  * choose the model's structure and must not imply a source for it.
  *
  * LITERATURE GROUNDING. Everything above used to be the whole story, and
  * it made this endpoint useless for the people it was built for: a lab
- * brought their own model and Terrium's entire reason to exist -- every
+ * brought their own model and Caterva's entire reason to exist -- every
  * number traceable -- switched off, leaving plain Tellurium with extra
  * steps. Nothing was checked, nothing was cited.
  *
  * A caller can now DECLARE what a parameter is, in a comment:
  *
- *     // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM"
+ *     // caterva: km enzyme="hexokinase" substrate="glucose" unit="mM"
  *     Km_hex = 0.15;
  *
- * and Terrium resolves it, reports what the literature says beside what
+ * and Caterva resolves it, reports what the literature says beside what
  * the model says, and attaches the citation. Adding `resolve` to the
  * declaration hands the number over entirely: it is filled from
  * literature, or THE RUN REFUSES -- there is no fallback value, because a
@@ -1476,7 +1476,7 @@ async function runCustomModelPipeline(
         queue.setJobError(jobId, {
           error: "MODEL_ERROR",
           message:
-            "This model's terrium annotations could not be read:\n" +
+            "This model's caterva annotations could not be read:\n" +
             grounding.problems
               .map((p) => `  line ${p.line}: ${p.message}`)
               .join("\n"),
@@ -1492,7 +1492,7 @@ async function runCustomModelPipeline(
         queue.setJobError(jobId, {
           error: "MODEL_ERROR",
           message:
-            "Terrium could not supply every value you asked it to " +
+            "Caterva could not supply every value you asked it to " +
             "resolve, and will not substitute one it cannot cite:\n" +
             grounding.blocking.map((b) => `  ${b}`).join("\n"),
         });
@@ -1524,7 +1524,7 @@ async function runCustomModelPipeline(
       parameters["points"] = model.points;
     }
 
-    const engineResult = await runTerium("sbml", parameters, abort.signal);
+    const engineResult = await runCaterva("sbml", parameters, abort.signal);
 
     if (queue.isCancelled(jobId)) {
       queue.setJobCancelled(jobId);
@@ -1581,7 +1581,7 @@ async function runCustomModelPipeline(
       trajectory: engineResult.trajectory,
       provenance: {
         reasoning:
-          "Caller-supplied model, simulated as given. Terrium did not " +
+          "Caller-supplied model, simulated as given. Caterva did not " +
           "choose the structure" +
           (grounded.length > 0
             ? ", and every parameter value is the caller's except those " +
@@ -1591,7 +1591,7 @@ async function runCustomModelPipeline(
               "for them."),
         // Citations here name sources for individual PARAMETERS the
         // caller declared, never for the model structure -- that is the
-        // caller's and Terrium must not imply a source for it.
+        // caller's and Caterva must not imply a source for it.
         modelCitations: groundedCitations,
         flags: [
           ...(engineResult.flagged && engineResult.flagReason
@@ -1690,7 +1690,7 @@ async function runPipeline(
 
     let engineResult;
     try {
-      engineResult = await runTerium(
+      engineResult = await runCaterva(
         resolved.domain,
         resolved.parameters,
         abort.signal,
@@ -1857,9 +1857,9 @@ async function fallThroughToComposition(
   if (queue.isCancelled(jobId)) return true;
 
   await queue.acquireRunnerSlot();
-  let engineResult: TeriumResult;
+  let engineResult: CatervaResult;
   try {
-    engineResult = await runTerium("compose", { description: query }, signal);
+    engineResult = await runCaterva("compose", { description: query }, signal);
   } catch (err) {
     if (signal.aborted || queue.isCancelled(jobId)) {
       // The request owner walked away while the composer was working. That
@@ -1880,7 +1880,7 @@ async function fallThroughToComposition(
   if (queue.isCancelled(jobId)) return true;
 
   // The compose payload's mechanism keys (rule/reading/structureOnly/
-  // network/...) are not declared on `TeriumResult`; they exist on the
+  // network/...) are not declared on `CatervaResult`; they exist on the
   // JSON it parsed. Widening here is not a cast-of-convenience -- the
   // shape is checked by `toCompositionReport`, which is this module's
   // guard that the engine's report reached us in the form it promised.
@@ -1935,7 +1935,7 @@ async function fallThroughToComposition(
     provenance: {
       reasoning:
         payload.summary ??
-        `Terium built a mechanism for "${query}".`,
+        `Caterva built a mechanism for "${query}".`,
       modelCitations: [],
       flags: [
         ...(payload.structureOnly

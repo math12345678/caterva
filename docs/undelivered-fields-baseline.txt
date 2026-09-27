@@ -76,7 +76,7 @@ selected_form.sibling_designators  # same sentence.
 # Nothing read it. I asserted a renderer I had not looked for, in a file whose
 # whole purpose is recording decisions somebody checked.
 #
-# What was actually happening: when BRENDA holds nothing, Terrium searches
+# What was actually happening: when BRENDA holds nothing, Caterva searches
 # PubMed and CORE, finds papers, and then REFUSES the query with "could not be
 # resolved from literature" -- while holding the list. The papers are now in
 # that refusal, which is the only place a student meets this path.

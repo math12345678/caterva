@@ -1,6 +1,6 @@
 ---
 name: I broke something
-about: You made Terrium behave badly. Report it here.
+about: You made Caterva behave badly. Report it here.
 title: "bug: "
 labels: needs-reproduction
 ---
@@ -21,6 +21,6 @@ One line is enough.
 
 *You do not need to know the fix. A precise report is the contribution.*
 
-*If Terrium failed to install or `make check` did not pass, that is also a
+*If Caterva failed to install or `make check` did not pass, that is also a
 bug worth filing — a setup that only works for the person who wrote it is a
 real defect.*

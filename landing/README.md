@@ -1,4 +1,4 @@
-# Terrium landing — verification console
+# Caterva landing — verification console
 
 Hand-written core for the landing page. This directory is **not** part of the
 100-stage engine build and has no dependency on it.

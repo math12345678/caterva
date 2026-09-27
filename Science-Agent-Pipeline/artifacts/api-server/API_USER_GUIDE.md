@@ -1,4 +1,4 @@
-# Terrium API User Guide
+# Caterva API User Guide
 
 **For:** Researchers, students, scientists using the API  
 **Status:** August 2026  
@@ -8,9 +8,9 @@
 
 ## Getting Started
 
-### What is Terrium?
+### What is Caterva?
 
-Terrium is a science agent that runs simulations based on your natural language descriptions. Tell it what you want to simulate, and it figures out the domain, parameters, and runs the computation.
+Caterva is a science agent that runs simulations based on your natural language descriptions. Tell it what you want to simulate, and it figures out the domain, parameters, and runs the computation.
 
 **Example:**
 ```
@@ -153,7 +153,7 @@ The `parameters` field shows the exact values used for the simulation.
   },
   "s0": {
     "origin": "default",
-    "source": "Terrium standard parameters",
+    "source": "Caterva standard parameters",
     "note": "SIR default: 900 susceptible population"
   }
 }
@@ -362,7 +362,7 @@ curl -X POST http://localhost:5000/api/simulate \
 
 **Goal:** Find published parameter values for your organism/enzyme
 
-**How Terrium helps:**
+**How Caterva helps:**
 
 ```bash
 curl -X POST http://localhost:5000/api/simulate \
@@ -502,7 +502,7 @@ Allele frequency:   Random walk toward 0 or 1
 **Possible causes:**
 
 1. **Different parameters** - Check `parameterProvenance`, might differ from paper
-2. **Different solver** - Terrium uses specific ODE solvers
+2. **Different solver** - Caterva uses specific ODE solvers
 3. **Different precision** - Numerical resolution (`points` parameter)
 4. **Stochastic variation** - For Gillespie/Wright-Fisher, different seed = different result
 
@@ -571,7 +571,7 @@ jq '.result.provenance.flags' result.json
 **First time with new domain:**
 ```bash
 # Find published baseline (textbook or paper)
-# Run Terrium with same parameters
+# Run Caterva with same parameters
 # Compare results visually
 ```
 

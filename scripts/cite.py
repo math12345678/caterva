@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS
 ---------------
-This is the thing Terrium is for, and until now you could not type it.
+This is the thing Caterva is for, and until now you could not type it.
 
 `scripts/report_lab.py` has produced literature-backed documents since
 ADR 0149: it asks UniProt which enzyme a name means, refuses to pick when
@@ -37,7 +37,7 @@ The document then says, in its own words, that no search was run.
 
 WHAT IT DOES NOT DO
 -------------------
-Compose a mechanism. That is `terrium compose`, which today builds
+Compose a mechanism. That is `caterva compose`, which today builds
 structure with the motif library's placeholder values and does not run this
 search (ADR 0178 records the gap and what wiring it would take).
 """
@@ -96,7 +96,7 @@ def _default_title(args: argparse.Namespace) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="terrium-cite",
+        prog="caterva-cite",
         description=__doc__.splitlines()[0],
         epilog=(
             "Examples:\n"
@@ -106,7 +106,7 @@ def main(argv: list[str] | None = None) -> int:
             "  cite.py --ec 1.1.1.27 --substrate pyruvate --fixture Tests/fixtures/brenda_ldh_fixture.html\n"
             "\n"
             "Exit codes: 0 a document was produced, 2 the request was not well\n"
-            "formed, 3 Terrium refused and said why (an ambiguous enzyme name,\n"
+            "formed, 3 Caterva refused and said why (an ambiguous enzyme name,\n"
             "a quantity nothing measured).\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -132,10 +132,10 @@ def main(argv: list[str] | None = None) -> int:
     if not args.quantity:
         args.quantity = ["km"]
 
-    # The same reading `terrium compose` applies: "human" is Homo sapiens,
+    # The same reading `caterva compose` applies: "human" is Homo sapiens,
     # and saying so beats a search for an organism nobody spells that way.
     sys.path.insert(0, str(ROOT))
-    from Terium.compose.organisms import normalise_organism
+    from caterva.compose.organisms import normalise_organism
 
     args.organism, organism_note = normalise_organism(args.organism)
     if organism_note:

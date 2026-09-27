@@ -1,4 +1,4 @@
-# Terrium: Complete Literature-Backed System - Test Commands
+# Caterva: Complete Literature-Backed System - Test Commands
 
 > **⚠️ CORRECTION (2026-08-10):** this doc targets `Science-Agent-Pipeline/artifacts/api-server` with `npm install && npm test`, but that package's dependencies use the `workspace:*` protocol (`@workspace/api-zod`, `@workspace/db`), which plain `npm install` cannot resolve — it will fail. That workspace declares `"packageManager": "pnpm@11.20.0"` in `Science-Agent-Pipeline/package.json`; use `pnpm install && pnpm test` (or `pnpm --filter api-server test` from the workspace root) instead. The test runner itself is vitest (`"test": "vitest run"` in that package's package.json), not a Jest-style runner as the phrasing here implies — `npm test -- --reporter=verbose` happens to pass through to vitest correctly if you do use npm for the test step alone (after a successful pnpm install). Also: `npm test -- metrics.test.ts` and the `-t "Job Tracking"` variant below reference a file that doesn't exist — the real filename is `verifiableMetrics.test.ts`. `strenda.test.ts`, `literature-verifier.test.ts`, and `literature-backed-e2e.test.ts` do exist and are correctly named below.
 
@@ -10,7 +10,7 @@
 
 ### 1. Run All Tests (Complete System)
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium/Science-Agent-Pipeline/artifacts/api-server
+cd /Users/smyan/Desktop/Coding/Caterva/Science-Agent-Pipeline/artifacts/api-server
 npm test
 ```
 
@@ -200,7 +200,7 @@ npm test -- metrics.test.ts --reporter=verbose
 
 ### Start Fresh
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium/Science-Agent-Pipeline/artifacts/api-server
+cd /Users/smyan/Desktop/Coding/Caterva/Science-Agent-Pipeline/artifacts/api-server
 npm install
 npm test
 ```

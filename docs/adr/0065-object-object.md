@@ -54,7 +54,7 @@ you how to supply it (ADR 0024, and Sauro's `--cite` work). All of it was
 replaced by eight characters of noise at the last step.
 
 Sauro's warning was that a tool which blocks without explaining pushes the
-researcher into hardcoding a number. Terrium had built the explanation
+researcher into hardcoding a number. Caterva had built the explanation
 carefully and then deleted it on the way out of the door.
 
 ## Why every test passed

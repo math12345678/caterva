@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — chapter seams
+   caterva — chapter seams
 
    The chapters were separated by a hairline border and a large
    pad, which made them read as four unrelated sections stacked in

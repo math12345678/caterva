@@ -1,7 +1,7 @@
 /**
  * The open path, end to end: a model the caller constructed.
  *
- * Every other simulate route asks Terrium to recognise a system from its
+ * Every other simulate route asks Caterva to recognise a system from its
  * catalogue of sixteen. This one accepts the system itself. These tests run
  * it through the real HTTP surface, the real subprocess and the real
  * engine -- no mocks -- because the claim being made is that an arbitrary

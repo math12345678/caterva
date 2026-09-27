@@ -93,7 +93,7 @@ PUBMED_ESUMMARY_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fc
 # three-tier match, same STRENDA assay-condition capture) but is
 # deliberately NOT reachable through RESOLVABLE_FIELDS / the simulation
 # engine -- ADR 0012 found Vmax = kcat * [E]0 needs a caller-supplied
-# enzyme concentration Terrium has no source for, and ADR 0013 declined to
+# enzyme concentration Caterva has no source for, and ADR 0013 declined to
 # default or infer it. Exposing quantity="kcat" here makes a real,
 # citable turnover number resolvable and displayable (e.g. for a student
 # comparing catalytic efficiency across enzymes) without pretending it can
@@ -279,7 +279,7 @@ class KineticResult(BaseModel):
     #:
     #: Reported rather than blocking: separating "allosteric effector someone
     #: added" from "cosubstrate the reaction requires" is a claim about the
-    #: enzyme's mechanism that Terrium has no source for. See ADR 0032.
+    #: enzyme's mechanism that Caterva has no source for. See ADR 0032.
     effector_contrasts: "list[EffectorContrast]" = []
 
     #: Bases the candidate pool named with more than one form designator.
@@ -576,7 +576,7 @@ def _nothing_matched(
         log.append(
             f"No {substrate!r} row, but this EC number reports: "
             + ", ".join(available)
-            + ". Terrium does not substitute one substrate for another, so "
+            + ". Caterva does not substitute one substrate for another, so "
             "re-run with the name you meant."
         )
     return available

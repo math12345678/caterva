@@ -215,7 +215,7 @@ itself, e.g. in `gillespieGolden.test.ts`:
 
 ```typescript
 // The SSA golden (Stage 6 Part 2): seed 12345, a0=100, k=0.5, end=3.0.
-// Pinned in Python in Terium/tests/test_gillespie_ssa_golden.py; this
+// Pinned in Python in caterva/tests/test_gillespie_ssa_golden.py; this
 // file pins the SAME trajectory through the real runner boundary so a
 // drift between engine and bridge (or a changed engine) breaks here too.
 const GOLDEN = {
@@ -241,7 +241,7 @@ trajectory is correct — there is no `--update-snapshots` mechanism wired to th
 has no `c8`, `istanbul`, or `nyc` dependency, no `@vitest/coverage-v8` (or any
 `@vitest/coverage-*` package), and `vitest.config.ts` has no `test.coverage` block. The
 per-file percentages that used to appear here (queryResolver.ts 95%, provenance.ts 98%,
-schemas.ts 100%, cache.ts 92%, llmResolver.ts 87%, teriumRunner.ts 85%) were not backed by
+schemas.ts 100%, cache.ts 92%, llmResolver.ts 87%, catervaRunner.ts 85%) were not backed by
 any coverage run and have been removed rather than corrected, since there is currently no
 tooling in this repo that could produce them.
 
@@ -321,7 +321,7 @@ jobs:
       - name: Build guards
         run: python scripts/verify_build.py --quick
       - name: Simulation engine tests
-        working-directory: Terium
+        working-directory: Caterva
         run: python -m pytest -v
       - name: Literature layer tests
         working-directory: Tests
@@ -355,7 +355,7 @@ jobs:
         run: pnpm --filter @workspace/api-server run test
 ```
 
-The `test` job runs the Python 3.10/3.12/3.13 matrix: the `Terium/tests` suite (970 cases
+The `test` job runs the Python 3.10/3.12/3.13 matrix: the `caterva/tests` suite (970 cases
 collected via `python3 -m pytest --collect-only -q`, verified 2026-08-09), the `Tests` suite
 (289 cases collected the same way), and a series of "constitution guard" scripts
 (`check_env.py`, `check_citation_format.py`, `check_documented_counts.py`,
@@ -409,8 +409,8 @@ pnpm run dev
 pnpm run build
 
 # Deploy to staging environment
-docker build -t terrium-api:staging .
-docker push registry.example.com/terrium-api:staging
+docker build -t caterva-api:staging .
+docker push registry.example.com/caterva-api:staging
 
 # Smoke tests
 curl https://staging-api.example.com/healthz
@@ -507,7 +507,7 @@ wired into any script or CI job).
 wrk -t8 -c500 -d5m --script scenario.lua http://localhost:5000/api
 
 # Watch logs for errors
-sudo journalctl -u terrium-api -f
+sudo journalctl -u caterva-api -f
 ```
 
 ---
@@ -720,7 +720,7 @@ Post-merge:
 
 - Test files: `src/__tests__/` and `src/lib/*.test.ts`
 - Package.json scripts (pnpm): `dev`, `build`, `start`, `test`, `test:watch`, `typecheck`
-- CI config: `.github/workflows/tests.yml` (root of the Terrium repo)
+- CI config: `.github/workflows/tests.yml` (root of the Caterva repo)
 - Performance guide: `PERFORMANCE_GUIDE.md`
 
 ---

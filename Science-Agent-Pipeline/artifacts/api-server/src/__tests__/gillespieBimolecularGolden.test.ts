@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { runTerium } from "../lib/teriumRunner";
+import { runCaterva } from "../lib/catervaRunner";
 import { resolveQuery } from "../lib/queryResolver";
 
 // The bimolecular SSA golden (Stage 7): seed 12345, a0=60, b0=40, k=0.01,
 // end=5.0. Pinned in Python in
-// Terium/tests/test_gillespie_ssa_bimolecular_golden.py; this pins the
+// caterva/tests/test_gillespie_ssa_bimolecular_golden.py; this pins the
 // SAME trajectory through the real runner boundary.
 const GOLDEN = {
   rows: 38,
@@ -15,7 +15,7 @@ const GOLDEN = {
 
 describe("Bimolecular SSA golden through the runner boundary", () => {
   it("reproduces the pinned seeded trajectory", async () => {
-    const res = await runTerium("gillespie_ssa_bimolecular", {
+    const res = await runCaterva("gillespie_ssa_bimolecular", {
       a0: 60,
       b0: 40,
       k: 0.01,
@@ -39,10 +39,10 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
     expect(res.flagReason).toBeNull();
   });
 
-  // This asserted /Terium runner exited with code 1/ and passed for as long
+  // This asserted /Caterva runner exited with code 1/ and passed for as long
   // as the boundary threw the engine's explanation away. The engine has
   // always written "a0+b0=1100000 exceeds API runtime ceiling
-  // (MAX_API_SSA_POPULATION) 1000000" to stdout; runTerium checked the exit
+  // (MAX_API_SSA_POPULATION) 1000000" to stdout; runCaterva checked the exit
   // status first and rejected with the status instead. Pinning the exit code
   // made the information loss look like the specification.
   //
@@ -50,7 +50,7 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
   // those are what a user needs to act: which limit, and by how much.
   // ONE spawn, two assertions about the SAME error.
   //
-  // This used to call runTerium twice, once per regex. That doubled the
+  // This used to call runCaterva twice, once per regex. That doubled the
   // cost of the most expensive test in the file -- each call spawns a
   // Python interpreter -- and under shard contention the pair exceeded
   // vitest's default 5s timeout and failed. Passing alone and failing in
@@ -68,7 +68,7 @@ describe("Bimolecular SSA golden through the runner boundary", () => {
   it(
     "rejects an over-budget initial population before simulating, and says why",
     async () => {
-      const error = await runTerium("gillespie_ssa_bimolecular", {
+      const error = await runCaterva("gillespie_ssa_bimolecular", {
         a0: 600_000,
         b0: 500_000,
       }).then(

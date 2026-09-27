@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — ATLAS inspection records
+   caterva — ATLAS inspection records
 
    One record per inspectable node. The schema is fixed, because
    the product's claim is that any object in the architecture can
@@ -213,7 +213,7 @@ export const ATLAS_RECORDS = {
   },
   'rt-backend': {
     label: 'Backend Runtime',
-    role: 'Runs heavier numerical work on Terrium-side compute.',
+    role: 'Runs heavier numerical work on Caterva-side compute.',
     receives: 'Configured models exceeding browser capability.',
     produces: 'Results, timing and resource records for the run.',
     acts: 'Extends what can be run without leaving the system\u2019s own accountability.',
@@ -222,11 +222,11 @@ export const ATLAS_RECORDS = {
   },
   'rt-hpc': {
     label: 'User-Provided HPC / Cloud',
-    role: 'The boundary of the system: compute the user owns and Terrium does not provide.',
-    receives: 'Runs whose requirements exceed anything Terrium can offer.',
+    role: 'The boundary of the system: compute the user owns and Caterva does not provide.',
+    receives: 'Runs whose requirements exceed anything Caterva can offer.',
     produces: 'A complete setup package for the user\u2019s own environment.',
     acts: 'States the limit of the product honestly, and makes the work portable across it.',
-    failure: 'This node is the failure behaviour. Terrium prepares the run rather than pretending to host it.',
+    failure: 'This node is the failure behaviour. Caterva prepares the run rather than pretending to host it.',
     related: ['execution-router', 'setup-package']
   },
 
@@ -299,7 +299,7 @@ export const ATLAS_RECORDS = {
   },
   'setup-package': {
     label: 'Setup Package',
-    role: 'A complete, portable run for compute Terrium does not provide.',
+    role: 'A complete, portable run for compute Caterva does not provide.',
     receives: 'The configured model and the environment requirements it could not meet locally.',
     produces: 'Code, parameters, environment manifest and the same disclosures as the record.',
     acts: 'Carries the run across the boundary of the product without losing its provenance.',

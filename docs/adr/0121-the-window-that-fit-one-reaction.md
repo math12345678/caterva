@@ -144,7 +144,7 @@ which holds under any window.
 Independent confirmation, scipy against the CLI's printed trajectory:
 
 ```
- t (s)      Terrium    closed form   residual
+ t (s)      Caterva    closed form   residual
       0.0     10.000        10.000      0.0000
   12930.7      8.245         8.245      0.0000
   51723.0      3.884         3.884      0.0002

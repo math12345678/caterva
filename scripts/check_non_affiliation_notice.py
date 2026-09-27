@@ -3,8 +3,8 @@
 
 WHY THIS EXISTS
 ---------------
-Terrium and Tellurium differ by two letters, work in the same field, and
-target the same people. Terrium *runs on* the Sauro lab's libRoadRunner and
+Caterva and Tellurium differ by two letters, work in the same field, and
+target the same people. Caterva *runs on* the Sauro lab's libRoadRunner and
 generates their Antimony. That is a permitted and ordinary use (see
 `docs/LICENSING.md`), but the name makes it look like something else, and
 once it actually did: Matthias König read a cold outreach email as a false
@@ -12,7 +12,7 @@ claim of credit for Tellurium's work.
 
 Before this guard, the disclaimer lived in exactly two files -- `README.md`
 and `NOTICE` -- both of which stay in the repository. Someone who runs
-`pip install terrium`, or reads the citation metadata, or copies a BibTeX
+`pip install caterva`, or reads the citation metadata, or copies a BibTeX
 entry off the landing page, never sees either.
 
 That is the same failure the BRENDA attribution had until 2026-08-13: a
@@ -29,7 +29,7 @@ credit:
   * `NOTICE` and `README.md` -- the repository
   * `CITATION.cff` -- what a citation manager ingests
   * `pyproject.toml` and `package.json` -- what PyPI and npm display
-  * `Terium/__init__.py` -- what `help(Terium)` prints, which travels with
+  * `caterva/__init__.py` -- what `help(Caterva)` prints, which travels with
     the installed package while a README does not
   * the landing page's "How to cite" section -- where someone actually
     decides whose name goes in the paper
@@ -56,7 +56,7 @@ _MIN_SURFACES = 6
 #: Matched on meaning rather than an exact sentence, so the wording can be
 #: adapted to each surface -- a BibTeX panel and a package docstring should
 #: not read identically -- while the two load-bearing claims survive:
-#: that Terrium is not Tellurium, and that it is unaffiliated.
+#: that Caterva is not Tellurium, and that it is unaffiliated.
 SURFACES: dict[str, tuple[str, tuple[str, ...]]] = {
     "NOTICE": (
         "the file Apache 2.0 4(d) makes travel with redistribution",
@@ -78,17 +78,17 @@ SURFACES: dict[str, tuple[str, tuple[str, ...]]] = {
         "what npm displays under the package name",
         (r"unaffiliated with tellurium",),
     ),
-    "Terium/__init__.py": (
+    "caterva/__init__.py": (
         "the package docstring -- travels with the installed software",
         (r"not\s+tellurium", r"unaffiliated"),
     ),
-    "Science-Agent-Pipeline/artifacts/terrium-landing/src/cli/HowToCiteSection.tsx": (
+    "Science-Agent-Pipeline/artifacts/caterva-landing/src/cli/HowToCiteSection.tsx": (
         "the landing page, where a reader decides whom to credit",
         (r"not\s+tellurium", r"unaffiliated"),
     ),
 }
 
-#: Surfaces where the notice should also name what Terrium actually builds
+#: Surfaces where the notice should also name what Caterva actually builds
 #: on. Saying "we are not them" without saying "we run on their software"
 #: is a denial rather than an attribution, and the attribution is the part
 #: the licences ask for.
@@ -96,8 +96,8 @@ MUST_CREDIT: tuple[str, ...] = (
     "NOTICE",
     "README.md",
     "CITATION.cff",
-    "Terium/__init__.py",
-    "Science-Agent-Pipeline/artifacts/terrium-landing/src/cli/HowToCiteSection.tsx",
+    "caterva/__init__.py",
+    "Science-Agent-Pipeline/artifacts/caterva-landing/src/cli/HowToCiteSection.tsx",
 )
 
 _CREDIT_RE = re.compile(r"libroadrunner", re.I)
@@ -151,9 +151,9 @@ def main() -> int:
         for problem in problems:
             print(f"  - {problem}")
         print(
-            "\nThis is not decoration. Terrium and Tellurium differ by two "
+            "\nThis is not decoration. Caterva and Tellurium differ by two "
             "letters, in the same\nfield, and one researcher has already read "
-            "a Terrium email as a claim on\nTellurium's work. See "
+            "a Caterva email as a claim on\nTellurium's work. See "
             "docs/RENAME_PLAN.md."
         )
         return 1

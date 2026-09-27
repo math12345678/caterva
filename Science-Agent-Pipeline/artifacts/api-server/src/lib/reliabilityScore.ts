@@ -18,8 +18,8 @@
  *   enzyme activity to clinical symptoms in mitochondrial β-oxidation
  *   defects", bioRxiv doi:10.64898/2026.05.05.722902
  *
- * The insight Terrium was missing: a measurement with a poor assay
- * description is not evidence of NOTHING. It is weak evidence. Terrium's
+ * The insight Caterva was missing: a measurement with a poor assay
+ * description is not evidence of NOTHING. It is weak evidence. Caterva's
  * binary verified/unverified discarded it entirely, which is a loss of
  * information dressed up as caution — and it is why roughly three quarters
  * of this project's own defaults came back "unverified", a number that had
@@ -142,7 +142,7 @@ const NO_AGGREGATE_REASON =
   "The three axes are reported separately and deliberately not combined. " +
   "Weighting them against each other requires knowing how a right-species " +
   "value with a poor assay description trades off against a thorough assay " +
-  "in the wrong species. That trade-off is an empirical finding Terrium " +
+  "in the wrong species. That trade-off is an empirical finding Caterva " +
   "does not have, and inventing it would fabricate the very kind of number " +
   "this system refuses to fabricate. See ADR 0024, Decision 3.";
 

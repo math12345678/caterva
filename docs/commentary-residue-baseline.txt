@@ -1,4 +1,4 @@
-# Commentary text Terrium cannot read.
+# Commentary text Caterva cannot read.
 #
 # Regenerate:  python3 scripts/check_commentary_coverage.py --update-baseline
 #              (regeneration writes a FLAT list -- re-apply this grouping, or
@@ -49,7 +49,7 @@
 # 
 # "attachment of polyethylene glycol side chains ... does not alter the Kcat
 # value" is the curator explicitly stating the modification had NO effect --
-# information Terrium discards along with the rest of the clause. Reading it
+# information Caterva discards along with the rest of the clause. Reading it
 # would be the one case where the commentary tells us a difference does not
 # matter.
 #

@@ -4,7 +4,7 @@
 
 ## What Was Built
 
-Batch and Sweep Metrics Recording extends Terrium's monitoring system to automatically capture performance data from parameter sweep (`/api/sweep`) and batch processing (`/api/batch`) operations. Previously, these operations generated no metrics—only final results were available. Now every simulation within a sweep/batch is tracked, and aggregate statistics are computed and exposed via REST endpoints and Prometheus.
+Batch and Sweep Metrics Recording extends Caterva's monitoring system to automatically capture performance data from parameter sweep (`/api/sweep`) and batch processing (`/api/batch`) operations. Previously, these operations generated no metrics—only final results were available. Now every simulation within a sweep/batch is tracked, and aggregate statistics are computed and exposed via REST endpoints and Prometheus.
 
 ## Key Deliverables
 
@@ -86,14 +86,14 @@ Enhanced the Prometheus exporter with sweep/batch metrics:
 
 ```prometheus
 # Sweep metrics
-terrium_sweeps_total 3
-terrium_sweep_avg_success_rate 94.33
-terrium_sweep_avg_execution_time_ms 466.67
+caterva_sweeps_total 3
+caterva_sweep_avg_success_rate 94.33
+caterva_sweep_avg_execution_time_ms 466.67
 
 # Batch metrics
-terrium_batches_total 2
-terrium_batch_avg_success_rate 95.5
-terrium_batch_avg_execution_time_ms 437.5
+caterva_batches_total 2
+caterva_batch_avg_success_rate 95.5
+caterva_batch_avg_execution_time_ms 437.5
 ```
 
 Automatically scraped by Prometheus every 15 seconds. Available in Grafana dashboards for trend visualization.
@@ -232,7 +232,7 @@ curl http://localhost:3000/api/metrics/sweeps/sweep_1692201600123_a1b2c
 
 **View in Prometheus:**
 - Navigate to http://localhost:9090/graph
-- Query: `terrium_sweep_avg_success_rate`
+- Query: `caterva_sweep_avg_success_rate`
 - See trend over time
 
 ## Success Criteria Met

@@ -19,7 +19,7 @@ import * as path from 'path';
 import { JobManager, historyPath, type RunRecord } from '../job-manager';
 
 let tempDir: string;
-const originalHistory = process.env['TERRIUM_HISTORY_FILE'];
+const originalHistory = process.env['CATERVA_HISTORY_FILE'];
 
 function record(jobId: string, overrides: Partial<RunRecord> = {}): RunRecord {
   return {
@@ -36,16 +36,16 @@ function record(jobId: string, overrides: Partial<RunRecord> = {}): RunRecord {
 }
 
 beforeEach(() => {
-  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-hist-'));
-  process.env['TERRIUM_HISTORY_FILE'] = path.join(tempDir, 'history.json');
+  tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-hist-'));
+  process.env['CATERVA_HISTORY_FILE'] = path.join(tempDir, 'history.json');
 });
 
 afterEach(() => {
   fs.rmSync(tempDir, { recursive: true, force: true });
   if (originalHistory === undefined) {
-    delete process.env['TERRIUM_HISTORY_FILE'];
+    delete process.env['CATERVA_HISTORY_FILE'];
   } else {
-    process.env['TERRIUM_HISTORY_FILE'] = originalHistory;
+    process.env['CATERVA_HISTORY_FILE'] = originalHistory;
   }
 });
 
@@ -79,7 +79,7 @@ describe('history survives a process boundary', () => {
   });
 
   it('creates the directory if it does not exist', () => {
-    process.env['TERRIUM_HISTORY_FILE'] = path.join(
+    process.env['CATERVA_HISTORY_FILE'] = path.join(
       tempDir,
       'nested',
       'deeper',
@@ -125,7 +125,7 @@ describe('a broken history file cannot break the CLI', () => {
   it('reports a write failure instead of silently losing the run', () => {
     // Pointing at a path that cannot be created. The user was told a job
     // id; if it will not be findable later they need to know why.
-    process.env['TERRIUM_HISTORY_FILE'] = path.join(
+    process.env['CATERVA_HISTORY_FILE'] = path.join(
       historyPath(),
       'impossible',
       'history.json',

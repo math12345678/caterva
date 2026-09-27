@@ -165,7 +165,7 @@ curl -X POST /api/compare -d '{ "parameters": {...} }'
 - ✓ ScientificPipeline (same execution)
 - ✓ Real literature integration (same validation)
 - ✓ SBML generation (same models)
-- ✓ Terium engine (same solver)
+- ✓ Caterva engine (same solver)
 
 **New features:**
 - ✓ Automated model comparison

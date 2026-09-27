@@ -1,4 +1,39 @@
-# Terrium
+# Caterva
+
+<p align="center">
+  <img src="Logo.png" alt="Caterva" width="360">
+</p>
+
+<p align="center">
+  <strong>Mechanistic models whose every number says where it came from.</strong><br>
+  Describe a mechanism in plain words; Caterva builds the model, fills its
+  constants from the literature with the reference each came from, and says
+  plainly which numbers nobody has measured.
+</p>
+
+<p align="center">
+  <a href="https://github.com/math12345678/caterva/actions/workflows/tests.yml"><img alt="tests" src="https://github.com/math12345678/caterva/actions/workflows/tests.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/math12345678/caterva/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/math12345678/caterva?color=1D8A72"></a>
+  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1D8A72"></a>
+  <img alt="Python 3.10 to 3.13" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.13-1D8A72">
+</p>
+
+<p align="center">
+  <a href="docs/USING_CATERVA.md">User guide</a> ·
+  <a href="START_HERE.md">Start here</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="https://github.com/math12345678/caterva/releases/latest">Download</a> ·
+  <a href="SECURITY.md">Security</a>
+</p>
+
+```bash
+caterva compose "Michaelis-Menten with a competitive inhibitor" \
+    --subject 1.1.1.27 --organism human --substrate pyruvate
+# -> Km 0.03 mM (BRENDA ref 286469), Ki 0.00059 mM (BRENDA ref 739793)
+#    kcat: never measured in human, so it stays a labelled placeholder and
+#    the report names the organisms where it was measured
+```
+
 
 > **Contributing, or just arrived? → [START_HERE.md](START_HERE.md)**
 >
@@ -6,7 +41,7 @@
 > real first task. Everything else is linked from there.
 
 Scientific computing for teaching labs. Students ask a question in plain
-language; Terrium resolves the real parameters from the literature, runs the
+language; Caterva resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that has
 been independently checked.
 
@@ -19,55 +54,28 @@ bimolecular association, and a multi-replicate ensemble view), and three
 ODE oscillators: Lotka-Volterra predator-prey, the Tyson (1991) cdc2-cyclin
 cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
 
-> **Terrium is not Tellurium.**
+> **Caterva is not Tellurium.**
 >
 > [Tellurium](https://tellurium.analogmachine.org/) is an established
 > systems-biology environment from the Sauro lab at the University of
 > Washington and collaborators including Lucian Smith and Matthias König.
-> Terrium is an unaffiliated personal project. It is not a fork of
+> Caterva is an unaffiliated personal project. It is not a fork of
 > Tellurium, not endorsed by its authors, and makes no claim to their work.
 >
-> Terrium is a *consumer* of that ecosystem: it runs on libRoadRunner and
-> generates Antimony, both of which come from that group. The similar name
-> is a mistake of mine and has already caused one researcher to reasonably
-> read a cold email as a false claim of credit. Saying so here is cheaper
-> than letting the next person work it out.
+> Caterva is a *consumer* of that ecosystem: it runs on libRoadRunner and
+> generates Antimony, both of which come from that group. It was called Terrium until 2026-09-27, a name too
+> close to Tellurium's: it led one researcher to reasonably read a
+> cold email as a false claim of credit. It is Caterva now, so the
+> two cannot be mistaken for each other.
 
 ## Quick start
 
-> **Not public.** Not "not yet" either: every `Terrium-sim` repository is
-> private and is staying that way (ADR 0179), so the command below needs
-> access. A plain `git clone` or `git ls-remote` URL stops at a username
-> prompt; `gh repo clone` uses your GitHub credentials and is the command
-> that works. If you are reading this without an account that has been added,
-> **line one is as far as you get** — that is a fact about the repository,
-> not a mistake you made.
->
-> (This notice was removed 2026-08-23 on a probe that had silently
-> authenticated through a developer keychain, and restored 2026-08-29 after
-> CI — which holds no credentials — and an unauthenticated API check both
-> said private. The probe now strips credential helpers so it cannot
-> recur.)
->
-> `scripts/check_quickstart_clone_works.py` reports this on every CI run and
-> lets no document promise a stranger anonymous access it does not have
-> ([ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md),
-> [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md)). It is
-> checked in the other direction too: publish the repositories and
-> `check_availability_notice_matches_reality.py` fails until this notice is
-> deleted, so it cannot outlive the thing it describes.
-
-> **Private repository.** These repositories are private and are staying
-> that way, so `gh repo clone` — which uses your GitHub credentials — is
-> the command that works. A plain `git clone` URL stops at a username
-> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).
-
 ```bash
-gh repo clone Terrium-sim/main
-cd main
+git clone https://github.com/math12345678/caterva.git
+cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,691 tests (3,511 engine + 1,180 literature)
+make test      # runs all 4,692 tests (3,513 engine + 1,179 literature)
 ```
 
 ### Or download the release
@@ -81,19 +89,19 @@ checkout; the release notes say what else does not ship
 caveat applies: the repository, and so its Releases page, is private.
 
 ```bash
-tar xzf terrium-0.3.4-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
-cd terrium && xattr -dr com.apple.quarantine .   # macOS only, once (unsigned folder)
-./terrium compose "a toggle switch between two repressors"
+tar xzf caterva-0.3.4-macos-arm64.tar.gz      # or linux-x86_64.tar.gz, windows-x86_64.zip
+cd caterva && xattr -dr com.apple.quarantine .   # macOS only, once (unsigned folder)
+./caterva compose "a toggle switch between two repressors"
 ```
 
 ```bash
-pip install terrium-0.3.4-py3-none-any.whl     # the wheel, from the same page
-terium-compose "a toggle switch between two repressors"
+pip install caterva-0.3.4-py3-none-any.whl     # the wheel, from the same page
+caterva-compose "a toggle switch between two repressors"
 ```
 
 The folders are not code-signed; macOS quarantines the folder and Windows
 SmartScreen asks once, and `README.txt` inside each folder gives the exact
-step for its platform (on Windows, run `.\terrium.exe` from a terminal in
+step for its platform (on Windows, run `.\caterva.exe` from a terminal in
 the folder).
 
 **Real constants with real citations** need the checkout, not the folder.
@@ -104,10 +112,10 @@ the conditions it was measured under; and `compose --subject 1.1.1.27
 those constants already in it, each row naming its reference and any
 constant the search could not find still marked a placeholder (ADR 0178).
 
-**New to it? [`docs/USING_TERRIUM.md`](docs/USING_TERRIUM.md)** is the guide:
+**New to it? [`docs/USING_CATERVA.md`](docs/USING_CATERVA.md)** is the guide:
 what to type first, how to read a report, and a recipe for each question a
 lab actually asks (which step matters, what to measure next, does the
-conclusion survive not knowing the constants). Running `terrium` with no
+conclusion survive not knowing the constants). Running `caterva` with no
 arguments prints the same quick start.
 
 ### See what it produces, before anything else
@@ -121,7 +129,7 @@ BRENDA page committed under `Tests/fixtures/`, runs the real report builder
 — the same one the CLI spawns — and prints the document a student would hand
 in: the Km with its reference, the values you chose marked as yours, what
 the published measurements disagree about, and a section listing what
-Terrium refused to do and why.
+Caterva refused to do and why.
 
 Because it uses a saved page it demonstrates the pipeline rather than a live
 lookup, and **the document says so itself** rather than leaving you to work
@@ -132,14 +140,14 @@ same thing against BRENDA.
 while it runs. That is normal. It is written here because the absence of a
 figure is what makes a slow suite look like a broken one — the author of
 this note spent a pass diagnosing a "hang" in
-`Terium/tests/test_popgen_correctness.py` that was a 58-second file being
+`caterva/tests/test_popgen_correctness.py` that was a 58-second file being
 run inside a 175-second budget alongside others. It had never hung.
 
 Measured on the reference container, `-p no:randomly`:
 
 | suite | time |
 |---|---|
-| `Terium/tests` (engine) | ~3.5-4 min |
+| `caterva/tests` (engine) | ~3.5-4 min |
 | `Tests/` (literature) | ~2.9 min |
 | `test_popgen_correctness.py` alone | 58 s |
 
@@ -168,7 +176,7 @@ just a verdict.
 ### The population-genetics resolver is opt-in
 
 `stdpopsim` is **not** installed by `make setup`. It is GPL-3.0-or-later and
-Terrium is Apache-2.0, so a default install would put copyleft code into the
+Caterva is Apache-2.0, so a default install would put copyleft code into the
 environment of a project that declares a permissive licence — compatible in
 one direction only, and not something a reader should have to derive by
 comparing two licence files.
@@ -177,7 +185,7 @@ comparing two licence files.
 pip install -r requirements-popgen.txt     # adds GPL-3.0-or-later code
 ```
 
-Nothing is violated either way: Terrium never bundles stdpopsim, and running
+Nothing is violated either way: Caterva never bundles stdpopsim, and running
 two separately-installed packages together is use rather than distribution.
 Splitting it just means you can see what you have. See
 [ADR 0061](docs/adr/0061-gpl-out-of-the-default-install.md) and NOTICE.
@@ -216,8 +224,8 @@ If you'd rather not touch your local Python at all, there's a container that
 gives you the same verified environment:
 
 ```bash
-docker build -f .devcontainer/Dockerfile -t terrium-sandbox .
-docker run -it --rm terrium-sandbox
+docker build -f .devcontainer/Dockerfile -t caterva-sandbox .
+docker run -it --rm caterva-sandbox
 # you're now in a shell where check_env.py has already passed
 ```
 
@@ -235,7 +243,7 @@ that command; `node_modules` is not baked into the image.
 
 ## Using it
 
-Terrium is a command-line tool. The point of it is the provenance: every
+Caterva is a command-line tool. The point of it is the provenance: every
 number it reports says where it came from, and anything it cannot source it
 refuses to invent.
 
@@ -259,7 +267,7 @@ scientific resolve "lactate dehydrogenase" \
   Citation  BRENDA ref 740253
 ```
 
-When the organism you asked for has no measurement, Terrium does **not**
+When the organism you asked for has no measurement, Caterva does **not**
 quietly hand you another organism's:
 
 ```
@@ -407,18 +415,18 @@ scientific history
 ```
 
 Every `--resolve` run is recorded with its full provenance to
-`~/.terrium/history.json`, so a job id printed today still means something
+`~/.caterva/history.json`, so a job id printed today still means something
 tomorrow.
 
 ### Environment
 
 | variable | effect |
 |---|---|
-| `TERRIUM_CONTACT_EMAIL` | identifies you to CrossRef's polite pool (better rate limits) |
-| `TERRIUM_SKIP_DOI_VERIFICATION=1` | skip registry lookups offline. Results become **unverified**, never verified |
-| `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` | accept unverified citations. Cannot rescue a *rejected* one |
-| `TERRIUM_HISTORY_FILE` | where run history is kept |
-| `TERRIUM_PYTHON` | which interpreter runs the engine |
+| `CATERVA_CONTACT_EMAIL` | identifies you to CrossRef's polite pool (better rate limits) |
+| `CATERVA_SKIP_DOI_VERIFICATION=1` | skip registry lookups offline. Results become **unverified**, never verified |
+| `CATERVA_ALLOW_UNVERIFIED_CITATIONS=1` | accept unverified citations. Cannot rescue a *rejected* one |
+| `CATERVA_HISTORY_FILE` | where run history is kept |
+| `CATERVA_PYTHON` | which interpreter runs the engine |
 
 ## Requirements
 
@@ -432,7 +440,7 @@ cp310, so we stay on 2.8.0. See
 
 The umbrella `tellurium` package pulls in `python-libcombine` and
 `python-libnuml`, which exist to handle COMBINE archives and numerical markup.
-Terrium uses neither. On any platform without prebuilt wheels for them, the
+Caterva uses neither. On any platform without prebuilt wheels for them, the
 install dies at the cmake step.
 
 Install the three packages that actually do the work instead — they are already
@@ -541,21 +549,20 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 ## Layout
 
 ```
-Terrium/
-├── Terium/                  simulation engine (ODE + discrete/stochastic)
-│   ├── terium_engine.py     public entry point (88 names)
-│   └── tests/                3,511 tests
+Caterva/
+├── caterva/                  simulation engine (ODE + discrete/stochastic)
+│   ├── caterva_engine.py     public entry point (88 names)
+│   └── tests/                3,513 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1180 tests
+│   └── ...                   1,179 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
 │   └── lib/api-spec/           OpenAPI 3.1 spec
 ├── docs/                       ADRs, engineering constitution, API docs
 │   └── adr/                    204 decision records (and counting)
-├── Business/                   build stages, roadmap, fundraising
 ├── scripts/                    78 guard scripts + build verification
 │   ├── verify_build.py         runs all guards + tests in one command
 │   ├── check_guard_wiring.py   every guard must run somewhere, unasked
@@ -615,7 +622,7 @@ solver tolerances, dropping the diploid factor of 2 in Wright-Fisher's
 binomial sampling) and confirmed caught, one at a time, as each domain is
 built. Every mutation claimed in an implementation report is independently
 reproduced by a reviewer before being trusted — see
-`Business/build-stages/STAGE_01_PART_04.md` and `STAGE_02_PART_04.md` for
+build record STAGE_01_PART_04 (private since 2026-09-27) and `STAGE_02_PART_04.md` for
 the worked examples, including two cases where the original claimed blast
 radius was wrong and got corrected.
 
@@ -628,9 +635,9 @@ models carry a comment explaining the rename.
 
 **Plausibility bounds are shared.** `KM_PLAUSIBLE_MIN_MM` and
 `KM_PLAUSIBLE_MAX_MM` must stay identical between `brenda_client.py` and
-`terium_engine.py`. They drifted once (1e3 vs 1e4), which meant a Km of
+`caterva_engine.py`. They drifted once (1e3 vs 1e4), which meant a Km of
 5000 mM was flagged by the literature layer and then silently accepted as
-confirmed by the simulation layer. `Terium/tests/test_brenda_integration.py` now pins
+confirmed by the simulation layer. `caterva/tests/test_brenda_integration.py` now pins
 them together.
 
 ## Common commands
@@ -638,10 +645,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,691 tests
+make test        # run all 4,692 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,511 tests)
-make test-lit    # literature layer only (1180 tests)
+make test-sim    # simulation engine only (3,513 tests)
+make test-lit    # literature layer only (1,179 tests)
 python3 scripts/verify_build.py --quick  # all 78 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

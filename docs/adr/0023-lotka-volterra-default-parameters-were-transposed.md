@@ -66,7 +66,7 @@ to a prey density of 0.25.
 a verification suite that checks the ODE's own analytic properties rather
 than the solver's output.**
 
-`Terium/tests/test_lotka_volterra_correctness.py`, 17 tests across four
+`caterva/tests/test_lotka_volterra_correctness.py`, 17 tests across four
 independent verification routes — deliberately independent, so no single
 wrong assumption can make all of them pass:
 

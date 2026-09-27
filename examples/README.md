@@ -1,6 +1,6 @@
 # `examples/` — runnable, and kept that way
 
-Three end-to-end examples, one per way of calling Terrium.
+Three end-to-end examples, one per way of calling Caterva.
 
 | file | shows |
 |---|---|

@@ -2,7 +2,7 @@
 
 # 🚀 Quick Start Deployment Guide
 
-**Get Terrium running in 5 minutes**
+**Get Caterva running in 5 minutes**
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### Easiest Way (5 seconds)
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 ```
 
@@ -23,7 +23,7 @@ Then visit **http://localhost:3000**
 docker-compose up -d
 
 # View logs
-docker-compose logs -f terrium
+docker-compose logs -f caterva
 
 # Stop
 docker-compose down
@@ -37,18 +37,18 @@ docker-compose down
 
 ```bash
 # Build image
-docker build -t terrium:latest .
+docker build -t caterva:latest .
 
 # Run container
 docker run -d \
-  --name terrium \
+  --name caterva \
   -p 3000:3000 \
-  -v terrium-data:/app/data \
+  -v caterva-data:/app/data \
   --restart unless-stopped \
-  terrium:latest
+  caterva:latest
 
 # Check status
-docker logs terrium
+docker logs caterva
 curl http://localhost:3000/api/health
 ```
 
@@ -56,33 +56,33 @@ curl http://localhost:3000/api/health
 
 ```bash
 # Create namespace
-kubectl create namespace terrium
+kubectl create namespace caterva
 
 # Create secret for environment
-kubectl create secret generic terrium-env \
+kubectl create secret generic caterva-env \
   --from-literal=NODE_ENV=production \
-  -n terrium
+  -n caterva
 
 # Deploy
 kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: terrium
-  namespace: terrium
+  name: caterva
+  namespace: caterva
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: terrium
+      app: caterva
   template:
     metadata:
       labels:
-        app: terrium
+        app: caterva
     spec:
       containers:
-      - name: terrium
-        image: terrium:latest
+      - name: caterva
+        image: caterva:latest
         ports:
         - containerPort: 3000
         env:
@@ -111,11 +111,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: terrium
-  namespace: terrium
+  name: caterva
+  namespace: caterva
 spec:
   selector:
-    app: terrium
+    app: caterva
   ports:
   - protocol: TCP
     port: 80
@@ -124,8 +124,8 @@ spec:
 EOF
 
 # Verify
-kubectl get pods -n terrium
-kubectl port-forward -n terrium svc/terrium 3000:80
+kubectl get pods -n caterva
+kubectl port-forward -n caterva svc/caterva 3000:80
 ```
 
 ### Cloud Platforms
@@ -146,7 +146,7 @@ export PATH=$PWD/node-v22.0.0-linux-x64/bin:$PATH
 
 # Clone and run
 git clone <repo>
-cd Terrium
+cd Caterva
 npm install
 npm run build
 npm run web:start &
@@ -158,7 +158,7 @@ npm run web:start &
 heroku login
 
 # Create app
-heroku create terrium-app
+heroku create caterva-app
 
 # Deploy
 git push heroku main
@@ -170,18 +170,18 @@ heroku logs --tail
 #### Google Cloud Run
 ```bash
 # Build and push image
-gcloud builds submit --tag gcr.io/PROJECT/terrium
+gcloud builds submit --tag gcr.io/PROJECT/caterva
 
 # Deploy
-gcloud run deploy terrium \
-  --image gcr.io/PROJECT/terrium \
+gcloud run deploy caterva \
+  --image gcr.io/PROJECT/caterva \
   --platform managed \
   --port 3000 \
   --memory 512Mi \
   --timeout 3600
 
 # Get URL
-gcloud run describe terrium --platform managed
+gcloud run describe caterva --platform managed
 ```
 
 ---
@@ -200,9 +200,9 @@ python examples/python_integration.py
 
 **Quick usage:**
 ```python
-from examples.python_integration import TerriumClient
+from examples.python_integration import CatervaClient
 
-client = TerriumClient()
+client = CatervaClient()
 
 # Run simulation
 job_id = client.simulate(
@@ -227,9 +227,9 @@ node examples/nodejs_integration.js
 
 **Quick usage:**
 ```javascript
-const TerriumClient = require('./examples/nodejs_integration');
+const CatervaClient = require('./examples/nodejs_integration');
 
-const client = new TerriumClient();
+const client = new CatervaClient();
 
 // Run simulation
 const jobId = await client.simulate(
@@ -330,13 +330,13 @@ curl http://localhost:3000/api/stats
 
 ```bash
 # Docker logs
-docker logs terrium
+docker logs caterva
 
 # Kubernetes logs
-kubectl logs -n terrium -l app=terrium -f
+kubectl logs -n caterva -l app=caterva -f
 
 # Follow live
-docker-compose logs -f terrium
+docker-compose logs -f caterva
 ```
 
 ---
@@ -347,9 +347,9 @@ docker-compose logs -f terrium
 
 ```bash
 # Start multiple instances
-docker run -d --name terrium1 -p 3000:3000 terrium:latest
-docker run -d --name terrium2 -p 3001:3000 terrium:latest
-docker run -d --name terrium3 -p 3002:3000 terrium:latest
+docker run -d --name caterva1 -p 3000:3000 caterva:latest
+docker run -d --name caterva2 -p 3001:3000 caterva:latest
+docker run -d --name caterva3 -p 3002:3000 caterva:latest
 
 # Use load balancer (nginx)
 # See DEPLOYMENT_AND_OPS.md for nginx config
@@ -368,17 +368,17 @@ docker run -d --name terrium3 -p 3002:3000 terrium:latest
 
 ### Job Data
 
-Jobs are saved to `terrium-jobs.jsonl`. This file:
+Jobs are saved to `caterva-jobs.jsonl`. This file:
 - Persists across restarts
 - Grows ~1KB per job
 - Should be backed up regularly
 
 ```bash
 # Backup
-cp terrium-jobs.jsonl terrium-jobs.jsonl.backup.$(date +%Y%m%d)
+cp caterva-jobs.jsonl caterva-jobs.jsonl.backup.$(date +%Y%m%d)
 
 # Or with Docker:
-docker cp terrium:/app/data/terrium-jobs.jsonl ./backup/
+docker cp caterva:/app/data/caterva-jobs.jsonl ./backup/
 ```
 
 ### Upgrade Path to Database
@@ -395,8 +395,8 @@ docker-compose up -d postgres
 # 3. Run migration (future feature)
 # npm run migrate:file-to-postgres
 
-# 4. Restart terrium
-docker-compose restart terrium
+# 4. Restart caterva
+docker-compose restart caterva
 ```
 
 ---
@@ -426,13 +426,13 @@ npm run web:start
 ### Jobs Not Persisting
 ```bash
 # Check file permissions
-ls -la terrium-jobs.jsonl
+ls -la caterva-jobs.jsonl
 
 # Check disk space
 df -h
 
 # Verify path in logs
-docker logs terrium | grep -i "database\|storage"
+docker logs caterva | grep -i "database\|storage"
 ```
 
 ---

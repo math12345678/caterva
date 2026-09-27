@@ -14,8 +14,8 @@ statement that this project lints thoroughly.
 
 What that cost, measured rather than supposed:
 
-    scripts/verify_build.py:813  F821  Undefined name `TERIUM_DIR`
-    scripts/verify_build.py:822  F821  Undefined name `TERIUM_DIR`
+    scripts/verify_build.py:813  F821  Undefined name `CATERVA_DIR`
+    scripts/verify_build.py:822  F821  Undefined name `CATERVA_DIR`
 
 `run_python_tests()` referenced a constant that did not exist, so the
 non-`--quick` path of the build verification script raised `NameError`
@@ -93,7 +93,7 @@ NOT_YET_GREEN = {"F401": 17, "F841": 3}
 #: these rules rather than carrying them: an unused binding is usually the
 #: residue of something that was removed.
 
-TARGETS = ["Tests", "scripts", "Terium"]
+TARGETS = ["Tests", "scripts", "caterva"]
 
 #: Fewest Python files that must exist under TARGETS for a clean lint to
 #: mean anything. Well below the real count so ordinary deletion does not

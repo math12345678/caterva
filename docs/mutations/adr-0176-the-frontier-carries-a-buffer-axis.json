@@ -10,24 +10,24 @@
     "Every mutation is a restore of a defect the ADR names, at the line it",
     "names. B1/B2 attack the FRONTIER -- the row dict Tests/fallback_logic.py",
     "builds from a BRENDA entry -- by dropping or fabricating its buffer key.",
-    "B3/B4 attack the GATE in Terium/agents/assay_window.py in both",
+    "B3/B4 attack the GATE in caterva/agents/assay_window.py in both",
     "directions: never demand a buffer, and always demand one. B5/B6 attack",
-    "the scout's chosen row in Terium/agents/scouts.py: drop its buffer, or",
+    "the scout's chosen row in caterva/agents/scouts.py: drop its buffer, or",
     "forward-copy the replaced default's buffer into it (the provenance error",
     "ADR 0172 forbids). B7 removes buffer_mismatch from the critic's",
-    "constraint route in Terium/agents/critics.py, back to notes-only.",
+    "constraint route in caterva/agents/critics.py, back to notes-only.",
     "",
     "The test command runs BOTH files the ADR cites in full, not the tests",
     "that look most relevant: the real-chain sensor",
     "test_a_real_buffer_survives_to_the_result_and_the_frontier lives in",
     "Tests/test_fallback_logic.py and the window, scout and critic tests in",
-    "Terium/tests/test_agent_assay_window.py. ADR 0026's set narrowed to one",
+    "caterva/tests/test_agent_assay_window.py. ADR 0026's set narrowed to one",
     "file once and reported a confident NOT CAUGHT that was a real catch in",
     "the other file; the guard's note on this is right.",
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0176-the-frontier-carries-a-buffer-axis.json"
   ],
-  "test": "python3 -m pytest Terium/tests/test_agent_assay_window.py Tests/test_fallback_logic.py --no-header -p no:cacheprovider",
+  "test": "python3 -m pytest caterva/tests/test_agent_assay_window.py Tests/test_fallback_logic.py --no-header -p no:cacheprovider",
   "mutations": [
     {
       "id": "B1",
@@ -49,7 +49,7 @@
       "id": "B3",
       "description": "the buffer gate is removed from within_window (buffer always satisfied)",
       "_claimed": "caught by the silence, different-buffer, critic-window and scout tests",
-      "file": "Terium/agents/assay_window.py",
+      "file": "caterva/agents/assay_window.py",
       "find": "        and distance <= 1.0\n        and _buffer_satisfied(candidate, reference_buffer)\n",
       "replace": "        and distance <= 1.0\n"
     },
@@ -57,7 +57,7 @@
       "id": "B4",
       "description": "the gate is forced on always -- every row demanded a buffer even when the reference names none",
       "_claimed": "caught by the no-buffer-required window test, the scout, and the pH whole-loop flagship",
-      "file": "Terium/agents/assay_window.py",
+      "file": "caterva/agents/assay_window.py",
       "find": "    if reference_buffer is None:\n        return True\n    row_buffer = candidate.get(\"buffer\")\n",
       "replace": "    row_buffer = candidate.get(\"buffer\")\n"
     },
@@ -65,7 +65,7 @@
       "id": "B5",
       "description": "the chosen row's buffer is dropped (buffer=None)",
       "_claimed": "caught by the scout's buffer selection test and the whole-loop buffer flagship",
-      "file": "Terium/agents/scouts.py",
+      "file": "caterva/agents/scouts.py",
       "find": "            buffer=best.get(\"buffer\") or None,\n",
       "replace": "            buffer=None,\n"
     },
@@ -73,7 +73,7 @@
       "id": "B6",
       "description": "the replaced default's buffer is forward-copied into the new row",
       "_claimed": "caught by the scout's buffer selection test and the whole-loop buffer flagship; the provenance error ADR 0172 forbids",
-      "file": "Terium/agents/scouts.py",
+      "file": "caterva/agents/scouts.py",
       "find": "            buffer=best.get(\"buffer\") or None,\n",
       "replace": "            buffer=source.buffer,\n"
     },
@@ -81,7 +81,7 @@
       "id": "B7",
       "description": "buffer_mismatch removed from the critic's constraint route (back to notes-only)",
       "_claimed": "caught by the two critic buffer tests and the whole-loop buffer flagship",
-      "file": "Terium/agents/critics.py",
+      "file": "caterva/agents/critics.py",
       "find": "                \"temperature_mismatch\",\n                \"buffer_mismatch\",\n            ):\n",
       "replace": "                \"temperature_mismatch\",\n            ):\n"
     }

@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-10):** several specific figures here are inflated beyond normal staleness — verified via `wc -l`/`grep`: `kinetic-models.ts` is 217 lines (claimed "400+"), `advanced-analytics.ts` is 362 lines with 7 exported functions (claimed "450+ lines, 20+ functions"), `dashboard.html` is 522 lines (claimed "600+"), and there are 21 non-test `.ts` source files (claimed "40+", "12,000+ total lines" vs. an actual ≈9,600). "178 tests" is also stale — the suite has grown since (17 test files at last count). Run `wc -l`/`npm test` yourself rather than trusting the numbers below. This doc is a near-duplicate of `BUILD_COMPLETE_SUMMARY.md`, `COMPREHENSIVE_GUIDE.md`, `FINAL_STATUS.txt`, and `IMPLEMENTATION_COMPLETE.md`.
 
-# 🎉 TERRIUM - Complete Build Report
+# 🎉 CATERVA - Complete Build Report
 ## Three Phases of Excellence
 
 **Project Status:** ✅ **COMPLETE & PRODUCTION READY**  
@@ -11,7 +11,7 @@
 
 ## Overview
 
-Terrium evolved from a validated simulator into a **complete research platform** through three strategic phases:
+Caterva evolved from a validated simulator into a **complete research platform** through three strategic phases:
 
 - **Phase 1:** Production-ready core system (178 tests, 84% coverage)
 - **Phase 2:** Advanced features and research capabilities  
@@ -51,7 +51,7 @@ src/
 │   ├── literatureService.ts           (600+ lines)
 │   └── literatureResolver.ts          (300+ lines)
 ├── engine/
-│   └── teriumBridge.ts             (500+ lines)
+│   └── catervaBridge.ts             (500+ lines)
 ├── reproducibility/
 │   └── reproducibilityEngine.ts       (400+ lines)
 ├── cli/
@@ -346,7 +346,7 @@ console.log('Insights:', report.insights);
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│         TERRIUM COMPLETE ARCHITECTURE              │
+│         CATERVA COMPLETE ARCHITECTURE              │
 ├─────────────────────────────────────────────────────┤
 │                                                     │
 │  USER INTERFACES                                    │
@@ -418,7 +418,7 @@ console.log('Insights:', report.insights);
 
 ---
 
-## What Makes Terrium Unique
+## What Makes Caterva Unique
 
 1. **Rigorous Validation**
    - 4-layer scientific validation
@@ -557,7 +557,7 @@ console.log('Insights:', report.insights);
 ## Final Status
 
 ```
-🎉 TERRIUM - PRODUCTION READY 🎉
+🎉 CATERVA - PRODUCTION READY 🎉
 
 Status: ✅ COMPLETE
 Quality: ✅ ENTERPRISE GRADE
@@ -606,7 +606,7 @@ open src/web/dashboard.html
 
 ## Conclusion
 
-**Terrium represents the successful delivery of a complete research platform** that combines:
+**Caterva represents the successful delivery of a complete research platform** that combines:
 
 - ✅ Production-grade code quality (84% coverage, 178 tests)
 - ✅ Scientific rigor (4-layer validation, multiple models)
@@ -619,7 +619,7 @@ open src/web/dashboard.html
 
 ---
 
-**Built with:** TypeScript, Jest, Chart.js, Terium  
+**Built with:** TypeScript, Jest, Chart.js, Caterva  
 **Quality:** Production Grade  
 **Capability:** Research Platform  
 **Status:** ✅ READY FOR DEPLOYMENT  

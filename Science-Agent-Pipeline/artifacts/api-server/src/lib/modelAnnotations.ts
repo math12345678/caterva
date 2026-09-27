@@ -4,7 +4,7 @@
  * WHY THIS EXISTS
  *
  * Tellurium is innovative because there is no catalogue: you write your
- * model, it compiles, it runs. Terrium shipped fifteen hardcoded domains,
+ * model, it compiles, it runs. Caterva shipped fifteen hardcoded domains,
  * and measured against realistic questions only three of them could
  * resolve anything from literature at all. "Write twelve more resolvers"
  * is the wrong answer, because a lab's actual model is never one of the
@@ -13,7 +13,7 @@
  * `POST /api/simulate/model` already runs any Antimony or SBML document.
  * But it stamped every parameter `origin: "user"` with `modelCitations:
  * []`, so the moment a real lab used the one endpoint built for them,
- * Terrium's entire reason to exist switched off and they had plain
+ * Caterva's entire reason to exist switched off and they had plain
  * Tellurium with extra steps.
  *
  * This module is the missing half: your model, with the constants in it
@@ -21,7 +21,7 @@
  *
  * THE RULE THAT SHAPES EVERY DECISION BELOW
  *
- * Terrium must never guess which enzyme a parameter called `Km` belongs
+ * Caterva must never guess which enzyme a parameter called `Km` belongs
  * to. `Km_1`, `KmA`, `Km_hex` are names, not facts, and a Km resolved
  * against the wrong enzyme is the worst failure this system has: a real
  * citation attached to a number that does not belong to it, which is more
@@ -29,7 +29,7 @@
  *
  * So the caller declares it, in a comment:
  *
- *     // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM"
+ *     // caterva: km enzyme="hexokinase" substrate="glucose" unit="mM"
  *     Km_hex = 0.15;
  *
  * That is a claim the caller makes and can be held to, not an inference
@@ -38,12 +38,12 @@
  *
  * TWO MODES, AND WHY BOTH
  *
- *   check   (default) -- your value stands. Terrium resolves what the
+ *   check   (default) -- your value stands. Caterva resolves what the
  *                        literature says and reports both, with the
  *                        citation and assay conditions. Your model is
  *                        never modified.
  *
- *   resolve            -- you left the constant to Terrium. It is filled
+ *   resolve            -- you left the constant to Caterva. It is filled
  *                        from literature with a citation, or the run
  *                        REFUSES. There is no fallback value, because a
  *                        fallback is the fabrication this project exists
@@ -51,7 +51,7 @@
  *
  * `check` is the one a lab will use on a model they already trust, and it
  * is non-invasive by construction. `resolve` is the one that makes the
- * literature layer worth having: write the structure, let Terrium source
+ * literature layer worth having: write the structure, let Caterva source
  * the numbers, and get a run that either cites every constant or does not
  * happen.
  */
@@ -112,8 +112,8 @@ export interface ParsedAnnotations {
   problems: AnnotationProblem[];
 }
 
-/** `// terrium: ...` or `# terrium: ...`, case-insensitive on the tag. */
-const DIRECTIVE_RE = /(?:\/\/|#)\s*terrium\s*:\s*(.+)$/i;
+/** `// caterva: ...` or `# caterva: ...`, case-insensitive on the tag. */
+const DIRECTIVE_RE = /(?:\/\/|#)\s*caterva\s*:\s*(.+)$/i;
 
 /**
  * The same directive inside SBML: an XML comment, or free text in a
@@ -142,7 +142,7 @@ const DIRECTIVE_RE = /(?:\/\/|#)\s*terrium\s*:\s*(.+)$/i;
  * label source can be verified rather than recalled, reading sboTerm
  * becomes a strict addition to this, not a replacement for it.
  */
-const XML_DIRECTIVE_RE = /terrium\s*:\s*([^<>]+?)\s*(?:-->|<\/|$)/i;
+const XML_DIRECTIVE_RE = /caterva\s*:\s*([^<>]+?)\s*(?:-->|<\/|$)/i;
 
 /**
  * An Antimony scalar assignment: `Km_hex = 0.15;`
@@ -158,7 +158,7 @@ const ASSIGNMENT_RE =
  * A parameter with no value yet -- `resolve` mode's placeholder.
  *
  * Antimony needs the symbol to exist, so the caller writes the assignment
- * and leaves Terrium to supply the number.
+ * and leaves Caterva to supply the number.
  */
 const PLACEHOLDER_RE = /^\s*([A-Za-z_]\w*)\s*=\s*\?\s*;?/;
 
@@ -180,7 +180,7 @@ const KNOWN_FIELDS = new Set([
 ]);
 
 /**
- * Read `terrium:` declarations out of an Antimony source.
+ * Read `caterva:` declarations out of an Antimony source.
  *
  * Antimony only. SBML is XML and carries no comments in the same sense;
  * its annotation story is `<annotation>` RDF, which is a different and
@@ -200,7 +200,7 @@ export function parseModelAnnotations(
 }
 
 /**
- * Validate the body of a directive -- everything after `terrium:`.
+ * Validate the body of a directive -- everything after `caterva:`.
  *
  * Shared by both formats deliberately. An SBML caller and an Antimony
  * caller must be held to exactly the same standard, or the weaker one
@@ -215,7 +215,7 @@ function parseDirectiveBody(
   if (!quantity || !KNOWN_QUANTITIES.has(quantity)) {
     return {
       error:
-        `'${quantity ?? body}' is not a quantity Terrium can resolve. ` +
+        `'${quantity ?? body}' is not a quantity Caterva can resolve. ` +
         `Use one of: ${[...KNOWN_QUANTITIES].join(", ")}.`,
     };
   }
@@ -236,8 +236,8 @@ function parseDirectiveBody(
   if (unknownField !== undefined) {
     return {
       error:
-        `'${unknownField}' is not a field Terrium understands. ` +
-        `Use: ${[...KNOWN_FIELDS].join(", ")}. To have Terrium supply ` +
+        `'${unknownField}' is not a field Caterva understands. ` +
+        `Use: ${[...KNOWN_FIELDS].join(", ")}. To have Caterva supply ` +
         "the value from literature, add the bare word 'resolve'.",
     };
   }
@@ -250,7 +250,7 @@ function parseDirectiveBody(
     return {
       error:
         'an enzyme must be named: add enzyme="..." or ec="1.1.1.27". ' +
-        "Terrium will not infer which enzyme a parameter belongs to from " +
+        "Caterva will not infer which enzyme a parameter belongs to from " +
         "its name.",
     };
   }
@@ -316,7 +316,7 @@ function parseAntimonyAnnotations(source: string): ParsedAnnotations {
     if (placeholder && mode === "check") {
       fail(
         `${parameter} has no value to check ('= ?'). Either give it a ` +
-          "value, or add 'resolve' to the annotation to have Terrium " +
+          "value, or add 'resolve' to the annotation to have Caterva " +
           "supply one from literature.",
       );
       continue;
@@ -381,7 +381,7 @@ function dedupeByParameter(
       line: group[1]!.line,
       message:
         `${parameter} is annotated ${group.length} times (lines ` +
-        `${group.map((a) => a.line).join(", ")}). Terrium will not choose ` +
+        `${group.map((a) => a.line).join(", ")}). Caterva will not choose ` +
         "between two claims about the same parameter.",
       source: parameter,
     });
@@ -451,7 +451,7 @@ function parseSbmlAnnotations(source: string): ParsedAnnotations {
     if (!target.hasValueAttr && mode === "check") {
       fail(
         `<parameter id="${name}"> has no value to check. Either give it a ` +
-          "value, or add 'resolve' to the declaration to have Terrium " +
+          "value, or add 'resolve' to the declaration to have Caterva " +
           "supply one from literature.",
       );
       continue;

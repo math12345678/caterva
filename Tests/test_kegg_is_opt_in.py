@@ -8,7 +8,7 @@ that non-academic use "requires a commercial license", and that even
 academic users "who utilize KEGG for providing services are requested to
 obtain an academic service provider license".
 
-Terrium provides a service, and this repository contains an incorporation
+Caterva provides a service, and this repository contains an incorporation
 checklist, a cap table and a fundraising tracker. Either reading points at a
 licence from Pathway Solutions. Nobody has obtained one.
 
@@ -23,11 +23,11 @@ default install over a licence interaction (ADR 0061). KEGG's terms are
 comparable to SABIO-RK's, and KEGG was integrated anyway — not after
 weighing them, but before anyone read them.
 
-So the lookup is off unless `TERRIUM_ENABLE_KEGG` is set, and setting it is
+So the lookup is off unless `CATERVA_ENABLE_KEGG` is set, and setting it is
 the operator stating that their own licence position permits it.
 
 This does NOT assert that using KEGG would be unlawful. It asserts that
-Terrium does not currently know that it is lawful, and a tool whose central
+Caterva does not currently know that it is lawful, and a tool whose central
 claim is traceability should not make an unexamined request on a user's
 behalf.
 """
@@ -128,7 +128,7 @@ def test_the_resolver_degrades_and_does_not_crash():
      ("0", False), ("false", False), ("", False), ("  ", False)],
 )
 def test_opt_in_parsing(monkeypatch, value, expected):
-    # `TERRIUM_ENABLE_KEGG=0` must mean off. An env var that is truthy
+    # `CATERVA_ENABLE_KEGG=0` must mean off. An env var that is truthy
     # merely by being present is how a switch gets flipped by a stray
     # export in a CI file.
     monkeypatch.setenv(enzyme_lookup.KEGG_OPT_IN_ENV, value)

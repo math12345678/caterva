@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — choreography
+   caterva — choreography
    Maps run-state to the rendered architecture. Every class here
    corresponds to a pipeline event, never to decoration.
    ============================================================ */

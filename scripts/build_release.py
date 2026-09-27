@@ -5,7 +5,7 @@ WHY THE ORDER MATTERS
 ---------------------
 The first 0.2.0 wheel, built while preparing the release straight from the
 working tree, carried
-`Terium/conftest.py`, the repository's own pytest path shim. `MANIFEST.in`
+`caterva/conftest.py`, the repository's own pytest path shim. `MANIFEST.in`
 excludes that file, but `MANIFEST.in` governs the SDIST, and
 `[tool.setuptools.exclude-package-data]` governs data files, not `.py`
 modules. Neither touches a wheel built directly from the tree.
@@ -43,7 +43,7 @@ changed a byte cannot be shipped.
 WHAT IT CHECKS BEFORE IT WRITES SHA256SUMS
 ------------------------------------------
 The wheel is opened and its file list is held to what the release notes
-and NOTICE claim: every member under `Terium/` or the dist-info, LICENSE and
+and NOTICE claim: every member under `caterva/` or the dist-info, LICENSE and
 NOTICE present, no test, conftest or pytest configuration inside, and no
 native object (`.so`, `.pyd`, `.dylib`, `.dll`), because NOTICE says the
 wheel conveys no third-party library. A wheel that fails a check is
@@ -131,10 +131,10 @@ def _check_wheel(wheel: Path) -> list[str]:
         if not any(m.endswith("/" + required) or m == required for m in names):
             problems.append(f"missing {required}")
     modules = [m for m in names if m.endswith(".py")]
-    # Every member is Terrium's package or its own metadata; nothing else.
-    outside = [m for m in names if not (m.startswith("Terium/") or ".dist-info/" in m)]
+    # Every member is Caterva's package or its own metadata; nothing else.
+    outside = [m for m in names if not (m.startswith("caterva/") or ".dist-info/" in m)]
     if outside:
-        problems.append(f"members outside Terium/ and the dist-info: {outside[:5]}")
+        problems.append(f"members outside caterva/ and the dist-info: {outside[:5]}")
     if not modules:
         problems.append("no Python modules at all")
     return problems
@@ -218,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     epoch = os.environ.get("SOURCE_DATE_EPOCH") or _head_commit_epoch()
     if epoch:
         os.environ["SOURCE_DATE_EPOCH"] = epoch
-    with tempfile.TemporaryDirectory(prefix="terrium-release-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="caterva-release-") as tmp:
         work = Path(tmp)
         # Build the sdist into a scratch directory first so a failed wheel
         # build does not leave a lone sdist in dist/ looking like a release.
@@ -248,7 +248,7 @@ def main(argv: list[str] | None = None) -> int:
         module_count = sum(1 for m in zf.namelist() if m.endswith(".py"))
     print(f"sdist : {final_sdist.relative_to(ROOT) if final_sdist.is_relative_to(ROOT) else final_sdist}")
     print(f"wheel : {final_wheel.relative_to(ROOT) if final_wheel.is_relative_to(ROOT) else final_wheel}"
-          f"  ({module_count} modules, all under Terium/)")
+          f"  ({module_count} modules, all under caterva/)")
     print(f"sums  : {sums.relative_to(ROOT) if sums.is_relative_to(ROOT) else sums}")
     print(f"epoch : SOURCE_DATE_EPOCH={os.environ.get('SOURCE_DATE_EPOCH', '(unset)')}"
           "  (both artifacts are byte-reproducible under this value)")

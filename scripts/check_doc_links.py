@@ -8,7 +8,7 @@ entirely links. A dead one is the worst possible first impression: it says,
 before they have written a line, that the project's claims about checking
 things are decoration.
 
-This guard was written immediately after `Terium/README.md` shipped with
+This guard was written immediately after `caterva/README.md` shipped with
 
     [ADR 0001](../docs/adr/0001-no-tellurium-dependency.md)
 
@@ -99,14 +99,13 @@ DOCS = [
     "docs/CONSTITUTION.md",
     "docs/API.md",
     "docs/adr/README.md",
-    "Terium/README.md",
+    "caterva/README.md",
     "Tests/README.md",
     "src/README.md",
     "examples/README.md",
     "scripts/README.md",
     "Science-Agent-Pipeline/README.md",
     "mule/README.md",
-    "Business/README.md",
 ]
 
 # `[text](target)` and `![alt](target)`.
@@ -128,7 +127,7 @@ SKIP_PREFIXES = ("http://", "https://", "mailto:", "#", "<")
 #: depend on somebody else's uptime. This resolves against the local tree
 #: and touches the network never.
 SELF_URL = re.compile(
-    r"^https://github\.com/Terrium-sim/main/(?:blob|tree)/[^/]+/(.+)$"
+    r"^https://github\.com/math12345678/caterva/(?:blob|tree)/[^/]+/(.+)$"
 )
 
 #: Below this the extractor is broken rather than the docs being sparse.

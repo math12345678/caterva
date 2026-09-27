@@ -3,10 +3,10 @@
 One OpenAI-compatible endpoint in front of five free-tier providers. When one
 runs out of quota, the next one answers.
 
-Terrium holds keys for groq, openrouter, mistral, siliconflow and tokenrouter,
+Caterva holds keys for groq, openrouter, mistral, siliconflow and tokenrouter,
 all on free tiers, all registered to `admin.terrium@gmail.com`. Any one of them
 alone will hit a daily cap or a per-minute ceiling and stop working. Chained
-behind a LiteLLM proxy they present a single endpoint -- `terrium-extract` --
+behind a LiteLLM proxy they present a single endpoint -- `caterva-extract` --
 and the proxy moves down the chain as each provider is exhausted.
 
 Three files:
@@ -46,7 +46,7 @@ it. A number a language model produced is not a measurement. The resolver used
 to label such values `origin: "default"`, which is a false statement at the API
 surface: a *default* is a value this project chose, documented and can defend,
 and a student reading `default` had no way to tell the two apart. Closing that
-gap is what makes the rest of Terrium's output checkable. A simulation whose
+gap is what makes the rest of Caterva's output checkable. A simulation whose
 parameters all trace to a paper or to the person who typed them is a
 simulation somebody can argue with. One where any number might have been
 generated is not, and no amount of capacity in `config.yaml` changes that.
@@ -86,7 +86,7 @@ Then point the API server at it with three environment variables:
 ```bash
 LLM_API_URL=http://127.0.0.1:4000/v1/chat/completions
 LLM_API_KEY=$LITELLM_MASTER_KEY
-LLM_MODEL=terrium-extract
+LLM_MODEL=caterva-extract
 ```
 
 **No application code changes.** The API server already accepts any
@@ -223,7 +223,7 @@ cd Science-Agent-Pipeline/artifacts/llm-gateway
 ```
 
 `--ledger PATH` says where the ledger lives; it otherwise follows
-`$TERRIUM_LLM_QUOTA_LEDGER`, and failing that a file under the user cache
+`$CATERVA_LLM_QUOTA_LEDGER`, and failing that a file under the user cache
 directory. Reporting never writes; only `--probe` persists anything.
 
 Exit codes AS SHIPPED. An earlier draft of this README proposed five codes,
@@ -309,7 +309,7 @@ over with a guess.
 
 **Nothing in the tree yet connects `quota.py` to the running proxy.** `quota.py`
 decides an order and records outcomes, but no code here feeds litellm's response
-headers into `Ledger.record()`, and nothing reads the `TERRIUM_QUOTA_LEDGER`
+headers into `Ledger.record()`, and nothing reads the `CATERVA_QUOTA_LEDGER`
 path that `.env.example` documents -- `Ledger` takes its path from its caller
 and persists nothing when given none. So today the ordering is a tested
 function that the proxy does not consult. The static order in `config.yaml` is

@@ -31,7 +31,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 # are not CI dependencies. Their imports are not required to be in
 # production dependencies.
 SOURCE_DIRS = [
-    REPO_ROOT / "Terium",
+    REPO_ROOT / "caterva",
     REPO_ROOT / "Tests",
 ]
 
@@ -110,9 +110,9 @@ def _local_module_stems() -> set[str]:
         if not src_dir.exists():
             continue
         # The directory itself is a local package root when something
-        # imports it by name (e.g. `from Terium.terium_engine import
-        # ...`, used by Terium/cli.py when run as `python -m
-        # Terium.cli` from the repo root) -- not just its file stems.
+        # imports it by name (e.g. `from caterva.caterva_engine import
+        # ...`, used by caterva/cli.py when run as `python -m
+        # caterva.cli` from the repo root) -- not just its file stems.
         stems.add(src_dir.name.lower())
         for path in src_dir.rglob("*.py"):
             if any(part in EXCLUDE_DIR_NAMES for part in path.parts):
@@ -213,7 +213,7 @@ def declared_distributions() -> set[str]:
     # Every requirements file in the repository root, not a fixed pair.
     #
     # `requirements-popgen.txt` was added when stdpopsim was split out on
-    # licence grounds (GPL-3.0-or-later against Terrium's Apache-2.0). It is
+    # licence grounds (GPL-3.0-or-later against Caterva's Apache-2.0). It is
     # a real declaration -- it names the package, pins it, and explains the
     # obligation -- but this guard only read two filenames, so it reported a
     # DECLARED dependency as undeclared for two days.
@@ -272,7 +272,7 @@ def main() -> int:
         if len(files) > 3:
             print(f"    ...and {len(files) - 3} more file(s)")
     print(
-        "\nThese modules are imported somewhere in Terium/, Tests/ or "
+        "\nThese modules are imported somewhere in caterva/, Tests/ or "
         "scripts/ but "
         "are not listed in any requirements*.txt file. A fresh "
         "install (like CI does) will fail to collect the affected tests."

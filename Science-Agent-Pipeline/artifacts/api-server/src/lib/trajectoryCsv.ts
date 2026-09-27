@@ -9,11 +9,11 @@
  *
  * That file is the artifact which OUTLIVES THE SESSION. It gets opened in
  * Excel, plotted, pasted into a lab report, mailed to a supervisor. Every
- * other surface Terrium has — the CLI warning, the API flags, the Antimony
+ * other surface Caterva has — the CLI warning, the API flags, the Antimony
  * comment — is attached to a session that ends. The CSV is the one that
  * leaves the building.
  *
- * And it carried no citation. Terrium's entire claim is that every number
+ * And it carried no citation. Caterva's entire claim is that every number
  * traces to a source; the file a student actually takes away had no source
  * on it at all, and no indication that the Km came from a mutant, a
  * different tissue, or another organism.
@@ -120,7 +120,7 @@ function describeParameter(
 export function buildTrajectoryCsv(input: TrajectoryExportInput): string {
   const lines: string[] = [];
 
-  lines.push(...commentLines("Terrium simulation export"));
+  lines.push(...commentLines("Caterva simulation export"));
   lines.push(...commentLines(`run: ${input.runId}`));
   lines.push(...commentLines(`domain: ${input.domain}`));
   if (input.completedAt) {

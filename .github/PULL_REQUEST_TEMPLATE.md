@@ -1,7 +1,7 @@
 ## What does this change?
 
 <!-- One or two sentences. If this is a new simulation domain or touches
-terium_engine.py or Tests/brenda_client.py, say which domain/module. -->
+caterva_engine.py or Tests/brenda_client.py, say which domain/module. -->
 
 ## Why?
 
@@ -10,7 +10,7 @@ if one exists. -->
 
 ## How was this verified?
 
-<!-- Required for anything touching terium_engine.py or brenda_client.py.
+<!-- Required for anything touching caterva_engine.py or brenda_client.py.
 See CONTRIBUTING.md's "standard this codebase holds itself to" section. -->
 
 - [ ] New/updated tests added, and they fail without this change (checked,
@@ -23,7 +23,7 @@ See CONTRIBUTING.md's "standard this codebase holds itself to" section. -->
       `requirements-dev.txt` (otherwise `test_dependencies_declared.py`
       will fail this PR)
 - [ ] If this changes `KM_PLAUSIBLE_MIN_MM`/`KM_PLAUSIBLE_MAX_MM`: both
-      `terium_engine.py` and `Tests/brenda_client.py` were updated
+      `caterva_engine.py` and `Tests/brenda_client.py` were updated
       together (see ADR 0003)
 
 ## Anything you're unsure about?

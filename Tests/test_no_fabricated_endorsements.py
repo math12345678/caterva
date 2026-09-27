@@ -79,7 +79,7 @@ def test_the_mit_licence_is_not_the_university(tmp_path) -> None:
 
 
 def test_the_university_of_washington_attribution_is_not_a_claim(tmp_path) -> None:
-    """Terrium is obliged to name libRoadRunner's copyright holder.
+    """Caterva is obliged to name libRoadRunner's copyright holder.
 
     An attribution the licence requires must not be mistaken for a boast.
     """

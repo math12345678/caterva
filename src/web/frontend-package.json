@@ -1,8 +1,8 @@
 {
-  "name": "terrium-dashboard",
+  "name": "caterva-dashboard",
   "version": "0.1.0",
   "private": true,
-  "description": "The Terrium dashboard UI. Served in production by src/web/server.ts in backend-main; this package is for working on it alone.",
+  "description": "The Caterva dashboard UI. Served in production by src/web/server.ts in backend-main; this package is for working on it alone.",
   "type": "module",
   "scripts": {
     "dev": "node dev-server.mjs",

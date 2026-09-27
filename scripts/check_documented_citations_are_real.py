@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS
 ---------------
-Terrium's entire claim is that every number carries a real reference. Its
+Caterva's entire claim is that every number carries a real reference. Its
 README demonstrated that claim with three citations, and all three were
 wrong:
 
@@ -17,7 +17,7 @@ wrong:
 
 The front page of a provenance tool, inventing provenance.
 
-This is not a cosmetic defect. Matthias König read a Terrium outreach email
+This is not a cosmetic defect. Matthias König read a Caterva outreach email
 as a false claim of credit and replied that it "is not a good idea to let AI
 just create lies about your own achievements" (ADR 0100, docs/RENAME_PLAN.md).
 A reader who checks `ref 12345` and finds nothing has that suspicion
@@ -162,7 +162,7 @@ def main() -> int:
         for problem in problems:
             print(f"  - {problem}")
         print(
-            "\nTerrium's whole claim is that every number carries a real "
+            "\nCaterva's whole claim is that every number carries a real "
             "reference.\nA reader who checks one of these and finds nothing "
             "has learned something\nabout the project that no later argument "
             "will undo."

@@ -12,7 +12,7 @@ obligations
 
 `Tests/citation_export.py` exists because of Daniel Katz's reply about
 per-constant citation, read in its sharper sense: *a citation nobody can act
-on is not a citation*. So Terrium emits BibTeX and RIS — the formats Zotero,
+on is not a citation*. So Caterva emits BibTeX and RIS — the formats Zotero,
 Mendeley, EndNote and JabRef import — and a student can put the sources of
 their parameters into the same bibliography as the papers they read.
 
@@ -20,7 +20,7 @@ their parameters into the same bibliography as the papers they read.
 
 > If you use BRENDA data in scientific work, cite BRENDA's current
 > publication — see https://www.brenda-enzymes.org/references.php. **Citing
-> Terrium is not a substitute for citing BRENDA.**
+> Caterva is not a substitute for citing BRENDA.**
 
 The export emitted one `@misc` per parameter:
 
@@ -28,7 +28,7 @@ The export emitted one `@misc` per parameter:
 @misc{brenda740253,
   howpublished = {BRENDA database record},
   brenda-reference = {740253},
-  note = {Resolved by Terrium as the KM = 10.73 mM. ...}
+  note = {Resolved by Caterva as the KM = 10.73 mM. ...}
 }
 ```
 
@@ -65,7 +65,7 @@ BRENDA's current publication, see .../references.php"* — **not a reference**.
 So the entry carries a title, the licensor as `howpublished`, the database
 URL, and a note that says plainly:
 
-> Terrium does not record that publication's author, year or volume and has
+> Caterva does not record that publication's author, year or volume and has
 > **NOT guessed them** — look it up and complete this entry before
 > submitting.
 
@@ -104,7 +104,7 @@ still fails on an unterminated one.
 
 `test_two_parameters_from_one_reference_get_distinct_keys` asserted
 `len(keys) == 2`. The property is *uniqueness*, so it now excludes the
-`terrium-source-*` block from the parameter count and asserts no duplicate
+`caterva-source-*` block from the parameter count and asserts no duplicate
 key anywhere — strictly stronger than before.
 
 Both were correct tests weakened by a literal. A count is the easiest thing

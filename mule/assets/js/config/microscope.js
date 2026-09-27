@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — EVIDENCE MICROSCOPE data
+   caterva — EVIDENCE MICROSCOPE data
 
    Six nested levels of one illustrative parameter. The reader
    starts at the number and descends until the number has stopped

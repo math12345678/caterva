@@ -4,7 +4,7 @@
     "",
     "This is Barbara Bakker's feedback, and the record of how it was being",
     "served wrong. She said a parameter's reliability should drive which",
-    "value gets used. Terrium implemented her three axes twice -- once in",
+    "value gets used. Caterva implemented her three axes twice -- once in",
     "Python, once in TypeScript -- with a parity test asserting the two",
     "agreed on a shared fixture. They did agree. The API server called the",
     "TypeScript grader with no PhysiologicalReference, because none was",

@@ -4,7 +4,7 @@
 >
 > Also, `openapi.yaml` was missing 13 real routes (`GET /api/jobs/{jobId}` and all 12 `GET /api/metrics/*` routes) as of this session; these have been added to `openapi.yaml`'s `paths` section so it now matches all 30 real routes in `server.ts`.
 
-Terrium publishes a complete **OpenAPI 3.0 specification** (`openapi.yaml`) that enables:
+Caterva publishes a complete **OpenAPI 3.0 specification** (`openapi.yaml`) that enables:
 
 - ✅ Interactive API documentation (Swagger UI, ReDoc)
 - ✅ Automatic client generation (TypeScript, Python, Go, Rust, etc.)
@@ -290,7 +290,7 @@ Now the build fails if the spec is invalid.
 npm install -g redoc-cli
 redoc-cli bundle openapi.yaml \
   -o api-docs.html \
-  --title "Terrium API Documentation"
+  --title "Caterva API Documentation"
 ```
 
 **Share the HTML file with stakeholders:**

@@ -9,7 +9,7 @@
  * starts with: *what is the Km of this enzyme for this substrate, and who
  * measured it?*
  *
- * It resolves through Terrium's real literature layer — BRENDA exact match,
+ * It resolves through Caterva's real literature layer — BRENDA exact match,
  * then BRENDA cross-species, then PubMed candidates — via the same
  * `science_agent_runner.py` bridge the production API server uses. It never
  * fabricates a number, and it distinguishes three outcomes that most tools
@@ -155,7 +155,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
         process.stdout.write(
           `${c(DIM, '  BRENDA had no value, and no number has been invented to fill the gap.')}\n` +
             `${c(DIM, `  The literature search did find ${papers.length} paper(s) that may report it.`)}\n` +
-            `${c(DIM, '  Terrium does not read numbers out of full text, so these are for you:')}\n\n`,
+            `${c(DIM, '  Caterva does not read numbers out of full text, so these are for you:')}\n\n`,
         );
         for (const paper of papers) {
           const locator = paper.pmid

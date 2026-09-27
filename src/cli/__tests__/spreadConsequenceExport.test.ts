@@ -25,7 +25,7 @@ const TWO_KM = [
 ];
 
 async function destination(): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), 'terrium-spread-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'caterva-spread-'));
   return path.join(directory, 'spread.json');
 }
 

@@ -1,4 +1,4 @@
-# 📊 Terrium Export & Analysis Guide
+# 📊 Caterva Export & Analysis Guide
 
 **Export results, compare jobs, and analyze sensitivity with 7 new endpoints**
 

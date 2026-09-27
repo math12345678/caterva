@@ -162,7 +162,7 @@ describe("parameter provenance", () => {
         const resolved = await resolveQuery(query);
         expect(resolved.domain).toBe(domain);
 
-        // The value ran, and the caller is told Terrium chose it. A
+        // The value ran, and the caller is told Caterva chose it. A
         // default that ran SILENTLY would be the fabrication the hard rule
         // exists to prevent.
         const provenance = resolved.parameterProvenance["starting_frequencies"];
@@ -879,13 +879,13 @@ describe("Target I — the narrowness is explicit, not inherited (Stage 5 Part 5
 
 // =========================================================================
 // Regression — the runner's dead `vmax = 5.0` fallback must stay dead
-// (terium_runner.py run_mm). The Python runner used to silently default
+// (caterva_runner.py run_mm). The Python runner used to silently default
 // to vmax = 5.0 when a request supplied neither vmax nor kcat+enzyme_conc.
 // That branch is unreachable only because the hard rule below fires first;
 // if the hard rule is ever weakened so vmax can default, the fallback
 // becomes live and a simulation runs on a number nobody chose. These tests
 // pin the hard rule for exactly that case; the runner-side rejection is
-// pinned in Terium/tests/test_vmax_from_kcat.py.
+// pinned in caterva/tests/test_vmax_from_kcat.py.
 // =========================================================================
 
 describe("regression — mm query with no route to a Vmax is hard-blocked", () => {
@@ -928,13 +928,13 @@ describe("regression — mm query with no route to a Vmax is hard-blocked", () =
 
 // =========================================================================
 // Regression — mm_competitive_inhibition runner must not default vmax
-// (terium_runner.py run_mm_competitive_inhibition). The Python runner
+// (caterva_runner.py run_mm_competitive_inhibition). The Python runner
 // used to silently fall back to vmax = 5.0 when a request supplied no vmax.
 // That branch is unreachable only because the hard rule below fires first;
 // if the hard rule is ever weakened so vmax can default, the fallback
 // becomes live and a simulation runs on a number nobody chose. These tests
 // pin the hard rule for exactly that case; the runner-side rejection is
-// pinned in Terium/tests/test_mm_competitive_inhibition.py.
+// pinned in caterva/tests/test_mm_competitive_inhibition.py.
 // =========================================================================
 
 describe("regression — competitive inhibition query with no vmax is hard-blocked", () => {

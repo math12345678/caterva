@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """The identifiers.org accession patterns are a dated copy. Is it still true?
 
-`Terium/core/miriam.py` decides whether Terrium may mint a resolvable URI
+`caterva/core/miriam.py` decides whether Caterva may mint a resolvable URI
 for an accession, using patterns captured from the identifiers.org registry
 into `Tests/fixtures/identifiers/identifiers_org_namespaces.json`.
 
@@ -25,21 +25,21 @@ is still *true*.
 The third is not folded into either of the others. Reporting "matched" when
 the network was down would make this a check that cannot fail, and reporting
 "drifted" would send someone hunting a registry change that never happened.
-Terrium keeps these apart everywhere else (resolution exit codes, relatedness
+Caterva keeps these apart everywhere else (resolution exit codes, relatedness
 verdicts, golden verification) and a guard is not exempt from its own rule.
 
 ## What drift would mean
 
-A **widened** pattern means Terrium is refusing accessions that are in fact
+A **widened** pattern means Caterva is refusing accessions that are in fact
 valid — it under-annotates, which is the safe direction and still wrong.
 
-A **narrowed** pattern means Terrium is minting URIs the registry no longer
+A **narrowed** pattern means Caterva is minting URIs the registry no longer
 considers well-formed — it fabricates, which is the direction this whole
 module exists to prevent.
 
 Both are reported; neither is auto-applied. Rewriting the fixture from the
 live registry without a person looking would mean a registry change silently
-alters what Terrium is willing to claim.
+alters what Caterva is willing to claim.
 
 Usage:
     python scripts/check_identifier_patterns_fresh.py
@@ -138,13 +138,13 @@ def main() -> int:
 
         if verdict == "matched":
             print("\nOK  every captured pattern still matches the live registry.")
-            print("    Not checked: whether any accession Terrium holds actually")
+            print("    Not checked: whether any accession Caterva holds actually")
             print("    exists. This compares patterns, not records.")
         elif verdict == "drifted":
             print("\nDRIFTED  the registry has changed since the capture.")
-            print("    A WIDENED pattern means Terrium now refuses valid accessions")
+            print("    A WIDENED pattern means Caterva now refuses valid accessions")
             print("    (under-annotates — safe direction, still wrong).")
-            print("    A NARROWED pattern means Terrium mints URIs the registry no")
+            print("    A NARROWED pattern means Caterva mints URIs the registry no")
             print("    longer considers well-formed (fabricates — the direction this")
             print("    module exists to prevent).")
             print("    Re-capture deliberately; do not let a script rewrite it.")

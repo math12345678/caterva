@@ -75,7 +75,7 @@ $ python3 ensemble.py --fixture fixtures/brenda_ldh_fixture.html \
   Spread: 0.03 to 0.398, a 13.3-fold range   (median 0.398)
 ```
 
-Terrium's answer today is **0.03** — `min()` over the frontier. The ensemble's
+Caterva's answer today is **0.03** — `min()` over the frontier. The ensemble's
 answer is *the literature contains 0.03 and 0.398, equally well evidenced,
 thirteen-fold apart*. Both rows score identically here, so the weights are
 equal; that is the axes correctly reporting that they cannot discriminate,
@@ -130,7 +130,7 @@ ADR 0024's objection was correct and is not waved away:
 > nothing of the kind.
 
 Bakker's published ensemble **rejects** models against measured flux.
-Terrium has no such data. So the answer is not to hide the spread; it is to
+Caterva has no such data. So the answer is not to hide the spread; it is to
 make the sentence inseparable from it. `EnsembleResult.disclaimer` travels
 with the numbers, `_format_report` prints it, and a test asserts it is there.
 

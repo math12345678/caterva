@@ -48,7 +48,7 @@ EC 1.1.1.27 — what BRENDA reports:
   ki    no 'Ki Values' table on this page
   kcat  no 'Turnover Numbers' table on this page
   organisms: Homo sapiens, Sus scrofa
-These are BRENDA's own labels. Use them exactly — Terrium does not
+These are BRENDA's own labels. Use them exactly — Caterva does not
 substitute a similar name, because a similar name can be a different
 molecule.
 ```

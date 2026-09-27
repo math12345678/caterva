@@ -12,7 +12,7 @@ Reads a JSON payload on stdin, writes Markdown on stdout.
 
 WHY THIS EXISTS
 ---------------
-Terrium could resolve a literature value, record its provenance, parse the
+Caterva could resolve a literature value, record its provenance, parse the
 assay conditions, grade it on Bakker's axes, run an ensemble over values the
 evidence cannot rank, export BibTeX, annotate a model, and integrate it.
 
@@ -39,7 +39,7 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "Tests"))
 # The repository root too — `lab_report` reaches modules that import
-# `Terium.*`. `export_citations.py` shipped in HEAD with only the first of
+# `caterva.*`. `export_citations.py` shipped in HEAD with only the first of
 # these lines and died on its import line (ADR 0107).
 sys.path.insert(0, str(REPO_ROOT))
 
@@ -113,14 +113,14 @@ def supplied_values(payload: dict) -> list[SuppliedValue]:
         name = entry.get("name")
         if name is None:
             raise MalformedSuppliedValue(
-                "A supplied value arrived with no name. Terrium cannot put "
+                "A supplied value arrived with no name. Caterva cannot put "
                 "it in the report, and will not drop it silently."
             )
         if entry.get("value") is None:
             raise MalformedSuppliedValue(
                 f"The supplied value {str(name)!r} arrived with no number. "
                 "This usually means a unit was not understood upstream — "
-                f"check what you passed for --{name}. Terrium will not drop "
+                f"check what you passed for --{name}. Caterva will not drop "
                 "it and then report it as missing."
             )
         values.append(
@@ -167,7 +167,7 @@ def model_inputs(
             raise ConflictingValue(
                 f"{name} was given twice with different values: "
                 f"{values[name]} ({origin[name]}) and {value} ({where}). "
-                "Terrium will not choose between them, because the report "
+                "Caterva will not choose between them, because the report "
                 "would state one number and be computed from the other."
             )
         values[name] = float(value)
@@ -222,7 +222,7 @@ def band_for(candidates, *, parameter, inputs, seed, draws):
             f"without {', '.join(missing)}."
         )
 
-    from Terium.continuous.simulations import simulate_michaelis_menten
+    from caterva.continuous.simulations import simulate_michaelis_menten
 
     # Bound to a name the test can read. There are TWO places that choose a
     # simulator -- this one for the band, and `main` for the trajectory in
@@ -260,7 +260,7 @@ def one_page_per_run(fetch):
 
     Lisa Jeske (BRENDA/DSMZ) asked directly that tools be gentle with their
     servers, and this repository already refuses to auto-download a bulk
-    corpus for that reason. Re-requesting a page Terrium is still holding is
+    corpus for that reason. Re-requesting a page Caterva is still holding is
     the same discourtesy in miniature, repeated once per parameter.
 
     Scoped to a single run deliberately. A cache that outlives the process
@@ -339,7 +339,7 @@ def fixture_reader(fixture: str | None, ec: str):
     if not path.is_file():
         raise FixtureUnusable(
             f"No saved BRENDA page at {fixture!r}. --fixture takes a path to "
-            "an HTML page you saved yourself; Terrium does not download one "
+            "an HTML page you saved yourself; Caterva does not download one "
             "for you and then call the result offline."
         )
 
@@ -351,7 +351,7 @@ def fixture_reader(fixture: str | None, ec: str):
     found = set(_EC_IN_PAGE.findall(text))
     if not found:
         raise FixtureUnusable(
-            f"{fixture!r} contains no EC number, so Terrium cannot tell which "
+            f"{fixture!r} contains no EC number, so Caterva cannot tell which "
             "enzyme it describes. It will not read kinetic rows off a page it "
             "cannot identify — a value is only as good as knowing what it "
             "measures."
@@ -359,7 +359,7 @@ def fixture_reader(fixture: str | None, ec: str):
     if str(ec) not in found:
         raise FixtureUnusable(
             f"{fixture!r} is a page for EC {', '.join(sorted(found))}, and you "
-            f"asked about EC {ec}. Terrium will not read rows from one "
+            f"asked about EC {ec}. Caterva will not read rows from one "
             "enzyme's page and report them under another's name: the "
             "reference numbers would be real and the protein would be wrong "
             "(ADR 0126)."
@@ -388,7 +388,7 @@ def bridge_vmax(kcat_result, enzyme_conc: float, km: float | None):
     WHAT IS NOT REIMPLEMENTED HERE
     ------------------------------
     The arithmetic, the unit convention and the validation all live in
-    `Terium.core.validation.vmax_from_kcat` (ADR 0012, ADR 0013), which also
+    `caterva.core.validation.vmax_from_kcat` (ADR 0012, ADR 0013), which also
     flags the [E]0 << Km assumption the Michaelis-Menten rate law rests on.
     Multiplying two floats here instead would have been three lines and a
     second definition of what the bridge means — the defect this repository
@@ -397,7 +397,7 @@ def bridge_vmax(kcat_result, enzyme_conc: float, km: float | None):
 
     Returns (DerivedValue, warnings) or (None, refusal-string).
     """
-    from Terium.core.validation import vmax_from_kcat
+    from caterva.core.validation import vmax_from_kcat
 
     if not getattr(kcat_result, "found", False) or kcat_result.value is None:
         return None, (
@@ -459,7 +459,7 @@ def _citation_of(result) -> str:
 #: the same way as a missing km tells a reader to go looking for a paper
 #: that cannot exist.
 MM_REQUIRED = {
-    "km": "a measured property of the enzyme; Terrium resolves it or refuses",
+    "km": "a measured property of the enzyme; Caterva resolves it or refuses",
     "vmax": "yours to supply, or derived from kcat and the enzyme concentration",
     "s0": "yours to choose — how much substrate you put in, not a property "
     "of the enzyme",
@@ -540,7 +540,7 @@ def main() -> int:
     # from one where the organism matched.
     offline = bool(payload.get("fixture"))
     offline_note = (
-        "Terrium did not verify the organism against NCBI Taxonomy or "
+        "Caterva did not verify the organism against NCBI Taxonomy or "
         "UniProt, and ran no literature search: you supplied a saved BRENDA "
         "page with --fixture, so this run made no network requests at all. "
         "Organism relatedness is therefore NOT ASSESSED rather than matched "
@@ -634,7 +634,7 @@ def main() -> int:
     elif enzyme_conc is not None:
         derive_refusals.append(
             "an enzyme concentration was given and not used: a vmax was "
-            "already supplied, and Terrium does not overrule a value you "
+            "already supplied, and Caterva does not overrule a value you "
             "chose with one it computed."
         )
 
@@ -673,7 +673,7 @@ def main() -> int:
 
     simulation = None
     # The offline note is a REFUSAL, not a footnote. It belongs in "What
-    # Terrium would not do" beside everything else the run declined, because
+    # Caterva would not do" beside everything else the run declined, because
     # that is the section a reader checks before trusting the document — and
     # an unverified organism is exactly the kind of gap this report exists to
     # make visible rather than absorb.
@@ -684,7 +684,7 @@ def main() -> int:
         # NOT silence. Until now the Result section simply did not render
         # when the model could not be run, which is indistinguishable from a
         # report where nobody tried to run it -- the exact failure the "What
-        # Terrium would not do" section exists to prevent, occurring inside
+        # Caterva would not do" section exists to prevent, occurring inside
         # the document that section belongs to.
         also_refused.append(
             "the simulation was not run: "
@@ -692,7 +692,7 @@ def main() -> int:
         )
     else:
         try:
-            from Terium.continuous.simulations import simulate_michaelis_menten
+            from caterva.continuous.simulations import simulate_michaelis_menten
 
             # The second simulator choice, bound for the same reason as the
             # one in `_band_for`: this produces the trajectory the Result

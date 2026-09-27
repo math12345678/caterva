@@ -1,6 +1,6 @@
 # Security Policy
 
-> **⚠️ CORRECTION (2026-08-12):** the "What's actually in scope" section describes `Science-Agent-Pipeline/` as "(landing page)" with concerns limited to XSS in a waitlist form and npm supply-chain issues. That undersells the actual directory: `Science-Agent-Pipeline/artifacts/` contains **two** separate things — `terrium-landing` (the actual landing page) **and** `api-server`, a full backend with routes for `simulate`, `pipeline`, `enzymes`, `metrics`, `dashboard`, `health`, and `waitlist` (`Science-Agent-Pipeline/artifacts/api-server/src/routes/`). The API server spawns Python subprocesses directly (`spawn(pythonExecutable, [SCRIPT_PATH], ...)` in `src/lib/scienceAgent.ts:189` and `src/lib/teriumRunner.ts:118`) and calls out to external LLM providers with an API key (`Science-Agent-Pipeline/artifacts/api-server/src/lib/llmResolver.ts`) — neither subprocess/command-injection risk nor LLM-API-key handling is mentioned anywhere in this scope section, and both are more security-relevant than the XSS/waitlist framing given. This is a scope gap, not a fabricated statistic.
+> **⚠️ CORRECTION (2026-08-12):** the "What's actually in scope" section describes `Science-Agent-Pipeline/` as "(landing page)" with concerns limited to XSS in a waitlist form and npm supply-chain issues. That undersells the actual directory: `Science-Agent-Pipeline/artifacts/` contains **two** separate things — `caterva-landing` (the actual landing page) **and** `api-server`, a full backend with routes for `simulate`, `pipeline`, `enzymes`, `metrics`, `dashboard`, `health`, and `waitlist` (`Science-Agent-Pipeline/artifacts/api-server/src/routes/`). The API server spawns Python subprocesses directly (`spawn(pythonExecutable, [SCRIPT_PATH], ...)` in `src/lib/scienceAgent.ts:189` and `src/lib/catervaRunner.ts:118`) and calls out to external LLM providers with an API key (`Science-Agent-Pipeline/artifacts/api-server/src/lib/llmResolver.ts`) — neither subprocess/command-injection risk nor LLM-API-key handling is mentioned anywhere in this scope section, and both are more security-relevant than the XSS/waitlist framing given. This is a scope gap, not a fabricated statistic.
 
 ## Before you deploy this anywhere: there is no authentication
 
@@ -55,7 +55,7 @@ to be careful about.
 
 ### If a school is involved
 
-Terrium is aimed at teaching labs, so this needs saying: a school deploying
+Caterva is aimed at teaching labs, so this needs saying: a school deploying
 this for students — particularly students under 18 — is processing data
 about minors, and the obligations that attach (FERPA in the US, UK GDPR and
 the ICO's Age Appropriate Design Code in the UK, and their equivalents
@@ -95,7 +95,7 @@ nothing is shell-parsed. There is no `shell: true`, no `execSync` and no
 `child_process.exec` anywhere in the server. User data reaches Python over
 **stdin as JSON** (`proc.stdin.write(JSON.stringify(payload))`), so it never
 appears on a command line at all, and the interpreter path is resolved from
-`TERRIUM_PYTHON` / `VIRTUAL_ENV` / `PATH` — operator-controlled environment,
+`CATERVA_PYTHON` / `VIRTUAL_ENV` / `PATH` — operator-controlled environment,
 not request input.
 
 So there is no command injection. `scripts/check_subprocess_safety.py` keeps
@@ -120,11 +120,14 @@ here is what they found".
 
 ## Reporting a vulnerability
 
-If you find a security issue in Terrium -- the simulation engine, the
+If you find a security issue in Caterva -- the simulation engine, the
 literature-scraping layer, or the landing page -- please report it
 privately rather than opening a public GitHub issue.
 
-**Email admin.terrium@gmail.com** with:
+**Report it privately on GitHub** at
+<https://github.com/math12345678/caterva/security/advisories/new> (the
+"Report a vulnerability" button on the Security tab), **or email
+admin.terrium@gmail.com**. Please do not open a public issue. Include:
 
 - A description of the vulnerability and its potential impact
 - Steps to reproduce it
@@ -140,9 +143,9 @@ seriously regardless of team size.
 
 Given the current state of the project:
 
-- **Terium/** (simulation engine): the main risk surface here is
+- **caterva/** (simulation engine): the main risk surface here is
   something that causes incorrect scientific output to be presented as
-  correct without being flagged -- see `terium_engine.py`'s
+  correct without being flagged -- see `caterva_engine.py`'s
   `ParameterValidation` / flagging system. A bug that lets an implausible
   or dangerous parameter slip through unflagged is a real security-relevant
   bug for this project, even though it's not a classic memory-safety or

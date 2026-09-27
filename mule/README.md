@@ -1,6 +1,6 @@
 # `mule/` — the MuleRun landing page
 
-A static landing page for Terrium's MuleRun listing. Ships as its own
+A static landing page for Caterva's MuleRun listing. Ships as its own
 repository, `mule`.
 
 | path | what it holds |

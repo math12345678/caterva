@@ -4,7 +4,7 @@
     "",
     "check_no_tellurium_integration_claims.py failed the build on",
     "docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md, whose inventory line reads",
-    "`Docw/terrium_full.docx    also: claims \"Tellurium integration\"`. The",
+    "`Docw/caterva_full.docx    also: claims \"Tellurium integration\"`. The",
     "phrase is the thing being removed, named so somebody can find it. The",
     "document planning the cleanup was the one blocking CI, and the only way",
     "to go green would have been to describe the offending files too vaguely",
@@ -40,14 +40,14 @@
       "_claimed": "not caught, correctly",
       "_note": "NOT CAUGHT is the right answer here and the row is kept to show why.\n    The property -- an exemption whose justification has gone must be deleted rather than left as a standing hole -- is asserted by test_the_remediation_plan_is_not_accused_of_the_thing_it_removes, which fails if the document stops quoting a claim. But the document quotes one TWICE: the inventory line, and a sentence describing what the guard does. Removing either alone leaves the exemption correctly justified, so the test passes and should.\n    Expressing the real mutation needs two edits and mutate.py applies one per row. Verified by hand instead: `sed -i 's|Tellurium integration|REDACTED|g'` on the document gives `1 failed, 6 passed`, and the failure is that test. Recorded as a harness limitation rather than as coverage, because a reader who sees NOT CAUGHT with no explanation will reasonably read it as a gap.",
       "file": "docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md",
-      "find": "Docw/terrium_full.docx                    also: claims \"Tellurium integration\"",
-      "replace": "Docw/terrium_full.docx                    also: a naming problem"
+      "find": "Docw/caterva_full.docx                    also: claims \"Tellurium integration\"",
+      "replace": "Docw/caterva_full.docx                    also: a naming problem"
     },
     {
       "id": "T3",
       "description": "CLAIM stops matching the bare phrase",
       "_claimed": "caught",
-      "_note": "`Tellurium integration` with no verb is how the claim actually appears in the roles table of Docw/terrium_full.docx -- assigned to a named engineer, so it reads as a live work item rather than an aspiration. The first attempt at this row edited a fixture string in the guard's _selftest instead of the regex, and passed.",
+      "_note": "`Tellurium integration` with no verb is how the claim actually appears in the roles table of Docw/caterva_full.docx -- assigned to a named engineer, so it reads as a live work item rather than an aspiration. The first attempt at this row edited a fixture string in the guard's _selftest instead of the regex, and passed.",
       "file": "scripts/check_no_tellurium_integration_claims.py",
       "find": "|\\btellurium\\s+integration\\b",
       "replace": "|\\bzzz_never_matches\\b"
@@ -65,7 +65,7 @@
       "id": "T5",
       "description": "a denial is read as a claim",
       "_claimed": "caught",
-      "_note": "NOTICE and README say Terrium is NOT built on Tellurium. A guard that cannot tell a denial from a claim fails on the two documents it exists to protect. Escaped first: every sentence in the test carried two or three denial markers, so deleting `not` was covered by `is not`, `does not` and `unaffiliated`. test_each_denial_word_carries_its_own_weight isolates one marker per sentence.",
+      "_note": "NOTICE and README say Caterva is NOT built on Tellurium. A guard that cannot tell a denial from a claim fails on the two documents it exists to protect. Escaped first: every sentence in the test carried two or three denial markers, so deleting `not` was covered by `is not`, `does not` and `unaffiliated`. test_each_denial_word_carries_its_own_weight isolates one marker per sentence.",
       "file": "scripts/check_no_tellurium_integration_claims.py",
       "find": "DENIAL = re.compile(\n    r\"\\b(not|never|no|without|avoid|forbidden|banned|instead\\s+of|rather\\s+than",
       "replace": "DENIAL = re.compile(\n    r\"\\b(zzz_never|never|no|without|avoid|forbidden|banned|instead\\s+of|rather\\s+than"

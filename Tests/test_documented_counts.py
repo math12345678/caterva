@@ -88,7 +88,7 @@ def test_the_drafted_public_readmes_are_checked() -> None:
 def test_a_test_count_no_suite_has_is_reported() -> None:
     """The figure is stale whatever suite it was about."""
     problems = guard.test_count_failures(
-        "docs/readmes/terium.md", "1,014 tests.\n", _ACTUAL
+        "docs/readmes/caterva.md", "1,014 tests.\n", _ACTUAL
     )
     assert problems and "1,014" in problems[0]
 
@@ -165,7 +165,7 @@ def test_write_leaves_the_domain_count_alone() -> None:
     number to a person. A `--write` that picked one would bury that
     decision inside a script.
     """
-    text = "Terrium ships 15 simulation domains.\n"
+    text = "Caterva ships 15 simulation domains.\n"
     out, changed = guard.rewrite(text, _ACTUAL, guards=62, adrs=93)
     assert out == text and changed == []
 
@@ -270,7 +270,7 @@ def test_main_with_write_never_touches_the_real_readme(monkeypatch, tmp_path) ->
     original = (
         "make test      # runs all 1 tests (2 engine + 3 literature)\n"
         "├── scripts/                    6 guard scripts\n"
-        "Terrium ships 15 simulation domains.\n"
+        "Caterva ships 15 simulation domains.\n"
     )
     readme.write_text(original, encoding="utf-8")
     monkeypatch.setattr(guard, "README", readme)

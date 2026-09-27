@@ -4,7 +4,7 @@
 
 **Date:** 2026-08-17
 
-**Context:** `Terium/core/sbml_provenance.py`, `scripts/export_annotated_model.py`,
+**Context:** `caterva/core/sbml_provenance.py`, `scripts/export_annotated_model.py`,
 ADR 0063 (attribution travels with the model)
 
 ## How this was found
@@ -109,7 +109,7 @@ output, which is the arrangement the audit exists to replace.
 - A total annotation loss is now a raised error rather than a successful
   return with a confident count.
 - A non-SBML document is a named problem rather than a clean audit.
-- `F841` is clear across `Tests`, `scripts` and `Terium`. It found a real
+- `F841` is clear across `Tests`, `scripts` and `caterva`. It found a real
   defect on its first honest run, in a repository that has had the rule
   configured and unexecuted (ADR 0093) the whole time.
 - Two guards were red in this environment for the right reason and were left

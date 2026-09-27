@@ -148,7 +148,7 @@ said `MIT`. Measured on the committed pair:
 ### The notice that outlived its subject — the good failure
 
 `check_availability_notice_matches_reality.py` went red.
-**`https://github.com/Terrium-sim/main.git` is now public**, confirmed
+**`https://github.com/math12345678/caterva.git` is now public**, confirmed
 independently: `GIT_TERMINAL_PROMPT=0 git ls-remote` exits 0, with no
 credential prompt. README.md and START_HERE.md still opened with **"Not
 public yet."**
@@ -197,7 +197,7 @@ Suites, before and after, on this machine with `make setup` done:
 | suite | before | after |
 |---|---|---|
 | root jest (`src/`) | 7 failed / 918 | **918 passed** |
-| engine (`Terium`) | 1 failed | **all passed** |
+| engine (`caterva`) | 1 failed | **all passed** |
 | literature (`Tests`) | 4 failed | 1 failed (pitch deck) |
 | api-server (vitest) | 625 passed | 625 passed |
 | `verify_build --quick` | 11 failed | **6 failed** |
@@ -289,7 +289,7 @@ no `network` marker — stops a third being written tomorrow.
 **What this pass did not check.** `Business/` (79 markdown files) was
 listed and not read. `mule/` was confirmed to be covered by five guards,
 all green, but its 30 JavaScript files were not reviewed and nothing
-type-checks them. `terrium-site/` has its own `package.json` and was not
+type-checks them. `caterva-site/` has its own `package.json` and was not
 installed, so its TypeScript is still compiled by nothing here;
 `landing/` type-checks clean but is reached by no guard, since
 `check_typescript_compiles.py` only walks `Science-Agent-Pipeline/`.

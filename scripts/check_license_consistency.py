@@ -6,7 +6,7 @@ WHY THIS EXISTS
 For months this repository said three different things about its own terms:
 
     LICENSE       "all rights reserved, no permission granted to copy"
-    CITATION.cff  license: LicenseRef-Terrium-Proprietary
+    CITATION.cff  license: LicenseRef-Caterva-Proprietary
     package.json  "license": "MIT"
 
 Nobody noticed, because nothing read more than one of them at a time. A
@@ -67,7 +67,7 @@ LICENCE_BODY_MARKERS = {
 CONTRADICTIONS = [
     "all rights reserved, no permission granted",
     "no permission granted to copy",
-    "LicenseRef-Terrium-Proprietary",
+    "LicenseRef-Caterva-Proprietary",
 ]
 
 

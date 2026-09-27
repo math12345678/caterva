@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** despite the title, several specific claims here are wrong or self-contradictory. The header says "18 Total, All Wired" but the Architecture section later says "11 routes" and the closing section says "any of the 11 endpoints above" — leftover text never updated after the endpoint count grew; 18 is the real, current, independently-verified figure (see `API_QUICK_REFERENCE.md`). Line-number citations for routes are stale (e.g. `/api/simulate` cited at line 51, actually line 63; `/api/health` cited at 430, actually 442 — the file grew after these were recorded; grep for the route string rather than trusting the line number). "819+ test blocks across 49 test files" is fabricated — real count is 19 files, ~296-379 blocks by grep.
 
-# 🔬 Terrium: Verified System Status
+# 🔬 Caterva: Verified System Status
 
 **Date:** August 11, 2026  
 **Status:** ✅ Production-Ready  
@@ -63,7 +63,7 @@ Verified in `src/web/server.ts` - all routes are functional:
 ✅ **Parameter Sweeps** — POST /api/sweep + GET /api/sweeps/:id  
 ✅ **Batch Processing** — POST /api/batch + GET /api/batches/:id (parallelism: 3 default)  
 ✅ **Model Comparison** — POST /api/compare (all 4 kinetic models)  
-✅ **Job Persistence** — File-based storage (terrium-jobs.jsonl)  
+✅ **Job Persistence** — File-based storage (caterva-jobs.jsonl)  
 ✅ **Web Dashboard** — Interactive HTML5 interface  
 ✅ **Real Literature** — PubMed + CrossRef integration  
 ✅ **CSV Export** — Export any result set as CSV (sweep, batch, comparison, stats, history)  
@@ -112,12 +112,12 @@ Background Job Processing
 Scientific Pipeline
 ├─ Literature fetching (PubMed + CrossRef)
 ├─ SBML model generation
-├─ Terium kinetics simulation
+├─ Caterva kinetics simulation
 └─ Result validation & confidence scoring
 
 Storage Layer
 ├─ In-memory: Current jobs (fast)
-└─ Persistent: terrium-jobs.jsonl (durable)
+└─ Persistent: caterva-jobs.jsonl (durable)
 ```
 
 ---
@@ -126,7 +126,7 @@ Storage Layer
 
 ### Start Server
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 # http://localhost:3000
 ```
@@ -315,7 +315,7 @@ GET /api/stats
 
 ## 🏁 Summary
 
-**Terrium is production-ready with 18 working endpoints, 9 distinct features, and comprehensive scientific accuracy.**
+**Caterva is production-ready with 18 working endpoints, 9 distinct features, and comprehensive scientific accuracy.**
 
 The system compiles cleanly, handles errors gracefully, and can be deployed immediately. Documentation has been audited and this file serves as the single source of truth.
 

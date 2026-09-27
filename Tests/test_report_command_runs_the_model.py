@@ -23,7 +23,7 @@ It is a test that drives the real script.
 
 WHAT IS ASSERTED, AND WHY NOT THE NUMBERS
 -----------------------------------------
-Not "the trajectory is correct" -- `Terium/tests` owns that, against a
+Not "the trajectory is correct" -- `caterva/tests` owns that, against a
 closed-form solution, and restating it here would be a second, weaker copy
 of a check that already exists.
 

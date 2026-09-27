@@ -1,7 +1,7 @@
 import { spawnSync } from 'child_process';
 import * as path from 'path';
 
-import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../engine/catervaBridge';
 
 /**
  * `scientific ensemble` — what the literature actually supports, as a band.
@@ -21,7 +21,7 @@ import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
  *    can sample and get an ensemble distribution. That is the right way to
  *    do it."
  *
- * Everywhere else in Terrium, a Km the literature disagrees about becomes
+ * Everywhere else in Caterva, a Km the literature disagrees about becomes
  * one number chosen by `min()` — or stops the run. This command runs the
  * model once per published value, weighted by how well evidenced each is,
  * and shows the envelope.

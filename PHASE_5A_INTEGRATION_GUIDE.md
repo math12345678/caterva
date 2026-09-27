@@ -1,12 +1,12 @@
 # Phase 5A Integration Guide
 
-## How to Use Real Terium in Your Code
+## How to Use Real Caterva in Your Code
 
 ### Simple Example: Michaelis-Menten Simulation
 
 ```typescript
 import { buildSBML } from './engine/sbml-builder';
-import { runTerium } from './engine/teriumBridge';
+import { runCaterva } from './engine/catervaBridge';
 
 // 1. Build SBML model
 const sbmlModel = buildSBML('michaelis_menten', {
@@ -16,7 +16,7 @@ const sbmlModel = buildSBML('michaelis_menten', {
 });
 
 // 2. Run real simulation
-const result = await runTerium('mm', {
+const result = await runCaterva('mm', {
   km: 5.2,
   vmax: 12.8,
   s0: 10.0,
@@ -43,7 +43,7 @@ if (result.flagged) {
 ```typescript
 import { searchPubMedForEnzymeKinetics } from './integrations/crossref-pubmed-real';
 import { buildSBML } from './engine/sbml-builder';
-import { runTerium } from './engine/teriumBridge';
+import { runCaterva } from './engine/catervaBridge';
 
 async function fullWorkflow() {
   // Phase 4: Get real parameters from literature
@@ -57,7 +57,7 @@ async function fullWorkflow() {
   // Phase 5A: Run real simulation
   const model = buildSBML('michaelis_menten', { km, vmax, s0 });
   
-  const result = await runTerium('mm', {
+  const result = await runCaterva('mm', {
     km, vmax, s0,
     end: 20.0,
     n_points: 201
@@ -79,7 +79,7 @@ async function fullWorkflow() {
       Vmax = ${vmax} μM/min
       [S]₀ = ${s0} mM
     
-    Results (from Terium):
+    Results (from caterva):
       Final [S] = ${finalSubstrate.toFixed(2)} mM
       Conversion = ${conversion.toFixed(1)}%
       Trajectory points: ${trajectory.length}
@@ -93,7 +93,7 @@ async function fullWorkflow() {
 
 ```typescript
 try {
-  const result = await runTerium('mm', {
+  const result = await runCaterva('mm', {
     km: 5.2,
     vmax: 12.8,
     s0: 10.0
@@ -113,7 +113,7 @@ try {
 
 ### Testing Locally
 
-**Without Terium installed** (in this sandbox):
+**Without Caterva installed** (in this sandbox):
 ```bash
 npm run build
 npm test -- sbml-builder
@@ -121,14 +121,14 @@ npm test -- sbml-builder
 # ❌ Actual simulation tests would fail (no Python)
 ```
 
-**With Terium installed** (on your machine):
+**With Caterva installed** (on your machine):
 ```bash
 pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001
 npm run build
 npm test -- sbml-builder
 # ✅ All tests pass
 npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
-# ✅ Real simulation runs with real Terium
+# ✅ Real simulation runs with real Caterva
 ```
 
 ## API Reference
@@ -154,9 +154,9 @@ const model = buildSBML('competitive_inhibition', {
 });
 ```
 
-### runTerium(domain, parameters, options?)
+### runCaterva(domain, parameters, options?)
 
-Executes a simulation using the Python Terium engine.
+Executes a simulation using the Python Caterva engine.
 
 **Parameters:**
 - `domain`: Simulation type (e.g., 'mm', 'sir', 'gillespie_ssa')
@@ -164,9 +164,9 @@ Executes a simulation using the Python Terium engine.
 - `options.required`: Array of parameter names that must be present
 - `options.signal`: AbortSignal for cancellation
 
-**Returns:** `Promise<TeriumResult>`
+**Returns:** `Promise<CatervaResult>`
 
-**TeriumResult:**
+**CatervaResult:**
 ```typescript
 {
   ok: true,
@@ -183,7 +183,7 @@ Executes a simulation using the Python Terium engine.
 
 **Example:**
 ```typescript
-const result = await runTerium('mm', {
+const result = await runCaterva('mm', {
   km: 5.2,
   vmax: 12.8,
   s0: 10.0,
@@ -243,17 +243,17 @@ Required parameters: `km`, `vmax`, `kp`, `s0`
 
 ## Troubleshooting
 
-### Error: "Terium runner script not found"
-- Check that `Science-Agent-Pipeline/artifacts/api-server/src/lib/terium_runner.py` exists
-- Check `REPO_ROOT` resolves correctly (should find `Terium/terium_engine.py`)
+### Error: "Caterva runner script not found"
+- Check that `Science-Agent-Pipeline/artifacts/api-server/src/lib/caterva_runner.py` exists
+- Check `REPO_ROOT` resolves correctly (should find `caterva/caterva_engine.py`)
 
 ### Error: "Cannot run 'mm': required parameter(s) km were not supplied"
 - Ensure all parameters in `options.required` are provided
 - Check parameter names match exactly
 
-### Error: "Failed to spawn Terium engine"
+### Error: "Failed to spawn Caterva engine"
 - Python interpreter not found or not in PATH
-- Set `TERRIUM_PYTHON` environment variable to override
+- Set `CATERVA_PYTHON` environment variable to override
 - Ensure libroadrunner and antimony are installed: `pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001`
 
 ### Timeout after 120 seconds
@@ -276,7 +276,7 @@ Required parameters: `km`, `vmax`, `kp`, `s0`
 ## What's Real
 
 ✅ SBML models are real and standard-compliant  
-✅ Terium is the real open-source simulator  
+✅ Caterva is the real open-source simulator  
 ✅ libroadrunner is the real SBML execution engine  
 ✅ Results are real kinetics, not approximations  
 ✅ Parameters come from real literature (Phase 4)  

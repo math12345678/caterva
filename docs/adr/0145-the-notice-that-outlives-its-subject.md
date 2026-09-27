@@ -26,14 +26,14 @@ Confirmed rather than assumed, on 2026-08-21:
 
 | repository | anonymous `git ls-remote` |
 |---|---|
-| `Terrium-sim/main` (documented) | not readable |
-| `Terrium-sim/terrium` | not readable |
-| `math12345678/terrium` (origin) | not readable |
+| `math12345678/caterva` (documented) | not readable |
+| `math12345678/caterva` | not readable |
+| `math12345678/caterva` (origin) | not readable |
 
 Nineteen `git clone` commands across README.md, START_HERE.md,
 CONTRIBUTING.md and `docs/readmes/` point at the first of those. The
 documented URL is not a typo — `Tests/test_clone_instructions_agree.py`
-records the deliberate choice of `Terrium-sim/main` over `origin` as the
+records the deliberate choice of `math12345678/caterva` over `origin` as the
 intended public home. The repositories simply are not published.
 
 ## Decision
@@ -121,7 +121,7 @@ decision behind it from drifting apart.
   stops being run (ADR 0028). CI-only, registered as such, for the same
   reason as its sibling.
 - **Still not fixed:** the repositories are private. This ADR makes the
-  situation honest to a visitor; it does not make Terrium obtainable. That
+  situation honest to a visitor; it does not make Caterva obtainable. That
   remains one action by the owner, and ADR 0143's red CI step remains the
   thing that goes green on the day it happens.
 
@@ -133,4 +133,4 @@ decision behind it from drifting apart.
   cries wolf gets suppressed" reasoning is recorded, and why this one is not
   in the fast local path
 - `Tests/test_clone_instructions_agree.py` — why the documented URL is
-  `Terrium-sim/main` and not `origin`
+  `math12345678/caterva` and not `origin`

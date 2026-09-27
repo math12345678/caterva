@@ -134,7 +134,7 @@ job.** Three for three so far.
 `report` still cannot bridge kcat to Vmax. `simulate --resolve` accepts
 `--enzyme-conc` and computes `Vmax = kcat x [E]0` (ADR 0013, ADR 0019);
 `report` reads neither, so a student must supply a Vmax they have no way of
-knowing while Terrium can resolve the kcat behind it from BRENDA.
+knowing while Caterva can resolve the kcat behind it from BRENDA.
 
 **This is the same defect class as the two above, and it is the largest
 remaining one on this path**, because Vmax is the only required input a

@@ -12,7 +12,7 @@ ADR 0037 (a tissue is not an organism)
 Not by a guard. By following a note I had written to myself.
 
 `docs/commentary-residue-baseline.txt` records every BRENDA commentary
-fragment Terrium cannot parse. Most entries are accepted with a reason. One
+fragment Caterva cannot parse. Most entries are accepted with a reason. One
 of the accepted ones read:
 
 > `muscle` survives here as a bare token in a row whose phrasing ADR 0037's

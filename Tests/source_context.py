@@ -43,7 +43,7 @@ A factor of fifty-four, and `min()` takes 1.1 and calls it the chicken LDH
 turnover number. Bactrocera dorsalis spans 587 (adult), 1079 (pupa) and
 1820 (larva) the same way.
 
-Terrium spent four ADRs making sure a rabbit's Km is not offered as a
+Caterva spent four ADRs making sure a rabbit's Km is not offered as a
 human's. Nothing was checking that a chicken's *muscle* Km is not offered as
 a chicken's *heart* Km, and here the second gap is the larger number.
 
@@ -313,10 +313,10 @@ def find_organism_discrepancies(
                         f"The organism column says {column_organism!r} "
                         f"(taxon {column_taxon}) and the commentary says the "
                         f"enzyme came from {claim.token!r} (taxon "
-                        f"{claim.taxon_id}). Terrium's cross-species gate "
+                        f"{claim.taxon_id}). Caterva's cross-species gate "
                         "reads the column, so this row passes as a "
                         f"{column_organism} measurement. One of the two is "
-                        "wrong and Terrium cannot tell which."
+                        "wrong and Caterva cannot tell which."
                     ),
                 )
             )

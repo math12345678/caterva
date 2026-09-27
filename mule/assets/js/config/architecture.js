@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — architecture configuration
+   caterva — architecture configuration
    The Evidence Cathedral is fully data-driven. Geometry lives in
    a single tall coordinate space (STAGE) and is rendered as SVG.
    Every visual state maps to a real pipeline concept.
@@ -295,7 +295,7 @@ export const EVIDENCE = [
        router's declared output four fields up is "Local ODE runtime" and its
        inspector record says heavier methods were routed away from the browser
        — so the evidence backing the solver tolerance cannot be browser
-       integration. Terrium's ODE path is libroadrunner, which is not a
+       integration. Caterva's ODE path is libroadrunner, which is not a
        browser. Same fact, two densities: `tag` fits the 106px channel,
        `scope` is what the inspector reads. */
     tag: 'ODE SOLVER',

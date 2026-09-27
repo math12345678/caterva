@@ -7,7 +7,7 @@ import {
 /**
  * The catalogue must agree with the engine, not with itself.
  *
- * Terrium advertises fifteen teaching domains and, until `scientific
+ * Caterva advertises fifteen teaching domains and, until `scientific
  * domains` existed, nothing could tell a student what they are: `help`
  * listed nine commands (all enzyme kinetics or generic), and the engine's
  * own subcommands lived behind a second CLI that `help` never mentions.
@@ -98,7 +98,7 @@ describe('what each entry has to carry to be useful', () => {
       // A sentence saying what question it answers.
       expect(entry.summary.length).toBeGreaterThan(15);
       // A command, not a description of one.
-      expect(entry.example).toMatch(/^(simulate|python -m Terium\.cli)\b/);
+      expect(entry.example).toMatch(/^(simulate|python -m caterva\.cli)\b/);
     },
   );
 

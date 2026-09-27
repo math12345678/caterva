@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * End-to-End Integration Test
- * Tests web server → PubMed → Terium → Results
+ * Tests web server → PubMed → Caterva → Results
  */
 
 const http = require('http');
@@ -98,7 +98,7 @@ async function testSimulation(enzyme, substrate, model, km, vmax, s0) {
 
 async function runTests() {
   console.log('\n' + '='.repeat(60));
-  console.log('TERRIUM END-TO-END INTEGRATION TESTS');
+  console.log('CATERVA END-TO-END INTEGRATION TESTS');
   console.log('='.repeat(60));
 
   const testCases = [

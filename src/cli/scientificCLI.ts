@@ -5,7 +5,7 @@ import { JobManager, historyPath } from '../execution/job-manager';
 import { commandSweep } from './commandSweep';
 import { spawnSync } from 'child_process';
 
-import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../engine/catervaBridge';
 import { parseArgs, parseQuantity } from './parseQuantity';
 import { parsePhysiological } from './physiologicalReference';
 import { parseReportQuantities } from './reportQuantities';
@@ -428,7 +428,7 @@ async function commandSimulate(
   //
   // So the most-seen output in the product told a student it had searched
   // the literature, and then reported "no literature match" for every
-  // parameter. A reader can only conclude Terrium looked and found nothing,
+  // parameter. A reader can only conclude Caterva looked and found nothing,
   // which is false — and it is false in the direction that makes the
   // product look empty rather than misconfigured.
   //
@@ -507,7 +507,7 @@ async function commandSimulate(
         console.log(
           '\n' + colors.dim +
           'No trajectory was produced, so there are no results to show.\n' +
-          'Your question names a system, so Terrium can look these up — it\n' +
+          'Your question names a system, so Caterva can look these up — it\n' +
           'just will not guess them out of a sentence. Run this and it will:' +
           colors.reset + '\n\n' +
           // `params` — the flags they already typed — is passed so the
@@ -547,13 +547,13 @@ async function commandSimulate(
           '\n' + colors.dim +
           'No trajectory was produced, so there are no results to show.\n' +
           'Either supply the values in the query — e.g. --km 5.2 --vmax 12.8\n' +
-          '--s0 10 — or name a system and let Terrium resolve them:\n' +
+          '--s0 10 — or name a system and let Caterva resolve them:\n' +
           colors.reset + '\n' +
           '  scientific simulate "michaelis menten" --resolve \\\n' +
           '    --enzyme "<enzyme>" --substrate "<substrate>" \\\n' +
           '    --organism "<organism>" --s0 10mM --enzyme-conc 0.001mM\n' +
           '\n' + colors.dim +
-          'Replace the three names with your system. Terrium does not read\n' +
+          'Replace the three names with your system. Caterva does not read\n' +
           'them out of your question, because a citation attached to a system\n' +
           'you did not name is worse than no citation at all.\n' +
           colors.reset
@@ -645,7 +645,7 @@ async function commandSimulate(
     // A RUN ON YOUR OWN NUMBERS CAN STILL PRODUCE A REUSABLE ARTIFACT.
     //
     // `--export-model` existed only behind `--resolve`, so the only way to
-    // get an SBML file or a COMBINE archive out of Terrium was to have
+    // get an SBML file or a COMBINE archive out of Caterva was to have
     // BRENDA reachable and a system it could resolve. A student with a Km
     // and a Vmax from their own bench had no route to the one output
     // somebody else can re-run — which is the output that matters most for
@@ -666,7 +666,7 @@ async function commandSimulate(
       //
       // Handing it the values as typed produced an SBML saying
       // `Vmax = 12.8` for a run that integrated 12.8 μM/min. Re-running
-      // that file exhausts the substrate by t = 2.2 s, while Terrium had
+      // that file exhausts the substrate by t = 2.2 s, while Caterva had
       // just printed S = 8.245 at t = 12,930 s. The artifact contradicted
       // its own run by 60,000x — and it is the artifact that outlives the
       // terminal, gets attached to a report, and is the only thing a
@@ -1006,7 +1006,7 @@ async function commandLiterature(enzyme?: string, substrate?: string) {
     //
     // on every run since the command existed. Both read as findings about
     // the papers -- that these are uncited articles in journals with no
-    // measurable impact -- when the true statement is that Terrium does not
+    // measurable impact -- when the true statement is that Caterva does not
     // know. It is the same zero-for-null inversion already corrected in the
     // perf collector, the response cache and the sweep analyser, reached
     // here through a helper's default rather than through a literal.
@@ -1020,7 +1020,7 @@ async function commandLiterature(enzyme?: string, substrate?: string) {
         ` summary${colors.reset}`,
     );
     console.log(
-      `  ${colors.dim}endpoint does not report them and Terrium does not` +
+      `  ${colors.dim}endpoint does not report them and Caterva does not` +
         ` estimate them.${colors.reset}`,
     );
 
@@ -1028,7 +1028,7 @@ async function commandLiterature(enzyme?: string, substrate?: string) {
     // `false` on every entry -- deliberately, because PubMed membership does
     // not establish peer review (see fetchRealLiterature). Printing
     // "Peer-reviewed: 0/5" would report that as a finding about the papers
-    // rather than as Terrium declining to assert it.
+    // rather than as Caterva declining to assert it.
     console.log(
       `  ${colors.dim}Review status is left unasserted; PubMed indexes preprints,` +
         `${colors.reset}`,
@@ -1059,7 +1059,7 @@ ${colors.bright}Commands:${colors.reset}
     ONE document you can hand in: the parameters with their sources and
     the conditions they were measured under, the values you chose marked
     as yours, what the literature disagrees about, the citations, and —
-    the part no other tool prints — what Terrium would not do, and why.
+    the part no other tool prints — what Caterva would not do, and why.
     Written to PATH, or to stdout.
     ${colors.dim}Example:${colors.reset} report --ec 1.1.1.27 --organism "Homo sapiens" \\
       --substrate "(S)-lactate" --s0 10mM --vmax 0.25mM/s --seed 1 --out report.md
@@ -1078,8 +1078,8 @@ ${colors.bright}Commands:${colors.reset}
     --fixture <brenda.html> reads a page you saved instead of fetching
     one, and then makes NO network requests at all -- so the organism is
     not verified against NCBI, and the report says so in its own
-    "What Terrium would not do" section rather than leaving you to
-    notice. The page's EC must match the one you asked for; Terrium
+    "What Caterva would not do" section rather than leaving you to
+    notice. The page's EC must match the one you asked for; Caterva
     refuses to read one enzyme's rows under another's name.
 
   domains [--json]
@@ -1089,7 +1089,7 @@ ${colors.bright}Commands:${colors.reset}
     is the failure this command exists to correct (ADR 0122).
 
     Each comes with a command that runs it. The values in those commands
-    are examples, not defaults -- Terrium has no defaults for measured
+    are examples, not defaults -- Caterva has no defaults for measured
     quantities.
     ${colors.dim}Example:${colors.reset} domains
 
@@ -1147,7 +1147,7 @@ ${colors.bright}Commands:${colors.reset}
       --quantity km|ki|kcat  which constant to resolve (default: km)
       --cite NAME="SOURCE"  Attach a source to a value YOU supplied, e.g.
                            --cite km="Smith 2019, PMID 12345". Repeatable.
-                           Terrium does not check that the source reports the
+                           Caterva does not check that the source reports the
                            value — it records that the claim is yours, which is
                            still far better than the number arriving from
                            nowhere.
@@ -1606,7 +1606,7 @@ async function main() {
     }
 
     // The first command a student should run, and the last one to exist.
-    // Terrium advertises fifteen teaching domains and, until this, nothing
+    // Caterva advertises fifteen teaching domains and, until this, nothing
     // could tell anybody what they are: `help` listed nine commands, all
     // enzyme kinetics or generic, and the engine's own subcommands lived
     // behind a second CLI that `help` never mentions. See ADR 0122.
@@ -1748,7 +1748,7 @@ async function main() {
     case 'report': {
       // ONE DOCUMENT A STUDENT CAN HAND IN.
       //
-      // Terrium could resolve a value, record its provenance, parse the
+      // Caterva could resolve a value, record its provenance, parse the
       // assay conditions, grade it, run an ensemble, export BibTeX,
       // annotate a model and integrate it — nine capabilities, and nothing
       // a person could give a teacher. Each answered a question nobody
@@ -1914,7 +1914,7 @@ async function main() {
         process.stdout.write(
           `Wrote ${destination}` +
           (withheld
-            ? ` — ${withheld} thing(s) Terrium would not do are recorded in it.\n`
+            ? ` — ${withheld} thing(s) Caterva would not do are recorded in it.\n`
             : ' — nothing was withheld.\n'),
         );
       } else {

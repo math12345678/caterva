@@ -1,4 +1,4 @@
-# Terrium Documentation Index & Navigation Guide
+# Caterva Documentation Index & Navigation Guide
 
 **Last Updated:** August 9, 2026  
 **Total Documentation:** 7,326 lines across the 14 documents listed below with line counts (counted directly via `wc -l` on 2026-08-10; an earlier version of this line claimed 19,300+ lines, roughly 2.6x the real total, and every per-document figure above was also inflated -- e.g. BACKEND_ARCHITECTURE.md claimed 2500 lines against a real 582).  
@@ -183,7 +183,7 @@
 ### Operations Documents
 
 #### **DEPLOYMENT_GUIDE.md** (871 lines)
-**What:** How to deploy Terrium in production  
+**What:** How to deploy Caterva in production  
 **Read when:** Ready to deploy, need to choose deployment option  
 **Key sections:**
 - Three Deployment Options — Single server, Docker, Kubernetes
@@ -294,7 +294,7 @@
 ### User-Facing Documents
 
 #### **API_USER_GUIDE.md** (706 lines)
-**What:** How to use Terrium as a researcher  
+**What:** How to use Caterva as a researcher  
 **Read when:** First time using the API, debugging query  
 **Key sections:**
 - Getting Started — 5-minute quick start
@@ -313,8 +313,8 @@
 ---
 
 #### **INTEGRATION_EXAMPLES.md** (889 lines)
-**What:** Working code examples to build on Terrium  
-**Read when:** Integrating Terrium into your application  
+**What:** Working code examples to build on Caterva  
+**Read when:** Integrating Caterva into your application  
 **Key sections:**
 - Quick Patterns — Sync, async, streaming (3 languages each)
 - Data Processing — DataFrame operations, analysis

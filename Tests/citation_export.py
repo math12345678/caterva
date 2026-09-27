@@ -8,14 +8,14 @@ citation to every resolved parameter was novel, replied:
     "I don't really understand the idea of per constant citation. Most
      constants are well known and are not typically cited."
 
-He is right about constants and was describing something Terrium does not
+He is right about constants and was describing something Caterva does not
 do — the wording was ours, and ADR 0024 records the language fix. But there
 is a second, sharper reading of his reply that is not a misunderstanding at
 all:
 
     a citation nobody can act on is not a citation.
 
-Terrium was attaching provenance to every number and then offering it only
+Caterva was attaching provenance to every number and then offering it only
 as prose on a terminal. From the software-citation perspective Katz works
 in, that is not a citation; it is a claim about one. A citation is something
 that goes into a bibliography.
@@ -29,12 +29,12 @@ WHAT IT REFUSES TO DO
 ---------------------
 It does not invent bibliographic fields.
 
-A BibTeX entry wants author, title, journal and year. BRENDA gives Terrium a
+A BibTeX entry wants author, title, journal and year. BRENDA gives Caterva a
 reference id and, sometimes, a title; PubMed gives a PMID. Filling the rest
 with plausible-looking values would produce an entry that imports cleanly,
 looks complete, and is fiction — the single most damaging thing this module
 could do, because it would enter someone's bibliography and be cited onward
-with Terrium's name attached to the fabrication.
+with Caterva's name attached to the fabrication.
 
 Absent fields are omitted, and every entry carries a `note` saying exactly
 what was and was not known, so the person can complete it deliberately
@@ -47,7 +47,7 @@ from dataclasses import dataclass
 
 from citation import Citation
 
-from Terium.core import data_sources
+from caterva.core import data_sources
 
 #: BibTeX keys must be ASCII-ish and free of the characters BibTeX treats as
 #: syntax. Anything else is stripped rather than escaped: a key is an
@@ -185,7 +185,7 @@ def bibtex_key(cited: CitedParameter, seen: set[str] | None = None) -> str:
 #: which can only ever return all three. A constant wearing the costume of a
 #: computation -- and it produced two false notes, one in each direction.
 #: `title` IS sometimes known and IS emitted, so an entry carrying a title
-#: still said Terrium "records the source identifier only"; and an entry
+#: still said Caterva "records the source identifier only"; and an entry
 #: with NO title listed author, year and journal as absent while saying
 #: nothing about the field a reference manager displays first.
 _BIBTEX_WANTS = ("author", "year", "journal", "title")
@@ -208,7 +208,7 @@ def _known_and_missing(citation: Citation) -> tuple[list[str], list[str]]:
 
 def _note_for(cited: CitedParameter) -> str:
     """What was and was not known, stated on the entry itself."""
-    parts = [f"Resolved by Terrium as the {cited.parameter.upper()}"]
+    parts = [f"Resolved by Caterva as the {cited.parameter.upper()}"]
     if cited.value is not None:
         parts[0] += f" = {cited.value}{(' ' + cited.unit) if cited.unit else ''}"
     if cited.organism:
@@ -216,9 +216,9 @@ def _note_for(cited: CitedParameter) -> str:
 
     known, missing = _known_and_missing(cited.citation)
     records = (
-        f"Terrium records the source identifier and the {', '.join(known)}"
+        f"Caterva records the source identifier and the {', '.join(known)}"
         if known
-        else "Terrium records the source identifier only"
+        else "Caterva records the source identifier only"
     )
     parts.append(
         f"{records}; "
@@ -239,7 +239,7 @@ def contributing_sources(parameters: list[CitedParameter]) -> list:
     `NOTICE` is unambiguous:
 
         If you use BRENDA data in scientific work, cite BRENDA's current
-        publication [...] Citing Terrium is not a substitute for citing
+        publication [...] Citing Caterva is not a substitute for citing
         BRENDA.
 
     The export emitted one record per parameter -- `howpublished = {BRENDA
@@ -282,10 +282,10 @@ def _source_entry_note(source) -> str:
     """
     return (
         f"The database this run drew values from. {source.citation_request}. "
-        "Terrium does not record that publication's author, year or volume "
+        "Caterva does not record that publication's author, year or volume "
         "and has NOT guessed them -- look it up and complete this entry "
         "before submitting. Licensed under "
-        f"{source.licence or 'terms Terrium has not recorded'}"
+        f"{source.licence or 'terms Caterva has not recorded'}"
         + (f" ({source.licence_uri})" if source.licence_uri else "")
     )
 
@@ -294,7 +294,7 @@ def to_bibtex(parameters: list[CitedParameter]) -> str:
     """A .bib document for every cited parameter.
 
     Entry type is `@misc`, deliberately. `@article` would assert that the
-    source is a journal article, which Terrium does not know: a BRENDA
+    source is a journal article, which Caterva does not know: a BRENDA
     reference id identifies a record, and the record may be a paper, a
     chapter or a submission. Asserting a publication type nobody verified
     is the same class of error as asserting an author.
@@ -313,10 +313,10 @@ def to_bibtex(parameters: list[CitedParameter]) -> str:
     # someone is about to paste into a bibliography.
     header = "\n".join(
         [
-            "% Generated by Terrium. One entry per literature-backed parameter.",
+            "% Generated by Caterva. One entry per literature-backed parameter.",
             "%",
             "% Author, year and journal are ABSENT, not omitted for brevity:",
-            "% Terrium resolves a source identifier and does not fabricate the",
+            "% Caterva resolves a source identifier and does not fabricate the",
             "% rest of a bibliographic record. Complete each entry from its",
             "% source before citing it.",
         ]
@@ -356,7 +356,7 @@ def to_bibtex(parameters: list[CitedParameter]) -> str:
         body = ",\n".join(
             f"  {field} = {{{_escape_bibtex(value)}}}" for field, value in fields
         )
-        blocks.append(f"@misc{{terrium-source-{name},\n{body}\n}}")
+        blocks.append(f"@misc{{caterva-source-{name},\n{body}\n}}")
 
     return "\n\n".join(blocks) + "\n"
 
@@ -371,7 +371,7 @@ def to_ris(parameters: list[CitedParameter]) -> str:
         return (
             "TY  - GEN\r\n"
             "TI  - No literature-backed parameters in this run\r\n"
-            "N1  - Terrium resolved no value carrying a citation. This is a "
+            "N1  - Caterva resolved no value carrying a citation. This is a "
             "run with no literature-backed values, not an empty export.\r\n"
             "ER  - \r\n"
         )

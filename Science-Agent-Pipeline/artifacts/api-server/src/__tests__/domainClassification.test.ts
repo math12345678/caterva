@@ -96,10 +96,10 @@ describe("keyword classifier: realistic phrasing that used to misclassify", () =
       const err = e as RequiredParametersMissingError;
       expect(err.domain).toBe("sir");
       expect(err.details["beta"]).toMatch(
-        /matches Terrium's literature-backed R0 registry/,
+        /matches Caterva's literature-backed R0 registry/,
       );
       expect(err.details["gamma"]).toMatch(
-        /matches Terrium's literature-backed R0 registry/,
+        /matches Caterva's literature-backed R0 registry/,
       );
     }
   });

@@ -1,6 +1,6 @@
 # Integration Examples & Code Recipes
 
-**For:** Developers building on Terrium  
+**For:** Developers building on Caterva  
 **Status:** August 2026  
 **Languages:** Python, JavaScript/Node.js, R, cURL
 
@@ -575,7 +575,7 @@ def robust_simulate(query, fallback_query=None):
     try:
         return simulate_blocking(query)
     except requests.ConnectionError:
-        print("Cannot connect to Terrium API")
+        print("Cannot connect to Caterva API")
         if fallback_query:
             print(f"Trying fallback query: {fallback_query}")
             return simulate_blocking(fallback_query)
@@ -683,7 +683,7 @@ RUN pip install -r requirements.txt
 
 COPY app.py .
 
-ENV TERRIUM_API=http://terrium-api:5000
+ENV CATERVA_API=http://caterva-api:5000
 
 CMD ["python", "app.py"]
 ```
@@ -693,8 +693,8 @@ CMD ["python", "app.py"]
 version: '3.8'
 
 services:
-  terrium-api:
-    image: terrium-api:latest
+  caterva-api:
+    image: caterva-api:latest
     ports:
       - "5000:5000"
     environment:
@@ -706,9 +706,9 @@ services:
     ports:
       - "5001:5001"
     environment:
-      - TERRIUM_API=http://terrium-api:5000
+      - CATERVA_API=http://caterva-api:5000
     depends_on:
-      - terrium-api
+      - caterva-api
 ```
 
 ---
@@ -829,7 +829,7 @@ rate_info = check_rate_limit(response)
 # research_app.py
 import pandas as pd
 import matplotlib.pyplot as plt
-from terrium_client import TerrriumClient
+from caterva_client import TerrriumClient
 
 def run_epidemiology_study():
     """Complete research workflow."""

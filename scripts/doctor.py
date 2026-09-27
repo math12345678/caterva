@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Diagnose a Terrium development environment that will not set up.
+"""Diagnose a Caterva development environment that will not set up.
 
     python3 scripts/doctor.py        (or: make doctor)
 
@@ -207,24 +207,24 @@ def check_venv():
     _record(".venv interpreter", status,
             "{} ({}.{}.{})".format(interpreter, *version),
             None if status == "PASS"
-            else "rm -rf .venv && TERRIUM_PYTHON=$(command -v python3.13) make setup")
+            else "rm -rf .venv && CATERVA_PYTHON=$(command -v python3.13) make setup")
     return interpreter
 
 
 def check_hidden_pth():
-    """Catch the macOS + iCloud failure that makes `terrium` vanish.
+    """Catch the macOS + iCloud failure that makes `caterva` vanish.
 
     WHY THIS EXISTS (2026-09-24)
     ----------------------------
-    `make setup` installs Terrium in editable mode, which works through a
+    `make setup` installs Caterva in editable mode, which works through a
     `.pth` file in site-packages. Python 3.13's `site.py` skips any `.pth`
     file carrying the macOS `hidden` flag, deliberately. When the checkout
     lives under ~/Desktop or ~/Documents with iCloud Drive's "Desktop &
     Documents" sync on, iCloud sets that flag on files inside `.venv`.
 
-    Measured on the owner's machine: `terrium --version` worked immediately
+    Measured on the owner's machine: `caterva --version` worked immediately
     after install; minutes later the same command from outside the
-    repository failed with `ModuleNotFoundError: No module named 'Terium'`.
+    repository failed with `ModuleNotFoundError: No module named 'caterva'`.
     Both `.pth` files had acquired the flag. Clearing it restored the
     command, including the full literature search. Nothing in the error
     points anywhere near iCloud, which is why this check names it.
@@ -247,7 +247,7 @@ def check_hidden_pth():
     _record(
         "hidden .pth", "FAIL",
         "{} of {} .pth file(s) carry the macOS hidden flag, so Python skips "
-        "them and `terrium` cannot find its own package{}".format(
+        "them and `caterva` cannot find its own package{}".format(
             len(hidden), len(found),
             " -- this checkout is under ~/{}, which iCloud Drive syncs".format(
                 next(part for part in REPO_ROOT.parts if part in ("Desktop", "Documents")))
@@ -446,7 +446,7 @@ def check_node():
 
 def main():
     print("=" * 70)
-    print("Terrium environment doctor")
+    print("Caterva environment doctor")
     print("=" * 70)
 
     check_platform()

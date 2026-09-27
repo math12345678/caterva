@@ -1,7 +1,7 @@
-# Terrium Build Status Summary
+# Caterva Build Status Summary
 
-> **⚠️ CORRECTION (2026-08-12):** this doc's "13/13 domains wired" and "13 previously failing tests" claims are stale — the real `SimulationDomain` union (`Science-Agent-Pipeline/artifacts/api-server/src/lib/teriumRunner.ts:11-38`) and the Python dispatch table it must match (`Science-Agent-Pipeline/artifacts/api-server/src/lib/terium_runner.py:646-666`) now list **16** domains, not 13 (the code comment at `teriumRunner.ts:18` literally says "15 core scientific domains + SBML escape hatch"). The three new ones (`lotka_volterra`, `cell_cycle_oscillator`, `repressilator`) were added after this doc was written.
-> - The "Python DISPATCHER table" referenced throughout (checklist items, Files Updated section) does not exist under that name — the real object is `DISPATCH: Dict[str, str]` at `terium_runner.py:646`, and it maps each domain to a handler-function **name string** (resolved via a separate `_RUNNERS` dict / `getattr`), not directly to callables. This same drift is already documented in `ARCHITECTURE_QUICK_REFERENCE.md`'s correction banner.
+> **⚠️ CORRECTION (2026-08-12):** this doc's "13/13 domains wired" and "13 previously failing tests" claims are stale — the real `SimulationDomain` union (`Science-Agent-Pipeline/artifacts/api-server/src/lib/catervaRunner.ts:11-38`) and the Python dispatch table it must match (`Science-Agent-Pipeline/artifacts/api-server/src/lib/caterva_runner.py:646-666`) now list **16** domains, not 13 (the code comment at `catervaRunner.ts:18` literally says "15 core scientific domains + SBML escape hatch"). The three new ones (`lotka_volterra`, `cell_cycle_oscillator`, `repressilator`) were added after this doc was written.
+> - The "Python DISPATCHER table" referenced throughout (checklist items, Files Updated section) does not exist under that name — the real object is `DISPATCH: Dict[str, str]` at `caterva_runner.py:646`, and it maps each domain to a handler-function **name string** (resolved via a separate `_RUNNERS` dict / `getattr`), not directly to callables. This same drift is already documented in `ARCHITECTURE_QUICK_REFERENCE.md`'s correction banner.
 > - The "Testing" instructions under Next Steps (`npm test -- competitiveInhibitionDomain.test.ts` etc., run from the repo root) do not work as written: `competitiveInhibitionDomain.test.ts`, `kiProvenance.test.ts`, and `routes.test.ts` live at `Science-Agent-Pipeline/artifacts/api-server/src/__tests__/` and run via `vitest`, not the root `jest`. Confirmed by running `npx jest --listTests` from the repo root — it lists 25 tests, none matching those three names (root `src/__tests__/` only contains `enzymeConcentration.test.ts` and `units.test.ts`).
 > - That said, the underlying architecture claim is currently true: running the three test files correctly (`npx vitest run src/__tests__/competitiveInhibitionDomain.test.ts src/__tests__/kiProvenance.test.ts src/__tests__/routes.test.ts` from `Science-Agent-Pipeline/artifacts/api-server/`) passes all 59 tests, and `RESOLVABLE_FIELDS.mm_competitive_inhibition` (`provenance.ts:85`) does list both `km` and `ki`.
 
@@ -28,13 +28,13 @@ Verified every file in the system:
 - ✅ `llmResolver.ts` — LLM domain classification (CRITICAL FIX APPLIED)
 - ✅ `queryResolver.ts` — Parameter resolution + hard rule enforcement
 - ✅ `provenance.ts` — Provenance tracking with origin validation
-- ✅ `teriumRunner.ts` — Type definitions + simulator dispatch
+- ✅ `catervaRunner.ts` — Type definitions + simulator dispatch
 - ✅ `scienceAgent.ts` — Python bridge for literature lookups
 - ✅ `schemas.ts` — Zod validation schemas for all domains
 
 **Python Files**:
-- ✅ `terium_runner.py` — DISPATCHER table + domain handlers (CONSISTENCY UPDATE APPLIED)
-- ✅ `terium_engine` — Simulator implementations
+- ✅ `caterva_runner.py` — DISPATCHER table + domain handlers (CONSISTENCY UPDATE APPLIED)
+- ✅ `caterva_engine` — Simulator implementations
 
 **Test Files**:
 - ✅ `competitiveInhibitionDomain.test.ts` — End-to-end tests for mm_competitive_inhibition
@@ -70,7 +70,7 @@ Verified every file in the system:
 ```
 
 ### Fix #3: Python Docstring Consistency
-**File**: `terium_runner.py` lines 13-16  
+**File**: `caterva_runner.py` lines 13-16  
 **Issue**: Python documentation inconsistent with TypeScript  
 **Fix**: Updated docstring to include mm_competitive_inhibition  
 **Impact**: Maintains single source of truth for domain list
@@ -96,7 +96,7 @@ Verified every file in the system:
 - [x] Provenance tracks origin (resolved/keyword/llm/user/default)
 
 ### Type Safety ✅
-- [x] SimulationDomain type exported from teriumRunner.ts
+- [x] SimulationDomain type exported from catervaRunner.ts
 - [x] Same type used in schemas, queryResolver, llmResolver
 - [x] JSON validation includes all domains
 - [x] Python DISPATCHER keys match TS union
@@ -168,7 +168,7 @@ Verified every file in the system:
 All three critical fixes confirmed as applied:
 1. llmResolver.ts line 40 ✅
 2. llmResolver.ts lines 54-55 ✅
-3. terium_runner.py lines 13-16 ✅
+3. caterva_runner.py lines 13-16 ✅
 
 ---
 
@@ -220,7 +220,7 @@ The system implements a **5-stage science agent pipeline**:
    - Hard rule: reject unverified parameters
    - Track provenance (origin, citation, assay conditions)
 
-5. **Simulation Output** (teriumRunner.ts + terium_runner.py)
+5. **Simulation Output** (catervaRunner.ts + caterva_runner.py)
    - Python DISPATCHER routes to correct handler
    - Handler extracts parameters, validates requirements
    - Calls engine simulator, returns trajectory
@@ -258,7 +258,7 @@ The system implements a **5-stage science agent pipeline**:
 
 **Status**: ✅ **ZERO ERRORS — ARCHITECTURALLY SOUND**
 
-The Terrium science agent pipeline is complete and ready for testing. All critical wiring has been verified, three essential fixes have been applied, and comprehensive documentation has been created.
+The Caterva science agent pipeline is complete and ready for testing. All critical wiring has been verified, three essential fixes have been applied, and comprehensive documentation has been created.
 
 **Key Achievement**: The system now correctly routes competitive inhibition queries through the full 5-stage pipeline with proper Ki resolution and provenance tracking.
 

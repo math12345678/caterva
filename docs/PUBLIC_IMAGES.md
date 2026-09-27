@@ -14,7 +14,7 @@ That line is mine. It is correct — a PNG is not source — and it means a
 number baked into a screenshot is the most unchecked claim this project can
 publish. `check_documented_counts.py`, `check_public_claims.py`,
 `check_investor_claims.py` and `check_no_fabricated_endorsements.py` would
-all pass a page whose hero image said "10,000 universities trust Terrium".
+all pass a page whose hero image said "10,000 universities trust Caterva".
 
 This file is the compensating control. It is not clever: a human looks at
 each image and writes down what it depicts, and a hash makes it fail when
@@ -50,7 +50,7 @@ hides best.
 ## The register
 
 <!-- PUBLIC-IMAGES-START
-9126ae28e71fde30  reviewed  Science-Agent-Pipeline/artifacts/terrium-landing/public/favicon.svg
+b43ebbd7ab78466b  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/favicon.svg
 790805bf4a0ac4cb  reviewed  mule/_shots/01-hero.png
 6737793581a7406d  reviewed  mule/_shots/02-atlas-system.png
 2925ce1e7d0348b4  reviewed  mule/_shots/02b-atlas-natural.png
@@ -68,10 +68,10 @@ PUBLIC-IMAGES-END -->
 
 ## What the reviewed ones actually show
 
-**`01-hero.png`** — the Terrium landing hero, Terrium's own UI. Carries, in
+**`01-hero.png`** — the Caterva landing hero, Caterva's own UI. Carries, in
 the image itself: *"ILLUSTRATIVE DEMO / NOT AN EXPERIMENTAL RESULT."*
 
-**`10-manifest.png`** — five principles ("Terrium does not silently choose a
+**`10-manifest.png`** — five principles ("Caterva does not silently choose a
 constant"), no numbers, no results.
 
 **`06-console-complete.png`** — the one that could have gone wrong, and did
@@ -121,7 +121,8 @@ REGIONS. EIGHT DECLARED ROUTES."* — a statement about the diagram, not
 about the software.
 
 **`favicon.svg`** — 13 lines of hand-written SVG: a rounded square, the
-letter T, three circles and three connecting lines. No embedded fonts, no
+letter C (T until the rename on 2026-09-27, the only change; re-reviewed
+then), three circles and three connecting lines. No embedded fonts, no
 traced artwork, nothing licensed from anywhere.
 
 ### A wording tension worth noting
@@ -154,7 +155,7 @@ capability claim.
 
 It is recorded because the framing is the only thing making it honest. Crop
 those captions out, drop the image into a deck, and it becomes a claim that
-Terrium queries five literature sources when it queries one of them. The
+Caterva queries five literature sources when it queries one of them. The
 caption is load-bearing, and nothing mechanical can check that it stayed.
 
 **No third-party content** in any of the three: no other product's UI, no

@@ -186,7 +186,7 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2026 Smyan Reddy and Terrium contributors
+   Copyright 2026 Smyan Reddy and Caterva contributors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -205,7 +205,7 @@
 THIRD-PARTY DATA IS NOT COVERED BY THE ABOVE
 ================================================================================
 
-The Apache License above covers Terrium's own code and documentation. It
+The Apache License above covers Caterva's own code and documentation. It
 does not, and cannot, relicense data this repository redistributes under
 someone else's terms.
 
@@ -240,14 +240,14 @@ WHY APACHE 2.0, AND WHAT IT REPLACES
 ================================================================================
 
 This file previously read "all rights reserved", on the reasoning that
-Terrium's business model assumed institutional licensing revenue and that
+Caterva's business model assumed institutional licensing revenue and that
 giving the codebase away before validating that model would foreclose an
 option rather than preserve one.
 
 That reasoning was answered by the project's own circumstances rather than
 refuted in the abstract:
 
-  * Contributors. Terrium is taking on student contributors from multiple
+  * Contributors. Caterva is taking on student contributors from multiple
     institutions. An all-rights-reserved repository cannot accept outside
     contributions cleanly -- there is no inbound licence for the
     contribution to arrive under.
@@ -268,7 +268,7 @@ Apache 2.0 over MIT specifically, for two reasons that matter here:
     technology-transfer offices routinely flag MIT for the absence of one,
     and this project intends to be adopted by exactly those institutions.
 
-  * The NOTICE mechanism (§4(d)). Terrium already redistributes CC BY 4.0
+  * The NOTICE mechanism (§4(d)). Caterva already redistributes CC BY 4.0
     material that must carry attribution downstream. Apache 2.0 makes
     propagating NOTICE a condition of redistribution, so the BRENDA
     attribution travels with the code by construction rather than by

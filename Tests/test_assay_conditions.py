@@ -6,7 +6,7 @@ inputs for a parser is how a parser ends up passing against data it will never
 see.
 
 Context: STRENDA requires temperature and pH for all reported kinetic data
-(Guidelines v1.4.0, Beilstein-Institut). Terrium captured BRENDA's commentary
+(Guidelines v1.4.0, Beilstein-Institut). Caterva captured BRENDA's commentary
 string and never read it, so every resolved Km was reported without the
 conditions it was measured under. See ADR 0010.
 """

@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** the "197+ tests / 84% / 0 vulnerabilities" quality block is unverified and inconsistent with sibling same-day docs (`COMPLETE_GUIDE.md` claims 178 for the same snapshot). This doc is a near-duplicate of `EVERYTHING_COMPLETE.md`/`SESSION_SUMMARY.md` (same architecture diagrams, same file lists). The `parameter-sweep.ts`/`batch-processor.ts` files it credits as "created" are real files but are not wired into any CLI command or the web server as of this writing — see `FEATURE_SWEEP_COMPLETE.md`'s correction banner for detail. Run `npm test` for the real current test count rather than citing the figure below.
 
-# Terrium: Final Session Report
+# Caterva: Final Session Report
 ## Web Interface → Production Platform
 
 **Session Duration:** Full development cycle  
@@ -139,7 +139,7 @@ User Query
 └─────────────────────┘
     ↓
 ┌─────────────────────┐
-│ Terium Engine    │
+│ Caterva Engine    │
 │ (Kinetics solver)   │
 └─────────────────────┘
     ↓
@@ -235,7 +235,7 @@ src/
 │   ├── sbml-builder.ts              ✅ SBML generation
 │   ├── parameter-sweep.ts           ✅ NEW - Sweep engine
 │   ├── batch-processor.ts           ✅ NEW - Batch processor
-│   └── kinetics-executor.ts         ✅ Terium integration
+│   └── kinetics-executor.ts         ✅ Caterva integration
 ├── integration/
 │   └── scientificPipeline.ts        ✅ Main pipeline
 ├── integrations/
@@ -280,7 +280,7 @@ CMD ["node", "dist/src/web/server.js"]
 ```bash
 PORT=3000              # Change port
 PUBMED_EMAIL=...      # For API politeness
-PUBMED_TOOL=terrium   # For API politeness
+PUBMED_TOOL=caterva   # For API politeness
 ```
 
 ---
@@ -394,8 +394,8 @@ curl http://localhost:3000/api/sweep ...
 ### For Production
 ```bash
 # Deploy with Docker
-docker build -t terrium .
-docker run -p 3000:3000 terrium
+docker build -t caterva .
+docker run -p 3000:3000 caterva
 
 # Scale with load balancer
 # Use database persistence

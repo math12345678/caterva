@@ -3,7 +3,7 @@
  *
  * GET /api/pipeline/literature answered, verbatim:
  *
- *   "All parameters in Terrium are backed by peer-reviewed scientific
+ *   "All parameters in Caterva are backed by peer-reviewed scientific
  *    literature. Every domain has primary references with DOI."
  *
  * Both halves were false, and the second is checkable in one pass over

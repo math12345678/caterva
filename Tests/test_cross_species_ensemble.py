@@ -129,7 +129,7 @@ def test_the_tie_machinery_consumes_these_unchanged():
     `spread_consequence.consequence_of` was written for ADR 0111's tie —
     several values the evidence ranked equal. These are several values from
     different organisms. Both are "the literature reports these numbers and
-    Terrium will not pick between them", so both go through the same code,
+    Caterva will not pick between them", so both go through the same code,
     and `cross_species_candidates` is shaped as `TiedCandidate` for exactly
     that reason.
 

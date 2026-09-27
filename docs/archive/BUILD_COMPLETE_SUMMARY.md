@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-10):** "178 tests, 84% coverage" is a stale snapshot, not a live fact — this repo has multiple agents committing continuously and the suite has already grown past this (17 test files at last count, up from 11). Don't cite a fixed test count/coverage number from any doc; run `npm test` / `npm run test:coverage` from repo root for the current figure. This doc is a near-duplicate of `COMPLETE_BUILD_REPORT.md`, `COMPREHENSIVE_GUIDE.md`, `FINAL_STATUS.txt`, and `IMPLEMENTATION_COMPLETE.md` (all landed within the same hour, repeating the same 178/84% figures) — see those files for the same correction. "PRODUCTION READY" also does not hold given the root `src/` tree has no HTTP server, no deployment, and is a library/CLI only.
 
-# 🎉 Terrium Build Complete - Executive Summary
+# 🎉 Caterva Build Complete - Executive Summary
 
 ## Project Status: PRODUCTION READY - RESEARCH GRADE
 
@@ -14,7 +14,7 @@
 
 ## What Was Built
 
-### Terrium Scientific Validation Framework
+### Caterva Scientific Validation Framework
 A **production-grade, research-capable enzyme kinetics simulation and validation system** that combines rigorous scientific validation with practical usability.
 
 **Core Capability:** Run validated enzyme kinetics simulations with full reproducibility, comprehensive error handling, and research-grade accuracy.
@@ -233,7 +233,7 @@ cat COMPREHENSIVE_GUIDE.md
 
 ```
 ┌──────────────────────────────────────────────────┐
-│           Terrium Scientific Validation          │
+│           Caterva Scientific Validation          │
 │              Framework v1.0.0                    │
 └──────────────────────────────────────────────────┘
           │                    │
@@ -371,7 +371,7 @@ Learn kinetics → Visualize effects → Benchmark understanding
 
 ## Conclusion
 
-**Terrium is a production-ready, research-capable enzyme kinetics validation framework.**
+**Caterva is a production-ready, research-capable enzyme kinetics validation framework.**
 
 It successfully combines:
 - Scientific rigor (4-layer validation)

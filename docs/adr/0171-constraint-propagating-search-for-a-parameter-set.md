@@ -47,7 +47,7 @@ a coherence constraint**.
 
 ## Decision
 
-`Terium/agents/` is a blackboard architecture — the HEARSAY-II shape —
+`caterva/agents/` is a blackboard architecture — the HEARSAY-II shape —
 specialised to literature-grounded model building.
 
 ```
@@ -114,11 +114,11 @@ once inside **each** organism the literature actually offered and reports
 what each yields:
 
 ```
-Values came from 2 different organisms, so Terrium built the model
+Values came from 2 different organisms, so Caterva built the model
 separately inside each rather than choosing one:
   [Homo sapiens: no measured Ki]
   [Oryctolagus cuniculus: no measured Km]
-No single organism has every constant this model needs, so Terrium has not
+No single organism has every constant this model needs, so Caterva has not
 assembled one. The measurements that would complete it, in whichever
 organism you choose: Ki, Km.
 ```
@@ -141,7 +141,7 @@ presenting a partial result as finished.
 **Failures are isolated but never laundered.** One scout raising does not
 lose its seven level-mates, and it is recorded as a failure rather than as
 an empty result — because an outage presented as a literature gap would have
-Terrium tell a researcher that a measurement does not exist when a server
+Caterva tell a researcher that a measurement does not exist when a server
 was down.
 
 **Inputs are not derived.** A seeded network carries the fingerprint in
@@ -169,7 +169,7 @@ that was substituted rather than implying a check that did not happen.
   frontier carries no buffer axis, so no search could satisfy a requirement
   on it; a buffer mismatch is a finding, permanently.
 - `resolveQuery` still routes through its own chain. `parameterize` is
-  registered in `COMPOSED_DOMAINS`, typed in `teriumRunner.ts`, reachable
+  registered in `COMPOSED_DOMAINS`, typed in `catervaRunner.ts`, reachable
   through the runner's stdin/JSON boundary, and carries a chosen model all
   the way to a trajectory -- but no HTTP route posts to it yet, and the
   web front door still goes through the catalogue.

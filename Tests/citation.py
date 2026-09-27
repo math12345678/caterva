@@ -1,7 +1,7 @@
 """
 citation.py
 
-A single, shared Citation model for every data source Terrium pulls
+A single, shared Citation model for every data source Caterva pulls
 kinetics data from (BRENDA today; PubMed literature and others later).
 Keeping one model means downstream code (UI, exports, the eventual
 Citation object in the product) never has to branch on "which source

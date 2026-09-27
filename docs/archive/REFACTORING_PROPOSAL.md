@@ -1,8 +1,8 @@
-# Terium Engine Refactoring Proposal
+# Caterva Engine Refactoring Proposal
 
 ## Overview
 
-The current `Terium/terium_engine.py` file is 4,283 lines with 64 top-level definitions. This proposal outlines a modular refactoring to improve maintainability while preserving all functionality.
+The current `caterva/caterva_engine.py` file is 4,283 lines with 64 top-level definitions. This proposal outlines a modular refactoring to improve maintainability while preserving all functionality.
 
 ## Current Structure Analysis
 
@@ -86,9 +86,9 @@ The current `Terium/terium_engine.py` file is 4,283 lines with 64 top-level defi
 This preserves the existing domain organization and creates clear separation:
 
 ```
-Terium/
+caterva/
 ├── __init__.py                    # Current exports preserved
-├── terium_engine.py           # Keep as main entry point with imports
+├── caterva_engine.py           # Keep as main entry point with imports
 ├── core/
 │   ├── __init__.py               # Re-export everything
 │   ├── data_structures.py        # ModelBuildError, SimulationError, ParameterValidation, SimulationResult, constants
@@ -123,9 +123,9 @@ Terium/
 Alternative organization by function type:
 
 ```
-Terium/
+caterva/
 ├── __init__.py
-├── terium_engine.py           # Main entry point
+├── caterva_engine.py           # Main entry point
 ├── core.py                      # Data structures and constants
 ├── validation.py                # All validation functions
 ├── model_building.py           # SBML/antimony functions
@@ -148,7 +148,7 @@ This aligns with the existing mental model of "domains" in the codebase and make
 ### Phase 1: Create Module Structure (No Breaking Changes)
 1. Create new module files
 2. Move functions to appropriate modules with proper imports
-3. Update `terium_engine.py` to import from new modules
+3. Update `caterva_engine.py` to import from new modules
 4. Ensure all tests still pass
 
 ### Phase 2: Update __init__.py
@@ -195,12 +195,12 @@ Move SBML and continuous simulation functions
 ### Step 4: Create discrete/ directory with subdirectories
 Move all discrete domain functions with logical grouping
 
-### Step 5: Update terium_engine.py
+### Step 5: Update caterva_engine.py
 Convert to import statements from the new modules
 
 ## Verification Strategy
 1. Run full test suite after each module extraction
-2. Use `python -c "import Terium; print('OK')"` to verify imports work
+2. Use `python -c "import caterva; print('OK')"` to verify imports work
 3. Check that all exported names are still available
 
 ## Benefits of This Refactoring
@@ -222,25 +222,25 @@ Convert to import statements from the new modules
 
 ## Files to Create
 
-1. `Terium/core/__init__.py`
-2. `Terium/core/data_structures.py`
-3. `Terium/core/validation.py`
-4. `Terium/core/utils.py`
-5. `Terium/continuous/__init__.py`
-6. `Terium/continuous/model_building.py`
-7. `Terium/continuous/simulations.py`
-8. `Terium/discrete/__init__.py`
-9. `Terium/discrete/pcr.py`
-10. `Terium/discrete/monte_carlo.py`
-11. `Terium/discrete/molecular_dynamics.py`
-12. `Terium/discrete/population_genetics/__init__.py`
-13. `Terium/discrete/population_genetics/core.py`
-14. `Terium/discrete/population_genetics/analysis.py`
-15. `Terium/discrete/population_genetics/probability.py`
-16. `Terium/discrete/population_genetics/theoretical.py`
-17. `Terium/discrete/population_genetics/two_locus.py`
-18. `Terium/scenarios/__init__.py`
-19. `Terium/scenarios/wf_scenarios.py`
+1. `caterva/core/__init__.py`
+2. `caterva/core/data_structures.py`
+3. `caterva/core/validation.py`
+4. `caterva/core/utils.py`
+5. `caterva/continuous/__init__.py`
+6. `caterva/continuous/model_building.py`
+7. `caterva/continuous/simulations.py`
+8. `caterva/discrete/__init__.py`
+9. `caterva/discrete/pcr.py`
+10. `caterva/discrete/monte_carlo.py`
+11. `caterva/discrete/molecular_dynamics.py`
+12. `caterva/discrete/population_genetics/__init__.py`
+13. `caterva/discrete/population_genetics/core.py`
+14. `caterva/discrete/population_genetics/analysis.py`
+15. `caterva/discrete/population_genetics/probability.py`
+16. `caterva/discrete/population_genetics/theoretical.py`
+17. `caterva/discrete/population_genetics/two_locus.py`
+18. `caterva/scenarios/__init__.py`
+19. `caterva/scenarios/wf_scenarios.py`
 
 ## Estimated Effort
 

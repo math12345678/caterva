@@ -11,8 +11,8 @@ export interface ExecutionMetrics {
   startTime: number;
   endTime: number;
   executionTimeMs: number;
-  // Terrium's engine (libRoadRunner via a fixed-step integrator,
-  // see Terium/) is not an iterative solver reporting a real convergence
+  // Caterva's engine (libRoadRunner via a fixed-step integrator,
+  // see caterva/) is not an iterative solver reporting a real convergence
   // count -- there is no such number to measure. Callers record the
   // trajectory point count here (a real, verifiable fact about the run:
   // how many output points the simulation actually produced), not a

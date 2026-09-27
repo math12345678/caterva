@@ -24,7 +24,7 @@ describe("parseModelAnnotations", () => {
   it("reads a declaration on the line above its parameter", () => {
     const a = only(`
       model hexokinase_assay
-        // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM"
+        // caterva: km enzyme="hexokinase" substrate="glucose" unit="mM"
         Km_hex = 0.15;
       end
     `);
@@ -39,7 +39,7 @@ describe("parseModelAnnotations", () => {
 
   it("reads a declaration trailing its parameter on one line", () => {
     const a = only(
-      `Km_hex = 0.15;  // terrium: km enzyme="hexokinase" unit="mM"`,
+      `Km_hex = 0.15;  // caterva: km enzyme="hexokinase" unit="mM"`,
     );
     expect(a.parameter).toBe("Km_hex");
     expect(a.value).toBe(0.15);
@@ -49,7 +49,7 @@ describe("parseModelAnnotations", () => {
     // The message has to send the reader to the number, which is what
     // they will edit.
     const a = only(
-      ['// terrium: km enzyme="hexokinase" unit="mM"', "Km_hex = 0.15;"].join(
+      ['// caterva: km enzyme="hexokinase" unit="mM"', "Km_hex = 0.15;"].join(
         "\n",
       ),
     );
@@ -58,7 +58,7 @@ describe("parseModelAnnotations", () => {
 
   it("accepts an EC number instead of a name, and an organism", () => {
     const a = only(
-      `// terrium: ki ec="1.1.1.27" organism="Oryctolagus cuniculus" unit="uM"\n` +
+      `// caterva: ki ec="1.1.1.27" organism="Oryctolagus cuniculus" unit="uM"\n` +
         `Ki_ldh = 40;`,
     );
     expect(a.ecNumber).toBe("1.1.1.27");
@@ -67,15 +67,15 @@ describe("parseModelAnnotations", () => {
   });
 
   it("reads scientific notation and hash comments", () => {
-    const a = only(`# terrium: kcat enzyme="catalase" unit="1/s"\nkcat_cat = 4.1e4;`);
+    const a = only(`# caterva: kcat enzyme="catalase" unit="1/s"\nkcat_cat = 4.1e4;`);
     expect(a.value).toBe(41000);
     expect(a.quantity).toBe("kcat");
   });
 
   it("reads the resolve mode and its placeholder", () => {
-    // The caller writes the structure and leaves the constant to Terrium.
+    // The caller writes the structure and leaves the constant to Caterva.
     const a = only(
-      `// terrium: km enzyme="hexokinase" substrate="glucose" unit="mM" resolve\n` +
+      `// caterva: km enzyme="hexokinase" substrate="glucose" unit="mM" resolve\n` +
         `Km_hex = ?;`,
     );
     expect(a.mode).toBe("resolve");
@@ -87,7 +87,7 @@ describe("parseModelAnnotations", () => {
     // "Use the literature's number instead of mine" is a legitimate ask,
     // and distinct from having no number at all.
     const a = only(
-      `Km_hex = 0.15; // terrium: km enzyme="hexokinase" unit="mM" resolve`,
+      `Km_hex = 0.15; // caterva: km enzyme="hexokinase" unit="mM" resolve`,
     );
     expect(a.mode).toBe("resolve");
     expect(a.value).toBe(0.15);
@@ -100,7 +100,7 @@ describe("parseModelAnnotations", () => {
     // means nothing to a resolver. Inferring it from the name is how a
     // real citation ends up attached to the wrong enzyme's constant.
     const { annotations, problems } = parse(
-      `// terrium: km substrate="glucose" unit="mM"\nKm_hex = 0.15;`,
+      `// caterva: km substrate="glucose" unit="mM"\nKm_hex = 0.15;`,
     );
     expect(annotations).toEqual([]);
     expect(problems[0]!.message).toMatch(/enzyme must be named/i);
@@ -111,7 +111,7 @@ describe("parseModelAnnotations", () => {
     // `enzmye="hexokinase"` silently dropped would leave the caller
     // believing the parameter was literature-checked when it was skipped.
     const { annotations, problems } = parse(
-      `// terrium: km enzmye="hexokinase" unit="mM"\nKm_hex = 0.15;`,
+      `// caterva: km enzmye="hexokinase" unit="mM"\nKm_hex = 0.15;`,
     );
     expect(annotations).toEqual([]);
     expect(problems[0]!.message).toMatch(/enzmye/);
@@ -119,14 +119,14 @@ describe("parseModelAnnotations", () => {
 
   it("reports an unknown quantity", () => {
     const { problems } = parse(
-      `// terrium: vmax enzyme="hexokinase"\nV = 1;`,
+      `// caterva: vmax enzyme="hexokinase"\nV = 1;`,
     );
-    expect(problems[0]!.message).toMatch(/not a quantity Terrium can resolve/i);
+    expect(problems[0]!.message).toMatch(/not a quantity Caterva can resolve/i);
   });
 
   it("reports an annotation attached to nothing", () => {
     const { annotations, problems } = parse(
-      `// terrium: km enzyme="hexokinase" unit="mM"\n// just a comment\n`,
+      `// caterva: km enzyme="hexokinase" unit="mM"\n// just a comment\n`,
     );
     expect(annotations).toEqual([]);
     expect(problems[0]!.message).toMatch(/not attached to a parameter/i);
@@ -136,7 +136,7 @@ describe("parseModelAnnotations", () => {
     // `Km = ?` in check mode has nothing to check and would silently do
     // nothing.
     const { problems } = parse(
-      `// terrium: km enzyme="hexokinase" unit="mM"\nKm_hex = ?;`,
+      `// caterva: km enzyme="hexokinase" unit="mM"\nKm_hex = ?;`,
     );
     expect(problems[0]!.message).toMatch(/no value to check/);
     expect(problems[0]!.message).toMatch(/resolve/);
@@ -147,14 +147,14 @@ describe("parseModelAnnotations", () => {
     // order -- the whichever-came-first non-decision that let domain
     // classification pick the wrong model.
     const { annotations, problems } = parse(
-      `// terrium: km enzyme="hexokinase" unit="mM"\nKm_x = 0.15;\n` +
-        `// terrium: km enzyme="glucokinase" unit="mM"\nKm_x = 0.20;`,
+      `// caterva: km enzyme="hexokinase" unit="mM"\nKm_x = 0.15;\n` +
+        `// caterva: km enzyme="glucokinase" unit="mM"\nKm_x = 0.20;`,
     );
     expect(annotations).toEqual([]);
     expect(problems[0]!.message).toMatch(/annotated 2 times/);
   });
 
-  it("ignores an ordinary comment that is not a terrium directive", () => {
+  it("ignores an ordinary comment that is not a caterva directive", () => {
     // Antimony sources are full of comments. Only the tagged ones are
     // claims.
     const { annotations, problems } = parse(
@@ -169,7 +169,7 @@ describe("parseModelAnnotations", () => {
     // constant. Reporting a citation for it would claim a source for
     // something the model derives.
     const { annotations, problems } = parse(
-      `// terrium: km enzyme="hexokinase" unit="mM"\nKm_hex = kcat * E0;`,
+      `// caterva: km enzyme="hexokinase" unit="mM"\nKm_hex = kcat * E0;`,
     );
     expect(annotations).toEqual([]);
     expect(problems[0]!.message).toMatch(/not attached to a parameter/i);
@@ -178,9 +178,9 @@ describe("parseModelAnnotations", () => {
   it("reads several declarations in one model", () => {
     const { annotations, problems } = parse(`
       model competitive
-        // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM"
+        // caterva: km enzyme="hexokinase" substrate="glucose" unit="mM"
         Km = 0.15;
-        // terrium: ki enzyme="hexokinase" substrate="glucose" unit="mM"
+        // caterva: ki enzyme="hexokinase" substrate="glucose" unit="mM"
         Ki = 0.02;
         S = 10;  // no claim made about this one
       end

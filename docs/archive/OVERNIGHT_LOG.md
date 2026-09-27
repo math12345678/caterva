@@ -1,6 +1,6 @@
 
 > **⚠️ CORRECTION (2026-08-12):** this log's entries were verified (live-probed) at the time they were written, but the file stops at Cycle 33 (commit `97ca83b`), which is **72 commits behind current `HEAD`** (`git log --oneline | wc -l` = 239; `97ca83b` is at position 73). None of the test/guard counts recorded here reflect the current tree — a reader should not treat the last entry as current status:
-> - Cycle 33's "make test-sim = 907 passed" (897 prior + 10 new, engine only) — current: `python3 -m pytest --collect-only` in `Terium/` collects **1,014** tests. The gap is real work (e.g. the `lotka_volterra`/`cell_cycle_oscillator`/`repressilator` domains landed after this log stopped), not a discrepancy in the log itself.
+> - Cycle 33's "make test-sim = 907 passed" (897 prior + 10 new, engine only) — current: `python3 -m pytest --collect-only` in `caterva/` collects **1,014** tests. The gap is real work (e.g. the `lotka_volterra`/`cell_cycle_oscillator`/`repressilator` domains landed after this log stopped), not a discrepancy in the log itself.
 > - Repeated "273 TypeScript tests PASS" entries (Cycles 20-32) — the Science-Agent-Pipeline API server now has **433** TypeScript test cases across 32 files (`npx vitest list`), not 273. See the correction in `NEXT_STEPS.md` for the same drift.
 > - "1,155 Python tests" (897 engine + 258 literature, Cycles 26-32) — current collected total is **1,291** (1,014 engine + 277 literature).
 > This is normal log staleness from continued development after the last entry, not fabrication — every cycle's claim was checked against live commands per this log's own stated discipline (see the Cycle 20 lesson quoted within). Treat it as a historical record, not a live status.
@@ -28,7 +28,7 @@ Per the Cycle step 1 rule: "If the tree isn't clean or something looks unexpecte
 - Verified that proceeding to backlog items on a dirty tree violates the provided loop protocol.
 
 ### Next
-User should explicitly approve committing the "llm-origin hard-block" work or clear the tree. Once the tree is clean, the loop can proceed to backlog item (a): deleting the dead `vmax = 5.0` fallback in `terium_runner.py`.
+User should explicitly approve committing the "llm-origin hard-block" work or clear the tree. Once the tree is clean, the loop can proceed to backlog item (a): deleting the dead `vmax = 5.0` fallback in `caterva_runner.py`.
 Cycle: verified mm_competitive_inhibition coverage, added tests for negative Vmax/Ki/S0/I rejection. Verified green. Next: item (d) scienceAgent.ts exception swallowing.
 
 ## Cycle 11 - ADR 0015 Documented Counts Drift Fix
@@ -80,9 +80,9 @@ Cycle: verified mm_competitive_inhibition coverage, added tests for negative Vma
 
 All backlog items have been addressed:
 
-- **(a) Dead vmax=5.0 fallback** - Already removed from `terium_runner.py` (commit ba01cd4). Regression tests exist in:
-  - `Terium/tests/test_vmax_from_kcat.py::test_a_request_with_no_route_to_a_vmax_is_rejected`
-  - `Terium/tests/test_mm_competitive_inhibition.py::test_runner_rejects_a_request_with_no_vmax`
+- **(a) Dead vmax=5.0 fallback** - Already removed from `caterva_runner.py` (commit ba01cd4). Regression tests exist in:
+  - `caterva/tests/test_vmax_from_kcat.py::test_a_request_with_no_route_to_a_vmax_is_rejected`
+  - `caterva/tests/test_mm_competitive_inhibition.py::test_runner_rejects_a_request_with_no_vmax`
   - `Science-Agent-Pipeline/artifacts/api-server/src/__tests__/provenance.test.ts` regression section
 
 - **(b) ADR drift check** - Completed:
@@ -224,7 +224,7 @@ complete.
 
 **Backlog status:**
 - (a) dead vmax=5.0 fallback: DONE (ba01cd4 + regression tests,
-  re-confirmed this session at Terium/tests/test_vmax_from_kcat.py:241).
+  re-confirmed this session at caterva/tests/test_vmax_from_kcat.py:241).
 - (b) ADR drift: DONE (spot-verified 8 ADRs across cycles; README count
   drift fixed and re-confirmed).
 - (c) domain physics coverage: COMPLETE. Cycles 14 (gillespie_ssa),
@@ -453,7 +453,7 @@ files they describe this cycle:
 - **0001** (no tellurium umbrella): requirements.txt:26 NOTE forbids it;
   README:56 documents it. Match.
 - **0002** (PCR discrete recurrence): implementation in
-  Terium/discrete/pcr.py, re-exported via terium_engine.py:63/90;
+  caterva/discrete/pcr.py, re-exported via caterva_engine.py:63/90;
   exact closed form N(c) = n0(1+e)^c, no roadrunner; tests are
   exact-equality (test_pcr_correctness.py docstring). Match (functions
   moved to discrete/ module but the engine re-export preserves the ADR's
@@ -465,7 +465,7 @@ files they describe this cycle:
   exist; monte_carlo.py:49 and population_genetics/core.py:161 use
   np.random.default_rng(seed). Match.
 - **0007** (boundary contract test): test_boundary_contract.py exists
-  (15 tests); DISPATCH table at terium_runner.py:568. Match.
+  (15 tests); DISPATCH table at caterva_runner.py:568. Match.
 - **0009** (gillespie SSA): simulate_gillespie_ssa(+bimolecular) at
   gillespie_ssa.py:105/142; pinned golden first event 0.06172192003509486
   present in test_gillespie_ssa_bimolecular_golden.py:32. Match.
@@ -500,7 +500,7 @@ probed live; prior live probes covered the popgen and MC pi paths):
    `vmax` OR `kcat+enzyme_conc` at request validation. The old `vmax=5.0`
    fallback is structurally unreachable from the API.
 2. **Hard-block fires for the exact former-fallback case (live):** spawning
-   terium_runner.py with `{"domain":"mm","parameters":{"km":2,"s0":10,...}}`
+   caterva_runner.py with `{"domain":"mm","parameters":{"km":2,"s0":10,...}}`
    (no vmax, no kcat+enzyme_conc) → `{"ok": false, "error": "mm needs a
    Vmax: ..."}`, exit 1. No silent 5.0 reachable. (Python-side guard alone
    rejects it even if a caller bypassed both TS layers.)
@@ -551,7 +551,7 @@ claims carry live-probe or grep-verified backing. Nothing new to fix.
 **Next:** item (e): log "no safe next item found" and stop; every
 "complete" claim in this backlog is now either (a) a code change +
 regression test, or (b) a live engine probe / direct grep of the
-cited behavior. No further safe scope within Terium/,
+cited behavior. No further safe scope within caterva/,
 Science-Agent-Pipeline/, Tests/, docs/.
 
 ## Cycle 25 - item (e) backed by live bimolecular SSA golden-trajectory probe
@@ -611,7 +611,7 @@ no new scope invented.
 
 **Decision:** All four backlog items remain closed with live-probe evidence. Per backlog item (e), no safe next item exists. Logging "no safe next item found" and stopping rather than inventing new scope.
 
-**Next:** Await owner instruction. The backlog is complete; every "complete" claim in this backlog carries either a code change + regression test, or a live engine probe / direct grep of the cited behavior. No further safe scope within Terium/, Science-Agent-Pipeline/, Tests/, docs/.
+**Next:** Await owner instruction. The backlog is complete; every "complete" claim in this backlog carries either a code change + regression test, or a live engine probe / direct grep of the cited behavior. No further safe scope within caterva/, Science-Agent-Pipeline/, Tests/, docs/.
 
 ## Cycle 27 - no safe next item found (backlog remains complete)
 
@@ -633,7 +633,7 @@ no new scope invented.
 - `python3 scripts/check_documented_counts.py`: OK
 - `python3 scripts/check_rng_convention.py`: OK
 
-**Decision:** All four backlog items remain closed with live-probe evidence. Per backlog item (e) and standing rules ("Stop entirely and log to OVERNIGHT_LOG.md instead of proceeding if... you're about to touch anything outside Terium/, Science-Agent-Pipeline/, Tests/, or docs/"), no safe next item exists. Logging "no safe next item found" and stopping rather than inventing new scope.
+**Decision:** All four backlog items remain closed with live-probe evidence. Per backlog item (e) and standing rules ("Stop entirely and log to OVERNIGHT_LOG.md instead of proceeding if... you're about to touch anything outside caterva/, Science-Agent-Pipeline/, Tests/, or docs/"), no safe next item exists. Logging "no safe next item found" and stopping rather than inventing new scope.
 
 **Next:** Await owner instruction. The backlog is complete; every "complete" claim carries either a code change + regression test, or a live engine probe / direct grep of the cited behavior. No further safe scope within the allowed directories.
 
@@ -775,7 +775,7 @@ no new scope invented.
 
 **Tree state at start:** OVERNIGHT_LOG.md had stale uncommitted entries from prior sessions (cycles 26-32, incl. duplicate Cycle 26/27) — last committed log was cycle 25. Untracked Docw/*.docx, advanced_analysis/, benchmark_results/ pre-existing and out of scope.
 
-**What was done:** Rather than trust the log-only "exhaustive item (c) audit" (commit 4b81b61, which added no tests), independently audited all 13 simulation domains. Found one genuine gap: the competitive-inhibition MM domain (simulate_mm_competitive_inhibition) tested only the initial rate and Rule 1/2 validation, unlike its sibling MM domain which has full closed-form trajectory coverage. Added to Terium/tests/test_mm_competitive_inhibition.py:
+**What was done:** Rather than trust the log-only "exhaustive item (c) audit" (commit 4b81b61, which added no tests), independently audited all 13 simulation domains. Found one genuine gap: the competitive-inhibition MM domain (simulate_mm_competitive_inhibition) tested only the initial rate and Rule 1/2 validation, unlike its sibling MM domain which has full closed-form trajectory coverage. Added to caterva/tests/test_mm_competitive_inhibition.py:
 
 - Full-trajectory check against the exact implicit closed form of the apparent-MM ODE (dS/dt = -Vmax*S/(Km_app+S), Km_app = Km*(1+I/Ki); solution Km_app*ln(S0/S)+(S0-S) = Vmax*t), parametrized across first-order/zeroth-order/comparable regimes. Live probe worst residual 9.4e-9.
 - Independent-integrator cross-check vs scipy solve_ivp of the same ODE (max deviation 1.4e-8 live).

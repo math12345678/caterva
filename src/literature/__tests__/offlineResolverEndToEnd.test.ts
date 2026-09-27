@@ -14,7 +14,7 @@ import { resolveKinetic, ResolverUnavailableError } from '../literatureResolver'
  * "not verified", which was honest and was not a substitute for verifying
  * it.
  *
- * `TERRIUM_LITERATURE_RUNNER` is a seam that already existed for exactly
+ * `CATERVA_LITERATURE_RUNNER` is a seam that already existed for exactly
  * this. These tests point it at a stub and exercise spawn, stdin, exit
  * code and stdout parsing — the boundary where every bug in this path has
  * actually been.
@@ -30,15 +30,15 @@ const STUB = path.resolve(
   '../../../Tests/fixtures/offline_runner/stub_literature_runner.py',
 );
 
-const original = process.env['TERRIUM_LITERATURE_RUNNER'];
+const original = process.env['CATERVA_LITERATURE_RUNNER'];
 
 beforeAll(() => {
-  process.env['TERRIUM_LITERATURE_RUNNER'] = STUB;
+  process.env['CATERVA_LITERATURE_RUNNER'] = STUB;
 });
 
 afterAll(() => {
-  if (original === undefined) delete process.env['TERRIUM_LITERATURE_RUNNER'];
-  else process.env['TERRIUM_LITERATURE_RUNNER'] = original;
+  if (original === undefined) delete process.env['CATERVA_LITERATURE_RUNNER'];
+  else process.env['CATERVA_LITERATURE_RUNNER'] = original;
 });
 
 jest.setTimeout(120_000);
@@ -129,7 +129,7 @@ describe('the failure the boundary actually has', () => {
     // The bug this whole approach exists to catch: a structured error on
     // stdout, discarded because the process also exited non-zero, and
     // replaced with "exited with code 1".
-    process.env['TERRIUM_LITERATURE_RUNNER'] = path.resolve(
+    process.env['CATERVA_LITERATURE_RUNNER'] = path.resolve(
       __dirname,
       '../../../Tests/fixtures/offline_runner/stub_failing_runner.py',
     );
@@ -144,12 +144,12 @@ describe('the failure the boundary actually has', () => {
       // The REASON must survive, not just the failure.
       expect((err as Error).message).toContain('403');
     } finally {
-      process.env['TERRIUM_LITERATURE_RUNNER'] = STUB;
+      process.env['CATERVA_LITERATURE_RUNNER'] = STUB;
     }
   });
 
   it('treats a missing runner as unavailable, not as an empty result', async () => {
-    process.env['TERRIUM_LITERATURE_RUNNER'] = path.resolve(
+    process.env['CATERVA_LITERATURE_RUNNER'] = path.resolve(
       __dirname,
       '../../../Tests/fixtures/offline_runner/does_not_exist.py',
     );
@@ -158,7 +158,7 @@ describe('the failure the boundary actually has', () => {
         resolveKinetic({ ...QUERY, quantity: 'km' }),
       ).rejects.toThrow();
     } finally {
-      process.env['TERRIUM_LITERATURE_RUNNER'] = STUB;
+      process.env['CATERVA_LITERATURE_RUNNER'] = STUB;
     }
   });
 });

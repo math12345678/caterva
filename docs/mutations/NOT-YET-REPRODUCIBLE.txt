@@ -118,7 +118,7 @@
        # refused outright when tried, reporting that the baseline ran no
        # tests rather than grading one.
        # CLEARABLE BY: giving those two guards a --selftest, which puts
-       # them under Terium/tests/test_guard_selftests.py and inside
+       # them under caterva/tests/test_guard_selftests.py and inside
        # mutate.py's reach. Not done here; it is a change to the guards,
        # not to the record of this pass.
        # another agent's, mid-pass. Asked, not claimed: re-deriving it

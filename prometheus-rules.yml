@@ -1,42 +1,42 @@
-# Prometheus Alert Rules for Terrium
+# Prometheus Alert Rules for Caterva
 
 groups:
-  - name: terrium_alerts
+  - name: caterva_alerts
     interval: 30s
     rules:
       # Alert when success rate drops below 90%
       - alert: LowSuccessRate
-        expr: terrium_success_rate < 90
+        expr: caterva_success_rate < 90
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Terrium success rate is low"
+          summary: "Caterva success rate is low"
           description: "Success rate is {{ $value }}%. Consider investigating failed queries."
 
       # Alert when success rate drops below 75%
       - alert: CriticalSuccessRateLow
-        expr: terrium_success_rate < 75
+        expr: caterva_success_rate < 75
         for: 5m
         labels:
           severity: critical
         annotations:
-          summary: "CRITICAL: Terrium success rate is critically low"
+          summary: "CRITICAL: Caterva success rate is critically low"
           description: "Success rate is {{ $value }}%. Immediate attention required."
 
       # Alert when average execution time exceeds 1 second
       - alert: SlowExecutionTime
-        expr: terrium_execution_time_avg_ms > 1000
+        expr: caterva_execution_time_avg_ms > 1000
         for: 10m
         labels:
           severity: warning
         annotations:
-          summary: "Terrium execution time is slow"
+          summary: "Caterva execution time is slow"
           description: "Average execution time is {{ $value }}ms (>1s threshold)."
 
       # Alert when too many slow queries
       - alert: TooManySlowQueries
-        expr: terrium_slow_queries_total > 20
+        expr: caterva_slow_queries_total > 20
         for: 5m
         labels:
           severity: warning
@@ -46,7 +46,7 @@ groups:
 
       # Alert when failures exceed 10
       - alert: MultipleFailedQueries
-        expr: terrium_failed_queries_total > 10
+        expr: caterva_failed_queries_total > 10
         for: 5m
         labels:
           severity: warning
@@ -56,7 +56,7 @@ groups:
 
       # Alert when standard deviation is high (inconsistent performance)
       - alert: HighPerformanceVariance
-        expr: terrium_execution_time_stddev_ms > (terrium_execution_time_avg_ms * 0.5)
+        expr: caterva_execution_time_stddev_ms > (caterva_execution_time_avg_ms * 0.5)
         for: 10m
         labels:
           severity: info
@@ -66,7 +66,7 @@ groups:
 
       # Alert when a model's success rate is low
       - alert: ModelLowSuccessRate
-        expr: terrium_model_success_rate < 85
+        expr: caterva_model_success_rate < 85
         for: 5m
         labels:
           severity: warning
@@ -76,7 +76,7 @@ groups:
 
       # Alert when median execution time exceeds threshold
       - alert: HighMedianExecutionTime
-        expr: terrium_execution_time_median_ms > 500
+        expr: caterva_execution_time_median_ms > 500
         for: 10m
         labels:
           severity: info

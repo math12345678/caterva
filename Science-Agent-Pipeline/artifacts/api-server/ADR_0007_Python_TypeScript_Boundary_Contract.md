@@ -6,7 +6,7 @@
 
 ## Problem
 
-The Terrium pipeline bridges Python (Terium engine) and TypeScript (API server). The two layers must agree on:
+The Caterva pipeline bridges Python (Caterva engine) and TypeScript (API server). The two layers must agree on:
 
 1. **Which domains exist** (16 total: 14 primary API, 2 engine-internal, 1 escape hatch)
 2. **What parameters each domain accepts** (structure and type)
@@ -22,12 +22,12 @@ Misalignment causes:
 **Automated contract verification between layers:**
 
 1. **Single source of truth: Python DISPATCH**
-   - `src/lib/terium_runner.py` defines DISPATCH: `{domain → handler function}`
+   - `src/lib/caterva_runner.py` defines DISPATCH: `{domain → handler function}`
    - This is the engine's canonical list of what it can do
    - Must have exactly 16 entries
 
 2. **TypeScript mirrors this in two places:**
-   - `src/lib/teriumRunner.ts`: `SimulationDomain` type enum (all 16 domains)
+   - `src/lib/catervaRunner.ts`: `SimulationDomain` type enum (all 16 domains)
    - `src/__tests__/llmProviders.test.ts`: Validates SUPPORTED_DOMAINS against schema (14 primary only)
 
 3. **Automated test enforcement:**
@@ -68,12 +68,12 @@ Escape Hatch (1) - raw SBML:
 
 Each domain must have:
 
-1. **Python side** (`terium_runner.py`):
+1. **Python side** (`caterva_runner.py`):
    - Entry in DISPATCH dict
    - Handler function (e.g., `run_sir()`)
    - Parameter validation in that function
 
-2. **TypeScript side** (`teriumRunner.ts` + `schemas.ts`):
+2. **TypeScript side** (`catervaRunner.ts` + `schemas.ts`):
    - Entry in SimulationDomain union type
    - Entry in SimulationParameterSchemas with Zod validation
    - Literature citations and domain defaults (for keyword fallback)
@@ -91,7 +91,7 @@ Each domain must have:
 **Making changes:**
 
 1. **Adding a new domain:**
-   - Add handler to `terium_runner.py`
+   - Add handler to `caterva_runner.py`
    - Add to DISPATCH
    - Add type to TypeScript SimulationDomain
    - Add schema to SimulationParameterSchemas
@@ -110,7 +110,7 @@ Each domain must have:
 
 **Why automated tests matter:**
 
-The test `llmProviders.test.ts` reads `terium_runner.py` at runtime, extracts the DISPATCH dict, and verifies TypeScript knows about all primary domains. If you add a domain to Python but forget TypeScript, the build fails. This prevents silent drift.
+The test `llmProviders.test.ts` reads `caterva_runner.py` at runtime, extracts the DISPATCH dict, and verifies TypeScript knows about all primary domains. If you add a domain to Python but forget TypeScript, the build fails. This prevents silent drift.
 
 ## Related ADRs
 
@@ -120,7 +120,7 @@ The test `llmProviders.test.ts` reads `terium_runner.py` at runtime, extracts th
 
 ## References
 
-- DISPATCH table: `src/lib/terium_runner.py` lines ~650–680
-- TypeScript mirror: `src/lib/teriumRunner.ts` line ~13
+- DISPATCH table: `src/lib/caterva_runner.py` lines ~650–680
+- TypeScript mirror: `src/lib/catervaRunner.ts` line ~13
 - Contract test: `src/__tests__/llmProviders.test.ts` line ~75
 - OpenAPI spec: `lib/api-spec/openapi.yaml` (SimulationResponse.domain enum)

@@ -495,7 +495,7 @@ curl http://localhost:3000/api/analyze/sweep/sweep_xyz
 
 ## 🎉 Summary
 
-Terrium has been transformed from a capable simulation platform into an enterprise-grade scientific research system with:
+Caterva has been transformed from a capable simulation platform into an enterprise-grade scientific research system with:
 
 - **Complete data export** for all result types
 - **Advanced analysis** capabilities for job comparison

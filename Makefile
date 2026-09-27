@@ -1,9 +1,9 @@
-# Terrium developer commands.
+# Caterva developer commands.
 # Run `make` with no arguments to see what's available.
 
 PYTHON  ?= python3
-TERRIUM_PYTHON ?=
-TERRIUM_PYTHON_ABS := $(if $(TERRIUM_PYTHON),$(if $(filter /%,$(TERRIUM_PYTHON)),$(TERRIUM_PYTHON),$(CURDIR)/$(TERRIUM_PYTHON)),)
+CATERVA_PYTHON ?=
+CATERVA_PYTHON_ABS := $(if $(CATERVA_PYTHON),$(if $(filter /%,$(CATERVA_PYTHON)),$(CATERVA_PYTHON),$(CURDIR)/$(CATERVA_PYTHON)),)
 VENV    := .venv
 
 # A Windows virtualenv puts its entry points in Scripts\, not bin/. This is
@@ -18,7 +18,7 @@ BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 .PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all dmg setup-js cite release-artifacts release-app
 
 help:
-	@echo "Terrium"
+	@echo "Caterva"
 	@echo ""
 	@echo "  make demo       SEE A REAL REPORT -- 30s, no network, no account"
 	@echo "  make cite       REAL CONSTANTS WITH CITATIONS, for your own enzyme:"
@@ -28,16 +28,16 @@ help:
 	@echo "  make check      verify the environment actually works"
 	@echo "  make test       run every test suite"
 	@echo "  make test-fast  skip the slow property/robustness suites"
-	@echo "  make test-sim   simulation engine only (Terium/)"
+	@echo "  make test-sim   simulation engine only (caterva/)"
 	@echo "  make test-lit   literature layer only (Tests/)"
 	@echo "  make guards     the guards CI runs (no test suites)"
 	@echo "  make counts-fix update README counts after adding a test/guard/ADR"
 	@echo "  make pr         everything CI runs -- do this before opening a PR"
-	@echo "  make cli        Terium CLI help (python -m Terium.cli)"
+	@echo "  make cli        Caterva CLI help (python -m caterva.cli)"
 	@echo "  make clean      remove caches and build artifacts"
 	@echo ""
 	@echo "  make publish-check   all offline checks before going public"
-	@echo "  make evidence        measured figures, for writing about Terrium"
+	@echo "  make evidence        measured figures, for writing about Caterva"
 	@echo "  make release-artifacts  wheel + sdist into dist/, as CI builds them"
 	@echo "  make release-app        the one-folder app (needs requirements-release.txt)"
 	@echo ""
@@ -116,8 +116,8 @@ doctor:
 PY := $(shell \
 	is_supported() { "$$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12), (3, 13)) else 1)' >/dev/null 2>&1; }; \
 	is_usable() { "$$1" -c 'import pytest' >/dev/null 2>&1; }; \
-	if [ -n "$(TERRIUM_PYTHON_ABS)" ]; then \
-		if [ -x "$(TERRIUM_PYTHON_ABS)" ] && is_supported "$(TERRIUM_PYTHON_ABS)"; then echo "$(TERRIUM_PYTHON_ABS)"; else echo ""; fi; \
+	if [ -n "$(CATERVA_PYTHON_ABS)" ]; then \
+		if [ -x "$(CATERVA_PYTHON_ABS)" ] && is_supported "$(CATERVA_PYTHON_ABS)"; then echo "$(CATERVA_PYTHON_ABS)"; else echo ""; fi; \
 	elif [ -n "$$VIRTUAL_ENV" ]; then \
 		if [ -x "$$VIRTUAL_ENV/bin/python" ] && is_supported "$$VIRTUAL_ENV/bin/python"; then echo "$$VIRTUAL_ENV/bin/python"; else echo ""; fi; \
 	elif [ -x "$(BIN)/python" ] && is_supported "$(BIN)/python"; then \
@@ -145,7 +145,7 @@ check-python:
 	@if [ -z "$(PY)" ]; then \
 		echo "No supported Python 3.10-3.13 interpreter found."; \
 		echo ""; \
-		echo "Terrium pins libroadrunner 2.8.0 and numpy 2.2.6, which publish"; \
+		echo "Caterva pins libroadrunner 2.8.0 and numpy 2.2.6, which publish"; \
 		echo "wheels for Python 3.10 through 3.13. Install one of python3.13,"; \
 		echo "python3.12, python3.11 or python3.10, then:"; \
 		echo ""; \
@@ -191,25 +191,25 @@ check: check-python
 
 test: require-pytest
 	@echo ">> simulation engine"
-	@cd Terium && "$(PY)" -m pytest
+	@cd Caterva && "$(PY)" -m pytest
 	@echo ""
 	@echo ">> literature layer"
 	@cd Tests && "$(PY)" -m pytest
 
 test-fast: require-pytest
-	@cd Terium && "$(PY)" -m pytest \
+	@cd Caterva && "$(PY)" -m pytest \
 		--ignore=tests/test_properties.py \
 		--ignore=tests/test_numerical_robustness.py
 	@cd Tests && "$(PY)" -m pytest
 
 test-sim: require-pytest
-	@cd Terium && "$(PY)" -m pytest
+	@cd Caterva && "$(PY)" -m pytest
 
 test-lit: require-pytest
 	@cd Tests && "$(PY)" -m pytest
 
 test-slow: require-pytest
-	@cd Terium && "$(PY)" -m pytest tests/test_properties.py \
+	@cd Caterva && "$(PY)" -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
 
 # The guards CI runs, in CI's order, minus the test suites -- plus the
@@ -370,12 +370,12 @@ pr: guards test
 # nobody had ever seen it without being told how. Possible only since
 # `report` learned `--fixture` (ADR 0149).
 # Everything checkable before publishing, in one command. Publication is
-# the last thing between Terrium and anybody using it, and PUBLISHING.md is
+# the last thing between Caterva and anybody using it, and PUBLISHING.md is
 # a careful five-section manual procedure — which is exactly the kind of
 # thing that gets put off. This says either "the only thing left is the
 # push" or precisely what is not ready, and is honest that it cannot see
 # GitHub.
-# The numbers a paper about Terrium would need, each computed by the run
+# The numbers a paper about Caterva would need, each computed by the run
 # rather than transcribed. Every figure carries the command that produced
 # it, and anything that cannot be measured offline is printed as "not
 # measurable here" with the reason rather than estimated.
@@ -486,12 +486,12 @@ cite: check-python
 		$(if $(FIXTURE),--fixture "$(FIXTURE)",)
 
 cli: check-python
-	@"$(PY)" -m Terium.cli --help
+	@"$(PY)" -m caterva.cli --help
 	@echo ""
 	@echo "Examples:"
-	@echo "  python -m Terium.cli wf --population-size 100 --generations 200 --seed 42"
-	@echo "  python -m Terium.cli wf --scenario bottleneck --out results.csv"
-	@echo "  python -m Terium.cli kimura --p0 0.3 --s 0.03 --population-size 50"
+	@echo "  python -m caterva.cli wf --population-size 100 --generations 200 --seed 42"
+	@echo "  python -m caterva.cli wf --scenario bottleneck --out results.csv"
+	@echo "  python -m caterva.cli kimura --p0 0.3 --s 0.03 --population-size 50"
 
 clean:
 	find . -type d -name __pycache__ -not -path "./.venv/*" -exec rm -rf {} + 2>/dev/null || true

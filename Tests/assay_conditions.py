@@ -7,7 +7,7 @@ text in the row's commentary cell, e.g.::
     inhibition assay, pH 7.4, 37°C
     pH 8.0, temperature not specified in the publication, healthy breast tissue
 
-Terrium already captured that string (``BRENDAKmEntry.conditions``) and never
+Caterva already captured that string (``BRENDAKmEntry.conditions``) and never
 read it. This module parses it into structured fields.
 
 Why this matters, and why it is not bookkeeping

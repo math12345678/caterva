@@ -209,7 +209,7 @@ app.use(express.json({ limit: '1mb' }));
 ### Nginx Rate Limiting (Production)
 
 ```nginx
-# /etc/nginx/sites-enabled/terrium
+# /etc/nginx/sites-enabled/caterva
 
 # Rate limit: 10 requests/second, burst 20
 limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
@@ -405,7 +405,7 @@ running server.
 GROQ_API_KEY=gsk_...  # Git will find this!
 
 # ✅ Use secrets manager
-aws secretsmanager create-secret --name terrium/groq-api-key
+aws secretsmanager create-secret --name caterva/groq-api-key
 ```
 
 ```typescript
@@ -422,7 +422,7 @@ export async function getSecret(name: string): Promise<string> {
 
 export async function loadEnv() {
   if (process.env.NODE_ENV === 'production') {
-    const groqKey = await getSecret('terrium/groq-api-key');
+    const groqKey = await getSecret('caterva/groq-api-key');
     process.env.GROQ_API_KEY = groqKey;
   }
 }
@@ -598,8 +598,8 @@ sudo ufw allow from 10.0.0.10 to any port 5432
 
 ```hcl
 # terraform/security_group.tf
-resource "aws_security_group" "terrium_api" {
-  name = "terrium-api"
+resource "aws_security_group" "caterva_api" {
+  name = "caterva-api"
   
   # Inbound: Only from ALB
   ingress {
@@ -667,10 +667,10 @@ logger.info({ jobId, domain, parameters }, "Simulation started");
 
 ```bash
 # 14-day retention
-logrotate /etc/logrotate.d/terrium
+logrotate /etc/logrotate.d/caterva
 
 # Archive to S3 after rotation
-s3cmd sync /var/log/terrium/ s3://terrium-logs-archive/
+s3cmd sync /var/log/caterva/ s3://caterva-logs-archive/
 ```
 
 ### Log Integrity (Optional)
@@ -868,7 +868,7 @@ npm install -g dependency-check
 dependency-check --scan .
 
 # Container scanning (if using Docker)
-docker scan terrium-api:latest
+docker scan caterva-api:latest
 
 # SAST (Static Application Security Testing)
 npm install -g semgrep

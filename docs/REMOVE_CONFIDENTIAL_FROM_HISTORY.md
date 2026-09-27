@@ -1,6 +1,25 @@
 # Removing the confidential documents from git history
 
-**Status: not done. This is a runbook, not a record of work.**
+**Status: done, 2026-09-27**, when the repository went public. What was run
+differs from the commands below in three ways, recorded here so nobody
+repeats the analysis:
+
+- `git filter-branch --index-filter` was used, not `git filter-repo`, which
+  could not be installed in the environment that did it. Same effect.
+- The removal list grew to the whole `Business/` folder (cap table,
+  fundraising tracker, incorporation notes, build records) and
+  `terrium_pitch_deck.pptx`, as well as the seven files below.
+- It ran on a throwaway mirror clone; every branch and tag (37 refs) was
+  force-pushed, with the Release workflow paused during the push so 20
+  rewritten tags did not trigger 20 builds. Every GitHub Release kept its
+  downloads.
+
+Verified afterwards: none of those paths is reachable from any branch or
+tag. **Still open:** GitHub serves old commits by ID until its own garbage
+collection runs, and pull requests hold references to them; the owner has
+been asked to file the support request in `docs/OWNER_CHECKLIST.md`, Step 2.
+
+The runbook as written before it was carried out follows.
 
 `61630fe` removed seven confidential documents from the *current* tree. They
 are still in every earlier commit, and those commits are on GitHub. This
@@ -16,13 +35,13 @@ Seven files, each marked **"Confidential"** on its own pages, one also marked
 **"Internal Use Only"**:
 
 ```
-Docw/terrium_full.docx                    also: claims "Tellurium integration"
-Docw/terrium_spec.docx                    also: 4 Tellurium claims
-Docw/terrium_mvp_timeline.docx
-Docw/terrium_poc_results.docx
-Docw/terrium_technical_implementation.docx
-Science-Agent-Pipeline/attached_assets/terrium_full_1784327975531.docx
-Science-Agent-Pipeline/attached_assets/terrium_spec_1784327975531.docx
+Docw/caterva_full.docx                    also: claims "Tellurium integration"
+Docw/caterva_spec.docx                    also: 4 Tellurium claims
+Docw/caterva_mvp_timeline.docx
+Docw/caterva_poc_results.docx
+Docw/caterva_technical_implementation.docx
+Science-Agent-Pipeline/attached_assets/caterva_full_1784327975531.docx
+Science-Agent-Pipeline/attached_assets/caterva_spec_1784327975531.docx
 ```
 
 Verified reachable from `origin/main` — they were pushed, not merely committed
@@ -84,13 +103,13 @@ pip install git-filter-repo
 # Work on a throwaway clone. filter-repo refuses to run on a repo with a
 # remote by default, and that default is protecting you.
 cd ..
-git clone --no-local terrium terrium-rewrite
-cd terrium-rewrite
+git clone --no-local caterva caterva-rewrite
+cd caterva-rewrite
 
 git filter-repo \
   --path Docw/ \
-  --path Science-Agent-Pipeline/attached_assets/terrium_full_1784327975531.docx \
-  --path Science-Agent-Pipeline/attached_assets/terrium_spec_1784327975531.docx \
+  --path Science-Agent-Pipeline/attached_assets/caterva_full_1784327975531.docx \
+  --path Science-Agent-Pipeline/attached_assets/caterva_spec_1784327975531.docx \
   --invert-paths
 ```
 
@@ -101,13 +120,13 @@ Verify before pushing anything:
 git log --all --oneline -- Docw/ | head
 
 # Must print nothing.
-git rev-list --objects --all | grep -i 'terrium_spec\|terrium_full' | head
+git rev-list --objects --all | grep -i 'caterva_spec\|caterva_full' | head
 ```
 
 Then, and only after reading Step 2:
 
 ```bash
-git remote add origin https://github.com/math12345678/terrium.git
+git remote add origin https://github.com/math12345678/caterva.git
 git push --force --all origin
 git push --force --tags origin
 ```

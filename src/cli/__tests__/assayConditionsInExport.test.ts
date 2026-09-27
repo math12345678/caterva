@@ -21,7 +21,7 @@ import path from 'path';
 import { exportModel, type ModelExportRequest } from '../exportArtifacts';
 
 async function destination(name: string): Promise<string> {
-  const directory = await mkdtemp(path.join(tmpdir(), 'terrium-assay-'));
+  const directory = await mkdtemp(path.join(tmpdir(), 'caterva-assay-'));
   return path.join(directory, name);
 }
 

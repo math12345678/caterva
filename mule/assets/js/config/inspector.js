@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — inspection content
+   caterva — inspection content
 
    Every inspectable node resolves to a record with the same
    schema, because the promise of the product is that any object
@@ -20,7 +20,7 @@
    ============================================================ */
 
 const DEMO_NOTE =
-  'Illustrative demonstration of Terrium\u2019s evidence-trail interface. Not a research-ready parameter recommendation.';
+  'Illustrative demonstration of Caterva\u2019s evidence-trail interface. Not a research-ready parameter recommendation.';
 
 /* The ordered spine of the run. Used to derive each record's position in the
    chain of custody, so the trail statement can never drift out of step with
@@ -141,7 +141,7 @@ export const INSPECTOR = {
     event: 'Docked on the right of the assembly core, tied to the tolerance berth.',
     trail: 'Supports the numerical method rather than the biology.',
     /* Not "browser numerical integration": this run routed away from the
-       browser, and Terrium's ODE path is libroadrunner. See architecture.js. */
+       browser, and Caterva's ODE path is libroadrunner. See architecture.js. */
     scope: 'Local ODE runtime / numerical integration',
     path: ['literature-retrieval', 'ev-ode', 'p-tol', 'compute-router'],
     note: 'Describes how the system is solved, not what the result means.'
@@ -341,7 +341,7 @@ export const PARAM_INSPECTOR = {
     event: 'Traced to its method record by sentinel 01.',
     trail: 'Value \u2192 method record \u2014 ODE solution.',
     /* Not "browser numerical integration": this run routed away from the
-       browser, and Terrium's ODE path is libroadrunner. See architecture.js. */
+       browser, and Caterva's ODE path is libroadrunner. See architecture.js. */
     scope: 'Local ODE runtime / numerical integration',
     path: ['p-tol', 'ev-ode', 'compute-router', 's-hallucination'],
     note: DEMO_NOTE

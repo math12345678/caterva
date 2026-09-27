@@ -3,11 +3,11 @@
  *
  * WHAT THIS REPLACES
  *
- * Terrium's domain set is a closed catalogue, and it is written down four
- * times: `SimulationDomain` here in teriumRunner.ts (16 members),
+ * Caterva's domain set is a closed catalogue, and it is written down four
+ * times: `SimulationDomain` here in catervaRunner.ts (16 members),
  * `SUPPORTED_DOMAINS` in llmResolver.ts (13, which TypeScript never checks
  * against the union), `DOMAIN_DEFAULTS` in queryResolver.ts (15), and
- * `DISPATCH` in terium_runner.py -- kept in agreement by a test rather than
+ * `DISPATCH` in caterva_runner.py -- kept in agreement by a test rather than
  * by derivation. `SimulationParameterSchemas` is a Record total over the
  * union, so every domain also needs a hand-written Zod schema.
  *
@@ -25,8 +25,8 @@
  *
  * Whether the rate laws refer to symbols that exist, whether the
  * stoichiometry is coherent, and whether every quantity is sourced. Those
- * are checked ONCE, in `Terium/core/network.py` and
- * `Terium/core/network_provenance.py`, at the engine boundary.
+ * are checked ONCE, in `caterva/core/network.py` and
+ * `caterva/core/network_provenance.py`, at the engine boundary.
  *
  * That is deliberate. Re-implementing them here would create a second
  * enforcer of the same rules in a different language, and two enforcers of
@@ -39,7 +39,7 @@
 import { z } from "zod";
 
 /**
- * An Antimony identifier, as `Terium/core/network.py` defines one.
+ * An Antimony identifier, as `caterva/core/network.py` defines one.
  *
  * Kept deliberately strict and in step with the engine: this is the
  * alphabet a rate law is tokenised against there, so a laxer rule here
@@ -58,7 +58,7 @@ const Identifier = z
 /**
  * Stoichiometric coefficients: species id -> whole number.
  *
- * Integers only. Antimony accepts fractional stoichiometry; Terrium does
+ * Integers only. Antimony accepts fractional stoichiometry; Caterva does
  * not, because a fractional coefficient makes the conservation laws derived
  * from the stoichiometry matrix meaningless as counts of anything.
  */

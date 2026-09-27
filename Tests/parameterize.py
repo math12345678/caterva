@@ -7,7 +7,7 @@ each constant the model needs, search BRENDA and the literature, pick a
 value, record where it came from, and -- the part that is easy to forget --
 check that the values chosen are mutually usable.
 
-Terrium already does the per-parameter half well. `fallback_logic` resolves
+Caterva already does the per-parameter half well. `fallback_logic` resolves
 one constant with its organism, its assay conditions and a citation, and
 `provenance.ts` refuses anything unsourced. What has never existed is the
 whole-model half: resolve everything the model needs, judge the set, and
@@ -153,7 +153,7 @@ class ParameterizationReport:
                     for r in self.missing
                 )
                 + ". Those are the measurements that would complete this "
-                "model; Terrium does not fill them in."
+                "model; Caterva does not fill them in."
             )
 
         lines.append(self.compatibility.summary())
@@ -200,7 +200,7 @@ def requests_for_network(
 ) -> List[ParameterRequest]:
     """Turn a model's own quantity list into lookup requests.
 
-    Pairs with `Terium/core/network.py`'s `quantity_ids()`, so a
+    Pairs with `caterva/core/network.py`'s `quantity_ids()`, so a
     constructed model can be handed straight to the literature layer
     without anyone re-listing what it needs -- the list that used to be
     re-typed per domain, and drifted.

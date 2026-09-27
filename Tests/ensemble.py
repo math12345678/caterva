@@ -20,7 +20,7 @@ Reproducibility), the same day, having been told about both options:
      any simulation, with Barbara's you can sample and get an ensemble
      distribution. **That is the right way to do it.**"
 
-Terrium shipped the scoring — `reliability.py` grades every value on exactly
+Caterva shipped the scoring — `reliability.py` grades every value on exactly
 the three axes Bakker names — and then used the scores to pick ONE number.
 The sampling half was recorded as "declined". This module is that half.
 
@@ -34,7 +34,7 @@ being waved away:
     nothing of the kind.
 
 Bakker's published ensemble has a rejection step — models are validated
-against measured flux and the failures are discarded. Terrium has no such
+against measured flux and the failures are discarded. Caterva has no such
 data and does not pretend to. So what comes out of here is **not** an
 uncertainty estimate, not a confidence interval, and not a posterior.
 
@@ -67,7 +67,7 @@ answered:
 
     "Combining the axes needs to know how a right-species value with a bad
      assay description trades off against a thorough assay in the wrong
-     species. That trade-off is an empirical finding Terrium does not have."
+     species. That trade-off is an empirical finding Caterva does not have."
 
 Sampling needs a scalar. There is no way around that, so the numbers below
 are **chosen, not measured**, and this module says so everywhere rather than
@@ -206,7 +206,7 @@ class EnsembleResult:
 
 
 #: Travels with the numbers. See the module docstring: Bakker's ensemble
-#: rejects against measured flux, and Terrium has no such data.
+#: rejects against measured flux, and Caterva has no such data.
 DISCLAIMER = (
     "This is the spread of published measurements, weighted by how well "
     "evidenced each one is. It is NOT an uncertainty estimate: there is no "
@@ -635,7 +635,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _root = str(_pathlib.Path(__file__).resolve().parent.parent)
         if _root not in sys.path:
             sys.path.insert(0, _root)
-        import Terium.terium_engine as _engine
+        import caterva.caterva_engine as _engine
 
         simulate_fn = getattr(_engine, f"simulate_{args.simulate}", None)
         if simulate_fn is None:

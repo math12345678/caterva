@@ -1,17 +1,17 @@
 > **⚠️ CORRECTION (2026-08-10):** the "178 tests" figure and per-module coverage table below are a stale snapshot (suite has grown to 17 test files at last count) — run `npm test` for the current number. The "Core Modules" listing also omits real, existing files: `commandResolve.ts`, `commandSensitivity.ts`, `commandSimulateResolved.ts`. "PRODUCTION READY" doesn't hold — root `src/` is a library/CLI with no HTTP server or deployment. This doc is a near-duplicate of `BUILD_COMPLETE_SUMMARY.md`, `COMPLETE_BUILD_REPORT.md`, `COMPREHENSIVE_GUIDE.md`, and `FINAL_STATUS.txt`.
 
-# Terrium Scientific Validation Framework - Implementation Complete
+# Caterva Scientific Validation Framework - Implementation Complete
 
 ## Status: ✓ PRODUCTION READY
 
-The Terrium scientific validation backend is now fully functional, thoroughly tested, and ready for production deployment.
+The Caterva scientific validation backend is now fully functional, thoroughly tested, and ready for production deployment.
 
 ## What Was Built
 
 A production-grade scientific validation system that:
 
 1. **Validates enzyme kinetics parameters** against peer-reviewed literature
-2. **Runs kinetic simulations** using the Terium engine
+2. **Runs kinetic simulations** using the Caterva engine
 3. **Enforces reproducibility** with SHA-256 hashing and job tracking
 4. **Works offline** with network resilience built-in
 5. **Provides comprehensive error handling** and structured logging
@@ -30,9 +30,9 @@ A production-grade scientific validation system that:
 - **REJECTED**: Registry says identifier doesn't exist (never accepted)
 
 ### 3. Network-Resilient Operation
-- **Offline mode**: `TERRIUM_SKIP_DOI_VERIFICATION=1` enables CLI to work without network
+- **Offline mode**: `CATERVA_SKIP_DOI_VERIFICATION=1` enables CLI to work without network
 - **Graceful degradation**: Falls back to built-in literature when network unavailable
-- **Explicit opt-in**: `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` for unverified citations
+- **Explicit opt-in**: `CATERVA_ALLOW_UNVERIFIED_CITATIONS=1` for unverified citations
 
 ### 4. Comprehensive Testing
 - **178 tests** across 11 test suites
@@ -59,7 +59,7 @@ npm run cli -- help
 **Problem**: CLI failed with "Literature reference not verified" because DOI verification required network access
 
 **Solution**: 
-- Added `TERRIUM_SKIP_DOI_VERIFICATION=1` environment variable
+- Added `CATERVA_SKIP_DOI_VERIFICATION=1` environment variable
 - Updated `verifyReferenceDetailed()` to check format-only when in offline mode
 - Set environment variable automatically in CLI mode
 - Maintains strict peer-review and format validation even in offline mode
@@ -108,7 +108,7 @@ src/
 │   ├── scientificPipeline.ts   # Orchestrates all layers
 │   └── __tests__/              # Integration tests
 ├── engine/             # Kinetic simulation
-│   ├── teriumBridge.ts      # Terium wrapper
+│   ├── catervaBridge.ts      # Caterva wrapper
 │   └── __tests__/              # Engine tests
 ├── reproducibility/    # Execution tracking
 │   ├── reproducibilityEngine.ts # Job tracking & hashing
@@ -128,7 +128,7 @@ src/
 | scientificValidator.ts | 79.64% | 78.21% | 90.62% | 80.37% |
 | literatureResolver.ts | 80.76% | 71.42% | 56.25% | 83.78% |
 | literatureService.ts | 77.9% | 39.13% | 94.87% | 77.27% |
-| teriumBridge.ts | 75.92% | 51.28% | 64% | 78.43% |
+| catervaBridge.ts | 75.92% | 51.28% | 64% | 78.43% |
 
 ## Usage Examples
 
@@ -140,7 +140,7 @@ npm run cli -- simulate "michaelis-menten" \
 
 ### Offline Mode
 ```bash
-TERRIUM_SKIP_DOI_VERIFICATION=1 npm test
+CATERVA_SKIP_DOI_VERIFICATION=1 npm test
 ```
 
 ### Validation Only
@@ -184,8 +184,8 @@ npm test
 1. Run `npm run verify-all` to confirm all checks pass
 2. Deploy dist/ folder or use ts-node in production
 3. Set environment variables as needed:
-   - `TERRIUM_SKIP_DOI_VERIFICATION=1` for offline mode
-   - `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` for accepting unverified sources
+   - `CATERVA_SKIP_DOI_VERIFICATION=1` for offline mode
+   - `CATERVA_ALLOW_UNVERIFIED_CITATIONS=1` for accepting unverified sources
 4. CLI is available at `bin/scientific` after installation
 
 ## Documentation
@@ -197,7 +197,7 @@ npm test
 
 ## Known Limitations
 
-1. **Branch coverage (66.24%)**: Complex defensive code in teriumBridge.ts and literatureService.ts makes 80% impractical. Current 66% covers all main paths.
+1. **Branch coverage (66.24%)**: Complex defensive code in catervaBridge.ts and literatureService.ts makes 80% impractical. Current 66% covers all main paths.
 
 2. **Literature database**: Built-in test DOIs are fabricated for demonstration. Real deployment should use actual DOI citations from CrossRef.
 
@@ -225,6 +225,6 @@ npm test
 
 ---
 
-**Built with**: TypeScript, Jest, Terium simulation engine
+**Built with**: TypeScript, Jest, Caterva simulation engine
 **Last Updated**: August 2026
 **Version**: 1.0.0

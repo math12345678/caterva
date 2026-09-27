@@ -55,7 +55,7 @@ stop being a real finding because a *different* parameter could not be
 resolved. The bibliography describes what the literature said, not what the
 simulator managed to do with it.
 
-And the timing matters: a refusal is precisely the moment Terrium is telling
+And the timing matters: a refusal is precisely the moment Caterva is telling
 a student to go and read. Withholding the reference list at that moment is
 the worst available moment to withhold it.
 

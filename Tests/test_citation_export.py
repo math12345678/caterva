@@ -2,7 +2,7 @@
 
 The assertions that matter are the ones about what is NOT emitted. An entry
 that imports cleanly and is fiction would enter someone's bibliography and
-be cited onward with Terrium's name on it.
+be cited onward with Caterva's name on it.
 """
 from __future__ import annotations
 
@@ -105,9 +105,9 @@ def test_two_parameters_from_one_reference_get_distinct_keys():
     out = to_bibtex([KM, SAME_REFERENCE_AS_KM])
     keys = re.findall(r"@misc\{([^,]+),", out)
     # The property is uniqueness, not the total. The database's own entry
-    # (`terrium-source-*`) is a third block and does not weaken the check --
+    # (`caterva-source-*`) is a third block and does not weaken the check --
     # it is excluded so this still measures the two PARAMETER keys.
-    parameter_keys = [k for k in keys if not k.startswith("terrium-source-")]
+    parameter_keys = [k for k in keys if not k.startswith("caterva-source-")]
     assert len(parameter_keys) == 2
     assert len(set(keys)) == len(keys), f"duplicate BibTeX key in {keys}"
 
@@ -207,7 +207,7 @@ class TestTheNoteMatchesTheEntry:
         # is the absence a user notices, and it was the one absence the
         # note did not mention.
         document = to_bibtex([self.UNTITLED])
-        assert "title = {" not in document.split("@misc{terrium-source-")[0]
+        assert "title = {" not in document.split("@misc{caterva-source-")[0]
         assert "author, year, journal, title are NOT known" in _note_for(self.UNTITLED)
 
     def test_the_answer_is_asked_of_the_citation_not_assumed(self):
@@ -261,7 +261,7 @@ def test_the_script_runs_end_to_end():
     """The regression guard for an import the library tests cannot see.
 
     Measured: `scripts/export_citations.py` died on its import line with
-    `ModuleNotFoundError: No module named 'Terium'` — in HEAD, since
+    `ModuleNotFoundError: No module named 'caterva'` — in HEAD, since
     `citation_export` began reading the shared source table. Its own
     docstring calls it "the reachable end of Tests/citation_export.py --
     which was built and then callable from nowhere", and it had become
@@ -490,7 +490,7 @@ def test_bibtex_braces_balance():
 # The database itself belongs in the bibliography
 #
 # NOTICE: "If you use BRENDA data in scientific work, cite BRENDA's current
-# publication [...] Citing Terrium is not a substitute for citing BRENDA."
+# publication [...] Citing Caterva is not a substitute for citing BRENDA."
 #
 # The export emitted one record per parameter and no entry for BRENDA, so a
 # student importing it into Zotero would not cite BRENDA -- in the one
@@ -510,7 +510,7 @@ def _brenda_param(parameter: str = "km") -> CitedParameter:
 
 def test_the_bibliography_contains_the_database_not_only_its_records() -> None:
     bib = to_bibtex([_brenda_param()])
-    assert "@misc{terrium-source-brenda," in bib
+    assert "@misc{caterva-source-brenda," in bib
     assert "brenda-enzymes.org/references.php" in bib, (
         "the entry must carry the citation NOTICE asks users to make"
     )
@@ -524,7 +524,7 @@ def test_the_database_entry_invents_no_bibliographic_fields() -> None:
     complete, and be fiction.
     """
     bib = to_bibtex([_brenda_param()])
-    entry = bib[bib.index("@misc{terrium-source-brenda,") :]
+    entry = bib[bib.index("@misc{caterva-source-brenda,") :]
     entry = entry[: entry.index("\n}")]
     for invented in ("author =", "year =", "journal =", "volume ="):
         assert invented not in entry, f"{invented} was fabricated"
@@ -542,7 +542,7 @@ def test_a_run_without_brenda_values_does_not_cite_brenda() -> None:
         citation=Citation(source="PubMed", reference_id="34962677"),
         value=1.0,
     )
-    assert "terrium-source-brenda" not in to_bibtex([pubmed_only])
+    assert "caterva-source-brenda" not in to_bibtex([pubmed_only])
     assert "TY  - DBASE" not in to_ris([pubmed_only])
 
 
@@ -558,4 +558,4 @@ def test_the_ris_export_carries_it_too() -> None:
 def test_the_database_entry_is_emitted_once_for_many_parameters() -> None:
     """Two BRENDA-resolved parameters are two records and one database."""
     bib = to_bibtex([_brenda_param("km"), _brenda_param("ki")])
-    assert bib.count("@misc{terrium-source-brenda,") == 1
+    assert bib.count("@misc{caterva-source-brenda,") == 1

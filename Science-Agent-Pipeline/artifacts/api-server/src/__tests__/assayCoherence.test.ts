@@ -59,7 +59,7 @@ describe("assay coherence — the failure per-parameter scoring cannot see", () 
   });
 
   it("refuses to say whether the divergence matters", () => {
-    // Terrium does not know this enzyme's pH sensitivity. Claiming the
+    // Caterva does not know this enzyme's pH sensitivity. Claiming the
     // model is invalid would be as unsourced as claiming it is fine.
     const report = assessCoherence([KM_AT_74_25, KI_AT_60_37]);
     expect(report.reason).toMatch(/does not know and does not guess/i);

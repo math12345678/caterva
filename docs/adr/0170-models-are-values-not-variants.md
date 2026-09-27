@@ -11,15 +11,15 @@ too broadly stops being read).
 
 ## Context
 
-Terrium's simulable systems were a closed catalogue, and the catalogue was
+Caterva's simulable systems were a closed catalogue, and the catalogue was
 written down four times:
 
 | Where | What | Count |
 |---|---|---|
-| `teriumRunner.ts` | `SimulationDomain`, a string-literal union | 16 |
+| `catervaRunner.ts` | `SimulationDomain`, a string-literal union | 16 |
 | `llmResolver.ts` | `SUPPORTED_DOMAINS`, a second list TypeScript never compares to the union | 13 |
 | `queryResolver.ts` | `DOMAIN_DEFAULTS` | 15 |
-| `terium_runner.py` | `DISPATCH` | 16 |
+| `caterva_runner.py` | `DISPATCH` | 16 |
 
 kept in agreement by a test rather than by derivation, plus
 `SimulationParameterSchemas` — a `Record` *total over the union*, so
@@ -40,13 +40,13 @@ system and it models it.
 
 **Make the model a value.**
 
-`Terium/core/network.py` defines a reaction network as data: species,
+`caterva/core/network.py` defines a reaction network as data: species,
 parameters, reactions with stoichiometry and rate laws, plus rate rules and
 assignment rules, with one compiler to Antimony. Every builder emitted the
 same shape; that shape is now the interface.
 
-`Terium/continuous/networks.py` rebuilds all seven ODE models through it,
-and `Terium/tests/test_network_equivalence.py` integrates each one *both
+`caterva/continuous/networks.py` rebuilds all seven ODE models through it,
+and `caterva/tests/test_network_equivalence.py` integrates each one *both
 ways* and requires the trajectories to agree. Measured, they agree to
 **0.000e+00** at every point of every column, for all seven.
 
@@ -60,7 +60,7 @@ model those fail in the worst direction: a parameter the catalogue never
 heard of has no entry, and **a key with no entry is not judged**. Absence
 reads as consent.
 
-`Terium/core/network_provenance.py` inverts it. The quantities to judge come
+`caterva/core/network_provenance.py` inverts it. The quantities to judge come
 from `network.quantity_ids()` — the model's own — so nobody enumerates them
 in advance. A quantity with *no* source is refused rather than defaulted.
 Species initials are judged, not only parameters. `resolved` without a

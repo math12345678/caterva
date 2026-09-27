@@ -304,7 +304,7 @@ npm run build
 
 ## Production Readiness
 
-**Terrium is production-ready for:**
+**Caterva is production-ready for:**
 - ✅ Research simulations
 - ✅ Educational demonstrations
 - ✅ Batch parameter exploration
@@ -390,7 +390,7 @@ npm run build
 
 ## Bottom Line
 
-Terrium now offers:
+Caterva now offers:
 - ✅ Complete kinetic simulation engine (7 features)
 - ✅ Advanced export capabilities (5 new formats)
 - ✅ Automated analysis features (2 new capabilities)

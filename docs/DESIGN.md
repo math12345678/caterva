@@ -1,11 +1,11 @@
-# Terrium: what it is for, and what it should therefore be
+# Caterva: what it is for, and what it should therefore be
 
 **Status:** Proposed. Nothing below is built yet. This document exists to be
 argued with before code is written.
 
 **Date:** 2026-08-17
 
-**Why it exists:** Terrium has ~115 ADRs, ~800 tests, nine CLI commands, an
+**Why it exists:** Caterva has ~115 ADRs, ~800 tests, nine CLI commands, an
 HTTP API, a dashboard and eighteen repositories. It does not yet have a
 person who uses it. Every pass of work has improved a part; no pass has
 asked whether the parts add up to a tool. This one does.
@@ -17,7 +17,7 @@ asked whether the parts add up to a tool. This one does.
 > **Every number in a simulation says where it came from, and getting the
 > simulation is easy enough that nobody routes around it.**
 
-Both halves are load-bearing, and Terrium currently has one of them.
+Both halves are load-bearing, and Caterva currently has one of them.
 
 The provenance half is genuinely built and genuinely unusual. The easy half
 is not built, and without it the provenance half does not matter — because a
@@ -25,7 +25,7 @@ tool people abandon has no provenance to speak of.
 
 ### The four audiences are one mission, in an order
 
-When asked what Terrium is for, the answer given was "all of the above". That
+When asked what Caterva is for, the answer given was "all of the above". That
 is right, and it is not vague, provided the four are ordered rather than
 pursued at once:
 
@@ -40,14 +40,14 @@ The failure mode of "all of the above" is building for everyone and serving
 nobody. The discipline that prevents it: **when two audiences conflict, the
 teaching lab wins until a teaching lab is actually using it.**
 
-### What Terrium is NOT
+### What Caterva is NOT
 
 Stating this is half the design, because the current codebase quietly tried
 to be several of these.
 
 - **Not a modelling environment.** Tellurium, COPASI and Virtual Cell exist,
   are excellent, and are not what a second-year student needs.
-- **Not a database.** BRENDA is the database. Terrium reads it honestly.
+- **Not a database.** BRENDA is the database. Caterva reads it honestly.
 - **Not a general simulator.** Fifteen domains is not a strength; it is
   fifteen surfaces each shallowly tested. See §5.
 - **Not an AI tool.** Nothing here should guess a scientific value.
@@ -58,7 +58,7 @@ to be several of these.
 
 Four experts replied. Their feedback has been treated as a list of features
 to implement. Read together it is something better: **a specification of the
-one thing Terrium must never do, and the one thing it must always do.**
+one thing Caterva must never do, and the one thing it must always do.**
 
 ### Jeske (BRENDA / DSMZ) — mixing conditions gives "fantasy numbers"
 
@@ -131,13 +131,13 @@ warning at all — a worse outcome, caused by the stricter rule. (That
 sentence is this project's restatement. An earlier draft of this document
 set it in a quotation block as if it were his. It is not.)
 
-Terrium did not merely risk this; **it instructed it.** The error said "Add
+Caterva did not merely risk this; **it instructed it.** The error said "Add
 km=<value> and try again", the user found a real number in a real paper,
-typed it, and Terrium recorded `origin: user`, no citation. A number with a
+typed it, and Caterva recorded `origin: user`, no citation. A number with a
 source in the world, stripped of that source by the tool whose purpose is not
 losing sources.
 
-**Design implication, and it is the central one:** *every* place Terrium
+**Design implication, and it is the central one:** *every* place Caterva
 cannot produce a value must offer a way to supply one **with its source
 attached**. Refusal without a path is a defect, not rigour. This is why §4
 has exactly one refusal shape and it always includes `--cite`.
@@ -161,7 +161,7 @@ product is not a design document. Two things follow.
 **He is right about a class of constants, and it is not this class.** The
 gas constant is well known. Avogadro's number is well known. A Km is not a
 constant in that sense at all — it is a *measurement*, made once, under
-conditions, by someone, and it moves. Terrium's own corpus is the evidence:
+conditions, by someone, and it moves. Caterva's own corpus is the evidence:
 ADR 0033 found the same enzyme reported at 21.1 and 327.2 depending on
 whether an allosteric activator was present, and ADR 0037 found chicken LDH
 at 60 from heart and 1.1 from muscle. Nobody cites *R*. Everybody should
@@ -174,14 +174,14 @@ sympathetic expert think the answer is obvious and the question is silly,
 the pitch is wrong before the code is.
 
 **Design implication:** the spread is not a footnote to the answer — it is
-the argument for the product. Where the literature agrees, Terrium should
+the argument for the product. Where the literature agrees, Caterva should
 say so plainly and Katz's objection holds. Where it disagrees by 15-fold,
 that disagreement is the finding, and it is what §4.2 must show.
 
 ### König (HU Berlin) — the email read as a claim of credit
 
 Handled (naming notice, guards). **Design implication for this document:**
-Terrium's credibility is its only asset. Every design choice that risks
+Caterva's credibility is its only asset. Every design choice that risks
 overclaiming — a confidence number with no basis, a "verified" badge, a
 default that looks measured — costs more than the feature is worth.
 
@@ -191,7 +191,7 @@ ADR 0024 Decision 2 is open: what to do when a value is missing entirely.
 This design answers it, and the answer is neither "refuse" nor "default":
 
 > **Refuse to invent. Never refuse to help.**
-> Terrium always produces either a cited value or a stated, sourced,
+> Caterva always produces either a cited value or a stated, sourced,
 > user-supplied one — and it always makes the second as easy as the first.
 
 ---
@@ -236,12 +236,12 @@ Three structural causes, each of which the new design must not reproduce:
 ### 4.1 One command
 
 ```
-terrium "How does human lactate dehydrogenase behave on pyruvate?"
+caterva "How does human lactate dehydrogenase behave on pyruvate?"
 ```
 
 That is the product. Everything else is a flag on it.
 
-Terrium parses the sentence into a **proposed system** and shows it back:
+Caterva parses the sentence into a **proposed system** and shows it back:
 
 ```
   I read that as:
@@ -252,7 +252,7 @@ Terrium parses the sentence into a **proposed system** and shows it back:
 
 **Confirming is not the same as inferring.** The parse never becomes
 provenance without a human keystroke — this is the constraint that lets
-Terrium accept plain language without violating "never attach a citation to a
+Caterva accept plain language without violating "never attach a citation to a
 system the user did not name". `confirmSystem.ts` already implements this
 correctly and is under-used.
 
@@ -298,7 +298,7 @@ Refusals are unavoidable and correct. What must change is that there is
   YOU CHOOSE  --enzyme-conc 0.01mM      (this is yours to pick, not a gap)
 
   OR CITE     --cite vmax="Smith 2019, PMID 12345"
-              recorded as user-supplied; Terrium does not verify it
+              recorded as user-supplied; Caterva does not verify it
 
   OR WIDEN    --allow-cross-species     related organism, relatedness checked
 ```
@@ -319,7 +319,7 @@ need opposite responses.
 The teaching-lab audience needs enzyme kinetics done perfectly, not
 population genetics done adequately. Fifteen shallow domains is why no path
 is finished. This is the change that will feel like losing work and is the
-one most likely to make Terrium usable.
+one most likely to make Caterva usable.
 
 ### 4.5 The layer, made real
 
@@ -376,7 +376,7 @@ Recorded so it can be challenged rather than discovered later.
   wrong more than occasionally, the feature is noise.
 - ~~**I have not read the professors' emails directly.**~~ **Resolved
   2026-08-18: read in full, and §2 was wrong.** Three errors, all in the
-  same direction — the paraphrase was more favourable to what Terrium had
+  same direction — the paraphrase was more favourable to what Caterva had
   already built than the sources were:
   1. Bakker's ensemble was recorded as "declined, and should stay declined".
      Sauro, shown all three options, called it *"the right way to do it"*,
@@ -396,7 +396,7 @@ Recorded so it can be challenged rather than discovered later.
   specific enough to be checked off:
   - *Bulk CSV download over SOAP* — she gave the exact URLs and the reason
     (she is building a REST API; SOAP would be double work by year end).
-    Terrium still scrapes per-query HTML.
+    Caterva still scrapes per-query HTML.
   - *Check the organisms are closely related enough* — "two different
     mammals instead of a bacterium and a human". §4.3 advertises
     `--allow-cross-species  relatedness checked`; whether the check is real

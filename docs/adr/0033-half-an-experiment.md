@@ -10,7 +10,7 @@ variants), ADR 0031 (commentary coverage, which surfaced this)
 
 ## Context
 
-ADR 0032 taught Terrium to read what an assay contained: which compounds,
+ADR 0032 taught Caterva to read what an assay contained: which compounds,
 present or absent, resolved to a PubChem identity. It answers a question
 about **one row**, and compares **two rows** against each other.
 
@@ -30,7 +30,7 @@ That is a controlled experiment. The authors measured with and without an
 allosteric activator deliberately, and the wild-type arms differ by a factor
 of **15.5** — larger than the twelvefold mutant span that motivated ADR 0029.
 
-Terrium selects `min()`. It takes 21.1 — the activated arm — and reports it
+Caterva selects `min()`. It takes 21.1 — the activated arm — and reports it
 as the enzyme's turnover number, with a real citation, having no idea it
 picked one side of a comparison whose other side sat in the same pool.
 
@@ -55,7 +55,7 @@ The pool contains both arms. That requires knowing nothing about fructose
 
 It does **not** decide which arm is right, and it does not withhold. Choosing
 would mean separating "allosteric effector someone added" from "cosubstrate
-the reaction requires" — a claim about each enzyme's mechanism that Terrium
+the reaction requires" — a claim about each enzyme's mechanism that Caterva
 has no source for. ADR 0032 makes the same point about the NADH rows in this
 corpus, where "present" describes the assay working as intended.
 

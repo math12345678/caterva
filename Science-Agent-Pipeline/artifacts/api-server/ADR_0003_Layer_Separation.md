@@ -57,7 +57,7 @@ In `src/lib/schemas.ts`:
 - Schemas validate structure only
 - Scientific bounds are explicitly excluded (see comments on each schema)
 
-In `src/lib/teriumRunner.ts`:
+In `src/lib/catervaRunner.ts`:
 - Python runner receives pre-validated parameters
 - Engine performs all scientific validation
 - Shape violations never reach the engine (fail fast at API boundary)

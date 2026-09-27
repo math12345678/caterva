@@ -1,5 +1,5 @@
 /**
- * Terrium refused 90% of the queries a lab would type, over numbers that
+ * Caterva refused 90% of the queries a lab would type, over numbers that
  * are not measurements.
  *
  * MEASURED, 2026-09-06. Twenty realistic queries, written before the run
@@ -135,7 +135,7 @@ describe("the guarantee that survives it", () => {
   );
 
   it("labels a defaulted scenario value as a default in the response", async () => {
-    // The value runs, and the caller is told Terrium chose it. A default
+    // The value runs, and the caller is told Caterva chose it. A default
     // that ran silently would be the fabrication this whole change is
     // careful not to become.
     const resolved = await resolveQuery("lotka volterra predator prey");

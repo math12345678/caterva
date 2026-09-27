@@ -1,7 +1,7 @@
 # Repository-wide audit plan
 
 ## Goal
-Inspect the entire Terrium codebase and produce an evidence-backed orientation and risk report without changing product code.
+Inspect the entire Caterva codebase and produce an evidence-backed orientation and risk report without changing product code.
 
 ## Phases
 - [x] Establish repository state, scope, and local instructions.

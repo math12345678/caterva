@@ -5,7 +5,7 @@
 > - "Test counts: 25+ test cases, all passing" (repeated four times) — running `npx jest src/storage/__tests__/metrics-collector.test.ts` this session shows **21** tests, all passing, not 25+.
 > - "Comprehensive Guide (`METRICS_GUIDE.md` - 700+ lines)" — the real file is 522 lines (as originally delivered; 527 after this session's correction banner was added on top).
 > - "Memory usage tracking" is listed as a Key Feature, but `src/storage/metrics-collector.ts:22` declares `memoryUsageMB?: number` as optional and no call site anywhere in `src/` (checked via repo-wide grep) ever sets it. Nothing tracks memory usage.
-> - "Convergence steps (how many iterations to solve)" mischaracterizes the field the same way `METRICS_GUIDE.md` does: `metrics-collector.ts:14-20` documents `convergenceSteps` as the trajectory output point count, explicitly noting Terrium's fixed-step integrator "is not an iterative solver reporting a real convergence count."
+> - "Convergence steps (how many iterations to solve)" mischaracterizes the field the same way `METRICS_GUIDE.md` does: `metrics-collector.ts:14-20` documents `convergenceSteps` as the trajectory output point count, explicitly noting Caterva's fixed-step integrator "is not an iterative solver reporting a real convergence count."
 > - The "Performance Overhead" section's specific numbers ("< 1ms per query", "< 5ms aggregation", "< 0.5% of total simulation time") have no benchmark, measurement, or profiling code anywhere in this repo to back them (checked via grep for benchmark/overhead references in `src/`) — they read as measured but are not.
 
 **Date:** 2026-08-12  

@@ -50,8 +50,8 @@ def test_it_reports_a_path_that_does_not_exist() -> None:
 
 def test_it_accepts_a_path_that_does_exist() -> None:
     """Crying wolf is how a guard gets ignored."""
-    real = "see `Terium/tests/test_brenda_integration.py` for it"
-    assert unresolved("x.md", real, {"Terium/tests/test_brenda_integration.py"}) == []
+    real = "see `caterva/tests/test_brenda_integration.py` for it"
+    assert unresolved("x.md", real, {"caterva/tests/test_brenda_integration.py"}) == []
     # ...and via the filesystem, not just the tracked-file set, since new
     # files are untracked until they are added.
     assert unresolved("x.md", real, set()) == []
@@ -60,12 +60,12 @@ def test_it_accepts_a_path_that_does_exist() -> None:
 def test_bare_filenames_are_left_alone() -> None:
     """Deliberate scope limit, pinned so it is not narrowed by accident.
 
-    These documents name `terium_engine.py` conversationally. Requiring a
+    These documents name `caterva_engine.py` conversationally. Requiring a
     directory there would fail on prose and teach people to stop naming
     files.
     """
-    assert extract("`terium_engine.py` and `brenda_client.py`") == set()
-    assert extract("`Terium/terium_engine.py`") == {"Terium/terium_engine.py"}
+    assert extract("`caterva_engine.py` and `brenda_client.py`") == set()
+    assert extract("`caterva/caterva_engine.py`") == {"caterva/caterva_engine.py"}
 
 
 def test_it_finds_paths_in_prose_and_in_lists() -> None:
@@ -93,7 +93,7 @@ def test_a_repository_slug_is_not_read_as_a_missing_file() -> None:
     """
     text = (
         "This said `Terrium-sim/main.git` while README said "
-        "`Terrium-sim/terrium.git`, and origin says `math12345678/terrium.git`."
+        "`Terrium-sim/terrium.git`, and origin says `math12345678/caterva.git`."
     )
     here, remote = classify(text)
     assert here == set(), f"a clone URL is being treated as a repo path: {here}"
@@ -108,7 +108,7 @@ def test_a_real_missing_path_still_fails_alongside_them() -> None:
     were implemented as "give up on this document" rather than "classify
     this token", this is where that would show.
     """
-    text = "clone `Terrium-sim/terrium.git`, then read `Tests/test_nope.py`"
+    text = "clone `math12345678/caterva.git`, then read `Tests/test_nope.py`"
     assert unresolved("x.md", text, set()) == ["Tests/test_nope.py"]
 
 

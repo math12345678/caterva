@@ -1,4 +1,4 @@
-# Working on Terrium
+# Working on Caterva
 
 **This document moved to [`START_HERE.md`](../START_HERE.md) at the
 repository root.**

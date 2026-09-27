@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""The numbers a paper about Terrium would need, each one measured now.
+"""The numbers a paper about Caterva would need, each one measured now.
 
 WHY THIS EXISTS
 ---------------
-Terrium's measurable facts are real and scattered. Its parser coverage is
+Caterva's measurable facts are real and scattered. Its parser coverage is
 printed by `check_commentary_coverage.py` as a side effect of passing. Its
 test counts live inside `check_documented_counts.py`. Its guard and decision
 counts are file globs nobody runs by hand. Every one of them is a number
@@ -29,7 +29,7 @@ re-derive any single figure without reading this file.
 WHAT IS DELIBERATELY NOT HERE
 -----------------------------
 Anything requiring the network: BRENDA coverage across the real database,
-and how many published Km values Terrium can resolve in the wild. Both are
+and how many published Km values Caterva can resolve in the wild. Both are
 listed at the end as open rather than approximated from eleven committed
 fixtures, because a number measured on eleven pages and presented as a
 property of the database would be exactly the overreach this project exists
@@ -153,8 +153,8 @@ def _domains() -> str:
 
 
 ROWS: tuple[Row, ...] = (
-    Row("Simulation engine tests", "pytest Terium/tests --co -q",
-        lambda: _count_tests("Terium/tests")),
+    Row("Simulation engine tests", "pytest caterva/tests --co -q",
+        lambda: _count_tests("caterva/tests")),
     Row("Literature layer tests", "pytest Tests --co -q",
         lambda: _count_tests("Tests")),
     Row("Guard scripts", "ls scripts/check_*.py",
@@ -183,7 +183,7 @@ OPEN: tuple[tuple[str, str], ...] = (
 
 
 def main() -> int:
-    print("Terrium — measured now, not transcribed\n")
+    print("Caterva — measured now, not transcribed\n")
     width = max(len(row.label) for row in ROWS)
     for row in ROWS:
         try:

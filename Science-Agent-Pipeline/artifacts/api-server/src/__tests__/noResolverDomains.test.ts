@@ -2,7 +2,7 @@
  * "Not found" and "never looked" are different facts, and the refusal
  * message was reporting the second as the first.
  *
- * Three of Terrium's fifteen domains have a literature lookup behind any
+ * Three of Caterva's fifteen domains have a literature lookup behind any
  * parameter: enzyme kinetics (BRENDA Km/Ki, plus the kcat→Vmax bridge),
  * Wright-Fisher (mutation_rate), and SIR (the R0/infectious-period bridge).
  * The other twelve have none. Every one of them was refusing with
@@ -11,7 +11,7 @@
  *
  * which asserts a search that never happened. The two cases call for
  * opposite actions from a researcher: "the literature has nothing" means
- * stop looking, "Terrium never looked" means the number is probably in a
+ * stop looking, "Caterva never looked" means the number is probably in a
  * paper you can find in a minute. Being told the first when the second is
  * true is the failure this project exists to refuse, and it was sitting in
  * the most-read sentence in the product.

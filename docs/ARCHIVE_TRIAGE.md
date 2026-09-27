@@ -11,7 +11,7 @@ one.
 
 | class | count | goes to |
 |---|---|---|
-| KEEP | 14 | [`main`](https://github.com/Terrium-sim/main) |
+| KEEP | 14 | [`main`](https://github.com/math12345678/caterva) |
 | WIRING | 3 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) |
 | MISC | 6 | [`miscellaneous`](https://github.com/Terrium-sim/miscellaneous) |
 | ARCHIVE | 58 | [`archive`](https://github.com/Terrium-sim/archive) |
@@ -77,9 +77,9 @@ including several documents whose mistakes are worth remembering.
 | `PHASE_4_IMPLEMENTATION.md` | ARCHIVE | Marked IN PROGRESS; superseded by PHASE_4_COMPLETE |
 | `PHASE_4_REAL_DATA.md` | ARCHIVE | Pre-work plan; superseded by PHASE_4_COMPLETE |
 | `PHASE_4_SETUP_GUIDE.md` | ARCHIVE | Setup for brenda-real.ts, deleted in Stage 10 Part 23 |
-| `PHASE_5A_INTEGRATION_GUIDE.md` | KEEP | How-to for buildSBML/runTerium, both of which exist |
+| `PHASE_5A_INTEGRATION_GUIDE.md` | KEEP | How-to for buildSBML/runCaterva, both of which exist |
 | `PHASE_5A_SUMMARY.md` | ARCHIVE | Superseded by PHASE_5A_INTEGRATION_GUIDE |
-| `PHASE_5A_TERIUM_ENGINE.md` | ARCHIVE | Same phase narrative; heavy overlap |
+| `PHASE_5A_CATERVA_ENGINE.md` | ARCHIVE | Same phase narrative; heavy overlap |
 | `QUICK_START.md` | ARCHIVE | Contains invalid `npm build`; COMPREHENSIVE_GUIDE covers the CLI |
 | `QUICK_START_DEPLOYMENT.md` | WIRING | Local/Docker steps verified against real docker-compose.yml |
 | `QUICK_START_PHASE_4.md` | ARCHIVE | "179 tests" stale; references a throwaway script |

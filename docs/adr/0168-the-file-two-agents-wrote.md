@@ -15,11 +15,11 @@ not exist; ADR 0165's report noted exactly that and called the
 consequence "could-not-determine, not all-clear").
 
 **What I did wrong, stated first because it is the unrecoverable part.**
-The other author had an uncommitted draft of `Terium/core/sbml_units.py`.
+The other author had an uncommitted draft of `caterva/core/sbml_units.py`.
 I wrote mine over it with an unchecked `cat >`. The file was untracked,
 so no git object ever existed: their draft is gone, not recovered. The
 owner's protective commit message had even flagged the in-flight work
-("Terium/core/sbml_units.py + unstaged exporter edits, neither included")
+("caterva/core/sbml_units.py + unstaged exporter edits, neither included")
 — evidence on the shelf that I did not read before writing. Rule: an
 untracked file you did not create is somebody's only copy.
 
@@ -67,7 +67,7 @@ On the settled pair, all measured this morning:
 |---|---|
 | the other author's `test_sbml_units_declared.py` | **7/7** |
 | mm export, `LIBSBML_CAT_UNITS_CONSISTENCY` | **15 → 0** |
-| engine suite (`Terium`) | all pass |
+| engine suite (`caterva`) | all pass |
 | root jest `cliEndToEnd` (COMBINE archive, exports) | 32/32 |
 | root `type-check` (my `ExportProvenance.unit` change) | clean |
 

@@ -12,12 +12,12 @@
 
 ## Overview
 
-The **Live Architecture Dashboard** is a comprehensive real-time monitoring system for the Terrium science agent pipeline. It visualizes all 5 stages, 13 domains, and resolution metrics through interactive charts and status indicators.
+The **Live Architecture Dashboard** is a comprehensive real-time monitoring system for the Caterva science agent pipeline. It visualizes all 5 stages, 13 domains, and resolution metrics through interactive charts and status indicators.
 
 ## Components Built
 
 ### 1. Frontend Dashboard Component
-**File**: `artifacts/terrium-landing/src/cli/LiveArchitectureDashboard.tsx`
+**File**: `artifacts/caterva-landing/src/cli/LiveArchitectureDashboard.tsx`
 
 A React component that displays:
 - **Key Metrics Cards**: Active jobs, success rate, latency, LLM hit rate

@@ -20,7 +20,7 @@ can see the failure Jeske described in her second paragraph:
 > mix these together, the simulation will end up calculating with "fantasy
 > numbers".
 
-Terrium's own design makes this reachable. `mm_competitive_inhibition`
+Caterva's own design makes this reachable. `mm_competitive_inhibition`
 requires a Km and a Ki. `RESOLVABLE_FIELDS` resolves them with two
 independent runner calls — separate lookups, separate citations, separate
 assay conditions — and that independence is deliberate: ADR 0008 requires
@@ -96,7 +96,7 @@ start failing runs that are merely imperfect.
 
 Bakker's own answer is the argument against blocking: she does not exclude
 anything a priori, and rejects at the level of the whole model after
-validating against measured flux data. Terrium has no flux data to reject
+validating against measured flux data. Caterva has no flux data to reject
 against. Naming the incoherence is what is left, and it is considerably
 more than saying nothing.
 
@@ -158,8 +158,8 @@ Neither is about coherence; both were blocking honest verification of it.
 
 **The engine suite could not be read by its own guard.**
 `check_no_silent_skips.py` reported "1 of 2 suite(s) did not run: engine" on
-a suite that ran 1,032 tests and exited 0. `Terium/pytest.ini` sets
-`addopts = -q`; invoking pytest with `Terium/tests` makes rootdir `Terium/`,
+a suite that ran 1,032 tests and exited 0. `caterva/pytest.ini` sets
+`addopts = -q`; invoking pytest with `caterva/tests` makes rootdir `caterva/`,
 so the guard's own `-q` became the second one, and `-qq` suppresses the
 summary line entirely. The guard now parses JUnit XML — exact counts, a
 structural `skipped` element, and immune to a verbosity flag three
@@ -197,5 +197,5 @@ wins where several interpreters exist.
 Jeske's warning has a second half this ADR does not answer: even when
 conditions match, values from different papers carry different measurement
 error, and combining them compounds it. Bakker's ensemble is the real
-answer to that, and ADR 0024 Decision 3 records why Terrium is not
+answer to that, and ADR 0024 Decision 3 records why Caterva is not
 attempting it without flux data to validate against.

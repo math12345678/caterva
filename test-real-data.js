@@ -9,7 +9,7 @@ async function resolveDOI(doi) {
   try {
     const url = `https://api.crossref.org/v1/works/${encodeURIComponent(doi)}`;
     const response = await fetch(url, {
-      headers: { 'User-Agent': 'Terrium-Scientific/1.0' }
+      headers: { 'User-Agent': 'Caterva-Scientific/1.0' }
     });
 
     if (!response.ok) {

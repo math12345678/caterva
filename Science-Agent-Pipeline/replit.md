@@ -1,13 +1,13 @@
-# Terrium — Science Agent Pipeline
+# Caterva — Science Agent Pipeline
 
-Scientific computing for teaching labs. Students ask a question in plain language; Terrium resolves parameters from the literature (BRENDA/KEGG/PubMed), runs the Terium ODE engine, and returns a verified trajectory with citations.
+Scientific computing for teaching labs. Students ask a question in plain language; Caterva resolves parameters from the literature (BRENDA/KEGG/PubMed), runs the Caterva ODE engine, and returns a verified trajectory with citations.
 
 ## Run & Operate
 
 ### Frontend (landing page)
 ```bash
 cd Science-Agent-Pipeline
-PORT=18612 BASE_PATH=/ pnpm --filter @workspace/terrium-landing dev
+PORT=18612 BASE_PATH=/ pnpm --filter @workspace/caterva-landing dev
 ```
 
 ### API server (required for the pipeline)
@@ -30,7 +30,7 @@ PORT=5000 pnpm --filter @workspace/api-server run dev
 
 # Terminal 2 — Frontend
 cd Science-Agent-Pipeline
-PORT=18612 BASE_PATH=/ pnpm --filter @workspace/terrium-landing dev
+PORT=18612 BASE_PATH=/ pnpm --filter @workspace/caterva-landing dev
 ```
 
 ### CLI
@@ -56,8 +56,8 @@ pnpm --filter @workspace/api-spec run codegen
 ```
 
 ## Required env
-- **PORT** — api-server (5000), terrium-landing (18612)
-- **BASE_PATH** — terrium-landing, mockup-sandbox (usually `/`)
+- **PORT** — api-server (5000), caterva-landing (18612)
+- **BASE_PATH** — caterva-landing, mockup-sandbox (usually `/`)
 - **OPENAI_API_KEY** or **LLM_API_KEY** — optional, enables LLM query resolution
 - **DATABASE_URL** — optional PostgreSQL connection (graceful fallback)
 - **API_SERVER_URL** — optional, defaults to `http://localhost:5000`
@@ -67,18 +67,18 @@ pnpm --filter @workspace/api-spec run codegen
 - Frontend: React 19, Vite 7, Tailwind CSS v4, shadcn/ui, Framer Motion, Recharts
 - API: Express 5, Zod, Pino
 - DB: PostgreSQL + Drizzle ORM (optional)
-- Python bridge: Terium engine (antimony + libroadrunner + libSBML)
+- Python bridge: Caterva engine (antimony + libroadrunner + libSBML)
 - Literature: BRENDA / KEGG / UniProt / PubMed live APIs
 
 ## Pipeline flow
-User query → LLM or keyword resolver → Python science agent (BRENDA/KEGG/PubMed) → Python Terium engine (ODE simulation) → PostgreSQL persistence → SSE stream
+User query → LLM or keyword resolver → Python science agent (BRENDA/KEGG/PubMed) → Python Caterva engine (ODE simulation) → PostgreSQL persistence → SSE stream
 
 ## Architecture
 ```
 Science-Agent-Pipeline/
 ├── artifacts/
 │   ├── api-server/          Express 5 REST API + Python bridge
-│   ├── terrium-landing/     Main React frontend
+│   ├── caterva-landing/     Main React frontend
 │   └── mockup-sandbox/      UI component preview server
 ├── lib/
 │   ├── api-spec/            OpenAPI 3.1 spec + Orval codegen
@@ -88,8 +88,8 @@ Science-Agent-Pipeline/
 ├── scripts/                 CLI tool (sci-pipe)
 └── attached_assets/         Design specs
 
-Terrium/
-├── Terium/               Python ODE engine (MM, SIR, SEIR)
+Caterva/
+├── caterva/               Python ODE engine (MM, SIR, SEIR)
 ├── Tests/                   BRENDA/KEGG/PubMed literature layer
 └── scripts/                 Environment verification
 ```

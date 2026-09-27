@@ -245,11 +245,11 @@ receives km and vmax and `response.results.finalValue` is independent of both.
 
 ### The engine is not the problem — checked, so you do not have to
 
-Driving `terium_runner.py` directly, same inputs, stdin JSON:
+Driving `caterva_runner.py` directly, same inputs, stdin JSON:
 
 ```bash
 echo '{"domain":"mm","parameters":{"km":0.5,"vmax":0.1,"s0":2,"end":10,"points":5}}' \
-  | PYTHONPATH=. python3 Science-Agent-Pipeline/artifacts/api-server/src/lib/terium_runner.py
+  | PYTHONPATH=. python3 Science-Agent-Pipeline/artifacts/api-server/src/lib/caterva_runner.py
 ```
 
 | vmax | `[S]` at t=0 | `[S]` at t=10 |
@@ -260,7 +260,7 @@ echo '{"domain":"mm","parameters":{"km":0.5,"vmax":0.1,"s0":2,"end":10,"points":
 The engine responds to vmax exactly as Michaelis-Menten should. **The defect is
 between the CLI and the engine**, in the layer that builds `engineParameters`
 and reads the result back — `scientificPipeline.ts` around lines 1058–1093,
-where km/vmax are unit-converted, sent via `runTerium('mm', ...)`, and the
+where km/vmax are unit-converted, sent via `runCaterva('mm', ...)`, and the
 substrate series is pulled out with `extractSeries(result.trajectory, '[S]')`.
 
 Two concrete suspects, in order:
@@ -275,7 +275,7 @@ Two concrete suspects, in order:
    what the student sees, and a fallback here would explain an output that
    tracks neither engine result.
 
-Bisect it by logging `engineParameters` immediately before `runTerium` and
+Bisect it by logging `engineParameters` immediately before `runCaterva` and
 comparing against the table above. If the numbers going in are right, the
 fault is in reading the result back; if they are wrong, it is the conversion.
 

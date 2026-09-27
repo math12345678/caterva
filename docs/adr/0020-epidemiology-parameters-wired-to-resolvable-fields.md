@@ -11,7 +11,7 @@ Vmax bridge this mirrors structurally)
 
 ADR 0017 built `Tests/epidemiology_resolver.py::resolve_disease_parameters()`
 — a hand-verified, single-entry registry (COVID-19, Hussein et al. 2021) —
-and `Terium/core/validation.py::beta_gamma_from_r0()`, but explicitly
+and `caterva/core/validation.py::beta_gamma_from_r0()`, but explicitly
 deferred wiring either into `RESOLVABLE_FIELDS`, "exactly as ADR 0012
 stopped at 'resolved and tested' before ADR 0013 did the runner wiring for
 kcat." This ADR is that follow-up wiring.
@@ -42,10 +42,10 @@ Concretely, mirroring ADR 0019's structure exactly:
 2. **`science_agent_runner.py`** gained a `parameterType="disease_parameters"`
    branch (alongside the existing `mutation_rate` branch) and
    `bridge_beta_gamma_from_r0()`, which calls
-   `Terium.core.validation.beta_gamma_from_r0()` — the exact function
+   `caterva.core.validation.beta_gamma_from_r0()` — the exact function
    the SIR engine itself uses — via the same lightweight `core.validation`
-   import path `bridge_vmax_from_kcat()` established in ADR 0019 (Terium/
-   on `sys.path`, not the Terium package root, so no antimony
+   import path `bridge_vmax_from_kcat()` established in ADR 0019 (caterva/
+   on `sys.path`, not the Caterva package root, so no antimony
    dependency is pulled in for pure arithmetic).
 3. **`scienceAgent.ts`** gained `resolveEpidemiologyParameters(disease)`,
    built on a new shared `spawnScienceAgent()` helper factored out of the

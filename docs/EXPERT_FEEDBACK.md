@@ -6,7 +6,7 @@ because of it, and — more importantly — what did **not** change and why.
 
 It is written to be uncomfortable to read. A feedback document that makes
 the project look good is a marketing document, and the whole premise of
-Terrium is that a check which cannot fail is worse than no check.
+Caterva is that a check which cannot fail is worse than no check.
 
 **Summary of outcomes**
 
@@ -31,7 +31,7 @@ Terrium is that a check which cannot fail is worse than no check.
 She was asked two narrow technical questions. She answered both, and then
 answered a third we had not asked, which turned out to be the important one.
 
-### 1a. The licence — Terrium was in breach
+### 1a. The licence — Caterva was in breach
 
 Her email ended with a link to BRENDA's licence page, almost in passing.
 Reading it revealed two violations of CC BY 4.0:
@@ -54,7 +54,7 @@ violation is cured within 30 days of discovery):
 - `NOTICE` — attribution to the BRENDA team and DSMZ, the licence named and
   linked, every location BRENDA data appears, the modifications made
   (§3(a)(1)(B)), the warranty disclaimer (§5), and a note that citing
-  Terrium is not a substitute for citing BRENDA.
+  Caterva is not a substitute for citing BRENDA.
 - `LICENSE` — a third-party carve-out exempting BRENDA-derived material,
   written to hold whichever licence the project eventually adopts.
 - All 11 fixtures — an attribution header naming the source, the licence,
@@ -74,7 +74,7 @@ contradiction is a decision the project owner has to make.
 > The simulation should rather abort or leave the value empty if there is
 > no exact organism match, instead of providing incorrect data.
 
-Terrium did the opposite: no human Km, so return the rabbit one with a
+Caterva did the opposite: no human Km, so return the rabbit one with a
 warning flag. Two days earlier Herbert Sauro had recommended going further
 still — invent a default and warn.
 
@@ -82,7 +82,7 @@ still — invent a default and warn.
 now `allow_cross_species=False` by default, and the refusal names which
 organisms held values so the opt-in can actually be exercised.
 
-The change also exposed something that predates the correspondence: Terrium
+The change also exposed something that predates the correspondence: Caterva
 *already* refused when nothing was found and *already* substituted silently
 when something was. It was applying two incompatible standards in
 neighbouring branches and had never noticed.
@@ -127,7 +127,7 @@ This sentence sat unaddressed while the organism gate and the reliability
 score were built, because both of those grade **one parameter at a time**
 and this failure does not live in any single parameter.
 
-Terrium's own design makes it reachable. A competitive-inhibition model
+Caterva's own design makes it reachable. A competitive-inhibition model
 needs a Km and a Ki, and ADR 0008 requires them to resolve independently —
 separate lookups, separate citations — precisely so a cross-species Ki can
 never inherit a verified Km's provenance. The cost of that correct decision
@@ -147,11 +147,11 @@ the project's cardinal sin, one level up. So the verdicts rest only on facts
 needing no threshold: identical publication ids, or equal reported values.
 When conditions differ, the report states the spread and says the values
 were never jointly measured, then stops. Whether 0.4 pH units matters for
-*this* enzyme is a judgement the reader is equipped to make and Terrium is
+*this* enzyme is a judgement the reader is equipped to make and Caterva is
 not.
 
 It reports rather than blocks, for Bakker's reason: she excludes nothing a
-priori and rejects at the model level after flux validation. Terrium has no
+priori and rejects at the model level after flux validation. Caterva has no
 flux data to reject against.
 
 Grounded in the standard Bakker herself co-authored — Swainston et al.,
@@ -197,7 +197,7 @@ Reference: Odendaal, Krebs & Bakker, *Ensemble kinetic modelling links
 residual enzyme activity to clinical symptoms in mitochondrial β-oxidation
 defects*, bioRxiv doi:10.64898/2026.05.05.722902.
 
-**What this exposed.** Terrium's binary flag treats a poorly-documented
+**What this exposed.** Caterva's binary flag treats a poorly-documented
 measurement as equivalent to no measurement. It is not — it is weak
 evidence, and weak evidence still constrains a distribution. The finding
 that "three quarters of our defaults are unverified" had been read as a
@@ -250,7 +250,7 @@ level up.
 > you generate.
 
 Director of the NIH Center for Reproducible Biomedical Modeling, and an
-author of the stack Terrium runs on. This is the opposite of the rule the
+author of the stack Caterva runs on. This is the opposite of the rule the
 project is built around, from the person best placed to challenge it.
 
 **Not resolved, and not resolved on purpose.** It would be easy to close
@@ -305,12 +305,12 @@ JOSS scope: accepted, no action.
 > achievements. You clearly did not built tellurium, because I was involved
 > in building it.
 
-**He was right to react, and the cause is a naming decision.** "Terrium"
+**He was right to react, and the cause is a naming decision.** "Caterva"
 against "Tellurium," in an email about SBML and Antimony, reads as a claim
 of credit rather than a coincidence. He is an author of Tellurium.
 
 **Changed:** a disambiguation notice now sits at the top of the README —
-Terrium is unaffiliated with Tellurium, is not a fork of it, and is a
+Caterva is unaffiliated with Tellurium, is not a fork of it, and is a
 consumer of that ecosystem rather than a competitor to it. The name is
 recorded in ADR 0024 as an open question rather than a settled one.
 
@@ -332,16 +332,16 @@ has no answer without knowing who is reading the output.
 | Jeske | student reading a screen | high — believed as fact | low — they ask why |
 | Bakker | researcher publishing | high — bounded by ensemble spread | high — information discarded |
 
-Terrium is a teaching tool. Jeske's column applies. Saying so out loud is
+Caterva is a teaching tool. Jeske's column applies. Saying so out loud is
 the change — the rule was previously stated unconditionally, as if it were
 a fact about correctness rather than a choice about audience.
 
 **The findings that hurt, listed plainly:**
 
-1. Terrium was violating the licence of its primary data source, and had
+1. Caterva was violating the licence of its primary data source, and had
    been telling downstream users they had fewer rights than BRENDA granted
    them.
-2. Terrium was refusing in one branch and silently substituting in the
+2. Caterva was refusing in one branch and silently substituting in the
    next, with no argument for the difference, and had not noticed.
 3. The error message asserted "could not be resolved from literature" in
    cases where the literature had a value that was withheld by policy — a
@@ -367,10 +367,10 @@ three things this document had wrong or incomplete:
    opt-in's survival across the payload → runner → resolver hop.
 2. `scripts/check_example_endpoints.py` was reporting eight false failures
    against `MONITORING_SETUP.md`, flagging Prometheus's own
-   `localhost:9090/api/v1/query` as a missing Terrium route. Correct
+   `localhost:9090/api/v1/query` as a missing Caterva route. Correct
    documentation, confidently accused. A named foreign-service rule now
    handles it, mutation-tested to confirm it still catches a fake route on
-   Terrium's own ports.
+   Caterva's own ports.
 3. `CITATION.cff` and `README.md` still pointed at the pre-move GitHub
    organisation.
 
@@ -434,7 +434,7 @@ document correctly citing that endpoint was accused.
 
 Two further false-positive classes were fixed: Prometheus URLs on
 `localhost:9090` in a monitoring guide were being read as claims about
-Terrium's routes, and `"endpoint": "/api/problematic"` inside a documented
+Caterva's routes, and `"endpoint": "/api/problematic"` inside a documented
 JSON response body was being read as a claim rather than as example data.
 
 That is the third time this guard has produced confident false accusations,
@@ -498,12 +498,12 @@ model file is read by everyone who opens the model afterwards, including the
 reviewer six months later who received it by email and never saw the
 terminal.
 
-The gap was worse than a missing feature. Terrium generated Antimony and
+The gap was worse than a missing feature. Caterva generated Antimony and
 **never handed it to anyone**, so the one artifact that could carry
 provenance onward never left the process. A tool built on an interchange
 format that exports nothing is not participating in the interchange.
 
-Now: `Terium/core/model_provenance.py` and `scripts/export_annotated_model.py`
+Now: `caterva/core/model_provenance.py` and `scripts/export_annotated_model.py`
 produce a model file that any Antimony reader — Tellurium, libRoadRunner,
 COPASI — can open, with every assignment carrying its origin inline and a
 full provenance block at the foot.
@@ -565,7 +565,7 @@ the consequence is the part they act on. Both now prefix the interpretation.
 
 His reply reads as a misunderstanding of the word "constant", and ADR 0024
 records that the wording was ours. But there is a sharper reading that is
-not a misunderstanding at all: Terrium attached provenance to every number
+not a misunderstanding at all: Caterva attached provenance to every number
 and then offered it only as prose on a terminal. From the software-citation
 perspective he works in, that is not a citation — it is a claim about one.
 A citation is something that goes into a bibliography.
@@ -575,10 +575,10 @@ reference manager imports. A student can now put the sources of their
 parameters into the same bibliography as the papers they read.
 
 What it refuses to do is the point. A BibTeX entry wants author, title,
-journal and year; Terrium knows a reference identifier and sometimes a
+journal and year; Caterva knows a reference identifier and sometimes a
 title. Filling the rest with plausible values would produce an entry that
 imports cleanly, looks complete, and is fiction — which would then enter
-someone's bibliography and be cited onward with Terrium's name on the
+someone's bibliography and be cited onward with Caterva's name on the
 fabrication. Absent fields are omitted, the absence is stated on the entry
 itself, and the type is `@misc` / `TY - DATA` rather than `@article` /
 `JOUR`, because asserting a publication type nobody verified is the same
@@ -606,7 +606,7 @@ reason rather than by oversight.
 | | |
 |---|---|
 | `Tests/` (Python) | 381 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing |
+| `caterva/tests/` (engine) | passing |
 | TypeScript (api-server) | 516 passed |
 | Guards | 6 of 6 green |
 | `tsc --noEmit` | clean, both trees |
@@ -681,8 +681,8 @@ A fourth thing, found by running the guards rather than assuming them:
    — on a suite that ran 1,032 tests and exited 0.
 
    The cause is the kind of thing that is invisible until someone looks.
-   `Terium/pytest.ini` already sets `addopts = -q`. Invoking pytest with
-   `Terium/tests` as the argument makes rootdir `Terium/`, so that ini
+   `caterva/pytest.ini` already sets `addopts = -q`. Invoking pytest with
+   `caterva/tests` as the argument makes rootdir `caterva/`, so that ini
    applies and the guard's own `-q` became the *second* one. Two `-q` flags
    is quiet level 2, which deletes the summary line outright. The suite
    printed its dots, exited clean, and emitted nothing a regex could read.
@@ -706,7 +706,7 @@ A fourth thing, found by running the guards rather than assuming them:
 | `Tests/` (Python) | 381 passed, 1 skipped |
 | TypeScript (api-server) | 516 passed, 0 failed |
 | `tsc --noEmit` | clean |
-| `Terium/tests` (engine) | 1,032 passed, 0 skipped |
+| `caterva/tests` (engine) | 1,032 passed, 0 skipped |
 | Guards | 24 total; 18 pass, 6 fail — 3 pre-existing (orphan modules, guard wiring, static-asset usage), 2 environment (`stdpopsim` unavailable on arm64), 1 slow-to-time-out here |
 | Mutations introduced this pass | 9; 7 caught first time, 2 required the test to be rewritten before they could be |
 
@@ -744,7 +744,7 @@ organism-specific question, so it cannot feed the resolution path.
 
 The resolution path therefore stays on the per-enzyme pages, which carry
 organism. The bulk file became something else it is genuinely good at: a
-corpus reader. Terrium can now ask aggregate questions about BRENDA for the
+corpus reader. Caterva can now ask aggregate questions about BRENDA for the
 first time — such as how many KM rows actually report both pH and
 temperature. The "roughly three quarters unverified" figure this project has
 been quoting came from its own small default set, which was never a sound
@@ -827,7 +827,7 @@ represents; filling the other half would silently assume a mammal.
 | | |
 |---|---|
 | `Tests/` (Python) | 403 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing |
+| `caterva/tests/` (engine) | passing |
 | TypeScript (api-server) | 516 passed |
 | Guards | 7 of 7 green (one new) |
 | `tsc --noEmit` | clean, both trees |
@@ -843,7 +843,7 @@ were not run, so nothing is claimed about them.
 
 ## Fifth pass — 2026-08-14
 
-### Sauro — he predicted a failure, and Terrium was causing it
+### Sauro — he predicted a failure, and Caterva was causing it
 
 The famous half of his reply is the recommendation to default. The sharper
 half is a prediction about what users do when a tool refuses:
@@ -852,26 +852,26 @@ half is a prediction about what users do when a tool refuses:
     researcher works around it by hardcoding a number with no warning at all
     — a strictly worse outcome caused by the strict rule.
 
-Terrium was not merely vulnerable to that. **It instructed it.** When a Km
+Caterva was not merely vulnerable to that. **It instructed it.** When a Km
 could not be resolved, the error said:
 
     Add km=<value> to your query and try again.
 
 So the user went and found a Km — from a paper, usually — typed it in, and
-Terrium recorded `origin: user`, no citation, no further comment. A number
+Caterva recorded `origin: user`, no citation, no further comment. A number
 with a real source in the world, stripped of that source by the tool whose
 entire purpose is not losing sources. Sauro's predicted outcome, arriving
-one step later than he described it, through a door Terrium opened.
+one step later than he described it, through a door Caterva opened.
 
 `--cite km="Smith 2019, PMID 12345"` closes it. The refusal message now
 points at it, which is the only place it can usefully be said: the moment
 before the user goes looking for a number.
 
 **A user citation is a different kind of thing, and never folded into
-`resolved`.** Terrium cannot check that Smith 2019 reports this value and
+`resolved`.** Caterva cannot check that Smith 2019 reports this value and
 does not pretend to. It travels as `origin: user_cited`, and every surface —
 the CLI table, the annotated model, the bibliography — says whose claim it
-is. The exported model line reads `CITED BY YOU (unverified by Terrium)`,
+is. The exported model line reads `CITED BY YOU (unverified by Caterva)`,
 and `unsourced_parameters()` still counts it, because the summary has to
 stay honest about what the file rests on.
 
@@ -928,7 +928,7 @@ Three consecutive passes reported `cliEndToEnd.test.ts` as "not verified
 because it needs the network". That was honest and was not a substitute for
 verifying it.
 
-`TERRIUM_LITERATURE_RUNNER` is a seam that already existed for this.
+`CATERVA_LITERATURE_RUNNER` is a seam that already existed for this.
 `offlineResolverEndToEnd.test.ts` points it at a stub and exercises the
 **real subprocess path** — spawn, stdin, exit code, stdout parsing — in
 under a second, where the network suite hangs for minutes on a 120-second
@@ -950,7 +950,7 @@ reference not forwarded.
 | | |
 |---|---|
 | `Tests/` (Python) | 403 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing |
+| `caterva/tests/` (engine) | passing |
 | TypeScript (api-server) | 489 passed across 39 files |
 | Guards | 7 of 7 green |
 | `tsc --noEmit` | clean, both trees |
@@ -998,7 +998,7 @@ bypassed, and `physiologicalReference` became a real caller input threaded
 end-to-end. Six mutations, all caught — including reintroducing the original
 bug, and reintroducing a grader under a different name.
 
-Bakker asked, in effect, whether Terrium could describe how much to trust a
+Bakker asked, in effect, whether Caterva could describe how much to trust a
 number. For every API user, for the whole time the feature has existed, one
 third of that answer was a constant.
 
@@ -1068,7 +1068,7 @@ guard asserts the fixture exercises every grade of every axis.
 
 ## Sixth pass — 2026-08-14
 
-Jeske named four things. Terrium compared two. This closes the third.
+Jeske named four things. Caterva compared two. This closes the third.
 
 ### Buffers, compared by chemistry rather than by string
 
@@ -1293,7 +1293,7 @@ next real failure gets re-run too.
 | | |
 |---|---|
 | `Tests/` (Python) | 486 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing, both halves |
+| `caterva/tests/` (engine) | passing, both halves |
 | TypeScript (api-server) | 516 passed across 41 files, all three shards |
 | Guards | 7 of 7 green |
 | `tsc --noEmit` | clean, both trees |
@@ -1400,7 +1400,7 @@ the duplicate deleted.
 
 ### Ground truth that never says when it was last true
 
-`Tests/test_golden_set.py` is where every claim Terrium makes about
+`Tests/test_golden_set.py` is where every claim Caterva makes about
 resolving real literature values bottoms out. Five tuples, pinned against
 BRENDA fixtures captured in July 2026.
 
@@ -1459,7 +1459,7 @@ own comments cite as the reason its organism pattern is generic rather than
 an enumerated list.
 
 What could not be established: whether the current markup still parses.
-`web_fetch` converts HTML to text, and the sandbox proxy blocks Terrium's
+`web_fetch` converts HTML to text, and the sandbox proxy blocks Caterva's
 own HTTP client, so `parse_brenda_km_html` was never given real input. That
 is recorded as unverified rather than claimed either way.
 
@@ -1474,7 +1474,7 @@ instrument, not a subject, looked broken.
 | | |
 |---|---|
 | `Tests/` (Python) | 488 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing, both halves |
+| `caterva/tests/` (engine) | passing, both halves |
 | TypeScript (api-server) | 516 passed across 41 files, all three shards |
 | Guards | 8 of 8 green (one new) |
 | `tsc --noEmit` | clean, both trees |
@@ -1490,12 +1490,12 @@ does not, and is the largest open verification gap in the project.
 
 ## Seventh pass — 2026-08-14
 
-Not new feedback. A measurement of how much of Jeske's warning Terrium is
+Not new feedback. A measurement of how much of Jeske's warning Caterva is
 even *able* to act on, which turned out to answer several questions at once.
 
 ### 73%
 
-BRENDA puts one free-text cell beside every kinetic value. Terrium mines it
+BRENDA puts one free-text cell beside every kinetic value. Caterva mines it
 for pH, temperature, buffer and — since ADR 0029 — whether the row measured a
 sequence variant. Everything else is discarded silently, and *silently* is
 the problem: a parser that ignores text does not report how much it ignored,
@@ -1517,7 +1517,7 @@ claim came from a grep for NAD/NADH/Mg2+ that missed `20 mM CaCl2` in the
 trypsin rows — a search that found nothing, reported as an absence. Worse,
 LDH rows read *"in the presence of fructose 1,6-bisphosphate"* and *"in the
 absence of fructose 1,6-bisphosphate"* — FBP is an allosteric activator, so
-that is a **designed contrast** whose two values are meant to differ. Terrium
+that is a **designed contrast** whose two values are meant to differ. Caterva
 reads neither and would take the lower. Corrected in ADR 0031 rather than
 edited into ADR 0028, so the mistake stays legible.
 
@@ -1601,7 +1601,7 @@ LDHB presence 0.2   mM NADH          presence D-fructose-1,6-diphosphate
 ```
 
 Same enzyme, pH, temperature, organism, paper, wild-type verdict, buffer.
-**Every check Terrium had said these two rows were identical.** They are
+**Every check Caterva had said these two rows were identical.** They are
 opposite allosteric conditions — fructose 1,6-bisphosphate is the classic
 activator of bacterial L-lactate dehydrogenase, and the pair exists because
 the two states differ.
@@ -1843,7 +1843,7 @@ is a different emergency from "the number moved".
 | | |
 |---|---|
 | `Tests/` (Python) | 523 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing, in three groups |
+| `caterva/tests/` (engine) | passing, in three groups |
 | TypeScript (api-server) | 516 passed across 41 files, all three shards |
 | Guards | 8 of 8 green |
 | `tsc --noEmit` | clean, both trees |
@@ -1855,9 +1855,9 @@ is a different emergency from "the number moved".
 
 Jeske's fourth item, and the thing it turned out to be hiding.
 
-### The controlled experiment Terrium was picking one arm of
+### The controlled experiment Caterva was picking one arm of
 
-ADR 0032 (a concurrent agent's work) taught Terrium to read what an assay
+ADR 0032 (a concurrent agent's work) taught Caterva to read what an assay
 contained — which compounds, present or absent, resolved against PubChem.
 That answers a question about one row.
 
@@ -1873,7 +1873,7 @@ paper, same pH 6.0, same 25 °C:
 
 The authors measured with and without an allosteric activator on purpose.
 The wild-type arms differ by **15.5×** — larger than the twelvefold mutant
-span that motivated ADR 0029. Terrium's selection is `min()`, so it took
+span that motivated ADR 0029. Caterva's selection is `min()`, so it took
 21.1, the activated arm, and would report it as the enzyme's turnover number
 with a real citation.
 
@@ -1988,22 +1988,22 @@ never report agreement.
 
 ### A missing dependency reported as a packaging fault
 
-Terrium supports two import styles, package and flat, through twenty-two
+Caterva supports two import styles, package and flat, through twenty-two
 fallbacks shaped like this:
 
     try:
-        from Terium.core.utils import _fmt
+        from caterva.core.utils import _fmt
     except ModuleNotFoundError:
         from core.utils import _fmt
 
-`Terium/core/utils.py` imports `roadrunner`. On a machine without it, the
+`caterva/core/utils.py` imports `roadrunner`. On a machine without it, the
 first import fails with the true and actionable reason, the `except`
 swallows it, flat mode is tried, and the user is shown:
 
     ModuleNotFoundError: No module named 'core'
 
 **A missing third-party package, reported as a missing internal module.**
-Someone reading that goes looking for a packaging bug inside `Terium/` —
+Someone reading that goes looking for a packaging bug inside `caterva/` —
 which is not where the problem is and not something they can fix — while the
 real cause sits two frames up a chained traceback almost nobody scrolls to.
 
@@ -2012,7 +2012,7 @@ fixed once: an error path that discards the reason and substitutes its own.
 There it was an exit code replacing `403 Forbidden`; here a fallback
 replacing `No module named 'roadrunner'`.
 
-`Terium/core/import_mode.py` states the rule: a flat-mode retry is only ever
+`caterva/core/import_mode.py` states the rule: a flat-mode retry is only ever
 the right response to the *package path* being unavailable, and
 `ModuleNotFoundError.name` says precisely which case this is. All twenty-two
 fallbacks now re-raise anything else, and the true error survives.
@@ -2040,7 +2040,7 @@ confusingly.
 | | |
 |---|---|
 | `Tests/` (Python) | 535 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing, both halves |
+| `caterva/tests/` (engine) | passing, both halves |
 | Guards | all green, including the two rebuilt this pass |
 | Mutations this pass | 4 introduced, 4 caught |
 
@@ -2234,7 +2234,7 @@ unexamined drift.
 
 ### The decision record had become ambiguous
 
-Terrium cites its own reasoning by ADR number. `taxonomy.py` says "see ADR
+Caterva cites its own reasoning by ADR number. `taxonomy.py` says "see ADR
 0024"; `queryResolver.ts` says "ADR 0026". That only works if a number names
 one document.
 
@@ -2500,7 +2500,7 @@ Three real defects, and three false accusations of its own making.
 
 **Real:**
 
-- `Terium/core/model_provenance.py` twice cited a guard that **does not
+- `caterva/core/model_provenance.py` twice cited a guard that **does not
   exist** — `scripts/check_model_provenance.py`, which never existed — as
   the thing that "matches" the NO PROVENANCE marker and would "fail a
   build". I wrote that. A
@@ -2544,7 +2544,7 @@ guard untrustworthy.
 | | |
 |---|---|
 | `Tests/` (Python) | 559 passed, 1 skipped |
-| `Terium/tests/` (engine) | passing, file by file |
+| `caterva/tests/` (engine) | passing, file by file |
 | TypeScript (api-server) | 529 passed across 41 files, all three shards |
 | Guards | 9 of 9 green (one new) |
 | `tsc --noEmit` | clean, both trees |
@@ -2896,7 +2896,7 @@ looked.
 
 ### The dashboard was inventing numbers
 
-`src/web/dashboard.html` — titled "Terrium - Scientific Enzyme Kinetics
+`src/web/dashboard.html` — titled "Caterva - Scientific Enzyme Kinetics
 Simulator", with a Run Simulation card — displayed **seven hardcoded
 numbers** with no `id` and nothing able to update them:
 
@@ -3576,7 +3576,7 @@ wrong.
 
 - `tsc --noEmit` clean in both trees.
 - `Tests/`: 589 passed, 1 skipped.
-- `Terium/tests`: all 40 files, run in six chunks, every chunk exit 0.
+- `caterva/tests`: all 40 files, run in six chunks, every chunk exit 0.
 - Root jest: `cliEndToEnd` all 20 (run in seven `-t` slices — the whole file
   exceeds the per-call ceiling; the slices sum to 20, which is the check
   that none was silently dropped), plus 84 in `src/__tests__` and the four
@@ -3596,7 +3596,7 @@ wrong.
 sandbox has no working orval install. It is wired on the strength of reading
 it, not of watching it pass. Stated rather than implied.
 
-The engine suite (`Terium/tests`) **did** run, in six chunks: all 40 test
+The engine suite (`caterva/tests`) **did** run, in six chunks: all 40 test
 files, every chunk exit 0. It is recorded separately because getting there
 turned up a sandbox fact worth writing down.
 
@@ -3605,7 +3605,7 @@ backgrounded it and polled. Every poll reported RUNNING for twenty minutes.
 Every one of those readings was false: the poll was
 
 ```
-pgrep -f "pytest Terium"
+pgrep -f "pytest Caterva"
 ```
 
 and the polling command's **own** command line contains that string, so
@@ -3716,7 +3716,7 @@ actually changed before running the suite, which is the same discipline the
 Not new feedback. The same question as the fifth pass — *is any of this
 reaching anyone?* — asked about the one artifact that leaves the building.
 
-### Every surface Terrium had was attached to a session that ends
+### Every surface Caterva had was attached to a session that ends
 
 The CLI warning scrolls past. The API `flags` array is discarded with the
 response. The Antimony comment is read once, at generation.
@@ -3847,7 +3847,7 @@ and did not complete. `trajectoryCsv.test.ts` and
 `poolFindingsReachTheUser.test.ts` were run individually and pass; the rest
 is a prediction. Stated rather than implied, per the standing habit.
 
-The engine suite (`Terium/tests`) was not run. Nothing this pass touches it.
+The engine suite (`caterva/tests`) was not run. Nothing this pass touches it.
 
 One full-suite run failed 17 tests in `test_fallback_logic.py` and could not
 be reproduced — three consecutive runs of that file passed 36 of 36, and the
@@ -4197,7 +4197,7 @@ and the file says **`literatureFound = yes`**.
 This is the Sauro `user_cited` problem inverted. There, a number with a real
 source was losing it, and the fix was to carry the source and mark it
 unverified. Here a number with **no** source acquires one by passing through
-Terrium. Of the two directions this is the worse: a missing citation is a
+Caterva. Of the two directions this is the worse: a missing citation is a
 gap the reader can see, and a manufactured one is a gap the reader cannot.
 
 Every expert's contribution converges on why this matters. Jeske's whole
@@ -4416,7 +4416,7 @@ Every unit test of `writeExports` passed. They all call `writeExports`.
 
 **Citations are now written.** A Km resolved from BRENDA with a reference is a
 real finding, and it does not stop being one because a *different* parameter
-is missing. The refusal is precisely the moment Terrium tells a student to go
+is missing. The refusal is precisely the moment Caterva tells a student to go
 and read; withholding the reference list at that moment is the worst
 available moment to withhold it.
 
@@ -4568,7 +4568,7 @@ had grown a `--selftest` entry point and not one of them ran anywhere:
 
 ```
 grep -rn selftest scripts/verify_build.py .github/workflows/tests.yml \
-    Makefile Tests/ Terium/tests/
+    Makefile Tests/ caterva/tests/
 (no output)
 ```
 
@@ -4576,7 +4576,7 @@ A selftest that nothing runs is worse than none, because seeing `--selftest`
 in a script reads as evidence the script is verified. It meant only that
 somebody could have run it.
 
-`Terium/tests/test_guard_selftests.py` now discovers and runs all five on
+`caterva/tests/test_guard_selftests.py` now discovers and runs all five on
 every push. Two findings from wiring it up, both immediate:
 
 - **The new selftest failed on its first run**, on a real bug: the status
@@ -4709,7 +4709,7 @@ helper instead of an ADR. Applied here with more force, because this copy
 was also wrong. A deletion guard now fails if any key matching
 `/optim|best/i` reappears on that return.
 
-Bakker's advice was that a score should drive selection. Terrium had two
+Bakker's advice was that a score should drive selection. Caterva had two
 scores driving selection in opposite directions, and the one the API served
 was the one nobody had reasoned about.
 
@@ -4835,7 +4835,7 @@ beyond the naming apology — and a hardcoded human hiding underneath it.
 ### The provenance died at the export boundary
 
 Sauro's mechanism — origin in a comment beside each Antimony assignment —
-works, and works only inside Terrium. Measured, not assumed:
+works, and works only inside Caterva. Measured, not assumed:
 
 ```
 annotate_antimony(model, provenance) -> antimony.getSBMLString(...)
@@ -4850,7 +4850,7 @@ deposition actually read. **Provenance that dies on export is provenance
 that never leaves the tool** — which, for a project whose entire claim is
 traceability, is close to the worst place for it to fail.
 
-`Terium/core/sbml_provenance.py` puts it back in the standard form: MIRIAM
+`caterva/core/sbml_provenance.py` puts it back in the standard form: MIRIAM
 RDF annotations (Le Novère et al. 2005) — `bqbiol:isDescribedBy` for a
 publication, `bqbiol:hasTaxon` for the organism a value was measured in,
 `bqbiol:isVersionOf` for the EC number — plus XHTML `<notes>` for everything
@@ -4900,7 +4900,7 @@ An early draft of the module docstring claimed the cross-species warning
 only. Rather than soften the sentence, the capability was built: the model
 carries one `bqbiol:hasTaxon`, each parameter carries its own, and
 `cross_species_parameters()` finds the mismatch **from the file alone**,
-using nothing Terrium-specific. A consumer that has never heard of Terrium
+using nothing Caterva-specific. A consumer that has never heard of Caterva
 reaches the same conclusion.
 
 With no model taxon it returns empty — and a test pins that this must not be
@@ -4928,7 +4928,7 @@ NCBI is down and the next line fetched the *human* UniProt accession and
 stamped it onto the thermophile's row as that measurement's protein
 identity.
 
-Terrium would refuse a cross-species *Km* while silently attaching a
+Caterva would refuse a cross-species *Km* while silently attaching a
 cross-species *accession* to it. "Could not look" collapsed into a confident
 wrong answer, in the codebase organised entirely around not doing that.
 
@@ -4971,11 +4971,11 @@ test passed. The unit tests fed `"PubMed 12345678"`. The CLI formats
 between the registry name and the number; `" ref "` is five.
 
 The fix is not a wider regex. The annotator was re-deriving identifiers from
-a string **Terrium itself formats** — parsing your own output, which is the
+a string **Caterva itself formats** — parsing your own output, which is the
 duplicate-source-of-truth defect with a formatting step in between. The
 citation splitter is now one exported function used by both exports, and the
 registry and accession are passed through structurally. The regex remains
-only as a fallback for citations Terrium did not format, and is now tested
+only as a fallback for citations Caterva did not format, and is now tested
 against the spelling the CLI actually produces.
 
 Related, and caught in the same run: the success message said "the
@@ -4999,7 +4999,7 @@ zero, and names the reason.
 ### Verification
 
 - `Tests/`: 671 passed, 1 skipped (was 655 before this pass's additions).
-- `Terium/tests`: all 43 files across six chunks, every chunk exit 0.
+- `caterva/tests`: all 43 files across six chunks, every chunk exit 0.
 - `tsc --noEmit` clean in both trees; CLI end-to-end suites pass.
 - Guards: `check_guard_wiring` (35 guards), `check_adr_index`,
   `check_cli_surface_documented`, `check_commands_runnable`,
@@ -5163,7 +5163,7 @@ placeholder zero looks like an excellent fit. The defect is most likely to
 fire exactly where the tool is most likely to be used.
 
 This is Bakker's concern arriving from an unexpected direction. Her point
-was that selection should be driven by properly scored evidence. Terrium's
+was that selection should be driven by properly scored evidence. Caterva's
 model selection was driven by a placeholder — and unlike a badly weighted
 score, there is no version of this that is defensible.
 
@@ -5234,7 +5234,7 @@ appears when a dependency is stubbed.
 
 Two guards are red on another agent's in-flight work — a new
 `check_dependency_licenses.py` with no `EXPECTED_WIRING` entry, and a
-`check_data_source_attribution.py` named by `Terium/core/data_sources.py`
+`check_data_source_attribution.py` named by `caterva/core/data_sources.py`
 that does not exist yet. Both files were written in the four minutes before
 the check ran. Not touched.
 
@@ -5295,7 +5295,7 @@ cross-species, detected from the file alone:
 ```
 
 Any tool that reads SBML reaches that conclusion with no knowledge of
-Terrium. The tests assert by re-reading the written file with a plain SBML
+Caterva. The tests assert by re-reading the written file with a plain SBML
 reader — asserting on the CLI's own summary would only prove the CLI agrees
 with itself.
 
@@ -5348,12 +5348,12 @@ cannot fail, and "drifted" would send someone hunting a registry change
 that never happened.
 
 Drift is reported in both directions with what each means, because they are
-not equivalent. A **widened** pattern means Terrium now refuses valid
+not equivalent. A **widened** pattern means Caterva now refuses valid
 accessions — under-annotating, the safe direction, still wrong. A
-**narrowed** one means Terrium mints URIs the registry no longer accepts —
+**narrowed** one means Caterva mints URIs the registry no longer accepts —
 fabricating, the direction the module exists to prevent. Neither is
 auto-applied: a script rewriting the fixture would let a registry change
-silently alter what Terrium is willing to claim.
+silently alter what Caterva is willing to claim.
 
 This sandbox can only ever produce `unreachable` (the proxy blocks the
 registry), so all three verdicts are driven offline against a stubbed fetch
@@ -5395,7 +5395,7 @@ hadn't been wired would be the honest-looking version of the same problem.
 ### Verification
 
 - `Tests/`: 682 passed, 1 skipped (655 → 671 → 682 across three passes).
-- `Terium/tests`: all 43 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 43 files across four chunks, every chunk exit 0.
 - Root `tsc --noEmit`: clean. api-server `tsc`: clean.
 - Root jest: 79 in `src/literature` + `src/__tests__`; the three new
   cross-species export tests pass.
@@ -5426,7 +5426,7 @@ Bakker's axis weighting, Jeske on BRENDA's missing organism column.
 ## Fourteenth pass — Jeske's licence, in the file that leaves
 
 `NOTICE` answers BRENDA's CC BY 4.0 obligations thoroughly: creator,
-copyright, licence URI, warranty disclaimer, an itemised list of Terrium's
+copyright, licence URI, warranty disclaimer, an itemised list of Caterva's
 modifications, and BRENDA's own citation request.
 
 **`NOTICE` stays in the repository. The model does not.** Measured on the
@@ -5464,7 +5464,7 @@ here is qualified to reach.
 
 **That the licensor endorses anything.** §2(a)(6) forbids implying
 sponsorship or endorsement, and this project has already been read that way
-once — a researcher took a Terrium outreach email as claiming credit that
+once — a researcher took a Caterva outreach email as claiming credit that
 was not ours. So the block says it outright: *"None of these sources
 produced, reviewed or endorsed this model."*
 
@@ -5479,7 +5479,7 @@ fact drift — ADR 0003's numeric bound, ADR 0027's duplicated score. The
 guard compares them literally, and immediately found the creator paraphrased
 ("the BRENDA team, Leibniz…" for "the BRENDA team **at the** Leibniz…") and
 an NCBI Taxonomy URI in the table that appears nowhere in `NOTICE` — a URI
-Terrium would have asserted in exported files and could not point at in its
+Caterva would have asserted in exported files and could not point at in its
 own records.
 
 ### The guard written to prevent the defect had the defect
@@ -5504,7 +5504,7 @@ disclaiming it.
 | | |
 |---|---|
 | Literature (`Tests/`) | 689 passed, 1 skipped |
-| Engine (`Terium/tests/`) | 1,106 passed |
+| Engine (`caterva/tests/`) | 1,106 passed |
 | Guards | 42, all wired |
 | Guard selftests | 8, now run on every push |
 | ADRs | 62, all unique, all indexed |
@@ -5557,7 +5557,7 @@ files rather than from memory.
 
 **stdpopsim is GPL-3.0-or-later** and was pinned in `requirements.txt`, so
 `make setup` put copyleft code into the default environment of an Apache-2.0
-project — compatible in one direction only. Nothing was violated (Terrium
+project — compatible in one direction only. Nothing was violated (Caterva
 never bundled it; running two separately-installed packages together is use,
 not distribution) but a reader would have had to compare two licence files to
 learn what they had. Moved to an opt-in `requirements-popgen.txt`. The code
@@ -5669,7 +5669,7 @@ one pass ago, and the CLI.
 **This is Sauro's warning, realised precisely.** His point was that a tool
 which blocks without explaining pushes the researcher into hardcoding a
 number with no warning at all — a strictly worse outcome caused by the
-strict rule. Terrium built the explanation with unusual care: ADR 0024's
+strict rule. Caterva built the explanation with unusual care: ADR 0024's
 refusal names the parameter, and the `--cite` work exists so a user who goes
 and finds a value can attach its source. All of it was replaced by eight
 characters of noise at the final step.
@@ -5785,7 +5785,7 @@ populated. The defect exists only *across* processes, which is the only way a
 user ever meets it. Every assertion in the new test file therefore uses a
 **second service instance**, standing in for the second process.
 
-Records now persist to `~/.terrium/records/<jobId>.json`. Failure to persist
+Records now persist to `~/.caterva/records/<jobId>.json`. Failure to persist
 never throws — a run that produced a correct result did produce it, and an
 unwritable home must not make the exit code mean two things. A damaged record
 raises "this is a damaged record, not a missing one" rather than "no such
@@ -5893,7 +5893,7 @@ something makes it fail on purpose.
 | | |
 |---|---|
 | Literature (`Tests/`) | 696 passed, 1 skipped |
-| Engine (`Terium/tests/`) | all green (run in three parts) |
+| Engine (`caterva/tests/`) | all green (run in three parts) |
 | Guards | 42 wired; ADR index, attribution, counts all green |
 
 ---
@@ -6110,7 +6110,7 @@ inspect the model.
 
 ### What was still missing after three passes on provenance
 
-A Terrium run produced an annotated SBML model, a bibliography, a job id and
+A Caterva run produced an annotated SBML model, a bibliography, a job id and
 a reproducibility key — and **none of it let another person repeat the
 experiment**. The model says what the system is. It does not say that this
 run integrated to t=10 with 101 output points, and that is the part that
@@ -6132,7 +6132,7 @@ format flag that can disagree with the filename.
 ### The claim, and how it is tested
 
 The claim is **"a third party can re-run this from the file alone"**, and it
-is tested by doing exactly that. `Terium/tests/test_combine_archive.py`
+is tested by doing exactly that. `caterva/tests/test_combine_archive.py`
 opens the archive, reads the time course **out of the SED-ML**, runs the
 model **out of the archive**, and compares against the original trajectory:
 
@@ -6154,7 +6154,7 @@ would have been perfectly happy with it.
 
 ### The off-by-one that would have been invisible
 
-SED-ML counts **intervals**; Terrium reports **rows**. 101 rows is 100
+SED-ML counts **intervals**; Caterva reports **rows**. 101 rows is 100
 intervals. Get it wrong and every re-run lands its samples *between* the
 original's — the curve looks right, every number differs, and nothing
 errors anywhere. Pinned by two tests, and the mutation confirms it:
@@ -6224,7 +6224,7 @@ opened it in COPASI is a claim this project does not make elsewhere.
   concurrent agent mid-edit of `test_science_agent_runner.py`; they passed
   in isolation and on re-run. Recorded rather than quietly re-run until
   green.)
-- `Terium/tests`: all 45 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 45 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean; the three new CLI archive tests pass.
 - Guards: **all 49 wired** (`check_guard_wiring`), and
   `check_ci_reproducible_locally`, `check_documented_counts`,
@@ -6526,7 +6526,7 @@ the cause rather than handling the symptom.
 ### Jeske's variant table holds up
 
 ADR 0029 is the record that came directly from her pointing at "Y124C
-mutant" sitting in the commentary of a row Terrium was treating as the
+mutant" sitting in the commentary of a row Caterva was treating as the
 enzyme. Re-derived under the fixed harness:
 
 | Mutation | Result |
@@ -6584,7 +6584,7 @@ Chasing whether the two Michaelis-Menten registries agreed led somewhere
 better than the answer.
 
 `verify_citations_live.py` asks CrossRef for the registered title of every
-DOI Terrium cites and compares it to the title our own source claims. That
+DOI Caterva cites and compares it to the title our own source claims. That
 is the project's strongest citation check — the difference between *the DOI
 resolves* and *the DOI is the paper we said it was* — and its own file
 records three citations it exists to catch: a fabricated Michaelis-Menten
@@ -6872,7 +6872,7 @@ hardcoded list would have silently truncated.
 ### The mutation that survived, again, for the same reason
 
 Putting `recorded = ["S", "P"]` back into the export script broke **nothing**
-in `Terium/tests/test_combine_archive.py`. Every test there calls
+in `caterva/tests/test_combine_archive.py`. Every test there calls
 `build_sedml()` directly and passes its own list. The unit tests pin the
 *builder*; nothing pinned the *call site*.
 
@@ -6922,7 +6922,7 @@ the same thing at some point. That point was a day ago.
 ### Verification
 
 - `Tests/`: **731 passed**, 1 skipped.
-- `Terium/tests`: all 45 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 45 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean.
 - Guards: `check_guard_wiring`, `check_dependencies_declared` (now green),
   `check_ci_reproducible_locally`, `check_documented_counts`,
@@ -6952,7 +6952,7 @@ missing organism column — all waiting on people, not on code.
 
 The SED-ML records species. A model with a **non-constant parameter** — an
 assignment rule, say — has a quantity that varies over the run and would not
-appear in the report. No Terrium domain has one today. Written down here
+appear in the report. No Caterva domain has one today. Written down here
 rather than discovered later by someone whose report is missing a curve.
 
 ---
@@ -6979,7 +6979,7 @@ sets:
 The one that matters most is ADR 0032's: `comparison_key` dropping
 `presence`. "In the presence of FBP" and "in the absence of FBP" are two
 arms of one designed experiment, and a key that collapses them makes the two
-rows the same condition — so Terrium returns one arm and never says the
+rows the same condition — so Caterva returns one arm and never says the
 other existed. Still caught.
 
 ADR 0028's is the same inversion as ADR 0029's, in a different module:
@@ -7124,10 +7124,10 @@ and the DOI↔title check that runs only behind `--live`.
 
 The half of Katz's field the earlier passes did not reach.
 
-### Terrium could cite everyone except itself
+### Caterva could cite everyone except itself
 
 `CITATION.cff` was already in the repository. **Nothing validated it,
-nothing referenced it, and no exported run carried it** — so a Terrium
+nothing referenced it, and no exported run carried it** — so a Caterva
 result could cite every measurement it used and not the tool that assembled
 them.
 
@@ -7211,7 +7211,7 @@ bundling without listing is the same as not bundling.
 ### Verification
 
 - `Tests/`: 751 passed, 1 skipped.
-- `Terium/tests`: all 47 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 47 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean.
 - Guards: **53 wired** (`check_guard_wiring`), plus `check_citation_cff`,
   `check_documented_counts`, `check_ci_reproducible_locally`,
@@ -7233,7 +7233,7 @@ missing organism column — all waiting on people.
 
 Carried forward from the eighteenth pass, still true: the SED-ML records
 species, so a model with a non-constant parameter would have a varying
-quantity absent from its report. No Terrium domain has one today.
+quantity absent from its report. No Caterva domain has one today.
 
 ---
 
@@ -7349,7 +7349,7 @@ papers they read.
 `NOTICE` says what that bibliography owes BRENDA:
 
 > If you use BRENDA data in scientific work, cite BRENDA's current
-> publication [...] **Citing Terrium is not a substitute for citing BRENDA.**
+> publication [...] **Citing Caterva is not a substitute for citing BRENDA.**
 
 The export emitted one `@misc` per parameter — `howpublished = {BRENDA
 database record}` — and **no entry for BRENDA**. A student importing it into
@@ -7518,7 +7518,7 @@ anything alarming.
 
 ### Bakker's deletion guard, tested the only way a deletion can be
 
-ADR 0027 is her feedback and the record of Terrium serving it wrong: her
+ADR 0027 is her feedback and the record of Caterva serving it wrong: her
 three axes implemented twice, a parity test asserting the two graders
 agreed, and the API server calling the TypeScript one with no
 `PhysiologicalReference` — so `conditionProximity` returned `not_assessed`
@@ -7618,7 +7618,7 @@ catches semantics.
 and returns `publicationReady: blockedParameters.length === 0` — a green
 light for putting the numbers in a paper. It reported per-parameter DOIs,
 PMIDs and STRENDA verdicts and **said nothing about what publishing
-obliges**, while `NOTICE` states that citing Terrium is not a substitute for
+obliges**, while `NOTICE` states that citing Caterva is not a substitute for
 citing BRENDA.
 
 The one surface that judges publication-readiness was silent on the
@@ -7632,7 +7632,7 @@ source that supplied a value in *this* run, from the same
 ### What was deliberately not done
 
 `publicationReady` is unchanged. Folding "has the user cited BRENDA?" into
-it was considered and rejected: Terrium cannot observe whether a citation
+it was considered and rejected: Caterva cannot observe whether a citation
 was made, and a boolean that silently absorbs an unobservable condition is a
 guess wearing the costume of a check. Reporting the obligation beside the
 verdict is the honest division, and the same reasoning ADR 0024 uses for
@@ -7645,7 +7645,7 @@ obligation in front of someone about to publish.
 
 ### The sweep that started with ADR 0063 is complete
 
-Every artifact leaving Terrium with BRENDA-derived values has now been
+Every artifact leaving Caterva with BRENDA-derived values has now been
 opened and checked, and each was missing something *different*:
 
 | artifact | what was missing |
@@ -7741,7 +7741,7 @@ comment of mine that was simply false.
 
 Two passes running, this document carried: *the SED-ML records species, so a
 model with a non-constant parameter would have a varying quantity absent
-from its report. No Terrium domain has one today.*
+from its report. No Caterva domain has one today.*
 
 The second sentence was checked rather than trusted:
 
@@ -7850,7 +7850,7 @@ five failures; widening the real tolerance to 99.0 still trips the bound.
 - `Tests/`: 46 files in two halves — 391 passed, then 373 passed + 1
   skipped. (Split because the whole suite now exceeds the sandbox's
   per-call ceiling.)
-- `Terium/tests`: all 46 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 46 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean.
 - Guards: `check_guard_wiring`, `check_citation_cff`,
   `check_dependencies_declared`, `check_documented_counts`,
@@ -7866,7 +7866,7 @@ missing organism column — waiting on people.
 
 New, and stated rather than quietly carried: `recorded_quantities` covers
 species, parameters and compartments. SBML also has **reactions**, whose
-fluxes vary and which no loop here reaches. No Terrium domain reports a flux
+fluxes vary and which no loop here reaches. No Caterva domain reports a flux
 today, and unlike the previous gap I have not yet checked whether SED-ML's
 own conventions make that a sensible thing to record at all.
 
@@ -8312,7 +8312,7 @@ notes carried grades only too.
 So the sentence was computed in Python, serialised across a process
 boundary, parsed in TypeScript, typed on an interface, and dropped one step
 before the screen. That is the same defect this codebase has now found at
-five layers, and this is the layer where it costs the most: Terrium is a
+five layers, and this is the layer where it costs the most: Caterva is a
 teaching tool (this document settled that when it chose Jeske's column), and
 "partial" teaches nothing while the sentence teaches STRENDA.
 
@@ -8367,7 +8367,7 @@ tempting response is to go change the code.
 
 - `Tests/`: 48 files in two halves — 401 passed, then 378 passed + 1
   skipped.
-- `Terium/tests`: all 46 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 46 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean; the three new CLI tests pass individually.
 - Guards: `check_guard_wiring`, `check_documented_counts`,
   `check_ci_reproducible_locally`, `check_citation_cff`,
@@ -8458,7 +8458,7 @@ Fluxes are now recorded. `mm` reports `S, P, J0`; `sir` reports
 
 ### Which quantity this actually is, measured
 
-This is **not** the number Terrium prints. `scientificPipeline.ts` derives a
+This is **not** the number Caterva prints. `scientificPipeline.ts` derives a
 `velocity` by backward finite difference on the concentration series
 (forward at t=0, deliberately, because t=0 is where the MM rate is
 highest). The SED-ML target is the **exact rate-law value**.
@@ -8473,9 +8473,9 @@ worst relative difference: 0.082%
 
 Close, and not the same. The exact flux is the right thing for an archive to
 carry — the archive describes the **model and the experiment**, not
-Terrium's post-processing, and a consumer re-running it computes what the
+Caterva's post-processing, and a consumer re-running it computes what the
 rate law defines. Written into the module so that a reader comparing the
-archive's curve against Terrium's screen finds the discrepancy explained
+archive's curve against Caterva's screen finds the discrepancy explained
 rather than alarming.
 
 **And the 0.082% is itself pinned by a test.** A measured number sitting in
@@ -8507,7 +8507,7 @@ on claiming a no-op that had stopped being one.
 ### Verification
 
 - `Tests/`: 48 files in two halves — 427 passed, then 354 passed + 1 skipped.
-- `Terium/tests`: all 46 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 46 files across four chunks, every chunk exit 0.
 - Guards: `check_guard_wiring`, `check_documented_counts`,
   `check_ci_reproducible_locally`, `check_citation_cff`,
   `check_dependencies_declared`, `check_cli_surface_documented` — all exit 0.
@@ -8795,7 +8795,7 @@ that never ran ranking first, because its fabricated `0` sat closest to a
 small experimental value. A defect in code nobody calls has no symptoms.
 
 This is Bakker's point arriving from the far side. Her advice was that
-evidence should drive which value gets used; Terrium had built the machinery
+evidence should drive which value gets used; Caterva had built the machinery
 to do that against a student's own measurement and never connected it.
 
 I named it as open for **five consecutive passes** before doing it — the same
@@ -8809,7 +8809,7 @@ models ranked by distance from your measurement, plus what was excluded and
 why. Send nothing and behaviour is byte-identical.
 
 Absent means absent. An experimental value is a number the experimenter
-measured; Terrium cannot resolve it from literature and must not invent one,
+measured; Caterva cannot resolve it from literature and must not invent one,
 so its absence means no ranking — never a default. ADR 0012/0013's rule
 applied to an input rather than a parameter.
 
@@ -8939,7 +8939,7 @@ reference is not a test that the reference resolves.*
 ### Verification
 
 - `Tests/`: 49 files in two halves — 427 passed, then 362 passed + 1 skipped.
-- `Terium/tests`: all 46 files across five chunks, every chunk exit 0.
+- `caterva/tests`: all 46 files across five chunks, every chunk exit 0.
 - `tsc --noEmit` clean.
 - Guards: `check_guard_wiring`, `check_ci_reproducible_locally`,
   `check_dependencies_declared`, `check_citation_cff`,
@@ -9180,7 +9180,7 @@ passes the standard validator without comment and disappears from the
 reader without comment. And `read_back()` is libSBML reading libSBML — the
 producer verified against itself, which is the parity-test failure applied
 to a dependency instead of to two of our own implementations. The entire
-reason for writing MIRIAM rather than something Terrium-shaped is that
+reason for writing MIRIAM rather than something Caterva-shaped is that
 *other* tools read it, and nothing was checking that they could.
 
 `audit_annotations()` parses the annotations with lxml alone and checks
@@ -9213,7 +9213,7 @@ quietly made HTTP calls would be its own surprise.
 
 - `Tests/`: 49 files in two halves — 427 passed, then 362 passed + 1
   skipped.
-- `Terium/tests`: all 46 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 46 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean.
 - Guards: `check_guard_wiring`, `check_ci_reproducible_locally`,
   `check_dependencies_declared`, `check_citation_cff`,
@@ -9251,7 +9251,7 @@ is still not the same as another tool opening the file.
 
 ## Twenty-first pass — the residue baseline's open finding, read
 
-`docs/commentary-residue-baseline.txt` records the BRENDA commentary Terrium
+`docs/commentary-residue-baseline.txt` records the BRENDA commentary Caterva
 cannot read, so unread text is *reviewed* rather than merely unparsed.
 Coverage has risen 73% → 92% since ADR 0031. One group in it is marked
 **OPEN FINDING**: covalent modification, affinity tags, immobilisation.
@@ -9444,7 +9444,7 @@ check, not a smoke test.
 
 It set the integrator to `1e-10` and `1e-12` — **as literals**.
 
-`Terium/core/data_structures.py` defines
+`caterva/core/data_structures.py` defines
 `DEFAULT_RELATIVE_TOLERANCE = 1e-10` and
 `DEFAULT_ABSOLUTE_TOLERANCE = 1e-12`. Identical. Correct. And a second
 statement of one fact.
@@ -9499,7 +9499,7 @@ back — not just the exact two numbers that were there before.
 ### Verification
 
 - `Tests/`: 51 files in three groups — 388, then 412 + 1 skipped, then 10.
-- `Terium/tests`: all 47 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 47 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean.
 - `scripts/check_env.py` exits 0 with the engine's tolerances reported.
 - Guards: `check_guard_wiring`, `check_ci_reproducible_locally`,
@@ -9684,7 +9684,7 @@ invitation to `check-integrity` later.
 
 ### Three defects in the reproducibility record
 
-**1. It described a solver Terrium does not use.**
+**1. It described a solver Caterva does not use.**
 
 `createRecord` hardcoded:
 
@@ -9692,7 +9692,7 @@ invitation to `check-integrity` later.
 solver: { algorithm: 'RK45', absoluteTolerance: 1e-8, relativeTolerance: 1e-6 }
 ```
 
-Terrium integrates with **CVODE** at **1e-10 / 1e-12**. Every field wrong,
+Caterva integrates with **CVODE** at **1e-10 / 1e-12**. Every field wrong,
 in the record whose entire job is describing how a result was produced.
 
 **2. That made the reproducibility verifier meaningless.**
@@ -9735,7 +9735,7 @@ there to begin with, and exactly what the previous pass removed from
 `check_env.py`.
 
 Instead the **engine reports its own configuration**:
-`terium_runner.py` reads `DEFAULT_RELATIVE_TOLERANCE` /
+`caterva_runner.py` reads `DEFAULT_RELATIVE_TOLERANCE` /
 `DEFAULT_ABSOLUTE_TOLERANCE` and puts them in its result; the bridge carries
 them; the pipeline passes them to `recordExecution`. The only side that
 knows is the side that says.
@@ -9754,9 +9754,9 @@ says RK45 is useless in a way that looks like information.
 ### Verification
 
 - `Tests/`: 53 files in three groups — 379, 428 + 1 skipped, 10.
-- `Terium/tests`: all 47 files across four chunks, every chunk exit 0.
+- `caterva/tests`: all 47 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean; `src/reproducibility` 40 passed, `src/integration`
-  28 passed, `teriumBridge` included — 54 across the four suites.
+  28 passed, `catervaBridge` included — 54 across the four suites.
 - `check_engine_contract` exits 0.
 
 ### Two failures that are not mine
@@ -9764,9 +9764,9 @@ says RK45 is useless in a way that looks like information.
 - `Tests/test_runner_contract.py::test_golden_found_output_shape` — a
   concurrent agent added a `preparation` field to
   `science_agent_runner.py`. Different file from the one I changed
-  (`terium_runner.py`); both are modified in the working tree, only one by
+  (`caterva_runner.py`); both are modified in the working tree, only one by
   me.
-- `check_doc_paths_resolve` — flagging `Terrium-sim/main.git` and two
+- `check_doc_paths_resolve` — flagging `math12345678/caterva.git` and two
   others quoted **inside prose about a URL discrepancy** in `START_HERE.md`,
   which another agent is editing right now. Those are git remotes, not
   paths, so this is a guard false positive on someone else's in-flight
@@ -9820,8 +9820,8 @@ runs it: not CI, not the Makefile, not `verify_build.py`.
 What that cost, measured rather than supposed:
 
 ```
-scripts/verify_build.py:813  F821  Undefined name `TERIUM_DIR`
-scripts/verify_build.py:822  F821  Undefined name `TERIUM_DIR`
+scripts/verify_build.py:813  F821  Undefined name `CATERVA_DIR`
+scripts/verify_build.py:822  F821  Undefined name `CATERVA_DIR`
 ```
 
 `run_python_tests()` referenced a constant that does not exist, and it is
@@ -9829,7 +9829,7 @@ called unconditionally on the non-`--quick` path:
 
 ```
 >>> run_python_tests(quick=True)
-NameError: name 'TERIUM_DIR' is not defined
+NameError: name 'CATERVA_DIR' is not defined
 ```
 
 **The script that verifies the build crashed in the branch that runs the
@@ -9873,7 +9873,7 @@ A missing ruff makes the guard **fail**, not skip. A check that passes when
 its tool is absent reports OK on every machine that lacks it — which is
 every machine where nobody installed it, which is how this went unrun.
 
-Verified against the exact historical failure: deleting the `TERIUM_DIR`
+Verified against the exact historical failure: deleting the `CATERVA_DIR`
 definition gives exit 1, restoring it gives exit 0.
 
 ### Verification
@@ -9986,7 +9986,7 @@ question this pass does not answer."* This is that answer.
 
 ### The engine suite runs, and it is green
 
-47 test files under `Terium/tests`, collected cleanly, run in three chunks
+47 test files under `caterva/tests`, collected cleanly, run in three chunks
 because the whole suite exceeds the sandbox's per-call limit:
 
 | chunk | result |
@@ -10052,7 +10052,7 @@ inventing checks to satisfy checks.
 
 | | |
 |---|---|
-| `Terium/tests` | 579+ passed across 47 files, 3 skipped, 0 failed |
+| `caterva/tests` | 579+ passed across 47 files, 3 skipped, 0 failed |
 | `CITATION.cff` | valid against CFF 1.2.0, verified not assumed |
 | Guards | green |
 
@@ -10182,7 +10182,7 @@ red stop being the same thing.
 
 - `Tests/`: 53 files in two groups — 440 passed, then 390 passed + 1
   skipped, plus `test_runner_contract` now 19 passed.
-- `Terium/tests`: 46 of 47 files across four chunks, every chunk exit 0.
+- `caterva/tests`: 46 of 47 files across four chunks, every chunk exit 0.
 - `tsc --noEmit` clean. `src/reproducibility` 44 passed,
   `src/integration` 28 passed, the three new CLI tests pass individually.
 - Guards: `check_guard_wiring`, `check_citation_cff`,
@@ -10194,7 +10194,7 @@ red stop being the same thing.
 
 ### The one file not verified
 
-`Terium/tests/test_popgen_correctness.py` **hangs** — 282 tests collect,
+`caterva/tests/test_popgen_correctness.py` **hangs** — 282 tests collect,
 then one never returns. The file is modified in the working tree by a
 concurrent agent, and it ran clean in earlier chunks this session. Nothing I
 changed touches population genetics.
@@ -10303,7 +10303,7 @@ once. 23 → 20, with the count and the reason both in the guard.
 
 | | |
 |---|---|
-| `Terium/tests` | 923 passed, 3 skipped, 0 failed, 47 files |
+| `caterva/tests` | 923 passed, 3 skipped, 0 failed, 47 files |
 | Delivery guard | 26 of 26 after editing it |
 | `test_form_mixture` + `test_fallback_logic` | 60 passed |
 | Bug-lint guard | green; outstanding now F401 x17, F841 x3 |
@@ -10379,7 +10379,7 @@ Three consequences, each against a blanket rule:
    honest state is *unknown* — not "probably harmful", which is what
    exclusion asserts.
 2. **The effect is quantity-dependent.** Where the tag did harm it reduced
-   *activity* and preserved *substrate affinity*. Both values Terrium would
+   *activity* and preserved *substrate affinity*. Both values Caterva would
    lose are **Ki** — affinity constants, the quantity that survived in the
    one case measured end to end.
 3. **The original defect was silence, and silence is already fixed.** The
@@ -10491,7 +10491,7 @@ neither looked at its *shape*.
 The previous pass closed with this, under a heading saying a suite that
 cannot be run is not a suite that passed:
 
-> `Terium/tests/test_popgen_correctness.py` **hangs** — 282 tests collect,
+> `caterva/tests/test_popgen_correctness.py` **hangs** — 282 tests collect,
 > then one never returns.
 
 **That was wrong.** Measured this pass:
@@ -10508,7 +10508,7 @@ and that looked like confirmation.
 
 This is the third measurement error of this shape in the session:
 
-1. `pgrep -f "pytest Terium"` matching its own command line — twenty minutes
+1. `pgrep -f "pytest Caterva"` matching its own command line — twenty minutes
    of "RUNNING" for a process that had already died.
 2. `EXIT=$?` after a pipe reporting `tail`'s status, not the CLI's — a run
    that exits 2 read as exiting 0.
@@ -10531,7 +10531,7 @@ Measured, on the reference container, `-p no:randomly`:
 
 | suite | time |
 |---|---|
-| `Terium/tests` (engine) | ~3.5-4 min (exceeds a 175 s budget in one call) |
+| `caterva/tests` (engine) | ~3.5-4 min (exceeds a 175 s budget in one call) |
 | `Tests/` (literature) | ~2.9 min (40.7 + 115.3 + 17.6 s in three groups) |
 | `test_popgen_correctness.py` alone | 58 s — the largest single file |
 
@@ -10549,12 +10549,12 @@ this document has recorded more often than any other.
 it (another agent's work — a good addition). It corrects README.md and
 leaves the three published-repo mirrors under `docs/readmes/` alone, so
 those were updated by hand: five stale claims across `main.md`,
-`terium.md` and `tests.md`.
+`caterva.md` and `tests.md`.
 
 ### Verification
 
 - `Tests/`: 57 files in three groups — 425, 431 + 1 skipped, 20. All pass.
-- `Terium/tests`: `test_popgen_correctness.py` 282 passed; files 1-24
+- `caterva/tests`: `test_popgen_correctness.py` 282 passed; files 1-24
   pass in 49 s; the remainder exceed a single call and were verified in
   chunks last pass.
 - `check_documented_counts` exits 0 across README and all three mirrors.
@@ -11027,7 +11027,7 @@ Installing each turned a refusal into a real check. Both then passed.
 |---|---|
 | Mutations | 4 caught — drop the not-SBML check; drop the reconciliation; pin the full namespace instead of the stem (fails the BioModels level-2 case); make the reconciliation fire when equal |
 | Tests | `test_sbml_provenance.py` 30 → 35, 5 new; provenance/export/citation/archive selection 125 green |
-| Lints | F841 clear across Tests, scripts, Terium |
+| Lints | F841 clear across Tests, scripts, Caterva |
 | Guards | ADR index (104), python bug lints, citation CFF, doc links, findings-reach-a-surface, vacuous, guard wiring all green |
 | Next | `F401 x17` is the other bug class the lint guard lists and does not enforce — unread, and worth the same treatment |
 | Open items | Bakker on axis weighting; Sauro on default-versus-refuse; the `--live` DOI check; NCBI's citation request wording; delete `.selftest_probe.md` from the repo root |
@@ -11069,7 +11069,7 @@ that is not a wrong answer — it is no answer and no error. Now bounded by
 
 **And proving it end-to-end found the real one.**
 `scripts/export_citations.py` died on its import line —
-`ModuleNotFoundError: No module named 'Terium'` — because it puts
+`ModuleNotFoundError: No module named 'caterva'` — because it puts
 `REPO_ROOT/Tests` on the path and not `REPO_ROOT`, while `citation_export`
 imports the shared source table. **In HEAD.** Every test imports the library
 directly, where pytest has already supplied the path, so the library was
@@ -11115,7 +11115,7 @@ which would be file-wide matching under a new name.
 `literatureCandidates` had **two** non-test references in the entire tree:
 the interface declaration and an empty-array initialiser. Nothing read it.
 
-When BRENDA holds no value, Terrium searches PubMed and CORE, finds papers,
+When BRENDA holds no value, Caterva searches PubMed and CORE, finds papers,
 and returns them — the fallback whose whole job is the case where the primary
 path failed. The runner emits them on two branches. And a student was told
 *"could not be resolved from literature"* while the system held papers that
@@ -11169,7 +11169,7 @@ UNTITLED -> ... records the source identifier only; author, year, journal
 ```
 
 Identical, and the entries are not. The titled entry emits
-`title = {LDH kinetics in human}` and the note inside it says Terrium records
+`title = {LDH kinetics in human}` and the note inside it says Caterva records
 the source identifier *only* — false about the entry it is attached to. The
 untitled entry has no title field at all, and the note names three absences
 and not the field every reference manager displays first: the one absence a
@@ -11646,7 +11646,7 @@ having skipped the ones already built.
 ## 2026-08-17 — the tool was correct and not useful, which are different things
 
 Smyan's note: *"I don't think it's fixing any problem."* He is right, and
-using Terrium from a standing start shows why in about ninety seconds.
+using Caterva from a standing start shows why in about ninety seconds.
 
 ```
 $ simulate "lactate dehydrogenase"
@@ -11671,7 +11671,7 @@ searches for a plausible enzyme concentration, pastes it, and now holds an
 unsourced parameter with no record of its origin — worse than the refusal,
 because the refusal was at least visible.
 
-Terrium was optimising for not being wrong and had stopped optimising for
+Caterva was optimising for not being wrong and had stopped optimising for
 being useful. It had only noticed one of those.
 
 ### What changed
@@ -11687,7 +11687,7 @@ made them look identical:
   source, or widen the search.
 
 That distinction is the whole thing. Listing both as "unresolved" implies
-both are gaps in Terrium's coverage; one is, and the other is a value that
+both are gaps in Caterva's coverage; one is, and the other is a value that
 is *theirs to pick*. Saying so turns a dead end into a decision the student
 is qualified to make.
 
@@ -11726,7 +11726,7 @@ Recorded as ADR 0116. ADR 0024 Decision 2 moves from open to answered:
 
 ## Forty-sixth pass — the name the database uses
 
-The owner said Terrium did not feel like it was fixing a problem. Rather
+The owner said Caterva did not feel like it was fixing a problem. Rather
 than argue, I used it as a student would.
 
 The live path could not run here — BRENDA returns 403 to this sandbox — so
@@ -12165,7 +12165,7 @@ from opposite directions, at the same mechanism.
 
 - Bakker: values EXIST and disagree — answered by ADR 0111, which runs the
   model at every value the evidence ranked equal.
-- Sauro: the requested organism has NO value — where Terrium either
+- Sauro: the requested organism has NO value — where Caterva either
   withholds or, with the opt-in, substitutes one organism's number.
 
 All three existing options were bad. Default 0.5 invents a number. Refusing
@@ -12181,7 +12181,7 @@ needs was in the function that declined to provide it.
 Shaped as `TiedCandidate`, so `spread_consequence.consequence_of` consumes
 them unchanged: one ensemble mechanism, two sources of candidates. The two
 cases really are the same act — *the literature reports these numbers and
-Terrium will not pick between them*.
+Caterva will not pick between them*.
 
 What it does not become: `found` stays False, `value` stays None, no
 candidate is `selected`. Carrying a rabbit's number so a student can see
@@ -12350,7 +12350,7 @@ and only the first belongs in CI_ONLY. It runs perfectly well on a laptop
 with network, so it went into `make guards`, which is what the guard
 suggested first.
 
-**2. The pitch deck understated the tests by 17%.** `terrium_pitch_deck.pptx`
+**2. The pitch deck understated the tests by 17%.** `caterva_pitch_deck.pptx`
 claimed 1,852 automated tests against 2,220 in the repository, on two
 slides, outside the guard's 15% tolerance. Rewritten by rebuilding the zip
 entry by entry — 73 parts before and after, identical name set, exactly two
@@ -12373,7 +12373,7 @@ with several agents, *"the guard is red"* is not sufficient grounds to fix it
 |---|---|
 | Fixed | `check_pins_resolve` given a local route; pitch deck corrected on two slides |
 | Verified | 543 + 69 + 50 + 142 + 280 tests green across five slices; the only remaining Python failure is the three unclassified steps above |
-| For the owner | `rm terrium_pitch_deck.pptx.bak` — a backup I made before rewriting the deck and cannot delete from this sandbox |
+| For the owner | `rm caterva_pitch_deck.pptx.bak` — a backup I made before rewriting the deck and cannot delete from this sandbox |
 | Open | the api-server job, red since 2026-08-05 and still not reproducible here |
 
 ## Fifty-sixth pass — nobody can get it
@@ -12387,9 +12387,9 @@ No. Measured, not assumed:
 
 | repository | anonymous `git ls-remote` |
 |---|---|
-| `Terrium-sim/main` (documented in 19 places) | not readable |
-| `Terrium-sim/terrium` | not readable |
-| `math12345678/terrium` (`origin`) | not readable |
+| `math12345678/caterva` (documented in 19 places) | not readable |
+| `math12345678/caterva` | not readable |
+| `math12345678/caterva` (`origin`) | not readable |
 
 2,235 tests, 70 guards, 143 decisions, four professors' feedback worked into
 the design — all of it behind a credential prompt. Every other thing on the
@@ -12397,7 +12397,7 @@ the design — all of it behind a credential prompt. Every other thing on the
 
 The documented URL is **not a typo**, which I checked before proposing to
 change it: `Tests/test_clone_instructions_agree.py` records the deliberate
-choice of `Terrium-sim/main` over `origin` as the intended public home. The
+choice of `math12345678/caterva` over `origin` as the intended public home. The
 repositories simply have not been published.
 
 ### What was already there, and what it could not do
@@ -12474,13 +12474,13 @@ Fifth collision this week.
 | Fixed | availability stated on both front doors; counts resynced across README and four `docs/readmes/` files after the tree grew under me twice |
 | Verified | counts, doc links, doc paths, scripts-reachable, and the new guard all green; the new guard proven to catch by mutation with the restore checked |
 | **For the owner** | **publish the repositories.** ADR 0143's CI step goes green the day it happens, and 0145's tells you to delete the notice. Nothing else in this document is upstream of that |
-| For the owner | `rm .git/index.lock` (stale, blocks every write) and `rm terrium_pitch_deck.pptx.bak` |
+| For the owner | `rm .git/index.lock` (stale, blocks every write) and `rm caterva_pitch_deck.pptx.bak` |
 | Proposed | move the 12 genuine orphans out of the root; keep `GOVERNANCE.md` and `SUPPORT.md` where GitHub looks for them |
 | Open | the api-server job, red since 2026-08-05, still not reproducible here |
 
 ## Fifty-seventh pass — using it, rather than reading it
 
-Asked to test-run Terrium, both surfaces. Not a review. Typing what a
+Asked to test-run Caterva, both surfaces. Not a review. Typing what a
 student types, starting with the invocation printed in `report`'s own help.
 
 ```
@@ -12499,7 +12499,7 @@ service sends a student to check whether the wrong database is down.
 A fixture run now makes no network requests at all — the first attempt
 replaced only the BRENDA fetch and still died on NCBI, the same lesson one
 layer down — and the cost is recorded rather than absorbed: organism
-relatedness is `not_assessed`, stated in the document's own *"What Terrium
+relatedness is `not_assessed`, stated in the document's own *"What Caterva
 would not do"* section. The page's EC is verified rather than inferred from
 its filename, because reading LDH rows under a hexokinase query would return
 real reference numbers for the wrong protein (ADR 0126), and an offline path
@@ -12536,7 +12536,7 @@ person to see the thing this project is for?
 Six hurdles. A private clone, a 120 MB `make setup`, a Node toolchain,
 guessing which of ten commands, discovering that BRENDA calls lactate
 `(S)-lactate`, and four services being reachable at that instant. Each one
-defensible on its own. Together they meant **nobody had ever seen a Terrium
+defensible on its own. Together they meant **nobody had ever seen a Caterva
 document without being told how to get one.**
 
 `make demo` — thirty seconds, no network, no BRENDA account, no Node. It
@@ -12635,7 +12635,7 @@ Seven numbers corrected on the first run, including a `literature layer only
 
 | | |
 |---|---|
-| Fixed | six new patterns, unconditional `--write`, README's counts checked, `terium.md` reworded so its number carries its own antecedent |
+| Fixed | six new patterns, unconditional `--write`, README's counts checked, `caterva.md` reworded so its number carries its own antecedent |
 | Verified | selftest still proves `rewrite()` changes digits and nothing else; falsifying the README total now fails naming the line, and passed before; the legitimate `skips its 19 tests` does not fire |
 | Corrected | the api-server claim, carried wrong through three ADRs |
 | Open, deliberately | `check_quickstart_clone_works` stays red until the repositories are published (ADR 0143) |
@@ -12653,7 +12653,7 @@ defaulting a parameter, one level up"*. The domain then drives validation,
 required parameters, and literature recommendations.
 
 **It does not drive the model.** `runSimulation(parameters, conditions)`
-never received it and called `runTerium('mm', ...)`.
+never received it and called `runCaterva('mm', ...)`.
 
 Measured over HTTP:
 
@@ -12704,7 +12704,7 @@ Last pass ended: *"SIR and the three inhibition models are implemented and
 unreachable over HTTP. Made visible, not papered over, and not built."*
 This pass built SIR.
 
-The engine had it all along — `runTerium` has accepted `'sir'` since the
+The engine had it all along — `runCaterva` has accepted `'sir'` since the
 bridge was written. The gap was entirely in the HTTP layer.
 
 **The trap is the obvious implementation.** Run the engine, return the
@@ -12989,7 +12989,7 @@ written to make expire.
 
 ## Sixty-seventh pass — the report claimed reproducibility and did not record it
 
-You keep saying the paper has to be perfect. So I read a Terrium report the
+You keep saying the paper has to be perfect. So I read a Caterva report the
 way a reviewer would, and the first thing I looked for was missing.
 
 Every report has carried this since the band section was built:
@@ -13039,7 +13039,7 @@ logic nothing tests.**
 
 ## Sixty-eighth pass — the numbers a paper would need, and two of them disagreed
 
-You keep saying the paper has to be perfect. Terrium's measurable facts are
+You keep saying the paper has to be perfect. Caterva's measurable facts are
 real and scattered: parser coverage prints as a side effect of a guard
 passing, test counts live inside another guard, domain and decision counts
 are file globs nobody runs by hand.
@@ -14124,7 +14124,7 @@ Retracting a row and implementing the units are materially different
 trees, and this is the record the project rests on. Not mine to pick. The
 guards stay red so it cannot be quietly forgotten.
 
-Also red and also the owner's: `terrium_pitch_deck.pptx` says 1,852 tests
+Also red and also the owner's: `caterva_pitch_deck.pptx` says 1,852 tests
 on two slides; the repository has 2,297.
 
 | | |
@@ -14132,7 +14132,7 @@ on two slides; the repository has 2,297.
 | Found | a five-day build break that a guard already caught and never got to run — `make guards` fail-fasts, and one README count stale by eleven hid two dozen later checks, a contract test whose verdict depended on network reachability, a test asserting the opposite of the branch it named, one domain list in three hand-kept copies, and an ADR index claiming a fix that measurably is not in the tree |
 | Built | `pnpm run typecheck` in CI + its local route and reason; 1 new test for the delivered taxon path; the no-refusal branch given its first coverage; the prompt's domain list derived rather than retyped |
 | Verified | 2 mutations, both caught against a green baseline; the JSX fix hand-verified and named as the weakest evidence, because grading it needs pnpm and a set file that says NOT CAUGHT without node_modules is worse than none; all restores checked by `diff` and `git diff` |
-| Not checked | `Business/`, `mule/`, `terrium-site/`, `advanced_analysis/`, `landing/`; whether the rest of the literature suite hits the network — two offline runs failed to finish, so **not determined**, not "fine"; whether CI was red during the five days, which needs the CI logs |
+| Not checked | `Business/`, `mule/`, `caterva-site/`, `advanced_analysis/`, `landing/`; whether the rest of the literature suite hits the network — two offline runs failed to finish, so **not determined**, not "fine"; whether CI was red during the five days, which needs the CI logs |
 | **For the owner** | decide 0146/0150 (retract or implement); the pitch-deck number; `make setup` here installs the `cffconvert` that leaves one engine test UNREACHABLE |
 
 ---
@@ -14319,7 +14319,7 @@ written to fix, one directory up. Outside its reach: the repository root's
 `src/` (115 files, including the CLI `START_HERE.md` tells you to run),
 `landing/` — whose own tsconfig opens by explaining that this code "no
 tsconfig.json covered, so nothing type-checked it", written and never run
-— and `terrium-site/`. Seven workspaces, now ten.
+— and `caterva-site/`. Seven workspaces, now ten.
 
 ### `pip install -r requirements.txt` did not work, and two names had no packages
 
@@ -14352,7 +14352,7 @@ like an untested claim, and the only reason neither became a false
 | Found | CI red for 28 pushes with the cause already fixed and two blockers behind it; a flag hiding 25 guards; a compile guard blind to the product; a requirements file that cannot install, naming two packages that do not exist |
 | Built | the four misplaced groups moved out, with a structural test pinning the branch; compile-guard scope 7 → 10 workspaces; `check_pins_resolve` extended to names across four files |
 | Verified | 2 mutations caught after two inert ones were correctly refused; scope widening and name check hand-verified old-guard vs new-guard on the same tree, named as the weaker evidence; all restores diff-checked |
-| Checked and clean | `terrium-site` installs, type-checks and builds; 30 `mule/` JS files parse; `landing/` type-checks — three of them now inside the compile guard so they stay checked |
+| Checked and clean | `caterva-site` installs, type-checks and builds; 30 `mule/` JS files parse; `landing/` type-checks — three of them now inside the compile guard so they stay checked |
 | Then checked | `Business/`, named unread by three passes: every referenced path resolves, the architecture table maps to eleven real files, and the only two live claims are already scanned — the 2,279 is 1.8% off and tolerated on purpose. What was wrong is the SCOPE: `INVESTOR_DOCS` is a hand-written five, and the file already calls itself the "sixth instance of a correct guard on too narrow a scope". A derived pass now asks whether any Business doc makes an undated claim nothing covers |
 | Then fixed | mypy, configured since before anything installed it: **12 errors → 0 across 167 files**. Ten were one name holding two types in one function. The eleventh narrowed an AST node with a boolean flag, which is correct and unverifiable — `ast.walk` yields bare `AST` — and `continue` narrows for both readers. Declared in requirements-dev with licences read from the shipped LICENSE files. Installed, **not** enforced: wiring a type checker changes what green means, and that is still yours — now a one-liner instead of a one-liner plus a backlog |
 | Corrected | I claimed the inhibition domains were unreachable from `dashboard.html`, citing ADR 0149. **False** — ADR 0157 fixed it on 2026-08-22 and I repeated 0149 without opening the file. Measured: all four enabled options are accepted and map to distinct domains, and `allosteric` is disabled in the markup exactly as the validator rejects it. Reading an ADR and reporting it as current is the same act as trusting the 0146/0150 index rows — the defect these three records have been chasing |
@@ -14365,7 +14365,7 @@ like an untested claim, and the only reason neither became a false
 ### A collision, yielded — the units are being built right now
 
 Starting on ADR 0150's substance — the unit declarations the index row
-claims — I wrote `Terium/core/sbml_units.py`, measured the mm export at
+claims — I wrote `caterva/core/sbml_units.py`, measured the mm export at
 **15 consistency problems → 0**, and proved the fixed file bit-identical
 to the original over 51 points through roadrunner.
 
@@ -14411,7 +14411,7 @@ with my mistake.
 ### I destroyed another author's only copy
 
 Another agent was building the same feature in the same worktree. Their
-draft of `Terium/core/sbml_units.py` was untracked — and I wrote mine
+draft of `caterva/core/sbml_units.py` was untracked — and I wrote mine
 over it with an unchecked `cat >`. No git object ever existed; it is
 gone. The owner's protective-commit message had flagged the in-flight
 work in so many words, and I did not read it before writing.

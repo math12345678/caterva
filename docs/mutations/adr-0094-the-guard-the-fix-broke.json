@@ -7,7 +7,7 @@
     "",
     "check_doc_paths_resolve.py went red because the pass that fixed the",
     "clone-URL disagreement wrote the explanation into START_HERE.md,",
-    "backticking three repository slugs. `Terrium-sim/terrium.git` has the",
+    "backticking three repository slugs. `math12345678/caterva.git` has the",
     "shape of a repo-relative path and is not one. A guard born from a",
     "wrong path typed while fixing paths was taken down by prose typed",
     "while fixing prose.",

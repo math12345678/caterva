@@ -9,8 +9,8 @@
 
 ## What was missed
 
-ADR 0062 audited every *package* Terrium depends on and concluded the
-licensing position was clean. It audited nothing Terrium *calls*.
+ADR 0062 audited every *package* Caterva depends on and concluded the
+licensing position was clean. It audited nothing Caterva *calls*.
 
 Three databases are queried live, from the server, on the resolution path.
 None appeared in `NOTICE`. Two of them are not free-for-any-use databases,
@@ -27,7 +27,7 @@ license".
 CORE's terms (https://core.ac.uk/terms) grant commercial use of their
 ODC-By *datasets* and explicitly exclude the *API*: "you need to obtain a
 licence to use other CORE datasets as well as the CORE API." They then list
-three conditions under which you must contact them. Terrium meets all
+three conditions under which you must contact them. Caterva meets all
 three — it may be monetised, it uses CORE data in a service, and that
 service is literature search and discovery, CORE's own listed example.
 
@@ -73,7 +73,7 @@ not to the sources someone happened to add, is not yet a policy.
 
 Record all three in `NOTICE` with their terms **quoted rather than
 paraphrased**, and flag KEGG and CORE as open questions with the specific
-action for each. Neither is resolved here: whether Terrium is academic or
+action for each. Neither is resolved here: whether Caterva is academic or
 commercial is not an engineering decision, and this repository contains an
 incorporation checklist, a cap table and a fundraising tracker.
 
@@ -144,6 +144,6 @@ Three times in two days, each found by mutation rather than by review.
 
 ## What this does not settle
 
-Whether Terrium needs a KEGG licence, a CORE licence, both, or neither.
+Whether Caterva needs a KEGG licence, a CORE licence, both, or neither.
 That depends on a commercial-status question the project has not answered,
 and it is not a question this repository can answer by inspecting itself.

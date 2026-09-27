@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — Evidence Cathedral renderer
+   caterva — Evidence Cathedral renderer
    Builds one tall SVG architecture from the config. Pure
    construction: no state transitions live here.
    ============================================================ */
@@ -207,7 +207,7 @@ function buildSheet() {
 
   // Left: sheet identity block.
   g.appendChild(s('line', { class: 'sheet-rule', x1: L, y1: 150, x2: L + 330, y2: 150 }));
-  g.appendChild(s('text', { class: 'sheet-note', x: L, y: 138, text: 'TERRIUM / EVIDENCE CATHEDRAL' }));
+  g.appendChild(s('text', { class: 'sheet-note', x: L, y: 138, text: 'CATERVA / EVIDENCE CATHEDRAL' }));
   g.appendChild(s('text', {
     class: 'sheet-note', x: L, y: 176, text: 'RUN 0007 \u2014 ILLUSTRATIVE',
     style: 'font-size:7.4px', opacity: 0.72

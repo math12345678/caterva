@@ -1,8 +1,8 @@
 """
-Engine contract guard for Terrium.
+Engine contract guard for Caterva.
 
 Verifies that the modular Python engine maintains the same public API
-and behavior as the original monolithic terium_engine.py.
+and behavior as the original monolithic caterva_engine.py.
 
 This guard ensures:
 1. All names in __all__ resolve correctly from both the shim and modules
@@ -48,11 +48,11 @@ def get_all_names_from_file(filepath: Path) -> List[str]:
 
 
 def verify_shim_imports() -> List[str]:
-    """Verify that the terium_engine.py shim correctly imports from modular structure."""
+    """Verify that the caterva_engine.py shim correctly imports from modular structure."""
     errors = []
     
     repo_root = Path(__file__).parent.parent
-    shim_file = repo_root / 'Terium' / 'terium_engine.py'
+    shim_file = repo_root / 'caterva' / 'caterva_engine.py'
     
     if not shim_file.exists():
         return [f"Shim file not found: {shim_file}"]
@@ -69,7 +69,7 @@ def verify_shim_imports() -> List[str]:
         for node in ast.walk(tree):
             if isinstance(node, ast.Try):
                 for item in node.body:
-                    if isinstance(item, ast.ImportFrom) and 'Terium.core' in str(ast.unparse(item)):
+                    if isinstance(item, ast.ImportFrom) and 'caterva.core' in str(ast.unparse(item)):
                         has_try_import = True
                 for handler in node.handlers:
                     if isinstance(handler, ast.ExceptHandler):
@@ -78,7 +78,7 @@ def verify_shim_imports() -> List[str]:
                                 has_except_import = True
         
         if not has_try_import:
-            errors.append("Shim missing try block with Terium.core imports")
+            errors.append("Shim missing try block with caterva.core imports")
         if not has_except_import:
             errors.append("Shim missing except block with relative core imports")
             
@@ -93,7 +93,7 @@ def verify_module_exports() -> List[str]:
     errors = []
     
     repo_root = Path(__file__).parent.parent
-    terium_dir = repo_root / 'Terium'
+    caterva_dir = repo_root / 'caterva'
     
     # Expected module structure
     expected_modules = [
@@ -105,7 +105,7 @@ def verify_module_exports() -> List[str]:
     
     # Check module structure
     for module in expected_modules:
-        module_dir = terium_dir / module
+        module_dir = caterva_dir / module
         if not module_dir.exists():
             errors.append(f"Expected module directory missing: {module_dir}")
         elif module == 'core':
@@ -116,7 +116,7 @@ def verify_module_exports() -> List[str]:
             )
     
     # Check discrete submodules
-    discrete_dir = terium_dir / 'discrete'
+    discrete_dir = caterva_dir / 'discrete'
     expected_discrete = ['__init__.py', 'pcr.py', 'monte_carlo.py', 'molecular_dynamics.py', 'gillespie_ssa.py', 'population_genetics']
     
     for discrete_file in expected_discrete:
@@ -146,16 +146,16 @@ def verify_import_compatibility() -> List[str]:
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent))
         
-        # Try importing from Terium package
-        from Terium import terium_engine  # noqa: F401
-        from Terium.core.data_structures import ModelBuildError, SimulationResult  # noqa: F401
-        from Terium.core.validation import validate_michaelis_menten_params  # noqa: F401
+        # Try importing from caterva package
+        from caterva import caterva_engine  # noqa: F401
+        from caterva.core.data_structures import ModelBuildError, SimulationResult  # noqa: F401
+        from caterva.core.validation import validate_michaelis_menten_params  # noqa: F401
         print("✓ Package mode imports successful")
         
     except ImportError as e:
         errors.append(f"Package mode import failed: {e}")
 
-    # Test flat mode (simulate being in Terium directory)
+    # Test flat mode (simulate being in Caterva directory)
     flat_errors = _test_flat_mode_imports()
     errors.extend(flat_errors)
 
@@ -163,23 +163,23 @@ def verify_import_compatibility() -> List[str]:
 
 
 def _test_flat_mode_imports() -> List[str]:
-    """Verify that imports work when Terium/ is on the path directly."""
+    """Verify that imports work when caterva/ is on the path directly."""
     local_errors = []
     original_path = sys.path[:]
     try:
         # Set up flat mode path
-        terium_dir = Path(__file__).parent.parent / 'Terium'
-        sys.path = [str(terium_dir)] + [p for p in sys.path if p != str(Path(__file__).parent.parent)]
+        caterva_dir = Path(__file__).parent.parent / 'caterva'
+        sys.path = [str(caterva_dir)] + [p for p in sys.path if p != str(Path(__file__).parent.parent)]
 
         # Clear any cached imports
-        modules_to_clear = [m for m in sys.modules if 'Terium' in m or m.startswith('core') or m.startswith('continuous') or m.startswith('discrete')]
+        modules_to_clear = [m for m in sys.modules if 'caterva' in m or m.startswith('core') or m.startswith('continuous') or m.startswith('discrete')]
         for m in modules_to_clear:
             if m in sys.modules:
                 del sys.modules[m]
 
         # Try flat mode imports — these are intentionally "unused"; the test
         # is that they import without error.
-        import terium_engine  # noqa: F401
+        import caterva_engine  # noqa: F401
         from core.data_structures import ModelBuildError, SimulationResult  # noqa: F401
         from core.validation import validate_michaelis_menten_params  # noqa: F401
         from continuous.model_building import build_michaelis_menten_antimony  # noqa: F401
@@ -197,26 +197,26 @@ def _test_flat_mode_imports() -> List[str]:
 
 
 def verify_all_exports() -> List[str]:
-    """Verify that all __all__ entries in terium_engine.py resolve correctly."""
+    """Verify that all __all__ entries in caterva_engine.py resolve correctly."""
     errors = []
     
     try:
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent))
         
-        from Terium import terium_engine
+        from caterva import caterva_engine
         
         # Get __all__ from the module
-        if hasattr(terium_engine, '__all__'):
-            all_names = terium_engine.__all__
-            missing_names = [name for name in all_names if not hasattr(terium_engine, name)]
+        if hasattr(caterva_engine, '__all__'):
+            all_names = caterva_engine.__all__
+            missing_names = [name for name in all_names if not hasattr(caterva_engine, name)]
             
             if missing_names:
                 errors.append(f"Missing __all__ exports: {missing_names}")
             else:
                 print(f"✓ All {len(all_names)} __all__ entries resolve correctly")
         else:
-            errors.append("No __all__ defined in terium_engine module")
+            errors.append("No __all__ defined in caterva_engine module")
             
     except Exception as e:
         errors.append(f"Error checking __all__ exports: {e}")
@@ -232,7 +232,7 @@ def verify_rule2_contract() -> List[str]:
         import sys
         sys.path.insert(0, str(Path(__file__).parent.parent))
         
-        from Terium.core.data_structures import ParameterValidation
+        from caterva.core.data_structures import ParameterValidation
         
         # Create a ParameterValidation instance with defaults
         validation = ParameterValidation()

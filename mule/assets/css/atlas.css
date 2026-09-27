@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — TERRIUM ATLAS
+   caterva — CATERVA ATLAS
    A full-bleed system map: substrate, region plates, modules,
    route lanes, chrome, and the inspection drawer.
 
@@ -379,7 +379,7 @@
 }
 .atl-node--rack-active .atl-rack__edge { stroke: rgba(49, 184, 148, 0.5); }
 .atl-node--rack-active .atl-rack__fill { fill: rgba(29, 138, 114, 0.1); }
-/* Compute outside the product is drawn dashed and dimmer. Terrium does
+/* Compute outside the product is drawn dashed and dimmer. Caterva does
    not own it and must not appear to. */
 .atl-rack__external {
   fill: none;

@@ -1,6 +1,6 @@
 # Complete Project Delivery Summary
 
-**Project:** Terrium Backend - Complete Code Quality + Scientific Documentation Transformation  
+**Project:** Caterva Backend - Complete Code Quality + Scientific Documentation Transformation  
 **Status:** ⚠️ NOT PRODUCTION READY BY THIS REPO'S OWN GATE -- all 79 jest tests pass, but branch coverage (65.26%) is below the 80% threshold `package.json` itself configures, so `npx jest --coverage` exits non-zero (see "Quality Metrics" below; corrected 2026-08-10, an earlier version of this line asserted PRODUCTION READY against a suite that had never been run clean, and an intermediate correction the same day caught 1 real test failure that has since been fixed).  
 **Completion Date:** 2026-08-09  
 **Total Scope:** 30+ code improvements + 9,134 lines of documentation across the 15 documents listed below (counted directly via `wc -l` on 2026-08-10; an earlier version of this line claimed 18,000+, about 2x the real total).  
@@ -463,13 +463,13 @@ tests pass; branch coverage 65.26% vs the repo's own 80% threshold
 
 ## 📝 Document Control
 
-**Project:** Terrium Backend - Code Quality & Documentation Transformation  
+**Project:** Caterva Backend - Code Quality & Documentation Transformation  
 **Version:** 1.0 (Production Release)  
 **Status:** ✅ Complete & Ready for Deployment  
 **Delivery Date:** 2026-08-09  
 **Owner:** Backend & Architecture Team  
 
-**All 15 documents ready in:** `/Users/smyan/Desktop/Coding/Terrium/`
+**All 15 documents ready in:** `/Users/smyan/Desktop/Coding/Caterva/`
 
 ---
 

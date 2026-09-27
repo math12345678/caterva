@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — run state machine
+   caterva — run state machine
    Drives the illustrated pipeline. Time-based but skippable,
    replayable, and fully readable in reduced-motion mode.
    ============================================================ */

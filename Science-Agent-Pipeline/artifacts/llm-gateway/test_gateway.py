@@ -637,7 +637,7 @@ class TestTheLedgerIsPersistedEachCall:
         declared = tmp_path / "somewhere" / "ledger.json"
         assert default_ledger_path({gateway.LEDGER_PATH_ENV_VAR: str(declared)}) == declared
         assert default_ledger_path({"XDG_CACHE_HOME": str(tmp_path)}) == (
-            tmp_path / "terrium" / "llm-quota-ledger.json"
+            tmp_path / "caterva" / "llm-quota-ledger.json"
         )
 
 
@@ -680,7 +680,7 @@ class TestEndpointsAreDeclaredNotInvented:
 
     def test_the_environment_wins_over_the_config(self) -> None:
         config = {"model_list": [{
-            "model_name": "terrium-extract",
+            "model_name": "caterva-extract",
             "litellm_params": {
                 "model": "groq/llama-3.3-70b-versatile",
                 "api_key": "os.environ/GROQ_API_KEY",
@@ -693,7 +693,7 @@ class TestEndpointsAreDeclaredNotInvented:
 
     def test_an_api_base_in_the_config_is_used(self) -> None:
         config = {"model_list": [{
-            "model_name": "terrium-extract",
+            "model_name": "caterva-extract",
             "litellm_params": {
                 "model": "openai/Qwen/Qwen2.5-7B-Instruct",
                 "api_key": "os.environ/SILICONFLOW_API_KEY",
@@ -717,7 +717,7 @@ class TestEndpointsAreDeclaredNotInvented:
 
     def test_a_config_endpoint_is_used_when_the_caller_passes_one(self) -> None:
         config = {"model_list": [{
-            "model_name": "terrium-extract",
+            "model_name": "caterva-extract",
             "litellm_params": {
                 "model": "openai/Qwen/Qwen2.5-7B-Instruct",
                 "api_key": "os.environ/SILICONFLOW_API_KEY",
@@ -926,7 +926,7 @@ def fake_config(*names: str, **settings: Any) -> Dict[str, Any]:
     return {
         "model_list": [
             {
-                "model_name": "terrium-extract",
+                "model_name": "caterva-extract",
                 "litellm_params": {
                     "model": PROVIDERS_BY_NAME[name].model,
                     "api_key": f"os.environ/{PROVIDERS_BY_NAME[name].key_env_var}",
@@ -950,7 +950,7 @@ class TestTheRouterPlanFollowsTheMeasuredOrder:
                            environ=dict(ENVIRON), now=NOW)
 
         assert plan.chain == ("openrouter", "groq")
-        assert plan.model_list[0]["model_name"] == "terrium-extract"
+        assert plan.model_list[0]["model_name"] == "caterva-extract"
         assert plan.model_list[0]["litellm_params"]["model"] == OPENROUTER.model
 
     def test_every_other_provider_gets_its_own_name_so_nothing_is_shuffled(self) -> None:
@@ -962,7 +962,7 @@ class TestTheRouterPlanFollowsTheMeasuredOrder:
                            environ=dict(ENVIRON), now=NOW)
 
         names = [entry["model_name"] for entry in plan.model_list]
-        assert names == ["terrium-extract", alias_for("terrium-extract", "openrouter")]
+        assert names == ["caterva-extract", alias_for("caterva-extract", "openrouter")]
         assert len(set(names)) == len(names)
 
     def test_the_fallback_chain_is_the_measured_order(self) -> None:
@@ -977,9 +977,9 @@ class TestTheRouterPlanFollowsTheMeasuredOrder:
         # groq measured AVAILABLE leads; the two UNKNOWN ones follow in the
         # order quota.py puts them, and the fallbacks list says so explicitly.
         assert plan.chain[0] == "groq"
-        assert plan.fallbacks == ({"terrium-extract": [
-            alias_for("terrium-extract", plan.chain[1]),
-            alias_for("terrium-extract", plan.chain[2]),
+        assert plan.fallbacks == ({"caterva-extract": [
+            alias_for("caterva-extract", plan.chain[1]),
+            alias_for("caterva-extract", plan.chain[2]),
         ]},)
 
     def test_an_exhausted_provider_is_dropped_and_the_reason_kept(self) -> None:
@@ -1010,13 +1010,13 @@ class TestTheRouterPlanFollowsTheMeasuredOrder:
         # provider quota.py does not know cannot be ordered by headroom.
         config = fake_config("groq")
         config["model_list"].append({
-            "model_name": "terrium-extract",
+            "model_name": "caterva-extract",
             "litellm_params": {"model": "openai/gpt-4o-mini", "api_key": "os.environ/SOMETHING_ELSE"},
         })
 
         plan = plan_router(config, ledger=ledger(), environ=dict(ENVIRON), now=NOW)
 
-        assert plan.model_list[-1]["model_name"] == "terrium-extract-unmeasured-1"
+        assert plan.model_list[-1]["model_name"] == "caterva-extract-unmeasured-1"
         assert any("matches no provider" in note for note in plan.notes)
 
     def test_a_retry_policy_that_is_not_applied_says_so(self) -> None:
@@ -1054,13 +1054,13 @@ class TestTheRouterPlanFollowsTheMeasuredOrder:
                               litellm_module=_FakeLitellm())
 
         assert [d["model_name"] for d in router.kwargs["model_list"]] == [
-            "terrium-extract", alias_for("terrium-extract", "groq"),
+            "caterva-extract", alias_for("caterva-extract", "groq"),
         ]
         assert router.kwargs["fallbacks"] == [
-            {"terrium-extract": [alias_for("terrium-extract", "groq")]}
+            {"caterva-extract": [alias_for("caterva-extract", "groq")]}
         ]
         assert router.kwargs["num_retries"] == 2
-        assert router.terrium_plan.chain == ("openrouter", "groq")
+        assert router.caterva_plan.chain == ("openrouter", "groq")
 
 
 class TestDeploymentMatching:
@@ -1120,7 +1120,7 @@ class TestAgainstTheRealConfig:
     def test_the_plan_over_the_real_config_uses_the_name_the_app_asks_for(self) -> None:
         plan = plan_router(self.config(), ledger=Ledger(environ=dict(ENVIRON)),
                            environ=dict(ENVIRON), now=NOW)
-        assert plan.primary_model_name == "terrium-extract"
+        assert plan.primary_model_name == "caterva-extract"
         assert len(plan.model_list) == len(PROVIDERS)
         assert plan.notes == () or all("retry_policy" in n or "matches no" in n for n in plan.notes)
 

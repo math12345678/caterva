@@ -45,7 +45,7 @@ serious defect this project has found lived in a copy nobody was watching"*
 runtime; neither owns it, and it is not generated, so it is a source file
 rather than committed build output.
 
-- `Terium/core/data_sources.py` loads it for the Antimony and SBML exports.
+- `caterva/core/data_sources.py` loads it for the Antimony and SBML exports.
 - `Science-Agent-Pipeline/.../lib/dataSources.ts` loads it for the CSV.
 - `NOTICE` stays authoritative prose; every field is transcribed from it,
   and the existing guard fails when the two disagree.
@@ -76,7 +76,7 @@ docstrings are excluded structurally, TypeScript has its comments stripped.
 ## Verification
 
 `src/__tests__/dataSources.test.ts` (10) and the existing
-`Terium/tests/test_data_sources.py` (16), asserting the CC BY clauses rather
+`caterva/tests/test_data_sources.py` (16), asserting the CC BY clauses rather
 than the wording so the block can be rephrased but not thinned.
 
 Two tests exist specifically because the CSV is *data*:

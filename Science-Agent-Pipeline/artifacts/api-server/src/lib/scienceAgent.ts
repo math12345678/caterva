@@ -55,13 +55,13 @@ export interface ScienceAgentResult {
   ki?: number;
   /** Turnover number (s^-1), quantity="kcat". A resolved kcat is NOT a
    * simulation-ready parameter on its own -- Vmax = kcat * [E]0 needs a
-   * caller-supplied enzyme concentration Terrium never defaults or infers
+   * caller-supplied enzyme concentration Caterva never defaults or infers
    * (ADR 0012 / 0013). See ADR 0019 for how a resolved kcat combines with
    * a user-supplied enzyme_conc override into a Vmax provenance entry. */
   kcat?: number;
   /** Only present when quantity="kcat" and enzymeConc was supplied: the
    * bridged Vmax = kcat * enzymeConc, computed in Python by the same
-   * Terium.core.validation.vmax_from_kcat() the engine itself uses --
+   * caterva.core.validation.vmax_from_kcat() the engine itself uses --
    * one implementation of the arithmetic and its Rule 2 bounds, not a
    * second copy in TypeScript. See ADR 0019. */
   vmax?: number;
@@ -74,7 +74,7 @@ export interface ScienceAgentResult {
    * reproduction number, and infectious period (from
    * Tests/epidemiology_resolver.py's hand-verified registry), plus the
    * bridged (beta, gamma) the SIR engine takes directly, computed by the
-   * same Terium.core.validation.beta_gamma_from_r0() the engine uses.
+   * same caterva.core.validation.beta_gamma_from_r0() the engine uses.
    * Only present when parameterType="disease_parameters" was requested. */
   disease?: string;
   r0?: number;
@@ -567,7 +567,7 @@ function notFoundResult(reason: string): ScienceAgentResult {
 /**
  * Resolve a disease's (R0, infectious period) golden tuple and bridge it to
  * the SIR engine's own (beta, gamma) — see Tests/epidemiology_resolver.py
- * and Terium.core.validation.beta_gamma_from_r0. Returns found=false for
+ * and caterva.core.validation.beta_gamma_from_r0. Returns found=false for
  * any disease outside the hand-verified registry; never fabricates a value.
  */
 export async function resolveEpidemiologyParameters(

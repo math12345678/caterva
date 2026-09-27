@@ -30,7 +30,7 @@ import { STRENDA_GOVERNED_FIELDS, unverifiedOriginKeys } from "../lib/provenance
 describe("domain citations are citations, not labels", () => {
   it("returns undefined rather than a placeholder for an unmapped domain", () => {
     // "sbml" is the raw-SBML escape hatch: the caller supplies the model,
-    // so Terrium has nothing of its own to cite.
+    // so Caterva has nothing of its own to cite.
     expect(getDomainCitation("sbml")).toBeUndefined();
     expect(getDomainCitation("not_a_real_domain")).toBeUndefined();
   });

@@ -89,7 +89,7 @@ REQUIRED = [
     (re.compile(r"\bquery\b", re.I),
      "what is actually sent"),
     (re.compile(r"their terms|provider'?s?\s+(data|terms)|retention", re.I),
-     "that the provider's terms govern it, not Terrium's"),
+     "that the provider's terms govern it, not Caterva's"),
 ]
 
 

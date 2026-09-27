@@ -13,9 +13,9 @@ carries)
 
 ## The problem, stated by the owner
 
-> Terrium is a tool. People should use Terrium.
+> Caterva is a tool. People should use Caterva.
 
-Terrium could, separately: resolve a literature value, record its
+Caterva could, separately: resolve a literature value, record its
 provenance, parse the assay conditions it was measured under, grade it on
 Bakker's axes, run an ensemble across values the evidence cannot rank,
 export BibTeX and RIS, write an annotated SBML model, build a COMBINE
@@ -25,7 +25,7 @@ archive, and integrate the system.
 
 Every one of them answers a question nobody asks in isolation. A student in
 a teaching lab has one job — run the simulation, and show where the numbers
-came from — and Terrium could do both halves while leaving them to assemble
+came from — and Caterva could do both halves while leaving them to assemble
 the result from a terminal transcript, two export files and a screen they
 had already scrolled past.
 
@@ -45,7 +45,7 @@ one document:
    and which of those the source did not report.
 3. **Where the literature disagrees** — the ensemble, with each candidate
    value and what the model does at it.
-4. **What Terrium would not do.**
+4. **What Caterva would not do.**
 5. **Result** — first and last row of the trajectory, and a pointer to the
    CSV for the rest. A lab report is not a data dump.
 6. **Citations** — BibTeX, ready for a reference manager.

@@ -13,12 +13,13 @@ and it saves a round trip.
 
 ## Two things that are not your fault
 
-**`No module named 'Terrium'`** — the package is spelled `Terium`, one r.
-The product is `Terrium`, two. Your install is fine. See
-[`START_HERE.md`](START_HERE.md).
+**`No module named 'caterva'`** — the environment you are in is not the one
+`make setup` made. Run `source .venv/bin/activate`, then `make doctor`, which
+names the cause (on a Mac it is usually iCloud hiding files in `.venv`). See
+[`docs/USING_CATERVA.md`](docs/USING_CATERVA.md).
 
 **A run that refuses instead of producing a number** — that is usually
-Terrium working. It declines to invent a parameter it cannot source, and
+Caterva working. It declines to invent a parameter it cannot source, and
 says which one and why. If the refusal does not tell you what was missing,
 *that* is a bug worth reporting.
 

@@ -1,4 +1,4 @@
-"""Guard-wiring guard for Terrium: every guard must run somewhere, unasked.
+"""Guard-wiring guard for Caterva: every guard must run somewhere, unasked.
 
 The Stage 4 amendment, made executable:
 
@@ -20,7 +20,7 @@ A guard is wired if it appears in at least one of:
 
   - `scripts/verify_build.py`      (the local aggregate)
   - `.github/workflows/tests.yml`  (CI)
-  - a pytest wrapper under `Terium/tests/`
+  - a pytest wrapper under `caterva/tests/`
 
 Any one is sufficient. The point is that *something* runs it without being
 asked, not that everything does.
@@ -43,7 +43,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 VERIFY_BUILD = SCRIPTS_DIR / "verify_build.py"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"
-PYTEST_DIRS = [REPO_ROOT / "Terium" / "tests", REPO_ROOT / "Tests"]
+PYTEST_DIRS = [REPO_ROOT / "caterva" / "tests", REPO_ROOT / "Tests"]
 
 # Guards that are deliberately NOT in every harness, with the reason. A
 # guard listed here is exempt from the harness named, not from the
@@ -110,7 +110,7 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # verify_build for no extra signal.
     "check_documented_equations_match_engine": ("verify_build",),
     # verify_build only, same reasoning: it parses the AST of every module
-    # under Terium/agents, which a pytest wrapper would re-do identically.
+    # under caterva/agents, which a pytest wrapper would re-do identically.
     "check_constraints_are_actionable": ("verify_build",),
     # verify_build, in both its offline and its --live form. Offline it
     # reads a committed snapshot; --live re-asks Expasy and sits with the

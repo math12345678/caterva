@@ -55,7 +55,7 @@ API_SERVER_ENV_EXAMPLE = (
 KNOWN_ENV_EXAMPLES = (
     "Science-Agent-Pipeline/.env.example",
     "Science-Agent-Pipeline/artifacts/api-server/.env.example",
-    "terrium-site/.env.example",
+    "caterva-site/.env.example",
 )
 
 #: Variable names present in api-server/.env.example BEFORE the 2026-09-13
@@ -93,7 +93,7 @@ VARIABLES_BEFORE_REWRITE = (
     "OPENROUTER_API_KEY",
     "PORT",
     "SILICONFLOW_API_KEY",
-    "TERRIUM_PYTHON",
+    "CATERVA_PYTHON",
     "TOKENROUTER_API_KEY",
     "VIRTUAL_ENV",
     "WAITLIST_FILE",
@@ -245,7 +245,7 @@ class TestTheCredentialShapeDetector:
             "3000",
             "development",
             "info",
-            "terrium-extract",
+            "caterva-extract",
             "http://127.0.0.1:4000/v1/chat/completions",
             "https://api.openai.com/v1/chat/completions",
             "/usr/bin/python3.12",
@@ -310,7 +310,7 @@ class TestNoTrackedEnvExampleHoldsACredential:
         """`your-groq-key-here` is not a key, but it is a key-shaped hole.
 
         It reads like live config in a diff, it teaches the next person that
-        populated values are normal in this file, and for TERRIUM_PYTHON and
+        populated values are normal in this file, and for CATERVA_PYTHON and
         CACHE_FILE a populated placeholder actively overrides a working
         default. Empty says "unset" without ambiguity.
         """
@@ -438,11 +438,11 @@ class TestTheWaterfallWiringIsDocumented:
 
     def test_the_model_name_matches_the_gateway_config(self) -> None:
         text = self.env_text()
-        assert "terrium-extract" in text
+        assert "caterva-extract" in text
         config = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "llm-gateway" / "config.yaml"
         # Asserted against config.yaml rather than a remembered string: the
         # name only works because every deployment there answers to it.
-        assert "model_name: terrium-extract" in config.read_text(encoding="utf-8")
+        assert "model_name: caterva-extract" in config.read_text(encoding="utf-8")
 
     def test_the_account_email_is_recorded(self) -> None:
         # A key with no known owner cannot be rotated.

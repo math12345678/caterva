@@ -91,7 +91,7 @@ def test_a_saved_page_produces_a_whole_document_with_no_network():
     markdown = result["markdown"]
 
     # A document, not a stub. Each of these is a section a student hands in.
-    for heading in ("## Parameters", "## Result", "## What Terrium would not do"):
+    for heading in ("## Parameters", "## Result", "## What Caterva would not do"):
         assert heading in markdown, f"the report has no {heading!r} section"
 
     # The literature value actually reached the table — the point of the run.
@@ -112,7 +112,7 @@ def test_the_document_says_the_organism_was_not_verified():
 
     assert "Organism relatedness is therefore NOT ASSESSED" in markdown
     # In the refusals section specifically, not loose in the prose.
-    refusals = markdown.split("## What Terrium would not do", 1)[1]
+    refusals = markdown.split("## What Caterva would not do", 1)[1]
     assert "NOT ASSESSED" in refusals
     assert result["refusals"], "the note must be a refusal, not decoration"
 
@@ -223,7 +223,7 @@ def test_the_lookup_failure_is_still_reported_even_though_the_row_is_gone():
     a way of hiding that the literature had nothing.
     """
     markdown = run(supplied_km_payload())["markdown"]
-    refusals = markdown.split("## What Terrium would not do", 1)[1]
+    refusals = markdown.split("## What Caterva would not do", 1)[1]
     assert "the substrate name matched nothing" in refusals
 
 

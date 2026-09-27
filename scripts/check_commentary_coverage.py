@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""How much of BRENDA's commentary can Terrium actually read?
+"""How much of BRENDA's commentary can Caterva actually read?
 
 WHY THIS EXISTS
 ---------------
-BRENDA puts one free-text cell beside every kinetic value. Terrium mines it
+BRENDA puts one free-text cell beside every kinetic value. Caterva mines it
 for pH, temperature, buffer, and (since ADR 0029) whether the row measured a
 sequence variant. Everything else in that string is discarded silently.
 
@@ -29,7 +29,7 @@ WHAT IT DOES
 ------------
 For every commentary in the fixtures, it removes the spans the pipeline's own
 extractors match, and reports what is left. The leftovers are, precisely,
-what Terrium cannot read.
+what Caterva cannot read.
 
 THE PATTERNS ARE IMPORTED, NOT RE-LISTED
 ----------------------------------------
@@ -240,7 +240,7 @@ def main() -> int:
     if args.update_baseline:
         BASELINE.parent.mkdir(parents=True, exist_ok=True)
         header = (
-            "# Commentary text Terrium cannot read, reviewed and accepted.\n"
+            "# Commentary text Caterva cannot read, reviewed and accepted.\n"
             "#\n"
             "# Regenerate: python3 scripts/check_commentary_coverage.py --update-baseline\n"
             "#\n"
@@ -263,7 +263,7 @@ def main() -> int:
         for txt, n in sorted(unreviewed.items(), key=lambda kv: -kv[1]):
             print(f"  x{n:<3} {txt!r}")
         print(
-            "\nEach of these is text beside a kinetic value that Terrium does not\n"
+            "\nEach of these is text beside a kinetic value that Caterva does not\n"
             "read. Some will be irrelevant. Some will change what the number means --\n"
             "that is how the mutant rows in ADR 0029 and the CaCl2 in the trypsin\n"
             "rows were both missed.\n"

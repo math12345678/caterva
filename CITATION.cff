@@ -1,36 +1,34 @@
 cff-version: 1.2.0
 message: >-
-  If you use Terrium in academic or research work, please cite it as below.
+  If you use Caterva in academic or research work, please cite it as below.
   This file exists for the same reason the test suite checks every number
   against an exact solution: a claim should be traceable back to something
   concrete, and "cite this project" deserves the same treatment as "cite
   this Km value."
-title: Terrium
+title: Caterva
 abstract: >-
   A biology simulation engine built on antimony/SBML/roadrunner, providing
   validated enzyme kinetics (Michaelis-Menten), epidemiology (SIR/SEIR), and
   PCR amplification models with literature-grounded parameter plausibility
   checks.
 
-  Terrium is NOT Tellurium. Tellurium is a separate, established
+  Caterva is NOT Tellurium. Tellurium is a separate, established
   systems-biology environment from the Sauro lab at the University of
-  Washington and collaborators. Terrium is an unaffiliated personal
+  Washington and collaborators. Caterva is an unaffiliated personal
   project: not a fork of Tellurium, not endorsed by its authors, and
-  making no claim to their work. Terrium is a consumer of that ecosystem,
+  making no claim to their work. Caterva is a consumer of that ecosystem,
   running on libRoadRunner (Apache 2.0, University of Washington) and
-  generating Antimony (MIT). The similar name is a mistake, and it has
-  already caused one researcher to reasonably read a cold email as a false
-  claim of credit.
+  generating Antimony (MIT). The project was called Terrium until 2026-09-27, too close to Tellurium's name; it has been Caterva since.
 authors:
-  - name: Terrium
-    website: "https://github.com/Terrium-sim/terrium"
+  - name: Caterva
+    website: "https://github.com/math12345678/caterva"
 license: Apache-2.0
-repository-code: "https://github.com/Terrium-sim/terrium"
-# The version matches Terium.__version__ (which pyproject.toml reads) and
+repository-code: "https://github.com/math12345678/caterva"
+# The version matches caterva.__version__ (which pyproject.toml reads) and
 # package.json, kept equal to the release tag so "cite the version you
 # used" resolves to a real tag. package.json said 1.0.0 until 2026-08-29;
 # 0.1.0 was the source-only release of that date; 0.2.0 the first with
 # built artifacts (2026-09-19); 0.3.0 the first on GitHub's Releases page
 # with app folders (2026-09-21); 0.3.1 adds the user's guide (2026-09-22).
-version: 0.3.4
-date-released: 2026-09-24
+version: 0.4.0
+date-released: 2026-09-27

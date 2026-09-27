@@ -5,7 +5,7 @@
 
 ## Context
 
-Every lab report Terrium produces has contained this sentence since the band
+Every lab report Caterva produces has contained this sentence since the band
 section was built:
 
 > Seed 1 — re-running with it reproduces this band exactly.
@@ -26,7 +26,7 @@ Reproducible Biomedical Modeling.
 
 ## Decision
 
-Every report ends with how it was produced: the Terrium commit, the UTC
+Every report ends with how it was produced: the Caterva commit, the UTC
 timestamp, and either an invitation to reproduce it or a refusal to claim
 it is reproducible.
 

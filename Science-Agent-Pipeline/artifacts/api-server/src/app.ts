@@ -107,7 +107,7 @@ app.get("/", (_req: Request, res: Response) => {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Terrium API</title>
+  <title>Caterva API</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -172,7 +172,7 @@ app.get("/", (_req: Request, res: Response) => {
   <div class="card">
     <div class="logo">
       <span class="dot"></span>
-      <span style="font-size:1.25rem;color:rgba(255,255,255,0.7)">terrium</span>
+      <span style="font-size:1.25rem;color:rgba(255,255,255,0.7)">caterva</span>
     </div>
     <h1>API Server</h1>
     <p>Science-Agent-Pipeline backend &mdash; all systems nominal</p>
@@ -188,7 +188,7 @@ app.get("/", (_req: Request, res: Response) => {
       <div class="endpoint"><span class="method">GET</span><span class="path">/api/waitlist/count</span><span class="ok">waitlist signup count</span></div>
     </div>
     <p style="margin-top:2rem;font-size:0.625rem">
-      see the <a href="https://github.com/anomalyco/Terrium">landing page</a> for the full app
+      see the <a href="https://github.com/anomalyco/Caterva">landing page</a> for the full app
     </p>
   </div>
 </body>

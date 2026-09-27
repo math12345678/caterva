@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — LIVE ORCHESTRATION CONSOLE data
+   caterva — LIVE ORCHESTRATION CONSOLE data
 
    Nine agents, each with a distinct responsibility, a visible
    input, a visible output and its own structural identity. The
@@ -77,7 +77,7 @@ export const AGENTS = [
     input: 'Method requirements',
     output: 'Local ODE runtime selected',
     duration: 380,
-    detail: 'Browser runtime was insufficient for the integration. Terrium routes to real capability rather than appearing capable.',
+    detail: 'Browser runtime was insufficient for the integration. Caterva routes to real capability rather than appearing capable.',
     emits: null
   },
   {
@@ -164,7 +164,7 @@ export const FAILURE_CASE = {
     execution: {
       output: 'Withheld / required constant unmet',
       settled: 'withheld', terminal: 'EXECUTION WITHHELD',
-      detail: 'Terrium does not integrate a model with a missing required constant in order to have something to show.',
+      detail: 'Caterva does not integrate a model with a missing required constant in order to have something to show.',
       emits: null
     },
     'hallucination-check': {
@@ -183,7 +183,7 @@ export const FAILURE_CASE = {
       output: 'Unsupported constant disclosed as blocking',
       settled: 'review', terminal: 'REVIEW POINT ADDED',
       disclosure: 'The run does not proceed to a final result, because a required constant has no source basis in the illustrative evidence scope.',
-      detail: 'Terrium states the blocker instead of producing a number that looks finished.',
+      detail: 'Caterva states the blocker instead of producing a number that looks finished.',
       emits: 'blocking'
     },
     polish: {

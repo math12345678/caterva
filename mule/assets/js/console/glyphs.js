@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — agent glyphs
+   caterva — agent glyphs
 
    Each agent carries a distinct structural mark. The point is not
    decoration: nine identical dots in a timeline would say the nine

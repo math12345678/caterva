@@ -22,7 +22,7 @@ pathway. None is in the catalogue and none ever will be, because the set of
 compositions is not enumerable — "three step" becomes "four step", and a
 catalogue entry is needed for each.
 
-Terrium already has a path meant for this: `networkResolver.ts` asks a
+Caterva already has a path meant for this: `networkResolver.ts` asks a
 language model for the structure. It returns `null` without an API key,
 which is the state of this checkout and of any deployment nobody has
 configured. The capability is unavailable exactly when a lab tries the tool
@@ -35,7 +35,7 @@ matching rather than inference.
 
 ## Decision
 
-`Terium/compose/` is a deterministic compositional model builder.
+`caterva/compose/` is a deterministic compositional model builder.
 
 ```
 motifs.py     what a motif is: ports, parameters, rate-law templates
@@ -54,7 +54,7 @@ Four decisions carry it.
 *something* for glycolysis would produce a plausible wrong pathway — the
 failure that is worse than a refusal, and the reason
 `UnrecognizedQueryError` exists at all. Named pathways are refused with the
-reason (they need KEGG or Reactome, which Terrium does not read) and that
+reason (they need KEGG or Reactome, which Caterva does not read) and that
 refusal is carried through the runner as a distinct `kind`, because "I do
 not know that word" and "that needs a database I do not have" send a
 researcher to different places.

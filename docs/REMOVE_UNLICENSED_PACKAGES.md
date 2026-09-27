@@ -18,9 +18,9 @@ at all. Everything else in a tree of 494 packages has one.
 | package | declared in | used? |
 |---|---|---|
 | `@replit/connectors-sdk` | `Science-Agent-Pipeline/package.json` | **no** — imported by no source file |
-| `@replit/vite-plugin-cartographer` | `artifacts/mockup-sandbox`, `artifacts/terrium-landing` | call sites already removed |
-| `@replit/vite-plugin-dev-banner` | `artifacts/terrium-landing` | call sites already removed |
-| `@replit/vite-plugin-runtime-error-modal` | `artifacts/mockup-sandbox`, `artifacts/terrium-landing` | call sites already removed |
+| `@replit/vite-plugin-cartographer` | `artifacts/mockup-sandbox`, `artifacts/caterva-landing` | call sites already removed |
+| `@replit/vite-plugin-dev-banner` | `artifacts/caterva-landing` | call sites already removed |
+| `@replit/vite-plugin-runtime-error-modal` | `artifacts/mockup-sandbox`, `artifacts/caterva-landing` | call sites already removed |
 
 The three vite plugins were Replit editor conveniences — an error overlay, a
 dev banner, a source mapper. Two were gated on the `REPL_ID` environment
@@ -51,7 +51,7 @@ pnpm --filter ./artifacts/mockup-sandbox remove \
   @replit/vite-plugin-cartographer \
   @replit/vite-plugin-runtime-error-modal
 
-pnpm --filter ./artifacts/terrium-landing remove \
+pnpm --filter ./artifacts/caterva-landing remove \
   @replit/vite-plugin-cartographer \
   @replit/vite-plugin-dev-banner \
   @replit/vite-plugin-runtime-error-modal

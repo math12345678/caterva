@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — design tokens
+   caterva — design tokens
    Base is dark and near-monochrome. Teal is an event, not a decoration.
    Amber is reserved exclusively for disclosed uncertainty / review.
    ============================================================ */
@@ -19,7 +19,7 @@
      tier of type instead of as decoration that happens to contain words. */
   --slate-text: #7f9290;
 
-  /* --- terrium -------------------------------------------- */
+  /* --- caterva -------------------------------------------- */
   --deep-teal: #1d8a72;
   /* The same signal, darkened for the pale sheets. --deep-teal is tuned for
      type on graphite, where it reads 4.6:1; on the archive stock it falls to

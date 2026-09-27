@@ -27,7 +27,7 @@ The two are related by
 $$V_{max} = k_{cat} \cdot [E]_0$$
 
 so converting a resolved kcat into the parameter the engine actually needs
-requires the **total enzyme concentration** $[E]_0$. Terrium has no such
+requires the **total enzyme concentration** $[E]_0$. Caterva has no such
 parameter — not in the MM domain defaults, not anywhere in the engine — and
 BRENDA does not supply it per row. A turnover number is a property of one
 enzyme molecule; $V_{max}$ is a property of an assay containing some amount
@@ -58,7 +58,7 @@ precise failure this project has caught three times — a fabricated citation
 (Stage 4), a synthetic golden row (Stage 7), a value labelled `default` that
 an LLM invented (ADR 0011). Each looked correct in a diff.
 
-The honest position: Terrium can tell a student *what the turnover number is
+The honest position: Caterva can tell a student *what the turnover number is
 and under what conditions it was measured*, and cannot turn that into a
 $V_{max}$ without an assay detail it does not have.
 

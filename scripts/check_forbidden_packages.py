@@ -1,4 +1,4 @@
-"""Constitution-rule guard for Terrium: Rules 7 and 8.
+"""Constitution-rule guard for Caterva: Rules 7 and 8.
 
 Both were stated as non-negotiable, both had ADRs behind them, and neither
 was enforced by anything executable until this script.
@@ -28,7 +28,7 @@ policed by prose.
 
 The failure this prevents is not hypothetical. The umbrella package pulls in
 `python-libcombine` and `python-libnuml`, which exist for COMBINE archives
-and numerical markup -- neither of which Terrium uses. On any platform
+and numerical markup -- neither of which Caterva uses. On any platform
 without prebuilt wheels for them, the install dies at the cmake step. Someone
 hitting an import error and "fixing" it with the obvious package name would
 break installation for every contributor on an unlucky platform.
@@ -38,10 +38,10 @@ What is checked
 Every dependency manifest, for any requirement whose distribution name is on
 the forbidden list. Matching is on the normalised project name (PEP 503), so
 `Tellurium`, `tellurium`, and `tellurium==2.2.10` are all caught, while
-`terium_engine` (this project's own module, renamed from the upstream-
-echoing `tellurium_engine`) and the `Terium/` package directory are not.
+`caterva_engine` (this project's own module, renamed from the upstream-
+echoing `tellurium_engine`) and the `caterva/` package directory are not.
 That distinction is now load-bearing: the 2026-08-11 rename briefly
-rewrote this entry to `terium`, which forbade this project's OWN name
+rewrote this entry to `caterva`, which forbade this project's OWN name
 and permitted the upstream package the guard exists to block.
 
 Usage:
@@ -63,7 +63,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 FORBIDDEN = {
     "tellurium": (
         ("the umbrella package pulls in python-libcombine and python-libnuml "
-         "(COMBINE archives / numerical markup), neither of which Terrium "
+         "(COMBINE archives / numerical markup), neither of which Caterva "
          "uses; on platforms without wheels for them the install dies at the "
          "cmake step"),
         "libroadrunner, antimony, python-libsbml -- see ADR 0001",
@@ -204,13 +204,13 @@ def _requirement_names(path: Path) -> List[Tuple[int, str]]:
     Two things this deliberately does NOT do:
 
     - **Match inside comments.** `requirements.txt` explains at length why
-      terium must not be installed. A substring search would flag that
+      caterva must not be installed. A substring search would flag that
       explanation as a violation, punishing the file for documenting the
       rule it obeys.
     - **Scan all of pyproject.toml.** Only `[project] dependencies` and
       `[project.optional-dependencies]` declare packages. The first version
       of this function scanned the whole file and reported
-      `"Terium/tests/*.py"` -- a ruff per-file-ignore key -- as a
+      `"caterva/tests/*.py"` -- a ruff per-file-ignore key -- as a
       forbidden dependency. A guard that cries wolf gets deleted.
     """
     found: List[Tuple[int, str]] = []

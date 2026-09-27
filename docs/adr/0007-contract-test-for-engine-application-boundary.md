@@ -4,9 +4,9 @@
 
 ## Context
 
-The Terium engine (Python) exposes its simulation API through
-`terium_engine.__all__`. The application layer (TypeScript) reaches it
-through a single JSON bridge, `terium_runner.py`, which the API server
+The Caterva engine (Python) exposes its simulation API through
+`caterva_engine.__all__`. The application layer (TypeScript) reaches it
+through a single JSON bridge, `caterva_runner.py`, which the API server
 spawns as a subprocess. Before Stage 4 Part 1, the runner dispatched only
 three domains (`mm`, `sir`, `seir`) while the engine exposed eight — every
 domain built under the constitution was unreachable from the product, and
@@ -28,10 +28,10 @@ Two mechanisms would close the gap "for real":
 
 ## Decision
 
-Enforce the boundary with a **contract test** (`Terium/tests/
+Enforce the boundary with a **contract test** (`caterva/tests/
 test_boundary_contract.py`), not a shared schema and not code generation.
 
-The test loads the actual `terium_runner.py` file the API server spawns
+The test loads the actual `caterva_runner.py` file the API server spawns
 (not a copy), collects every `simulate_*` in the engine's `__all__`, and
 asserts that the runner's `DISPATCH` table dispatches exactly that set —
 and that every dispatched function still exists in the engine. Mutation
@@ -93,7 +93,7 @@ that knows it is serving a request.
 - A deleted dispatch entry fails CI with a message naming the orphaned
   engine function, pinning the fix to the boundary.
 - The serialisation logic remains hand-written in one file
-  (`terium_runner.py`), where its per-domain mapping is visible to
+  (`caterva_runner.py`), where its per-domain mapping is visible to
   review. The contract test guards the *set* of domains; the runner's
   execution tests guard each domain's `ok`/`flagged`/`flagReason` shape.
 - No new build tooling, no published schema package, no code generation
@@ -108,7 +108,7 @@ The decision above is written entirely in terms of one axis: the engine's
 `__all__` against the runner's `DISPATCH` table. That axis was mutation-tested
 and has held.
 
-But `terium_runner.py` has **two** tables, not one. `DISPATCH` maps a domain to
+But `caterva_runner.py` has **two** tables, not one. `DISPATCH` maps a domain to
 an engine function *name* (a string, used by this contract test). `_RUNNERS`
 maps the same domain to the actual `run_*` callable. `main()` was written as:
 
@@ -140,7 +140,7 @@ What a drift actually produced, confirmed by running it: deleting `pcr` from
 — the entire error message being the repr of a `KeyError`. Two things are wrong
 with that. It is unreadable, and it is *misattributed*: the request was
 perfectly valid and the build was broken, but the student is the one shown an
-error naming what they asked for. `teriumRunnerFailures.test.ts` already exists
+error naming what they asked for. `catervaRunnerFailures.test.ts` already exists
 to stop precisely this ("gives the engine's own reason for a rejected run, not
 its exit status"); the same principle had not reached the dispatch itself.
 

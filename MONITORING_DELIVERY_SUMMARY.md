@@ -59,7 +59,7 @@ Professional dashboard with 10 panels:
 ### 3. **Prometheus Configuration** (`prometheus.yml` - 20+ lines)
 
 Scrape configuration:
-- **Target:** `terrium:3000/metrics`
+- **Target:** `caterva:3000/metrics`
 - **Interval:** 15 seconds
 - **Timeout:** 10 seconds
 - **Retention:** 30 days
@@ -88,7 +88,7 @@ Scrape configuration:
 Complete monitoring infrastructure:
 
 ```
-terrium (Port 3000)
+caterva (Port 3000)
   ↓
 prometheus (Port 9090) - collects metrics
   ↓
@@ -107,7 +107,7 @@ Features:
 ### 6. **Provisioning Configs**
 
 - `grafana-datasources.yml` — Auto-connects Grafana to Prometheus
-- `grafana-dashboards.yml` — Auto-imports Terrium dashboard
+- `grafana-dashboards.yml` — Auto-imports Caterva dashboard
 
 **Result:** Zero manual configuration needed
 
@@ -168,7 +168,7 @@ docker-compose -f docker-compose-monitoring.yml up -d
 
 ### 2. Access Services
 
-- **Terrium API:** http://localhost:3000
+- **Caterva API:** http://localhost:3000
 - **Prometheus:** http://localhost:9090
 - **Grafana:** http://localhost:3001
 
@@ -179,7 +179,7 @@ docker-compose -f docker-compose-monitoring.yml up -d
 curl http://localhost:3000/metrics
 
 # Prometheus query API
-curl http://localhost:9090/api/v1/query?query=terrium_success_rate
+curl http://localhost:9090/api/v1/query?query=caterva_success_rate
 
 # Grafana dashboard
 open http://localhost:3001
@@ -239,22 +239,22 @@ curl -X POST http://localhost:3000/api/simulate \
 ```bash
 $ curl http://localhost:3000/metrics
 
-# HELP terrium_jobs_total Total number of jobs
-# TYPE terrium_jobs_total gauge
-terrium_jobs_total 150 1660316400000
+# HELP caterva_jobs_total Total number of jobs
+# TYPE caterva_jobs_total gauge
+caterva_jobs_total 150 1660316400000
 
-# HELP terrium_success_rate Success rate percentage
-# TYPE terrium_success_rate gauge
-terrium_success_rate 96.67 1660316400000
+# HELP caterva_success_rate Success rate percentage
+# TYPE caterva_success_rate gauge
+caterva_success_rate 96.67 1660316400000
 
-# HELP terrium_execution_time_avg_ms Average execution time
-# TYPE terrium_execution_time_avg_ms gauge
-terrium_execution_time_avg_ms 245.3 1660316400000
+# HELP caterva_execution_time_avg_ms Average execution time
+# TYPE caterva_execution_time_avg_ms gauge
+caterva_execution_time_avg_ms 245.3 1660316400000
 
-# HELP terrium_model_jobs_total Jobs per model
-# TYPE terrium_model_jobs_total gauge
-terrium_model_jobs_total{model="michaelis-menten"} 100 1660316400000
-terrium_model_jobs_total{model="competitive-inhibition"} 35 1660316400000
+# HELP caterva_model_jobs_total Jobs per model
+# TYPE caterva_model_jobs_total gauge
+caterva_model_jobs_total{model="michaelis-menten"} 100 1660316400000
+caterva_model_jobs_total{model="competitive-inhibition"} 35 1660316400000
 
 # ... (more metrics)
 ```
@@ -266,7 +266,7 @@ terrium_model_jobs_total{model="competitive-inhibition"} 35 1660316400000
 ### CI/CD
 ```yaml
 - run: |
-    SUCCESS_RATE=$(curl -s http://localhost:3000/metrics | grep terrium_success_rate | awk '{print $2}')
+    SUCCESS_RATE=$(curl -s http://localhost:3000/metrics | grep caterva_success_rate | awk '{print $2}')
     if (( $(echo "$SUCCESS_RATE < 90" | bc -l) )); then exit 1; fi
 ```
 
@@ -275,7 +275,7 @@ terrium_model_jobs_total{model="competitive-inhibition"} 35 1660316400000
 # Query Prometheus API
 import requests
 data = requests.get('http://localhost:9090/api/v1/query',
-  params={'query': 'terrium_success_rate'}).json()
+  params={'query': 'caterva_success_rate'}).json()
 ```
 
 ### Slack Alerts
@@ -312,7 +312,7 @@ Export metrics → Jupyter notebooks → Analysis
 - **Metrics export:** < 5ms per request
 - **Prometheus scrape:** Every 15 seconds, < 100ms
 - **Grafana rendering:** Every 30 seconds, < 500ms
-- **Total impact on Terrium:** < 0.1% overhead
+- **Total impact on Caterva:** < 0.1% overhead
 
 ---
 
@@ -344,7 +344,7 @@ Daily backups recommended
 ## Complete System Status
 
 ### Components
-- ✅ Terrium API (26 endpoints)
+- ✅ Caterva API (26 endpoints)
 - ✅ OpenAPI spec (650+ lines)
 - ✅ Metrics collector (automatic)
 - ✅ Prometheus exporter (live)
@@ -397,8 +397,8 @@ Daily backups recommended
 | View Grafana | `open http://localhost:3001` |
 | View Prometheus | `open http://localhost:9090` |
 | Check metrics | `curl http://localhost:3000/metrics` |
-| View logs | `docker-compose logs -f terrium` |
-| Scale Terrium | Modify `docker-compose-monitoring.yml` replicas |
+| View logs | `docker-compose logs -f caterva` |
+| Scale Caterva | Modify `docker-compose-monitoring.yml` replicas |
 
 ---
 

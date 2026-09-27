@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** the Phase-1 checklist below marks "✅ Advanced Export (CSV/JSON/BibTeX/PDF)" as done. It isn't — `src/storage/job-database.ts` exposes only `saveJob/getJob/getAllJobs/getRecentJobs/getJobsByStatus/getJobsByQuery/getStatistics`; no export/CSV/BibTeX method exists anywhere in that file or elsewhere in `src/storage/`. Treat that checkbox as aspirational, not complete, until an actual export function is added.
 
-# Terrium Improvement Roadmap
+# Caterva Improvement Roadmap
 
 **Goal:** Transform from MVP to production-grade scientific platform  
 **Timeline:** Prioritized by impact and complexity
@@ -224,7 +224,7 @@ docker-compose up
 **Impact:** More sophisticated simulations  
 **Complexity:** High
 
-**Current:** Terium (good for kinetics)  
+**Current:** Caterva (good for kinetics)  
 **Add:** SciPy ODE solver for complex systems
 
 ### 5.3 Multi-Substrate Simulations ⭐⭐
@@ -343,4 +343,4 @@ All quick wins that have massive impact on usability:
 3. ✅ Persistent storage
 4. ✅ Advanced export
 
-These make Terrium from "interesting research tool" to "genuinely useful platform."
+These make Caterva from "interesting research tool" to "genuinely useful platform."

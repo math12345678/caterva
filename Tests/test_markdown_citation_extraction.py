@@ -2,10 +2,10 @@
 
 WHY THIS EXISTS
 ---------------
-`verify_citations_live.py` checks every DOI Terrium cites. Until
+`verify_citations_live.py` checks every DOI Caterva cites. Until
 2026-09-05 its `DOI_SOURCE_FILES` list held only `.ts` and `.py` sources,
 so `LITERATURE_BACKING_DATABASE.md` -- the one document in the repository
-whose entire purpose is to enumerate Terrium's citations -- was never read
+whose entire purpose is to enumerate Caterva's citations -- was never read
 by the citation checker.
 
 The cost is measurable. `domain-literature.ts` was corrected on 2026-08-09
@@ -119,7 +119,7 @@ def test_the_document_is_actually_enrolled() -> None:
     doc = _ROOT / "LITERATURE_BACKING_DATABASE.md"
     assert doc in verify.DOI_SOURCE_FILES, (
         "LITERATURE_BACKING_DATABASE.md was dropped from DOI_SOURCE_FILES; "
-        "the file that lists Terrium's citations would stop being checked"
+        "the file that lists Caterva's citations would stop being checked"
     )
 
 

@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-The Terrium Science-Agent Pipeline backend is **well-engineered and production-ready**. A comprehensive audit identified and fixed structural issues (domain list drift, missing metrics wiring, incomplete parameter defaults). All 404 tests pass. To ensure maintainability and future development, complete architectural documentation has been created.
+The Caterva Science-Agent Pipeline backend is **well-engineered and production-ready**. A comprehensive audit identified and fixed structural issues (domain list drift, missing metrics wiring, incomplete parameter defaults). All 404 tests pass. To ensure maintainability and future development, complete architectural documentation has been created.
 
 ## Work Completed
 
@@ -19,7 +19,7 @@ The Terrium Science-Agent Pipeline backend is **well-engineered and production-r
 |-------|----------|--------|-------|
 | OpenAPI spec missing 3 ODE oscillator domains | Medium | ✅ Fixed | openapi.yaml |
 | Metrics router not wired into main app | High | ✅ Fixed | src/routes/index.ts |
-| Python DISPATCH has duplicate entries (3 domains) | Medium | ✅ Fixed | terium_runner.py |
+| Python DISPATCH has duplicate entries (3 domains) | Medium | ✅ Fixed | caterva_runner.py |
 | LLM domain list incomplete (11 vs 14) | High | ✅ Fixed | llmResolver.ts |
 | ODE oscillator defaults missing from queryResolver | Critical | ✅ Fixed | queryResolver.ts |
 | Parameter regex incomplete (missing alpha, delta, etc.) | Medium | ✅ Fixed | queryResolver.ts |
@@ -305,7 +305,7 @@ Every parameter carries metadata:
 
 ## Conclusion
 
-The Terrium backend is **production-ready, well-tested, and thoroughly documented**. The architecture emphasizes scientific integrity, graceful degradation, and maintainability. With clear separation of concerns and comprehensive error handling, the system can handle complex queries reliably.
+The Caterva backend is **production-ready, well-tested, and thoroughly documented**. The architecture emphasizes scientific integrity, graceful degradation, and maintainability. With clear separation of concerns and comprehensive error handling, the system can handle complex queries reliably.
 
 The audit found and fixed several structural issues (domain drift, missing wiring, incomplete defaults) that would have caused problems at scale. The comprehensive documentation created will enable future developers to understand, maintain, and extend the system confidently.
 

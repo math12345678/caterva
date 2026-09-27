@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Dev server for the Terrium dashboard.
+ * Dev server for the Caterva dashboard.
  *
  * The dashboard is normally served by `src/web/server.ts`, which lives in
  * the `backend-main` repository. Cloned on its own, `frontend-main` would
@@ -62,7 +62,7 @@ const server = createServer(async (req, res) => {
         JSON.stringify({
           error: "UPSTREAM_UNREACHABLE",
           message:
-            `Could not reach the Terrium API at ${API}${url.pathname}. ` +
+            `Could not reach the Caterva API at ${API}${url.pathname}. ` +
             `Start it with \`npm run web\` in the backend-main repository, ` +
             `or point this proxy elsewhere with API=<url>.`,
           cause: String(err?.cause?.code ?? err?.message ?? err),
@@ -84,7 +84,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Terrium dashboard   http://localhost:${PORT}`);
+  console.log(`Caterva dashboard   http://localhost:${PORT}`);
   console.log(`proxying /api/*  ->  ${API}`);
   console.log(`\nIf calls return 502, the backend is not running. In backend-main:`);
   console.log(`    npm run web`);

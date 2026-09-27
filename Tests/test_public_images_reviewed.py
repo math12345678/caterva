@@ -24,7 +24,7 @@ def test_an_edited_image_fails(tmp_path, monkeypatch) -> None:
     """The case that matters, and the one a diff hides.
 
     A new file is conspicuous. A screenshot edited to add "10,000
-    universities trust Terrium" is one binary blob replacing another.
+    universities trust Caterva" is one binary blob replacing another.
     """
     img = tmp_path / "mule" / "shot.png"
     img.parent.mkdir(parents=True)

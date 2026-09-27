@@ -16,7 +16,7 @@ ADR is about.*
 
 Looking was worse than expected.
 
-`src/web/dashboard.html` is titled **"Terrium - Scientific Enzyme Kinetics
+`src/web/dashboard.html` is titled **"Caterva - Scientific Enzyme Kinetics
 Simulator"**. It has a Run Simulation card taking an enzyme and a substrate.
 For anyone who does not use the CLI, it is the product.
 

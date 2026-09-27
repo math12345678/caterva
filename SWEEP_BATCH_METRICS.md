@@ -8,7 +8,7 @@
 
 ## Overview
 
-Batch and Sweep Metrics Recording extends Terrium's metrics tracking system to record performance data not just from individual simulations (`/api/simulate`) but also from parameter sweep (`/api/sweep`) and batch processing (`/api/batch`) operations.
+Batch and Sweep Metrics Recording extends Caterva's metrics tracking system to record performance data not just from individual simulations (`/api/simulate`) but also from parameter sweep (`/api/sweep`) and batch processing (`/api/batch`) operations.
 
 **Why this matters:** A sweep with 1000 simulations previously generated no metrics data in the system—only the final sweep results were returned. Now every simulation within a sweep or batch is individually tracked, and aggregate statistics for the entire sweep/batch operation are automatically computed.
 
@@ -183,14 +183,14 @@ The `/metrics` endpoint (Prometheus format) now includes:
 
 ```prometheus
 # Sweep metrics
-terrium_sweeps_total 3
-terrium_sweep_avg_success_rate 94.33
-terrium_sweep_avg_execution_time_ms 466.67
+caterva_sweeps_total 3
+caterva_sweep_avg_success_rate 94.33
+caterva_sweep_avg_execution_time_ms 466.67
 
 # Batch metrics
-terrium_batches_total 2
-terrium_batch_avg_success_rate 95.5
-terrium_batch_avg_execution_time_ms 437.5
+caterva_batches_total 2
+caterva_batch_avg_success_rate 95.5
+caterva_batch_avg_execution_time_ms 437.5
 ```
 
 These are automatically scraped by Prometheus every 15 seconds and available in Grafana dashboards.
@@ -302,14 +302,14 @@ curl http://localhost:3000/api/metrics/batches/batch_1692201600456_x9y8z
 
 ### Prometheus Scraping
 
-Prometheus automatically scrapes Terrium's `/metrics` endpoint every 15 seconds. Add to `prometheus.yml`:
+Prometheus automatically scrapes Caterva's `/metrics` endpoint every 15 seconds. Add to `prometheus.yml`:
 
 ```yaml
 global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'terrium'
+  - job_name: 'caterva'
     static_configs:
       - targets: ['localhost:3000']
 ```
@@ -323,7 +323,7 @@ Create panels to visualize sweep/batch metrics:
   "title": "Sweep Success Rate Trend",
   "targets": [
     {
-      "expr": "terrium_sweep_avg_success_rate"
+      "expr": "caterva_sweep_avg_success_rate"
     }
   ]
 }

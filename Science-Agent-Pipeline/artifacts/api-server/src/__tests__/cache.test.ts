@@ -11,7 +11,7 @@ import {
 } from "../lib/cache";
 import type { Job } from "../lib/queue";
 
-const tempDir = mkdtempSync(join(tmpdir(), "terrium-cache-test-"));
+const tempDir = mkdtempSync(join(tmpdir(), "caterva-cache-test-"));
 process.env.CACHE_FILE = join(tempDir, "cache.json");
 
 function completedJob(runId: string): Job {

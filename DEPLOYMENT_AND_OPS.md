@@ -1,8 +1,8 @@
 > **⚠️ CORRECTION (2026-08-11, updated same day):** when this banner was first written, none of this guide's infrastructure existed. Since then, real Docker deployment has actually been built and now matches much of what's described: `Dockerfile` is now a genuine multi-stage `FROM node:22-alpine` build (npm ci → tsc → non-root user → `CMD node dist/src/web/server.js`), and a real `docker-compose.yml` exists at repo root, correctly wired to it, with a healthcheck against `/api/health`. What's still fabricated/missing: no nginx config anywhere in the repo (grep confirms nothing), despite nginx load-balancing being described here and in `QUICK_START_DEPLOYMENT.md`; no Kubernetes manifest files exist (the K8s section is an inline `kubectl apply -f - <<EOF` heredoc with no backing file); no deploy job exists in `.github/workflows/` (that directory doesn't exist); `npm run cleanup:jobs -- --days N` is still not a real script (`package.json` has no such entry). Treat the Docker sections as accurate and the nginx/K8s/CI-deploy/cleanup sections as still aspirational.
 
-# 🚀 Terrium: Deployment & Operations Guide
+# 🚀 Caterva: Deployment & Operations Guide
 
-**Complete production readiness guide for Terrium scientific platform**
+**Complete production readiness guide for Caterva scientific platform**
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### Local Development
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 # http://localhost:3000
 ```
@@ -53,12 +53,12 @@ Job Dispatch Layer
 Scientific Pipeline
     ├─ Literature: PubMed + CrossRef
     ├─ Model: 4 kinetic types (SBML)
-    ├─ Engine: Terium + libroadrunner
+    ├─ Engine: Caterva + libroadrunner
     └─ Validation: Confidence scoring
     ↓
 Persistence Layer
     ├─ In-memory: Current jobs
-    └─ File: terrium-jobs.jsonl (history)
+    └─ File: caterva-jobs.jsonl (history)
     ↓
 Response to Client
 ```
@@ -71,12 +71,12 @@ Response to Client
 ```bash
 PORT=3000              # Server port (default: 3000)
 PUBMED_EMAIL=...       # Your email (for API politeness)
-PUBMED_TOOL=terrium    # Tool name (for API identification)
+PUBMED_TOOL=caterva    # Tool name (for API identification)
 ```
 
 ### Storage
 - **In-Memory**: Cleared on restart (session jobs)
-- **Persistent**: `terrium-jobs.jsonl` (all completed jobs)
+- **Persistent**: `caterva-jobs.jsonl` (all completed jobs)
 - **Size**: ~1KB per job (scalable to thousands)
 
 ### Performance Tuning
@@ -134,7 +134,7 @@ curl http://localhost:3000/api/jobs/history
 ### Log Files
 ```bash
 # Structured JSON logging
-tail -f ~/.terrium/logs/main.log
+tail -f ~/.caterva/logs/main.log
 
 # Log entries include:
 # - timestamp, level (info/warn/error)
@@ -167,19 +167,19 @@ CMD ["node", "dist/src/web/server.js"]
 ### Build & Run
 ```bash
 # Build
-docker build -t terrium:latest .
+docker build -t caterva:latest .
 
 # Run locally
-docker run -p 3000:3000 terrium:latest
+docker run -p 3000:3000 caterva:latest
 
 # Run with volume persistence
-docker run -p 3000:3000 -v terrium-data:/app/data terrium:latest
+docker run -p 3000:3000 -v caterva-data:/app/data caterva:latest
 
 # Run with environment
 docker run -p 3000:3000 \
   -e PORT=3000 \
   -e PUBMED_EMAIL=your@email.com \
-  terrium:latest
+  caterva:latest
 ```
 
 ### Docker Compose
@@ -187,12 +187,12 @@ docker run -p 3000:3000 \
 version: '3.8'
 
 services:
-  terrium:
-    image: terrium:latest
+  caterva:
+    image: caterva:latest
     ports:
       - "3000:3000"
     volumes:
-      - terrium-data:/app/data
+      - caterva-data:/app/data
     environment:
       PORT: 3000
       PUBMED_EMAIL: your@email.com
@@ -203,7 +203,7 @@ services:
       retries: 3
 
 volumes:
-  terrium-data:
+  caterva-data:
 ```
 
 ---
@@ -226,7 +226,7 @@ npm run web &
 
 ### Heroku
 ```bash
-heroku create terrium-app
+heroku create caterva-app
 git push heroku main
 
 # Procfile content:
@@ -235,9 +235,9 @@ web: npm run web
 
 ### Google Cloud Run
 ```bash
-gcloud builds submit --tag gcr.io/PROJECT/terrium
-gcloud run deploy terrium \
-  --image gcr.io/PROJECT/terrium \
+gcloud builds submit --tag gcr.io/PROJECT/caterva
+gcloud run deploy caterva \
+  --image gcr.io/PROJECT/caterva \
   --port 3000 \
   --memory 512Mi
 ```
@@ -249,12 +249,12 @@ gcloud run deploy terrium \
 ### Horizontal (Multiple Instances)
 ```
 Load Balancer
-    ├─ Terrium Instance 1
-    ├─ Terrium Instance 2
-    └─ Terrium Instance 3
+    ├─ Caterva Instance 1
+    ├─ Caterva Instance 2
+    └─ Caterva Instance 3
     ↓
 Shared Persistence
-    └─ terrium-jobs.jsonl (NFS mount or S3)
+    └─ caterva-jobs.jsonl (NFS mount or S3)
 ```
 
 ### Vertical (Bigger Machine)
@@ -264,7 +264,7 @@ Shared Persistence
 
 ### Load Balancer Config (nginx)
 ```nginx
-upstream terrium {
+upstream caterva {
     server localhost:3000;
     server localhost:3001;
     server localhost:3002;
@@ -273,7 +273,7 @@ upstream terrium {
 server {
     listen 80;
     location / {
-        proxy_pass http://terrium;
+        proxy_pass http://caterva;
     }
 }
 ```
@@ -289,7 +289,7 @@ server {
 - [ ] Add authentication (JWT or API keys)
 - [ ] Enable request logging
 - [ ] Set up monitoring/alerting
-- [ ] Regular backups of terrium-jobs.jsonl
+- [ ] Regular backups of caterva-jobs.jsonl
 - [ ] Keep Node.js updated
 
 ### CORS Configuration
@@ -313,7 +313,7 @@ location /api/ {
 
 ## 📦 Database Upgrade Path
 
-### Current: File-based (terrium-jobs.jsonl)
+### Current: File-based (caterva-jobs.jsonl)
 - Pros: No external dependency, portable, simple
 - Cons: Not queryable, single-threaded access, no advanced features
 
@@ -383,7 +383,7 @@ npm run verify-all         # Full validation suite
 
 ### GitHub Actions Example
 ```yaml
-name: Terrium CI/CD
+name: Caterva CI/CD
 
 on: [push, pull_request]
 
@@ -407,8 +407,8 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v2
-      - run: docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/terrium:latest .
-      - run: docker push gcr.io/${{ secrets.GCP_PROJECT }}/terrium:latest
+      - run: docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/caterva:latest .
+      - run: docker push gcr.io/${{ secrets.GCP_PROJECT }}/caterva:latest
 ```
 
 ---
@@ -471,7 +471,7 @@ curl https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=t
 ### Issue: Database File Corrupted
 ```bash
 # Backup old file
-mv terrium-jobs.jsonl terrium-jobs.jsonl.backup
+mv caterva-jobs.jsonl caterva-jobs.jsonl.backup
 
 # System will auto-create new file
 # Restart server
@@ -529,13 +529,13 @@ curl http://localhost:3000/api/stats | jq
 ### Weekly Tasks
 ```bash
 # Review logs for errors
-tail -n 1000 ~/.terrium/logs/main.log | grep ERROR
+tail -n 1000 ~/.caterva/logs/main.log | grep ERROR
 
 # Backup job database
-cp terrium-jobs.jsonl terrium-jobs.jsonl.backup.$(date +%Y%m%d)
+cp caterva-jobs.jsonl caterva-jobs.jsonl.backup.$(date +%Y%m%d)
 
 # Check disk usage
-du -sh terrium-jobs.jsonl
+du -sh caterva-jobs.jsonl
 ```
 
 ### Monthly Tasks
@@ -555,7 +555,7 @@ npm update --save-minor
 
 ## 🎯 Summary
 
-Terrium is **production-ready** and can be deployed with confidence:
+Caterva is **production-ready** and can be deployed with confidence:
 
 ✅ Zero external dependencies for core server  
 ✅ Stateless design (horizontal scalable)  
@@ -569,12 +569,12 @@ Terrium is **production-ready** and can be deployed with confidence:
 **Start production deployment:**
 ```bash
 npm run build
-docker build -t terrium:latest .
-docker run -p 3000:3000 terrium:latest
+docker build -t caterva:latest .
+docker run -p 3000:3000 caterva:latest
 ```
 
 **It's ready. Deploy it. Use it. Make amazing science.** 🚀
 
 ---
 
-**Questions?** See the full documentation in `/Users/smyan/Desktop/Coding/Terrium/`
+**Questions?** See the full documentation in `/Users/smyan/Desktop/Coding/Caterva/`

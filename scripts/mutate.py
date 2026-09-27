@@ -160,7 +160,7 @@ def open_journal(file_path: Path, original_bytes: bytes) -> None:
         json.dumps({
             # RELATIVE to the repository root, because several agents mount
             # THE SAME repository at different absolute paths
-            # (/sessions/<their-sandbox>/mnt/Terrium/...). An absolute path
+            # (/sessions/<their-sandbox>/mnt/Caterva/...). An absolute path
             # is only meaningful in the sandbox that wrote it, so a journal
             # naming a real repo file looked "outside the repository" to
             # every other agent and was discarded -- with a message calling

@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS
 ---------------
-Terrium is published as eighteen repositories under github.com/Terrium-sim.
+Caterva is published as eighteen repositories under github.com/Terrium-sim.
 `scripts/split_repos.sh` regenerates seventeen of them from the monorepo.
 
 On 2026-08-16, `LICENSE` appeared exactly once in that 655-line script: in the

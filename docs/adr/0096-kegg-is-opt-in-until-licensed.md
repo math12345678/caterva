@@ -30,7 +30,7 @@ KEGG's terms (https://www.kegg.jp/kegg/legal.html, 1 October 2024):
 > nor is it a publicly funded database. Non-academic use of KEGG requires a
 > commercial license.
 
-Terrium provides a service. This repository contains an incorporation
+Caterva provides a service. This repository contains an incorporation
 checklist, a cap table and a fundraising tracker. Either reading points at a
 licence from Pathway Solutions. Nobody has obtained one.
 
@@ -42,10 +42,10 @@ documents describing a problem is not a decision.
 
 ## Decision
 
-**The KEGG lookup is off unless `TERRIUM_ENABLE_KEGG` is set.**
+**The KEGG lookup is off unless `CATERVA_ENABLE_KEGG` is set.**
 
 Setting it is the operator stating that their own licence position permits
-the call. Terrium makes no KEGG request on anyone's behalf by default.
+the call. Caterva makes no KEGG request on anyone's behalf by default.
 
 This is the project's own precedent applied consistently rather than a new
 policy:
@@ -65,11 +65,11 @@ configuration.
 
 ## What this does NOT claim
 
-It does not assert that using KEGG would be unlawful. Terrium's founder may
+It does not assert that using KEGG would be unlawful. Caterva's founder may
 well qualify as an academic user, and KEGG may well grant a licence for the
 asking — their own page says many users are eligible.
 
-It asserts something narrower and checkable: **Terrium does not currently
+It asserts something narrower and checkable: **Caterva does not currently
 know that the call is licensed, and a tool whose central claim is
 traceability should not make an unexamined request on a user's behalf.**
 The switch converts an unexamined default into a stated choice by someone
@@ -112,7 +112,7 @@ fault.
   would satisfy a type check and still have contacted KEGG.
 - It also asserts the refusal message names the switch and the terms. A
   refusal a reader cannot act on is the defect this project fixes elsewhere.
-- Parsing is strict: `TERRIUM_ENABLE_KEGG=0` means off. An env var truthy
+- Parsing is strict: `CATERVA_ENABLE_KEGG=0` means off. An env var truthy
   merely by being present is how a switch gets flipped by a stray `export`
   in a CI file.
 - Mutation-tested: removing the gate fails two of thirteen tests — the two
@@ -121,6 +121,6 @@ fault.
 ## Still open
 
 A licence enquiry to Pathway Solutions (https://www.pathway.jp/) has not
-been sent. That is a decision for whoever is willing to state Terrium's
+been sent. That is a decision for whoever is willing to state Caterva's
 academic-or-commercial status, which is not a question code can answer.
 `docs/LICENSING.md` carries the action item.

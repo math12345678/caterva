@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** any specific test-count/coverage figure in this doc (e.g. "178/178 passing," "84.04%") is an unverified snapshot — the real suite has grown to 17 test files / 249+ individual test blocks (`grep -rhoE '\b(it|test)\(' src --include="*.test.ts" | wc -l`), and other same-day docs cite a different figure ("197+") for the same codebase, which is itself evidence neither number was actually measured. Run `npm test` for the current count. This API section may omit real routes that now exist in `src/web/server.ts` (`/api/sweep`, `/api/sweeps/:id`, `/api/batch`, `/api/batches/:id`, `/api/compare`, `/api/stats`) — verify against that file directly. This doc is one of nine near-identical "complete/ready/summary" docs written the same session; see the others for the same caveat.
 
-# Terrium Complete System Guide
+# Caterva Complete System Guide
 
 ## 🎯 What You Have
 
@@ -9,7 +9,7 @@ A **production-ready scientific enzyme kinetics simulation system** with:
 - ✅ REST API for programmatic access
 - ✅ Real literature integration from PubMed/CrossRef
 - ✅ SBML model generation
-- ✅ Terium kinetics simulation engine
+- ✅ Caterva kinetics simulation engine
 - ✅ Comprehensive CLI tool
 - ✅ Full TypeScript codebase with 178/178 tests passing
 - ✅ 84% code coverage
@@ -20,7 +20,7 @@ A **production-ready scientific enzyme kinetics simulation system** with:
 ### Option 1: Web Interface (Recommended)
 
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 # Opens web interface at http://localhost:3000
 ```
@@ -63,7 +63,7 @@ curl http://localhost:3000/api/jobs/job_...
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    TERRIUM SYSTEM                        │
+│                    CATERVA SYSTEM                        │
 ├─────────────────────────────────────────────────────────┤
 │                                                           │
 │  ┌──────────────────────────────────────────────────┐  │
@@ -80,7 +80,7 @@ curl http://localhost:3000/api/jobs/job_...
 │  │  1. Parameter Resolution                        │  │
 │  │  2. Literature Verification (PubMed + CrossRef) │  │
 │  │  3. Model Generation (4 SBML kinetic models)    │  │
-│  │  4. Simulation Execution (Terium + libroadrunner) │
+│  │  4. Simulation Execution (Caterva + libroadrunner) │
 │  └──────────────────────────────────────────────────┘  │
 │                          ↓                               │
 │  ┌──────────────────────────────────────────────────┐  │
@@ -211,7 +211,7 @@ User Input: enzyme, substrate, kinetic model
 └─────────────────────────────────────────┘
     ↓
 ┌─────────────────────────────────────────┐
-│  Terium Simulation                   │
+│  Caterva Simulation                   │
 │  - Execute kinetic equations            │
 │  - Generate time-series trajectory      │
 │  - Calculate final substrate value      │
@@ -265,7 +265,7 @@ src/
 **Test Categories:**
 - Parameter validation (20 tests)
 - SBML model generation (18 tests)
-- Terium integration (22 tests)
+- Caterva integration (22 tests)
 - Literature validation (16 tests)
 - Job management (14 tests)
 - Reproducibility (12 tests)
@@ -338,7 +338,7 @@ CMD ["node", "dist/src/web/server.js"]
 ```bash
 PORT=3000              # Server port (default 3000)
 PUBMED_EMAIL=...      # Your email for PubMed politeness
-PUBMED_TOOL=terrium   # Tool name for PubMed
+PUBMED_TOOL=caterva   # Tool name for PubMed
 ```
 
 ### Performance
@@ -400,7 +400,7 @@ PORT=3001 npm run web
 ## 📚 Additional Resources
 
 - **SBML Specification:** http://sbml.org/
-- **Terium Documentation:** http://terium.readthedocs.io/
+- **Caterva Documentation:** http://caterva.readthedocs.io/
 - **PubMed API Guide:** https://www.ncbi.nlm.nih.gov/books/NBK25497/
 - **CrossRef API:** https://github.com/CrossRef/rest-api-doc
 
@@ -419,7 +419,7 @@ You now have a **complete, production-ready scientific simulation system** that:
 
 ✅ Integrates with real scientific databases (PubMed, CrossRef)
 ✅ Generates valid SBML models for enzyme kinetics
-✅ Runs kinetics simulations via Terium
+✅ Runs kinetics simulations via Caterva
 ✅ Validates results against literature
 ✅ Provides web, CLI, and REST API interfaces
 ✅ Tracks reproducibility & job history

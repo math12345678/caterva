@@ -1,5 +1,5 @@
 """
-Documented-counts guard for Terrium.
+Documented-counts guard for Caterva.
 
 Verifies that the test counts and domain count printed in README.md match
 what the repository actually contains.
@@ -10,7 +10,7 @@ Three README numbers had drifted silently and were found by hand during the
 Stage 7 audit:
 
     make test           claimed   524 tests   actual 1,040
-    Terium/tests/    claimed   833 tests   actual   858
+    caterva/tests/    claimed   833 tests   actual   858
     Tests/              claimed   124 tests   actual   182
 
 and the domain count was stated twice in the same file with two different
@@ -132,7 +132,7 @@ HISTORICAL_DOCS_NOT_CHECKED = [
 #: number was 21 too high, because the search was for things absent HERE and
 #: never for things absent THERE.
 SUITES = [
-    ("engine", REPO_ROOT / "Terium" / "tests"),
+    ("engine", REPO_ROOT / "caterva" / "tests"),
     ("literature", REPO_ROOT / "Tests"),
 ]
 
@@ -347,7 +347,7 @@ def documented_test_counts(text: str) -> List[Tuple[int, int]]:
     """Every "<N> tests" claim about the size of a suite, with its line.
 
     Deliberately does NOT try to work out *which* suite each refers to.
-    `docs/readmes/terium.md` says "1,014 tests." with no antecedent on the
+    `docs/readmes/caterva.md` says "1,014 tests." with no antecedent on the
     line, and guessing would be inventing an attribution. What is checkable
     without guessing is that the number is one the repository can currently
     produce; a figure matching no suite is stale whatever it meant.

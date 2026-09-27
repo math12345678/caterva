@@ -8,16 +8,16 @@
 #
 # WHY THIS IS SEPARATE
 # --------------------
-# Terrium is Apache-2.0. stdpopsim is GPL-3.0-or-later. The two are
+# Caterva is Apache-2.0. stdpopsim is GPL-3.0-or-later. The two are
 # compatible in one direction only: Apache-2.0 code may be incorporated into
 # a GPLv3 work, but GPLv3 code cannot be incorporated into a work
 # distributed under Apache-2.0 without the combination becoming GPLv3.
 #
-# Nothing in Terrium bundles or redistributes stdpopsim — pip fetches it
+# Nothing in Caterva bundles or redistributes stdpopsim — pip fetches it
 # from PyPI on your machine, and `Tests/popgen_resolver.py` imports it at
 # runtime behind a try/except. Running the two together locally is your own
 # use, which the GPL does not restrict. The obligations attach on
-# DISTRIBUTION, and Terrium distributes source that names a dependency
+# DISTRIBUTION, and Caterva distributes source that names a dependency
 # rather than the dependency itself.
 #
 # The reason to split it anyway is that a default install should not quietly
@@ -25,7 +25,7 @@
 # Apache-2.0. A reader should not have to work out the interaction to know
 # what they have.
 #
-# IF YOU PACKAGE TERRIUM FOR REDISTRIBUTION
+# IF YOU PACKAGE CATERVA FOR REDISTRIBUTION
 # -----------------------------------------
 # A wheel, container image or installer that CONTAINS stdpopsim is a
 # distribution of GPLv3 code, and the combined work's terms change

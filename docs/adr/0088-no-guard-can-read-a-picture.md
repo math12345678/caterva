@@ -21,7 +21,7 @@ That exclusion is correct — a PNG is not source — and every other guard
 shares it by omission. `check_documented_counts.py`,
 `check_public_claims.py`, `check_investor_claims.py` and
 `check_no_fabricated_endorsements.py` all read text. **A hero image reading
-"10,000 universities trust Terrium" passes all four.**
+"10,000 universities trust Caterva" passes all four.**
 
 Fourteen images sit on public surfaces. Before this, none of them was
 checked by anything.

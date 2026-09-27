@@ -1,4 +1,4 @@
-# Terrium Advanced Analysis System
+# Caterva Advanced Analysis System
 
 > **Most of this document describes work that has not been built.**
 >
@@ -29,7 +29,7 @@
 
 ## System Overview
 
-The Terrium Advanced Analysis System consists of four main components:
+The Caterva Advanced Analysis System consists of four main components:
 
 1. **Simulation Domain Architecture Graph** - Comprehensive visualization of all simulation domains
 2. **Performance Analysis Dashboard** - Benchmarking and performance optimization tools
@@ -238,4 +238,4 @@ Each component has detailed documentation:
 
 ## License
 
-This system is part of the Terrium project and is licensed under the same terms as Terrium.
+This system is part of the Caterva project and is licensed under the same terms as Caterva.

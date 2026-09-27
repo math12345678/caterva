@@ -73,9 +73,9 @@ export interface Job {
  * Overridable so tests do not write into a developer's real history.
  */
 export function historyPath(): string {
-  const override = process.env['TERRIUM_HISTORY_FILE'];
+  const override = process.env['CATERVA_HISTORY_FILE'];
   if (override) return override;
-  return path.join(os.homedir(), '.terrium', 'history.json');
+  return path.join(os.homedir(), '.caterva', 'history.json');
 }
 
 /** One completed run, in the form that survives a process boundary. */

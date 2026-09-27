@@ -4,18 +4,18 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { buildTeriumEnvironment } from "../lib/teriumRunner";
+import { buildCatervaEnvironment } from "../lib/catervaRunner";
 import {
   canRunSupportedPython,
   isSupportedPythonMinor,
   resolvePythonExecutable,
 } from "../lib/python";
 
-const originalTerriumPython = process.env["TERRIUM_PYTHON"];
+const originalCatervaPython = process.env["CATERVA_PYTHON"];
 
 afterEach(() => {
-  if (originalTerriumPython === undefined) delete process.env["TERRIUM_PYTHON"];
-  else process.env["TERRIUM_PYTHON"] = originalTerriumPython;
+  if (originalCatervaPython === undefined) delete process.env["CATERVA_PYTHON"];
+  else process.env["CATERVA_PYTHON"] = originalCatervaPython;
 });
 
 describe("Python bridge environment", () => {
@@ -25,7 +25,7 @@ describe("Python bridge environment", () => {
       PYTHONPATH: ["/opt/science", "/opt/shared"].join(path.delimiter),
     };
 
-    const merged = buildTeriumEnvironment(baseEnv, "/repo");
+    const merged = buildCatervaEnvironment(baseEnv, "/repo");
 
     expect(merged.PATH).toBe("/usr/bin");
     expect(merged.PYTHONPATH).toBe(
@@ -45,7 +45,7 @@ describe("Python bridge interpreter selection", () => {
   });
 
   /**
-   * Finds an interpreter this environment can actually run Terrium on, or
+   * Finds an interpreter this environment can actually run Caterva on, or
    * throws saying so.
    *
    * Both tests below used to branch on the result -- asserting the happy
@@ -61,8 +61,8 @@ describe("Python bridge interpreter selection", () => {
    * silently converting every test in this describe block into a no-op.
    *
    * The absent-interpreter error message is not left untested: "does not
-   * silently fall back when TERRIUM_PYTHON is invalid" below asserts it
-   * directly, by pointing TERRIUM_PYTHON at a path that cannot exist.
+   * silently fall back when CATERVA_PYTHON is invalid" below asserts it
+   * directly, by pointing CATERVA_PYTHON at a path that cannot exist.
    */
   function requireSupportedPython(repoRoot: string): string {
     // Deliberately NOT a mirror of resolvePythonExecutable's fallback order.
@@ -89,23 +89,23 @@ describe("Python bridge interpreter selection", () => {
 
     if (!discovered) {
       throw new Error(
-        "no Python 3.10-3.13 interpreter with Terrium dependencies is " +
+        "no Python 3.10-3.13 interpreter with Caterva dependencies is " +
           `available, so the interpreter-selection tests cannot run. Tried: ${candidates.join(
             ", ",
           )}. Install the dependencies in requirements.txt, or set ` +
-          "TERRIUM_PYTHON to an interpreter that has them.",
+          "CATERVA_PYTHON to an interpreter that has them.",
       );
     }
 
     return discovered;
   }
 
-  it("honours TERRIUM_PYTHON when set to a supported interpreter path", () => {
-    delete process.env["TERRIUM_PYTHON"];
+  it("honours CATERVA_PYTHON when set to a supported interpreter path", () => {
+    delete process.env["CATERVA_PYTHON"];
     const repoRoot = process.cwd();
 
     const discovered = requireSupportedPython(repoRoot);
-    process.env["TERRIUM_PYTHON"] = discovered;
+    process.env["CATERVA_PYTHON"] = discovered;
 
     // Unconditional: an explicitly configured, working interpreter must be
     // the one used. Silently preferring a different one is the failure this
@@ -113,8 +113,8 @@ describe("Python bridge interpreter selection", () => {
     expect(resolvePythonExecutable(repoRoot)).toBe(discovered);
   });
 
-  it("honours TERRIUM_PYTHON when set to a bare executable name", () => {
-    delete process.env["TERRIUM_PYTHON"];
+  it("honours CATERVA_PYTHON when set to a bare executable name", () => {
+    delete process.env["CATERVA_PYTHON"];
     const repoRoot = process.cwd();
 
     // A bare name (resolved via PATH) rather than an absolute path -- the
@@ -126,28 +126,28 @@ describe("Python bridge interpreter selection", () => {
     expect(
       executableName,
       "no supported python3.1x is on PATH, so the bare-name case cannot be " +
-        "exercised; install one or set TERRIUM_PYTHON",
+        "exercised; install one or set CATERVA_PYTHON",
     ).toBeDefined();
 
-    process.env["TERRIUM_PYTHON"] = executableName!;
+    process.env["CATERVA_PYTHON"] = executableName!;
     expect(resolvePythonExecutable(repoRoot)).toBe(executableName);
   });
 
-  it("does not silently fall back when TERRIUM_PYTHON is invalid", () => {
-    process.env["TERRIUM_PYTHON"] = "/definitely/not/a/python";
+  it("does not silently fall back when CATERVA_PYTHON is invalid", () => {
+    process.env["CATERVA_PYTHON"] = "/definitely/not/a/python";
     expect(() => resolvePythonExecutable(process.cwd())).toThrow(
-      /No supported Python 3\.10–3\.13 interpreter with Terrium dependencies found/,
+      /No supported Python 3\.10–3\.13 interpreter with Caterva dependencies found/,
     );
   });
 });
 
 describe("interpreter discovery does not judge by filename", () => {
-  const originalConfigured = process.env["TERRIUM_PYTHON"];
+  const originalConfigured = process.env["CATERVA_PYTHON"];
   const originalPath = process.env["PATH"];
 
   afterEach(() => {
-    if (originalConfigured === undefined) delete process.env["TERRIUM_PYTHON"];
-    else process.env["TERRIUM_PYTHON"] = originalConfigured;
+    if (originalConfigured === undefined) delete process.env["CATERVA_PYTHON"];
+    else process.env["CATERVA_PYTHON"] = originalConfigured;
     process.env["PATH"] = originalPath;
   });
 
@@ -162,7 +162,7 @@ describe("interpreter discovery does not judge by filename", () => {
    * reported as coverage of a line it could not reach.
    */
   function pathWithOnlyBarePython3(source: string): string | undefined {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "terrium-py-"));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "caterva-py-"));
     try {
       fs.symlinkSync(source, path.join(dir, "python3"));
     } catch {
@@ -194,7 +194,7 @@ describe("interpreter discovery does not judge by filename", () => {
       return;
     }
 
-    delete process.env["TERRIUM_PYTHON"];
+    delete process.env["CATERVA_PYTHON"];
     process.env["PATH"] = isolated;
 
     // The container case: one fully-provisioned interpreter, no python3.NN
@@ -217,7 +217,7 @@ describe("interpreter discovery does not judge by filename", () => {
       return;
     }
 
-    delete process.env["TERRIUM_PYTHON"];
+    delete process.env["CATERVA_PYTHON"];
     expect(resolvePythonExecutable(repoRoot)).not.toBe("python3");
   });
 });

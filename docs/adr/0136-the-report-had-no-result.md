@@ -16,8 +16,8 @@ the input is produced), ADR 0003 / 0027 / 0036 / 0086 (one fact, two copies)
 
 ## What was found
 
-ADR 0133 built `report` to answer the owner's sentence — *"Terrium is a
-tool. People should use Terrium."* — by joining nine capabilities into one
+ADR 0133 built `report` to answer the owner's sentence — *"Caterva is a
+tool. People should use Caterva."* — by joining nine capabilities into one
 document a student could hand to a teacher.
 
 The document had six sections. **The fifth was Result, and it could never
@@ -84,7 +84,7 @@ the model takes a km.
 **A model that did not run becomes a refusal, not a missing section.** Three
 outcomes are distinguished, because they need different actions:
 
-- `km` missing — a property of the enzyme; Terrium resolves it or refuses.
+- `km` missing — a property of the enzyme; Caterva resolves it or refuses.
 - `vmax` missing — yours to supply, or derived from kcat and [E]₀.
 - `s0` missing — *yours to choose, not a property of the enzyme.*
 

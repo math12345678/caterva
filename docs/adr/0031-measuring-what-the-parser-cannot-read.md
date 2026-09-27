@@ -10,7 +10,7 @@ in it is corrected here**), ADR 0029 (protein variants)
 
 ## Context
 
-BRENDA puts one free-text cell beside every kinetic value. Terrium mines it
+BRENDA puts one free-text cell beside every kinetic value. Caterva mines it
 for pH, temperature, buffer, and — since ADR 0029 — whether the row measured
 a sequence variant. Everything else in that string is discarded.
 
@@ -37,7 +37,7 @@ looking should not have been necessary.
 
 `scripts/check_commentary_coverage.py` removes from every commentary the
 spans the pipeline's own extractors match, and reports what is left. The
-leftovers are, precisely, what Terrium cannot read.
+leftovers are, precisely, what Caterva cannot read.
 
 **Coverage at introduction: 73% of 263 commentaries fully understood.**
 
@@ -82,7 +82,7 @@ sharply:
 ```
 
 FBP is an allosteric activator of LDH. Those two rows are a **designed
-contrast** — the values are *meant* to differ — and Terrium reads neither,
+contrast** — the values are *meant* to differ — and Caterva reads neither,
 so it would treat them as two measurements of one thing and take the lower.
 
 This is Jeske's fourth item, present and unread. ADR 0028's claim to the

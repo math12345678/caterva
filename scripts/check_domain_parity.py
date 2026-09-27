@@ -2,12 +2,12 @@
 
 A domain has to be declared in four places to actually work:
 
-  1. ``terium_runner.py``'s ``DISPATCH``      (domain -> engine function)
-  2. ``teriumRunner.ts``'s ``SimulationDomain`` union
+  1. ``caterva_runner.py``'s ``DISPATCH``      (domain -> engine function)
+  2. ``catervaRunner.ts``'s ``SimulationDomain`` union
   3. ``schemas.ts``'s ``SimulationParameterSchemas``
   4. the engine's ``__all__`` (checked by DISPATCH's own contract test)
 
-``Terium/tests/test_boundary_contract.py`` (ADR 0007) already pins 1
+``caterva/tests/test_boundary_contract.py`` (ADR 0007) already pins 1
 against 4. Nothing pinned 2 or 3 against anything, and on 2026-08-09 that
 cost real money in two opposite directions on the same day:
 
@@ -56,9 +56,9 @@ API_LIB = (
     / "src"
     / "lib"
 )
-RUNNER_PY = API_LIB / "terium_runner.py"
+RUNNER_PY = API_LIB / "caterva_runner.py"
 LLM_RESOLVER_TS = API_LIB / "llmResolver.ts"
-RUNNER_TS = API_LIB / "teriumRunner.ts"
+RUNNER_TS = API_LIB / "catervaRunner.ts"
 SCHEMAS_TS = API_LIB / "schemas.ts"
 
 #: `sbml` is the raw-SBML escape hatch, not a teaching domain. It is
@@ -72,7 +72,7 @@ def _read(path: pathlib.Path) -> str:
 
 
 def dispatch_domains() -> set[str]:
-    """Keys of DISPATCH in terium_runner.py."""
+    """Keys of DISPATCH in caterva_runner.py."""
     source = _read(RUNNER_PY)
     match = re.search(
         r"^DISPATCH:\s*Dict\[str,\s*str\]\s*=\s*\{(.*?)^\}",
@@ -85,7 +85,7 @@ def dispatch_domains() -> set[str]:
 
 
 def composed_domains_py() -> set[str]:
-    """Keys of COMPOSED_DOMAINS in terium_runner.py."""
+    """Keys of COMPOSED_DOMAINS in caterva_runner.py."""
     source = _read(RUNNER_PY)
     match = re.search(
         r"^COMPOSED_DOMAINS:\s*Dict\[str,\s*str\]\s*=\s*\{(.*?)^\}",
@@ -98,7 +98,7 @@ def composed_domains_py() -> set[str]:
 
 
 def composed_domains_ts() -> set[str]:
-    """Members of the ComposedDomain union in teriumRunner.ts.
+    """Members of the ComposedDomain union in catervaRunner.ts.
 
     Read from the type rather than the const array so a drift between those
     two is caught as well: TypeScript would reject a const member missing
@@ -114,7 +114,7 @@ def composed_domains_ts() -> set[str]:
 
 
 def simulation_domain_union() -> set[str]:
-    """Members of the SimulationDomain union in teriumRunner.ts."""
+    """Members of the SimulationDomain union in catervaRunner.ts."""
     source = _read(RUNNER_TS)
     match = re.search(
         r"export type SimulationDomain\s*=(.*?);", source, re.DOTALL
@@ -174,8 +174,8 @@ def llm_supported_domains() -> set[str]:
 def _layers() -> dict[str, set[str]]:
     """The three declaration sites, by human-readable name."""
     return {
-        "DISPATCH (terium_runner.py)": dispatch_domains(),
-        "SimulationDomain (teriumRunner.ts)": simulation_domain_union(),
+        "DISPATCH (caterva_runner.py)": dispatch_domains(),
+        "SimulationDomain (catervaRunner.ts)": simulation_domain_union(),
         "SimulationParameterSchemas (schemas.ts)": schema_domains(),
     }
 
@@ -199,13 +199,13 @@ def check() -> list[str]:
     composed_ts = composed_domains_ts()
     if not composed_py:
         violations.append(
-            "parsed ZERO domains out of COMPOSED_DOMAINS in terium_runner.py. "
+            "parsed ZERO domains out of COMPOSED_DOMAINS in caterva_runner.py. "
             "Refusing to report success on an extraction that has broken."
         )
     if not composed_ts:
         violations.append(
             "parsed ZERO members out of the ComposedDomain union in "
-            "teriumRunner.ts. Refusing to report success on an extraction "
+            "catervaRunner.ts. Refusing to report success on an extraction "
             "that has broken."
         )
     if composed_py and composed_ts and composed_py != composed_ts:
@@ -213,15 +213,15 @@ def check() -> list[str]:
         only_ts = sorted(composed_ts - composed_py)
         if only_py:
             violations.append(
-                f"composed domain(s) in terium_runner.py's COMPOSED_DOMAINS "
-                f"but not in teriumRunner.ts's ComposedDomain union: "
+                f"composed domain(s) in caterva_runner.py's COMPOSED_DOMAINS "
+                f"but not in catervaRunner.ts's ComposedDomain union: "
                 f"{only_py}. The runner would dispatch them; TypeScript will "
                 f"not let a caller ask."
             )
         if only_ts:
             violations.append(
-                f"composed domain(s) in teriumRunner.ts's ComposedDomain "
-                f"union but not in terium_runner.py's COMPOSED_DOMAINS: "
+                f"composed domain(s) in catervaRunner.ts's ComposedDomain "
+                f"union but not in caterva_runner.py's COMPOSED_DOMAINS: "
                 f"{only_ts}. TypeScript would accept the request and the "
                 f"runner would refuse it as an unknown domain."
             )
@@ -268,7 +268,7 @@ def check() -> list[str]:
             "Refusing to report success."
         )
     else:
-        dispatch = layers["DISPATCH (terium_runner.py)"]
+        dispatch = layers["DISPATCH (caterva_runner.py)"]
         for domain in sorted(llm_domains - dispatch):
             violations.append(
                 f"{domain!r} is advertised to the LLM in SUPPORTED_DOMAINS "

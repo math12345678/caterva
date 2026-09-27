@@ -5,7 +5,7 @@ One document a student can hand in.
 
 WHY THIS EXISTS
 ---------------
-Terrium had, separately: a resolver that finds literature values, a
+Caterva had, separately: a resolver that finds literature values, a
 provenance record for each one, assay conditions, reliability grades on
 Bakker's axes, an ensemble for values the evidence cannot rank, a BibTeX
 exporter, an annotated model exporter, and a simulation engine.
@@ -14,13 +14,13 @@ Nine capabilities, and nothing a person could hand to a teacher.
 
 Every one of those is an ANSWER TO A QUESTION NOBODY ASKED IN ISOLATION. A
 student in a teaching lab has one job: run the simulation, and show where
-the numbers came from. Terrium could do both halves and made the student
+the numbers came from. Caterva could do both halves and made the student
 assemble them from a terminal transcript, two export files and a screen
 they had already scrolled past.
 
 WHAT MAKES THIS DIFFERENT FROM A PRINTOUT
 -----------------------------------------
-The section other tools do not have is **what Terrium refused to do**.
+The section other tools do not have is **what Caterva refused to do**.
 
 A report that silently omits what could not be sourced is this project's
 own defect at document scale: computed, correct, and not delivered. A
@@ -154,7 +154,7 @@ class LabReport(BaseModel):
     supplied: list[str] = []
     #: Parameter names computed from a cited value and a chosen one.
     derived: list[str] = []
-    #: One line per thing Terrium declined to do, in the reader's terms.
+    #: One line per thing Caterva declined to do, in the reader's terms.
     refusals: list[str] = []
     #: Parameters where the literature reports more than one value.
     disagreements: list[str] = []
@@ -262,7 +262,7 @@ def _provenance_lines(rate_law: str | None = None) -> list[str]:
         "",
         "| | |",
         "|---|---|",
-        f"| Terrium commit | `{version}` |",
+        f"| Caterva commit | `{version}` |",
         f"| Generated | {generated} |",
     ]
 
@@ -368,7 +368,7 @@ def build_report(
     `also_refused` carries refusals the CALLER established, which this
     function cannot see -- chiefly "the model was not run, and here is what
     was missing". They render in the same section as the ones found here,
-    because a reader looking for what Terrium would not do must find all of
+    because a reader looking for what Caterva would not do must find all of
     it in one place; a second list somewhere else is a gap with extra steps.
     """
     lines: list[str] = [f"# {title}", "", question, ""]
@@ -400,12 +400,12 @@ def build_report(
             #
             # The supplied row below carries the value and its basis. Only
             # the empty row is dropped, and the lookup's failure is still in
-            # "What Terrium would not do" — so nothing is hidden, it is just
+            # "What Caterva would not do" — so nothing is hidden, it is just
             # not said twice in contradictory ways.
             continue
         else:
             lines.append(
-                f"| {name} | — | **not sourced** | see *What Terrium would "
+                f"| {name} | — | **not sourced** | see *What Caterva would "
                 f"not do* |"
             )
 
@@ -449,7 +449,7 @@ def build_report(
     lines += [
         "",
         "A value marked **yours** describes the experiment, not the enzyme. "
-        "No database reports it, and Terrium has not checked it.",
+        "No database reports it, and Caterva has not checked it.",
         "",
     ]
     if supplied_measurements:
@@ -458,7 +458,7 @@ def build_report(
             + ", ".join(f"**{n}**" for n in supplied_measurements)
             + ": that IS a property of the enzyme, and you are its source "
             "rather than a paper. The literature could not supply it and "
-            "Terrium did not invent one — the basis in the table is what "
+            "Caterva did not invent one — the basis in the table is what "
             "stands behind the number, and it is the thing to question.",
             "",
         ]
@@ -584,9 +584,9 @@ def build_report(
             # wording here would be a second claim (ADR 0003).
             lines += [disclaimer, ""]
 
-    # ---- What Terrium would not do ---------------------------------------
+    # ---- What Caterva would not do ---------------------------------------
     #
-    # THE SECTION THAT MAKES THIS A TERRIUM REPORT.
+    # THE SECTION THAT MAKES THIS A CATERVA REPORT.
     #
     # Every other tool's output is what it managed to produce. A refusal
     # that appears nowhere is indistinguishable from a question nobody
@@ -628,7 +628,7 @@ def build_report(
         if available:
             detail = (
                 "the substrate name matched nothing, though this enzyme "
-                f"reports values for {', '.join(available)} — Terrium does "
+                f"reports values for {', '.join(available)} — Caterva does "
                 "not substitute a similar name, because a similar name can "
                 "be a different molecule"
             )
@@ -652,7 +652,7 @@ def build_report(
 
     if refusals:
         lines += [
-            "## What Terrium would not do",
+            "## What Caterva would not do",
             "",
             "These are not omissions. Each one is a decision, with the reason "
             "and what would change it.",
@@ -662,7 +662,7 @@ def build_report(
         ]
     else:
         lines += [
-            "## What Terrium would not do",
+            "## What Caterva would not do",
             "",
             "Nothing was withheld: every parameter resolved to a cited value "
             "or was supplied by you.",

@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Caterva Landing Page"
+version = "1.0.0"
+id = "artifacts/caterva-landing"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18612
+
+[services.development]
+run = "pnpm --filter @workspace/caterva-landing run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/caterva-landing", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/caterva-landing/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18612"
+BASE_PATH = "/"

@@ -8,7 +8,7 @@ assignees: ''
 
 ## What's the gap?
 
-<!-- What can't Terrium currently do that this would let it do? -->
+<!-- What can't Caterva currently do that this would let it do? -->
 
 ## If this is a new simulation domain
 

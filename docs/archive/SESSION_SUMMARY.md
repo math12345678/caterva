@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** this doc's "5 core endpoints" list includes a "literature" endpoint that does not exist — `src/web/server.ts` has no `/api/literature/search` route (real routes: simulate, jobs/:jobId, jobs/history, stats, compare, batch, batches/:id, sweep, sweeps/:id, health). The "178/178 tests, 84.04%" figures are also unverified/stale — a sibling same-day doc (`EVERYTHING_COMPLETE.md`) cites "197+" for the same snapshot. Near-duplicate of `READY_TO_SHIP.md`.
 
-# Terrium Session Summary — Web Interface Complete
+# Caterva Session Summary — Web Interface Complete
 
 **Session:** August 11, 2026  
 **Focus:** Building production-ready web interface for scientific simulation system  
@@ -152,7 +152,7 @@ npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
 | Health check | <1ms | Immediate |
 | PubMed search | 5-10s | With fallbacks |
 | SBML generation | <100ms | Instant |
-| Terium simulation | 2-3s | Fast |
+| Caterva simulation | 2-3s | Fast |
 | **End-to-end** | **10-15s** | Acceptable |
 | Dashboard timeout | 60s | Plenty of headroom |
 
@@ -306,7 +306,7 @@ npm run verify-all  # Full verification
 ✅ REST API (5 endpoints)  
 ✅ Real literature integration  
 ✅ SBML model generation  
-✅ Terium simulations  
+✅ Caterva simulations  
 ✅ Job management  
 ✅ Error handling  
 ✅ Full test coverage  
@@ -328,7 +328,7 @@ npm run verify-all  # Full verification
 
 ## Summary
 
-**You now have a complete, tested, production-ready web interface for the Terrium scientific simulation system.**
+**You now have a complete, tested, production-ready web interface for the Caterva scientific simulation system.**
 
 Start using it:
 ```bash

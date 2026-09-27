@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** "Catalogued 819+ test blocks across 49 files" is fabricated — real count is 19 test files (`find src -name "*.test.ts"`), ~296-379 `it`/`test`/`describe` blocks by grep. This is a new, third inconsistent test-count figure (joining the already-flagged "178" and "197+" from other same-day docs) — treat any specific number in this batch of docs as unverified until you run `npm test` yourself. Route/endpoint claims and file existence (`csv-exporter.ts`, `result-comparator.ts`, `dist/src/web/server.js` line count) were independently verified as accurate.
 
-# ✅ TERRIUM: CONTINUATION SESSION COMPLETE
+# ✅ CATERVA: CONTINUATION SESSION COMPLETE
 
 **Date:** August 11, 2026  
 **Status:** 🚀 Production-Ready with Enhanced Capabilities  
@@ -288,7 +288,7 @@ curl http://localhost:3000/api/analyze/sweep/sweep_123
 - ✅ 9 distinct features (core + export + analysis)
 - ✅ 4 kinetic models (all SBML Level 3)
 - ✅ Web dashboard (interactive, real-time)
-- ✅ Persistent storage (terrium-jobs.jsonl)
+- ✅ Persistent storage (caterva-jobs.jsonl)
 - ✅ Literature integration (PubMed + CrossRef)
 
 ### What's Ready
@@ -305,7 +305,7 @@ curl http://localhost:3000/api/analyze/sweep/sweep_123
 
 ### Start the System
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 # Open http://localhost:3000
 ```
@@ -335,7 +335,7 @@ curl http://localhost:3000/api/export/jobs/csv > data.csv
 
 ## 🎉 Summary
 
-**Terrium is now a production-grade scientific platform with:**
+**Caterva is now a production-grade scientific platform with:**
 - ✅ 18 working API endpoints
 - ✅ 9 core features
 - ✅ Complete data export capabilities

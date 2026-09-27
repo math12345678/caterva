@@ -18,7 +18,7 @@ that CI cannot run is not a guard.
 
 WHAT WAS FOUND ON THE FIRST RUN
 -------------------------------
-`terrium_pitch_deck.pptx`, slides 6 and 11: **"382 automated tests
+`caterva_pitch_deck.pptx`, slides 6 and 11: **"382 automated tests
 passing"**. The repository had 1,851. The deck understated its own evidence
 by nearly five times.
 
@@ -92,26 +92,18 @@ PUBLIC_MARKETING: tuple[str, ...] = (
 #: one. The alternative was continuing to publish confidential documents in
 #: order to keep them checkable, which is a worse trade, but it is a trade and
 #: not a free win. If they ever return to the repository, re-add them here.
-INVESTOR_DOCS: tuple[str, ...] = (
-    "terrium_pitch_deck.pptx",
-    # A grant/programme application draft. Marked "ready to copy in", so it
-    # is operational rather than historical: somebody will paste these
-    # numbers into a real submission. It claimed 429 tests and 3 domains --
-    # true when drafted on 2026-07-28, and a 77% understatement by the time
-    # anyone would submit it.
-    #
-    # An understatement is not harmless here. It is a claim to an evaluating
-    # body about what the project is, made by someone who cannot check it.
-    "Business/FYDEMY_APPLICATION_DRAFT.md",
-    "Business/FUNDRAISING_TRACKER.md",
-    "Business/ROADMAP.md",
-    "Business/README.md",
-)
+#: EMPTY SINCE 2026-09-27, and recorded the same way. The pitch deck and the
+#: Business/ folder (application draft, fundraising tracker, roadmap) were
+#: removed from the repository and scrubbed from its history when it went
+#: public: they named investors and a cap table. Their numbers still reach
+#: an audience; this guard can no longer see them, so checking them is a
+#: human job again. If any audience-facing document returns, list it here.
+INVESTOR_DOCS: tuple[str, ...] = ()
 
 #: A number that says WHEN it was true is not a stale claim; it is a dated
 #: one, and dated claims age honestly.
 #:
-#: `Docw/terrium_mvp_timeline.docx` says the literature layer "already
+#: `Docw/caterva_mvp_timeline.docx` says the literature layer "already
 #: exists and passes 124 tests **as of this session**". The live figure is
 #: far higher, but that sentence was true when written and says so. The
 #: pitch deck's "382 automated tests passing" carried no such qualifier and

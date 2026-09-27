@@ -48,7 +48,7 @@ Three rules carry it.
 
 ### 1. The window is the judge's threshold, not a second one
 
-`Terium/agents/assay_window.py` declares no new "how far is too far". Its
+`caterva/agents/assay_window.py` declares no new "how far is too far". Its
 half-widths are the model judge's own `*_SERIOUS` thresholds. A candidate is
 inside the window when, on every axis that **both** it and the reference
 state, it lies within one of those thresholds of the reference. The metric
@@ -72,7 +72,7 @@ frontier hold a row inside the other value's conditions?".
   A constraint `assay_window [subject] must be <anchor's conditions>` is
   raised, because it is satisfiable and the search should be run.
 - **Both do**: either could be re-selected and neither is privileged. The
-  mismatch stays a finding with a note naming why — Terrium will not pick a
+  mismatch stays a finding with a note naming why — Caterva will not pick a
   side. This is ADR 0171's "explore, do not choose" applying to the case it
   was built for.
 - **Neither does**: no re-search could remove the mismatch; it stands as a

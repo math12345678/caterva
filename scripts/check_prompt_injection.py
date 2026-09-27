@@ -2,7 +2,7 @@
 
 WHY THIS REPOSITORY SPECIFICALLY
 
-Several AI coding agents commit to Terrium concurrently, and they read each
+Several AI coding agents commit to Caterva concurrently, and they read each
 other's files -- source, comments, docs, test fixtures. That makes text an
 execution surface: a sentence written to manipulate a reader rather than inform
 one can change what the next agent does. It is the same threat model as a
@@ -199,7 +199,7 @@ If `npx`/`trojan-scan` is unavailable the guard reports that it could not
 run and FAILS, rather than printing a pass. A scanner that silently skips
 is indistinguishable from a scanner that found nothing, which is precisely
 the defect class this repository keeps correcting. Set
-TERRIUM_SKIP_INJECTION_SCAN=1 to opt out explicitly -- visibly, in the
+CATERVA_SKIP_INJECTION_SCAN=1 to opt out explicitly -- visibly, in the
 environment, not by accident.
 
 Run directly: python scripts/check_prompt_injection.py
@@ -258,7 +258,7 @@ SEVERITY_RANK = {
 #: Generous: the scan walks ~750 files and took 27s on a slow mount.
 SCAN_TIMEOUT_S = 300
 
-SKIP_ENV = "TERRIUM_SKIP_INJECTION_SCAN"
+SKIP_ENV = "CATERVA_SKIP_INJECTION_SCAN"
 
 #: Reviewed exemptions. Both this file's docstring and the failure message
 #: told readers to record benign findings here -- and until now NOTHING READ

@@ -1,4 +1,4 @@
-# Briefing for AI agents working on Terrium
+# Briefing for AI agents working on Caterva
 
 Two prompts. Paste **Prompt A** into any agent that has worked on this repo
 before — it corrects things that changed underneath them. Paste **Prompt B**
@@ -9,19 +9,19 @@ to set them working.
 ## Prompt A — what changed (paste this first)
 
 ```
-Terrium changed underneath you on 2026-08-12. Three things will make your
+Caterva changed underneath you on 2026-08-12. Three things will make your
 work wrong if you don't know them. Read this before touching anything.
 
 1. THE ENGINE DIRECTORY WAS RENAMED
 
-   Tellurium/            ->  Terium/
-   tellurium_engine.py   ->  terium_engine.py
-   tellurium_runner.py   ->  terium_runner.py
-   telluriumRunner.ts    ->  teriumRunner.ts
-   telluriumBridge.ts    ->  teriumBridge.ts
+   Tellurium/            ->  caterva/
+   tellurium_engine.py   ->  caterva_engine.py
+   tellurium_runner.py   ->  caterva_runner.py
+   telluriumRunner.ts    ->  catervaRunner.ts
+   telluriumBridge.ts    ->  catervaBridge.ts
 
-   Imports are now `from Terium import terium_engine`, and the CLI is
-   `python -m Terium.cli`. If you have a cached path or an import from
+   Imports are now `from caterva import caterva_engine`, and the CLI is
+   `python -m caterva.cli`. If you have a cached path or an import from
    before this date, it is wrong.
 
    The upstream Tellurium project is unrelated to this code and always was
@@ -40,7 +40,7 @@ work wrong if you don't know them. Read this before touching anything.
 2. THE PROJECT IS NOW 18 REPOSITORIES
 
    Development happens at github.com/Terrium-sim, not in one repo. `main`
-   is an umbrella of submodules; the code lives in `terium`, `tests`,
+   is an umbrella of submodules; the code lives in `caterva`, `tests`,
    `backend-main`, `frontend-main`, `wiring-main`,
    `science-agent-pipeline-replit`, `documents`, `business` and others.
 
@@ -71,12 +71,12 @@ work wrong if you don't know them. Read this before touching anything.
 ## Prompt B — how to work here (paste this to set them going)
 
 ```
-You are working on Terrium, an open-source scientific simulation engine for
+You are working on Caterva, an open-source scientific simulation engine for
 teaching labs. Read docs/CONSTITUTION.md before you start.
 
 WHAT MAKES THIS PROJECT DIFFERENT
 
-Terrium resolves scientific parameters from real literature and attaches a
+Caterva resolves scientific parameters from real literature and attaches a
 citation to every number. Its central rule is that it refuses to invent: a
 parameter it cannot source stops the run rather than becoming a plausible
 default. "The literature has nothing" and "the lookup failed" are reported
@@ -115,7 +115,7 @@ Concretely, when you fix something:
 BEFORE YOU SAY YOU ARE DONE
 
     python scripts/verify_build.py --quick     # the guards
-    python -m pytest Terium/tests Tests -q     # the Python suites
+    python -m pytest caterva/tests Tests -q     # the Python suites
     npx tsc --noEmit -p .                      # both trees must compile
 
 State what you verified and how. "Should work" is not a result.

@@ -34,7 +34,7 @@ describe('scientific report', () => {
     const { out } = run(['help']);
     expect(out).toContain('report --ec N --organism O --substrate S');
     // The distinguishing section is advertised, not buried.
-    expect(out).toMatch(/what Terrium would not do/);
+    expect(out).toMatch(/what Caterva would not do/);
   }, 120_000);
 
   it('points at `catalog` when the request is incomplete', () => {

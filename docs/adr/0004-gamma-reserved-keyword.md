@@ -6,7 +6,7 @@
 
 The SIR and SEIR models both have a recovery-rate parameter that every
 epidemiology textbook calls `gamma`. Antimony, the model-definition
-language Terrium translates to SBML, treats `gamma` as a reserved name --
+language Caterva translates to SBML, treats `gamma` as a reserved name --
 it's the built-in gamma function. Generating an antimony model with a
 parameter literally named `gamma` fails to parse, with an error that gives
 no hint the problem is a naming collision with a math function rather than
@@ -16,7 +16,7 @@ identified.
 ## Decision
 
 Internally, generated antimony source emits the parameter as `gamma_rate`
-(the constant `GAMMA_PARAM` in `terium_engine.py`), with a comment in
+(the constant `GAMMA_PARAM` in `caterva_engine.py`), with a comment in
 the generated model source explaining why, so a student inspecting the raw
 antimony/SBML sees an explanation, not just an unexplained rename. The
 Python API (`simulate_sir`, `simulate_seir`, `build_sir_antimony`,

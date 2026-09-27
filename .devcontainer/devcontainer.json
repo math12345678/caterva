@@ -1,5 +1,5 @@
 {
-  "name": "Terrium (simulation engine + literature layer)",
+  "name": "Caterva (simulation engine + literature layer)",
 
   // ".devcontainer/Dockerfile", not "../Dockerfile". The root Dockerfile is
   // the Node API-server image; it has no Python, so the postCreateCommand

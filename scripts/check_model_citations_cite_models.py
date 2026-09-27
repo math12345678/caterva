@@ -63,7 +63,7 @@ RESOLVER = (
     / "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts"
 )
 
-#: Data sources Terrium draws values from. Named here rather than imported
+#: Data sources Caterva draws values from. Named here rather than imported
 #: from `data_sources.py` on purpose: that table is the list of sources it
 #: is CORRECT to attribute, and this is the list it is INCORRECT to cite as
 #: a model. Coupling them would make adding a source silently change what

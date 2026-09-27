@@ -27,7 +27,7 @@ Four things were checked, and all four are right:
   3. User data goes over **stdin as JSON**:
      `proc.stdin.write(JSON.stringify(payload))`. It never appears on a
      command line at all.
-  4. `pythonExecutable` is resolved from `TERRIUM_PYTHON`, `VIRTUAL_ENV` and
+  4. `pythonExecutable` is resolved from `CATERVA_PYTHON`, `VIRTUAL_ENV` and
      `PATH` -- operator-controlled environment, not request-controlled input.
 
 So there is no command injection here. That is worth writing down: an

@@ -14,7 +14,7 @@ five quotes under the heading **"Built for teaching labs. Trusted by
 educators."** Each was attributed to a named individual with a title at a
 named institution: Stanford, MIT, Johns Hopkins, UC Berkeley, Cambridge.
 
-Terrium is pre-launch. It has a waitlist and no users. Nobody had used it,
+Caterva is pre-launch. It has a waitlist and no users. Nobody had used it,
 so nobody had said any of those things.
 
 The quotes are gone, `TestimonialCarousel.tsx` is deleted, and
@@ -54,7 +54,7 @@ correcting the content, and drew the lesson:
 
 That lesson had been applied to the documentation and to the numbers. It
 had never been applied to the marketing, because the compliance work
-audited what Terrium *consumes* and never what Terrium *says*.
+audited what Caterva *consumes* and never what Caterva *says*.
 
 ## Decision
 
@@ -66,7 +66,7 @@ person, their actual words, and the date written permission was given.
 names an institution without a matching record.
 
 **The register does not cover the real expert feedback.** Five named
-experts have reviewed Terrium and their comments are in
+experts have reviewed Caterva and their comments are in
 `docs/EXPERT_FEEDBACK.md`. None of it is an endorsement. It is criticism,
 given in reply to a cold email, and König read that email as a claim on
 Tellurium's work. Quoting a critic as a supporter is the same fabrication

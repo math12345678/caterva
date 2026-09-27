@@ -1,14 +1,14 @@
 import { spawnSync } from 'child_process';
 import * as path from 'path';
 
-import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../engine/catervaBridge';
 import { reconcileCatalogue, type CatalogueReport } from './domainCatalogue';
 
 /**
- * `scientific domains` — what Terrium can simulate, and how to run each one.
+ * `scientific domains` — what Caterva can simulate, and how to run each one.
  *
  * The list is asked of the ENGINE, not read from a file in this package.
- * `terium_runner.py --list-domains` emits `DISPATCH`, the table the engine
+ * `caterva_runner.py --list-domains` emits `DISPATCH`, the table the engine
  * actually dispatches on, so a domain cannot appear here unless it really
  * runs — and cannot be missing here just because nobody updated a doc.
  *
@@ -24,7 +24,7 @@ const RUNNER = path.join(
   'api-server',
   'src',
   'lib',
-  'terium_runner.py',
+  'caterva_runner.py',
 );
 
 export interface DomainsOptions {
@@ -44,7 +44,7 @@ export function dispatchIdsFromEngine(): string[] | null {
     {
       cwd: REPO_ROOT,
       encoding: 'utf8',
-      // The runner imports `Terium`, which lives at the repository root.
+      // The runner imports `caterva`, which lives at the repository root.
       env: { ...process.env, PYTHONPATH: REPO_ROOT },
       timeout: 60_000,
     },
@@ -84,9 +84,9 @@ export function commandDomains(options: DomainsOptions = {}): number {
   }
 
   process.stdout.write(
-    `\n${BOLD}Terrium can simulate ${report.entries.length} things.${RESET}\n` +
+    `\n${BOLD}Caterva can simulate ${report.entries.length} things.${RESET}\n` +
       `${DIM}Each line below is a command that runs. Values are examples, not defaults —\n` +
-      `Terrium has no defaults for measured quantities.${RESET}\n\n`,
+      `Caterva has no defaults for measured quantities.${RESET}\n\n`,
   );
 
   for (const entry of report.entries) {

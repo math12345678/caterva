@@ -1,10 +1,10 @@
-# Terrium Build Verification Summary
+# Caterva Build Verification Summary
 
-> **⚠️ CORRECTION (2026-08-10):** the "220 TypeScript tests across 15 files, ALL PASSING" figure (originally dated Aug 3) is stale — the api-server test suite has grown since. Get the current count by running `pnpm test` (or `vitest run`) from `Science-Agent-Pipeline/artifacts/api-server/` rather than trusting the number below; this repo has multiple agents committing continuously, so any hardcoded test count in a doc should be treated as a snapshot, not a live fact. Citation fixes and refactoring claims elsewhere in this doc (Mullis/Lewontin/Hoare & Pal citation corrections in `queryResolver.ts`, the `Terium/` package split into core/continuous/discrete/scenarios, and the guard scripts listed) were independently verified as real.
+> **⚠️ CORRECTION (2026-08-10):** the "220 TypeScript tests across 15 files, ALL PASSING" figure (originally dated Aug 3) is stale — the api-server test suite has grown since. Get the current count by running `pnpm test` (or `vitest run`) from `Science-Agent-Pipeline/artifacts/api-server/` rather than trusting the number below; this repo has multiple agents committing continuously, so any hardcoded test count in a doc should be treated as a snapshot, not a live fact. Citation fixes and refactoring claims elsewhere in this doc (Mullis/Lewontin/Hoare & Pal citation corrections in `queryResolver.ts`, the `caterva/` package split into core/continuous/discrete/scenarios, and the guard scripts listed) were independently verified as real.
 
 ## 🎯 Executive Summary
 
-This document summarizes the comprehensive improvements made to the Terrium codebase to achieve a **deployable, verifiable, and maintainable** state. All changes implement the project's core rules:
+This document summarizes the comprehensive improvements made to the Caterva codebase to achieve a **deployable, verifiable, and maintainable** state. All changes implement the project's core rules:
 
 - **Rule 1**: Every numerical/bibliographic claim is checked against ground truth
 - **Rule 2**: Distinguish physically impossible (reject) from implausible (flag)
@@ -124,9 +124,9 @@ Stage 4 Part 4 recommended a citation-format guard. Implemented as:
 
 #### 🏗️ New Structure
 ```
-Terium/
+caterva/
 ├── __init__.py                    # Re-exports for backward compatibility
-├── terium_engine.py            # Shim (imports from modular structure)
+├── caterva_engine.py            # Shim (imports from modular structure)
 ├── core/
 │   ├── __init__.py               # Re-exports data_structures, validation, utils
 │   ├── data_structures.py        # Exceptions, dataclasses, constants
@@ -158,18 +158,18 @@ Terium/
 **Dual-mode compatibility**:
 
 ```python
-# Package mode (Terium package on PYTHONPATH)
+# Package mode (Caterva package on PYTHONPATH)
 try:
-    from Terium.core.data_structures import ModelBuildError
+    from caterva.core.data_structures import ModelBuildError
 except (ModuleNotFoundError, ImportError):
-    # Flat mode (Terium/ on sys.path)
+    # Flat mode (caterva/ on sys.path)
     from core.data_structures import ModelBuildError
 ```
 
-- **Package mode**: `PYTHONPATH=/repo/root` → `from Terium.core.xxx`
-- **Flat mode**: `cd Terium` → `from core.xxx`
+- **Package mode**: `PYTHONPATH=/repo/root` → `from caterva.core.xxx`
+- **Flat mode**: `cd Caterva` → `from core.xxx`
 - All modules use relative imports within the package
-- Core modules never import from `Terium.*` (avoids circular imports)
+- Core modules never import from `caterva.*` (avoids circular imports)
 
 #### ✅ Verification
 
@@ -285,26 +285,26 @@ MOD:  docs/adr/README.md (index entry)
 
 ### Python (Refactoring + Stage 4 Part 4)
 ```
-NEW:  Terium/core/__init__.py
-NEW:  Terium/core/data_structures.py
-NEW:  Terium/core/validation.py
-NEW:  Terium/core/utils.py
-NEW:  Terium/continuous/__init__.py
-NEW:  Terium/continuous/model_building.py
-NEW:  Terium/continuous/simulations.py
-NEW:  Terium/discrete/__init__.py
-NEW:  Terium/discrete/pcr.py
-NEW:  Terium/discrete/monte_carlo.py
-NEW:  Terium/discrete/molecular_dynamics.py
-NEW:  Terium/discrete/population_genetics/__init__.py
-NEW:  Terium/discrete/population_genetics/core.py
-NEW:  Terium/discrete/population_genetics/analysis.py
-NEW:  Terium/discrete/population_genetics/theoretical.py
-NEW:  Terium/discrete/population_genetics/probability.py
-NEW:  Terium/discrete/population_genetics/two_locus.py
-NEW:  Terium/scenarios/__init__.py
-NEW:  Terium/scenarios/wf_scenarios.py
-MOD:  Terium/terium_engine.py (shim conversion)
+NEW:  caterva/core/__init__.py
+NEW:  caterva/core/data_structures.py
+NEW:  caterva/core/validation.py
+NEW:  caterva/core/utils.py
+NEW:  caterva/continuous/__init__.py
+NEW:  caterva/continuous/model_building.py
+NEW:  caterva/continuous/simulations.py
+NEW:  caterva/discrete/__init__.py
+NEW:  caterva/discrete/pcr.py
+NEW:  caterva/discrete/monte_carlo.py
+NEW:  caterva/discrete/molecular_dynamics.py
+NEW:  caterva/discrete/population_genetics/__init__.py
+NEW:  caterva/discrete/population_genetics/core.py
+NEW:  caterva/discrete/population_genetics/analysis.py
+NEW:  caterva/discrete/population_genetics/theoretical.py
+NEW:  caterva/discrete/population_genetics/probability.py
+NEW:  caterva/discrete/population_genetics/two_locus.py
+NEW:  caterva/scenarios/__init__.py
+NEW:  caterva/scenarios/wf_scenarios.py
+MOD:  caterva/caterva_engine.py (shim conversion)
 MOD:  Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts
 NEW:  scripts/check_citation_format.py
 NEW:  scripts/check_engine_contract.py
@@ -371,7 +371,7 @@ The guard system can be extended with:
 | Import Compatibility | ? | ✅ | Both modes work |
 | Documentation | ? | ✅ | 16 ADRs indexed |
 
-**The Terrium codebase is in its strongest, most verifiable, and most maintainable state to date.**
+**The Caterva codebase is in its strongest, most verifiable, and most maintainable state to date.**
 
 ---
 

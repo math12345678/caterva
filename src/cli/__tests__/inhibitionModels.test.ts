@@ -23,13 +23,13 @@ import {
   runInhibitionModel,
   suggestModel,
 } from '../inhibitionModels';
-import { REPO_ROOT, resolvePythonExecutable } from '../../engine/teriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../../engine/catervaBridge';
 
 function engineIsAvailable(): boolean {
   try {
     execFileSync(
       resolvePythonExecutable(REPO_ROOT),
-      ['-c', 'import Terium.terium_engine'],
+      ['-c', 'import caterva.caterva_engine'],
       { cwd: REPO_ROOT, env: { ...process.env, PYTHONPATH: REPO_ROOT }, stdio: 'pipe' },
     );
     return true;

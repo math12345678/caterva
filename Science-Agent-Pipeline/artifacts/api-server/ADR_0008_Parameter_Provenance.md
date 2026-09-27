@@ -80,7 +80,7 @@ LLM guesses are flagged as unverified. They're served but the user sees the warn
 ```json
 {
   "origin": "default",
-  "source": "Terrium standard parameters",
+  "source": "Caterva standard parameters",
   "note": "Lotka-Volterra default: alpha=0.5 (Lotka 1925, Volterra 1926)"
 }
 ```
@@ -106,7 +106,7 @@ Defaults are documented with their own literature backing.
 
 **Default case:**
 ```json
-{"origin": "default", "source": "Terrium...", "citation": "..."}
+{"origin": "default", "source": "Caterva...", "citation": "..."}
 ```
 
 **Why:** Defaults are vetted project choices with scientific backing. LLM guesses are speculative. Users need to know the difference.

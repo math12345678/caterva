@@ -7,7 +7,7 @@
  * codes, what lands on which stream — are invisible to a unit test of the
  * functions underneath.
  *
- * The literature runner is stubbed via TERRIUM_LITERATURE_RUNNER so these
+ * The literature runner is stubbed via CATERVA_LITERATURE_RUNNER so these
  * are offline and deterministic. The stub returns the shape
  * `science_agent_runner.py` really returns; the contract between them is
  * covered separately in literatureResolver.test.ts.
@@ -16,7 +16,7 @@ import { execFileSync } from 'child_process';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { resolvePythonExecutable } from '../../engine/teriumBridge';
+import { resolvePythonExecutable } from '../../engine/catervaBridge';
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
 const CLI = path.join(REPO_ROOT, 'src', 'cli', 'scientificCLI.ts');
@@ -66,7 +66,7 @@ function writeStub(name: string, payload: unknown): string {
 }
 
 beforeAll(() => {
-  stubDir = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-cli-'));
+  stubDir = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-cli-'));
 });
 
 afterAll(() => {
@@ -99,7 +99,7 @@ describe('resolve: three outcomes, three exit codes', () => {
 
     const { stdout, code } = runCli(
       ['resolve', 'ldh', '--substrate', 'pyruvate', '--organism', 'Homo sapiens'],
-      { TERRIUM_LITERATURE_RUNNER: stub },
+      { CATERVA_LITERATURE_RUNNER: stub },
     );
 
     expect(code).toBe(0);
@@ -119,7 +119,7 @@ describe('resolve: three outcomes, three exit codes', () => {
 
     const { stdout, code } = runCli(
       ['resolve', 'nothing', '--substrate', 'x', '--organism', 'y'],
-      { TERRIUM_LITERATURE_RUNNER: stub },
+      { CATERVA_LITERATURE_RUNNER: stub },
     );
 
     // Distinct from 1: a script needs to tell "no data" from "no network".
@@ -134,7 +134,7 @@ describe('resolve: three outcomes, three exit codes', () => {
 
     const { stderr, code } = runCli(
       ['resolve', 'ldh', '--substrate', 'pyruvate', '--organism', 'Homo sapiens'],
-      { TERRIUM_LITERATURE_RUNNER: stub },
+      { CATERVA_LITERATURE_RUNNER: stub },
     );
 
     expect(code).toBe(1);
@@ -159,7 +159,7 @@ describe('resolve: provenance is never buried', () => {
 
     const { stdout } = runCli(
       ['resolve', 'ldh', '--substrate', 'pyruvate', '--organism', 'Homo sapiens'],
-      { TERRIUM_LITERATURE_RUNNER: stub },
+      { CATERVA_LITERATURE_RUNNER: stub },
     );
 
     expect(stdout).toMatch(/cross-species/i);
@@ -191,7 +191,7 @@ describe('resolve: --json is machine readable', () => {
 
     const { stdout, stderr, code } = runCli(
       ['resolve', 'ldh', '--substrate', 'pyruvate', '--organism', 'Homo sapiens', '--json'],
-      { TERRIUM_LITERATURE_RUNNER: stub },
+      { CATERVA_LITERATURE_RUNNER: stub },
     );
 
     // Surface both streams on failure: a CLI test that reports only an exit
@@ -250,7 +250,7 @@ describe('simulate --resolve: the tool doing its actual job', () => {
   it('resolves, runs the real engine, and shows where each number came from', () => {
     const { stdout, stderr, code } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM, '--s0', '10mM', '--enzyme-conc', '0.001mM'],
-      { TERRIUM_LITERATURE_RUNNER: multiStub() },
+      { CATERVA_LITERATURE_RUNNER: multiStub() },
     );
 
     if (code !== 0) {
@@ -272,7 +272,7 @@ describe('simulate --resolve: the tool doing its actual job', () => {
   it('never buries a cross-species substitution', () => {
     const { stdout } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM, '--s0', '10mM', '--enzyme-conc', '0.001mM'],
-      { TERRIUM_LITERATURE_RUNNER: multiStub() },
+      { CATERVA_LITERATURE_RUNNER: multiStub() },
     );
     expect(stdout).toContain('Oryctolagus cuniculus');
     expect(stdout).toMatch(/not the organism requested/i);
@@ -283,7 +283,7 @@ describe('simulate --resolve: the tool doing its actual job', () => {
     // pipeline would have used `|| 10.0`.
     const { stdout, code } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM, '--s0', '10mM'],
-      { TERRIUM_LITERATURE_RUNNER: multiStub() },
+      { CATERVA_LITERATURE_RUNNER: multiStub() },
     );
 
     expect(code).toBe(2);
@@ -295,7 +295,7 @@ describe('simulate --resolve: the tool doing its actual job', () => {
   it('requires s0, which is a condition nobody can look up', () => {
     const { stdout, code } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM, '--enzyme-conc', '0.001mM'],
-      { TERRIUM_LITERATURE_RUNNER: multiStub() },
+      { CATERVA_LITERATURE_RUNNER: multiStub() },
     );
     expect(code).toBe(2);
     expect(stdout).toMatch(/s0.*experimental condition/i);
@@ -312,7 +312,7 @@ describe('simulate --resolve: the tool doing its actual job', () => {
     const stub = writeStub('down', { ok: false, error: '403 Forbidden' });
     const { stderr, code } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM, '--s0', '10mM'],
-      { TERRIUM_LITERATURE_RUNNER: stub },
+      { CATERVA_LITERATURE_RUNNER: stub },
     );
     expect(code).toBe(1);
     expect(stderr).toContain('403 Forbidden');
@@ -421,7 +421,7 @@ describe('simulate --resolve: reliability reaches the user and the runner', () =
     const record = path.join(stubDir, `req_${Math.random().toString(36).slice(2)}.jsonl`);
     const { stdout, stderr, code } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM_2, '--s0', '10mM', '--enzyme-conc', '0.001mM'],
-      { TERRIUM_LITERATURE_RUNNER: reflectingStub(record) },
+      { CATERVA_LITERATURE_RUNNER: reflectingStub(record) },
     );
 
     if (code !== 0) throw new Error(`expected 0, got ${code}\n${stdout}\n${stderr}`);
@@ -443,7 +443,7 @@ describe('simulate --resolve: reliability reaches the user and the runner', () =
         '--physiological', '7.4,37',
         '--physiological-basis', 'human cytosol, Alberts 6e',
       ],
-      { TERRIUM_LITERATURE_RUNNER: reflectingStub(record) },
+      { CATERVA_LITERATURE_RUNNER: reflectingStub(record) },
     );
 
     if (code !== 0) throw new Error(`expected 0, got ${code}\n${stdout}\n${stderr}`);
@@ -476,7 +476,7 @@ describe('simulate --resolve: reliability reaches the user and the runner', () =
         '--s0', '10mM', '--enzyme-conc', '0.001mM',
         '--physiological', '7.4,37',
       ],
-      { TERRIUM_LITERATURE_RUNNER: reflectingStub(record) },
+      { CATERVA_LITERATURE_RUNNER: reflectingStub(record) },
     );
 
     expect(code).toBe(1);
@@ -549,7 +549,7 @@ describe('simulate --resolve: cross-species is machine-detectable in the export'
       [
         '-c',
         'import sys,json;sys.path.insert(0,".");' +
-          'from Terium.core.sbml_provenance import read_back;' +
+          'from caterva.core.sbml_provenance import read_back;' +
           'print(json.dumps(read_back(open(sys.argv[1]).read())))',
         file,
       ],
@@ -564,7 +564,7 @@ describe('simulate --resolve: cross-species is machine-detectable in the export'
       [
         '-c',
         'import sys,json;sys.path.insert(0,".");' +
-          'from Terium.core.sbml_provenance import cross_species_parameters;' +
+          'from caterva.core.sbml_provenance import cross_species_parameters;' +
           'print(json.dumps(cross_species_parameters(open(sys.argv[1]).read())))',
         file,
       ],
@@ -581,7 +581,7 @@ describe('simulate --resolve: cross-species is machine-detectable in the export'
         '--s0', '10mM', '--enzyme-conc', '0.001mM',
         '--allow-cross-species', '--export-model', out,
       ],
-      { TERRIUM_LITERATURE_RUNNER: taxonStub('9986') },
+      { CATERVA_LITERATURE_RUNNER: taxonStub('9986') },
     );
     if (code !== 0) throw new Error(`expected 0, got ${code}\n${stdout}\n${stderr}`);
 
@@ -590,7 +590,7 @@ describe('simulate --resolve: cross-species is machine-detectable in the export'
     expect(annotations['Vmax']).toContain('https://identifiers.org/taxonomy:9986');
   });
 
-  it('lets a plain SBML reader find the substitution with no Terrium knowledge', () => {
+  it('lets a plain SBML reader find the substitution with no Caterva knowledge', () => {
     const out = path.join(stubDir, `cross_${Math.random().toString(36).slice(2)}.xml`);
     runCli(
       [
@@ -598,7 +598,7 @@ describe('simulate --resolve: cross-species is machine-detectable in the export'
         '--s0', '10mM', '--enzyme-conc', '0.001mM',
         '--allow-cross-species', '--export-model', out,
       ],
-      { TERRIUM_LITERATURE_RUNNER: taxonStub('9986') },
+      { CATERVA_LITERATURE_RUNNER: taxonStub('9986') },
     );
 
     const mismatches = mismatchesIn(out);
@@ -619,7 +619,7 @@ describe('simulate --resolve: cross-species is machine-detectable in the export'
         '--s0', '10mM', '--enzyme-conc', '0.001mM',
         '--allow-cross-species', '--export-model', out,
       ],
-      { TERRIUM_LITERATURE_RUNNER: taxonStub(null) },
+      { CATERVA_LITERATURE_RUNNER: taxonStub(null) },
     );
 
     const annotations = annotationsIn(out);
@@ -634,7 +634,7 @@ describe('simulate --resolve: cross-species is machine-detectable in the export'
 /**
  * A run somebody else can actually re-run.
  *
- * Terrium could export a model, a bibliography, a job id and a
+ * Caterva could export a model, a bibliography, a job id and a
  * reproducibility key — and none of that let another person repeat the
  * experiment. The model says what the system is; it does not say this run
  * integrated to t=10 with 101 points, which is what decides the figure.
@@ -664,7 +664,7 @@ describe('simulate --resolve: the COMBINE archive re-runs', () => {
     // machine: `ModuleNotFoundError: No module named 'libsedml'`, raised by
     // the test's own helper, about a module the project installs. Reusing
     // the resolver rather than repeating its logic keeps one answer to
-    // "which Python is this project's Python" (TERRIUM_PYTHON, then
+    // "which Python is this project's Python" (CATERVA_PYTHON, then
     // .venv, then venv, then PATH).
     return execFileSync(resolvePythonExecutable(REPO_ROOT), ['-c', script, ...args], {
       cwd: REPO_ROOT,
@@ -708,7 +708,7 @@ describe('simulate --resolve: the COMBINE archive re-runs', () => {
         '--s0', '10mM', '--enzyme-conc', '0.001mM',
         '--export-model', file,
       ],
-      { TERRIUM_LITERATURE_RUNNER: archiveStub() },
+      { CATERVA_LITERATURE_RUNNER: archiveStub() },
     );
     if (code !== 0) throw new Error(`expected 0, got ${code}\n${stdout}\n${stderr}`);
     return { file, stdout, code };
@@ -718,7 +718,7 @@ describe('simulate --resolve: the COMBINE archive re-runs', () => {
     const { file } = writeArchive();
     const out = python(
       'import sys,json;sys.path.insert(0,".");' +
-        'from Terium.core.combine_archive import verify_archive;' +
+        'from caterva.core.combine_archive import verify_archive;' +
         'v=verify_archive(sys.argv[1]);' +
         'print(json.dumps({"ok":v.ok,"problems":v.problems,"present":v.present}))',
       file,
@@ -728,7 +728,7 @@ describe('simulate --resolve: the COMBINE archive re-runs', () => {
     expect(result.ok).toBe(true);
     // CITATION.cff is IN the archive on purpose: a result that cites every
     // measurement it used and not the tool that produced them is the
-    // converse of Katz's objection, and Terium/tests/test_citation_metadata.py
+    // converse of Katz's objection, and caterva/tests/test_citation_metadata.py
     // pins the same bundling from the Python side. This list did not have it
     // and had been stale since the file started being bundled -- unnoticed
     // because the Python test that asserts it skips when `libsedml` is
@@ -845,7 +845,7 @@ describe('simulate --resolve: a grade explains itself', () => {
         'simulate', 'mm', '--resolve', ...SYSTEM_5,
         '--s0', '10mM', '--enzyme-conc', '0.001mM', ...extra,
       ],
-      { TERRIUM_LITERATURE_RUNNER: gradedStub(assayGrade) },
+      { CATERVA_LITERATURE_RUNNER: gradedStub(assayGrade) },
     );
   }
 
@@ -944,7 +944,7 @@ describe('simulate --resolve: the reproducible identifier reproduces', () => {
   function run() {
     const { stdout, stderr, code } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM_6, '--s0', '10mM', '--enzyme-conc', '0.001mM'],
-      { TERRIUM_LITERATURE_RUNNER: stub() },
+      { CATERVA_LITERATURE_RUNNER: stub() },
     );
     if (code !== 0) throw new Error(`expected 0, got ${code}\n${stdout}\n${stderr}`);
     return identifiers(stdout);
@@ -965,7 +965,7 @@ describe('simulate --resolve: the reproducible identifier reproduces', () => {
   it('says which is which, rather than leaving the reader to find out', () => {
     const { stdout } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM_6, '--s0', '10mM', '--enzyme-conc', '0.001mM'],
-      { TERRIUM_LITERATURE_RUNNER: stub() },
+      { CATERVA_LITERATURE_RUNNER: stub() },
     );
     expect(stdout).toMatch(/same inputs give the same value/);
     expect(stdout).toMatch(/unique per run, never repeats/);
@@ -979,7 +979,7 @@ describe('simulate --resolve: the reproducible identifier reproduces', () => {
     const base = run();
     const { stdout } = runCli(
       ['simulate', 'mm', '--resolve', ...SYSTEM_6, '--s0', '20mM', '--enzyme-conc', '0.001mM'],
-      { TERRIUM_LITERATURE_RUNNER: stub() },
+      { CATERVA_LITERATURE_RUNNER: stub() },
     );
     expect(identifiers(stdout).inputs).not.toBe(base.inputs);
   });

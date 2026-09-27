@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — SYSTEM MODE
+   caterva — SYSTEM MODE
 
    A single global control that changes the behaviour of the whole
    page. Four modes, and the difference between them has to be
@@ -163,7 +163,7 @@ export class SystemMode {
     } catch (err) {
       /* One section failing to honour a mode must not leave the rest of
          the page stuck in the previous one. */
-      console.warn('[terrium] mode adapter failed', err);
+      console.warn('[caterva] mode adapter failed', err);
     }
   }
 

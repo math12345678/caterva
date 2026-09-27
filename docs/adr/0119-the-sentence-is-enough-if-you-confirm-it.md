@@ -37,7 +37,7 @@ regular expression was involved in reading it.
 A confirmation answers that:
 
 ```
-Your question names a system. Terrium read it as:
+Your question names a system. Caterva read it as:
 
     enzyme      lactate dehydrogenase
     substrate   pyruvate

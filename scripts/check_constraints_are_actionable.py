@@ -3,7 +3,7 @@
 
 THE FAILURE THIS CATCHES
 ------------------------
-`Terium/agents` iterates: a critic finds a problem, emits a `Constraint`,
+`caterva/agents` iterates: a critic finds a problem, emits a `Constraint`,
 and the scouts search again inside it. That only works while every kind of
 constraint a critic can emit is a kind some agent actually reads.
 
@@ -24,7 +24,7 @@ the enforcement.
 
 WHAT IT DOES
 ------------
-Reads the AST of every module under `Terium/agents`, collecting:
+Reads the AST of every module under `caterva/agents`, collecting:
 
   emitted   -- literal `kind=` on a `Constraint(...)` construction
   honoured  -- literal arguments to `constraints_of_kind(...)`, and literal
@@ -44,7 +44,7 @@ import pathlib
 import sys
 from typing import Dict, List, Set, Tuple
 
-AGENTS_DIR = pathlib.Path(__file__).resolve().parent.parent / "Terium" / "agents"
+AGENTS_DIR = pathlib.Path(__file__).resolve().parent.parent / "caterva" / "agents"
 
 #: Kinds that are deliberately raised without any agent acting on them --
 #: none today. An entry here needs a reason, because the whole point of the
@@ -136,7 +136,7 @@ def check(paths) -> Tuple[List[str], Set[str], Set[str]]:
             f"make an agent honour it (read it via constraints_of_kind or "
             f"compare against .kind), or leave the finding as a note instead "
             f"of a constraint -- see the 'WHEN A FINDING BECOMES A "
-            f"CONSTRAINT' section of Terium/agents/critics.py."
+            f"CONSTRAINT' section of caterva/agents/critics.py."
         )
     return problems, emitted, honoured
 

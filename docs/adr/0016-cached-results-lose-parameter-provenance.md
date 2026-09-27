@@ -110,7 +110,7 @@ The four-part fix described in §Decision has been implemented:
 **Full test suite (`make test`):**
 
 ```
-Terium (engine):     881 passed
+Caterva (engine):     881 passed
 Tests (literature):      214 passed
 Total:                  1095 passed
 ```

@@ -25,7 +25,7 @@
  * THE SECOND HALF, WHICH IS THE DANGEROUS ONE
  * -------------------------------------------
  * Fixing only the validator would have moved the lie deeper.
- * `runSimulation` called `runTerium('mm', ...)` with the domain out of
+ * `runSimulation` called `runCaterva('mm', ...)` with the domain out of
  * scope entirely, so a correctly-validated SIR request would have reached
  * an integrator running enzyme kinetics. Nothing had gone visibly wrong
  * only because the missing `km` killed it first — a coincidence standing in

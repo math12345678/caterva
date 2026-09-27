@@ -1,6 +1,6 @@
 """The agent architecture driving the real resolver on real BRENDA markup.
 
-Everything else that exercises `Terium/agents` injects a stand-in resolver,
+Everything else that exercises `caterva/agents` injects a stand-in resolver,
 which proves the architecture and proves nothing about the literature layer
 underneath it. This drives `fallback_logic.resolve_kinetic_value` -- the
 actual resolution chain, with its evidence ranking, variant partitioning and
@@ -50,8 +50,8 @@ for _p in (str(_ROOT), str(_HERE)):
 from fallback_logic import resolve_kinetic_value  # noqa: E402
 from parameterize import ParameterRequest  # noqa: E402
 
-from Terium.agents.assembly import search_model  # noqa: E402
-from Terium.continuous.networks import mm_competitive_network  # noqa: E402
+from caterva.agents.assembly import search_model  # noqa: E402
+from caterva.continuous.networks import mm_competitive_network  # noqa: E402
 
 FIXTURES = _HERE / "fixtures"
 LDH = "1.1.1.27"

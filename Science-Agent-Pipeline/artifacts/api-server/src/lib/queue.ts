@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { RunnableDomain } from "./teriumRunner";
+import type { RunnableDomain } from "./catervaRunner";
 import type { ParameterProvenance } from "./provenance";
 import type { GroundedParameter } from "./modelGrounding";
 import type {
@@ -39,7 +39,7 @@ export interface SimulationResponse {
   /**
    * Per-parameter literature audit for a caller-supplied model.
    *
-   * Present only for `POST /simulate/model` with `terrium:` declarations.
+   * Present only for `POST /simulate/model` with `caterva:` declarations.
    * Separate from `parameterProvenance` because it carries what
    * provenance has no field for and a reader needs most: the caller's
    * value AND the literature's, side by side, in the caller's own unit,

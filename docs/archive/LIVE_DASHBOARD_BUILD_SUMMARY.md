@@ -18,7 +18,7 @@
 ## What Was Built
 
 ### 1. **React Live Dashboard Component** (700 lines)
-**File**: `artifacts/terrium-landing/src/cli/LiveArchitectureDashboard.tsx`
+**File**: `artifacts/caterva-landing/src/cli/LiveArchitectureDashboard.tsx`
 
 A fully-featured, interactive real-time monitoring dashboard that displays:
 
@@ -303,7 +303,7 @@ Complete documentation for integrating dashboard into production:
 ## File Structure
 
 ```
-Terrium/
+Caterva/
 ├── Science-Agent-Pipeline/
 │   ├── artifacts/
 │   │   ├── api-server/src/
@@ -313,7 +313,7 @@ Terrium/
 │   │   │   │   └── metrics.ts (NEW - 150 lines)
 │   │   │   └── __tests__/
 │   │   │       └── metrics.test.ts (NEW - 550 lines)
-│   │   └── terrium-landing/src/cli/
+│   │   └── caterva-landing/src/cli/
 │   │       └── LiveArchitectureDashboard.tsx (NEW - 700 lines)
 │   │
 │   └── [existing files unchanged]
@@ -430,7 +430,7 @@ Total Lines Added: ~2,150 production-ready lines of code
 
 ## Summary
 
-**Built**: A complete, production-grade real-time monitoring dashboard for the Terrium science agent pipeline.
+**Built**: A complete, production-grade real-time monitoring dashboard for the Caterva science agent pipeline.
 
 **Deliverables**:
 1. React dashboard component with 4 tabbed views

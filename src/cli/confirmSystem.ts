@@ -18,7 +18,7 @@ import type { ParsedSystem } from './suggestResolveCommand';
  * **provenance for a system nobody named** — so the question it really asks
  * is whether a person named it, not whether a regex was involved.
  *
- * A confirmation answers that. Terrium reads three names out of the
+ * A confirmation answers that. Caterva reads three names out of the
  * sentence, prints them, and does nothing until a human says yes. At the
  * moment the citation is attached, a person has read "lactate
  * dehydrogenase / pyruvate / Homo sapiens" and agreed to it — which is
@@ -59,7 +59,7 @@ export interface ConfirmIO {
 export function describeParsedSystem(system: ParsedSystem): string {
   return [
     '',
-    'Your question names a system. Terrium read it as:',
+    'Your question names a system. Caterva read it as:',
     '',
     `    enzyme      ${system.enzyme}`,
     `    substrate   ${system.substrate}`,

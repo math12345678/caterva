@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — TERRIUM ATLAS topology
+   caterva — CATERVA ATLAS topology
 
    The atlas is a map of the whole system, drawn once from this
    file. Nothing here knows anything about the DOM: this module
@@ -261,7 +261,7 @@ export const NODES = [
   },
   {
     id: 'rt-hpc', region: 'execution', kind: 'rack-external', coord: '05.4',
-    label: 'User-Provided HPC / Cloud', sub: 'OUTSIDE TERRIUM', status: 'blocked',
+    label: 'User-Provided HPC / Cloud', sub: 'OUTSIDE CATERVA', status: 'blocked',
     box: { x: 1710, y: 1942, w: 280, h: 84 }
   },
 
@@ -305,7 +305,7 @@ export const NODES = [
   },
   {
     id: 'setup-package', region: 'output', kind: 'paper', coord: '07.4',
-    label: 'Setup Package', sub: 'FOR COMPUTE TERRIUM CANNOT RUN', status: 'review',
+    label: 'Setup Package', sub: 'FOR COMPUTE CATERVA CANNOT RUN', status: 'review',
     box: { x: 3050, y: 1270, w: 600, h: 120 }
   }
 ];
@@ -403,7 +403,7 @@ export const FAILURES = [
     from: 'model-picker', to: 'decision-point',
     word: 'QUESTION AMBIGUITY',
     trigger: 'The question does not determine a single method.',
-    consequence: 'Terrium returns a clarification request instead of guessing a model.',
+    consequence: 'Caterva returns a clarification request instead of guessing a model.',
     info: 'Clarification request + candidate readings',
     status: 'user',
     points: [[790, 930], [660, 930], [660, 1225], [570, 1225]]
@@ -424,7 +424,7 @@ export const FAILURES = [
     index: 'F3',
     from: 'rt-hpc', to: 'setup-package',
     word: 'COMPUTE BOUNDARY',
-    trigger: 'The method requires compute Terrium does not provide.',
+    trigger: 'The method requires compute Caterva does not provide.',
     consequence: 'A complete setup package is prepared for the user\u2019s own environment.',
     info: 'Runnable setup package + environment manifest',
     status: 'review',

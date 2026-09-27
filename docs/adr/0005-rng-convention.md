@@ -10,7 +10,7 @@ Both are implemented as direct Python/numpy without antimony or roadrunner,
 and both rely on numpy random number generation for their core computation.
 
 In Monte Carlo's implementation, the seed handling was documented as a
-judgment call (see `terium_engine.py`'s Monte Carlo module comment: "The
+judgment call (see `caterva_engine.py`'s Monte Carlo module comment: "The
 seed convention uses `numpy.random.Generator` for reproducibility; future
 stochastic domains should reuse this same pattern rather than inventing a
 different RNG interface"). With a second stochastic domain now following
@@ -28,7 +28,7 @@ None`, some accepting `numpy.random.Generator` objects, some using
 
 ## Decision
 
-All discrete/stochastic domains in Terrium use:
+All discrete/stochastic domains in Caterva use:
 
 - `numpy.random.default_rng(seed)` as the single RNG constructor, where
   `seed: int | None = None`.
@@ -45,7 +45,7 @@ reproducibility — must state its reasons in its implementation report per
 the constitution's Rule 9 (judgment calls flagged explicitly, not silently
 made). Compliance with this ADR is checked automatically by
 `scripts/check_rng_convention.py` (AST-based static analysis) and
-`Terium/tests/test_rng_convention.py` (pytest wrapper that runs the
+`caterva/tests/test_rng_convention.py` (pytest wrapper that runs the
 script as a CI step). The check runs as Step 2b of the verification
 procedure (`docs/CONSTITUTION.md` Section 6) and is automated by
 `scripts/verify_domain.sh`.
@@ -86,7 +86,7 @@ procedure (`docs/CONSTITUTION.md` Section 6) and is automated by
   > nobody re-reads the premise. The true reason was always available in
   > numpy's own documentation, and is now quoted instead.
   >
-  > Pinned by `Terium/tests/test_rng_convention.py`, which asserts both
+  > Pinned by `caterva/tests/test_rng_convention.py`, which asserts both
   > halves against the installed numpy rather than against this prose.
 - The `default_rng(seed)` call is deterministic given a fixed numpy
   version, which is sufficient for the use case (a student reproducing a

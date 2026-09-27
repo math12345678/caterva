@@ -1,4 +1,4 @@
-# Terrium Backend Architecture Guide
+# Caterva Backend Architecture Guide
 
 **Last Updated:** August 9, 2026  
 **Status:** Complete audit and documentation  
@@ -6,7 +6,7 @@
 
 ## Overview
 
-The Terrium Science-Agent Pipeline backend is a TypeScript/Express API that bridges natural language queries to scientific simulations. Users describe what they want to simulate ("show me predator-prey dynamics"), and the system resolves the domain, parameters, and runs the computation.
+The Caterva Science-Agent Pipeline backend is a TypeScript/Express API that bridges natural language queries to scientific simulations. Users describe what they want to simulate ("show me predator-prey dynamics"), and the system resolves the domain, parameters, and runs the computation.
 
 The architecture emphasizes:
 - **Scientific integrity** through parameter provenance tracking
@@ -25,7 +25,7 @@ User Query
     ↓
 [Parameter Validation] → Shape check (TypeScript) + Science check (Python)
     ↓
-[Simulation Engine] → Python Terium with ODE solver
+[Simulation Engine] → Python Caterva with ODE solver
     ↓
 [Response] → Parameters, trajectory, full provenance
     ↓
@@ -201,10 +201,10 @@ try {
 
 ### 5. Python Bridge
 
-**File:** `src/lib/terium_runner.ts` (TypeScript wrapper), `src/lib/terium_runner.py` (Python implementation)
+**File:** `src/lib/caterva_runner.ts` (TypeScript wrapper), `src/lib/caterva_runner.py` (Python implementation)
 
 **Responsibility:**
-- Execute simulation in Python/Terium
+- Execute simulation in Python/Caterva
 - Populate any engine-generated parameters (e.g., seed)
 - Return trajectory and domain
 
@@ -467,8 +467,8 @@ src/
 │   ├── python.ts              # Python interpreter resolution
 │   ├── queue.ts               # Job queue & concurrency
 │   ├── schemas.ts             # Zod parameter schemas (16 domains)
-│   ├── teriumRunner.ts      # Python bridge wrapper
-│   ├── terium_runner.py     # Python simulation engine
+│   ├── catervaRunner.ts      # Python bridge wrapper
+│   ├── caterva_runner.py     # Python simulation engine
 │   ├── queryResolver.ts        # Domain + parameter resolution
 │   ├── llmResolver.ts          # LLM provider integration
 │   ├── literature-verifier.ts  # Citation verification

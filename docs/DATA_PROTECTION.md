@@ -10,7 +10,7 @@ it — the same failure mode `docs/ARCHIVE_TRIAGE.md` names about the
 documentation: *"a specific, confident, wrong claim is worse than no claim
 at all."*
 
-## Who Terrium's audience is
+## Who Caterva's audience is
 
 This matters for which rules apply. The four experts who reviewed this
 project are at DSMZ (Braunschweig), Humboldt-Universität zu Berlin,
@@ -22,10 +22,10 @@ public-sector. **Assume GDPR applies.**
 
 ### Google Fonts — on every page load, before any consent
 
-`Science-Agent-Pipeline/artifacts/terrium-landing/index.html` opens
+`Science-Agent-Pipeline/artifacts/caterva-landing/index.html` opens
 `preconnect` to `fonts.googleapis.com` and `fonts.gstatic.com` and then
 loads a stylesheet from them. `src/index.css` `@import`s the same URL.
-`terrium-site/index.html`, `mule/index.html`,
+`caterva-site/index.html`, `mule/index.html`,
 `Science-Agent-Pipeline/artifacts/mockup-sandbox/index.html` and
 `src/web/server.ts` do the same.
 
@@ -52,7 +52,7 @@ families the landing page actually uses — DM Mono, Newsreader, Space
 Grotesk. The OFL explicitly permits it. Concretely:
 
 1. Download the families from `fonts.google.com` (or `google-webfonts-helper`).
-2. Put the `.woff2` files under `terrium-landing/public/fonts/`.
+2. Put the `.woff2` files under `caterva-landing/public/fonts/`.
 3. Replace the `@import` in `src/index.css` with local `@font-face` rules.
 4. Delete the `preconnect` and stylesheet `<link>` from `index.html`.
 5. Add the OFL text to `NOTICE` — self-hosting means redistributing, which
@@ -74,7 +74,7 @@ fetched (`schema.org`, `w3.org`, `sbml.org`). There is no analytics, no
 tag manager, no ad network, no session recorder. The banner's claim of "no
 analytics, no ads" is accurate.
 
-## What Terrium collects
+## What Caterva collects
 
 **Waitlist email addresses.** `POST /waitlist`
 (`Science-Agent-Pipeline/artifacts/api-server/src/routes/waitlist.ts`)
@@ -97,7 +97,7 @@ cheaper to close before the first address is collected than after.
 ## Cookies
 
 `CookieConsent.tsx` writes one `localStorage` key,
-`terrium-cookie-consent`, to remember that the banner was dismissed. It
+`caterva-cookie-consent`, to remember that the banner was dismissed. It
 sets no cookies and gates nothing — the banner is informational, not a
 consent gate. That is a defensible design *if* nothing non-essential loads
 before dismissal, which is precisely what the Google Fonts load breaks.

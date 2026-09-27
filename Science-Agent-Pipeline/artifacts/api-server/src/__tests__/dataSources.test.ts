@@ -8,7 +8,7 @@
  *
  * These tests assert the CC BY 4.0 clauses rather than the wording, so the
  * block can be rephrased but not thinned. They mirror
- * `Terium/tests/test_data_sources.py`, because the two renderers read the
+ * `caterva/tests/test_data_sources.py`, because the two renderers read the
  * same `docs/data-sources.json` and must not drift.
  */
 
@@ -121,10 +121,10 @@ describe("what CC BY 4.0 §3(a)(1) asks to be retained", () => {
   });
 
   it("disclaims endorsement", () => {
-    // §2(a)(6). Load bearing here: a researcher already read a Terrium
+    // §2(a)(6). Load bearing here: a researcher already read a Caterva
     // outreach email as claiming credit that was not ours.
     expect(text()).toContain("endorsed");
-    expect(text()).toContain("Terrium's, not theirs");
+    expect(text()).toContain("Caterva's, not theirs");
   });
 });
 
@@ -152,7 +152,7 @@ describe("the block must not damage the data", () => {
 
 describe("what publication obliges", () => {
   it("reports the citation the source asks for", () => {
-    // NOTICE: "Citing Terrium is not a substitute for citing BRENDA."
+    // NOTICE: "Citing Caterva is not a substitute for citing BRENDA."
     // The audit endpoint judges publication-readiness and said nothing
     // about this.
     const obligations = citationObligations({ km: brenda });

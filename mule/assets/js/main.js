@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — application entry
+   caterva — application entry
    Wires the inquiry terminal, the Evidence Cathedral, inspection
    mode, the three chapters, and the pilot invitation.
    ============================================================ */
@@ -89,7 +89,7 @@ function mountWhenNear(sel, load, anchor) {
     built = Promise.resolve()
       .then(load)
       .catch((err) => {
-        console.error(`[terrium] deferred section "${sel}" failed to load; the rest of the page continues.`, err);
+        console.error(`[caterva] deferred section "${sel}" failed to load; the rest of the page continues.`, err);
         const root = document.documentElement;
         root.dataset.bootFailed = root.dataset.bootFailed ? `${root.dataset.bootFailed} ${sel}` : sel;
       });
@@ -130,7 +130,7 @@ function safely(name, fn) {
   try {
     return fn();
   } catch (err) {
-    console.error(`[terrium] "${name}" failed to initialise; the rest of the page continues.`, err);
+    console.error(`[caterva] "${name}" failed to initialise; the rest of the page continues.`, err);
     const root = document.documentElement;
     const failed = root.dataset.bootFailed ? `${root.dataset.bootFailed} ${name}` : name;
     root.dataset.bootFailed = failed;

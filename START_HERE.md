@@ -5,19 +5,19 @@ stranger who found this on GitHub. This is the only document you have to
 read before you do something useful. Everything else is linked from here and
 can wait until you need it.
 
-**Want to use Terrium rather than work on it?** [`docs/USING_TERRIUM.md`](docs/USING_TERRIUM.md) is the user's guide; this file is for people changing the code.
+**Want to use Caterva rather than work on it?** [`docs/USING_CATERVA.md`](docs/USING_CATERVA.md) is the user's guide; this file is for people changing the code.
 
-## What Terrium is, in one paragraph
+## What Caterva is, in one paragraph
 
 A simulation engine for teaching labs. A student asks a question in plain
-language; Terrium finds the real parameters in the scientific literature,
+language; Caterva finds the real parameters in the scientific literature,
 runs the simulation, and shows where every number came from. Fifteen
 domains — enzyme kinetics, epidemics, population genetics, molecular
 dynamics.
 
 ## The one idea
 
-**Terrium refuses to invent.** If it cannot find a real value for a
+**Caterva refuses to invent.** If it cannot find a real value for a
 parameter, it stops and says so rather than filling in something plausible.
 
 That sounds obvious. It is unusual. Most tools default a missing value to
@@ -42,45 +42,26 @@ that wrong shipped a hardcoded 37 °C into every entry point for months
 
 ## Get it running
 
-> **Not public.** This document opens by addressing "a stranger who found
-> this on GitHub", and then hands them a clone of a repository that is
-> private and staying that way — so for that reader everything this page
-> describes sits behind a credential prompt, unreached.> (Removed 2026-08-23 on a probe that had silently authenticated
-> through a developer keychain; restored 2026-08-29 after CI — which
-> holds no credentials — and an unauthenticated API check both said
-> private. The probe now strips credential helpers so this cannot
-> recur.)
->
-> Said here rather than discovered at a credential prompt. See
-> [ADR 0143](docs/adr/0143-the-first-command-a-stranger-runs.md).
->
-> (No test or guard counts in this notice on purpose. They are stated once,
-> where `check_documented_counts.py` watches them; a second copy inside a
-> warning would be a number drifting with nothing looking at it.)
-
-> **Private repository.** These repositories are private and are staying
-> that way, so `gh repo clone` — which uses your GitHub credentials — is
-> the command that works. A plain `git clone` URL stops at a username
-> prompt. See [ADR 0179](docs/adr/0179-the-guard-that-could-not-go-green.md).```bash
-gh repo clone Terrium-sim/main
-cd main
+```bash
+git clone https://github.com/math12345678/caterva.git
+cd caterva
 make setup     # creates .venv, installs everything — 2–5 min, ~120 MB
 make check     # verifies the stack genuinely works
 make test      # the full suite
 ```
 
 > **`git remote get-url origin` says something else** — it says
-> `math12345678/terrium.git`. That is the remote this working copy pushes
-> to; `Terrium-sim/main` is where the project is published, confirmed by
+> `math12345678/caterva.git`. That is the remote this working copy pushes
+> to; `math12345678/caterva` is where the project is published, confirmed by
 > the owner on 2026-08-16. Both being true at once is normal for a repo
 > that moved, and it is recorded here because a newcomer who runs
 > `git remote -v` after cloning will see the difference and otherwise have
 > no way to tell which is wrong.
 >
 > This is worth knowing about how it got fixed. The URL was stated three
-> different ways — this file said `Terrium-sim/main`, `README.md` said
-> `Terrium-sim/terrium`, `origin` said neither — and the first repair made
-> all three agree on `terrium` **without checking which was more widely
+> different ways — this file said `math12345678/caterva`, `README.md` said
+> `math12345678/caterva`, `origin` said neither — and the first repair made
+> all three agree on `caterva` **without checking which was more widely
 > used**. It was the minority spelling: 3 references against 126, and the
 > 126 included every link on the GitHub New Issue page. Agreement reached
 > by looking at three files is not agreement.
@@ -114,18 +95,21 @@ block.
 Windows: use WSL2 or the Dev Container. The Makefile is POSIX shell. See
 [CONTRIBUTING.md](CONTRIBUTING.md#windows).
 
-## One letter that will confuse you
+## One name
 
-The Python package is **`Terium`** — one r. The product, this repository and
-the GitHub organisation are **`Terrium`** — two.
+The product, this repository, the command and the Python package are all
+**Caterva**: `caterva` wherever case matters.
 
 ```python
-import Terium          # correct
-import Terrium         # ModuleNotFoundError, always
+import caterva          # the package
 ```
 
+Until 2026-09-27 the project was called Terrium, and the package was spelled
+`Terium`. Old notes that say `terrium ...` still work: the `terrium` command
+is kept as an alias of `caterva`.
+
 Both spellings are right in their place and you will see both everywhere.
-If you hit `No module named 'Terrium'`, **your environment is fine** — you
+If you hit `No module named 'Caterva'`, **your environment is fine** — you
 have typed the product name where the package name goes. `make doctor` will
 tell you the install is healthy, which is true and unhelpful.
 
@@ -142,7 +126,7 @@ non-affiliation notice near the top of the README for why it matters.
 
 | directory | what is in it |
 |---|---|
-| [`Terium/`](Terium/README.md) | the simulation engine — fifteen domains, and the Python that integrates them |
+| [`caterva/`](caterva/README.md) | the simulation engine — fifteen domains, and the Python that integrates them |
 | [`Tests/`](Tests/README.md) | the literature layer — BRENDA and PubMed clients, resolvers, the fallback chain |
 | [`src/`](src/README.md) | the TypeScript surface — CLI, web server, dashboard, engine bridge |
 | [`Science-Agent-Pipeline/`](Science-Agent-Pipeline/README.md) | the Express API server and the agent pipeline |
@@ -213,7 +197,7 @@ If you want the pieces separately:
 
 ```bash
 make guards                                # the guards only, no suites
-python -m pytest Terium/tests Tests -q     # the Python suites
+python -m pytest caterva/tests Tests -q     # the Python suites
 npx tsc --noEmit -p .                      # both trees must compile
 ```
 
@@ -225,7 +209,7 @@ In the PR, say what you verified and how. "Should work" is not a result.
 
 Branch naming: `yourname/what-it-does`, e.g. `priya/fix-csv-zero-export`.
 
-Work in **`main`**. Do not commit directly into `terium`, `tests`,
+Work in **`main`**. Do not commit directly into `caterva`, `tests`,
 `backend-main` and the rest — those are regenerated from here by
 `scripts/split_repos.sh`, and a commit made straight into one gets
 overwritten on the next split.
@@ -250,10 +234,9 @@ overwritten on the next split.
 | setup detail, Python version policy, PR rules | [`CONTRIBUTING.md`](CONTRIBUTING.md) |
 | the HTTP API | [`docs/API.md`](docs/API.md) |
 | what lives in which of the 18 repositories | [`docs/REPO_MAP.md`](docs/REPO_MAP.md) |
-| how it was actually built, mistakes included | `Business/build-stages/` |
 | if you are an AI agent | [`docs/AGENT_BRIEF.md`](docs/AGENT_BRIEF.md) |
 
-`Business/build-stages/` is the honest one. Every stage records what broke
+The build-stage records (kept privately since 2026-09-27) are the honest one. Every stage records what broke
 and what the failure taught. If you want to understand why the project is
 paranoid about certain things, the reasons are there.
 

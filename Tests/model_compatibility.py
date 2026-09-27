@@ -14,7 +14,7 @@ check passes. The model is still wrong.
 
 BRENDA can tell you each value's conditions. Tellurium and COPASI will
 integrate whatever you give them. Neither asks whether the set is
-mutually coherent, because neither has both halves. Terrium does:
+mutually coherent, because neither has both halves. Caterva does:
 `fallback_logic.KineticResult` carries the organism and the source tier,
 and `assay_conditions.AssayConditions` carries pH, temperature and buffer.
 This module is the missing judgement over a SET of them.
@@ -41,7 +41,7 @@ That last one is not a weaker version of "fine". If a paper never reported
 its assay temperature, the compatibility of its value with another cannot
 be checked at all, and reporting silence as compatibility is how a model
 becomes wrong quietly. Tipton et al. (2014) built the STRENDA standard
-around exactly this, and Terrium already demotes a citation to `flagged`
+around exactly this, and Caterva already demotes a citation to `flagged`
 for it. This carries that demotion up to the level of the whole model.
 
 THRESHOLDS ARE JUDGEMENTS AND ARE MARKED AS SUCH
@@ -101,7 +101,7 @@ class ParameterSource:
     origin: str = "literature"
 
     #: Fields the source states the original publication did not report,
-    #: as opposed to fields Terrium simply has no value for.
+    #: as opposed to fields Caterva simply has no value for.
     #:
     #: The conclusion is the same either way -- compatibility cannot be
     #: checked -- but the ACTION is not. "The 1974 paper did not report a
@@ -342,7 +342,7 @@ def assess(sources: Sequence[ParameterSource]) -> CompatibilityReport:
                     f"measured {gap:.1f} pH units apart ({low_q} at pH "
                     f"{low:g}, {high_q} at pH {high:g}). Enzyme activity "
                     f"follows a bell-shaped pH profile, so both Km and kcat "
-                    f"move; Terrium reports the gap and does not correct for "
+                    f"move; Caterva reports the gap and does not correct for "
                     f"it, because the correction is itself enzyme-specific "
                     f"and unmeasured here."
                 ),
@@ -399,7 +399,7 @@ def assess(sources: Sequence[ParameterSource]) -> CompatibilityReport:
     # Reported as its own category. Silence is not compatibility: an
     # unpublished assay temperature means the question cannot be asked,
     # which is exactly why STRENDA (Tipton et al. 2014) requires it and
-    # why Terrium already demotes such a citation to `flagged`.
+    # why Caterva already demotes such a citation to `flagged`.
     unassessable = tuple(
         s.quantity for s in literature if not s.conditions_stated
     )
@@ -421,11 +421,11 @@ def assess(sources: Sequence[ParameterSource]) -> CompatibilityReport:
             named = " and ".join(stated_absent)
             attribution = (
                 f"of which {named} is stated unreported by the publication "
-                f"and the rest is simply absent from the record Terrium read"
+                f"and the rest is simply absent from the record Caterva read"
             )
         else:
             attribution = (
-                "absent from the record Terrium read, which may mean the "
+                "absent from the record Caterva read, which may mean the "
                 "publication omitted them or that they were not captured"
             )
         findings.append(

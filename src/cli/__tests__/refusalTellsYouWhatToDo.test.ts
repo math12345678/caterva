@@ -3,7 +3,7 @@
  *
  * WHY THIS FILE EXISTS
  * --------------------
- * Used the way a student uses it, Terrium took three attempts and six flags
+ * Used the way a student uses it, Caterva took three attempts and six flags
  * before producing a single number:
  *
  *   simulate "lactate dehydrogenase"
@@ -48,7 +48,7 @@ function runCli(args: string[]): { stdout: string; code: number } {
   try {
     const stdout = execFileSync(TS_NODE, [CLI, ...args], {
       cwd: REPO_ROOT,
-      env: { ...process.env, TERRIUM_LITERATURE_RUNNER: stub },
+      env: { ...process.env, CATERVA_LITERATURE_RUNNER: stub },
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 120_000,
@@ -78,7 +78,7 @@ const ANSI = /\x1b\[[0-9;]*m/g;
 
 /** Km resolves; nothing else does. The ordinary shape of a first run. */
 beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-next-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-next-'));
   stub = path.join(tmpDir, 'stub.py');
   fs.writeFileSync(
     stub,
@@ -138,7 +138,7 @@ describe('a refusal explains the next step', () => {
 
     expect(clean).toContain('What to do next');
     // The distinction is the substance: a value you choose is not a gap in
-    // Terrium's coverage, and saying so is what stops a student treating it
+    // Caterva's coverage, and saying so is what stops a student treating it
     // as one.
     expect(clean).toMatch(/describe YOUR experiment/i);
     expect(clean).toMatch(/--enzyme-conc/);

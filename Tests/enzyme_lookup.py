@@ -161,7 +161,7 @@ def parse_uniprot_accession(data: dict) -> str | None:
 # ---------------------------------------------------------------------------
 
 class KeggLicenceNotConfigured(RuntimeError):
-    """KEGG is reachable but Terrium has no licence position for it.
+    """KEGG is reachable but Caterva has no licence position for it.
 
     A distinct type rather than a bare RuntimeError so a caller can tell
     "we chose not to ask KEGG" from "KEGG did not answer". Those are the
@@ -180,7 +180,7 @@ class KeggLicenceNotConfigured(RuntimeError):
 #: academic users "who utilize KEGG for providing services are requested to
 #: obtain an academic service provider license".
 #:
-#: Terrium provides a service, and this repository contains an incorporation
+#: Caterva provides a service, and this repository contains an incorporation
 #: checklist, a cap table and a fundraising tracker. On either reading a
 #: licence from Pathway Solutions (https://www.pathway.jp/) is indicated,
 #: and nobody has obtained one.
@@ -192,17 +192,17 @@ class KeggLicenceNotConfigured(RuntimeError):
 #: comparable to SABIO-RK's and KEGG was integrated anyway -- not after
 #: weighing them, but before anyone read them (ADR 0068, NOTICE).
 #:
-#: So the default is now OFF. Terrium makes no KEGG request unless an
+#: So the default is now OFF. Caterva makes no KEGG request unless an
 #: operator sets this, and setting it is the operator stating that their own
 #: licence position permits it. That is the same shape as CORE, which
 #: already refuses to run without CORE_API_KEY -- obtaining the key IS
 #: engaging CORE's licensing process.
 #:
 #: This does NOT assert that using KEGG would be unlawful. It asserts that
-#: Terrium does not currently know that it is lawful, and that a tool whose
+#: Caterva does not currently know that it is lawful, and that a tool whose
 #: central claim is traceability should not make an unexamined request on a
 #: user's behalf.
-KEGG_OPT_IN_ENV = "TERRIUM_ENABLE_KEGG"
+KEGG_OPT_IN_ENV = "CATERVA_ENABLE_KEGG"
 
 
 def kegg_enabled() -> bool:
@@ -213,7 +213,7 @@ def kegg_enabled() -> bool:
 def fetch_kegg_enzyme_text(ec_number: str, timeout: float = 15) -> str:
     """Fetch the raw KEGG flat-file text for an EC number.
 
-    Raises KeggLicenceNotConfigured unless TERRIUM_ENABLE_KEGG is set. See
+    Raises KeggLicenceNotConfigured unless CATERVA_ENABLE_KEGG is set. See
     KEGG_OPT_IN_ENV above for why the default is off.
     """
     if not kegg_enabled():
@@ -221,7 +221,7 @@ def fetch_kegg_enzyme_text(ec_number: str, timeout: float = 15) -> str:
             "KEGG lookup is disabled by default. KEGG is not a public database: "
             "non-academic use requires a commercial licence, and academic users "
             "providing a service are asked to obtain an academic service-provider "
-            "licence (https://www.kegg.jp/kegg/legal.html). Terrium has not "
+            "licence (https://www.kegg.jp/kegg/legal.html). Caterva has not "
             f"obtained one. Set {KEGG_OPT_IN_ENV}=1 to enable this lookup, which "
             "is you stating that your own licence position permits it. "
             "See NOTICE and docs/LICENSING.md."
@@ -520,7 +520,7 @@ def ec_number_for_name(
         raise EnzymeNameNotResolved(
             f"{enzyme_name!r} names more than one enzyme: "
             + ", ".join(candidates)
-            + ". These are different proteins, so Terrium will not pick one "
+            + ". These are different proteins, so Caterva will not pick one "
             "for you — a wrong EC number is a citation for the wrong enzyme, "
             "not merely a wrong value. Re-run with the one you meant.",
             candidates,

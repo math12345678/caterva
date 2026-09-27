@@ -35,7 +35,7 @@ import sys
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "Tests"))
-# The repository root too — `Terium.continuous.simulations` is imported by
+# The repository root too — `caterva.continuous.simulations` is imported by
 # the module below. `export_citations.py` shipped in HEAD with only the
 # first of these two lines and died on its import line (ADR 0107).
 sys.path.insert(0, str(REPO_ROOT))

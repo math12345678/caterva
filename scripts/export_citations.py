@@ -25,11 +25,11 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "Tests"))
 # The REPO ROOT as well, not only `Tests/`.
 #
-# `citation_export` imports `Terium.core.data_sources` (the shared source
-# table, ADR 0079) and `Terium` is a package at the root, so with only
+# `citation_export` imports `caterva.core.data_sources` (the shared source
+# table, ADR 0079) and `caterva` is a package at the root, so with only
 # `Tests/` on the path this script died on its import line:
 #
-#     ModuleNotFoundError: No module named 'Terium'
+#     ModuleNotFoundError: No module named 'caterva'
 #
 # It had been failing since that import landed, in HEAD, unnoticed —
 # because every test imports `citation_export` directly, where pytest's

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Sixty seconds, no network, no account: what Terrium actually produces.
+"""Sixty seconds, no network, no account: what Caterva actually produces.
 
 WHY THIS EXISTS
 ---------------
-Terrium's front page describes a document. To see one, a stranger had to
+Caterva's front page describes a document. To see one, a stranger had to
 clone the repository (private), run `make setup` (120 MB, two to five
 minutes), install Node, learn which of ten commands to type, discover that
 BRENDA calls lactate "(S)-lactate", and have the network reach four separate
@@ -38,7 +38,7 @@ WHAT IT IS HONEST ABOUT
 -----------------------
 The saved BRENDA page is committed under `Tests/fixtures/`. This run
 therefore proves the pipeline, not the network — and the document says so
-itself, in its own "What Terrium would not do" section, because that is
+itself, in its own "What Caterva would not do" section, because that is
 where a reader looks before trusting it.
 """
 from __future__ import annotations
@@ -127,7 +127,7 @@ def main() -> int:
     print("No network was used. The BRENDA page came from")
     print(f"  {FIXTURE.relative_to(REPO_ROOT)}")
     print("so this shows the pipeline, not a live lookup — and the document")
-    print("says so itself, under 'What Terrium would not do'.")
+    print("says so itself, under 'What Caterva would not do'.")
     print()
     print("The same thing through the CLI, which does go to BRENDA when you")
     print("drop --fixture:")

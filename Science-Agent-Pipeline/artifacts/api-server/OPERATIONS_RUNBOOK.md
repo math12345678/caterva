@@ -6,7 +6,7 @@
 
 ---
 
-> **Note on infrastructure assumptions in this runbook.** This runbook was written assuming a systemd-managed deployment (`systemctl`/`journalctl` against a `terrium-api` service) and PagerDuty/Slack alerting. **None of that exists in this repository** — there is no systemd unit file, install script, or `terrium-api` service reference anywhere in the codebase, and no PagerDuty/Slack integration or webhook config either. Treat every `systemctl`/`journalctl -u terrium-api` command below as a **proposed** convention for operators who choose to run the built server under systemd, not as something this repo ships or configures today. If you're running the server directly (`pnpm run start`) or under Docker, substitute your process manager's equivalent commands (e.g. `docker logs`, `docker restart`, or your own process supervisor). Endpoint paths below have been corrected to match the real router in `src/app.ts` (`app.use("/api", router)`), where `/healthz` is mounted at `/api/healthz`, not `/healthz`.
+> **Note on infrastructure assumptions in this runbook.** This runbook was written assuming a systemd-managed deployment (`systemctl`/`journalctl` against a `caterva-api` service) and PagerDuty/Slack alerting. **None of that exists in this repository** — there is no systemd unit file, install script, or `caterva-api` service reference anywhere in the codebase, and no PagerDuty/Slack integration or webhook config either. Treat every `systemctl`/`journalctl -u caterva-api` command below as a **proposed** convention for operators who choose to run the built server under systemd, not as something this repo ships or configures today. If you're running the server directly (`pnpm run start`) or under Docker, substitute your process manager's equivalent commands (e.g. `docker logs`, `docker restart`, or your own process supervisor). Endpoint paths below have been corrected to match the real router in `src/app.ts` (`app.use("/api", router)`), where `/healthz` is mounted at `/api/healthz`, not `/healthz`.
 
 ---
 
@@ -41,13 +41,13 @@ curl http://localhost:5000/api/healthz
 
 ```bash
 # systemd
-sudo journalctl -u terrium-api -n 50 -f
+sudo journalctl -u caterva-api -n 50 -f
 
 # Docker
-docker logs -f terrium-api --tail 50
+docker logs -f caterva-api --tail 50
 
 # File logs
-tail -f /var/log/terrium/app.log
+tail -f /var/log/caterva/app.log
 ```
 
 **Look for:**
@@ -114,10 +114,10 @@ curl http://localhost:5000/api/snapshot | \
 **Mitigation:**
 ```bash
 # Restart service (clears in-memory state)
-sudo systemctl restart terrium-api
+sudo systemctl restart caterva-api
 
 # Or scale horizontally
-docker run -d --name terrium-api-2 -p 5001:5000 ... terrium-api
+docker run -d --name caterva-api-2 -p 5001:5000 ... caterva-api
 ```
 
 ---
@@ -126,15 +126,15 @@ docker run -d --name terrium-api-2 -p 5001:5000 ... terrium-api
 
 **Symptoms:**
 - `curl http://localhost:5000/api/healthz` → Connection refused
-- `systemctl status terrium-api` → Inactive (dead) — assumes the proposed systemd setup; substitute your process manager's status command otherwise
+- `systemctl status caterva-api` → Inactive (dead) — assumes the proposed systemd setup; substitute your process manager's status command otherwise
 
 **Immediate Actions:**
 ```bash
 # 1. Restart
-sudo systemctl restart terrium-api
+sudo systemctl restart caterva-api
 
 # 2. Check if it stays up
-sleep 5 && systemctl status terrium-api
+sleep 5 && systemctl status caterva-api
 
 # 3. Verify health
 curl http://localhost:5000/api/healthz
@@ -142,7 +142,7 @@ curl http://localhost:5000/api/healthz
 
 **If still down, check logs:**
 ```bash
-sudo journalctl -u terrium-api -n 100
+sudo journalctl -u caterva-api -n 100
 ```
 
 **Common Root Causes:**
@@ -151,7 +151,7 @@ sudo journalctl -u terrium-api -n 100
    ```bash
    lsof -i :5000
    kill -9 <PID>
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    ```
 
 2. **Python not found**
@@ -161,9 +161,9 @@ sudo journalctl -u terrium-api -n 100
    # or
    ls -la /usr/bin/python3*
    
-   # Fix: update TERRIUM_PYTHON in .env
-   export TERRIUM_PYTHON=/usr/bin/python3.12
-   sudo systemctl restart terrium-api
+   # Fix: update CATERVA_PYTHON in .env
+   export CATERVA_PYTHON=/usr/bin/python3.12
+   sudo systemctl restart caterva-api
    ```
 
 3. **Out of memory (OOM)**
@@ -172,7 +172,7 @@ sudo journalctl -u terrium-api -n 100
    # Shows if kernel killed the process
    
    # Fix: restart to clear memory
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    
    # Monitor going forward
    while true; do
@@ -187,26 +187,26 @@ sudo journalctl -u terrium-api -n 100
    sudo systemctl status postgresql
    
    # Test connection
-   psql -U terrium -d terrium -c "SELECT 1"
+   psql -U caterva -d caterva -c "SELECT 1"
    
    # If not running: start it
    sudo systemctl start postgresql
    
    # Then restart API
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    ```
 
 5. **Corrupted cache file**
    ```bash
    # Check cache file
-   cat /var/cache/terrium/cache.json | jq . > /dev/null
+   cat /var/cache/caterva/cache.json | jq . > /dev/null
    # If parse error:
    
    # Backup and remove
-   mv /var/cache/terrium/cache.json /tmp/cache-corrupt.json
+   mv /var/cache/caterva/cache.json /tmp/cache-corrupt.json
    
    # Restart (will create new cache)
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    ```
 
 ---
@@ -227,7 +227,7 @@ sudo journalctl -u terrium-api -n 100
 curl http://localhost:5000/api/snapshot | jq '.data.stages'
 
 # Sample errors from logs
-sudo journalctl -u terrium-api -n 50 | grep ERROR
+sudo journalctl -u caterva-api -n 50 | grep ERROR
 ```
 
 **Common Errors & Fixes:**
@@ -246,7 +246,7 @@ sudo journalctl -u terrium-api -n 50 | grep ERROR
 # Service should auto-recover
 
 # If errors persist:
-sudo systemctl restart terrium-api
+sudo systemctl restart caterva-api
 ```
 
 ---
@@ -268,7 +268,7 @@ for i in {1..10}; do
 done
 
 # Check cache size
-ls -lh /var/cache/terrium/cache.json
+ls -lh /var/cache/caterva/cache.json
 ```
 
 **Probable Causes:**
@@ -281,10 +281,10 @@ ls -lh /var/cache/terrium/cache.json
    **Fix:**
    ```bash
    # Rotate/archive cache
-   mv /var/cache/terrium/cache.json \
+   mv /var/cache/caterva/cache.json \
       /backups/cache-$(date +%Y%m%d).json
    # Restart to create fresh cache
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    ```
 
 2. **Trajectory data is huge**
@@ -294,7 +294,7 @@ ls -lh /var/cache/terrium/cache.json
    **Fix:**
    ```bash
    # Monitor cache size
-   du -sh /var/cache/terrium/cache.json
+   du -sh /var/cache/caterva/cache.json
    
    # If >100MB, rotate it
    ```
@@ -305,7 +305,7 @@ ls -lh /var/cache/terrium/cache.json
    **Fix:**
    ```bash
    # Restart (clears in-memory state)
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    
    # Report to dev team
    ```
@@ -330,7 +330,7 @@ watch -n 5 'free -h && ps aux | grep node'
 **Diagnosis:**
 ```bash
 # Test PostgreSQL
-psql -U terrium -d terrium -c "SELECT 1"
+psql -U caterva -d caterva -c "SELECT 1"
 
 # If connection refused:
 sudo systemctl status postgresql
@@ -345,13 +345,13 @@ sudo tail -f /var/log/postgresql/postgresql-*.log
    ```bash
    sudo systemctl start postgresql
    sudo systemctl status postgresql
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    ```
 
 2. **Connection string wrong**
    ```bash
    # Check .env
-   grep DATABASE_URL /opt/terrium-api/.env
+   grep DATABASE_URL /opt/caterva-api/.env
    
    # Test manually
    psql $DATABASE_URL -c "SELECT 1"
@@ -414,7 +414,7 @@ curl https://api.groq.com/openapi/v1/models \
    ```bash
    # Update .env
    export GROQ_API_KEY="new-key"
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    ```
 
 3. **Network connectivity issue**
@@ -446,7 +446,7 @@ curl https://api.groq.com/openapi/v1/models \
 **Diagnosis:**
 ```bash
 # Check exit codes in logs
-sudo journalctl -u terrium-api | grep -i "exit\|signal"
+sudo journalctl -u caterva-api | grep -i "exit\|signal"
 
 # Check if Python is running
 ps aux | grep python3
@@ -475,7 +475,7 @@ dmesg | tail -20
    # Or increase server memory
    
    # Restart
-   sudo systemctl restart terrium-api
+   sudo systemctl restart caterva-api
    ```
 
 2. **Segmentation fault (exit -11)**
@@ -514,13 +514,13 @@ dmesg | tail -20
 # the proposed systemd setup from DEPLOYMENT_GUIDE.md; substitute your
 # actual process manager's restart command if you're not using systemd.
 curl -s http://localhost:5000/api/healthz || \
-  systemctl restart terrium-api
+  systemctl restart caterva-api
 
 # Log rotation (daily)
-/usr/sbin/logrotate /etc/logrotate.d/terrium
+/usr/sbin/logrotate /etc/logrotate.d/caterva
 
 # Backup cache (hourly)
-0 * * * * /opt/terrium-api/backup-cache.sh
+0 * * * * /opt/caterva-api/backup-cache.sh
 ```
 
 ### Weekly (Manual)
@@ -528,15 +528,15 @@ curl -s http://localhost:5000/api/healthz || \
 ```bash
 # Disk usage review
 df -h
-du -sh /var/cache/terrium/
+du -sh /var/cache/caterva/
 
 # Log review for trends
-sudo journalctl -u terrium-api -S "1 week ago" | \
+sudo journalctl -u caterva-api -S "1 week ago" | \
   grep ERROR | wc -l
 
 # Cache rotation if needed
-if [ $(du -s /var/cache/terrium/cache.json | cut -f1) -gt 100000 ]; then
-  mv /var/cache/terrium/cache.json \
+if [ $(du -s /var/cache/caterva/cache.json | cut -f1) -gt 100000 ]; then
+  mv /var/cache/caterva/cache.json \
      /backups/cache-$(date +%Y%m%d).json
 fi
 ```
@@ -545,8 +545,8 @@ fi
 
 ```bash
 # Database maintenance
-sudo -u postgres vacuumdb terrium
-sudo -u postgres reindexdb terrium
+sudo -u postgres vacuumdb caterva
+sudo -u postgres reindexdb caterva
 
 # Backup verification
 # Restore latest backup to test DB
@@ -677,18 +677,18 @@ After resolving any P1 or P2 incident:
 # Service management — proposed; assumes the systemd unit from
 # DEPLOYMENT_GUIDE.md, which is not installed by anything in this repo.
 # If you're not running under systemd, use your process manager's
-# equivalents (e.g. `docker start/stop/restart terrium-api`, or `pnpm run start`).
-sudo systemctl start terrium-api
-sudo systemctl stop terrium-api
-sudo systemctl restart terrium-api
-sudo systemctl status terrium-api
-sudo systemctl enable terrium-api
+# equivalents (e.g. `docker start/stop/restart caterva-api`, or `pnpm run start`).
+sudo systemctl start caterva-api
+sudo systemctl stop caterva-api
+sudo systemctl restart caterva-api
+sudo systemctl status caterva-api
+sudo systemctl enable caterva-api
 
 # Logging — Note: the app itself logs to stdout via pino. Systemd journal
 # entries appear only when the app is run under a systemd unit.
-sudo journalctl -u terrium-api -f
-sudo journalctl -u terrium-api -S "1 hour ago"
-sudo journalctl -u terrium-api -u postgresql -f
+sudo journalctl -u caterva-api -f
+sudo journalctl -u caterva-api -S "1 hour ago"
+sudo journalctl -u caterva-api -u postgresql -f
 
 # Monitoring — real, verified paths (src/app.ts mounts the router at /api;
 # src/routes/health.ts, src/routes/pipeline.ts, src/routes/metrics.ts)
@@ -698,9 +698,9 @@ curl http://localhost:5000/api/snapshot
 curl http://localhost:5000/api/simulate | jq '.[] | .status'
 
 # Database
-psql -U terrium -d terrium -c "SELECT COUNT(*) FROM simulations"
+psql -U caterva -d caterva -c "SELECT COUNT(*) FROM simulations"
 sudo systemctl status postgresql
-sudo -u postgres psql terrium
+sudo -u postgres psql caterva
 
 # Performance
 ps aux | grep node

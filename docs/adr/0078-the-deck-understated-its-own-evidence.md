@@ -21,7 +21,7 @@ uses `zipfile` and `re` only.
 
 ## What was on the slides
 
-`terrium_pitch_deck.pptx`, slides 6 and 11: **"382 automated tests
+`caterva_pitch_deck.pptx`, slides 6 and 11: **"382 automated tests
 passing"**. The repository had 1,852.
 
 The deck understated its own evidence by nearly five times, to the audience

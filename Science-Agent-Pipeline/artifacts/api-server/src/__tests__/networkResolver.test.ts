@@ -4,7 +4,7 @@
  * This is the security boundary of the open path. Letting a language model
  * construct a network is what makes arbitrary systems expressible; letting
  * it construct the CONSTANTS in that network would hand it the one thing
- * Terrium exists to refuse.
+ * Caterva exists to refuse.
  *
  * The split cannot rest on the model's cooperation, so it does not: a value
  * survives only if the model quoted the span of the USER's text that states

@@ -33,7 +33,7 @@ tool whose entire premise is that every number traces to a source. It is the
 exact inverse of the `user_cited` discipline adopted for Sauro's feedback:
 there, a number with a real source was losing it, and the fix was to carry
 the source while marking it unverified. Here a number with *no* source
-acquires one by passing through Terrium.
+acquires one by passing through Caterva.
 
 Of the two directions, this is the damaging one. A lost citation is a gap
 the reader can see. A manufactured one is a gap the reader cannot.

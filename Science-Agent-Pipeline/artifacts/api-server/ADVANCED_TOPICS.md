@@ -1,4 +1,4 @@
-# Advanced Topics: Mastering Terrium
+# Advanced Topics: Mastering Caterva
 
 **For:** Engineers who want to truly understand and extend the system  
 **Status:** August 2026  
@@ -212,7 +212,7 @@ Flip to `llm > literature`:
 
 The saying goes: "There are only two hard things in computer science: cache invalidation and naming things."
 
-Terrium's cache strategy is deceptively simple, but understanding it reveals important constraints.
+Caterva's cache strategy is deceptively simple, but understanding it reveals important constraints.
 
 ### Current Cache Strategy
 
@@ -252,7 +252,7 @@ Terrium's cache strategy is deceptively simple, but understanding it reveals imp
 
 **Traditional cache expiration:** Delete entries after TTL (e.g., 1 hour)
 
-**Why Terrium doesn't:**
+**Why Caterva doesn't:**
 - Simulation results are deterministic
 - If parameters/code unchanged, result never changes
 - Expiring cache trades accuracy for simplicity
@@ -471,7 +471,7 @@ async function runSimulation() {
 }
 ```
 
-Terrium uses `finally` blocks for this reason.
+Caterva uses `finally` blocks for this reason.
 
 **Scenario 2: Cancellation While Waiting**
 
@@ -603,7 +603,7 @@ Vmax = "100"  # Should be 100.0
 # Or error: TypeError ✗
 # Or silently truncate: int("100.5") = 100 ✗
 
-# Terrium prevents this: TypeScript validates types
+# Caterva prevents this: TypeScript validates types
 # But edge case: "100abc" → NaN → rejected
 ```
 
@@ -625,11 +625,11 @@ User thinks this is a bug. It's not—it's stochastic behavior.
 
 ## Extending the System: Adding a Custom Domain
 
-This is the template for adding a new simulation domain to Terrium.
+This is the template for adding a new simulation domain to Caterva.
 
 ### Step 1: Write the Python Handler
 
-**File:** `src/lib/terium_runner.py`
+**File:** `src/lib/caterva_runner.py`
 
 ```python
 def run_my_model(parameters):
@@ -686,7 +686,7 @@ DISPATCH['my_model'] = run_my_model
 
 ### Step 2: Add TypeScript Type and Schema
 
-**File:** `src/lib/teriumRunner.ts`
+**File:** `src/lib/catervaRunner.ts`
 
 ```typescript
 export type SimulationDomain = 
@@ -785,7 +785,7 @@ it('exposes my_model to LLM', () => {
 ```typescript
 describe('my_model', () => {
   it('runs simulation with valid parameters', async () => {
-    const result = await runTerium('my_model', {
+    const result = await runCaterva('my_model', {
       param1: 0.5,
       param2: 1.0
     });
@@ -870,7 +870,7 @@ This process reveals:
 
 ## Conclusion: The Design Philosophy
 
-Terrium's architecture embodies this philosophy:
+Caterva's architecture embodies this philosophy:
 
 1. **Explicit over implicit** - Provenance is explicit; we don't hide assumptions
 2. **Fail fast** - Validate early; don't produce garbage

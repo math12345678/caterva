@@ -13,8 +13,8 @@ refuses to paper over it; it does not build the dispatch."*
 
 This builds the dispatch for SIR.
 
-The engine already had it. `runTerium` has accepted `'sir'` since the bridge
-was written, and driving `terium_runner.py` directly returns
+The engine already had it. `runCaterva` has accepted `'sir'` since the bridge
+was written, and driving `caterva_runner.py` directly returns
 `{"time", "[S]", "[I]", "[R]"}` from `beta, gamma, s0, i0, end, points`. The
 gap was entirely in the HTTP layer.
 

@@ -1,7 +1,7 @@
 # What your contribution arrives under
 
 **Short version:** you keep your copyright. You license the work to the
-project under Apache-2.0, the same licence Terrium ships under. There is no
+project under Apache-2.0, the same licence Caterva ships under. There is no
 CLA to sign and no copyright to assign.
 
 This is not legal advice. The university question below in particular needs
@@ -12,7 +12,7 @@ counsel, not a document written by the project it concerns.
 `LICENSE` closes with the reasoning behind relicensing to Apache-2.0, and
 one of the three reasons was this:
 
-> Contributors. Terrium is taking on student contributors from multiple
+> Contributors. Caterva is taking on student contributors from multiple
 > institutions. An all-rights-reserved repository cannot accept outside
 > contributions cleanly — there is no inbound licence for the contribution
 > to arrive under.
@@ -50,7 +50,7 @@ does ask you to, read it carefully — that is a materially different request.
 
 ## Sign-off (DCO)
 
-Terrium uses the [Developer Certificate of Origin](https://developercertificate.org/),
+Caterva uses the [Developer Certificate of Origin](https://developercertificate.org/),
 the same lightweight mechanism the Linux kernel and most of the CNCF use. It
 is one line per commit:
 
@@ -69,13 +69,13 @@ you wrote the contribution or have the right to submit it, and that you
 understand it is public and recorded.
 
 **One open question, stated rather than hidden.** This document describes
-grants running in both directions — Terrium's outbound Apache-2.0 licence, and
-your inbound contribution. Terrium's founder and copyright holder is currently
+grants running in both directions — Caterva's outbound Apache-2.0 licence, and
+your inbound contribution. Caterva's founder and copyright holder is currently
 a minor. A minor can unambiguously *own* copyright, but a licence grant is
 contract-like, and in most US states a minor's contract is voidable by that
 minor. Nobody involved here is a lawyer and this is not advice; the question
-is recorded, with what is and is not uncertain, in
-[`Business/INCORPORATION_CHECKLIST.md`](../Business/INCORPORATION_CHECKLIST.md).
+is recorded, with what is and is not uncertain, in the maintainer's private
+incorporation notes (kept out of this public repository since 2026-09-27).
 It changes nothing about contributing today. It is written down because a
 contributor deserves to know the shape of what they are relying on, and
 because finding it in someone else's diligence review is worse.
@@ -100,7 +100,7 @@ this project cannot answer for you.
 **Your university may have a claim on work you produce.** Institutional IP
 policies vary enormously. Some claim anything made with university
 resources; some claim only work arising from funded research; some claim
-nothing from unpaid personal projects. Whether Terrium work falls inside
+nothing from unpaid personal projects. Whether Caterva work falls inside
 your institution's policy depends on that policy, on whether you are being
 paid, on whose equipment you use, and on your specific enrolment or
 employment terms.
@@ -133,7 +133,7 @@ Do not paste code from Stack Overflow, another repository, a textbook or a
 model's output without checking what it is licensed under and saying so in
 the pull request.
 
-Terrium is Apache-2.0. Code arriving under GPL, or under no licence at all,
+Caterva is Apache-2.0. Code arriving under GPL, or under no licence at all,
 cannot simply be absorbed — `scripts/check_dependency_licenses.py` exists
 because an unlicensed dependency was found in this tree, and the same
 standard applies to a copied function.

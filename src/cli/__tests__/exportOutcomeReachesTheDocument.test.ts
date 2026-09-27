@@ -46,7 +46,7 @@ jest.setTimeout(300_000);
 let tmp: string;
 
 beforeAll(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-export-outcome-'));
+  tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-export-outcome-'));
 });
 
 afterAll(() => {
@@ -95,7 +95,7 @@ function runJson(extra: string[]): { doc: Record<string, any>; code: number } {
   try {
     stdout = execFileSync(TS_NODE, [CLI, ...args], {
       cwd: REPO_ROOT,
-      env: { ...process.env, TERRIUM_LITERATURE_RUNNER: stub() },
+      env: { ...process.env, CATERVA_LITERATURE_RUNNER: stub() },
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 240_000,

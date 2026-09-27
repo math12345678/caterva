@@ -1,10 +1,10 @@
-# Terrium Engineering Constitution
+# Caterva Engineering Constitution
 
 Status: canonical. Every future implementation prompt (OpenCode, FreeBuff,
 or any other coding agent) is prefaced with the text in Section 3. Every
 future spec follows the template in Section 4. Every diff is reviewed
 against Section 5 before it's trusted. This file is the consolidation of
-`Business/build-stages/STAGE_01_PART_01.md` through `PART_04.md` — read
+build record STAGE_01_PART_01 (private since 2026-09-27) through `PART_04.md` — read
 those for the full reasoning and worked examples; read this file when you
 need the operative rules fast, mid-work.
 
@@ -58,14 +58,14 @@ need the operative rules fast, mid-work.
   Target section; it does not go straight to an implementer, and it does
   not skip verification just because it came with citations.
 
-Full reasoning: `Business/BUILD_PIPELINE.md`.
+Full reasoning: the maintainers' private BUILD_PIPELINE notes.
 
 ## 3. The permanent prompt preamble
 
 Prepend this, verbatim, to every implementation prompt:
 
 ```
-You are implementing a piece of Terrium, a scientific simulation engine
+You are implementing a piece of Caterva, a scientific simulation engine
 for teaching labs. Before you write any code, internalize these
 non-negotiable standards — they exist because each one was learned from a
 real bug in this exact codebase, not as generic best practice:
@@ -119,8 +119,8 @@ real bug in this exact codebase, not as generic best practice:
 If this is a discrete/stochastic domain, also read
 ``docs/adr/0005-rng-convention.md`` before starting — it formalizes the
 ``numpy.random.default_rng(seed)`` convention that all stochastic domains
-in Terrium share. Complying with this ADR is checked automatically by
-``scripts/check_rng_convention.py`` and ``Terium/tests/
+in Caterva share. Complying with this ADR is checked automatically by
+``scripts/check_rng_convention.py`` and ``caterva/tests/
 test_rng_convention.py``.
 
 [DOMAIN-SPEC GOES HERE]
@@ -133,7 +133,7 @@ one-sentence definition, governing model, continuous-or-discrete (and why),
 public function signature(s), validation contract, verification target,
 relevant ADRs, shared-constraint check, out-of-scope statement, deliverables
 checklist. Full template and a fully-worked Monte Carlo example:
-`Business/build-stages/STAGE_01_PART_02.md`, Sections 2-3.
+build record STAGE_01_PART_02 (private since 2026-09-27), Sections 2-3.
 
 ## 5. The mechanical review checklist (10 items)
 
@@ -157,7 +157,7 @@ Applied to every diff, in order, stop at first failure:
 
 ## 6. The verification procedure (mechanical steps)
 
-1. Run the full suite — both `Terium/` and `Tests/`, not just the new
+1. Run the full suite — both `caterva/` and `Tests/`, not just the new
    domain's tests.
 2. Run `python3 scripts/check_dependencies_declared.py`.
 2b. Run `python3 scripts/check_rng_convention.py` — checks all
@@ -174,7 +174,7 @@ Applied to every diff, in order, stop at first failure:
    short-circuit an `&&` chain and skip the revert. Use `;` between steps,
    or a `trap ... EXIT` that fires the revert unconditionally. (Found by
    FreeBuff independently reproducing this exact procedure — see
-   `Business/build-stages/STAGE_01_PART_04.md`, Section 0.)
+   build record STAGE_01_PART_04 (private since 2026-09-27), Section 0.)
 5. For antimony-touching domains: confirm no new reserved-word collision
    by an actual build, not by inspection.
 6. Confirm the diff's file list matches the spec's out-of-scope section.
@@ -185,7 +185,7 @@ procedure and a reminder about the `&&`-chaining trap, then exits without
 performing the mutation. Run the script first, then do Step 4 by hand.
 
 Full procedure with commands and the `&&`-chaining incident:
-`Business/build-stages/STAGE_01_PART_03.md`.
+build record STAGE_01_PART_03 (private since 2026-09-27).
 
 ## 7. Divergence resolution
 
@@ -201,7 +201,7 @@ inference, update the permanent record (not just the conversation), and
 ask whether it reveals a process gap worth fixing generally (not just this
 one instance). Full procedure and prompt template, plus the real worked
 example (OpenCode's mutation-count correction, FreeBuff's `&&`-chaining
-catch): `Business/build-stages/STAGE_01_PART_04.md`.
+catch): build record STAGE_01_PART_04 (private since 2026-09-27).
 
 ## 8. Amendment history
 
@@ -220,13 +220,13 @@ they happen:
   the Monte Carlo domain.
 - 2026-07 — Stage 1 improvements (post-close): created
   `scripts/verify_domain.sh` from the Part 3 draft, automated Steps 1-3
-  of the verification procedure; updated `Business/BUILD_PIPELINE.md` to
+  of the verification procedure; updated the maintainers' private BUILD_PIPELINE notes to
   reflect the actual 5-part stage structure established during Stage 1;
   added the script reference to Section 6.
 - 2026-07 — Stage 2 (Wright-Fisher population genetics): confirmed the
   existing divergence-resolution procedure (Section 7) needs no amendment
   after catching two more mutation-test blast-radius overclaims/
-  underclaims in one domain (see `Business/build-stages/
+  underclaims in one domain (see `build-stages/
   STAGE_02_PART_04.md`) — the procedure already requires independent
   reproduction precisely because self-reported blast radius is
   unreliable; this is the procedure working, not a gap. Fixed a real bug
@@ -256,7 +256,7 @@ they happen:
   appended a second, generic one on top), producing redundant text in
   `ModelBuildError`. Michaelis-Menten's validator never had this bug —
   the others now match its pattern. Fixed the module-level docstring in
-  `terium_engine.py`, stale since Stage 1 (still said "the two Tier-2
+  `caterva_engine.py`, stale since Stage 1 (still said "the two Tier-2
   ODE domains" with three more domains since added). Found, via this
   audit, that a `mutation_rate` parameter had been added to Wright-Fisher
   after Stage 2 Part 2's spec explicitly listed mutation as out of scope
@@ -292,7 +292,7 @@ they happen:
   headline claim — carrying no verification discipline at all: the engine
   has no citation or source field, and provenance is re-attached to the
   response after simulation. Rule 1 applies to parameter provenance, not
-  only to numerics. See `Business/ARCHITECTURE_ASSESSMENT.md`.
+  only to numerics. See the maintainers' private ARCHITECTURE_ASSESSMENT notes.
 - 2026-08 — Stage 4 (engine/application boundary), closed. Four amendments
   with standing force. Two of them are repeats of lessons that failed to
   transfer between stages, which is the argument for recording them here
@@ -321,7 +321,7 @@ they happen:
   `verify_domain.sh` in the same change that creates it.
 
   **(c) A passing suite does not prove a change took effect.** During the
-  Stage 4 Part 3 audit, `terium_engine.py` imported all 67 public names
+  Stage 4 Part 3 audit, `caterva_engine.py` imported all 67 public names
   from the new package and then redefined all 64 below. Python takes the
   later definition, so the package was imported and immediately shadowed —
   and every test passed, because the monolith was still doing the work.

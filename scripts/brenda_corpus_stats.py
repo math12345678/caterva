@@ -6,7 +6,7 @@
 
 WHY THIS EXISTS
 ---------------
-Terrium has been repeating a figure: "roughly three quarters of our default
+Caterva has been repeating a figure: "roughly three quarters of our default
 parameters are unverified under STRENDA." That number came from this
 project's own small hand-assembled default set. It was never a basis for a
 claim about the literature, and it has been quoted in outreach as though it

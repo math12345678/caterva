@@ -99,7 +99,7 @@ can interpret.
 documented assumption rather than a silent one, and it is now the only
 remaining guess on this path.
 
-The Python CLI (`python -m Terium.cli`) exposes population genetics and SSA
+The Python CLI (`python -m caterva.cli`) exposes population genetics and SSA
 only — none of the enzyme-kinetics or literature-resolution capability
 described in the README is reachable from it. That is a separate gap and is
 not addressed here.
@@ -128,8 +128,8 @@ and does not balance for the one the name-based table would have assumed.
 Independent confirmation outside the codebase:
 
 ```
-scipy, 12.8 uM/min : t=1.1  9.9998    Terrium 10.000
-scipy, 12.8 mM/s   : t=1.1  2.7098    Terrium  2.710
+scipy, 12.8 uM/min : t=1.1  9.9998    Caterva 10.000
+scipy, 12.8 mM/s   : t=1.1  2.7098    Caterva  2.710
 ```
 
 ## Related

@@ -50,12 +50,12 @@
 
 - [x] **Metrics Exporter** (`src/web/metrics-exporter.ts`)
   - [x] Import sweep-batch-metrics module
-  - [x] Export `terrium_sweeps_total` counter
-  - [x] Export `terrium_sweep_avg_success_rate` gauge
-  - [x] Export `terrium_sweep_avg_execution_time_ms` gauge
-  - [x] Export `terrium_batches_total` counter
-  - [x] Export `terrium_batch_avg_success_rate` gauge
-  - [x] Export `terrium_batch_avg_execution_time_ms` gauge
+  - [x] Export `caterva_sweeps_total` counter
+  - [x] Export `caterva_sweep_avg_success_rate` gauge
+  - [x] Export `caterva_sweep_avg_execution_time_ms` gauge
+  - [x] Export `caterva_batches_total` counter
+  - [x] Export `caterva_batch_avg_success_rate` gauge
+  - [x] Export `caterva_batch_avg_execution_time_ms` gauge
   - [x] Handle empty metrics gracefully
   - [x] Format compliant with Prometheus text format
 
@@ -191,7 +191,7 @@ Total: 40 tests passing, 0 failures
 ## Post-Delivery Recommendations
 
 ### Immediate (Optional)
-- Consider setting up Prometheus alert rule: `terrium_sweep_avg_success_rate < 80`
+- Consider setting up Prometheus alert rule: `caterva_sweep_avg_success_rate < 80`
 - Add sample Grafana dashboard (can be imported from JSON)
 
 ### Short-term (Future Work)

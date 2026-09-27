@@ -354,7 +354,7 @@ importers:
         specifier: 'catalog:'
         version: 3.25.76
 
-  artifacts/terrium-landing:
+  artifacts/caterva-landing:
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0

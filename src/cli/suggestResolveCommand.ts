@@ -8,7 +8,7 @@
  *
  *     simulate "michaelis menten of lactate dehydrogenase on pyruvate in Homo sapiens"
  *
- * Terrium reports that km, vmax and s0 have "no literature match", and then
+ * Caterva reports that km, vmax and s0 have "no literature match", and then
  * advises: *"name a system to resolve them from literature with --resolve."*
  *
  * They did name the system. It is in the sentence. The enzyme, the substrate

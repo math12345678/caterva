@@ -1,23 +1,16 @@
-# Terrium
+# Caterva
 
 Scientific computing for teaching labs. Students ask a question in plain
-language; Terrium resolves the real parameters from the literature, runs the
+language; Caterva resolves the real parameters from the literature, runs the
 simulation, and shows its work — every number traceable to a citation that
 has been independently checked.
 
-> **Private repository.** `Terrium-sim/main` is not readable
-> anonymously and is not going to be, so `gh repo clone` (which uses your
-> GitHub credentials) is the command that works; a plain `git clone` URL
-> would stop at a username prompt. If you do not have access, this is the
-> point at which to ask for it rather than the point at which to debug
-> git. See [ADR 0179](../adr/0179-the-guard-that-could-not-go-green.md).
-
 ```bash
-gh repo clone Terrium-sim/main -- --recursive
-cd main
+git clone --recursive https://github.com/math12345678/caterva.git
+cd caterva
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 4,691 tests (3,511 engine + 1,180 literature)
+make test      # 4,692 tests (3,513 engine + 1,179 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -66,15 +59,15 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`terium`](https://github.com/Terrium-sim/terium) | the simulation engine — 15 domains, 3,511 tests |
-| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,180 tests |
+| [`caterva`](https://github.com/math12345678/caterva) | the simulation engine — 15 domains, 3,513 tests |
+| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,179 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
 | [`science-agent-pipeline-replit`](https://github.com/Terrium-sim/science-agent-pipeline-replit) | the Express API service |
 | [`documents`](https://github.com/Terrium-sim/documents) | constitution, 204 ADRs, API reference |
 | [`business`](https://github.com/Terrium-sim/business) | strategy, and the build-stage record |
-| [`terrium-site`](https://github.com/Terrium-sim/terrium-site) · [`landing`](https://github.com/Terrium-sim/landing) · [`mule`](https://github.com/Terrium-sim/mule) | the three web front ends |
+| [`caterva-site`](https://github.com/Terrium-sim/terrium-site) · [`landing`](https://github.com/Terrium-sim/landing) · [`mule`](https://github.com/Terrium-sim/mule) | the three web front ends |
 | [`advanced-analysis`](https://github.com/Terrium-sim/advanced-analysis) · [`benchmark-results`](https://github.com/Terrium-sim/benchmark-results) | figures and measurements |
 | [`archive`](https://github.com/Terrium-sim/archive) · [`miscellaneous`](https://github.com/Terrium-sim/miscellaneous) · [`worktrees`](https://github.com/Terrium-sim/worktrees) | superseded reports, loose files, scratch space |
 
@@ -103,9 +96,9 @@ included. Those records are never rewritten to match the present.
 
 ## The engine's name
 
-`terium`, not `tellurium`. The upstream
+`caterva`, not `tellurium`. The upstream
 [Tellurium](https://tellurium.analogmachine.org/) project is unrelated to
-this code — Terrium calls `libroadrunner` and `antimony` directly and has
+this code — Caterva calls `libroadrunner` and `antimony` directly and has
 never depended on the umbrella package (ADR 0001). The old directory name
 implied a relationship that does not exist.
 
@@ -116,7 +109,7 @@ implied a relationship that does not exist.
 libroadrunner line drops cp310. See ADR 0014.
 
 Do **not** `pip install tellurium` — the umbrella package pulls in
-`python-libcombine` and `python-libnuml`, neither of which Terrium uses, and
+`python-libcombine` and `python-libnuml`, neither of which Caterva uses, and
 on any platform without prebuilt wheels the install dies at the cmake step.
 `scripts/check_forbidden_packages.py` fails the build if it reaches a
 manifest, or if a document tells you to install it.
@@ -130,19 +123,18 @@ See [LICENSE](LICENSE). Citation metadata in
 
 ## Licence, and one thing worth knowing
 
-Apache-2.0. See [`LICENSE`](https://github.com/Terrium-sim/main/blob/main/LICENSE)
-and [`NOTICE`](https://github.com/Terrium-sim/main/blob/main/NOTICE) in the
+Apache-2.0. See [`LICENSE`](https://github.com/math12345678/caterva/blob/main/LICENSE)
+and [`NOTICE`](https://github.com/math12345678/caterva/blob/main/NOTICE) in the
 umbrella repository — NOTICE carries the BRENDA CC BY 4.0 attribution and the
 third-party software terms, and Apache-2.0 §4(d) makes it travel with any
 redistribution.
 
-**Terrium is not Tellurium.**
+**Caterva is not Tellurium.**
 [Tellurium](https://tellurium.analogmachine.org/) is an established
 systems-biology environment from the Sauro lab at the University of
-Washington. Terrium is unaffiliated with it and is not a fork of it. Terrium
+Washington. Caterva is unaffiliated with it and is not a fork of it. Caterva
 is a *consumer* of that ecosystem — it runs on libRoadRunner and generates
-Antimony, both from that group. The similar name is a mistake and is
-addressed in the umbrella README.
+Antimony, both from that group. The project was called Terrium until 2026-09-27, too close to Tellurium's name; it has been Caterva since.
 
 ## Contributing
 
@@ -155,4 +147,4 @@ made directly into one of those is overwritten on the next split. Commit
 here.
 
 What your contribution arrives under:
-[`docs/INBOUND_LICENSE.md`](https://github.com/Terrium-sim/main/blob/main/docs/INBOUND_LICENSE.md).
+[`docs/INBOUND_LICENSE.md`](https://github.com/math12345678/caterva/blob/main/docs/INBOUND_LICENSE.md).

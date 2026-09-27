@@ -42,7 +42,7 @@ present, the response carries a `fit` block: models ranked by
 `|finalValue − experimental|`, plus the models excluded and why.
 
 **Optional by design, and absent means absent.** An experimental value is a
-number the experimenter measured. Terrium cannot resolve it from literature
+number the experimenter measured. Caterva cannot resolve it from literature
 and must not invent one, so its absence means *no fit ranking* — never a
 default. That is ADR 0012/0013's measured-quantity-versus-experimental-
 condition rule applied to an input rather than a parameter.

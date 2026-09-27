@@ -143,7 +143,7 @@ def test_the_band_cannot_reach_outside_the_enumerated_outcomes():
     low, high = min(outcomes), max(outcomes)
 
     from model_ensemble import ensemble_over
-    from Terium.continuous.simulations import simulate_michaelis_menten
+    from caterva.continuous.simulations import simulate_michaelis_menten
 
     drawn = sample_ensemble([scored(c) for c in rows], draws=50, seed=SEED)
     band = ensemble_over(
@@ -178,7 +178,7 @@ def test_neither_module_claims_to_be_an_uncertainty_estimate():
     """Both refuse the same thing, and must keep refusing it together.
 
     Bakker's published spread is bounded by rejection against measured
-    flux, which Terrium has no data for. If one module quietly started
+    flux, which Caterva has no data for. If one module quietly started
     presenting its band as a confidence interval while the other kept the
     disclaimer, a reader comparing two sections of one report would get two
     different claims about the same numbers.
@@ -188,7 +188,7 @@ def test_neither_module_claims_to_be_an_uncertainty_estimate():
     assert "NOT an uncertainty estimate" in enumerated.reason
 
     from model_ensemble import ensemble_over
-    from Terium.continuous.simulations import simulate_michaelis_menten
+    from caterva.continuous.simulations import simulate_michaelis_menten
 
     drawn = sample_ensemble([scored(c) for c in rows], draws=20, seed=SEED)
     band = ensemble_over(

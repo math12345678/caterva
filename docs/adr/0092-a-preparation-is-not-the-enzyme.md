@@ -11,7 +11,7 @@ conditions), ADR 0027 / 0038 (computed and not delivered)
 ## Context
 
 ADR 0031 introduced `docs/commentary-residue-baseline.txt`: a record of the
-BRENDA commentary Terrium cannot read, so that unread text is *reviewed*
+BRENDA commentary Caterva cannot read, so that unread text is *reviewed*
 rather than merely unparsed. Coverage has risen 73% → 92% since.
 
 One group in that file is marked **OPEN FINDING**:
@@ -45,7 +45,7 @@ resolve_kinetic_value("1.1.1.27", "Homo sapiens", "NADH", quantity="ki")
 ```
 
 That row's commentary reads *"competitive versus NADH, pH 7.5, 37 °C,
-**recombinant His-tagged enzyme**"*. Terrium returned a His-tagged
+**recombinant His-tagged enzyme**"*. Caterva returned a His-tagged
 construct's inhibition constant as the human LDH inhibition constant, with a
 real citation attached and nothing anywhere saying what it measured.
 
@@ -181,7 +181,7 @@ Three things follow, and each argues against a blanket rule:
    honest state is *unknown* — not "probably harmful", which exclusion
    would assert.
 2. **The effect is quantity-dependent.** Where the tag did harm, it reduced
-   *activity* and **preserved substrate affinity**. Both values Terrium
+   *activity* and **preserved substrate affinity**. Both values Caterva
    would lose are **Ki** — affinity constants, the quantity that survived
    in the one case measured end to end.
 3. **The original defect was silence, and silence is fixed.** The value now

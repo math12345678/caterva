@@ -560,7 +560,7 @@ async function registerDataset(simulation: SimulationResult) {
     osf: osf.url,
     zenodo: zenodo.url,
     doi: zenodo.doi,
-    github: `https://github.com/terrium/...`
+    github: `https://github.com/caterva/...`
   };
 }
 ```

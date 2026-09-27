@@ -21,16 +21,16 @@ The sentence was not correct today. Printing it against both cases shows two
 false notes, one in each direction.
 
 ```
-TITLED   -> ... Terrium records the source identifier only; author, year,
+TITLED   -> ... Caterva records the source identifier only; author, year,
              journal are NOT known to it ...
-UNTITLED -> ... Terrium records the source identifier only; author, year,
+UNTITLED -> ... Caterva records the source identifier only; author, year,
              journal are NOT known to it ...
 ```
 
 They are identical, and the entries are not.
 
 **The titled entry emits `title = {LDH kinetics in human}`** and the note
-sitting inside it says Terrium records the source identifier *only*. False
+sitting inside it says Caterva records the source identifier *only*. False
 about the very entry it is attached to.
 
 **The untitled entry has no `title` field at all**, and the note lists

@@ -1,9 +1,9 @@
-# What Terrium collects
+# What Caterva collects
 
-Short version: Terrium itself stores an email address, only if you type one
+Short version: Caterva itself stores an email address, only if you type one
 into the waitlist form. No cookies, no analytics, no trackers, no accounts.
 
-The two marketing pages — `mule/index.html` and `terrium-site/index.html` —
+The two marketing pages — `mule/index.html` and `caterva-site/index.html` —
 make no third-party request at all as of 2026-08-16. The Google Fonts links
 that used to hand every visitor's IP to Google on page load are gone.
 
@@ -30,7 +30,7 @@ signup. Nothing else — no name, no IP address, no browser fingerprint.
 service. It is `.gitignore`d, so it does not end up in the repository or its
 history.
 
-**Why:** to tell you when Terrium is ready to try. That is the only intended
+**Why:** to tell you when Caterva is ready to try. That is the only intended
 use.
 
 **Who can read it:** whoever operates that server. There is no HTTP endpoint
@@ -51,14 +51,14 @@ someone who reads a page and leaves without typing anything.
 
 Each public page asks the visitor's browser to fetch files from a CDN. The
 browser cannot do that without telling the CDN who is asking, so the visitor's
-IP address, their browser's `User-Agent`, and the address of the Terrium page
+IP address, their browser's `User-Agent`, and the address of the Caterva page
 they were on reach a third party before the page has finished rendering. No
 click, no form, no consent.
 
 | page | goes to | for |
 |---|---|---|
 | `mule/index.html` | *nothing* | — |
-| `terrium-site/index.html` | *nothing* | — |
+| `caterva-site/index.html` | *nothing* | — |
 | `src/web/dashboard.html` | `cdnjs.cloudflare.com` | Chart.js 3.9.1 |
 | `src/web/server.ts` (API docs) | `cdnjs.cloudflare.com`, `cdn.jsdelivr.net`, **and still `fonts.googleapis.com` in the published tree** | Swagger UI, Redoc, Montserrat/Roboto |
 
@@ -103,7 +103,7 @@ awarded the visitor €100 with penalties of up to €250,000 for continuing.
 Sending that address to a US server also engages Chapter V (Articles 44–46),
 which wants an adequacy decision or Standard Contractual Clauses first.
 
-Terrium is aimed at students, including students in the EU.
+Caterva is aimed at students, including students in the EU.
 
 **The fix is to self-host.** The fonts are licensed for it — Inter, IBM Plex
 Mono and JetBrains Mono are SIL Open Font License 1.1, Montserrat and Roboto
@@ -199,7 +199,7 @@ So the honest statement is conditional:
 | | |
 |---|---|
 | default install | nothing leaves the machine |
-| an LLM key configured | the query text goes to that provider, under **their** terms and retention policy, not Terrium's |
+| an LLM key configured | the query text goes to that provider, under **their** terms and retention policy, not Caterva's |
 
 If you enable it, you are choosing to send your users' text to a third
 party. That is your decision to make and your disclosure to give — read the

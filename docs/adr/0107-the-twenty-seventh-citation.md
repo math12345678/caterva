@@ -80,11 +80,11 @@ Proving the fix end-to-end through the real entry point instead of the
 library, `scripts/export_citations.py` died on its import line:
 
 ```
-ModuleNotFoundError: No module named 'Terium'
+ModuleNotFoundError: No module named 'caterva'
 ```
 
 It inserts `REPO_ROOT / "Tests"` on `sys.path` and not `REPO_ROOT`, and
-`citation_export` imports `Terium.core.data_sources` — the shared source
+`citation_export` imports `caterva.core.data_sources` — the shared source
 table (ADR 0079). **Committed in HEAD**, not a working-tree artifact.
 
 Every test in the file imports `citation_export` directly, where pytest has
@@ -120,7 +120,7 @@ running `aa`, `ab`, `ac`.
 - Left alone, deliberately: `_note_for` builds its `missing` list from a
   tuple of hardcoded `None` values, so the comprehension can only ever
   return all three field names. It produces the correct sentence today —
-  Terrium genuinely holds no author, year or journal — but it is a constant
+  Caterva genuinely holds no author, year or journal — but it is a constant
   wearing the costume of a computation. Recorded rather than changed,
   because changing it needs a decision about whether `title` (which *is*
   sometimes known, and is emitted) belongs in that sentence when absent.

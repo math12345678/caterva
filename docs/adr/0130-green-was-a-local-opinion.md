@@ -10,7 +10,7 @@
 
 ## The finding
 
-Terrium's CI has failed on **every commit for roughly two weeks**.
+Caterva's CI has failed on **every commit for roughly two weeks**.
 
 The evidence was not in the repository. It was in the owner's inbox: seven
 GitHub notifications, one per commit pushed during this session, each
@@ -61,7 +61,7 @@ Two causes, both fixed:
 
   ```
   ...and reported the document as claiming
-  Terrium is built on Tellurium.
+  Caterva is built on Tellurium.
   ```
 
   The second line alone reads as a flat assertion; with the first it is a
@@ -90,7 +90,7 @@ measurement error this project keeps finding. So the cause is recorded as
 **unknown**, with the one command that will answer it:
 
 ```
-gh run view --repo math12345678/terrium --job <api-server job id> --log-failed
+gh run view --repo math12345678/caterva --job <api-server job id> --log-failed
 ```
 
 ## Consequences

@@ -1,4 +1,4 @@
-"""Silent-skip guard for Terrium.
+"""Silent-skip guard for Caterva.
 
 Fails when the test suites skip more tests than expected.
 
@@ -51,7 +51,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Skips are counted per suite, in the order `make test` runs them.
 SUITES = [
-    ("engine", REPO_ROOT / "Terium" / "tests"),
+    ("engine", REPO_ROOT / "caterva" / "tests"),
     ("literature", REPO_ROOT / "Tests"),
 ]
 
@@ -184,9 +184,9 @@ def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
     did not run: engine" on a suite that ran perfectly and exited 0.
 
     The cause is worth writing down because it is invisible and it will
-    recur. `Terium/pytest.ini` already sets `addopts = -q`. When pytest is
-    invoked with `Terium/tests` as the argument it resolves rootdir to
-    `Terium/` and picks up that ini, so this guard's own `-q` became the
+    recur. `caterva/pytest.ini` already sets `addopts = -q`. When pytest is
+    invoked with `caterva/tests` as the argument it resolves rootdir to
+    `caterva/` and picks up that ini, so this guard's own `-q` became the
     SECOND one. Two `-q` flags is quiet level 2, which suppresses the
     summary line entirely. The suite printed its dots, exited 0, and said
     nothing a regex could read.

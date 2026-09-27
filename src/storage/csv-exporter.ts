@@ -219,7 +219,7 @@ function failureSummaryLines(rows: any[], noun: string): string[] {
  * That is ADR 0012/0013's distinction, applied at the point of export.
  */
 function sweepProvenanceHeader(sweepResult: any): string[] {
-  const lines: string[] = ['# Terrium parameter sweep'];
+  const lines: string[] = ['# Caterva parameter sweep'];
 
   if (sweepResult.query) lines.push(`# query: ${String(sweepResult.query).replace(/\s+/g, ' ')}`);
   if (sweepResult.sweepId) lines.push(`# sweep: ${sweepResult.sweepId}`);

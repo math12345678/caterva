@@ -4,14 +4,14 @@
 WHY THIS EXISTS
 ---------------
 The file was already in the repository. Nothing validated it, nothing
-referenced it, and no exported run carried it — so a Terrium result could
+referenced it, and no exported run carried it — so a Caterva result could
 cite every measurement it used and not the tool that produced them.
 
 That is the half of Daniel Katz's field the earlier passes did not reach.
 His objection was that per-constant citation is confusing; the FORCE11
 Software Citation Principles (Smith et al. 2016, *PeerJ CS* 2:e86), which he
 co-authored, make the converse point: the software behind a result is
-citable and routinely goes uncited. Terrium exported a bibliography of
+citable and routinely goes uncited. Caterva exported a bibliography of
 everyone else's measurements and no way to cite itself.
 
 WHAT IS CHECKED
@@ -88,7 +88,7 @@ def main() -> int:
     repository = re.search(r'^repository-code:\s*"?([^"\n]+)"?', text, re.M)
     if not repository:
         problems.append("no `repository-code`, so a reader cannot find the software")
-    elif "Terrium-sim/terrium" not in repository.group(1):
+    elif "math12345678/caterva" not in repository.group(1):
         problems.append(
             f"`repository-code` is {repository.group(1)!r}, which is not this "
             "repository. It pointed at the pre-rename org once already."

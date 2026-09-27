@@ -15,7 +15,7 @@
  * nothing from literature" and "nobody wired the counter", because the
  * wire format is identical.
  *
- * That is exactly the defect Terrium exists to refuse, committed in its
+ * That is exactly the defect Caterva exists to refuse, committed in its
  * own telemetry: a number presented as measured that nobody measured.
  *
  * The gap survived because the only available tests were of the SHAPE of

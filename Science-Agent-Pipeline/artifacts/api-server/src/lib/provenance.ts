@@ -73,7 +73,7 @@ export class RequiredParametersMissingError extends Error {
       const example = unexplained.map((k) => exampleFor(k, examples)).join(" ");
       // Say what those numbers are, when any of them is a real one. A
       // concrete `end=200` is only safe if the reader knows it is a
-      // starting point they are expected to replace, not a value Terrium
+      // starting point they are expected to replace, not a value Caterva
       // is vouching for.
       const illustrative = unexplained.some(
         (k) => exampleFor(k, examples) !== `${k}=<value>`,
@@ -92,7 +92,7 @@ export class RequiredParametersMissingError extends Error {
           "the query."
         : `${unexplained.join(", ")} ` +
           `${unexplained.length > 1 ? "were" : "was"} not supplied in the ` +
-          `query, and Terrium has no literature lookup for any parameter ` +
+          `query, and Caterva has no literature lookup for any parameter ` +
           `in the '${domain}' domain — so ` +
           `${unexplained.length > 1 ? "they were" : "it was"} never ` +
           "searched for, rather than searched for and not found.";
@@ -103,7 +103,7 @@ export class RequiredParametersMissingError extends Error {
           //
           // Herbert Sauro predicted that a refusing tool makes the
           // researcher "hardcode a number with no warning at all -- a
-          // strictly worse outcome caused by the strict rule". Terrium was
+          // strictly worse outcome caused by the strict rule". Caterva was
           // not merely vulnerable to that: this message INSTRUCTED it. A
           // user who goes and finds a Km in a paper, types it in, and gets
           // it recorded as origin=user with no citation has been walked
@@ -138,7 +138,7 @@ export class RequiredParametersMissingError extends Error {
 
 /**
  * Thrown by the keyword fallback resolver when a query matches none of
- * Terrium's fifteen domains -- even after word-set matching and light
+ * Caterva's fifteen domains -- even after word-set matching and light
  * stemming, not just an exact-phrase miss.
  *
  * This replaces a worse behavior: silently classifying an unmatched query
@@ -160,7 +160,7 @@ export class UnrecognizedQueryError extends Error {
 
   constructor(query: string, availableDomains: string[]) {
     super(
-      `Could not match this query to any of Terrium's ${availableDomains.length} ` +
+      `Could not match this query to any of Caterva's ${availableDomains.length} ` +
         `simulation domains: ${availableDomains.join(", ")}. Try naming the ` +
         "domain directly (e.g. \"simulate sir ...\"), using terms closer to " +
         "the science (\"outbreak\", \"enzyme kinetics\", \"predator-prey\", " +
@@ -204,7 +204,7 @@ export type ParameterOrigin =
   | "llm"
   | "default"
   /**
-   * A number Terrium supplied for a quantity that describes the USER'S
+   * A number Caterva supplied for a quantity that describes the USER'S
    * setup, not the system's behaviour -- an enzyme concentration, a PCR
    * efficiency. Distinct from `default`, which is a fabricated measurement
    * and stays blocked, and from `user`, which claims they said it.
@@ -217,7 +217,7 @@ export type ParameterOrigin =
   | "placeholder"
   /**
    * A value the requested model FIXES. Neutral genetic drift is
-   * selection_coefficient = 0 -- not a guess Terrium made, but what the
+   * selection_coefficient = 0 -- not a guess Caterva made, but what the
    * words the user typed mean.
    *
    * Deliberately not `user` (they did not say it), not `placeholder` (there
@@ -306,7 +306,7 @@ export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set([
  * because no lookup exists for them at all.
  *
  * A reader has no way to tell those apart, and they call for opposite
- * actions. "The literature has nothing" means stop looking. "Terrium
+ * actions. "The literature has nothing" means stop looking. "Caterva
  * never looked" means the value is in a paper you can probably find in a
  * minute. Telling a researcher the first when the second is true is the
  * true-sounding-and-misleading shape this project spends most of its
@@ -336,14 +336,14 @@ export const DOMAINS_WITH_LITERATURE_RESOLUTION: ReadonlySet<string> =
  * Km reported without them cannot be reproduced and cannot be compared
  * against another laboratory's number.
  *
- * BRENDA — the source Terrium resolves from — stores pH optimum, temperature
+ * BRENDA — the source Caterva resolves from — stores pH optimum, temperature
  * optimum, and an experimental-conditions commentary alongside every Km
  * entry (Schomburg et al., Nucleic Acids Research). So these fields are
  * available upstream; omitting them discards data the source already
  * supplied.
  *
  * `pressure` is deliberately absent: STRENDA requires it only when other than
- * atmospheric, and no path in Terrium currently resolves a non-atmospheric
+ * atmospheric, and no path in Caterva currently resolves a non-atmospheric
  * measurement. Adding it later is a field addition, not a contract change.
  */
 export interface AssayConditions {
@@ -445,7 +445,7 @@ export type StrendaStatus = "complete" | "incomplete";
  * Parameters that are enzyme kinetic constants, and therefore fall under
  * STRENDA's reporting requirement.
  *
- * Km is the only one Terrium currently resolves (see RESOLVABLE_FIELDS). vmax
+ * Km is the only one Caterva currently resolves (see RESOLVABLE_FIELDS). vmax
  * and kcat are listed because they are governed by the same standard the
  * moment a lookup path exists for them — the list states the rule, not the
  * current implementation, so extending RESOLVABLE_FIELDS cannot silently
@@ -557,7 +557,7 @@ export interface ParameterProvenance {
      * BRENDA held nothing, and the PubMed/CORE fallback found papers that
      * may report the value.
      *
-     * Every other member of this union means "a value existed and Terrium
+     * Every other member of this union means "a value existed and Caterva
      * declined it". This one means "no value, but here is where to look",
      * and it belongs here for the same reason the others do: it makes the
      * generic sentence ("could not be resolved from literature") false by
@@ -594,7 +594,7 @@ export interface ParameterProvenance {
      * The correct action is the opposite one: state YOUR enzyme
      * concentration and let the kcat bridge derive Vmax with a real
      * citation. kcat is the quantity literature actually reports about the
-     * enzyme itself, and [E]0 is the one thing here Terrium must never
+     * enzyme itself, and [E]0 is the one thing here Caterva must never
      * guess, because it is the user's experiment.
      */
     | "enzyme_conc_not_supplied"
@@ -625,7 +625,7 @@ export interface ParameterProvenance {
    * reported axes (ADR 0024 Decision 3, on Barbara Bakker's method).
    *
    * Deliberately not a number. See reliabilityScore.ts for why combining
-   * the axes would require a trade-off Terrium does not have and must not
+   * the axes would require a trade-off Caterva does not have and must not
    * invent.
    */
   reliability?: ReliabilityScore;
@@ -1054,7 +1054,7 @@ const NON_SCIENTIFIC_KEYS = new Set(["points"]);
  * chooses; a pre-filled measurement is a fabrication", and records that
  * pre-filling `s0` is CORRECTLY NOT FLAGGED.
  *
- * ADR 0044 is right. The hard rule exists to stop Terrium inventing
+ * ADR 0044 is right. The hard rule exists to stop Caterva inventing
  * MEASUREMENTS OF NATURE. A simulation window is not a measurement of
  * nature, and refusing to choose one protects nobody.
  *
@@ -1114,7 +1114,7 @@ export const SCENARIO_DEFAULTABLE_KEYS = new Set([
 ]);
 
 /**
- * A default is only acceptable when Terrium CHOSE it and can show it.
+ * A default is only acceptable when Caterva CHOSE it and can show it.
  *
  * `default` origin means a documented value in this repository, auditable
  * and identical for every user. `llm` origin means a number a model
@@ -1244,7 +1244,7 @@ export function unverifiedOriginKeys(
 //   your_choice    the quantity describes YOUR setup, not the system's
 //                  behaviour -- an enzyme concentration, a PCR efficiency, a
 //                  simulation window. No literature value exists to find.
-//                  Terrium supplies one, labels it `placeholder`, and says
+//                  Caterva supplies one, labels it `placeholder`, and says
 //                  plainly that the number is yours to replace.
 //
 //   literature_gap a real measurement that a real search failed to find.
@@ -1256,7 +1256,7 @@ export function unverifiedOriginKeys(
 // The classification is per-quantity and reasoned, not per-domain. There is no
 // branch here for `mm` or `sir`.
 
-/** What Terrium should do about one unresolved quantity. */
+/** What Caterva should do about one unresolved quantity. */
 export type GapKind = "definitional" | "your_choice" | "literature_gap";
 
 export interface GapVerdict {
@@ -1295,18 +1295,18 @@ const DEFINITIONAL: {
     reason:
       "s = 0 because the neutral Wright-Fisher model IS drift without " +
       "selection. This is what the query asked for, not an assumption " +
-      "Terrium added; a non-zero s would be the unrequested change.",
+      "Caterva added; a non-zero s would be the unrequested change.",
   },
   // NOT `mutation_rate`. It was here, and it was wrong.
   //
-  // `RESOLVABLE_FIELDS.wright_fisher` is `["mutation_rate"]` -- Terrium
+  // `RESOLVABLE_FIELDS.wright_fisher` is `["mutation_rate"]` -- Caterva
   // SEARCHES for mutation rates. Declaring one definitionally zero
   // short-circuits a lookup that can succeed, and `noResolverDomains.test.ts`
   // caught it by asserting that this domain still says the literature was
   // genuinely searched.
   //
   // The rule that survives: a definitional value is legitimate only for a
-  // quantity Terrium has NO literature path for. Where a path exists, use it
+  // quantity Caterva has NO literature path for. Where a path exists, use it
   // or refuse; a definition must never be a shortcut past a search that
   // would have worked. `selection_coefficient` qualifies because nothing
   // resolves it.
@@ -1398,7 +1398,7 @@ export function classifyGap(
         kind: "literature_gap",
         reason:
           detail ??
-          `${key} is your experimental choice and Terrium has no ` +
+          `${key} is your experimental choice and Caterva has no ` +
             `illustrative value for it.`,
       };
     }
@@ -1417,7 +1417,7 @@ export function classifyGap(
   // is yours".
   //
   // It was, briefly. It took the twenty-query harness from 8 answered to 17
-  // -- and gave "SEIR model of measles" a beta of 0.3 labelled "Terrium
+  // -- and gave "SEIR model of measles" a beta of 0.3 labelled "Caterva
   // performs no literature lookup for beta in this domain, so nothing was
   // searched and nothing failed."
   //
@@ -1438,7 +1438,7 @@ export function classifyGap(
     kind: "literature_gap",
     reason:
       detail ??
-      `${key} could not be resolved and Terrium will not supply one: it ` +
+      `${key} could not be resolved and Caterva will not supply one: it ` +
         `describes the system's behaviour, not your setup, so any value ` +
         `here would be invented.`,
   };

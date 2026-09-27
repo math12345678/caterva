@@ -1,6 +1,6 @@
 # Developer Quick Start Guide
 
-**For:** Developers working on the Terrium backend  
+**For:** Developers working on the Caterva backend  
 **Status:** August 2026 — All 404 tests passing
 
 ## 5-Minute Setup
@@ -12,7 +12,7 @@ npm install
 # 2. Set environment variables
 export PORT=5000
 export NODE_ENV=development
-export TERRIUM_PYTHON=$(which python3.12)
+export CATERVA_PYTHON=$(which python3.12)
 
 # 3. Run tests
 npm test                    # Full suite (404 tests)
@@ -52,7 +52,7 @@ curl http://localhost:5000/api/simulate/abc-123/stream
 
 If adding domain `new_domain`:
 
-1. **Python** (`src/lib/terium_runner.py`):
+1. **Python** (`src/lib/caterva_runner.py`):
    ```python
    def run_new_domain(parameters):
        # Implementation
@@ -61,7 +61,7 @@ If adding domain `new_domain`:
    DISPATCH["new_domain"] = run_new_domain
    ```
 
-2. **TypeScript** (`src/lib/teriumRunner.ts`):
+2. **TypeScript** (`src/lib/catervaRunner.ts`):
    ```typescript
    export type SimulationDomain = 
      | "mm" | "sir" | ... | "new_domain";
@@ -126,7 +126,7 @@ Example: `km` parameter is being accepted when it shouldn't
    })
    ```
 
-3. **Update Python** (if needed) (`src/lib/terium_runner.py`):
+3. **Update Python** (if needed) (`src/lib/caterva_runner.py`):
    ```python
    def run_mm(parameters):
        if parameters["km"] <= 0:
@@ -263,7 +263,7 @@ HTTP Request (Express)
     ↓
 [Python Bridge] Spawn and communicate
     ↓
-[Simulation Engine] Terium/ODE solver
+[Simulation Engine] caterva/ODE solver
     ↓
 [Provenance Tracking] Record all origins
     ↓
@@ -278,7 +278,7 @@ HTTP Request (Express)
 |------|------|--------------|
 | `src/lib/schemas.ts` | Parameter validation | Adding domain or parameter |
 | `src/lib/queryResolver.ts` | Domain/param detection | Improving resolution logic |
-| `src/lib/terium_runner.py` | Simulation engine | Adding domain or fixing engine |
+| `src/lib/caterva_runner.py` | Simulation engine | Adding domain or fixing engine |
 | `src/lib/llmResolver.ts` | LLM integration | Changing LLM behavior |
 | `src/routes/simulate.ts` | HTTP endpoints | Adding/changing API routes |
 | `src/__tests__/llmProviders.test.ts` | Python/TS contract | Verifying domain sync |
@@ -289,7 +289,7 @@ HTTP Request (Express)
 ```bash
 PORT=5000                              # Server port
 NODE_ENV=development                   # Log level
-TERRIUM_PYTHON=/path/to/python3.12    # Python exe
+CATERVA_PYTHON=/path/to/python3.12    # Python exe
 ```
 
 **Optional (with defaults):**

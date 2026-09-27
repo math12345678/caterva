@@ -11,7 +11,7 @@ import {
  *    the researcher works around it by hardcoding a number with no warning
  *    at all — a strictly worse outcome caused by the strict rule."
  *
- * Terrium was not merely vulnerable to that. Its refusal message said
+ * Caterva was not merely vulnerable to that. Its refusal message said
  * "Add km=<value> to your query and try again", and then recorded the
  * result as origin=user with no citation — walking the user into exactly
  * the outcome he described, through a door the tool opened.
@@ -113,7 +113,7 @@ describe('what it refuses', () => {
 });
 
 describe('a user citation is never a verified one', () => {
-  it('states plainly that Terrium has not checked it', () => {
+  it('states plainly that Caterva has not checked it', () => {
     // The whole risk of this feature is a number acquiring borrowed
     // credibility by passing through a tool that promises provenance.
     expect(USER_CITATION_CAVEAT).toContain('cited by you');

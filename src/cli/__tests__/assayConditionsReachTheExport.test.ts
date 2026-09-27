@@ -68,7 +68,7 @@ describe('the conditions travel from the resolver into the written model', () =>
       ReturnType<typeof resolveKinetic>
     >);
 
-    const directory = await mkdtemp(path.join(tmpdir(), 'terrium-reach-'));
+    const directory = await mkdtemp(path.join(tmpdir(), 'caterva-reach-'));
     const target = path.join(directory, 'model.txt');
     const restore = silenceStdout();
     try {

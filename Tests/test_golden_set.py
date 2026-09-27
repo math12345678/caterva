@@ -67,7 +67,7 @@ def make_html_provider(fixture_name: str):
 #
 # EVERY TUPLE CARRIES `verified_on`, AND THAT IS NOT BOOKKEEPING.
 #
-# This is Terrium's ground truth. Every claim the project makes about
+# This is Caterva's ground truth. Every claim the project makes about
 # resolving real values traces back to these numbers, and until now nothing
 # recorded WHEN they were last checked against BRENDA, or ever asked.
 #

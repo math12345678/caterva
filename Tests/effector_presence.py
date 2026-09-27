@@ -38,7 +38,7 @@ Four rows from the LDH turnover fixture, one paper, same pH 6.0, same 25 °C:
 The authors measured with and without an allosteric activator on purpose,
 and the wild-type arms differ by a factor of **15.5**.
 
-Terrium selects `min()`. It takes 21.1 — the activated arm — and reports it
+Caterva selects `min()`. It takes 21.1 — the activated arm — and reports it
 as the enzyme's turnover number with a real citation, having no idea it
 picked one side of a comparison. Larger than the mutant case in ADR 0029,
 which was a factor of twelve.
@@ -52,7 +52,7 @@ arms. That requires knowing nothing about FBP except that a curator wrote
 It does not decide which arm is right, and it does not withhold. Choosing
 would require separating "allosteric effector someone added" from
 "cosubstrate the reaction requires" — a claim about each enzyme's mechanism
-that Terrium has no source for. `effector.py`'s header makes the same point
+that Caterva has no source for. `effector.py`'s header makes the same point
 about the NADH rows in this corpus.
 """
 from __future__ import annotations

@@ -112,7 +112,7 @@ const BASE_ARGS = [
 ];
 
 beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-refusal-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-refusal-'));
 });
 
 afterAll(() => {
@@ -125,7 +125,7 @@ describe('a refused run still delivers what it can', () => {
   it('writes the bibliography of what WAS resolved', () => {
     const bib = path.join(tmpDir, 'refs.bib');
     const { stdout, code } = runCli([...BASE_ARGS, '--export-citations', bib], {
-      TERRIUM_LITERATURE_RUNNER: writeStub(),
+      CATERVA_LITERATURE_RUNNER: writeStub(),
     });
 
     // Still a refusal. Delivering the bibliography must not be mistaken for
@@ -145,7 +145,7 @@ describe('a refused run still delivers what it can', () => {
   it('does not write a model with a hole in it, and says why', () => {
     const model = path.join(tmpDir, 'model.txt');
     const { stdout, code } = runCli([...BASE_ARGS, '--export-model', model], {
-      TERRIUM_LITERATURE_RUNNER: writeStub(),
+      CATERVA_LITERATURE_RUNNER: writeStub(),
     });
 
     expect(code).toBe(2);
@@ -183,7 +183,7 @@ describe('a refused run still delivers what it can', () => {
         '--export-model',
         model,
       ],
-      { TERRIUM_LITERATURE_RUNNER: writeStub() },
+      { CATERVA_LITERATURE_RUNNER: writeStub() },
     );
 
     expect(code).toBe(0);
@@ -217,7 +217,7 @@ describe('--json is one document, and the exports still happen', () => {
     const bib = path.join(tmpDir, 'json_refused.bib');
     const model = path.join(tmpDir, 'json_refused.txt');
     const { stdout, code } = runCli([...BASE_ARGS, '--json', '--export-citations', bib, '--export-model', model], {
-      TERRIUM_LITERATURE_RUNNER: writeStub(),
+      CATERVA_LITERATURE_RUNNER: writeStub(),
     });
 
     expect(code).toBe(2);
@@ -246,7 +246,7 @@ describe('--json is one document, and the exports still happen', () => {
         '--s0', '10mM', '--vmax', '1.2mM/s',
         '--json', '--export-citations', bib, '--export-model', model,
       ],
-      { TERRIUM_LITERATURE_RUNNER: writeStub() },
+      { CATERVA_LITERATURE_RUNNER: writeStub() },
     );
 
     expect(code).toBe(0);
@@ -263,7 +263,7 @@ describe('--json is one document, and the exports still happen', () => {
     // would slip past a substring check.
     const { stdout } = runCli(
       [...BASE_ARGS, '--json', '--export-citations', path.join(tmpDir, 'only.bib')],
-      { TERRIUM_LITERATURE_RUNNER: writeStub() },
+      { CATERVA_LITERATURE_RUNNER: writeStub() },
     );
     expect(() => JSON.parse(stdout)).not.toThrow();
   });
@@ -288,7 +288,7 @@ describe('the unresolved list names each thing once', () => {
         '--enzyme',
         'lactate dehydrogenase',
       ],
-      { TERRIUM_LITERATURE_RUNNER: writeStub() },
+      { CATERVA_LITERATURE_RUNNER: writeStub() },
     );
 
     expect(code).toBe(2);
@@ -314,7 +314,7 @@ describe('the unresolved list names each thing once', () => {
         '--enzyme',
         'lactate dehydrogenase',
       ],
-      { TERRIUM_LITERATURE_RUNNER: writeStub() },
+      { CATERVA_LITERATURE_RUNNER: writeStub() },
     );
 
     const block = stdout.split('Cannot run.')[1]?.split('No value has been')[0] ?? '';

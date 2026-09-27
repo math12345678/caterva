@@ -10,7 +10,7 @@ a pool — same structural move), ADR 0028 / 0032 (PubChem identity)
 
 ## Context
 
-ADR 0029 taught Terrium to spot a variant row. Its `_ISOZYME_RE` matches the
+ADR 0029 taught Caterva to spot a variant row. Its `_ISOZYME_RE` matches the
 **word** "isozyme"/"isoform", so `"pH 8.5, 25°C, isozyme H4"` is caught.
 
 BRENDA also names forms **positionally**, and those were not:
