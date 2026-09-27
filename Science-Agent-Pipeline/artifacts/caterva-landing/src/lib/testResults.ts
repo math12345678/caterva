@@ -1,7 +1,7 @@
 // Real, current results from running every suite in the stack end to end.
 //
 // This is NOT a mock. These numbers come from actually running the suites:
-//   cd Caterva                                          && python -m pytest -v -rs
+//   cd caterva                                          && python -m pytest -v -rs
 //   cd Tests                                            && python -m pytest -v -rs
 //   cd Science-Agent-Pipeline/artifacts/api-server      && npx vitest run
 //   cd Science-Agent-Pipeline/artifacts/caterva-landing && npx vitest run

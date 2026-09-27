@@ -258,7 +258,7 @@ jobs:
         run: python scripts/verify_build.py --quick --no-typescript
 
       - name: Simulation engine tests
-        working-directory: Caterva
+        working-directory: caterva
         run: python -m pytest -v
 
       - name: Literature layer tests

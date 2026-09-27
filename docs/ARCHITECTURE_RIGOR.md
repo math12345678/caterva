@@ -319,7 +319,7 @@ Mutation testing (changing code to verify tests catch it):
 ### 1. Unit Tests (Offline, no network)
 
 ```bash
-cd Caterva
+cd caterva
 pytest Tests/test_e2e_architecture_integration.py -v
 pytest Tests/test_beta_gamma_from_r0.py -v  # 15 SIR conversion tests
 pytest Tests/test_epidemiology_resolver.py -v  # Disease parameter registry
@@ -330,7 +330,7 @@ pytest Tests/test_core_fulltext.py -v  # CORE integration (offline)
 
 ```bash
 # Terminal 1: Start the API server
-cd Caterva/Science-Agent-Pipeline
+cd caterva/Science-Agent-Pipeline
 export $(grep -v '^#' .env | xargs)
 export LLM_PROVIDER=groq  # or another provider
 pnpm --filter @workspace/api-server run dev
@@ -358,7 +358,7 @@ curl -X POST http://localhost:3000/api/simulate \
 ### 3. Full TS Suite (Includes LLM provider tests)
 
 ```bash
-cd Caterva/Science-Agent-Pipeline
+cd caterva/Science-Agent-Pipeline
 pnpm --filter @workspace/api-server run test
 ```
 

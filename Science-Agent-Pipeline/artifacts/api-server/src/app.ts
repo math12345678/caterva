@@ -188,7 +188,7 @@ app.get("/", (_req: Request, res: Response) => {
       <div class="endpoint"><span class="method">GET</span><span class="path">/api/waitlist/count</span><span class="ok">waitlist signup count</span></div>
     </div>
     <p style="margin-top:2rem;font-size:0.625rem">
-      see the <a href="https://github.com/anomalyco/Caterva">landing page</a> for the full app
+      see the <a href="https://github.com/math12345678/caterva">landing page</a> for the full app
     </p>
   </div>
 </body>

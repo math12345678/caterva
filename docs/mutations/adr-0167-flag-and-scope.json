@@ -18,7 +18,7 @@
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0167-flag-and-scope.json"
   ],
-  "test": "cd Caterva && python3 -m pytest tests/test_no_typescript_flag_only_skips_typescript.py --no-header -p no:cacheprovider",
+  "test": "cd caterva && python3 -m pytest tests/test_no_typescript_flag_only_skips_typescript.py --no-header -p no:cacheprovider",
   "mutations": [
     {
       "id": "F1",

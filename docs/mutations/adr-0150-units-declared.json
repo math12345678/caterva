@@ -7,7 +7,7 @@
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0150-units-declared.json"
   ],
-  "test": "cd Caterva && python3 -m pytest tests/test_sbml_units.py --no-header -p no:cacheprovider",
+  "test": "cd caterva && python3 -m pytest tests/test_sbml_units.py --no-header -p no:cacheprovider",
   "mutations": [
     {
       "id": "U1",
