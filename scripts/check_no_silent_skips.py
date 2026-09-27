@@ -99,58 +99,24 @@ ALLOWED_SKIP_REQUIRES_MODULE: dict[str, str] = {
 }
 
 
-#: The same idea for a skip whose real condition is the operating system.
-#:
-#: Maps a test to the platform it is ABOUT. The exemption holds everywhere
-#: else, and expires on that platform: a macOS-only test skipping ON macOS is
-#: a skip nothing explains, which is exactly the case worth catching.
-#: Without this the entry would have to be unconditional, and an exemption
-#: that cannot expire is the rubber stamp this file argues against two
-#: comments above.
-#: Keyed by TEST NAME, not module: `_skip_key` returns the half after "::",
-#: because a collection-level skip has an empty file half. The stdpopsim
-#: entry looks like a module name only because that module skips whole.
-ALLOWED_SKIP_REQUIRES_PLATFORM: dict[str, str] = {
-    "test_a_hidden_pth_is_a_named_failure": "darwin",
-    "test_a_visible_pth_passes": "darwin",
-    "test_the_terrium_command_is_declared": "darwin",
-}
-
-
 def _allowed_reason_still_holds(key: str) -> bool:
     """False when the skip's stated cause is absent and it skipped anyway.
 
-    Two causes, checked the same way: a package that turns out to be
-    installed, or a platform-specific test skipping on its own platform.
+    One cause today: a package that turns out to be installed. A
+    platform-conditional variant lived here until 2026-09-27, for three
+    macOS-only doctor tests; it went when those tests stopped skipping --
+    they now simulate the macOS branch on every runner instead. Worth
+    knowing it existed, because the shape recurs: the entry has to expire on
+    the platform the test is about, or it rubber-stamps the one case that
+    matters.
     """
     module = ALLOWED_SKIP_REQUIRES_MODULE.get(key)
     if module is not None and importlib.util.find_spec(module) is not None:
         return False
-    platform = ALLOWED_SKIP_REQUIRES_PLATFORM.get(key)
-    if platform is not None and sys.platform == platform:
-        return False
     return True
 
 
-#: One reason, three tests: they are the whole of
-#: Tests/test_doctor_hidden_pth.py, skipped together by one module-level
-#: `pytestmark`.
-_HIDDEN_PTH_SKIP = (
-    "Tests the macOS-only failure where iCloud sets the UF_HIDDEN flag on a "
-    ".pth inside .venv and Python 3.13 then skips it, so `terrium` vanishes "
-    "with `No module named 'Terium'`. The module is "
-    "`skipif(sys.platform != 'darwin')` because UF_HIDDEN is a macOS flag "
-    "with no Linux counterpart -- hiding on Linux is a leading dot, which "
-    "Python does not treat specially. CI is ubuntu-latest, so these three "
-    "skip on every run. Expected OFF darwin only: on macOS this entry "
-    "expires and a skip there goes red, because on the one platform the "
-    "test is about, not running is not a fact about the operating system."
-)
-
 ALLOWED_SKIPS: dict[str, str] = {
-    "test_a_hidden_pth_is_a_named_failure": _HIDDEN_PTH_SKIP,
-    "test_a_visible_pth_passes": _HIDDEN_PTH_SKIP,
-    "test_the_terrium_command_is_declared": _HIDDEN_PTH_SKIP,
     "test_popgen_resolver": (
         "Needs `stdpopsim`, which lives in the optional "
         "requirements-popgen.txt. `make setup` installs requirements-dev.txt "

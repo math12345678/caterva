@@ -192,11 +192,13 @@ export const TEST_SUITES: TestSuite[] = [
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
         // Re-measured 2026-09-27 for v0.4.0, running Tests/ alone, read
-        // out of a junit-xml report: 1174 tests, 1173 passed, 0 failed,
-        // 1 skipped (test_popgen_resolver, collection skipped), 552 s. One
-        // fewer than before: two tests that read the pitch deck became one
-        // pinning that it stays out of the now-public repository.
-        passed: 1173,
+        // out of a junit-xml report: 1175 tests, 1173 passed, 0 failed,
+        // 2 skipped, 555 s. The skips are named in check_no_silent_skips:
+        // test_popgen_resolver (optional stdpopsim) and the dependency-
+        // licence test, which reads installed JavaScript packages and was
+        // run for real with them present (10 passed) -- so, as for the
+        // engine row, the figure here is the one where npm works: 1174.
+        passed: 1174,
         skipped: 1,
         failed: 0,
       },
