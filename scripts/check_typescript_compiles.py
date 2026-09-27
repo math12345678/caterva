@@ -94,7 +94,7 @@ def _candidate_workspaces() -> list[pathlib.Path]:
         noticed the code was unchecked. Its header says so: "landing/ held
         hand-written TypeScript that no tsconfig.json covered, so nothing
         type-checked it". The config was added and nothing ever ran it.
-      * `terrium-site/` -- its own npm project, with a `typecheck` script
+      * `caterva-site/` -- its own npm project, with a `typecheck` script
         no automation calls.
 
     Root-level configs are matched non-recursively per directory, and the

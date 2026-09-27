@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** "197+ unit tests (100% passing)" and "Coverage: 84%" are unverified — no test run or coverage artifact backs these figures, and other same-day docs cite a different number ("178") for what should be the same snapshot. Real current suite: 17 test files (`find src -name "*.test.ts"`), 250+ individual `it()`/`test()` blocks by grep count. "Lines of Code: 5000+" is a stale lowball — real non-test TS LOC is ~11,000. Run `npm test` / `wc -l` yourself rather than citing the numbers below. The `/api/compare` endpoint and 19-test parameter-sweep-suite claims were independently verified as accurate.
 
-# 🌟 Terrium Complete Feature Set
+# 🌟 Caterva Complete Feature Set
 
 **All Features Implemented & Production-Ready**
 
@@ -120,7 +120,7 @@ GET /api/jobs/:jobId       # Specific job
 ```
 
 **Features:**
-- File-based storage (terrium-jobs.jsonl)
+- File-based storage (caterva-jobs.jsonl)
 - Query by status, time, model
 - Export to CSV
 - Statistics aggregation
@@ -269,7 +269,7 @@ Performance
 - Reproducible equations
 
 ✅ **Simulation Accuracy**
-- Terium + libroadrunner (industry-standard)
+- Caterva + libroadrunner (industry-standard)
 - Time-series trajectory
 - Final value calculation
 - Precision: floating-point
@@ -327,8 +327,8 @@ npm run web:start
 
 ✅ **Docker Ready**
 ```bash
-docker build -t terrium .
-docker run -p 3000:3000 terrium
+docker build -t caterva .
+docker run -p 3000:3000 caterva
 ```
 
 ✅ **Stateless Design**

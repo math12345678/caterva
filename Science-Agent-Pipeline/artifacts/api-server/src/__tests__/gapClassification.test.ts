@@ -1,5 +1,5 @@
 /**
- * What Terrium does about a quantity nobody resolved.
+ * What Caterva does about a quantity nobody resolved.
  *
  * The front door used to throw away a whole result over one gap: on twenty
  * realistic queries it answered three, and fourteen of the seventeen
@@ -83,7 +83,7 @@ describe("resolveGaps", () => {
     // Beside the value, not left to the caller. A placeholder whose label
     // depends on somebody remembering to add it will eventually ship
     // unlabelled.
-    // `mutation_rate` is NOT filled: Terrium searches for mutation rates,
+    // `mutation_rate` is NOT filled: Caterva searches for mutation rates,
     // and a definition must never short-circuit a search that could work.
     const gaps = resolveGaps(
       "wright_fisher", "genetic drift in a small population",
@@ -171,7 +171,7 @@ describe("the end to end behaviour this changed", () => {
     // range and endorse no single value -- so no honest default exists.
     //
     // An earlier version of this classification gave measles a beta of 0.3
-    // labelled "Terrium performs no literature lookup for beta in this
+    // labelled "Caterva performs no literature lookup for beta in this
     // domain". Every clause of that was false, and it contradicted a cited
     // scientific position this codebase had already argued at length.
     await expect(

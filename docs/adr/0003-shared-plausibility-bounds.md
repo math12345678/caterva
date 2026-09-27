@@ -4,10 +4,10 @@
 
 ## Context
 
-Terrium has two layers that each independently judge whether a Km value is
+Caterva has two layers that each independently judge whether a Km value is
 scientifically plausible: `Tests/brenda_client.py` (the literature layer,
 which flags implausible values scraped from BRENDA) and
-`Terium/terium_engine.py` (the simulation layer, which flags
+`caterva/caterva_engine.py` (the simulation layer, which flags
 implausible values before building a model). These were originally written
 with their own copies of the plausibility bounds
 (`KM_PLAUSIBLE_MIN_MM` / `KM_PLAUSIBLE_MAX_MM`).
@@ -18,13 +18,13 @@ by the literature layer -- would arrive at the simulation layer, be judged
 against the *engine's* (looser) bound, and come back as "confirmed." A
 value the literature layer explicitly warned about would silently lose
 that warning by the time a student saw it plotted. This is exactly the
-failure mode Terrium exists to prevent: a number that should carry a
+failure mode Caterva exists to prevent: a number that should carry a
 visible caveat quietly becoming a confident-looking number instead.
 
 ## Decision
 
 The two constants must always be numerically equal. This is enforced by a
-test (`Terium/tests/test_brenda_integration.py::
+test (`caterva/tests/test_brenda_integration.py::
 test_km_lower_bound_matches_the_brenda_layer` and its upper-bound
 counterpart), not just a comment asking future editors to remember. If
 either constant changes, the test fails until both are updated together.
@@ -36,7 +36,7 @@ either constant changes, the test fails until both are updated together.
 - The two layers are now coupled: changing the plausibility range requires
   touching both files, or extracting the constants to a shared module
   either layer can import. Extracting to a shared module was considered
-  and deferred -- `Tests/` and `Terium/` are currently siblings with no
+  and deferred -- `Tests/` and `caterva/` are currently siblings with no
   shared dependency, and introducing one for two float constants seemed
   like more coupling than the problem warranted. This should be
   revisited if a third consumer of these bounds appears.

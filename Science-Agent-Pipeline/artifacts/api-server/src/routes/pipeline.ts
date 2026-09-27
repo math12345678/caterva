@@ -79,9 +79,9 @@ router.get(
   async (_req: Request, res: Response, next: NextFunction) => {
     try {
       const scriptsDir = path.resolve(_dirname, "..", "src", "lib");
-      const [teriumExists, scienceAgentExists, python, dbAvailable] =
+      const [catervaExists, scienceAgentExists, python, dbAvailable] =
         await Promise.all([
-          fileExists(path.join(scriptsDir, "terium_runner.py")),
+          fileExists(path.join(scriptsDir, "caterva_runner.py")),
           fileExists(path.join(scriptsDir, "science_agent_runner.py")),
           checkPython3(),
           isDbAvailable(),
@@ -89,9 +89,9 @@ router.get(
 
       const subsystems: SubsystemStatus[] = [
         {
-          ok: teriumExists,
-          label: "terium_runner.py",
-          detail: teriumExists
+          ok: catervaExists,
+          label: "caterva_runner.py",
+          detail: catervaExists
             ? "Script found"
             : "Missing — pipeline will fail at 'running' stage",
         },
@@ -107,7 +107,7 @@ router.get(
           label: "python3",
           detail: python.available
             ? `Found: ${python.version}`
-            : "Not found — pipeline cannot run Terium or science agent",
+            : "Not found — pipeline cannot run Caterva or science agent",
         },
         {
           ok: dbAvailable,
@@ -227,7 +227,7 @@ router.get(
 
       res.json({
         timestamp: new Date().toISOString(),
-        // "All parameters in Terrium are backed by peer-reviewed
+        // "All parameters in Caterva are backed by peer-reviewed
         // scientific literature. Every domain has primary references with
         // DOI." -- what this said until 2026-09-05. Both halves were
         // false, and the second is checkable in one pass over this very

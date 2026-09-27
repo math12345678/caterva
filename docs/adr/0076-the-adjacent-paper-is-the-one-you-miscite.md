@@ -11,7 +11,7 @@
 ## Context
 
 `verify_citations_live.py` asks CrossRef for the registered title of every
-DOI Terrium cites and compares it to the title our own source claims. That
+DOI Caterva cites and compares it to the title our own source claims. That
 comparison is the strongest citation check in the project — the difference
 between *the DOI resolves* and *the DOI is the paper we said it was*.
 

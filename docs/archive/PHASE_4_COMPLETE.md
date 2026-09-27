@@ -10,8 +10,8 @@
 
 **After**: CLI now calls real PubMed and CrossRef APIs
 - ✅ Removed BUILT_IN_LITERATURE array (3 fake papers)
-- ✅ Removed TERRIUM_SKIP_DOI_VERIFICATION environment variable
-- ✅ Removed TERRIUM_ALLOW_UNVERIFIED_CITATIONS environment variable
+- ✅ Removed CATERVA_SKIP_DOI_VERIFICATION environment variable
+- ✅ Removed CATERVA_ALLOW_UNVERIFIED_CITATIONS environment variable
 
 ### 2. Integrated Real APIs
 

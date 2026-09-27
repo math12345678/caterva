@@ -17,7 +17,6 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import check_investor_claims as guard  # noqa: E402
 
-DECK = guard.ROOT / "terrium_pitch_deck.pptx"
 
 
 # `check()` iterates (*INVESTOR_DOCS, *PUBLIC_MARKETING). A test that
@@ -54,34 +53,26 @@ def test_investor_numbers_match_the_repository() -> None:
     assert guard.check() == []
 
 
-def test_the_reader_gets_real_text_out_of_the_real_deck() -> None:
-    """Pinned against the actual .pptx, not a synthetic one.
+def test_the_private_documents_stay_out_of_the_public_repository() -> None:
+    """The deck and Business/ left on 2026-09-27, scrubbed from history too.
 
-    A reader that works on a file you built yourself tells you nothing
-    about the file it will be pointed at.
+    Two tests used to read the real pitch deck, which was right while it was
+    tracked. It is not any more: the repository is public and the deck named
+    investors. This pins the opposite fact, so re-adding it -- the easy
+    accident, `git add .` in a folder that still has it -- fails here and is
+    blocked by .gitignore first. The Office reader itself is still tested
+    below, against files built in the test.
     """
-    if not DECK.exists():
-        raise AssertionError("the deck is gone; update INVESTOR_DOCS")
-    text = guard.office_text(DECK)
-    assert len(text.split()) > guard._MIN_WORDS, (
-        f"extracted only {len(text.split())} words from the real deck"
-    )
-    # Content that is unambiguously from these slides.
-    for phrase in ("THE PROBLEM", "THE ASK", "Terrium"):
-        assert phrase in text, f"{phrase!r} missing -- the reader is not reading slides"
+    import subprocess
 
-
-def test_the_deck_no_longer_claims_382_tests() -> None:
-    """The defect, pinned.
-
-    Slides 6 and 11 said "382 automated tests passing" while the suite had
-    over 1,800 -- understating the evidence by nearly five times, to the
-    audience deciding whether to fund it.
-    """
-    text = guard.office_text(DECK)
-    assert "382" not in text, (
-        "the deck has gone back to claiming 382 tests"
-    )
+    tracked = subprocess.run(
+        ["git", "ls-files", "--", "*pitch_deck*", "Business"],
+        capture_output=True, text=True, cwd=guard.ROOT, check=True,
+    ).stdout.split()
+    assert tracked == [], f"private documents are tracked again: {tracked}"
+    assert guard.INVESTOR_DOCS == ()
+    ignored = (guard.ROOT / ".gitignore").read_text()
+    assert "/Business/" in ignored and "*pitch_deck*" in ignored
 
 
 def test_a_stale_number_is_caught(tmp_path, monkeypatch) -> None:
@@ -172,7 +163,7 @@ def test_an_underivable_live_value_fails(tmp_path, monkeypatch) -> None:
 def test_a_dated_number_is_not_treated_as_a_stale_claim(tmp_path, monkeypatch) -> None:
     """A number that says when it was true ages honestly.
 
-    `Docw/terrium_mvp_timeline.docx` says the literature layer "already
+    `Docw/caterva_mvp_timeline.docx` says the literature layer "already
     exists and passes 124 tests **as of this session**". That was true when
     written and says so. The pitch deck's "382 automated tests passing"
     carried no qualifier and therefore read as a claim about now.

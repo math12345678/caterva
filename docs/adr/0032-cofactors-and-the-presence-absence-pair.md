@@ -54,7 +54,7 @@ Two real rows from the lactate dehydrogenase fixture:
 Same enzyme. Same pH. Same temperature. Same organism. Same paper. Same
 wild-type verdict. Same buffer (unstated in both).
 
-**Every check Terrium had said these two rows were identical.** They are
+**Every check Caterva had said these two rows were identical.** They are
 opposite allosteric conditions — fructose 1,6-bisphosphate is the classic
 activator of bacterial L-lactate dehydrogenase, and the pair exists in the
 literature precisely because the two states differ.

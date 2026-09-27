@@ -563,7 +563,7 @@ access of its own (`src/literature/literatureService.ts`) -- a caller must
 hand it `Literature` objects before it can recommend anything.
 
 What was actually built instead of the pseudocode below: `LiteratureResolver`
-(`src/literature/literatureResolver.ts`) bridges this tree to Terrium's real,
+(`src/literature/literatureResolver.ts`) bridges this tree to Caterva's real,
 already-verified literature layer -- `Tests/fallback_logic.py`'s
 `resolve_kinetic_value`, which walks BRENDA exact match -> BRENDA
 cross-species -> PubMed candidates and returns a value with its unit,

@@ -309,30 +309,30 @@ export function generatePrometheusMetrics(): string {
   
   // NEW: Sweep metrics
   const sweepMetrics = getAllSweepMetrics();
-  lines.push('# HELP terrium_sweeps_total Total number of sweeps');
-  lines.push('# TYPE terrium_sweeps_total gauge');
-  lines.push(`terrium_sweeps_total ${sweepMetrics.length} ${timestamp}`);
+  lines.push('# HELP caterva_sweeps_total Total number of sweeps');
+  lines.push('# TYPE caterva_sweeps_total gauge');
+  lines.push(`caterva_sweeps_total ${sweepMetrics.length} ${timestamp}`);
 
   if (sweepMetrics.length > 0) {
     const avgSweepSuccess = sweepMetrics.reduce((a, b) => a + b.successRate, 0) / sweepMetrics.length;
-    lines.push(`terrium_sweep_avg_success_rate ${avgSweepSuccess} ${timestamp}`);
+    lines.push(`caterva_sweep_avg_success_rate ${avgSweepSuccess} ${timestamp}`);
     
     const avgSweepTime = sweepMetrics.reduce((a, b) => a + b.averageTimeMs, 0) / sweepMetrics.length;
-    lines.push(`terrium_sweep_avg_execution_time_ms ${avgSweepTime ?? 0} ${timestamp}`);
+    lines.push(`caterva_sweep_avg_execution_time_ms ${avgSweepTime ?? 0} ${timestamp}`);
   }
 
   // NEW: Batch metrics
   const batchMetrics = getAllBatchMetrics();
-  lines.push('# HELP terrium_batches_total Total number of batch operations');
-  lines.push('# TYPE terrium_batches_total gauge');
-  lines.push(`terrium_batches_total ${batchMetrics.length} ${timestamp}`);
+  lines.push('# HELP caterva_batches_total Total number of batch operations');
+  lines.push('# TYPE caterva_batches_total gauge');
+  lines.push(`caterva_batches_total ${batchMetrics.length} ${timestamp}`);
 
   if (batchMetrics.length > 0) {
     const avgBatchSuccess = batchMetrics.reduce((a, b) => a + b.successRate, 0) / batchMetrics.length;
-    lines.push(`terrium_batch_avg_success_rate ${avgBatchSuccess} ${timestamp}`);
+    lines.push(`caterva_batch_avg_success_rate ${avgBatchSuccess} ${timestamp}`);
     
     const avgBatchTime = batchMetrics.reduce((a, b) => a + b.averageTimeMs, 0) / batchMetrics.length;
-    lines.push(`terrium_batch_avg_execution_time_ms ${avgBatchTime ?? 0} ${timestamp}`);
+    lines.push(`caterva_batch_avg_execution_time_ms ${avgBatchTime ?? 0} ${timestamp}`);
   }
   
   return lines.join('\n') + '\n';
@@ -392,9 +392,9 @@ export function generatePrometheusMetrics(): string {
    → metrics-exporter.ts: generatePrometheusMetrics()
    → Reads all caches
    → Exports:
-     terrium_sweeps_total 1
-     terrium_sweep_avg_success_rate 75
-     terrium_sweep_avg_execution_time_ms 120
+     caterva_sweeps_total 1
+     caterva_sweep_avg_success_rate 75
+     caterva_sweep_avg_execution_time_ms 120
 
 8. Grafana visualizes:
    Historical trend of success rates and execution times
@@ -456,4 +456,4 @@ All 19 tests: PASS ✓
 
 ---
 
-This implementation follows Terrium's patterns and integrates cleanly with the existing architecture without any breaking changes.
+This implementation follows Caterva's patterns and integrates cleanly with the existing architecture without any breaking changes.

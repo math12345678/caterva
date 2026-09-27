@@ -51,7 +51,7 @@ NO_AGGREGATE_REASON = (
     "The three axes are reported separately and deliberately not combined. "
     "Weighting them against each other requires knowing how a right-species "
     "value with a poor assay description trades off against a thorough assay "
-    "in the wrong species. That trade-off is an empirical finding Terrium "
+    "in the wrong species. That trade-off is an empirical finding Caterva "
     "does not have, and inventing it would fabricate the very kind of number "
     "this system refuses to fabricate. See ADR 0024, Decision 3."
 )
@@ -116,7 +116,7 @@ def grade_assay_completeness(
     # "The source states it did not report pH" and "we failed to parse a pH"
     # are different facts, and only the first is a statement about the
     # literature. Both grade the same; the reason must not claim knowledge
-    # of the paper that Terrium does not have.
+    # of the paper that Caterva does not have.
     declared = (
         f" The source states it did not report: {', '.join(unreported)}."
         if unreported

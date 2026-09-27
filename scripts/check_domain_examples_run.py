@@ -8,10 +8,10 @@ first act with this tool is to paste one, so an example that does not run is
 not a cosmetic defect -- it is the first impression.
 
 `domainCatalogue.test.ts` checks the examples LOOK like commands: they start
-with `simulate` or `python -m Terium.cli`, they contain a digit, they carry
+with `simulate` or `python -m caterva.cli`, they contain a digit, they carry
 no `<PLACEHOLDER>`. Every one of those passed while
 
-    python -m Terium.cli wf --n 100 --p0 0.5 --generations 200 --seed 1
+    python -m caterva.cli wf --n 100 --p0 0.5 --generations 200 --seed 1
 
 was in the file, and `--n` and `--p0` are not flags. The real ones are
 `--population-size` and `--starting-frequency`. A shape assertion cannot
@@ -21,7 +21,7 @@ THEN THE FIX BROKE A WORKING EXAMPLE
 ------------------------------------
 Reading the true flag names with
 
-    python3 -m Terium.cli ssa --help | grep -oE '\\-\\-[a-z-]+'
+    python3 -m caterva.cli ssa --help | grep -oE '\\-\\-[a-z-]+'
 
 reported `--a` and `--b`. The character class has no digits, so `--a0`
 arrived as `--a`, and a correct example was "corrected" into
@@ -38,7 +38,7 @@ does.
 
 SCOPE, STATED
 -------------
-Only the `python -m Terium.cli` examples run here. The `simulate` ones need
+Only the `python -m caterva.cli` examples run here. The `simulate` ones need
 the TypeScript CLI and a Node toolchain, cost ~15 s each through ts-node,
 and would take this guard past the per-call ceiling several times over.
 Those are covered by `documentedExamplesRun.test.ts` on the jest side.
@@ -61,7 +61,7 @@ CATALOGUE = REPO_ROOT / "src" / "cli" / "domainCatalogue.ts"
 #: `example: '...'` — single-quoted, which every entry uses.
 EXAMPLE_RE = re.compile(r"example:\s*'((?:[^'\\]|\\.)*)'", re.MULTILINE)
 
-PY_PREFIX = "python -m Terium.cli "
+PY_PREFIX = "python -m caterva.cli "
 
 
 def examples() -> list[str]:
@@ -107,7 +107,7 @@ def main() -> int:
         command = example.split("#", 1)[0].strip()
         args = command[len(PY_PREFIX):].split()
         proc = subprocess.run(
-            [sys.executable, "-m", "Terium.cli", *args],
+            [sys.executable, "-m", "caterva.cli", *args],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,

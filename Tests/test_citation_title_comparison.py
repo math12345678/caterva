@@ -2,7 +2,7 @@
 
 WHY THIS EXISTS
 ---------------
-`verify_citations_live.py` decides, for every DOI Terrium cites, whether
+`verify_citations_live.py` decides, for every DOI Caterva cites, whether
 CrossRef's registered title matches the title our own source claims. That
 comparison is the strongest citation check in the project: it is what
 distinguishes "the DOI resolves" from "the DOI is the paper we said it was",

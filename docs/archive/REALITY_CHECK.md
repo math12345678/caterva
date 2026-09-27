@@ -35,8 +35,8 @@
    - Impact factors made up
 
 2. **Network Integration** - BYPASSED
-   - `TERRIUM_SKIP_DOI_VERIFICATION=1` skips validation
-   - `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` accepts fake data
+   - `CATERVA_SKIP_DOI_VERIFICATION=1` skips validation
+   - `CATERVA_ALLOW_UNVERIFIED_CITATIONS=1` accepts fake data
    - No actual CrossRef API calls
    - No actual PubMed integration
    - No actual BRENDA database queries
@@ -48,7 +48,7 @@
    - Organism = "Homo sapiens" (guessed)
 
 4. **Simulation Engine** - DOESN'T WORK
-   - Terium spawn error
+   - Caterva spawn error
    - Python not properly configured
    - Simulation output is fake
 
@@ -65,7 +65,7 @@ FAKE VERSION (current):
 User → CLI → Validation ✓ → Literature (FAKE) ✗ → Simulation (fails) ✗
 
 REAL VERSION (needed):
-User → CLI → Validation ✓ → Literature (CrossRef API) ✓ → Simulation (Terium) ✓
+User → CLI → Validation ✓ → Literature (CrossRef API) ✓ → Simulation (Caterva) ✓
                                     ↓
                               PubMed API
                                     ↓
@@ -84,10 +84,10 @@ User → CLI → Validation ✓ → Literature (CrossRef API) ✓ → Simulation
 - ⏳ BRENDA integration (requires API key from BRENDA)
 - ⏳ NLP extraction of Km/Vmax from papers
 
-### 2. Terium Engine (NOT WORKING)
+### 2. Caterva Engine (NOT WORKING)
 - Current: Spawn error for Python
 - Needed: Proper Python environment with:
-  - Terium package
+  - Caterva package
   - libSBML
   - SBML model files
   - Proper subprocess handling
@@ -122,7 +122,7 @@ const papers = await aggregator.searchEnzymeKinetics('lactate dehydrogenase', 'l
 // Returns real papers from CrossRef + PubMed with actual DOIs
 ```
 
-**Step 2: Fix Terium Integration**
+**Step 2: Fix Caterva Integration**
 ```bash
 # Install real dependencies
 pip install libroadrunner antimony python-libsbml  # NOT `pip install tellurium` -- ADR 0001
@@ -178,7 +178,7 @@ To make this TRULY REAL requires:
    - UniProt API is free, open
    - BRENDA requires registration (~free academic)
 
-2. **Terium Setup** (1 day)
+2. **Caterva Setup** (1 day)
    - Python environment
    - SBML model library
    - Proper subprocess management
@@ -215,13 +215,13 @@ SCIENTIFIC VALIDITY: ⭐⭐☆☆☆ (not validated)
 
 This is a beautiful skeleton with no bones. It looks impressive but doesn't actually *do* anything with real data.
 
-**But the infrastructure is there.** The moment we wire it to real APIs and real Terium, it becomes legitimate.
+**But the infrastructure is there.** The moment we wire it to real APIs and real Caterva, it becomes legitimate.
 
 The question is: **Do you want me to make it REAL?**
 
 I can, in about a week of focused work:
 1. ✅ Complete real literature APIs
-2. ✅ Fix Terium engine
+2. ✅ Fix Caterva engine
 3. ✅ Extract real kinetic parameters
 4. ✅ Validate against real scientific data
 5. ✅ Run actual simulations with real data

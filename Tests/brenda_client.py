@@ -153,7 +153,7 @@ def classify_substrate(substrate_name: str) -> str:
 KM_PLAUSIBLE_MIN_MM = 0.0000001
 KM_PLAUSIBLE_MAX_MM = 1000
 
-# kcat (turnover number), s^-1. Must match Terium/core/data_structures.py
+# kcat (turnover number), s^-1. Must match caterva/core/data_structures.py
 # exactly -- ADR 0003 makes these a cross-layer contract, and
 # scripts/check_plausibility_constants.py enforces the agreement.
 #
@@ -836,7 +836,7 @@ def fetch_and_parse_brenda_kcat(
     as it governs Km (ADR 0010).
 
     Note this returns literature values; it does NOT feed the simulation
-    engine. Vmax = kcat * [E]0 needs an enzyme concentration Terrium does
+    engine. Vmax = kcat * [E]0 needs an enzyme concentration Caterva does
     not have, so kcat is deliberately absent from RESOLVABLE_FIELDS.
     See ADR 0012.
     """

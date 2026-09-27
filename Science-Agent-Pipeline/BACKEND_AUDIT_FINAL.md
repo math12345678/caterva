@@ -18,7 +18,7 @@
 **Severity:** Medium  
 **Issue:** Three domain entries (lotka_volterra, cell_cycle_oscillator, repressilator) appeared twice in the DISPATCH table, violating Python dictionary semantics.
 
-**Fix:** Removed duplicate entries in `terium_runner.py` DISPATCH.
+**Fix:** Removed duplicate entries in `caterva_runner.py` DISPATCH.
 
 ---
 
@@ -128,7 +128,7 @@ This is applied throughout: provenance violations get flagged, missing data gets
 
 - `src/lib/queryResolver.ts` — Added ODE oscillator defaults; updated parameter regex
 - `src/lib/llmResolver.ts` — Updated SUPPORTED_DOMAINS and SYSTEM_PROMPT
-- `src/lib/terium_runner.py` — Removed duplicate DISPATCH entries
+- `src/lib/caterva_runner.py` — Removed duplicate DISPATCH entries
 - `src/__tests__/llmProviders.test.ts` — Updated test RESOLVABLE_DOMAINS
 - `src/routes/index.ts` — Added metrics router wiring
 - `src/routes/metrics.ts` — Fixed endpoint paths

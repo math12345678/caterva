@@ -392,7 +392,7 @@ export async function compareModelPair(
  * is (ADR 0050): a decision reachable only through an HTTP server is a
  * decision nobody tests.
  *
- * `experimentalFinalValue` is a number the EXPERIMENTER measured. Terrium
+ * `experimentalFinalValue` is a number the EXPERIMENTER measured. Caterva
  * cannot resolve it from literature and must not invent one, so absence
  * means no ranking -- never a default. Non-finite is refused for a sharper
  * reason: `Math.abs(x - NaN)` is NaN, `.sort()` on NaN comparisons leaves

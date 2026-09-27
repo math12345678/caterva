@@ -2,9 +2,9 @@
 
 Badly named, for historical reasons: this is **not** the test suite. It is
 the code that finds real parameters in the scientific literature and decides
-whether a value is usable. The engine's tests live in `Terium/tests/`.
+whether a value is usable. The engine's tests live in `caterva/tests/`.
 
-This directory is what makes Terrium different from a solver with a
+This directory is what makes Caterva different from a solver with a
 textbook table in it.
 
 ## The resolution chain

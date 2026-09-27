@@ -1,6 +1,6 @@
-# Terrium Architecture Quick Reference
+# Caterva Architecture Quick Reference
 
-> **⚠️ CORRECTION (2026-08-10):** line numbers throughout this doc were wrong even at the commit that introduced it (files have grown since, so treat every `:NNN` reference as approximate, not exact — always grep for the symbol). One structural (not just stale) error: the Python dispatch table (§5, "Python Dispatch") is named `DISPATCHER` with type `Dict[str, Callable]` below — the real object in `Science-Agent-Pipeline/artifacts/api-server/src/lib/terium_runner.py:646` is named `DISPATCH` with type `Dict[str, str]` (maps domain name → handler function *name*, not the callable itself — dispatch resolves the string via `getattr`/lookup, it doesn't store callables directly). `DOMAIN_DEFAULTS` in `queryResolver.ts` is currently at line 513, not 236-555 as shown below (file is now 1589 lines, was shorter when this doc was written).
+> **⚠️ CORRECTION (2026-08-10):** line numbers throughout this doc were wrong even at the commit that introduced it (files have grown since, so treat every `:NNN` reference as approximate, not exact — always grep for the symbol). One structural (not just stale) error: the Python dispatch table (§5, "Python Dispatch") is named `DISPATCHER` with type `Dict[str, Callable]` below — the real object in `Science-Agent-Pipeline/artifacts/api-server/src/lib/caterva_runner.py:646` is named `DISPATCH` with type `Dict[str, str]` (maps domain name → handler function *name*, not the callable itself — dispatch resolves the string via `getattr`/lookup, it doesn't store callables directly). `DOMAIN_DEFAULTS` in `queryResolver.ts` is currently at line 513, not 236-555 as shown below (file is now 1589 lines, was shorter when this doc was written).
 
 ## File Dependency Map
 
@@ -25,15 +25,15 @@ resolveQuery() [queryResolver.ts]
     └── Returns: {domain, parameters, parameterProvenance}
         └── Passed to Python runner
     ↓
-teriumRunner.ts / terium_runner.py
-    ├── SimulationDomain type [teriumRunner.ts:8]
-    ├── DISPATCHER lookup [terium_runner.py:585-586]
+catervaRunner.ts / caterva_runner.py
+    ├── SimulationDomain type [catervaRunner.ts:8]
+    ├── DISPATCHER lookup [caterva_runner.py:585-586]
     │   ├── "mm" → run_mm()
     │   ├── "mm_competitive_inhibition" → run_mm_competitive_inhibition()
     │   └── ... (11 more)
     └── Engine simulation call
     ↓
-terium_engine module (Python)
+caterva_engine module (Python)
     └── simulate_mm_competitive_inhibition()
     ↓
 Trajectory result → Return to client
@@ -149,7 +149,7 @@ if ((best.domain === "mm" || best.domain === "mm_competitive_inhibition") &&
 ```
 
 ### 5. Python Dispatch
-**File**: `terium_runner.py`  
+**File**: `caterva_runner.py`  
 **Lines**: 585-586
 
 ```python
@@ -168,7 +168,7 @@ result = handler(params)
 ```
 
 ### 6. mm_competitive_inhibition Handler
-**File**: `terium_runner.py`  
+**File**: `caterva_runner.py`  
 **Lines**: 227-257
 
 ```python
@@ -181,7 +181,7 @@ def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
     end = float(params.get("end", 10.0))
     points = int(params.get("points", 51))
 
-    result = terium_engine.simulate_mm_competitive_inhibition(
+    result = caterva_engine.simulate_mm_competitive_inhibition(
         km=km, vmax=vmax, ki=ki, s0=s0, i=i0, end=end, points=points
     )
 
@@ -267,7 +267,7 @@ Query: "simulate competitive inhibition km=2 vmax=5"
 
 ### Adding a New Domain
 
-1. **Add to type** (teriumRunner.ts:8)
+1. **Add to type** (catervaRunner.ts:8)
    ```typescript
    export type SimulationDomain = "mm" | "mm_competitive_inhibition" | ... | "new_domain";
    ```
@@ -302,7 +302,7 @@ Query: "simulate competitive inhibition km=2 vmax=5"
    new_domain: ["param1", "param2"],
    ```
 
-7. **Implement Python handler** (terium_runner.py)
+7. **Implement Python handler** (caterva_runner.py)
    ```python
    def run_new_domain(params):
        # Extract and validate
@@ -312,7 +312,7 @@ Query: "simulate competitive inhibition km=2 vmax=5"
    DISPATCHER["new_domain"] = run_new_domain
    ```
 
-8. **Implement engine** (terium_engine module)
+8. **Implement engine** (caterva_engine module)
    ```python
    def simulate_new_domain(...):
        # Simulation logic

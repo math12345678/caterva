@@ -18,7 +18,7 @@ It is not used to run the model.
 ```ts
 private async runSimulation(parameters, conditions) {
   ...
-  const result = await runTerium('mm', engineParameters, {
+  const result = await runCaterva('mm', engineParameters, {
     required: ['km', 'vmax', 's0']
   });
 ```
@@ -82,7 +82,7 @@ is actually chosen.
 
    > This pipeline classified your query as 'sir' and cannot run it over
    > HTTP: only mm is dispatched here today. The engine does implement sir,
-   > and it is reachable from the CLI — see `scientific domains`. Terrium
+   > and it is reachable from the CLI — see `scientific domains`. Caterva
    > will not substitute a model you did not ask for.
 
 3. **`DISPATCHABLE_DOMAINS`** as a separate list from `DOMAINS`, not a flag

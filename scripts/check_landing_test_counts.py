@@ -3,7 +3,7 @@
 
 WHAT THIS COMES FROM
 --------------------
-`Science-Agent-Pipeline/artifacts/terrium-landing/src/lib/testResults.ts`
+`Science-Agent-Pipeline/artifacts/caterva-landing/src/lib/testResults.ts`
 feeds the "N tests passing" figure in the hero, the metrics bar and the
 trust section. Its own header says:
 
@@ -57,7 +57,7 @@ TEST_RESULTS = (
     REPO_ROOT
     / "Science-Agent-Pipeline"
     / "artifacts"
-    / "terrium-landing"
+    / "caterva-landing"
     / "src"
     / "lib"
     / "testResults.ts"
@@ -67,7 +67,7 @@ TEST_RESULTS = (
 # workingDirectory. Keyed by the exact string in testResults.ts so a
 # renamed directory fails loudly here rather than being skipped silently.
 SUITES: Dict[str, Dict[str, object]] = {
-    "Terium/": {
+    "caterva/": {
         "glob": "tests/test_*.py",
         "run": ["python3", "-m", "pytest", "-q"],
     },
@@ -82,7 +82,7 @@ SUITES: Dict[str, Dict[str, object]] = {
         "glob": "src/**/*.test.ts",
         "run": ["npx", "vitest", "run"],
     },
-    "Science-Agent-Pipeline/artifacts/terrium-landing/": {
+    "Science-Agent-Pipeline/artifacts/caterva-landing/": {
         "glob": "src/**/*.test.tsx",
         "run": ["npx", "vitest", "run"],
     },
@@ -285,7 +285,7 @@ def main() -> int:
             print(f"  - {f}", file=sys.stderr)
         print(
             "\nRe-run the affected suite and paste the real numbers into\n"
-            "  Science-Agent-Pipeline/artifacts/terrium-landing/src/lib/testResults.ts\n"
+            "  Science-Agent-Pipeline/artifacts/caterva-landing/src/lib/testResults.ts\n"
             "This figure is displayed in the hero, the metrics bar and the\n"
             "trust section, on a page whose claim is that every number is\n"
             "verifiable.",

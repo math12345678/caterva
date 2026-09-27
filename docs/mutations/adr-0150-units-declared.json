@@ -7,14 +7,14 @@
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0150-units-declared.json"
   ],
-  "test": "cd Terium && python3 -m pytest tests/test_sbml_units.py --no-header -p no:cacheprovider",
+  "test": "cd Caterva && python3 -m pytest tests/test_sbml_units.py --no-header -p no:cacheprovider",
   "mutations": [
     {
       "id": "U1",
       "description": "the kinetic law is no longer multiplied by the compartment",
       "_claimed": "caught by the consistency tests (the law's units revert to concentration/time)",
       "_note": "This is the dimensional half of the fix: without the wrap, the math is concentration/time where SBML defines a rate as substance/time, and only the 1-litre compartment hid it. The equivalence test must KEEP passing under this mutation (removing the x1.0 changes no number) -- what catches it is the declared file no longer reaching 0 problems.",
-      "file": "Terium/core/sbml_units.py",
+      "file": "caterva/core/sbml_units.py",
       "find": "        times.addChild(law.getMath().deepCopy())\n        times.addChild(compartment_ref)",
       "replace": "        times = law.getMath().deepCopy()"
     },
@@ -23,7 +23,7 @@
       "description": "a missing parameter unit is silently tolerated instead of refused",
       "_claimed": "caught by the completeness and byte-identical refusal tests",
       "_note": "The all-or-nothing contract: a file with three declared parameters and one bare number reads as checked and is not.",
-      "file": "Terium/core/sbml_units.py",
+      "file": "caterva/core/sbml_units.py",
       "find": "    for symbol in sorted(model_parameters - set(parameter_units)):",
       "replace": "    for symbol in sorted(set()):"
     },
@@ -32,7 +32,7 @@
       "description": "the wrong scale is written for every concentration (uM where mM was stated)",
       "_claimed": "caught by nothing that inspects the number -- see note",
       "_note": "Deliberately included although libSBML CANNOT catch it: unit CONSISTENCY is dimension checking, and 10^-3 vs 10^-6 mole are the same dimension. The test that catches it asserts the written scale attribute matches the stated unit. If this comes back NOT CAUGHT the suite has lost its only defence against a plausible-looking wrong declaration. First find-string targeted a line from an earlier revision of the module (this file was co-authored live by two agents and the line moved into _scale_for); the harness returned INDETERMINATE rather than grading an unmutated tree, which is the third time this session it has been right about one of these.",
-      "file": "Terium/core/sbml_units.py",
+      "file": "caterva/core/sbml_units.py",
       "find": "def _scale_for(unit: str) -> int | None:\n    return _CONCENTRATION_SCALE.get(_normalise(unit))",
       "replace": "def _scale_for(unit: str) -> int | None:\n    return -6 if _CONCENTRATION_SCALE.get(_normalise(unit)) is not None else None"
     },

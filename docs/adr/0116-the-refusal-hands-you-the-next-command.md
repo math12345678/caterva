@@ -12,7 +12,7 @@ none), ADR 0077 (`--json` is one document)
 
 ## What was found
 
-Terrium was used the way a student uses it, from a standing start:
+Caterva was used the way a student uses it, from a standing start:
 
 ```
 $ simulate "lactate dehydrogenase"
@@ -64,7 +64,7 @@ responses and the old output made them look identical:
 | `literature` | `km`, `vmax`, `ki` — a measured quantity | cite a source, or widen the search |
 
 That distinction is the substance. Telling a student "vmax is unresolved"
-and "s0 is unresolved" in the same list implies both are gaps in Terrium's
+and "s0 is unresolved" in the same list implies both are gaps in Caterva's
 coverage. One is. The other is a value that is *theirs to pick*, and saying
 so converts a dead end into a decision they are qualified to make.
 
@@ -74,7 +74,7 @@ needs it:
 
 ```
 --cite vmax="Smith 2019, PMID 12345"
-  Terrium does not verify the source; it records that you supplied it.
+  Caterva does not verify the source; it records that you supplied it.
 ```
 
 That is the answer to Sauro. The student who was going to paste a number

@@ -27,7 +27,7 @@ It does NOT claim to be a rigorous performance benchmark:
 
 Those are real limitations and are stated here rather than implied away. The
 honest use of this file is *relative*: "did this change make the SSA path
-slower", not "Terrium runs SIR in 23 ms".
+slower", not "Caterva runs SIR in 23 ms".
 
 Usage:
     python benchmark_results/run_benchmarks.py            # rewrite both files
@@ -49,7 +49,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from Terium import terium_engine as te  # noqa: E402
+from caterva import caterva_engine as te  # noqa: E402
 
 #: domain -> {size: kwargs}. Every parameter is supplied explicitly: the
 #: engine refuses to default an experimental condition (ADR 0012/0013), and

@@ -116,12 +116,12 @@ src/web/server.ts (+80 LOC)
 
 src/web/metrics-exporter.ts (+45 LOC)
 ├─ Import sweep-batch-metrics module
-├─ Export terrium_sweeps_total
-├─ Export terrium_sweep_avg_success_rate
-├─ Export terrium_sweep_avg_execution_time_ms
-├─ Export terrium_batches_total
-├─ Export terrium_batch_avg_success_rate
-└─ Export terrium_batch_avg_execution_time_ms
+├─ Export caterva_sweeps_total
+├─ Export caterva_sweep_avg_success_rate
+├─ Export caterva_sweep_avg_execution_time_ms
+├─ Export caterva_batches_total
+├─ Export caterva_batch_avg_success_rate
+└─ Export caterva_batch_avg_execution_time_ms
 
 openapi.yaml (+1 line)
 └─ Added Metrics tag to API specification
@@ -196,12 +196,12 @@ Backward Compatibility:        ✓ VERIFIED
 ### Prometheus Metrics Available
 
 ```prometheus
-terrium_sweeps_total
-terrium_sweep_avg_success_rate
-terrium_sweep_avg_execution_time_ms
-terrium_batches_total
-terrium_batch_avg_success_rate
-terrium_batch_avg_execution_time_ms
+caterva_sweeps_total
+caterva_sweep_avg_success_rate
+caterva_sweep_avg_execution_time_ms
+caterva_batches_total
+caterva_batch_avg_success_rate
+caterva_batch_avg_execution_time_ms
 ```
 
 ### Scrape Configuration
@@ -211,7 +211,7 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'terrium'
+  - job_name: 'caterva'
     static_configs:
       - targets: ['localhost:3000']
 ```
@@ -271,7 +271,7 @@ Grafana visualizes trends
 
 - [METRICS.md](./METRICS.md) — Core metrics collector system
 - [MONITORING.md](./MONITORING.md) — Prometheus & Grafana setup
-- [START_HERE.md](./START_HERE.md) — Terrium project overview
+- [START_HERE.md](./START_HERE.md) — Caterva project overview
 
 ---
 

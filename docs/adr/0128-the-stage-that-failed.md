@@ -24,7 +24,7 @@ that happened two steps earlier.
 That is worse than a vague message. A vague one leaves a reader looking; a
 wrong one sends them away — to hunt for a substrate-name problem, a rare
 organism, a gap in BRENDA's coverage — when what actually happened is that
-Terrium could not tell which enzyme they meant.
+Caterva could not tell which enzyme they meant.
 
 The three stages send a reader to three different fixes:
 

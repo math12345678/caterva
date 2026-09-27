@@ -241,7 +241,7 @@ curl -X POST http://localhost:3000/api/simulate \
 **After:**
 ```bash
 # Option 1: Use generated SDK
-npm install ./clients/terrium-ts
+npm install ./clients/caterva-ts
 # Then use with full type safety
 
 # Option 2: Import Postman collection

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Terrium Build Verification Script.
+Caterva Build Verification Script.
 
 Comprehensive build verification that runs all static analysis guards
 and test suites to ensure the codebase is in a deployable state.
@@ -36,10 +36,10 @@ SCRIPTS_DIR = REPO_ROOT / "scripts"
 API_SERVER_DIR = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-server"
 
 #: The simulation engine package. One `r` -- the importable package is
-#: `Terium`, the product is `Terrium` (there is a whole guard about that).
+#: `caterva`, the product is `Caterva` (there is a whole guard about that).
 #:
 #: This constant did not exist. `run_python_tests()` referenced it twice and
-#: raised `NameError: name 'TERIUM_DIR' is not defined` on the first line
+#: raised `NameError: name 'CATERVA_DIR' is not defined` on the first line
 #: that touched it -- so the non-`--quick` path of THIS SCRIPT crashed before
 #: running a single Python test, and every check sequenced after it never
 #: ran either.
@@ -48,7 +48,7 @@ API_SERVER_DIR = REPO_ROOT / "Science-Agent-Pipeline" / "artifacts" / "api-serve
 #: rule families selected and is executed by nothing: not CI, not the
 #: Makefile, not this file. F821 (undefined-name) finds it in under a second.
 #: A linter that is configured and never run reads as coverage and is not.
-TERIUM_DIR = REPO_ROOT / "Terium"
+CATERVA_DIR = REPO_ROOT / "caterva"
 
 
 #: The interpreter running THIS script, quoted for the shell.
@@ -281,8 +281,8 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_split_repo_legal_files.py'}"
     ))
 
-    # Every shipping surface says Terrium is not affiliated with Tellurium.
-    # Not a licensing problem -- libRoadRunner is Apache 2.0 and Terrium is a
+    # Every shipping surface says Caterva is not affiliated with Tellurium.
+    # Not a licensing problem -- libRoadRunner is Apache 2.0 and Caterva is a
     # legitimate consumer of it -- but a naming one. Matthias König (HU
     # Berlin) read a cold outreach email as a false claim of credit for the
     # Sauro lab's work, and a disclaimer that exists on one surface while the
@@ -304,8 +304,8 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_documented_citations_are_real.py'}"
     ))
 
-    # The importable package is `Terium` (one r); the product is `Terrium`
-    # (two). `import Terrium` is always a ModuleNotFoundError, and a newcomer
+    # The importable package is `caterva` (one r); the product is `Caterva`
+    # (two). `import Caterva` is always a ModuleNotFoundError, and a newcomer
     # who hits it concludes their environment is broken -- then runs
     # `make doctor`, which reports a healthy install.
     guards.append(run_guard(
@@ -343,7 +343,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         timeout=180,
     ))
 
-    # Publishing a build artifact changes Terrium's licence obligations.
+    # Publishing a build artifact changes Caterva's licence obligations.
     # The compliance position today rests on a fact nobody was watching:
     # nothing in CI publishes anything, so the LGPL (python-libsbml) and GPL
     # (stdpopsim, opt-in) terms impose nothing. A legal position that depends
@@ -360,7 +360,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     # Every relative link in a contributor doc resolves. START_HERE.md is
     # the first thing a newcomer reads and is almost entirely links; a dead
     # one tells them the project's claims about checking things are
-    # decoration. Written after Terium/README.md shipped a confident,
+    # decoration. Written after caterva/README.md shipped a confident,
     # plausible, wrong path to ADR 0001.
     guards.append(run_guard(
         "Doc Links Guard (self-check)",
@@ -413,7 +413,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     ))
 
     # Every constraint an agent critic can raise must be honoured by some
-    # agent. Added 2026-09-07 with Terium/agents.
+    # agent. Added 2026-09-07 with caterva/agents.
     #
     # The failure it catches is silent by construction. A critic that emits
     # a constraint kind nothing reads still changes the fingerprint, still
@@ -480,7 +480,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
 
     # Rule 7 (never `pip install tellurium`) made executable. It was one of
     # the nine non-negotiable rules, had ADR 0001 behind it, and adding
-    # terium to requirements.txt passed every guard in the repo.
+    # caterva to requirements.txt passed every guard in the repo.
     guards.append(run_guard(
         "Constitution Rules 7+8 Guard",
         f"{PYTHON} {SCRIPTS_DIR / 'check_forbidden_packages.py'}"
@@ -509,7 +509,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
         f"{PYTHON} {SCRIPTS_DIR / 'check_runner_boundary.py'}"
     ))
 
-    # How much of BRENDA's commentary Terrium can actually read.
+    # How much of BRENDA's commentary Caterva can actually read.
     #
     # Not a correctness check -- a coverage measurement. It exists because a
     # parser that ignores text does not report how much it ignored, and two
@@ -565,7 +565,7 @@ def run_python_guards() -> List[Tuple[str, bool, str]]:
     #
     # check_license_consistency.py: LICENSE, CITATION.cff and package.json
     #   drifted to three different licences (LICENSE said "all rights
-    #   reserved", CITATION.cff said LicenseRef-Terrium-Proprietary,
+    #   reserved", CITATION.cff said LicenseRef-Caterva-Proprietary,
     #   package.json said MIT) and nothing read more than one of them at
     #   once. A project about provenance must agree about its own terms.
     guards.append(run_guard(
@@ -934,7 +934,7 @@ def run_vacuous_test_guard() -> List[Tuple[str, bool, str]]:
             timeout=120,
         ),
         # ruff is configured in pyproject.toml with forty-odd rule families
-        # and was executed by NOTHING. F821 found `TERIUM_DIR` undefined in
+        # and was executed by NOTHING. F821 found `CATERVA_DIR` undefined in
         # THIS FILE -- so the non-`--quick` path crashed with a NameError
         # before running a single Python test, and every check after it
         # never ran. A linter configured and never invoked reads as coverage
@@ -1016,7 +1016,7 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
             run_guard(
                 f"Python Test: {test_file}",
                 f"{PYTHON} -m pytest {test_file} -v",
-                cwd=TERIUM_DIR
+                cwd=CATERVA_DIR
             )
             for test_file in test_files
         )
@@ -1025,7 +1025,7 @@ def run_python_tests(quick: bool = False) -> List[Tuple[str, bool, str]]:
         tests.append(run_guard(
             "Python All Tests",
             "python -m pytest tests/ -x --tb=short",
-            cwd=TERIUM_DIR,
+            cwd=CATERVA_DIR,
             timeout=600  # 10 minutes for full test suite
         ))
     
@@ -1110,7 +1110,7 @@ def main() -> int:
     import argparse
     
     parser = argparse.ArgumentParser(
-        description="Terrium Build Verification Script"
+        description="Caterva Build Verification Script"
     )
     parser.add_argument(
         "--quick",
@@ -1136,7 +1136,7 @@ def main() -> int:
     args = parser.parse_args()
     
     print("=" * 60)
-    print("TERRIUM BUILD VERIFICATION")
+    print("CATERVA BUILD VERIFICATION")
     print("=" * 60)
     
     start_time = time.time()

@@ -21,7 +21,7 @@ mechanism as well as a policy:
 
     "...and write a warning comment in the antimony file you generate."
 
-Terrium generated Antimony and never handed it to anyone, so there was
+Caterva generated Antimony and never handed it to anyone, so there was
 nowhere for that comment to live. This is the export that gives it one. The
 resulting file is loadable by Tellurium, libRoadRunner, COPASI or anything
 else that reads Antimony — and it carries, in comments, where every number
@@ -40,7 +40,7 @@ import sys
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from Terium.core.model_provenance import (  # noqa: E402
+from caterva.core.model_provenance import (  # noqa: E402
     ParameterProvenance,
     annotate_antimony,
     unsourced_parameters,
@@ -129,7 +129,7 @@ def build(payload: dict) -> tuple[int, str]:
             "Nothing is defaulted here."
         )
 
-    from Terium.continuous import model_building
+    from caterva.continuous import model_building
 
     builder = getattr(model_building, builder_name)
     try:
@@ -149,7 +149,7 @@ def build(payload: dict) -> tuple[int, str]:
     # unsourced measurement.
     structural: dict[str, ParameterProvenance] = {}
     argument_symbols = {SYMBOLS.get(name, name).lower() for name in required}
-    from Terium.core.model_provenance import parameters_in
+    from caterva.core.model_provenance import parameters_in
 
     for symbol in parameters_in(antimony_text):
         if symbol.lower() not in argument_symbols:
@@ -211,8 +211,8 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
     if code != 0:
         return code, antimony_or_error, {}
 
-    from Terium.core.model_provenance import strip_annotations
-    from Terium.core.sbml_provenance import SbmlParameterProvenance, annotate_sbml
+    from caterva.core.model_provenance import strip_annotations
+    from caterva.core.sbml_provenance import SbmlParameterProvenance, annotate_sbml
 
     import antimony as antimony_lib
 
@@ -272,7 +272,7 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
     # carries is the TIME base of the system; the declarations hard-code
     # per-second rates, so any other base refuses here, before the call,
     # rather than being reinterpreted inside it.
-    from Terium.core.sbml_units import UnitsOutcome, declare_units
+    from caterva.core.sbml_units import UnitsOutcome, declare_units
 
     # ---- units, before annotation (ADR 0150's claimed and missing work).
     #
@@ -360,7 +360,7 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
     if code != 0:
         return code, b"", {"error": sbml_text}
 
-    from Terium.core.combine_archive import (
+    from caterva.core.combine_archive import (
         BIBTEX,
         CFF,
         SBML_L3V2,
@@ -377,7 +377,7 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
         return 1, b"", {
             "error": (
                 "A COMBINE archive needs the time course that was run "
-                "(endTime, points). Terrium will not guess them: the archive's "
+                "(endTime, points). Caterva will not guess them: the archive's "
                 "whole purpose is that someone else re-runs the SAME experiment."
             )
         }
@@ -386,7 +386,7 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
     # `["S", "P"]`, which is right for Michaelis-Menten and silently wrong
     # for a competitively-inhibited model, whose inhibitor would be missing
     # from the report of the very experiment it was the point of.
-    from Terium.core.combine_archive import recorded_quantities
+    from caterva.core.combine_archive import recorded_quantities
 
     # Everything that VARIES, not just the species. Identical output for
     # every domain today; the difference appears the day a model gains a
@@ -403,7 +403,7 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
 
     sedml_text, sedml_errors = build_sedml(
         model_location="model.xml",
-        model_id="terrium_model",
+        model_id="caterva_model",
         end_time=float(end_time),
         points=int(points),
         recorded=recorded,
@@ -414,7 +414,7 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
     # points at nothing passes validation, opens fine, and produces a report
     # of empty columns. Checked here, at the one place both halves exist.
     if not sedml_errors:
-        from Terium.core.combine_archive import resolve_targets
+        from caterva.core.combine_archive import resolve_targets
 
         resolution = resolve_targets(sbml_text, sedml_text)
         if not resolution.ok:
@@ -460,7 +460,7 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
     # Katz's objection was that per-constant citation is confusing; the
     # deeper half of his field's answer (FORCE11 Software Citation
     # Principles, Smith et al. 2016) is that the software producing a result
-    # is itself citable and usually goes uncited. Terrium exported a
+    # is itself citable and usually goes uncited. Caterva exported a
     # bibliography of everyone else's measurements and no way to cite the
     # thing that assembled them.
     #
@@ -471,7 +471,7 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
     if citation_cff.exists():
         files["CITATION.cff"] = (
             citation_cff.read_text(encoding="utf-8"),
-            ArchiveEntry("CITATION.cff", CFF, description="how to cite Terrium itself"),
+            ArchiveEntry("CITATION.cff", CFF, description="how to cite Caterva itself"),
         )
 
     import tempfile

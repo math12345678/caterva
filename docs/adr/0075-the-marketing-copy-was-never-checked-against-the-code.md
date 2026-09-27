@@ -21,10 +21,10 @@ actually reads. Four claims had drifted:
 | --- | --- |
 | "rk4 (adaptive)" in the terminal panel | `simulate.ts` uses `h = dt / substeps` with a constant 200 substeps, no error estimate, no step rejection. Fixed-step. |
 | "304+ tests and counting" | 1,113 engine + 714 literature |
-| "Planned: PCR, Monte Carlo, population genetics, molecular dynamics" | all four ship in `Terium/discrete/` |
+| "Planned: PCR, Monte Carlo, population genetics, molecular dynamics" | all four ship in `caterva/discrete/` |
 | "validated ... to 1e-10 tolerance" | tolerances range from 1e-10 on analytic cases to 1e-4 where a stochastic method makes tighter meaningless |
 
-**Only one of the four flattered the product.** Three made Terrium look
+**Only one of the four flattered the product.** Three made Caterva look
 worse than it is — a five-times understated test count, four shipped
 domains advertised as unbuilt. That is the finding worth keeping: this is
 not a check against exaggeration, it is a check against *unverified*

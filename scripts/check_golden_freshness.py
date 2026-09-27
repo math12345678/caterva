@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""How old is Terrium's ground truth?
+"""How old is Caterva's ground truth?
 
 WHAT THIS CHECKS, AND WHAT IT DOES NOT
 --------------------------------------
@@ -15,7 +15,7 @@ decade.
 
 WHY IT EXISTS
 -------------
-`Tests/test_golden_set.py` is where every claim Terrium makes about
+`Tests/test_golden_set.py` is where every claim Caterva makes about
 resolving real literature values bottoms out. Those assertions compare the
 resolver against a FIXTURE -- a photograph of BRENDA taken in July 2026.
 
@@ -196,7 +196,7 @@ def main() -> int:
             "today and reports matched, drifted, or could-not-check. "
             "Re-capture the fixtures for anything that drifted, then update "
             "verified_on.\n\n"
-            "Every claim Terrium makes about resolving real values rests on "
+            "Every claim Caterva makes about resolving real values rests on "
             "these numbers, and right now nobody has confirmed them in over "
             "a year."
         )

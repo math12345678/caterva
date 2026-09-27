@@ -13,7 +13,7 @@
  * Both are advertised in `help`. The simulation itself prints
  * "Saved. Re-check it later with: scientific check-integrity <jobId>" — a
  * promise the tool could not keep. And `history` persists to
- * `~/.terrium/history.json` and lists those same ids, its help text reading:
+ * `~/.caterva/history.json` and lists those same ids, its help text reading:
  * "The run id printed at the end of a simulation is only useful if something
  * can resolve it later; this is that something." So the tool printed an id,
  * listed it, and then denied it existed.
@@ -44,7 +44,7 @@ const OUTPUT = { trajectory: [{ time: 0, value: 10 }, { time: 1, value: 5.14 }] 
 
 beforeEach(() => {
   originalHome = process.env['HOME'];
-  home = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-home-'));
+  home = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-home-'));
   process.env['HOME'] = home;
 });
 
@@ -156,7 +156,7 @@ describe('persistence never turns a good run into a failed one', () => {
 
     // Nothing was written — the failure was real, not swallowed silently by
     // a path that happened to work.
-    expect(fs.existsSync(path.join(blocker, '.terrium'))).toBe(false);
+    expect(fs.existsSync(path.join(blocker, '.caterva'))).toBe(false);
 
     // Still usable within this process, which is what the caller needs now.
     expect(service.getRecord('job_eps')).toBeDefined();

@@ -490,17 +490,17 @@ HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*)")
 DOC_MENTION_RE = re.compile(r"(/api/[A-Za-z0-9_/:$.*<>{}-]*)")
 
 
-#: Ports the Terrium HTTP servers listen on. A `/api/...` path preceded by an
+#: Ports the Caterva HTTP servers listen on. A `/api/...` path preceded by an
 #: explicit host on any OTHER port is addressed at a different service and
-#: says nothing about Terrium's route table.
+#: says nothing about Caterva's route table.
 #:
 #: This exists because the guard reported seven confident failures in
 #: MONITORING_SETUP.md for lines like
 #:
-#:     curl http://localhost:9090/api/v1/query?query=terrium_success_rate
+#:     curl http://localhost:9090/api/v1/query?query=caterva_success_rate
 #:
 #: which is Prometheus's own HTTP API, correctly documented, on Prometheus's
-#: own port -- sitting two lines above a genuine Terrium example, in a file
+#: own port -- sitting two lines above a genuine Caterva example, in a file
 #: whose whole subject is wiring the two together.
 #:
 #: False POSITIVES are the dangerous direction for a guard. A red build
@@ -509,7 +509,7 @@ DOC_MENTION_RE = re.compile(r"(/api/[A-Za-z0-9_/:$.*<>{}-]*)")
 #: accusations once by parsing half the route table (see docs/API.md); this
 #: is the same failure with a different cause, so it gets a named rule
 #: rather than an entry in an ignore list.
-TERRIUM_PORTS = {"3000", "3001", "8080"}
+CATERVA_PORTS = {"3000", "3001", "8080"}
 
 _HOSTED_MENTION_RE = re.compile(
     r"https?://[A-Za-z0-9_.:-]*?:(\d+)(?=/api/)"
@@ -517,11 +517,11 @@ _HOSTED_MENTION_RE = re.compile(
 
 
 def _foreign_service_ports(line: str) -> set[str]:
-    """Non-Terrium ports that appear immediately before an `/api/` path."""
+    """Non-Caterva ports that appear immediately before an `/api/` path."""
     return {
         port
         for port in _HOSTED_MENTION_RE.findall(line)
-        if port not in TERRIUM_PORTS
+        if port not in CATERVA_PORTS
     }
 
 
@@ -537,7 +537,7 @@ def _foreign_service_ports(line: str) -> set[str]:
 #:
 #: Third false-positive class found in this guard. All three shared a shape:
 #: the parser recognised a `/api/...` string and assumed the surrounding
-#: context was a claim about Terrium's routes. The context is what
+#: context was a claim about Caterva's routes. The context is what
 #: distinguishes a claim from a mention, and this guard now reads three
 #: kinds of it -- foreign host, JSON value position, and code-span wildcard.
 _JSON_VALUE_MENTION_RE = re.compile(

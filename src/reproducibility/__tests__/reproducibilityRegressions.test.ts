@@ -300,7 +300,7 @@ describe('a genuine reproduction still passes', () => {
     // Tolerance is `atol + rtol*|original|` read from the record's own
     // solver block, not a constant in the verifier.
     //
-    // The record now declares what Terrium actually integrates at --
+    // The record now declares what Caterva actually integrates at --
     // CVODE, rtol 1e-10, atol 1e-12 -- so at value 100 the allowance is
     // 1e-12 + 1e-8 = 1.000001e-8.
     //
@@ -367,7 +367,7 @@ describe('a genuine reproduction still passes', () => {
  * The record must describe the run, not a solver nobody uses.
  *
  * `createRecord` hardcoded `algorithm: 'RK45'` at rtol 1e-6 / atol 1e-8.
- * Terrium integrates with **CVODE** at 1e-10 / 1e-12
+ * Caterva integrates with **CVODE** at 1e-10 / 1e-12
  * (`DEFAULT_RELATIVE_TOLERANCE` / `DEFAULT_ABSOLUTE_TOLERANCE`).
  *
  * That was not a cosmetic mislabel. `verifyReproducibility` calibrates its

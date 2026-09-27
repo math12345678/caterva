@@ -54,7 +54,7 @@ for 25 results rather than 1 — the same single request, a larger page.
 `catalog --enzyme NAME` uses it and **refuses to pick**:
 
 > 'lactate dehydrogenase' names more than one enzyme: 1.1.1.27, 1.1.1.28.
-> These are different proteins, so Terrium will not pick one for you — a
+> These are different proteins, so Caterva will not pick one for you — a
 > wrong EC number is a citation for the wrong enzyme, not merely a wrong
 > value. Re-run with the one you meant.
 

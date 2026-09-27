@@ -19,7 +19,7 @@
 > the actual `docs/adr/` files.
 
 **Purpose:** Document significant architectural decisions, rationale, and trade-offs  
-**Scope:** Terrium backend code quality refactoring  
+**Scope:** Caterva backend code quality refactoring  
 **Date:** 2026-08-09  
 
 ---

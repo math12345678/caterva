@@ -1,4 +1,4 @@
-"""Python-support-window guard for Terrium.
+"""Python-support-window guard for Caterva.
 
 Verifies that the interpreter range the project claims to support is
 consistent across every file that states it, and that the pinned dependencies

@@ -10,7 +10,7 @@
 # (out of scope for this spec file to fix), not an error in this spec.
 openapi: 3.0.0
 info:
-  title: Terrium Scientific Simulation API
+  title: Caterva Scientific Simulation API
   description: |
     REST API for enzyme kinetics simulations, parameter sweeps, batch processing, and comparative analysis.
 
@@ -21,7 +21,7 @@ info:
     Check which server you're targeting — wrong choice produces 404s.
   version: 1.0.0
   contact:
-    name: Terrium Team
+    name: Caterva Team
     url: https://github.com/Terrium-sim
   license:
     name: MIT
@@ -29,9 +29,9 @@ info:
 servers:
   - url: http://localhost:3000
     description: Local development
-  - url: https://api.terrium.example.com
+  - url: https://api.caterva.example.com
     description: Production
-  - url: http://terrium:3000
+  - url: http://caterva:3000
     description: Docker container
 
 tags:

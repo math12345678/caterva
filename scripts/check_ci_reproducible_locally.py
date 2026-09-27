@@ -8,7 +8,7 @@ CONTRIBUTING.md said, and still says, the right thing:
     Run `make test` before opening the PR, not just after CI catches it.
     CI is the backstop, not the first line of defense.
 
-`make test` runs two commands: pytest in Terium/ and pytest in Tests/.
+`make test` runs two commands: pytest in caterva/ and pytest in Tests/.
 The `test` job in .github/workflows/tests.yml runs eleven, of which those
 two are the ninth and tenth. The other nine are guards -- citation format,
 documented counts, the Python-support claim, forbidden packages, guard
@@ -276,8 +276,8 @@ def _normalise(cmd: str) -> str:
     c = re.sub(r'"?\$[({][A-Za-z_]+[)}]"?', "python", c)
     c = re.sub(r"\bpython3(\.\d+)?\b", "python", c)
     c = re.sub(r"\s+", " ", c)
-    # `cd Terium && python -m pytest` in a recipe and `python -m pytest` under
-    # `working-directory: Terium` in CI are the same command run in the same
+    # `cd Caterva && python -m pytest` in a recipe and `python -m pytest` under
+    # `working-directory: Caterva` in CI are the same command run in the same
     # place, spelled by the two systems' different conventions.
     c = re.sub(r"^cd [A-Za-z0-9_./-]+ && ", "", c)
     # -v changes what is printed, not what is checked.

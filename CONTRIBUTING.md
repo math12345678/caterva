@@ -1,4 +1,4 @@
-# Contributing to Terrium
+# Contributing to Caterva
 
 > **New here? Read [START_HERE.md](START_HERE.md) first.** It is one page and
 > gets you to a passing test run and a real first task. This file is the
@@ -6,14 +6,14 @@
 > not the way in.
 
 This project is pre-launch and the team is small (currently two confirmed
-people, one backend/infra role still open -- see `Business/CAP_TABLE.md`),
+people, one backend/infra role still open),
 so this document is written for that scale, not for a large open-source
 project with a governance process. It'll need to grow as the team does.
 
 ## What your contribution arrives under
 
 You keep your copyright. Opening a pull request licenses that contribution
-under **Apache-2.0**, the same licence Terrium ships under — Apache-2.0 §5
+under **Apache-2.0**, the same licence Caterva ships under — Apache-2.0 §5
 says so, which is why there is no CLA to sign and nothing to assign.
 
 Sign your commits with `git commit -s` ([DCO](https://developercertificate.org/)).
@@ -28,16 +28,16 @@ to discover late.
 
 ## One thing to get right before you describe this project anywhere
 
-**Terrium is not Tellurium, and please do not write that it is.**
+**Caterva is not Tellurium, and please do not write that it is.**
 
 [Tellurium](https://tellurium.analogmachine.org/) is an established
 systems-biology environment from Herbert Sauro's lab at the University of
-Washington. Terrium is unaffiliated with it, is not a fork of it, and does
+Washington. Caterva is unaffiliated with it, is not a fork of it, and does
 not depend on the `tellurium` package — a prohibition made executable by
 `scripts/check_forbidden_packages.py`, which fails the build if anyone adds
 it.
 
-The confusion is easy to fall into, because Terrium **does** use
+The confusion is easy to fall into, because Caterva **does** use
 `libroadrunner` and `antimony`, and those come from the same lab. Using them
 is ordinary — they are separately licensed open-source libraries, consumed
 through their public APIs, exactly as they are meant to be. But *using a
@@ -47,13 +47,13 @@ one letter apart makes that distinction easy to lose.
 This is not pedantry. A cold email from this project has already been read
 by a researcher as a false claim of credit, and that was a fair reading of
 what was sent. If you write a README line, a blog post, a conference
-abstract or a grant application that mentions Terrium, please keep the
+abstract or a grant application that mentions Caterva, please keep the
 distinction explicit.
 
 `scripts/check_non_affiliation_notice.py` checks the disclaimer is still
 present on every shipping surface; `scripts/check_no_tellurium_integration_claims.py`
 checks no document claims the opposite. Background:
-`Business/LEGAL_BRIEF_NAMING.md`.
+the maintainers' private LEGAL_BRIEF_NAMING notes.
 
 ## Before you start
 
@@ -71,8 +71,8 @@ comfortable with:
 make setup && make check && make test
 
 # Option 2: container (no local Python needed)
-docker build -f .devcontainer/Dockerfile -t terrium-sandbox . \
-  && docker run -it --rm terrium-sandbox
+docker build -f .devcontainer/Dockerfile -t caterva-sandbox . \
+  && docker run -it --rm caterva-sandbox
 ```
 
 The `-f` is not optional. The Dockerfile at the repository root builds the
@@ -110,7 +110,7 @@ defect.
 py -3.13 -m venv .venv
 .venv\Scripts\pip install -r requirements-dev.txt
 .venv\Scripts\python scripts\check_env.py
-.venv\Scripts\python -m pytest Terium/tests Tests -q
+.venv\Scripts\python -m pytest caterva/tests Tests -q
 ```
 
 ## The standard this codebase holds itself to
@@ -119,13 +119,13 @@ This is the part that matters most, more than any specific style rule:
 
 **Every numerical claim gets checked against something that isn't the
 solver checking itself.** That means one of:
-- an exact closed-form solution (see `Terium/tests/test_kinetics_correctness.py`,
-  `Terium/tests/test_pcr_correctness.py`)
+- an exact closed-form solution (see `caterva/tests/test_kinetics_correctness.py`,
+  `caterva/tests/test_pcr_correctness.py`)
 - an independent integrator, e.g. scipy's `solve_ivp`, which shares no code
-  with roadrunner (see `Terium/tests/test_numerical_robustness.py`)
+  with roadrunner (see `caterva/tests/test_numerical_robustness.py`)
 - a physical invariant (conservation, monotonicity, non-negativity) checked
   across the input space with Hypothesis, not just hand-picked values (see
-  `Terium/tests/test_properties.py`)
+  `caterva/tests/test_properties.py`)
 
 If you add a new domain or a new claim about correctness, it needs one of
 these, not just "the output looked reasonable when I ran it once."
@@ -177,7 +177,7 @@ set file did exactly that on its first run.
 
 ## Supported Python versions
 
-Terrium supports Python 3.10–3.13. This is a hard constraint, but not for the
+Caterva supports Python 3.10–3.13. This is a hard constraint, but not for the
 reason this file used to give. It is **not** "the SBML C extensions stop at
 cp312" — `python-libsbml` 5.21.1 already ships cp314 wheels, and `antimony`
 2.14.0 ships `py3-none-<platform>` wheels that are Python-version agnostic.
@@ -207,14 +207,14 @@ pip install -r requirements-dev.txt
 ```bash
 make test        # everything
 make test-fast    # skip the slow property/robustness suites
-make test-sim     # Terium/ only
+make test-sim     # caterva/ only
 make test-lit     # Tests/ (literature layer) only
 ```
 
 Never skip a test to make the suite pass. If a test is skipping because of
 a real, explainable data condition (see
 `test_flagged_brenda_entries_do_not_become_confident_numbers`
-in `Terium/tests/test_brenda_integration.py` for the one
+in `caterva/tests/test_brenda_integration.py` for the one
 legitimate example in this codebase), the skip must be explained in a
 docstring or comment, and if possible, backed by a deterministic sibling
 test that exercises the same contract without depending on the same
@@ -285,11 +285,11 @@ followed the instructions exactly.
 
 ## Pull requests
 
-- Every PR that touches `Terium/terium_engine.py` or `Tests/brenda_client.py`
+- Every PR that touches `caterva/caterva_engine.py` or `Tests/brenda_client.py`
   needs new or updated tests, not just a description that it was tested
   locally.
 - If you add a dependency, it must appear in `requirements.txt` or
-  `requirements-dev.txt` -- `Terium/tests/test_dependencies_declared.py` will fail
+  `requirements-dev.txt` -- `caterva/tests/test_dependencies_declared.py` will fail
   the build otherwise, on purpose.
 - Run `make pr` before opening the PR, not just after CI catches it.
   CI is the backstop, not the first line of defense. (`make test` alone is
@@ -301,10 +301,10 @@ No linter is currently enforced (this should probably change once the
 backend hire is confirmed and there's a second engineering opinion on
 tooling choice). Until then: match the style of the file you're editing.
 Docstrings that explain *why*, not just *what*, are valued highly in this
-codebase -- see the module docstring in `Terium/terium_engine.py` for the bar.
+codebase -- see the module docstring in `caterva/caterva_engine.py` for the bar.
 
 ## Questions
 
 Open an issue, or if it's about strategic direction rather than a specific
-bug, see `Business/ROADMAP.md` for what's already been deliberately
+bug, ask in an issue for what's already been deliberately
 deprioritized and why.

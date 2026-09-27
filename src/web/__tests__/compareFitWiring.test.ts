@@ -65,7 +65,7 @@ describe('the comparison route ranks models against the caller measurement', () 
 
   it('omits the ranking entirely when no measurement was supplied', () => {
     // `experimentalFinalValue` is a number the experimenter measured.
-    // Terrium cannot resolve it from literature and must not invent one, so
+    // Caterva cannot resolve it from literature and must not invent one, so
     // its absence means "no fit ranking" -- never a default. This is the
     // experimental-condition rule of ADR 0012/0013 applied to an input.
     expect(fitFor(RAN, undefined)).toBeUndefined();

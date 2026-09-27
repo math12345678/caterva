@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS
 ---------------
-Terrium is published as eighteen repositories under
+Caterva is published as eighteen repositories under
 github.com/Terrium-sim. The monorepo is where work happens; the other
 seventeen are regenerated from it by `scripts/split_repos.sh`, each with a
 README written from a source in `docs/readmes/`.
@@ -75,11 +75,11 @@ REPO = Path(__file__).resolve().parent.parent
 REPO_MAP = REPO / "docs" / "REPO_MAP.md"
 READMES = REPO / "docs" / "readmes"
 
-#: Repositories in the map that are not Terrium's to write a README for.
+#: Repositories in the map that are not Caterva's to write a README for.
 NOT_OURS = {
     "demo-repository": (
         "GitHub's own demo repository, left untouched. docs/PUBLISHING.md "
-        "records the same. Writing a Terrium README into it would be "
+        "records the same. Writing a Caterva README into it would be "
         "editing somebody else's repository."
     ),
 }
@@ -96,7 +96,7 @@ REQUIRED = [
     (
         re.compile(r"not\s+tellurium", re.I),
         "the non-affiliation notice",
-        "Terrium shares a field and nearly a name with the Sauro lab's "
+        "Caterva shares a field and nearly a name with the Sauro lab's "
         "Tellurium, and a researcher has already read an outreach email as "
         "a false claim of credit. A disclaimer on one surface out of "
         "eighteen is a disclaimer nobody sees.",
@@ -128,7 +128,7 @@ def selftest() -> int:
 
     good = (
         "# backend-main\n\nApache-2.0. See LICENSE.\n\n"
-        "**Terrium is not Tellurium.** Unaffiliated with the Sauro lab.\n\n"
+        "**Caterva is not Tellurium.** Unaffiliated with the Sauro lab.\n\n"
         "Start at START_HERE.md.\n"
     )
     for pattern, what, _ in REQUIRED:

@@ -195,7 +195,7 @@ def _extract_tests(source: str) -> list[tuple[str, int, str]]:
 
 #: Roots holding the pytest suites. Separate from SEARCH_ROOTS because the
 #: Python scan is AST-based, not brace-based.
-PYTHON_ROOTS = ["Tests", "Terium/tests"]
+PYTHON_ROOTS = ["Tests", "caterva/tests"]
 
 PYTHON_TEST_FILE = re.compile(r"^test_.*\.py$")
 

@@ -11,7 +11,7 @@ ADR 0177 (the release that shipped the composer as an app without this).
 
 ## Context
 
-Terrium's claim is that every number can be traced to where it came from.
+Caterva's claim is that every number can be traced to where it came from.
 The machinery that does it works: on 2026-09-22 a single live call returned
 
     Km = 0.03 mM, Homo sapiens, BRENDA reference 286469
@@ -22,7 +22,7 @@ reported as disagreement rather than folded into an average.
 
 None of that was reachable from anything a person types.
 
-- `terrium compose "..." --subject "lactate dehydrogenase"` records the
+- `caterva compose "..." --subject "lactate dehydrogenase"` records the
   subject and prints *"Subject named but no search was run in this
   report."* The CLI never calls `compose_and_parameterise`, the function
   that would run the search.
@@ -79,7 +79,7 @@ for the wrong protein rather than merely a wrong value.
 `compose` now searches:
 
 ```bash
-terrium compose "Michaelis-Menten with a competitive inhibitor" \
+caterva compose "Michaelis-Menten with a competitive inhibitor" \
     --subject 1.1.1.27 --organism "Homo sapiens" --substrate pyruvate
 ```
 
@@ -95,7 +95,7 @@ whose kcat is still the motif library's placeholder and says so:
 
 The four things it needed, and what each turned out to be:
 
-**1. `Terium/checkout.py`.** One helper, `literature_module(name)`, used by
+**1. `caterva/checkout.py`.** One helper, `literature_module(name)`, used by
 all seven sites that reach into `Tests/`. It tries the package form, the
 flat form, then puts the checkout's `Tests/` on `sys.path` and retries, and
 raises `LiteratureLayerUnavailable` naming the reason when there is no such
@@ -147,7 +147,7 @@ A cited number presented alone reads as MORE settled than a placeholder,
 not less. The first composed report to carry real data therefore made a
 13-fold disagreement invisible, which is the laundering this project exists
 to refuse, one layer up from the placeholder case. The lab-report path had
-printed the disagreement since it was written, so the two halves of Terrium
+printed the disagreement since it was written, so the two halves of Caterva
 disagreed about how honest to be.
 
 `Measurement` now carries `alternatives` and a `disagreement` property, and
@@ -193,7 +193,7 @@ Two details worth keeping:
 
 - **A source that stated no conditions is named**, in those words. "The
   paper did not report a pH" is permanent and sends a researcher to the
-  bench; "Terrium has no pH" may be a parser bug. Measured on EC 1.1.1.27:
+  bench; "Caterva has no pH" may be a parser bug. Measured on EC 1.1.1.27:
   the Ki row states pH 7.5 and 37 °C and the Km row states nothing, so the
   two cannot be checked against each other, and the report says so instead
   of comparing what it has and calling it clean.
@@ -240,7 +240,7 @@ The first eight were one defect -- the resolver knew and a conversion
 dropped it. This one is a contract broken rather than a fact silenced, and
 it is worth keeping separate.
 
-`terrium compose --subject "lactate dehydrogenase"` asks for a search. The
+`caterva compose --subject "lactate dehydrogenase"` asks for a search. The
 resolver refuses, correctly, because the name is six enzymes. The report
 says so, at length, in the right place. And the process exited **0**, while
 this CLI's own `--help` promises "3 something refused and said why (the
@@ -274,13 +274,13 @@ that could not name its paper, a value with no conditions, an absence with
 no reason.
 
 Anyone adding a field to the resolver should assume the same gap exists
-until they have looked. `Terium/tests/test_compose_literature.py` audits
+until they have looked. `caterva/tests/test_compose_literature.py` audits
 `Measurement`'s fields against what the report renders, which is the cheap
 version of that check.
 
 ## A fifth thing, found on the way
 
-`citation_text` in `Terium/agents/adapters.py` looked for an attribute
+`citation_text` in `caterva/agents/adapters.py` looked for an attribute
 called `reference`. `Citation` declares **`reference_id`**. The attribute
 never existed, so every BRENDA citation fell through to `url` and every
 artefact built from the agent stack printed

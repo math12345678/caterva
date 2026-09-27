@@ -13,7 +13,7 @@
  * Three sources named, none of them consulted. A student reads that as "the
  * literature has no value for my enzyme" and goes looking for a different
  * problem than the one they have — a wrong substrate name, a rare organism,
- * a gap in BRENDA — when the truth is that Terrium could not tell which
+ * a gap in BRENDA — when the truth is that Caterva could not tell which
  * enzyme they meant.
  *
  * The same family as the substrate and cross-species refusals: a message

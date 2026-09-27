@@ -9,7 +9,7 @@ Asked whether to use SOAP or SPARQL for per-parameter lookups, Lisa Jeske
      files... If this solution does not fit your algorithm, simply use the
      SOAP API."
 
-Her reasoning was sound and Terrium accepted it: she is building a REST API,
+Her reasoning was sound and Caterva accepted it: she is building a REST API,
 so SOAP work would be thrown away, and bulk files are gentler on DSMZ's
 servers than per-parameter queries.
 
@@ -44,7 +44,7 @@ WHAT THIS MODULE IS THEREFORE FOR
 Not resolution. `resolve_kinetic_value` still reads per-enzyme BRENDA pages,
 which do carry organism.
 
-This is a corpus reader. It gives Terrium, for the first time, the ability
+This is a corpus reader. It gives Caterva, for the first time, the ability
 to ask questions about BRENDA *in aggregate* — how many KM values report
 both pH and temperature, how the STRENDA-completeness picture actually looks
 across an EC class rather than across the handful of enzymes anyone has
@@ -132,7 +132,7 @@ class BulkRow:
     def for_resolution(self) -> None:
         """Always raises.
 
-        This file has no organism, and Terrium's resolution path is
+        This file has no organism, and Caterva's resolution path is
         organism-specific by policy (ADR 0024, on Jeske's own
         recommendation). A row from here cannot answer "what is the Km in
         Homo sapiens" and must not be able to pretend it can.
@@ -314,7 +314,7 @@ def strenda_completeness(rows: list[BulkRow]) -> dict[str, int]:
     """How many rows report both conditions, one, or neither.
 
     The aggregate question this file makes answerable for the first time.
-    Terrium's claim that "roughly three quarters of values are unverified"
+    Caterva's claim that "roughly three quarters of values are unverified"
     came from its own small default set; this counts a whole EC class.
 
     `additional information` rows are excluded from the denominator: they

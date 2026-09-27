@@ -2,14 +2,14 @@
   "_why": [
     "ADR 0067's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "The notice that Terrium is not Tellurium lived in two files that both",
-    "stay in the repository. Someone who runs `pip install terrium` never",
+    "The notice that Caterva is not Tellurium lived in two files that both",
+    "stay in the repository. Someone who runs `pip install caterva` never",
     "saw either. These five rows are the ways that could silently become",
     "true again.",
     "",
     "N4 is the one worth reading twice. Disclaiming ('not Tellurium') and",
     "attributing ('runs on libRoadRunner') are different obligations -- the",
-    "first is Terrium's own problem, the second is what the licences ask",
+    "first is Caterva's own problem, the second is what the licences ask",
     "for. A surface that does only the first looks compliant and is not.",
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0067-non-affiliation-notice.json"
@@ -22,15 +22,15 @@
       "_claimed": "1 failed",
       "_note": "Citation metadata is what a reference manager ingests, and citation is exactly where credit confusion does its damage.",
       "file": "CITATION.cff",
-      "find": "  Terrium is NOT Tellurium.",
-      "replace": "  Terrium is a simulation engine."
+      "find": "  Caterva is NOT Tellurium.",
+      "replace": "  Caterva is a simulation engine."
     },
     {
       "id": "N2",
       "description": "the package docstring loses it",
       "_claimed": "2 failed",
       "_note": "README and NOTICE stay in the repository; a docstring travels with the installed package. This is the surface that reaches someone who never opens GitHub.",
-      "file": "Terium/__init__.py",
+      "file": "caterva/__init__.py",
       "find": "NOT TELLURIUM. Tellurium is a separate, established systems-biology",
       "replace": "Tellurium is a separate, established systems-biology"
     },

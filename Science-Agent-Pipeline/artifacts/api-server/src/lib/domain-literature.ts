@@ -288,7 +288,7 @@ export const PCR_LITERATURE: DomainLiterature = {
   // The formula below said `N(n) = N0 × E^n` until 2026-09-05. With the
   // efficiency range it states in the same sentence (0.85-1.0), that is a
   // DECAY curve: at 30 cycles and E = 0.9 it yields 0.042*N0, a PCR
-  // reaction that destroys 96% of its template. Terium/discrete/pcr.py
+  // reaction that destroys 96% of its template. caterva/discrete/pcr.py
   // computes `n0 * (1.0 + efficiency) ** cycle` = 5.2e8*N0 -- a factor of
   // 1.2e10 apart. The engine was right; this description, which is served
   // to users through /api/pipeline/literature, was wrong.
@@ -441,7 +441,7 @@ export const CELL_CYCLE_OSCILLATOR_LITERATURE: DomainLiterature = {
       // was found by comparing the registered CrossRef title against the
       // title claimed here, which verify_citations_live.py now does.
       //
-      // Correct source, already used by Terium/continuous/model_building.py:
+      // Correct source, already used by caterva/continuous/model_building.py:
       // PNAS 88(16), 7328-7332. PMID 1831270, PMC52288.
       authors: "Tyson, J. J.",
       year: 1991,
@@ -509,7 +509,7 @@ export const MONTE_CARLO_PI_LITERATURE: DomainLiterature = {
     },
   ],
   defaultJustification:
-    "Metropolis & Ulam (1949) is the source of the METHOD, not of a sample count. n_samples is a precision/runtime tradeoff chosen by the caller, not a measured quantity. What IS verified is the convergence behaviour: the estimator's error is checked against the CLT rate 1/sqrt(N) in Terium/tests/test_monte_carlo_correctness.py. See docs/literature-inventory.toml.",
+    "Metropolis & Ulam (1949) is the source of the METHOD, not of a sample count. n_samples is a precision/runtime tradeoff chosen by the caller, not a measured quantity. What IS verified is the convergence behaviour: the estimator's error is checked against the CLT rate 1/sqrt(N) in caterva/tests/test_monte_carlo_correctness.py. See docs/literature-inventory.toml.",
 };
 
 /**
@@ -523,7 +523,7 @@ export const GILLESPIE_SSA_REPLICATES_LITERATURE: DomainLiterature = {
     "Ensemble of independent Gillespie SSA trajectories, averaged onto a common time grid. The ensemble mean converges on the closed form E[a(t)] = a0*exp(-k*t).",
   references: GILLESPIE_SSA_LITERATURE.references,
   defaultJustification:
-    "Gillespie (1976) is the source of the ALGORITHM. n_replicates is an ensemble size — a precision/runtime tradeoff, not a measured value. The ensemble mean is verified against the exact closed form E[a(t)] = a0*exp(-k*t) in Terium/tests/test_ssa_ensemble_unbiased.py, which pins that the bias SHRINKS as replicates grow. See docs/literature-inventory.toml.",
+    "Gillespie (1976) is the source of the ALGORITHM. n_replicates is an ensemble size — a precision/runtime tradeoff, not a measured value. The ensemble mean is verified against the exact closed form E[a(t)] = a0*exp(-k*t) in caterva/tests/test_ssa_ensemble_unbiased.py, which pins that the bias SHRINKS as replicates grow. See docs/literature-inventory.toml.",
 };
 
 export const DOMAIN_LITERATURE_MAP: Record<string, DomainLiterature> = {
@@ -543,7 +543,7 @@ export const DOMAIN_LITERATURE_MAP: Record<string, DomainLiterature> = {
   monte_carlo_pi: MONTE_CARLO_PI_LITERATURE,
   gillespie_ssa_replicates: GILLESPIE_SSA_REPLICATES_LITERATURE,
   // `sbml` is deliberately absent: it is the raw-SBML escape hatch, where
-  // the caller supplies the model. Terrium makes no scientific claim about
+  // the caller supplies the model. Caterva makes no scientific claim about
   // a document it did not author, so it has no domain citation to give.
 };
 
@@ -562,7 +562,7 @@ export function getDomainLiterature(domain: string): DomainLiterature | undefine
  * the one place a placeholder must never appear.
  *
  * `sbml` legitimately has no domain citation: the caller supplies the
- * model, so there is nothing for Terrium to cite. Returning undefined lets
+ * model, so there is nothing for Caterva to cite. Returning undefined lets
  * the caller omit it rather than inventing one.
  */
 export function getDomainCitation(domain: string): string | undefined {

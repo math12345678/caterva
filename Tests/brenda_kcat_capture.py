@@ -2,7 +2,7 @@
 
 Run from the Tests/ directory, on a machine with network access:
 
-    cd ~/Desktop/Coding/Terrium/Tests
+    cd <your checkout>/Tests
     ../.venv/bin/python brenda_kcat_capture.py            # AChE (default)
     ../.venv/bin/python brenda_kcat_capture.py 1.1.1.27   # LDH
 

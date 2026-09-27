@@ -36,7 +36,7 @@ import {
   buildNonCompetitiveInhibition,
   buildProductInhibition,
 } from '../engine/sbml-builder';
-import { runTerium } from '../engine/teriumBridge';
+import { runCaterva } from '../engine/catervaBridge';
 
 /**
  * BRENDA's Ki table records an inhibition constant for a NAMED inhibitor,
@@ -126,14 +126,14 @@ export async function runInhibitionModel(
   });
   if (missing.length > 0) {
     throw new Error(
-      `${model} inhibition needs ${missing.join(', ')}. Terrium does not ` +
+      `${model} inhibition needs ${missing.join(', ')}. Caterva does not ` +
         'default a missing parameter -- a run on an invented value produces ' +
         'a result that looks measured and is not.',
     );
   }
 
   if (spec.engineDomain !== 'sbml') {
-    const result = await runTerium(
+    const result = await runCaterva(
       spec.engineDomain as never,
       {
         km: parameters.km,
@@ -171,7 +171,7 @@ export async function runInhibitionModel(
           s0: parameters.s0,
         });
 
-  const result = await runTerium(
+  const result = await runCaterva(
     'sbml',
     {
       sbml_string: built.xml,

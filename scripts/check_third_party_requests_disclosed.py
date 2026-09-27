@@ -11,7 +11,7 @@ anything.
 On 20 January 2022 the Landgericht Muenchen I (Az. 3 O 17493/20) held that
 embedding Google Fonts from Google's CDN without consent breaches GDPR Article
 6, awarded the visitor EUR 100, and attached penalties of up to EUR 250,000 for
-continuing. Terrium is aimed at students, including students in the EU.
+continuing. Caterva is aimed at students, including students in the EU.
 
 Until 2026-08-16, docs/PRIVACY.md said "no third-party requests **from the page
 itself**", and then -- in the correction that replaced it -- "the page does not
@@ -63,7 +63,7 @@ PRIVACY_DOC = REPO_ROOT / "docs" / "PRIVACY.md"
 # Public-facing surfaces: anything a visitor's browser renders.
 PAGE_GLOBS = (
     "mule/*.html",
-    "terrium-site/*.html",
+    "caterva-site/*.html",
     "landing/**/*.html",
     "src/web/*.html",
     "src/web/server.ts",

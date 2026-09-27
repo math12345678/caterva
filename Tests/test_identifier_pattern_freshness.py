@@ -7,7 +7,7 @@ right" is the standard this project spent several passes rejecting.
 
 So the fetch is stubbed and each verdict is driven deliberately, including
 the one that matters most: a **narrowed** live pattern, which is the case
-where Terrium would be minting URIs the registry no longer accepts.
+where Caterva would be minting URIs the registry no longer accepts.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ class TestAllThreeVerdicts:
     def test_drifted_when_the_registry_narrowed_a_pattern(
         self, guard, captured, monkeypatch, capsys
     ):
-        """The dangerous direction: Terrium would mint accessions the
+        """The dangerous direction: Caterva would mint accessions the
         registry no longer considers well-formed."""
 
         def narrowed(prefix):
@@ -76,7 +76,7 @@ class TestAllThreeVerdicts:
         assert "DRIFTED" in out
         assert "pubmed" in out
         # Both directions have to be explained, or a reader seeing DRIFTED
-        # cannot tell whether Terrium is now too strict or too loose.
+        # cannot tell whether Caterva is now too strict or too loose.
         assert "WIDENED" in out and "NARROWED" in out
 
     def test_unreachable_is_not_reported_as_matched(
@@ -133,12 +133,12 @@ class TestTheGuardReadsTheSameFileTheCodeDoes:
         # A freshness guard aimed at a different copy of the patterns would
         # pass while the copy in use rotted. Compared as resolved paths, so
         # a relative-path refactor cannot silently split them.
-        from Terium.core import miriam
+        from caterva.core import miriam
 
         assert guard.FIXTURE.resolve() == miriam._FIXTURE.resolve()
 
     def test_every_namespace_the_code_uses_is_checked(self, guard, captured):
-        from Terium.core import miriam
+        from caterva.core import miriam
 
         assert set(captured["namespaces"]) >= set(miriam.NAMESPACES), (
             "a namespace the code mints in is not covered by the freshness check"

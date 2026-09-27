@@ -66,23 +66,23 @@ While editing CONTRIBUTING.md to correct a wrong path, I wrote another one:
 ```
 
 No such file. The test named in that sentence is in
-`Terium/tests/test_brenda_integration.py`. The wrong path was plausible —
+`caterva/tests/test_brenda_integration.py`. The wrong path was plausible —
 right shape, right convention, right directory for a literature test — and
 it was typed by someone who was at that moment fixing broken paths.
 
 `check_commands_runnable.py` would not have caught it: that guard checks
 `scripts/*.py` mentions, because its own origin was a guard printing an
-unrunnable command. Anything under `Terium/tests/` is outside its scope.
+unrunnable command. Anything under `caterva/tests/` is outside its scope.
 
 **`scripts/check_doc_paths_resolve.py`** now requires every backticked
 repo-relative path *with a directory component* in the eleven
 contributor-facing documents to exist. It found two more that were already
 there: `README.md` pointing at `tests/test_brenda_integration.py` (it is
-`Terium/tests/…`) and `SECURITY.md` at `src/lib/llmResolver.ts` (it is
+`caterva/tests/…`) and `SECURITY.md` at `src/lib/llmResolver.ts` (it is
 `Science-Agent-Pipeline/artifacts/api-server/src/lib/…`). Both fixed.
 
 Bare filenames are deliberately **not** checked. These documents name
-`terium_engine.py` conversationally; demanding a full path there would
+`caterva_engine.py` conversationally; demanding a full path there would
 either fail constantly or teach people to stop naming files. A token with a
 slash is a claim about where something lives and is checkable; a bare name
 is a claim about what it is called and is not.

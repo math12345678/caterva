@@ -5,7 +5,7 @@ What does this enzyme actually report? Asked BEFORE the first query.
 
 WHY THIS EXISTS
 ---------------
-The owner's assessment of Terrium was that it was not fixing a problem.
+The owner's assessment of Caterva was that it was not fixing a problem.
 Using it as a student does shows the shape of that. Measured through the
 real resolver on the LDH fixture:
 
@@ -149,7 +149,7 @@ class EnzymeCatalog(BaseModel):
             else "  organisms: none named"
         )
         lines.append(
-            "These are BRENDA's own labels. Use them exactly — Terrium does "
+            "These are BRENDA's own labels. Use them exactly — Caterva does "
             "not substitute a similar name, because a similar name can be a "
             "different molecule."
         )

@@ -12,7 +12,7 @@ ADR 0012 closed the kcat extraction and stopped, deliberately:
 
 > The MM engine takes `vmax`, not `kcat`, and `Vmax = kcat · [E]₀`.
 > Converting a resolved kcat into the parameter the engine needs requires
-> the total enzyme concentration — which Terrium has nowhere, and which
+> the total enzyme concentration — which Caterva has nowhere, and which
 > BRENDA does not supply per row.
 
 That left a working literature lookup that could not reach a simulation. The

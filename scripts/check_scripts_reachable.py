@@ -176,7 +176,7 @@ LIBRARY_MODULES = (
     "Tests/citation_export.py",
     "Tests/reliability.py",
     "Tests/taxonomy.py",
-    "Terium/core/model_provenance.py",
+    "caterva/core/model_provenance.py",
 )
 
 #: Opt-out marker. The reason is mandatory.

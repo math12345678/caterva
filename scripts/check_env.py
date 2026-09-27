@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify a Terrium development environment actually works.
+"""Verify a Caterva development environment actually works.
 
 Not a version-string check: this imports every engine, builds a real model,
 translates it to SBML, integrates it, and compares the answer to a known
@@ -171,7 +171,7 @@ def check_end_to_end() -> None:
     #
     # They were `1e-10` and `1e-12`, hardcoded, and identical to
     # `DEFAULT_RELATIVE_TOLERANCE` / `DEFAULT_ABSOLUTE_TOLERANCE` in
-    # `Terium/core/data_structures.py`. Two statements of one fact, and the
+    # `caterva/core/data_structures.py`. Two statements of one fact, and the
     # README leans the project's most load-bearing claim on this check:
     #
     #     "If it passes, the numerics are trustworthy."
@@ -187,7 +187,7 @@ def check_end_to_end() -> None:
     # are fine".
     try:
         sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
-        from Terium.core.data_structures import (
+        from caterva.core.data_structures import (
             DEFAULT_ABSOLUTE_TOLERANCE,
             DEFAULT_RELATIVE_TOLERANCE,
         )
@@ -227,7 +227,7 @@ def check_end_to_end() -> None:
 
 def main() -> int:
     print("=" * 66)
-    print("Terrium environment check")
+    print("Caterva environment check")
     print("=" * 66)
 
     check_python()

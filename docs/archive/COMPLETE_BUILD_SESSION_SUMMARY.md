@@ -1,4 +1,4 @@
-# Terrium Complete Build Session Summary
+# Caterva Complete Build Session Summary
 
 > **⚠️ CORRECTION (2026-08-10) — several claims below are false; not deleted, corrected here per project convention.**
 > - Phase 2's "Metrics Collection System," "REST API endpoints," and "comprehensive test suite (25+ cases)" describe `artifacts/api-server/src/lib/metrics.ts` and `src/__tests__/metrics.test.ts`, which **do not exist**. The real, current system is `src/lib/verifiable-metrics.ts` (`verifiableMetricsCollector`) with `src/__tests__/verifiableMetrics.test.ts` (251 lines, **15** test cases, not 25+). See `LIVE_DASHBOARD_BUILD_SUMMARY.md`'s correction banner for the full history (the original design had zero production writers and fabricated a 100% success rate from empty data — commits `de1febb`, `3a298a7`).

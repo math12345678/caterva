@@ -29,7 +29,7 @@ evidence for it was unverified.
 Two things had to be fixed to get there, and both are the harness refusing
 to guess rather than producing a confident wrong answer:
 
-1. **`-q` had to go.** `Terium/pytest.ini` suppresses the summary line under
+1. **`-q` had to go.** `caterva/pytest.ini` suppresses the summary line under
    `-q`, so the harness could not count tests and **refused to run at all**,
    reporting that every verdict would be meaningless. A silent `0 total`
    read as `0 failed` is one of the three ways hand-run mutations were wrong

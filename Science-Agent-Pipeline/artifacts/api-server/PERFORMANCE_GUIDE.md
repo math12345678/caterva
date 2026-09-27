@@ -241,7 +241,7 @@ ORDER BY COUNT(*) DESC;
 ### Profile Python Execution
 
 ```bash
-python -m cProfile -s cumulative src/lib/terium_runner.py 2>&1 | head -20
+python -m cProfile -s cumulative src/lib/caterva_runner.py 2>&1 | head -20
 ```
 
 ## Caching Strategy
@@ -466,8 +466,8 @@ node --inspect-brk src/index.ts
 ### Python Profiling
 
 ```bash
-python -m cProfile -s cumulative src/lib/terium_runner.py
-python -m memory_profiler src/lib/terium_runner.py
+python -m cProfile -s cumulative src/lib/caterva_runner.py
+python -m memory_profiler src/lib/caterva_runner.py
 ```
 
 ## References

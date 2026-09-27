@@ -21,7 +21,7 @@ their affiliation, and the date written permission was given.
 |---|---|---|
 REAL-ENDORSEMENTS-END -->
 
-Terrium is pre-launch. It has a waitlist and no users. No person or
+Caterva is pre-launch. It has a waitlist and no users. No person or
 institution has endorsed it, and until one does, no page may say otherwise.
 
 ## What was here before
@@ -84,8 +84,8 @@ recorded the lesson:
 
 The same failure had reached the public-facing site, where it is not an
 internal embarrassment but a representation to third parties. The
-compliance work in `docs/LICENSING.md` audited what Terrium *consumes* and
-never looked at what Terrium *says*.
+compliance work in `docs/LICENSING.md` audited what Caterva *consumes* and
+never looked at what Caterva *says*.
 
 ## The rule from here
 
@@ -95,7 +95,7 @@ record in this file**, containing:
 1. who said it, verifiably — a real name, affiliation, and a way to check;
 2. what they actually said, quoted rather than paraphrased into marketing;
 3. written permission to publish it with their name and affiliation;
-4. the date, and what version of Terrium they were talking about.
+4. the date, and what version of Caterva they were talking about.
 
 `scripts/check_no_fabricated_endorsements.py` fails the build when a public
 page names an institution in a promotional context without a matching entry
@@ -103,7 +103,7 @@ here.
 
 ## A note on the real expert feedback
 
-Terrium has had substantive review from five named experts — Lisa Jeske
+Caterva has had substantive review from five named experts — Lisa Jeske
 (BRENDA/DSMZ), Barbara Bakker (UMCG), Herbert Sauro (UW), Daniel Katz
 (NCSA) and Matthias König (HU Berlin). It is recorded in
 `docs/EXPERT_FEEDBACK.md`.

@@ -9,7 +9,7 @@
  * `LITERATURE_INTEGRATION_GUIDE.md` describing a literature integration.
  * Everything it "recommends" is something the caller already had.
  *
- * Terrium's actual literature layer is `Tests/fallback_logic.py`
+ * Caterva's actual literature layer is `Tests/fallback_logic.py`
  * (`resolve_kinetic_value`), which walks BRENDA exact match -> BRENDA
  * cross-species -> PubMed candidates, and returns a value, its unit, the
  * organism it was measured in, a citation, and the STRENDA assay
@@ -28,7 +28,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 import { logger } from '../logger';
-import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../engine/catervaBridge';
 
 /** Which kinetic constant to resolve. Each call resolves exactly one, so a
  *  cross-species Ki can never borrow a verified Km's provenance (ADR 0008). */
@@ -162,7 +162,7 @@ export interface ResolvedKinetic {
    * Carried so the SBML export can write `bqbiol:hasTaxon` on the model and
    * on each parameter. When the two differ, any tool that reads SBML can
    * detect the cross-species substitution from the file alone, without
-   * knowing anything about Terrium. Prose in a note cannot do that.
+   * knowing anything about Caterva. Prose in a note cannot do that.
    */
   taxonId?: string | null;
   requestedTaxonId?: string | null;
@@ -237,7 +237,7 @@ export interface ResolvedKinetic {
    * Vmax = kcat * [E]0, present only for a kcat query with `enzymeConc`.
    *
    * Computed in PYTHON by the same
-   * `Terium.core.validation.vmax_from_kcat()` the engine itself uses --
+   * `caterva.core.validation.vmax_from_kcat()` the engine itself uses --
    * one implementation of the arithmetic and its Rule 2 bounds, not a
    * second copy in TypeScript. The [E]0/Km flag in particular carries a
    * threshold that must not be duplicated here and allowed to drift.
@@ -321,7 +321,7 @@ export interface SelectionTie {
 /**
  * A paper the fallback search turned up, offered rather than used.
  *
- * Terrium does not extract numbers from full text. These are places to
+ * Caterva does not extract numbers from full text. These are places to
  * look, which is why each carries a locator: a title alone is a claim, a
  * title with a PMID or DOI is checkable. PubMed's esummary never supplies a
  * DOI and CORE has no PMID, so neither field alone covers both sources.
@@ -514,7 +514,7 @@ const DEFAULT_SCRIPT_PATH = path.join(
 /**
  * Which runner script to spawn.
  *
- * `TERRIUM_LITERATURE_RUNNER` overrides it so the subprocess path -- spawn,
+ * `CATERVA_LITERATURE_RUNNER` overrides it so the subprocess path -- spawn,
  * stdin, exit code, stdout parsing -- can be exercised against a stub that
  * emits canned JSON, with no network. That path is where the bugs actually
  * are: the first version of this module threw away the runner's structured
@@ -523,7 +523,7 @@ const DEFAULT_SCRIPT_PATH = path.join(
  * the whole module would not have caught that; a real subprocess does.
  */
 function scriptPath(): string {
-  return process.env['TERRIUM_LITERATURE_RUNNER'] || DEFAULT_SCRIPT_PATH;
+  return process.env['CATERVA_LITERATURE_RUNNER'] || DEFAULT_SCRIPT_PATH;
 }
 
 /** BRENDA and PubMed are network calls; this is generous but finite. */

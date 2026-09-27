@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — inspection mode
+   caterva — inspection mode
    Any architecture node resolves to a readable record.
    Desktop: right-side panel. Mobile: full-width bottom sheet.
    ============================================================ */

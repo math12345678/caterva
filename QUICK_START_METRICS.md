@@ -4,7 +4,7 @@
 
 ## 60-Second Overview
 
-Terrium now automatically tracks metrics from parameter sweeps and batch operations. Every simulation within a sweep/batch is counted, and aggregate statistics (success rate, timing, counts) are exposed via REST APIs and Prometheus.
+Caterva now automatically tracks metrics from parameter sweeps and batch operations. Every simulation within a sweep/batch is counted, and aggregate statistics (success rate, timing, counts) are exposed via REST APIs and Prometheus.
 
 ## Basic Usage
 
@@ -83,12 +83,12 @@ curl http://localhost:3000/api/metrics/batches-by-query
 2. Prometheus scrapes `/metrics` every 15 seconds
 
 3. Metrics available:
-   - `terrium_sweeps_total` — number of sweeps
-   - `terrium_sweep_avg_success_rate` — average success rate
-   - `terrium_sweep_avg_execution_time_ms` — average time per sweep
-   - `terrium_batches_total` — number of batches
-   - `terrium_batch_avg_success_rate` — average batch success rate
-   - `terrium_batch_avg_execution_time_ms` — average batch time
+   - `caterva_sweeps_total` — number of sweeps
+   - `caterva_sweep_avg_success_rate` — average success rate
+   - `caterva_sweep_avg_execution_time_ms` — average time per sweep
+   - `caterva_batches_total` — number of batches
+   - `caterva_batch_avg_success_rate` — average batch success rate
+   - `caterva_batch_avg_execution_time_ms` — average batch time
 
 4. View in Grafana: http://localhost:3001
 

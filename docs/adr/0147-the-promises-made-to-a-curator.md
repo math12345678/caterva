@@ -12,7 +12,7 @@ separation), ADR 0015 (a rule nothing executes is not enforced)
 
 ## Why this exists
 
-On 2026-08-13 Terrium wrote to Lisa Jeske of the BRENDA team at DSMZ,
+On 2026-08-13 Caterva wrote to Lisa Jeske of the BRENDA team at DSMZ,
 reporting two licence breaches found by reading the page she linked, and
 committing to five things. On 2026-08-20 she replied:
 

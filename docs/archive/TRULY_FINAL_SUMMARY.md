@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** "API Endpoints (10 Total)" below is stale/wrong — the real, current `src/web/server.ts` has 18 wired routes (verified against `API_QUICK_REFERENCE.md`, itself independently confirmed accurate). This doc is also not actually "truly final" — three more same-day docs (`CONTINUATION_FINAL_STATUS.md`, `SESSION_CONTINUATION_SUMMARY.md`, `VERIFIED_SYSTEM_STATUS.md`) separately claim to be the authoritative status doc, each with different numbers. Treat none of these "final" labels as load-bearing.
 
-# 🏆 TERRIUM: TRULY COMPLETE
+# 🏆 CATERVA: TRULY COMPLETE
 
 **Status:** ✅ ALL FEATURES FULLY IMPLEMENTED & WIRED  
 **Date:** August 11, 2026  
@@ -82,7 +82,7 @@ src/cli/
 
 ### Start (30 seconds)
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 # http://localhost:3000
 ```
@@ -166,7 +166,7 @@ curl -X POST http://localhost:3000/api/compare \
    - Complete implementation
 
 4. **Job Persistence**
-   - File-based storage (terrium-jobs.jsonl)
+   - File-based storage (caterva-jobs.jsonl)
    - Query by status/time/model
    - Statistics aggregation
    - Survives restarts
@@ -215,7 +215,7 @@ curl -X POST http://localhost:3000/api/compare \
 
 🌟 **Scientific Rigor**
 - Real SBML models
-- Real Terium engine
+- Real Caterva engine
 - Real PubMed integration
 - Literature validation
 

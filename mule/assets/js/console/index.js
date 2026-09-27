@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — LIVE ORCHESTRATION CONSOLE
+   caterva — LIVE ORCHESTRATION CONSOLE
 
    Left: the scientific input. Centre: a vertical agent timeline.
    Right: the output workspace that assembles as the run proceeds.

@@ -1,11 +1,11 @@
 # Phase 2: Advanced Features & Tooling
-## Terrium Scientific Validation Framework Enhancement Report
+## Caterva Scientific Validation Framework Enhancement Report
 
 ---
 
 ## Overview
 
-Phase 2 significantly expands Terrium's capabilities with advanced scientific features, multiple kinetic models, and comprehensive tooling for research workflows.
+Phase 2 significantly expands Caterva's capabilities with advanced scientific features, multiple kinetic models, and comprehensive tooling for research workflows.
 
 **Status:** ✓ COMPLETE - All features implemented and type-checked
 
@@ -415,7 +415,7 @@ Potential enhancements for future phases:
 
 ## Summary
 
-**Phase 2 transforms Terrium from a validated simulator into a comprehensive research platform**, enabling:
+**Phase 2 transforms Caterva from a validated simulator into a comprehensive research platform**, enabling:
 
 - ✓ **High-throughput analysis** - Batch and sweep capabilities
 - ✓ **Robust design** - Sensitivity analysis and profiling

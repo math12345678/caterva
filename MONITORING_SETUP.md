@@ -1,8 +1,8 @@
 # Monitoring Setup Guide: Prometheus + Grafana
 
-> **⚠️ CORRECTION (2026-08-12):** The "Metrics Reference" section below ("All metrics exposed at `/metrics`") lists `terrium_success_rate`, `terrium_execution_time_avg_ms`/`median_ms`/`min_ms`/`max_ms`/`stddev_ms`, `terrium_convergence_steps_avg`, `terrium_model_execution_time_avg_ms`, `terrium_model_convergence_steps_avg`, and `terrium_execution_time_percentile_ms{...}` as if unconditionally present. In the real `src/web/metrics-exporter.ts`, each of these is **omitted from the output** (not printed as `0`) whenever the underlying value has no data to report -- a fresh server (zero jobs), or a specific model where every recorded job failed. Before this session, six of these eight gauges (`terrium_success_rate` and `terrium_execution_time_percentile_ms` were already correct) instead printed a fabricated `0`, which would have shown as real 0ms/0-step measurements on the "Average Execution Time" and "Execution Time Distribution" Grafana panels below for a server with zero traffic. Fixed this session (`src/web/metrics-exporter.ts`); reproduced the before/after output directly by calling `generatePrometheusMetrics()` with an empty metrics collector.
+> **⚠️ CORRECTION (2026-08-12):** The "Metrics Reference" section below ("All metrics exposed at `/metrics`") lists `caterva_success_rate`, `caterva_execution_time_avg_ms`/`median_ms`/`min_ms`/`max_ms`/`stddev_ms`, `caterva_convergence_steps_avg`, `caterva_model_execution_time_avg_ms`, `caterva_model_convergence_steps_avg`, and `caterva_execution_time_percentile_ms{...}` as if unconditionally present. In the real `src/web/metrics-exporter.ts`, each of these is **omitted from the output** (not printed as `0`) whenever the underlying value has no data to report -- a fresh server (zero jobs), or a specific model where every recorded job failed. Before this session, six of these eight gauges (`caterva_success_rate` and `caterva_execution_time_percentile_ms` were already correct) instead printed a fabricated `0`, which would have shown as real 0ms/0-step measurements on the "Average Execution Time" and "Execution Time Distribution" Grafana panels below for a server with zero traffic. Fixed this session (`src/web/metrics-exporter.ts`); reproduced the before/after output directly by calling `generatePrometheusMetrics()` with an empty metrics collector.
 
-Complete monitoring stack for Terrium with real-time dashboards, alerts, and metrics.
+Complete monitoring stack for Caterva with real-time dashboards, alerts, and metrics.
 
 ---
 
@@ -15,7 +15,7 @@ docker-compose -f docker-compose-monitoring.yml up -d
 ```
 
 This starts:
-- **Terrium** at `http://localhost:3000`
+- **Caterva** at `http://localhost:3000`
 - **Prometheus** at `http://localhost:9090`
 - **Grafana** at `http://localhost:3001`
 
@@ -29,7 +29,7 @@ open http://localhost:3001
 
 ### 3. View Dashboard
 
-- Click **Dashboards** → **Terrium Performance Monitoring**
+- Click **Dashboards** → **Caterva Performance Monitoring**
 - Graphs update every 30 seconds
 
 ### 4. Stop Everything
@@ -43,7 +43,7 @@ docker-compose -f docker-compose-monitoring.yml down
 ## Architecture
 
 ```
-Terrium (Port 3000)
+Caterva (Port 3000)
     ↓ exposes /metrics in Prometheus format
 Prometheus (Port 9090)
     ↓ scrapes every 15 seconds, stores time-series data
@@ -130,22 +130,22 @@ curl http://localhost:3000/metrics
 
 Output format:
 ```
-# HELP terrium_jobs_total Total number of jobs
-# TYPE terrium_jobs_total gauge
-terrium_jobs_total 150 1628000000000
+# HELP caterva_jobs_total Total number of jobs
+# TYPE caterva_jobs_total gauge
+caterva_jobs_total 150 1628000000000
 
-# HELP terrium_success_rate Success rate percentage
-# TYPE terrium_success_rate gauge
-terrium_success_rate 96.67 1628000000000
+# HELP caterva_success_rate Success rate percentage
+# TYPE caterva_success_rate gauge
+caterva_success_rate 96.67 1628000000000
 ```
 
 ### JSON Format
 
 ```bash
 # Query through Prometheus HTTP API
-curl http://localhost:9090/api/v1/query?query=terrium_success_rate
+curl http://localhost:9090/api/v1/query?query=caterva_success_rate
 
-# Or directly from Terrium API
+# Or directly from Caterva API
 curl http://localhost:3000/api/metrics
 ```
 
@@ -160,7 +160,7 @@ curl http://localhost:3000/api/metrics
 open http://localhost:9090
 
 # Query a metric
-Query: terrium_success_rate
+Query: caterva_success_rate
 Graph: Shows live value
 ```
 
@@ -180,19 +180,19 @@ open http://localhost:9090/alerts
 # Through Grafana export button on any panel
 
 # Or query Prometheus API
-curl 'http://localhost:9090/api/v1/query_range?query=terrium_success_rate&start=START&end=END&step=60s'
+curl 'http://localhost:9090/api/v1/query_range?query=caterva_success_rate&start=START&end=END&step=60s'
 ```
 
 ### Debug Scraping Issues
 
 ```bash
-# Check if Prometheus can reach Terrium
-curl http://terrium:3000/metrics
+# Check if Prometheus can reach Caterva
+curl http://caterva:3000/metrics
 
 # View scrape status in Prometheus
 open http://localhost:9090/targets
 
-# Should show "terrium" job as UP (green)
+# Should show "caterva" job as UP (green)
 ```
 
 ---
@@ -229,7 +229,7 @@ Edit `prometheus-rules.yml`:
 
 ```yaml
 - alert: CustomAlert
-  expr: terrium_execution_time_avg_ms > 2000
+  expr: caterva_execution_time_avg_ms > 2000
   for: 5m
   labels:
     severity: warning
@@ -242,7 +242,7 @@ Edit `prometheus-rules.yml`:
 
 1. In Grafana: **+** → **Create** → **Graph**
 2. Data source: `Prometheus`
-3. Metrics: `terrium_*`
+3. Metrics: `caterva_*`
 4. Customize visualization
 5. Save to dashboard
 
@@ -260,14 +260,14 @@ import requests
 
 # Query current value
 response = requests.get('http://localhost:9090/api/v1/query', 
-  params={'query': 'terrium_success_rate'})
+  params={'query': 'caterva_success_rate'})
 data = response.json()
 print(data['data']['result'][0]['value'])
 
 # Query time range
 response = requests.get('http://localhost:9090/api/v1/query_range',
   params={
-    'query': 'terrium_success_rate',
+    'query': 'caterva_success_rate',
     'start': '1640000000',
     'end': '1640086400',
     'step': '300'
@@ -300,17 +300,17 @@ receivers:
 
 ## Troubleshooting
 
-### Prometheus says "DOWN" for terrium
+### Prometheus says "DOWN" for caterva
 
 ```bash
-# Check if Terrium is running
-docker ps | grep terrium
+# Check if Caterva is running
+docker ps | grep caterva
 
 # Check if /metrics endpoint works
 curl http://localhost:3000/metrics
 
 # Check Prometheus logs
-docker logs terrium
+docker logs caterva
 ```
 
 ### No data in Grafana
@@ -320,7 +320,7 @@ docker logs terrium
 # Then refresh browser
 
 # Check if Prometheus has scraped data
-curl http://localhost:9090/api/v1/query?query=terrium_jobs_total
+curl http://localhost:9090/api/v1/query?query=caterva_jobs_total
 
 # If empty, Prometheus hasn't scraped yet (wait 15s for scrape interval)
 ```
@@ -422,23 +422,23 @@ Trigger notifications
 All metrics exposed at `/metrics`:
 
 ```
-terrium_jobs_total                           # Total jobs
-terrium_jobs_successful                      # Successful jobs
-terrium_jobs_failed                          # Failed jobs
-terrium_success_rate                         # Success % (0-100)
-terrium_execution_time_avg_ms                # Average time
-terrium_execution_time_median_ms             # Median time
-terrium_execution_time_min_ms                # Min time
-terrium_execution_time_max_ms                # Max time
-terrium_execution_time_stddev_ms             # Standard deviation
-terrium_convergence_steps_avg                # Avg convergence
-terrium_model_jobs_total{model="..."}        # Jobs per model
-terrium_model_execution_time_avg_ms{...}     # Time per model
-terrium_model_success_rate{model="..."}      # Rate per model
-terrium_model_convergence_steps_avg{...}     # Convergence per model
-terrium_execution_time_percentile_ms{...}    # P50, P75, P90, P95, P99
-terrium_slow_queries_total                   # Slow queries (>1s)
-terrium_failed_queries_total                 # Failed queries
+caterva_jobs_total                           # Total jobs
+caterva_jobs_successful                      # Successful jobs
+caterva_jobs_failed                          # Failed jobs
+caterva_success_rate                         # Success % (0-100)
+caterva_execution_time_avg_ms                # Average time
+caterva_execution_time_median_ms             # Median time
+caterva_execution_time_min_ms                # Min time
+caterva_execution_time_max_ms                # Max time
+caterva_execution_time_stddev_ms             # Standard deviation
+caterva_convergence_steps_avg                # Avg convergence
+caterva_model_jobs_total{model="..."}        # Jobs per model
+caterva_model_execution_time_avg_ms{...}     # Time per model
+caterva_model_success_rate{model="..."}      # Rate per model
+caterva_model_convergence_steps_avg{...}     # Convergence per model
+caterva_execution_time_percentile_ms{...}    # P50, P75, P90, P95, P99
+caterva_slow_queries_total                   # Slow queries (>1s)
+caterva_failed_queries_total                 # Failed queries
 ```
 
 ---
@@ -461,7 +461,7 @@ terrium_failed_queries_total                 # Failed queries
 - **Prometheus docs:** https://prometheus.io/docs/
 - **Grafana docs:** https://grafana.com/docs/
 - **Docker Compose:** https://docs.docker.com/compose/
-- **Terrium API:** See `/OPENAPI_GUIDE.md`
+- **Caterva API:** See `/OPENAPI_GUIDE.md`
 
 ---
 

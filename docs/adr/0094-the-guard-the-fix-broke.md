@@ -19,7 +19,7 @@ is survivable and an unrecorded one is not.
 
 That explanation quotes three repository slugs in backticks:
 
-    `Terrium-sim/main.git`, `Terrium-sim/terrium.git`, `math12345678/terrium.git`
+    `math12345678/caterva.git`, `math12345678/caterva.git`, `math12345678/caterva.git`
 
 `check_doc_paths_resolve.py` matches backticked tokens containing a slash
 and a short suffix, and reported all three as missing files. Exit 1. `make`

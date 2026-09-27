@@ -1,14 +1,14 @@
-Terrium
-Copyright 2026 Smyan Reddy and Terrium contributors
+Caterva
+Copyright 2026 Smyan Reddy and Caterva contributors
 
-This product includes software developed as part of the Terrium project,
+This product includes software developed as part of the Caterva project,
 licensed under the Apache License, Version 2.0 (see LICENSE).
 
 
 THIRD-PARTY SOFTWARE
 ====================
 
-Terrium does not bundle, vendor or redistribute any of its dependencies.
+Caterva does not bundle, vendor or redistribute any of its dependencies.
 `requirements.txt` names them; pip fetches them from PyPI onto the user's
 own machine. That fact does most of the work below, because almost every
 obligation in an open-source licence attaches on DISTRIBUTION, and
@@ -38,7 +38,7 @@ differed from the pin, that is noted.
   hypothesis       MPL-2.0                       dev only
   stdpopsim        GPL-3.0-or-later              NOT in the default install
 
-All of these are compatible with redistributing Terrium's own code under
+All of these are compatible with redistributing Caterva's own code under
 Apache-2.0. Three need saying out loud.
 
 
@@ -80,7 +80,7 @@ which is the whole point of the "Lesser" in its name. Its obligations —
 notice, and the ability for a recipient to relink against a modified
 libSBML — attach when you convey the library itself.
 
-Whether Terrium conveys it depends on which artifact you hold, and the
+Whether Caterva conveys it depends on which artifact you hold, and the
 section "WHAT IS ACTUALLY DISTRIBUTED" below says so artifact by artifact.
 From 2026-08-15 to 2026-09-19 the answer was "never": one CI workflow,
 `tests.yml`, publishing nothing. Since v0.2.0 the wheel and sdist name
@@ -104,11 +104,11 @@ THE TRIGGER THAT CHANGES THIS
 
   WHAT ELSE ATTACHES AT THAT MOMENT
 
-  The section above names libSBML because that is the dependency Terrium
+  The section above names libSBML because that is the dependency Caterva
   installs. A published image also conveys **its base image**, and that is
   a separate set of licences nobody put in this file.
 
-  Terrium's Dockerfiles start from:
+  Caterva's Dockerfiles start from:
 
       FROM node:22-alpine       (Dockerfile, both stages)
       FROM python:3.12-slim     (.devcontainer/Dockerfile)
@@ -141,7 +141,7 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
   records each, so the reasoning above is applied rather than left as a
   hypothetical.
 
-  1. THE WHEEL AND THE SDIST (since v0.2.0). They contain Terrium's own
+  1. THE WHEEL AND THE SDIST (since v0.2.0). They contain Caterva's own
   code (Apache-2.0), LICENSE, and this NOTICE. They contain NO third-party
   library. They NAME python-libsbml (LGPL-2.1-or-later) as a dependency in
   their metadata, and pip fetches it from PyPI onto the user's machine at
@@ -151,11 +151,11 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
   relink against a modified libSBML) therefore do not attach to these two
   artifacts. Verified on every build by `scripts/build_release.py`, which
   lists the wheel and refuses one containing a `.so`, a test, or anything
-  outside `Terium/`.
+  outside `caterva/`.
 
-  2. THE APP FOLDER, ONE PER PLATFORM (since v0.3.0). `terrium-<version>-
+  2. THE APP FOLDER, ONE PER PLATFORM (since v0.3.0). `caterva-<version>-
   <os>-<arch>.tar.gz` / `.zip` is a PyInstaller ONEDIR freeze of the
-  released wheel: the Python runtime, Terrium, and every library Terrium
+  released wheel: the Python runtime, Caterva, and every library Caterva
   imports. This artifact CONVEYS libSBML, and not once: python-libsbml's
   extension is the library as a separate file, and libroadrunner's
   `_roadrunner` extension and Antimony's `libantimony` shared library each
@@ -225,7 +225,7 @@ WHAT IS ACTUALLY DISTRIBUTED, AS OF v0.3.0 (2026-09-21)
   certificate the repository does not hold and is the owner's to obtain.
 
   3. THE SOURCE ARCHIVES GitHub attaches to every release are copies of the
-  tagged tree: Terrium's own files only, no dependency.
+  tagged tree: Caterva's own files only, no dependency.
 
   stdpopsim (GPL-3.0-or-later) is in none of the three. It stays opt-in
   through `requirements-popgen.txt` (ADR 0058); the wheel does not name it
@@ -253,7 +253,7 @@ Those licences are compatible in one direction only. Apache-2.0 code may be
 taken into a GPLv3 work; GPLv3 code cannot be folded into a work
 distributed under Apache-2.0 without the combination becoming GPLv3.
 
-Nothing was being violated — Terrium never bundled stdpopsim, and running
+Nothing was being violated — Caterva never bundled stdpopsim, and running
 two separately-installed packages together on your own machine is use, not
 distribution. But a reader would have had to compare two licence files and
 reason about their interaction to work out what they had, and this project's
@@ -280,7 +280,7 @@ terms in one licence file is the defect this project spends most of its
 effort eliminating in code, and a reader who cannot tell which of two
 sections is authoritative has been given less than one section would.)
 
-Terrium does not vendor, copy or modify any of the software below. It
+Caterva does not vendor, copy or modify any of the software below. It
 imports each as a separately-installed package through its public API. No
 file in this repository carries a third-party copyright header, and there
 is no vendor/ or third_party/ tree.
@@ -291,7 +291,7 @@ libRoadRunner  --  Apache License 2.0
   Copyright (C) 2012-2018 University of Washington, Seattle, WA, USA
 
 libRoadRunner is the ODE integrator underneath every continuous simulation
-Terrium runs. It comes from the Sauro lab at the University of Washington
+Caterva runs. It comes from the Sauro lab at the University of Washington
 and collaborators. Licensed under the Apache License, Version 2.0:
 
     http://www.apache.org/licenses/LICENSE-2.0
@@ -305,7 +305,7 @@ accompanies redistribution.
 Antimony  --  MIT
 -----------------
 
-The model-definition language Terrium generates before handing off to
+The model-definition language Caterva generates before handing off to
 libRoadRunner. Also from that ecosystem. MIT grants use, copying,
 modification, distribution and sale, provided the copyright and permission
 notice are retained.
@@ -319,21 +319,20 @@ libSBML  --  LGPL 2.1
   Japan Science and Technology Agency.
 
 SBML validation. The LGPL condition is that a recipient be able to replace
-the library. From the wheel, Terrium installs it as an ordinary Python
+the library. From the wheel, Caterva installs it as an ordinary Python
 package and neither vendors nor statically links it, so replacement is a
 `pip install` away. In the app folder it is one separate file the
 recipient can swap; see "WHAT IS ACTUALLY DISTRIBUTED" above.
 
-TERRIUM IS NOT TELLURIUM
+CATERVA IS NOT TELLURIUM
 
 Tellurium is a separate, established systems-biology environment from the
-same lab. Terrium is unaffiliated with it, is not a fork of it, and does not
+same lab. Caterva is unaffiliated with it, is not a fork of it, and does not
 depend on the `tellurium` package -- a prohibition made executable by
 Constitution Rule 7 and scripts/check_forbidden_packages.py.
 
-Terrium is a consumer of libRoadRunner and Antimony, in the ordinary way
-those libraries are meant to be consumed. The similar name is a mistake and
-is addressed in README.md and docs/RENAME_PLAN.md.
+Caterva is a consumer of libRoadRunner and Antimony, in the ordinary way
+those libraries are meant to be consumed. The project was called Terrium until 2026-09-27, too close to Tellurium's name; it has been Caterva since.md and docs/RENAME_PLAN.md.
 
 Other software
 --------------
@@ -343,10 +342,10 @@ numpy and scipy (BSD-3-Clause), requests (Apache-2.0), httpx and lxml
 (MPL-2.0). The JavaScript workspace depends on 494 packages, all under
 MIT, ISC, BSD, Apache-2.0 or equivalent permissive terms.
 
-stdpopsim (GPL-3.0) is OPTIONAL and is not redistributed with Terrium. It is
+stdpopsim (GPL-3.0) is OPTIONAL and is not redistributed with Caterva. It is
 imported at runtime only when a user has installed it themselves; the
 population-genetics tests skip when it is absent. No stdpopsim code ships
-with Terrium, so no GPL obligation attaches to Terrium's own distribution.
+with Caterva, so no GPL obligation attaches to Caterva's own distribution.
 
 Every direct dependency and the grant it rests on is recorded in
 scripts/check_dependency_licenses.py, which fails the build when a
@@ -357,9 +356,9 @@ reasoning and the open items.
 THIRD-PARTY DATA IN THIS REPOSITORY
 ===================================
 
-This file exists because Terrium redistributes data it did not create, and
+This file exists because Caterva redistributes data it did not create, and
 that data carries obligations. It is separate from LICENSE, which covers
-Terrium's own code.
+Caterva's own code.
 
 Apache 2.0 §4(d) requires that this file travel with any redistribution, so
 the attributions below reach downstream users by construction rather than by
@@ -396,7 +395,7 @@ WHERE BRENDA DATA APPEARS IN THIS REPOSITORY
 
 MODIFICATIONS
 
-CC BY 4.0 §3(a)(1)(B) requires that modifications be indicated. Terrium
+CC BY 4.0 §3(a)(1)(B) requires that modifications be indicated. Caterva
 does modify the data it extracts:
 
   * rows are filtered by organism and substrate
@@ -407,22 +406,22 @@ does modify the data it extracts:
   * the HTML fixtures are trimmed excerpts of full BRENDA pages, not
     complete copies
 
-The underlying measurements are unaltered. Terrium never edits a value.
+The underlying measurements are unaltered. Caterva never edits a value.
 
 NO WARRANTY
 
 CC BY 4.0 §5: the Licensed Material is offered as-is and as-available, and
 the licensor makes no representations or warranties of any kind concerning
-it. Terrium restates that disclaimer here and extends it: a value resolved
-through Terrium carries whatever uncertainty the original measurement
-carried, and Terrium's provenance reporting does not make a measurement
+it. Caterva restates that disclaimer here and extends it: a value resolved
+through Caterva carries whatever uncertainty the original measurement
+carried, and Caterva's provenance reporting does not make a measurement
 more reliable than it was.
 
 CITATION
 
 If you use BRENDA data in scientific work, cite BRENDA's current
 publication — see https://www.brenda-enzymes.org/references.php. Citing
-Terrium is not a substitute for citing BRENDA.
+Caterva is not a substitute for citing BRENDA.
 
 
 CORE — queried live, and UNRESOLVED
@@ -447,7 +446,7 @@ ODC-By datasets, which may be used commercially with acknowledgement, from
     existing services, such as but not limited to an API, a recommender
     system, search, discovery system or analytical dashboard.
 
-**Terrium meets all three conditions**, not one: it may be monetised (this
+**Caterva meets all three conditions**, not one: it may be monetised (this
 repository holds an incorporation checklist and a fundraising tracker), and
 it uses the CORE API to provide literature search and discovery, which is
 CORE's own listed example.
@@ -483,7 +482,7 @@ unresolved. What changed on 2026-08-16 is narrower: **the call is now off by
 default.**
 
 `Tests/enzyme_lookup.py` raises `KeggLicenceNotConfigured` unless
-`TERRIUM_ENABLE_KEGG` is set, so Terrium contacts KEGG only when an operator
+`CATERVA_ENABLE_KEGG` is set, so Caterva contacts KEGG only when an operator
 has stated that their own licence position permits it (ADR 0096). Until
 then the resolver degrades to the unfiltered BRENDA fallback.
 
@@ -492,7 +491,7 @@ Gating removes the exposure. It does not settle the entitlement, and
 variable is making the claim themselves, and the analysis below is what they
 should read first.
 
-Terrium makes live calls to `https://rest.kegg.jp/get/ec:<ec_number>` from
+Caterva makes live calls to `https://rest.kegg.jp/get/ec:<ec_number>` from
 the server, in `resolve_substrate_from_kegg()`
 (Science-Agent-Pipeline/artifacts/api-server/src/lib/science_agent_runner.py),
 to fill in a substrate name when the caller did not supply one. No KEGG data
@@ -513,7 +512,7 @@ KEGG's own terms (https://www.kegg.jp/kegg/legal.html, last updated
     nor is it a publicly funded database. Non-academic use of KEGG requires
     a commercial license.
 
-**This is an open question, not a settled position.** Terrium calls KEGG
+**This is an open question, not a settled position.** Caterva calls KEGG
 server-side while providing a service to its users, and this repository
 contains an incorporation checklist, a cap table and a fundraising tracker.
 On KEGG's stated terms that reads as either the academic service-provider
@@ -549,7 +548,7 @@ Information, U.S. National Library of Medicine. NCBI databases are in the
 public domain within the United States and carry no copyright restriction;
 NCBI asks to be cited but does not require it as a licence condition.
 
-Terrium uses these lineages at runtime to decide whether a kinetic value
+Caterva uses these lineages at runtime to decide whether a kinetic value
 measured in one organism may stand in for another (ADR 0024). The XML
 wrapper around each fixture is reconstructed to match NCBI's eFetch shape;
 the lineage content is captured. Each fixture says which is which in its
@@ -559,8 +558,8 @@ own header.
 PubMed / NCBI
 -------------
 
-Terrium queries PubMed via NCBI E-utilities. PubMed records are largely US
-Government works or publisher abstracts; Terrium stores reference
+Caterva queries PubMed via NCBI E-utilities. PubMed records are largely US
+Government works or publisher abstracts; Caterva stores reference
 identifiers (PMIDs, DOIs) rather than article text.
 
 
@@ -569,7 +568,7 @@ Why this file exists at all
 
 It was written on 2026-08-13, after Lisa Jeske of the BRENDA team replied
 to a question about querying the database and pointed at the licence page.
-Reading it revealed that Terrium was in breach on two counts:
+Reading it revealed that Caterva was in breach on two counts:
 
   1. No CC BY attribution appeared anywhere in the repository, though
      BRENDA-derived material was committed and redistributed.
@@ -580,7 +579,7 @@ Reading it revealed that Terrium was in breach on two counts:
      had licensed them to copy. CC BY 4.0 §2(a)(5)(B) forbids exactly that.
 
 The second point has since been resolved twice over: first by a carve-out
-exempting BRENDA material, and then on 2026-08-13 by relicensing Terrium
+exempting BRENDA material, and then on 2026-08-13 by relicensing Caterva
 itself to Apache 2.0, which imposes no restriction for the carve-out to
 except. The carve-out remains in LICENSE anyway, because a reader who finds
 BRENDA HTML in this repository should not have to reason about licence

@@ -1,10 +1,10 @@
-# Terrium: Complete Literature Backing Database
+# Caterva: Complete Literature Backing Database
 
 > **⚠️ AUDIT (2026-09-05):** this document was checked line-by-line against the engine it describes and against CrossRef. **Nine science errors and five bad DOIs were found and are corrected below**, each with a note saying what it used to say.
 >
 > The science errors were all of one kind: the page described maths the engine does not compute. PCR was written as a decay formula (a factor of 1.2 × 10¹⁰ from the implemented recurrence at 30 cycles), SIR and SEIR were written density-dependent while the engine integrates the frequency-dependent form (R₀ off by a factor of N), Gillespie was described as tau-leaping when the implementation is the exact Direct Method, Km was called a dissociation constant, and the Lineweaver-Burk section swapped non-competitive for uncompetitive inhibition. In every case **the code was right and this page was wrong** — which is the reassuring half. `scripts/check_documented_equations_match_engine.py` now reads both and fails if either side moves alone.
 >
-> The citation errors were of two kinds. Three DOIs are **not registered at all** (`10.3390/jcm4020248`, `10.1109/ACCESS.2019.2913256`, `10.1186/s40411-016-0035-5`) and two **resolve to a different paper in the same volume** (`10.1007/978-3-662-44202-9_8` → a different ECOOP chapter; `10.1109/ICSE.1994.296773` → a different ICSE paper). A sixth, `10.1038/ng.3285`, had already been corrected in `domain-literature.ts` a month earlier and survived here because `verify_citations_live.py` read only `.ts` and `.py` files — this document, whose entire purpose is to list Terrium's citations, was the one file the citation checker never opened. It is enrolled now.
+> The citation errors were of two kinds. Three DOIs are **not registered at all** (`10.3390/jcm4020248`, `10.1109/ACCESS.2019.2913256`, `10.1186/s40411-016-0035-5`) and two **resolve to a different paper in the same volume** (`10.1007/978-3-662-44202-9_8` → a different ECOOP chapter; `10.1109/ICSE.1994.296773` → a different ICSE paper). A sixth, `10.1038/ng.3285`, had already been corrected in `domain-literature.ts` a month earlier and survived here because `verify_citations_live.py` read only `.ts` and `.py` files — this document, whose entire purpose is to list Caterva's citations, was the one file the citation checker never opened. It is enrolled now.
 >
 > **⚠️ CORRECTION (2026-08-10):** the "42 peer-reviewed sources" total asserted near the end of this doc doesn't reconcile with its own per-category counts (which sum to 40). The real, current `domain-literature.ts` (`DOMAIN_LITERATURE_MAP`, 15 domains) contains 24 individual citation entries — a smaller, independently-checkable set that doesn't match either 40 or 42. A later pass (2026-09-05) found this sentence itself wrong: the STRENDA citation it vouched for was fabricated, and the Harter DOI pointed at a different paper. Both are corrected below. Kermack & McKendrick, Gillespie and Lennard-Jones were re-verified against CrossRef and are genuine. However, some general-software-engineering statistics cited here read as folklore-precision with no corresponding code tie-in — e.g. "15% reduction in bugs in typed codebases (Hanenberg et al., 2010)" and "40-80% reduction in defect density (Nagappan et al., 2008)" — this repo implements no coverage gate or TDD process that these specific figures could be checked against; treat them as unverified until someone confirms the actual Hanenberg/Nagappan findings support the stated numbers.
 
@@ -21,7 +21,7 @@
 - **Modern Treatment**: Lehninger, A. L., Nelson, D. L., & Cox, M. M. (2008). *Lehninger Principles of Biochemistry* (5th ed.). W.H. Freeman.
 - **Equation**: v₀ = (Vmax × [S]) / (Km + [S]) — the *initial* rate, valid at t = 0 before the substrate is appreciably depleted
 - **Parameters**:
-  - **Vmax** (maximum velocity): the rate approached as [S] → ∞ and essentially every enzyme molecule is substrate-bound. Vmax = kcat × [E]₀, so it is a property of *the assay*, not of the enzyme alone — which is why Terrium refuses to resolve a Vmax from literature without a user-supplied [E]₀ (ADR 0013, ADR 0019).
+  - **Vmax** (maximum velocity): the rate approached as [S] → ∞ and essentially every enzyme molecule is substrate-bound. Vmax = kcat × [E]₀, so it is a property of *the assay*, not of the enzyme alone — which is why Caterva refuses to resolve a Vmax from literature without a user-supplied [E]₀ (ADR 0013, ADR 0019).
   - **Km** (Michaelis constant): the substrate concentration at which v₀ = Vmax/2. **Not a dissociation constant.** For E + S ⇌ ES → E + P, Km = (k₋₁ + kcat)/k₁, whereas the dissociation constant is Kd = k₋₁/k₁. The two differ by kcat/k₁, so Km ≥ Kd always, and they coincide only under the rapid-equilibrium assumption kcat ≪ k₋₁. Km bounds affinity from above; it does not measure it.
     - **Reference**: Briggs, G. E., & Haldane, J. B. S. (1925). "A Note on the Kinetics of Enzyme Action." *Biochemical Journal*, 19(2), 338–339 — the steady-state derivation that gives Km this form. Already cited by `queryResolver.ts`; verified against CrossRef, 2026-09-05.
     - **Citation**: https://doi.org/10.1042/bj0190338
@@ -152,7 +152,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
   - dS/dt = -β·S·I
   - dI/dt = β·S·I - γ·I
   - dR/dt = γ·I
-- **Equations Terrium actually integrates** (frequency-dependent transmission, N = S + I + R):
+- **Equations Caterva actually integrates** (frequency-dependent transmission, N = S + I + R):
   - dS/dt = -β·S·I/N
   - dI/dt = β·S·I/N - γ·I
   - dR/dt = γ·I
@@ -161,7 +161,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
   - **γ** (recovery rate, per day): 1/infectious period
   - **s0, i0, r0_recovered** (initial compartment sizes): `s0` is the number **susceptible**, not the total population; N is their sum
 
-> **⚠️ CORRECTION (2026-09-05):** this section previously documented only `dS/dt = -β·S·I`. `Terium/continuous/model_building.py` emits `beta * S * I / N` — the frequency-dependent form — for both SIR and SEIR. The two are different models, not notational variants: β carries different units (per day versus per host per day), and R₀ is β/γ under the form the engine integrates but β·N/γ under the form the document described. A reader recomputing R₀ from this page for the shipped COVID-19 parameters (β = 0.5761, γ = 0.1835) and a population of 1000 would have got **3140 instead of 3.14** — a factor of N. Both forms are now shown, and which one the engine solves is stated.
+> **⚠️ CORRECTION (2026-09-05):** this section previously documented only `dS/dt = -β·S·I`. `caterva/continuous/model_building.py` emits `beta * S * I / N` — the frequency-dependent form — for both SIR and SEIR. The two are different models, not notational variants: β carries different units (per day versus per host per day), and R₀ is β/γ under the form the engine integrates but β·N/γ under the form the document described. A reader recomputing R₀ from this page for the shipped COVID-19 parameters (β = 0.5761, γ = 0.1835) and a population of 1000 would have got **3140 instead of 3.14** — a factor of N. Both forms are now shown, and which one the engine solves is stated.
 
 **Frequency- vs density-dependent transmission**:
 - **Reference**: Begon, M., Bennett, M., Bowers, R. G., French, N. P., et al. (2002). "A clarification of transmission terms in host-microparasite models: numbers, densities and areas." *Epidemiology and Infection*, 129(1), 147–153. (Verified against CrossRef, 2026-09-05.)
@@ -180,7 +180,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 **Theory**:
 - **Reference**: Anderson, R. M., & May, R. M. (1991). *Infectious Diseases of Humans: Dynamics and Control*. Oxford University Press.
 - **Extension**: Adds exposed (latent) period between infection and infectiousness
-- **Equations Terrium actually integrates** (frequency-dependent, as for SIR; N = S + E + I + R):
+- **Equations Caterva actually integrates** (frequency-dependent, as for SIR; N = S + E + I + R):
   - dS/dt = -β·S·I/N
   - dE/dt = β·S·I/N - σ·E
   - dI/dt = σ·E - γ·I
@@ -206,7 +206,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 
 > **⚠️ CORRECTION (2026-09-05):** this entry previously cited `10.1038/ng.3285` as *"Rahbari, R., et al. (2016). 'Variation and heritability of recombination rate in humans.' Nature Genetics, 47(7), 776–783."* Checked against CrossRef, **that DOI is Polderman et al. (2015), "Meta-analysis of the heritability of human traits based on fifty years of twin studies", Nature Genetics 47(7), 702–709** — not Rahbari, not recombination, and not a mutation rate. The DOI resolves cleanly, which is exactly why an existence check passed it for so long.
 >
-> This is not a newly discovered fault. `domain-literature.ts` was corrected to `10.1038/ng.3469` on 2026-08-09, and `Business/build-stages/STAGE_10_PART_06.md` names "the `ng.3285` citation surviving in two markdown files after the code was fixed" as a symptom of duplicated sources of truth. **This file was one of those two, and stayed wrong for another month.** `scripts/verify_citations_live.py` could not have caught it: its `DOI_SOURCE_FILES` list contains only `.ts` and `.py` sources, so the document whose entire purpose is to list Terrium's citations was the one file the citation checker never read. That gap is now closed — see `scripts/check_documented_equations_match_engine.py` and this file's enrolment in the live checker.
+> This is not a newly discovered fault. `domain-literature.ts` was corrected to `10.1038/ng.3469` on 2026-08-09, and `Business/build-stages/STAGE_10_PART_06.md` names "the `ng.3285` citation surviving in two markdown files after the code was fixed" as a symptom of duplicated sources of truth. **This file was one of those two, and stayed wrong for another month.** `scripts/verify_citations_live.py` could not have caught it: its `DOI_SOURCE_FILES` list contains only `.ts` and `.py` sources, so the document whose entire purpose is to list Caterva's citations was the one file the citation checker never read. That gap is now closed — see `scripts/check_documented_equations_match_engine.py` and this file's enrolment in the live checker.
 
 **What the code actually resolves**: `Tests/popgen_resolver.py` does not read this reference. It resolves the mutation rate from **stdpopsim**'s `HomSap` genome (`mean_mutation_rate` ≈ 1.29 × 10⁻⁸ per bp per generation) and surfaces stdpopsim's own bundled citation for that quantity, deliberately refusing to surface a bundled citation that is present for some *other* reason. The reference above is context for the reader, not the provenance of the number.
 
@@ -221,7 +221,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
   reference as a whole describing no paper that exists. All fields now
   match CrossRef's record for the 1976 paper.)
 - **Citation**: https://doi.org/10.1016/0021-9991(76)90041-3
-- **Method**: the **exact SSA (Gillespie's Direct Method)** — the implementation in `Terium/discrete/gillespie_ssa.py` samples a waiting time `tau = -ln(u)/propensity` for each individual reaction event and fires reactions one at a time. No trajectory is approximated.
+- **Method**: the **exact SSA (Gillespie's Direct Method)** — the implementation in `caterva/discrete/gillespie_ssa.py` samples a waiting time `tau = -ln(u)/propensity` for each individual reaction event and fires reactions one at a time. No trajectory is approximated.
 - **Reactions**: Chemical reactions modeled as Poisson processes
 - **Parameters**:
   - **a0** (initial molecules): Starting population
@@ -231,7 +231,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 **Modern Application**:
 - **Reference**: Cao, Y., Gillespie, D. T., & Petzold, L. R. (2006). "Efficient step size selection for the tau-leaping simulation method." *The Journal of Chemical Physics*, 124(4), 044109.
 - **Citation**: https://doi.org/10.1063/1.2159468
-- **Implementation status**: **not implemented.** Listed as the standard reference for tau-leaping should Terrium ever need an approximate accelerated method; the engine is exact SSA only.
+- **Implementation status**: **not implemented.** Listed as the standard reference for tau-leaping should Caterva ever need an approximate accelerated method; the engine is exact SSA only.
 
 > **⚠️ CORRECTION (2026-09-05):** this section previously described the method as *"Tau-leaping algorithm for stochastic reaction dynamics"* and claimed *"Implementation: Adaptive tau-selection for accuracy/speed tradeoff"*. Neither is in the codebase. Tau-leaping (Gillespie, 2001) is an **approximation** that fires many reactions per step; `gillespie_ssa.py` implements the **exact** Direct Method of the 1976/1977 papers and says so in its own module docstring. The `tau` in the source is the exact inter-event waiting time, not a leap interval — the same symbol for a different quantity. Attributing tau-leaping to the 1976 paper is also an anachronism: tau-leaping postdates it by 25 years.
 
@@ -267,7 +267,7 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
   - **E**: Efficiency — the fraction of template copied per cycle, in [0, 1]. Perfect doubling is E = 1, giving N = N₀·2ⁿ.
   - **n**: Number of cycles
 
-> **⚠️ CORRECTION (2026-09-05):** this equation previously read `N(n) = N₀ × E^n`. With the efficiency range stated one line below it (0.85–1.0), that formula **describes decay, not amplification**: at 30 cycles and E = 0.9 it returns 0.042·N₀, i.e. a PCR reaction that destroys 96% of its template. `Terium/discrete/pcr.py` computes `n0 * (1.0 + efficiency) ** cycle`, which returns 5.2 × 10⁸·N₀ for the same inputs — the documented and implemented formulas differ by a factor of **1.2 × 10¹⁰**. The engine was correct throughout; only this page was wrong.
+> **⚠️ CORRECTION (2026-09-05):** this equation previously read `N(n) = N₀ × E^n`. With the efficiency range stated one line below it (0.85–1.0), that formula **describes decay, not amplification**: at 30 cycles and E = 0.9 it returns 0.042·N₀, i.e. a PCR reaction that destroys 96% of its template. `caterva/discrete/pcr.py` computes `n0 * (1.0 + efficiency) ** cycle`, which returns 5.2 × 10⁸·N₀ for the same inputs — the documented and implemented formulas differ by a factor of **1.2 × 10¹⁰**. The engine was correct throughout; only this page was wrong.
 - **Parameters**:
   - **n0** (initial template): DNA copy number at start
   - **efficiency**: Per-cycle amplification efficiency
@@ -556,4 +556,4 @@ if (!assayConditions.ph || !assayConditions.temperatureC) {
 
 ## Implementation Guarantee
 
-Every line of code in Terrium maps to at least one reference in this database. Configuration and infrastructure decisions are grounded in scientific literature or established engineering standards.
+Every line of code in Caterva maps to at least one reference in this database. Configuration and infrastructure decisions are grounded in scientific literature or established engineering standards.

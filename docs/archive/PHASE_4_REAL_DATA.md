@@ -8,7 +8,7 @@
 
 ### 1. CrossRef API (Real DOI Resolution)
 ```bash
-curl -H "User-Agent: Terrium/1.0" \
+curl -H "User-Agent: Caterva/1.0" \
   "https://api.crossref.org/v1/works/10.1038/nature12373"
 ```
 **What we get:** Real papers. Real authors. Real DOIs.
@@ -101,11 +101,11 @@ const kineticsFromBREND = await brenda.getKineticParameters(
 ✅ Cross-reference PubMed papers
 ```
 
-### Week 2: Real Terium Engine
+### Week 2: Real Caterva Engine
 
 **Day 1-2: Python Environment Setup**
 ```bash
-✅ Install Terium
+✅ Install Caterva
 ✅ Install libSBML
 ✅ Create SBML models for real enzymes
 ✅ Test simulation end-to-end
@@ -200,7 +200,7 @@ const kineticsFromBREND = await brenda.getKineticParameters(
 ✅ Confidence scored  
 
 ### Every Simulation Real
-✅ Terium actually running  
+✅ Caterva actually running  
 ✅ SBML models from real enzymes  
 ✅ Parameters from actual experiments  
 ✅ Results reproducible and citable  

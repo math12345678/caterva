@@ -51,7 +51,7 @@ It is **not** an ensemble, and the distinction is not cosmetic:
   running a model at a number nobody measured is precisely the fabrication
   this project exists to refuse.
 * No uncertainty is estimated. Bakker's spread is bounded by rejection at
-  the model level after flux validation. Terrium has no flux data, so
+  the model level after flux validation. Caterva has no flux data, so
   nothing here may be read as "the answer is X +/- Y".
 * Nothing is aggregated. There is no mean outcome. A mean over values whose
   weights are unknown is the invented total that `reliabilityScore.ts`
@@ -246,14 +246,14 @@ def consequence_of(
             reason=(
                 f"cannot run the model: {', '.join(missing)} not supplied. "
                 "These are experimental settings, not properties of the "
-                "enzyme, and Terrium does not have them. Guessing one would "
+                "enzyme, and Caterva does not have them. Guessing one would "
                 "change the trajectory shown to the reader while looking "
                 "like a result."
             ),
         )
 
     if simulate is None:  # pragma: no cover - exercised via the real engine
-        from Terium.continuous.simulations import simulate_michaelis_menten
+        from caterva.continuous.simulations import simulate_michaelis_menten
 
         simulate = simulate_michaelis_menten
 

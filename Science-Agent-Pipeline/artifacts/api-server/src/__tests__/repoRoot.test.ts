@@ -8,9 +8,9 @@ import { findRepositoryRoot } from "../lib/repoRoot";
 const tempDirs: string[] = [];
 
 function makeFakeRepo(): string {
-  const root = mkdtempSync(path.join(tmpdir(), "terrium-root-"));
+  const root = mkdtempSync(path.join(tmpdir(), "caterva-root-"));
   tempDirs.push(root);
-  mkdirSync(path.join(root, "Terium"));
+  mkdirSync(path.join(root, "caterva"));
   mkdirSync(path.join(root, "Science-Agent-Pipeline"));
   writeFileSync(
     path.join(root, "Science-Agent-Pipeline", "pnpm-workspace.yaml"),
@@ -75,19 +75,19 @@ describe("findRepositoryRoot", () => {
   });
 
   it("throws when no repo markers exist up the tree", () => {
-    const root = mkdtempSync(path.join(tmpdir(), "terrium-empty-"));
+    const root = mkdtempSync(path.join(tmpdir(), "caterva-empty-"));
     tempDirs.push(root);
     expect(() => findRepositoryRoot(root)).toThrow(
-      /Could not find Terrium repository root/,
+      /Could not find Caterva repository root/,
     );
   });
 
   it("does not accept a directory with only one of the two markers", () => {
-    const root = mkdtempSync(path.join(tmpdir(), "terrium-half-"));
+    const root = mkdtempSync(path.join(tmpdir(), "caterva-half-"));
     tempDirs.push(root);
-    mkdirSync(path.join(root, "Terium"));
+    mkdirSync(path.join(root, "caterva"));
     expect(() => findRepositoryRoot(root)).toThrow(
-      /Could not find Terrium repository root/,
+      /Could not find Caterva repository root/,
     );
   });
 });

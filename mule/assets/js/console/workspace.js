@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — console output workspace
+   caterva — console output workspace
 
    The workspace assembles as a consequence of the timeline: each
    agent that emits something adds its own block here, in order.

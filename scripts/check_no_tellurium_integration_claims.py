@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""No published document may claim Terrium is built on or integrates Tellurium.
+"""No published document may claim Caterva is built on or integrates Tellurium.
 
 WHY THIS EXISTS
 ---------------
 NOTICE says, publicly:
 
-    Terrium is unaffiliated with it, is not a fork of it, and does not depend
+    Caterva is unaffiliated with it, is not a fork of it, and does not depend
     on the `tellurium` package.
 
-On 2026-08-16, `Docw/terrium_spec.docx` -- tracked, published, in every clone
+On 2026-08-16, `Docw/caterva_spec.docx` -- tracked, published, in every clone
 -- was found to say, also publicly:
 
     "built with the Tellurium systems-biology toolkit"
@@ -47,7 +47,7 @@ that gap, and reads Office files, because that is where the instance lived.
 WHAT IT CHECKS
 --------------
 Every published document -- markdown, .docx and .pptx -- for a sentence
-claiming Terrium uses, integrates, embeds or is built on Tellurium.
+claiming Caterva uses, integrates, embeds or is built on Tellurium.
 
 Denials are not claims. "does not depend on tellurium" and "is not a fork of
 it" must pass, or the guard would flag NOTICE itself, which is the document
@@ -62,7 +62,7 @@ contradiction recorded rather than deleted, and keeps the guard able to fail
 for anything new.
 
 An entry here is not an endorsement of publishing the document. Whether
-`Docw/terrium_spec.docx` should be superseded, corrected or withdrawn is an
+`Docw/caterva_spec.docx` should be superseded, corrected or withdrawn is an
 editorial decision for its author, and is recorded in
 `Business/LEGAL_BRIEF_NAMING.md` section 3a.
 
@@ -80,7 +80,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
-#: A claim that Terrium *uses* Tellurium, as opposed to naming it.
+#: A claim that Caterva *uses* Tellurium, as opposed to naming it.
 CLAIM = re.compile(
     r"\b(?:built\s+(?:with|on)|using|uses|via|powered\s+by|integrat\w*\s+with"
     r"|renders?\s+(?:using|with)|based\s+on)\s+(?:the\s+)?tellurium\b"
@@ -99,7 +99,7 @@ DENIAL = re.compile(
 #: Documents that record a superseded plan. Each needs a reason, and being
 #: listed here does not mean the document should stay published.
 HISTORICAL: dict[str, str] = {
-    "Docw/terrium_spec.docx": (
+    "Docw/caterva_spec.docx": (
         "Brand and Product Spec v1.0, July 2026. Describes an intended "
         "product that was not built: a browser notebook rendering via the "
         "Tellurium toolkit. ADR 0001 records the decision not to depend on "
@@ -109,7 +109,7 @@ HISTORICAL: dict[str, str] = {
         "which also notes it is marked 'Internal Use Only' and 'Confidential' "
         "while sitting in a public repository."
     ),
-    "Docw/terrium_full.docx": (
+    "Docw/caterva_full.docx": (
         "Found by this guard on 2026-08-16, after the spec above and after a "
         "report saying the spec was the only one. It assigns 'Tellurium "
         "integration' to a named engineer as a backend responsibility, in a "
@@ -136,7 +136,7 @@ DISCUSSES: dict[str, str] = {
     ),
     "docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md": (
         "The remediation plan for these exact files. Its inventory reads "
-        '`Docw/terrium_full.docx    also: claims \"Tellurium integration\"` '
+        '`Docw/caterva_full.docx    also: claims \"Tellurium integration\"` '
         "-- the phrase is the thing being removed, named so somebody can "
         "find it. This guard failed the build on it, so the document "
         "planning the cleanup was the one blocking CI, and the only way to "
@@ -160,8 +160,8 @@ DISCUSSES: dict[str, str] = {
 #: `**/*.docx`, not `Docw/*.docx`. The first version of this guard named the
 #: one directory where the claims had been found, which is the defect it was
 #: written to catch, committed one pass after warning about it. There were
-#: copies: Science-Agent-Pipeline/attached_assets/terrium_spec_*.docx and
-#: terrium_full_*.docx hold the same four claims and the same "Confidential"
+#: copies: Science-Agent-Pipeline/attached_assets/caterva_spec_*.docx and
+#: caterva_full_*.docx hold the same four claims and the same "Confidential"
 #: marking, tracked, and were never scanned. Removing Docw/ alone would have
 #: removed nothing.
 SUFFIXES = (".md", ".docx", ".pptx")
@@ -171,7 +171,12 @@ _SKIP_PARTS = {"node_modules", ".venv", "venv", "dist", "build", ".git"}
 
 #: A scan that reads no Office file is not reading the place this was found.
 _MIN_DOCS = 30
-_MIN_OFFICE = 1
+#: Zero since 2026-09-27: the last tracked Office file (the pitch deck) was
+#: removed and scrubbed from history when the repository went public. The
+#: guard still reads any .docx/.pptx that is added; it no longer requires one
+#: to exist, because requiring a confidential deck in a public repository in
+#: order to keep a check non-vacuous is the wrong trade.
+_MIN_OFFICE = 0
 
 
 def _office_text(path: Path) -> str:
@@ -285,7 +290,7 @@ def _sentences(text: str) -> list[str]:
 
         ...found no denial word on the line, and reported the document as
         claiming
-        Terrium is built on Tellurium.
+        Caterva is built on Tellurium.
 
     The second line alone reads as a flat assertion. With the first, it is
     a REPORT of somebody else's claim. The guard flagged the tail and
@@ -350,7 +355,7 @@ def check(docs: list[Path] | None = None) -> list[str]:
                 sentence, match.start(), match.end()
             ):
                 problems.append(
-                    f"{rel} claims Terrium uses Tellurium:\n"
+                    f"{rel} claims Caterva uses Tellurium:\n"
                     f'      "{sentence.strip()[:150]}"\n'
                     f"      NOTICE says it does not. Both are published."
                 )
@@ -371,12 +376,12 @@ def _selftest() -> int:
     if not CLAIM.search("built with the Tellurium systems-biology toolkit"):
         failures.append("did not match 'built with the Tellurium'")
 
-    notice = "Terrium is unaffiliated with it, is not a fork of it, and does not depend on the tellurium package"
+    notice = "Caterva is unaffiliated with it, is not a fork of it, and does not depend on the tellurium package"
     if CLAIM.search(notice) and not DENIAL.search(notice):
         failures.append("would have flagged NOTICE's own denial")
 
     # A document carrying the claim must be caught. This used to assert that
-    # removing Docw/terrium_spec.docx from HISTORICAL made the tree fail --
+    # removing Docw/caterva_spec.docx from HISTORICAL made the tree fail --
     # a real test until 2026-08-16, when those files were removed from the
     # repository. `_documents()` reads `git ls-files`, so an untracked file is
     # not scanned at all and the exemption stopped being load-bearing. Keeping
@@ -463,7 +468,7 @@ def main() -> int:
     office = [p for p in docs if p.suffix in {".docx", ".pptx"}]
     print(
         f"OK: {len(docs)} document(s) checked ({len(office)} Office file(s)); "
-        f"none claims Terrium is built on Tellurium. "
+        f"none claims Caterva is built on Tellurium. "
         f"{len(HISTORICAL)} recorded as historical."
     )
     return 0

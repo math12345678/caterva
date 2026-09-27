@@ -16,7 +16,7 @@ trust them was invented.**
 
 ## What DESIGN.md said, and what the tool says
 
-`docs/DESIGN.md` is the page that explains what Terrium's three trust grades
+`docs/DESIGN.md` is the page that explains what Caterva's three trust grades
 mean, using `ref 740253` as its worked example.
 
 | DESIGN.md said | the resolver, on the committed fixture |

@@ -5,7 +5,7 @@
 
 ## Context
 
-Terrium's front page describes a document. To see one, a stranger had to
+Caterva's front page describes a document. To see one, a stranger had to
 clear six separate hurdles:
 
 1. clone the repository — which is private (ADR 0143)
@@ -55,7 +55,7 @@ than a secret.
 
 The saved page is committed under `Tests/fixtures/`, so the run demonstrates
 the pipeline and not a live lookup. The document says so in its own *"What
-Terrium would not do"* section, and the demo repeats it. A demo that quietly
+Caterva would not do"* section, and the demo repeats it. A demo that quietly
 read a fixture while looking like a live lookup would be more flattering and
 dishonest.
 

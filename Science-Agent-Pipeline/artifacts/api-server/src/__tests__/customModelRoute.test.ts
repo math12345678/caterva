@@ -20,10 +20,10 @@
  * parsed and run. Antimony reaches the same place by a second route -- its
  * `import` directive reads files off disk.
  *
- * So the guards in `terium_runner.run_sbml` are load-bearing, and these
+ * So the guards in `caterva_runner.run_sbml` are load-bearing, and these
  * tests exist to hold them AT THE HTTP BOUNDARY, which is where an attacker
  * actually stands. The engine-side unit tests in
- * `Terium/tests/test_boundary_contract.py` cover the same refusals directly;
+ * `caterva/tests/test_boundary_contract.py` cover the same refusals directly;
  * these cover the fact that a request can still reach them -- a guard that
  * works in the engine but is bypassed by the route protects nothing.
  *
@@ -241,7 +241,7 @@ describe("POST /api/simulate/model — a model the caller supplies", () => {
   // ---- literature grounding of the caller's own model -----------------
   //
   // Until this existed, a lab that brought its own model got every
-  // parameter stamped origin "user" with no citations -- Terrium's whole
+  // parameter stamped origin "user" with no citations -- Caterva's whole
   // reason to exist switched off at exactly the moment a real lab used
   // it. See modelAnnotations.ts.
 
@@ -253,7 +253,7 @@ describe("POST /api/simulate/model — a model the caller supplies", () => {
       antimony: [
         "model m",
         "  S -> P; (Vmax * S) / (Km + S);",
-        '  // terrium: km substrate="glucose" unit="mM"',
+        '  // caterva: km substrate="glucose" unit="mM"',
         "  Km = 0.15;",
         "  Vmax = 0.5; S = 10; P = 0;",
         "end",
@@ -275,7 +275,7 @@ describe("POST /api/simulate/model — a model the caller supplies", () => {
       antimony: [
         "model m",
         "  S -> P; (Vmax * S) / (Km + S);",
-        '  // terrium: km enzyme="not a real enzyme at all" organism="Homo sapiens" unit="mM" resolve',
+        '  // caterva: km enzyme="not a real enzyme at all" organism="Homo sapiens" unit="mM" resolve',
         "  Km = ?;",
         "  Vmax = 0.5; S = 10; P = 0;",
         "end",
@@ -301,7 +301,7 @@ describe("POST /api/simulate/model — a model the caller supplies", () => {
   }, 30_000);
 
   it("simulates the number it cited, in a model nobody hardcoded", async () => {
-    // The headline capability, unmocked: a model Terrium has never seen,
+    // The headline capability, unmocked: a model Caterva has never seen,
     // with a constant it fills from BRENDA and a citation a reader can
     // follow. This is what "Tellurium, but every number is traceable"
     // has to mean in practice.
@@ -315,7 +315,7 @@ describe("POST /api/simulate/model — a model the caller supplies", () => {
       antimony: [
         "model my_assay",
         "  S -> P; (Vmax * S) / (Km_hex + S);",
-        '  // terrium: km enzyme="hexokinase" substrate="glucose" unit="mM" resolve',
+        '  // caterva: km enzyme="hexokinase" substrate="glucose" unit="mM" resolve',
         "  Km_hex = ?;",
         "  Vmax = 0.02;",
         "  S = 10;",

@@ -316,7 +316,7 @@ def _argument_for(name: str, *, ledger: Ledger, streams: Dict[str, Any]) -> Any:
     if "config" in lowered or "path" in lowered:
         return str(CONFIG_PATH)
     if "model" in lowered:
-        return "terrium-extract"
+        return "caterva-extract"
     raise _Unsuppliable(name)
 
 
@@ -561,7 +561,7 @@ class TestConfigStatesNoInventedNumber:
         )
 
     def test_prompts_and_responses_are_never_logged(self) -> None:
-        """Terrium's queries can contain a researcher's unpublished subject.
+        """Caterva's queries can contain a researcher's unpublished subject.
 
         A gateway that wrote them to disk would be a disclosure the rest of
         the project is careful to avoid, and it would be one nobody noticed

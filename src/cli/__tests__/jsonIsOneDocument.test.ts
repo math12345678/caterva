@@ -41,7 +41,7 @@ function runCli(args: string[]): { stdout: string; code: number } {
   try {
     const stdout = execFileSync(TS_NODE, [CLI, ...args], {
       cwd: REPO_ROOT,
-      env: { ...process.env, TERRIUM_LITERATURE_RUNNER: stub },
+      env: { ...process.env, CATERVA_LITERATURE_RUNNER: stub },
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 120_000,
@@ -54,7 +54,7 @@ function runCli(args: string[]): { stdout: string; code: number } {
 }
 
 beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-json-'));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-json-'));
   stub = path.join(tmpDir, 'stub.py');
   // Km resolves; everything else is a clean absence. Enough to reach both
   // the successful and the refused paths depending on what the caller

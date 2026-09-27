@@ -90,7 +90,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_execution_time_avg_ms",
+          "expr": "caterva_execution_time_avg_ms",
           "refId": "A"
         }
       ],
@@ -148,7 +148,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_success_rate",
+          "expr": "caterva_success_rate",
           "refId": "A"
         }
       ],
@@ -226,17 +226,17 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_execution_time_min_ms",
+          "expr": "caterva_execution_time_min_ms",
           "legendFormat": "Min",
           "refId": "A"
         },
         {
-          "expr": "terrium_execution_time_median_ms",
+          "expr": "caterva_execution_time_median_ms",
           "legendFormat": "Median",
           "refId": "B"
         },
         {
-          "expr": "terrium_execution_time_max_ms",
+          "expr": "caterva_execution_time_max_ms",
           "legendFormat": "Max",
           "refId": "C"
         }
@@ -312,7 +312,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_model_jobs_total",
+          "expr": "caterva_model_jobs_total",
           "legendFormat": "{{ model }}",
           "refId": "A"
         }
@@ -390,7 +390,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_model_execution_time_avg_ms",
+          "expr": "caterva_model_execution_time_avg_ms",
           "legendFormat": "{{ model }}",
           "refId": "A"
         }
@@ -466,7 +466,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_execution_time_percentile_ms",
+          "expr": "caterva_execution_time_percentile_ms",
           "legendFormat": "p{{ percentile }}",
           "refId": "A"
         }
@@ -524,7 +524,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_slow_queries_total",
+          "expr": "caterva_slow_queries_total",
           "refId": "A"
         }
       ],
@@ -581,7 +581,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_failed_queries_total",
+          "expr": "caterva_failed_queries_total",
           "refId": "A"
         }
       ],
@@ -630,7 +630,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "terrium_jobs_total",
+          "expr": "caterva_jobs_total",
           "refId": "A"
         }
       ],
@@ -642,7 +642,7 @@
   "schemaVersion": 27,
   "style": "dark",
   "tags": [
-    "terrium",
+    "caterva",
     "scientific",
     "monitoring"
   ],
@@ -655,7 +655,7 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "Terrium Performance Monitoring",
-  "uid": "terrium-monitoring",
+  "title": "Caterva Performance Monitoring",
+  "uid": "caterva-monitoring",
   "version": 1
 }

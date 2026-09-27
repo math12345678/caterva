@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Terrium Python Integration Examples
+Caterva Python Integration Examples
 
-Working examples of the Terrium web API from Python.
+Working examples of the Caterva web API from Python.
 
 WHICH SERVER THIS TALKS TO
 --------------------------
-Terrium serves TWO HTTP APIs, and they are not interchangeable:
+Caterva serves TWO HTTP APIs, and they are not interchangeable:
 
   * `src/web/server.ts` — the root tree's own server, started with
     `npm run web`. THIS FILE TARGETS THAT ONE. It exposes /api/simulate,
@@ -32,14 +32,14 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-TERRIUM_URL = "http://localhost:3000"
+CATERVA_URL = "http://localhost:3000"
 API_TIMEOUT = 30
 
 
-class TerriumClient:
-    """Python client for the Terrium web API (`src/web/server.ts`)."""
+class CatervaClient:
+    """Python client for the Caterva web API (`src/web/server.ts`)."""
 
-    def __init__(self, base_url: str = TERRIUM_URL):
+    def __init__(self, base_url: str = CATERVA_URL):
         self.base_url = base_url.rstrip("/")
         self.session = requests.Session()
 
@@ -199,7 +199,7 @@ class TerriumClient:
 # ---------------------------------------------------------------------------
 
 
-def example_simulation(client: TerriumClient) -> Optional[str]:
+def example_simulation(client: CatervaClient) -> Optional[str]:
     job_id = client.simulate(
         query="michaelis-menten",
         parameters={"km": 5.2, "vmax": 12.8, "s0": 10.0},
@@ -212,7 +212,7 @@ def example_simulation(client: TerriumClient) -> Optional[str]:
     return job_id
 
 
-def example_literature_backed(client: TerriumClient) -> None:
+def example_literature_backed(client: CatervaClient) -> None:
     """With enzyme and substrate, the server looks up real kinetics first."""
     job_id = client.simulate(
         query="michaelis-menten",
@@ -225,7 +225,7 @@ def example_literature_backed(client: TerriumClient) -> None:
     print(f"  validated against literature: {result.get('validated')}")
 
 
-def example_sweep(client: TerriumClient) -> None:
+def example_sweep(client: CatervaClient) -> None:
     sweep_id = client.sweep(
         query="michaelis-menten",
         base_parameters={"vmax": 12.8, "s0": 10.0},
@@ -234,19 +234,19 @@ def example_sweep(client: TerriumClient) -> None:
     print(f"  sweep id: {sweep_id}")
 
 
-def example_statistics(client: TerriumClient) -> None:
+def example_statistics(client: CatervaClient) -> None:
     stats = client.statistics()
     for key in ("totalJobs", "successful", "failed"):
         print(f"  {key:<12} {stats.get(key)}")
 
 
 def main() -> int:
-    client = TerriumClient()
+    client = CatervaClient()
 
     try:
         client.health_check()
     except requests.RequestException:
-        print(f"No Terrium web server at {TERRIUM_URL}. Start it with `npm run web`.")
+        print(f"No Caterva web server at {CATERVA_URL}. Start it with `npm run web`.")
         return 1
 
     for name, example in [

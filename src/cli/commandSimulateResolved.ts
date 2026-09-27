@@ -2,7 +2,7 @@
  * `scientific simulate --resolve` — look up what the simulation needs, run
  * it, and show where every number came from.
  *
- * This is the command that makes Terrium a tool rather than a validator.
+ * This is the command that makes Caterva a tool rather than a validator.
  * The old `simulate` path could not succeed through literature at all:
  *
  *   - `fetchRealLiterature('lactate dehydrogenase', 'lactate')` was called
@@ -152,7 +152,7 @@ function assayConditionsFor(
  * ----------------------------
  * `condition` — a value the USER chooses. `s0`, `i0` and `[E]0` describe the
  * experiment being run, not the enzyme, so no database can report them and
- * refusing to default them is not a gap in Terrium's coverage. The honest
+ * refusing to default them is not a gap in Caterva's coverage. The honest
  * response is to say "this one is yours to pick".
  *
  * `literature` — a measured quantity that BRENDA/PubMed did not yield. Here
@@ -176,7 +176,7 @@ interface Blocker {
  *
  * WHY THIS EXISTS
  * ---------------
- * Used as a student uses it, Terrium took three attempts and six flags
+ * Used as a student uses it, Caterva took three attempts and six flags
  * before producing a single number, and the refusal at each step named what
  * was missing without saying what to type next.
  *
@@ -184,7 +184,7 @@ interface Blocker {
  * refuses pushes people to "hardcode a number with no warning at all". A
  * student stuck on `[E]0` will search for a plausible enzyme concentration,
  * paste it in, and now hold an unsourced parameter with no record of where
- * it came from — which is worse than anything Terrium was protecting them
+ * it came from — which is worse than anything Caterva was protecting them
  * from.
  *
  * The refusal stands. Nothing is defaulted, nothing is invented. What
@@ -234,7 +234,7 @@ function renderNextStep(
       `\n${c(DIM, '  If you have a source for one of these, record it rather than')}\n` +
         `${c(DIM, '  typing a bare number — the value then travels with its citation:')}\n\n` +
         `    ${c(BOLD, `--cite ${gaps[0]!.parameter}="Smith 2019, PMID 12345"`)}\n` +
-        `${c(DIM, '      Terrium does not verify the source; it records that you supplied it.')}\n` +
+        `${c(DIM, '      Caterva does not verify the source; it records that you supplied it.')}\n` +
         `\n${c(DIM, '  Or widen the search, understanding what you are accepting:')}\n\n` +
         `    ${c(BOLD, '--allow-cross-species')}\n` +
         `${c(DIM, '      a value measured in a related organism, still checked for')}\n` +
@@ -301,7 +301,7 @@ export interface SimulateResolvedOptions {
   /**
    * `--cite km="Smith 2019"` — sources for values the user supplied.
    *
-   * Keyed by lower-case parameter name. Never verified by Terrium, and
+   * Keyed by lower-case parameter name. Never verified by Caterva, and
    * carried as `user_cited` rather than `resolved` so no surface can
    * present it with the authority of a BRENDA reference.
    */
@@ -504,7 +504,7 @@ async function writeExports(
    *
    * The model stays `null` on the `!runnable` path below, and that is the
    * point: a model deliberately withheld because the simulation was
-   * refused is a decision Terrium made and explained, not a write that
+   * refused is a decision Caterva made and explained, not a write that
    * failed. `false` there would make "I declined to run" and "the file
    * system said no" the same fact.
    */
@@ -635,7 +635,7 @@ async function writeExports(
         }
       }
 
-      // An identifier Terrium declined to mint a URI for is NOT a missing
+      // An identifier Caterva declined to mint a URI for is NOT a missing
       // annotation — the source is real, it just has no resolvable form.
       // Saying so is the difference between "we had nothing" and "we had
       // something and refused to dress it up as a link".
@@ -683,7 +683,7 @@ async function writeExports(
       say(
         `\n${c(BOLD, 'Citations written')} ${outcome.path}\n` +
           `${c(DIM, `  ${cited.length} source(s), importable into Zotero, Mendeley or EndNote.`)}\n` +
-          `${c(DIM, '  Author, year and journal are absent, not omitted — Terrium knows')}\n` +
+          `${c(DIM, '  Author, year and journal are absent, not omitted — Caterva knows')}\n` +
           `${c(DIM, '  the identifier and does not invent the rest.')}\n`,
       );
     } else {
@@ -748,7 +748,7 @@ export async function commandSimulateResolved(
 
     // A value the user typed may still have a real source in the world.
     // Sauro predicted that a refusing tool pushes people to "hardcode a
-    // number with no warning at all" -- and Terrium's own error message
+    // number with no warning at all" -- and Caterva's own error message
     // told them to. If they can say where it came from, that is recorded
     // rather than discarded.
     const cited = options.userCitations?.get(name.toLowerCase());

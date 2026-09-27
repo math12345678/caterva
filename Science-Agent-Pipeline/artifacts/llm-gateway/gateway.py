@@ -115,7 +115,7 @@ DEFAULT_CONFIG_PATH = Path(__file__).resolve().with_name("config.yaml")
 #: NOT default into this directory: a generated file in a tracked tree becomes
 #: a committed file, and `.gitignore` in this repository is mostly a record of
 #: that happening.
-LEDGER_PATH_ENV_VAR = "TERRIUM_LLM_QUOTA_LEDGER"
+LEDGER_PATH_ENV_VAR = "CATERVA_LLM_QUOTA_LEDGER"
 
 #: The standard OpenAI-compatible path, appended to whatever base the operator
 #: declared. This is the one piece of a URL this file states, and it is the
@@ -612,7 +612,7 @@ def default_ledger_path(environ: Optional[Mapping[str, str]] = None) -> Path:
         return Path(declared).expanduser()
     cache = str(env.get("XDG_CACHE_HOME", "")).strip()
     root = Path(cache).expanduser() if cache else Path.home() / ".cache"
-    return root / "terrium" / "llm-quota-ledger.json"
+    return root / "caterva" / "llm-quota-ledger.json"
 
 
 def response_text(body: Any) -> Optional[str]:
@@ -1003,7 +1003,7 @@ def plan_router(
     a `model_name` by its routing strategy, and config.yaml sets
     `simple-shuffle` -- which is the right default for the proxy and would
     shuffle away any order this function put in `model_list`. So each provider
-    gets its OWN model_name here (`terrium-extract-via-groq`, ...), the head of
+    gets its OWN model_name here (`caterva-extract-via-groq`, ...), the head of
     the measured chain keeps the name the application asks for, and an explicit
     `fallbacks` list chains them in measured order. Every group then holds one
     deployment, there is nothing left to shuffle, and the order is the measured
@@ -1151,7 +1151,7 @@ def build_router(
     The returned Router is a SNAPSHOT. It was ordered by what the providers had
     reported when it was built, and quota moves -- a Router held for an hour is
     ordered by an hour-old measurement. Rebuild it, or use `complete()`, which
-    re-derives the order every hop. The plan is attached as `terrium_plan` so a
+    re-derives the order every hop. The plan is attached as `caterva_plan` so a
     caller can see what was decided and what was dropped.
     """
     litellm = _import_litellm() if litellm_module is None else litellm_module
@@ -1169,7 +1169,7 @@ def build_router(
 
     router = litellm.Router(**kwargs)
     try:
-        router.terrium_plan = plan
+        router.caterva_plan = plan
     except Exception:  # pragma: no cover -- a Router that refuses attributes
         pass
     return router

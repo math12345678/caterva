@@ -210,7 +210,7 @@ export class ExecutionRecorder {
 
       // The solver configuration of the run being recorded.
       //
-      // This said `RK45` at rtol 1e-6 / atol 1e-8. Terrium integrates with
+      // This said `RK45` at rtol 1e-6 / atol 1e-8. Caterva integrates with
       // **CVODE** at 1e-10 / 1e-12 (DEFAULT_RELATIVE_TOLERANCE and
       // DEFAULT_ABSOLUTE_TOLERANCE). Every field was wrong, in the record
       // whose entire job is describing how a result was produced.
@@ -706,7 +706,7 @@ Biological Plausibility: ${record.validation.biologicalPlausibility}
  * been constructed empty, and threw `Record not found for job <jobId>` — for
  * every job id, always, since the commands existed.
  *
- * `history` meanwhile persists to `~/.terrium/history.json` and lists those
+ * `history` meanwhile persists to `~/.caterva/history.json` and lists those
  * same ids happily. Its help text reads: "The run id printed at the end of a
  * simulation is only useful if something can resolve it later; this is that
  * something." So the tool printed an id, listed it, and then denied it
@@ -718,7 +718,7 @@ Biological Plausibility: ${record.validation.biologicalPlausibility}
  * processes, which is the only way a user ever meets it.
  */
 export function recordsDir(): string {
-  return path.join(os.homedir(), '.terrium', 'records');
+  return path.join(os.homedir(), '.caterva', 'records');
 }
 
 export class ReproducibilityService {

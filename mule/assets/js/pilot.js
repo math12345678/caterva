@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — pilot invitation
+   caterva — pilot invitation
    Accessible client-side validation. No network dependency:
    this is a pre-validation site, so submission is acknowledged
    honestly rather than pretending to deliver a message.
@@ -84,7 +84,7 @@ export function initPilot() {
 
     status.dataset.state = 'ok';
     status.textContent =
-      'Request captured in this prototype. Terrium is pre-validation, so no message has been sent — this demonstration does not transmit data.';
+      'Request captured in this prototype. Caterva is pre-validation, so no message has been sent — this demonstration does not transmit data.';
     form.classList.add('is-submitted');
     qs('.pilot__submit', form).disabled = true;
   });

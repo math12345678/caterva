@@ -440,7 +440,7 @@ app.use((err: Error, req, res, next) => {
 - Implement parallel resolver pathways
 
 ### 4. Python Bridge
-- Connection pooling for Terium spawning
+- Connection pooling for Caterva spawning
 - Reduce startup overhead
 - Implement result caching layer
 

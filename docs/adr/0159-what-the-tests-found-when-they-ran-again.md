@@ -82,7 +82,7 @@ smallest possible demonstration.
   pass.
 - `check_investor_claims` green: 14 cases.
 
-**Not run here:** `Terium/tests`, the engine suite. It collects (1,183
+**Not run here:** `caterva/tests`, the engine suite. It collects (1,183
 tests) but takes about four minutes, past this sandbox's per-command limit,
 and nothing in this pass touched the engine. Said rather than implied — "I
 did not run it" and "it passes" are different claims.

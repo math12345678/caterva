@@ -50,7 +50,7 @@ class PopgenResult(BaseModel):
     doi: Optional[str] = None
 
 
-# Map common organism names (as they appear in Terrium queries) to
+# Map common organism names (as they appear in Caterva queries) to
 # stdpopsim species IDs. Deliberately small: this is a name-resolution
 # table, not an enzyme registry. A name not in this map falls through
 # to fuzzy matching against stdpopsim's species list.

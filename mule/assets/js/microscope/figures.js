@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — microscope figures
+   caterva — microscope figures
 
    Six drawings for six kinds of fact. A value is drawn as a
    magnitude, a decision as an equation with one term marked, a

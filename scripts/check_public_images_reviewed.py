@@ -12,7 +12,7 @@ That exclusion is correct — a PNG is not source — and it leaves a hole
 every other guard shares. `check_documented_counts.py`,
 `check_public_claims.py`, `check_investor_claims.py` and
 `check_no_fabricated_endorsements.py` all read text. A hero image reading
-"10,000 universities trust Terrium" would pass every one of them.
+"10,000 universities trust Caterva" would pass every one of them.
 
 Given that this project has already shipped five fabricated testimonials
 (ADR 0071) and four stale test counts in text that WAS being read, the
@@ -60,9 +60,9 @@ _MIN_IMAGES = 5
 #: Trees whose images a member of the public sees.
 PUBLIC_TREES: tuple[str, ...] = (
     "mule/",
-    "terrium-site/",
+    "caterva-site/",
     "landing/",
-    "Science-Agent-Pipeline/artifacts/terrium-landing/",
+    "Science-Agent-Pipeline/artifacts/caterva-landing/",
 )
 
 _SUFFIXES = (".png", ".jpg", ".jpeg", ".svg", ".webp", ".ico")

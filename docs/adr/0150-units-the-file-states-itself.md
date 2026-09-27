@@ -36,7 +36,7 @@ right answer everywhere anyone had looked.
 
 ## Decision
 
-`Terium/core/sbml_units.py::declare_units` — the one module that writes
+`caterva/core/sbml_units.py::declare_units` — the one module that writes
 `unitDefinition`s. Per-row unit strings arrive from the CLI's provenance
 entries (`ExportProvenance.unit`, threaded through in the same change:
 `ParameterProvenance.unit` existed all along and the export interface
@@ -65,7 +65,7 @@ point exactly, not by trusting the comment that says so.
 
 ## Verification
 
-`Terium/tests/test_sbml_units.py` (11 tests): **15 → 0** for the MM model
+`caterva/tests/test_sbml_units.py` (11 tests): **15 → 0** for the MM model
 asserted at both ends; **0** for competitive including the literal;
 bit-exact trajectory equivalence under roadrunner for both domains;
 every refusal direction; byte-identical documents on refusal; the scale

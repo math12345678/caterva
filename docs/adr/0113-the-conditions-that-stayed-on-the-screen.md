@@ -4,7 +4,7 @@
 
 **Date:** 2026-08-17
 
-**Context:** `Terium/core/sbml_provenance.py`, `Terium/core/model_provenance.py`,
+**Context:** `caterva/core/sbml_provenance.py`, `caterva/core/model_provenance.py`,
 `scripts/export_annotated_model.py`, `src/cli/exportArtifacts.ts`,
 `src/cli/commandSimulateResolved.ts`
 

@@ -1,5 +1,5 @@
 # Phase 3: Visualization, Analytics & Automation
-## Terrium Enhancement Report - Final Phase
+## Caterva Enhancement Report - Final Phase
 
 **Status:** ✅ COMPLETE  
 **Build Date:** August 2026  
@@ -187,7 +187,7 @@ jobManager.clearCompleted();          // Remove finished jobs
 
 ```
 ┌─────────────────────────────────────────────────┐
-│     Terrium Phase 3 - Complete Platform        │
+│     Caterva Phase 3 - Complete Platform        │
 ├─────────────────────────────────────────────────┤
 │                                                 │
 │  ┌─────────────────┐  ┌──────────────────────┐ │
@@ -336,7 +336,7 @@ setTimeout(() => {
 ## Key Innovations in Phase 3
 
 ### 1. Real-Time Dashboard
-- Converts Terrium from CLI-only to web-accessible
+- Converts Caterva from CLI-only to web-accessible
 - Enables visual parameter exploration
 - Provides live result streaming
 - Supports non-technical users
@@ -462,7 +462,7 @@ setTimeout(() => {
 
 ## Conclusion
 
-**Terrium is now a complete, production-grade research platform** that combines:
+**Caterva is now a complete, production-grade research platform** that combines:
 
 ✅ Rigorous scientific validation  
 ✅ Advanced kinetic modeling  

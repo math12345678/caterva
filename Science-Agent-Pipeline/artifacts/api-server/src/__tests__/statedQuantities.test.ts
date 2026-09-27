@@ -16,7 +16,7 @@ import {
   CONCENTRATION_TO_MM,
   TIME_IN_SECONDS,
 } from "../lib/statedQuantities";
-import { REPO_ROOT } from "../lib/teriumRunner";
+import { REPO_ROOT } from "../lib/catervaRunner";
 
 const find = (
   query: string,

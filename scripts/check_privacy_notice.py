@@ -64,7 +64,7 @@ from typing import List
 
 REPO = Path(__file__).resolve().parent.parent
 FORM = (
-    REPO / "Science-Agent-Pipeline" / "artifacts" / "terrium-landing"
+    REPO / "Science-Agent-Pipeline" / "artifacts" / "caterva-landing"
     / "src" / "components" / "ui" / "WaitlistForm.tsx"
 )
 PRIVACY = REPO / "docs" / "PRIVACY.md"

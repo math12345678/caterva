@@ -1,7 +1,7 @@
 # What to run next
 
 > **⚠️ CORRECTION (2026-08-12):** the counts below are stale (the suite has grown substantially since this was written) and Step 5's framing is now misleading. Verified this session:
-> - **Step 1** ("881 passed / 214 passed"): `python3 -m pytest --collect-only` from `Terium/` now collects **1,014** tests (not 881), and from `Tests/` now collects **277** tests (not 214) — total 1,291, not the 1,095 this doc implies.
+> - **Step 1** ("881 passed / 214 passed"): `python3 -m pytest --collect-only` from `caterva/` now collects **1,014** tests (not 881), and from `Tests/` now collects **277** tests (not 214) — total 1,291, not the 1,095 this doc implies.
 > - **Step 2** ("220 passed (220), 15 files"): `Science-Agent-Pipeline/artifacts/api-server` now has **32** `*.test.ts` files with **433** individual test cases per `npx vitest list` (not 220/15).
 > - **Step 3** ("11 guards, up from 6"): running `python3 scripts/verify_build.py --quick` today shows the Guard Wiring Guard reporting **"all 22 guards run in at least one harness"** — the guard count is 22, not 11.
 > - **Step 5** (NumPy upgrade framing): this section describes reaching Python 3.14 as requiring "a NumPy 2.x major upgrade with breaking API changes across 1,040 tests" as if that upgrade were still pending. It already shipped — `requirements.txt:42` currently pins `numpy==2.2.6` (up from the 1.26.4 in ADR 0014's original text), per ADR 0014's own "Amendment (2026-08-03): the 3.13 step ships". Going to `numpy 2.5.x` for 3.14 would be a minor version bump within NumPy 2.x, capped by `scipy==1.15.3`'s `numpy<2.5` requirement (see `requirements.txt:21-22`), not a repeat of the 1.x→2.x breaking-change migration. The "1,040 tests" figure also doesn't match this same document's own Step 1 total (881+214=1,095).
@@ -13,7 +13,7 @@ see, and what to do if you see something else.
 **Every command assumes you start here:**
 
 ```bash
-cd ~/Desktop/Coding/Terrium
+cd ~/Desktop/Coding/Caterva
 ```
 
 ---
@@ -37,7 +37,7 @@ make test
 
 ```bash
 cd Science-Agent-Pipeline && pnpm --filter @workspace/api-server run test
-cd ~/Desktop/Coding/Terrium
+cd ~/Desktop/Coding/Caterva
 ```
 
 **Expect:** `220 passed (220)`, 15 files, 0 failed.
@@ -64,9 +64,9 @@ This is the only thing blocking a second literature-resolvable field, and it
 needs network access, which I do not have.
 
 ```bash
-cd ~/Desktop/Coding/Terrium/Tests
+cd ~/Desktop/Coding/Caterva/Tests
 ../.venv/bin/python brenda_kcat_capture.py
-cd ~/Desktop/Coding/Terrium
+cd ~/Desktop/Coding/Caterva
 ```
 
 **Then paste me the entire output**, whatever it says. There are three
@@ -106,7 +106,7 @@ is a stage of work, not a config edit.
 
 ```bash
 # the full loop, all at once
-cd ~/Desktop/Coding/Terrium
+cd ~/Desktop/Coding/Caterva
 make test                                              # Step 1
 cd Science-Agent-Pipeline/artifacts/api-server && pnpm run test && cd ../../..   # Step 2
 python3 scripts/verify_build.py --quick                # Step 3

@@ -27,7 +27,7 @@ The sections below are the steps it cannot do for you.
 ## 0. Get the prepared work
 
 ```bash
-cd ~/Desktop/Coding/Terrium
+cd ~/Desktop/Coding/Caterva
 git pull origin main          # make sure you have the latest split script
 git push origin main          # push the rename + split machinery
 ```
@@ -50,21 +50,21 @@ it on the next command.
 ```
 
 Takes about a minute. It creates 11 local `split/*` branches with preserved
-history and stages 6 assembled repositories in `$TMPDIR/terrium-split`. It
+history and stages 6 assembled repositories in `$TMPDIR/caterva-split`. It
 pushes nothing, and it refuses to run on a dirty tree.
 
 Expected output:
 
 | repo | commits | from |
 |---|---|---|
-| `terium` | 72 | `Tellurium/` + replayed rename |
+| `caterva` | 72 | `Tellurium/` + replayed rename |
 | `science-agent-pipeline-replit` | 80 | `Science-Agent-Pipeline/` |
 | `business` | 77 | `Business/` |
 | `wiring-main` | 67 | `scripts/` |
 | `documents` | 51 | `docs/` |
 | `tests` | 37 | `Tests/` |
 | `backend-main` | 17 | `src/` |
-| `terrium-site` | 10 | `terrium-site/` |
+| `caterva-site` | 10 | `caterva-site/` |
 | `landing` | 5 | `landing/` |
 | `advanced-analysis` | 2 | `advanced_analysis/` |
 | `benchmark-results` | 1 | `benchmark_results/` |
@@ -118,11 +118,11 @@ correct in your local repository either way — re-running is free.
 `main` is an umbrella. After everything else is pushed:
 
 ```bash
-cd "$TMPDIR/terrium-split/main"
+cd "$TMPDIR/caterva-split/main"
 
-for r in terium tests backend-main frontend-main wiring-main \
+for r in caterva tests backend-main frontend-main wiring-main \
          science-agent-pipeline-replit documents business \
-         terrium-site landing advanced-analysis benchmark-results; do
+         caterva-site landing advanced-analysis benchmark-results; do
   git submodule add "https://github.com/Terrium-sim/$r.git" "$r"
 done
 
@@ -133,12 +133,12 @@ git push
 Then a full checkout is:
 
 ```bash
-git clone --recursive https://github.com/Terrium-sim/main.git
+git clone --recursive https://github.com/math12345678/caterva.git
 ```
 
 ## 4. Point the old repo at the new home
 
-`math12345678/terrium` holds all 218 commits and stays as the archive of
+`math12345678/caterva` holds all 218 commits and stays as the archive of
 record. Worth adding a line at the top of its README:
 
 > Development moved to [github.com/Terrium-sim](https://github.com/Terrium-sim).
@@ -156,5 +156,5 @@ working tree.
 - **`mule`.** You said you would add the MuleRun page; it is created with a
   placeholder README.
 - **`demo-repository`.** Left untouched — it is GitHub's demo repo.
-- **`worktrees`.** Genuinely empty: `Terrium.worktrees/` tracks no files. It
+- **`worktrees`.** Genuinely empty: `Caterva.worktrees/` tracks no files. It
   gets a README so an empty repo is not mistaken for a failed push.

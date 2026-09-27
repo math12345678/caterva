@@ -219,7 +219,7 @@ Dashboard/alerts/analysis
 ### For Developers
 
 ```
-Integrate with Terrium
+Integrate with Caterva
 ↓
 Generate client: npm run generate:client:ts
 ↓

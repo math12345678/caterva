@@ -26,7 +26,7 @@
     {
       "id": "F2",
       "description": "a non-number measurement is coerced rather than refused",
-      "_note": "The experimental-condition rule of ADR 0012/0013 applied to an input: `experimentalFinalValue` is a number the experimenter measured. Terrium cannot resolve it from literature and must not invent one, so absence means no ranking -- never a default. Defaulting to 0 would rank every model by how close it came to zero, which is a real ranking of nothing.",
+      "_note": "The experimental-condition rule of ADR 0012/0013 applied to an input: `experimentalFinalValue` is a number the experimenter measured. Caterva cannot resolve it from literature and must not invent one, so absence means no ranking -- never a default. Defaulting to 0 would rank every model by how close it came to zero, which is a real ranking of nothing.",
       "file": "src/engine/model-comparison.ts",
       "find": "  if (typeof experimental !== \"number\" || !Number.isFinite(experimental)) {\n    return undefined;\n  }\n  return rankModelsByFit(models, experimental);",
       "replace": "  return rankModelsByFit(models, Number(experimental) || 0);"

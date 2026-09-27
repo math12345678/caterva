@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { SimulationDomain } from "./teriumRunner";
+import type { SimulationDomain } from "./catervaRunner";
 
 export const WaitlistBody = z.object({
   email: z.string().email("Invalid email address").trim().toLowerCase(),
@@ -175,7 +175,7 @@ export const SimulationParameterSchemas: Record<
   }),
   // Three literature-fixed ODE oscillators (ADR 0022). All rate constants
   // are the source papers' own standard parameter sets, not caller inputs
-  // -- see Terium/continuous/model_building.py -- so only the
+  // -- see caterva/continuous/model_building.py -- so only the
   // integration window is a request-time parameter.
   lotka_volterra: z
     .object({
@@ -222,8 +222,8 @@ export const SimulationParameterSchemas: Record<
  * so every parameter is origin "user" by construction. That is the same
  * status a value supplied inline as `km=2` already has today. The hard rule
  * ("no value nobody chose and nothing verified reaches the engine") is
- * satisfied trivially here -- there is nothing for Terrium to invent,
- * because Terrium supplies nothing. What this endpoint does NOT do is claim
+ * satisfied trivially here -- there is nothing for Caterva to invent,
+ * because Caterva supplies nothing. What this endpoint does NOT do is claim
  * literature backing for those numbers; it cannot, and it does not.
  */
 export const CustomModelBody = z

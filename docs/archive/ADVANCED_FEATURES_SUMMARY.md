@@ -427,7 +427,7 @@ API Endpoints:         19 total
 
 ## 🎉 Summary
 
-Terrium now has enterprise-grade validation and advanced querying capabilities:
+Caterva now has enterprise-grade validation and advanced querying capabilities:
 
 - ✅ **Validation** — All inputs checked before processing
 - ✅ **Error Handling** — Clear, field-level error messages

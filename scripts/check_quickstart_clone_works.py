@@ -7,7 +7,7 @@ START_HERE.md opens with "You are in the right place whether you are an
 intern joining the team or a stranger who found this on GitHub", and the
 first command it gives is:
 
-    git clone https://github.com/Terrium-sim/main.git
+    git clone https://github.com/math12345678/caterva.git
 
 That repository is not readable anonymously. A stranger following the only
 document they are asked to read gets a username prompt and stops, on line

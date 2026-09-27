@@ -1,6 +1,6 @@
 """One document a student can hand in.
 
-Terrium had nine capabilities and nothing a person could give a teacher.
+Caterva had nine capabilities and nothing a person could give a teacher.
 The resolver, the provenance, the assay conditions, the reliability grades,
 the ensemble, the BibTeX exporter, the annotated model and the engine were
 each an answer to a question nobody asks in isolation.
@@ -8,7 +8,7 @@ each an answer to a question nobody asks in isolation.
 The assertions here are mostly about what the document REFUSES to leave
 out. A report that silently omits what could not be sourced is this
 project's own defect at document scale — computed, correct, undelivered —
-and it is the section that distinguishes a Terrium report from a printout.
+and it is the section that distinguishes a Caterva report from a printout.
 """
 from __future__ import annotations
 
@@ -94,7 +94,7 @@ def test_the_two_kinds_are_counted_separately():
 
 
 # ---------------------------------------------------------------------------
-# The section that makes it a Terrium report
+# The section that makes it a Caterva report
 # ---------------------------------------------------------------------------
 
 
@@ -104,7 +104,7 @@ def test_an_unsourced_parameter_becomes_a_refusal_rather_than_a_gap():
     result = report(resolved={"km": ask("lactate"), "ki": ask("lactate", quantity="ki")})
 
     assert any(r.startswith("ki:") for r in result.refusals)
-    assert "## What Terrium would not do" in result.markdown
+    assert "## What Caterva would not do" in result.markdown
     assert "These are not omissions" in result.markdown
 
 
@@ -135,7 +135,7 @@ def test_an_unsourced_parameter_still_has_a_row_in_the_table():
     assert rows, "the unsourced parameter has no row in the Parameters table"
     assert "not sourced" in rows[0]
     # Points at where the reason lives, so the row is actionable on its own.
-    assert "What Terrium would" in rows[0]
+    assert "What Caterva would" in rows[0]
 
 
 def test_a_withheld_cross_species_value_says_so_and_says_why():
@@ -181,7 +181,7 @@ def test_the_absence_of_refusals_is_stated_rather_than_left_blank():
     result = report(resolved={})
     assert result.refusals == []
     text = result.markdown
-    assert "## What Terrium would not do" in text
+    assert "## What Caterva would not do" in text
     assert (
         "Nothing was withheld: every parameter resolved to a cited value "
         "or was supplied by you." in text
@@ -323,7 +323,7 @@ def test_a_report_records_the_commit_and_the_time():
         ],
     )
     assert "## How this document was produced" in report.markdown
-    assert "Terrium commit" in report.markdown
+    assert "Caterva commit" in report.markdown
     assert "Generated" in report.markdown
 
 

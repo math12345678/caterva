@@ -1,4 +1,4 @@
-# Terrium Advanced Analysis System Dependencies
+# Caterva Advanced Analysis System Dependencies
 #
 # THREE ENTRIES WERE REMOVED because they made this file unusable or
 # unsafe, and `pip install -r requirements.txt` -- the command
@@ -16,7 +16,7 @@
 #   * `excalidraw-export` is not on PyPI either (HTTP 404), same exposure.
 #
 # Neither removed package is imported by anything here. The only committed
-# script is scripts/generate_figures.py, and it imports Terium, matplotlib,
+# script is scripts/generate_figures.py, and it imports Caterva, matplotlib,
 # numpy and the standard library -- nothing else in this file. The rest is
 # left in place because it is declared intent for the components README.md
 # describes, and thinning it is the owner's call, not a side effect of

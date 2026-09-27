@@ -1,5 +1,5 @@
 /**
- * Terrium Web Server
+ * Caterva Web Server
  *
  * REST API for scientific simulations
  * Serves interactive dashboard
@@ -477,7 +477,7 @@ const server = http.createServer(async (req, res) => {
               // experimental value) could sit there unnoticed.
               //
               // Optional by design. `experimentalFinalValue` is a
-              // measurement the experimenter made; Terrium cannot resolve it
+              // measurement the experimenter made; Caterva cannot resolve it
               // from literature and must not invent one, so its absence
               // means "no fit ranking", never a default.
               const experimental = data.experimentalFinalValue;
@@ -759,7 +759,7 @@ const server = http.createServer(async (req, res) => {
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Terrium API Documentation</title>
+  <title>Caterva API Documentation</title>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.17.14/swagger-ui.min.css">
@@ -797,7 +797,7 @@ const server = http.createServer(async (req, res) => {
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Terrium API Documentation (ReDoc)</title>
+  <title>Caterva API Documentation (ReDoc)</title>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- No webfont. This pulled Montserrat and Roboto from fonts.googleapis.com,
@@ -836,7 +836,7 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="terrium-jobs-${Date.now()}.csv"`
+        'Content-Disposition': `attachment; filename="caterva-jobs-${Date.now()}.csv"`
       });
       res.end(csv);
       return;
@@ -870,7 +870,7 @@ const server = http.createServer(async (req, res) => {
       const csv = exportSweepToCSV(sweep.result, { includeParameters: true });
       res.writeHead(200, {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="terrium-sweep-${sweepId}-${Date.now()}.csv"`
+        'Content-Disposition': `attachment; filename="caterva-sweep-${sweepId}-${Date.now()}.csv"`
       });
       res.end(csv);
       return;
@@ -891,7 +891,7 @@ const server = http.createServer(async (req, res) => {
       const csv = exportBatchToCSV(batch.result, { includeParameters: true });
       res.writeHead(200, {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="terrium-batch-${batchId}-${Date.now()}.csv"`
+        'Content-Disposition': `attachment; filename="caterva-batch-${batchId}-${Date.now()}.csv"`
       });
       res.end(csv);
       return;
@@ -912,7 +912,7 @@ const server = http.createServer(async (req, res) => {
       const csv = exportComparisonToCSV(comparison.result, {});
       res.writeHead(200, {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="terrium-comparison-${compareId}-${Date.now()}.csv"`
+        'Content-Disposition': `attachment; filename="caterva-comparison-${compareId}-${Date.now()}.csv"`
       });
       res.end(csv);
       return;
@@ -925,7 +925,7 @@ const server = http.createServer(async (req, res) => {
 
       res.writeHead(200, {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="terrium-stats-${Date.now()}.csv"`
+        'Content-Disposition': `attachment; filename="caterva-stats-${Date.now()}.csv"`
       });
       res.end(csv);
       return;
@@ -1193,7 +1193,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n🧪 Terrium Dashboard: http://localhost:${PORT}\n`);
+  console.log(`\n🧪 Caterva Dashboard: http://localhost:${PORT}\n`);
 
   // Printed on every start, not tucked into a document nobody opens.
   //

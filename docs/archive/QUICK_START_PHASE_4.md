@@ -5,7 +5,7 @@
 
 ## Step 1: Build
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run build
 ```
 
@@ -61,7 +61,7 @@ const BUILT_IN_LITERATURE = [
   }
 ];
 // Skip DOI verification with env var
-process.env['TERRIUM_SKIP_DOI_VERIFICATION'] = '1';
+process.env['CATERVA_SKIP_DOI_VERIFICATION'] = '1';
 ```
 
 ### After (Real)

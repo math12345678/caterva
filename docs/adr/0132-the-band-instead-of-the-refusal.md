@@ -7,7 +7,7 @@ outstanding — see Consequences.
 
 **Context:** `Tests/model_ensemble.py`, `Tests/test_model_ensemble.py`,
 `Tests/test_ensemble_boundary.py`,
-`Science-Agent-Pipeline/artifacts/api-server/src/lib/terium_runner.py`
+`Science-Agent-Pipeline/artifacts/api-server/src/lib/caterva_runner.py`
 
 **Follows:** [ADR 0131](0131-the-ensemble-both-professors-asked-for.md),
 which built the weighting and left the simulation half open.
@@ -32,7 +32,7 @@ the model once per draw and reports what the family does.
 
 Human LDH on pyruvate. BRENDA reports Km = 0.03 and 0.398 mM, both wild-type,
 both human, neither reporting pH or temperature — so the reliability axes
-cannot separate them and the sampler weights them equally. Terrium's answer
+cannot separate them and the sampler weights them equally. Caterva's answer
 today is `0.03`, because `min()`.
 
 ```
@@ -51,7 +51,7 @@ now no surface of this product could show it.
 
 ## Emitted from the runner, on purpose
 
-The `--ensemble` flag lives on `terium_runner.py` rather than in either
+The `--ensemble` flag lives on `caterva_runner.py` rather than in either
 front end, because the runner is the one place the CLI and the API both read
 from. A capability added to one of them reaches half the users — recorded
 four times now (ADR 0106, 0109, 0110, 0114) and guarded by
@@ -75,7 +75,7 @@ reader to skim past it exactly when it matters.
 There is one rejection this can do honestly and it is carefully scoped: a
 parameter set that **fails to integrate**. That is a numerical fact about the
 solver, not a judgement about biology, and the note says so. Bakker's
-ensemble rejects against measured flux; Terrium has no flux data and does not
+ensemble rejects against measured flux; Caterva has no flux data and does not
 invent a substitute, so `ensemble.DISCLAIMER` still travels with the band.
 
 ### Drawing it over runs that are not comparable
@@ -118,7 +118,7 @@ indistinguishable from a hang.
 
 ## Consequences
 
-- Terrium can now **run** where it refused. The refusal remains correct when
+- Caterva can now **run** where it refused. The refusal remains correct when
   nothing was resolved at all; it is no longer the only answer to
   disagreement.
 - `max_runs` defaults to 200. Integrating an ODE a few thousand times is not

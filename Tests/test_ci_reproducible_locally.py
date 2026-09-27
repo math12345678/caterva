@@ -133,7 +133,7 @@ def test_it_sees_through_the_two_spellings_of_the_same_command() -> None:
     assert _normalise('@"$(PY)" scripts/check_env.py') == _normalise(
         "python scripts/check_env.py"
     )
-    assert _normalise("cd Terium && python3 -m pytest") == _normalise(
+    assert _normalise("cd Caterva && python3 -m pytest") == _normalise(
         "python -m pytest -v"
     )
 

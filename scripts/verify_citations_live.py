@@ -2,7 +2,7 @@
 """
 verify_citations_live.py
 
-Prove that the literature Terrium's resolvers cite is actually findable.
+Prove that the literature Caterva's resolvers cite is actually findable.
 
 Static guards (check_citation_format.py, ADR 0008 amendments, the golden
 set) ensure every citation carries a locator-shaped locator -- but
@@ -148,13 +148,13 @@ DOI_SOURCE_FILES = [
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/lib/strenda-validator.ts",
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/dashboard.ts",
     ROOT / "Science-Agent-Pipeline/artifacts/api-server/src/routes/pipeline.ts",
-    ROOT / "Terium/core/data_structures.py",
-    ROOT / "Terium/continuous/model_building.py",
+    ROOT / "caterva/core/data_structures.py",
+    ROOT / "caterva/continuous/model_building.py",
     ROOT / "Tests/epidemiology_resolver.py",
     ROOT / "Tests/popgen_resolver.py",
     # Added 2026-09-05. This list held only .ts and .py sources, so the one
     # document in the repository whose entire purpose is to enumerate
-    # Terrium's citations was the one file the citation checker never read.
+    # Caterva's citations was the one file the citation checker never read.
     #
     # That gap has a measured cost. `domain-literature.ts` was corrected on
     # 2026-08-09 from doi 10.1038/ng.3285 -- which CrossRef records as

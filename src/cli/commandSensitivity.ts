@@ -3,7 +3,7 @@
  * number, and how much do you trust that number?
  *
  * Sensitivity analysis on its own is ordinary; most simulation packages
- * have it. What makes it worth having here is that Terrium knows the
+ * have it. What makes it worth having here is that Caterva knows the
  * PROVENANCE of every parameter, so the two can be shown together:
  *
  *     km    0.14 mM   brenda_cross_species   47.2%   ← rabbit value, and

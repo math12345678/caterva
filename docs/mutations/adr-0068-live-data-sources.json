@@ -2,11 +2,11 @@
   "_why": [
     "ADR 0068's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "ADR 0062 audited every package Terrium depends on and none of the",
+    "ADR 0062 audited every package Caterva depends on and none of the",
     "databases it calls. Three are queried live from the server and none",
     "was in NOTICE. KEGG says it 'is not a public database' and that",
     "non-academic use 'requires a commercial license'; CORE excludes its",
-    "API from the ODC-By grant and Terrium meets all three of their",
+    "API from the ODC-By grant and Caterva meets all three of their",
     "contact conditions.",
     "",
     "D6 is the row that escaped. The check asked whether NOTICE matched",

@@ -2,8 +2,8 @@
   "_why": [
     "ADR 0133's mutation table, re-derived under scripts/mutate.py.",
     "",
-    "0133 is the ADR that answered the owner's sentence -- 'Terrium is a",
-    "tool. People should use Terrium.' -- by joining nine capabilities into",
+    "0133 is the ADR that answered the owner's sentence -- 'Caterva is a",
+    "tool. People should use Caterva.' -- by joining nine capabilities into",
     "one document a student could hand to a teacher. Its table has been",
     "unreproduced since it was written; the guard that should have said so",
     "could not see an indented table until ADR 0144.",
@@ -43,8 +43,8 @@
       "_claimed": "claimed caught by ADR 0133; was NOT CAUGHT until a test was added",
       "_note": "The printout behaviour this whole command exists to replace. A document that silently omits what it could not find is indistinguishable from one where nobody looked, and the student cannot defend a gap they cannot see.",
       "file": "Tests/lab_report.py",
-      "find": "        else:\n            lines.append(\n                f\"| {name} | \u2014 | **not sourced** | see *What Terrium would \"",
-      "replace": "        elif False:\n            lines.append(\n                f\"| {name} | \u2014 | **not sourced** | see *What Terrium would \""
+      "find": "        else:\n            lines.append(\n                f\"| {name} | \u2014 | **not sourced** | see *What Caterva would \"",
+      "replace": "        elif False:\n            lines.append(\n                f\"| {name} | \u2014 | **not sourced** | see *What Caterva would \""
     },
     {
       "id": "L2",
@@ -77,7 +77,7 @@
       "id": "L5",
       "description": "the whole trajectory is dumped instead of first and last row",
       "_claimed": "caught",
-      "_note": "A lab report is not a data dump. The full trajectory belongs in the CSV export, and a document that inlines 101 rows is one nobody reads to the end -- including past the section that says what Terrium refused to do.",
+      "_note": "A lab report is not a data dump. The full trajectory belongs in the CSV export, and a document that inlines 101 rows is one nobody reads to the end -- including past the section that says what Caterva refused to do.",
       "file": "Tests/lab_report.py",
       "find": "            for row in (data[0], data[-1]):",
       "replace": "            for row in data:"

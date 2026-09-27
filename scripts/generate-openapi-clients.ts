@@ -73,11 +73,11 @@ const SETUP_INSTRUCTIONS: Record<string, string> = {
   go: `
 📚 Go Setup:
    cd {output}
-   go mod init github.com/yourusername/terrium-client
+   go mod init github.com/yourusername/caterva-client
    go build ./...
 
 📖 Usage:
-   import "github.com/yourusername/terrium-client"
+   import "github.com/yourusername/caterva-client"
    client := swagger.NewAPIClient(cfg)
    job, _, _ := client.DefaultApi.Simulate(ctx, request)
   `,
@@ -110,7 +110,7 @@ async function getOpenAPISpec(specPath: string): Promise<string> {
   }
 
   // Try remote
-  const remoteUrl = `${process.env.TERRIUM_URL || 'http://localhost:3000'}/api/openapi.json`;
+  const remoteUrl = `${process.env.CATERVA_URL || 'http://localhost:3000'}/api/openapi.json`;
   console.log(`ℹ️  Using remote spec: ${remoteUrl}`);
   return remoteUrl;
 }
@@ -118,7 +118,7 @@ async function getOpenAPISpec(specPath: string): Promise<string> {
 async function generateClient(
   language: string,
   outputDir: string = '',
-  packageName: string = 'terrium-client',
+  packageName: string = 'caterva-client',
   packageVersion: string = '1.0.0'
 ): Promise<void> {
   // Validate language
@@ -201,7 +201,7 @@ async function main() {
 
   let language = 'typescript';
   let outputDir = '';
-  let packageName = 'terrium-client';
+  let packageName = 'caterva-client';
   let packageVersion = '1.0.0';
 
   // Parse arguments
@@ -224,7 +224,7 @@ Usage:
 Options:
   -l, --language <lang>    Target language (default: typescript)
   -o, --output <dir>       Output directory (default: ./generated-client-<lang>)
-  -p, --package <name>     Package name (default: terrium-client)
+  -p, --package <name>     Package name (default: caterva-client)
   -v, --version <version>  Package version (default: 1.0.0)
   -h, --help               Show this help
 

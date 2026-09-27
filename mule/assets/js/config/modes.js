@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — SYSTEM MODE definitions
+   caterva — SYSTEM MODE definitions
 
    Four modes, and the point of them is that they are not four
    labels. Each one changes what the whole page *does*: which

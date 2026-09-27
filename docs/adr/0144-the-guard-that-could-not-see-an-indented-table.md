@@ -66,7 +66,7 @@ becomes confident and wrong.
 
 ### 2. Every citation on the front page was invented or misattributed
 
-Terrium's whole claim is that every number carries a real reference. The
+Caterva's whole claim is that every number carries a real reference. The
 README demonstrated it three times:
 
 | README | what it actually was |
@@ -77,7 +77,7 @@ README demonstrated it three times:
 
 The front page of a provenance tool, inventing provenance.
 
-This is not cosmetic. Matthias König replied to a Terrium outreach email
+This is not cosmetic. Matthias König replied to a Caterva outreach email
 that it "is not a good idea to let AI just create lies about your own
 achievements." A reader who checks `ref 12345` and finds nothing has that
 suspicion confirmed by the project's own README, and there is no recovering

@@ -32,7 +32,7 @@ export interface StoredJob {
 export class JobDatabase {
   private dbPath: string;
 
-  constructor(dbPath: string = './terrium-jobs.jsonl') {
+  constructor(dbPath: string = './caterva-jobs.jsonl') {
     this.dbPath = dbPath;
 
     // Create file if doesn't exist
@@ -232,7 +232,7 @@ let defaultDb: JobDatabase | null = null;
 
 export function getDefaultDatabase(): JobDatabase {
   if (!defaultDb) {
-    defaultDb = new JobDatabase('./terrium-jobs.jsonl');
+    defaultDb = new JobDatabase('./caterva-jobs.jsonl');
   }
   return defaultDb;
 }

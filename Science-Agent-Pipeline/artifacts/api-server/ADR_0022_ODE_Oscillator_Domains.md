@@ -6,7 +6,7 @@
 
 ## Problem
 
-Terrium initially supported kinetic (Michaelis-Menten), epidemiological (SIR/SEIR), genetic (Wright-Fisher), and stochastic (Gillespie) domains. But three classical ODE models from biology are missing:
+Caterva initially supported kinetic (Michaelis-Menten), epidemiological (SIR/SEIR), genetic (Wright-Fisher), and stochastic (Gillespie) domains. But three classical ODE models from biology are missing:
 
 1. **Lotka-Volterra** (predator-prey dynamics) — foundational in ecology
 2. **Cell Cycle Oscillator** (cyclin/CDK dynamics) — central to cell biology
@@ -79,7 +79,7 @@ This split is intentional and reflects the models' scientific role.
 
 ## Implementation
 
-### In Python (terium_runner.py)
+### In Python (caterva_runner.py)
 
 Three new handlers:
 

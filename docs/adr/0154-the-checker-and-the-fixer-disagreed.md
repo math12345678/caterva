@@ -81,7 +81,7 @@ N tests". The pattern matched only the first. One letter, and 2,003 drifted
   claim about one file rather than a suite. Deliberately narrow: an
   exclusion list that grows to cover every awkward case is how a check stops
   checking.
-- `docs/readmes/terium.md` reworded from a wrapped `1,182 tests.` to `1,182
+- `docs/readmes/caterva.md` reworded from a wrapped `1,182 tests.` to `1,182
   engine tests.` — making the document say what it means is better than
   teaching the fixer to guess.
 

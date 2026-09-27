@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The equations Terrium documents must be the equations Terrium solves.
+"""The equations Caterva documents must be the equations Caterva solves.
 
 WHAT THIS COMES FROM
 --------------------
@@ -70,10 +70,10 @@ from typing import Dict, List, Tuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOC = REPO_ROOT / "LITERATURE_BACKING_DATABASE.md"
 
-PCR_PY = REPO_ROOT / "Terium" / "discrete" / "pcr.py"
-MODEL_BUILDING_PY = REPO_ROOT / "Terium" / "continuous" / "model_building.py"
-GILLESPIE_PY = REPO_ROOT / "Terium" / "discrete" / "gillespie_ssa.py"
-MD_PY = REPO_ROOT / "Terium" / "discrete" / "molecular_dynamics.py"
+PCR_PY = REPO_ROOT / "caterva" / "discrete" / "pcr.py"
+MODEL_BUILDING_PY = REPO_ROOT / "caterva" / "continuous" / "model_building.py"
+GILLESPIE_PY = REPO_ROOT / "caterva" / "discrete" / "gillespie_ssa.py"
+MD_PY = REPO_ROOT / "caterva" / "discrete" / "molecular_dynamics.py"
 
 #: Not documentation in the filing sense -- this is a LIVE SURFACE. Its
 #: `description` strings are served to users through
@@ -146,7 +146,7 @@ CHECKS: List[Check] = [
     Check(
         name="SIR",
         doc_required=[
-            "Equations Terrium actually integrates",
+            "Equations Caterva actually integrates",
             "dS/dt = -β·S·I/N",
             "dI/dt = β·S·I/N - γ·I",
             # The consequence a reader would otherwise get wrong by N.

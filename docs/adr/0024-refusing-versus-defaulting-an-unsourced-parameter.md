@@ -64,7 +64,7 @@ not by the run being *prevented*.
 > mammals instead of a bacterium and a human).
 
 A curator on the BRENDA team at the Leibniz Institute DSMZ — the source
-Terrium reads from, answering about her own data.
+Caterva reads from, answering about her own data.
 
 **The case, stated at its strongest.** She adds a second argument beyond
 species: BRENDA aggregates thousands of papers with different pH,
@@ -109,7 +109,7 @@ Chief Scientist at NCSA and a co-founder of JOSS.
 
 He is right about *constants*: `c`, Avogadro's number, Planck's constant —
 quantities with one agreed value that nobody cites. He is not describing
-what Terrium resolves. A Michaelis constant is a **measurement**: different
+what Caterva resolves. A Michaelis constant is a **measurement**: different
 in humans and rabbits, different at pH 6.8 and 7.4, and two papers can
 report legitimately different values for the same enzyme under different
 conditions.
@@ -117,7 +117,7 @@ conditions.
 **The misunderstanding was caused by our word.** The outreach email said
 "constant," which invites exactly that reading. See "Language" below.
 
-Katz also confirmed JOSS is out of scope, on the grounds that Terrium is
+Katz also confirmed JOSS is out of scope, on the grounds that Caterva is
 not software researchers use to do research. Accepted; no action.
 
 ## Why they disagree
@@ -131,7 +131,7 @@ as though there were only one.
 | Jeske | student reading a screen | high — believed as fact | low — they ask why |
 | Bakker | researcher publishing | high — but bounded by ensemble spread | high — information discarded |
 
-Terrium's stated user is a student in a teaching lab. On that population
+Caterva's stated user is a student in a teaching lab. On that population
 Jeske's column is the one that applies, and it is not close.
 
 ## Decision 1 — cross-species is now opt-in (DECIDED, IMPLEMENTED)
@@ -142,7 +142,7 @@ cross-species hit returns `found=False` with
 `source="cross_species_withheld"`.
 
 This also resolves a self-inflicted inconsistency that predates all of this
-correspondence. Terrium refused when nothing was found, but silently
+correspondence. Caterva refused when nothing was found, but silently
 substituted another organism's value when something was — accepting
 "proceed with a caveat" in one branch and rejecting it in the neighbouring
 one, for no argued reason. The project was already doing a weak version of
@@ -315,12 +315,12 @@ and Katz's reply is what surfaced the drift.
 
 Matthias König (HU Berlin / Universität zu Lübeck), an author of Tellurium,
 read the outreach email as a claim to have built Tellurium and called it
-"very suspicious." He was reacting to a real problem: **Terrium** against
+"very suspicious." He was reacting to a real problem: **Caterva** against
 **Tellurium**, in a message about SBML and Antimony, reads as a claim
 rather than a coincidence.
 
 Consequence: a disambiguation notice now sits at the top of the README
-stating that Terrium is unaffiliated with Tellurium, is not a fork, and
+stating that Caterva is unaffiliated with Tellurium, is not a fork, and
 consumes that ecosystem rather than competing with it. The name itself is
 recorded as an open question rather than a settled one.
 
@@ -350,4 +350,4 @@ the same shape as a misleading error message.
 - User-facing language stops saying "constant."
 - This ADR is the project's own standard applied to itself: three experts
   disagreed, and the response is to record the disagreement and say which
-  column of the table Terrium sits in — not to quote the one who agreed.
+  column of the table Caterva sits in — not to quote the one who agreed.

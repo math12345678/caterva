@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — atlas camera
+   caterva — atlas camera
 
    viewBox animation, pointer panning, wheel and pinch zoom.
    The camera owns three published facts about itself:

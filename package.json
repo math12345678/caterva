@@ -1,5 +1,5 @@
 {
-  "name": "terrium-scientific-backend",
+  "name": "caterva-scientific-backend",
   "version": "0.3.3",
   "description": "Production-ready scientific validation and reproducibility framework. Unaffiliated with Tellurium.",
   "main": "src/integration/scientificPipeline.ts",
@@ -38,7 +38,7 @@
     "enzyme-kinetics",
     "michaelis-menten"
   ],
-  "author": "Terrium Team",
+  "author": "Caterva Team",
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/express": "^4.17.25",

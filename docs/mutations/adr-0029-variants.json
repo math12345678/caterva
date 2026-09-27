@@ -2,7 +2,7 @@
   "_why": [
     "ADR 0029's mutation table, re-derived under scripts/mutate.py. This is",
     "Jeske's finding -- she pointed at 'Y124C mutant' sitting in the",
-    "commentary of a row Terrium was treating as the enzyme -- so it is the",
+    "commentary of a row Caterva was treating as the enzyme -- so it is the",
     "table whose correctness matters most to the people who gave feedback.",
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0029-variants.json",

@@ -19,7 +19,7 @@ repository is published — see "Why this ships red".
 Its first command is:
 
 ```bash
-git clone https://github.com/Terrium-sim/main.git
+git clone https://github.com/math12345678/caterva.git
 ```
 
 That repository is **not readable anonymously**. A stranger following the
@@ -61,8 +61,8 @@ So the probe was validated before its output was believed:
 |---|---|---|
 | `sys-bio/tellurium` | cloneable | cloneable |
 | `pnpm/pnpm` | cloneable | cloneable |
-| `Terrium-sim/main` | — | **not cloneable** |
-| `math12345678/terrium` | — | **not cloneable** |
+| `math12345678/caterva` | — | **not cloneable** |
+| `math12345678/caterva` | — | **not cloneable** |
 
 The controls pass, so the negative is a fact about the repository and not
 about the probe.

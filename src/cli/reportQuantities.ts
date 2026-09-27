@@ -158,7 +158,7 @@ export function parseReportQuantities(
   // source is a default with extra steps.
   if (kmRaw !== undefined && (kmBasis === undefined || kmBasis.trim() === '')) {
     problems.push(
-      'km is a measured property of the enzyme, so Terrium will not take it ' +
+      'km is a measured property of the enzyme, so Caterva will not take it ' +
       'as a bare number. Say where it came from:\n' +
       '  --km 5.2mM --km-basis "measured in our lab, 14 Mar 2026"\n\n' +
       'The report prints that basis beside the value, so whoever reads it ' +

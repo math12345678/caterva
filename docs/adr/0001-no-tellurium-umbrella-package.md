@@ -10,11 +10,11 @@ other packages for COMBINE archive support and numerical markup handling.
 
 In practice, `tellurium` also pulls in `python-libcombine` and
 `python-libnuml`. Neither has prebuilt wheels for every platform/Python
-version combination Terrium needs to support, and on any platform without a
+version combination Caterva needs to support, and on any platform without a
 prebuilt wheel, `pip install` falls back to compiling from source, which
 requires `cmake` and `swig` to be installed separately. This turns "install
 one package" into "debug a C++ build toolchain," for functionality (COMBINE
-archives, numerical markup) that Terrium doesn't use at all.
+archives, numerical markup) that Caterva doesn't use at all.
 
 ## Decision
 
@@ -31,9 +31,9 @@ section) so nobody re-adds it by habit, since `tellurium` is the
 - Installation is faster and more reliable across platforms, since all
   three real dependencies do publish prebuilt wheels for the supported
   Python range (3.10-3.13).
-- Anyone reading Terrium's imports and expecting to see `import tellurium`
+- Anyone reading Caterva's imports and expecting to see `import tellurium`
   needs the README's explanation, or the deviation looks like a mistake.
-- If Terrium ever needs COMBINE archive import/export (e.g., accepting a
+- If Caterva ever needs COMBINE archive import/export (e.g., accepting a
   model file from another tool), this decision needs revisiting --
   `python-libcombine` would become a real, justified dependency at that
   point rather than unnecessary bulk.

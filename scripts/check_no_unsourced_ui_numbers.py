@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS
 ---------------
-`src/web/dashboard.html` is titled "Terrium - Scientific Enzyme Kinetics
+`src/web/dashboard.html` is titled "Caterva - Scientific Enzyme Kinetics
 Simulator". It has a Run Simulation card. It is the product, for anyone who
 does not use the CLI.
 

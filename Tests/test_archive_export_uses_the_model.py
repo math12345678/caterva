@@ -2,7 +2,7 @@
 
 A mutation survived the unit suite: putting `recorded = ["S", "P"]` back
 into `scripts/export_annotated_model.py` broke nothing, because every test
-in `Terium/tests/test_combine_archive.py` calls `build_sedml()` directly and
+in `caterva/tests/test_combine_archive.py` calls `build_sedml()` directly and
 passes its own list. The unit tests pin the *builder*; nothing pinned the
 *call site*.
 

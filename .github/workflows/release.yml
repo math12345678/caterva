@@ -15,7 +15,7 @@
 #               byte-identical SHA256SUMS, or nothing is published
 #   verify      the wheel installs into a fresh interpreter on Linux, macOS
 #               and Windows at the floor (3.10) and ceiling (3.13) of the
-#               supported window, and `terium-compose` simulates a model to
+#               supported window, and `caterva-compose` simulates a model to
 #               a VERDICT with nothing of the repository on the path
 #   app         scripts/build_app.py freezes the INSTALLED wheel into a
 #               one-folder app per platform, keeps python-libsbml's copy of
@@ -93,11 +93,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Read, not imported: importing Terium needs the engine's dependencies.
-          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' Terium/__init__.py)"
+          # Read, not imported: importing Caterva needs the engine's dependencies.
+          version="$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' caterva/__init__.py)"
           base="${RELEASE_TAG%%-*}"        # v0.3.0-rc.1 -> v0.3.0
           echo "package version: $version   tag: $RELEASE_TAG   base: $base"
-          [ "v$version" = "$base" ] || { echo "::error::tag $RELEASE_TAG does not match Terium.__version__ $version"; exit 1; }
+          [ "v$version" = "$base" ] || { echo "::error::tag $RELEASE_TAG does not match caterva.__version__ $version"; exit 1; }
           [ -f "docs/releases/$base.md" ] || { echo "::error::docs/releases/$base.md is missing; a release has notes"; exit 1; }
       - name: Build
         shell: bash
@@ -169,35 +169,35 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install dist/terrium-*.whl
+          python -m pip install dist/caterva-*.whl
       - name: Run it from an empty directory, with no checkout anywhere
         shell: bash
         working-directory: ${{ runner.temp }}
         run: |
           set -euo pipefail
           python - <<'PY'
-          import Terium, pathlib
-          p = pathlib.Path(Terium.__file__).resolve()
+          import caterva, pathlib
+          p = pathlib.Path(caterva.__file__).resolve()
           assert "site-packages" in p.parts, p
-          print("import Terium ->", p, "| version", Terium.__version__)
+          print("import caterva ->", p, "| version", caterva.__version__)
           PY
-          terium --help > /dev/null
-          terium-compose --help > /dev/null
+          caterva --help > /dev/null
+          caterva-compose --help > /dev/null
           # A VERDICT alone is not proof: a failed simulation becomes the note
           # "no time course" and still exits 0. Require the integration line,
           # a real SBML export (libsbml + the packaged data files), and a
           # shape from an expansion library (imported dynamically).
-          terium-compose "reversible binding of a ligand to a receptor" --no-ranking | tee compose.out
+          caterva-compose "reversible binding of a ligand to a receptor" --no-ranking | tee compose.out
           grep -q '^VERDICT:' compose.out
           grep -q 'Integrated to t=' compose.out
           # Not `! grep`: bash's errexit ignores a negated command, so that
           # form could never fail the step.
           if grep -q 'no time course' compose.out; then echo "::error::the simulation did not run"; exit 1; fi
-          terium-compose "reversible binding of a ligand to a receptor" --export sbml | head -c 20000 > model.xml
+          caterva-compose "reversible binding of a ligand to a receptor" --export sbml | head -c 20000 > model.xml
           grep -q '<sbml' model.xml
-          terium-compose "two stage gene expression" --no-analysis --no-simulate --no-ranking | grep -q '^VERDICT:'
-          python -m Terium.app --version
-          terrium --version   # the console script every document teaches
+          caterva-compose "two stage gene expression" --no-analysis --no-simulate --no-ranking | grep -q '^VERDICT:'
+          python -m caterva.app --version
+          caterva --version   # the console script every document teaches
 
   app:
     name: app folder ${{ matrix.os }}
@@ -229,7 +229,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install dist/terrium-*.whl -r requirements-release.txt
+          python -m pip install dist/caterva-*.whl -r requirements-release.txt
       - name: Freeze, check, smoke-test, archive
         shell: bash
         # Run from outside the checkout so the analysis cannot pick the
@@ -243,7 +243,7 @@ jobs:
         with:
           name: app-${{ matrix.label }}
           path: |
-            dist/app/terrium-*
+            dist/app/caterva-*
             dist/app/libsbml-copies-*.tsv
           if-no-files-found: error
 
@@ -304,7 +304,7 @@ jobs:
           # of an empty file.
           sha256sum -- *.whl *.tar.gz *.zip *.tsv | sort -k2 > SHA256SUMS
           # The wheel/sdist lines must equal the tested build's own sums.
-          grep -E '  terrium-[0-9][0-9.]*(-py3-none-any\.whl|\.tar\.gz)$' SHA256SUMS | diff - <(sort -k2 ../staged/python-artifacts/SHA256SUMS)
+          grep -E '  caterva-[0-9][0-9.]*(-py3-none-any\.whl|\.tar\.gz)$' SHA256SUMS | diff - <(sort -k2 ../staged/python-artifacts/SHA256SUMS)
           cat SHA256SUMS
       - name: Create or update the Release
         shell: bash
@@ -318,11 +318,11 @@ jobs:
           case "$RELEASE_TAG" in *-*) prerelease="--prerelease" ;; esac
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "release $RELEASE_TAG exists; replacing its assets and notes"
-            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "Terrium $RELEASE_TAG" --notes-file "$notes" $prerelease
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "Caterva $RELEASE_TAG" --notes-file "$notes" $prerelease
             gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber release/*
           else
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
-              --title "Terrium $RELEASE_TAG" --notes-file "$notes" $prerelease release/*
+              --title "Caterva $RELEASE_TAG" --notes-file "$notes" $prerelease release/*
           fi
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,assets \
             --jq '"\(.url)\n" + (.assets | map("  " + .name + "  " + (.size|tostring) + " bytes") | join("\n"))'

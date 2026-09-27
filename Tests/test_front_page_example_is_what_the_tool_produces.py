@@ -1,4 +1,4 @@
-"""The provenance example on the front page is what Terrium actually outputs.
+"""The provenance example on the front page is what Caterva actually outputs.
 
 WHY THIS FILE EXISTS
 --------------------
@@ -170,7 +170,7 @@ def test_the_units_agree(resolved):
 # ---------------------------------------------------------------------------
 # The FIFTH layer: right value, right reference, invented conditions.
 #
-# `docs/DESIGN.md` is the page that teaches what Terrium's trust grades mean,
+# `docs/DESIGN.md` is the page that teaches what Caterva's trust grades mean,
 # using ref 740253 as its worked example. Measured against the committed
 # fixture, that example was wrong in three ways and every one of them
 # overstated confidence:

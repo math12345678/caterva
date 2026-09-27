@@ -172,7 +172,7 @@ def test_exported_model_still_loads_as_antimony():
     broke the syntax, everything above would still pass."""
     _, out = run(MM_PAYLOAD)
     sys.path.insert(0, str(SCRIPT.parent.parent))
-    from Terium.continuous.model_building import antimony_to_sbml
+    from caterva.continuous.model_building import antimony_to_sbml
 
     sbml = antimony_to_sbml(out["model"])
     assert "<sbml" in sbml

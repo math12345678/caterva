@@ -9,7 +9,7 @@ defect, at the runner), ADR 0024, 0028, 0029, 0032
 
 ## Context
 
-Terrium exists for a student in a teaching lab. Lisa Jeske's objection was
+Caterva exists for a student in a teaching lab. Lisa Jeske's objection was
 about exactly that person: they read a number off a screen and believe it.
 
 Everything built in response to the professors' feedback was verified end to

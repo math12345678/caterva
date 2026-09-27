@@ -36,8 +36,8 @@ Makefile, not `verify_build.py`.
 ## What it cost
 
 ```
-scripts/verify_build.py:813  F821  Undefined name `TERIUM_DIR`
-scripts/verify_build.py:822  F821  Undefined name `TERIUM_DIR`
+scripts/verify_build.py:813  F821  Undefined name `CATERVA_DIR`
+scripts/verify_build.py:822  F821  Undefined name `CATERVA_DIR`
 ```
 
 `run_python_tests()` referenced a constant that does not exist. It is called
@@ -45,7 +45,7 @@ unconditionally on the non-`--quick` path, so:
 
 ```
 >>> run_python_tests(quick=True)
-NameError: name 'TERIUM_DIR' is not defined
+NameError: name 'CATERVA_DIR' is not defined
 ```
 
 **The script that verifies the build crashed in the branch that runs the
@@ -116,7 +116,7 @@ this went unrun in the first place.
 
 ## Verification
 
-Re-introduced the exact defect by deleting the `TERIUM_DIR` definition:
+Re-introduced the exact defect by deleting the `CATERVA_DIR` definition:
 
 ```
 with the NameError back: exit=1
@@ -128,7 +128,7 @@ is the standing rule for guards here.
 
 ## Consequences
 
-- `TERIUM_DIR` is defined, so `verify_build.py`'s Python-test path runs at
+- `CATERVA_DIR` is defined, so `verify_build.py`'s Python-test path runs at
   all for the first time. What that path then reports is a separate
   question, and this ADR does not claim to have answered it — the engine
   suite exceeds the sandbox's per-call limit.

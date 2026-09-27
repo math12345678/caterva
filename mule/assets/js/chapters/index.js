@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — chapter bootstrapping
+   caterva — chapter bootstrapping
    Chapters below the fold initialise lazily so the first
    interaction is never delayed.
    ============================================================ */

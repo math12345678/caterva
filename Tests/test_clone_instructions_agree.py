@@ -5,16 +5,16 @@ WHAT THIS COMES FROM
 `CONTRIBUTING.md` opens with "New here? Read START_HERE.md first."
 `START_HERE.md` line 44 said:
 
-    git clone --recursive https://github.com/Terrium-sim/main.git
+    git clone --recursive https://github.com/math12345678/caterva.git
     cd main
 
 `README.md` said:
 
-    git clone https://github.com/Terrium-sim/terrium.git
-    cd terrium
+    git clone https://github.com/math12345678/caterva.git
+    cd caterva
 
 `git remote get-url origin` says neither — it says
-`math12345678/terrium.git`.
+`math12345678/caterva.git`.
 
 **Three answers to the first command a newcomer runs**, in the two files
 they are told to read first. A newcomer following START_HERE and one
@@ -140,8 +140,8 @@ def extract_self_links(text: str) -> list[tuple[str, str]]:
 def test_every_link_into_our_own_files_names_one_repository() -> None:
     """The New Issue page, which is reached before anything is cloned.
 
-    Its five `contact_links` pointed at `Terrium-sim/main` while the clone
-    command said `Terrium-sim/terrium`. Whichever is right, they could not
+    Its five `contact_links` pointed at `math12345678/caterva` while the clone
+    command said `math12345678/caterva`. Whichever is right, they could not
     both be, and a broken link on that page is the first thing a would-be
     contributor sees.
     """
@@ -195,7 +195,7 @@ def test_a_link_to_another_repository_is_not_treated_as_a_self_reference() -> No
     """Evidence, not a name.
 
     `docs/PUBLISHING.md` plans eighteen repositories. Their READMEs link to
-    each other — `Terrium-sim/frontend-main`, `Terrium-sim/terium` and the
+    each other — `Terrium-sim/frontend-main`, `math12345678/caterva` and the
     rest — and those are correct references to different repositories. A
     rule that demanded every `Terrium-sim/*` URL match the clone URL would
     fail on documents that are right, and a guard that fails on correct
@@ -203,10 +203,10 @@ def test_a_link_to_another_repository_is_not_treated_as_a_self_reference() -> No
 
     The discriminator is whether the linked path resolves *here*.
     """
-    ours = "see https://github.com/Terrium-sim/main/blob/main/SECURITY.md"
+    ours = "see https://github.com/math12345678/caterva/blob/main/SECURITY.md"
     theirs = "see https://github.com/Terrium-sim/frontend-main/blob/main/src/no/such/file.tsx"
 
-    assert extract_self_links(ours) == [("Terrium-sim/main", "SECURITY.md")]
+    assert extract_self_links(ours) == [("math12345678/caterva", "SECURITY.md")]
     assert extract_self_links(theirs) == [], (
         "a link to a file that does not exist in this tree was read as a "
         "claim about this repository"
@@ -253,7 +253,7 @@ def test_the_entry_points_all_use_one_clone_url() -> None:
 
 
 def test_the_cd_target_matches_the_url() -> None:
-    """`clone .../main.git` followed by `cd terrium` leaves you nowhere."""
+    """`clone .../main.git` followed by `cd caterva` leaves you nowhere."""
     commands = clone_commands()
     repo = {url.rsplit("/", 1)[-1].removesuffix(".git") for _, _, url in commands}
     assert len(repo) == 1

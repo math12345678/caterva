@@ -31,14 +31,14 @@
     "M21 came from a different method and it is worth naming: running the full dossier across all eleven buildable models rather than the one being worked on. That sweep is what found the conservation pinning, the empty-ranking caption, the missing binding target and this. Working one model at a time found none of them.",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0175-a-threshold-finer-than-the-method.json"
   ],
-  "test": "./.venv/bin/python -m pytest Terium/tests/test_compose_sensitivity.py Terium/tests/test_compose_report.py Terium/tests/test_compose_analysis.py --no-header --tb=no -p no:cacheprovider",
+  "test": "./.venv/bin/python -m pytest caterva/tests/test_compose_sensitivity.py caterva/tests/test_compose_report.py caterva/tests/test_compose_analysis.py --no-header --tb=no -p no:cacheprovider",
   "mutations": [
     {
       "id": "M1",
       "description": "the step goes back to one fixed 1e-6 for every quantity, ignoring declared precision",
       "_claimed": "caught by test_the_two_quantities_do_not_get_the_same_step and by the settling-time floor tests",
       "_note": "The original defect. A settling time accurate to 1e-8 differentiated with a 1e-6 step reported S = 0.004 for a parameter 1/kd does not contain.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "    step = float(step) if step is not None else step_for(precision)",
       "replace": "    step = float(step) if step is not None else 1e-6"
     },
@@ -47,7 +47,7 @@
       "description": "the noise floor is the precision itself rather than precision ** (2/3)",
       "_claimed": "caught by test_a_step_from_precision_balances_the_two_error_terms",
       "_note": "Makes the floor far too fine -- 1e-8 instead of 5e-5 for the settling time -- so method noise reads as signal again.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "    return SAFETY * float(precision) ** (2.0 / 3.0)",
       "replace": "    return SAFETY * float(precision)"
     },
@@ -56,7 +56,7 @@
       "description": "the dominance test drops the resolution slack, so an exact |S| = 1 is decided by rounding",
       "_claimed": "caught by test_the_slack_is_the_resolution_and_not_a_second_threshold and test_both_constants_of_a_first_order_turnover_are_dominant",
       "_note": "The coin-flip defect: ks at +0.9999999999621 not dominant, kd at -1.0000000000510 dominant, same model and same true answer.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "        return abs(self.relative) >= DOMINANT - self.resolution",
       "replace": "        return abs(self.relative) >= DOMINANT"
     },
@@ -65,7 +65,7 @@
       "description": "the two thresholds are re-conflated: negligible means below the arithmetic's floor again",
       "_claimed": "caught by test_the_upstream_constants_have_real_influence_not_no_influence and test_the_summary_keeps_the_two_kinds_of_small_apart",
       "_note": "This is the conflation that hid the cascade's real 1e-8 sensitivities behind the words 'no measurable influence'.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "        return abs(self.relative) < NEGLIGIBLE_INFLUENCE",
       "replace": "        return abs(self.relative) < self.resolution"
     },
@@ -74,7 +74,7 @@
       "description": "the steady-state search drops back below the analysis module's measured default",
       "_claimed": "caught by test_the_refusal_searches_at_least_as_hard_as_the_analysis_default and test_a_bistable_model_refuses_a_steady_state_derivative",
       "_note": "At 4 the toggle switch reports ONE stable state when it has two, so the multistability refusal never fires and a derivative is taken through a bistable system in silence.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "STARTS_PER_SPECIES = 16",
       "replace": "STARTS_PER_SPECIES = 4"
     },
@@ -83,7 +83,7 @@
       "description": "the continuation ignores its anchor and re-searches globally, so it may return a different branch",
       "_claimed": "caught by TestContinuationStaysOnOneBranch",
       "_note": "REPLACED after the first attempt came back NOT CAUGHT, and the harness was right. That attempt kept extra_starts=[anchor] and merely re-enabled the global search alongside it -- which is INERT, because extra_starts are prepended and _continue_from returns points[0], so the anchor's branch converges first and wins no matter how many other starts follow. An inert mutation reads exactly like an untested claim (ADR 0167, F2). This version removes the anchor, which is the actual defect: a continuation that re-decides which branch to be on at every step. Unreachable through analyse -- multistable models refuse at the base point -- which is why TestContinuationStaysOnOneBranch drives follow() directly.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "        network, starts_per_species=0, extra_starts=[list(anchor)]",
       "replace": "        network, starts_per_species=STARTS_PER_SPECIES"
     },
@@ -92,7 +92,7 @@
       "description": "a search with no starting points reports 'no steady states' instead of refusing",
       "_claimed": "caught by test_searching_nowhere_is_refused_rather_than_reported_as_empty",
       "_note": "A model with no steady state and a search that looked nowhere would then render identically, which is the specific silent lie the check exists for.",
-      "file": "Terium/compose/analysis.py",
+      "file": "caterva/compose/analysis.py",
       "find": "    if not starts:\n        raise AnalysisError(",
       "replace": "    if False:\n        raise AnalysisError("
     },
@@ -100,7 +100,7 @@
       "id": "M8",
       "description": "an explicit start of the wrong length is padded instead of refused",
       "_claimed": "caught by test_a_start_of_the_wrong_length_is_refused",
-      "file": "Terium/compose/analysis.py",
+      "file": "caterva/compose/analysis.py",
       "find": "        if len(start) != len(species):",
       "replace": "        if False and len(start) != len(species):"
     },
@@ -108,7 +108,7 @@
       "id": "M9",
       "description": "zero starts per species still generates the floor of four, so a continuation can jump branches",
       "_claimed": "caught by test_zero_starts_per_species_generates_none",
-      "file": "Terium/compose/analysis.py",
+      "file": "caterva/compose/analysis.py",
       "find": "    if per_species <= 0:\n        return []",
       "replace": "    if False:\n        return []"
     },
@@ -117,7 +117,7 @@
       "description": "the influence column collapses every negligible row to one word again, discarding the spread",
       "_claimed": "caught by test_a_negligible_row_keeps_its_number",
       "_note": "The cascade's twelve constants span four orders of magnitude and that spread IS the ranking. 'negligible here' for all twelve is true and useless.",
-      "file": "Terium/compose/report.py",
+      "file": "caterva/compose/report.py",
       "find": "        return f\"S = {entry.relative:+.2g} _(negligible)_\"",
       "replace": "        return \"negligible here\""
     },
@@ -126,7 +126,7 @@
       "description": "the default ranking target goes back to the last product of the last reaction",
       "_claimed": "caught by test_it_is_the_last_thing_the_mechanism_produces and test_it_is_not_the_last_product_of_the_last_reaction",
       "_note": "For a cascade that is the DEPHOSPHORYLATED form -- the last reaction of the last tier is the phosphatase step -- so the whole table gets ranked against the opposite of the question.",
-      "file": "Terium/compose/report.py",
+      "file": "caterva/compose/report.py",
       "find": "    instances = getattr(model.recognition.composition, \"instances\", ())\n    for instance in reversed(list(instances)):\n        products = instance.motif.ports_with_role(ROLE_PRODUCT)\n        if products:\n            return instance.species_for(products[-1].name)\n    return None",
       "replace": "    for reaction in reversed(model.network.reactions):\n        if reaction.products:\n            return list(reaction.products)[-1]\n    return None"
     },
@@ -134,7 +134,7 @@
       "id": "M12",
       "description": "the table always says 'measure the top of this list', even when nothing on it is worth measuring",
       "_claimed": "caught by test_a_table_where_nothing_is_actionable_says_the_opposite_advice",
-      "file": "Terium/compose/report.py",
+      "file": "caterva/compose/report.py",
       "find": "        actionable = [\n            s for s in self.sensitivity.sensitivities if not s.negligible\n        ]",
       "replace": "        actionable = list(self.sensitivity.sensitivities)"
     },
@@ -143,7 +143,7 @@
       "description": "an all-zero ranking is captioned as saturation even when a conservation law is what pins it",
       "_claimed": "caught by test_the_pinned_summary_names_the_law_and_redirects and test_a_conserved_target_gets_the_structural_caption",
       "_note": "Saturation and conservation produce the same empty priority list and demand opposite advice. This is the plausible-wrong-reason failure attached to a correct number -- the same shape as calling a continuum a set of attractors.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "    law = conservation_pinning(model.network, species, report)\n    return replace(report, conserved_by=law) if law else report",
       "replace": "    return report"
     },
@@ -152,7 +152,7 @@
       "description": "conservation pinning is decided by the law alone, without requiring the sensitivities to be zero",
       "_claimed": "caught by test_a_saturated_model_is_not_called_conserved",
       "_note": "The conjunction is the whole point. tier3_Xp IS in a conservation law -- every phosphorylation tier conserves its total protein -- so a law-only test reroutes the SATURATED cascade to the structural caption. This mutation is why the cascade case is in the tests.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "    if not all(s.unresolvable for s in report.sensitivities):\n        return None",
       "replace": "    if False:\n        return None"
     },
@@ -161,7 +161,7 @@
       "description": "a binding motif's complex is no longer a fallback target, so binding models get no ranking",
       "_claimed": "caught by test_a_motif_with_no_product_falls_back_to_its_complex and test_the_dossier_now_ranks_a_binding_model",
       "_note": "Restores the gap exactly: silence rather than a refusal with a reason.",
-      "file": "Terium/compose/report.py",
+      "file": "caterva/compose/report.py",
       "find": "    for role in (ROLE_PRODUCT, ROLE_COMPLEX):",
       "replace": "    for role in (ROLE_PRODUCT,):"
     },
@@ -170,7 +170,7 @@
       "description": "the conservation-law match is a substring test, so tier1_X matches tier1_Xp",
       "_claimed": "caught by TestLawMentions",
       "_note": "The first version of this mutation targeted the same rule inline inside conservation_pinning and came back NOT CAUGHT -- correctly, and the mutation was INERT rather than the tests weak. In every law the library currently produces, a species that is a substring of another token is also a token of the same law ('complex_A + complex_AB' names both), so substring and token matching agree on every real input and the distinction could not be exercised through any composable model. A guard indistinguishable from its own bug is not yet a guard, so the rule was split out as law_mentions() and TestLawMentions drives it with the law strings that separate the two rules -- including a test asserting those strings DO separate them, so the class cannot quietly become vacuous.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "    return species in re.findall(r\"[A-Za-z_][A-Za-z0-9_]*\", law)",
       "replace": "    return species in law"
     },
@@ -179,7 +179,7 @@
       "description": "an empty ranking falls through to the saturation caption, claiming a measurement nobody took",
       "_claimed": "caught by test_the_summary_says_nothing_was_measured and test_it_says_nothing_was_measured_rather_than_nothing_matters",
       "_note": "The allosteric model's activator starts at zero and is conserved, so the answer is zero and every RELATIVE sensitivity is undefined -- skipped, not small. Reporting 'no constant influences this answer' there is a finding from a run that found nothing.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "        elif not self.sensitivities:",
       "replace": "        elif False:"
     },
@@ -187,7 +187,7 @@
       "id": "M18",
       "description": "a pinned steady state no longer falls back to the settling time, so the advice points at nothing",
       "_claimed": "caught by test_the_dossier_ranks_the_settling_time_instead and test_the_fallback_ranking_is_the_analytic_one",
-      "file": "Terium/compose/report.py",
+      "file": "caterva/compose/report.py",
       "find": "                if sensitivity.conserved_by:",
       "replace": "                if False:"
     },
@@ -196,7 +196,7 @@
       "description": "the fallback drops the conservation law, so a settling-time ranking reads as a steady-state one",
       "_claimed": "caught by test_the_law_is_carried_forward_so_the_switch_can_be_explained and test_it_says_why_it_is_ranking_a_settling_time",
       "_note": "A worse misreading than the one the fallback fixed: kcat at S = -1 with no explanation is a claim about WHERE the system lands, and it means how FAST.",
-      "file": "Terium/compose/report.py",
+      "file": "caterva/compose/report.py",
       "find": "    return replace(report, conserved_by=law)",
       "replace": "    return report"
     },
@@ -204,7 +204,7 @@
       "id": "M20",
       "description": "the table captions an unranked list 'Ordered by influence', for an ordering that did not happen",
       "_claimed": "caught by test_it_does_not_claim_an_ordering_it_did_not_make",
-      "file": "Terium/compose/report.py",
+      "file": "caterva/compose/report.py",
       "find": "        if self.sensitivity.sensitivities:\n            lines.append(\n                f\"Ordered by influence on **{self.sensitivity.quantity}**: S \"",
       "replace": "        if True:\n            lines.append(\n                f\"Ordered by influence on **{self.sensitivity.quantity}**: S \""
     },
@@ -213,7 +213,7 @@
       "description": "a refusal that already explains itself is wrapped in a generic one, burying the real reason",
       "_claimed": "caught by test_a_refusal_that_explains_itself_is_not_re_explained and test_the_dossier_note_carries_the_real_reason",
       "_note": "Found by running the full dossier over every buildable model rather than the one under development. Three of eleven reached a refusal, and each note read 'the quantity could not be computed at the base point, so there is nothing to differentiate: <the actual, precise reason>' -- with the open system's saying 'differentiate' twice in one sentence. The mutation restores the old double-wrapping by inserting a handler AHEAD of the pass-through, rather than by disabling it against a sentinel exception -- a first attempt added a _NeverRaised class to the module for the harness to aim at, which is production code existing to serve its own test and was removed.",
-      "file": "Terium/compose/sensitivity.py",
+      "file": "caterva/compose/sensitivity.py",
       "find": "    except SensitivityUnavailable:\n        # A REFUSAL THAT EXPLAINS ITSELF IS NOT RE-EXPLAINED.",
       "replace": "    except SensitivityUnavailable as reraise:\n        raise SensitivityUnavailable(\n            f\"the quantity could not be computed at the base point, so \"\n            f\"there is nothing to differentiate: {reraise}\"\n        ) from reraise\n    except SensitivityUnavailable:\n        # A REFUSAL THAT EXPLAINS ITSELF IS NOT RE-EXPLAINED."
     }

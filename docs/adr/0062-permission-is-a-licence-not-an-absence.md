@@ -12,7 +12,7 @@
 "Take out all code related to Tellurium. I don't want to use things I don't
 have permission for."
 
-Taken literally, the first sentence deletes the project. Terrium's ODE
+Taken literally, the first sentence deletes the project. Caterva's ODE
 integration is libRoadRunner and its models are generated as Antimony, both
 from the Sauro lab at the University of Washington — the group behind
 Tellurium. 218 references across 25 files, underpinning all 15 domains.
@@ -32,7 +32,7 @@ plain English:
 > You CAN use the software in packages or distributions that you create.
 
 Removing software whose authors have written an explicit invitation to use
-it would not make Terrium safer. It would cost the integrator underneath
+it would not make Caterva safer. It would cost the integrator underneath
 every domain and invalidate the closed-form and independent-integrator
 correctness tests, and buy nothing.
 
@@ -63,7 +63,7 @@ affiliation on its own.
 
 One was never imported. The other three were, and
 `vite-plugin-runtime-error-modal` was **not** gated on `REPL_ID` as the
-other two were: it ran on every build of `terrium-landing` and
+other two were: it ran on every build of `caterva-landing` and
 `mockup-sandbox`, production included. My first draft of the guard's
 explanation claimed all three were gated. Reading the config disproved it,
 and the recorded reason was corrected before it shipped.
@@ -132,19 +132,19 @@ fail under any input. Found by reading it back rather than by any tool.
 
 ## What this does not settle
 
-The name. Terrium against Tellurium, two letters apart, same field, built
+The name. Caterva against Tellurium, two letters apart, same field, built
 on the other project's libraries, with one documented instance of an expert
 reading a cold email as a false claim of credit.
 
 Licensing is settled and favourable. Trademark is not, and it is now the
 larger exposure. `docs/RENAME_PLAN.md` costs it out: 452 files, 2,651
 occurrences, and — a finding of its own — **two spellings already in use**,
-`Terium` for the Python package you import and `Terrium` for everything
-else, so you `pip install terrium` and then `import Terium`.
+`caterva` for the Python package you import and `Caterva` for everything
+else, so you `pip install caterva` and then `import caterva`.
 
 I first recorded that split as a live bug: that following the docs would
 produce an ImportError. Checking it before acting showed otherwise. No
-document tells anyone to `import Terrium`; all 17 `python -m Terium.cli`
+document tells anyone to `import Caterva`; all 17 `python -m caterva.cli`
 invocations are correct. It is a cosmetic inconsistency, and the correction
 matters because it changes the recommendation from "fix this now" to "fold
 it into the rename" — a directory move is the most disruptive edit

@@ -24,13 +24,13 @@ It reported per-parameter DOIs, PMIDs and STRENDA verdicts, and **said
 nothing about what publishing the data obliges.** `NOTICE` is explicit:
 
 > If you use BRENDA data in scientific work, cite BRENDA's current
-> publication […] **Citing Terrium is not a substitute for citing BRENDA.**
+> publication […] **Citing Caterva is not a substitute for citing BRENDA.**
 
 So the one surface in the system that judges publication-readiness was
 silent on the requirements of publication.
 
 This completes a sweep that began with ADR 0063. Every artifact that leaves
-Terrium carrying BRENDA-derived values has now been checked: the Antimony
+Caterva carrying BRENDA-derived values has now been checked: the Antimony
 model, the SBML, the trajectory CSV, the BibTeX/RIS bibliography, and this.
 Each was missing something different, and each was found only by looking at
 the artifact rather than at the code that builds it.
@@ -50,7 +50,7 @@ CSV.
 Unchanged. It remains `blockedParameters.length === 0`.
 
 Folding "has the user cited BRENDA?" into it was considered and rejected:
-Terrium cannot observe whether a citation was made, and a boolean that
+Caterva cannot observe whether a citation was made, and a boolean that
 silently incorporates an unobservable condition is a guess wearing the
 costume of a check. The obligations are reported *alongside* the verdict for
 a person to act on, which is the honest division — the same reasoning ADR
@@ -99,7 +99,7 @@ three-valued:
 |---|---|
 | `cite` | the source asks to be cited; `citationRequest` says how |
 | `none` | its terms are recorded and require no citation |
-| `unknown` | Terrium has no record of its terms |
+| `unknown` | Caterva has no record of its terms |
 
 `none` and `unknown` both carry `citationRequest: null`, so a reader
 inferring from that field alone cannot tell "nothing is owed" from "we do

@@ -13,7 +13,7 @@ items on it were answerable and are now answered.
 
 Both previous records said this was *not determined* because it needed the
 CI logs. It did not; `gh` is installed and authenticated. Measured against
-`math12345678/terrium`:
+`math12345678/caterva`:
 
 - **58 main-branch runs examined. Last green: 2026-08-18T22:11:50Z.**
 - **28 consecutive failures since.**
@@ -87,7 +87,7 @@ Outside that directory and checked by nothing:
 - `landing/`, whose own `tsconfig.json` opens by explaining that this code
   *"no tsconfig.json covered, so nothing type-checked it"* — the config
   was written and nothing ever ran it;
-- `terrium-site/`, its own npm project with a `typecheck` script no
+- `caterva-site/`, its own npm project with a `typecheck` script no
   automation calls.
 
 ### A requirements file that could not be installed, naming two packages that do not exist
@@ -119,7 +119,7 @@ matched only `==`, and this file uses `>=` throughout.
   Node-free run has to be able to turn it off. Nothing else in that branch
   had that property.
 - **Widen the compile guard to the whole repository** — root, `landing/`
-  and `terrium-site/` alongside the seven pipeline workspaces. Root-level
+  and `caterva-site/` alongside the seven pipeline workspaces. Root-level
   configs are matched per directory rather than by `rglob` from the root,
   which would walk `.venv`, `node_modules` and every fixture tree.
 - **Teach `check_pins_resolve.py` about names, not only versions**, across
@@ -187,7 +187,7 @@ as ADR 0166 left, none of which names a file this pass touched.
 
 ## Consequences
 
-**Checked and clean, so recorded as checked.** `terrium-site` installs,
+**Checked and clean, so recorded as checked.** `caterva-site` installs,
 type-checks and builds with its lockfile already in sync. All 30
 JavaScript files under `mule/` parse. `landing/` type-checks. None of
 these had ever been established; three of them are now inside the compile
@@ -268,7 +268,7 @@ single parenthesis. A notice at the top now states what is present, and
 deleted — it is real intent — but a plan in the present tense is a claim.
 
 **And that notice is now guarded, because it is the kind that rots.**
-`Terium/tests/test_advanced_analysis_notice_matches_reality.py` fails in
+`caterva/tests/test_advanced_analysis_notice_matches_reality.py` fails in
 both directions: if a claimed-absent path is built, and if the notice is
 removed while they are still absent. This is ADR 0145's argument reused —
 nothing else in the tree fires when a *true* sentence stops being true,

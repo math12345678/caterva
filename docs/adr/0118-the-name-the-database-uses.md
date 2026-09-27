@@ -12,7 +12,7 @@ available — the same idea, one field over)
 
 ## How this was found
 
-The owner said Terrium did not feel like it was fixing a problem. Rather
+The owner said Caterva did not feel like it was fixing a problem. Rather
 than argue, I used it the way a student would.
 
 The live path could not run here — BRENDA returns 403 to this sandbox — so

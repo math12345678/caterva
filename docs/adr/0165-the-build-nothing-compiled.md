@@ -25,7 +25,7 @@ Introduced in `982ebca` (2026-08-18), found 2026-08-23.
 I wrote that nothing in the tree asked whether the TypeScript compiles.
 Then I ran it. `scripts/check_typescript_compiles.py` exists, is wired
 into `verify_build.py`, covers seven workspaces including
-`terrium-landing`, and catches this exact defect — with the bug restored
+`caterva-landing`, and catches this exact defect — with the bug restored
 it exits 1 and prints `src/cli/CliApp.tsx(701,12): error TS1005: '}'
 expected.` The guard was never the problem.
 
@@ -76,7 +76,7 @@ Worse, because every test in the file ran with the lookup unresolved, the
 path where an id actually reaches the JSON was covered by nothing —
 deleting both assignments in the runner changed no assertion.
 
-*The refusals sentence.* `lab_report.py` ends its "What Terrium would not
+*The refusals sentence.* `lab_report.py` ends its "What Caterva would not
 do" section with an else-branch stating "Nothing was withheld…" when there
 are no refusals. The test named for that branch built its report from the
 shared fixture — which now resolves a km whose candidate rows mix diseased
@@ -100,7 +100,7 @@ being reachable, and the test still passes.
 
 **Close the comment.** One `}`. The landing app builds; the whole
 workspace typechecks clean (`api-server`, `mockup-sandbox`,
-`terrium-landing` all "Done").
+`caterva-landing` all "Done").
 
 **Put a compile check in the job that has a compiler.** `pnpm run
 typecheck` now runs in CI's Node job — after `pnpm install`, where
@@ -165,7 +165,7 @@ Suites after the change:
 
 | suite | before | after |
 |---|---|---|
-| engine (`Terium`) | 2 failed | 1 failed |
+| engine (`caterva`) | 2 failed | 1 failed |
 | literature (`Tests`) | 4 failed | 1 failed |
 | api-server (vitest) | 625 passed | 625 passed |
 | wired guards | 3 red of 27 | 2 red of 27 |
@@ -211,7 +211,7 @@ units, or retract the row — lead to materially different trees, and this
 is the record the whole project rests on. The guards stay red so it cannot
 be quietly forgotten.
 
-*The pitch deck.* `test_investor_claims.py` fails: `terrium_pitch_deck.pptx`
+*The pitch deck.* `test_investor_claims.py` fails: `caterva_pitch_deck.pptx`
 says 1,852 tests on two slides, the repository has 2,297. Investor-facing
 material and outward-facing; the number is the owner's to change.
 
@@ -232,9 +232,9 @@ all of them and reporting at the end would have surfaced three red guards
 on the first command instead of one — but fail-fast may be deliberate
 (the last step is minutes long), so this is flagged rather than altered.
 
-**What I did not check.** The `Business/`, `mule/`, `terrium-site/`,
+**What I did not check.** The `Business/`, `mule/`, `caterva-site/`,
 `advanced_analysis/` and `landing/` trees were not audited. The
-`mockup-sandbox` and `terrium-landing` suites were not run — only
+`mockup-sandbox` and `caterva-landing` suites were not run — only
 typechecked. Whether the *rest* of the literature suite depends on the
 network is **not determined**: a full offline run was attempted twice and
 did not complete (it reached 57% in over twenty minutes against a 5m19s

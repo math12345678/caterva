@@ -27,7 +27,7 @@
  * rounds stopped. Both are reported as the engine computed them, neither
  * is second-guessed here.
  */
-import type { TeriumResult } from "./teriumRunner";
+import type { CatervaResult } from "./catervaRunner";
 
 /** One resolved value, as the engine serialised it. */
 export interface LiteratureSource {
@@ -196,13 +196,13 @@ export interface CompositionRefusal {
 }
 
 /**
- * What `runTerium("parameterize", ...)` returns, over and above the common
- * `TeriumResult` fields. The engine's serialised search sits on the payload
+ * What `runCaterva("parameterize", ...)` returns, over and above the common
+ * `CatervaResult` fields. The engine's serialised search sits on the payload
  * alongside `parameters`/`trajectory`; the extra keys are what this module
  * exists to name. The build fields are still snake_case here -- that is what
  * the engine sent -- and become camelCase in `toLiteratureSearchReport`.
  */
-export interface ParameterizePayload extends TeriumResult {
+export interface ParameterizePayload extends CatervaResult {
   chosen_organism: string | null;
   undecided_organisms: string[];
   branches: RawLiteratureBranch[];

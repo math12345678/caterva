@@ -16,7 +16,7 @@ audit. A reader could open the dashboard, see a working simulation tool with
 a history panel, and have no reason to suspect the panel was showing them
 somebody else's work.
 
-Terrium is aimed at teaching labs, which makes the omission worse than it
+Caterva is aimed at teaching labs, which makes the omission worse than it
 would be for a developer tool: the person deploying it may be a teacher, and
 the people using it may be minors.
 

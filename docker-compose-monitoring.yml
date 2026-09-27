@@ -1,8 +1,8 @@
 version: '3.8'
 
 services:
-  # Terrium API Server
-  terrium:
+  # Caterva API Server
+  caterva:
     build:
       context: .
       dockerfile: Dockerfile
@@ -12,7 +12,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
     volumes:
-      - terrium_data:/app/data
+      - caterva_data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
@@ -53,7 +53,7 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml
       - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml
-      - ./grafana-dashboard.json:/etc/grafana/provisioning/dashboards/terrium.json
+      - ./grafana-dashboard.json:/etc/grafana/provisioning/dashboards/caterva.json
     depends_on:
       - prometheus
     restart: unless-stopped
@@ -64,7 +64,7 @@ services:
       retries: 3
 
 volumes:
-  terrium_data:
+  caterva_data:
     driver: local
   prometheus_data:
     driver: local

@@ -39,7 +39,7 @@ const LINKS = [
        what happens and contradicts two other places on this page: the compute
        router's own record says the browser runtime was insufficient for the
        integration, and manifest item 04 promises no browser execution where
-       real compute is required. Terrium integrates ODEs through libroadrunner
+       real compute is required. Caterva integrates ODEs through libroadrunner
        outside the browser; the rail now says that. */
     body: 'The schema is integrated by a real ODE solver outside the browser. Where the method cannot run there either, routing escalates instead of pretending.',
     status: 'user'

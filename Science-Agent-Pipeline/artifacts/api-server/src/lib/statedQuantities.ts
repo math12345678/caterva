@@ -3,7 +3,7 @@
  *
  * THE PROBLEM THIS EXISTS FOR
  *
- * Terrium's promise is "ask a question, get a verified simulation". Measured
+ * Caterva's promise is "ask a question, get a verified simulation". Measured
  * against the running API, that promise had a 0% success rate for any
  * question not containing CLI syntax:
  *
@@ -18,7 +18,7 @@
  *
  * WHY THIS DOES NOT WEAKEN THE "NEVER INVENT" RULE
  *
- * It is the same rule, applied honestly. "Never invent" forbids Terrium
+ * It is the same rule, applied honestly. "Never invent" forbids Caterva
  * supplying a number nobody chose. It does not require ignoring a number the
  * user chose out loud. "A town of 10000 people" is the user specifying a
  * population as surely as "s0=10000" is; the difference is grammar, not
@@ -50,7 +50,7 @@
  * is a TOTAL rather than a susceptible count.
  */
 import { matchEnzyme, type EnzymeEntry } from "./enzymes";
-import type { SimulationDomain } from "./teriumRunner";
+import type { SimulationDomain } from "./catervaRunner";
 
 export interface StatedQuantity {
   /** The engine parameter this binds to. */
@@ -211,7 +211,7 @@ const INFECTED_RE = new RegExp(
  * "a town of 10000 people", "population of 10000", "10000 people".
  *
  * NOTE THIS IS A TOTAL, NOT s0. In the engine's SIR, s0 is the SUSCEPTIBLE
- * count and N = s0 + i0 + r0_recovered (Terium/core/validation.py's
+ * count and N = s0 + i0 + r0_recovered (caterva/core/validation.py's
  * validate_sir_params checks exactly that sum). So "a town of 10000 people
  * with 5 infected" means N=10000, i0=5, and therefore s0=9995. Binding
  * s0=10000 would quietly simulate a town of 10005 -- not the town the user

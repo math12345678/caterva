@@ -1,4 +1,4 @@
-# Terrium's legal position
+# Caterva's legal position
 
 **Not legal advice.** This records what the licence files in this tree
 actually say, checked mechanically so it cannot drift. Anything that
@@ -9,7 +9,7 @@ runs in CI and fails when a dependency has no recorded grant of permission.
 
 ## The short version
 
-Terrium's own code is Apache 2.0. Every software dependency it uses grants
+Caterva's own code is Apache 2.0. Every software dependency it uses grants
 permission to use it, in writing, including commercially. Four packages
 that granted nothing have been removed from the code.
 
@@ -32,7 +32,7 @@ That distinction drove every decision below.
 
 ## The simulation engine, and why it stays
 
-Terrium runs on **libRoadRunner** (Apache 2.0, © 2012–2018 University of
+Caterva runs on **libRoadRunner** (Apache 2.0, © 2012–2018 University of
 Washington) and generates **Antimony** (MIT). Both come from the Sauro lab
 at UW — the same group behind Tellurium.
 
@@ -46,7 +46,7 @@ the permission out in plain English:
 > You CAN use the software in packages or distributions that you create.
 
 Removing software whose authors have explicitly invited you to use it would
-not make Terrium safer. It would cost the ODE integrator underneath all 15
+not make Caterva safer. It would cost the ODE integrator underneath all 15
 domains, invalidate the closed-form and independent-integrator correctness
 tests that ADR-level rigour depends on, and buy nothing legally.
 
@@ -77,7 +77,7 @@ file, and no repository URL** — no grant of permission of any kind.
 | package | status |
 |---|---|
 | `@replit/connectors-sdk` | Declared in `Science-Agent-Pipeline/package.json`, imported by no source file. Never used. |
-| `@replit/vite-plugin-runtime-error-modal` | Ran on **every** build of `mockup-sandbox` and `terrium-landing`, including production — it was not gated. Call sites removed. |
+| `@replit/vite-plugin-runtime-error-modal` | Ran on **every** build of `mockup-sandbox` and `caterva-landing`, including production — it was not gated. Call sites removed. |
 | `@replit/vite-plugin-cartographer` | Gated on `REPL_ID`. Call sites removed. |
 | `@replit/vite-plugin-dev-banner` | Gated on `REPL_ID`. Call sites removed. |
 
@@ -104,7 +104,7 @@ that "almost certainly" is not a licence, and this project does not accept
 ## Dependencies with a condition worth knowing
 
 **libSBML — LGPL 2.1.** The condition is that a recipient can replace the
-library. From the wheel and sdist, Terrium installs it as an ordinary Python
+library. From the wheel and sdist, Caterva installs it as an ordinary Python
 package, does not vendor it, does not modify it and does not statically
 link it, so replacement is a `pip install` away and nothing is conveyed. The
 downloadable app folder (since v0.3.0, ADR 0177) is different: it contains
@@ -113,16 +113,16 @@ libSBML's extension stays a single separate file a recipient can swap, and
 it carries libSBML's own terms and the LGPL text beside it; NOTICE states
 the position artifact by artifact and `scripts/build_app.py` refuses to
 write a folder that does not match it. No source-disclosure obligation
-attaches to Terrium's own code in either case.
+attaches to Caterva's own code in either case.
 
 **stdpopsim — GPL 3.0.** Optional and never redistributed. Imported at
 runtime only if the user installed it themselves; the population-genetics
-tests skip when absent. Since no stdpopsim code ships with Terrium, no GPL
-obligation attaches to Terrium's distribution. **This changes if it ever
+tests skip when absent. Since no stdpopsim code ships with Caterva, no GPL
+obligation attaches to Caterva's distribution. **This changes if it ever
 becomes a hard requirement or is bundled** — revisit then.
 
 **Hypothesis — MPL 2.0.** File-level copyleft, triggered by modifying the
-covered files. Terrium does not modify them.
+covered files. Caterva does not modify them.
 
 **caniuse-lite — CC BY 4.0.** Build-time browser-support data in the JS
 tree. Attribution satisfied by `NOTICE`.
@@ -141,7 +141,7 @@ have an untraceable moment in its own compliance history.
 US. Citation requested, not required.
 
 **KEGG — GATED 2026-08-16 (ADR 0096); licence still unobtained.**
-The live call is now off unless `TERRIUM_ENABLE_KEGG` is set, so Terrium no
+The live call is now off unless `CATERVA_ENABLE_KEGG` is set, so Caterva no
 longer queries KEGG on a user's behalf by default. The licence question
 below is unchanged and unanswered — gating removes the exposure, it does not
 resolve the entitlement. Anyone setting that variable is asserting their own
@@ -158,7 +158,7 @@ live, server-side, on the resolution path. KEGG's terms
 license", and that even academic users "providing services" are asked to
 obtain an academic service-provider licence.
 
-Terrium provides a service and this repository contains an incorporation
+Caterva provides a service and this repository contains an incorporation
 checklist, a cap table and a fundraising tracker. Either reading points at
 a licence from Pathway Solutions (https://www.pathway.jp/).
 
@@ -174,7 +174,7 @@ CORE's terms (https://core.ac.uk/terms) grant commercial use of their
 a licence to use other CORE datasets as well as the CORE API."
 
 They then list three conditions under which you should contact them, and
-Terrium meets all three: it might be monetised, it uses CORE data in a
+Caterva meets all three: it might be monetised, it uses CORE data in a
 service, and that service is literature search and discovery — CORE's own
 listed example of "functionality provided by one of CORE's existing
 services."
@@ -184,7 +184,7 @@ than by implication. It is also the easier one: CORE say many users qualify
 for a **free** licence and ask to be contacted either way. The action is an
 email, most likely followed by a form.
 
-**The deck presents it as an asset.** `terrium_pitch_deck.pptx`, slide 11,
+**The deck presents it as an asset.** `caterva_pitch_deck.pptx`, slide 11,
 under the heading "Product proof is done", lists as a completed item:
 
 > ✓ Live GitHub repo — **BRENDA/KEGG scraper** + simulation engine, CI
@@ -211,7 +211,7 @@ audience most entitled to know about it. Resolve the licence, then say so.
 
 **What to do, in order:**
 
-1. Decide whether Terrium is academic or commercial. It is currently both
+1. Decide whether Caterva is academic or commercial. It is currently both
    on paper.
 2. Contact Pathway Solutions about the appropriate licence, or
 3. Remove the dependency. The cost is bounded and small: KEGG supplies a
@@ -241,7 +241,7 @@ also covers the waitlist's email collection and the absent privacy notice.
 
 ## The name
 
-The trademark question — Terrium against Tellurium, in the same field, on
+The trademark question — Caterva against Tellurium, in the same field, on
 the same ecosystem — is **not resolved by anything in this document**, and
 it is the largest remaining exposure. It has already produced one concrete
 incident: a researcher read a cold outreach email as a false claim of

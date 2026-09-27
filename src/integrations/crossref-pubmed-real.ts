@@ -44,7 +44,7 @@ export async function resolveDOIFromCrossRef(doi: string): Promise<{
 
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Terrium-Scientific/1.0 (mailto:admin.terrium@gmail.com)'
+        'User-Agent': 'Caterva-Scientific/1.0 (mailto:admin.terrium@gmail.com)'
       }
     });
 
@@ -124,7 +124,7 @@ export async function searchPubMedForEnzymeKinetics(
     try {
       logger.info({ enzyme, substrate, query: searchQuery }, `Searching PubMed: "${searchQuery}"`);
 
-      const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=${limit}&rettype=json&tool=Terrium&email=admin.terrium@gmail.com`;
+      const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(searchQuery)}&retmax=${limit}&rettype=json&tool=Caterva&email=admin.terrium@gmail.com`;
 
       const searchResponse = await fetch(searchUrl);
 

@@ -31,7 +31,7 @@
       "description": "an unlicensed package is re-imported into a vite config",
       "_claimed": "1 failed",
       "_note": "A manifest entry is a paperwork problem; an import is a use. This is the row that would matter in a dispute, and it is why the call sites came out before the manifest entries could.",
-      "file": "Science-Agent-Pipeline/artifacts/terrium-landing/vite.config.ts",
+      "file": "Science-Agent-Pipeline/artifacts/caterva-landing/vite.config.ts",
       "find": "import path from \"path\";",
       "replace": "import path from \"path\";\nimport devBanner from \"@replit/vite-plugin-dev-banner\";"
     },

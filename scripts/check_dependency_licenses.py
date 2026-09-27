@@ -5,7 +5,7 @@ WHY THIS EXISTS
 ---------------
 "I don't want to use things I don't have permission for" is a requirement
 like any other, and until this script existed nothing in the repository
-could answer it. The dependency manifests said *what* Terrium uses. Nothing
+could answer it. The dependency manifests said *what* Caterva uses. Nothing
 said *under what terms*, so the answer had to be re-derived by hand every
 time anyone asked — and a hand-derived answer is exactly the kind of claim
 this project does not accept anywhere else.
@@ -119,7 +119,7 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "Caltech, EMBL-EBI, University of Heidelberg and others. LGPL "
         "permits use and distribution of a work that links the library; the "
         "condition is that recipients can replace the library. In the wheel "
-        "and sdist Terrium names it as a dependency and does not vendor, "
+        "and sdist Caterva names it as a dependency and does not vendor, "
         "modify or statically link it, so replacement is a pip install. In "
         "the downloadable app folder (ADR 0177) it IS conveyed, as one "
         "separate file the recipient can swap, with the LGPL text and "
@@ -130,7 +130,7 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "GPL-2.0-or-later WITH Bootloader-exception",
         "Read from pyinstaller-6.22.2.dist-info/licenses/COPYING.txt in the "
         "installed wheel by the session on branch "
-        "claude/terrium-orientation-setup-c1310b (PR #21), which installed "
+        "claude/caterva-orientation-setup-c1310b (PR #21), which installed "
         "it; the machine that recorded this entry could not reach PyPI and "
         "carries the text over from that record. The GPL alone would be "
         "a problem: the downloadable app folder embeds PyInstaller's "
@@ -149,10 +149,10 @@ PERMISSION: dict[str, tuple[str, str]] = {
     "scipy": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
     "stdpopsim": (
         "GPL-3.0",
-        "Optional and NOT redistributed by Terrium. Imported at runtime "
+        "Optional and NOT redistributed by Caterva. Imported at runtime "
         "when a user has installed it themselves; the population-genetics "
-        "tests skip when it is absent. Terrium ships no stdpopsim code, so "
-        "no GPL obligation attaches to Terrium's own distribution. Revisit "
+        "tests skip when it is absent. Caterva ships no stdpopsim code, so "
+        "no GPL obligation attaches to Caterva's own distribution. Revisit "
         "if it ever becomes a hard requirement or is bundled.",
     ),
     # --- HTTP / parsing ---------------------------------------------------
@@ -164,7 +164,7 @@ PERMISSION: dict[str, tuple[str, str]] = {
     # --- Dev / test -------------------------------------------------------
     "pytest": ("MIT", "Use, copy, modify, distribute, sell."),
     "pytest-timeout": ("MIT", "Use, copy, modify, distribute, sell."),
-    "hypothesis": ("MPL-2.0", "File-level copyleft; Terrium does not modify it."),
+    "hypothesis": ("MPL-2.0", "File-level copyleft; Caterva does not modify it."),
     "ruff": (
         "MIT",
         "Lints for bug-class findings (scripts/check_python_bug_lints.py). "
@@ -211,11 +211,11 @@ PERMISSION: dict[str, tuple[str, str]] = {
         "including commercially; condition is attribution and notice "
         "retention. Dev-only: it validates CITATION.cff and ships in nothing.",
     ),
-    # --- Front-end build (terrium-site) -----------------------------------
+    # --- Front-end build (caterva-site) -----------------------------------
     "autoprefixer": (
         "MIT",
         "Copyright 2013 Andrey Sitnik. Read from the LICENSE file shipped in "
-        "terrium-site/node_modules/autoprefixer, which grants use, copy, "
+        "caterva-site/node_modules/autoprefixer, which grants use, copy, "
         "modify, merge, publish, distribute, sublicense and sell, on "
         "condition the notice is retained. Its package.json `license` field "
         "says MIT and agrees with the shipped text -- checked, because this "
@@ -229,7 +229,7 @@ _REPLIT_NO_LICENCE = (
     "Ships no `license` field, no LICENSE file and no repository URL, so "
     "there is no grant of permission to use it. Unlike connectors-sdk these "
     "three WERE used, in the vite.config.ts of mockup-sandbox and "
-    "terrium-landing, as Replit editor conveniences (an error overlay, a dev "
+    "caterva-landing, as Replit editor conveniences (an error overlay, a dev "
     "banner, a source mapper). cartographer and dev-banner were gated on the "
     "REPL_ID environment variable; the error overlay was NOT -- it ran on "
     "every build, including production ones. All three call sites have been "
@@ -276,8 +276,8 @@ NO_GRANT: dict[str, str] = {
         "      * ADR 0001 (the only reason that ADR gives): the umbrella "
         "package pulls in python-libcombine and python-libnuml, which lack "
         "wheels on some supported platforms and fall back to a cmake/swig "
-        "source build — for COMBINE-archive features Terrium does not use.\n"
-        "      * The naming review (docs/LICENSING.md, NOTICE): Terrium "
+        "source build — for COMBINE-archive features Caterva does not use.\n"
+        "      * The naming review (docs/LICENSING.md, NOTICE): Caterva "
         "must not depend on the project whose name it resembles, so the "
         "non-affiliation notice stays true.\n"
         "    ADR 0001 says nothing about naming; citing it for that put a "
@@ -379,7 +379,7 @@ _JS_ROOTS = (
     "Science-Agent-Pipeline/node_modules",
     "Science-Agent-Pipeline/artifacts/api-server/node_modules",
     "Science-Agent-Pipeline/artifacts/mockup-sandbox/node_modules",
-    "Science-Agent-Pipeline/artifacts/terrium-landing/node_modules",
+    "Science-Agent-Pipeline/artifacts/caterva-landing/node_modules",
 )
 
 

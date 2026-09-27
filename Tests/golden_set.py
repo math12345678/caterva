@@ -1,4 +1,4 @@
-"""The golden set: Terrium's ground truth, as DATA.
+"""The golden set: Caterva's ground truth, as DATA.
 
 WHY THIS IS NOT IN THE TEST FILE
 --------------------------------

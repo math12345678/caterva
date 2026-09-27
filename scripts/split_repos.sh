@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Split the Terrium monorepo into the 18 repositories under
+# Split the Caterva monorepo into the 18 repositories under
 # github.com/Terrium-sim, preserving per-folder history.
 #
 # Run this from a clean checkout of the monorepo. It only creates local
@@ -17,17 +17,17 @@ set -euo pipefail
 ORG="Terrium-sim"
 
 # Staging area for repos assembled from scattered files. Defined here,
-# beside the other config, because the terium replay below uses it and
+# beside the other config, because the caterva replay below uses it and
 # `set -u` turns a late definition into a hard failure.
-STAGE="${TMPDIR:-/tmp}/terrium-split"
+STAGE="${TMPDIR:-/tmp}/caterva-split"
 PUSH="${1:-}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# The commit that renamed Tellurium/ -> Terium/. History for the engine
+# The commit that renamed Tellurium/ -> caterva/. History for the engine
 # lives under the OLD path, so its split runs from the commit before this
 # one and replays the rename on top. See docs/REPO_MAP.md.
-RENAME_COMMIT="$(git log --format=%H --grep='Rename Tellurium -> Terium' -n 1 || true)"
+RENAME_COMMIT="$(git log --format=%H --grep='Rename Tellurium -> Caterva' -n 1 || true)"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
@@ -40,7 +40,7 @@ ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
 # repository is a backup rather than something anyone can use.
 # ---------------------------------------------------------------------------
 
-scaffold_terium() {
+scaffold_caterva() {
   local d="$1"
 
   cat > "$d/pyproject.toml" <<'TOML'
@@ -49,17 +49,17 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "terium"
+name = "caterva"
 version = "0.1.0"
-description = "Terrium's simulation engine: 15 domains, every numerical claim checked against an independent source of truth"
+description = "Caterva's simulation engine: 15 domains, every numerical claim checked against an independent source of truth"
 requires-python = ">=3.10,<3.14"
 dependencies = ["libroadrunner==2.8.0", "antimony==2.14.0", "python-libsbml", "numpy", "scipy"]
 
 [tool.setuptools.packages.find]
-include = ["Terium*"]
+include = ["caterva*"]
 
 [tool.pytest.ini_options]
-testpaths = ["Terium/tests"]
+testpaths = ["caterva/tests"]
 TOML
 
   cat > "$d/requirements.txt" <<'REQ'
@@ -84,8 +84,8 @@ REQ
   # -- a silent skip is indistinguishable from a pass, which is the defect
   # `check_no_disabled_tests` exists to prevent. Under the umbrella checkout
   # `scripts/` is reachable, nothing skips, and the count stays 1,014.
-  cat >> "$d/Terium/conftest.py" <<'PY'
-"""Standalone-clone support for the Terium engine.
+  cat >> "$d/caterva/conftest.py" <<'PY'
+"""Standalone-clone support for the Caterva engine.
 
 Five test modules reach outside this repository:
 
@@ -115,7 +115,7 @@ Nothing is silently absent: the exclusion is ANNOUNCED on stderr. A clean
 skip is indistinguishable from a pass in a CI summary, which is the defect
 `check_no_disabled_tests` exists to prevent.
 
-Under the umbrella checkout (`Terrium-sim/main`, cloned --recursive) the
+Under the umbrella checkout (`math12345678/caterva`, cloned --recursive) the
 siblings ARE reachable, nothing is excluded, and the engine reports its
 full 1,014 tests.
 """
@@ -176,11 +176,11 @@ def pytest_ignore_collect(collection_path, config):
     if not _ANNOUNCED:
         _ANNOUNCED = True
         sys.stderr.write(
-            "\n[terium] %d test module(s) need sibling repositories that are "
+            "\n[caterva] %d test module(s) need sibling repositories that are "
             "not in this checkout, so they were NOT COLLECTED -- they did not "
             "run, and did not pass.\n"
             "         For the full suite:\n"
-            "         git clone --recursive https://github.com/Terrium-sim/main.git\n\n"
+            "         git clone --recursive https://github.com/math12345678/caterva.git\n\n"
             % len(NEEDS_SIBLINGS)
         )
     return True
@@ -220,9 +220,9 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -r requirements.txt
-      - run: python -m pytest Terium/tests -q
+      - run: python -m pytest caterva/tests -q
       - name: The CLI must actually run
-        run: python -m Terium.cli --help
+        run: python -m caterva.cli --help
 YML
 }
 
@@ -231,7 +231,7 @@ YML
 kind_of() {
   case "$1" in
     tests)                          echo python ;;
-    terrium-site|landing|backend-main|science-agent-pipeline-replit) echo node ;;
+    caterva-site|landing|backend-main|science-agent-pipeline-replit) echo node ;;
     mule)                           echo static ;;
     *)                              echo none ;;
   esac
@@ -430,7 +430,7 @@ business	Business
 advanced-analysis	advanced_analysis
 benchmark-results	benchmark_results
 landing	landing
-terrium-site	terrium-site
+caterva-site	caterva-site
 science-agent-pipeline-replit	Science-Agent-Pipeline
 backend-main	src
 wiring-main	scripts
@@ -453,43 +453,43 @@ while IFS=$'\t' read -r repo path; do
 done <<< "$DIRECT_SPLITS"
 
 # ---------------------------------------------------------------------------
-# 2. terium: the engine, whose path was renamed.
+# 2. caterva: the engine, whose path was renamed.
 # ---------------------------------------------------------------------------
-say "Splitting terium (two-step: pre-rename history + replayed rename)"
-git branch -D split/terium >/dev/null 2>&1 || true
+say "Splitting caterva (two-step: pre-rename history + replayed rename)"
+git branch -D split/caterva >/dev/null 2>&1 || true
 if [ -n "$RENAME_COMMIT" ]; then
   TMPWT="$(mktemp -d)/prerename"
   git worktree add -f --detach "$TMPWT" "$RENAME_COMMIT^" >/dev/null 2>&1
-  ( cd "$TMPWT" && git subtree split -P Tellurium -b split/terium >/dev/null 2>&1 )
+  ( cd "$TMPWT" && git subtree split -P Tellurium -b split/caterva >/dev/null 2>&1 )
   git worktree remove --force "$TMPWT" >/dev/null 2>&1
-  PRE=$(git rev-list --count split/terium)
+  PRE=$(git rev-list --count split/caterva)
 
   # The split ends in the PRE-rename state, because that is where the
   # history lives. Replay the rename on top so the branch preserves the
   # history AND lands in the state the engine is actually in -- otherwise
   # the pushed repo would be correct about the past and wrong about now.
-  RTMP="$STAGE/_terium_head"
+  RTMP="$STAGE/_caterva_head"
   rm -rf "$RTMP"; mkdir -p "$RTMP"
   git -C "$RTMP" init -q -b replay
-  git -C "$RTMP" fetch -q "$ROOT" split/terium
+  git -C "$RTMP" fetch -q "$ROOT" split/caterva
   git -C "$RTMP" checkout -q FETCH_HEAD
   git -C "$RTMP" rm -rq . >/dev/null 2>&1 || true
-  # Nested under Terium/, NOT flattened to the repo root.
+  # Nested under caterva/, NOT flattened to the repo root.
   #
-  # `git subtree split -P Terium` strips the prefix, so the split lands with
+  # `git subtree split -P Caterva` strips the prefix, so the split lands with
   # __init__.py, cli.py and tests/ at the top level. The package is then not
-  # importable as `Terium`, and every test doing `from Terium import
-  # terium_engine` fails on a fresh clone:
+  # importable as `caterva`, and every test doing `from caterva import
+  # caterva_engine` fails on a fresh clone:
   #
-  #     ModuleNotFoundError: No module named 'Terium'
+  #     ModuleNotFoundError: No module named 'caterva'
   #
   # Verified by extracting the split branch into a temp directory and running
   # pytest: 12 collection errors. A repository whose own test suite cannot be
   # collected is not a published repository, it is a backup.
-  mkdir -p "$RTMP/Terium"
-  cp -R "$ROOT/Terium/." "$RTMP/Terium/"
+  mkdir -p "$RTMP/Caterva"
+  cp -R "$ROOT/caterva/." "$RTMP/caterva/"
   find "$RTMP" -maxdepth 1 -mindepth 1 \
-       ! -name '.git' ! -name 'Terium' -exec rm -rf {} + 2>/dev/null || true
+       ! -name '.git' ! -name 'caterva' -exec rm -rf {} + 2>/dev/null || true
 
   # Untracked junk the monorepo's .gitignore hides but `cp -R` does not.
   find "$RTMP" \( -name '__pycache__' -o -name '.DS_Store' -o -name '.coverage' \
@@ -497,11 +497,11 @@ if [ -n "$RENAME_COMMIT" ]; then
                   -o -name '.hypothesis' \) \
        -not -path "$RTMP/.git/*" -prune -exec rm -rf {} + 2>/dev/null || true
 
-  scaffold_terium "$RTMP"
+  scaffold_caterva "$RTMP"
   git -C "$RTMP" add -A
   git -C "$RTMP" -c user.name="$(git config user.name)" \
                  -c user.email="$(git config user.email)" \
-                 commit -q -m "Rename Tellurium -> Terium
+                 commit -q -m "Rename Tellurium -> Caterva
 
 The upstream Tellurium project is unrelated to this engine: requirements.txt
 has always said 'do NOT pip install tellurium' (ADR 0001), and this code
@@ -509,18 +509,18 @@ imports it nowhere, calling libroadrunner and antimony directly. The old
 name implied a relationship that does not exist.
 
 The $PRE commits before this one are the engine's real history, recovered
-from the pre-rename path -- 'git subtree split -P Terium' alone returns a
+from the pre-rename path -- 'git subtree split -P Caterva' alone returns a
 single commit, because the path only exists from the rename forward."
   # `checkout FETCH_HEAD` detaches, so the commit above landed on a detached
   # HEAD and the `replay` branch never pointed at it. Name it explicitly
   # before fetching, and fetch by ref rather than by SHA -- the SHA is not an
   # object this repository has yet.
   git -C "$RTMP" branch -f replay HEAD
-  git fetch -q "$RTMP" replay:split/terium --force
-  ok "terium                         $(git rev-list --count split/terium) commits  <- Tellurium/ + replayed rename"
+  git fetch -q "$RTMP" replay:split/caterva --force
+  ok "caterva                         $(git rev-list --count split/caterva) commits  <- Tellurium/ + replayed rename"
 else
-  git subtree split -P Terium -b split/terium >/dev/null 2>&1
-  echo "  ! rename commit not found; split Terium/ directly ($(git rev-list --count split/terium) commits)"
+  git subtree split -P Caterva -b split/caterva >/dev/null 2>&1
+  echo "  ! rename commit not found; split caterva/ directly ($(git rev-list --count split/caterva) commits)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -565,7 +565,7 @@ build_fileset() {
 
 Assembled from files at the monorepo root, which have no single directory to
 split, so this repository starts with one commit rather than a partial
-history. The full history is in Terrium-sim/main."
+history. The full history is in math12345678/caterva."
   ok "$(printf '%-30s' "$repo") $staged file(s)  -> $dest"
 }
 
@@ -583,7 +583,7 @@ while IFS= read -r f; do ARCHIVE_DOCS+=("$f"); done < <(
 build_fileset archive docs/readmes/archive.md "${ARCHIVE_DOCS[@]}"
 
 build_fileset miscellaneous docs/readmes/miscellaneous.md \
-  Logo.png terrium_ai_architecture.png terrium_pitch_deck.pptx \
+  Logo.png caterva_ai_architecture.png caterva_pitch_deck.pptx \
   FINAL_STATUS.txt lr_probe.js test-real-data.js e2e-test.js
 
 # The dashboard the web server serves. Split from server.ts, which stays in
@@ -603,7 +603,7 @@ build_fileset main docs/readmes/main.md "${KEEP_DOCS[@]}" \
   LICENSE CITATION.cff Dockerfile docker-compose.yml .dockerignore \
   .editorconfig .gitignore docs/REPO_MAP.md docs/ARCHIVE_TRIAGE.md
 
-build_fileset worktrees docs/readmes/worktrees.md Terrium.worktrees/worktree.sh
+build_fileset worktrees docs/readmes/worktrees.md Caterva.worktrees/worktree.sh
 build_fileset mule docs/readmes/mule.md
 
 # ---------------------------------------------------------------------------

@@ -125,7 +125,7 @@ see, and here it is fifty-four fold.
 ### Reported, not withheld
 
 Consistent with ADR 0033 and 0035. Deciding which tissue the user wanted is
-the user's call, and Terrium cannot tell which side of an organism
+the user's call, and Caterva cannot tell which side of an organism
 contradiction is the error.
 
 ## Verification
@@ -168,7 +168,7 @@ counterpart-test for every positive one.
 ## What this does not claim
 
 A discrepancy is not proof the row is wrong — it is proof that two fields
-disagree, and Terrium cannot tell which is the error. The row may describe a
+disagree, and Caterva cannot tell which is the error. The row may describe a
 human enzyme expressed in Drosophila, which is a real and common experiment
 that BRENDA has no column for.
 

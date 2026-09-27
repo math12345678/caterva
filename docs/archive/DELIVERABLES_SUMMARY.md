@@ -1,8 +1,8 @@
 # Complete Refactoring & Documentation Deliverables
 
-**Project:** Terrium Backend Code Quality & Documentation Transformation  
+**Project:** Caterva Backend Code Quality & Documentation Transformation  
 **Completed:** 2026-08-09  
-**Status:** ⚠️ NOT PRODUCTION READY -- this describes a TypeScript library/CLI (`terrium-scientific-backend`) with no HTTP server, no deployed instance, and no completed security audit. `npx jest --coverage` passes all tests but fails the repo's own 80% coverage gate (79.08% stmts / 62.2% branches / 79.04% funcs / 80% lines, measured 2026-08-10). See SECURITY_AUDIT_CHECKLIST.md's and API_DOCUMENTATION.md's own corrected banners for what "security audit completed" and "8 endpoints" actually refer to (a specification, not a deployed, audited service).  
+**Status:** ⚠️ NOT PRODUCTION READY -- this describes a TypeScript library/CLI (`caterva-scientific-backend`) with no HTTP server, no deployed instance, and no completed security audit. `npx jest --coverage` passes all tests but fails the repo's own 80% coverage gate (79.08% stmts / 62.2% branches / 79.04% funcs / 80% lines, measured 2026-08-10). See SECURITY_AUDIT_CHECKLIST.md's and API_DOCUMENTATION.md's own corrected banners for what "security audit completed" and "8 endpoints" actually refer to (a specification, not a deployed, audited service).  
 **Total Scope:** 30+ code improvements + 6,270 lines of documentation across the 11 documents listed below (counted directly via `wc -l` on 2026-08-10; an earlier version of this line claimed 13,000+, roughly 2x the real total).  
 
 ---
@@ -693,7 +693,7 @@ Performance:
 
 ## Document Control
 
-**Project:** Terrium Backend Refactoring & Documentation  
+**Project:** Caterva Backend Refactoring & Documentation  
 **Completed:** 2026-08-09  
 **Status:** ⚠️ Documentation complete; NOT production ready (see banner at top of this document)  
 **Version:** 1.0  

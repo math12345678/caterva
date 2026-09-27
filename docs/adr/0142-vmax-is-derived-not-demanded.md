@@ -63,7 +63,7 @@ because a reader who cannot see the operation cannot check the number.
 ### Nothing about the bridge is reimplemented
 
 The arithmetic, the unit convention (kcat s⁻¹ x [E]0 mM → Vmax mM/s) and the
-validation all live in `Terium.core.validation.vmax_from_kcat`, which also
+validation all live in `caterva.core.validation.vmax_from_kcat`, which also
 flags the `[E]0 << Km` assumption the Michaelis-Menten rate law rests on.
 Multiplying two floats in `report_lab.py` would have been three lines and a
 second definition of what the bridge means.
@@ -90,7 +90,7 @@ kcat lookup would have made it three.
 
 Lisa Jeske (BRENDA/DSMZ) asked directly that tools be gentle with their
 servers, and this repository already refuses to auto-download a bulk corpus
-for that reason. Re-requesting a page Terrium is still holding is the same
+for that reason. Re-requesting a page Caterva is still holding is the same
 discourtesy in miniature, once per parameter.
 
 `one_page_per_run` fetches each EC page once. **Scoped to a single run

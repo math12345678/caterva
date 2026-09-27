@@ -50,7 +50,7 @@ export interface DataSource {
   /** §3(a)(1)(C) — the licence and a URI to its text. */
   licence: string | null;
   licence_uri: string | null;
-  /** §3(a)(1)(B) — what Terrium does to the data. */
+  /** §3(a)(1)(B) — what Caterva does to the data. */
   modifications: string;
   /** Where the full attribution lives, per §3(a)(2). */
   notice_uri: string;
@@ -159,7 +159,7 @@ function looksLikeADatabaseReference(label: string): boolean {
  *   `none`     the source's terms are recorded and require no citation.
  *              NCBI Taxonomy is public domain; NOTICE says it "asks to be
  *              cited but does not require it as a licence condition".
- *   `unknown`  Terrium has no record of this source's terms. Not the same
+ *   `unknown`  Caterva has no record of this source's terms. Not the same
  *              as `none`, and the distinction is the whole point.
  */
 export type ObligationKind = "cite" | "none" | "unknown";
@@ -192,14 +192,14 @@ export interface SourceObligation {
  * nothing about what publishing the data obliges, while `NOTICE` says:
  *
  *   "If you use BRENDA data in scientific work, cite BRENDA's current
- *    publication [...] Citing Terrium is not a substitute for citing
+ *    publication [...] Citing Caterva is not a substitute for citing
  *    BRENDA."
  *
  * The one surface that judges publication-readiness was silent on the
  * requirements of publication.
  *
  * This does NOT change what `publicationReady` means. Whether the user has
- * actually cited BRENDA is not something Terrium can observe, and folding an
+ * actually cited BRENDA is not something Caterva can observe, and folding an
  * unobservable condition into a boolean would make the boolean a guess.
  * The obligations are reported alongside it, for the person to act on.
  */
@@ -249,8 +249,8 @@ export function attributionLines(
     `${comment} documents them.`,
     `${comment}`,
     `${comment} None of these sources produced, reviewed or endorsed this file.`,
-    `${comment} Terrium selected and combined the values; any error in doing so is`,
-    `${comment} Terrium's, not theirs.`,
+    `${comment} Caterva selected and combined the values; any error in doing so is`,
+    `${comment} Caterva's, not theirs.`,
   ];
 
   for (const { source, label } of used) {
@@ -258,7 +258,7 @@ export function attributionLines(
     if (!source) {
       lines.push(`${comment}   ${label}`);
       lines.push(
-        `${comment}     licence: NOT RECORDED by Terrium. Check the source's own`,
+        `${comment}     licence: NOT RECORDED by Caterva. Check the source's own`,
         `${comment}              terms before redistributing this file.`,
       );
       continue;
@@ -269,7 +269,7 @@ export function attributionLines(
       ? source.licence_uri
         ? `${source.licence} (${source.licence_uri})`
         : source.licence
-      : "NOT RECORDED by Terrium";
+      : "NOT RECORDED by Caterva";
     lines.push(`${comment}     licence: ${licence}`);
     if (source.source_uri) {
       lines.push(`${comment}     source:  ${source.source_uri}`);

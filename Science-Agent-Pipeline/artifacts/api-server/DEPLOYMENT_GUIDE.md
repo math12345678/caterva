@@ -1,6 +1,6 @@
 # Deployment Guide
 
-**For:** Operators deploying Terrium backend  
+**For:** Operators deploying Caterva backend  
 **Status:** August 2026  
 **Audience:** DevOps, SRE, deployment engineers
 
@@ -34,7 +34,7 @@ cp .env.example .env
 # - PORT=5000            (required — server will not start without it)
 # - NODE_ENV=production
 # - LOG_LEVEL=info
-# - TERRIUM_PYTHON=/usr/bin/python3.12
+# - CATERVA_PYTHON=/usr/bin/python3.12
 
 # 4. Build (from artifacts/api-server, or use the workspace-root filter)
 pnpm run build
@@ -48,7 +48,7 @@ pnpm run start
 
 ### Option 2: Docker Container
 
-> **Proposed — not implemented in this repo yet.** The repo's one real `Dockerfile` lives at the git root (`/Dockerfile`). It is `FROM python:3.12-slim` and builds a sandbox/CI-parity image for the Terium simulation engine (installs `requirements-dev.txt`, runs `scripts/check_env.py`, and drops into `CMD ["bash"]`). It has no Node.js, no `EXPOSE`, and nothing to do with the Express API server. There is no Dockerfile anywhere under `Science-Agent-Pipeline/artifacts/api-server`. The Node Dockerfile below is a proposal for containerizing the API server, not something that exists or has been built/tested in this repo — treat it as a starting point, not a verified artifact.
+> **Proposed — not implemented in this repo yet.** The repo's one real `Dockerfile` lives at the git root (`/Dockerfile`). It is `FROM python:3.12-slim` and builds a sandbox/CI-parity image for the Caterva simulation engine (installs `requirements-dev.txt`, runs `scripts/check_env.py`, and drops into `CMD ["bash"]`). It has no Node.js, no `EXPOSE`, and nothing to do with the Express API server. There is no Dockerfile anywhere under `Science-Agent-Pipeline/artifacts/api-server`. The Node Dockerfile below is a proposal for containerizing the API server, not something that exists or has been built/tested in this repo — treat it as a starting point, not a verified artifact.
 >
 > The earlier version of this section also used `npm ci` against a `package-lock.json`, which does not exist and would not work here: this is a pnpm workspace (`Science-Agent-Pipeline/package.json` declares `"packageManager": "pnpm@11.20.0"` and its `preinstall` script deletes `package-lock.json`/`yarn.lock` if either appears), and the API server's own dependencies (`@workspace/api-zod`, `@workspace/db`) use the `workspace:*` protocol that plain `npm`/`npm ci` cannot resolve at all. The Dockerfile below has been corrected to use `pnpm` and to build from the workspace root so the `workspace:*` deps resolve.
 
@@ -96,16 +96,16 @@ CMD ["node", "--enable-source-maps", "dist/index.mjs"]
 
 **Build and run (once such a Dockerfile is added):**
 ```bash
-docker build -t terrium-api:latest -f Dockerfile.api .
+docker build -t caterva-api:latest -f Dockerfile.api .
 
 docker run -d \
-  --name terrium-api \
+  --name caterva-api \
   -p 5000:5000 \
   -e PORT=5000 \
   -e NODE_ENV=production \
   -e DATABASE_URL="postgresql://..." \
   -e GROQ_API_KEY="..." \
-  terrium-api:latest
+  caterva-api:latest
 ```
 
 ### Option 3: Kubernetes (Scale)
@@ -121,22 +121,22 @@ docker run -d \
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: terrium-api
+  name: caterva-api
   labels:
-    app: terrium-api
+    app: caterva-api
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: terrium-api
+      app: caterva-api
   template:
     metadata:
       labels:
-        app: terrium-api
+        app: caterva-api
     spec:
       containers:
       - name: api
-        image: terrium-api:latest
+        image: caterva-api:latest
         ports:
         - containerPort: 5000
         env:
@@ -147,12 +147,12 @@ spec:
         - name: DATABASE_URL
           valueFrom:
             secretKeyRef:
-              name: terrium-secrets
+              name: caterva-secrets
               key: database-url
         - name: GROQ_API_KEY
           valueFrom:
             secretKeyRef:
-              name: terrium-secrets
+              name: caterva-secrets
               key: groq-api-key
         resources:
           requests:
@@ -178,10 +178,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: terrium-api
+  name: caterva-api
 spec:
   selector:
-    app: terrium-api
+    app: caterva-api
   type: LoadBalancer
   ports:
   - protocol: TCP
@@ -207,7 +207,7 @@ PORT=5000                           # Listening port
 NODE_ENV=production                 # development|production
 
 # Python
-TERRIUM_PYTHON=/usr/bin/python3.12 # Python interpreter path
+CATERVA_PYTHON=/usr/bin/python3.12 # Python interpreter path
 VIRTUAL_ENV=/path/to/venv          # Optional: virtual environment
 
 # Logging
@@ -278,13 +278,13 @@ NODE_ENV=production
 LOG_LEVEL=info
 
 # Python Bridge
-TERRIUM_PYTHON=/usr/bin/python3.12
-VIRTUAL_ENV=/opt/terrium-venv
+CATERVA_PYTHON=/usr/bin/python3.12
+VIRTUAL_ENV=/opt/caterva-venv
 
 # Persistence (optional)
-DATABASE_URL=postgresql://user:password@localhost:5432/terrium
-CACHE_FILE=/var/cache/terrium/cache.json
-WAITLIST_FILE=/var/lib/terrium/waitlist.json
+DATABASE_URL=postgresql://user:password@localhost:5432/caterva
+CACHE_FILE=/var/cache/caterva/cache.json
+WAITLIST_FILE=/var/lib/caterva/waitlist.json
 
 # LLM Configuration (optional - falls back to keywords if not set)
 GROQ_API_KEY=gsk_your_key_here
@@ -315,9 +315,9 @@ sudo systemctl start postgresql
 
 # Docker
 docker run -d \
-  --name terrium-db \
-  -e POSTGRES_DB=terrium \
-  -e POSTGRES_USER=terrium \
+  --name caterva-db \
+  -e POSTGRES_DB=caterva \
+  -e POSTGRES_USER=caterva \
   -e POSTGRES_PASSWORD=secure_password \
   -p 5432:5432 \
   postgres:15-alpine
@@ -326,12 +326,12 @@ docker run -d \
 ### Create Database & User
 
 ```sql
-CREATE DATABASE terrium;
-CREATE USER terrium WITH PASSWORD 'secure_password';
-ALTER ROLE terrium SET client_encoding TO 'utf8';
-ALTER ROLE terrium SET default_transaction_isolation TO 'read committed';
-ALTER ROLE terrium SET timezone TO 'UTC';
-GRANT ALL PRIVILEGES ON DATABASE terrium TO terrium;
+CREATE DATABASE caterva;
+CREATE USER caterva WITH PASSWORD 'secure_password';
+ALTER ROLE caterva SET client_encoding TO 'utf8';
+ALTER ROLE caterva SET default_transaction_isolation TO 'read committed';
+ALTER ROLE caterva SET timezone TO 'UTC';
+GRANT ALL PRIVILEGES ON DATABASE caterva TO caterva;
 ```
 
 ### Push Schema (Drizzle)
@@ -349,35 +349,35 @@ pnpm --filter @workspace/db run push
 pnpm --filter @workspace/db run push-force
 
 # Verify
-psql -U terrium -d terrium -c "\d"
+psql -U caterva -d caterva -c "\d"
 # Should show: simulations table
 ```
 
 ### Connection String
 
 ```
-postgresql://terrium:secure_password@localhost:5432/terrium
+postgresql://caterva:secure_password@localhost:5432/caterva
 ```
 
 ---
 
 ## System Service Setup (systemd)
 
-> **Proposed — not implemented in this repo yet.** There is no systemd unit file, install script, or any reference to `terrium-api` as a service anywhere in this repository. Nothing here installs, enables, or manages a systemd service today. The unit file below is a proposal for operators who choose to run the built server directly on a Linux host with systemd — it has not been tested against this repo.
+> **Proposed — not implemented in this repo yet.** There is no systemd unit file, install script, or any reference to `caterva-api` as a service anywhere in this repository. Nothing here installs, enables, or manages a systemd service today. The unit file below is a proposal for operators who choose to run the built server directly on a Linux host with systemd — it has not been tested against this repo.
 
 ### Service File (proposed)
 
 ```ini
-# /etc/systemd/system/terrium-api.service
+# /etc/systemd/system/caterva-api.service
 [Unit]
-Description=Terrium Science Agent API
+Description=Caterva Science Agent API
 After=network.target
 
 [Service]
 Type=simple
-User=terrium
-WorkingDirectory=/opt/terrium-api
-EnvironmentFile=/opt/terrium-api/.env
+User=caterva
+WorkingDirectory=/opt/caterva-api
+EnvironmentFile=/opt/caterva-api/.env
 # Real entry point per package.json's "start" script:
 ExecStart=/usr/bin/node --enable-source-maps dist/index.mjs
 Restart=on-failure
@@ -393,14 +393,14 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable terrium-api
-sudo systemctl start terrium-api
+sudo systemctl enable caterva-api
+sudo systemctl start caterva-api
 
 # Check status
-sudo systemctl status terrium-api
+sudo systemctl status caterva-api
 
 # View logs
-sudo journalctl -u terrium-api -f
+sudo journalctl -u caterva-api -f
 ```
 
 ---
@@ -457,7 +457,7 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
-  - job_name: 'terrium-api'
+  - job_name: 'caterva-api'
     static_configs:
       - targets: ['localhost:5000']
     metrics_path: '/api/metrics'
@@ -485,7 +485,7 @@ scrape_configs:
 
 ```nginx
 # proposed nginx config — not present in this repo
-upstream terrium_backend {
+upstream caterva_backend {
     server localhost:5000;
     server localhost:5001;
     server localhost:5002;
@@ -493,7 +493,7 @@ upstream terrium_backend {
 
 server {
     listen 80;
-    server_name api.terrium.example.com;
+    server_name api.caterva.example.com;
     
     # Rate limiting
     limit_req_zone $binary_remote_addr zone=api_limit:10m rate=10r/s;
@@ -511,7 +511,7 @@ server {
     proxy_read_timeout 60s;
     
     location / {
-        proxy_pass http://terrium_backend;
+        proxy_pass http://caterva_backend;
     }
     
     # GET /api/metrics is a real, unauthenticated endpoint (see
@@ -522,7 +522,7 @@ server {
     # that specific path instead of all of /api/metrics.
     location /api/metrics/reset {
         auth_request /auth;
-        proxy_pass http://terrium_backend;
+        proxy_pass http://caterva_backend;
     }
     
     location /auth {
@@ -549,8 +549,8 @@ sudo systemctl start nginx
 ```bash
 #!/bin/bash
 # backup-cache.sh
-CACHE_FILE=/var/cache/terrium/cache.json
-BACKUP_DIR=/backups/terrium
+CACHE_FILE=/var/cache/caterva/cache.json
+BACKUP_DIR=/backups/caterva
 
 cp $CACHE_FILE $BACKUP_DIR/cache-$(date +%s).json
 
@@ -562,9 +562,9 @@ find $BACKUP_DIR -name "cache-*.json" -mtime +7 -delete
 ```bash
 #!/bin/bash
 # backup-db.sh
-BACKUP_DIR=/backups/terrium
+BACKUP_DIR=/backups/caterva
 
-pg_dump -U terrium terrium > \
+pg_dump -U caterva caterva > \
     $BACKUP_DIR/db-$(date +%Y%m%d).sql.gz
 
 # Keep only last 30 days
@@ -580,14 +580,14 @@ git push origin main  # Automated via CI/CD
 
 **Restore from database backup:**
 ```bash
-gunzip < /backups/terrium/db-20260809.sql.gz | \
-    psql -U terrium terrium
+gunzip < /backups/caterva/db-20260809.sql.gz | \
+    psql -U caterva caterva
 ```
 
 **Restore cache:**
 ```bash
-cp /backups/terrium/cache-1691596800.json \
-    /var/cache/terrium/cache.json
+cp /backups/caterva/cache-1691596800.json \
+    /var/cache/caterva/cache.json
 ```
 
 ---
@@ -629,22 +629,22 @@ Increase resources on existing server:
 
 ## Log Rotation
 
-> **Proposed — not implemented in this repo yet.** There is no logrotate config, `/etc/logrotate.d/terrium` file, or any log-rotation setup anywhere in this repository. The app logs via `pino`/`pino-http` to stdout (see `src/app.ts`, `src/lib/logger`) — it does not write to `/var/log/terrium/*.log` on its own. The config below assumes an operator has separately redirected stdout to that path.
+> **Proposed — not implemented in this repo yet.** There is no logrotate config, `/etc/logrotate.d/caterva` file, or any log-rotation setup anywhere in this repository. The app logs via `pino`/`pino-http` to stdout (see `src/app.ts`, `src/lib/logger`) — it does not write to `/var/log/caterva/*.log` on its own. The config below assumes an operator has separately redirected stdout to that path.
 
 ### Logrotate Configuration (proposed)
 
 ```bash
-# /etc/logrotate.d/terrium
-/var/log/terrium/*.log {
+# /etc/logrotate.d/caterva
+/var/log/caterva/*.log {
     daily
     rotate 14
     compress
     delaycompress
     missingok
     notifempty
-    create 0640 terrium terrium
+    create 0640 caterva caterva
     postrotate
-        systemctl reload terrium-api > /dev/null 2>&1 || true
+        systemctl reload caterva-api > /dev/null 2>&1 || true
     endscript
 }
 ```
@@ -652,7 +652,7 @@ Increase resources on existing server:
 ### Apply
 
 ```bash
-sudo logrotate -f /etc/logrotate.d/terrium
+sudo logrotate -f /etc/logrotate.d/caterva
 ```
 
 ---
@@ -673,8 +673,8 @@ export METRICS_ADMIN_TOKEN=$(openssl rand -base64 32)
 
 ```bash
 # Run as non-root user
-sudo useradd -m -s /bin/bash terrium
-sudo chown -R terrium:terrium /opt/terrium-api
+sudo useradd -m -s /bin/bash caterva
+sudo chown -R caterva:caterva /opt/caterva-api
 ```
 
 ### Secret Management
@@ -685,15 +685,15 @@ sudo chown -R terrium:terrium /opt/terrium-api
 ```bash
 # Option 1: AWS Secrets Manager
 aws secretsmanager create-secret \
-  --name terrium/groq-api-key \
+  --name caterva/groq-api-key \
   --secret-string "gsk_..."
 
 # Option 2: HashiCorp Vault
-vault kv put secret/terrium groq_api_key="gsk_..."
+vault kv put secret/caterva groq_api_key="gsk_..."
 
 # Option 3: Sealed Secrets (Kubernetes) — depends on the proposed
 # Kubernetes deployment in Option 3 above, which also does not exist yet.
-kubectl create secret generic terrium-secrets \
+kubectl create secret generic caterva-secrets \
   --from-literal=groq-api-key="gsk_..."
 ```
 
@@ -708,7 +708,7 @@ kubectl create secret generic terrium-secrets \
 ```yaml
 # alerts.yml
 groups:
-  - name: terrium
+  - name: caterva
     rules:
       - alert: HighErrorRate
         expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
@@ -726,7 +726,7 @@ groups:
           summary: "Cache hit rate below 50%"
       
       - alert: PythonProcessDown
-        expr: up{job="terrium-api"} == 0
+        expr: up{job="caterva-api"} == 0
         annotations:
           summary: "API process is down"
 ```
@@ -780,7 +780,7 @@ kill -9 <PID>
 ### Python Not Found
 
 ```bash
-export TERRIUM_PYTHON=$(which python3.12)
+export CATERVA_PYTHON=$(which python3.12)
 # Verify:
 python3.12 --version
 ```
@@ -789,7 +789,7 @@ python3.12 --version
 
 ```bash
 # Test connection
-psql -U terrium -d terrium -c "SELECT 1"
+psql -U caterva -d caterva -c "SELECT 1"
 
 # Check PostgreSQL is running
 sudo systemctl status postgresql
@@ -859,7 +859,7 @@ top -b -n 1 | head -n 15
 ## References
 
 - Environment setup: See `.env.example` (in this directory)
-- Docker: the repo's root `Dockerfile` builds a Python/Terium sandbox & CI-parity image — it is not a Docker build for this API server. See "Option 2: Docker Container" above for a proposed (not implemented) Node/pnpm Dockerfile for the API server itself.
+- Docker: the repo's root `Dockerfile` builds a Python/Caterva sandbox & CI-parity image — it is not a Docker build for this API server. See "Option 2: Docker Container" above for a proposed (not implemented) Node/pnpm Dockerfile for the API server itself.
 - Database schema: See `Science-Agent-Pipeline/lib/db/src/schema/`
 - Monitoring: `PERFORMANCE_GUIDE.md`
 - Architecture: `BACKEND_ARCHITECTURE.md`

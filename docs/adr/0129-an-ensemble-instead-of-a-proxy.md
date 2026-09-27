@@ -37,7 +37,7 @@ ensemble" would become false:
 
 ADR 0111 already runs the model at every value the evidence ranked equal.
 Sauro's case is the one where the requested organism has nothing at all —
-where Terrium currently either withholds, or (with the opt-in) substitutes
+where Caterva currently either withholds, or (with the opt-in) substitutes
 one organism's number as a proxy.
 
 ## The three existing options were all bad
@@ -71,7 +71,7 @@ ensemble needs was already in the function that refused to give it.
 **unchanged**. One ensemble mechanism, two sources of candidates — a second
 implementation would be a second place the reasoning could drift, and the
 two cases really are the same act: *the literature reports these numbers and
-Terrium will not pick between them.*
+Caterva will not pick between them.*
 
 ## What this does NOT become
 

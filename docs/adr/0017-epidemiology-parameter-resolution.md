@@ -9,7 +9,7 @@ not yet reachable" staging), ADR 0003 (shared plausibility bounds)
 
 ## Context
 
-Every literature-resolvable field in Terrium so far (`km`, `ki`,
+Every literature-resolvable field in Caterva so far (`km`, `ki`,
 `mutation_rate`) is backed by a queryable source: BRENDA for enzyme
 kinetics, stdpopsim for population genetics. Both let a resolver take a
 name (enzyme, organism) and look up a value programmatically, with the
@@ -82,7 +82,7 @@ Concretely:
    DOI [10.1097/SLA.0000000000004400](https://doi.org/10.1097/SLA.0000000000004400),
    PMID 33214421 — a single 39-study meta-analysis reporting both
    quantities together, so no cross-paper mismatch is possible.
-3. `Terium/core/validation.py::beta_gamma_from_r0(r0, infectious_period_days)`
+3. `caterva/core/validation.py::beta_gamma_from_r0(r0, infectious_period_days)`
    does the arithmetic bridge (`gamma = 1/infectious_period_days`,
    `beta = r0 * gamma`), returning `(beta, gamma, ParameterValidation)`.
    Impossible inputs (non-finite, non-positive) are rejected here; an
@@ -104,7 +104,7 @@ symptom onset in successive cases), not a virologically-measured shedding
 duration. For a two-compartment SIR model with no separate exposed/latent
 stage, the serial interval *is* the standard proxy for the model's
 characteristic generation time (1/gamma) — this is not a shortcut invented
-for Terrium, it is the conventional simplification any introductory SIR
+for Caterva, it is the conventional simplification any introductory SIR
 model makes in the absence of an E compartment. `EpidemiologyResult` carries
 this in `infectious_period_measure` explicitly rather than leaving a caller
 to assume it means something more precise than it does.
@@ -124,7 +124,7 @@ taken here.
 **Easier.** A resolved (R0, infectious period) pair can now produce a
 runnable SIR simulation via `beta_gamma_from_r0`, verified end-to-end
 against the independently-derivable peak condition
-`S(t_peak) = N / R0` (see `Terium/tests/test_beta_gamma_from_r0.py`),
+`S(t_peak) = N / R0` (see `caterva/tests/test_beta_gamma_from_r0.py`),
 not against the engine's own output. Registering a new disease later is
 additive — nothing built here needs revisiting.
 
@@ -139,7 +139,7 @@ trajectory, and `RESOLVABLE_FIELDS` itself.
 
 ## Verification
 
-- 15 tests in `Terium/tests/test_beta_gamma_from_r0.py`: arithmetic
+- 15 tests in `caterva/tests/test_beta_gamma_from_r0.py`: arithmetic
   correctness, Rule 2's impossible/implausible distinction (mirroring
   `vmax_from_kcat`'s), and an end-to-end check against the SIR peak
   condition `S(t_peak) = N/R0` using the real Hussein et al. values —

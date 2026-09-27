@@ -6,17 +6,17 @@
 
 **Context:** `src/cli/commandDomains.ts`, `src/cli/domainCatalogue.ts`,
 `scripts/check_domain_examples_run.py`,
-`Science-Agent-Pipeline/artifacts/api-server/src/lib/terium_runner.py`
+`Science-Agent-Pipeline/artifacts/api-server/src/lib/caterva_runner.py`
 
 ## The product's breadth was invisible
 
-Terrium advertises fifteen teaching domains. Nothing could tell a student
+Caterva advertises fifteen teaching domains. Nothing could tell a student
 what they are.
 
 | where a student would look | what it lists |
 |---|---|
 | `scientific help` | nine commands, all enzyme kinetics or generic |
-| `python -m Terium.cli --help` | seven subcommands, all popgen and Gillespie |
+| `python -m caterva.cli --help` | seven subcommands, all popgen and Gillespie |
 | either, about the other | nothing |
 
 Neither names epidemiology, PCR, Monte Carlo or molecular dynamics —
@@ -33,7 +33,7 @@ what question it answers and a command that runs it.
 
 ## The list is asked of the engine
 
-`terium_runner.py --list-domains` emits `DISPATCH` — the table the engine
+`caterva_runner.py --list-domains` emits `DISPATCH` — the table the engine
 actually dispatches on — so a domain cannot appear in the catalogue unless
 it really runs, and cannot be missing from it because somebody forgot a doc.
 
@@ -61,12 +61,12 @@ same reason.
 ## The tests passed on a command that could not run
 
 `domainCatalogue.test.ts` checks the examples *look* like commands: they
-start with `simulate` or `python -m Terium.cli`, they contain a digit, they
+start with `simulate` or `python -m caterva.cli`, they contain a digit, they
 carry no `<PLACEHOLDER>`. Thirty-six cases, all green — while this was in
 the file:
 
 ```
-python -m Terium.cli wf --n 100 --p0 0.5 --generations 200 --seed 1
+python -m caterva.cli wf --n 100 --p0 0.5 --generations 200 --seed 1
 ```
 
 `--n` and `--p0` are not flags. The real ones are `--population-size` and
@@ -82,7 +82,7 @@ defect was found by pasting a command.
 Reading the true flag names with
 
 ```
-python3 -m Terium.cli ssa --help | grep -oE '\-\-[a-z-]+'
+python3 -m caterva.cli ssa --help | grep -oE '\-\-[a-z-]+'
 ```
 
 reported `--a` and `--b`. The character class has no digits, so `--a0`
@@ -106,7 +106,7 @@ All five engine examples are now verified by execution, not by reading.
 and **runs** the engine-CLI ones. Verified to fail: breaking one flag
 produces exit 1 naming the command and the error.
 
-Scope is stated rather than implied. Only the `python -m Terium.cli`
+Scope is stated rather than implied. Only the `python -m caterva.cli`
 examples run here; the ten `simulate` ones need a Node toolchain and would
 take the guard past the per-call ceiling several times over, so they stay
 with `documentedExamplesRun.test.ts`. **A `simulate` example can rot without

@@ -8,7 +8,7 @@
 > is also stale: `src/storage/job-database.ts` provides on-disk JSON-lines
 > persistence, used by `server.ts` via `db.saveJob` / `db.getJob`.
 
-# Terrium Web Interface — Ready to Ship
+# Caterva Web Interface — Ready to Ship
 
 ## ✅ What's Done
 
@@ -45,7 +45,7 @@
 - Multi-strategy search fallback
 - DOI resolution via CrossRef
 - SBML model generation for 4 kinetic types
-- Terium-based kinetics simulation
+- Caterva-based kinetics simulation
 - Validation with confidence scoring
 
 ### 5. **Build System Updates**
@@ -151,7 +151,7 @@ res.end(JSON.stringify({ jobId, status: 'queued' }));
 // Then processes in background async
 (async () => {
   // Fetch literature from PubMed (5-10s)
-  // Run Terium simulation (2-3s)
+  // Run Caterva simulation (2-3s)
   // Store results in jobs Map
 })();
 ```
@@ -174,7 +174,7 @@ CrossRef DOI Resolution: Validate & get full metadata
   ↓
 SBML Model Generation: Create valid Systems Biology model
   ↓
-Terium Simulation: Run kinetics, get time-series data
+Caterva Simulation: Run kinetics, get time-series data
   ↓
 Response: Validated results with literature citations
 ```
@@ -187,7 +187,7 @@ Response: Validated results with literature citations
 | PubMed search (with fallbacks) | 5-10s |
 | CrossRef DOI resolution | 1-2s each |
 | SBML model generation | <100ms |
-| Terium simulation | 2-3s |
+| Caterva simulation | 2-3s |
 | **Total end-to-end** | **~10-15s** |
 
 Dashboard timeout: 60s (plenty of headroom)
@@ -239,7 +239,7 @@ Dashboard timeout: 60s (plenty of headroom)
 
 ## ✨ Summary
 
-You now have a **full production-ready web interface** for the Terrium scientific simulation system:
+You now have a **full production-ready web interface** for the Caterva scientific simulation system:
 
 - 🌐 Beautiful, responsive dashboard
 - ⚡ Fast REST API with zero external dependencies

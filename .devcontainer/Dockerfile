@@ -1,4 +1,4 @@
-# Terrium sandbox / Dev Container image: the Python simulation and
+# Caterva sandbox / Dev Container image: the Python simulation and
 # literature stack, proven working at build time.
 #
 # This is deliberately a SECOND Dockerfile rather than the one at the
@@ -11,8 +11,8 @@
 # against an interpreter that was not installed. Two images with two
 # purposes now live in two files, which is what stops that recurring.
 #
-# Build:  docker build -f .devcontainer/Dockerfile -t terrium-sandbox .
-# Run:    docker run -it --rm terrium-sandbox
+# Build:  docker build -f .devcontainer/Dockerfile -t caterva-sandbox .
+# Run:    docker run -it --rm caterva-sandbox
 
 FROM python:3.12-slim
 
@@ -20,7 +20,7 @@ FROM python:3.12-slim
 # publishes a cp312 wheel, so nothing here compiles on x86_64.
 # See docs/adr/0014-python-version-support.md.
 
-WORKDIR /workspaces/terrium
+WORKDIR /workspaces/caterva
 
 # msprime is stdpopsim's C-extension dependency, and it publishes wheels
 # only for manylinux x86_64, macOS and win_amd64 -- there is no Linux

@@ -3,7 +3,7 @@
  *
  * `LiteratureService` was an in-memory `Map` that reached no database,
  * registry or API -- everything it "recommended" was something the caller
- * had already handed it. This module connects it to Terrium's real
+ * had already handed it. This module connects it to Caterva's real
  * literature layer (`Tests/fallback_logic.py` via
  * `science_agent_runner.py`), which walks BRENDA exact -> BRENDA
  * cross-species -> PubMed and never fabricates a number.
@@ -24,7 +24,7 @@ import {
   ResolverUnavailableError,
   resolveKinetic
 } from '../literatureResolver';
-import { REPO_ROOT, resolvePythonExecutable } from '../../engine/teriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../../engine/catervaBridge';
 
 const PYTHON = resolvePythonExecutable(REPO_ROOT);
 
@@ -47,7 +47,7 @@ if (!PYTHON_AVAILABLE) {
 const describeSubprocess = PYTHON_AVAILABLE ? describe : describe.skip;
 
 let stubDirectory: string;
-const originalRunner = process.env['TERRIUM_LITERATURE_RUNNER'];
+const originalRunner = process.env['CATERVA_LITERATURE_RUNNER'];
 
 /** Write a stub runner that prints `payload` and exits with `exitCode`. */
 function useStubRunner(payload: string, exitCode = 0): void {
@@ -60,19 +60,19 @@ function useStubRunner(payload: string, exitCode = 0): void {
     `sys.exit(${exitCode})\n`,
     'utf-8'
   );
-  process.env['TERRIUM_LITERATURE_RUNNER'] = script;
+  process.env['CATERVA_LITERATURE_RUNNER'] = script;
 }
 
 beforeAll(() => {
-  stubDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'terrium-resolver-'));
+  stubDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'caterva-resolver-'));
 });
 
 afterAll(() => {
   fs.rmSync(stubDirectory, { recursive: true, force: true });
   if (originalRunner === undefined) {
-    delete process.env['TERRIUM_LITERATURE_RUNNER'];
+    delete process.env['CATERVA_LITERATURE_RUNNER'];
   } else {
-    process.env['TERRIUM_LITERATURE_RUNNER'] = originalRunner;
+    process.env['CATERVA_LITERATURE_RUNNER'] = originalRunner;
   }
 });
 
@@ -206,7 +206,7 @@ describeSubprocess('reading the runner', () => {
 
   it('returns the Python-computed bridged Vmax for kcat + enzymeConc', async () => {
     // Vmax = kcat * [E]0 is computed by the runner using the same
-    // Terium.core.validation.vmax_from_kcat the engine uses. This side
+    // caterva.core.validation.vmax_from_kcat the engine uses. This side
     // must read it, not recompute it -- a second copy of the arithmetic
     // would also be a second copy of the [E]0/Km flag threshold, free to
     // drift.
@@ -275,7 +275,7 @@ describeSubprocess('reading the runner', () => {
 
   it('does not treat a missing script as "no literature"', async () => {
     // "We never asked" and "the registry says no" are different facts.
-    process.env['TERRIUM_LITERATURE_RUNNER'] = path.join(
+    process.env['CATERVA_LITERATURE_RUNNER'] = path.join(
       stubDirectory,
       'does-not-exist.py'
     );

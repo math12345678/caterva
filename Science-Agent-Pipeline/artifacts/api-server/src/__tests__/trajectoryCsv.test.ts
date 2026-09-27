@@ -5,7 +5,7 @@ import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
 /**
  * The exported CSV is the artifact that outlives the session.
  *
- * Every other surface Terrium has is attached to a session that ends: the
+ * Every other surface Caterva has is attached to a session that ends: the
  * CLI warning scrolls away, the API flags are discarded with the response,
  * the Antimony comment is read once. The CSV gets opened in Excel, plotted,
  * pasted into a lab report, and mailed to a supervisor months later.
@@ -148,7 +148,7 @@ describe("degrading honestly", () => {
       runId: "r", domain: "mm", parameters: {}, trajectory: [{ time: 0 }],
     });
     expect(dataLines(csv)).toEqual(["time", "0"]);
-    expect(csv).toContain("Terrium simulation export");
+    expect(csv).toContain("Caterva simulation export");
   });
 
   it("marks a parameter with no provenance as unknown, not as resolved", () => {

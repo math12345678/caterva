@@ -9,7 +9,7 @@ editor wrote:
     (in `Tests/test_brenda_flags.py`)
 
 There is no such file. The test named in that sentence lives in
-`Terium/tests/test_brenda_integration.py`. The wrong path was plausible --
+`caterva/tests/test_brenda_integration.py`. The wrong path was plausible --
 right shape, right naming convention, right directory for a literature
 test -- which is exactly why nobody would have questioned it, and why the
 mistake survived being typed by someone who was at that moment fixing
@@ -17,7 +17,7 @@ broken paths.
 
 `check_commands_runnable.py` did not catch it. That guard checks every
 `scripts/<name>.py` a document names, because its own origin was a guard
-printing an unrunnable command. A test module under `Terium/tests/` is
+printing an unrunnable command. A test module under `caterva/tests/` is
 outside its scope.
 
 So the repository had a rule about one directory and no rule about the
@@ -38,7 +38,7 @@ the same one. The delegation is verified, not assumed — if that test stops
 reading clone URLs, this guard fails rather than quietly exempting them.
 
 **Bare filenames are deliberately not checked.** These documents refer to
-`terium_engine.py` and `brenda_client.py` conversationally, the way you
+`caterva_engine.py` and `brenda_client.py` conversationally, the way you
 would in a sentence, and demanding a full path there would either fail
 constantly or push people to stop naming files at all. A token with a
 slash in it is a claim about where something lives; a bare name is a claim
@@ -93,7 +93,7 @@ _MIN_REFS = 20
 #: A backticked token containing a directory separator and a file suffix.
 _PATH_RE = re.compile(r"`([A-Za-z0-9_][A-Za-z0-9_./-]*/[A-Za-z0-9_./-]+\.[a-zA-Z]{2,4})`")
 
-#: A remote repository, not a file in this tree. `Terrium-sim/terrium.git`
+#: A remote repository, not a file in this tree. `math12345678/caterva.git`
 #: has the shape of a repo-relative path -- one slash, a short suffix -- and
 #: is not one; it is the tail of a clone URL.
 #:

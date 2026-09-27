@@ -28,7 +28,7 @@ resolution.md):
   extrapolated, interpolated, or guessed.
 - This module resolves literature values. It does not decide whether they
   are simulable -- that bridge (beta = R0 * gamma) lives in
-  Terium/core/validation.py::beta_gamma_from_r0, mirroring how
+  caterva/core/validation.py::beta_gamma_from_r0, mirroring how
   fallback_logic.py resolves a kcat and vmax_from_kcat (a different module
   entirely) turns it into something the engine can run.
 """

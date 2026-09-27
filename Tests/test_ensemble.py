@@ -101,7 +101,7 @@ class TestWeightsSteerTheSampling:
         """Nobody supplied a physiological reference, so every row is
         `not_assessed`. That axis carries no information and must not change
         the relative weights — otherwise the common case (no reference given)
-        would quietly reweight every ensemble Terrium produces.
+        would quietly reweight every ensemble Caterva produces.
         """
         with_ref = [
             candidate(1.0, score("complete", "near", "exact")),

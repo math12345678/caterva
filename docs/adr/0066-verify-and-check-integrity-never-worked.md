@@ -26,7 +26,7 @@ since the commands existed.**
 
 Both are advertised in `help`. A completed simulation prints *"Saved. Re-check
 it later with: `scientific check-integrity <jobId>`"* — a promise the tool
-could not keep. And `history` persists to `~/.terrium/history.json`, its help
+could not keep. And `history` persists to `~/.caterva/history.json`, its help
 text reading: *"The run id printed at the end of a simulation is only useful
 if something can resolve it later; this is that something."*
 
@@ -74,7 +74,7 @@ and the interface converted the failure into reassurance.
 
 ### Records persist
 
-`recordExecution` writes to `~/.terrium/records/<jobId>.json`; lookups check
+`recordExecution` writes to `~/.caterva/records/<jobId>.json`; lookups check
 the Map, then disk. Failure to persist never throws — a simulation that
 produced a correct result did produce it, and an unwritable home directory
 must not make the exit code mean two things. The consequence is logged.

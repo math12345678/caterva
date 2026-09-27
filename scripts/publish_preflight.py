@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS
 ---------------
-Publishing is the last thing standing between Terrium and anybody using it.
+Publishing is the last thing standing between Caterva and anybody using it.
 `check_quickstart_clone_works.py` has failed on every CI run since
 2026-08-21 for exactly one reason: no documented `git clone` works for a
 stranger, because the repositories are private (ADR 0143).
@@ -90,7 +90,7 @@ CHECKS: tuple[tuple[str, tuple[str, ...], str], ...] = (
     ),
     (
         "check_no_tellurium_integration_claims.py", (),
-        "a published document would claim Terrium is built on Tellurium "
+        "a published document would claim Caterva is built on Tellurium "
         "while NOTICE says it is not.",
     ),
 )

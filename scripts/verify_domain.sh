@@ -2,7 +2,7 @@
 # scripts/verify_domain.sh
 # Usage: scripts/verify_domain.sh <domain_name> [test_file_basename]
 #
-# Runs the mechanical verification steps from the Terrium Engineering
+# Runs the mechanical verification steps from the Caterva Engineering
 # Constitution (docs/CONSTITUTION.md, Section 6) for a newly implemented
 # domain. Step 4 (mutation-test reproduction) is deliberately not
 # automated — it requires a human (or Claude-as-reviewer) to read the
@@ -38,17 +38,17 @@ is_supported_python() {
     "$1" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] in ((3, 10), (3, 11), (3, 12), (3, 13)) else 1)' >/dev/null 2>&1
 }
 
-if [ -n "${TERRIUM_PYTHON:-}" ]; then
-    TERRIUM_PYTHON_PATH="$TERRIUM_PYTHON"
-    case "$TERRIUM_PYTHON_PATH" in
+if [ -n "${CATERVA_PYTHON:-}" ]; then
+    CATERVA_PYTHON_PATH="$CATERVA_PYTHON"
+    case "$CATERVA_PYTHON_PATH" in
         /*) ;;
-        *) TERRIUM_PYTHON_PATH="$REPO_DIR/$TERRIUM_PYTHON_PATH" ;;
+        *) CATERVA_PYTHON_PATH="$REPO_DIR/$CATERVA_PYTHON_PATH" ;;
     esac
-    if [ ! -x "$TERRIUM_PYTHON_PATH" ] || ! is_supported_python "$TERRIUM_PYTHON_PATH"; then
-        echo "TERRIUM_PYTHON must point to a supported Python 3.10–3.13 interpreter: $TERRIUM_PYTHON"
+    if [ ! -x "$CATERVA_PYTHON_PATH" ] || ! is_supported_python "$CATERVA_PYTHON_PATH"; then
+        echo "CATERVA_PYTHON must point to a supported Python 3.10–3.13 interpreter: $CATERVA_PYTHON"
         exit 2
     fi
-    PYTHON="$TERRIUM_PYTHON_PATH"
+    PYTHON="$CATERVA_PYTHON_PATH"
 elif [ -n "${VIRTUAL_ENV:-}" ]; then
     if [ ! -x "$VIRTUAL_ENV/bin/python" ] || ! is_supported_python "$VIRTUAL_ENV/bin/python"; then
         echo "Active VIRTUAL_ENV must use supported Python 3.10–3.13: $VIRTUAL_ENV/bin/python"
@@ -71,7 +71,7 @@ fi
 
 if [ -z "$PYTHON" ]; then
     echo "No supported Python 3.10–3.13 interpreter was found."
-    echo "Install Python 3.13 and requirements-dev.txt, or set TERRIUM_PYTHON."
+    echo "Install Python 3.13 and requirements-dev.txt, or set CATERVA_PYTHON."
     exit 2
 fi
 
@@ -97,15 +97,15 @@ echo "=========================================="
 echo ""
 
 # ------------------------------------------------------------------
-# Step 1: Full test suites (both Terium/ and Tests/)
+# Step 1: Full test suites (both caterva/ and Tests/)
 # ------------------------------------------------------------------
 echo "=== Step 1: full test suite ==="
 
-cd "$REPO_DIR/Terium"
-TERIUM_OUT=$("$PYTHON" -m pytest tests/ -q 2>&1) && TERIUM_OK=0 || TERIUM_OK=1
-check "Terium/ tests pass" "$TERIUM_OK"
-if [ "$TERIUM_OK" -ne 0 ]; then
-    echo "$TERIUM_OUT" | tail -10
+cd "$REPO_DIR/Caterva"
+CATERVA_OUT=$("$PYTHON" -m pytest tests/ -q 2>&1) && CATERVA_OK=0 || CATERVA_OK=1
+check "caterva/ tests pass" "$CATERVA_OK"
+if [ "$CATERVA_OK" -ne 0 ]; then
+    echo "$CATERVA_OUT" | tail -10
 fi
 
 cd "$REPO_DIR/Tests"
@@ -224,12 +224,12 @@ if [ $# -ge 2 ]; then
     TEST_BASENAME="$2"
 else
     TEST_BASENAME="test_${DOMAIN}_correctness.py"
-    TEST_FILE="$REPO_DIR/Terium/tests/$TEST_BASENAME"
+    TEST_FILE="$REPO_DIR/caterva/tests/$TEST_BASENAME"
     if [ ! -f "$TEST_FILE" ]; then
         # Fall back: search for test files that import simulate_<domain>.
         # This handles naming mismatches like wright_fisher ->
         # test_popgen_correctness.py (named after the domain category).
-        CANDIDATE=$(grep -rl "simulate_${DOMAIN}" "$REPO_DIR/Terium/tests/" \
+        CANDIDATE=$(grep -rl "simulate_${DOMAIN}" "$REPO_DIR/caterva/tests/" \
             --include='*.py' 2>/dev/null | head -1)
         if [ -n "$CANDIDATE" ]; then
             TEST_BASENAME=$(basename "$CANDIDATE")
@@ -237,14 +237,14 @@ else
     fi
 fi
 
-TEST_FILE="$REPO_DIR/Terium/tests/$TEST_BASENAME"
+TEST_FILE="$REPO_DIR/caterva/tests/$TEST_BASENAME"
 if [ ! -f "$TEST_FILE" ]; then
     echo "  [FAIL] test file not found: $TEST_FILE"
     echo "         (pass the actual filename as a 2nd arg if auto-detect fails)"
     FAIL=$((FAIL + 1))
 else
     echo "  test file: $TEST_BASENAME"
-    COLLECT_OUT=$(cd "$REPO_DIR/Terium" && "$PYTHON" -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
+    COLLECT_OUT=$(cd "$REPO_DIR/Caterva" && "$PYTHON" -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
     check "test file collects" "$COLLECT_OK"
     if [ "$COLLECT_OK" -ne 0 ]; then
         echo "$COLLECT_OUT" | tail -10
@@ -263,13 +263,13 @@ echo "  at least one claimed mutation per the procedure in"
 echo "  docs/CONSTITUTION.md Section 6 Step 4."
 echo ""
 echo "  Procedure (run all from repo root):"
-echo "    1. Backup: cp Terium/terium_engine.py /tmp/terium_engine.py.bak"
+echo "    1. Backup: cp caterva/caterva_engine.py /tmp/caterva_engine.py.bak"
 echo "    2. Apply the exact mutation described in the report"
-echo "    3. Run the specific test(s): cd Terium && $PYTHON -m pytest \\"
+echo "    3. Run the specific test(s): cd Caterva && $PYTHON -m pytest \\"
 echo "       tests/test_popgen_correctness.py::<test_name> -q"
 echo "    4. Confirm failure matches the claimed cause"
-echo "    5. Revert: cp /tmp/terium_engine.py.bak Terium/terium_engine.py"
-echo "    6. Confirm suite clean: cd Terium && $PYTHON -m pytest tests/ -q"
+echo "    5. Revert: cp /tmp/caterva_engine.py.bak caterva/caterva_engine.py"
+echo "    6. Confirm suite clean: cd Caterva && $PYTHON -m pytest tests/ -q"
 echo ""
 echo "  IMPORTANT: Do NOT chain steps 3-5 with && — the mutated test"
 echo "  is *supposed* to fail (nonzero exit), which would short-circuit"

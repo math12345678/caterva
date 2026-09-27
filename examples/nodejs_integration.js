@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Terrium Node.js Integration Examples
+ * Caterva Node.js Integration Examples
  *
- * Working examples of Terrium's REST API from Node.
+ * Working examples of Caterva's REST API from Node.
  *
  * WHICH SERVER THIS TALKS TO
  * --------------------------
- * Terrium serves TWO HTTP APIs, and they are not interchangeable:
+ * Caterva serves TWO HTTP APIs, and they are not interchangeable:
  *
  *   * `Science-Agent-Pipeline/artifacts/api-server/` — the Express service,
  *     reference at `docs/API.md`. THIS FILE TARGETS THAT ONE. Routes are
@@ -37,10 +37,10 @@
  * No dependencies — uses the built-in fetch (Node 18+).
  */
 
-const TERRIUM_URL = process.env.TERRIUM_URL || 'http://localhost:3000';
+const CATERVA_URL = process.env.CATERVA_URL || 'http://localhost:3000';
 
-class TerriumClient {
-  constructor(baseUrl = TERRIUM_URL) {
+class CatervaClient {
+  constructor(baseUrl = CATERVA_URL) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
   }
 
@@ -186,7 +186,7 @@ async function exampleMichaelisMenten(client) {
 }
 
 async function exampleMissingCondition(client) {
-  // The behaviour most worth understanding: Terrium does not fill in
+  // The behaviour most worth understanding: Caterva does not fill in
   // s0/i0/end/points with plausible-looking numbers. It names them.
   const jobId = await client.simulate('simulate sir beta=0.3 gamma=0.1');
   try {
@@ -213,12 +213,12 @@ async function exampleProvenance(client) {
 }
 
 async function main() {
-  const client = new TerriumClient();
+  const client = new CatervaClient();
 
   try {
     await client.healthCheck();
   } catch {
-    console.log(`No Terrium server at ${TERRIUM_URL}. Start it with \`npm start\`.`);
+    console.log(`No Caterva server at ${CATERVA_URL}. Start it with \`npm start\`.`);
     process.exitCode = 1;
     return;
   }
@@ -245,4 +245,4 @@ if (require.main === module) {
   main();
 }
 
-module.exports = { TerriumClient };
+module.exports = { CatervaClient };

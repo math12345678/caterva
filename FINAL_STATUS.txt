@@ -4,14 +4,14 @@ below are a stale snapshot, not a live fact -- the suite has grown since
 (17 test files at last count, up from 11). Run `npm test` /
 `npm run test:coverage` from repo root for the current numbers. The test
 file list further below omits newer files (e.g. critical-paths.test.ts,
-teriumBridge.test.ts, literatureResolver.test.ts, sbml-builder.test.ts,
+catervaBridge.test.ts, literatureResolver.test.ts, sbml-builder.test.ts,
 jobHistory.test.ts, reproducibilityRegressions.test.ts,
 enzymeConcentration.test.ts, cliEndToEnd.test.ts, verificationStates.test.ts,
 parameter-sweep.test.ts). This file is a near-duplicate of
 BUILD_COMPLETE_SUMMARY.md, COMPLETE_BUILD_REPORT.md, COMPREHENSIVE_GUIDE.md,
 and IMPLEMENTATION_COMPLETE.md.
 ================================================================================
-TERRIUM SCIENTIFIC VALIDATION FRAMEWORK - FINAL STATUS
+CATERVA SCIENTIFIC VALIDATION FRAMEWORK - FINAL STATUS
 ================================================================================
 
 ✓ IMPLEMENTATION COMPLETE & PRODUCTION READY
@@ -20,7 +20,7 @@ TERRIUM SCIENTIFIC VALIDATION FRAMEWORK - FINAL STATUS
 SUMMARY
 ================================================================================
 
-The Terrium scientific validation backend is now fully functional with:
+The Caterva scientific validation backend is now fully functional with:
 
 ✓ 178 tests passing (100% pass rate)
 ✓ 84.04% statement coverage
@@ -49,7 +49,7 @@ WHAT WORKS
    - help: Show usage instructions
 
 3. OFFLINE OPERATION
-   - TERRIUM_SKIP_DOI_VERIFICATION=1 enables offline mode
+   - CATERVA_SKIP_DOI_VERIFICATION=1 enables offline mode
    - Built-in literature database with 3 sources
    - Graceful degradation when network unavailable
 
@@ -68,7 +68,7 @@ RECENT FIXES IMPLEMENTED
 
 2. Network Resilience (CRITICAL)
    - Fixed: CLI failed with "Literature reference not verified"
-   - Solution: Added TERRIUM_SKIP_DOI_VERIFICATION=1 environment variable
+   - Solution: Added CATERVA_SKIP_DOI_VERIFICATION=1 environment variable
    - Implementation: Modified verifyReferenceDetailed() to skip network checks in offline mode
    - Result: CLI now works perfectly without network access
 
@@ -134,7 +134,7 @@ Core Modules:
   • validation/        - 4-layer validation pipeline
   • literature/        - Literature database & DOI verification
   • integration/       - End-to-end pipeline orchestration
-  • engine/            - Terium kinetic simulation
+  • engine/            - Caterva kinetic simulation
   • reproducibility/   - Execution tracking & hashing
   • cli/               - Command-line interface
   • units.ts           - Unit conversion utilities
@@ -178,13 +178,13 @@ Testing:
 ENVIRONMENT VARIABLES
 ================================================================================
 
-TERRIUM_SKIP_DOI_VERIFICATION=1
+CATERVA_SKIP_DOI_VERIFICATION=1
   - Enable offline mode (skip network DOI checks)
   - Default: not set
   - Used by: CLI automatically, tests when needed
   - Effect: Format validation still enforced, peer-review still required
 
-TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1
+CATERVA_ALLOW_UNVERIFIED_CITATIONS=1
   - Accept citations when network unavailable
   - Default: not set
   - Requires explicit opt-in (network failures only, not rejected DOIs)
@@ -202,7 +202,7 @@ NEXT STEPS FOR DEPLOYMENT
    (or use ts-node directly)
 
 3. Configure environment:
-   - Set TERRIUM_SKIP_DOI_VERIFICATION=1 for offline mode
+   - Set CATERVA_SKIP_DOI_VERIFICATION=1 for offline mode
    - Use real DOIs instead of test DOIs in production
 
 4. Monitor:
@@ -233,7 +233,7 @@ File Structure
 
 Key Files Created/Modified:
   ✓ src/cli/scientificCLI.ts        - Added offline mode variables
-  ✓ src/validation/scientificValidator.ts - Added TERRIUM_SKIP_DOI_VERIFICATION support
+  ✓ src/validation/scientificValidator.ts - Added CATERVA_SKIP_DOI_VERIFICATION support
   ✓ src/validation/__tests__/verificationStates.test.ts - Added 6 offline mode tests
   ✓ src/literature/__tests__/coverage.test.ts - Added 8 new tests
   ✓ package.json - Updated coverage thresholds, excluded logger.ts
@@ -267,7 +267,7 @@ npm run cli -- help
 Summary
 ================================================================================
 
-The Terrium scientific validation framework is COMPLETE and PRODUCTION READY.
+The Caterva scientific validation framework is COMPLETE and PRODUCTION READY.
 
 All requirements met:
   ✓ "Fix everything" - All known issues resolved
@@ -280,7 +280,7 @@ All requirements met:
 Ready for deployment!
 
 ================================================================================
-Built with: TypeScript, Jest, Terium
+Built with: TypeScript, Jest, Caterva
 Version: 1.0.0
 Status: ✓ PRODUCTION READY
 ================================================================================

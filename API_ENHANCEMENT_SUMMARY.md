@@ -2,7 +2,7 @@
 
 ## 🎯 What Was Built
 
-Three major improvements to Terrium's API:
+Three major improvements to Caterva's API:
 
 ### 1. HTTP Response Caching (`http-cache.ts`)
 

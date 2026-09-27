@@ -23,7 +23,7 @@ distributions' own licence files rather than from memory or a package index:
 | hypothesis | MPL-2.0 |
 | **stdpopsim** | **GPL-3.0-or-later** |
 
-Terrium declares Apache-2.0. Two entries need more than a row in a table.
+Caterva declares Apache-2.0. Two entries need more than a row in a table.
 
 ### stdpopsim
 
@@ -35,14 +35,14 @@ Those licences are compatible in one direction only. Apache-2.0 code may be
 taken into a GPLv3 work; GPLv3 code cannot be folded into a work distributed
 under Apache-2.0 without the combination becoming GPLv3.
 
-**Nothing was being violated.** Terrium has never bundled stdpopsim: pip
+**Nothing was being violated.** Caterva has never bundled stdpopsim: pip
 fetches it onto the user's machine, and running two separately-installed
 packages together is use, not distribution. The GPL's obligations attach on
 conveyance.
 
 The problem was smaller and more this-project-shaped. A reader would have
 had to open two licence files and reason about their interaction to learn
-what a default install had given them. Terrium's whole claim is that nothing
+what a default install had given them. Caterva's whole claim is that nothing
 should require that.
 
 ### The code already disagreed with the manifest
@@ -80,7 +80,7 @@ LGPL-2.1-or-later. The "Lesser" is the point: a work may *use* the library
 without becoming LGPL. Its obligations — notice, and a recipient's ability
 to relink against a modified libSBML — attach when the library is conveyed.
 
-Terrium does not convey it. Nothing is vendored, and as of today the
+Caterva does not convey it. Nothing is vendored, and as of today the
 repository has one CI workflow, `tests.yml`, which publishes nothing.
 
 That last sentence is the entire compliance position, and it was a fact
@@ -128,7 +128,7 @@ different authors.
 ## Consequences
 
 - A default `make setup` is Apache-2.0-compatible throughout. Someone
-  packaging Terrium commercially does not inherit a GPL question they did
+  packaging Caterva commercially does not inherit a GPL question they did
   not know they had.
 - Population genetics costs one extra command and is documented in three
   places a person might look: README, `requirements.txt` where the pin used

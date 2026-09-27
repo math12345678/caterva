@@ -107,7 +107,7 @@ describe("Vmax-from-kcat bridge — ADR 0019", () => {
     //
     // "1 uM enzyme" is 0.001 mM, and it must arrive as origin "user":
     // reading it out of prose is the user supplying it (grammar differs,
-    // provenance does not), never Terrium inferring it. ADR 0013 stands.
+    // provenance does not), never Caterva inferring it. ADR 0013 stands.
     const resolved = await resolveQuery(
       "simulate acetylcholinesterase with 10 mM acetylthiocholine and " +
         "1 uM enzyme for 10 seconds",

@@ -137,7 +137,7 @@ export class ParameterValidator {
         // measured it themselves, or be exploring a range deliberately --
         // both are legitimate, and refusing to run made the tool unusable
         // for exactly the person it is for: someone with their own bench
-        // data. Terrium's rule is that an unsourced number must never be
+        // data. Caterva's rule is that an unsourced number must never be
         // PRESENTED as sourced, not that it may never be used.
         //
         // So it warns, loudly, and the provenance table already reports it
@@ -262,16 +262,16 @@ export class ParameterValidator {
  * Identify this tool to CrossRef.
  *
  * CrossRef operates a "polite pool" with better rate limits for clients
- * that identify themselves with a contact address. `TERRIUM_CONTACT_EMAIL`
+ * that identify themselves with a contact address. `CATERVA_CONTACT_EMAIL`
  * supplies it; without one the request still works, just in the anonymous
  * pool. The address is NOT hardcoded -- a fork should not silently
  * identify itself as this project's author.
  */
 function crossRefUserAgent(): string {
-  const contact = process.env['TERRIUM_CONTACT_EMAIL'];
+  const contact = process.env['CATERVA_CONTACT_EMAIL'];
   return contact
-    ? `Terrium/1.0 (mailto:${contact})`
-    : 'Terrium/1.0 (https://github.com/terrium)';
+    ? `Caterva/1.0 (mailto:${contact})`
+    : 'Caterva/1.0 (https://github.com/caterva)';
 }
 
 /** Registry lookups must not hang a validation pass. */
@@ -373,15 +373,15 @@ export class LiteratureVerifier {
       // That is the same defect Stage 10 Parts 6 and 11 removed, arriving
       // a third time by a different route.
       //
-      // `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` already decides whether an
+      // `CATERVA_ALLOW_UNVERIFIED_CITATIONS=1` already decides whether an
       // unverified citation is acceptable to a given run, and says so in
       // its warning. The two variables compose: skip the lookup, then
       // decide what an unlooked-up citation is worth. Neither can make a
       // citation verified without a registry saying so.
-      if (process.env['TERRIUM_SKIP_DOI_VERIFICATION'] === '1') {
+      if (process.env['CATERVA_SKIP_DOI_VERIFICATION'] === '1') {
         logger.warn(
           { doi: ref.doi, pmid: ref.pubmedId },
-          'DOI/PMID verification skipped (TERRIUM_SKIP_DOI_VERIFICATION=1); ' +
+          'DOI/PMID verification skipped (CATERVA_SKIP_DOI_VERIFICATION=1); ' +
           'citation is UNVERIFIED, not verified'
         );
         // Format-only check: DOI and PMID must still be well-formed
@@ -402,7 +402,7 @@ export class LiteratureVerifier {
         return {
           status: 'unverified',
           reason:
-            'Registry lookup was skipped (TERRIUM_SKIP_DOI_VERIFICATION=1). ' +
+            'Registry lookup was skipped (CATERVA_SKIP_DOI_VERIFICATION=1). ' +
             'The identifier is well-formed but has not been shown to exist. ' +
             'Results from this run must not be described as ' +
             'literature-verified.'
@@ -505,7 +505,7 @@ export class LiteratureVerifier {
    * Boolean form, kept for existing callers.
    *
    * `true` means VERIFIED. An UNVERIFIED citation is true only when
-   * `TERRIUM_ALLOW_UNVERIFIED_CITATIONS` is explicitly set -- which exists
+   * `CATERVA_ALLOW_UNVERIFIED_CITATIONS` is explicitly set -- which exists
    * so that working offline does not require editing this file, the
    * pressure that produced the regression described above. A REJECTED
    * citation is never true, whatever that variable says.
@@ -524,10 +524,10 @@ export class LiteratureVerifier {
       return false;
     }
 
-    if (process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'] === '1') {
+    if (process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'] === '1') {
       logger.warn(
         { title: ref.title, doi: ref.doi, reason: outcome.reason },
-        'Citation is UNVERIFIED but TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1 is ' +
+        'Citation is UNVERIFIED but CATERVA_ALLOW_UNVERIFIED_CITATIONS=1 is ' +
         'set, so it is being accepted. Results from this run must not be ' +
         'described as literature-verified.'
       );

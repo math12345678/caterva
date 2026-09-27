@@ -86,9 +86,9 @@ that mechanism exists for precisely this reasoning, in its own words:
 > could have had by flipping a flag, is the true-sounding-and-misleading
 > shape this project treats as a defect everywhere else.
 
-Terrium holding papers it does not mention is that sentence again, so
+Caterva holding papers it does not mention is that sentence again, so
 `unresolvedReason` gains `literature_candidates`. Every other member of that
-union means *a value existed and Terrium declined it*; this one means *no
+union means *a value existed and Caterva declined it*; this one means *no
 value, but here is where to look* — and it belongs there for the same
 reason, because it makes the generic sentence false by omission. **The
 literature was not silent. Nobody read it out.**

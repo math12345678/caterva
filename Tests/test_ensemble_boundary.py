@@ -10,7 +10,7 @@ repeatedly:
     "a test that pins a component tells you nothing about the wiring"
     -- ADR 0027
 
-The ensemble is emitted from `terium_runner.py` deliberately, because that is
+The ensemble is emitted from `caterva_runner.py` deliberately, because that is
 the single place both the CLI and the API read from — a capability added to
 one front end reaches half the users, which `docs/one-sided-findings.txt`
 exists to track. So the thing worth testing is the runner invocation itself:
@@ -39,7 +39,7 @@ RUNNER = (
     / "api-server"
     / "src"
     / "lib"
-    / "terium_runner.py"
+    / "caterva_runner.py"
 )
 
 

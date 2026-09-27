@@ -38,7 +38,7 @@ each one is. It is NOT an uncertainty estimate…
 Reproduce with --seed 1.
 ```
 
-Every other command in Terrium answers this query with `0.03`, because
+Every other command in Caterva answers this query with `0.03`, because
 `min()`. This one names both published values, says how often each was
 drawn and why, and then answers the question a student can actually act on:
 **does the disagreement change the result?** Seven-fold at t=2, yes.

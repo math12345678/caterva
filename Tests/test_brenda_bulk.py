@@ -41,7 +41,7 @@ def test_no_row_carries_an_organism(parsed):
     """The whole reason this is not the resolution path.
 
     BRENDA's bulk KM export has no organism column -- verified across all
-    623 rows of a real capture. Terrium's resolver is organism-specific by
+    623 rows of a real capture. Caterva's resolver is organism-specific by
     policy (ADR 0024, on Jeske's own recommendation), so these rows cannot
     answer the question the resolver asks.
     """

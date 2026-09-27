@@ -25,7 +25,7 @@ assumed unit) and integrates accordingly; the exported SBML said
 the file's own (undeclared, therefore arbitrary) system.
 
 Measured, not reasoned: re-running the exported file exhausted the
-substrate by t = 2.2 s, while Terrium had just printed S = 8.245 at
+substrate by t = 2.2 s, while Caterva had just printed S = 8.245 at
 t = 12,930 s. **The reproducibility artifact contradicted its own run by
 60,000×**, in valid SBML with zero read errors. It is the artifact that
 outlives the terminal, gets attached to a report, and is the only thing a

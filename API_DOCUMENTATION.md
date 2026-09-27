@@ -1,4 +1,4 @@
-# Terrium API Documentation
+# Caterva API Documentation
 
 **The API reference lives at [`docs/API.md`](docs/API.md).**
 
@@ -14,8 +14,8 @@ Until 2026-08-11 this was 725 lines documenting a REST API that **did not
 exist**: bearer-token authentication, a literature-search endpoint, a
 STRENDA validation endpoint, webhooks with signed payloads, cursor
 pagination, URL-path versioning with a deprecation date of 2026-12-31, an
-`@terrium/sdk` npm package, a `terrium-sdk` PyPI package, `api.terrium.dev`
-and `status.terrium.dev`.
+`@caterva/sdk` npm package, a `caterva-sdk` PyPI package, an `api.` host
+and a `status.` host.
 
 None of it was real. The root `src/` tree it claimed to document is a
 TypeScript library and CLI with no HTTP server at all — `package.json` had
@@ -44,7 +44,7 @@ mentions as wrong. That number was itself wrong, and it is worth saying so
 in the same place it was published.
 
 The guard behind it parsed only the Express routers under
-`Science-Agent-Pipeline/artifacts/api-server/`. Terrium serves a **second**
+`Science-Agent-Pipeline/artifacts/api-server/`. Caterva serves a **second**
 HTTP API — `src/web/server.ts`, a raw `http.createServer` dispatching on
 `pathname` equality — whose nineteen routes it could not see. Measured
 against the full table the real figure is **19 of 282**, and most of the

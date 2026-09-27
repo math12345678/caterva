@@ -40,16 +40,16 @@ hand-written names would not notice the whole discovered set vanishing.
 `spread_consequence.py` imports the engine lazily:
 
 ```python
-from Terium.continuous.simulations import simulate_michaelis_menten
+from caterva.continuous.simulations import simulate_michaelis_menten
 ```
 
-`Terium` lives at the repository root, so that resolves when pytest runs
+`caterva` lives at the repository root, so that resolves when pytest runs
 from the root and fails when it runs from inside `Tests/`.
 `pytest test_lab_report.py` reported **2 failures** from there and 16 passes
 from one directory up. A contributor sees red and reasonably concludes they
 broke something.
 
-`Terium/pytest.ini` has carried `pythonpath = . ..` since the package split,
+`caterva/pytest.ini` has carried `pythonpath = . ..` since the package split,
 for exactly this reason. `Tests/pytest.ini` never got the line. It has it
 now, and the suite is green from both directories.
 

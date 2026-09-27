@@ -1,5 +1,5 @@
 """
-Plausibility constants consistency guard for Terrium.
+Plausibility constants consistency guard for Caterva.
 
 Verifies that all plausibility constants used in validation have consistent
 values across the modular Python codebase. This ensures that the Rule 2
@@ -19,7 +19,7 @@ from typing import Dict, List, Any
 
 
 # Constants that should have consistent values across modules.
-# NOTE: the engine's definitions in Terium/core/data_structures.py are
+# NOTE: the engine's definitions in caterva/core/data_structures.py are
 # the single source of truth — these values must match them exactly. The
 # list was stale (14 of 19 mismatched) and the old code only value-checked
 # constants defined in 2+ files, so the drift was silent; the check below
@@ -118,7 +118,7 @@ def _collect_py_files(repo_root: Path) -> List[Path]:
     literature layer. Excludes the venv and bytecode caches.
     """
     files: List[Path] = []
-    for sub in ('Terium', 'Tests'):
+    for sub in ('caterva', 'Tests'):
         directory = repo_root / sub
         if not directory.is_dir():
             continue
@@ -140,7 +140,7 @@ def check_constants_consistency() -> List[str]:
     # split (engine 1e4 vs BRENDA 1e3, so a Km of 5000 mM was flagged
     # upstream and silently accepted downstream).
     #
-    # This guard scanned Terium/ only, so Tests/brenda_client.py -- the
+    # This guard scanned caterva/ only, so Tests/brenda_client.py -- the
     # other half of the contract -- was outside its search path entirely.
     # Verified: setting brenda_client's KM_PLAUSIBLE_MAX_MM to 9999 while
     # the engine said 1000 PASSED this guard before this change.
@@ -224,7 +224,7 @@ def check_constant_usage() -> List[str]:
     returned [] no matter what that file contained: deleting every use of
     every bound would still have printed the guard's OK line.
 
-    It also looked only at Terium/core/validation.py, while the WF_ and
+    It also looked only at caterva/core/validation.py, while the WF_ and
     MD_ constants legitimately live in their domain modules -- which is
     what the second `continue` was papering over. The search now covers
     the whole engine, so those constants can be held to the same standard
@@ -236,11 +236,11 @@ def check_constant_usage() -> List[str]:
 
     # BOTH layers, matching check_constants_consistency above. ADR 0003
     # makes these bounds a contract between the literature layer
-    # (Tests/brenda_client.py) and the simulation layer (Terium/), and
+    # (Tests/brenda_client.py) and the simulation layer (caterva/), and
     # the kcat bounds are consumed by the BRENDA parser rather than by a
-    # Terium validator. Scanning only Terium/ reported them as
+    # Caterva validator. Scanning only caterva/ reported them as
     # defined-and-unused, which was wrong -- they are used, one layer over.
-    search_roots = [repo_root / 'Terium', repo_root / 'Tests']
+    search_roots = [repo_root / 'caterva', repo_root / 'Tests']
     missing_roots = [r for r in search_roots if not r.is_dir()]
     if missing_roots:
         return [
@@ -253,7 +253,7 @@ def check_constant_usage() -> List[str]:
     # value is deliberately duplicated across the layer boundary (ADR 0003,
     # with the agreement enforced by check_constants_consistency).
     definition_files = {
-        repo_root / 'Terium' / 'core' / 'data_structures.py',
+        repo_root / 'caterva' / 'core' / 'data_structures.py',
         repo_root / 'Tests' / 'brenda_client.py',
     }
 
@@ -316,14 +316,14 @@ def check_constant_usage() -> List[str]:
             where = ", ".join(sorted(p.name for p in defined_in))
             errors.append(
                 f"{const_name} is defined in {where} but read by no other "
-                "module in Terium/ or Tests/. A plausibility bound that "
+                "module in caterva/ or Tests/. A plausibility bound that "
                 "nothing reads does not bound anything -- either wire it "
                 "into a validator or remove it."
             )
         else:
             errors.append(
                 f"{const_name} is expected by this guard but appears in "
-                "neither Terium/ nor Tests/."
+                "neither caterva/ nor Tests/."
             )
 
     return errors

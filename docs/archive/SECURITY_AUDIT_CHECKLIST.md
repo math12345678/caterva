@@ -4,7 +4,7 @@
 > read as a specification, not a result.** This describes security controls
 > (Zod input validation, an Express rate limiter, CORS/security headers)
 > for an HTTP service that does not exist in this codebase: `src/` (package
-> `terrium-scientific-backend`) has no `dependencies` in `package.json` at
+> `caterva-scientific-backend`) has no `dependencies` in `package.json` at
 > all (only `devDependencies` -- jest, ts-node, eslint, typescript), `zod`
 > is not installed, and no `express()`/`app.use()`/`createServer()` exists
 > anywhere in `src/` (confirmed by grep, 2026-08-10). A security checklist
@@ -18,7 +18,7 @@
 
 ## Executive Summary
 
-This document provides a comprehensive security audit checklist for the Terrium backend. It covers:
+This document provides a comprehensive security audit checklist for the Caterva backend. It covers:
 - Input validation & output encoding
 - Authentication & authorization
 - Data protection & encryption
@@ -277,7 +277,7 @@ catch (err) {
 // ✅ IMPLEMENTED: Python process isolation
 const proc = spawn(pythonExecutable, [SCRIPT_PATH], {
   cwd: REPO_ROOT,
-  env: buildTeriumEnvironment(process.env, REPO_ROOT)
+  env: buildCatervaEnvironment(process.env, REPO_ROOT)
 });
 
 // Timeout prevents hanging processes
@@ -549,7 +549,7 @@ Annually:
 **Bug Bounty Program:** [URL or email]  
 **Privacy Officer:** [Name] ([email])  
 
-For security vulnerabilities, please report to security@terrium.dev (not public issues).
+For security vulnerabilities, please report privately through https://github.com/math12345678/caterva/security/advisories/new (not public issues).
 
 ---
 

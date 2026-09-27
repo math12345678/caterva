@@ -21,7 +21,7 @@ __pycache__/
 *.bak
 *.orig
 *.Rhistory
-terrium_data_flow.html
+caterva_data_flow.html
 
 # OS
 .DS_Store
@@ -42,7 +42,7 @@ Thumbs.db
 
 # Installed dependencies, anywhere in the tree.
 #
-# The root package.json ("terrium-scientific-backend", which drives src/
+# The root package.json ("caterva-scientific-backend", which drives src/
 # and examples/) needs its own node_modules, and until 2026-08-10 nothing
 # ignored it: `git status` listed it as untracked, so a `git add -A` would
 # have committed tens of thousands of vendored files. The rule below is
@@ -128,3 +128,9 @@ Science-Agent-Pipeline/artifacts/api-server/front-door-coverage.txt
 
 # Worktree machinery / machine-local IDE config (never tracked).
 .claude/
+
+# Private business records. Removed from the repository and scrubbed from its
+# history on 2026-09-27 when it went public; kept out so `git add .` in a
+# checkout that still has them cannot publish them again.
+/Business/
+*pitch_deck*

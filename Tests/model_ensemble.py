@@ -24,7 +24,7 @@ literature actually reports.
 WHAT IS AND IS NOT REJECTED
 ---------------------------
 Bakker's published ensemble rejects models that disagree with measured flux.
-Terrium has no flux data and does not invent a substitute — the spread here
+Caterva has no flux data and does not invent a substitute — the spread here
 is still not an uncertainty estimate, and `ensemble.DISCLAIMER` still travels
 with it.
 

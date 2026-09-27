@@ -1,6 +1,6 @@
 """End-to-end architecture integration test: Full pipeline with provenance tracking.
 
-This test demonstrates the complete Terrium architecture in action:
+This test demonstrates the complete Caterva architecture in action:
   Stage 1: Entity extraction (deterministic + LLM paths)
   Stage 2: Parameter resolution (BRENDA → PubMed → CORE fallback)
   Stage 3: Epidemiology R₀ → SIR bridge (Hussein et al. 2021)
@@ -22,7 +22,7 @@ import core_fulltext
 import enzyme_lookup
 import epidemiology_resolver
 import fallback_logic
-from Terium.core import validation
+from caterva.core import validation
 
 
 class TestE2EArchitectureStage1EntityExtraction:

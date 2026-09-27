@@ -14,7 +14,7 @@ import {
  * system — not whether a regex was involved.
  *
  * Every test below is about the moment a citation becomes attachable. If any
- * of them regress, Terrium is silently inferring a system and stamping real
+ * of them regress, Caterva is silently inferring a system and stamping real
  * BRENDA references onto it, which is the single worst thing this codebase
  * can do.
  */

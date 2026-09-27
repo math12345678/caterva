@@ -1,15 +1,15 @@
 /**
- * What Terrium can simulate, and the command that runs each one.
+ * What Caterva can simulate, and the command that runs each one.
  *
  * THE PROBLEM THIS EXISTS FOR
  * ---------------------------
- * Terrium advertises fifteen teaching domains. Nothing told a student what
+ * Caterva advertises fifteen teaching domains. Nothing told a student what
  * they are.
  *
  *   - `scientificCLI.ts help` lists nine commands. All of them are enzyme
  *     kinetics (`resolve`, `literature`, `corpus`) or generic (`simulate`,
  *     `sweep`, `validate`).
- *   - `python -m Terium.cli --help` lists seven subcommands, all population
+ *   - `python -m caterva.cli --help` lists seven subcommands, all population
  *     genetics and Gillespie.
  *   - Neither mentions the other exists.
  *   - Neither names epidemiology, PCR, Monte Carlo or molecular dynamics —
@@ -22,10 +22,10 @@
  *
  * WHY THE LIST IS NOT WRITTEN HERE
  * --------------------------------
- * The domain NAMES come from `terium_runner.py --list-domains`, which emits
+ * The domain NAMES come from `caterva_runner.py --list-domains`, which emits
  * `DISPATCH` — the table the engine actually dispatches on. A hand-written
  * list is a second source of truth that goes stale the first time somebody
- * adds a domain, and `terium_runner.py` already carries a comment about two
+ * adds a domain, and `caterva_runner.py` already carries a comment about two
  * tables "kept equal by hand (they have diverged before)".
  *
  * What IS written here is the part that cannot be derived: a sentence saying
@@ -109,35 +109,35 @@ export const DOMAIN_CATALOGUE: DomainEntry[] = [
     id: 'wright_fisher',
     title: 'Wright–Fisher drift',
     summary: 'How allele frequencies wander in a finite population.',
-    example: 'python -m Terium.cli wf --population-size 100 --starting-frequency 0.5 --generations 200 --seed 1',
+    example: 'python -m caterva.cli wf --population-size 100 --starting-frequency 0.5 --generations 200 --seed 1',
     literatureBacked: false,
   },
   {
     id: 'two_locus_wright_fisher',
     title: 'Two-locus Wright–Fisher',
     summary: 'Linkage disequilibrium, and how recombination decays it.',
-    example: 'python -m Terium.cli ld --population-size 500 --recombination-rate 0.01 --generations 200 --seed 1',
+    example: 'python -m caterva.cli ld --population-size 500 --recombination-rate 0.01 --generations 200 --seed 1',
     literatureBacked: false,
   },
   {
     id: 'gillespie_ssa',
     title: 'Gillespie SSA — decay',
     summary: 'Exact stochastic A → B, where small numbers make noise matter.',
-    example: 'python -m Terium.cli ssa --a0 100 --k 0.1 --end 50 --seed 1',
+    example: 'python -m caterva.cli ssa --a0 100 --k 0.1 --end 50 --seed 1',
     literatureBacked: false,
   },
   {
     id: 'gillespie_ssa_bimolecular',
     title: 'Gillespie SSA — association',
     summary: 'Exact stochastic A + B → C.',
-    example: 'python -m Terium.cli ssa --bimolecular --a0 100 --b0 100 --k 0.01 --end 50 --seed 1',
+    example: 'python -m caterva.cli ssa --bimolecular --a0 100 --b0 100 --k 0.01 --end 50 --seed 1',
     literatureBacked: false,
   },
   {
     id: 'gillespie_ssa_replicates',
     title: 'Gillespie SSA — replicates',
     summary: 'Many runs of the same system, to see the spread rather than one path.',
-    example: 'python -m Terium.cli ssa --a0 100 --k 0.1 --end 50 --seed 1 --out runs.csv',
+    example: 'python -m caterva.cli ssa --a0 100 --k 0.1 --end 50 --seed 1 --out runs.csv',
     literatureBacked: false,
   },
   {

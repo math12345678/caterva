@@ -376,7 +376,7 @@ Analysis (2):      /api/compare/jobs, /api/analyze/sweep/:id
 
 ### Start the System
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 # Open http://localhost:3000
 ```
@@ -443,7 +443,7 @@ curl http://localhost:3000/api/analyze/sweep/sweep_123
 
 ## 🎉 Bottom Line
 
-**Terrium is now a complete, production-grade scientific research platform with enterprise-level export and analysis capabilities.**
+**Caterva is now a complete, production-grade scientific research platform with enterprise-level export and analysis capabilities.**
 
 - 18 working endpoints (all verified)
 - 9 core features (7 original + 2 new)

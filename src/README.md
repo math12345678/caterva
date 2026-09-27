@@ -1,7 +1,7 @@
 # `src/` — the TypeScript surface
 
 Everything a person or another program touches. The science is in
-[`Terium/`](../Terium/README.md) and [`Tests/`](../Tests/README.md); this
+[`caterva/`](../caterva/README.md) and [`Tests/`](../Tests/README.md); this
 directory is how it reaches anyone.
 
 ## Layout
@@ -10,7 +10,7 @@ directory is how it reaches anyone.
 |---|---|
 | `cli/` | `scientificCLI.ts` and the subcommands — `commandResolve`, `commandSimulateResolved`, `commandSweep` |
 | `web/` | `server.ts` (the HTTP surface) and `dashboard.html` (the page a student actually opens) |
-| `engine/` | `teriumBridge.ts` — spawns the Python engine. Also batch, sweep and model-comparison drivers |
+| `engine/` | `catervaBridge.ts` — spawns the Python engine. Also batch, sweep and model-comparison drivers |
 | `literature/` | `literatureResolver.ts`, `literatureService.ts` — the TypeScript side of the resolution chain |
 | `validation/` | `scientificValidator.ts` (assumption checks), `runConditions.ts` (what conditions a run is at) |
 | `integration/` | `scientificPipeline.ts` — orchestrates resolve → validate → simulate → record |

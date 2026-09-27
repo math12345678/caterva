@@ -2,7 +2,7 @@
 
 THE PROBLEM
 -----------
-Terrium has keys for several LLM providers, each with a free tier. Any one of
+Caterva has keys for several LLM providers, each with a free tier. Any one of
 them runs out -- a daily request cap, a per-minute token ceiling -- and the
 entity extraction that depends on it stops working. Chained together they
 should not: when one is exhausted the next takes over, and with enough of them
@@ -138,7 +138,7 @@ class Provider:
     `cost_per_million_tokens` is declared by the OPERATOR in configuration,
     not by this file. A price written here would be a number nobody in this
     repository measured, and it would go stale silently. `None` means free
-    or unpriced, which is the case for every tier Terrium currently uses.
+    or unpriced, which is the case for every tier Caterva currently uses.
     """
 
     name: str
@@ -186,7 +186,7 @@ class Provider:
         return bool(self.remaining_requests_header or self.remaining_tokens_header)
 
 
-#: The providers Terrium holds keys for.
+#: The providers Caterva holds keys for.
 #:
 #: HEADER NAMES ARE FROM EACH PROVIDER'S OWN DOCUMENTATION, read for this
 #: module and cited in `documentation`. Where a provider's docs were not

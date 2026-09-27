@@ -1,5 +1,5 @@
 /**
- * Advanced CLI Features for Terrium
+ * Advanced CLI Features for Caterva
  *
  * Additional capabilities:
  * - Batch processing (multiple simulations)

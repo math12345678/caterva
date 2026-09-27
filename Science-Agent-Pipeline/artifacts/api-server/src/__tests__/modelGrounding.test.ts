@@ -1,7 +1,7 @@
 /**
  * A model the caller wrote, with its constants traced to the literature.
  *
- * This is the capability Terrium existed to have and did not: `POST
+ * This is the capability Caterva existed to have and did not: `POST
  * /simulate/model` ran any Antimony document and stamped every parameter
  * origin "user" with no citations, so a lab that brought its own model --
  * the only case a real lab has -- got plain Tellurium with extra steps.
@@ -53,7 +53,7 @@ describe("grounding a caller's own model", () => {
     vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
     const report = await groundAnnotatedModel(
       model(
-        '// terrium: km enzyme="hexokinase" substrate="glucose" unit="mM"',
+        '// caterva: km enzyme="hexokinase" substrate="glucose" unit="mM"',
         "Km_hex = 0.15;",
       ),
     );
@@ -78,7 +78,7 @@ describe("grounding a caller's own model", () => {
     vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
     const report = await groundAnnotatedModel(
       model(
-        '// terrium: km enzyme="hexokinase" substrate="glucose" unit="uM"',
+        '// caterva: km enzyme="hexokinase" substrate="glucose" unit="uM"',
         "Km_hex = 120;",
       ),
     );
@@ -93,7 +93,7 @@ describe("grounding a caller's own model", () => {
     // would be a fabricated finding. The citation is still delivered.
     vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
     const report = await groundAnnotatedModel(
-      model('// terrium: km enzyme="hexokinase"', "Km_hex = 0.15;"),
+      model('// caterva: km enzyme="hexokinase"', "Km_hex = 0.15;"),
     );
     const entry = report.entries[0]!;
     expect(entry.status).toBe("grounded");
@@ -102,13 +102,13 @@ describe("grounding a caller's own model", () => {
     expect(entry.comparisonSkipped).toMatch(/no unit was declared/i);
   });
 
-  // ---- resolve mode: Terrium supplies the number, or nothing runs -----
+  // ---- resolve mode: Caterva supplies the number, or nothing runs -----
 
   it("fills a placeholder from literature, in the model's unit", async () => {
     vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
     const report = await groundAnnotatedModel(
       model(
-        '// terrium: km enzyme="hexokinase" substrate="glucose" unit="uM" resolve',
+        '// caterva: km enzyme="hexokinase" substrate="glucose" unit="uM" resolve',
         "Km_hex = ?;",
       ),
     );
@@ -126,7 +126,7 @@ describe("grounding a caller's own model", () => {
     // 1000x error in a simulation that runs perfectly.
     vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
     const report = await groundAnnotatedModel(
-      model('// terrium: km enzyme="hexokinase" resolve', "Km_hex = ?;"),
+      model('// caterva: km enzyme="hexokinase" resolve', "Km_hex = ?;"),
     );
     expect(report.groundedSource).toBeUndefined();
     expect(report.blocking).toHaveLength(1);
@@ -143,7 +143,7 @@ describe("grounding a caller's own model", () => {
     } as never);
     const report = await groundAnnotatedModel(
       model(
-        '// terrium: km enzyme="hexokinase" unit="mM" resolve',
+        '// caterva: km enzyme="hexokinase" unit="mM" resolve',
         "Km_hex = ?;",
       ),
     );
@@ -160,7 +160,7 @@ describe("grounding a caller's own model", () => {
     } as never);
     const report = await groundAnnotatedModel(
       model(
-        '// terrium: km enzyme="hexokinase" unit="mM" resolve',
+        '// caterva: km enzyme="hexokinase" unit="mM" resolve',
         "Km_hex = ?;",
       ),
     );
@@ -171,7 +171,7 @@ describe("grounding a caller's own model", () => {
   it("does not spend lookups on a model whose declarations are wrong", async () => {
     vi.mocked(resolveKineticValue).mockClear();
     const report = await groundAnnotatedModel(
-      model('// terrium: km substrate="glucose" unit="mM"', "Km_hex = 0.15;"),
+      model('// caterva: km substrate="glucose" unit="mM"', "Km_hex = 0.15;"),
     );
     expect(report.problems).toHaveLength(1);
     expect(report.entries).toEqual([]);
@@ -195,7 +195,7 @@ describe("grounding a caller's own model", () => {
     vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
     const report = await groundAnnotatedModel(
       model(
-        '// terrium: km enzyme="hexokinase" unit="mM" resolve',
+        '// caterva: km enzyme="hexokinase" unit="mM" resolve',
         "Km_hex = ?;",
       ),
     );
@@ -225,7 +225,7 @@ describe("grounding a caller's own model", () => {
     const report = await groundAnnotatedModel(
       SBML(
         '<parameter id="Km_hex" value="0.15" constant="true"/>',
-        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="mM" -->',
+        '<!-- caterva: km parameter="Km_hex" enzyme="hexokinase" unit="mM" -->',
       ),
       { format: "sbml" },
     );
@@ -242,7 +242,7 @@ describe("grounding a caller's own model", () => {
     const report = await groundAnnotatedModel(
       SBML(
         '<parameter id="Km_hex" constant="true"/>',
-        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="uM" resolve -->',
+        '<!-- caterva: km parameter="Km_hex" enzyme="hexokinase" unit="uM" resolve -->',
       ),
       { format: "sbml" },
     );
@@ -257,7 +257,7 @@ describe("grounding a caller's own model", () => {
     vi.mocked(resolveKineticValue).mockResolvedValue(CITED as never);
     const source = SBML(
       '<parameter id="Km_hex" value="0.9" constant="true"/>\n      <parameter id="Km_hex_2" value="0.3" constant="true"/>',
-      '<!-- terrium: km parameter="Km_hex_2" enzyme="hexokinase" unit="mM" resolve -->',
+      '<!-- caterva: km parameter="Km_hex_2" enzyme="hexokinase" unit="mM" resolve -->',
     );
     const report = await groundAnnotatedModel(source, { format: "sbml" });
     expect(report.blocking).toEqual([]);
@@ -270,7 +270,7 @@ describe("grounding a caller's own model", () => {
     const report = await groundAnnotatedModel(
       SBML(
         '<parameter id="Km_hex" value="0.15" constant="true"/>',
-        '<!-- terrium: km parameter="Km_typo" enzyme="hexokinase" unit="mM" -->',
+        '<!-- caterva: km parameter="Km_typo" enzyme="hexokinase" unit="mM" -->',
       ),
       { format: "sbml" },
     );
@@ -284,7 +284,7 @@ describe("grounding a caller's own model", () => {
     const report = await groundAnnotatedModel(
       SBML(
         '<parameter id="Km_hex" value="0.15" constant="true"/>',
-        '<!-- terrium: km parameter="Km_hex" unit="mM" -->',
+        '<!-- caterva: km parameter="Km_hex" unit="mM" -->',
       ),
       { format: "sbml" },
     );
@@ -304,7 +304,7 @@ describe("grounding a caller's own model", () => {
     const report = await groundAnnotatedModel(
       SBML(
         '<parameter id="Km_hex" value="999" constant="true"/>',
-        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="uM" resolve -->',
+        '<!-- caterva: km parameter="Km_hex" enzyme="hexokinase" unit="uM" resolve -->',
       ),
       { format: "sbml" },
     );
@@ -322,7 +322,7 @@ describe("grounding a caller's own model", () => {
     const report = await groundAnnotatedModel(
       SBML(
         '<parameter id="Km_hex_long" value="777" constant="true"/>\n      <parameter id="Km_hex" value="0.9" constant="true"/>',
-        '<!-- terrium: km parameter="Km_hex" enzyme="hexokinase" unit="mM" resolve -->',
+        '<!-- caterva: km parameter="Km_hex" enzyme="hexokinase" unit="mM" resolve -->',
       ),
       { format: "sbml" },
     );

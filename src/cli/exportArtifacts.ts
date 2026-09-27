@@ -30,7 +30,7 @@ import { spawn } from 'child_process';
 import { writeFile } from 'fs/promises';
 import path from 'path';
 
-import { REPO_ROOT, resolvePythonExecutable } from '../engine/teriumBridge';
+import { REPO_ROOT, resolvePythonExecutable } from '../engine/catervaBridge';
 
 export interface ExportProvenance {
   origin: string;
@@ -74,7 +74,7 @@ export interface ExportProvenance {
    * huge role [...] If you simply mix these together, the simulation will
    * end up calculating with 'fantasy numbers'."
    *
-   * Terrium parsed them and showed them on screen. The exported model —
+   * Caterva parsed them and showed them on screen. The exported model —
    * the artifact that outlives the terminal session — said only "assay
    * completeness: complete — pH and temperature both reported", which
    * tells a reader the conditions exist and not what they were.
@@ -190,7 +190,7 @@ function runPythonScript(script: string, payload: unknown): Promise<string> {
       // The exit CODE is not the contract; the payload is. The script
       // reports its own failure as JSON on stdout and exits 1, so reading
       // the code first would discard the reason -- the same mistake
-      // teriumRunner.ts had to be corrected for.
+      // catervaRunner.ts had to be corrected for.
       if (!stdout.trim()) {
         reject(new Error(stderr.trim() || `${script} produced no output`));
         return;

@@ -3,7 +3,7 @@
 WHY THIS IS THE INTERESTING TEST FILE
 -------------------------------------
 Every value in the scavenged fixture below has a real citation and would
-pass every provenance check Terrium already has. Individually they are
+pass every provenance check Caterva already has. Individually they are
 clean. Together they describe no enzyme in any organism under any
 condition.
 

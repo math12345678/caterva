@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — EVIDENCE MICROSCOPE
+   caterva — EVIDENCE MICROSCOPE
 
    One parameter, six depths. The reader descends and the value
    stops being a number.

@@ -3,7 +3,7 @@
 > **⚠️ Nothing here is deployed -- read before treating this as real.**
 > This describes monitoring, Grafana dashboards, alert routing, on-call
 > escalation, and cost breakdowns for an Express HTTP service. No such
-> service exists: `src/` (package `terrium-scientific-backend`) is a
+> service exists: `src/` (package `caterva-scientific-backend`) is a
 > library/CLI with no `express()`/`app.listen()`/`createServer()` anywhere
 > (confirmed by grep, 2026-08-10), no Prometheus/Grafana/PagerDuty config
 > exists anywhere in this repo, and the repo's only `Dockerfile` builds a
@@ -254,7 +254,7 @@ Case 1: Errors in specific domain
 Case 2: Errors in Python bridge
   → Check Python process status
   → Review python logs
-  → Check Terium availability
+  → Check Caterva availability
   
 Case 3: Widespread errors
   → Check cache health

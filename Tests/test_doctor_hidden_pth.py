@@ -1,8 +1,8 @@
-"""`make doctor` names the macOS + iCloud failure that makes `terrium` vanish.
+"""`make doctor` names the macOS + iCloud failure that makes `caterva` vanish.
 
 Python 3.13 skips `.pth` files carrying the macOS `hidden` flag, and iCloud
 Drive sets that flag on files inside `.venv` when the checkout is under
-~/Desktop or ~/Documents. The symptom -- `No module named 'Terium'` from an
+~/Desktop or ~/Documents. The symptom -- `No module named 'caterva'` from an
 interpreter that imported it a minute earlier -- points nowhere near
 iCloud, which is why the doctor checks for it by name.
 """
@@ -30,7 +30,7 @@ def _doctor():
 def _venv_with_pth(tmp_path, hidden):
     site = tmp_path / ".venv" / "lib" / "python3.13" / "site-packages"
     site.mkdir(parents=True)
-    pth = site / "__editable__.terrium.pth"
+    pth = site / "__editable__.caterva.pth"
     pth.write_text("import x\n")
     if hidden:
         subprocess.run(["chflags", "hidden", str(pth)], check=True)
@@ -60,7 +60,7 @@ def test_a_visible_pth_passes(tmp_path, monkeypatch):
     assert doctor.checked[-1][:2] == ("hidden .pth", "PASS")
 
 
-def test_the_terrium_command_is_declared():
-    """`terrium` is what every document teaches; the wheel must install it."""
+def test_the_caterva_command_is_declared():
+    """`caterva` is what every document teaches; the wheel must install it."""
     text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'terrium = "Terium.app:main"' in text
+    assert 'caterva = "caterva.app:main"' in text

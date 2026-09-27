@@ -8,7 +8,7 @@ quotes under the heading "Built for teaching labs. Trusted by educators."
 Each was attributed to a named person with a title at a named institution:
 Stanford, MIT, Johns Hopkins, UC Berkeley, Cambridge.
 
-Terrium is pre-launch. It has a waitlist and no users. None of those people
+Caterva is pre-launch. It has a waitlist and no users. None of those people
 had used it, because nobody had.
 
 Every other compliance finding in this repository has been a paperwork
@@ -52,9 +52,9 @@ _MIN_FILES = 10
 
 #: Directories whose contents are shown to the public.
 PUBLIC_TREES: tuple[str, ...] = (
-    "Science-Agent-Pipeline/artifacts/terrium-landing/src",
-    "Science-Agent-Pipeline/artifacts/terrium-landing/index.html",
-    "terrium-site",
+    "Science-Agent-Pipeline/artifacts/caterva-landing/src",
+    "Science-Agent-Pipeline/artifacts/caterva-landing/index.html",
+    "caterva-site",
     "landing",
     "src/web",
 )
@@ -76,7 +76,7 @@ LEGITIMATE_CONTEXTS: dict[str, str] = {
     "licence": "a sentence about licensing",
     "license": "a sentence about licensing",
     "University of Washington": (
-        "libRoadRunner's copyright holder -- an attribution Terrium is "
+        "libRoadRunner's copyright holder -- an attribution Caterva is "
         "obliged to make, and the opposite of a claimed endorsement"
     ),
     "not Tellurium": "the non-affiliation notice, which disclaims rather than claims",

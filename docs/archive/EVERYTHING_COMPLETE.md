@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-11):** "197+ PASSING" is unverified — a sibling same-day doc (`COMPLETE_GUIDE.md`) claims "178" for the same codebase snapshot; neither number traces to an actual captured test run. Real current suite: 17 test files, 249+ individual test blocks (grep lower bound) — run `npm test` for the true pass count. The API list omits `/api/compare`, which is a real route in `src/web/server.ts`. One of nine near-duplicate "complete" docs written the same session.
 
-# 🎉 Terrium: Complete & Production-Ready
+# 🎉 Caterva: Complete & Production-Ready
 
 **Status:** ✅ FULLY IMPLEMENTED, TESTED, AND DOCUMENTED  
 **Build:** ✅ SUCCESS (0 errors, 0 warnings)  
@@ -40,7 +40,7 @@
 
 ### Start the System
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 ```
 
@@ -78,7 +78,7 @@ curl -X POST http://localhost:3000/api/batch \
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       TERRIUM PLATFORM                       │
+│                       CATERVA PLATFORM                       │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
 │  ┌───────────────────────────────────────────────────────┐  │
@@ -106,7 +106,7 @@ curl -X POST http://localhost:3000/api/batch \
 │  │  2. Literature Verification (PubMed + CrossRef)       │  │
 │  │  3. Model Selection (4 kinetic models)                │  │
 │  │  4. SBML Generation (complete MathML)                 │  │
-│  │  5. Terium Execution (libroadrunner)               │  │
+│  │  5. Caterva Execution (libroadrunner)               │  │
 │  │  6. Result Validation (confidence scoring)            │  │
 │  └───────────────────────────────────────────────────────┘  │
 │                          ↓                                    │
@@ -114,7 +114,7 @@ curl -X POST http://localhost:3000/api/batch \
 │  │  PERSISTENCE LAYER                                    │  │
 │  ├───────────────────────────────────────────────────────┤  │
 │  │  • In-memory cache (fast access)                      │  │
-│  │  • File-based storage (terrium-jobs.jsonl)            │  │
+│  │  • File-based storage (caterva-jobs.jsonl)            │  │
 │  │  • History queryable (status, time, model)            │  │
 │  │  • Statistics aggregated                              │  │
 │  └───────────────────────────────────────────────────────┘  │
@@ -172,7 +172,7 @@ GET    /                  Web dashboard
 - Cleared on restart
 
 ### Persistent (Survives Restarts)
-- All completed jobs (terrium-jobs.jsonl)
+- All completed jobs (caterva-jobs.jsonl)
 - Job statistics
 - Historical data
 - Queryable by status, time, model type
@@ -303,8 +303,8 @@ npm run web:start
 
 ### Docker Container
 ```bash
-docker build -t terrium .
-docker run -p 3000:3000 terrium
+docker build -t caterva .
+docker run -p 3000:3000 caterva
 # Self-contained, portable
 # Good for deployment
 ```
@@ -319,7 +319,7 @@ docker run -p 3000:3000 terrium
 
 ### Kubernetes
 ```bash
-kubectl apply -f terrium-deployment.yaml
+kubectl apply -f caterva-deployment.yaml
 # Production-grade scaling
 # High availability
 # Auto-restart on failure
@@ -420,7 +420,7 @@ curl http://localhost:3000/api/health  # Check system
 - API is fully RESTful (no special libraries needed)
 - All responses are JSON
 - Use progress callbacks for long-running jobs
-- Jobs persist in terrium-jobs.jsonl (queryable)
+- Jobs persist in caterva-jobs.jsonl (queryable)
 
 ### For DevOps
 - Stateless design (can run multiple instances)
@@ -441,7 +441,7 @@ You have built a **complete, production-ready scientific simulation platform** t
 ✅ Persists history across restarts  
 ✅ Provides real-time progress tracking  
 ✅ Generates valid SBML models  
-✅ Runs industry-standard Terium kinetics  
+✅ Runs industry-standard Caterva kinetics  
 ✅ Integrates real scientific literature  
 ✅ Has zero security vulnerabilities  
 ✅ Is fully tested and documented  
@@ -453,7 +453,7 @@ You have built a **complete, production-ready scientific simulation platform** t
 
 ### Start Using It Today
 ```bash
-cd /Users/smyan/Desktop/Coding/Terrium
+cd /Users/smyan/Desktop/Coding/Caterva
 npm run web:start
 # Open http://localhost:3000
 ```
@@ -477,4 +477,4 @@ npm run web:start
 
 ---
 
-*Terrium: Making enzyme kinetics research faster, easier, and more scientific.*
+*Caterva: Making enzyme kinetics research faster, easier, and more scientific.*

@@ -1,4 +1,4 @@
-# Terrium runtime dependencies.
+# Caterva runtime dependencies.
 # Pinned to versions verified working together on 2026-07-22.
 #
 # Python 3.10-3.13 is required.
@@ -25,7 +25,7 @@
 # --- Simulation engines (Tier 2 ODE domains) -------------------------------
 # NOTE: do NOT `pip install tellurium`. The umbrella package pulls in
 # python-libcombine and python-libnuml, which are only needed for COMBINE
-# archives and numerical markup -- neither of which Terrium uses. On any
+# archives and numerical markup -- neither of which Caterva uses. On any
 # platform without prebuilt wheels for them, that install fails at the cmake
 # step. These three packages are the parts that actually do the work.
 #
@@ -65,7 +65,7 @@ pydantic==2.13.4
 # installed by default, and that is a licence decision rather than a
 # packaging preference.
 #
-# stdpopsim is GPL-3.0-or-later. Terrium is Apache-2.0. Those licences are
+# stdpopsim is GPL-3.0-or-later. Caterva is Apache-2.0. Those licences are
 # compatible in one direction only: Apache-2.0 code may be taken into a
 # GPLv3 work, but GPLv3 code cannot be folded into a work distributed under
 # Apache-2.0 without the combination becoming GPLv3. Listing it here made

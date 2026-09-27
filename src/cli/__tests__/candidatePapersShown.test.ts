@@ -121,7 +121,7 @@ describe('candidate papers are shown, not discarded', () => {
     expect(out).not.toContain('returned nothing');
   });
 
-  it('says Terrium did not read a number out of them', async () => {
+  it('says Caterva did not read a number out of them', async () => {
     const out = await render(PAPERS);
     expect(out).toMatch(/does not read numbers out of full text/i);
   });

@@ -10,7 +10,7 @@ Azure Databricks is a managed Apache Spark platform. It exists for
 distributed processing of data too large for one machine: ETL over
 terabytes, large-scale ML training, lakehouse analytics.
 
-Terrium has no such workload. It is a Python simulation engine plus a
+Caterva has no such workload. It is a Python simulation engine plus a
 TypeScript library and API. Its largest data artefact is a 14 MB git
 repository. Its heaviest computation — a 125-particle molecular dynamics
 run — takes about eleven seconds on a laptop. There is no dataset to
@@ -76,7 +76,7 @@ under a day. That question is where new contributors are lost.
 There are two things it would genuinely buy you, neither of which is
 Databricks:
 
-**Azure Static Web Apps** — free tier, hosts `mule/` and `terrium-site/`
+**Azure Static Web Apps** — free tier, hosts `mule/` and `caterva-site/`
 with automatic deploys from GitHub. Currently the sites have no host at
 all. This is the one worth doing.
 
@@ -84,7 +84,7 @@ all. This is the one worth doing.
 with a school email. Worth having regardless; it covers the above with room
 to spare.
 
-A database is premature. Terrium currently persists job history to a local
+A database is premature. Caterva currently persists job history to a local
 JSON-lines file (`src/storage/job-database.ts`). Nothing needs a server
 until multiple people share state, and no feature currently does.
 

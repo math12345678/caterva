@@ -14,7 +14,7 @@
  *    simply mix these together, the simulation will end up calculating with
  *    'fantasy numbers'."
  *
- * A competitive-inhibition model needs a Km AND a Ki. Terrium resolves them
+ * A competitive-inhibition model needs a Km AND a Ki. Caterva resolves them
  * with two independent lookups — separate runner calls, separate sources,
  * separate citations — precisely so that a cross-species Ki can never borrow
  * a verified Km's provenance (ADR 0008). That independence is correct, and
@@ -79,7 +79,7 @@
  *
  * Bakker's own answer is the argument against blocking: she does not exclude
  * anything a priori, and rejects at the level of the whole model after
- * validating against measured flux data. Terrium has no flux data to reject
+ * validating against measured flux data. Caterva has no flux data to reject
  * against. Reporting the incoherence and naming it is what is left, and it
  * is considerably more than saying nothing.
  */
@@ -601,7 +601,7 @@ export function assessCoherence(
       "true of the same enzyme at the same time, so the model combines " +
       "measurements from experiments that were never run together. Whether " +
       "that matters depends on how strongly this enzyme responds to pH and " +
-      "temperature, which Terrium does not know and does not guess.",
+      "temperature, which Caterva does not know and does not guess.",
     comparedKeys,
     excluded,
     spread,

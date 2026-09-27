@@ -1,4 +1,4 @@
-"""Guard: every scientific number in Terrium must declare its provenance.
+"""Guard: every scientific number in Caterva must declare its provenance.
 
 The project's central claim is that nothing is hardcoded and everything is
 backed by literature. That claim was, until this guard existed,

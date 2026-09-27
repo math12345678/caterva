@@ -7,7 +7,7 @@
  * capability is real and invisible in that measurement.
  *
  * This is the case where it shows: the caller supplies the one quantity
- * Terrium looks up, and the one it does not look up is settled by the words.
+ * Caterva looks up, and the one it does not look up is settled by the words.
  * Without this file the mechanism would be correct, tested at unit level, and
  * unable to demonstrate that it does anything to a user.
  */

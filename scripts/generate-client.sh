@@ -15,12 +15,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 OPENAPI_FILE="$PROJECT_ROOT/openapi.yaml"
-OPENAPI_URL="${TERRIUM_URL:-http://localhost:3000}/api/openapi.json"
+OPENAPI_URL="${CATERVA_URL:-http://localhost:3000}/api/openapi.json"
 
 # Parse arguments
 LANGUAGE="${1:-typescript}"
 OUTPUT_DIR="${2:-./generated-client-$LANGUAGE}"
-PACKAGE_NAME="${3:-terrium-client}"
+PACKAGE_NAME="${3:-caterva-client}"
 PACKAGE_VERSION="${4:-1.0.0}"
 
 # Map language to generator
@@ -117,7 +117,7 @@ case $LANGUAGE in
   go)
     echo "📚 Go Setup:"
     echo "   cd $OUTPUT_DIR"
-    echo "   go mod init github.com/yourusername/terrium-client"
+    echo "   go mod init github.com/yourusername/caterva-client"
     echo "   go build ./..."
     echo ""
     echo "📖 Usage:"
@@ -140,7 +140,7 @@ case $LANGUAGE in
     echo "   mvn clean package"
     echo ""
     echo "📖 Usage:"
-    echo "   import com.terrium.client.api.DefaultApi;"
+    echo "   import com.caterva.client.api.DefaultApi;"
     echo "   DefaultApi api = new DefaultApi();"
     echo "   Job job = api.simulate(request);"
     ;;

@@ -113,7 +113,7 @@ EXIT_CANNOT_ANSWER = 2
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 #: Env var holding an override for where the ledger lives.
-LEDGER_PATH_ENV_VAR = "TERRIUM_LLM_QUOTA_LEDGER"
+LEDGER_PATH_ENV_VAR = "CATERVA_LLM_QUOTA_LEDGER"
 
 #: A configured value shorter than this is not used for scrubbing output.
 #:
@@ -456,7 +456,7 @@ def default_ledger_path(environ: Mapping[str, str]) -> Path:
         return Path(override).expanduser()
     cache = str(environ.get("XDG_CACHE_HOME", "") or "").strip()
     base = Path(cache).expanduser() if cache else Path.home() / ".cache"
-    return base / "terrium" / "llm-quota.json"
+    return base / "caterva" / "llm-quota.json"
 
 
 def key_lines(ledger: Ledger) -> List[str]:
@@ -482,7 +482,7 @@ def human_report(
     probe_reports: Optional[Sequence[ProbeReport]] = None,
     reset_note: str = "",
 ) -> str:
-    lines: List[str] = ["Terrium LLM waterfall -- status"]
+    lines: List[str] = ["Caterva LLM waterfall -- status"]
     lines.append(f"account: {ACCOUNT_EMAIL}")
     lines.append(f"ledger:  {ledger.path if ledger.path else '(none -- in memory)'}")
     if getattr(ledger, "corrupt_reason", None):
@@ -617,7 +617,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="status",
         description=(
-            "Report the state of Terrium's LLM provider waterfall. Exits 0 "
+            "Report the state of Caterva's LLM provider waterfall. Exits 0 "
             "when at least one provider is available or unknown, 1 when every "
             "provider is exhausted or has no key, 2 when the question could "
             "not be answered."

@@ -10,7 +10,7 @@ the suite is simply never run. Three consecutive verification passes have
 had to report it as "not verified", which is honest and is not a substitute
 for verifying it.
 
-This stub is pointed at by `TERRIUM_LITERATURE_RUNNER`, a seam that already
+This stub is pointed at by `CATERVA_LITERATURE_RUNNER`, a seam that already
 existed for exactly this purpose. It exercises the REAL subprocess path --
 spawn, stdin, exit code, stdout parsing -- against canned JSON.
 

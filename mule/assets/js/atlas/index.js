@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — atlas controller
+   caterva — atlas controller
 
    Owns interaction and state. Reads topology from config/atlas.js,
    shapes from atlas/render.js, framing from atlas/camera.js.
@@ -535,7 +535,7 @@ export class Atlas {
   showFailures() {
     const token = this.runToken;
     this.camera.goLevel('layers');
-    this.log('SHOWING FAILURE PATHS / HOW TERRIUM DECLINES', { hold: true });
+    this.log('SHOWING FAILURE PATHS / HOW CATERVA DECLINES', { hold: true });
     this.announce(
       'Failure paths shown. Five ways the system declines safely: ' +
       FAILURES.map((f) => `${f.word}, ${f.consequence}`).join(' ')

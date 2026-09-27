@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.10 is the floor Terrium supports; 3.13 is the ceiling. Testing
+        # 3.10 is the floor Caterva supports; 3.13 is the ceiling. Testing
         # across the window catches version drift before it reaches anyone's
         # laptop; the 3.10 job also guards the libroadrunner==2.8.0 floor.
         python-version: ["3.10", "3.12", "3.13"]
@@ -113,7 +113,7 @@ jobs:
       - name: Split-repo legal files guard
         run: python scripts/check_split_repo_legal_files.py
 
-      # No published document may claim Terrium is built on Tellurium while
+      # No published document may claim Caterva is built on Tellurium while
       # NOTICE says it is not. Reads .docx/.pptx, because that is where two
       # such claims sat unread through twenty-five audits.
       - name: Tellurium integration-claim guard (self-check)
@@ -127,7 +127,7 @@ jobs:
       - name: Non-affiliation notice guard
         run: python scripts/check_non_affiliation_notice.py
 
-      # `import Terrium` is always wrong -- the package is `Terium`.
+      # `import Caterva` is always wrong -- the package is `caterva`.
       - name: Package-spelling guard (self-check)
         run: python scripts/check_package_spelling.py --selftest
 
@@ -182,7 +182,7 @@ jobs:
       - name: CI-toolchain guard
         run: python scripts/check_ci_toolchain.py
 
-      # Publishing a build artifact changes Terrium's licence
+      # Publishing a build artifact changes Caterva's licence
       # obligations. Nothing publishes today, which is the whole reason the
       # LGPL/GPL terms of the dependencies impose nothing -- so the day that
       # changes must not be silent.
@@ -196,7 +196,7 @@ jobs:
       # the first thing a newcomer reads and is almost entirely links; a dead
       # one tells them, before they have written a line, that this project's
       # claims about checking things are decoration. Written after
-      # Terium/README.md shipped a confident, plausible, wrong path to
+      # caterva/README.md shipped a confident, plausible, wrong path to
       # ADR 0001.
       - name: Doc-links guard (self-check)
         run: python scripts/check_doc_links.py --selftest
@@ -258,7 +258,7 @@ jobs:
         run: python scripts/verify_build.py --quick --no-typescript
 
       - name: Simulation engine tests
-        working-directory: Terium
+        working-directory: Caterva
         run: python -m pytest -v
 
       - name: Literature layer tests

@@ -23,7 +23,7 @@
       "id": "C1",
       "description": "comparison_key ignores presence -- the motivating pair collapses",
       "_claimed": "3 failed",
-      "_note": "THE defect this module exists for. 'in the presence of FBP' and 'in the absence of FBP' are two arms of one designed experiment; a key that drops presence makes them the same condition and Terrium silently returns one arm.",
+      "_note": "THE defect this module exists for. 'in the presence of FBP' and 'in the absence of FBP' are two arms of one designed experiment; a key that drops presence makes them the same condition and Caterva silently returns one arm.",
       "file": "Tests/effector.py",
       "find": "            return (self.identity.parent_cid, self.presence)\n        return (self.compound_text.strip().lower(), self.presence)",
       "replace": "            return (self.identity.parent_cid, \"\")\n        return (self.compound_text.strip().lower(), \"\")"

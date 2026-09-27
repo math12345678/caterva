@@ -1,6 +1,6 @@
 > **⚠️ CORRECTION (2026-08-10):** the "178 tests passing" and specific coverage percentages (84.04%/86.25%/85.01%/66.24%) cited in this guide are a stale snapshot — the suite has grown since (17 test files at last count, up from 11) and coverage moves with it. Run `npm test` / `npm run test:coverage` from repo root for the current numbers rather than citing these. CLI command names and class names (`ScientificPipeline`, `LiteratureService`, etc.) were verified as real. This doc is a near-duplicate of `BUILD_COMPLETE_SUMMARY.md`, `COMPLETE_BUILD_REPORT.md`, `FINAL_STATUS.txt`, and `IMPLEMENTATION_COMPLETE.md`.
 
-# TERRIUM Scientific Validation Framework
+# CATERVA Scientific Validation Framework
 ## Complete User Manual & API Documentation
 
 ---
@@ -42,7 +42,7 @@ This runs a complete enzyme kinetics simulation with full 4-layer scientific val
 
 ### System Overview
 
-Terrium validates enzyme kinetics simulations through **4 scientific layers**:
+Caterva validates enzyme kinetics simulations through **4 scientific layers**:
 
 1. **Layer 1: Parameter Validation** - Ranges, units, data types
 2. **Layer 2: Literature Verification** - DOI/PMID checks against CrossRef/PubMed
@@ -208,7 +208,7 @@ const profile = await profileSimulation(
 
 ## Kinetic Models Reference
 
-Terrium supports 5 advanced kinetic models.
+Caterva supports 5 advanced kinetic models.
 
 ### Classic Michaelis-Menten
 
@@ -339,20 +339,20 @@ const result = await ScientificValidationPipeline.validate(
 
 ### Environment Configuration
 
-**TERRIUM_SKIP_DOI_VERIFICATION=1**
+**CATERVA_SKIP_DOI_VERIFICATION=1**
 
 Enable offline mode (skip network DOI verification). Maintains peer-review and format validation.
 
 ```bash
-TERRIUM_SKIP_DOI_VERIFICATION=1 npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
+CATERVA_SKIP_DOI_VERIFICATION=1 npm run cli -- simulate "michaelis-menten" --km 5.2 --vmax 12.8 --s0 10
 ```
 
-**TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1**
+**CATERVA_ALLOW_UNVERIFIED_CITATIONS=1**
 
 Accept unverified citations when network unavailable (network failures only, not rejected DOIs).
 
 ```bash
-TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1 npm test
+CATERVA_ALLOW_UNVERIFIED_CITATIONS=1 npm test
 ```
 
 ### Build and Deploy
@@ -381,13 +381,13 @@ Deploy `dist/` folder or run with ts-node directly.
 
 **Problem:** CLI fails during literature verification
 
-**Solution:** Set `TERRIUM_SKIP_DOI_VERIFICATION=1` for offline mode
+**Solution:** Set `CATERVA_SKIP_DOI_VERIFICATION=1` for offline mode
 
 ### "Network unreachable"
 
 **Problem:** DOI verification fails due to network issues
 
-**Solution:** System automatically falls back to built-in literature. Set `TERRIUM_ALLOW_UNVERIFIED_CITATIONS=1` if needed.
+**Solution:** System automatically falls back to built-in literature. Set `CATERVA_ALLOW_UNVERIFIED_CITATIONS=1` if needed.
 
 ### Test failures
 

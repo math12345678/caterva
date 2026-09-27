@@ -1,4 +1,4 @@
-# Terrium HTTP API
+# Caterva HTTP API
 
 Every endpoint below is registered by the server. This file is checked by
 `scripts/check_example_endpoints.py`, which resolves each path against the

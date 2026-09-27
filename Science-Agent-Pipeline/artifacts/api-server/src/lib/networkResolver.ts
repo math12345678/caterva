@@ -16,7 +16,7 @@
  *
  *   - STRUCTURE (species, reactions, rate laws, rate rules) comes from the
  *     model and is checked against the network that owns it by
- *     `Terium/core/network.py`.
+ *     `caterva/core/network.py`.
  *   - NUMBERS come from the person asking or from literature. A value the
  *     model emits that the user did not state is dropped, and the quantity
  *     is reported as needed.
@@ -257,12 +257,12 @@ export function describeWhatIsNeeded(resolved: ResolvedNetwork): string {
   const { needed, network } = resolved;
   if (needed.length === 0) return "";
   return (
-    `Terrium built a model of this system -- ${network.species.length} ` +
+    `Caterva built a model of this system -- ${network.species.length} ` +
     `species, ${network.reactions.length} reaction(s) -- but will not run ` +
     `it until every number in it has a source. ` +
     `${needed.length} quantit${needed.length === 1 ? "y is" : "ies are"} ` +
     `still unknown: ${needed.join(", ")}. ` +
-    `Supply them in your query, or resolve them from literature. Terrium ` +
+    `Supply them in your query, or resolve them from literature. Caterva ` +
     `does not fill them in: a value nobody measured, plotted next to values ` +
     `somebody did, is the thing this tool exists to refuse.`
   );

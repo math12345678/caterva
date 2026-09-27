@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { SimulationDomain } from "./teriumRunner";
+import type { SimulationDomain } from "./catervaRunner";
 import { resolveQueryWithLLM, type EntityExtraction } from "./llmResolver";
 import {
   coherenceFromProvenance,
@@ -137,7 +137,7 @@ function selectedFormFlags(
  * reads, and the cap is stated rather than silently truncating.
  */
 /**
- * The papers Terrium found and then threw away.
+ * The papers Caterva found and then threw away.
  *
  * WHEN BRENDA HAS NOTHING, the resolver does not stop. It searches PubMed
  * and CORE, and when that turns up papers it returns
@@ -192,7 +192,7 @@ function literatureCandidateNote(
       : "";
 
   return (
-    `Terrium found ${candidates.length} candidate paper(s) that may report ` +
+    `Caterva found ${candidates.length} candidate paper(s) that may report ` +
     `${K}. It does not extract numbers from full text, so these are for you ` +
     `to read rather than a value it will use: ${listed}${more}. ` +
     // THE INSTRUCTION, RESTATED, BECAUSE PROMOTING A NOTE DROPS IT.
@@ -578,7 +578,7 @@ function buildUnresolvedKineticProvenance(
         `No ${K} was found for the substrate you named, but this enzyme ` +
         `reports ${K} values for: ${substratesAvailable.join(", ")}. ` +
         `Substrate names differ between databases and papers, so the one ` +
-        `you meant may be spelled differently above. Terrium does not ` +
+        `you meant may be spelled differently above. Caterva does not ` +
         `substitute one substrate for another — a similar name can be a ` +
         `salt, a stereoisomer or an ester, which is a different molecule — ` +
         `so re-run with the name you meant.`,
@@ -703,7 +703,7 @@ async function applyKineticResolution(
       // precisely this reasoning: telling a user the literature has
       // nothing, when it has something they could have had, is the
       // true-sounding-and-misleading shape treated as a defect everywhere
-      // else here. Terrium holding papers it does not mention is that
+      // else here. Caterva holding papers it does not mention is that
       // sentence again.
       const offer = literatureCandidateNote(
         key,
@@ -877,7 +877,7 @@ async function applyVmaxFromKcatResolution(
           note:
             "Vmax is not a property of the enzyme on its own — it is " +
             "kcat × [E]0, so it depends on how much enzyme is in YOUR " +
-            "assay. Terrium resolves kcat from literature, but [E]0 is " +
+            "assay. Caterva resolves kcat from literature, but [E]0 is " +
             "your experimental choice and is never guessed (ADR 0013). " +
             "State the enzyme concentration — e.g. \"with 50 nM enzyme\" " +
             "or enzyme_conc=0.00005 (mM) — and Vmax is derived and cited " +
@@ -1091,7 +1091,7 @@ async function applyBetaGammaFromR0Resolution(
     // promise applied to its own gaps.
     const measlesAsked = /\bmeasles\b/i.test(query);
     const note =
-      "No disease name in this query matches Terrium's literature-backed " +
+      "No disease name in this query matches Caterva's literature-backed " +
       "R0 registry (currently COVID-19, seasonal influenza, and influenza " +
       "A(H1N1)pdm09 -- see ADR 0017 and ADR 0169). This is a gap in what " +
       "this system has verified so far, not a statement that the " +
@@ -2748,7 +2748,7 @@ export async function resolveQuery(
             ? [
                 ...flags,
                 `discarded_unverified_model_citation: the language model ` +
-                  `offered ${discardedLlmCitations} reference(s). Terrium ` +
+                  `offered ${discardedLlmCitations} reference(s). Caterva ` +
                   `cites only the curated domain literature, because ` +
                   `nothing has checked that those references exist or say ` +
                   `what the model claims.`,

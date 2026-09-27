@@ -1,13 +1,13 @@
 #!/bin/bash
-# Terrium Web Server Startup Script
+# Caterva Web Server Startup Script
 
 set -e
 
-echo "📦 Building Terrium..."
+echo "📦 Building Caterva..."
 npm run build
 
 echo ""
-echo "🚀 Starting Terrium Web Server..."
+echo "🚀 Starting Caterva Web Server..."
 echo ""
 
 node dist/src/web/server.js

@@ -40,18 +40,18 @@ const BASE: LiteratureReference = {
 const REAL_DOI = '10.1073/pnas.88.16.7328';
 const FABRICATED_DOI = '10.9999/completely-made-up';
 
-const originalOptIn = process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'];
+const originalOptIn = process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'];
 
 beforeEach(() => {
   LiteratureVerifier.resetRegistryCache();
-  delete process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'];
+  delete process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'];
 });
 
 afterAll(() => {
   if (originalOptIn === undefined) {
-    delete process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'];
+    delete process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'];
   } else {
-    process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'] = originalOptIn;
+    process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'] = originalOptIn;
   }
 });
 
@@ -74,7 +74,7 @@ describe('a registry that answers "no" is a rejection, not a network problem', (
     // offline does not require editing the source -- the pressure that
     // caused both regressions. It must not rescue a fabricated citation.
     LiteratureVerifier.primeRegistryCache(`doi:${FABRICATED_DOI}`, false);
-    process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'] = '1';
+    process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'] = '1';
 
     return LiteratureVerifier.verifyReference({
       ...BASE,
@@ -132,12 +132,12 @@ describe('a reference with no identifier is unverified, not verified', () => {
   });
 
   it('is accepted only under the explicit opt-in', async () => {
-    process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'] = '1';
+    process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'] = '1';
     expect(await LiteratureVerifier.verifyReference(BASE)).toBe(true);
   });
 });
 
-describe('offline mode: TERRIUM_SKIP_DOI_VERIFICATION', () => {
+describe('offline mode: CATERVA_SKIP_DOI_VERIFICATION', () => {
   // Skipping the registry lookup is a legitimate need -- an offline
   // laptop, CI without egress, a sandbox that 403s CrossRef. What it must
   // never do is call the result VERIFIED.
@@ -152,18 +152,18 @@ describe('offline mode: TERRIUM_SKIP_DOI_VERIFICATION', () => {
   //
   // Skipping a check yields UNVERIFIED. That is the entire reason the
   // third state exists.
-  const originalSkipDoi = process.env['TERRIUM_SKIP_DOI_VERIFICATION'];
+  const originalSkipDoi = process.env['CATERVA_SKIP_DOI_VERIFICATION'];
 
   beforeEach(() => {
-    process.env['TERRIUM_SKIP_DOI_VERIFICATION'] = '1';
+    process.env['CATERVA_SKIP_DOI_VERIFICATION'] = '1';
     LiteratureVerifier.resetRegistryCache();
   });
 
   afterEach(() => {
     if (originalSkipDoi === undefined) {
-      delete process.env['TERRIUM_SKIP_DOI_VERIFICATION'];
+      delete process.env['CATERVA_SKIP_DOI_VERIFICATION'];
     } else {
-      process.env['TERRIUM_SKIP_DOI_VERIFICATION'] = originalSkipDoi;
+      process.env['CATERVA_SKIP_DOI_VERIFICATION'] = originalSkipDoi;
     }
   });
 
@@ -217,17 +217,17 @@ describe('offline mode: TERRIUM_SKIP_DOI_VERIFICATION', () => {
     // The two variables compose: skip the lookup, then decide separately
     // what an unlooked-up citation is worth. Skipping alone does not make
     // it acceptable.
-    delete process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'];
+    delete process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'];
     expect(
       await LiteratureVerifier.verifyReference({ ...BASE, doi: FABRICATED_DOI })
     ).toBe(false);
   });
 
   it('is accepted only when the caller also opts in to unverified citations', async () => {
-    process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'] = '1';
+    process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'] = '1';
     expect(
       await LiteratureVerifier.verifyReference({ ...BASE, doi: FABRICATED_DOI })
     ).toBe(true);
-    delete process.env['TERRIUM_ALLOW_UNVERIFIED_CITATIONS'];
+    delete process.env['CATERVA_ALLOW_UNVERIFIED_CITATIONS'];
   });
 });

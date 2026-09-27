@@ -1,8 +1,8 @@
-"""No published document may claim Terrium is built on Tellurium.
+"""No published document may claim Caterva is built on Tellurium.
 
 WHAT THIS COMES FROM
 --------------------
-`NOTICE` and `README.md` state that Terrium is unaffiliated with Tellurium
+`NOTICE` and `README.md` state that Caterva is unaffiliated with Tellurium
 and does not depend on it. `scripts/check_no_tellurium_integration_claims.py`
 exists so no other published file can say otherwise while those stand.
 
@@ -14,7 +14,7 @@ THE FALSE POSITIVE
 `docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md` is the remediation plan for the
 offending `.docx` files. Its inventory reads:
 
-    Docw/terrium_full.docx     also: claims "Tellurium integration"
+    Docw/caterva_full.docx     also: claims "Tellurium integration"
 
 The guard matched `tellurium integration`, found no denial word in the
 line, and failed the build. **The document planning the cleanup was the one
@@ -53,7 +53,7 @@ def test_no_published_document_claims_tellurium_integration() -> None:
 
 
 def test_the_matcher_still_fires_on_a_real_claim() -> None:
-    """Verbatim from `Docw/terrium_spec.docx`, the document that started this."""
+    """Verbatim from `Docw/caterva_spec.docx`, the document that started this."""
     for sentence in (
         "plots render using the Tellurium toolkit",
         "Tellurium integration, file handling",
@@ -67,8 +67,8 @@ def test_the_matcher_still_fires_on_a_real_claim() -> None:
 def test_the_notice_itself_is_not_a_claim() -> None:
     """`NOTICE` says the opposite and must never trip this."""
     for sentence in (
-        "Terrium is not built on Tellurium",
-        "Terrium is unaffiliated with Tellurium",
+        "Caterva is not built on Tellurium",
+        "Caterva is unaffiliated with Tellurium",
         "does not depend on the tellurium package",
         "uses libroadrunner directly rather than Tellurium",
     ):
@@ -86,10 +86,10 @@ def test_each_denial_word_carries_its_own_weight() -> None:
     A test whose inputs are over-specified proves less than it appears to.
     """
     only_not = {
-        "not": "Terrium was not, and will not be, a Tellurium product",
-        "never": "Terrium has never shipped a Tellurium dependency",
-        "unaffiliated": "Terrium: unaffiliated, separate project, separate authors",
-        "without": "Terrium runs without Tellurium",
+        "not": "Caterva was not, and will not be, a Tellurium product",
+        "never": "Caterva has never shipped a Tellurium dependency",
+        "unaffiliated": "Caterva: unaffiliated, separate project, separate authors",
+        "without": "Caterva runs without Tellurium",
     }
     for marker, sentence in only_not.items():
         assert guard.DENIAL.search(sentence), (
@@ -147,8 +147,8 @@ def test_the_exempt_set_cannot_grow_quietly() -> None:
         "docs/REMOVE_CONFIDENTIAL_FROM_HISTORY.md",
     }, "the DISCUSSES set changed; confirm each entry quotes rather than claims"
     assert set(guard.HISTORICAL) == {
-        "Docw/terrium_spec.docx",
-        "Docw/terrium_full.docx",
+        "Docw/caterva_spec.docx",
+        "Docw/caterva_full.docx",
     }, "the HISTORICAL set changed; confirm each is a dated record, not live copy"
 
 

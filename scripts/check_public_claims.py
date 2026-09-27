@@ -12,14 +12,14 @@ four claims had drifted:
     substeps, no error estimate and no step rejection. It is fixed-step.
   * The FAQ said **"304+ tests"**. The real figure is over 1,800.
   * The FAQ listed PCR, Monte Carlo, population genetics and molecular
-    dynamics as **"Planned"**. All four ship in `Terium/discrete/`.
+    dynamics as **"Planned"**. All four ship in `caterva/discrete/`.
   * The FAQ said every simulation is validated **"to 1e-10 tolerance"**.
     The suite ranges from 1e-10 down to 1e-4 depending on the domain; the
     tightest case was being stated as the general one.
 
 Only the third of those flattered the product. That is the point: this is
 not a check against exaggeration, it is a check against *unverified*
-claims, and three of the four made Terrium look worse than it is. A number
+claims, and three of the four made Caterva look worse than it is. A number
 nobody checks drifts in whichever direction the edit happened to go.
 
 WHAT THIS CHECKS
@@ -51,14 +51,14 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 _MIN_FILES = 10
 
 PUBLIC_TREES: tuple[str, ...] = (
-    "Science-Agent-Pipeline/artifacts/terrium-landing/src",
-    "Science-Agent-Pipeline/artifacts/terrium-landing/index.html",
-    "terrium-site/src",
+    "Science-Agent-Pipeline/artifacts/caterva-landing/src",
+    "Science-Agent-Pipeline/artifacts/caterva-landing/index.html",
+    "caterva-site/src",
     "landing",
 )
 
 SIMULATE_TS = (
-    ROOT / "Science-Agent-Pipeline" / "artifacts" / "terrium-landing"
+    ROOT / "Science-Agent-Pipeline" / "artifacts" / "caterva-landing"
     / "src" / "lib" / "simulate.ts"
 )
 
@@ -82,15 +82,15 @@ def _integrator_is_fixed_step() -> tuple[bool, str]:
 def _four_domains_are_built() -> tuple[bool, str]:
     """True while PCR, Monte Carlo, popgen and MD exist in the engine."""
     paths = {
-        "PCR": ROOT / "Terium" / "discrete" / "pcr.py",
-        "Monte Carlo": ROOT / "Terium" / "discrete" / "monte_carlo.py",
-        "population genetics": ROOT / "Terium" / "discrete" / "population_genetics",
-        "molecular dynamics": ROOT / "Terium" / "discrete" / "molecular_dynamics.py",
+        "PCR": ROOT / "caterva" / "discrete" / "pcr.py",
+        "Monte Carlo": ROOT / "caterva" / "discrete" / "monte_carlo.py",
+        "population genetics": ROOT / "caterva" / "discrete" / "population_genetics",
+        "molecular dynamics": ROOT / "caterva" / "discrete" / "molecular_dynamics.py",
     }
     missing = [name for name, path in paths.items() if not path.exists()]
     if missing:
         return False, f"these are no longer built: {missing}; 'Planned' may be right again"
-    return True, "all four exist under Terium/discrete/"
+    return True, "all four exist under caterva/discrete/"
 
 
 #: forbidden phrase -> (why it is wrong, predicate re-deriving that from code)
@@ -106,7 +106,7 @@ CLAIMS: dict[str, tuple[str, Callable[[], tuple[bool, str]]]] = {
     ),
     "Planned: PCR": (
         "PCR, Monte Carlo, population genetics and molecular dynamics all "
-        "ship in Terium/discrete/ -- listing them as planned understates the "
+        "ship in caterva/discrete/ -- listing them as planned understates the "
         "product and is simply out of date",
         _four_domains_are_built,
     ),
@@ -196,7 +196,7 @@ def main() -> int:
             print(f"  {problem}")
         print(
             "\nFix the page, or fix the code and remove the entry from CLAIMS. "
-            "Three of the\nfour original defects made Terrium look WORSE than "
+            "Three of the\nfour original defects made Caterva look WORSE than "
             "it is -- an unchecked number\ndrifts whichever way the edit went."
         )
         return 1

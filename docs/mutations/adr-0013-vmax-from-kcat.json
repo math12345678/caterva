@@ -14,16 +14,16 @@
     "",
     "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0013-vmax-from-kcat.json",
     "",
-    "NOTE ON THE TEST COMMAND: `-q` is deliberately absent. Terium/pytest.ini suppresses the summary line under -q, so the harness could not count tests and refused to run -- correctly reporting that every verdict would be meaningless rather than guessing. That refusal is the harness working: a silent `0 total` read as `0 failed` is one of the three ways hand-run mutations were wrong before ADR 0069."
+    "NOTE ON THE TEST COMMAND: `-q` is deliberately absent. caterva/pytest.ini suppresses the summary line under -q, so the harness could not count tests and refused to run -- correctly reporting that every verdict would be meaningless rather than guessing. That refusal is the harness working: a silent `0 total` read as `0 failed` is one of the three ways hand-run mutations were wrong before ADR 0069."
   ],
-  "test": "cd Terium && python3 -m pytest tests/test_vmax_from_kcat.py --no-header -p no:cacheprovider",
+  "test": "cd Caterva && python3 -m pytest tests/test_vmax_from_kcat.py --no-header -p no:cacheprovider",
   "mutations": [
     {
       "id": "B1",
       "description": "`kcat * enzyme_conc` becomes `kcat + enzyme_conc`",
       "_claimed": "caught by the doubling-enzyme test",
       "_note": "The bridge itself. Addition is dimensionally meaningless -- 1/s plus mM -- and still returns a plausible-looking positive float, which is why a test that only checked 'a number came back' would pass.",
-      "file": "Terium/core/validation.py",
+      "file": "caterva/core/validation.py",
       "find": "    vmax = kcat * enzyme_conc",
       "replace": "    vmax = kcat + enzyme_conc"
     },
@@ -32,7 +32,7 @@
       "description": "the [E]0 << Km ratio check is disabled",
       "_claimed": "caught by the flag-boundary test",
       "_note": "Past this ratio the ES complex holds a non-negligible share of substrate and the curve is quantitatively wrong (the tight-binding regime this engine does not implement). Disabling the check does not change any number -- it removes the warning that the number is being stretched.",
-      "file": "Terium/core/validation.py",
+      "file": "caterva/core/validation.py",
       "find": "        if ratio > ENZYME_CONC_MM_RATIO_FLAG_ABOVE:",
       "replace": "        if False:"
     },
@@ -41,7 +41,7 @@
       "description": "a zero enzyme concentration is allowed through",
       "_claimed": "caught by the zero-enzyme rejection test",
       "_note": "[E]0 = 0 gives Vmax = 0: a model that provably cannot turn over. validate_michaelis_menten_params rejects it later, so catching it here is what names the real cause instead of reporting a downstream symptom.",
-      "file": "Terium/core/validation.py",
+      "file": "caterva/core/validation.py",
       "find": "    _finite_positive(enzyme_conc, \"enzyme_conc\", errors, allow_zero=False)",
       "replace": "    _finite_positive(enzyme_conc, \"enzyme_conc\", errors, allow_zero=True)"
     },
@@ -50,7 +50,7 @@
       "description": "the flag is collapsed into a rejection",
       "_claimed": "caught by the flag-boundary test",
       "_note": "The one ADR 0013 says matters most: the constitution names this violation explicitly -- 'do not collapse this distinction in either direction'. A stretched approximation still runs and still teaches something; refusing it and rejecting it are different answers to the student. The bare `v.flagged = True` occurs three times in this file, so the first spec was INDETERMINATE -- the harness refused to say which site it had changed rather than pick one. Extended with the flag_reason that is unique to the [E]0/Km ratio.",
-      "file": "Terium/core/validation.py",
+      "file": "caterva/core/validation.py",
       "find": "            v.flagged = True\n            v.flag_reason = (\n                f\"[E]0 {enzyme_conc:g} mM is {ratio:.3g}x Km ({km:g} mM); the \"",
       "replace": "            v.ok = False\n            v.flag_reason = (\n                f\"[E]0 {enzyme_conc:g} mM is {ratio:.3g}x Km ({km:g} mM); the \""
     }

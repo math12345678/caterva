@@ -5,7 +5,7 @@
 
 ## Context
 
-The owner asked for a test run of Terrium — both surfaces, CLI and web. Not
+The owner asked for a test run of Caterva — both surfaces, CLI and web. Not
 a code review. Running it.
 
 Every finding below comes from typing the commands a student would type,
@@ -50,9 +50,9 @@ usually the student with no network.
 **What that costs is recorded, not absorbed.** Organism relatedness is
 graded from an NCBI lineage; without it the axis is `not_assessed` — the
 honest third state, not a pass — and the document says so in its own *"What
-Terrium would not do"* section:
+Caterva would not do"* section:
 
-> Terrium did not verify the organism against NCBI Taxonomy or UniProt, and
+> Caterva did not verify the organism against NCBI Taxonomy or UniProt, and
 > ran no literature search: you supplied a saved BRENDA page with
 > `--fixture`, so this run made no network requests at all. Organism
 > relatedness is therefore NOT ASSESSED rather than matched.
@@ -85,7 +85,7 @@ Measured against `/api/simulate`:
 | `product-inhibition` | Validation failed |
 | `allosteric` | Validation failed |
 
-These are real Terrium domains; the query classifier does not know these
+These are real Caterva domains; the query classifier does not know these
 labels. **The classifier gap is not fixed here** — the four options are
 disabled and labelled, because offering a control that cannot work is the UI
 form of a check that cannot fail: it is trusted.

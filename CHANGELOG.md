@@ -2,7 +2,7 @@
 
 > **⚠️ CORRECTION (2026-08-12):** the `## Unreleased` section's counts are stale — the repo has moved well past the state they describe:
 > - **"11 guard scripts"**: running `python3 scripts/verify_build.py --quick` today shows the Guard Wiring Guard reporting **"all 22 guards run in at least one harness"** — 22 guards now exist, not 11.
-> - **"Engine test suite: 715 -> 883 tests"**: `python3 -m pytest --collect-only` in `Terium/` now collects **1,014** tests.
+> - **"Engine test suite: 715 -> 883 tests"**: `python3 -m pytest --collect-only` in `caterva/` now collects **1,014** tests.
 > - **"Literature test suite: 182 -> 214 tests"**: `Tests/` now collects **277** tests.
 > - **"TypeScript test suite: 111 -> 224 tests (16 files)"**: `Science-Agent-Pipeline/artifacts/api-server` now has **433** test cases across **32** `*.test.ts` files (`npx vitest list`).
 > This is ordinary changelog staleness (the Unreleased section wasn't updated as later work landed, and later work was logged in `OVERNIGHT_LOG.md` instead — see that file's own correction banner for the same underlying drift), not fabrication.
@@ -18,7 +18,7 @@ Nobody could tell what to type. The release worked and explained nothing,
 which is a product nobody adopts.
 
 ### Added
-- **`docs/USING_TERRIUM.md`**, the user's guide: the one rule that explains
+- **`docs/USING_CATERVA.md`**, the user's guide: the one rule that explains
   most refusals (it recognises a *shape*, never a *subject*), what to type
   in the first three minutes, how to read a report section by section, and
   a recipe for each question a lab actually asks -- which step matters
@@ -26,7 +26,7 @@ which is a product nobody adopts.
   survive not knowing the constants (`--robustness`), is it physically
   possible in and out (`--scale`, `--predictions`). Every command in it was
   executed before it was written down.
-- **`Terium/tests/test_using_terrium_guide.py`** pins the guide to the
+- **`caterva/tests/test_using_caterva_guide.py`** pins the guide to the
   code: every flag it names must exist in the parser, every shape must be
   recognised by the grammar, every export format must be offered, every
   `sim` subcommand must exist, and the stated mechanism count must equal
@@ -34,7 +34,7 @@ which is a product nobody adopts.
   withdrawn export format and a stale count each fail it.
 
 ### Changed
-- **`terrium` with no arguments is now the first lesson**, not a six-line
+- **`caterva` with no arguments is now the first lesson**, not a six-line
   usage: three commands worth typing in order, the shape-versus-subject
   rule, the flags that answer real questions, and the exit codes. The
   mechanism count in it is read from the grammar, so the message cannot
@@ -44,18 +44,42 @@ which is a product nobody adopts.
 - README, `START_HERE.md`, the docs index and the v0.3.0 release notes
   point at the guide.
 
+## [0.4.0] - 2026-09-27
+
+**Terrium is now Caterva.** Notes: `docs/releases/v0.4.0.md`.
+
+### Changed
+- **The name, everywhere.** Product, repository (`math12345678/caterva`),
+  command (`caterva`), Python package (`caterva`, was `Terium`), download
+  filenames, environment variables (`TERRIUM_*` to `CATERVA_*`) and the
+  website. The logo's mark is unchanged; the wordmark reads "caterva". The
+  `terrium` command is kept as an alias. Entries below this one were passed
+  through the same rename, so older command names read as `caterva`.
+- **The engine command is `caterva-sim`** (was `terium`); `caterva sim` is
+  the same thing.
+
+### Removed
+- **`Business/`, the pitch deck and seven confidential documents, from the
+  repository and its whole history**, before it went public.
+
+### Fixed
+- The README quick start `cd main` after cloning `caterva`.
+- The website credited a nonexistent "Terium" project at a nonexistent
+  address; links pointed at domains that never existed.
+- A tracked `.coverage` database, already listed in `.gitignore`.
+
 ## [0.3.4] - 2026-09-24
 
 The first clean-checkout run of 0.3.3 read like a demo: a sourced model's
 verdict said no search had run, and plain Michaelis-Menten was refused.
 
 ### Fixed
-- **The bare `terrium` screen said sourced constants were "not wired
+- **The bare `caterva` screen said sourced constants were "not wired
   yet"**, false since 0.3.3; it now shows the command. `compose --help`
   leads with a `--subject` example, and every help example is tested.
 - **Naming the inhibited step did nothing** despite the note promising
   it. `feedback_inhibition` now wires the end product to the named step.
-  `Terium/tests/test_feedback_inhibition_named_step.py`.
+  `caterva/tests/test_feedback_inhibition_named_step.py`.
 - The guide said twelve scenario presets; there are thirteen (now tested).
 - **`"3 step phosphorylation cascade"` crashed** (any description
   starting with a digit gave an invalid model name).
@@ -64,7 +88,7 @@ verdict said no search had run, and plain Michaelis-Menten was refused.
   literature search was graded STRUCTURAL with "none has been run", above
   a table of BRENDA citations. It now reads the search's results; a fully
   sourced model is GROUNDED. The behaviour caveat's count was wrong for
-  the same reason. `Terium/tests/test_verdict_after_search.py`, which fails
+  the same reason. `caterva/tests/test_verdict_after_search.py`, which fails
   without the fix.
 - **A withheld constant named an option that does not exist.** It now says
   to re-run with `--organism` set to an organism that has a measurement.
@@ -72,10 +96,10 @@ verdict said no search had run, and plain Michaelis-Menten was refused.
 ### Added
 - **Every shape builds from its own `--shapes` description** (21 of 36 did
   not), and every example in the usage message and the guide builds.
-  `Terium/tests/test_every_shape_builds_from_its_own_words.py`.
+  `caterva/tests/test_every_shape_builds_from_its_own_words.py`.
 - **`--organism` reads common names and lower case** (`human`, `yeast`,
   `homo sapiens`) and says how it read them; `make cite` does the same.
-  `Terium/compose/organisms.py`.
+  `caterva/compose/organisms.py`.
 - **A misspelt substrate lists what BRENDA holds**; an unknown or
   incomplete EC number says so and exits 3; the verdict's remedy is the
   reason the search could not run.
@@ -83,7 +107,7 @@ verdict said no search had run, and plain Michaelis-Menten was refused.
 
 - **Plain Michaelis-Menten**, the `michaelis_menten` rule, at priority 45
   so every enzyme shape with more structure still wins.
-  `Terium/tests/test_grammar_michaelis_menten.py`. The composer now builds
+  `caterva/tests/test_grammar_michaelis_menten.py`. The composer now builds
   12 of the twenty coverage questions, not 11.
 - **"Try it on your own enzyme"** in `docs/OWNER_CHECKLIST.md`, with four
   enzymes run unscripted.
@@ -106,16 +130,16 @@ true of the code and unreachable from anything a person types.
   provenance table.
 
 ### Added
-- **`terrium` is the command everywhere.** The wheel installs it beside
-  `terium` and `terium-compose`, and `make setup` now installs the package
-  itself, so in a checkout `terrium compose ...` works from any directory
-  instead of `./.venv/bin/python -m Terium.app compose ...` from the root.
+- **`caterva` is the command everywhere.** The wheel installs it beside
+  `caterva` and `caterva-compose`, and `make setup` now installs the package
+  itself, so in a checkout `caterva compose ...` works from any directory
+  instead of `./.venv/bin/python -m caterva.app compose ...` from the root.
 - **`make doctor` detects the macOS + iCloud failure** that makes it
   vanish. Python 3.13 skips `.pth` files carrying the macOS `hidden` flag,
   and iCloud Drive sets that flag on files inside `.venv` when the checkout
   is under `~/Desktop` or `~/Documents`. Measured on the owner's machine:
-  `terrium --version` worked right after install and minutes later failed
-  with `No module named 'Terium'` from the same interpreter. Nothing in that
+  `caterva --version` worked right after install and minutes later failed
+  with `No module named 'caterva'` from the same interpreter. Nothing in that
   error points at iCloud, so the doctor names it and gives the fix.
 - **`docs/OWNER_CHECKLIST.md`**: the owner's remaining steps, copy and
   paste, each with what you should see and what to do if you don't.
@@ -159,7 +183,7 @@ true of the code and unreachable from anything a person types.
   adjudicate itself is not advice. The lab-report path has printed this
   since it was written; this is the composed model catching up.
 - **`compose` searches the literature.**
-  `terrium compose "..." --subject 1.1.1.27 --organism "Homo sapiens"
+  `caterva compose "..." --subject 1.1.1.27 --organism "Homo sapiens"
   --substrate pyruvate` returns a model whose constants are BRENDA's, each
   with its reference, and every section below -- stability, the influence
   ranking, the time course, the verdict -- runs on those numbers. The
@@ -167,7 +191,7 @@ true of the code and unreachable from anything a person types.
   disagree. A partial result stays partial: constants the search did not
   find keep the motif library's placeholder and are listed as
   *searched and not found*, which is a different fact from *not looked
-  for*. Four pieces (ADR 0178): `Terium/checkout.py` makes the literature
+  for*. Four pieces (ADR 0178): `caterva/checkout.py` makes the literature
   layer importable outside pytest; `ComposedModel` carries `organism` and
   `substrate` and fills the `ec_number`, `substrate` and `organism` fields
   BRENDA requires; `with_measured()` substitutes through
@@ -226,13 +250,13 @@ and run everything it is about to attach (ADR 0177).
   (or by hand for an existing tag), builds the wheel and sdist, rebuilds
   them independently and fails if the checksums differ, installs the wheel
   into a fresh interpreter on Linux, macOS and Windows at Python 3.10 and
-  3.13 and runs `terium-compose` to a `VERDICT:` from an empty directory,
+  3.13 and runs `caterva-compose` to a `VERDICT:` from an empty directory,
   freezes the app folders, and only then creates the Release with the
   notes, every artifact and one `SHA256SUMS`.
-- **A downloadable app folder per platform** (`terrium-<version>-<os>-
+- **A downloadable app folder per platform** (`caterva-<version>-<os>-
   <arch>.tar.gz` / `.zip`, Linux x86_64, macOS arm64, Windows x86_64):
-  one executable, `terrium`, with `terrium compose "..."` and
-  `terrium sim ...`. No Python, no install. Built from the released wheel
+  one executable, `caterva`, with `caterva compose "..."` and
+  `caterva sim ...`. No Python, no install. Built from the released wheel
   by `scripts/build_app.py`, which refuses the folder unless python-
   libsbml's extension is a separate replaceable file, every conveyed
   component's licence is inside, and the frozen binary runs from an empty
@@ -240,8 +264,8 @@ and run everything it is about to attach (ADR 0177).
   and the copies libroadrunner and Antimony compile in); the script finds
   and lists them, and the release page carries the corresponding source
   of every version, and of the two libraries, beside the folders.
-- **`terrium`, a single entry point.** `Terium/app.py` dispatches to the
-  two existing commands unchanged (`python -m Terium.app` from the wheel;
+- **`caterva`, a single entry point.** `caterva/app.py` dispatches to the
+  two existing commands unchanged (`python -m caterva.app` from the wheel;
   the executable in the folder). 83 modules in the wheel, up from 82.
 - **`third_party_licenses/LGPL-2.1.txt`.** The LGPL text python-libsbml's
   wheel refers to but does not carry; the app folder ships it.
@@ -266,14 +290,14 @@ and run everything it is about to attach (ADR 0177).
   released builds.
 
 ### Fixed
-- **`terium-compose --export sbml` and `--export antimony` crashed from
+- **`caterva-compose --export sbml` and `--export antimony` crashed from
   every installed copy of 0.2.0** with `FileNotFoundError`: two files the
   engine reads at import, `docs/data-sources.json` and
   `Tests/fixtures/identifiers/identifiers_org_namespaces.json`, were
   resolved relative to the checkout and shipped in neither the wheel nor
-  the sdist. Copies now live in `Terium/core/data/`; the loaders read the
+  the sdist. Copies now live in `caterva/core/data/`; the loaders read the
   checkout's original when it exists and the packaged copy otherwise, and
-  `Terium/tests/test_packaged_data.py` fails if a copy and its original
+  `caterva/tests/test_packaged_data.py` fails if a copy and its original
   ever differ. Proved from an installed wheel in an empty directory. The
   0.2.0 notes' "Known limits" did not record this; it was found by reading
   every `Path(__file__)` in the package for the app folder.
@@ -304,27 +328,27 @@ entry records what makes 0.2.0 an installable release rather than a
 checkout.
 
 ### Added
-- **Installable package.** `pip install terrium-0.2.0-py3-none-any.whl`
-  installs `Terium` (engine, composer, agents; 82 modules) with pinned
+- **Installable package.** `pip install caterva-0.2.0-py3-none-any.whl`
+  installs `caterva` (engine, composer, agents; 82 modules) with pinned
   dependencies. Verified by installing the wheel into an empty directory
   and building a model from there with nothing of the repository on the
   path.
-- **Two commands.** `terium` (the simulation engine: `wf`, `kimura`, `ne`,
-  `sweep`, `scenarios`, `ld`, `ssa`) and `terium-compose` (the model
+- **Two commands.** `caterva` (the simulation engine: `wf`, `kimura`, `ne`,
+  `sweep`, `scenarios`, `ld`, `ssa`) and `caterva-compose` (the model
   builder and its analyses). Before this the composer was reachable only
-  as `python -m Terium.compose` from a checkout.
-- **A version.** `Terium.__version__` is the single source; `pyproject.toml`
+  as `python -m caterva.compose` from a checkout.
+- **A version.** `caterva.__version__` is the single source; `pyproject.toml`
   reads it, and `CITATION.cff` and `package.json` are kept equal to it.
-  `terium-compose` and the package metadata cannot disagree.
+  `caterva-compose` and the package metadata cannot disagree.
 - **`scripts/build_release.py`.** Builds the sdist, then the wheel from
   the extracted sdist, checks the wheel against what the release notes
   claim (no tests, no conftest, LICENSE and NOTICE inside, every module
-  under `Terium/`), and writes `SHA256SUMS`. With `SOURCE_DATE_EPOCH`
+  under `caterva/`), and writes `SHA256SUMS`. With `SOURCE_DATE_EPOCH`
   pinned to the tagged commit the wheel is byte-reproducible; the sdist is
   content-identical but not byte-identical (setuptools writes fresh
   mtimes into `PKG-INFO`), and the script says so rather than hiding it.
 - **A conveyance section in NOTICE** stating what the artifacts do and do
-  not distribute: Terrium's own code only; python-libsbml (LGPL-2.1) is
+  not distribute: Caterva's own code only; python-libsbml (LGPL-2.1) is
   named as a dependency and not bundled, so its conveyance obligations do
   not attach. (This is also why there is no frozen desktop bundle in this
   release: PR #21's onefile DMG froze libSBML in, and that changes the
@@ -332,12 +356,12 @@ checkout.
 
 ### Fixed
 - **Packaging built nothing.** Setuptools' flat-layout discovery saw
-  `Terium/` beside `Tests/`, `Business/`, `node_modules/` and a dozen more,
+  `caterva/` beside `Tests/`, `Business/`, `node_modules/` and a dozen more,
   and an editable install registered `dist-info` and no code: `import
-  Terium` failed from any directory but the repository root. Packages are
+  Caterva` failed from any directory but the repository root. Packages are
   now named explicitly. The sdist also swept the whole `Tests/` tree in
   through a case-folded `tests/` glob; a `MANIFEST.in` prunes it.
-- **A wheel built straight from the tree carried `Terium/conftest.py`.**
+- **A wheel built straight from the tree carried `caterva/conftest.py`.**
   `MANIFEST.in` governs the sdist and `exclude-package-data` governs data
   files; neither excludes a module from a wheel built directly. Building
   the wheel from the sdist does, which is what the build script enforces.
@@ -346,9 +370,9 @@ checkout.
 - Everything under `Unreleased` below, which this release ships.
 
 ### Known limits, stated
-- **Literature search needs the source checkout.** `Terium.agents` reaches
+- **Literature search needs the source checkout.** `caterva.agents` reaches
   into `Tests/` (the BRENDA resolvers) lazily; those modules are not part
-  of the package. From the wheel, `terium-compose ... --subject <enzyme>`
+  of the package. From the wheel, `caterva-compose ... --subject <enzyme>`
   builds the model and the verdict page says, correctly, that no search
   was run. Running the search means cloning the repository.
 - **The api-server and landing site are not in this release.** They are
@@ -376,7 +400,7 @@ figures is in `docs/EXPERT_FEEDBACK.md` ("Seventy-ninth pass").
 - **ADR 0014**: Python 3.10-3.12 support window documented with the correct
   constraint (libroadrunner + numpy, not libSBML).
 - **ADR 0015**: A constitution rule that nothing executes is not enforced —
-  adding terium to requirements.txt passed every guard.
+  adding caterva to requirements.txt passed every guard.
 - **ADR 0016**: Cached results lose per-parameter provenance — schema column,
   persistence, cache read, and serialisation guard all implemented.
 - 11 guard scripts with automated wiring check (`check_guard_wiring.py`).
@@ -439,7 +463,7 @@ figures is in `docs/EXPERT_FEEDBACK.md` ("Seventy-ninth pass").
 ## 2026-07-23
 
 ### Added
-- Terium simulation engine (`terium_engine.py`): Michaelis-Menten
+- Caterva simulation engine (`caterva_engine.py`): Michaelis-Menten
   enzyme kinetics and SIR/SEIR epidemiology, built on antimony/roadrunner
   rather than the full `tellurium` umbrella package.
 - 258-test simulation-engine suite, verified against exact closed-form
@@ -447,7 +471,7 @@ figures is in `docs/EXPERT_FEEDBACK.md` ("Seventy-ninth pass").
   (Hypothesis) -- not just internal self-consistency.
 - `requirements.txt` / `requirements-dev.txt`, `Makefile`, GitHub Actions CI,
   `scripts/check_env.py`, `README.md`.
-- Investor pitch deck (`terrium_pitch_deck.pptx`).
+- Investor pitch deck (`caterva_pitch_deck.pptx`).
 - `tests/test_dependencies_declared.py`: automated guard that fails CI if
   any import isn't declared in `requirements*.txt`.
 

@@ -30,7 +30,7 @@ one of them is the case he means:
 
 1. **The substrate label did not match.** BRENDA calls lactate
    `(S)-lactate`, so a reasonable guess returns nothing. This is not missing
-   data — it is a lookup that never happened. Terrium answers with the
+   data — it is a lookup that never happened. Caterva answers with the
    labels the enzyme *does* report and the student re-runs.
 
 2. **The lookup could not be performed.** BRENDA or NCBI unreachable. Kept
@@ -87,7 +87,7 @@ student's own tube, which no database reports.
   once as the supplied value. Both rows were accurate and the table was not.
   A document handed to a teacher cannot list one parameter twice, once as
   absent. The empty row is dropped; the failed lookup is still reported
-  under *What Terrium would not do*, so nothing is hidden — it is just not
+  under *What Caterva would not do*, so nothing is hidden — it is just not
   said twice in contradictory ways.
 
 - **The caveat under the table became false.** *"A value marked yours
@@ -117,7 +117,7 @@ student's own tube, which no database reports.
   end, and the answer is auditable: the basis is the thing to question.
 - Test count +10.
 - **Still open, and Sauro's point stands:** if a student has no measurement
-  either, there is genuinely nothing. Terrium says so and stops. Whether
+  either, there is genuinely nothing. Caterva says so and stops. Whether
   that is right for model *development*, as opposed to a teaching lab,
   remains his open disagreement and is not claimed as settled here.
 

@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Freeze the installed Terrium wheel into a downloadable, runnable folder.
+"""Freeze the installed Caterva wheel into a downloadable, runnable folder.
 
 WHAT IT BUILDS
 --------------
 One folder, one executable:
 
-    terrium/                    (terrium-<version>-<os>-<arch>.tar.gz or .zip)
-      terrium(.exe)             `terrium compose "..."`, `terrium sim wf ...`
-      _internal/                the Python runtime, Terrium, and its libraries
-      LICENSE, NOTICE           Terrium's own terms and what this folder conveys
+    caterva/                    (caterva-<version>-<os>-<arch>.tar.gz or .zip)
+      caterva(.exe)             `caterva compose "..."`, `caterva sim wf ...`
+      _internal/                the Python runtime, Caterva, and its libraries
+      LICENSE, NOTICE           Caterva's own terms and what this folder conveys
       licenses/                 every third-party licence the folder carries
       README.txt                how to run it, and how to replace libSBML
 
-It is a PyInstaller ONEDIR freeze of `Terium.app:main`, built from the wheel
+It is a PyInstaller ONEDIR freeze of `caterva.app:main`, built from the wheel
 that is INSTALLED in the interpreter running this script, not from the
 checkout, so what a recipient runs is the released code and nothing else.
 
@@ -42,7 +42,7 @@ means; this script makes sure the folder matches what NOTICE says.
 
 WHAT IT CHECKS BEFORE IT WRITES THE ARCHIVE
 -------------------------------------------
-- Terium was imported from site-packages, not from this checkout.
+- Caterva was imported from site-packages, not from this checkout.
 - The frozen executable, run from an empty directory, prints the installed
   version, shows the engine's help, integrates a time course (roadrunner and
   antimony ran, not just a page printed), exports SBML (libsbml, lxml and
@@ -59,7 +59,7 @@ Python build. Two runs give the same files with different checksums. The
 wheel inside is reproducible (see scripts/build_release.py); the folder is
 not, and SHA256SUMS on the release page records the folder that was tested.
 
-Usage (in a venv where `pip install pyinstaller dist/terrium-*.whl` ran):
+Usage (in a venv where `pip install pyinstaller dist/caterva-*.whl` ran):
     python3 scripts/build_app.py --out dist/app
 """
 from __future__ import annotations
@@ -90,12 +90,12 @@ COLLECT_ALL = ("libsbml", "roadrunner", "antimony")
 #: Distributions whose licence files must be in licenses/. The names are
 #: distribution (PyPI) names; the folder is checked to actually contain
 #: each one's files before its licence is required.
-CONVEYED = ("terrium", "python-libsbml", "libroadrunner", "antimony", "numpy", "scipy", "pyinstaller")
+CONVEYED = ("caterva", "python-libsbml", "libroadrunner", "antimony", "numpy", "scipy", "pyinstaller")
 
 #: Directories inside _internal/ that are test fixtures, not the program.
 PRUNE = ("roadrunner/tests",)
 
-LAUNCHER = "from Terium.app import main\nimport sys\nsys.exit(main())\n"
+LAUNCHER = "from caterva.app import main\nimport sys\nsys.exit(main())\n"
 
 
 def _fail(msg: str) -> NoReturn:
@@ -110,33 +110,33 @@ def _platform_tag() -> str:
     return f"{system}-{machine}"
 
 
-def _installed_terium():
-    """Import Terium and refuse to continue if it came from this checkout."""
-    terium = importlib.import_module("Terium")
-    where = Path(terium.__file__).resolve()
+def _installed_caterva():
+    """Import Caterva and refuse to continue if it came from this checkout."""
+    caterva = importlib.import_module("caterva")
+    where = Path(caterva.__file__).resolve()
     # An installed wheel lives under a site-packages directory, wherever the
     # venv is; an editable install or a bare checkout does not.
     if "site-packages" not in where.parts and "dist-packages" not in where.parts:
         _fail(
-            f"Terium imported from the checkout ({where}), not from an installed wheel.\n"
-            "  Build the wheel (scripts/build_release.py), `pip install dist/terrium-*.whl`,\n"
+            f"Caterva imported from the checkout ({where}), not from an installed wheel.\n"
+            "  Build the wheel (scripts/build_release.py), `pip install dist/caterva-*.whl`,\n"
             "  and run this script from a directory that is not the repository root."
         )
-    return terium
+    return caterva
 
 
 def _run_pyinstaller(launcher: Path, work: Path, stage: Path) -> None:
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm", "--clean", "--log-level", "WARN",
-        "--onedir", "--console", "--name", "terrium",
+        "--onedir", "--console", "--name", "caterva",
         "--workpath", str(work / "build"),
         "--distpath", str(stage),
         "--specpath", str(work),
         # --collect-all, not --collect-submodules: the two JSON files under
-        # Terium/core/data/ are package data, and submodule collection alone
+        # caterva/core/data/ are package data, and submodule collection alone
         # would leave them out of _internal/, failing the SBML export smoke.
-        "--collect-all", "Terium",
+        "--collect-all", "caterva",
     ]
     for pkg in COLLECT_ALL:
         cmd += ["--collect-all", pkg]
@@ -146,7 +146,7 @@ def _run_pyinstaller(launcher: Path, work: Path, stage: Path) -> None:
 
 
 def _exe(bundle: Path) -> Path:
-    return bundle / ("terrium.exe" if platform.system() == "Windows" else "terrium")
+    return bundle / ("caterva.exe" if platform.system() == "Windows" else "caterva")
 
 
 def _prune(bundle: Path) -> list[str]:
@@ -295,19 +295,19 @@ def _write_licences(bundle: Path) -> None:
     out.mkdir(exist_ok=True)
     lines = [
         "Third-party software conveyed in this folder, and its licence files.",
-        "Terrium itself: ../LICENSE (Apache-2.0). What is conveyed and under",
+        "Caterva itself: ../LICENSE (Apache-2.0). What is conveyed and under",
         "which terms: ../NOTICE.",
         "",
     ]
     for dist_name in CONVEYED:
         files = _licence_files(dist_name)
-        if dist_name == "terrium":
-            # Terrium's LICENSE and NOTICE sit at the folder root, from the
+        if dist_name == "caterva":
+            # Caterva's LICENSE and NOTICE sit at the folder root, from the
             # installed wheel's dist-info, so they are the released texts.
             for f in files:
                 shutil.copy2(f, bundle / f.name)
             if not ((bundle / "LICENSE").is_file() and (bundle / "NOTICE").is_file()):
-                _fail("the installed terrium wheel does not declare LICENSE and NOTICE")
+                _fail("the installed caterva wheel does not declare LICENSE and NOTICE")
             continue
         try:
             version = md.version(dist_name)
@@ -360,16 +360,16 @@ def _first_run_text() -> str:
 
         xattr -dr com.apple.quarantine .
 
-    (from the folder above it: xattr -dr com.apple.quarantine terrium/)
+    (from the folder above it: xattr -dr com.apple.quarantine caterva/)
 """
     if system == "Windows":
         return """FIRST RUN ON WINDOWS
     This folder is not code-signed. Run it from a terminal (PowerShell or
-    cmd) inside this folder as  .\\terrium.exe  -- PowerShell does not run a
+    cmd) inside this folder as  .\\caterva.exe  -- PowerShell does not run a
     program from the current directory without the  .\\  prefix. If
     SmartScreen shows "Windows protected your PC", choose More info > Run
     anyway. Some antivirus products quarantine freshly built PyInstaller
-    programs; if terrium.exe disappears after extraction, restore it from
+    programs; if caterva.exe disappears after extraction, restore it from
     the quarantine and add an exclusion for this folder.
 """
     return ""
@@ -377,13 +377,13 @@ def _first_run_text() -> str:
 
 def _write_readme(bundle: Path, version: str, copies: list[tuple[Path, str, bool]], tag: str) -> None:
     windows = platform.system() == "Windows"
-    exe = ".\\terrium.exe" if windows else "./terrium"
+    exe = ".\\caterva.exe" if windows else "./caterva"
     rows = "\n".join(
         f"        {p.relative_to(bundle).as_posix():60s} libSBML {v}  "
         + ("separate file, replaceable" if r else "compiled into this library, not separately replaceable")
         for p, v, r in copies
     )
-    text = f"""Terrium {version} ({tag})
+    text = f"""Caterva {version} ({tag})
 
 Unaffiliated with Tellurium. See NOTICE.
 
@@ -431,13 +431,13 @@ USEFUL FLAGS ON compose
 Nothing is installed, nothing is written outside the directory you run it
 in, and no network connection is made.
 
-The full guide, with worked examples, is docs/USING_TERRIUM.md in the
+The full guide, with worked examples, is docs/USING_CATERVA.md in the
 repository, and the release notes for this version are on the release page
 you downloaded this from.
 
 {_first_run_text()}
 WHAT IS INSIDE, AND THE LGPL
-    _internal/ holds the Python runtime, Terrium, and the libraries Terrium
+    _internal/ holds the Python runtime, Caterva, and the libraries Caterva
     uses. libSBML (GNU LGPL v2.1) is in this folder {len(copies)} times:
 
 {rows}
@@ -466,7 +466,7 @@ def _smoke(bundle: Path, version: str) -> None:
     exe = _exe(bundle)
     if not exe.is_file():
         _fail(f"executable missing: {exe}")
-    with tempfile.TemporaryDirectory(prefix="terrium-smoke-") as empty:
+    with tempfile.TemporaryDirectory(prefix="caterva-smoke-") as empty:
         env = {k: v for k, v in os.environ.items() if k not in ("PYTHONPATH", "PYTHONHOME")}
         # The report contains non-ASCII (em dashes, degree signs). On Windows
         # the frozen program writes them in the console code page unless
@@ -486,7 +486,7 @@ def _smoke(bundle: Path, version: str) -> None:
             )
 
         r = run("--version", timeout=120)
-        if r.returncode != 0 or r.stdout.strip() != f"terrium {version}":
+        if r.returncode != 0 or r.stdout.strip() != f"caterva {version}":
             _fail(f"--version: exit {r.returncode}, stdout {r.stdout!r}, stderr {r.stderr[-400:]!r}")
         r = run("sim", "--help", timeout=300)
         if r.returncode != 0 or "kimura" not in r.stdout:
@@ -518,14 +518,14 @@ def _smoke(bundle: Path, version: str) -> None:
 
 def _archive(bundle: Path, out_dir: Path, version: str, tag: str) -> Path:
     if platform.system() == "Windows":
-        archive = out_dir / f"terrium-{version}-{tag}.zip"
+        archive = out_dir / f"caterva-{version}-{tag}.zip"
         with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zf:
             for path in sorted(bundle.rglob("*")):
-                zf.write(path, Path("terrium") / path.relative_to(bundle))
+                zf.write(path, Path("caterva") / path.relative_to(bundle))
     else:
-        archive = out_dir / f"terrium-{version}-{tag}.tar.gz"
+        archive = out_dir / f"caterva-{version}-{tag}.tar.gz"
         with tarfile.open(archive, "w:gz") as tar:
-            tar.add(bundle, arcname="terrium")
+            tar.add(bundle, arcname="caterva")
     return archive
 
 
@@ -548,17 +548,17 @@ def main(argv: list[str] | None = None) -> int:
         importlib.import_module("PyInstaller")
     except ImportError:
         _fail("PyInstaller is not installed in this interpreter (pip install pyinstaller)")
-    terium = _installed_terium()
-    version = terium.__version__
+    caterva = _installed_caterva()
+    version = caterva.__version__
     tag = _platform_tag()
 
-    with tempfile.TemporaryDirectory(prefix="terrium-app-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="caterva-app-") as tmp:
         work = Path(tmp)
-        launcher = work / "terrium_launcher.py"
+        launcher = work / "caterva_launcher.py"
         launcher.write_text(LAUNCHER, encoding="utf-8")
         stage = work / "stage"
         _run_pyinstaller(launcher, work, stage)
-        bundle = stage / "terrium"
+        bundle = stage / "caterva"
         if not bundle.is_dir():
             _fail(f"PyInstaller did not produce {bundle}")
 

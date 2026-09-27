@@ -11,7 +11,7 @@ mode, approached from the other side), ADR 0048 (selection ties).
 
 ## Context
 
-`Terium/compose/` builds a three-tier phosphorylation cascade from a
+`caterva/compose/` builds a three-tier phosphorylation cascade from a
 description and reports that twelve rate constants are unmeasured. "Go and
 measure twelve things" is not advice. `compose/sensitivity.py` was written to
 turn that list into a ranking: the relative sensitivity

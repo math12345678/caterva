@@ -54,12 +54,12 @@ def test_a_denial_without_an_attribution_is_reported(tmp_path, monkeypatch) -> N
     """Saying "we are not them" is not the same as crediting them.
 
     The attribution is the part libRoadRunner's Apache 2.0 and Antimony's
-    MIT actually ask for; the disclaimer is Terrium's own problem. A
+    MIT actually ask for; the disclaimer is Caterva's own problem. A
     surface that does only the second looks compliant and is not.
     """
     surface = tmp_path / "thing.md"
     surface.write_text(
-        "Terrium is not Tellurium and is unaffiliated with it."
+        "Caterva is not Tellurium and is unaffiliated with it."
     )
     monkeypatch.setattr(guard, "ROOT", tmp_path)
     monkeypatch.setattr(
@@ -72,7 +72,7 @@ def test_a_denial_without_an_attribution_is_reported(tmp_path, monkeypatch) -> N
     assert "does not credit libRoadRunner" in problems[0]
 
     surface.write_text(
-        "Terrium is not Tellurium, is unaffiliated, and runs on libRoadRunner."
+        "Caterva is not Tellurium, is unaffiliated, and runs on libRoadRunner."
     )
     assert guard.check() == []
 
@@ -86,12 +86,12 @@ def test_the_floor_fires_when_the_checklist_is_gutted(monkeypatch, capsys) -> No
 def test_the_notice_reaches_the_installed_package_not_just_the_repo() -> None:
     """README and NOTICE stay behind; a docstring does not.
 
-    Someone who runs `pip install terrium` and never opens the repository
+    Someone who runs `pip install caterva` and never opens the repository
     is exactly the person the naming confusion affects.
     """
-    assert "Terium/__init__.py" in guard.SURFACES
+    assert "caterva/__init__.py" in guard.SURFACES
     assert "CITATION.cff" in guard.SURFACES
-    text = (guard.ROOT / "Terium" / "__init__.py").read_text()
+    text = (guard.ROOT / "caterva" / "__init__.py").read_text()
     assert re.search(r"not\s+tellurium", text, re.I)
 
 

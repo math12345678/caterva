@@ -1,5 +1,5 @@
 /* ============================================================
-   terrium — atlas rendering
+   caterva — atlas rendering
 
    Pure construction. This module reads config/atlas.js and returns
    SVG; it holds no state and installs no listeners. Interaction
@@ -456,7 +456,7 @@ export function buildAtlas() {
     preserveAspectRatio: 'xMidYMid meet',
     role: 'img',
     'aria-label':
-      'Terrium system map. Seven regions: human intake, interpretation, evidence, configuration, execution, trust and output, connected by eight labelled information routes. An equivalent text description follows.'
+      'Caterva system map. Seven regions: human intake, interpretation, evidence, configuration, execution, trust and output, connected by eight labelled information routes. An equivalent text description follows.'
   });
 
   svg.appendChild(buildSubstrate());

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Publishing a build artifact changes Terrium's licence obligations.
+"""Publishing a build artifact changes Caterva's licence obligations.
 
 WHY THIS EXISTS
 ---------------
-Terrium's dependency licences are clean today for one reason, and it is not
+Caterva's dependency licences are clean today for one reason, and it is not
 a property of the licences. It is that **nothing here is distributed**.
 
 `requirements.txt` names dependencies; pip fetches them onto the user's own
@@ -125,12 +125,12 @@ def selftest() -> int:
     project has shipped, so the patterns are exercised against text directly.
     """
     must_detect = [
-        "        run: docker push ghcr.io/terrium-sim/terrium:latest",
+        "        run: docker push ghcr.io/caterva-sim/caterva:latest",
         "      - uses: docker/build-push-action@v5",
         "          push: true",
         "      - uses: pypa/gh-action-pypi-publish@release/v1",
         "        run: twine upload dist/*",
-        "        run: gh release create v1.0.0 dist/terrium.whl",
+        "        run: gh release create v1.0.0 dist/caterva.whl",
     ]
     must_ignore = [
         "        run: docker build -f .devcontainer/Dockerfile -t local .",
@@ -183,7 +183,7 @@ def main() -> int:
         print(
             "OK: no CI workflow publishes an artifact, so no LGPL/GPL "
             "conveyance obligation attaches.\n"
-            "    Terrium distributes source that names its dependencies, not "
+            "    Caterva distributes source that names its dependencies, not "
             "the dependencies themselves.\n"
             "    (Publishing done outside CI is invisible here -- see this "
             "script.)"
@@ -206,7 +206,7 @@ def main() -> int:
 
     print(
         "\nFAIL: NOTICE does not state the conveyance obligations.\n"
-        "\nUntil now Terrium conveyed nothing, so the LGPL and GPL terms of its"
+        "\nUntil now Caterva conveyed nothing, so the LGPL and GPL terms of its"
         "\ndependencies imposed no obligations. Publishing an artifact that "
         "CONTAINS them\nchanges that:\n"
         "\n  python-libsbml is LGPL-2.1-or-later. Conveying it requires notice "

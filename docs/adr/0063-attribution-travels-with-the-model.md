@@ -14,7 +14,7 @@ annotated-model export
 Dr Lisa Jeske (BRENDA / Leibniz Institute DSMZ) raised BRENDA's CC BY 4.0
 obligations directly. `NOTICE` answers them thoroughly: creator, copyright,
 licence URI, warranty disclaimer, an itemised list of the modifications
-Terrium makes, and BRENDA's own citation request.
+Caterva makes, and BRENDA's own citation request.
 
 **`NOTICE` stays in the repository. The model does not.**
 
@@ -44,8 +44,8 @@ applied to a licence obligation instead of a computation.
 
 ## Decision
 
-`Terium/core/data_sources.py` holds the attribution facts for each source
-Terrium redistributes values from, and `annotate_antimony` writes a block
+`caterva/core/data_sources.py` holds the attribution facts for each source
+Caterva redistributes values from, and `annotate_antimony` writes a block
 into every model naming the sources **that model actually used**.
 
 ### What the licence asks for, read rather than remembered
@@ -90,12 +90,12 @@ says so in the same words.
 **Not that the licensor endorses the model.** CC BY 4.0 §2(a)(6) forbids
 implying that your use is "sponsored, endorsed, or granted official status
 by, the Licensor". This is not boilerplate in this project: a researcher
-already read a Terrium outreach email as claiming credit that was not ours,
-and a block naming DSMZ beside Terrium's generated numbers is the same shape
+already read a Caterva outreach email as claiming credit that was not ours,
+and a block naming DSMZ beside Caterva's generated numbers is the same shape
 misread. The block states the non-endorsement outright:
 
-> None of these sources produced, reviewed or endorsed this model. Terrium
-> selected and combined the values; any error in doing so is Terrium's, not
+> None of these sources produced, reviewed or endorsed this model. Caterva
+> selected and combined the values; any error in doing so is Caterva's, not
 > theirs.
 
 ### Credited only when they contributed
@@ -121,7 +121,7 @@ to a different cry-wolf.
 
 ## Verification
 
-`Terium/tests/test_data_sources.py` (13) asserts the licence *elements*
+`caterva/tests/test_data_sources.py` (13) asserts the licence *elements*
 rather than the wording, so the block can be rephrased but not thinned.
 `scripts/check_data_source_attribution.py` fails when the table and `NOTICE`
 disagree — two statements of one licence, which drift the way ADR 0003's two

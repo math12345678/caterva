@@ -18,7 +18,7 @@ came from a mutant, from a different tissue, or from another species. In a
 project whose entire claim is that every number traces to a source, the one
 file a student actually takes away had no source on it at all.
 
-Every other surface Terrium has is attached to a session that ends. The CLI
+Every other surface Caterva has is attached to a session that ends. The CLI
 warning scrolls past. The API `flags` array is discarded with the response.
 The Antimony comment is read once, at the moment of generation. The CSV is
 the artifact that **outlives the session** — it gets opened in Excel, plotted,
