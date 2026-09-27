@@ -85,7 +85,7 @@ is unrelated to this code: `requirements.txt` has always said *"do NOT
 `libroadrunner` and `antimony` directly. The old name implied a
 relationship that does not exist.
 
-Splitting this one needed two steps. `git subtree split -P Caterva` returns a
+Splitting this one needed two steps. `git subtree split -P caterva` returns a
 single commit, because the path only exists from the rename forward. The
 history lives under the old path, so the split runs from a worktree at the
 commit *before* the rename (`-P Tellurium`, 71 commits) and the rename is

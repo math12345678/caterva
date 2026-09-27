@@ -146,7 +146,7 @@ export PATH=$PWD/node-v22.0.0-linux-x64/bin:$PATH
 
 # Clone and run
 git clone <repo>
-cd Caterva
+cd caterva
 npm install
 npm run build
 npm run web:start &

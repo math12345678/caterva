@@ -491,3 +491,9 @@ jobs:
       - name: Application layer tests
         working-directory: Science-Agent-Pipeline
         run: pnpm --filter @workspace/api-server run test
+
+      # The codegen load check's selftest needs npx and an installed zod, so
+      # the Python jobs report it as "could not run". This job has both, so it
+      # proves here that the check can fail -- a skip elsewhere, never a gap.
+      - name: Codegen load check (self-check)
+        run: python scripts/check_codegen_loads.py --selftest

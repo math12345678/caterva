@@ -154,7 +154,28 @@ def selftest() -> int:
 
     when a real generated file was loaded earlier today. If the load check
     cannot reject this, it cannot reject anything.
+
+    IT NEEDS THE JAVASCRIPT TOOLCHAIN, AND SAYS SO WHEN IT IS ABSENT. Without
+    `npx` or an installed `zod`, the valid module cannot load either, and the
+    selftest used to report that as "rejected a module that is valid" -- a
+    false failure, red on every Python-only CI job (found 2026-09-27). It now
+    exits 2, "could not run", which the harness reports as a skip with this
+    reason; the api-server job, which installs the toolchain, runs it for real.
     """
+    zod_installed = any(
+        (base / "zod" / "package.json").exists()
+        for base in (
+            REPO_ROOT / "Science-Agent-Pipeline" / "lib" / "api-zod" / "node_modules",
+            REPO_ROOT / "Science-Agent-Pipeline" / "node_modules",
+        )
+    )
+    if shutil.which("npx") is None or not zod_installed:
+        print(
+            "SELFTEST COULD NOT RUN: needs npx and an installed zod "
+            "(`pnpm install` in Science-Agent-Pipeline). Not a pass: the "
+            "api-server CI job runs it with both present."
+        )
+        return 2
     with tempfile.TemporaryDirectory() as tmp:
         broken = Path(tmp) / "broken.ts"
         broken.write_text(

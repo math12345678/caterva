@@ -191,25 +191,25 @@ check: check-python
 
 test: require-pytest
 	@echo ">> simulation engine"
-	@cd Caterva && "$(PY)" -m pytest
+	@cd caterva && "$(PY)" -m pytest
 	@echo ""
 	@echo ">> literature layer"
 	@cd Tests && "$(PY)" -m pytest
 
 test-fast: require-pytest
-	@cd Caterva && "$(PY)" -m pytest \
+	@cd caterva && "$(PY)" -m pytest \
 		--ignore=tests/test_properties.py \
 		--ignore=tests/test_numerical_robustness.py
 	@cd Tests && "$(PY)" -m pytest
 
 test-sim: require-pytest
-	@cd Caterva && "$(PY)" -m pytest
+	@cd caterva && "$(PY)" -m pytest
 
 test-lit: require-pytest
 	@cd Tests && "$(PY)" -m pytest
 
 test-slow: require-pytest
-	@cd Caterva && "$(PY)" -m pytest tests/test_properties.py \
+	@cd caterva && "$(PY)" -m pytest tests/test_properties.py \
 		tests/test_numerical_robustness.py -v
 
 # The guards CI runs, in CI's order, minus the test suites -- plus the

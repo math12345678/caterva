@@ -27,7 +27,7 @@ cd "$ROOT"
 # The commit that renamed Tellurium/ -> caterva/. History for the engine
 # lives under the OLD path, so its split runs from the commit before this
 # one and replays the rename on top. See docs/REPO_MAP.md.
-RENAME_COMMIT="$(git log --format=%H --grep='Rename Tellurium -> Caterva' -n 1 || true)"
+RENAME_COMMIT="$(git log --format=%H --grep='Rename Tellurium -> Terium' -n 1 || true)"
 
 say() { printf '\n\033[1m%s\033[0m\n' "$*"; }
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$*"; }
@@ -476,7 +476,7 @@ if [ -n "$RENAME_COMMIT" ]; then
   git -C "$RTMP" rm -rq . >/dev/null 2>&1 || true
   # Nested under caterva/, NOT flattened to the repo root.
   #
-  # `git subtree split -P Caterva` strips the prefix, so the split lands with
+  # `git subtree split -P caterva` strips the prefix, so the split lands with
   # __init__.py, cli.py and tests/ at the top level. The package is then not
   # importable as `caterva`, and every test doing `from caterva import
   # caterva_engine` fails on a fresh clone:
@@ -486,7 +486,7 @@ if [ -n "$RENAME_COMMIT" ]; then
   # Verified by extracting the split branch into a temp directory and running
   # pytest: 12 collection errors. A repository whose own test suite cannot be
   # collected is not a published repository, it is a backup.
-  mkdir -p "$RTMP/Caterva"
+  mkdir -p "$RTMP/caterva"
   cp -R "$ROOT/caterva/." "$RTMP/caterva/"
   find "$RTMP" -maxdepth 1 -mindepth 1 \
        ! -name '.git' ! -name 'caterva' -exec rm -rf {} + 2>/dev/null || true
@@ -501,7 +501,7 @@ if [ -n "$RENAME_COMMIT" ]; then
   git -C "$RTMP" add -A
   git -C "$RTMP" -c user.name="$(git config user.name)" \
                  -c user.email="$(git config user.email)" \
-                 commit -q -m "Rename Tellurium -> Caterva
+                 commit -q -m "Rename Tellurium -> Terium
 
 The upstream Tellurium project is unrelated to this engine: requirements.txt
 has always said 'do NOT pip install tellurium' (ADR 0001), and this code
@@ -509,7 +509,7 @@ imports it nowhere, calling libroadrunner and antimony directly. The old
 name implied a relationship that does not exist.
 
 The $PRE commits before this one are the engine's real history, recovered
-from the pre-rename path -- 'git subtree split -P Caterva' alone returns a
+from the pre-rename path -- 'git subtree split -P caterva' alone returns a
 single commit, because the path only exists from the rename forward."
   # `checkout FETCH_HEAD` detaches, so the commit above landed on a detached
   # HEAD and the `replay` branch never pointed at it. Name it explicitly
@@ -519,7 +519,7 @@ single commit, because the path only exists from the rename forward."
   git fetch -q "$RTMP" replay:split/caterva --force
   ok "caterva                         $(git rev-list --count split/caterva) commits  <- Tellurium/ + replayed rename"
 else
-  git subtree split -P Caterva -b split/caterva >/dev/null 2>&1
+  git subtree split -P caterva -b split/caterva >/dev/null 2>&1
   echo "  ! rename commit not found; split caterva/ directly ($(git rev-list --count split/caterva) commits)"
 fi
 

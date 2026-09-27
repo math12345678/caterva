@@ -167,7 +167,7 @@ except (ModuleNotFoundError, ImportError):
 ```
 
 - **Package mode**: `PYTHONPATH=/repo/root` → `from caterva.core.xxx`
-- **Flat mode**: `cd Caterva` → `from core.xxx`
+- **Flat mode**: `cd caterva` → `from core.xxx`
 - All modules use relative imports within the package
 - Core modules never import from `caterva.*` (avoids circular imports)
 

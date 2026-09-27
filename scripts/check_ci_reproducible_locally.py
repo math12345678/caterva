@@ -276,8 +276,8 @@ def _normalise(cmd: str) -> str:
     c = re.sub(r'"?\$[({][A-Za-z_]+[)}]"?', "python", c)
     c = re.sub(r"\bpython3(\.\d+)?\b", "python", c)
     c = re.sub(r"\s+", " ", c)
-    # `cd Caterva && python -m pytest` in a recipe and `python -m pytest` under
-    # `working-directory: Caterva` in CI are the same command run in the same
+    # `cd caterva && python -m pytest` in a recipe and `python -m pytest` under
+    # `working-directory: caterva` in CI are the same command run in the same
     # place, spelled by the two systems' different conventions.
     c = re.sub(r"^cd [A-Za-z0-9_./-]+ && ", "", c)
     # -v changes what is printed, not what is checked.

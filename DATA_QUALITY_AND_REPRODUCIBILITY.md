@@ -560,7 +560,7 @@ async function registerDataset(simulation: SimulationResult) {
     osf: osf.url,
     zenodo: zenodo.url,
     doi: zenodo.doi,
-    github: `https://github.com/caterva/...`
+    github: `https://github.com/math12345678/caterva`
   };
 }
 ```

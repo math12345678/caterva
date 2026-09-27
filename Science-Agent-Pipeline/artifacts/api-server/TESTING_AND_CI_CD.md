@@ -321,7 +321,7 @@ jobs:
       - name: Build guards
         run: python scripts/verify_build.py --quick
       - name: Simulation engine tests
-        working-directory: Caterva
+        working-directory: caterva
         run: python -m pytest -v
       - name: Literature layer tests
         working-directory: Tests

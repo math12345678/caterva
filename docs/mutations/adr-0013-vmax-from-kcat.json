@@ -16,7 +16,7 @@
     "",
     "NOTE ON THE TEST COMMAND: `-q` is deliberately absent. caterva/pytest.ini suppresses the summary line under -q, so the harness could not count tests and refused to run -- correctly reporting that every verdict would be meaningless rather than guessing. That refusal is the harness working: a silent `0 total` read as `0 failed` is one of the three ways hand-run mutations were wrong before ADR 0069."
   ],
-  "test": "cd Caterva && python3 -m pytest tests/test_vmax_from_kcat.py --no-header -p no:cacheprovider",
+  "test": "cd caterva && python3 -m pytest tests/test_vmax_from_kcat.py --no-header -p no:cacheprovider",
   "mutations": [
     {
       "id": "B1",

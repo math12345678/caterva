@@ -101,7 +101,7 @@ echo ""
 # ------------------------------------------------------------------
 echo "=== Step 1: full test suite ==="
 
-cd "$REPO_DIR/Caterva"
+cd "$REPO_DIR/caterva"
 CATERVA_OUT=$("$PYTHON" -m pytest tests/ -q 2>&1) && CATERVA_OK=0 || CATERVA_OK=1
 check "caterva/ tests pass" "$CATERVA_OK"
 if [ "$CATERVA_OK" -ne 0 ]; then
@@ -244,7 +244,7 @@ if [ ! -f "$TEST_FILE" ]; then
     FAIL=$((FAIL + 1))
 else
     echo "  test file: $TEST_BASENAME"
-    COLLECT_OUT=$(cd "$REPO_DIR/Caterva" && "$PYTHON" -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
+    COLLECT_OUT=$(cd "$REPO_DIR/caterva" && "$PYTHON" -m pytest "tests/$TEST_BASENAME" --collect-only -q 2>&1) && COLLECT_OK=0 || COLLECT_OK=1
     check "test file collects" "$COLLECT_OK"
     if [ "$COLLECT_OK" -ne 0 ]; then
         echo "$COLLECT_OUT" | tail -10
@@ -265,11 +265,11 @@ echo ""
 echo "  Procedure (run all from repo root):"
 echo "    1. Backup: cp caterva/caterva_engine.py /tmp/caterva_engine.py.bak"
 echo "    2. Apply the exact mutation described in the report"
-echo "    3. Run the specific test(s): cd Caterva && $PYTHON -m pytest \\"
+echo "    3. Run the specific test(s): cd caterva && $PYTHON -m pytest \\"
 echo "       tests/test_popgen_correctness.py::<test_name> -q"
 echo "    4. Confirm failure matches the claimed cause"
 echo "    5. Revert: cp /tmp/caterva_engine.py.bak caterva/caterva_engine.py"
-echo "    6. Confirm suite clean: cd Caterva && $PYTHON -m pytest tests/ -q"
+echo "    6. Confirm suite clean: cd caterva && $PYTHON -m pytest tests/ -q"
 echo ""
 echo "  IMPORTANT: Do NOT chain steps 3-5 with && — the mutated test"
 echo "  is *supposed* to fail (nonzero exit), which would short-circuit"
