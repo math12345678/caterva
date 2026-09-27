@@ -211,6 +211,19 @@ def check_venv():
     return interpreter
 
 
+#: Module-level, so the tests can exercise the macOS branch on any platform
+#: rather than skipping it everywhere but a Mac (a skip is a test that did
+#: not run; see scripts/check_no_silent_skips.py).
+IS_MACOS = sys.platform == "darwin"
+
+
+def _is_hidden(path) -> bool:
+    """True when `path` carries the macOS `hidden` flag (UF_HIDDEN)."""
+    import stat
+
+    return bool(getattr(path.lstat(), "st_flags", 0) & getattr(stat, "UF_HIDDEN", 0))
+
+
 def check_hidden_pth():
     """Catch the macOS + iCloud failure that makes `caterva` vanish.
 
@@ -230,16 +243,14 @@ def check_hidden_pth():
     points anywhere near iCloud, which is why this check names it.
     """
     print("\nHidden .pth files (macOS + iCloud)")
-    if sys.platform != "darwin":
+    if not IS_MACOS:
         _record("hidden .pth", "PASS", "not macOS; the flag does not exist here")
         return
     found = sorted(VENV.glob("lib/python*/site-packages/*.pth")) if VENV.is_dir() else []
     if not found:
         _record("hidden .pth", "PASS", "no .pth files in .venv to check")
         return
-    import stat
-
-    hidden = [p for p in found if getattr(p.lstat(), "st_flags", 0) & stat.UF_HIDDEN]
+    hidden = [p for p in found if _is_hidden(p)]
     if not hidden:
         _record("hidden .pth", "PASS", "{} .pth file(s), none hidden".format(len(found)))
         return
