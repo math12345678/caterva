@@ -438,3 +438,9 @@ jobs:
       # proves here that the check can fail -- a skip elsewhere, never a gap.
       - name: Codegen load check (self-check)
         run: python scripts/check_codegen_loads.py --selftest
+
+      # Reads licences out of the installed JavaScript packages, so it can
+      # only run where they are installed; the Python jobs report it as a
+      # skip with that reason.
+      - name: Dependency licences (installed packages)
+        run: python -m pytest Tests/test_dependency_licenses.py -p no:cacheprovider -q

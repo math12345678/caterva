@@ -313,8 +313,14 @@ def test_the_url_disagreement_with_origin_is_recorded_somewhere() -> None:
     if not origin:
         return  # no remote configured; nothing to disagree with
 
-    urls = {url for _, _, url in clone_commands()}
-    if origin in urls:
+    # `.git` is optional in a GitHub URL and CI's checkout omits it, so a
+    # documented `.../caterva.git` and an origin of `.../caterva` are the
+    # same repository; comparing them raw read as a disagreement.
+    def same(url: str) -> str:
+        return url.rstrip("/").removesuffix(".git").lower()
+
+    urls = {same(url) for _, _, url in clone_commands()}
+    if same(origin) in urls:
         return  # they agree; nothing to record
 
     plan = (ROOT / "docs" / "RENAME_PLAN.md")

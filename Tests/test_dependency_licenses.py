@@ -13,6 +13,8 @@ be deleted or skipped today, and a deleted test does not come back.
 """
 from __future__ import annotations
 
+import pytest
+
 import pathlib
 import sys
 
@@ -74,6 +76,17 @@ def test_the_known_unlicensed_packages_are_still_the_only_ones() -> None:
     from check_dependency_licenses import installed_js_licence
 
     declared = set(js_deps())
+
+    # Not installed is a different fact from "installed and declares
+    # nothing" (the detector returns None for it). With no JavaScript
+    # packages installed -- the Python CI jobs -- nothing here can be read,
+    # so this is "could not run", reported as a skip with the reason; the
+    # api-server job installs them and runs this test for real.
+    if all(installed_js_licence(dep) is None for dep in KNOWN_UNLICENSED & declared):
+        pytest.skip(
+            "JavaScript packages are not installed here (`pnpm install` in "
+            "Science-Agent-Pipeline); the api-server CI job checks licences"
+        )
 
     # Direction 1: nothing NEW declares no licence.
     undeclared_now = {

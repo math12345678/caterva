@@ -93,6 +93,12 @@ ALLOWED_SKIPS: dict[str, str] = {
         "job installs the toolchain and runs the selftest for real. Added "
         "2026-09-27; before, it reported the missing toolchain as a failure."
     ),
+    "test_the_known_unlicensed_packages_are_still_the_only_ones": (
+        "Reads the licences in installed JavaScript packages, which the "
+        "Python CI jobs do not install; it skips there rather than reading "
+        "'not installed' as 'no licence'. The api-server job installs them "
+        "and runs this test for real. Added 2026-09-27."
+    ),
 }
 
 #: Allowances whose skip depends on what the MACHINE has installed, not on
@@ -101,6 +107,7 @@ ALLOWED_SKIPS: dict[str, str] = {
 #: other allowance must still skip or be deleted.
 CONDITIONAL_ON_ENVIRONMENT: frozenset[str] = frozenset({
     "test_the_guards_selftest_passes[check_codegen_loads.py]",
+    "test_the_known_unlicensed_packages_are_still_the_only_ones",
 })
 
 
