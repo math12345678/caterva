@@ -339,6 +339,9 @@ def test_the_url_disagreement_with_origin_is_recorded_somewhere() -> None:
     if not origin:
         return  # no remote configured; nothing to disagree with
 
+    # `.git` is optional in a GitHub URL and CI's checkout omits it, so a
+    # documented `.../caterva.git` and an origin of `.../caterva` are the
+    # same repository; comparing them raw read as a disagreement.
     urls = {url for _, _, url in clone_commands()}
     if _same_repository(origin, urls):
         return  # they agree; nothing to record
