@@ -102,6 +102,32 @@ def clone_commands() -> list[tuple[str, str, str]]:
     return found
 
 
+def _normalise_remote(url: str) -> str:
+    """One spelling for one repository.
+
+    `actions/checkout` writes origin without the `.git` suffix while the
+    documents write it with one. Comparing the raw strings called those two
+    different repositories, which sent this test down its
+    disagreement-recording branch on a tree where the URL was in fact
+    correct -- and then failed it for a reason that had nothing to do with
+    cloning.
+    """
+    u = url.strip().rstrip("/")
+    if u.endswith(".git"):
+        u = u[: -len(".git")]
+    return u.lower()
+
+
+def _same_repository(origin: str, urls: set[str]) -> bool:
+    """Does any documented URL name the same repository as `origin`?"""
+    return _normalise_remote(origin) in {_normalise_remote(u) for u in urls}
+
+
+def _repo_names(urls: set[str]) -> set[str]:
+    """The bare repository name out of each documented clone URL."""
+    return {_normalise_remote(u).rsplit("/", 1)[-1] for u in urls if u.strip()}
+
+
 def self_links() -> list[tuple[str, str, str]]:
     """(surface, slug, path) for links into files that exist in this tree.
 
@@ -314,15 +340,24 @@ def test_the_url_disagreement_with_origin_is_recorded_somewhere() -> None:
         return  # no remote configured; nothing to disagree with
 
     urls = {url for _, _, url in clone_commands()}
-    if origin in urls:
+    if _same_repository(origin, urls):
         return  # they agree; nothing to record
 
     plan = (ROOT / "docs" / "RENAME_PLAN.md")
     assert plan.exists(), "docs/RENAME_PLAN.md is where this is tracked"
     text = plan.read_text(encoding="utf-8", errors="replace")
-    assert "origin" in text and "Terrium-sim" in text, (
+    # What the plan has to contain is the SUBJECT of the disagreement: the
+    # remote, and the name the documents use. This used to require the
+    # literal string "Terrium-sim", which was the old organisation -- and the
+    # rename to Caterva swept that spelling out of the plan, so the test
+    # failed on the one document that had been correctly updated. An
+    # assertion keyed to a name is an assertion with an expiry date on it.
+    documented = sorted(_repo_names(urls))
+    missing = [n for n in documented if n not in text]
+    assert "origin" in text and not missing, (
         "the documented clone URL differs from `git remote get-url origin` "
-        "and docs/RENAME_PLAN.md no longer records that. An unverified URL "
+        f"({origin!r}) and docs/RENAME_PLAN.md does not record that: "
+        f"missing {missing or ['a mention of `origin`']}. An unverified URL "
         "is survivable; an unrecorded one is how a newcomer's first command "
         "fails with nobody knowing why."
     )
