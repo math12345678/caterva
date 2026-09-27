@@ -174,11 +174,11 @@ def _export(destination: Path) -> tuple[bool, str]:
     return True, ""
 
 
-def _terrium_substrate() -> float | None:
-    """Terrium's own final substrate, for comparison."""
+def _caterva_substrate() -> float | None:
+    """Caterva's own final substrate, for comparison."""
     code = (
         "import sys; sys.path.insert(0, %r)\n"
-        "from Terium.continuous.simulations import simulate_michaelis_menten\n"
+        "from caterva.continuous.simulations import simulate_michaelis_menten\n"
         "r = simulate_michaelis_menten(km=0.31, vmax=0.25, s0=10.0, end=10.0, points=11)\n"
         "print(float(list(r.data)[-1][1]))\n" % str(REPO_ROOT)
     )
@@ -256,7 +256,7 @@ def main() -> int:
             "Opening and integrating were still checked."
         )
 
-    mine = _terrium_substrate()
+    mine = _caterva_substrate()
     theirs = report.get("final_substrate")
     if mine is None:
         problems.append("Terrium's own run produced no number to compare")

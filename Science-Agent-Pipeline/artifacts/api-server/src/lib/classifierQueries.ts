@@ -21,7 +21,7 @@
  * questions.
  */
 
-import type { SimulationDomain } from "./teriumRunner";
+import type { SimulationDomain } from "./catervaRunner";
 
 export interface LabelledQuery {
   query: string;

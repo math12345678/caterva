@@ -145,7 +145,7 @@ def main() -> int:
     if found < _MIN_SIMULATE_FNS:
         print(
             f"FAIL: found only {found} simulate_* function(s) under "
-            f"{TERIUM_DIR.name}/, below the floor of {_MIN_SIMULATE_FNS}.\n"
+            f"{CATERVA_DIR.name}/, below the floor of {_MIN_SIMULATE_FNS}.\n"
             "\nThe scan is broken, not the domains. Over zero functions "
             "\"all stochastic domains comply\" is true and means nothing."
         )

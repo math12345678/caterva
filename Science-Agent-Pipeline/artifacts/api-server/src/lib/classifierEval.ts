@@ -31,7 +31,7 @@
 
 import { classifyDomainByKeyword } from "./queryResolver";
 import { resolveQueryWithLLM } from "./llmResolver";
-import type { SimulationDomain } from "./teriumRunner";
+import type { SimulationDomain } from "./catervaRunner";
 import {
   LABELLED_QUERIES,
   DEV_QUERIES,
