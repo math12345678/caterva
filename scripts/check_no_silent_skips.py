@@ -86,7 +86,22 @@ ALLOWED_SKIPS: dict[str, str] = {
         "extra, or by folding stdpopsim into requirements-dev if the "
         "population-genetics domain stops being optional."
     ),
+    "test_the_guards_selftest_passes[check_codegen_loads.py]": (
+        "The codegen load check's selftest needs npx and an installed zod, "
+        "which the Python CI jobs do not install, so it exits 2 ('could not "
+        "run'), reported as this skip. It is not untested: the api-server "
+        "job installs the toolchain and runs the selftest for real. Added "
+        "2026-09-27; before, it reported the missing toolchain as a failure."
+    ),
 }
+
+#: Allowances whose skip depends on what the MACHINE has installed, not on
+#: the code: on a machine with the toolchain the test runs, which is the
+#: good outcome, so these are exempt from the stale-entry rule below. Every
+#: other allowance must still skip or be deleted.
+CONDITIONAL_ON_ENVIRONMENT: frozenset[str] = frozenset({
+    "test_the_guards_selftest_passes[check_codegen_loads.py]",
+})
 
 
 def _skip_key(reason: str) -> str:
@@ -105,7 +120,7 @@ def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
 
     RESULTS ARE READ FROM JUnit XML, NOT FROM THE TERMINAL OUTPUT.
 
-    This used to parse `(\d+) passed` out of stdout, and for the engine
+    This used to parse `(\\d+) passed` out of stdout, and for the engine
     suite it parsed nothing at all -- so the guard reported "1 of 2 suite(s)
     did not run: engine" on a suite that ran perfectly and exited 0.
 
@@ -257,7 +272,7 @@ def main() -> int:
 
         # An allowance whose skip stopped happening is stale, and a baseline
         # that only ever grows records a problem instead of fixing it.
-        stale = sorted(set(ALLOWED_SKIPS) - allowed_seen)
+        stale = sorted(set(ALLOWED_SKIPS) - allowed_seen - CONDITIONAL_ON_ENVIRONMENT)
         if stale:
             print(
                 f"\nFAIL: {len(stale)} entr(y/ies) in ALLOWED_SKIPS no longer "

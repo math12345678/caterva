@@ -103,6 +103,12 @@ def test_the_guards_selftest_passes(script: pathlib.Path) -> None:
         cwd=REPO_ROOT,
         timeout=300,
     )
+    if completed.returncode == 2 and "SELFTEST COULD NOT RUN" in completed.stdout:
+        # Exit 2 is this repository's "could not run", never "passed". It is
+        # reported as a skip with the guard's own reason, so it stays visible;
+        # the only guard that uses it (check_codegen_loads) is run for real
+        # in the api-server job, where its toolchain is installed.
+        pytest.skip(completed.stdout.strip().splitlines()[0])
     assert completed.returncode == 0, (
         f"{script.name} --selftest failed (exit {completed.returncode}).\n"
         "A guard whose own selftest is red cannot be trusted about the "
