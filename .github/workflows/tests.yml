@@ -280,8 +280,9 @@ jobs:
       # It runs orval, so it needs the Node toolchain and a real install --
       # which is why it belongs in CI rather than in `verify_build --quick`,
       # the fast path that stops getting run the moment it stops being fast.
-      - name: Codegen guard
-        run: python scripts/check_codegen_loads.py
+      # The codegen guard runs orval against the installed workspace, so it
+      # lives in the api-server job, which runs `pnpm install`; this job has
+      # no JavaScript packages, so here it could only report "cannot verify".
 
       # The identifiers.org accession patterns are a DATED COPY, and they are
       # the only thing standing between a resolvable citation and a
@@ -438,6 +439,11 @@ jobs:
       # proves here that the check can fail -- a skip elsewhere, never a gap.
       - name: Codegen load check (self-check)
         run: python scripts/check_codegen_loads.py --selftest
+
+      # Moved here 2026-09-27 from the Python jobs, which never install the
+      # workspace: there it could only exit 2 ("cannot verify").
+      - name: Codegen guard
+        run: python scripts/check_codegen_loads.py
 
       # Reads licences out of the installed JavaScript packages, so it can
       # only run where they are installed; the Python jobs report it as a
