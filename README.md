@@ -1,7 +1,7 @@
 # Caterva
 
 <p align="center">
-  <img src="Logo.png" alt="Caterva" width="360">
+  <img src="Logo.png" alt="Caterva" width="440">
 </p>
 
 <p align="center">
@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://github.com/math12345678/caterva/actions/workflows/tests.yml"><img alt="tests" src="https://github.com/math12345678/caterva/actions/workflows/tests.yml/badge.svg?branch=main"></a>
-  <a href="https://github.com/math12345678/caterva/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/math12345678/caterva?color=1D8A72"></a>
-  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1D8A72"></a>
-  <img alt="Python 3.10 to 3.13" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.13-1D8A72">
+  <a href="https://github.com/math12345678/caterva/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/math12345678/caterva?color=1D201A"></a>
+  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1D201A"></a>
+  <img alt="Python 3.10 to 3.13" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.13-1D201A">
 </p>
 
 <p align="center">

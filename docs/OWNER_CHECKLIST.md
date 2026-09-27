@@ -12,8 +12,8 @@ ones that need your GitHub login, and those say so.
 
 - The repository is **<https://github.com/math12345678/caterva>**, public.
 - The name is Caterva everywhere: the website, the docs, the command
-  (`caterva`), the Python package (`caterva`) and the downloads. The logo's
-  crystal mark is unchanged; its wordmark now reads "caterva".
+  (`caterva`), the Python package (`caterva`) and the downloads. The logo is the new dotted C, in ink on paper
+  (`docs/brand/`).
 - Your cap table, fundraising tracker, pitch deck and the seven old
   "Confidential" Word files are **gone from the repository and from its
   entire history.**
@@ -91,7 +91,8 @@ GitHub does not let this be set from the command line.
 
 1. Open **<https://github.com/math12345678/caterva/settings>**.
 2. Under **Social preview**, click **Edit → Upload an image**.
-3. Choose `Logo.png` from your `~/Code/caterva` folder.
+3. Choose `docs/brand/social-preview.png` from your `~/Code/caterva`
+   folder (the logo on paper, at the 1280 x 640 size GitHub asks for).
 
 ---
 
