@@ -1463,3 +1463,14 @@
     transition-duration: 0.001ms !important;
   }
 }
+
+/* While the merged ink chapters are on screen they carry their own bottom
+   controls (the Cathedral's replay/skip/new, the system-mode dock), so the
+   paper page's floating bar and back-to-top step aside. */
+.mule-in-view .sticky-cta,
+.mule-in-view [data-back-to-top] {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 240ms ease, visibility 0s linear 240ms;
+}

@@ -122,6 +122,23 @@ Flat. Depth comes from the ink slabs and from hairline rules
 - **Buttons**: tinted outline in the role's colour; a solid fill only where
   a single action must lead, with paper text on it.
 
+## 5b. The run chapters (merged from the MuleRun page)
+
+`src/mule/` holds the Evidence Cathedral, the system atlas, the
+orchestration console, the evidence rail, the evidence microscope, the
+separated trust layer and the runtimes, merged on 2026-09-28. They are
+plain JavaScript modules and static markup, mounted once by
+`MuleChapters.tsx`; their stylesheet (`mule.css`) is scoped under `.mule`
+by `brand/scope_css.py`, so it cannot restyle the page around it. On paper
+they read as one full-width ink chapter, in the brand's on-ink palette.
+
+Their content follows the page's rule: the microscope, the evidence rail
+and the Cathedral carry the real LDH Km (0.03 mM, BRENDA ref 286469) with
+its 13.3-fold disagreement, and the "real output" panel quotes a recorded
+`scripts/cite.py` run verbatim. What is illustrative (the agent
+choreography) says so. `MergedChapters.test.ts` keeps archived domains and
+the old 0.42 example out.
+
 ## 6. Do's and Don'ts
 
 **Do:**

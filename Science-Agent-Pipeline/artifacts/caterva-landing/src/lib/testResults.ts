@@ -240,11 +240,12 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "5 test files -- component rendering, nav/section integrity, " +
-          "page-claim accuracy, and disabled-source claims",
-        // Measured 2026-09-28, `vitest run`: 5 files, 33 passed. Three
-        // EpiPlayground claim tests left with that playground.
-        passed: 33,
+          "6 test files -- component rendering, nav/section integrity, " +
+          "page-claim accuracy, disabled-source claims, and the merged " +
+          "MuleRun chapters' content",
+        // Measured 2026-09-28, `vitest run`: 6 files, 36 passed (33, plus
+        // the three MergedChapters tests added with the MuleRun merge).
+        passed: 36,
         skipped: 0,
         failed: 0,
       },

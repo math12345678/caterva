@@ -105,7 +105,7 @@ export function initEvidenceRail() {
       h('p', { class: 'rail-detail__body', text: link.body }),
       h('p', { class: 'rail-detail__status', dataset: { status: link.status } }, [
         h('span', { 'aria-hidden': 'true', text: GLYPH[link.status] }),
-        h('span', { text: link.status === 'user' ? 'User-defined / example condition' : 'Illustrative source-supported example' })
+        h('span', { text: link.status === 'user' ? 'User-defined / example condition' : 'Cited: BRENDA ref 286469' })
       ])
     );
   };

@@ -32,13 +32,19 @@ export default function MuleChapters() {
     // chapters, so it is shown only while they are on screen, and never over
     // the paper sections' own bottom bar.
     const io = new IntersectionObserver(
-      ([entry]) => el.classList.toggle("is-offstage", !entry.isIntersecting),
+      ([entry]) => {
+        el.classList.toggle("is-offstage", !entry.isIntersecting);
+        // The paper sections' bottom bar and back-to-top step aside while
+        // the ink chapters (which have their own controls there) are shown.
+        document.documentElement.classList.toggle("mule-in-view", entry.isIntersecting);
+      },
       { rootMargin: "-20% 0px -20% 0px" },
     );
     io.observe(el);
     return () => {
       cancelled = true;
       io.disconnect();
+      document.documentElement.classList.remove("mule-in-view");
     };
   }, []);
 

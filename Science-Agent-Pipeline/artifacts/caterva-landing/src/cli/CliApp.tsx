@@ -299,12 +299,12 @@ export default function CliApp() {
 
           <nav className="hidden md:flex items-center gap-1" aria-label="Main sections">
             {HEADER_NAV.map((item) => (
-              <Magnetic key={HEADER_LABEL[item] ?? item} strength={0.06}>
+              <Magnetic key={item} strength={0.06}>
                 <a
                   href={`#${item}`}
-                  className="px-2.5 py-1 rounded-md text-fg/76 hover:text-fg hover:bg-fg/[0.05] transition-colors duration-200 text-[13px]"
+                  className="px-2.5 py-1 rounded-md text-fg/76 hover:text-fg hover:bg-fg/[0.05] transition-colors duration-200 text-[13px] whitespace-nowrap"
                 >
-                  {item}
+                  {HEADER_LABEL[item] ?? item}
                 </a>
               </Magnetic>
             ))}

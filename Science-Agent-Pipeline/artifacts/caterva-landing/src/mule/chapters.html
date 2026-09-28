@@ -140,7 +140,7 @@
   <!-- exit codes instead of two — are shown here verbatim    -->
   <!-- rather than described in the abstract, and shown       -->
   <!-- before the architecture rather than after it.          -->
-  <!-- Source: src/cli/commandResolve.ts.                     -->
+  <!-- Source: scripts/cite.py, the tool behind `make cite`. -->
   <!-- ==================================================== -->
   <section id="proof" class="proof" aria-labelledby="proof-title">
     <div class="proof__inner">
@@ -151,42 +151,41 @@
           <span class="display-dim">The ones it cannot source, it will not invent.</span>
         </h2>
         <p class="prose" data-reveal>
-          Ask for a measured parameter and Caterva searches BRENDA for an exact
-          organism match, then a cross-species match, then PubMed. What comes back
-          is the measurement, the organism it was measured in, and the reference —
-          and a warning that cannot be switched off when the organism is not the
-          one you asked for.
+          Ask for a measured constant and Caterva searches BRENDA for an exact organism
+          match, then a related organism, then PubMed. What comes back is the
+          measurement, the organism it was measured in and the reference; where
+          papers disagree, all of them, and what the disagreement does to the result.
         </p>
       </div>
 
       <div class="proof__body">
         <div class="transcript" data-reveal>
           <div class="transcript__meta">
-            <span class="label label--micro">scientific resolve / recorded session</span>
+            <span class="label label--micro">scripts/cite.py (make cite) / recorded 2026-09-28</span>
             <span class="label label--micro transcript__exit">EXIT 0</span>
           </div>
-          <!-- tabindex + role: the pre scrolls horizontally on narrow viewports
-               so terminal lines are never re-wrapped (a wrapped transcript is a
-               misquoted one), and a scrollable region has to be reachable by
-               keyboard as well as by touch. -->
+          <!-- Verbatim excerpts of one run of scripts/cite.py against
+               Tests/fixtures/brenda_ldh_fixture.html; "..." marks omitted lines.
+               Re-record it rather than editing it. -->
           <pre class="transcript__code" tabindex="0" role="group"
-               aria-label="Recorded terminal session resolving a Michaelis constant (Km)"><span class="t-cmd">$ scientific resolve "lactate dehydrogenase" \
-      --substrate pyruvate --organism "Homo sapiens"</span>
+               aria-label="Recorded terminal session resolving the Km of human lactate dehydrogenase for pyruvate"><span class="t-cmd">$ python scripts/cite.py --ec 1.1.1.27 --substrate pyruvate \
+    --organism "Homo sapiens" \
+    --fixture Tests/fixtures/brenda_ldh_fixture.html</span>
 
-<span class="t-ok">&#10003;</span> <b>KM = 2.5 mM</b>
+| parameter | value | origin | source |
+|---|---|---|---|
+<span class="t-ok">| km | 0.03 mM | literature | BRENDA ref 286469 |</span>
+| s0 | 10 mM | **yours** | chosen for this run |
+| vmax | 0.25 mM/s | **yours** | chosen for this run |
+...
+<span class="t-warn">## The literature disagrees about km
 
-  <span class="t-key">System  </span>  lactate dehydrogenase / pyruvate
-  <span class="t-key">Organism</span>  Oryctolagus cuniculus
-  <span class="t-key">Source  </span>  brenda_cross_species
-  <span class="t-key">Citation</span>  BRENDA ref 649716
-
-<span class="t-warn">&#9888; <b>Cross-species match.</b> This was measured in Oryctolagus
-  cuniculus, not Homo sapiens.
-  Real and citable, but do not report it as a Homo
-  sapiens measurement.</span></pre>
+The evidence ranked 2 values of km equal: 0.03 to 0.398.
+... This is the disagreement among the sources carried
+through the model. It is NOT an uncertainty estimate: ...</span></pre>
           <p class="transcript__foot disclaimer">
-            A rabbit value is real, and it is not a human measurement. The warning is
-            not suppressible.
+            The second paper is not averaged in and not dropped. The numbers you
+            chose are labelled as yours, because no database reports them.
           </p>
         </div>
 
@@ -195,40 +194,39 @@
 
           <div class="exits__row">
             <p class="exits__code mono" aria-hidden="true">0</p>
-            <p class="exits__what"><span class="visually-hidden">Exit code 0. </span>Found</p>
-            <p class="exits__why">A real measurement, with its unit, organism and citation.</p>
+            <p class="exits__what"><span class="visually-hidden">Exit code 0. </span>Produced</p>
+            <p class="exits__why">Every constant with its citation, and every disagreement named.</p>
           </div>
 
           <div class="exits__row exits__row--review">
-            <p class="exits__code mono" aria-hidden="true">2</p>
-            <p class="exits__what"><span class="visually-hidden">Exit code 2. </span>The literature has nothing</p>
+            <p class="exits__code mono" aria-hidden="true">3</p>
+            <p class="exits__what"><span class="visually-hidden">Exit code 3. </span>Refused, and said why</p>
             <p class="exits__why">
-              BRENDA and PubMed were searched and returned nothing. This is an answer,
-              not a failure — no value has been invented to fill the gap.
+              An enzyme name that means more than one enzyme, or a constant nothing
+              measured. A refusal is an answer: no value was invented to fill the gap.
             </p>
           </div>
 
           <div class="exits__row exits__row--blocked">
-            <p class="exits__code mono" aria-hidden="true">1</p>
-            <p class="exits__what"><span class="visually-hidden">Exit code 1. </span>The lookup could not be performed</p>
+            <p class="exits__code mono" aria-hidden="true">2</p>
+            <p class="exits__what"><span class="visually-hidden">Exit code 2. </span>The question was not well formed</p>
             <p class="exits__why">
-              Not the same as “no value exists”. Nothing was learned about this system
-              at all.
+              Nothing was looked up. Not the same as "nothing was found".
             </p>
           </div>
 
           <p class="exits__foot">
-            Most tools collapse the last two. They are different facts, and a tool that
-            reports “no result” when it could not reach the registry teaches you to read
-            an absence of evidence as evidence of absence.
+            Most tools collapse these. They are different facts, and a tool that
+            reports "no result" when it never looked teaches you to read an absence
+            of evidence as evidence of absence.
           </p>
         </div>
       </div>
 
       <p class="proof__note disclaimer">
-        Transcript recorded from the command-line tool. The interactive architecture
-        below this section is an illustrative demonstration and uses placeholder records
-        throughout.
+        Transcript recorded from the command-line tool. The architecture above is an
+        illustrative demonstration of how a run is assembled; its Km is the same cited
+        value.
       </p>
     </div>
   </section>
@@ -411,9 +409,9 @@
         <p class="label label--micro">Pipeline / text description</p>
         <ol class="pipeline-list" data-pipeline-list></ol>
         <p class="disclaimer summary__note">
-          Caterva is pre-validation. This site demonstrates the intended architecture and
-          interaction model. It does not present scientific results, and it does not
-          guarantee correctness.
+          The architecture on this page is an illustration of how a run is assembled; the
+          values Caterva reports, here and in the tool, are real and cited. Caterva is
+          pre-release and does not guarantee correctness.
         </p>
       </div>
     </div>
@@ -483,8 +481,7 @@
       </div>
 
       <p class="disclaimer micro__note">
-        This is an interface demonstration. It is not a research-ready parameter
-        recommendation.
+        A real value, shown with everything that qualifies it. Where the record is silent, the page says so.
       </p>
     </div>
 
