@@ -197,7 +197,7 @@ def report(s: Summary) -> List[str]:
         if s.verdict == "consistent":
             L.append(f"Result: {figure}. Report the spread, not only the mean.")
         else:
-            L.append(f"Not a result yet: {figure}, but see the verdict above. Do not report this number.")
+            L.append(f"Not a result yet: {figure}; quote it only once the verdict above reads consistent.")
     L += ["", f"The first {DISCARD:.0%} of each run is discarded as relaxation (a choice). Errors are "
           "Flyvbjerg & Petersen (1989) block averages, J. Chem. Phys. 91:461, doi:10.1063/1.457480."]
     return L
