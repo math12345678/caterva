@@ -79,7 +79,15 @@ will know it works.
   chosen or cited, run at the assay conditions of a cited constant. Run end
   to end with GROMACS 2021 and in CI.
 
-### M1. `caterva prepare`: a structure-preparation audit (highest value)
+### M1. `caterva prepare`: a structure-preparation audit (shipped 2026-09-28, protonation pending)
+
+Shipped: sequence differences from UniProt (reported whatever the depositors
+call them), chain breaks, incomplete side chains, alternate conformations,
+non-standard residues, assembly vs asymmetric unit, R-free, and M-CSA
+catalytic residues carried onto each chain by alignment, with every defect
+ranked by distance to them and a per-chain recommendation. Verified on 1I10
+and 1L63 (fixtures in the test suite). Pending: protonation at the assay
+pH, and the five-entry hand-checked validation set below.
 
 Before any simulation, report what is wrong with the model of the protein
 and fix only what the user agrees to:
@@ -95,7 +103,7 @@ and fix only what the user agrees to:
   choice, and should be recorded as one).
 - **Protonation at the assay pH**, with the residues whose state is
   uncertain named.
-- **Catalytic residues from M-CSA** (Ribeiro et al. 2017, Nucleic Acids
+- **Catalytic residues from M-CSA** (Ribeiro et al. 2018, Nucleic Acids
   Res., doi:10.1093/nar/gkx1012): the curated atlas of enzyme mechanisms
   says which residues do the chemistry, so every warning can say whether it
   touches them.
@@ -106,7 +114,14 @@ hand. *Done when* the report on a known problem entry (a mutant, a
 structure with missing loops) names every defect a structural biologist
 would, verified on at least five hand-checked entries.
 
-### M2. Replicas and convergence by default
+### M2. Replicas and convergence by default (shipped 2026-09-28)
+
+Shipped: `--replicas` (default 3) with recorded seeds, per-replica backbone
+RMSD from `run.sh`, and `caterva md --summarise` (block averaging,
+effective sample count, between-replica agreement). Verified on synthetic
+AR(1) series of known correlation time and on a real two-replica GROMACS
+run of 1AKI. Next: the same summary for the M3 enzyme quantities.
+
 
 `caterva md --replicas 5` writes independent runs with recorded seeds and
 reports every quantity as a spread across replicas, with block averaging for

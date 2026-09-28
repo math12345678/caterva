@@ -355,6 +355,34 @@ further. `ldha.cxc` opens the top entry in ChimeraX with the ligand, the
 residues within 5 A of it, and the citations in its header:
 `chimerax ldha.cxc`.
 
+### `caterva prepare`: what is wrong with the structure before you simulate it
+
+```bash
+caterva prepare 1I10
+```
+
+It reads the entry's own records and ranks every defect by how close it
+sits to the enzyme's catalytic residues, which it takes from M-CSA and maps
+onto each chain by alignment. For 1I10 the answer is a table:
+
+```
+| chain | blocking defects | findings within 10 Å of the active site | catalytic residues intact |
+| A | 0 | 0 | yes |
+| D | 2 | 3 | **no** |
+| G | 2 | 2 | **no** |
+...
+Chains with no blocking defect: A, C.
+```
+
+Chain D's catalytic Arg105 has no side chain; chain G's is not modelled at
+all. Both sit in the active-site loop, which is disordered in several
+chains. A setup that took "chain D" would have run without complaint.
+
+It also reports substitutions whatever the depositors called them
+(1L63's two engineered mutations are labelled 'conflict'), and says what it
+did not check. It changes nothing; `--json` writes the findings for a
+script. Exit code 4 means every chain has a blocking defect.
+
 ### `caterva md`: a GROMACS setup at the conditions the constants were measured under
 
 ```bash
@@ -377,6 +405,26 @@ standard protonation states match an assay at pH 5 (it records the pH and
 points at PROPKA). `run.sh` needs `gmx` on PATH (or `GMX=/path/to/gmx`);
 it was run end to end with GROMACS 2021 on 1I10 chain A, and CI runs every
 stage on lysozyme (1AKI) with Ubuntu's GROMACS.
+
+**Three replicas by default.** `run.sh` builds and minimises the system
+once, then runs `rep1`, `rep2`, `rep3`, which differ only in their initial
+velocities (seeds recorded in PROVENANCE.md). One trajectory is an
+anecdote; `--replicas 1` is allowed and labelled one sample. When the runs
+finish:
+
+```bash
+caterva md --summarise ldha-md
+```
+
+It reads each replica's backbone RMSD, estimates its error by block
+averaging (Flyvbjerg & Petersen 1989, which corrects for correlated frames),
+counts how many independent samples each run is really worth, and compares
+the replicas with each other. The verdict is **consistent**, **replicas
+disagree** (each run found a different state), **unconverged** (a run is
+shorter than its own correlation time), or **one sample**; anything but
+consistent exits 4. On synthetic runs with a known correlation time it
+called every under-sampled set unconverged, and raised a false alarm on
+about 6 in 100 converged ones: it errs towards "not yet".
 
 ## Exact stochastic kinetics: `caterva sim ssa`
 

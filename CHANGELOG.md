@@ -63,6 +63,22 @@ Caterva narrows to enzymes: kinetics, structure and dynamics.
   stage on lysozyme.
 - `caterva/methods.py`: the eleven method citations those outputs rest on,
   each DOI checked against Crossref.
+- **`caterva prepare`**: a structure-preparation audit. Reads a PDB entry's
+  mmCIF records and reports sequence differences from UniProt (whatever
+  the depositors call them: 1L63's C54T/C97A are labelled 'conflict'),
+  chain breaks, truncated side chains, alternate conformations,
+  non-standard residues, the biological assembly and model quality, each
+  ranked by distance to the catalytic residues. Those come from a cited
+  M-CSA snapshot carried onto each chain by alignment, with the reference,
+  its identity and the rejected candidates named. On 1I10 it finds LDH-A's
+  catalytic Arg105 truncated in chain D and unmodelled in chain G, and
+  recommends chains A or C. No new dependencies.
+- **`caterva md` runs three replicas by default** from one minimised system,
+  differing only in velocity seeds (all recorded), and **`caterva md
+  --summarise DIR`** reports each replica's block-averaged error
+  (Flyvbjerg & Petersen 1989), its effective sample count, and whether the
+  replicas agree: consistent, replicas disagree, unconverged, or one sample.
+  Exit 4 unless consistent.
 - `docs/design/MD_ROADMAP.md`: what the dynamics side will add
   (structure-preparation audit, replicas by default, enzyme-specific
   analysis, ligand provenance, simulation beside measured Ki), and why each

@@ -25,16 +25,22 @@ describe("interpreting labeller input", () => {
   });
 
   it("accepts an unambiguous prefix as a label", () => {
-    // Nobody should type "two_locus_wright_fisher" forty times.
-    expect(interpret("two_")).toEqual({
+    // Nobody should type "mm_competitive_inhibition" forty times.
+    expect(interpret("mm_")).toEqual({
       kind: "label",
-      domain: "two_locus_wright_fisher",
+      domain: "mm_competitive_inhibition",
     });
-    expect(interpret("repress")).toEqual({ kind: "label", domain: "repressilator" });
+    expect(interpret("gillespie_ssa_b")).toEqual({
+      kind: "label",
+      domain: "gillespie_ssa_bimolecular",
+    });
   });
 
   it("accepts a full domain name", () => {
-    expect(interpret("seir")).toEqual({ kind: "label", domain: "seir" });
+    expect(interpret("mm_competitive_inhibition")).toEqual({
+      kind: "label",
+      domain: "mm_competitive_inhibition",
+    });
   });
 
   it("refuses an ambiguous prefix rather than guessing", () => {

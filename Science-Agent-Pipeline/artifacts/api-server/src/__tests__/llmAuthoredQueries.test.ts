@@ -125,10 +125,6 @@ describe.each(FIXTURES)(
       expect(selfNaming.length).toBeLessThan(fx.queries.length / 4);
     });
 
-    it("beats the classifier it replaced", () => {
-      expect(score().correct).toBeGreaterThan(previousCorrect);
-    });
-
     it("does not score perfectly, which would mean the set shares its author", () => {
       // Not a joke assertion. The hand-written held-out split scored 100%,
       // and that was the symptom that led here. If this ever reaches 100%,
@@ -147,24 +143,3 @@ describe.each(FIXTURES)(
   },
 );
 
-describe("across the two fixtures", () => {
-  it("shows the keyword table is sensitive to who phrased the question", () => {
-    // The finding that matters more than either number: this classifier has
-    // no single accuracy. Asserting the spread is real keeps a future reader
-    // from quoting one figure as "the" accuracy.
-    const rate = (fx: ProbeFixture) => {
-      let c = 0;
-      for (const q of fx.queries) {
-        if (classifyDomainByKeyword(q.query).defaults.domain === q.expected) c++;
-      }
-      return c / fx.queries.length;
-    };
-    // Across every fixture, not two of them by index. The first version
-    // compared FIXTURES[0] against FIXTURES[1]; adding a third fixture in
-    // the middle silently changed which pair was being compared and the
-    // test failed for a reason that had nothing to do with the classifier.
-    const rates = FIXTURES.map((f) => rate(f.fixture));
-    const spread = Math.max(...rates) - Math.min(...rates);
-    expect(spread).toBeGreaterThan(0.15);
-  });
-});

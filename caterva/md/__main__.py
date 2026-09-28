@@ -34,13 +34,14 @@ def build_parser(prog: str = "caterva md") -> argparse.ArgumentParser:
             "Examples:\n"
             f"  {prog} --pdb 1I10 --chain A --out ldha-md\n"
             f"  {prog} --pdb 1I10 --chain A --subject 1.1.1.27 --organism human --substrate pyruvate --out ldha-md\n"
+            f"  {prog} --summarise ldha-md          (after run.sh finishes)\n"
             "\nThen: bash ldha-md/run.sh   (needs GROMACS: gmx on PATH, or GMX=/path/to/gmx)\n"
             "Exit codes: 0 written, 2 malformed question, 3 refused and said why, 1 a crash."
         ),
     )
-    p.add_argument("--pdb", required=True, help="PDB entry id (find one with `caterva structure`)")
+    p.add_argument("--pdb", help="PDB entry id (find one with `caterva structure`)")
     p.add_argument("--chain", help="simulate one chain (a monomer of an oligomer); default: all")
-    p.add_argument("--out", required=True, help="directory to write the setup into")
+    p.add_argument("--out", help="directory to write the setup into")
     p.add_argument("--subject", help="EC number, to take temperature and pH from the kinetics")
     p.add_argument("--organism", help="organism of those kinetics (Latin or common name)")
     p.add_argument("--substrate", help="the substrate whose Km's assay conditions to use")
@@ -48,7 +49,13 @@ def build_parser(prog: str = "caterva md") -> argparse.ArgumentParser:
     p.add_argument("--ph", type=float, help="override: the pH to record for protonation")
     p.add_argument("--ns", type=float, default=10.0, help="production length in ns (default 10)")
     p.add_argument("--ionic-strength", type=float, default=0.15, help="NaCl, molar (default 0.15)")
-    p.add_argument("--seed", type=int, default=20260927, help="velocity seed (default fixed)")
+    p.add_argument("--seed", type=int, default=20260927,
+                   help="velocity seed of replica 1; replica N uses seed+N-1 (default fixed)")
+    p.add_argument("--replicas", type=int, default=3,
+                   help="independent runs differing only in initial velocities (default 3; 1 is one sample)")
+    p.add_argument("--summarise", metavar="DIR",
+                   help="after run.sh: report each replica's backbone RMSD with block-averaged "
+                        "errors and the spread across replicas, and say whether it converged")
     return p
 
 
@@ -90,6 +97,15 @@ def _from_kinetics(ec: str, organism: Optional[str], substrate: str) -> Tuple[Co
 
 def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva md") -> int:
     args = build_parser(prog).parse_args(argv)
+    if args.summarise:
+        return _summarise(Path(args.summarise))
+    if not args.pdb or not args.out:
+        print("Refused: a setup needs --pdb and --out (or use --summarise DIR on a finished run).",
+              file=sys.stderr)
+        return 2
+    if args.replicas < 1:
+        print("Refused: --replicas must be at least 1.", file=sys.stderr)
+        return 2
     pdb = args.pdb.strip().upper()
     if len(pdb) != 4 or not pdb[0].isdigit() or not pdb.isalnum():
         print(f"Refused: {args.pdb!r} is not a PDB id (four characters, starting with a digit, like 1I10).",
@@ -117,24 +133,47 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva md") -> int:
         conditions.ph_source = "chosen: set with --ph"
 
     setup = MdSetup(pdb_id=pdb, chain=args.chain, conditions=conditions, ns=args.ns,
-                    ionic_strength_m=args.ionic_strength, seed=args.seed)
+                    ionic_strength_m=args.ionic_strength, seed=args.seed, replicas=args.replicas)
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     for name, text in setup.files().items():
         path = out / name
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
         if name.endswith(".sh"):
             path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     if note:
         print(note)
-    print(f"Wrote {out}/: run.sh, em/nvt/npt/md.mdp, PROVENANCE.md "
-          f"({conditions.temperature_k:.2f} K, {args.ns:g} ns).")
+    print(f"Wrote {out}/: run.sh, em/npt/md.mdp, rep1..rep{args.replicas}/nvt.mdp, PROVENANCE.md "
+          f"({conditions.temperature_k:.2f} K, {args.ns:g} ns, {args.replicas} replica"
+          f"{'s' if args.replicas > 1 else ''}).")
+    if args.replicas == 1:
+        print("  One replica is one sample: it has no spread, and nothing it shows can be told apart from chance.")
     for p in setup.parameters:
         if p.origin != "method":
             print(f"  {p.name:<20} {p.value:<38} {p.origin}")
     print(f"Run it: bash {out}/run.sh   (GROMACS needed; GMX=/path/to/gmx to choose one)")
+    print(f"Then:   {prog} --summarise {out}")
     return exit_code
+
+
+#: `--summarise` found the run is not (yet) a result.
+EXIT_NOT_A_RESULT = 4
+
+
+def _summarise(directory: Path) -> int:
+    from caterva.md.convergence import collect, report, summarise
+
+    series = collect(directory)
+    if not series:
+        print(f"Refused: no rep*/rmsd.xvg under {directory}. Run its run.sh first.", file=sys.stderr)
+        return 3
+    s = summarise(series, "backbone RMSD from the starting structure", "nm")
+    text = "\n".join(report(s)) + "\n"
+    print(text, end="")
+    (directory / "CONVERGENCE.md").write_text(text, encoding="utf-8")
+    return 0 if s.verdict == "consistent" else EXIT_NOT_A_RESULT
 
 
 def console_main() -> int:
