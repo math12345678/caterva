@@ -143,12 +143,11 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "109 test files -- kinetics & Michaelis-Menten correctness, " +
-          "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
-          "molecular dynamics, population genetics, PCR, SBML export & " +
-          "provenance, compositional model building with influence " +
-          "ranking, mechanism libraries and verdicts, agents and assay " +
-          "windows, and citation/build guards",
+          "96 test files -- kinetics & Michaelis-Menten correctness, " +
+          "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
+          "GROMACS setup, SBML export & provenance, compositional model " +
+          "building with influence ranking, mechanism libraries and " +
+          "verdicts, agents and assay windows, and citation/build guards",
         // Re-measured 2026-09-27 with `caterva structure` and `caterva md`,
         // caterva/ run alone, read out of a junit-xml report: 3518 tests,
         // 3515 passed, 2 failed, 1 skipped, 1176 s. The two failures were
@@ -191,7 +190,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "81 test files -- query resolution, parameter provenance, " +
+          "75 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +

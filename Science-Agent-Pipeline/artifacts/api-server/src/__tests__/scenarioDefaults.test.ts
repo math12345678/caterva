@@ -59,16 +59,9 @@ import {
  */
 const REALISTIC_QUERIES = [
   "enzyme kinetics with km=2 vmax=5 s0=10 end=10 points=51",
-  "model a covid outbreak in a town of 10000",
-  "SIR model beta=0.5 gamma=0.2 s0=990 i0=10 end=60",
-  "simulate an influenza epidemic",
+  "competitive inhibition km=2 ki=1 vmax=5 s0=10 i0=1",
   "gillespie simulation of first order decay a0=100 k=0.1 end=10",
-  "PCR amplification 30 cycles efficiency 0.95",
-  "lennard jones molecular dynamics 20 particles",
-  "lotka volterra predator prey",
-  "repressilator oscillations",
-  "cell cycle oscillator",
-  "monte carlo estimate of pi",
+  "gillespie simulation of first order decay a0=100 k=0.1",
 ];
 
 describe("the queries a lab would actually type", () => {
@@ -86,7 +79,7 @@ describe("the queries a lab would actually type", () => {
     }
     expect(
       failures,
-      `these were refused; before this change ALL BUT ONE of them were:\n` +
+      `these were refused; each asks only for choices or states its constants:\n` +
         failures.join("\n"),
     ).toEqual([]);
   }, 300_000);
@@ -138,7 +131,10 @@ describe("the guarantee that survives it", () => {
     // The value runs, and the caller is told Caterva chose it. A default
     // that ran silently would be the fabrication this whole change is
     // careful not to become.
-    const resolved = await resolveQuery("lotka volterra predator prey");
+    // No end time given: the window is Caterva's choice, and must say so.
+    const resolved = await resolveQuery(
+      "gillespie simulation of first order decay a0=100 k=0.1",
+    );
     const defaulted = Object.entries(resolved.parameterProvenance)
       .filter(([, p]) => p.origin === "default")
       .map(([key]) => key);
@@ -149,15 +145,6 @@ describe("the guarantee that survives it", () => {
         true,
       );
     }
-  }, 120_000);
-
-  it("still refuses a measurement nobody can source", async () => {
-    // ADR 0017: Guerra et al. found no single defensible R0 for measles,
-    // so the registry has no entry and this must stay refused. The point
-    // of the change was never to make everything run.
-    await expect(resolveQuery("measles outbreak in a school")).rejects.toThrow(
-      /beta|gamma|not registered/i,
-    );
   }, 120_000);
 
   it("still refuses a Vmax with no enzyme concentration", async () => {

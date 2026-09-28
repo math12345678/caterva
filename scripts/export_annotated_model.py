@@ -64,9 +64,6 @@ from caterva.core.model_provenance import (  # noqa: E402
 #: Names not listed here map to themselves.
 SYMBOLS = {
     "s0": "S",
-    "i0": "I",
-    "e0": "E",
-    "r0_recovered": "R",
     "i": "I",
 }
 
@@ -75,11 +72,6 @@ BUILDERS = {
     "mm_competitive_inhibition": (
         "build_mm_competitive_antimony",
         ("km", "vmax", "ki", "s0", "i"),
-    ),
-    "sir": ("build_sir_antimony", ("beta", "gamma", "s0", "i0", "r0_recovered")),
-    "seir": (
-        "build_seir_antimony",
-        ("beta", "sigma", "gamma", "s0", "e0", "i0", "r0_recovered"),
     ),
 }
 

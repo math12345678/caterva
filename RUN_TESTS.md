@@ -99,13 +99,7 @@ npm test -- literature-backed-e2e.test.ts -t "Domain-Specific Literature"
 Each domain mapped to peer-reviewed source:
 - **mm**: Lehninger et al. (2008) "Lehninger Principles of Biochemistry"
 - **mm_competitive_inhibition**: Copeland (2013) "Enzymes: Practical Introduction"
-- **sir**: Kermack & McKendrick (1927) "Mathematical theory of epidemics"
-- **seir**: Anderson & May (1991) "Infectious Diseases of Humans"
-- **wright_fisher**: Rahbari et al. (2016) Nature Genetics
 - **gillespie_ssa**: Gillespie (1976) "General method for stochastic reactions"
-- **pcr**: Mullis et al. (1986) Cold Spring Harbor Symposia
-- **molecular_dynamics**: Lennard-Jones (1924), Verlet (1967)
-- [And 5 more domains, each with DOI]
 
 ---
 

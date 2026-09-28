@@ -9,11 +9,12 @@ can wait until you need it.
 
 ## What Caterva is, in one paragraph
 
-A simulation engine for teaching labs. A student asks a question in plain
-language; Caterva finds the real parameters in the scientific literature,
-runs the simulation, and shows where every number came from. Fifteen
-domains — enzyme kinetics, epidemics, population genetics, molecular
-dynamics.
+Enzyme kinetics and molecular dynamics for research groups and teaching
+labs. Ask a question in plain language; Caterva finds the real parameters
+in the scientific literature, runs the simulation, and shows where every
+number came from: kinetics (deterministic and exact stochastic), PDB
+structures, and GROMACS setups at the conditions a constant was measured
+under.
 
 ## The one idea
 
@@ -126,7 +127,7 @@ non-affiliation notice near the top of the README for why it matters.
 
 | directory | what is in it |
 |---|---|
-| [`caterva/`](caterva/README.md) | the simulation engine — fifteen domains, and the Python that integrates them |
+| [`caterva/`](caterva/README.md) | the simulation engine: enzyme kinetics, SSA, structures and MD setup |
 | [`Tests/`](Tests/README.md) | the literature layer — BRENDA and PubMed clients, resolvers, the fallback chain |
 | [`src/`](src/README.md) | the TypeScript surface — CLI, web server, dashboard, engine bridge |
 | [`Science-Agent-Pipeline/`](Science-Agent-Pipeline/README.md) | the Express API server and the agent pipeline |

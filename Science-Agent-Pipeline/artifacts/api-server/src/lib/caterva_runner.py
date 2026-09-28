@@ -64,20 +64,8 @@ import libsbml  # type: ignore[import-untyped]
 # wall-clock time per request: the queue governs concurrency, these govern
 # duration.
 #
-# Measured on the pinned CI configuration (Python 3.10, numpy 1.26.4),
-# 2026-08-01, by timing the engine directly:
-#
-#     MC   1e6 samples ............................. 0.31s
-#     WF   10k generations x 10 replicates ......... 0.86s
-#     MD   108 particles x 10k steps ............... 7.32s
-#
-# An earlier revision of this comment cited "STAGE_04_PART_01 §6.3" for these
-# numbers and quoted MD at ~11s. That section does not exist and the figure
-# was never measured; both are corrected above.
-MAX_API_MONTE_CARLO_SAMPLES = 1_000_000
-MAX_API_MD_STEPS = 10_000
-MAX_API_WF_GENERATIONS = 10_000
-MAX_API_WF_REPLICATES = 1_000
+# The Monte Carlo, Wright-Fisher and Lennard-Jones MD ceilings that stood
+# here left with those domains on 2026-09-27 (archive/legacy_domains/).
 
 # SSA cost is O(initial population): each reaction event consumes one
 # molecule of A. 1e6 events is a few seconds in the engine — a hard
@@ -91,24 +79,6 @@ MAX_API_SSA_POPULATION = 1_000_000
 # request can only ask for a handful of replicates, and a 1000-run
 # ensemble can only use a small population.
 MAX_API_SSA_REPLICATES = 1_000
-
-# MD cost is O(N^2 * steps) -- pairwise forces, no neighbour lists (ADR 0006
-# put those out of scope). Capping n_steps alone therefore does NOT bound a
-# request, because the quadratic term is unconstrained. Measured at a step
-# count 50x BELOW the ceiling:
-#
-#     n=108   0.15s      n=500   3.64s
-#     n=256   0.95s      n=800   9.94s
-#
-# and the engine accepts n_particles=5000 (ok=True, merely flagged, then
-# rounded UP to the next fcc count, 5324). That request passes every ceiling
-# above and costs roughly six hours at the step limit.
-#
-# So the budget is applied to the product that actually drives cost. Measured
-# throughput is ~1.6e7 pair-steps/second, so 1.2e8 is about a 7.5-second
-# ceiling -- chosen to keep the documented 108-particle x 10k-step case
-# (1.17e8) inside the budget while rejecting the pathological shapes.
-MAX_API_MD_PAIR_STEPS = 120_000_000
 
 # ---------------------------------------------------------------------------
 # Raw-SBML ceilings.

@@ -82,7 +82,7 @@ describe("model-authored citations never reach the caller", () => {
     const resolved = await resolveQuery(QUERY);
 
     expect(resolved.provenance.modelCitations.length).toBe(1);
-    expect(resolved.provenance.modelCitations[0]).toMatch(/Michaelis/);
+    expect(resolved.provenance.modelCitations[0]).toMatch(/Lehninger/);
   }, 60000);
 
   it("says that it discarded something, rather than dropping it silently", async () => {

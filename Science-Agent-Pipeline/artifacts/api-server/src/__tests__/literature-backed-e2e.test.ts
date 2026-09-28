@@ -74,7 +74,7 @@ describe("Literature-Backed End-to-End Pipeline", () => {
     });
 
     it("records both completed and failed jobs", async () => {
-      const successQuery = "simulate sir beta=0.3 gamma=0.1 s0=100 i0=10 r0_recovered=0 end=10 points=51";
+      const successQuery = "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51";
 
       await resolveQuery(successQuery);
 
@@ -110,27 +110,6 @@ describe("Literature-Backed End-to-End Pipeline", () => {
       const citation = getDomainCitation("mm_competitive_inhibition");
       expect(citation).toContain("Copeland");
       expect(citation).toContain("2013");
-    });
-
-    it("sir domain backed by Kermack & McKendrick (1927)", async () => {
-      const query = "simulate sir beta=0.3 gamma=0.1 s0=100 i0=10 r0_recovered=0 end=10 points=51";
-
-      const result = await resolveQuery(query);
-
-      expect(result.domain).toBe("sir");
-
-      const citation = getDomainCitation("sir");
-      expect(citation).toContain("Kermack");
-      expect(citation).toContain("1927");
-    });
-
-    it("wright_fisher domain backed by Rahbari et al. (2016)", async () => {
-      const query = "simulate wright fisher mutation_rate=1e-8";
-
-      // This may fail if LLM/keyword matching doesn't trigger, but domain should have backing
-      const citation = getDomainCitation("wright_fisher");
-      expect(citation).toContain("Rahbari");
-      expect(citation).toContain("2016");
     });
 
     it("gillespie_ssa domain backed by Gillespie (1976)", async () => {
@@ -267,7 +246,7 @@ describe("Literature-Backed End-to-End Pipeline", () => {
     });
 
     it("calculates success rate with Wilson confidence intervals (Wilson 1927)", async () => {
-      const query = "simulate sir beta=0.3 gamma=0.1 s0=100 i0=10 r0_recovered=0 end=10 points=51";
+      const query = "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51";
 
       await resolveQuery(query);
 
@@ -378,7 +357,7 @@ describe("Literature-Backed End-to-End Pipeline", () => {
     });
 
     it("domain citation included in final provenance", async () => {
-      const query = "simulate sir beta=0.3 gamma=0.1 s0=100 i0=10 r0_recovered=0 end=10 points=51";
+      const query = "simulate michaelis menten km=2 vmax=5 s0=10 end=10 points=51";
 
       const result = await resolveQuery(query);
 

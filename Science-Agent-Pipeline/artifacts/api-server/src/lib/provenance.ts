@@ -162,10 +162,12 @@ export class UnrecognizedQueryError extends Error {
     super(
       `Could not match this query to any of Caterva's ${availableDomains.length} ` +
         `simulation domains: ${availableDomains.join(", ")}. Try naming the ` +
-        "domain directly (e.g. \"simulate sir ...\"), using terms closer to " +
-        "the science (\"outbreak\", \"enzyme kinetics\", \"predator-prey\", " +
-        '"population genetics"), or supplying parameters directly with ' +
-        "key=value pairs.",
+        "domain directly (e.g. \"simulate enzyme kinetics ...\"), using " +
+        "terms closer to the science (\"Michaelis-Menten\", \"competitive " +
+        "inhibition\", \"gillespie\"), or supplying parameters directly " +
+        "with key=value pairs. Epidemics, population genetics, PCR and the " +
+        "ODE oscillators were archived on 2026-09-27; Caterva v0.4.0 still " +
+        "runs them.",
     );
     this.name = "UnrecognizedQueryError";
     this.query = query;
@@ -1287,19 +1289,14 @@ const DEFINITIONAL: {
   contradictedBy: string[];
   reason: string;
 }[] = [
-  // NOT `mutation_rate`. It was here, and it was wrong.
+  // Empty since 2026-09-27. Its one entry -- neutral drift's selection
+  // coefficient, s = 0, which is what "genetic drift" means -- left with
+  // population genetics.
   //
-  // `RESOLVABLE_FIELDS.wright_fisher` is `["mutation_rate"]` -- Caterva
-  // SEARCHES for mutation rates. Declaring one definitionally zero
-  // short-circuits a lookup that can succeed, and `noResolverDomains.test.ts`
-  // caught it by asserting that this domain still says the literature was
-  // genuinely searched.
-  //
-  // The rule that survives: a definitional value is legitimate only for a
-  // quantity Caterva has NO literature path for. Where a path exists, use it
-  // or refuse; a definition must never be a shortcut past a search that
-  // would have worked. `selection_coefficient` qualifies because nothing
-  // resolves it.
+  // The rule for any future entry: a definitional value is legitimate only
+  // for a quantity Caterva has NO literature path for. Where a path exists,
+  // use it or refuse; a definition must never be a shortcut past a search
+  // that would have worked.
 ];
 
 /**

@@ -63,6 +63,32 @@ Caterva narrows to enzymes: kinetics, structure and dynamics.
   stage on lysozyme.
 - `caterva/methods.py`: the eleven method citations those outputs rest on,
   each DOI checked against Crossref.
+- `docs/design/MD_ROADMAP.md`: what the dynamics side will add
+  (structure-preparation audit, replicas by default, enzyme-specific
+  analysis, ligand provenance, simulation beside measured Ki), and why each
+  is better than running the engines by hand.
+
+### Removed (archived)
+- SIR/SEIR epidemiology, PCR, Monte Carlo π, population genetics
+  (Wright-Fisher, two-locus), the Lennard-Jones cluster MD and the three ODE
+  oscillators moved to `archive/legacy_domains/` with their tests. The
+  engine, the API runner, the root CLI and the website no longer offer
+  them. A query for one is refused with a message naming the archive,
+  never answered with an enzyme simulation; v0.4.0 still runs them.
+- `caterva sim` keeps only `ssa`.
+
+### Changed
+- The website's hero widget and example gallery show human LDH-A with and
+  without oxamate, from recorded BRENDA constants (Km 0.03 mM, ref 286469;
+  Ki 0.00059 mM, ref 739793), in place of an SIR outbreak with drifting
+  parameters.
+
+### Fixed
+- The TypeScript record store resolved its directory through
+  `os.homedir()`, and the jest suites' temporary `HOME` did not reach it, so
+  test runs wrote thousands of records into the real `~/.terrium/records`.
+  It now reads `HOME` first, and still loads records left in the old
+  location.
 
 ## [0.4.0] - 2026-09-27
 

@@ -378,38 +378,27 @@ points at PROPKA). `run.sh` needs `gmx` on PATH (or `GMX=/path/to/gmx`);
 it was run end to end with GROMACS 2021 on 1I10 chain A, and CI runs every
 stage on lysozyme (1AKI) with Ubuntu's GROMACS.
 
-## The other half: population genetics
+## Exact stochastic kinetics: `caterva sim ssa`
 
-The same executable carries a simulation engine that has nothing to do with
-the model builder.
-
-```bash
-caterva sim scenarios                 # thirteen teaching presets, listed
-caterva sim wf --scenario bottleneck --seed 42
-caterva sim kimura --p0 0.1 --s 0.01 --population-size 100
-```
-
-`wf` is Wright-Fisher: drift, selection, mutation, dominance, population
-structure with migration between demes. The presets are built for teaching —
-`bottleneck`, `founder-effect`, `balancing-selection`, `island-model` — and
-any option overrides the preset:
+When the molecule counts are small enough that a smooth curve hides what
+matters, `caterva sim ssa` runs the exact Gillespie algorithm and prints the
+closed-form expectation next to the one trajectory it drew:
 
 ```bash
-caterva sim wf --scenario bottleneck --generations 500 --replicate-runs 200 \
-    --seed 42 --out results.csv
+caterva sim ssa --a0 200 --k 0.5 --end 4 --seed 42
 ```
 
-It flags what it notices, in words, rather than leaving you to spot it:
-
 ```
-Flagged: population_size_series minimum (5) is below 10; some generations
-will have extremely rapid drift
+A(0) = 200   events = 174   final A = 26
+expected B(end) = a0*(1-e^(-k*end)) = 172.9
 ```
 
-Other subcommands: `kimura` (fixation probability under selection), `ne`
-(effective population size from a saved CSV), `ld` (two-locus linkage
-disequilibrium decay), `ssa` (exact stochastic decay), `sweep` (one run per
-parameter value, as a table).
+`--bimolecular` switches to A + B → C, and `--out` writes the table to CSV.
+The same seed gives the same trajectory, bit for bit.
+
+Population genetics, epidemiology, PCR and the other domains Caterva used to
+carry were archived on 2026-09-27; v0.4.0 still runs them (see
+`archive/legacy_domains/README.md`).
 
 ---
 

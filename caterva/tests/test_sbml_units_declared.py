@@ -154,16 +154,17 @@ def test_refusals_are_whole_and_named(label, mutate, expected_symbol):
 
 
 def test_a_domain_without_concentration_semantics_refuses():
-    out = export({
-        "domain": "sir",
-        "format": "sbml",
-        "parameters": {"beta": 0.3, "gamma": 0.1, "s0": 990.0,
-                       "i0": 10.0, "r0_recovered": 0.0},
-        "provenance": {},
-    })
-    assert out["unitsDeclared"] == []
-    assert [e["symbol"] for e in out["unitsRefused"]] == ["domain"], (
-        "an SIR model's species are not concentrations; declaring molar "
-        "units on them would be an invented fact, and the refusal must say "
-        "it is about the domain rather than about a missing entry"
+    # Every domain the exporter builds today is an enzyme model, so the gate
+    # is exercised directly. (Through the exporter it was tested with SIR,
+    # archived on 2026-09-27.) An SSA's species are molecule counts.
+    from caterva.core.sbml_units import declare_units
+
+    sbml = "<sbml/>"
+    out = declare_units(sbml, {"k": "1/s"}, domain="gillespie_ssa")
+    assert out.sbml == sbml
+    assert out.declared == []
+    assert [symbol for symbol, _ in out.refusals] == ["domain"], (
+        "molecule counts are not concentrations; declaring molar units on "
+        "them would be an invented fact, and the refusal must say it is "
+        "about the domain rather than about a missing entry"
     )

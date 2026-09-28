@@ -39,12 +39,11 @@ if str(_REPO_ROOT) not in sys.path:
 import caterva  # noqa: E402
 from caterva import caterva_engine  # noqa: E402
 
-#: The seven that were actually missing. Named individually so a failure
-#: says which capability disappeared rather than only a count.
+#: The ones that were actually missing and are still live. Named
+#: individually so a failure says which capability disappeared rather than
+#: only a count. (The three ODE oscillators were also on the list; they were
+#: archived on 2026-09-27.)
 DOMAINS_THAT_WENT_MISSING = [
-    "simulate_lotka_volterra",
-    "simulate_cell_cycle_oscillator",
-    "simulate_repressilator",
     "simulate_gillespie_ssa",
     "simulate_gillespie_ssa_bimolecular",
     "simulate_gillespie_ssa_replicates",
@@ -98,6 +97,7 @@ class TestTheModuleItselfStaysImportable:
 
     def test_a_domain_actually_runs_through_the_package_path(self):
         # Reachable is not the same as working.
-        result = caterva.simulate_lotka_volterra(end=5.0, points=51)
+        result = caterva.simulate_mm_competitive_inhibition(
+            km=2.0, vmax=5.0, ki=1.0, s0=10.0, i=1.0, end=5.0, points=51)
         assert len(result.data) == 51
         assert result.colnames[0] == "time"

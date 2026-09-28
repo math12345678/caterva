@@ -37,8 +37,8 @@ project's own name and permitted the package it exists to block.
 | `cli.py` | `python -m caterva.cli` |
 | `core/` | `validation.py` (the physical-validity rules), `data_structures.py`, provenance (`model_provenance.py`, `sbml_provenance.py`, `miriam.py`), `import_mode.py` |
 | `continuous/` | `model_building.py`, `simulations.py` — ODE domains |
-| `discrete/` | `gillespie_ssa.py`, `molecular_dynamics.py`, `monte_carlo.py`, `pcr.py` — stochastic domains |
-| `scenarios/` | `wf_scenarios.py` — Wright-Fisher population-genetics scenarios |
+| `discrete/` | `gillespie_ssa.py`: exact stochastic kinetics |
+| `structure/`, `md/` | `caterva structure` and `caterva md` |
 | `tests/` | the engine's own suite |
 
 ## What "correct" means here

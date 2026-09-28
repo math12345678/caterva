@@ -119,8 +119,7 @@ This is the part that matters most, more than any specific style rule:
 
 **Every numerical claim gets checked against something that isn't the
 solver checking itself.** That means one of:
-- an exact closed-form solution (see `caterva/tests/test_kinetics_correctness.py`,
-  `caterva/tests/test_pcr_correctness.py`)
+- an exact closed-form solution (see `caterva/tests/test_kinetics_correctness.py`)
 - an independent integrator, e.g. scipy's `solve_ivp`, which shares no code
   with roadrunner (see `caterva/tests/test_numerical_robustness.py`)
 - a physical invariant (conservation, monotonicity, non-negativity) checked

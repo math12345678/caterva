@@ -62,3 +62,7 @@ def test_seir_good_parameters():
     assert not validation.flagged
 
 
+def test_scan_over_beta_changes_epidemic_size(sir_sbml):
+    mild, severe = parameter_scan(sir_sbml, "beta", [0.11, 0.9], end=500.0,
+                                  points=101)
+    assert severe.final("R") > mild.final("R")
