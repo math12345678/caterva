@@ -355,6 +355,34 @@ further. `ldha.cxc` opens the top entry in ChimeraX with the ligand, the
 residues within 5 A of it, and the citations in its header:
 `chimerax ldha.cxc`.
 
+### `caterva prepare`: what is wrong with the structure before you simulate it
+
+```bash
+caterva prepare 1I10
+```
+
+It reads the entry's own records and ranks every defect by how close it
+sits to the enzyme's catalytic residues, which it takes from M-CSA and maps
+onto each chain by alignment. For 1I10 the answer is a table:
+
+```
+| chain | blocking defects | findings within 10 Å of the active site | catalytic residues intact |
+| A | 0 | 0 | yes |
+| D | 2 | 3 | **no** |
+| G | 2 | 2 | **no** |
+...
+Chains with no blocking defect: A, C.
+```
+
+Chain D's catalytic Arg105 has no side chain; chain G's is not modelled at
+all. Both sit in the active-site loop, which is disordered in several
+chains. A setup that took "chain D" would have run without complaint.
+
+It also reports substitutions whatever the depositors called them
+(1L63's two engineered mutations are labelled 'conflict'), and says what it
+did not check. It changes nothing; `--json` writes the findings for a
+script. Exit code 4 means every chain has a blocking defect.
+
 ### `caterva md`: a GROMACS setup at the conditions the constants were measured under
 
 ```bash

@@ -79,7 +79,15 @@ will know it works.
   chosen or cited, run at the assay conditions of a cited constant. Run end
   to end with GROMACS 2021 and in CI.
 
-### M1. `caterva prepare`: a structure-preparation audit (highest value)
+### M1. `caterva prepare`: a structure-preparation audit (shipped 2026-09-28, protonation pending)
+
+Shipped: sequence differences from UniProt (reported whatever the depositors
+call them), chain breaks, incomplete side chains, alternate conformations,
+non-standard residues, assembly vs asymmetric unit, R-free, and M-CSA
+catalytic residues carried onto each chain by alignment, with every defect
+ranked by distance to them and a per-chain recommendation. Verified on 1I10
+and 1L63 (fixtures in the test suite). Pending: protonation at the assay
+pH, and the five-entry hand-checked validation set below.
 
 Before any simulation, report what is wrong with the model of the protein
 and fix only what the user agrees to:
