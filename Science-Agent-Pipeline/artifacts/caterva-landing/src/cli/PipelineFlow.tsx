@@ -25,7 +25,7 @@ function Arrow({ index }: { index: number }) {
       <svg
         viewBox="0 0 20 20"
         fill="none"
-        className="w-full h-full text-white/15 group-hover:text-[#1D8A72]/40 transition-colors"
+        className="w-full h-full text-fg/66 group-hover:text-signal/40 transition-colors"
       >
         <path
           d="M4 10h12M12 4l6 6-6 6"
@@ -36,7 +36,7 @@ function Arrow({ index }: { index: number }) {
         />
       </svg>
       <motion.div
-        className="absolute w-1.5 h-1.5 rounded-full bg-[#1D8A72]"
+        className="absolute w-1.5 h-1.5 rounded-full bg-signal"
         style={{ left: `${dotPos * 60 + 20}%`, top: "50%" }}
         animate={{
           opacity: [0, 1, 0],
@@ -70,9 +70,9 @@ export default function PipelineFlow() {
               whileHover={{ scale: 1.03 }}
               transition={{ type: "spring", stiffness: 300, damping: 20 }}
             >
-              <motion.div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-[11px] backdrop-blur-sm transition-all duration-300 hover:border-[#1D8A72]/30 hover:bg-[#1D8A72]/[0.04] hover:shadow-[0_0_20px_rgba(29,138,114,0.08)]">
-                <span className="text-[11px] text-white/30">{step.icon}</span>
-                <span className="text-white/60 whitespace-nowrap">
+              <motion.div className="flex items-center gap-2 rounded-lg border border-fg/10 bg-surface/40 px-3 py-2 text-[11px] backdrop-blur-sm transition-all duration-300 hover:border-signal/30 hover:bg-signal/[0.04]">
+                <span className="text-[11px] text-fg/70">{step.icon}</span>
+                <span className="text-fg/80 whitespace-nowrap">
                   {step.label}
                 </span>
               </motion.div>

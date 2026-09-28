@@ -58,7 +58,7 @@
 .mode::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
 .mode::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
 
-.mode.is-open { border-color: rgba(49, 184, 148, 0.42); }
+.mode.is-open { border-color: rgba(127, 157, 171, 0.42); }
 
 .mode__face {
   appearance: none;
@@ -183,7 +183,7 @@
   visibility: hidden;
 }
 
-.mode.is-open .mode__panel { border-color: rgba(49, 184, 148, 0.42); }
+.mode.is-open .mode__panel { border-color: rgba(127, 157, 171, 0.42); }
 
 .mode.is-open .mode__panel {
   grid-template-rows: 1fr;
@@ -243,7 +243,7 @@
 .mode__opt + .mode__opt { border-top: 1px solid var(--line-grid); }
 
 .mode__opt:hover {
-  background: rgba(49, 184, 148, 0.05);
+  background: rgba(127, 157, 171, 0.05);
   color: var(--text-primary);
 }
 
@@ -271,7 +271,7 @@
 
 .mode__opt.is-active {
   border-left-color: var(--signal-teal);
-  background: rgba(49, 184, 148, 0.07);
+  background: rgba(127, 157, 171, 0.07);
   color: var(--text-primary);
 }
 .mode__opt.is-active .mode__i,
@@ -282,7 +282,7 @@
    review colour it puts the rest of the page into. */
 .mode__opt[data-mode-set='failure'].is-active {
   border-left-color: var(--status-review);
-  background: rgba(216, 167, 67, 0.08);
+  background: rgba(217, 173, 106, 0.08);
 }
 .mode__opt[data-mode-set='failure'].is-active .mode__i,
 .mode__opt[data-mode-set='failure'].is-active .mode__glyph { color: var(--status-review); }
@@ -294,7 +294,7 @@
   display: none;
   padding: 0.55rem 0.75rem;
   border-top: 1px solid var(--line-grid);
-  background: rgba(216, 167, 67, 0.05);
+  background: rgba(217, 173, 106, 0.05);
 }
 
 [data-mode='failure'] .mode__kinds { display: block; }
@@ -368,8 +368,8 @@
 /* RUN: the page is working. The signal system brightens by a notch and
    the running row's sweep is allowed to be conspicuous. */
 [data-mode='run'] {
-  --line-hairline: rgba(184, 222, 213, 0.17);
-  --line-structural: rgba(184, 222, 213, 0.32);
+  --line-hairline: rgba(213, 225, 230, 0.17);
+  --line-structural: rgba(213, 225, 230, 0.32);
 }
 
 /* FAILURE: the signal system itself turns to review amber. This is the
@@ -377,7 +377,7 @@
    and it is honest, because in failure mode every route being shown is a
    route that ends in a refusal. */
 [data-mode='failure'] {
-  --signal-teal: #d8a743;
+  --signal-teal: #d9ad6a;
   --mineral-teal: #e6c37e;
   --deep-teal: #9c7726;
   --fog-teal: #efe0bd;
@@ -404,8 +404,8 @@
   pointer-events: none;
   z-index: 1;
   background:
-    linear-gradient(to right, rgba(216, 167, 67, 0.05), transparent 22%,
-                    transparent 78%, rgba(216, 167, 67, 0.05));
+    linear-gradient(to right, rgba(217, 173, 106, 0.05), transparent 22%,
+                    transparent 78%, rgba(217, 173, 106, 0.05));
 }
 
 /* --- 7. responsive -----------------------------------------

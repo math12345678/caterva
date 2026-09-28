@@ -27,13 +27,13 @@ export default function WaitlistCounter() {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-        className="flex items-center gap-3 text-white/25"
+        className="flex items-center gap-3 text-fg/66"
       >
         <div className="flex items-center -space-x-2">
           {[0, 1, 2].map((i) => (
             <span
               key={i}
-              className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-white/[0.08] bg-[#1D8A72]/10 text-[9px] text-[#1D8A72] font-medium"
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full border border-fg/[0.16] bg-signal/10 text-[9px] text-signal font-medium"
               style={{ zIndex: 3 - i }}
             >
               {String.fromCharCode(65 + i)}
@@ -41,7 +41,7 @@ export default function WaitlistCounter() {
           ))}
         </div>
         <span className="text-[11px]">
-          <span className="text-[#1D8A72] font-medium">{count}</span> researcher
+          <span className="text-signal font-medium">{count}</span> researcher
           {count !== 1 ? "s" : ""} already joined
         </span>
       </motion.div>

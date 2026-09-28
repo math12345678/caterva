@@ -15,7 +15,7 @@ const TABS: {
     id: "mm",
     label: "Enzyme Kinetics",
     desc: "Michaelis-Menten with Km, Vmax, and [S]₀",
-    color: "#1D8A72",
+    color: "#5D7F8D",
   },
 ];
 
@@ -31,33 +31,33 @@ export default function PlaygroundTabs() {
     >
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#1D8A72] text-[11px] font-mono font-medium">
+          <span className="text-signal text-[11px] font-mono font-medium">
             play
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#1D8A72]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-signal/20 to-transparent" />
         </div>
         <h2 className="section-header">Interactive playground</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-2 -mt-2 max-w-md">
+        <p className="font-sans text-[13px] text-fg/76 mb-2 -mt-2 max-w-md">
           Tweak real parameters and watch the full ODE trajectory update in real
           time. No backend.
         </p>
 
         {/* Domain Tabs: shown only when there is more than one */}
-        {TABS.length > 1 && (<div className="flex items-center gap-0.5 mb-6 p-0.5 rounded-lg border border-white/[0.05] bg-white/[0.015] w-fit">
+        {TABS.length > 1 && (<div className="flex items-center gap-0.5 mb-6 p-0.5 rounded-lg border border-fg/[0.10] bg-fg/[0.015] w-fit">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setDomain(tab.id)}
               className={`relative px-3.5 py-1.5 rounded-md text-[11px] font-mono transition-all duration-300 ${
                 domain === tab.id
-                  ? "text-white/90"
-                  : "text-white/25 hover:text-white/50"
+                  ? "text-fg/92"
+                  : "text-fg/66 hover:text-fg/76"
               }`}
             >
               {domain === tab.id && (
                 <motion.div
                   layoutId="playground-tab-active"
-                  className="absolute inset-0 rounded-md border border-white/[0.08] bg-white/[0.04]"
+                  className="absolute inset-0 rounded-md border border-fg/[0.16] bg-fg/[0.04]"
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
@@ -66,7 +66,7 @@ export default function PlaygroundTabs() {
                   className="w-1 h-1 rounded-full"
                   style={{
                     background:
-                      domain === tab.id ? tab.color : "rgba(255,255,255,0.15)",
+                      domain === tab.id ? tab.color : "rgba(42,45,53,0.15)",
                   }}
                 />
                 {tab.label}
@@ -76,7 +76,7 @@ export default function PlaygroundTabs() {
         </div>)}
 
         {/* Active description */}
-        <p className="font-sans text-[11px] text-white/25 mb-6 font-mono">
+        <p className="font-sans text-[11px] text-fg/66 mb-6 font-mono">
           $ caterva playground --domain {domain} &mdash;{" "}
           <span style={{ color: active.color }}>{active.desc}</span>
         </p>

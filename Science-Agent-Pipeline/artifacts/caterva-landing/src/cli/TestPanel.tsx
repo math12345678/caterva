@@ -34,15 +34,15 @@ function FileRow({
                 ? "bg-red-400"
                 : file.skipped > 0
                   ? "bg-yellow-400"
-                  : "bg-[#1D8A72]"
+                  : "bg-signal"
             }`}
           />
-          <span className="text-white/60 truncate group-hover:text-white/80 transition-colors">
+          <span className="text-fg/80 truncate group-hover:text-fg/85 transition-colors">
             {file.file}
           </span>
         </div>
         <span className="flex gap-3 shrink-0 font-mono text-[11px]">
-          <span className="text-[#1D8A72]">{file.passed} passed</span>
+          <span className="text-signal">{file.passed} passed</span>
           {file.skipped > 0 && (
             <span className="text-yellow-500/70">{file.skipped} skipped</span>
           )}
@@ -51,7 +51,7 @@ function FileRow({
           )}
         </span>
       </div>
-      <div className="h-1 w-full bg-white/[0.03] rounded-full overflow-hidden">
+      <div className="h-1 w-full bg-fg/[0.03] rounded-full overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${passPct}%` }}
@@ -61,7 +61,7 @@ function FileRow({
               ? "bg-red-400/40"
               : file.skipped > 0
                 ? "bg-yellow-400/40"
-                : "bg-[#1D8A72]/40"
+                : "bg-signal/40"
           }`}
         />
       </div>
@@ -106,18 +106,18 @@ export default function TestPanelBody() {
 
   return (
     <div>
-      <div className="mb-4 text-white/90">
-        <span className="text-[#1D8A72]">$</span> caterva test --run --no-skip
+      <div className="mb-4 text-fg/92">
+        <span className="text-signal">$</span> caterva test --run --no-skip
         -v
       </div>
 
       {TEST_SUITES.map((suite, si) => (
         <div key={suite.name} className="mb-6">
           <div className="flex items-center gap-2 text-[11px] mb-3">
-            <span className="inline-flex items-center gap-1 rounded bg-white/[0.04] px-2 py-0.5 text-white/30">
+            <span className="inline-flex items-center gap-1 rounded bg-fg/[0.04] px-2 py-0.5 text-fg/70">
               {suite.workingDirectory}
             </span>
-            <span className="text-white/20">— {suite.name}</span>
+            <span className="text-fg/66">— {suite.name}</span>
           </div>
           <div className="space-y-1">
             {suite.files.map((f, i) => (
@@ -131,37 +131,37 @@ export default function TestPanelBody() {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="mt-6 pt-4 border-t border-white/[0.04] flex items-center gap-3 text-[13px]"
+        className="mt-6 pt-4 border-t border-fg/[0.08] flex items-center gap-3 text-[13px]"
       >
-        <span className="text-white/70 font-semibold">
+        <span className="text-fg/78 font-semibold">
           <AnimatedCount value={total} /> total
         </span>
-        <span className="w-px h-3 bg-white/[0.06]" />
-        <span className="text-[#1D8A72]">
+        <span className="w-px h-3 bg-fg/[0.06]" />
+        <span className="text-signal">
           <AnimatedCount value={passed} /> passed
         </span>
         {skipped > 0 && (
           <>
-            <span className="w-px h-3 bg-white/[0.06]" />
+            <span className="w-px h-3 bg-fg/[0.06]" />
             <span className="text-yellow-500/70">
               <AnimatedCount value={skipped} /> skipped
             </span>
           </>
         )}
-        <span className="w-px h-3 bg-white/[0.06]" />
+        <span className="w-px h-3 bg-fg/[0.06]" />
         {failed > 0 ? (
           <span className="text-red-400">
             <AnimatedCount value={failed} />
           </span>
         ) : (
-          <span className="text-white/30">
+          <span className="text-fg/70">
             <AnimatedCount value={0} /> failed
           </span>
         )}
       </motion.div>
 
       {skipped > 0 && (
-        <div className="mt-4 text-[11px] text-white/30 leading-relaxed border border-yellow-500/15 bg-yellow-500/[0.03] px-3 py-2">
+        <div className="mt-4 text-[11px] text-fg/70 leading-relaxed border border-yellow-500/15 bg-yellow-500/[0.03] px-3 py-2">
           <span className="text-yellow-500/60 font-medium">skip note: </span>
           {SKIP_EXPLANATION}
         </div>

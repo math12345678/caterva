@@ -26,7 +26,7 @@ function LoadingDots() {
       {[0, 1, 2].map((i) => (
         <motion.span
           key={i}
-          className="w-1 h-1 rounded-full bg-white inline-block"
+          className="w-1 h-1 rounded-full bg-fg inline-block"
           animate={{ opacity: [0.2, 1, 0.2] }}
           transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
         />
@@ -93,15 +93,15 @@ export const WaitlistForm: React.FC<{
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           className={className}
         >
-          <div className="rounded-lg border border-[#1D8A72]/15 bg-[#1D8A72]/[0.02] p-5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#1D8A72]/10">
+          <div className="rounded-lg border border-signal/15 bg-signal/[0.02] p-5 flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-signal/10">
               <CheckIcon />
             </div>
             <div>
-              <p className="font-sans text-[14px] text-white/80 font-medium">
+              <p className="font-sans text-[14px] text-fg/85 font-medium">
                 You&apos;re on the list.
               </p>
-              <p className="text-[12px] text-white/30 mt-0.5">
+              <p className="text-[12px] text-fg/70 mt-0.5">
                 We&apos;ll notify you when your spot is ready. Typically 1–2
                 weeks.
               </p>
@@ -132,8 +132,8 @@ export const WaitlistForm: React.FC<{
                 error ? "waitlist-error waitlist-privacy" : "waitlist-privacy"
               }
               disabled={loading}
-              className={`w-full rounded-lg border bg-white/[0.02] px-4 py-3 text-[13px] font-mono text-white/80 outline-none placeholder:text-white/15 transition-all duration-200 ${
-                error ? "border-red-500/30" : "border-white/[0.06]"
+              className={`w-full rounded-lg border bg-fg/[0.02] px-4 py-3 text-[13px] font-mono text-fg/85 outline-none placeholder:text-fg/66 transition-all duration-200 ${
+                error ? "border-red-500/30" : "border-fg/[0.12]"
               }`}
               animate={shaking ? { x: [0, -6, 6, -4, 4, 0] } : { x: 0 }}
               transition={{ duration: 0.35 }}
@@ -158,7 +158,7 @@ export const WaitlistForm: React.FC<{
             <motion.button
               type="submit"
               disabled={loading}
-              className={`rounded-lg border border-[#1D8A72]/20 px-6 py-3 text-[11px] font-mono tracking-[0.15em] uppercase text-white bg-[#1D8A72]/90 hover:bg-[#1D8A72] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`rounded-lg border border-signal/20 px-6 py-3 text-[11px] font-mono tracking-[0.15em] uppercase text-on-accent bg-signal/90 hover:bg-signal transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed ${
                 large ? "px-8 py-4 text-[12px]" : ""
               }`}
               whileHover={{ scale: 1.02 }}
@@ -185,21 +185,21 @@ export const WaitlistForm: React.FC<{
           */}
           <p
             id="waitlist-privacy"
-            className="mt-3 text-[10px] leading-relaxed text-white/30 font-mono"
+            className="mt-3 text-[10px] leading-relaxed text-fg/70 font-mono"
           >
             Your email is stored on our own server so we can tell you when
             Caterva is ready. Not shared, not sold, no mailing list, no
             tracking. Email{" "}
             <a
               href="mailto:admin.terrium@gmail.com"
-              className="underline hover:text-white/50"
+              className="underline hover:text-fg/76"
             >
               admin.terrium@gmail.com
             </a>{" "}
             to have it removed. What we collect and what we do not:{" "}
             <a
               href="https://github.com/math12345678/caterva/blob/main/docs/PRIVACY.md"
-              className="underline hover:text-white/50"
+              className="underline hover:text-fg/76"
               target="_blank"
               rel="noreferrer"
             >

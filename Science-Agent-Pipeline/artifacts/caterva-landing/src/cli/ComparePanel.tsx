@@ -3,11 +3,11 @@ import type { SimulationJob } from "@workspace/api-client-react";
 import LineChart from "./LineChart";
 
 const COLOR_PALETTES: Record<string, string[]> = {
-  S: ["#1D8A72", "#F59E0B"],
-  I: ["#EF4444", "#8B5CF6"],
-  R: ["#3B82F6", "#F97316"],
-  P: ["#F59E0B", "#10B981"],
-  E: ["#8B5CF6", "#EC4899"],
+  S: ["#5D7F8D", "#946522"],
+  I: ["#A63D35", "#6A6E78"],
+  R: ["#6A6E78", "#946522"],
+  P: ["#946522", "#5D7F8D"],
+  E: ["#6A6E78", "#6A6E78"],
 };
 
 function rmsd(a: number[], b: number[]): number {
@@ -49,10 +49,10 @@ function seriesForComparison(a: SimulationJob, b: SimulationJob) {
     return point;
   });
   const series = allKeys.flatMap((key) => [
-    { key: `${key} (A)`, color: (COLOR_PALETTES[key] ?? ["#ffffff"])[0]! },
+    { key: `${key} (A)`, color: (COLOR_PALETTES[key] ?? ["#FDF8EE"])[0]! },
     {
       key: `${key} (B)`,
-      color: (COLOR_PALETTES[key] ?? ["#ffffff"])[1] ?? "#888888",
+      color: (COLOR_PALETTES[key] ?? ["#FDF8EE"])[1] ?? "#888888",
     },
   ]);
   return { data, series, allKeys };
@@ -115,44 +115,44 @@ export default function ComparePanel({ runs, onClear }: Props) {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="rounded-lg border border-[#F59E0B]/20 bg-[#F59E0B]/[0.02] p-4 mb-4"
+      className="rounded-lg border border-caution/20 bg-caution/[0.02] p-4 mb-4"
     >
       <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] text-[#F59E0B]/60 uppercase tracking-wide font-medium">
+        <span className="text-[11px] text-caution/60 uppercase tracking-wide font-medium">
           comparison
         </span>
         <button
           onClick={onClear}
-          className="text-[9px] text-white/30 hover:text-white/60 border border-white/[0.06] rounded px-2 py-0.5 transition-colors"
+          className="text-[9px] text-fg/70 hover:text-fg/80 border border-fg/[0.12] rounded px-2 py-0.5 transition-colors"
         >
           clear
         </button>
       </div>
 
-      <div className="flex items-center gap-3 text-[11px] text-white/30 mb-4">
-        <span className="inline-flex items-center gap-1 rounded bg-[#1D8A72]/10 px-2 py-0.5 text-[9px] text-[#1D8A72]">
+      <div className="flex items-center gap-3 text-[11px] text-fg/70 mb-4">
+        <span className="inline-flex items-center gap-1 rounded bg-signal/10 px-2 py-0.5 text-[9px] text-signal">
           Run A &middot; {a.result.domain}
         </span>
-        <span className="text-white/20 truncate max-w-[200px]">{a.query}</span>
-        <span className="text-white/10">vs</span>
-        <span className="inline-flex items-center gap-1 rounded bg-[#F59E0B]/10 px-2 py-0.5 text-[9px] text-[#F59E0B]">
+        <span className="text-fg/66 truncate max-w-[200px]">{a.query}</span>
+        <span className="text-fg/66">vs</span>
+        <span className="inline-flex items-center gap-1 rounded bg-caution/10 px-2 py-0.5 text-[9px] text-caution">
           Run B &middot; {b.result.domain}
         </span>
-        <span className="text-white/20 truncate max-w-[200px]">{b.query}</span>
+        <span className="text-fg/66 truncate max-w-[200px]">{b.query}</span>
       </div>
 
       {sameDomain && data.length > 0 && (
-        <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2 mb-4">
+        <div className="rounded-lg border border-fg/[0.08] bg-fg/[0.01] p-2 mb-4">
           <LineChart
             data={data as import("@/lib/simulate").Point[]}
             series={series}
           />
-          <div className="flex gap-4 mt-2 px-1 text-[9px] text-white/25">
+          <div className="flex gap-4 mt-2 px-1 text-[9px] text-fg/66">
             <span className="flex items-center gap-1">
               <span
                 className="w-2 h-2 rounded-sm inline-block"
                 style={{
-                  backgroundColor: (COLOR_PALETTES.S ?? ["#1D8A72"])[0],
+                  backgroundColor: (COLOR_PALETTES.S ?? ["#5D7F8D"])[0],
                 }}
               />
               Run A
@@ -162,7 +162,7 @@ export default function ComparePanel({ runs, onClear }: Props) {
                 className="w-2 h-2 rounded-sm inline-block"
                 style={{
                   backgroundColor:
-                    (COLOR_PALETTES.S ?? ["#1D8A72"])[1] ?? "#F59E0B",
+                    (COLOR_PALETTES.S ?? ["#5D7F8D"])[1] ?? "#946522",
                 }}
               />
               Run B
@@ -172,21 +172,21 @@ export default function ComparePanel({ runs, onClear }: Props) {
       )}
 
       {rmsdMetrics.length > 0 && (
-        <div className="rounded border border-white/[0.06] bg-white/[0.01] p-3 mb-3">
-          <div className="text-[9px] text-white/20 uppercase tracking-wide mb-2">
+        <div className="rounded border border-fg/[0.12] bg-fg/[0.01] p-3 mb-3">
+          <div className="text-[9px] text-fg/66 uppercase tracking-wide mb-2">
             trajectory divergence (RMSD)
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px]">
             {rmsdMetrics.map((m) => (
               <div key={m.key} className="flex items-center gap-1.5">
-                <span className="text-white/25">{m.key}:</span>
+                <span className="text-fg/66">{m.key}:</span>
                 <span
                   className={
                     m.value < 0.01
-                      ? "text-[#1D8A72]"
+                      ? "text-signal"
                       : m.value < 1
-                        ? "text-[#F59E0B]/70"
-                        : "text-[#EF4444]/70"
+                        ? "text-caution/70"
+                        : "text-danger/70"
                   }
                 >
                   {m.value < 0.001 ? "<0.001" : m.value.toFixed(4)}
@@ -198,19 +198,19 @@ export default function ComparePanel({ runs, onClear }: Props) {
       )}
 
       <div className="grid grid-cols-2 gap-3 text-[11px]">
-        <div className="rounded border border-white/[0.04] p-2">
-          <div className="text-[9px] text-white/20 uppercase tracking-wide mb-1">
+        <div className="rounded border border-fg/[0.08] p-2">
+          <div className="text-[9px] text-fg/66 uppercase tracking-wide mb-1">
             parameters A
           </div>
-          <pre className="text-white/50 text-[10px] overflow-x-auto">
+          <pre className="text-fg/76 text-[10px] overflow-x-auto">
             {JSON.stringify(a.result.parameters, null, 2)}
           </pre>
         </div>
-        <div className="rounded border border-white/[0.04] p-2">
-          <div className="text-[9px] text-white/20 uppercase tracking-wide mb-1">
+        <div className="rounded border border-fg/[0.08] p-2">
+          <div className="text-[9px] text-fg/66 uppercase tracking-wide mb-1">
             parameters B
           </div>
-          <pre className="text-white/50 text-[10px] overflow-x-auto">
+          <pre className="text-fg/76 text-[10px] overflow-x-auto">
             {JSON.stringify(b.result.parameters, null, 2)}
           </pre>
         </div>
@@ -226,66 +226,66 @@ export default function ComparePanel({ runs, onClear }: Props) {
         statsB.finalE !== null) && (
         <div className="grid grid-cols-2 gap-3 mt-3 text-[10px]">
           <div className="space-y-1">
-            <div className="text-[8px] text-white/15 uppercase tracking-wide mb-1">
+            <div className="text-[8px] text-fg/66 uppercase tracking-wide mb-1">
               run A
             </div>
             {statsA.peakI !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">peak I:</span>
-                <span className="text-white/50">{statsA.peakI.toFixed(0)}</span>
+                <span className="text-fg/66">peak I:</span>
+                <span className="text-fg/76">{statsA.peakI.toFixed(0)}</span>
               </div>
             )}
             {statsA.finalS !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">final S:</span>
-                <span className="text-white/50">
+                <span className="text-fg/66">final S:</span>
+                <span className="text-fg/76">
                   {statsA.finalS.toFixed(3)}
                 </span>
               </div>
             )}
             {statsA.peakR !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">peak R:</span>
-                <span className="text-white/50">{statsA.peakR.toFixed(0)}</span>
+                <span className="text-fg/66">peak R:</span>
+                <span className="text-fg/76">{statsA.peakR.toFixed(0)}</span>
               </div>
             )}
             {statsA.finalE !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">final E:</span>
-                <span className="text-white/50">
+                <span className="text-fg/66">final E:</span>
+                <span className="text-fg/76">
                   {statsA.finalE.toFixed(3)}
                 </span>
               </div>
             )}
           </div>
           <div className="space-y-1">
-            <div className="text-[8px] text-white/15 uppercase tracking-wide mb-1">
+            <div className="text-[8px] text-fg/66 uppercase tracking-wide mb-1">
               run B
             </div>
             {statsB.peakI !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">peak I:</span>
-                <span className="text-white/50">{statsB.peakI.toFixed(0)}</span>
+                <span className="text-fg/66">peak I:</span>
+                <span className="text-fg/76">{statsB.peakI.toFixed(0)}</span>
               </div>
             )}
             {statsB.finalS !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">final S:</span>
-                <span className="text-white/50">
+                <span className="text-fg/66">final S:</span>
+                <span className="text-fg/76">
                   {statsB.finalS.toFixed(3)}
                 </span>
               </div>
             )}
             {statsB.peakR !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">peak R:</span>
-                <span className="text-white/50">{statsB.peakR.toFixed(0)}</span>
+                <span className="text-fg/66">peak R:</span>
+                <span className="text-fg/76">{statsB.peakR.toFixed(0)}</span>
               </div>
             )}
             {statsB.finalE !== null && (
               <div className="flex justify-between">
-                <span className="text-white/25">final E:</span>
-                <span className="text-white/50">
+                <span className="text-fg/66">final E:</span>
+                <span className="text-fg/76">
                   {statsB.finalE.toFixed(3)}
                 </span>
               </div>

@@ -26,7 +26,7 @@
   gap: 1rem;
   padding: clamp(1.2rem, 2.4vw, 2rem);
   border: 1px solid var(--line-hairline);
-  background: rgba(7, 11, 12, 0.5);
+  background: rgba(31, 33, 39, 0.5);
 }
 .pipeline-list { display: grid; }
 .pipeline-step {
@@ -59,7 +59,7 @@
   max-width: 78rem;
   margin: clamp(2.5rem, 6vh, 4.5rem) auto 0;
   border: 1px solid var(--line-hairline);
-  background: rgba(13, 20, 21, 0.45);
+  background: rgba(42, 45, 53, 0.45);
 }
 .rail-shell__meta {
   display: flex;
@@ -144,8 +144,8 @@
 }
 .rail-link:hover { box-shadow: inset 0 0 0 1px var(--line-hairline); }
 .rail-link.is-active {
-  box-shadow: inset 0 0 0 1px rgba(49, 184, 148, 0.55);
-  background: rgba(29, 138, 114, 0.09);
+  box-shadow: inset 0 0 0 1px rgba(127, 157, 171, 0.55);
+  background: rgba(93, 127, 141, 0.09);
 }
 .rail-link__index { color: var(--text-tertiary); }
 .rail-link.is-active .rail-link__index { color: var(--mineral-teal); }
@@ -177,7 +177,7 @@
   gap: 0.7rem;
   padding: clamp(1.2rem, 2.4vw, 2rem);
   border-top: 1px solid var(--line-hairline);
-  background: rgba(7, 11, 12, 0.5);
+  background: rgba(31, 33, 39, 0.5);
 }
 .rail-detail__title {
   font-family: var(--font-sans);
@@ -211,7 +211,7 @@
    ============================================================ */
 .chapter--trust {
   background:
-    radial-gradient(ellipse 70% 50% at 50% 45%, rgba(29, 138, 114, 0.07), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 50% 45%, rgba(93, 127, 141, 0.07), transparent 70%),
     var(--void);
 }
 .exploded {
@@ -269,7 +269,7 @@
   transition: stroke var(--dur-slow) var(--ease-glide);
 }
 .exp-ring-path--inner { stroke: var(--line-grid); }
-.is-polish .exp-ring-path { stroke: rgba(49, 184, 148, 0.4); }
+.is-polish .exp-ring-path { stroke: rgba(127, 157, 171, 0.4); }
 
 /* layers appear as their stage engages */
 .exp-layer { opacity: 0; transition: opacity 800ms var(--ease-structural); }
@@ -288,14 +288,14 @@
   transition: stroke var(--dur-slow) var(--ease-glide);
 }
 .exp-status { fill: var(--status-pending); transition: fill var(--dur-slow) var(--ease-glide); }
-.is-trace .exp-param:not(.is-review) .exp-plate { stroke: rgba(49, 184, 148, 0.5); }
+.is-trace .exp-param:not(.is-review) .exp-plate { stroke: rgba(127, 157, 171, 0.5); }
 .is-trace .exp-param:not(.is-review) .exp-status { fill: var(--signal-teal); }
 .is-critique .exp-param.is-review .exp-plate { stroke: var(--status-review); }
 .is-critique .exp-param.is-review .exp-status { fill: var(--status-review); }
 
 /* evidence column */
 .exp-ev-plate {
-  fill: rgba(29, 138, 114, 0.14);
+  fill: rgba(93, 127, 141, 0.14);
   stroke: var(--mineral-teal);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
@@ -331,8 +331,8 @@
 }
 .is-envelope .exp-axis { stroke-dashoffset: 0; }
 .exp-envelope {
-  fill: rgba(49, 184, 148, 0.1);
-  stroke: rgba(114, 214, 193, 0.36);
+  fill: rgba(127, 157, 171, 0.1);
+  stroke: rgba(157, 184, 196, 0.36);
   stroke-width: 1;
   stroke-dasharray: 3 3;
   vector-effect: non-scaling-stroke;
@@ -363,7 +363,7 @@
 }
 .is-critique .exp-fracture { animation: exp-draw 1300ms var(--ease-instrument) forwards; }
 .exp-flag {
-  fill: rgba(7, 11, 12, 0.94);
+  fill: rgba(31, 33, 39, 0.94);
   stroke: var(--status-review);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
@@ -381,7 +381,7 @@
   letter-spacing: 0;
 }
 .exp-rec-warn {
-  fill: rgba(216, 167, 67, 0.16);
+  fill: rgba(217, 173, 106, 0.16);
   stroke: #9a6f14;
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
@@ -473,9 +473,9 @@
 .stratum:last-child { border-bottom: 1px solid var(--line-hairline); }
 
 /* substrate depth: each stratum sits visually lower/darker */
-.stratum:nth-child(2) { background: linear-gradient(to bottom, rgba(13, 20, 21, 0.3), transparent); }
-.stratum:nth-child(3) { background: linear-gradient(to bottom, rgba(13, 20, 21, 0.5), rgba(13, 20, 21, 0.2)); }
-.stratum:nth-child(4) { background: linear-gradient(to bottom, rgba(23, 35, 36, 0.55), rgba(13, 20, 21, 0.3)); }
+.stratum:nth-child(2) { background: linear-gradient(to bottom, rgba(42, 45, 53, 0.3), transparent); }
+.stratum:nth-child(3) { background: linear-gradient(to bottom, rgba(42, 45, 53, 0.5), rgba(42, 45, 53, 0.2)); }
+.stratum:nth-child(4) { background: linear-gradient(to bottom, rgba(23, 35, 36, 0.55), rgba(42, 45, 53, 0.3)); }
 
 .stratum::before {
   content: "";
@@ -519,7 +519,7 @@
 .strata-feed--out { stroke: var(--status-review); opacity: 0.7; stroke-dasharray: 3 3; }
 .strata-gap { fill: none; stroke: var(--status-review); stroke-width: 1; stroke-dasharray: 2 4; opacity: 0.6; vector-effect: non-scaling-stroke; }
 .strata-cell {
-  fill: rgba(49, 184, 148, 0.22);
+  fill: rgba(127, 157, 171, 0.22);
   stroke: var(--mineral-teal);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
@@ -623,7 +623,7 @@
 .seam-line--lane { stroke: var(--line-structural); }
 .seam-hair { fill: none; stroke: var(--fog-teal); stroke-width: 1; opacity: 0.4; vector-effect: non-scaling-stroke; }
 .seam-solid {
-  fill: rgba(29, 138, 114, 0.18);
+  fill: rgba(93, 127, 141, 0.18);
   stroke: var(--mineral-teal);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;

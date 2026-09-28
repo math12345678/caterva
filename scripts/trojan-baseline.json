@@ -92,6 +92,27 @@
       "rule": "injection/agent-targeting",
       "reviewed": "2026-09-06",
       "reason": "A signpost, not an instruction. The line is one row of START_HERE.md's routing table -- 'where do I go for X' -- and its cell is a link to docs/AGENT_BRIEF.md. It branches the reader by audience the way the rows above it branch by topic, and it tells the reader nothing except which file to open. AGENT_BRIEF.md was read in full before this verdict: it is the project's standing brief for coding agents, and its content pushes in the opposite direction to an injection -- it requires verification against sources outside the codebase, and states that a failing guard must not be reported as success. A repository several agents commit to concurrently has to be able to address them; the rule cannot tell a table of contents from a payload."
+    },
+    {
+      "fingerprint": "3b7bb61ba13dcda0",
+      "file": "Science-Agent-Pipeline/artifacts/caterva-landing/src/mule/chapters.html",
+      "rule": "concealment/hidden-markup",
+      "reviewed": "2026-09-28",
+      "reason": "A `visually-hidden` paragraph (line 41) carrying the question terminal's keyboard hint, 'Press Enter to construct an illustrative verified run...', for screen-reader users; the same text reviewed in mule/index.html, copied when the MuleRun chapters were merged into the site. It is addressed to a person who cannot see the page, and it gives no instruction beyond how to use the form."
+    },
+    {
+      "fingerprint": "c40d6c4924fa3ed9",
+      "file": "Science-Agent-Pipeline/artifacts/caterva-landing/src/mule/chapters.html",
+      "rule": "concealment/hidden-markup",
+      "reviewed": "2026-09-28",
+      "reason": "`aria-hidden=\"true\"` on the decorative square brackets flanking the 'Construct verified run' button label (line 48), so a screen reader does not announce 'left bracket'. Two punctuation marks; no instruction. Same markup as the reviewed mule/index.html entry."
+    },
+    {
+      "fingerprint": "7e542a79af8ba658",
+      "file": "Science-Agent-Pipeline/artifacts/caterva-landing/src/mule/chapters.html",
+      "rule": "concealment/hidden-markup",
+      "reviewed": "2026-09-28",
+      "reason": "`aria-hidden=\"true\"` on an EMPTY span (line 549) used as a CSS-drawn rule in the manifest section. There is no text in it at all. Same markup as the reviewed mule/index.html entry."
     }
   ]
 }

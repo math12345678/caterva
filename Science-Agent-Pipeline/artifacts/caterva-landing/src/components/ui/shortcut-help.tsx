@@ -45,7 +45,7 @@ export default function ShortcutHelp() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            className="fixed inset-0 bg-surface/50 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
           <motion.div
@@ -53,9 +53,9 @@ export default function ShortcutHelp() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="relative w-full max-w-sm rounded-xl border border-white/[0.08] bg-[#0a0f0c] p-5 shadow-2xl"
+            className="relative w-full max-w-sm rounded-xl border border-fg/[0.16] bg-surface p-5 shadow-2xl"
           >
-            <h2 className="text-white/70 text-[13px] font-medium mb-4">
+            <h2 className="text-fg/78 text-[13px] font-medium mb-4">
               Keyboard Shortcuts
             </h2>
             <div className="space-y-2">
@@ -64,20 +64,20 @@ export default function ShortcutHelp() {
                   key={s.keys}
                   className="flex items-center justify-between text-[12px]"
                 >
-                  <span className="text-white/40">{s.label}</span>
-                  <kbd className="rounded border border-white/[0.06] px-1.5 py-0.5 text-[10px] text-white/30 font-sans">
+                  <span className="text-fg/70">{s.label}</span>
+                  <kbd className="rounded border border-fg/[0.12] px-1.5 py-0.5 text-[10px] text-fg/70 font-sans">
                     {s.keys}
                   </kbd>
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-[10px] text-white/20 text-center">
+            <p className="mt-4 text-[10px] text-fg/66 text-center">
               Press{" "}
-              <kbd className="rounded border border-white/[0.06] px-1 py-0.5">
+              <kbd className="rounded border border-fg/[0.12] px-1 py-0.5">
                 ?
               </kbd>{" "}
               or{" "}
-              <kbd className="rounded border border-white/[0.06] px-1 py-0.5">
+              <kbd className="rounded border border-fg/[0.12] px-1 py-0.5">
                 {"\u2318?"}
               </kbd>{" "}
               to close

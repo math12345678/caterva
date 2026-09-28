@@ -16,29 +16,29 @@ const STATUS_COLORS: Record<string, string> = {
   pending: "text-blue-400/80",
   resolving: "text-yellow-400/80",
   validating: "text-orange-400/80",
-  running: "text-[#1D8A72]",
-  completed: "text-[#1D8A72]",
+  running: "text-signal",
+  completed: "text-signal",
   failed: "text-red-400/80",
-  cancelled: "text-white/30",
+  cancelled: "text-fg/70",
 };
 
 const STATUS_BG: Record<string, string> = {
   pending: "bg-blue-400/[0.06]",
   resolving: "bg-yellow-400/[0.06]",
   validating: "bg-orange-400/[0.06]",
-  running: "bg-[#1D8A72]/[0.06]",
-  completed: "bg-[#1D8A72]/[0.06]",
+  running: "bg-signal/[0.06]",
+  completed: "bg-signal/[0.06]",
   failed: "bg-red-400/[0.06]",
-  cancelled: "bg-white/[0.03]",
+  cancelled: "bg-fg/[0.03]",
 };
 
 function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`shrink-0 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wide transition-all ${STATUS_COLORS[status] ?? "text-white/50"} ${STATUS_BG[status] ?? "bg-white/[0.03]"}`}
+      className={`shrink-0 inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[10px] uppercase tracking-wide transition-all ${STATUS_COLORS[status] ?? "text-fg/76"} ${STATUS_BG[status] ?? "bg-fg/[0.03]"}`}
     >
       {status === "running" && (
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#1D8A72] animate-pulse" />
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
       )}
       {status}
     </span>
@@ -55,15 +55,15 @@ function formatTime(iso: string) {
 
 function seriesForResponse(response: SimulationResponse) {
   const colorMap: Record<string, string> = {
-    S: "#1D8A72",
-    P: "#F59E0B",
-    I: "#EF4444",
-    R: "#3B82F6",
-    E: "#8B5CF6",
+    S: "#5D7F8D",
+    P: "#946522",
+    I: "#A63D35",
+    R: "#6A6E78",
+    E: "#6A6E78",
   };
   if (!response.trajectory || response.trajectory.length === 0) return [];
   const keys = Object.keys(response.trajectory[0]!).filter((k) => k !== "t");
-  return keys.map((key) => ({ key, color: colorMap[key] ?? "#ffffff" }));
+  return keys.map((key) => ({ key, color: colorMap[key] ?? "#FDF8EE" }));
 }
 
 interface RecentRunsProps {
@@ -112,14 +112,14 @@ function saveBookmarks(ids: Set<string>): void {
 
 function SkeletonRow() {
   return (
-    <div className="rounded-lg border border-white/[0.04] p-3">
+    <div className="rounded-lg border border-fg/[0.08] p-3">
       <div className="flex items-center justify-between gap-3 mb-2">
-        <Skeleton className="h-3 w-44 bg-white/[0.04]" />
-        <Skeleton className="h-4 w-16 rounded-md bg-white/[0.04]" />
+        <Skeleton className="h-3 w-44 bg-fg/[0.04]" />
+        <Skeleton className="h-4 w-16 rounded-md bg-fg/[0.04]" />
       </div>
       <div className="flex items-center gap-3">
-        <Skeleton className="h-2.5 w-20 bg-white/[0.03]" />
-        <Skeleton className="h-2.5 w-16 bg-white/[0.03]" />
+        <Skeleton className="h-2.5 w-20 bg-fg/[0.03]" />
+        <Skeleton className="h-2.5 w-16 bg-fg/[0.03]" />
       </div>
     </div>
   );
@@ -324,10 +324,10 @@ export default function RecentRuns({
 
   return (
     <TerminalWindow path="~/caterva — recent runs" glow>
-      <div className="mb-4 text-white/90">
-        <span className="text-[#1D8A72]">$</span> caterva runs --recent
+      <div className="mb-4 text-fg/92">
+        <span className="text-signal">$</span> caterva runs --recent
       </div>
-      <p className="text-white/30 text-[12px] mb-5 leading-relaxed">
+      <p className="text-fg/70 text-[12px] mb-5 leading-relaxed">
         Latest pipeline runs. Click a row to inspect, select two to compare.
         Refreshes every 5 seconds.
       </p>
@@ -347,12 +347,12 @@ export default function RecentRuns({
             setDisplayCount(pageSize);
           }}
           placeholder="filter runs..."
-          className="flex-1 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-white/60 text-[11px] outline-none transition-all duration-300 focus:border-[#1D8A72]/30 focus:bg-[#1D8A72]/[0.02] focus:shadow-[0_0_12px_rgba(29,138,114,0.04)] placeholder:text-white/20"
+          className="flex-1 rounded-lg border border-fg/[0.12] bg-fg/[0.02] px-3 py-2 text-fg/80 text-[11px] outline-none transition-all duration-300 focus:border-signal/30 focus:bg-signal/[0.02] placeholder:text-fg/66"
         />
         {compare.size > 0 && (
           <button
             onClick={() => setCompare(new Set())}
-            className="px-2.5 py-1.5 rounded-lg border border-white/[0.06] text-[10px] text-white/30 hover:text-white/60 transition-colors"
+            className="px-2.5 py-1.5 rounded-lg border border-fg/[0.12] text-[10px] text-fg/70 hover:text-fg/80 transition-colors"
           >
             clear ({compare.size})
           </button>
@@ -385,7 +385,7 @@ export default function RecentRuns({
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-white/25 text-[12px] italic"
+              className="text-fg/66 text-[12px] italic"
             >
               {search
                 ? `No runs matching "${search}".`
@@ -401,33 +401,33 @@ export default function RecentRuns({
               exit={{ opacity: 0 }}
               className={`rounded-lg border overflow-hidden transition-all duration-500 ${
                 highlighted.has(run.jobId)
-                  ? "border-[#1D8A72]/40 shadow-[0_0_20px_rgba(29,138,114,0.15)]"
-                  : "border-white/[0.04] hover:border-white/[0.08]"
+                  ? "border-signal/40"
+                  : "border-fg/[0.08] hover:border-fg/[0.16]"
               }`}
             >
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => toggleExpanded(run.jobId)}
-                  className="flex-1 text-left hover:bg-white/[0.015] transition-colors duration-150 p-3"
+                  className="flex-1 text-left hover:bg-fg/[0.015] transition-colors duration-150 p-3"
                 >
                   <div className="flex items-center justify-between gap-3 mb-1">
                     <span className="flex items-center gap-2 min-w-0">
                       <span
-                        className="text-white/60 truncate text-[12px]"
+                        className="text-fg/80 truncate text-[12px]"
                         title={run.query}
                       >
                         {run.query}
                       </span>
                       {newlyCompleted.has(run.jobId) &&
                         run.status === "completed" && (
-                          <span className="shrink-0 inline-flex items-center rounded bg-[#1D8A72]/15 px-1.5 py-0.5 text-[8px] text-[#1D8A72] uppercase tracking-wide animate-pulse-soft">
+                          <span className="shrink-0 inline-flex items-center rounded bg-signal/15 px-1.5 py-0.5 text-[8px] text-signal uppercase tracking-wide animate-pulse-soft">
                             new
                           </span>
                         )}
                     </span>
                     <StatusBadge status={run.status} />
                   </div>
-                  <div className="flex items-center gap-3 text-[10px] text-white/20">
+                  <div className="flex items-center gap-3 text-[10px] text-fg/66">
                     <span>progress: {run.progress}%</span>
                     <span>&middot;</span>
                     <span>{formatTime(run.updatedAt)}</span>
@@ -440,8 +440,8 @@ export default function RecentRuns({
                         onClick={(e) => toggleBookmark(run.jobId, e)}
                         className={`px-2 py-1 rounded-md border text-[9px] transition-all duration-200 ${
                           bookmarked.has(run.jobId)
-                            ? "border-[#F59E0B]/30 text-[#F59E0B] bg-[#F59E0B]/[0.06]"
-                            : "border-white/[0.06] text-white/20 hover:text-white/50 hover:bg-white/[0.03]"
+                            ? "border-caution/30 text-caution bg-caution/[0.06]"
+                            : "border-fg/[0.12] text-fg/66 hover:text-fg/76 hover:bg-fg/[0.03]"
                         }`}
                         title={
                           bookmarked.has(run.jobId)
@@ -458,8 +458,8 @@ export default function RecentRuns({
                         }}
                         className={`px-2 py-1 rounded-md border text-[9px] transition-all duration-200 ${
                           compare.has(run.jobId)
-                            ? "border-[#F59E0B]/30 text-[#F59E0B]/60 bg-[#F59E0B]/[0.06]"
-                            : "border-white/[0.06] text-white/25 hover:text-white/50 hover:bg-white/[0.03]"
+                            ? "border-caution/30 text-caution/60 bg-caution/[0.06]"
+                            : "border-fg/[0.12] text-fg/66 hover:text-fg/76 hover:bg-fg/[0.03]"
                         }`}
                         title="Select for comparison"
                       >
@@ -467,14 +467,14 @@ export default function RecentRuns({
                       </button>
                       <button
                         onClick={(e) => handleRerun(run.query, e)}
-                        className="px-2 py-1 rounded-md border border-[#1D8A72]/15 text-[#1D8A72]/50 text-[9px] hover:bg-[#1D8A72]/[0.06] hover:text-[#1D8A72] transition-all duration-200"
+                        className="px-2 py-1 rounded-md border border-signal/15 text-signal/50 text-[9px] hover:bg-signal/[0.06] hover:text-signal transition-all duration-200"
                         title="Re-run this query"
                       >
                         re-run
                       </button>
                       <button
                         onClick={(e) => handleExport(run.jobId, e)}
-                        className="px-2 py-1 rounded-md border border-white/[0.06] text-white/30 text-[9px] hover:bg-white/[0.03] hover:text-white/50 transition-all duration-200"
+                        className="px-2 py-1 rounded-md border border-fg/[0.12] text-fg/70 text-[9px] hover:bg-fg/[0.03] hover:text-fg/76 transition-all duration-200"
                         title="Download CSV"
                       >
                         csv
@@ -499,7 +499,7 @@ export default function RecentRuns({
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    className="border-t border-white/[0.03] bg-white/[0.01]"
+                    className="border-t border-fg/[0.06] bg-fg/[0.01]"
                   >
                     <div className="p-3 space-y-4">
                       {run.error && (
@@ -510,8 +510,8 @@ export default function RecentRuns({
 
                       {run.result && (
                         <>
-                          <div className="flex items-center gap-3 text-[11px] text-white/30">
-                            <span className="inline-flex items-center gap-1 rounded bg-[#1D8A72]/10 px-2 py-0.5 text-[10px] text-[#1D8A72] uppercase tracking-wide">
+                          <div className="flex items-center gap-3 text-[11px] text-fg/70">
+                            <span className="inline-flex items-center gap-1 rounded bg-signal/10 px-2 py-0.5 text-[10px] text-signal uppercase tracking-wide">
                               {run.result.domain}
                             </span>
                             <span>runId: {run.result.runId}</span>
@@ -537,7 +537,7 @@ export default function RecentRuns({
 
                           {run.result.trajectory &&
                             run.result.trajectory.length > 0 && (
-                              <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2">
+                              <div className="rounded-lg border border-fg/[0.08] bg-fg/[0.01] p-2">
                                 <LineChart
                                   data={
                                     (run.result.trajectory ??
@@ -549,9 +549,9 @@ export default function RecentRuns({
                             )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="rounded-lg border border-white/[0.04] p-3">
+                            <div className="rounded-lg border border-fg/[0.08] p-3">
                               <div className="flex items-center justify-between mb-2">
-                                <span className="text-white/20 text-[10px] uppercase tracking-wide">
+                                <span className="text-fg/66 text-[10px] uppercase tracking-wide">
                                   parameters
                                 </span>
                                 <button
@@ -575,22 +575,22 @@ export default function RecentRuns({
                                       })
                                       .catch(() => {});
                                   }}
-                                  className="flex items-center gap-1 rounded border border-white/[0.06] px-1.5 py-0.5 text-[9px] text-white/25 hover:text-white/50 hover:border-white/[0.12] transition-all duration-200"
+                                  className="flex items-center gap-1 rounded border border-fg/[0.12] px-1.5 py-0.5 text-[9px] text-fg/66 hover:text-fg/76 hover:border-fg/[0.24] transition-all duration-200"
                                 >
                                   {copiedParams.has(run.jobId)
                                     ? "copied"
                                     : "copy"}
                                 </button>
                               </div>
-                              <pre className="text-white/60 overflow-x-auto text-[11px]">
+                              <pre className="text-fg/80 overflow-x-auto text-[11px]">
                                 {JSON.stringify(run.result.parameters, null, 2)}
                               </pre>
                             </div>
-                            <div className="rounded-lg border border-white/[0.04] p-3">
-                              <div className="text-white/20 text-[10px] uppercase tracking-wide mb-2">
+                            <div className="rounded-lg border border-fg/[0.08] p-3">
+                              <div className="text-fg/66 text-[10px] uppercase tracking-wide mb-2">
                                 provenance
                               </div>
-                              <p className="text-white/60 mb-2 text-[11px] leading-relaxed">
+                              <p className="text-fg/80 mb-2 text-[11px] leading-relaxed">
                                 {run.result.provenance.reasoning}
                               </p>
                               {run.result.provenance.flags &&
@@ -611,12 +611,12 @@ export default function RecentRuns({
                               {run.result.provenance.modelCitations &&
                                 run.result.provenance.modelCitations.length >
                                   0 && (
-                                  <div className="border-t border-white/[0.04] pt-2 mt-2 space-y-0.5">
+                                  <div className="border-t border-fg/[0.08] pt-2 mt-2 space-y-0.5">
                                     {run.result.provenance.modelCitations.map(
                                       (citation, i) => (
                                         <div
                                           key={i}
-                                          className="text-[10px] text-white/25 truncate"
+                                          className="text-[10px] text-fg/66 truncate"
                                         >
                                           {citation}
                                         </div>
@@ -630,7 +630,7 @@ export default function RecentRuns({
                       )}
 
                       {!run.result && !run.error && (
-                        <div className="text-white/25 text-[12px] italic">
+                        <div className="text-fg/66 text-[12px] italic">
                           Job is still running. Expand again once it completes.
                         </div>
                       )}
@@ -650,14 +650,14 @@ export default function RecentRuns({
               {hasMore ? (
                 <button
                   onClick={() => setDisplayCount((p) => p + pageSize)}
-                  className="px-3 py-1.5 rounded-md border border-white/[0.06] text-[10px] text-white/30 hover:text-[#1D8A72] hover:border-[#1D8A72]/20 transition-all duration-200 bg-white/[0.02] hover:bg-[#1D8A72]/[0.03]"
+                  className="px-3 py-1.5 rounded-md border border-fg/[0.12] text-[10px] text-fg/70 hover:text-signal hover:border-signal/20 transition-all duration-200 bg-fg/[0.02] hover:bg-signal/[0.03]"
                 >
                   show more ({filteredRuns.length - displayCount} remaining)
                 </button>
               ) : displayCount > pageSize ? (
                 <button
                   onClick={() => setDisplayCount(pageSize)}
-                  className="px-3 py-1.5 rounded-md border border-white/[0.06] text-[10px] text-white/30 hover:text-white/50 transition-all duration-200 bg-white/[0.02] hover:bg-white/[0.03]"
+                  className="px-3 py-1.5 rounded-md border border-fg/[0.12] text-[10px] text-fg/70 hover:text-fg/76 transition-all duration-200 bg-fg/[0.02] hover:bg-fg/[0.03]"
                 >
                   show less
                 </button>
