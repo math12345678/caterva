@@ -194,7 +194,9 @@ export default function BrandMotion({ height = 170 }: { height?: number }) {
         {RING.map(([cx, cy, r], i) => (
           <circle
             key={i}
-            ref={(el) => (dots.current[i] = el)}
+            ref={(el) => {
+              dots.current[i] = el;
+            }}
             cx={cx}
             cy={cy}
             r={r}
@@ -211,7 +213,9 @@ export default function BrandMotion({ height = 170 }: { height?: number }) {
         {LETTERS.map((l, i) => (
           <span
             key={i}
-            ref={(el) => (letters.current[i] = el)}
+            ref={(el) => {
+              letters.current[i] = el;
+            }}
             className="inline-block"
             style={{ opacity: 0 }}
           >
