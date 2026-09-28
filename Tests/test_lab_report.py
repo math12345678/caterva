@@ -207,8 +207,12 @@ def test_the_absence_of_refusals_is_stated_rather_than_left_blank():
 def test_a_preparation_caveat_reaches_the_report():
     """ADR 0092: the value returned may be an immobilised or tagged
     enzyme's. That belongs in a document somebody submits."""
+    # The His-tagged quinoline sulfonamide rows (BRENDA ref 739793). This
+    # asked for "NADH" until the parser stopped matching compounds named
+    # only in a row's commentary; then it found nothing and skipped.
     ki = resolve_kinetic_value(
-        LDH, "Homo sapiens", "NADH",
+        LDH, "Homo sapiens",
+        "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid",
         html_provider=make_html_provider(
             {LDH: load_fixture("brenda_ldh_ki_fixture.html")}
         ),
@@ -217,8 +221,7 @@ def test_a_preparation_caveat_reaches_the_report():
         search_literature=False, allow_cross_species=False,
         quantity="ki", lineage_provider=fixture_lineage_provider,
     )
-    if not (ki.preparation and ki.preparation.differs_from_the_free_enzyme):
-        pytest.skip("this fixture's winning row is not a modified preparation")
+    assert ki.found and ki.preparation and ki.preparation.differs_from_the_free_enzyme
 
     result = report(resolved={"ki": ki})
     assert any("not the free enzyme" in r for r in result.refusals)

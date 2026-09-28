@@ -481,6 +481,23 @@ async function ensureRunnerScript(): Promise<void> {
 }
 
 /**
+ * The `error` of the runner's last stdout line when it is a JSON failure
+ * record ({"ok": false, "error": "..."}), else null.
+ */
+export function runnerError(stdout: string): string | null {
+  const last = stdout.trim().split("\n").pop();
+  if (!last) return null;
+  try {
+    const parsed = JSON.parse(last) as { ok?: unknown; error?: unknown };
+    return parsed.ok === false && typeof parsed.error === "string" && parsed.error
+      ? parsed.error
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Spawn the Python science-agent runner with an arbitrary JSON payload and
  * parse its stdout. Shared by resolveKineticValue() (enzyme kinetics) and
  * resolveEpidemiologyParameters() (ADR 0017 / ADR 0020) so there is exactly
@@ -535,23 +552,25 @@ async function spawnScienceAgent(
       const hadNoOutput = !trimmed;
 
       if (hadNonZeroExit || hadNoOutput) {
-        // The runner's own reason first, then the exit status -- never the
-        // status alone. This boundary had the defect
-        // catervaRunnerFailures.test.ts records for the OTHER one: the
-        // engine writes its reason to stdout and exits non-zero, and reading
-        // the status first threw the reason away. Here it was narrower and
-        // harder to see, because stderr usually carries something: when the
-        // child died with stderr empty, the caller got "exited with code 1"
-        // and stdout was discarded unread. Measured 2026-09-28, that is
-        // exactly what three failing organismFromQuery tests reported in CI,
-        // and it is why the cause could not be read off the log.
-        const parts = [`Science agent runner exited with code ${code}`];
-        if (stderr.trim()) parts.push(`stderr: ${stderr.trim()}`);
-        if (trimmed) parts.push(`stdout: ${trimmed.slice(0, 4000)}`);
-        if (!stderr.trim() && !trimmed) {
-          parts.push("the runner wrote nothing to stdout or stderr");
-        }
-        reject(new Error(parts.join("\n")));
+        // The runner reports a caught failure as {"ok": false, "error": ...}
+        // on STDOUT and exits 1, so stderr is empty exactly when the reason
+        // is known. Reading only stderr turned "BRENDA returned 500" into
+        // "exited with code 1" (found 2026-09-28, BRENDA down for 2.7.1.1).
+        //
+        // The last two fallbacks are for the cases runnerError cannot parse:
+        // output that is not the expected JSON at all, which is worth
+        // printing verbatim rather than replacing with an exit status, and
+        // a child that wrote nothing anywhere, which is worth saying out
+        // loud because it looks identical to a silent success otherwise.
+        const message =
+          stderr.trim() ||
+          runnerError(trimmed) ||
+          (trimmed
+            ? `Science agent runner exited with code ${code}; ` +
+              `unparseable output: ${trimmed.slice(0, 4000)}`
+            : `Science agent runner exited with code ${code}; ` +
+              "the runner wrote nothing to stdout or stderr");
+        reject(new Error(message));
         return;
       }
 

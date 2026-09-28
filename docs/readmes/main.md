@@ -10,7 +10,7 @@ git clone --recursive https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything
 make check     # verifies the stack genuinely works
-make test      # 4,115 tests (2,936 engine + 1,179 literature)
+make test      # 4,165 tests (2,985 engine + 1,180 literature)
 ```
 
 `make check` is not a version-string check. It builds a real
@@ -59,8 +59,8 @@ can drift out of sync.
 
 | repository | what |
 |---|---|
-| [`caterva`](https://github.com/math12345678/caterva) | the simulation engine — 15 domains, 2,936 tests |
-| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,179 tests |
+| [`caterva`](https://github.com/math12345678/caterva) | the simulation engine — 15 domains, 2,985 tests |
+| [`tests`](https://github.com/Terrium-sim/tests) | the literature layer — BRENDA/PubMed resolvers, 1,180 tests |
 | [`backend-main`](https://github.com/Terrium-sim/backend-main) | TypeScript library, CLI, web server |
 | [`frontend-main`](https://github.com/Terrium-sim/frontend-main) | the dashboard UI |
 | [`wiring-main`](https://github.com/Terrium-sim/wiring-main) | the 22 guards, CI, build config |
