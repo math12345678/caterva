@@ -324,6 +324,60 @@ output so the trajectory can be reproduced.
 
 ---
 
+## Structures and dynamics: from a constant to a simulation
+
+Two commands carry an enzyme from its kinetics to its structure and on to a
+molecular dynamics setup, with the same rule throughout: every number says
+where it came from.
+
+### `caterva structure`: which structures exist, and which protein each is
+
+```bash
+caterva structure --subject 1.1.1.27 --organism human
+```
+
+EC 1.1.1.27 in human is five proteins (LDHA, LDHB, LDHC and two LDHAL6),
+with 55 PDB entries between them. A structure belongs to one protein, so
+this lists them and refuses (exit 3) to pick one for you. Choose:
+
+```bash
+caterva structure --subject 1.1.1.27 --organism human --gene LDHA \
+    --ligand oxamate --chimerax ldha.cxc
+```
+
+Entries with the ligand bound come first, then by method and resolution.
+Each shows its ligands, cofactors and metals, kept apart from
+crystallisation additives (glycerol, sulfate, acetate), and its primary
+citation, or, for the depositions whose paper never appeared, says
+"unpublished deposition" and cites the entry's own DOI. `oxamate` finds
+OXAMIC ACID: the carboxylate and its acid are folded together, nothing
+further. `ldha.cxc` opens the top entry in ChimeraX with the ligand, the
+residues within 5 A of it, and the citations in its header:
+`chimerax ldha.cxc`.
+
+### `caterva md`: a GROMACS setup at the conditions the constants were measured under
+
+```bash
+caterva md --pdb 1I10 --chain A \
+    --subject 1.1.1.27 --organism human --substrate pyruvate --out ldha-md
+bash ldha-md/run.sh
+```
+
+With `--subject`, `--organism` and `--substrate`, the literature is searched
+first, and the simulation runs at the temperature and pH of the first cited
+constant whose paper states them: here 37 C and pH 7.5, from the assay
+behind human LDHA's Ki (BRENDA ref 739793). `ldha-md/PROVENANCE.md` lists
+every setting in the `.mdp` files as **measured**, **chosen** or
+**method** (with a verified DOI). Without a measured temperature the run
+still writes, at 25 C labelled a choice, and exits 3 to say so.
+
+What it will not do: invent a topology for a ligand (it strips and lists
+them; parameterise them with ACPYPE/GAFF or CGenFF), or pretend GROMACS's
+standard protonation states match an assay at pH 5 (it records the pH and
+points at PROPKA). `run.sh` needs `gmx` on PATH (or `GMX=/path/to/gmx`);
+it was run end to end with GROMACS 2021 on 1I10 chain A, and CI runs every
+stage on lysozyme (1AKI) with Ubuntu's GROMACS.
+
 ## The other half: population genetics
 
 The same executable carries a simulation engine that has nothing to do with

@@ -50,7 +50,7 @@ hides best.
 ## The register
 
 <!-- PUBLIC-IMAGES-START
-b43ebbd7ab78466b  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/favicon.svg
+e8605d3ff345900f  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/favicon.svg
 790805bf4a0ac4cb  reviewed  mule/_shots/01-hero.png
 6737793581a7406d  reviewed  mule/_shots/02-atlas-system.png
 2925ce1e7d0348b4  reviewed  mule/_shots/02b-atlas-natural.png
@@ -120,10 +120,10 @@ open, and the mode dock. No results, no counts. `02b` reads *"SEVEN
 REGIONS. EIGHT DECLARED ROUTES."* — a statement about the diagram, not
 about the software.
 
-**`favicon.svg`** — 13 lines of hand-written SVG: a rounded square, the
-letter C (T until the rename on 2026-09-27, the only change; re-reviewed
-then), three circles and three connecting lines. No embedded fonts, no
-traced artwork, nothing licensed from anywhere.
+**`favicon.svg`** — hand-written SVG: a cream rounded square and eleven
+circles forming a C, the Caterva mark (replaced the teal "T" tile on
+2026-09-27; re-reviewed then). No text, no embedded fonts, no traced
+artwork, nothing licensed from anywhere.
 
 ### A wording tension worth noting
 

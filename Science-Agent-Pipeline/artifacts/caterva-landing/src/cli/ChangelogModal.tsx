@@ -21,7 +21,7 @@ const RELEASES: Release[] = [
     date: "September 27, 2026",
     tag: "feature",
     title: "v0.4.0: Terrium is now Caterva",
-    desc: "Same logo, same code, a name that can no longer be confused with Tellurium. The command is caterva (terrium still works), the repository is public at github.com/math12345678/caterva, and private business records were removed from its history first.",
+    desc: "A new logo, the same code, and a name that can no longer be confused with Tellurium. The command is caterva (terrium still works), the repository is public at github.com/math12345678/caterva, and private business records were removed from its history first.",
   },
   {
     date: "September 24, 2026",

@@ -36,6 +36,8 @@ from typing import Optional, Sequence
 #: proof that the native libraries load.)
 COMMANDS = {
     "compose": ("caterva.compose.__main__", "the model builder and its analyses"),
+    "structure": ("caterva.structure.__main__", "an enzyme's PDB structures, cited, and a ChimeraX script"),
+    "md": ("caterva.md.__main__", "a GROMACS setup whose every parameter is measured, chosen or cited"),
     "sim": ("caterva.cli", "the simulation engine: wf, kimura, ne, sweep, scenarios, ld, ssa"),
 }
 
@@ -67,8 +69,7 @@ IT RECOGNISES A SHAPE, NEVER A SUBJECT
 
 COMMANDS
 
-  compose   {compose}
-  sim       {sim}
+{commands}
 
   caterva <command> --help   every option, with examples
   caterva --version          the version and exit
@@ -115,7 +116,7 @@ def _usage() -> str:
     return USAGE.format(
         version=__version__,
         shapes=count,
-        **{k: v[1] for k, v in COMMANDS.items()},
+        commands="\n".join(f"  {k:<9} {v[1]}" for k, v in COMMANDS.items()),
     )
 
 

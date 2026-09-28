@@ -146,3 +146,4 @@ Science-Agent-Pipeline/artifacts/api-server/front-door-coverage.txt
 # checkout that still has them cannot publish them again.
 /Business/
 *pitch_deck*
+md-smoke

@@ -1,7 +1,7 @@
 # Caterva
 
 <p align="center">
-  <img src="Logo.png" alt="Caterva" width="360">
+  <img src="Logo.png" alt="Caterva" width="440">
 </p>
 
 <p align="center">
@@ -13,9 +13,9 @@
 
 <p align="center">
   <a href="https://github.com/math12345678/caterva/actions/workflows/tests.yml"><img alt="tests" src="https://github.com/math12345678/caterva/actions/workflows/tests.yml/badge.svg?branch=main"></a>
-  <a href="https://github.com/math12345678/caterva/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/math12345678/caterva?color=1D8A72"></a>
-  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1D8A72"></a>
-  <img alt="Python 3.10 to 3.13" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.13-1D8A72">
+  <a href="https://github.com/math12345678/caterva/releases/latest"><img alt="latest release" src="https://img.shields.io/github/v/release/math12345678/caterva?color=1D201A"></a>
+  <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-1D201A"></a>
+  <img alt="Python 3.10 to 3.13" src="https://img.shields.io/badge/python-3.10%20%E2%80%93%203.13-1D201A">
 </p>
 
 <p align="center">
@@ -75,7 +75,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,693 tests (3,513 engine + 1,180 literature)
+make test      # runs all 4,723 tests (3,543 engine + 1,180 literature)
 ```
 
 ### Or download the release
@@ -552,7 +552,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                3,513 tests
+│   └── tests/                3,543 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -645,9 +645,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,693 tests
+make test        # run all 4,723 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,513 tests)
+make test-sim    # simulation engine only (3,543 tests)
 make test-lit    # literature layer only (1,180 tests)
 python3 scripts/verify_build.py --quick  # all 78 guard scripts, incl. TypeScript compile
 make clean       # remove caches

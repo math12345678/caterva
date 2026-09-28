@@ -339,8 +339,9 @@ jobs:
       # It runs orval, so it needs the Node toolchain and a real install --
       # which is why it belongs in CI rather than in `verify_build --quick`,
       # the fast path that stops getting run the moment it stops being fast.
-      - name: Codegen guard
-        run: python scripts/check_codegen_loads.py
+      # The codegen guard runs orval against the installed workspace, so it
+      # lives in the api-server job, which runs `pnpm install`; this job has
+      # no JavaScript packages, so here it could only report "cannot verify".
 
       # The identifiers.org accession patterns are a DATED COPY, and they are
       # the only thing standing between a resolvable citation and a
@@ -498,8 +499,34 @@ jobs:
       - name: Codegen load check (self-check)
         run: python scripts/check_codegen_loads.py --selftest
 
+      # Moved here 2026-09-27 from the Python jobs, which never install the
+      # workspace: there it could only exit 2 ("cannot verify").
+      - name: Codegen guard
+        run: python scripts/check_codegen_loads.py
+
       # Reads licences out of the installed JavaScript packages, so it can
       # only run where they are installed; the Python jobs report it as a
       # skip with that reason.
       - name: Dependency licences (installed packages)
         run: python -m pytest Tests/test_dependency_licenses.py -p no:cacheprovider -q
+
+  # `caterva md` writes a GROMACS setup; this runs it, every stage, with
+  # Ubuntu's GROMACS, on hen lysozyme (1AKI, EC 3.2.1.17: small, one chain,
+  # the standard GROMACS test protein). Steps are capped so each stage is
+  # exercised in seconds; the inputs and topology are the real ones.
+  md-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install GROMACS
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq gromacs
+          gmx --version | head -3
+      - name: Set up Caterva
+        run: make setup
+      - name: Run every stage (capped)
+        run: make md-smoke

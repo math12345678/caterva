@@ -44,6 +44,26 @@ which is a product nobody adopts.
 - README, `START_HERE.md`, the docs index and the v0.3.0 release notes
   point at the guide.
 
+## [Unreleased]
+
+Caterva narrows to enzymes: kinetics, structure and dynamics.
+
+### Added
+- **`caterva structure`**: an enzyme's PDB entries, grouped by UniProt
+  protein (an EC number in one organism is often several proteins, and the
+  command refuses to pick between them), ranked by the ligand asked for,
+  method and resolution, with ligands, cofactors, metals and
+  crystallisation additives kept apart, and each entry cited by its paper
+  or, when unpublished, by its own DOI. `--chimerax` writes a script.
+- **`caterva md`**: a GROMACS setup (mdp files, `run.sh`,
+  `PROVENANCE.md`) in which every setting is measured, chosen or cited;
+  with `--subject/--organism/--substrate` the temperature and pH come from
+  the assay behind a cited kinetic constant. Run end to end with GROMACS
+  2021 on LDHA (held 310.2 K for a measured 37 C); a CI job runs every
+  stage on lysozyme.
+- `caterva/methods.py`: the eleven method citations those outputs rest on,
+  each DOI checked against Crossref.
+
 ## [0.4.0] - 2026-09-27
 
 **Terrium is now Caterva.** Notes: `docs/releases/v0.4.0.md`.
@@ -52,7 +72,8 @@ which is a product nobody adopts.
 - **The name, everywhere.** Product, repository (`math12345678/caterva`),
   command (`caterva`), Python package (`caterva`, was `Terium`), download
   filenames, environment variables (`TERRIUM_*` to `CATERVA_*`) and the
-  website. The logo's mark is unchanged; the wordmark reads "caterva". The
+  website. New logo: a C of eleven dots with a serif wordmark, in ink
+  (`#1D201A`) on paper (`#F2EFE5`); see `docs/brand/`. The
   `terrium` command is kept as an alias. Entries below this one were passed
   through the same rename, so older command names read as `caterva`.
 - **The engine command is `caterva-sim`** (was `terium`); `caterva sim` is
