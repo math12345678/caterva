@@ -3,23 +3,26 @@ import { motion, AnimatePresence } from "framer-motion";
 import { simulateMichaelisMenten } from "@/lib/simulate";
 import LineChart from "./LineChart";
 
-// Human LDH-A reducing pyruvate, with and without the competitive
-// inhibitor oxamate. Km and Ki are recorded BRENDA values (both Homo
-// sapiens); [I], Vmax and [S]0 are chosen for the picture and labelled so.
-// A competitive inhibitor keeps the Michaelis-Menten form with the
-// apparent Km = Km(1 + [I]/Ki), so one integrator draws both curves.
+// Human LDH-A reducing pyruvate, with and without a quinoline sulfonamide
+// inhibitor. Km and Ki are recorded BRENDA values (both Homo sapiens). The
+// Ki is the pyruvate row of ref 739793: 0.00252 mM, noncompetitive, measured
+// at pH 7.5 and 37 C on a His-tagged enzyme. (The same paper's 0.00059 mM
+// is competitive against NADH, not pyruvate, so it does not belong here.)
+// A noncompetitive inhibitor leaves Km alone and scales Vmax by
+// 1/(1 + [I]/Ki), so one integrator draws both curves. [I], Vmax and [S]0
+// are chosen for the picture and labelled so.
 const citations = [
   { label: "Km 0.03 mM", id: "BRENDA 286469" },
-  { label: "Ki 0.00059 mM", id: "BRENDA 739793" },
+  { label: "Ki 0.00252 mM", id: "BRENDA 739793" },
   { label: "Michaelis & Menten", id: "1913" },
 ];
 
 const KM = 0.03;
-const KI = 0.00059;
+const KI = 0.00252;
 const VMAX = 0.05;
 const S0 = 0.2;
 const END = 6;
-const INHIBITOR_LEVELS = [0, 0.0005, 0.001, 0.002];
+const INHIBITOR_LEVELS = [0, 0.001, 0.0025, 0.005];
 
 export default function DashboardPreview() {
   const [level, setLevel] = useState(0);
@@ -56,9 +59,9 @@ export default function DashboardPreview() {
   }, [startAutoCycle]);
 
   const inhibitor = INHIBITOR_LEVELS[level]!;
-  const kmApp = KM * (1 + inhibitor / KI);
+  const vmaxApp = VMAX / (1 + inhibitor / KI);
   const free = simulateMichaelisMenten({ km: KM, vmax: VMAX, s0: S0, end: END, points: 61 });
-  const inhibited = simulateMichaelisMenten({ km: kmApp, vmax: VMAX, s0: S0, end: END, points: 61 });
+  const inhibited = simulateMichaelisMenten({ km: KM, vmax: vmaxApp, s0: S0, end: END, points: 61 });
   const data = free.trajectory.map((p, i) => ({
     t: p.t,
     S: p.S,
@@ -86,7 +89,7 @@ export default function DashboardPreview() {
         <span className="w-2 h-2 rounded-full bg-fg/10" />
         <span className="w-2 h-2 rounded-full bg-fg/10" />
         <span className="text-[10px] text-fg/66 ml-2 font-mono">
-          simulation — LDH-A + oxamate
+          simulation, LDH-A + quinoline inhibitor
         </span>
       </div>
 
@@ -150,8 +153,8 @@ export default function DashboardPreview() {
 
               <div className="grid grid-cols-4 gap-2 mt-2">
                 {[
-                  { label: "[oxamate]", value: `${(inhibitor * 1000).toFixed(1)} µM`, color: "text-fg/78" },
-                  { label: "apparent Km", value: `${kmApp.toFixed(3)} mM`, color: "text-caution" },
+                  { label: "[inhibitor]", value: `${(inhibitor * 1000).toFixed(1)} µM`, color: "text-fg/78" },
+                  { label: "apparent Vmax", value: `${(vmaxApp * 1000).toFixed(1)} µM/min`, color: "text-caution" },
                   { label: "[S] left", value: `${finalInh.toFixed(3)} mM`, color: "text-caution" },
                   { label: "uninhibited", value: `${finalFree.toFixed(3)} mM`, color: "text-signal" },
                 ].map((stat) => (
@@ -181,7 +184,7 @@ export default function DashboardPreview() {
             >
               {[
                 { key: "Km (pyruvate)", val: "0.03 mM", range: "BRENDA 286469", color: "[#5D7F8D]" },
-                { key: "Ki (oxamate)", val: "0.00059 mM", range: "BRENDA 739793", color: "[#946522]" },
+                { key: "Ki (vs pyruvate)", val: "0.00252 mM", range: "BRENDA 739793, His-tagged", color: "[#946522]" },
                 { key: "Vmax", val: `${VMAX} mM/min`, range: "chosen", color: "[#6A6E78]" },
                 { key: "[S]0, [I]", val: `${S0} mM, ${(inhibitor * 1000).toFixed(1)} µM`, range: "chosen", color: "[#6A6E78]" },
               ].map((p) => (
@@ -242,7 +245,7 @@ export default function DashboardPreview() {
           <span className="w-1 h-1 rounded-full bg-signal" />
           ode simulation · rk4
         </span>
-        <span>competitive · Vmax unchanged</span>
+        <span>noncompetitive · Km unchanged</span>
       </div>
     </div>
   );

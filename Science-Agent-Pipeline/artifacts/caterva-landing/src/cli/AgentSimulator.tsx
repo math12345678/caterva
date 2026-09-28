@@ -73,7 +73,6 @@ const DOMAIN_PARAMS: Record<
 
 const EXAMPLE_QUERIES = [
   "simulate lactate dehydrogenase with pyruvate",
-  "competitive inhibition of lactate dehydrogenase by oxamate",
   "enzyme kinetics km 5 vmax 10",
 ];
 

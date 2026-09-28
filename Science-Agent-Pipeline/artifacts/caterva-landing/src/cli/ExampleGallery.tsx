@@ -26,18 +26,19 @@ const MM_EXAMPLE = simulateMichaelisMenten({
   end: 3,
   points: 61,
 });
-// Competitive inhibition of human LDH-A by oxamate. A competitive inhibitor
-// leaves the rate law in Michaelis-Menten form with Km scaled by
-// (1 + [I]/Ki), so the same integrator is exact here -- no second model.
-// Km 0.03 mM (BRENDA ref 286469) and Ki 0.00059 mM (BRENDA ref 739793) are
-// both Homo sapiens, pyruvate; [I], Vmax and [S]0 are chosen.
+// Noncompetitive inhibition of human LDH-A by a quinoline sulfonamide. A
+// noncompetitive inhibitor leaves the rate law in Michaelis-Menten form with
+// Vmax divided by (1 + [I]/Ki), so the same integrator is exact here.
+// Km 0.03 mM (BRENDA ref 286469) and Ki 0.00252 mM (BRENDA ref 739793, the
+// pyruvate row: pH 7.5, 37 C, His-tagged enzyme) are both Homo sapiens;
+// [I], Vmax and [S]0 are chosen.
 const LDH_KM = 0.03;
-const OXAMATE_KI = 0.00059;
-const OXAMATE_I = 0.001;
+const INHIBITOR_KI = 0.00252;
+const INHIBITOR_I = 0.0025;
 const LDH_FREE = simulateMichaelisMenten({ km: LDH_KM, vmax: 0.05, s0: 0.2, end: 6, points: 61 });
 const LDH_INHIBITED = simulateMichaelisMenten({
-  km: LDH_KM * (1 + OXAMATE_I / OXAMATE_KI),
-  vmax: 0.05,
+  km: LDH_KM,
+  vmax: 0.05 / (1 + INHIBITOR_I / INHIBITOR_KI),
   s0: 0.2,
   end: 6,
   points: 61,
@@ -81,15 +82,15 @@ const EXAMPLES: ExampleCard[] = [
     query: "simulate lactate dehydrogenase with pyruvate",
   },
   {
-    id: "ldh-oxamate-demo",
-    domain: "mm_competitive_inhibition",
-    label: "Competitive inhibition",
+    id: "ldh-inhibitor-demo",
+    domain: "mm",
+    label: "Noncompetitive inhibition",
     description:
-      "Human LDH-A with and without oxamate. Km 0.03 mM (BRENDA ref 286469) " +
-      "and Ki 0.00059 mM (BRENDA ref 739793), both measured in H. sapiens; " +
-      "the inhibitor raises the apparent Km and leaves Vmax untouched.",
+      "Human LDH-A with and without a quinoline sulfonamide inhibitor. Km 0.03 mM " +
+      "(BRENDA ref 286469) and Ki 0.00252 mM against pyruvate (BRENDA ref 739793, " +
+      "His-tagged enzyme, pH 7.5, 37 °C); the inhibitor lowers Vmax and leaves Km untouched.",
     stats: [
-      { label: "apparent Km", value: (LDH_KM * (1 + OXAMATE_I / OXAMATE_KI)).toFixed(3) + " mM" },
+      { label: "apparent Vmax", value: (0.05 / (1 + INHIBITOR_I / INHIBITOR_KI)).toFixed(4) + " mM/min" },
       {
         label: "[S] left at t=6",
         value:
@@ -106,7 +107,7 @@ const EXAMPLES: ExampleCard[] = [
         { key: "S_inhibited", color: "#946522" },
       ],
     },
-    query: "competitive inhibition of lactate dehydrogenase by oxamate",
+    query: "simulate lactate dehydrogenase with pyruvate",
   },
 ];
 

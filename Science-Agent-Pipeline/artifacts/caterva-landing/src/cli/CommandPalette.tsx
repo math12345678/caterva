@@ -16,10 +16,6 @@ const EXAMPLE_QUERIES = [
     query: "simulate lactate dehydrogenase with pyruvate",
     label: "LDH Kinetics",
   },
-  {
-    query: "competitive inhibition of lactate dehydrogenase by oxamate",
-    label: "LDH + oxamate",
-  },
   { query: "enzyme kinetics km 5 vmax 10", label: "MM Kinetics" },
 ];
 

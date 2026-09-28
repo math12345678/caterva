@@ -10,6 +10,7 @@ import {
 import { render, screen, fireEvent, act } from "@testing-library/react";
 import ExportButtons from "@/components/ui/export-buttons";
 import StatsBar from "@/cli/StatsBar";
+import DashboardPreview from "@/cli/DashboardPreview";
 import BackendHealth from "@/components/ui/backend-health";
 
 const mockTrajectory = [
@@ -145,5 +146,15 @@ describe("BackendHealth", () => {
     render(<BackendHealth />);
     const disconnected = await screen.findByText(/disconnected/i);
     expect(disconnected).toBeInTheDocument();
+  });
+});
+
+// The hero demo once shipped a stale `kmApp` reference that typechecked
+// nowhere and blanked the hero behind the error boundary. Rendering it is
+// the cheapest test that would have caught that.
+describe("DashboardPreview", () => {
+  it("renders the cited inhibitor constant", () => {
+    render(<DashboardPreview />);
+    expect(screen.getByText(/noncompetitive/)).toBeTruthy();
   });
 });
