@@ -67,7 +67,10 @@ describe("StatsBar", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("no network"));
     render(<StatsBar />);
     expect(screen.getByText(/tests passing/i)).toBeInTheDocument();
-    expect(screen.getByText(/simulation domains/i)).toBeInTheDocument();
+    // "live capabilities" since 2026-09-28: the list now includes the
+    // structure and MD tools, which are not simulation domains. The count
+    // is derived from lib/domains.ts, never a second hardcoded copy.
+    expect(screen.getByText(/live capabilities/i)).toBeInTheDocument();
   });
 
   it("does not fabricate a waitlist count or uptime figure when the API call fails", async () => {

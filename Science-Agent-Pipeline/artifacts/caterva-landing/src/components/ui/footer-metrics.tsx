@@ -16,7 +16,7 @@ export default function FooterMetrics() {
   if (wc === null) return null;
 
   return (
-    <span className="text-white/15">
+    <span className="text-fg/66">
       {wc} researcher{wc !== 1 ? "s" : ""} on the waitlist
     </span>
   );

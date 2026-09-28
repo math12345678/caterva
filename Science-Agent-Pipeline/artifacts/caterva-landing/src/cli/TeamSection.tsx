@@ -15,7 +15,7 @@ const CONTRIBUTORS: Contributor[] = [
     initials: "SR",
     name: "Smyan Reddy",
     role: "Creator & Lead Developer",
-    gradient: "from-[#1D8A72] to-[#0D6B5A]",
+    gradient: "from-signal to-signal-deep",
     links: [
       { label: "github", href: "https://github.com/smyan" },
       { label: "email", href: "mailto:admin.terrium@gmail.com" },
@@ -25,7 +25,7 @@ const CONTRIBUTORS: Contributor[] = [
     initials: "??",
     name: "You?",
     role: "Contributor — join us",
-    gradient: "from-[#8B5CF6] to-[#6D28D9]",
+    gradient: "from-muted to-muted",
     // The repository isn't public yet (see README.md's own "Not public
     // yet" notice), so a "contribute" link to it would be a dead end for
     // every visitor. The waitlist is the real, working way in today.
@@ -38,28 +38,28 @@ const ECOSYSTEM = [
     name: "BRENDA",
     desc: "Enzyme functional data — the gold standard for kinetic parameters.",
     url: "https://www.brenda-enzymes.org",
-    color: "#1D8A72",
+    color: "#5D7F8D",
     emoji: "\u{1F9EC}",
   },
   {
     name: "KEGG",
     desc: "Kyoto Encyclopedia of Genes and Genomes — pathway & genomic reference.",
     url: "https://www.genome.jp/kegg/",
-    color: "#3B82F6",
+    color: "#6A6E78",
     emoji: "\u{1F517}",
   },
   {
     name: "PubMed",
     desc: "30M+ biomedical citations — every parameter linked to its source paper.",
     url: "https://pubmed.ncbi.nlm.nih.gov",
-    color: "#F59E0B",
+    color: "#946522",
     emoji: "\u{1F4DA}",
   },
   {
     name: "roadrunner",
     desc: "High-performance SBML JIT compiler and ODE solver from the Sys-Bio community.",
     url: "https://github.com/sys-bio/roadrunner",
-    color: "#EC4899",
+    color: "#6A6E78",
     emoji: "\u26A1",
   },
 ];
@@ -72,19 +72,19 @@ export default function TeamSection() {
     >
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#8B5CF6] text-[11px] font-mono font-medium">
+          <span className="text-muted text-[11px] font-mono font-medium">
             TEAM
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#8B5CF6]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-muted/20 to-transparent" />
         </div>
         <h2 className="section-header">Built by humans, for humans</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
           A small team building big things. Open source, open science.
         </p>
 
         <TerminalWindow path="~ — caterva team --list" glow>
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span> caterva team --list
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span> caterva team --list
           </div>
 
           {/* Contributors grid */}
@@ -100,11 +100,11 @@ export default function TeamSection() {
                   delay: i * 0.1,
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                className="flex items-start gap-4 rounded-xl border border-white/[0.06] bg-white/[0.01] p-5 hover:border-[#8B5CF6]/20 hover:bg-white/[0.02] transition-all duration-500 group"
+                className="flex items-start gap-4 rounded-xl border border-fg/[0.12] bg-fg/[0.01] p-5 hover:border-muted/20 hover:bg-fg/[0.02] transition-all duration-500 group"
               >
                 {/* Avatar */}
                 <div
-                  className={`shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${c.gradient} flex items-center justify-center text-white/90 font-sans text-[15px] font-semibold shadow-lg group-hover:scale-105 transition-transform duration-300`}
+                  className={`shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br ${c.gradient} flex items-center justify-center text-fg/92 font-sans text-[15px] font-semibold shadow-lg group-hover:scale-105 transition-transform duration-300`}
                   aria-hidden="true"
                 >
                   {c.initials}
@@ -112,10 +112,10 @@ export default function TeamSection() {
 
                 {/* Info */}
                 <div className="min-w-0">
-                  <h3 className="text-[14px] font-sans font-medium text-white/80 group-hover:text-white transition-colors">
+                  <h3 className="text-[14px] font-sans font-medium text-fg/85 group-hover:text-fg transition-colors">
                     {c.name}
                   </h3>
-                  <p className="text-[11px] text-white/50 mt-0.5 mb-2">
+                  <p className="text-[11px] text-fg/76 mt-0.5 mb-2">
                     {c.role}
                   </p>
                   {c.links && (
@@ -132,7 +132,7 @@ export default function TeamSection() {
                               ? "noopener noreferrer"
                               : undefined
                           }
-                          className="text-[10px] text-white/25 hover:text-[#8B5CF6] transition-colors uppercase tracking-wide"
+                          className="text-[10px] text-fg/66 hover:text-muted transition-colors uppercase tracking-wide"
                         >
                           {link.label}
                         </a>
@@ -145,12 +145,12 @@ export default function TeamSection() {
           </div>
 
           {/* Ecosystem section */}
-          <div className="border-t border-white/[0.04] pt-6">
+          <div className="border-t border-fg/[0.08] pt-6">
             <div className="flex items-center gap-2 mb-4">
-              <span className="text-[#8B5CF6]/60 text-[10px] uppercase tracking-widest font-medium">
+              <span className="text-muted/60 text-[10px] uppercase tracking-widest font-medium">
                 standing on the shoulders of giants
               </span>
-              <span className="flex-1 h-px bg-gradient-to-r from-[#8B5CF6]/10 to-transparent" />
+              <span className="flex-1 h-px bg-gradient-to-r from-muted/10 to-transparent" />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -164,7 +164,7 @@ export default function TeamSection() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ duration: 0.3, delay: 0.3 + i * 0.06 }}
-                  className="flex items-start gap-3 rounded-lg border border-white/[0.04] bg-white/[0.01] p-3 hover:border-white/[0.10] hover:bg-white/[0.02] transition-all duration-300 group/eco"
+                  className="flex items-start gap-3 rounded-lg border border-fg/[0.08] bg-fg/[0.01] p-3 hover:border-fg/[0.20] hover:bg-fg/[0.02] transition-all duration-300 group/eco"
                 >
                   <span
                     className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[14px]"
@@ -177,11 +177,11 @@ export default function TeamSection() {
                   </span>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[12px] font-medium text-white/60 group-hover/eco:text-white/80 transition-colors">
+                      <span className="text-[12px] font-medium text-fg/80 group-hover/eco:text-fg/85 transition-colors">
                         {eco.name}
                       </span>
                       <svg
-                        className="w-3 h-3 text-white/15 group-hover/eco:text-white/30 transition-colors shrink-0"
+                        className="w-3 h-3 text-fg/66 group-hover/eco:text-fg/70 transition-colors shrink-0"
                         viewBox="0 0 12 12"
                         fill="none"
                       >
@@ -194,7 +194,7 @@ export default function TeamSection() {
                         />
                       </svg>
                     </div>
-                    <p className="text-[10px] text-white/25 leading-relaxed mt-0.5 group-hover/eco:text-white/35 transition-colors">
+                    <p className="text-[10px] text-fg/66 leading-relaxed mt-0.5 group-hover/eco:text-fg/70 transition-colors">
                       {eco.desc}
                     </p>
                   </div>
@@ -204,8 +204,8 @@ export default function TeamSection() {
           </div>
 
           {/* Open source CTA */}
-          <div className="mt-6 pt-4 border-t border-white/[0.04] flex items-center gap-3 text-[11px]">
-            <span className="text-[#8B5CF6]">
+          <div className="mt-6 pt-4 border-t border-fg/[0.08] flex items-center gap-3 text-[11px]">
+            <span className="text-muted">
               <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
                 <path
                   fillRule="evenodd"
@@ -213,12 +213,12 @@ export default function TeamSection() {
                 />
               </svg>
             </span>
-            <span className="text-white/30">
+            <span className="text-fg/70">
               Caterva will be Apache-2.0 licensed. The repository isn&apos;t
               public yet &mdash;{" "}
               <a
                 href="#waitlist"
-                className="text-[#8B5CF6]/60 hover:text-[#8B5CF6] transition-colors"
+                className="text-muted/60 hover:text-muted transition-colors"
               >
                 join the waitlist
               </a>{" "}

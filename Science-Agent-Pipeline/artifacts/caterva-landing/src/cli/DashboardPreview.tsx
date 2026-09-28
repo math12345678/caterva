@@ -66,8 +66,8 @@ export default function DashboardPreview() {
   }));
 
   const series = [
-    { key: "S", color: "#1D8A72" },
-    { key: "S_inhibited", color: "#F59E0B" },
+    { key: "S", color: "var(--signal)" },
+    { key: "S_inhibited", color: "var(--caution)" },
   ];
 
   const finalFree = free.trajectory[free.trajectory.length - 1]!.S;
@@ -77,21 +77,21 @@ export default function DashboardPreview() {
 
   return (
     <div
-      className="rounded-xl border border-white/[0.06] bg-black/50 backdrop-blur-sm"
+      className="ink-surface rounded-lg"
       style={{ overflow: 'clip' }}
     >
       {/* mock window controls */}
-      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-white/[0.04]">
-        <span className="w-2 h-2 rounded-full bg-white/10" />
-        <span className="w-2 h-2 rounded-full bg-white/10" />
-        <span className="w-2 h-2 rounded-full bg-white/10" />
-        <span className="text-[10px] text-white/20 ml-2 font-mono">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-fg/[0.08]">
+        <span className="w-2 h-2 rounded-full bg-fg/10" />
+        <span className="w-2 h-2 rounded-full bg-fg/10" />
+        <span className="w-2 h-2 rounded-full bg-fg/10" />
+        <span className="text-[10px] text-fg/66 ml-2 font-mono">
           simulation — LDH-A + oxamate
         </span>
       </div>
 
       {/* tabs */}
-      <div className="flex border-b border-white/[0.04] text-[11px]">
+      <div className="flex border-b border-fg/[0.08] text-[11px]">
         {(["simulation", "parameters", "citations"] as const).map((tab) => (
           <button
             key={tab}
@@ -101,8 +101,8 @@ export default function DashboardPreview() {
             }}
             className={`px-3 py-2 border-b-2 transition-colors ${
               selectedTab === tab
-                ? "border-[#1D8A72] text-white/80"
-                : "border-transparent text-white/25 hover:text-white/50"
+                ? "border-signal text-fg/85"
+                : "border-transparent text-fg/66 hover:text-fg/76"
             }`}
           >
             {tab}
@@ -123,18 +123,18 @@ export default function DashboardPreview() {
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#1D8A72] animate-pulse" />
-                  <span className="text-[10px] text-white/30 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
+                  <span className="text-[10px] text-fg/70 font-mono">
                     ode-int:rk4 · t=6
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span
                     className={`inline-block w-1.5 h-1.5 rounded-full ${
-                      exact ? "bg-[#1D8A72]" : "bg-[#EF4444]"
+                      exact ? "bg-signal" : "bg-danger"
                     }`}
                   />
-                  <span className="text-[9px] text-white/25 font-mono">
+                  <span className="text-[9px] text-fg/66 font-mono">
                     {exact ? "matches closed form ✓" : "closed-form check FAILED"}
                   </span>
                 </div>
@@ -150,10 +150,10 @@ export default function DashboardPreview() {
 
               <div className="grid grid-cols-4 gap-2 mt-2">
                 {[
-                  { label: "[oxamate]", value: `${(inhibitor * 1000).toFixed(1)} µM`, color: "text-white/70" },
-                  { label: "apparent Km", value: `${kmApp.toFixed(3)} mM`, color: "text-[#F59E0B]" },
-                  { label: "[S] left", value: `${finalInh.toFixed(3)} mM`, color: "text-[#F59E0B]" },
-                  { label: "uninhibited", value: `${finalFree.toFixed(3)} mM`, color: "text-[#1D8A72]" },
+                  { label: "[oxamate]", value: `${(inhibitor * 1000).toFixed(1)} µM`, color: "text-fg/78" },
+                  { label: "apparent Km", value: `${kmApp.toFixed(3)} mM`, color: "text-caution" },
+                  { label: "[S] left", value: `${finalInh.toFixed(3)} mM`, color: "text-caution" },
+                  { label: "uninhibited", value: `${finalFree.toFixed(3)} mM`, color: "text-signal" },
                 ].map((stat) => (
                   <div key={stat.label} className="text-center">
                     <div
@@ -161,7 +161,7 @@ export default function DashboardPreview() {
                     >
                       {stat.value}
                     </div>
-                    <div className="text-[8px] text-white/20 uppercase tracking-wider mt-0.5">
+                    <div className="text-[8px] text-fg/66 uppercase tracking-wider mt-0.5">
                       {stat.label}
                     </div>
                   </div>
@@ -180,20 +180,20 @@ export default function DashboardPreview() {
               className="space-y-2 py-1"
             >
               {[
-                { key: "Km (pyruvate)", val: "0.03 mM", range: "BRENDA 286469", color: "[#1D8A72]" },
-                { key: "Ki (oxamate)", val: "0.00059 mM", range: "BRENDA 739793", color: "[#F59E0B]" },
-                { key: "Vmax", val: `${VMAX} mM/min`, range: "chosen", color: "[#8B5CF6]" },
-                { key: "[S]0, [I]", val: `${S0} mM, ${(inhibitor * 1000).toFixed(1)} µM`, range: "chosen", color: "[#3B82F6]" },
+                { key: "Km (pyruvate)", val: "0.03 mM", range: "BRENDA 286469", color: "[#5D7F8D]" },
+                { key: "Ki (oxamate)", val: "0.00059 mM", range: "BRENDA 739793", color: "[#946522]" },
+                { key: "Vmax", val: `${VMAX} mM/min`, range: "chosen", color: "[#6A6E78]" },
+                { key: "[S]0, [I]", val: `${S0} mM, ${(inhibitor * 1000).toFixed(1)} µM`, range: "chosen", color: "[#6A6E78]" },
               ].map((p) => (
                 <div
                   key={p.key}
                   className="flex items-center justify-between text-[11px]"
                 >
-                  <span className="text-white/40">{p.key}</span>
+                  <span className="text-fg/70">{p.key}</span>
                   <div className="flex items-center gap-3">
-                    <span className="text-white/20 text-[9px]">{p.range}</span>
+                    <span className="text-fg/66 text-[9px]">{p.range}</span>
                     <span
-                      className={`text-white/80 font-mono bg-${p.color}/10 px-2 py-0.5 rounded text-[10px]`}
+                      className={`text-fg/85 font-mono bg-${p.color}/10 px-2 py-0.5 rounded text-[10px]`}
                     >
                       {p.val}
                     </span>
@@ -216,16 +216,16 @@ export default function DashboardPreview() {
                 {citations.map((c) => (
                   <span
                     key={c.id}
-                    className="inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.03] px-2 py-0.5 text-[9px] text-white/40"
+                    className="inline-flex items-center gap-1 rounded-full border border-fg/[0.12] bg-fg/[0.03] px-2 py-0.5 text-[9px] text-fg/70"
                   >
-                    <span className="text-[#1D8A72] font-medium">
+                    <span className="text-signal font-medium">
                       {c.label}
                     </span>
                     {c.id}
                   </span>
                 ))}
               </div>
-              <div className="text-[10px] text-white/25 leading-relaxed border-t border-white/[0.04] pt-2 mt-2">
+              <div className="text-[10px] text-fg/66 leading-relaxed border-t border-fg/[0.08] pt-2 mt-2">
                 Km and Ki are recorded measurements for human LDH-A, each
                 with its BRENDA reference. Vmax and the concentrations are
                 chosen for this preview and labelled so; Caterva never
@@ -237,9 +237,9 @@ export default function DashboardPreview() {
       </div>
 
       {/* status bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 border-t border-white/[0.04] text-[9px] text-white/20 font-mono">
+      <div className="flex items-center justify-between px-3 py-1.5 border-t border-fg/[0.08] text-[9px] text-fg/66 font-mono">
         <span className="flex items-center gap-1.5">
-          <span className="w-1 h-1 rounded-full bg-[#1D8A72]" />
+          <span className="w-1 h-1 rounded-full bg-signal" />
           ode simulation · rk4
         </span>
         <span>competitive · Vmax unchanged</span>

@@ -58,7 +58,7 @@ export default function MobileBottomNav() {
       initial={{ y: 100 }}
       animate={{ y: hidden ? 100 : 0 }}
       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-      className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-white/[0.04] bg-[#050807]/95 backdrop-blur-xl safe-area-bottom"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-fg/[0.08] bg-surface/95 backdrop-blur-xl safe-area-bottom"
       role="navigation"
       aria-label="Mobile quick navigation"
     >
@@ -71,8 +71,8 @@ export default function MobileBottomNav() {
               href={`#${item.id}`}
               className={`flex flex-col items-center justify-center gap-0.5 min-w-0 px-2 py-1 rounded-lg transition-all duration-300 ${
                 isActive
-                  ? "text-[#1D8A72]"
-                  : "text-white/25 hover:text-white/50"
+                  ? "text-signal"
+                  : "text-fg/66 hover:text-fg/76"
               }`}
               aria-current={isActive ? "true" : undefined}
             >
@@ -83,7 +83,7 @@ export default function MobileBottomNav() {
               {isActive && (
                 <motion.span
                   layoutId="mobile-nav-active"
-                  className="absolute -top-px h-[2px] w-8 rounded-full bg-[#1D8A72]"
+                  className="absolute -top-px h-[2px] w-8 rounded-full bg-signal"
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 />
               )}

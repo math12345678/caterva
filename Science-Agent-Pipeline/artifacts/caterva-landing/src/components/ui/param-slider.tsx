@@ -19,7 +19,7 @@ export default function ParamSlider({
   step,
   unit,
   onChange,
-  color = "#1D8A72",
+  color = "#5D7F8D",
   hint,
   precision,
 }: ParamSliderProps) {
@@ -35,14 +35,14 @@ export default function ParamSlider({
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] text-white/40 font-mono">{label}</span>
-        <span className="text-[13px] text-white/80 font-mono tabular-nums">
+        <span className="text-[11px] text-fg/70 font-mono">{label}</span>
+        <span className="text-[13px] text-fg/85 font-mono tabular-nums">
           {fmt}
-          <span className="text-white/30 ml-0.5 text-[10px]">{unit}</span>
+          <span className="text-fg/70 ml-0.5 text-[10px]">{unit}</span>
         </span>
       </div>
       {hint && (
-        <span className="text-[9px] text-white/15 font-mono -mt-0.5 block">
+        <span className="text-[9px] text-fg/66 font-mono -mt-0.5 block">
           {hint}
         </span>
       )}
@@ -54,19 +54,19 @@ export default function ParamSlider({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-1.5 rounded-full appearance-none bg-white/[0.06] cursor-pointer
+          className="w-full h-1.5 rounded-full appearance-none bg-fg/[0.06] cursor-pointer
             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4
-            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white/20
-            [&::-webkit-slider-thumb]:bg-[#0A0E0C] [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:transition-all
-            [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:hover:border-[#1D8A72]/60
+            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-fg/20
+            [&::-webkit-slider-thumb]:bg-surface [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:transition-all
+            [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:hover:border-signal/60
             [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full
-            [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white/20 [&::-moz-range-thumb]:bg-[#0A0E0C]"
+            [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-fg/20 [&::-moz-range-thumb]:bg-surface"
           aria-valuemin={min}
           aria-valuemax={max}
           aria-valuenow={value}
           aria-label={`${label} slider`}
           style={{
-            background: `linear-gradient(to right, ${color}40 ${pct}%, rgba(255,255,255,0.06) ${pct}%)`,
+            background: `linear-gradient(to right, ${color}40 ${pct}%, rgba(42,45,53,0.06) ${pct}%)`,
           }}
         />
       </div>

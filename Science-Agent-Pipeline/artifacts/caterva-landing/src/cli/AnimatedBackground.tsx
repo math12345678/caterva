@@ -137,9 +137,9 @@ export default function AnimatedBackground() {
 
       // cursor glow
       const glowGrad = ctx.createRadialGradient(mx, my, 0, mx, my, 200);
-      glowGrad.addColorStop(0, "rgba(29, 138, 114, 0.06)");
-      glowGrad.addColorStop(0.5, "rgba(29, 138, 114, 0.02)");
-      glowGrad.addColorStop(1, "rgba(29, 138, 114, 0)");
+      glowGrad.addColorStop(0, "rgba(93,127,141, 0.06)");
+      glowGrad.addColorStop(0.5, "rgba(93,127,141, 0.02)");
+      glowGrad.addColorStop(1, "rgba(93,127,141, 0)");
       ctx.fillStyle = glowGrad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -164,8 +164,8 @@ export default function AnimatedBackground() {
             p.x - p.vx * 3,
             p.y - p.vy * 3,
           );
-          grad.addColorStop(0, `rgba(29, 138, 114, ${p.alpha * 0.8})`);
-          grad.addColorStop(1, "rgba(29, 138, 114, 0)");
+          grad.addColorStop(0, `rgba(93,127,141, ${p.alpha * 0.8})`);
+          grad.addColorStop(1, "rgba(93,127,141, 0)");
           ctx.beginPath();
           ctx.moveTo(p.x, p.y);
           ctx.lineTo(p.x - p.vx * tailLen, p.y - p.vy * tailLen);
@@ -191,7 +191,7 @@ export default function AnimatedBackground() {
           p.alpha * (0.6 + 0.4 * Math.sin(p.pulse)) * mouseBoost;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(29, 138, 114, ${pulseAlpha})`;
+        ctx.fillStyle = `rgba(93,127,141, ${pulseAlpha})`;
         ctx.fill();
 
         return true;
@@ -218,7 +218,7 @@ export default function AnimatedBackground() {
             ctx.beginPath();
             ctx.moveTo(a.x, a.y);
             ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = `rgba(29, 138, 114, ${alpha})`;
+            ctx.strokeStyle = `rgba(93,127,141, ${alpha})`;
             ctx.lineWidth = 0.5;
             ctx.stroke();
           }
@@ -229,8 +229,8 @@ export default function AnimatedBackground() {
       const cy = canvas.height / 2;
       const maxDist = Math.min(canvas.width, canvas.height) * 0.5;
       const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDist);
-      grad.addColorStop(0, "rgba(29, 138, 114, 0.02)");
-      grad.addColorStop(0.4, "rgba(29, 138, 114, 0.01)");
+      grad.addColorStop(0, "rgba(93,127,141, 0.02)");
+      grad.addColorStop(0.4, "rgba(93,127,141, 0.01)");
       grad.addColorStop(1, "transparent");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, canvas.width, canvas.height);

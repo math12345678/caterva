@@ -76,7 +76,7 @@ const EXAMPLES: ExampleCard[] = [
     ],
     chart: {
       data: MM_EXAMPLE.trajectory,
-      series: [{ key: "S", color: "#1D8A72" }],
+      series: [{ key: "S", color: "#5D7F8D" }],
     },
     query: "simulate lactate dehydrogenase with pyruvate",
   },
@@ -102,8 +102,8 @@ const EXAMPLES: ExampleCard[] = [
     chart: {
       data: LDH_BOTH,
       series: [
-        { key: "S", color: "#1D8A72" },
-        { key: "S_inhibited", color: "#F59E0B" },
+        { key: "S", color: "#5D7F8D" },
+        { key: "S_inhibited", color: "#946522" },
       ],
     },
     query: "competitive inhibition of lactate dehydrogenase by oxamate",
@@ -128,22 +128,22 @@ export default function ExampleGallery({ onTryQuery }: ExampleGalleryProps) {
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           onMouseEnter={() => setHovered(example.id)}
           onMouseLeave={() => setHovered(null)}
-          className="group rounded-lg border border-white/[0.06] bg-white/[0.015] overflow-hidden transition-all duration-300 hover:border-[#1D8A72]/20 hover:bg-[#1D8A72]/[0.02]"
+          className="group rounded-lg border border-fg/[0.12] bg-fg/[0.015] overflow-hidden transition-all duration-300 hover:border-signal/20 hover:bg-signal/[0.02]"
         >
           <div className="p-3">
             <div className="flex items-center gap-2 mb-2">
-              <span className="inline-flex items-center rounded bg-[#1D8A72]/10 px-1.5 py-0.5 text-[9px] text-[#1D8A72] uppercase tracking-wide">
+              <span className="inline-flex items-center rounded bg-signal/10 px-1.5 py-0.5 text-[9px] text-signal uppercase tracking-wide">
                 {example.domain}
               </span>
-              <span className="text-white/60 text-[11px] font-medium">
+              <span className="text-fg/80 text-[11px] font-medium">
                 {example.label}
               </span>
             </div>
-            <p className="text-white/25 text-[10px] mb-3 leading-relaxed">
+            <p className="text-fg/66 text-[10px] mb-3 leading-relaxed">
               {example.description}
             </p>
 
-            <div className="rounded border border-white/[0.04] bg-white/[0.01] p-1.5 mb-3">
+            <div className="rounded border border-fg/[0.08] bg-fg/[0.01] p-1.5 mb-3">
               <LineChart
                 data={example.chart.data}
                 series={example.chart.series}
@@ -152,8 +152,8 @@ export default function ExampleGallery({ onTryQuery }: ExampleGalleryProps) {
 
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] mb-3">
               {example.stats.map((s) => (
-                <span key={s.label} className="text-white/30">
-                  {s.label}: <span className="text-white/60">{s.value}</span>
+                <span key={s.label} className="text-fg/70">
+                  {s.label}: <span className="text-fg/80">{s.value}</span>
                 </span>
               ))}
             </div>
@@ -167,7 +167,7 @@ export default function ExampleGallery({ onTryQuery }: ExampleGalleryProps) {
                     ?.scrollIntoView({ behavior: "smooth", block: "start" });
                 }, 100);
               }}
-              className="w-full rounded-md border border-[#1D8A72]/15 text-[10px] text-[#1D8A72]/60 py-1.5 transition-all duration-200 hover:bg-[#1D8A72]/[0.06] hover:text-[#1D8A72]"
+              className="w-full rounded-md border border-signal/15 text-[10px] text-signal/60 py-1.5 transition-all duration-200 hover:bg-signal/[0.06] hover:text-signal"
               whileHover={{ scale: 1.01 }}
               whileTap={{ scale: 0.98 }}
             >

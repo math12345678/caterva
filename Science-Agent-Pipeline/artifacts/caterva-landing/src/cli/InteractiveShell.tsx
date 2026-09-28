@@ -36,7 +36,7 @@ const COMMANDS = [
 
 function AboutOutput() {
   return (
-    <div className="text-white/60 leading-relaxed">
+    <div className="text-fg/80 leading-relaxed">
       Scientific computing for teaching labs. A student asks a question in plain
       language; Caterva resolves the real parameters from the literature, runs
       the simulation, and shows its work — every number traceable to a citation.
@@ -69,8 +69,8 @@ function HelpOutput() {
     <div className="space-y-0.5">
       {rows.map(([cmd, desc]) => (
         <div key={cmd} className="flex gap-3">
-          <span className="text-[#1D8A72] w-36 shrink-0">{cmd}</span>
-          <span className="text-white/40">{desc}</span>
+          <span className="text-signal w-36 shrink-0">{cmd}</span>
+          <span className="text-fg/70">{desc}</span>
         </div>
       ))}
     </div>
@@ -91,13 +91,13 @@ function DomainsOutput() {
           <span
             className={
               status === "live"
-                ? "text-[#1D8A72] w-36 shrink-0"
-                : "text-white/40 w-36 shrink-0"
+                ? "text-signal w-36 shrink-0"
+                : "text-fg/70 w-36 shrink-0"
             }
           >
             {name}
           </span>
-          <span className="text-white/25 uppercase text-[9px] mt-0.5">
+          <span className="text-fg/66 uppercase text-[9px] mt-0.5">
             {status}
           </span>
         </div>
@@ -115,10 +115,10 @@ function Line({ line }: { line: ShellLine }) {
     >
       {line.kind === "input" ? (
         <div className="flex gap-2">
-          <span className="text-[#1D8A72] select-none" aria-hidden="true">
+          <span className="text-signal select-none" aria-hidden="true">
             $
           </span>
-          <span className="text-white/80">{line.content}</span>
+          <span className="text-fg/85">{line.content}</span>
         </div>
       ) : (
         <div className="pl-4 text-[12px]">{line.content}</div>
@@ -131,20 +131,20 @@ function VersionOutput() {
   return (
     <div className="space-y-0.5">
       <div className="flex gap-3">
-        <span className="text-[#1D8A72] w-24 shrink-0">caterva-landing</span>
-        <span className="text-white/40">v2.0.0 (pre-launch)</span>
+        <span className="text-signal w-24 shrink-0">caterva-landing</span>
+        <span className="text-fg/70">v2.0.0 (pre-launch)</span>
       </div>
       <div className="flex gap-3">
-        <span className="text-[#1D8A72] w-24 shrink-0">caterva-engine</span>
-        <span className="text-white/40">v1.0.0</span>
+        <span className="text-signal w-24 shrink-0">caterva-engine</span>
+        <span className="text-fg/70">v1.0.0</span>
       </div>
       <div className="flex gap-3">
-        <span className="text-[#1D8A72] w-24 shrink-0">react</span>
-        <span className="text-white/40">v19</span>
+        <span className="text-signal w-24 shrink-0">react</span>
+        <span className="text-fg/70">v19</span>
       </div>
       <div className="flex gap-3">
-        <span className="text-[#1D8A72] w-24 shrink-0">ode-solver</span>
-        <span className="text-white/40">rk4 (fixed step)</span>
+        <span className="text-signal w-24 shrink-0">ode-solver</span>
+        <span className="text-fg/70">rk4 (fixed step)</span>
       </div>
     </div>
   );
@@ -153,19 +153,19 @@ function VersionOutput() {
 function StatusOutput() {
   return (
     <div className="space-y-1">
-      <div className="flex items-center gap-2 text-[#1D8A72]">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#1D8A72] animate-pulse" />
+      <div className="flex items-center gap-2 text-signal">
+        <span className="w-1.5 h-1.5 rounded-full bg-signal animate-pulse" />
         <span>pipeline: operational</span>
       </div>
-      <div className="flex items-center gap-2 text-white/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#1D8A72]/40" />
+      <div className="flex items-center gap-2 text-fg/70">
+        <span className="w-1.5 h-1.5 rounded-full bg-signal/40" />
         <span>llm-resolver: connected</span>
       </div>
-      <div className="flex items-center gap-2 text-white/40">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#1D8A72]/40" />
+      <div className="flex items-center gap-2 text-fg/70">
+        <span className="w-1.5 h-1.5 rounded-full bg-signal/40" />
         <span>brenda-kegg: indexed</span>
       </div>
-      <div className="flex items-center gap-2 text-white/40">
+      <div className="flex items-center gap-2 text-fg/70">
         <span className="w-1.5 h-1.5 rounded-full bg-yellow-500/40" />
         <span>pubmed: rate-limited</span>
       </div>
@@ -181,8 +181,8 @@ export default function InteractiveShell({
     {
       kind: "output",
       content: (
-        <span className="text-white/35">
-          Caterva shell — type <span className="text-[#1D8A72]">help</span> to
+        <span className="text-fg/70">
+          Caterva shell — type <span className="text-signal">help</span> to
           get started.
         </span>
       ),
@@ -239,14 +239,14 @@ export default function InteractiveShell({
         push(
           "output",
           <span>
-            <span className="text-[#1D8A72]">{passed} passed</span>
+            <span className="text-signal">{passed} passed</span>
             {skipped > 0 && (
               <span className="text-yellow-500/70">, {skipped} skipped</span>
             )}
-            <span className="text-white/40">
+            <span className="text-fg/70">
               , {failed} failed, {total} total
             </span>
-            <span className="text-white/25">
+            <span className="text-fg/66">
               {" "}
               — scrolling to full report...
             </span>
@@ -259,7 +259,7 @@ export default function InteractiveShell({
         const domain = "mm";
         push(
           "output",
-          <span className="text-white/40">
+          <span className="text-fg/70">
             opening the live simulator ({domain})...
           </span>,
         );
@@ -270,16 +270,16 @@ export default function InteractiveShell({
       case "waitlist":
         push(
           "output",
-          <span className="text-white/40">scrolling to the waitlist...</span>,
+          <span className="text-fg/70">scrolling to the waitlist...</span>,
         );
         onNavigate("waitlist");
         break;
       case "whoami":
         push(
           "output",
-          <span className="text-white/40">
+          <span className="text-fg/70">
             you&apos;re looking at a project built by{" "}
-            <span className="text-[#1D8A72]">Smyan Reddy</span> and a small
+            <span className="text-signal">Smyan Reddy</span> and a small
             team, pre-launch, aiming for real classroom pilots.
           </span>,
         );
@@ -287,7 +287,7 @@ export default function InteractiveShell({
       case "ls":
         push(
           "output",
-          <div className="text-white/40">
+          <div className="text-fg/70">
             about.md&nbsp;&nbsp;domains.txt&nbsp;&nbsp;tests.log&nbsp;&nbsp;simulate/&nbsp;&nbsp;waitlist.form
           </div>,
         );
@@ -311,11 +311,11 @@ export default function InteractiveShell({
           "output",
           <div className="space-y-0.5 max-h-32 overflow-y-auto">
             {history.length === 0 ? (
-              <span className="text-white/25 italic">no commands yet</span>
+              <span className="text-fg/66 italic">no commands yet</span>
             ) : (
               history.map((cmd, i) => (
-                <div key={i} className="flex gap-3 text-white/35">
-                  <span className="text-white/15 w-6 shrink-0 text-right">
+                <div key={i} className="flex gap-3 text-fg/70">
+                  <span className="text-fg/66 w-6 shrink-0 text-right">
                     {i + 1}
                   </span>
                   <span>{cmd}</span>
@@ -329,10 +329,10 @@ export default function InteractiveShell({
         push(
           "output",
           <div className="space-y-0.5">
-            <span className="text-white/40">
-              current theme: <span className="text-[#1D8A72]">dark-teal</span>
+            <span className="text-fg/70">
+              current theme: <span className="text-signal">dark-teal</span>
             </span>
-            <span className="text-white/20 text-[10px]">
+            <span className="text-fg/66 text-[10px]">
               Available: dark-teal (only theme in pre-launch)
             </span>
           </div>,
@@ -347,10 +347,10 @@ export default function InteractiveShell({
       case "export":
         push(
           "output",
-          <span className="text-white/40">
-            export formats: <span className="text-[#1D8A72]">csv</span>,{" "}
-            <span className="text-[#1D8A72]">json</span>,{" "}
-            <span className="text-[#1D8A72]">sbml</span>. Use the export buttons
+          <span className="text-fg/70">
+            export formats: <span className="text-signal">csv</span>,{" "}
+            <span className="text-signal">json</span>,{" "}
+            <span className="text-signal">sbml</span>. Use the export buttons
             in simulation results.
           </span>,
         );
@@ -358,7 +358,7 @@ export default function InteractiveShell({
       case "cite":
         push(
           "output",
-          <span className="text-white/40">
+          <span className="text-fg/70">
             scroll to the citation section for BibTeX &amp; APA templates...
           </span>,
         );
@@ -367,14 +367,14 @@ export default function InteractiveShell({
       case "pricing":
         push(
           "output",
-          <span className="text-white/40">opening pricing plans...</span>,
+          <span className="text-fg/70">opening pricing plans...</span>,
         );
         onNavigate("pricing");
         break;
       case "glossary":
         push(
           "output",
-          <span className="text-white/40">
+          <span className="text-fg/70">
             opening the key terms glossary...
           </span>,
         );
@@ -383,7 +383,7 @@ export default function InteractiveShell({
       case "playground":
         push(
           "output",
-          <span className="text-white/40">
+          <span className="text-fg/70">
             opening the interactive playground...
           </span>,
         );
@@ -392,7 +392,7 @@ export default function InteractiveShell({
       case "compare":
         push(
           "output",
-          <span className="text-white/40">
+          <span className="text-fg/70">
             opening the workflow comparison...
           </span>,
         );
@@ -411,7 +411,7 @@ export default function InteractiveShell({
           "output",
           <span className="text-red-400/60">
             command not found: {head}{" "}
-            <span className="text-white/20">(try `help`)</span>
+            <span className="text-fg/66">(try `help`)</span>
           </span>,
         );
     }
@@ -475,7 +475,7 @@ export default function InteractiveShell({
           onSubmit={onSubmit}
           className="flex items-center gap-2 pt-1 relative"
         >
-          <span className="text-[#1D8A72] select-none" aria-hidden="true">
+          <span className="text-signal select-none" aria-hidden="true">
             $
           </span>
           <div className="flex-1 relative">
@@ -491,11 +491,11 @@ export default function InteractiveShell({
               autoFocus
               spellCheck={false}
               autoComplete="off"
-              className="w-full bg-transparent outline-none text-white/80 caret-[#1D8A72] placeholder:text-white/15"
+              className="w-full bg-transparent outline-none text-fg/85 caret-signal placeholder:text-fg/66"
               placeholder="try `help`"
             />
             {showHints && matchedHints.length > 0 && (
-              <div className="absolute left-0 top-full mt-1 rounded-lg border border-white/[0.06] bg-[#0a0f0c] py-1 min-w-[120px] shadow-xl z-10">
+              <div className="absolute left-0 top-full mt-1 rounded-lg border border-fg/[0.12] bg-surface py-1 min-w-[120px] shadow-xl z-10">
                 {matchedHints.slice(0, 5).map((hint) => (
                   <button
                     key={hint}
@@ -505,7 +505,7 @@ export default function InteractiveShell({
                       setValue(hint);
                       inputRef.current?.focus();
                     }}
-                    className="block w-full text-left px-3 py-1 text-[11px] text-white/50 hover:bg-white/[0.04] hover:text-white/80 transition-colors"
+                    className="block w-full text-left px-3 py-1 text-[11px] text-fg/76 hover:bg-fg/[0.04] hover:text-fg/85 transition-colors"
                   >
                     {hint}
                   </button>

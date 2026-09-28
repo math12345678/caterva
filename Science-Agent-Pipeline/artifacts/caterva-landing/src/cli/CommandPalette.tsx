@@ -17,8 +17,8 @@ const EXAMPLE_QUERIES = [
     label: "LDH Kinetics",
   },
   {
-    query: "model an outbreak with beta 0.4 and gamma 0.1",
-    label: "SIR Outbreak",
+    query: "competitive inhibition of lactate dehydrogenase by oxamate",
+    label: "LDH + oxamate",
   },
   { query: "enzyme kinetics km 5 vmax 10", label: "MM Kinetics" },
 ];
@@ -90,7 +90,7 @@ export default function CommandPalette({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 bg-surface/60 backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
           <motion.div
@@ -98,7 +98,7 @@ export default function CommandPalette({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -10 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
-            className="relative w-full max-w-lg rounded-xl border border-white/[0.08] bg-[#0a0f0c] shadow-2xl shadow-[#1D8A72]/[0.03] overflow-hidden glass-deep"
+            className="relative w-full max-w-lg rounded-xl border border-fg/[0.16] bg-surface shadow-2xl shadow-signal/[0.03] overflow-hidden glass-deep"
             role="dialog"
             aria-modal="true"
             aria-label="Command palette"
@@ -106,13 +106,13 @@ export default function CommandPalette({
             <Command label="Command palette">
               <Command.Input
                 placeholder="Search sections or try an example query\u2026"
-                className="w-full bg-transparent px-4 py-3.5 text-[13px] text-white/80 outline-none placeholder:text-white/20 border-b border-white/[0.04]"
+                className="w-full bg-transparent px-4 py-3.5 text-[13px] text-fg/85 outline-none placeholder:text-fg/66 border-b border-fg/[0.08]"
                 autoFocus
               />
               <Command.List className="max-h-64 overflow-y-auto p-2 space-y-0.5">
                 <Command.Group
                   heading={
-                    <span className="text-[9px] text-white/20 uppercase tracking-wide px-2 py-1">
+                    <span className="text-[9px] text-fg/66 uppercase tracking-wide px-2 py-1">
                       Navigate
                     </span>
                   }
@@ -123,9 +123,9 @@ export default function CommandPalette({
                       value={`nav:${item.id}`}
                       keywords={[item.label]}
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-2 py-2 text-[12px] text-white/60 rounded-lg cursor-pointer aria-selected:bg-white/[0.04] aria-selected:text-white/90 transition-colors"
+                      className="flex items-center gap-3 px-2 py-2 text-[12px] text-fg/80 rounded-lg cursor-pointer aria-selected:bg-fg/[0.04] aria-selected:text-fg/92 transition-colors"
                     >
-                      <span className="text-[#1D8A72]/60 text-[11px]">
+                      <span className="text-signal/60 text-[11px]">
                         {item.icon}
                       </span>
                       <span>{item.label}</span>
@@ -134,7 +134,7 @@ export default function CommandPalette({
                 </Command.Group>
                 <Command.Group
                   heading={
-                    <span className="text-[9px] text-white/20 uppercase tracking-wide px-2 py-1 pt-3">
+                    <span className="text-[9px] text-fg/66 uppercase tracking-wide px-2 py-1 pt-3">
                       Example Queries
                     </span>
                   }
@@ -144,29 +144,29 @@ export default function CommandPalette({
                       key={item.query}
                       value={`query:${item.query}`}
                       onSelect={handleSelect}
-                      className="flex items-center gap-3 px-2 py-2 text-[12px] text-white/60 rounded-lg cursor-pointer aria-selected:bg-white/[0.04] aria-selected:text-white/90 transition-colors"
+                      className="flex items-center gap-3 px-2 py-2 text-[12px] text-fg/80 rounded-lg cursor-pointer aria-selected:bg-fg/[0.04] aria-selected:text-fg/92 transition-colors"
                     >
-                      <span className="text-white/20 text-[10px]">\u2318</span>
+                      <span className="text-fg/66 text-[10px]">\u2318</span>
                       <span>{item.label}</span>
-                      <span className="ml-auto text-white/20 text-[10px] truncate max-w-[180px]">
+                      <span className="ml-auto text-fg/66 text-[10px] truncate max-w-[180px]">
                         {item.query}
                       </span>
                     </Command.Item>
                   ))}
                 </Command.Group>
-                <Command.Empty className="px-2 py-4 text-[12px] text-white/30 text-center">
+                <Command.Empty className="px-2 py-4 text-[12px] text-fg/70 text-center">
                   No results found.
                 </Command.Empty>
               </Command.List>
-              <div className="border-t border-white/[0.04] px-4 py-2 text-[10px] text-white/20 flex items-center gap-3">
+              <div className="border-t border-fg/[0.08] px-4 py-2 text-[10px] text-fg/66 flex items-center gap-3">
                 <span>
-                  <kbd className="text-white/40">{"\u2191\u2193"}</kbd> navigate
+                  <kbd className="text-fg/70">{"\u2191\u2193"}</kbd> navigate
                 </span>
                 <span>
-                  <kbd className="text-white/40">{"\u21B5"}</kbd> select
+                  <kbd className="text-fg/70">{"\u21B5"}</kbd> select
                 </span>
                 <span>
-                  <kbd className="text-white/40">esc</kbd> close
+                  <kbd className="text-fg/70">esc</kbd> close
                 </span>
               </div>
             </Command>

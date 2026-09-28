@@ -1,3 +1,4 @@
+import { GUARD_COUNT, LIVE_DOMAIN_COUNT } from "@/lib/domains";
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import Reveal from "./Reveal";
@@ -59,13 +60,13 @@ function AnimatedMetric({
   return (
     <div
       ref={ref}
-      className="metric-card text-center p-4 rounded-xl border border-white/[0.04] bg-white/[0.01] hover:border-[#1D8A72]/15 transition-all duration-500 hover:bg-[#1D8A72]/[0.02]"
+      className="metric-card text-center p-4 rounded-xl border border-fg/[0.08] bg-fg/[0.01] hover:border-signal/15 transition-all duration-500 hover:bg-signal/[0.02]"
     >
-      <div className="text-[28px] md:text-[36px] font-mono font-medium text-[#1D8A72] tabular-nums count-reveal">
+      <div className="text-[28px] md:text-[36px] font-mono font-medium text-signal tabular-nums count-reveal">
         {count.toLocaleString()}
         {suffix}
       </div>
-      <div className="text-[11px] text-white/30 mt-1">{label}</div>
+      <div className="text-[11px] text-fg/70 mt-1">{label}</div>
     </div>
   );
 }
@@ -106,13 +107,13 @@ export default function TrustSection() {
     >
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#F59E0B] text-[11px] font-mono font-medium">
+          <span className="text-caution text-[11px] font-mono font-medium">
             TRUST
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-caution/20 to-transparent" />
         </div>
         <h2 className="section-header">Built on real science</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
           Every number is traceable. Every simulation is verified. No black
           boxes.
         </p>
@@ -125,13 +126,13 @@ export default function TrustSection() {
             delay={0}
           />
           <AnimatedMetric
-            target={15}
-            label="simulation domains"
+            target={LIVE_DOMAIN_COUNT}
+            label="live capabilities"
             delay={200}
           />
           <AnimatedMetric target={3} label="literature sources" delay={400} />
           <AnimatedMetric
-            target={72}
+            target={GUARD_COUNT}
             label="correctness guards"
             delay={600}
           />
@@ -148,10 +149,10 @@ export default function TrustSection() {
               className="trust-badge"
               aria-label={`${src.name}: ${src.desc}`}
             >
-              <span className="text-[#1D8A72] font-medium">{src.name}</span>
-              <span className="text-white/25 hidden sm:inline">{src.desc}</span>
+              <span className="text-signal font-medium">{src.name}</span>
+              <span className="text-fg/66 hidden sm:inline">{src.desc}</span>
               <svg
-                className="w-3 h-3 text-white/15"
+                className="w-3 h-3 text-fg/66"
                 viewBox="0 0 12 12"
                 fill="none"
                 aria-hidden="true"
@@ -170,8 +171,8 @@ export default function TrustSection() {
 
         {/* Pipeline Verification */}
         <TerminalWindow path="~ — how we validate" glow>
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span> caterva validate
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span> caterva validate
             --pipeline
           </div>
 
@@ -204,21 +205,21 @@ export default function TrustSection() {
             ].map((item) => (
               <div
                 key={item.step}
-                className="flex gap-4 py-3 group border-b border-white/[0.03] last:border-0"
+                className="flex gap-4 py-3 group border-b border-fg/[0.06] last:border-0"
               >
-                <div className="shrink-0 w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.05] flex items-center justify-center text-[11px] text-white/30 group-hover:text-[#1D8A72] group-hover:border-[#1D8A72]/20 transition-all duration-300">
+                <div className="shrink-0 w-8 h-8 rounded-lg bg-fg/[0.03] border border-fg/[0.10] flex items-center justify-center text-[11px] text-fg/70 group-hover:text-signal group-hover:border-signal/20 transition-all duration-300">
                   {item.icon}
                 </div>
                 <div>
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] text-white/15 font-mono">
+                    <span className="text-[10px] text-fg/66 font-mono">
                       {item.step}
                     </span>
-                    <span className="text-[13px] text-white/70 font-medium group-hover:text-white/90 transition-colors">
+                    <span className="text-[13px] text-fg/78 font-medium group-hover:text-fg/92 transition-colors">
                       {item.title}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/50 leading-relaxed">
+                  <p className="text-[11px] text-fg/76 leading-relaxed">
                     {item.desc}
                   </p>
                 </div>
