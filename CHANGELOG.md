@@ -19,6 +19,12 @@ done: there was no release to version.
   assay temperatures, filtered by inhibition mode (`--state free|ternary`)
   and isoform (`--isoform`), and a computed free energy is judged against
   the band at 2σ (exit 0 agrees, 4 disagrees). See docs/USING_CATERVA.md.
+- `caterva fep`: an absolute binding free-energy calculation (double
+  decoupling, Boresch restraints with their analytic correction, BAR) run
+  at the cited Ki's assay temperature and judged against `caterva bind`'s
+  band by `--summarise`. Five methods added to `caterva/methods.py`, each
+  DOI checked against Crossref. Run end to end on T4 lysozyme L99A with
+  benzene (PDB 181L) with GROMACS 2026.1.
 
 ### Fixed
 - The Ki parser matched a requested compound anywhere in a row, including

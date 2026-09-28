@@ -247,7 +247,7 @@ def judge(t: Target, computed_kcal: float, error_kcal: float, temperature_c: flo
     side = "binds too tightly" if computed_kcal < t.lo else "binds too weakly"
     return Verdict("disagrees", gap, fold,
                    f"the simulation {side}: {gap:.2f} kcal/mol beyond the band even at 2σ, "
-                   f"a {fold:.1f}-fold error in Ki")
+                   f"a {fold:.3g}-fold error in Ki")
 
 
 def parse_computed(text: str) -> tuple[float, float]:
