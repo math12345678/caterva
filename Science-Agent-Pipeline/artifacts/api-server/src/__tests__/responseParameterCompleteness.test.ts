@@ -43,7 +43,14 @@ async function runToCompletion(query: string) {
 describe("resolver-established parameters survive into the response", () => {
   it("returns the enzyme concentration that produced the Vmax", async () => {
     const job = await runToCompletion(QUERY);
-    expect(job.status).toBe("completed");
+    // The job body, not just its status. `expect(status).toBe("completed")`
+    // prints `expected 'failed' to be 'completed'` and drops the reason the
+    // job already carries -- which is the third time this boundary pattern
+    // has cost a diagnosis here, after runCaterva and spawnScienceAgent.
+    // frontDoorRouteCoverage and networkRoute already pass the body; this
+    // one did not, and on 2026-09-28 that hid "BRENDA returned 500 for
+    // ecno=2.7.1.1" behind a bare status comparison.
+    expect(job.status, JSON.stringify(job)).toBe("completed");
 
     const params = job.result.parameters as Record<string, number>;
     // "50 nM enzyme" is 5e-5 mM. Without this the reader cannot check
