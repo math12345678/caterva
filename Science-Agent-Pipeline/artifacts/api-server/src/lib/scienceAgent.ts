@@ -535,8 +535,23 @@ async function spawnScienceAgent(
       const hadNoOutput = !trimmed;
 
       if (hadNonZeroExit || hadNoOutput) {
-        const message = stderr || `Science agent runner exited with code ${code}`;
-        reject(new Error(message));
+        // The runner's own reason first, then the exit status -- never the
+        // status alone. This boundary had the defect
+        // catervaRunnerFailures.test.ts records for the OTHER one: the
+        // engine writes its reason to stdout and exits non-zero, and reading
+        // the status first threw the reason away. Here it was narrower and
+        // harder to see, because stderr usually carries something: when the
+        // child died with stderr empty, the caller got "exited with code 1"
+        // and stdout was discarded unread. Measured 2026-09-28, that is
+        // exactly what three failing organismFromQuery tests reported in CI,
+        // and it is why the cause could not be read off the log.
+        const parts = [`Science agent runner exited with code ${code}`];
+        if (stderr.trim()) parts.push(`stderr: ${stderr.trim()}`);
+        if (trimmed) parts.push(`stdout: ${trimmed.slice(0, 4000)}`);
+        if (!stderr.trim() && !trimmed) {
+          parts.push("the runner wrote nothing to stdout or stderr");
+        }
+        reject(new Error(parts.join("\n")));
         return;
       }
 
