@@ -95,7 +95,7 @@ and fix only what the user agrees to:
   choice, and should be recorded as one).
 - **Protonation at the assay pH**, with the residues whose state is
   uncertain named.
-- **Catalytic residues from M-CSA** (Ribeiro et al. 2017, Nucleic Acids
+- **Catalytic residues from M-CSA** (Ribeiro et al. 2018, Nucleic Acids
   Res., doi:10.1093/nar/gkx1012): the curated atlas of enzyme mechanisms
   says which residues do the chemistry, so every warning can say whether it
   touches them.
