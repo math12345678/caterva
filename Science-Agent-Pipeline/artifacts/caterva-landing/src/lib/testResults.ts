@@ -143,8 +143,9 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "96 test files -- kinetics & Michaelis-Menten correctness, " +
-          "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
+          "97 test files -- kinetics & Michaelis-Menten correctness, " +
+          "stochastic simulation (Gillespie SSA), PDB structure lookup " +
+          "and preparation audit, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
           "building with influence ranking, mechanism libraries and " +
           "verdicts, agents and assay windows, and citation/build guards",
@@ -153,8 +154,9 @@ export const TEST_SUITES: TestSuite[] = [
         // 2855 tests, 2854 passed, 0 failed, 1 skipped, 797 s. The skip is
         // the codegen selftest, which needs npx and runs for real in the
         // api-server CI job. So the figure where npm works, as for the
-        // other rows: 2855.
-        passed: 2855,
+        // other rows: 2855. Plus the 22 tests of `caterva prepare`, run
+        // alone 2026-09-28 (22 passed): 2877.
+        passed: 2877,
         skipped: 0,
         failed: 0,
       },
