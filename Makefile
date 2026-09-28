@@ -139,6 +139,11 @@ PY := $(shell \
 VENV_BROKEN := $(shell \
 	if [ -d "$(VENV)" ] && ! "$(BIN)/python" -c '' >/dev/null 2>&1; then echo 1; fi)
 
+# Runs a `caterva md` setup through every GROMACS stage (capped to seconds).
+# Needs GROMACS: gmx on PATH, or GMX=/path/to/gmx. CI runs this target.
+md-smoke: check-python
+	@GMX="$(or $(GMX),gmx)" "$(PY)" scripts/md_smoke.py
+
 check-python:
 	@if [ -z "$(PY)" ]; then \
 		echo "No supported Python 3.10-3.13 interpreter found."; \

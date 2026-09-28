@@ -72,6 +72,15 @@ _MIN_RECIPES = 6
 #
 # Keyed by a distinctive substring of the command.
 CI_ONLY: dict[str, str] = {
+    "sudo apt-get update -qq && sudo apt-get install -y -qq gromacs": (
+        "installs GROMACS on the runner. Locally GROMACS is whatever the "
+        "developer has (the md-smoke target takes GMX=/path/to/gmx); a Makefile "
+        "recipe cannot sudo-install a system package."
+    ),
+    "gmx --version | head -3": (
+        "prints which GROMACS the runner got, for the log. `make md-smoke` "
+        "fails with the path it looked for if GROMACS is missing."
+    ),
     # --- Classified 2026-08-22 (ADR 0159) ------------------------------
     #
     # These were unclassified, so this guard failed, so the pytest wrapper
@@ -286,7 +295,7 @@ def _normalise(cmd: str) -> str:
 
 
 def classify(
-    steps: list[str], local: set[str]
+    steps: list[str], local: set[str], make_targets: frozenset[str] | set[str] = frozenset()
 ) -> tuple[list[str], list[str], list[str]]:
     """Split CI steps into (reachable, ci_only, unreachable).
 
@@ -306,6 +315,12 @@ def classify(
             ci_only.append(step)
             continue
         want = _normalise(step)
+        if want.startswith("make "):
+            # A make invocation is local exactly when its target exists. The
+            # substring match below would accept `make md-smokee` for a
+            # `make md-smoke` target, so targets are compared whole.
+            (reachable if want.split(" PY=")[0] in make_targets else unreachable).append(step)
+            continue
         if any(want in have or have in want for have in local if have):
             reachable.append(step)
         else:
@@ -340,8 +355,13 @@ def main() -> int:
         return 1
 
     local = {_normalise(c) for body in recipes.values() for c in body}
+    # A CI step that IS a make invocation (`make md-smoke`) is reproducible
+    # by definition, when the target exists. Matching only recipe bodies
+    # reported CI calling the Makefile as "nothing local does" (2026-09-27).
+    # Only real targets count, so a typo'd target still fails.
+    make_targets = {_normalise(f"make {target}") for target in recipes}
 
-    reachable, ci_only, unreachable = classify(steps, local)
+    reachable, ci_only, unreachable = classify(steps, local, make_targets)
 
     print(f"CI run-steps parsed:     {len(steps)}")
     print(f"Runnable from `make`:    {len(reachable)}")

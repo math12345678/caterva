@@ -450,3 +450,24 @@ jobs:
       # skip with that reason.
       - name: Dependency licences (installed packages)
         run: python -m pytest Tests/test_dependency_licenses.py -p no:cacheprovider -q
+
+  # `caterva md` writes a GROMACS setup; this runs it, every stage, with
+  # Ubuntu's GROMACS, on hen lysozyme (1AKI, EC 3.2.1.17: small, one chain,
+  # the standard GROMACS test protein). Steps are capped so each stage is
+  # exercised in seconds; the inputs and topology are the real ones.
+  md-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install GROMACS
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq gromacs
+          gmx --version | head -3
+      - name: Set up Caterva
+        run: make setup
+      - name: Run every stage (capped)
+        run: make md-smoke

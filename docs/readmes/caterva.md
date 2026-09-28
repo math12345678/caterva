@@ -2,7 +2,7 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-The simulation engine. 64 files, 38 test modules, 3,488 engine tests.
+The simulation engine. 64 files, 38 test modules, 3,518 engine tests.
 
 Fifteen domains: Michaelis-Menten (plain and competitively inhibited),
 SIR/SEIR epidemiology, PCR amplification, Monte Carlo, Wright-Fisher

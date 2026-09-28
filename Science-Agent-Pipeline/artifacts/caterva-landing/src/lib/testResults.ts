@@ -143,20 +143,20 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "107 test files -- kinetics & Michaelis-Menten correctness, " +
+          "109 test files -- kinetics & Michaelis-Menten correctness, " +
           "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
           "molecular dynamics, population genetics, PCR, SBML export & " +
           "provenance, compositional model building with influence " +
           "ranking, mechanism libraries and verdicts, agents and assay " +
           "windows, and citation/build guards",
-        // Re-measured 2026-09-27 for v0.4.0 (the rename to Caterva), on
-        // the final code, caterva/ run alone, read out of a junit-xml
-        // report: 3488 tests, 3487 passed, 1 failed, 1156 s. The failure is
-        // the check_codegen_loads.py selftest, which needs npx and cannot
-        // write the npm cache in the sandbox (see the long note above); it
-        // passes where npm works, as in CI. The two new tests pin the wheel
-        // to every subpackage, which the rename briefly broke.
-        passed: 3488,
+        // Re-measured 2026-09-27 with `caterva structure` and `caterva md`,
+        // caterva/ run alone, read out of a junit-xml report: 3518 tests,
+        // 3515 passed, 2 failed, 1 skipped, 1176 s. The two failures were
+        // the usage screen not listing the new commands, fixed and re-run
+        // (test_app: 11 passed); the skip is the codegen selftest, which
+        // needs npx and runs for real in the api-server CI job. So the
+        // figure where npm works, as for the other rows: 3518.
+        passed: 3518,
         skipped: 0,
         failed: 0,
       },
