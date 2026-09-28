@@ -65,11 +65,18 @@ class MdSetup:
     ns: float = 10.0
     ionic_strength_m: float = 0.15
     seed: int = 20260927
+    replicas: int = 3
     force_field: str = "amber99sb-ildn"
     water: str = "tip3p"
     parameters: List[Parameter] = field(default_factory=list)
 
+    def seeds(self) -> List[int]:
+        """One velocity seed per replica: the base seed, then the next integers."""
+        return [self.seed + r for r in range(self.replicas)]
+
     def __post_init__(self) -> None:
+        if self.replicas < 1:
+            raise ValueError("replicas must be at least 1")
         c = self.conditions
         m = METHODS
         self.parameters = [
@@ -83,8 +90,16 @@ class MdSetup:
                       "chosen", "physiological default; override with --ionic-strength"),
             Parameter("pressure", "1.0 bar", "chosen", "ambient"),
             Parameter("production length", f"{self.ns:g} ns", "chosen", "override with --ns"),
-            Parameter("velocity seed", str(self.seed), "chosen",
-                      "fixed so a run can be reproduced (also seeds ion placement); change it for independent replicas"),
+            Parameter("replicas", str(self.replicas), "chosen",
+                      ("independent runs from one solvated, minimised system, differing only in their "
+                       "initial velocities; every quantity is reported as a spread across them"
+                       if self.replicas > 1 else
+                       "ONE SAMPLE: a single trajectory has no spread, so nothing it shows can be told "
+                       "apart from chance; use --replicas 3 or more for a result")),
+            Parameter("velocity seed", ", ".join(f"rep{r + 1}: {s}" for r, s in enumerate(self.seeds())),
+                      "chosen",
+                      f"fixed so each run can be reproduced; ion placement uses {self.seed} for all replicas, "
+                      "so they share one starting structure"),
             Parameter("force field", self.force_field, "method", m["amber99sb-ildn"].cite()),
             Parameter("water model", self.water, "method", m["tip3p"].cite()),
             Parameter("thermostat", "V-rescale, tau 0.1 ps", "method", m["v-rescale"].cite()),
@@ -127,7 +142,7 @@ class MdSetup:
         )
 
     def _dynamics(self, *, nsteps: int, posres: bool, continuation: bool,
-                  barostat: Optional[str]) -> str:
+                  barostat: Optional[str], seed: Optional[int] = None) -> str:
         t = f"{self.conditions.temperature_k:.2f}"
         text = (
             ("define          = -DPOSRES\n" if posres else "")
@@ -164,7 +179,8 @@ class MdSetup:
         if continuation:
             text += "gen_vel         = no\n"
         else:
-            text += f"gen_vel         = yes\ngen_temp        = {t}\ngen_seed        = {self.seed}\n"
+            text += (f"gen_vel         = yes\ngen_temp        = {t}\n"
+                     f"gen_seed        = {self.seed if seed is None else seed}\n")
         return text
 
     def files(self) -> Dict[str, str]:
@@ -179,10 +195,14 @@ class MdSetup:
         ions_mdp = (header + "integrator      = steep\nemtol           = 1000.0\n"
                     "emstep          = 0.01\nnsteps          = 50000\n"
                     + self._common().replace("coulombtype     = PME", "coulombtype     = cutoff"))
-        return {
+        out = {
             "ions.mdp": ions_mdp,
             "em.mdp": min_mdp,
-            "nvt.mdp": header + self._dynamics(nsteps=50_000, posres=True, continuation=False, barostat=None),
+        }
+        for r, seed in enumerate(self.seeds(), start=1):
+            out[f"rep{r}/nvt.mdp"] = header + self._dynamics(nsteps=50_000, posres=True, continuation=False,
+                                                             barostat=None, seed=seed)
+        return {**out,
             "npt.mdp": header + self._dynamics(nsteps=50_000, posres=True, continuation=True, barostat="C-rescale"),
             "md.mdp": header + self._dynamics(nsteps=steps, posres=False, continuation=True,
                                               barostat="Parrinello-Rahman"),
@@ -225,12 +245,20 @@ echo SOL | "$GMX" genion -s ions.tpr -o ionized.gro -p topol.top -pname NA -nnam
 
 "$GMX" grompp -f em.mdp -c ionized.gro -p topol.top -o em.tpr
 "$GMX" mdrun -deffnm em $MDRUN_FLAGS
-"$GMX" grompp -f nvt.mdp -c em.gro -r em.gro -p topol.top -o nvt.tpr
-"$GMX" mdrun -deffnm nvt $MDRUN_FLAGS
-"$GMX" grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
-"$GMX" mdrun -deffnm npt $MDRUN_FLAGS
-"$GMX" grompp -f md.mdp -c npt.gro -t npt.cpt -p topol.top -o md.tpr
-"$GMX" mdrun -deffnm md $MDRUN_FLAGS
+
+# {self.replicas} replica{'s' if self.replicas > 1 else ''} from the same minimised system; each differs only in
+# the velocity seed in its own repN/nvt.mdp. Backbone RMSD per replica is
+# written for `caterva md --summarise .`, which reports the spread.
+for r in $(seq 1 {self.replicas}); do
+  d="rep$r"
+  "$GMX" grompp -f "$d/nvt.mdp" -c em.gro -r em.gro -p topol.top -o "$d/nvt.tpr" -po "$d/mdout.mdp"
+  "$GMX" mdrun -deffnm "$d/nvt" $MDRUN_FLAGS
+  "$GMX" grompp -f npt.mdp -c "$d/nvt.gro" -r "$d/nvt.gro" -t "$d/nvt.cpt" -p topol.top -o "$d/npt.tpr" -po "$d/mdout.mdp"
+  "$GMX" mdrun -deffnm "$d/npt" $MDRUN_FLAGS
+  "$GMX" grompp -f md.mdp -c "$d/npt.gro" -t "$d/npt.cpt" -p topol.top -o "$d/md.tpr" -po "$d/mdout.mdp"
+  "$GMX" mdrun -deffnm "$d/md" $MDRUN_FLAGS
+  printf 'Backbone\\nBackbone\\n' | "$GMX" rms -s "$d/md.tpr" -f "$d/md.xtc" -o "$d/rmsd.xvg" -tu ns
+done
 """
 
     def provenance(self) -> str:
@@ -263,6 +291,11 @@ published model or algorithm, cited).
   topology (for example from ACPYPE/GAFF or CGenFF) before it can be
   simulated; none is invented here.
 - **Protonation.** {ph_note}
+- **Replicas.** {self.replicas} run{'s' if self.replicas > 1 else ''}, seeds {", ".join(map(str, self.seeds()))}.
+  {"Report every quantity as a spread across them (`caterva md --summarise`); "
+   "a mean without that spread is one number pretending to be a result."
+   if self.replicas > 1 else
+   "One run is one sample: whatever it shows cannot be told apart from chance."}
 - **Length.** {self.ns:g} ns samples side-chain and loop motion. It does not
   sample catalysis, and a kcat cannot be read off it.
 

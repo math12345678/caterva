@@ -65,9 +65,9 @@ def test_measured_conditions_reach_every_stage():
     c = Conditions(temperature_k=310.15, temperature_source="measured: 37 C in BRENDA ref 1",
                    ph=7.5, ph_source="measured: pH 7.5 in BRENDA ref 1", measured_temperature=True)
     files = _setup(conditions=c).files()
-    for stage in ("nvt.mdp", "npt.mdp", "md.mdp"):
+    for stage in ("rep1/nvt.mdp", "npt.mdp", "md.mdp"):
         assert "ref_t           = 310.15 310.15" in files[stage]
-    assert "gen_temp        = 310.15" in files["nvt.mdp"]
+    assert "gen_temp        = 310.15" in files["rep1/nvt.mdp"]
     temp = next(p for p in _setup(conditions=c).parameters if p.name == "temperature")
     assert temp.origin == "measured" and "BRENDA ref 1" in temp.source
     assert "PROPKA" in files["PROVENANCE.md"] or "Olsson" in files["PROVENANCE.md"]
@@ -81,12 +81,12 @@ def test_without_measured_conditions_the_temperature_is_labelled_a_choice():
 def test_production_length_and_seed_are_what_was_asked():
     files = _setup(ns=2.5, seed=7).files()
     assert "nsteps          = 1250000" in files["md.mdp"]
-    assert "gen_seed        = 7" in files["nvt.mdp"]
+    assert "gen_seed        = 7" in files["rep1/nvt.mdp"]
 
 
 def test_equilibration_restrains_and_production_does_not():
     files = _setup().files()
-    assert "-DPOSRES" in files["nvt.mdp"] and "-DPOSRES" in files["npt.mdp"]
+    assert "-DPOSRES" in files["rep1/nvt.mdp"] and "-DPOSRES" in files["npt.mdp"]
     assert "-DPOSRES" not in files["md.mdp"]
     assert "pcoupl          = C-rescale" in files["npt.mdp"]
     assert "pcoupl          = Parrinello-Rahman" in files["md.mdp"]
@@ -104,3 +104,32 @@ def test_a_malformed_pdb_id_is_refused(bad, tmp_path, capsys):
     from caterva.md.__main__ import main
 
     assert main(["--pdb", bad, "--out", str(tmp_path / "x")]) == 2
+
+
+# --- replicas (MD roadmap M2) ---------------------------------------------------
+
+def test_three_replicas_by_default_differing_only_in_their_seed():
+    files = _setup(seed=7).files()
+    nvts = [files[f"rep{r}/nvt.mdp"] for r in (1, 2, 3)]
+    assert [re.search(r"gen_seed\s*=\s*(\d+)", t).group(1) for t in nvts] == ["7", "8", "9"]
+    strip = [re.sub(r"gen_seed.*", "", t) for t in nvts]
+    assert strip[0] == strip[1] == strip[2]
+    assert "for r in $(seq 1 3)" in files["run.sh"]
+    assert 'rms -s "$d/md.tpr"' in files["run.sh"]
+
+
+def test_every_seed_is_recorded():
+    seeds = next(p for p in _setup(seed=7).parameters if p.name == "velocity seed")
+    assert seeds.value == "rep1: 7, rep2: 8, rep3: 9"
+
+
+def test_one_replica_is_labelled_one_sample():
+    row = next(p for p in _setup(replicas=1).parameters if p.name == "replicas")
+    assert "ONE SAMPLE" in row.source
+    assert "one sample" in _setup(replicas=1).files()["PROVENANCE.md"]
+
+
+def test_zero_replicas_is_refused(tmp_path):
+    from caterva.md.__main__ import main
+
+    assert main(["--pdb", "1AKI", "--out", str(tmp_path / "x"), "--replicas", "0"]) == 2
