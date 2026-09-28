@@ -12,6 +12,26 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## [Unreleased: tools]
+
+### Added
+- `caterva bind`: cited Ki values become ΔG°bind targets at their own
+  assay temperatures, filtered by inhibition mode (`--state free|ternary`)
+  and isoform (`--isoform`), and a computed free energy is judged against
+  the band at 2σ (exit 0 agrees, 4 disagrees). See docs/USING_CATERVA.md.
+- `caterva fep`: an absolute binding free-energy calculation (double
+  decoupling, Boresch restraints with their analytic correction, BAR) run
+  at the cited Ki's assay temperature and judged against `caterva bind`'s
+  band by `--summarise`. Five methods added to `caterva/methods.py`, each
+  DOI checked against Crossref. Run end to end on T4 lysozyme L99A with
+  benzene (PDB 181L) with GROMACS 2026.1.
+
+### Fixed
+- The Ki parser matched a requested compound anywhere in a row, including
+  its commentary, so the quinoline sulfonamide row "competitive versus
+  NADH" came back as a Ki of NADH (0.00059 mM). It now matches the row's
+  compound cell; `resolve_kinetic_value(..., "NADH", quantity="ki")` is
+  not found, as it should be.
 ## [Unreleased: site]
 
 ### Fixed

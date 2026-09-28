@@ -143,9 +143,9 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "99 test files -- kinetics & Michaelis-Menten correctness, " +
+          "101 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
-          "preparation audit and trajectory analysis, " +
+          "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
           "building with influence ranking, mechanism libraries and " +
           "verdicts, agents and assay windows, and citation/build guards",
@@ -158,7 +158,12 @@ export const TEST_SUITES: TestSuite[] = [
         // alone 2026-09-28 (22 passed), and the md replica and
         // convergence tests (26 passed with the setup suite): 2894. Plus
         // the 17 `caterva analyze` tests (42 passed with setup and app): 2911.
-        passed: 2911,
+        // Plus the 27 `caterva bind` tests and the 2 guide examples they
+        // added to test_using_caterva_guide.py (per-file collect diff
+        // against d2ef8b4; all 29 passed 2026-09-28): 2940. Plus the 18
+        // `caterva fep` tests and its 2 guide examples (all passed
+        // 2026-09-28): 2960.
+        passed: 2960,
         skipped: 0,
         failed: 0,
       },
@@ -195,7 +200,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "75 test files -- query resolution, parameter provenance, " +
+          "76 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -203,7 +208,8 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-09-28 in CI (run 36368330079, api-server job):
         // 764 tests, 763 passed, 1 failed -- the failure an assertion that
         // more than five domains are served, stale after the archiving and
-        // corrected in the same change. So: 764.
+        // corrected in the same change. So: 764. Plus the 2 tests of
+        // runnerErrorReachesCaller.test.ts (2 passed, 2026-09-28): 766.
         //
         // Earlier, 2026-09-17: `81 passed (81) / 854 passed (854)`, run
         // alone with the repo's .venv/bin first on PATH.
@@ -228,7 +234,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 764,
+        passed: 766,
         skipped: 0,
         failed: 0,
       },
