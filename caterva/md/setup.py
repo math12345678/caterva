@@ -202,6 +202,10 @@ class MdSetup:
         for r, seed in enumerate(self.seeds(), start=1):
             out[f"rep{r}/nvt.mdp"] = header + self._dynamics(nsteps=50_000, posres=True, continuation=False,
                                                              barostat=None, seed=seed)
+        import json
+        out["caterva-setup.json"] = json.dumps(
+            {"pdb": self.pdb_id.upper(), "chain": self.chain, "replicas": self.replicas,
+             "seeds": self.seeds(), "ns": self.ns, "temperature_k": self.conditions.temperature_k}, indent=2) + "\n"
         return {**out,
             "npt.mdp": header + self._dynamics(nsteps=50_000, posres=True, continuation=True, barostat="C-rescale"),
             "md.mdp": header + self._dynamics(nsteps=steps, posres=False, continuation=True,

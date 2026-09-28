@@ -79,6 +79,12 @@ Caterva narrows to enzymes: kinetics, structure and dynamics.
   (Flyvbjerg & Petersen 1989), its effective sample count, and whether the
   replicas agree: consistent, replicas disagree, unconverged, or one sample.
   Exit 4 unless consistent.
+- **`caterva analyze`**: in every replica, the distance between the
+  functional groups of each pair of catalytic residues (M-CSA, mapped by
+  `caterva prepare`) against the crystal, and the active-site pocket's RMSF
+  against the rest of the protein; each called held/moved or rigid/mobile
+  only when the replicas agree. Measured by `gmx distance` and `gmx rmsf`,
+  with the commands written to analyze.sh.
 - `docs/design/MD_ROADMAP.md`: what the dynamics side will add
   (structure-preparation audit, replicas by default, enzyme-specific
   analysis, ligand provenance, simulation beside measured Ki), and why each

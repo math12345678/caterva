@@ -38,6 +38,7 @@ COMMANDS = {
     "compose": ("caterva.compose.__main__", "the model builder and its analyses"),
     "structure": ("caterva.structure.__main__", "an enzyme's PDB structures, cited, and a ChimeraX script"),
     "md": ("caterva.md.__main__", "a GROMACS setup whose every parameter is measured, chosen or cited"),
+    "analyze": ("caterva.analyze.__main__", "catalytic geometry and active-site flexibility across replicas"),
     "prepare": ("caterva.prepare.__main__", "audit a PDB entry before simulating it, defects ranked by distance to the active site"),
     "sim": ("caterva.cli", "exact stochastic chemical kinetics (Gillespie SSA)"),
 }

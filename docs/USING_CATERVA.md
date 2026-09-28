@@ -426,6 +426,27 @@ consistent exits 4. On synthetic runs with a known correlation time it
 called every under-sampled set unconverged, and raised a false alarm on
 about 6 in 100 converged ones: it errs towards "not yet".
 
+### `caterva analyze`: the questions the mechanism asks
+
+```bash
+caterva analyze ldha-md
+```
+
+After `run.sh`, this takes the enzyme's catalytic residues (M-CSA, mapped
+onto your chain by `caterva prepare`) and measures, in every replica, the
+distance between the functional groups of each pair: a histidine's ring
+nitrogens, a carboxylate's oxygens. Each distance is set beside its value
+in the starting crystal structure and called **held** or **moved** (more
+than 0.1 nm, a stated choice) only when the replicas agree; otherwise it is
+not yet a result. It also compares the active-site pocket's flexibility
+(Cα RMSF within 8 Å of a catalytic residue) with the rest of the protein.
+
+GROMACS does the measuring. The exact commands go in `analyze.sh`, so
+`--script-only` writes them for a cluster and `--no-run` reads what they
+produced. On a 200-step test run of lysozyme it lists all fifteen
+distances between the six M-CSA catalytic residues, and correctly calls
+every one unconverged.
+
 ## Exact stochastic kinetics: `caterva sim ssa`
 
 When the molecule counts are small enough that a smooth curve hides what
