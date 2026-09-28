@@ -20,8 +20,12 @@ import {
   formatSummary,
   type LabelledQuery,
 } from "../lib/classifierEval";
-import { classifyDomainByKeyword } from "../lib/queryResolver";
+import {
+  classifyDomainByKeyword,
+  declaredDomains,
+} from "../lib/queryResolver";
 import { DOMAIN_MEANINGS } from "../lib/llmResolver";
+import type { SimulationDomain } from "../lib/catervaRunner";
 
 /** The domains the LLM resolver is allowed to return; the benchmark should
  *  exercise every one of them or it is not a benchmark of the classifier.
@@ -32,7 +36,7 @@ import { DOMAIN_MEANINGS } from "../lib/llmResolver";
  *  having a stale copy of the answer rather than for anything the classifier
  *  did. That is the third hardcoded list on this branch to expire when a
  *  name moved (ADR 0205, ADR 0206); a derived one cannot. */
-const LLM_EXPOSED_DOMAINS = Object.keys(DOMAIN_MEANINGS);
+const LLM_EXPOSED_DOMAINS = Object.keys(DOMAIN_MEANINGS) as SimulationDomain[];
 
 /**
  * A question the tool genuinely cannot simulate. Used to exercise the third
@@ -155,7 +159,12 @@ describe("the benchmark itself", () => {
       const actual = classifyDomainByKeyword(q.query).defaults.domain;
       return {
         ...q,
-        expected: actual === "pcr" ? "molecular_dynamics" : "pcr",
+        // Any domain other than the right one. Taken from the declared
+        // table rather than named here, so this cannot expire the way the
+        // hardcoded "pcr"/"molecular_dynamics" pair did when those domains
+        // were archived.
+        expected: (declaredDomains().find((d) => d !== actual) ??
+          actual) as SimulationDomain,
         why: "deliberately wrong label, to prove the benchmark can fail",
       };
     });
