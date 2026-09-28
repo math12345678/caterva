@@ -60,10 +60,11 @@ describe("domain citations are citations, not labels", () => {
     ).toEqual([]);
   });
 
-  it("the two domains that were missing now have real literature", () => {
+  it("the domains that were missing now have real literature", () => {
     // They were dispatchable and simulable, but had no entry, which is why
-    // the placeholder was reachable at all.
-    for (const domain of ["monte_carlo_pi", "gillespie_ssa_replicates"]) {
+    // the placeholder was reachable at all. (monte_carlo_pi was the other
+    // one; it was archived on 2026-09-27.)
+    for (const domain of ["gillespie_ssa_replicates"]) {
       const entry = DOMAIN_LITERATURE_MAP[domain];
       expect(entry, `${domain} has no literature entry`).toBeDefined();
       expect(entry!.references.length).toBeGreaterThan(0);

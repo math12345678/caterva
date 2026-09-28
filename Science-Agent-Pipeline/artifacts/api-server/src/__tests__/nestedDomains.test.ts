@@ -21,6 +21,7 @@
 import { describe, expect, it } from "vitest";
 import {
   classifyDomainByKeyword,
+  declaredDomains,
   refinementPairs,
 } from "../lib/queryResolver";
 
@@ -28,21 +29,10 @@ const domainOf = (q: string) => classifyDomainByKeyword(q).defaults.domain;
 
 describe("the declared refinement graph", () => {
   it("names a parent that exists for every child", () => {
-    const known = new Set([
-      "mm",
-      "mm_competitive_inhibition",
-      "sir",
-      "seir",
-      "wright_fisher",
-      "gillespie_ssa",
-      "pcr",
-      "molecular_dynamics",
-      "gillespie_ssa_bimolecular",
-      "two_locus_wright_fisher",
-      "lotka_volterra",
-      "cell_cycle_oscillator",
-      "repressilator",
-    ]);
+    // Derived, not listed: a hand-written copy of this set named all
+    // thirteen domains after the 2026-09-27 archiving and failed for being
+    // stale rather than for anything the graph did.
+    const known = new Set(declaredDomains());
     for (const { child, parent } of refinementPairs()) {
       expect(known.has(child)).toBe(true);
       expect(known.has(parent)).toBe(true);
@@ -77,22 +67,14 @@ describe("the declared refinement graph", () => {
 
 describe("a query that names the special case gets it", () => {
   it.each([
-    [
-      "Can you show me how an infection spreads when there's a hidden incubation phase?",
-      "seir",
-    ],
-    [
-      "I want to see a simulation where people go from susceptible to exposed before getting sick.",
-      "seir",
-    ],
-    [
-      "Please generate a chart of disease dynamics with a separate exposed group.",
-      "seir",
-    ],
     ["Can you run a stochastic simulation of A plus B forming C?", "gillespie_ssa_bimolecular"],
     [
       "Could you generate a random trajectory for A + B to C using the Gillespie approach?",
       "gillespie_ssa_bimolecular",
+    ],
+    [
+      "simulate competitive inhibition of the enzyme with an inhibitor present",
+      "mm_competitive_inhibition",
     ],
   ])("routes %j to %s", (query, expected) => {
     expect(domainOf(query)).toBe(expected);
@@ -102,16 +84,14 @@ describe("a query that names the special case gets it", () => {
 describe("a query that names only the general case keeps it", () => {
   // The direction that bounds the rule. Promotion happens on one distinctive
   // term regardless of score, so it has to not happen when no distinctive
-  // term is there. Measured across all 228 fixture queries: zero
-  // over-promotions.
+  // term is there.
   it.each([
-    ["How many people in a closed town are still susceptible after the wave passes?", "sir"],
-    ["Model how measles spreads through an unvaccinated school.", "sir"],
     [
       "Simulate the random decay of a small number of molecules, one reaction at a time.",
       "gillespie_ssa",
     ],
-    ["How does an allele drift to fixation in a small population?", "wright_fisher"],
+    ["a stochastic simulation of first-order decay with low copy number", "gillespie_ssa"],
+    ["how fast does catalase turn over its substrate", "mm"],
   ])("leaves %j as %s", (query, expected) => {
     expect(domainOf(query)).toBe(expected);
   });
@@ -133,8 +113,8 @@ describe("promotion needs a term the parent does not also have", () => {
     // Asserted through behaviour: a query built only from vocabulary the
     // parent owns must stay with the parent, however strongly it matches.
     const parentOnly =
-      "Model an epidemic outbreak where a virus spreads through a population and people recover.";
-    expect(domainOf(parentOnly)).toBe("sir");
+      "a stochastic run of molecule counts decaying one reaction at a time";
+    expect(domainOf(parentOnly)).toBe("gillespie_ssa");
   });
 
   /**

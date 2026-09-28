@@ -50,23 +50,12 @@ _PACKAGE_PRESENT = (_CATERVA_DIR / "core" / "validation.py").exists()
 # Public API -> the package module it must come from once the split is live.
 EXPECTED_HOMES: dict[str, str] = {
     "simulate_michaelis_menten": "continuous.simulations",
-    "simulate_sir": "continuous.simulations",
-    "simulate_seir": "continuous.simulations",
     "simulate_sbml": "continuous.simulations",
-    "simulate_pcr": "discrete.pcr",
-    "simulate_monte_carlo_pi": "discrete.monte_carlo",
-    "simulate_molecular_dynamics": "discrete.molecular_dynamics",
-    "lj_cluster_positions": "discrete.molecular_dynamics",
-    "lennard_jones_force": "discrete.molecular_dynamics",
-    "simulate_wright_fisher": "discrete.population_genetics.core",
-    "simulate_two_locus_wright_fisher": "discrete.population_genetics.two_locus",
+    "simulate_mm_competitive_inhibition": "continuous.simulations",
+    "simulate_gillespie_ssa": "discrete.gillespie_ssa",
     "validate_michaelis_menten_params": "core.validation",
-    "validate_sir_params": "core.validation",
-    "validate_seir_params": "core.validation",
-    "validate_pcr_params": "core.validation",
-    "validate_monte_carlo_params": "core.validation",
-    "validate_wright_fisher_params": "core.validation",
-    "validate_md_params": "core.validation",
+    "validate_mm_competitive_params": "core.validation",
+    "validate_ssa_params": "core.validation",
 }
 
 
@@ -122,36 +111,12 @@ CASES: list[tuple[str, dict[str, Any], str, str]] = [
     ("validate_michaelis_menten_params", dict(km=0.0, vmax=5.0, s0=10.0), "rejected", "MM km zero"),
     ("validate_michaelis_menten_params", dict(km=float("nan"), vmax=5.0, s0=10.0), "rejected", "MM km NaN"),
 
-    ("validate_sir_params", dict(beta=0.3, gamma=0.1, s0=990, i0=10), "accepted", "SIR nominal"),
-    ("validate_sir_params", dict(beta=0.3, gamma=0.1, s0=990, i0=0), "flagged", "SIR no infected"),
-    ("validate_sir_params", dict(beta=10.0, gamma=0.1, s0=990, i0=10), "flagged", "SIR R0=100"),
-    ("validate_sir_params", dict(beta=-1.0, gamma=0.1, s0=990, i0=10), "rejected", "SIR beta negative"),
 
-    ("validate_seir_params", dict(beta=0.3, sigma=0.2, gamma=0.1, s0=990, e0=10, i0=0), "accepted", "SEIR nominal"),
-    ("validate_seir_params", dict(beta=0.3, sigma=0.2, gamma=0.1, s0=1000, e0=0, i0=0), "flagged", "SEIR no seed"),
-    ("validate_seir_params", dict(beta=0.3, sigma=-1.0, gamma=0.1, s0=990, e0=10, i0=0), "rejected", "SEIR sigma negative"),
 
-    ("validate_pcr_params", dict(n0=100.0, efficiency=0.95, cycles=30), "accepted", "PCR nominal"),
-    ("validate_pcr_params", dict(n0=100.0, efficiency=0.2, cycles=30), "flagged", "PCR low efficiency"),
-    ("validate_pcr_params", dict(n0=100.0, efficiency=1.4, cycles=30), "rejected", "PCR efficiency>1"),
-    ("validate_pcr_params", dict(n0=100.0, efficiency=0.9, cycles=80), "rejected", "PCR cycles>60"),
 
-    ("validate_monte_carlo_params", dict(n_samples=10_000), "accepted", "MC nominal"),
-    ("validate_monte_carlo_params", dict(n_samples=10), "flagged", "MC below min"),
-    ("validate_monte_carlo_params", dict(n_samples=0), "rejected", "MC zero"),
 
-    ("validate_wright_fisher_params", dict(population_size=100, starting_frequency=0.5, generations=100, replicate_runs=50), "accepted", "WF nominal"),
-    ("validate_wright_fisher_params", dict(population_size=5, starting_frequency=0.5, generations=100, replicate_runs=50), "flagged", "WF small N"),
-    ("validate_wright_fisher_params", dict(population_size=100, starting_frequency=0.5, generations=100, replicate_runs=2), "flagged", "WF few replicates"),
-    ("validate_wright_fisher_params", dict(population_size=0, starting_frequency=0.5, generations=100), "rejected", "WF N=0"),
-    ("validate_wright_fisher_params", dict(population_size=100, starting_frequency=1.5, generations=100), "rejected", "WF p0>1"),
 
     # These five are the exact cases the flag->rejection inversion corrupted.
-    ("validate_md_params", dict(n_particles=108, temperature=0.4, timestep=0.005, n_steps=100), "accepted", "MD nominal"),
-    ("validate_md_params", dict(n_particles=108, temperature=0.9, timestep=0.005, n_steps=100), "flagged", "MD T above bound"),
-    ("validate_md_params", dict(n_particles=108, temperature=0.05, timestep=0.005, n_steps=100), "flagged", "MD T below bound"),
-    ("validate_md_params", dict(n_particles=108, temperature=0.4, timestep=0.05, n_steps=100), "flagged", "MD timestep high"),
-    ("validate_md_params", dict(n_particles=108, temperature=-1.0, timestep=0.005, n_steps=100), "rejected", "MD T negative"),
 
     ("validate_ssa_replicates_params", dict(n_replicates=100), "accepted", "SSA replicates nominal"),
     ("validate_ssa_replicates_params", dict(n_replicates=5), "flagged", "SSA few replicates"),

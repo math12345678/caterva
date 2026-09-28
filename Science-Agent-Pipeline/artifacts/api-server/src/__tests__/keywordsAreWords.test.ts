@@ -1,66 +1,68 @@
 /**
  * A domain keyword is a word, not a substring.
  *
- * The repressilator lists "repress", which occurs inside "repressors", so
- * "a toggle switch between two repressors" scored as a repressilator and
- * never reached the compositional fallthrough that is supposed to answer
- * it. A toggle switch is built from repressors too -- the word is evidence
- * of neither circuit in particular. Only `frontDoorRouteCoverage.test.ts`
- * caught it, end to end through a running server, and it reported the
- * symptom (`composition.rule` undefined) rather than the cause.
+ * Found on the repressilator, which listed the keyword "repress": it occurs
+ * inside "repress*ors*", so "a toggle switch between two repressors"
+ * classified as a repressilator and never reached the compositional
+ * grammar that was supposed to answer it. Only an end-to-end HTTP test
+ * caught that, and it reported a missing field three layers from the cause.
+ * See ADR 0206.
  *
- * Same shape as ADR 0205's enzyme patterns one layer down, and the same
- * remedy. See ADR 0206.
+ * That domain has since been archived, so the original case cannot be
+ * asserted here any more. The property did not go with it -- the surviving
+ * keyword lists carry the same trap, and the examples below are all real:
+ *
+ *   "compete"  inside "compet*ence*"  -- bacterial competence is a normal
+ *                                        thing to ask about, and without
+ *                                        boundaries it resolves as
+ *                                        competitive inhibition
+ *   "ssa"      inside "di*ssa*tisfied"
+ *   "binding"  inside "re*binding*"
+ *   "assa(y)"  inside "*assa*mbling"  (via "a + b"-style short terms)
+ *
+ * Each was measured: with the boundary filter removed they all match, and
+ * the first returns a wrong domain for a question about genetics.
  */
 import { describe, expect, it } from "vitest";
 
 import { classifyDomainByKeyword } from "../lib/queryResolver";
 
 const domainOf = (q: string) => classifyDomainByKeyword(q).defaults.domain;
+const matched = (q: string) => classifyDomainByKeyword(q).matched;
 
 describe("keyword matching respects word boundaries", () => {
-  it("does not read 'repress' inside 'repressors'", () => {
-    // The query this was found on. It must fall through classification so
-    // the compositional grammar can answer it; a keyword match here is a
-    // wrong answer that also hides the right one.
-    const { matched } = classifyDomainByKeyword(
-      "a toggle switch between two repressors",
-    );
-    expect(matched).toBe(false);
+  it.each([
+    ["bacterial competence in a culture", "compete"],
+    ["the cells are dissatisfied with the medium", "ssa"],
+    ["rebinding after release", "binding"],
+    ["a workman assembling the apparatus", "assa"],
+  ])("does not read a keyword inside a longer word: %j (%s)", (query) => {
+    // Falls through rather than matching: none of these queries names a
+    // domain, and a keyword found inside an unrelated word is not evidence.
+    expect(matched(query)).toBe(false);
   });
 
-  it("does not read 'ring' inside 'bring'", () => {
-    expect(domainOf("bring the substrate concentration up and watch v")).not.toBe(
-      "repressilator",
+  it("does not resolve bacterial competence as competitive inhibition", () => {
+    // The sharpest of the four, kept as its own case because the wrong
+    // answer is plausible rather than absurd: both are about molecules
+    // competing for something, and only one is a question about kinetics.
+    expect(domainOf("bacterial competence in a culture")).not.toBe(
+      "mm_competitive_inhibition",
     );
   });
 
-  it("still matches a keyword the query writes as a word", () => {
-    // The bounding direction: boundaries must not cost real matches.
-    expect(domainOf("a synthetic gene circuit with three genes in a ring")).toBe(
-      "repressilator",
-    );
-    expect(
-      domainOf("Simulate the Elowitz and Leibler synthetic genetic oscillator."),
-    ).toBe("repressilator");
+  it.each([
+    ["simulate competitive inhibition of the enzyme", "mm_competitive_inhibition"],
+    ["run a gillespie simulation of decay", "gillespie_ssa"],
+    ["how fast does catalase turn over its substrate", "mm"],
+  ])("still matches a keyword the query writes as a word: %j", (query, expected) => {
+    // The bounding direction. Boundaries must not cost real matches.
+    expect(domainOf(query)).toBe(expected);
   });
 
   it("still matches an inflected keyword, through the stem path", () => {
-    // "spreads" for the keyword "spread" -- half credit, but found.
-    expect(domainOf("Model how measles spreads through an unvaccinated school.")).toBe(
-      "sir",
-    );
-  });
-});
-
-describe("a host organism is not a mechanism", () => {
-  it("does not classify an E. coli growth question as a repressilator", () => {
-    // "e. coli" was a repressilator keyword: it is the organism the
-    // Elowitz-Leibler circuit was built in, which is a fact about the
-    // paper, not about the question being asked.
-    const { matched, defaults } = classifyDomainByKeyword(
-      "how fast does E. coli grow in glucose",
-    );
-    expect(matched && defaults.domain === "repressilator").toBe(false);
+    // "catalyses" for the keyword "catalyze" -- half credit under ADR 0204,
+    // but found. The literal path cannot see it; the stem path can.
+    expect(domainOf("the enzyme catalyses the step")).toBe("mm");
   });
 });

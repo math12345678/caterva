@@ -162,10 +162,12 @@ export class UnrecognizedQueryError extends Error {
     super(
       `Could not match this query to any of Caterva's ${availableDomains.length} ` +
         `simulation domains: ${availableDomains.join(", ")}. Try naming the ` +
-        "domain directly (e.g. \"simulate sir ...\"), using terms closer to " +
-        "the science (\"outbreak\", \"enzyme kinetics\", \"predator-prey\", " +
-        '"population genetics"), or supplying parameters directly with ' +
-        "key=value pairs.",
+        "domain directly (e.g. \"simulate enzyme kinetics ...\"), using " +
+        "terms closer to the science (\"Michaelis-Menten\", \"competitive " +
+        "inhibition\", \"gillespie\"), or supplying parameters directly " +
+        "with key=value pairs. Epidemics, population genetics, PCR and the " +
+        "ODE oscillators were archived on 2026-09-27; Caterva v0.4.0 still " +
+        "runs them.",
     );
     this.name = "UnrecognizedQueryError";
     this.query = query;
@@ -290,8 +292,9 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
  * that the set below can be DERIVED from it. The bridge imports this;
  * there is one list, not two.
  */
-export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set([
-  "sir",
+export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set<string>([
+  // Empty since epidemiology was archived on 2026-09-27; kept so the bridge
+  // still has one list to consult if the domain ever returns.
 ]);
 
 /**
@@ -1286,30 +1289,14 @@ const DEFINITIONAL: {
   contradictedBy: string[];
   reason: string;
 }[] = [
-  {
-    domain: "wright_fisher",
-    key: "selection_coefficient",
-    value: 0,
-    contradictedBy: ["selection", "selective", "advantage", "fitness",
-                     "beneficial", "deleterious", "adaptive"],
-    reason:
-      "s = 0 because the neutral Wright-Fisher model IS drift without " +
-      "selection. This is what the query asked for, not an assumption " +
-      "Caterva added; a non-zero s would be the unrequested change.",
-  },
-  // NOT `mutation_rate`. It was here, and it was wrong.
+  // Empty since 2026-09-27. Its one entry -- neutral drift's selection
+  // coefficient, s = 0, which is what "genetic drift" means -- left with
+  // population genetics.
   //
-  // `RESOLVABLE_FIELDS.wright_fisher` is `["mutation_rate"]` -- Caterva
-  // SEARCHES for mutation rates. Declaring one definitionally zero
-  // short-circuits a lookup that can succeed, and `noResolverDomains.test.ts`
-  // caught it by asserting that this domain still says the literature was
-  // genuinely searched.
-  //
-  // The rule that survives: a definitional value is legitimate only for a
-  // quantity Caterva has NO literature path for. Where a path exists, use it
-  // or refuse; a definition must never be a shortcut past a search that
-  // would have worked. `selection_coefficient` qualifies because nothing
-  // resolves it.
+  // The rule for any future entry: a definitional value is legitimate only
+  // for a quantity Caterva has NO literature path for. Where a path exists,
+  // use it or refuse; a definition must never be a shortcut past a search
+  // that would have worked.
 ];
 
 /**

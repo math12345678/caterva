@@ -10,11 +10,12 @@ Usage:
 
 Expected input JSON shape:
     {
-      "domain": "mm" | "mm_competitive_inhibition" | "sir" | "seir" | "pcr" | "monte_carlo_pi" |
-                 "wright_fisher" | "two_locus_wright_fisher" |
-                 "molecular_dynamics" | "gillespie_ssa" |
-                 "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates" |
-                 "lotka_volterra" | "cell_cycle_oscillator" | "repressilator" | "sbml",
+      "domain": "mm" | "mm_competitive_inhibition" | "gillespie_ssa" |
+                 "gillespie_ssa_bimolecular" | "gillespie_ssa_replicates" | "sbml",
+                 (archived 2026-09-27, answered with ARCHIVED_DOMAINS: "sir",
+                 "seir", "pcr", "monte_carlo_pi", "wright_fisher",
+                 "two_locus_wright_fisher", "molecular_dynamics",
+                 "lotka_volterra", "cell_cycle_oscillator", "repressilator")
       "parameters": { ...domain-specific params... }
     }
 
@@ -63,20 +64,8 @@ import libsbml  # type: ignore[import-untyped]
 # wall-clock time per request: the queue governs concurrency, these govern
 # duration.
 #
-# Measured on the pinned CI configuration (Python 3.10, numpy 1.26.4),
-# 2026-08-01, by timing the engine directly:
-#
-#     MC   1e6 samples ............................. 0.31s
-#     WF   10k generations x 10 replicates ......... 0.86s
-#     MD   108 particles x 10k steps ............... 7.32s
-#
-# An earlier revision of this comment cited "STAGE_04_PART_01 §6.3" for these
-# numbers and quoted MD at ~11s. That section does not exist and the figure
-# was never measured; both are corrected above.
-MAX_API_MONTE_CARLO_SAMPLES = 1_000_000
-MAX_API_MD_STEPS = 10_000
-MAX_API_WF_GENERATIONS = 10_000
-MAX_API_WF_REPLICATES = 1_000
+# The Monte Carlo, Wright-Fisher and Lennard-Jones MD ceilings that stood
+# here left with those domains on 2026-09-27 (archive/legacy_domains/).
 
 # SSA cost is O(initial population): each reaction event consumes one
 # molecule of A. 1e6 events is a few seconds in the engine — a hard
@@ -90,24 +79,6 @@ MAX_API_SSA_POPULATION = 1_000_000
 # request can only ask for a handful of replicates, and a 1000-run
 # ensemble can only use a small population.
 MAX_API_SSA_REPLICATES = 1_000
-
-# MD cost is O(N^2 * steps) -- pairwise forces, no neighbour lists (ADR 0006
-# put those out of scope). Capping n_steps alone therefore does NOT bound a
-# request, because the quadratic term is unconstrained. Measured at a step
-# count 50x BELOW the ceiling:
-#
-#     n=108   0.15s      n=500   3.64s
-#     n=256   0.95s      n=800   9.94s
-#
-# and the engine accepts n_particles=5000 (ok=True, merely flagged, then
-# rounded UP to the next fcc count, 5324). That request passes every ceiling
-# above and costs roughly six hours at the step limit.
-#
-# So the budget is applied to the product that actually drives cost. Measured
-# throughput is ~1.6e7 pair-steps/second, so 1.2e8 is about a 7.5-second
-# ceiling -- chosen to keep the documented 108-particle x 10k-step case
-# (1.17e8) inside the budget while rejecting the pathological shapes.
-MAX_API_MD_PAIR_STEPS = 120_000_000
 
 # ---------------------------------------------------------------------------
 # Raw-SBML ceilings.
@@ -186,20 +157,6 @@ MAX_API_SBML_SOURCE_CHARS = 400_000
 # the cost of the conversion itself.
 MAX_API_ANTIMONY_SOURCE_CHARS = 40_000
 
-
-def _fcc_particle_count(requested: int) -> int:
-    """Mirror the engine's fcc round-up: 4*k^3 for the smallest sufficient k.
-
-    The budget must be computed on the count the engine will actually
-    simulate, not the count the caller asked for -- rounding is always
-    upward, so using the request would systematically underestimate cost.
-    """
-    if requested <= 0:
-        return 0
-    cells = 1
-    while 4 * cells**3 < requested:
-        cells += 1
-    return 4 * cells**3
 
 # The repo root must be on PYTHONPATH so we can import caterva.caterva_engine.
 # The API server sets this when spawning the process.
@@ -365,86 +322,6 @@ def run_mm_competitive_inhibition(params: Dict[str, Any]) -> Dict[str, Any]:
     return _serialise_result(result, "mm_competitive_inhibition", reported)
 
 
-def run_sir(params: Dict[str, Any]) -> Dict[str, Any]:
-    beta = float(params.get("beta", 0.3))
-    gamma = float(params.get("gamma", 0.1))
-    s0 = float(params.get("s0", 990.0))
-    i0 = float(params.get("i0", 10.0))
-    r0 = float(params.get("r0_recovered", 0.0))
-    end = float(params.get("end", 100.0))
-    points = int(params.get("points", 101))
-
-    result = caterva_engine.simulate_sir(
-        beta=beta, gamma=gamma, s0=s0, i0=i0, r0_recovered=r0, end=end,
-        points=points
-    )
-
-    return _serialise_result(
-        result, "sir",
-        {"beta": beta, "gamma": gamma, "s0": s0, "i0": i0,
-         "r0_recovered": r0, "end": end, "points": points},
-    )
-
-
-def run_seir(params: Dict[str, Any]) -> Dict[str, Any]:
-    beta = float(params.get("beta", 0.3))
-    sigma = float(params.get("sigma", 0.2))
-    gamma = float(params.get("gamma", 0.1))
-    s0 = float(params.get("s0", 990.0))
-    e0 = float(params.get("e0", 10.0))
-    i0 = float(params.get("i0", 0.0))
-    r0 = float(params.get("r0_recovered", 0.0))
-    end = float(params.get("end", 100.0))
-    points = int(params.get("points", 101))
-
-    result = caterva_engine.simulate_seir(
-        beta=beta, sigma=sigma, gamma=gamma, s0=s0, e0=e0, i0=i0,
-        r0_recovered=r0, end=end, points=points
-    )
-
-    return _serialise_result(
-        result, "seir",
-        {"beta": beta, "sigma": sigma, "gamma": gamma,
-         "s0": s0, "e0": e0, "i0": i0, "r0_recovered": r0,
-         "end": end, "points": points},
-    )
-
-
-def run_pcr(params: Dict[str, Any]) -> Dict[str, Any]:
-    n0 = float(params.get("n0", 100.0))
-    efficiency = float(params.get("efficiency", 0.95))
-    cycles = int(params.get("cycles", 30))
-
-    result = caterva_engine.simulate_pcr(
-        n0=n0, efficiency=efficiency, cycles=cycles
-    )
-
-    return _serialise_result(
-        result, "pcr",
-        {"n0": n0, "efficiency": efficiency, "cycles": cycles},
-    )
-
-
-def run_monte_carlo_pi(params: Dict[str, Any]) -> Dict[str, Any]:
-    n_samples = int(params.get("n_samples", 10000))
-    if n_samples > MAX_API_MONTE_CARLO_SAMPLES:
-        raise ValueError(
-            f"n_samples={n_samples} exceeds API runtime ceiling "
-            f"(MAX_API_MONTE_CARLO_SAMPLES) {MAX_API_MONTE_CARLO_SAMPLES}"
-        )
-
-    seed = params.get("seed")
-    seed = None if seed is None else int(seed)
-    result = caterva_engine.simulate_monte_carlo_pi(
-        n_samples=n_samples, seed=seed
-    )
-
-    return _serialise_result(
-        result, "monte_carlo_pi",
-        {"n_samples": n_samples, "seed": seed},
-    )
-
-
 def run_gillespie_ssa(params: Dict[str, Any]) -> Dict[str, Any]:
     a0 = int(params.get("a0", 1000))
     k = float(params.get("k", 0.5))
@@ -526,191 +403,6 @@ def run_gillespie_ssa_bimolecular(params: Dict[str, Any]) -> Dict[str, Any]:
     return _serialise_result(
         result, "gillespie_ssa_bimolecular",
         {"a0": a0, "b0": b0, "k": k, "end": end, "seed": seed},
-    )
-
-
-def run_wright_fisher(params: Dict[str, Any]) -> Dict[str, Any]:
-    population_size = int(params.get("population_size", 100))
-    starting_frequency = float(params.get("starting_frequency", 0.5))
-    generations = int(params.get("generations", 100))
-    replicate_runs = int(params.get("replicate_runs", 100))
-    mutation_rate = float(params.get("mutation_rate", 0.0))
-    selection_coefficient = float(params.get("selection_coefficient", 0.0))
-    dominance = params.get("dominance")
-    seed = params.get("seed")
-
-    if generations > MAX_API_WF_GENERATIONS:
-        raise ValueError(
-            f"generations={generations} exceeds API runtime ceiling "
-            f"(MAX_API_WF_GENERATIONS) {MAX_API_WF_GENERATIONS}"
-        )
-    if replicate_runs > MAX_API_WF_REPLICATES:
-        raise ValueError(
-            f"replicate_runs={replicate_runs} exceeds API runtime ceiling "
-            f"(MAX_API_WF_REPLICATES) {MAX_API_WF_REPLICATES}"
-        )
-
-    result = caterva_engine.simulate_wright_fisher(
-        population_size=population_size, starting_frequency=starting_frequency,
-        generations=generations, replicate_runs=replicate_runs,
-        mutation_rate=mutation_rate, selection_coefficient=selection_coefficient,
-        dominance=dominance, seed=seed
-    )
-
-    return _serialise_result(
-        result, "wright_fisher",
-        {"population_size": population_size,
-         "starting_frequency": starting_frequency,
-         "generations": generations,
-         "replicate_runs": replicate_runs,
-         "mutation_rate": mutation_rate,
-         "selection_coefficient": selection_coefficient,
-         "dominance": dominance,
-         "seed": seed},
-    )
-
-
-def run_two_locus_wright_fisher(params: Dict[str, Any]) -> Dict[str, Any]:
-    population_size = int(params.get("population_size", 100))
-    generations = int(params.get("generations", 100))
-    recombination_rate = float(params.get("recombination_rate", 0.1))
-    raw_freqs = params.get("starting_frequencies", [0.5, 0.0, 0.0, 0.5])
-    starting_frequencies = [float(x) for x in raw_freqs]
-    replicate_runs = int(params.get("replicate_runs", 100))
-    mutation_rate = float(params.get("mutation_rate", 0.0))
-    seed = params.get("seed")
-
-    if generations > MAX_API_WF_GENERATIONS:
-        raise ValueError(
-            f"generations={generations} exceeds API runtime ceiling "
-            f"(MAX_API_WF_GENERATIONS) {MAX_API_WF_GENERATIONS}"
-        )
-    if replicate_runs > MAX_API_WF_REPLICATES:
-        raise ValueError(
-            f"replicate_runs={replicate_runs} exceeds API runtime ceiling "
-            f"(MAX_API_WF_REPLICATES) {MAX_API_WF_REPLICATES}"
-        )
-
-    result = caterva_engine.simulate_two_locus_wright_fisher(
-        population_size=population_size, generations=generations,
-        recombination_rate=recombination_rate,
-        starting_frequencies=starting_frequencies,
-        replicate_runs=replicate_runs, mutation_rate=mutation_rate, seed=seed
-    )
-
-    # TwoLocusResult validates by raising; a returned result is un-flagged.
-    return _serialise_result(
-        result, "two_locus_wright_fisher",
-        {"population_size": population_size,
-         "generations": generations,
-         "recombination_rate": recombination_rate,
-         "starting_frequencies": starting_frequencies,
-         "replicate_runs": replicate_runs,
-         "mutation_rate": mutation_rate,
-         "seed": seed},
-    )
-
-
-def run_molecular_dynamics(params: Dict[str, Any]) -> Dict[str, Any]:
-    n_particles = int(params.get("n_particles", 108))
-    temperature = float(params.get("temperature", 0.4))
-    timestep = float(params.get("timestep", 0.005))
-    n_steps = int(params.get("n_steps", 1000))
-    density = float(params.get("density", 0.85))
-    if n_steps > MAX_API_MD_STEPS:
-        raise ValueError(
-            f"n_steps={n_steps} exceeds API runtime ceiling "
-            f"(MAX_API_MD_STEPS) {MAX_API_MD_STEPS}"
-        )
-
-    # Bound the quadratic term too -- n_steps alone does not bound the request.
-    actual_n = _fcc_particle_count(n_particles)
-    pair_steps = actual_n * actual_n * max(n_steps, 1)
-    if pair_steps > MAX_API_MD_PAIR_STEPS:
-        raise ValueError(
-            f"n_particles={n_particles} (simulated as {actual_n} after fcc "
-            f"round-up) with n_steps={n_steps} is {pair_steps:.3g} pair-steps, "
-            f"exceeding the API runtime ceiling (MAX_API_MD_PAIR_STEPS) "
-            f"{MAX_API_MD_PAIR_STEPS:.3g}. MD cost scales as N^2 * steps; "
-            f"reduce either."
-        )
-
-    seed = params.get("seed")
-
-    result = caterva_engine.simulate_molecular_dynamics(
-        n_particles=n_particles, temperature=temperature, timestep=timestep,
-        n_steps=n_steps, density=density, seed=seed
-    )
-
-    return _serialise_result(
-        result, "molecular_dynamics",
-        {"n_particles": n_particles, "temperature": temperature,
-         "timestep": timestep, "n_steps": n_steps, "density": density,
-         "seed": seed},
-    )
-
-
-def run_lotka_volterra(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Lotka-Volterra predator-prey dynamics (Lotka 1925, Volterra 1926).
-
-    gamma/delta defaults are 0.1/0.4, matching
-    ``simulate_lotka_volterra``'s own defaults -- NOT 0.4/0.1. That
-    transposed pairing put the coexistence fixed point at (0.25, 2.75)
-    against a p0=10 start (a 40x excursion), drove the prey population
-    negative, and drifted the system's exactly-conserved first integral
-    by 49%. See the docstring on ``simulate_lotka_volterra`` and
-    tests/test_lotka_volterra_correctness.py.
-    """
-    alpha = float(params.get("alpha", 1.1))
-    beta = float(params.get("beta", 0.4))
-    gamma = float(params.get("gamma", 0.1))
-    delta = float(params.get("delta", 0.4))
-    p0 = float(params.get("p0", 10.0))  # Prey population
-    v0 = float(params.get("v0", 5.0))   # Predator population
-    end = float(params.get("end", 20.0))
-    points = int(params.get("points", 201))
-
-    result = caterva_engine.simulate_lotka_volterra(
-        alpha=alpha, beta=beta, gamma=gamma, delta=delta,
-        p0=p0, v0=v0, end=end, points=points
-    )
-
-    return _serialise_result(
-        result, "lotka_volterra",
-        {"alpha": alpha, "beta": beta, "gamma": gamma, "delta": delta,
-         "p0": p0, "v0": v0, "end": end, "points": points},
-    )
-
-
-def run_cell_cycle_oscillator(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Cell cycle oscillator (Tyson 1991): cyclin-CDK regulation driving mitosis."""
-    end = float(params.get("end", 100.0))
-    points = int(params.get("points", 1001))
-    seed = params.get("seed")
-
-    result = caterva_engine.simulate_cell_cycle_oscillator(
-        end=end, points=points, seed=seed
-    )
-
-    return _serialise_result(
-        result, "cell_cycle_oscillator",
-        {"end": end, "points": points, "seed": seed},
-    )
-
-
-def run_repressilator(params: Dict[str, Any]) -> Dict[str, Any]:
-    """Repressilator (Elowitz & Leibler 2000): three-gene synthetic oscillator."""
-    end = float(params.get("end", 200.0))
-    points = int(params.get("points", 2001))
-    seed = params.get("seed")
-
-    result = caterva_engine.simulate_repressilator(
-        end=end, points=points, seed=seed
-    )
-
-    return _serialise_result(
-        result, "repressilator",
-        {"end": end, "points": points, "seed": seed},
     )
 
 
@@ -879,7 +571,6 @@ def run_sbml(params: Dict[str, Any]) -> Dict[str, Any]:
         result, "sbml",
         {"start": start, "end": end, "points": points},
     )
-
 
 
 # ---------------------------------------------------------------------------
@@ -1573,23 +1264,9 @@ def _conservation_law_strings(network: Any) -> Any:
 DISPATCH: Dict[str, str] = {
     "mm": "simulate_michaelis_menten",
     "mm_competitive_inhibition": "simulate_mm_competitive_inhibition",
-    "sir": "simulate_sir",
-    "seir": "simulate_seir",
-    "wright_fisher": "simulate_wright_fisher",
     "gillespie_ssa": "simulate_gillespie_ssa",
-    "pcr": "simulate_pcr",
-    "molecular_dynamics": "simulate_molecular_dynamics",
     "gillespie_ssa_bimolecular": "simulate_gillespie_ssa_bimolecular",
-    "two_locus_wright_fisher": "simulate_two_locus_wright_fisher",
-    "monte_carlo_pi": "simulate_monte_carlo_pi",
     "gillespie_ssa_replicates": "simulate_gillespie_ssa_replicates",
-    # Three ODE oscillator domains (ADR 0022). Removed earlier the same day
-    # when the engine did not yet implement them; restored now that
-    # simulate_lotka_volterra / _cell_cycle_oscillator / _repressilator are
-    # real and in the engine's __all__.
-    "lotka_volterra": "simulate_lotka_volterra",
-    "cell_cycle_oscillator": "simulate_cell_cycle_oscillator",
-    "repressilator": "simulate_repressilator",
     "sbml": "simulate_sbml",
 }
 
@@ -1626,22 +1303,27 @@ COMPOSED_DOMAINS: Dict[str, str] = {
 }
 
 
+#: Domains Caterva no longer runs, and why. Caterva narrowed to enzymes on
+#: 2026-09-27: kinetics, structure and dynamics. These were archived rather
+#: than deleted (archive/legacy_domains/), and tag v0.4.0 still runs them. A
+#: request for one gets this sentence, not "unknown domain": the caller asked
+#: for something real that moved.
+ARCHIVED_DOMAINS: Dict[str, str] = {
+    d: (f"{d!r} was archived on 2026-09-27, when Caterva narrowed to enzymes "
+        "(kinetics, structure, dynamics). The code is in archive/legacy_domains/; "
+        "Caterva v0.4.0 still runs it.")
+    for d in ("sir", "seir", "pcr", "monte_carlo_pi", "wright_fisher",
+              "two_locus_wright_fisher", "molecular_dynamics", "lotka_volterra",
+              "cell_cycle_oscillator", "repressilator")
+}
+
+
 _RUNNERS: Dict[str, Callable[[Dict[str, Any]], Dict[str, Any]]] = {
     "mm": run_mm,
     "mm_competitive_inhibition": run_mm_competitive_inhibition,
-    "sir": run_sir,
-    "seir": run_seir,
-    "wright_fisher": run_wright_fisher,
     "gillespie_ssa": run_gillespie_ssa,
-    "pcr": run_pcr,
-    "molecular_dynamics": run_molecular_dynamics,
     "gillespie_ssa_bimolecular": run_gillespie_ssa_bimolecular,
-    "two_locus_wright_fisher": run_two_locus_wright_fisher,
-    "monte_carlo_pi": run_monte_carlo_pi,
     "gillespie_ssa_replicates": run_gillespie_ssa_replicates,
-    "lotka_volterra": run_lotka_volterra,
-    "cell_cycle_oscillator": run_cell_cycle_oscillator,
-    "repressilator": run_repressilator,
     "sbml": run_sbml,
     "compose": run_compose,
     "parameterize": run_parameterize,
@@ -1795,6 +1477,8 @@ def main() -> None:
         # "unknown domain" for it blames the caller for a request that was
         # fine. Testing _RUNNERS directly would collapse the two cases into
         # the wrong one; the missing-handler check below keeps them apart.
+        if domain in ARCHIVED_DOMAINS:
+            raise ValueError(ARCHIVED_DOMAINS[domain])  # noqa: TRY301
         if domain not in DISPATCH and domain not in COMPOSED_DOMAINS:
             raise ValueError(f"unknown domain: {domain!r}")  # noqa: TRY301
         if not isinstance(params, dict):

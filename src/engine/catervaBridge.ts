@@ -50,19 +50,9 @@ import { logger } from '../logger';
 export type SimulationDomain =
   | 'mm'
   | 'mm_competitive_inhibition'
-  | 'sir'
-  | 'seir'
-  | 'wright_fisher'
   | 'gillespie_ssa'
-  | 'pcr'
-  | 'molecular_dynamics'
   | 'gillespie_ssa_bimolecular'
-  | 'two_locus_wright_fisher'
-  | 'monte_carlo_pi'
   | 'gillespie_ssa_replicates'
-  | 'lotka_volterra'
-  | 'cell_cycle_oscillator'
-  | 'repressilator'
   | 'sbml';
 
 export type EngineParameterValue =

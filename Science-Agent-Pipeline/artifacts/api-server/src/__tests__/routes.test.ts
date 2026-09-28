@@ -157,19 +157,17 @@ describe("POST /api/simulate", () => {
         // "failed"` and passed -- so the assertions below, including the two
         // that check beta and gamma survive the round trip, had never once
         // executed. Making the helper throw surfaced it on the first run.
-        query:
-          "simulate sir beta=0.5 gamma=0.1 s0=100 i0=10 r0_recovered=0 " +
-          "end=10 points=51",
+        query: "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51",
       });
 
     const result = (await awaitJob(createRes.body.jobId)) as any;
 
     expect(result).toBeDefined();
-    expect(result.domain).toBe("sir");
+    expect(result.domain).toBe("mm");
     expect(Array.isArray(result.trajectory)).toBe(true);
     expect(result.trajectory.length).toBeGreaterThan(0);
-    expect(result.parameters.beta).toBe(0.5);
-    expect(result.parameters.gamma).toBe(0.1);
+    expect(result.parameters.km).toBe(0.5);
+    expect(result.parameters.vmax).toBe(2);
   });
 
   it("runs a Gillespie SSA query to completion with seeded trajectory", async () => {
@@ -201,22 +199,6 @@ describe("POST /api/simulate", () => {
     ).toEqual(result.trajectory);
   });
 
-  it("runs a two_locus_wright_fisher query with an array override to completion", async () => {
-    const createRes = await request(server)
-      .post("/api/simulate")
-      .send({
-        query:
-          "linkage disequilibrium two locus population_size=200 generations=30 " +
-          "recombination_rate=0.1 starting_frequencies=0.5,0,0,0.5 " +
-          "mutation_rate=0.001 replicate_runs=50",
-      });
-    const result = (await awaitJob(createRes.body.jobId)) as any;
-
-    expect(result.domain).toBe("two_locus_wright_fisher");
-    expect(result.parameters.starting_frequencies).toEqual([0.5, 0, 0, 0.5]);
-    expect(result.trajectory.length).toBeGreaterThan(0);
-    expect(result.trajectory[0].generation).toBe(0);
-  });
 });
 
 describe("GET /api/simulate/:jobId", () => {
@@ -281,7 +263,7 @@ describe("POST /api/simulate/:jobId/cancel", () => {
   it("returns 409 for already completed job", async () => {
     const create = await request(server)
       .post("/api/simulate")
-      .send({ query: "simulate sir" });
+      .send({ query: "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51" });
     const { jobId } = create.body;
 
     // Wait for completion
@@ -389,23 +371,23 @@ describe("POST /api/resolve", () => {
     expect(res.status).toBe(400);
   });
 
-  it("resolves an SIR query", async () => {
+  it("resolves a fully specified enzyme query", async () => {
     const res = await request(server)
       .post("/api/resolve")
-      .send({ query: "simulate sir beta=0.5 gamma=0.1 s0=990 i0=10 r0_recovered=0 end=100 points=101" });
+      .send({ query: "simulate michaelis menten km=0.5 vmax=2 s0=10 end=10 points=51" });
     expect(res.status).toBe(200);
-    expect(res.body.domain).toBe("sir");
-    expect(res.body.parameters.beta).toBe(0.5);
+    expect(res.body.domain).toBe("mm");
+    expect(res.body.parameters.km).toBe(0.5);
     expect(res.body.provenance).toHaveProperty("reasoning");
   });
 
-  it("returns 422 when SIR query has unsourced defaults", async () => {
+  it("returns 422 when an enzyme query leaves Vmax unsourced", async () => {
     const res = await request(server)
       .post("/api/resolve")
-      .send({ query: "simulate sir beta=0.5" });
+      .send({ query: "simulate michaelis menten km=0.5" });
     expect(res.status).toBe(422);
     expect(res.body.error).toBe("RequiredParametersMissingError");
-    expect(res.body.missingKeys).toContain("gamma");
+    expect(res.body.missingKeys).toContain("vmax");
   });
 
   it("names the domain on a 422, and never labels a missing key's fallback number as resolved", async () => {
@@ -744,7 +726,7 @@ describe("GET /api/dashboard/overview", () => {
     expect(res.body).toHaveProperty("domains");
     expect(res.body.domains).toHaveProperty("total");
     expect(res.body.domains).toHaveProperty("covered");
-    expect(res.body.domains.covered.length).toBe(13);
+    expect(res.body.domains.covered.length).toBe(4);
     expect(res.body.domains).toHaveProperty("citations");
     expect(Array.isArray(res.body.domains.citations)).toBe(true);
   });

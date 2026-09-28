@@ -117,7 +117,7 @@ def test_a_missing_parameter_is_refused_not_defaulted():
 def test_an_unknown_domain_names_the_ones_it_knows():
     code, out = run({**MM_PAYLOAD, "domain": "nonexistent_domain"})
     assert code == 1
-    assert "mm" in out["error"] and "sir" in out["error"]
+    assert "mm" in out["error"] and "mm_competitive_inhibition" in out["error"]
 
 
 def test_engine_validation_rejection_is_reported_not_swallowed():
@@ -150,7 +150,6 @@ def test_malformed_json_fails_cleanly():
             "mm_competitive_inhibition",
             {"km": 2.5, "vmax": 5.0, "ki": 1.2, "s0": 10.0, "i": 0.5},
         ),
-        ("sir", {"beta": 0.3, "gamma": 0.1, "s0": 990.0, "i0": 10.0, "r0_recovered": 0.0}),
     ],
 )
 def test_every_supported_domain_exports_with_every_assignment_commented(

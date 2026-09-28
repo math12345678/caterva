@@ -1,38 +1,38 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { simulateSIR } from "@/lib/simulate";
+import { simulateMichaelisMenten } from "@/lib/simulate";
 import LineChart from "./LineChart";
 
-// This widget shows an SIR outbreak model (compartmental epidemiology),
-// so its citations must be the real SIR literature -- not an enzyme
-// EC number and a KEGG reaction ID, which is what stood here before and
-// belongs to an entirely different domain. See
-// Science-Agent-Pipeline/artifacts/api-server/src/lib/domain-literature.ts
-// (SIR_LITERATURE) for the source of truth.
+// Human LDH-A reducing pyruvate, with and without the competitive
+// inhibitor oxamate. Km and Ki are recorded BRENDA values (both Homo
+// sapiens); [I], Vmax and [S]0 are chosen for the picture and labelled so.
+// A competitive inhibitor keeps the Michaelis-Menten form with the
+// apparent Km = Km(1 + [I]/Ki), so one integrator draws both curves.
 const citations = [
-  { label: "Kermack & McKendrick", id: "1927", href: "#" },
-  { label: "DOI", id: "10.1098/rspa.1927.0118", href: "#" },
-  { label: "Heesterbeek et al.", id: "2015", href: "#" },
+  { label: "Km 0.03 mM", id: "BRENDA 286469" },
+  { label: "Ki 0.00059 mM", id: "BRENDA 739793" },
+  { label: "Michaelis & Menten", id: "1913" },
 ];
 
-const replicatingParams = { beta: 0.35, gamma: 0.12 };
+const KM = 0.03;
+const KI = 0.00059;
+const VMAX = 0.05;
+const S0 = 0.2;
+const END = 6;
+const INHIBITOR_LEVELS = [0, 0.0005, 0.001, 0.002];
 
 export default function DashboardPreview() {
-  const [phase, setPhase] = useState(0);
-  const params = useRef({ ...replicatingParams });
+  const [level, setLevel] = useState(0);
   const [selectedTab, setSelectedTab] = useState<
     "simulation" | "citations" | "parameters"
   >("simulation");
 
+  // Step through inhibitor concentrations; the constants never move.
   useEffect(() => {
-    const id = window.setInterval(() => {
-      const p = params.current;
-      p.beta += (Math.random() - 0.5) * 0.02;
-      p.gamma += (Math.random() - 0.5) * 0.01;
-      p.beta = Math.max(0.1, Math.min(0.9, p.beta));
-      p.gamma = Math.max(0.01, Math.min(0.5, p.gamma));
-      setPhase((v) => v + 1);
-    }, 2500);
+    const id = window.setInterval(
+      () => setLevel((v) => (v + 1) % INHIBITOR_LEVELS.length),
+      2500,
+    );
     return () => window.clearInterval(id);
   }, []);
 
@@ -55,34 +55,25 @@ export default function DashboardPreview() {
     return () => window.clearInterval(autoCycleRef.current);
   }, [startAutoCycle]);
 
-  const result = simulateSIR({
-    beta: params.current.beta,
-    gamma: params.current.gamma,
-    s0: 990,
-    i0: 10,
-    end: 100,
-    points: 60,
-  });
+  const inhibitor = INHIBITOR_LEVELS[level]!;
+  const kmApp = KM * (1 + inhibitor / KI);
+  const free = simulateMichaelisMenten({ km: KM, vmax: VMAX, s0: S0, end: END, points: 61 });
+  const inhibited = simulateMichaelisMenten({ km: kmApp, vmax: VMAX, s0: S0, end: END, points: 61 });
+  const data = free.trajectory.map((p, i) => ({
+    t: p.t,
+    S: p.S,
+    S_inhibited: inhibited.trajectory[i]!.S,
+  }));
 
   const series = [
     { key: "S", color: "#1D8A72" },
-    { key: "I", color: "#EF4444" },
-    { key: "R", color: "#3B82F6" },
+    { key: "S_inhibited", color: "#F59E0B" },
   ];
 
-  const t = result.trajectory;
-  const peakI = t.length > 0 ? Math.max(...t.map((d) => d.I)) : 0;
-  const peakIdx = Math.max(
-    0,
-    t.findIndex((d) => d.I === peakI),
-  );
-  const finalS = t.length > 0 ? t[t.length - 1].S : 0;
-  const conserved =
-    t.length > 0
-      ? t.every(
-          (d) => Math.abs(d.S + d.I + d.R - (t[0].S + t[0].I + t[0].R)) < 1,
-        )
-      : false;
+  const finalFree = free.trajectory[free.trajectory.length - 1]!.S;
+  const finalInh = inhibited.trajectory[inhibited.trajectory.length - 1]!.S;
+  // The closed-form MM solution, checked at the last point for both runs.
+  const exact = Math.max(free.finalResidual, inhibited.finalResidual) < 1e-6;
 
   return (
     <div
@@ -95,7 +86,7 @@ export default function DashboardPreview() {
         <span className="w-2 h-2 rounded-full bg-white/10" />
         <span className="w-2 h-2 rounded-full bg-white/10" />
         <span className="text-[10px] text-white/20 ml-2 font-mono">
-          simulation — SIR outbreak model
+          simulation — LDH-A + oxamate
         </span>
       </div>
 
@@ -134,24 +125,24 @@ export default function DashboardPreview() {
                 <div className="flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-[#1D8A72] animate-pulse" />
                   <span className="text-[10px] text-white/30 font-mono">
-                    ode-int:rk4 · t=100
+                    ode-int:rk4 · t=6
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span
                     className={`inline-block w-1.5 h-1.5 rounded-full ${
-                      conserved ? "bg-[#1D8A72]" : "bg-[#EF4444]"
+                      exact ? "bg-[#1D8A72]" : "bg-[#EF4444]"
                     }`}
                   />
                   <span className="text-[9px] text-white/25 font-mono">
-                    {conserved ? "conserved ✓" : "NOT conserved"}
+                    {exact ? "matches closed form ✓" : "closed-form check FAILED"}
                   </span>
                 </div>
               </div>
 
               <div className="h-[130px]">
                 <LineChart
-                  data={result.trajectory}
+                  data={data}
                   series={series}
                   height={130}
                 />
@@ -159,28 +150,10 @@ export default function DashboardPreview() {
 
               <div className="grid grid-cols-4 gap-2 mt-2">
                 {[
-                  {
-                    label: "R₀",
-                    value: (params.current.beta / params.current.gamma).toFixed(
-                      2,
-                    ),
-                    color: "text-white/70",
-                  },
-                  {
-                    label: "peak I",
-                    value: Math.round(peakI).toLocaleString(),
-                    color: "text-[#EF4444]",
-                  },
-                  {
-                    label: "final S",
-                    value: Math.round(finalS).toLocaleString(),
-                    color: "text-[#1D8A72]",
-                  },
-                  {
-                    label: "β/γ",
-                    value: `${params.current.beta.toFixed(2)}/${params.current.gamma.toFixed(2)}`,
-                    color: "text-white/40",
-                  },
+                  { label: "[oxamate]", value: `${(inhibitor * 1000).toFixed(1)} µM`, color: "text-white/70" },
+                  { label: "apparent Km", value: `${kmApp.toFixed(3)} mM`, color: "text-[#F59E0B]" },
+                  { label: "[S] left", value: `${finalInh.toFixed(3)} mM`, color: "text-[#F59E0B]" },
+                  { label: "uninhibited", value: `${finalFree.toFixed(3)} mM`, color: "text-[#1D8A72]" },
                 ].map((stat) => (
                   <div key={stat.label} className="text-center">
                     <div
@@ -207,30 +180,10 @@ export default function DashboardPreview() {
               className="space-y-2 py-1"
             >
               {[
-                {
-                  key: "β (transmission rate)",
-                  val: params.current.beta.toFixed(3),
-                  range: "0.10 – 0.90",
-                  color: "[#1D8A72]",
-                },
-                {
-                  key: "γ (recovery rate)",
-                  val: params.current.gamma.toFixed(3),
-                  range: "0.01 – 0.50",
-                  color: "[#3B82F6]",
-                },
-                {
-                  key: "population",
-                  val: "1,000",
-                  range: "fixed",
-                  color: "[#8B5CF6]",
-                },
-                {
-                  key: "initial infected",
-                  val: "10",
-                  range: "1 – 100",
-                  color: "[#EF4444]",
-                },
+                { key: "Km (pyruvate)", val: "0.03 mM", range: "BRENDA 286469", color: "[#1D8A72]" },
+                { key: "Ki (oxamate)", val: "0.00059 mM", range: "BRENDA 739793", color: "[#F59E0B]" },
+                { key: "Vmax", val: `${VMAX} mM/min`, range: "chosen", color: "[#8B5CF6]" },
+                { key: "[S]0, [I]", val: `${S0} mM, ${(inhibitor * 1000).toFixed(1)} µM`, range: "chosen", color: "[#3B82F6]" },
               ].map((p) => (
                 <div
                   key={p.key}
@@ -273,10 +226,10 @@ export default function DashboardPreview() {
                 ))}
               </div>
               <div className="text-[10px] text-white/25 leading-relaxed border-t border-white/[0.04] pt-2 mt-2">
-                The SIR model itself is Kermack &amp; McKendrick (1927). The
-                β/γ shown here drift randomly for this preview &mdash; ask
-                about a named disease and Caterva resolves real rates with
-                a citation instead.
+                Km and Ki are recorded measurements for human LDH-A, each
+                with its BRENDA reference. Vmax and the concentrations are
+                chosen for this preview and labelled so; Caterva never
+                presents a chosen number as a measured one.
               </div>
             </motion.div>
           )}
@@ -289,7 +242,7 @@ export default function DashboardPreview() {
           <span className="w-1 h-1 rounded-full bg-[#1D8A72]" />
           ode simulation · rk4
         </span>
-        <span>peak at t={peakIdx * 2}</span>
+        <span>competitive · Vmax unchanged</span>
       </div>
     </div>
   );

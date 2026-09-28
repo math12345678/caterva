@@ -92,8 +92,10 @@ def test_unknown_command_is_refused_on_stderr():
 def test_sim_dispatches_to_the_engine_cli_unchanged():
     rc, out, _ = _run(["sim", "--help"])
     assert rc == 0
-    for sub in ("wf", "kimura", "ssa"):
-        assert sub in out
+    assert "ssa" in out
+    # The population-genetics subcommands were archived on 2026-09-27.
+    for gone in ("{wf", "kimura"):
+        assert gone not in out
 
 
 def test_compose_dispatches_to_the_composer_unchanged():

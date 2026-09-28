@@ -80,17 +80,8 @@ const VALID_LLM_RESPONSE = {
 const RESOLVABLE_DOMAINS = [
   "mm",
   "mm_competitive_inhibition",
-  "sir",
-  "seir",
-  "wright_fisher",
   "gillespie_ssa",
-  "pcr",
-  "molecular_dynamics",
   "gillespie_ssa_bimolecular",
-  "two_locus_wright_fisher",
-  "lotka_volterra",
-  "cell_cycle_oscillator",
-  "repressilator",
 ] as const;
 
 

@@ -16,56 +16,9 @@ const VALID: Record<
     end: 10,
     points: 51,
   },
-  sir: { beta: 0.3, gamma: 0.1, s0: 990, i0: 10, end: 100, points: 101 },
-  seir: {
-    beta: 0.3,
-    sigma: 0.2,
-    gamma: 0.1,
-    s0: 990,
-    e0: 10,
-    i0: 0,
-    end: 100,
-    points: 101,
-  },
-  wright_fisher: {
-    population_size: 100,
-    starting_frequency: 0.5,
-    generations: 100,
-    replicate_runs: 100,
-    mutation_rate: 0,
-    selection_coefficient: 0,
-  },
   gillespie_ssa: { a0: 1000, k: 0.5, end: 10 },
-  pcr: { n0: 100, efficiency: 0.95, cycles: 30 },
-  monte_carlo_pi: { n_samples: 10_000, seed: 42 },
-  molecular_dynamics: {
-    n_particles: 108,
-    temperature: 0.4,
-    timestep: 0.005,
-    n_steps: 1000,
-    density: 0.85,
-  },
   gillespie_ssa_bimolecular: { a0: 100, b0: 100, k: 0.005, end: 10 },
   gillespie_ssa_replicates: { a0: 100, k: 0.5, end: 10, n_replicates: 100 },
-  two_locus_wright_fisher: {
-    population_size: 100,
-    generations: 20,
-    recombination_rate: 0.1,
-    starting_frequencies: [0.5, 0, 0, 0.5],
-    replicate_runs: 50,
-  },
-  lotka_volterra: {
-    alpha: 1.1,
-    beta: 0.4,
-    gamma: 0.1,
-    delta: 0.4,
-    p0: 10,
-    v0: 5,
-    end: 20,
-    points: 201,
-  },
-  cell_cycle_oscillator: { end: 100, points: 1001 },
-  repressilator: { end: 200, points: 2001 },
   sbml: {
     sbml_string: "model M()\n  A = 1\nend",
     start: 0,
@@ -77,26 +30,9 @@ const VALID: Record<
 const INVALID: Record<string, Record<string, unknown>> = {
   mm: { km: "abc", vmax: 5, s0: 10 },
   mm_competitive_inhibition: { km: 2, ki: 1.5, vmax: 5, s0: 10 }, // missing i0
-  sir: { beta: 0.3, gamma: 0.1 }, // missing s0, i0
-  seir: { beta: 0.3, sigma: 0.2, gamma: 0.1, s0: 990 }, // missing e0, i0
-  wright_fisher: {
-    population_size: 50.5,
-    starting_frequency: 0.5,
-    generations: 10,
-  },
   gillespie_ssa: { a0: 1000, k: 0.5 }, // missing end
-  pcr: { n0: 100, efficiency: 0.95 }, // missing cycles
-  molecular_dynamics: { n_particles: 10, temperature: 0.4 }, // missing timestep, n_steps
   gillespie_ssa_bimolecular: { a0: 100, b0: 100, k: 0.005 }, // missing end
-  monte_carlo_pi: { n_samples: 0.5 }, // not an integer
   gillespie_ssa_replicates: { a0: 100, k: 0.5, end: 10 }, // missing n_replicates
-  two_locus_wright_fisher: {
-    population_size: 100,
-    generations: 20,
-    recombination_rate: 0.1,
-    starting_frequencies: [0.5, 0.5], // must be 4 entries
-    replicate_runs: 50,
-  },
   sbml: { start: 0, end: 1, points: 11 }, // missing sbml_string
 };
 
@@ -117,15 +53,6 @@ describe("SimulationParameterSchemas", () => {
     });
   }
 
-  it("accepts engine-defaulted optional parameters omitted", () => {
-    const parse = SimulationParameterSchemas.wright_fisher.safeParse({
-      population_size: 100,
-      starting_frequency: 0.5,
-      generations: 100,
-      replicate_runs: 100,
-    });
-    expect(parse.success).toBe(true);
-  });
 
   it("rejects NaN parameters rather than passing them to the engine", () => {
     const parse = SimulationParameterSchemas.mm.safeParse({
@@ -136,18 +63,6 @@ describe("SimulationParameterSchemas", () => {
     expect(parse.success).toBe(false);
   });
 
-  it("rejects malformed molecular-dynamics density", () => {
-    for (const density of ["0.85", null]) {
-      const parse = SimulationParameterSchemas.molecular_dynamics.safeParse({
-        n_particles: 108,
-        temperature: 0.4,
-        timestep: 0.005,
-        n_steps: 1000,
-        density,
-      });
-      expect(parse.success).toBe(false);
-    }
-  });
 });
 
 describe("mm accepts Vmax either directly or as kcat x [E]0 (ADR 0013)", () => {

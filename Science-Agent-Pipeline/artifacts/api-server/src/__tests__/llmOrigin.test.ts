@@ -134,17 +134,17 @@ describe("Target J — an LLM-supplied parameter is hard-blocked (user directive
 
   it("a user override in the query text still wins over an LLM value", async () => {
     vi.mocked(resolveQueryWithLLM).mockResolvedValueOnce({
-      domain: "sir",
-      parameters: { beta: 0.42 },
-      reasoning: "inferred a plausible transmission rate",
+      domain: "mm",
+      parameters: { km: 0.42 },
+      reasoning: "inferred a plausible Km",
       modelCitations: [],
     } as never);
 
     const resolved = await resolveQuery(
-      "simulate an outbreak beta=0.2 gamma=0.1 s0=990 i0=10 end=100 points=101 r0_recovered=0",
+      "simulate enzyme kinetics km=0.2 vmax=5 s0=10 end=10 points=51",
     );
-    expect(resolved.parameters["beta"]).toBe(0.2);
-    expect(resolved.parameterProvenance["beta"]!.origin).toBe("user");
+    expect(resolved.parameters["km"]).toBe(0.2);
+    expect(resolved.parameterProvenance["km"]!.origin).toBe("user");
   });
 
   it("a literature-resolved value still passes through the llm path", async () => {

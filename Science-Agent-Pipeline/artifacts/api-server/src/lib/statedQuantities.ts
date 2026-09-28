@@ -158,8 +158,6 @@ const DOMAIN_TIME_UNIT: Partial<Record<SimulationDomain, "seconds" | "days">> =
   {
     mm: "seconds",
     mm_competitive_inhibition: "seconds",
-    sir: "days",
-    seir: "days",
   };
 
 function timeToDomainUnit(
@@ -425,57 +423,9 @@ export function extractStatedQuantities(
     if (hit) out.push({ key, value: hit.value, sourcePhrase: hit.phrase });
   };
 
-  const isEpi = domain === "sir" || domain === "seir";
 
-  if (isEpi) {
-    const infected = firstMatch(query, INFECTED_RE);
-    push("i0", infected);
 
-    const population = matchPopulation(query);
-    if (population) {
-      // N is a total; s0 is the susceptible remainder. See POPULATION_RE.
-      const i0 = infected?.value ?? 0;
-      const s0 = population.value - i0;
-      // A stated population smaller than the stated infected count is not a
-      // reading this code should force into shape. Leave both to the
-      // refusal path rather than emitting a negative or zero susceptible
-      // count that would fail validation with a confusing message.
-      if (s0 > 0) {
-        out.push({
-          key: "s0",
-          value: s0,
-          sourcePhrase: population.phrase,
-        });
-        // Describing a population and how many of it are infected accounts
-        // for all of it: the rest are susceptible, and nobody has been
-        // described as already recovered. So r0_recovered = 0 is READ from
-        // the sentence, not defaulted into it -- the same reading that makes
-        // s0 = N - i0 above, and it would be incoherent to derive s0 from
-        // that arithmetic while refusing to state the term it assumed.
-        //
-        // A query that DOES mention recovered people is a different
-        // sentence, and this deliberately does not try to parse it -- the
-        // refusal path asks, which is correct when the reading is not
-        // obvious.
-        if (!/\brecover|\bimmune|\bvaccinat/i.test(query)) {
-          out.push({
-            key: "r0_recovered",
-            value: 0,
-            sourcePhrase: population.phrase,
-          });
-        }
-      }
-    }
-  }
 
-  if (domain === "wright_fisher" || domain === "two_locus_wright_fisher") {
-    push("population_size", matchPopulation(query));
-    push("generations", firstMatch(query, GENERATIONS_RE));
-  }
-
-  if (domain === "pcr") {
-    push("cycles", firstMatch(query, CYCLES_RE));
-  }
 
   if (domain === "mm" || domain === "mm_competitive_inhibition") {
     const enzyme = matchEnzyme(query);

@@ -11,11 +11,11 @@ imports keep working unchanged:
     core.utils                      _fmt, _check_model_name, _load_runner
     continuous.model_building       antimony model construction, SBML translation
     continuous.simulations          roadrunner-backed ODE simulation entry points
-    discrete.pcr / monte_carlo      discrete simulations
-    discrete.molecular_dynamics     Lennard-Jones velocity Verlet (ADR 0006)
-    discrete.population_genetics    Wright-Fisher family (core/analysis/
-                                    probability/theoretical/two_locus)
-    scenarios.wf_scenarios          scenario presets
+    discrete.gillespie_ssa          exact stochastic chemical kinetics
+
+Population genetics, epidemiology, PCR, Monte Carlo, the oscillators and the
+Lennard-Jones toy MD were moved to archive/legacy_domains/ on 2026-09-27,
+when Caterva narrowed to enzymes (tag v0.4.0 still runs them).
 
 The dual import guard below lets the shim load both as ``caterva`` package
 member (repo root on PYTHONPATH, as the API runner does) and as a flat module
@@ -67,24 +67,14 @@ try:
     from caterva.core.validation import (
         validate_michaelis_menten_params,
         validate_mm_competitive_params,
-        validate_sir_params,
-        validate_seir_params,
-        validate_pcr_params,
-        validate_monte_carlo_params,
-        validate_wright_fisher_params,
-        validate_md_params,
         validate_ssa_bimolecular_params,
         vmax_from_kcat,
-        beta_gamma_from_r0,
         validate_ssa_params,
         validate_ssa_replicates_params,
-        validate_lotka_volterra_params,
     )  # type: ignore[no-redef]
     from caterva.continuous.model_building import (
         build_michaelis_menten_antimony,
         build_mm_competitive_antimony,
-        build_sir_antimony,
-        build_seir_antimony,
         antimony_to_sbml,
         sbml_to_antimony,
         validate_sbml,
@@ -93,62 +83,13 @@ try:
         simulate_sbml,
         simulate_michaelis_menten,
         simulate_mm_competitive_inhibition,
-        simulate_sir,
-        simulate_seir,
-        simulate_lotka_volterra,
-        simulate_cell_cycle_oscillator,
-        simulate_repressilator,
         steady_state,
         parameter_scan,
     )  # type: ignore[no-redef]
-    from caterva.discrete.pcr import simulate_pcr  # type: ignore[no-redef]
-    from caterva.discrete.monte_carlo import simulate_monte_carlo_pi  # type: ignore[no-redef]
     from caterva.discrete.gillespie_ssa import (
         simulate_gillespie_ssa,
         simulate_gillespie_ssa_bimolecular,
         simulate_gillespie_ssa_replicates,
-    )  # type: ignore[no-redef]
-    from caterva.discrete.molecular_dynamics import (
-        lennard_jones_force,
-        lj_cluster_positions,
-        _compute_lj_potential,
-        simulate_molecular_dynamics,
-    )  # type: ignore[no-redef]
-    from caterva.discrete.population_genetics.core import (
-        simulate_wright_fisher,
-        _clamp_wf_fst_roundoff,
-    )  # type: ignore[no-redef]
-    from caterva.discrete.population_genetics.analysis import (
-        wright_fisher_sweep,
-        expected_loss_time,
-    )  # type: ignore[no-redef]
-    from caterva.discrete.population_genetics.probability import (
-        wright_fisher_transition_matrix,
-        wright_fisher_fixation_probability,
-        wright_fisher_expected_fixation_time,
-        wright_fisher_expected_loss_time,
-        wright_fisher_expected_absorption_time,
-        wright_fisher_stationary_vector,
-        wright_stationary_distribution,
-        _normalise_stationary_vector,
-    )  # type: ignore[no-redef]
-    from caterva.discrete.population_genetics.theoretical import (
-        kimura_fixation_probability,
-        expected_fixation_time,
-        estimate_ne_from_heterozygosity,
-        effective_size_harmonic_mean,
-        theoretical_fst,
-        expected_fst_after_split,
-    )  # type: ignore[no-redef]
-    from caterva.discrete.population_genetics.two_locus import (
-        TwoLocusResult,
-        simulate_two_locus_wright_fisher,
-        theoretical_ld_decay,
-    )  # type: ignore[no-redef]
-    from caterva.scenarios.wf_scenarios import (
-        _SCENARIO_REGISTRY,
-        list_scenarios,
-        wright_fisher_scenario,
     )  # type: ignore[no-redef]
 except ModuleNotFoundError as _exc:  # flat mode: caterva/ on sys.path, no repo root
     if not _package_path_missing(_exc):
@@ -188,24 +129,14 @@ except ModuleNotFoundError as _exc:  # flat mode: caterva/ on sys.path, no repo 
     )  # type: ignore[no-redef]
     from core.validation import (
         validate_michaelis_menten_params,
-        validate_sir_params,
-        validate_seir_params,
-        validate_pcr_params,
-        validate_monte_carlo_params,
-        validate_wright_fisher_params,
-        validate_md_params,
         validate_ssa_bimolecular_params,
         vmax_from_kcat,
-        beta_gamma_from_r0,
         validate_ssa_params,
         validate_ssa_replicates_params,
         validate_mm_competitive_params,
-        validate_lotka_volterra_params,
     )  # type: ignore[no-redef]
     from continuous.model_building import (
         build_michaelis_menten_antimony,
-        build_sir_antimony,
-        build_seir_antimony,
         antimony_to_sbml,
         sbml_to_antimony,
         validate_sbml,
@@ -214,63 +145,14 @@ except ModuleNotFoundError as _exc:  # flat mode: caterva/ on sys.path, no repo 
     from continuous.simulations import (
         simulate_sbml,
         simulate_michaelis_menten,
-        simulate_sir,
-        simulate_seir,
         steady_state,
         parameter_scan,
         simulate_mm_competitive_inhibition,
-        simulate_lotka_volterra,
-        simulate_cell_cycle_oscillator,
-        simulate_repressilator,
     )  # type: ignore[no-redef]
-    from discrete.pcr import simulate_pcr  # type: ignore[no-redef]
-    from discrete.monte_carlo import simulate_monte_carlo_pi  # type: ignore[no-redef]
     from discrete.gillespie_ssa import (
         simulate_gillespie_ssa,
         simulate_gillespie_ssa_bimolecular,
         simulate_gillespie_ssa_replicates,
-    )  # type: ignore[no-redef]
-    from discrete.molecular_dynamics import (
-        lennard_jones_force,
-        lj_cluster_positions,
-        _compute_lj_potential,
-        simulate_molecular_dynamics,
-    )  # type: ignore[no-redef]
-    from discrete.population_genetics.core import (
-        simulate_wright_fisher,
-        _clamp_wf_fst_roundoff,
-    )  # type: ignore[no-redef]
-    from discrete.population_genetics.analysis import (
-        wright_fisher_sweep,
-        expected_loss_time,
-    )  # type: ignore[no-redef]
-    from discrete.population_genetics.probability import (
-        wright_fisher_transition_matrix,
-        wright_fisher_fixation_probability,
-        wright_fisher_expected_fixation_time,
-        wright_fisher_expected_loss_time,
-        wright_fisher_expected_absorption_time,
-        wright_fisher_stationary_vector,
-        wright_stationary_distribution,
-        _normalise_stationary_vector,
-    )  # type: ignore[no-redef]
-    from discrete.population_genetics.theoretical import (
-        kimura_fixation_probability,
-        expected_fixation_time,
-        estimate_ne_from_heterozygosity,
-        effective_size_harmonic_mean,
-        theoretical_fst,
-        expected_fst_after_split,
-    )  # type: ignore[no-redef]
-    from discrete.population_genetics.two_locus import (
-        TwoLocusResult,
-        simulate_two_locus_wright_fisher,
-        theoretical_ld_decay,
-    )  # type: ignore[no-redef]
-    from scenarios.wf_scenarios import (
-        _SCENARIO_REGISTRY,
-        list_scenarios,
-        wright_fisher_scenario,
     )  # type: ignore[no-redef]
 
 __all__ = [
@@ -298,73 +180,28 @@ __all__ = [
     "WF_PLAUSIBLE_MAX_SELECTION_COEFFICIENT",
     "WF_PLAUSIBLE_MIN_POPULATION_SIZE",
     "WF_PLAUSIBLE_MIN_REPLICATE_RUNS",
-    "_SCENARIO_REGISTRY",
     "ModelBuildError",
     "ParameterValidation",
     "SimulationError",
     "SimulationResult",
-    "TwoLocusResult",
-    "_clamp_wf_fst_roundoff",
-    "_compute_lj_potential",
-    "_normalise_stationary_vector",
     "antimony_to_sbml",
-    "beta_gamma_from_r0",
     "build_michaelis_menten_antimony",
     "build_mm_competitive_antimony",
-    "build_seir_antimony",
-    "build_sir_antimony",
-    "effective_size_harmonic_mean",
-    "estimate_ne_from_heterozygosity",
-    "expected_fixation_time",
-    "expected_fst_after_split",
-    "expected_loss_time",
-    "kimura_fixation_probability",
-    "lennard_jones_force",
-    "list_scenarios",
-    "lj_cluster_positions",
     "parameter_scan",
     "sbml_to_antimony",
-    "simulate_cell_cycle_oscillator",
     "simulate_gillespie_ssa",
     "simulate_gillespie_ssa_bimolecular",
     "simulate_gillespie_ssa_replicates",
-    "simulate_lotka_volterra",
     "simulate_michaelis_menten",
     "simulate_mm_competitive_inhibition",
-    "simulate_molecular_dynamics",
-    "simulate_monte_carlo_pi",
-    "simulate_pcr",
-    "simulate_repressilator",
     "simulate_sbml",
-    "simulate_seir",
-    "simulate_sir",
-    "simulate_two_locus_wright_fisher",
-    "simulate_wright_fisher",
     "steady_state",
-    "theoretical_fst",
-    "theoretical_ld_decay",
-    "validate_lotka_volterra_params",
-    "validate_md_params",
     "validate_michaelis_menten_params",
     # Competitive inhibition Michaelis-Menten
     "validate_mm_competitive_params",
-    "validate_monte_carlo_params",
-    "validate_pcr_params",
     "validate_sbml",
-    "validate_seir_params",
-    "validate_sir_params",
     "validate_ssa_bimolecular_params",
     "validate_ssa_params",
     "validate_ssa_replicates_params",
-    "validate_wright_fisher_params",
     "vmax_from_kcat",
-    "wright_fisher_expected_absorption_time",
-    "wright_fisher_expected_fixation_time",
-    "wright_fisher_expected_loss_time",
-    "wright_fisher_fixation_probability",
-    "wright_fisher_scenario",
-    "wright_fisher_stationary_vector",
-    "wright_fisher_sweep",
-    "wright_fisher_transition_matrix",
-    "wright_stationary_distribution",
 ]

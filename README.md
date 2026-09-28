@@ -40,19 +40,31 @@ caterva compose "Michaelis-Menten with a competitive inhibitor" \
 > One page: what this is, how to get it running, where things live, and a
 > real first task. Everything else is linked from there.
 
-Scientific computing for teaching labs. Students ask a question in plain
-language; Caterva resolves the real parameters from the literature, runs the
-simulation, and shows its work — every number traceable to a citation that has
-been independently checked.
+Enzyme kinetics and molecular dynamics for research groups and teaching
+labs. Ask a question in plain language; Caterva resolves the real parameters
+from the literature, runs the simulation, and shows its work: every number
+traceable to a citation that has been independently checked.
 
-Fifteen simulation domains built so far: enzyme kinetics (plain and
-competitively-inhibited Michaelis-Menten), SIR/SEIR epidemiological modeling,
-PCR amplification, Monte Carlo simulation, population genetics
-(Wright-Fisher, single- and two-locus), molecular dynamics (Lennard-Jones
-cluster), Gillespie SSA stochastic chemical kinetics (first-order decay,
-bimolecular association, and a multi-replicate ensemble view), and three
-ODE oscillators: Lotka-Volterra predator-prey, the Tyson (1991) cdc2-cyclin
-cell-cycle oscillator, and the Elowitz & Leibler (2000) repressilator.
+What it does today, across five simulation domains and two structure tools:
+
+- **Enzyme kinetics**: plain and competitively inhibited Michaelis-Menten,
+  with Km, kcat and Ki resolved from BRENDA at the stated assay conditions,
+  and composed mechanisms (`caterva compose`).
+- **Stochastic chemical kinetics**: exact Gillespie SSA (first-order decay,
+  bimolecular association, and a multi-replicate ensemble).
+- **Structures**: `caterva structure` finds the PDB entries for an enzyme,
+  separates bound ligands from crystallisation additives, and writes a
+  ChimeraX script.
+- **Molecular dynamics setup**: `caterva md` writes a GROMACS system where
+  every setting is measured, chosen or cited, run at the assay conditions
+  of a cited constant.
+
+Where the dynamics side is going is in
+[docs/design/MD_ROADMAP.md](docs/design/MD_ROADMAP.md). Epidemiology, PCR,
+Monte Carlo, population genetics, the Lennard-Jones toy MD and the three
+ODE oscillators were archived on 2026-09-27 (see
+[archive/legacy_domains/](archive/legacy_domains/README.md)); Caterva
+v0.4.0 still runs them.
 
 > **Caterva is not Tellurium.**
 >
@@ -75,7 +87,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,723 tests (3,543 engine + 1,180 literature)
+make test      # runs all 4,059 tests (2,880 engine + 1,179 literature)
 ```
 
 ### Or download the release
@@ -136,20 +148,17 @@ lookup, and **the document says so itself** rather than leaving you to work
 it out. Drop `--fixture` from the command it prints at the end to run the
 same thing against BRENDA.
 
-**`make test` takes six to eight minutes**, and prints nothing per-file
-while it runs. That is normal. It is written here because the absence of a
-figure is what makes a slow suite look like a broken one — the author of
-this note spent a pass diagnosing a "hang" in
-`caterva/tests/test_popgen_correctness.py` that was a 58-second file being
-run inside a 175-second budget alongside others. It had never hung.
+**`make test` takes a few minutes**, and prints nothing per-file while it
+runs. That is normal. It is written here because the absence of a figure is
+what makes a slow suite look like a broken one.
 
-Measured on the reference container, `-p no:randomly`:
+Measured on GitHub's `ubuntu-latest` runners (CI run 36368330079,
+2026-09-28), `-p no:randomly`:
 
 | suite | time |
 |---|---|
-| `caterva/tests` (engine) | ~3.5-4 min |
-| `Tests/` (literature) | ~2.9 min |
-| `test_popgen_correctness.py` alone | 58 s |
+| `caterva/tests` (engine) | 4.5-10 min |
+| `Tests/` (literature) | ~5 min |
 
 Test counts are deliberately absent from that table: they are stated once
 above and checked by `check_documented_counts.py`, and a second copy here
@@ -454,43 +463,24 @@ in `requirements.txt`:
 
 ## Domains
 
-Fifteen simulation domains, two pipelines:
+Five simulation domains, plus the structure and MD setup tools:
 
 **Continuous (antimony → SBML → roadrunner):**
-- **Michaelis-Menten** — irreversible single-substrate enzyme kinetics.
+- **Michaelis-Menten**: irreversible single-substrate enzyme kinetics.
   Verified against the implicit closed form `Km·ln(S₀/S) + (S₀−S) = Vmax·t`.
-- **Michaelis-Menten with competitive inhibition** — `v = Vmax·S / (Km·(1+I/Ki) + S)`.
+- **Michaelis-Menten with competitive inhibition**: `v = Vmax·S / (Km·(1+I/Ki) + S)`.
   Verified against the apparent-Km closed form `Km_app = Km·(1 + I/Ki)`, and
   against plain Michaelis-Menten exactly at I=0.
-- **SIR** — frequency-dependent epidemic model. Verified against conserved
-  population, final-size relation, and peak condition `S = N/R₀`.
-- **SEIR** — SIR with an explicit latent (exposed) compartment.
-- **Lotka-Volterra** — predator-prey (Lotka 1925; Volterra 1926).
-  `dP/dt = αP − βPV`, `dV/dt = γPV − δV`. Verified against the exact first
-  integral `H = γP − δ·ln P + βV − α·ln V` (conserved to <1e-5 over the
-  orbit), the coexistence fixed point `(δ/γ, α/β)`, the linearised
-  small-oscillation period `2π/√(αδ)`, and scipy's `solve_ivp`. The default
-  parameters give the classic ~10-year lynx-hare period (9.47).
-- **Cell-cycle oscillator** — Tyson (1991) 2-variable cdc2-cyclin
-  relaxation oscillator, DOI 10.1073/pnas.88.16.7328.
-- **Repressilator** — Elowitz & Leibler (2000) synthetic three-gene ring.
+- **Composed mechanisms** (`caterva compose`): enzyme steps assembled from
+  their own words, with every constant resolved or refused.
 
-**Discrete/stochastic (direct Python, no ODE solver):**
-- **PCR amplification** — exact closed-form recurrence `N(c) = n₀ · (1+E)ᶜ`,
-  optionally with a logistic plateau. Verified against copy-number conservation
-  and plateau approach.
-- **Monte Carlo π estimation** — uniform sampling in [-1,1]². Verified against
-  the CLT error rate `1/√N`.
-- **Molecular dynamics** — Lennard-Jones cluster, velocity Verlet. Verified
-  against energy/momentum conservation, the O(Δt²) symplectic error rate,
-  and published global-minimum energies (LJ13 = −44.326801 ε, Hoare & Pal
-  1971). Not built through roadrunner — see ADR 0006.
-- **Gillespie SSA** — exact stochastic simulation (ADR 0009) of a single
+**Stochastic (direct Python, no ODE solver):**
+- **Gillespie SSA**: exact stochastic simulation (ADR 0009) of a single
   first-order decay A → B. Verified against the closed form
   `E[a(t)] = a₀·e^(−kt)` (the count at time t is exactly Binomial(a₀, e^(−kt)))
   and a hand-verified seeded golden trajectory pinned through the API
   (`test_gillespie_ssa_golden.py`, `gillespieGolden.test.ts`).
-- **Gillespie SSA bimolecular** — same Direct Method (Stage 7) for the
+- **Gillespie SSA bimolecular**: the same Direct Method for the
   association A + B → C with second-order propensity `k·a·b`, conserved
   `a+c = a₀`, `b+c = b₀`, halting at minor-species exhaustion. Verified
   against the ODE closed form
@@ -498,50 +488,22 @@ Fifteen simulation domains, two pipelines:
   `a(t) = a₀/(1 + k·a₀·t)`) and a hand-verified seeded golden trajectory
   pinned through the API (`test_gillespie_ssa_bimolecular_golden.py`,
   `gillespieBimolecularGolden.test.ts`).
-- **Gillespie SSA ensemble** (`simulate_gillespie_ssa_replicates`) — runs
+- **Gillespie SSA ensemble** (`simulate_gillespie_ssa_replicates`): runs
   `n_replicates` independent SSA trajectories (first-order or bimolecular)
   and reports the sample mean trajectory on a fixed time grid alongside
   each replicate's final counts, for comparing stochastic spread against
   the deterministic reference. Replicate RNGs are derived deterministically
   from a single master seed (ADR 0005), so a fixed seed reproduces the
   whole ensemble bit-identically.
-- **Wright-Fisher neutral drift** — binomial sampling of 2N allele copies each
-  generation. Verified against the exact heterozygosity decay
-  `Hₜ = H₀ · (1 − 1/(2N))ᵗ` and Kimura's fixation probability `P(fix) = p₀`.
-  Also: selection with dominance (incl. over/underdominance), symmetric
-  mutation, time-varying N, structured populations (island / stepping-stone
-  migration with Fst), Kimura & Ohta expected fixation time, Ne estimation
-  from heterozygosity decay, Wright's stationary distribution
-  `Beta(4Nu, 4Nu)`, the island-model equilibrium Fst
-  (`1/(1+4N(m+u))`), parameter sweeps (`wright_fisher_sweep`, CLI
-  `sweep`), and an exact Markov-chain layer
-  (`wright_fisher_transition_matrix`,
-  `wright_fisher_fixation_probability`,
-  `wright_fisher_expected_fixation_time`,
-  `wright_fisher_expected_loss_time`,
-  `wright_fisher_expected_absorption_time`,
-  `wright_fisher_stationary_vector`) whose values cross-check
-  the diffusion approximations -- and resolve Kimura's documented
-  `dominance > 1` failure exactly. The three times obey
-  `E[T] = E[T|fix]·P_fix + E[T|loss]·(1 − P_fix)` exactly, and
-  `fixation_analysis()` reports the observed mean fixation, loss, and
-  absorption times to compare against them; the exact stationary
-  distribution (Perron-Frobenius eigenvector of the chain) matches
-  both Wright's `Beta(4Nu, 4Nu)` density and long simulations within
-  ~0.007 in central mass. The effective size of a time-varying-N
-  trajectory is the harmonic mean of the census sizes
-  (`effective_size_harmonic_mean`) -- the textbook bottleneck result,
-  verified against the heterozygosity-decay estimator. Two-locus
-  haploid simulation with recombination and symmetric mutation
-  (`simulate_two_locus_wright_fisher`): linkage disequilibrium decays
-  as `Dₜ = D₀·(1−r)ᵗ·(1−2u)²ᵗ·(1−1/N)ᵗ`, verified against simulation
-  within ~3%, with D and r² reported per generation. Divergence after a
-  split: `expected_fst_after_split` gives the exact Fst trajectory of
-  two isolated daughter populations (matches simulation within 0.01),
-  including its counterintuitive limit — Fst approaches the
-  probability of *divergent* fixation `2p₀(1−p₀)`, not 1.
 
-All discrete/stochastic domains share a common RNG convention
+**Structures and dynamics:**
+- **`caterva structure`**: PDB entries grouped by protein (isoforms kept
+  apart), every entry cited, ChimeraX script.
+- **`caterva md`**: GROMACS setup (AMBER ff99SB-ILDN, TIP3P, PME), each
+  mdp setting labelled measured, chosen or cited. Run end to end with
+  GROMACS 2021 and in CI.
+
+All stochastic domains share a common RNG convention
 (`numpy.random.default_rng(seed)` with `seed: int | None = None`), formalised
 in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 `scripts/check_rng_convention.py`.
@@ -552,11 +514,11 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                3,543 tests
+│   └── tests/                2,880 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1,180 tests
+│   └── ...                   1,179 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
@@ -608,18 +570,16 @@ The suites deliberately avoid checking the solver against itself. Numerical
 claims are verified against one of:
 
 - **Exact closed-form solutions** — the implicit MM solution
-  `Km·ln(S₀/S) + (S₀−S) = Vmax·t`, the SIR conserved quantity, the final-size
-  relation, and the peak condition `S = N/R₀`.
+  `Km·ln(S₀/S) + (S₀−S) = Vmax·t`, the apparent-Km relation under
+  competitive inhibition, and the SSA mean `a₀·e^(−kt)`.
 - **An independent integrator** — scipy's `solve_ivp`, which shares no code
   with roadrunner.
 - **Physical invariants** — mass and population conservation, monotonicity,
   non-negativity — checked across the input space with Hypothesis.
 
 The suite is mutation-tested: deliberate scientific errors are injected into
-the engine (breaking the rate law, driving SEIR infection off the exposed
-compartment instead of the infectious one, disabling validation, loosening
-solver tolerances, dropping the diploid factor of 2 in Wright-Fisher's
-binomial sampling) and confirmed caught, one at a time, as each domain is
+the engine (breaking the rate law, disabling validation, loosening solver
+tolerances) and confirmed caught, one at a time, as each domain is
 built. Every mutation claimed in an implementation report is independently
 reproduced by a reviewer before being trusted — see
 build record STAGE_01_PART_04 (private since 2026-09-27) and `STAGE_02_PART_04.md` for
@@ -645,10 +605,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,723 tests
+make test        # run all 4,059 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,543 tests)
-make test-lit    # literature layer only (1,180 tests)
+make test-sim    # simulation engine only (2,880 tests)
+make test-lit    # literature layer only (1,179 tests)
 python3 scripts/verify_build.py --quick  # all 78 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

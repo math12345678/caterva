@@ -133,19 +133,9 @@ class TestBoundaryContract:
         expected = {
             "simulate_michaelis_menten",
             "simulate_mm_competitive_inhibition",
-            "simulate_sir",
-            "simulate_seir",
-            "simulate_pcr",
-            "simulate_monte_carlo_pi",
-            "simulate_wright_fisher",
-            "simulate_two_locus_wright_fisher",
-            "simulate_molecular_dynamics",
             "simulate_gillespie_ssa",
             "simulate_gillespie_ssa_bimolecular",
             "simulate_gillespie_ssa_replicates",
-            "simulate_lotka_volterra",
-            "simulate_cell_cycle_oscillator",
-            "simulate_repressilator",
             "simulate_sbml",
         }
         assert expected == ENGINE_SIMULATE_FUNCTIONS
@@ -154,19 +144,9 @@ class TestBoundaryContract:
         assert set(runner.DISPATCH.keys()) == {
             "mm",
             "mm_competitive_inhibition",
-            "sir",
-            "seir",
-            "pcr",
-            "monte_carlo_pi",
-            "wright_fisher",
-            "two_locus_wright_fisher",
-            "molecular_dynamics",
             "gillespie_ssa",
             "gillespie_ssa_bimolecular",
             "gillespie_ssa_replicates",
-            "lotka_volterra",
-            "cell_cycle_oscillator",
-            "repressilator",
             "sbml",
         }
 
@@ -186,16 +166,16 @@ class TestBoundaryContract:
     def test_mutation_deleted_dispatch_entry_is_detected(self, monkeypatch):
         """Simulated mutation: one dispatch branch deleted (the Rule 4 case)."""
         dispatch = dict(runner.DISPATCH)
-        dispatch.pop("molecular_dynamics")
+        dispatch.pop("gillespie_ssa_bimolecular")
         monkeypatch.setattr(runner, "DISPATCH", dispatch)
         monkeypatch.setattr(
-            runner, "_RUNNERS", {k: v for k, v in runner._RUNNERS.items() if k != "molecular_dynamics"}  # noqa: SLF001
+            runner, "_RUNNERS", {k: v for k, v in runner._RUNNERS.items() if k != "gillespie_ssa_bimolecular"}  # noqa: SLF001
         )
         violations = _contract_violations(runner)
-        assert any("simulate_molecular_dynamics" in v for v in violations)
+        assert any("simulate_gillespie_ssa_bimolecular" in v for v in violations)
 
     # The mutation above deletes the entry from BOTH tables, so what catches it
-    # is the engine axis: `simulate_molecular_dynamics` stops being dispatched.
+    # is the engine axis: `simulate_gillespie_ssa_bimolecular` stops being dispatched.
     # That left the two branches comparing DISPATCH against _RUNNERS -- the
     # `unhandled_domains` and `stray_handlers` checks -- never once shown to
     # fire. They are the branches that matter most at runtime, because main()
@@ -212,10 +192,10 @@ class TestBoundaryContract:
         monkeypatch.setattr(
             runner,
             "_RUNNERS",
-            {k: v for k, v in runner._RUNNERS.items() if k != "pcr"},  # noqa: SLF001
+            {k: v for k, v in runner._RUNNERS.items() if k != "gillespie_ssa_replicates"},  # noqa: SLF001
         )
         violations = _contract_violations(runner)
-        assert any("without a run_* handler" in v and "pcr" in v for v in violations)
+        assert any("without a run_* handler" in v and "gillespie_ssa_replicates" in v for v in violations)
 
     def test_mutation_dispatch_removed_but_handler_kept_is_detected(self, monkeypatch):
         """One-sided mutation: DISPATCH loses a domain, _RUNNERS still has it.
@@ -224,12 +204,12 @@ class TestBoundaryContract:
         unreachable. Nothing fails, the domain just stops existing.
         """
         monkeypatch.setattr(
-            runner, "DISPATCH", {k: v for k, v in runner.DISPATCH.items() if k != "pcr"}
+            runner, "DISPATCH", {k: v for k, v in runner.DISPATCH.items() if k != "gillespie_ssa_replicates"}
         )
         violations = _contract_violations(runner)
         assert any(
             "reachable through neither DISPATCH nor COMPOSED_DOMAINS" in v
-            and "pcr" in v
+            and "gillespie_ssa_replicates" in v
             for v in violations
         )
 
@@ -238,10 +218,10 @@ class TestBoundaryContract:
         monkeypatch.setattr(
             runner,
             "_RUNNERS",
-            {k: v for k, v in runner._RUNNERS.items() if k != "pcr"},  # noqa: SLF001
+            {k: v for k, v in runner._RUNNERS.items() if k != "gillespie_ssa_replicates"},  # noqa: SLF001
         )
         monkeypatch.setattr(
-            sys, "stdin", io.StringIO(json.dumps({"domain": "pcr", "parameters": {}}))
+            sys, "stdin", io.StringIO(json.dumps({"domain": "gillespie_ssa_replicates", "parameters": {}}))
         )
         buf = io.StringIO()
         monkeypatch.setattr(sys, "stdout", buf)
@@ -250,7 +230,7 @@ class TestBoundaryContract:
         error = json.loads(buf.getvalue())["error"]
         assert "build defect" in error
         assert "unknown domain" not in error  # the request was valid
-        assert error != "'pcr'"  # the bare KeyError repr this replaced
+        assert error != "'gillespie_ssa_replicates'"  # the bare KeyError repr this replaced
 
 
 class TestRunnerExecution:
@@ -258,20 +238,8 @@ class TestRunnerExecution:
 
     SMALL_PARAMS: ClassVar[dict[str, dict[str, float | int | str]]] = {
         "mm": {"km": 2.0, "vmax": 5.0, "s0": 10.0, "end": 1.0, "points": 3},
-        "sir": {"beta": 0.3, "gamma": 0.1, "s0": 990.0, "i0": 10.0, "end": 10.0, "points": 4},
-        "seir": {"beta": 0.3, "sigma": 0.2, "gamma": 0.1, "e0": 10.0, "end": 10.0, "points": 4},
-        "pcr": {"n0": 100.0, "efficiency": 0.95, "cycles": 5},
-        "monte_carlo_pi": {"n_samples": 64},
-        "wright_fisher": {
-            "population_size": 40, "starting_frequency": 0.5, "generations": 5,
-            "replicate_runs": 3,
-        },
-        "two_locus_wright_fisher": {
-            "population_size": 40, "generations": 5, "recombination_rate": 0.1,
-            "replicate_runs": 3,
-        },
-        "molecular_dynamics": {
-            "n_particles": 13, "temperature": 0.4, "timestep": 0.005, "n_steps": 5,
+        "mm_competitive_inhibition": {
+            "km": 2.0, "vmax": 5.0, "ki": 1.0, "s0": 10.0, "i0": 1.0, "end": 1.0, "points": 3,
         },
         "gillespie_ssa": {"a0": 100, "k": 1.0, "end": 2.0},
         "gillespie_ssa_bimolecular": {"a0": 60, "b0": 40, "k": 0.01, "end": 2.0},
@@ -307,31 +275,16 @@ class TestRunnerExecution:
         assert payload["flagReason"] is None or isinstance(payload["flagReason"], str)
 
     def test_flagged_engine_result_preserves_reason(self):
-        payload = runner.run_molecular_dynamics({
-            "n_particles": 13,
-            "temperature": 0.9,
-            "timestep": 0.005,
-            "n_steps": 2,
-        })
+        # Five molecules: legal, but too few for the trajectory to resemble
+        # the deterministic curve, so the engine flags it and says why.
+        payload = runner.run_gillespie_ssa({"a0": 5, "k": 1.0, "end": 2.0})
         assert payload["ok"] is True
         assert payload["flagged"] is True
-        assert "initialization temperature" in payload["flagReason"]
+        assert "molecules" in payload["flagReason"]
 
     def test_runtime_ceilings_reject_before_simulation(self):
         with pytest.raises(ValueError, match="API runtime ceiling"):
-            runner.run_monte_carlo_pi({"n_samples": 1_000_001})
-        with pytest.raises(ValueError, match="API runtime ceiling"):
-            runner.run_molecular_dynamics({"n_steps": 10_001})
-        with pytest.raises(ValueError, match="API runtime ceiling"):
             runner.run_gillespie_ssa({"a0": 1_000_001})
-
-    # ---- MD quadratic-cost ceiling -------------------------------------
-    #
-    # n_steps alone does not bound an MD request: cost is O(N^2 * steps) and
-    # the engine ACCEPTS n_particles=5000 (ok=True, merely flagged, then
-    # rounded up to 5324). Measured before the fix: 800 particles at 200
-    # steps -- 4% of the step ceiling -- already cost 9.94s, and 5000
-    # particles at the step ceiling is roughly six hours.
 
     # ---- raw-SBML ceilings ---------------------------------------------
     #
@@ -460,38 +413,6 @@ class TestRunnerExecution:
         assert result["ok"] is True
         assert len(result["trajectory"]) == 51
 
-    def test_md_pair_step_budget_rejects_large_particle_counts(self):
-        """A request under every scalar ceiling but quadratically huge."""
-        with pytest.raises(ValueError, match="pair-steps"):
-            runner.run_molecular_dynamics({"n_particles": 5000, "n_steps": 100})
-
-    def test_md_pair_step_budget_rejects_at_step_ceiling(self):
-        with pytest.raises(ValueError, match="pair-steps"):
-            runner.run_molecular_dynamics(
-                {"n_particles": 5000, "n_steps": runner.MAX_API_MD_STEPS})
-
-    def test_md_documented_reference_case_stays_within_budget(self):
-        """108 particles x 10k steps is the documented case and must remain
-        allowed -- a budget that rejects it would be miscalibrated."""
-        actual = runner._fcc_particle_count(108)  # noqa: SLF001
-        assert actual * actual * runner.MAX_API_MD_STEPS <= runner.MAX_API_MD_PAIR_STEPS
-
-    def test_fcc_round_up_matches_engine(self):
-        """The budget must use the count the engine actually simulates.
-
-        Rounding is always upward, so budgeting on the requested count would
-        systematically underestimate cost.
-        """
-        assert runner._fcc_particle_count(108) == 108      # 4 * 3^3  # noqa: SLF001
-        assert runner._fcc_particle_count(5000) == 5324    # 4 * 11^3  # noqa: SLF001
-        assert runner._fcc_particle_count(1) == 4          # smallest cell  # noqa: SLF001
-        for requested in (5, 33, 100, 500, 900):
-            actual = runner._fcc_particle_count(requested)  # noqa: SLF001
-            assert actual >= requested
-            k = round((actual / 4) ** (1 / 3))
-            assert actual == 4 * k**3
-            assert 4 * (k - 1) ** 3 < requested  # k is the smallest sufficient
-
     def test_unknown_domain_returns_error(self, capsys):
         import json
 
@@ -512,10 +433,6 @@ class TestRunnerExecution:
     @pytest.mark.parametrize(
         ("domain", "params", "ceiling_name"),
         [
-            ("molecular_dynamics", {"n_steps": 10_001}, "MAX_API_MD_STEPS"),
-            ("monte_carlo_pi", {"n_samples": 1_000_001}, "MAX_API_MONTE_CARLO_SAMPLES"),
-            ("wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
-            ("two_locus_wright_fisher", {"generations": 10_001}, "MAX_API_WF_GENERATIONS"),
             ("gillespie_ssa", {"a0": 1_000_001}, "MAX_API_SSA_POPULATION"),
             ("gillespie_ssa_bimolecular", {"a0": 600_000, "b0": 500_000}, "MAX_API_SSA_POPULATION"),
             ("gillespie_ssa_replicates", {"a0": 100, "n_replicates": 2_000}, "MAX_API_SSA_REPLICATES"),

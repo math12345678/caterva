@@ -118,61 +118,6 @@ class Check:
 
 CHECKS: List[Check] = [
     Check(
-        name="PCR amplification",
-        doc_required=["N(n) = N₀ × (1 + E)ⁿ"],
-        engine_required=[(PCR_PY, ["(1.0 + efficiency) ** cycle"])],
-        doc_forbidden=[
-            # The shipped defect. `N₀ × E^n` with E <= 1 is decay.
-            (r"N₀\s*[×x]\s*E\s*\^?\s*n\b", "the decay form `N₀ × E^n`"),
-        ],
-        surface_required=["N(n) = N0 × (1 + E)^n"],
-        surface_forbidden=[
-            (r"N0\s*[×x]\s*E\s*\^\s*n\b", "the decay form `N0 × E^n`"),
-        ],
-    ),
-    Check(
-        name="PCR plateau",
-        doc_required=["N(c+1) = N(c) + E·N(c)·(1 - N(c)/K)"],
-        engine_required=[
-            (PCR_PY, ["copies + efficiency * copies * (1.0 - copies / plateau_capacity)"])
-        ],
-        doc_forbidden=[
-            (
-                r"After\s*~?30\s*cycles,\s*reagent depletion",
-                "a plateau tied to a fixed cycle count",
-            ),
-        ],
-    ),
-    Check(
-        name="SIR",
-        doc_required=[
-            "Equations Caterva actually integrates",
-            "dS/dt = -β·S·I/N",
-            "dI/dt = β·S·I/N - γ·I",
-            # The consequence a reader would otherwise get wrong by N.
-            "**R₀ = β/γ**",
-        ],
-        engine_required=[
-            (MODEL_BUILDING_PY, ["J0: S -> I; beta * S * I / N;"]),
-        ],
-        surface_required=["dS/dt = -β·S·I/N", "dI/dt = β·S·I/N - γ·I"],
-        surface_forbidden=[
-            (r"dS/dt = -β·S·I(?!/N)", "the density-dependent form `dS/dt = -β·S·I`"),
-        ],
-    ),
-    Check(
-        name="SEIR",
-        doc_required=["dS/dt = -β·S·I/N\n  - dE/dt = β·S·I/N - σ·E"],
-        engine_required=[
-            (MODEL_BUILDING_PY, ["J0: S -> E; beta * S * I / N;"]),
-        ],
-        surface_required=["dE/dt = β·S·I/N - σ·E"],
-        surface_forbidden=[
-            (r"dE/dt = β·S·I(?!/N)",
-             "the density-dependent form `dE/dt = β·S·I`"),
-        ],
-    ),
-    Check(
         name="Gillespie SSA",
         doc_required=["exact SSA (Gillespie's Direct Method)"],
         engine_required=[
@@ -187,13 +132,6 @@ CHECKS: List[Check] = [
                 r"\*\*Implementation\*\*:\s*Adaptive tau-selection",
                 "an adaptive tau-selection implementation that does not exist",
             ),
-        ],
-    ),
-    Check(
-        name="Molecular dynamics",
-        doc_required=["V(r) = 4ε[(σ/r)¹² - (σ/r)⁶]"],
-        engine_required=[
-            (MD_PY, ["4.0 * (r12_inv - r6_inv)", "velocity Verlet"]),
         ],
     ),
 ]
@@ -322,27 +260,6 @@ def selftest() -> int:
         return 1
 
     mutations: List[Tuple[str, str, Dict[Path, str], str]] = [
-        # (label, mutated doc, mutated engine, substring expected in failure)
-        (
-            "PCR equation reverted to the decay form",
-            doc.replace("N(n) = N₀ × (1 + E)ⁿ", "N(n) = N₀ × E^n"),
-            engine,
-            "decay form",
-        ),
-        (
-            "SIR doc reverted to density-dependent",
-            # Both lines, not just dS/dt. A one-line replace left
-            # `dI/dt = β·S·I/N - γ·I` intact and so exercised only the
-            # first assertion -- the mutation has to be the regression
-            # that would actually happen, or it measures less than it
-            # appears to.
-            doc.replace("dS/dt = -β·S·I/N", "dS/dt = -β·S·I")
-               .replace("dI/dt = β·S·I/N - γ·I", "dI/dt = β·S·I - γ·I"),
-            engine,
-            # The exact needle, not the check name: "SIR" alone would also
-            # be satisfied by the SEIR check's failure and prove less.
-            "'dI/dt = β·S·I/N - γ·I'",
-        ),
         (
             "tau-leaping re-asserted as the method",
             doc.replace(
@@ -351,51 +268,6 @@ def selftest() -> int:
             ),
             engine,
             "tau-leaping named as the implemented method",
-        ),
-        (
-            "engine switched to frequency-independent transmission",
-            doc,
-            {
-                **engine,
-                MODEL_BUILDING_PY: engine[MODEL_BUILDING_PY].replace(
-                    "J0: S -> I; beta * S * I / N;", "J0: S -> I; beta * S * I;"
-                ),
-            },
-            "model_building.py",
-        ),
-        (
-            "the PCR description SERVED TO USERS reverted to decay",
-            doc,
-            {
-                **engine,
-                DOMAIN_LITERATURE_TS: engine[DOMAIN_LITERATURE_TS].replace(
-                    "N(n) = N0 × (1 + E)^n", "N(n) = N0 × E^n"
-                ),
-            },
-            "serves users the decay form",
-        ),
-        (
-            "the SIR description SERVED TO USERS reverted to "
-            "density-dependent",
-            doc,
-            {
-                **engine,
-                DOMAIN_LITERATURE_TS: engine[DOMAIN_LITERATURE_TS].replace(
-                    "dS/dt = -β·S·I/N", "dS/dt = -β·S·I"
-                ),
-            },
-            "serves users the density-dependent form",
-        ),
-        (
-            "engine PCR switched to a different recurrence",
-            doc,
-            {
-                **engine,
-                PCR_PY: engine[PCR_PY].replace(
-                    "(1.0 + efficiency) ** cycle", "(2.0 * efficiency) ** cycle"
-                ),
-            },
-            "pcr.py",
         ),
     ]
 
@@ -421,9 +293,13 @@ def selftest() -> int:
         # exemption is dead code dressed as diligence -- and nobody would
         # learn that until a correction note quoted a formula and the guard
         # went red on its own evidence.
-        print("  MISSED  blockquote exemption is dead code: no forbidden "
-              "pattern is quoted in any correction note", file=sys.stderr)
-        ok = False
+        # Since 2026-09-27 this is expected: the correction notes that
+        # quoted forbidden formulae were for PCR and SIR, which were
+        # archived with their checks. The exemption stays so the next
+        # correction note to quote a formula does not turn the guard red on
+        # its own evidence; until then it is unused, and said so.
+        print("  NOTE    blockquote exemption currently unused: no remaining "
+              "forbidden pattern is quoted in a correction note")
     else:
         # Not all of them need it, and that is correct rather than a gap:
         # patterns anchored on the asserted markdown form (`- **Method**:`)

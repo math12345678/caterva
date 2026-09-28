@@ -1517,234 +1517,6 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     ],
   },
   {
-    domain: "sir",
-    parameters: {
-      beta: 0.3,
-      gamma: 0.1,
-      s0: 990,
-      i0: 10,
-      r0_recovered: 0,
-      end: 100,
-      points: 101,
-    },
-    keywords: [
-      "sir",
-      "infection",
-      "epidemic",
-      "virus",
-      "disease",
-      "outbreak",
-      "pandemic",
-      "spread",
-      "contagious",
-      "infectious",
-      // Named diseases, so a query naming one directly ("model measles in
-      // a school") still reaches the SIR domain even without also saying
-      // "outbreak" or "epidemic". Only "covid" resolves an actual R0 from
-      // literature today (see diseases.ts / ADR 0017) -- the rest still
-      // correctly refuse rather than invent an R0, but at least refuse
-      // from the right domain instead of silently running as if the
-      // question had been about enzyme kinetics.
-      "covid",
-      "coronavirus",
-      "sars-cov-2",
-      "measles",
-      "influenza",
-      "flu",
-      "mumps",
-      "rubella",
-      "chickenpox",
-      "varicella",
-      "smallpox",
-      "pertussis",
-      "whooping cough",
-      "tuberculosis",
-      "cholera",
-      "ebola",
-      "mpox",
-      "monkeypox",
-      "norovirus",
-          // Compartment and outcome vocabulary: a query can describe an
-      // outbreak entirely in SIR terms ("how many stay susceptible",
-      // "herd immunity threshold") without ever writing "epidemic".
-      "susceptible",
-      "recovered",
-      "immunity",
-      "immune",
-      "infected",
-      "illness",
-      "transmission",
-      "spreads",
-      "attack rate",
-      "herd immunity",
-      "wave",
-    ],
-    reasoning:
-      "Keywords related to infectious disease spread were found; defaulting to an SIR epidemic simulation.",
-    modelCitations: [
-      "Kermack W.O., McKendrick A.G. (1927) A contribution to the mathematical theory of epidemics. Proceedings of the Royal Society A 115(772), 700-721.",
-    ],
-  },
-  {
-    domain: "seir",
-    refines: "sir",
-    parameters: {
-      beta: 0.3,
-      sigma: 0.2,
-      gamma: 0.1,
-      s0: 990,
-      e0: 10,
-      i0: 0,
-      r0_recovered: 0,
-      end: 100,
-      points: 101,
-    },
-    keywords: [
-      "incubation period",
-      "pre-infectious",
-      "before they can pass it on",
-      "not contagious",
-      "carries it",
-      "latency",
-      "delay between","seir", "exposed", "latent", "incubation"],
-    reasoning:
-      "Keywords related to latent-period epidemiology were found; defaulting to an SEIR simulation.",
-    modelCitations: [
-      "Kermack W.O., McKendrick A.G. (1927) A contribution to the mathematical theory of epidemics. Proceedings of the Royal Society A 115(772), 700-721.",
-    ],
-  },
-  {
-    domain: "pcr",
-    parameters: { n0: 100, efficiency: 0.95, cycles: 30 },
-    keywords: [
-      "thermal cycles",
-      "doubling",
-      "amplify",
-      "dna copies",
-      "template strands",
-      "rounds of doubling",
-      "yield",
-      "per cycle",
-      "pcr",
-      "polymerase chain",
-      "amplification",
-      "template",
-      "cycles",
-    ],
-    reasoning:
-      "PCR amplification keywords were found; defaulting to a discrete PCR simulation.",
-    modelCitations: [
-      "Mullis K., Faloona F., Scharf S., Saiki R., Horn G., Erlich H. (1986) Specific enzymatic amplification of DNA in vitro: the polymerase chain reaction. Cold Spring Harbor Symposia on Quantitative Biology 51, 263-273.",
-    ],
-  },
-  {
-    domain: "monte_carlo_pi",
-    parameters: { n_samples: 10_000 },
-    keywords: ["monte carlo", "estimate pi", "pi estimate", "random points"],
-    reasoning:
-      "Monte Carlo estimation keywords were found; defaulting to pi estimation.",
-    modelCitations: [
-      "Metropolis N., Ulam S. (1949) The Monte Carlo method. Journal of the American Statistical Association 44(247), 335-341.",
-    ],
-  },
-  {
-    domain: "wright_fisher",
-    parameters: {
-      population_size: 100,
-      starting_frequency: 0.5,
-      generations: 100,
-      replicate_runs: 100,
-      mutation_rate: 0,
-      selection_coefficient: 0,
-    },
-    keywords: [
-      "allele",
-      "gene variant",
-      "variant",
-      "drift",
-      "neutral evolution",
-      "selection coefficient",
-      "sweep",
-      "gene frequency",
-      "takes over by chance",
-      "wright-fisher",
-      "genetic drift",
-      "allele frequency",
-      "population genetics",
-      "fixation",
-    ],
-    reasoning:
-      "Population-genetics keywords were found; defaulting to a Wright-Fisher simulation.",
-    // The model carries both names; citing only Fisher attributes half of it.
-    modelCitations: [
-      "Fisher R.A. (1930) The Genetical Theory of Natural Selection. Oxford: Clarendon Press.",
-      "Wright S. (1931) Evolution in Mendelian populations. Genetics 16(2), 97-159.",
-    ],
-  },
-  {
-    domain: "two_locus_wright_fisher",
-    refines: "wright_fisher",
-    parameters: {
-      population_size: 100,
-      generations: 20,
-      recombination_rate: 0.1,
-      starting_frequencies: [0.5, 0, 0, 0.5],
-      mutation_rate: 0,
-      replicate_runs: 50,
-    },
-    keywords: [
-      "linked genes",
-      "two loci",
-      "crossing over",
-      "linkage",
-      "joint frequencies",
-      "two sites",
-      "nearby genes",
-      "inherited together",
-      "linkage disequilibrium",
-      "two locus",
-      "two-locus",
-      "recombination",
-      "haplotype",
-    ],
-    reasoning:
-      "Linkage and recombination keywords were found; defaulting to a two-locus Wright-Fisher simulation.",
-    modelCitations: [
-      "Lewontin R.C. (1964) The interaction of selection and linkage. I. General considerations; heterotic models. Genetics 49(1), 49-67.",
-    ],
-  },
-  {
-    domain: "molecular_dynamics",
-    parameters: {
-      n_particles: 108,
-      temperature: 0.4,
-      timestep: 0.005,
-      n_steps: 1000,
-      density: 0.85,
-    },
-    keywords: [
-      "atoms",
-      "argon",
-      "noble gas",
-      "pair potential",
-      "trajectories",
-      "atom cluster",
-      "positions of atoms",
-      "repelling",
-      "attracting",
-      "molecular dynamics",
-      "lennard-jones",
-      "lennard jones",
-      "lj cluster",
-      "particles",
-    ],
-    reasoning:
-      "Molecular-dynamics keywords were found; defaulting to a Lennard-Jones simulation.",
-    modelCitations: [
-      "Hoare M.R., Pal P. (1971) Physical cluster mechanics: statics and energy surfaces for monatomic systems. Advances in Physics 20(84), 161-196.",
-    ],
-  },
-  {
     domain: "gillespie_ssa_replicates",
     parameters: { a0: 100, k: 0.5, end: 10, n_replicates: 100 },
     keywords: ["replicates", "many seeds", "multiple runs", "ensemble"],
@@ -1806,86 +1578,6 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       "Keywords related to stochastic chemical kinetics were found; defaulting to a Gillespie SSA simulation of a single first-order decay reaction.",
     modelCitations: [
       "Gillespie D.T. (1977) Exact stochastic simulation of coupled chemical reactions. The Journal of Physical Chemistry 81(25), 2340-2361.",
-    ],
-  },
-  {
-    domain: "lotka_volterra",
-    parameters: { end: 20, points: 201 },
-    keywords: [
-      "predator",
-      "prey",
-      "rabbit",
-      "fox",
-      "lynx",
-      "hare",
-      "ecosystem",
-      "eats",
-      "consumer-resource",
-      "out of step",
-      "rise and fall",
-      "lotka-volterra",
-      "lotka volterra",
-      "predator-prey",
-      "predator prey",
-      "population dynamics",
-    ],
-    reasoning:
-      "Keywords related to predator-prey dynamics were found; defaulting to a Lotka-Volterra simulation.",
-    modelCitations: [
-      "Lotka A.J. (1925) Elements of Physical Biology. Baltimore: Williams & Wilkins.",
-      "Volterra V. (1926) Fluctuations in the abundance of a species considered mathematically. Nature 118(2972), 558-560.",
-    ],
-  },
-  {
-    domain: "cell_cycle_oscillator",
-    parameters: { end: 100, points: 1001 },
-    keywords: [
-      "cell division",
-      "dividing",
-      "divides",
-      "division",
-      "commits to dividing",
-      "regulatory protein",
-      "cell cycle",
-      "mitosis",
-      "cyclin",
-      "cdk",
-      "oscillator",
-    ],
-    reasoning:
-      "Keywords related to the cell cycle were found; defaulting to a cell cycle oscillator simulation.",
-    modelCitations: [
-      "Tyson J.J. (1991) Modeling the cell division cycle: cdc2 and cyclin interactions. Proceedings of the National Academy of Sciences USA 88(16), 7328-7332.",
-    ],
-  },
-  {
-    domain: "repressilator",
-    parameters: { end: 200, points: 2001 },
-    keywords: [
-      "three genes",
-      "repress",
-      "represses",
-      "ring",
-      "engineered loop",
-      "synthetic oscillator",
-      "genetic oscillator",
-      "blinks",
-      "shutting off the next",
-      "turns the next one off",
-      // NOT "e. coli". It is the organism the Elowitz-Leibler circuit was
-      // built in, not evidence that a question is about that circuit:
-      // measured, "how fast does E. coli grow in glucose" classified as a
-      // repressilator. A host organism is not a mechanism.
-      "repressilator",
-      "synthetic",
-      "genetic circuit",
-      "repressive",
-      "oscillation",
-    ],
-    reasoning:
-      "Keywords related to a synthetic genetic oscillator were found; defaulting to a repressilator simulation.",
-    modelCitations: [
-      "Elowitz M.B., Leibler S. (2000) A synthetic oscillatory network of transcriptional regulators. Nature 403(6767), 335-338.",
     ],
   },
 ];
@@ -2281,6 +1973,19 @@ function resolveNesting(
  * table would be testing the stub; testing the declarations is the honest
  * version of the same check.
  */
+/**
+ * Every domain the table declares, in table order.
+ *
+ * Exported because the tests kept holding their own copy of this list and
+ * the copies kept expiring -- when the non-enzyme domains were archived on
+ * 2026-09-27, two separate hardcoded arrays went on naming thirteen domains
+ * and failed for saying so rather than for anything the classifier did. A
+ * list derived from DOMAIN_DEFAULTS cannot disagree with DOMAIN_DEFAULTS.
+ */
+export function declaredDomains(): string[] {
+  return DOMAIN_DEFAULTS.map((d) => d.domain);
+}
+
 export function refinementPairs(): {
   child: string;
   parent: string;
@@ -3154,20 +2859,6 @@ export async function resolveQuery(
       flags = epiResult.flags;
     }
 
-    // Population genetics parameter resolution for LLM path
-    if (llmResult.domain === "wright_fisher" || llmResult.domain === "two_locus_wright_fisher") {
-      const popgenResult = await applyPopgenResolution(
-        llmResult.entities,
-        effectiveOverrides,
-        llmResult.domain,
-        parameters,
-        parameterProvenance,
-        flags,
-      );
-      parameters = popgenResult.parameters;
-      parameterProvenance = popgenResult.parameterProvenance;
-      flags = popgenResult.flags;
-    }
 
     if (
       Object.keys(effectiveOverrides).length === 0 &&
@@ -3438,20 +3129,6 @@ export async function resolveQuery(
     flags = epiResult.flags;
   }
 
-  // Population genetics parameter resolution (e.g., mutation_rate for Wright-Fisher)
-  if (best.domain === "wright_fisher" || best.domain === "two_locus_wright_fisher") {
-    const popgenResult = await applyPopgenResolution(
-      fallbackEntities,
-      effectiveOverrides,
-      best.domain,
-      parameters,
-      parameterProvenance,
-      flags,
-    );
-    parameters = popgenResult.parameters;
-    parameterProvenance = popgenResult.parameterProvenance;
-    flags = popgenResult.flags;
-  }
 
   flags.push(...buildParameterExtractionFlags(effectiveOverrides));
   const violations = provenanceViolations(parameters, parameterProvenance);

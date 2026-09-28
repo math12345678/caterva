@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from caterva.continuous.networks import mm_network, sir_network
+from caterva.continuous.networks import mm_network
 from caterva.core.data_structures import ModelBuildError
 from caterva.core.network import Parameter, Reaction, ReactionNetwork, Species
 from caterva.core.network_provenance import (
@@ -154,18 +154,6 @@ def test_a_source_for_a_quantity_the_model_lacks_is_reported() -> None:
 
     problems = unsourced_quantities(network, sources)
     assert any("Ki" in p and "does not contain" in p for p in problems)
-
-
-def test_every_problem_is_reported_at_once() -> None:
-    """A caller assembling a model wants the whole list.
-
-    Reporting the first failure turns one fix into a sequence of them, and
-    a person fixing a model one error at a time stops reading the errors.
-    """
-    network = sir_network(0.5761, 0.1835, 999.0, 1.0, 0.0)
-    problems = unsourced_quantities(network, {})
-    # S, I, R, beta, gamma_rate, N -- all six, not just the first.
-    assert len(problems) == len(network.quantity_ids()) == 6
 
 
 def test_the_judged_set_comes_from_the_model_not_from_a_list() -> None:

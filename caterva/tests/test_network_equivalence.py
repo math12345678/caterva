@@ -39,25 +39,8 @@ import numpy as np
 import pytest
 
 from caterva.continuous.model_building import antimony_to_sbml
-from caterva.continuous.networks import (
-    cell_cycle_oscillator_network,
-    lotka_volterra_network,
-    mm_competitive_network,
-    mm_network,
-    repressilator_network,
-    seir_network,
-    sir_network,
-)
-from caterva.continuous.simulations import (
-    simulate_cell_cycle_oscillator,
-    simulate_lotka_volterra,
-    simulate_mm_competitive_inhibition,
-    simulate_michaelis_menten,
-    simulate_repressilator,
-    simulate_seir,
-    simulate_sir,
-    simulate_sbml,
-)
+from caterva.continuous.networks import mm_competitive_network, mm_network
+from caterva.continuous.simulations import simulate_mm_competitive_inhibition, simulate_michaelis_menten, simulate_sbml
 from caterva.core.data_structures import ModelBuildError
 from caterva.core.network import (
     AssignmentRule,
@@ -74,6 +57,19 @@ START, END, POINTS = 0.0, 20.0, 101
 
 #: (label, network, callable producing the hand-built result over the same
 #: window). Every builder in model_building.py that emits an ODE model.
+
+
+def _columns(result) -> dict:
+    data = np.array(result.data, dtype=float)
+    return {name: data[:, i] for i, name in enumerate(result.colnames)}
+
+
+def _simulate_network(network: ReactionNetwork):
+    return simulate_sbml(
+        antimony_to_sbml(compile_to_antimony(network)), START, END, POINTS
+    )
+
+
 CASES = [
     (
         "michaelis_menten",
@@ -87,50 +83,7 @@ CASES = [
             2.0, 5.0, 1.0, 10.0, 0.5, START, END, POINTS
         ),
     ),
-    (
-        "sir",
-        sir_network(0.5761, 0.1835, 999.0, 1.0, 0.0),
-        lambda: simulate_sir(
-            0.5761, 0.1835, 999.0, 1.0, 0.0, START, END, POINTS
-        ),
-    ),
-    (
-        "seir",
-        seir_network(0.5, 0.2, 0.1, 990.0, 5.0, 5.0, 0.0),
-        lambda: simulate_seir(
-            0.5, 0.2, 0.1, 990.0, 5.0, 5.0, 0.0, START, END, POINTS
-        ),
-    ),
-    (
-        "lotka_volterra",
-        lotka_volterra_network(1.1, 0.4, 0.1, 0.4, 10.0, 5.0),
-        lambda: simulate_lotka_volterra(
-            1.1, 0.4, 0.1, 0.4, 10.0, 5.0, START, END, POINTS
-        ),
-    ),
-    (
-        "cell_cycle_oscillator",
-        cell_cycle_oscillator_network(),
-        lambda: simulate_cell_cycle_oscillator(START, END, POINTS),
-    ),
-    (
-        "repressilator",
-        repressilator_network(),
-        lambda: simulate_repressilator(START, END, POINTS),
-    ),
 ]
-
-
-def _columns(result) -> dict:
-    data = np.array(result.data, dtype=float)
-    return {name: data[:, i] for i, name in enumerate(result.colnames)}
-
-
-def _simulate_network(network: ReactionNetwork):
-    return simulate_sbml(
-        antimony_to_sbml(compile_to_antimony(network)), START, END, POINTS
-    )
-
 
 @pytest.mark.parametrize(
     "label, network, build_reference", CASES, ids=[c[0] for c in CASES]

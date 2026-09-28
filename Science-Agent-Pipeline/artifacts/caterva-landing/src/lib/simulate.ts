@@ -91,39 +91,3 @@ export function simulateMichaelisMenten(p: MMParams): MMResult {
 
   return { trajectory, finalResidual };
 }
-
-export interface SIRParams {
-  beta: number;
-  gamma: number;
-  s0: number;
-  i0: number;
-  end: number;
-  points: number;
-}
-
-export interface SIRResult {
-  trajectory: Point[];
-  // S + I + R must equal N at every point (population conservation) -- the
-  // same invariant caterva/tests/test_properties.py checks with Hypothesis
-  // across the whole input space, spot-checked here at the final point.
-  conservationError: number;
-}
-
-export function simulateSIR(p: SIRParams): SIRResult {
-  const N = p.s0 + p.i0;
-  const derivs = ([S, I]: number[]) => {
-    const infection = (p.beta * S * I) / N;
-    const recovery = p.gamma * I;
-    return [-infection, infection - recovery, recovery];
-  };
-  const trajectory = integrate(derivs, [p.s0, p.i0, 0], p.end, p.points, [
-    "S",
-    "I",
-    "R",
-  ]);
-
-  const last = trajectory[trajectory.length - 1];
-  const conservationError = Math.abs(last.S + last.I + last.R - N);
-
-  return { trajectory, conservationError };
-}

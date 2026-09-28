@@ -7,7 +7,8 @@ import {
 /**
  * The catalogue must agree with the engine, not with itself.
  *
- * Caterva advertises fifteen teaching domains and, until `scientific
+ * Caterva advertised fifteen teaching domains (five since the archive of
+ * 2026-09-27) and, until `scientific
  * domains` existed, nothing could tell a student what they are: `help`
  * listed nine commands (all enzyme kinetics or generic), and the engine's
  * own subcommands lived behind a second CLI that `help` never mentions.
@@ -21,22 +22,12 @@ import {
 
 /** What the engine reports today, plus the ingest path that is not a domain. */
 const ENGINE_IDS = [
-  'cell_cycle_oscillator',
   'gillespie_ssa',
   'gillespie_ssa_bimolecular',
   'gillespie_ssa_replicates',
-  'lotka_volterra',
   'mm',
   'mm_competitive_inhibition',
-  'molecular_dynamics',
-  'monte_carlo_pi',
-  'pcr',
-  'repressilator',
   'sbml',
-  'seir',
-  'sir',
-  'two_locus_wright_fisher',
-  'wright_fisher',
 ];
 
 describe('the catalogue against the engine', () => {
@@ -53,15 +44,15 @@ describe('the catalogue against the engine', () => {
 
   /**
    * `sbml` is "run the model in this file" — a generic ingest path, not a
-   * teaching domain. It is why the README says fifteen and DISPATCH holds
-   * sixteen, and `check_documented_counts.py` declines to derive that
+   * teaching domain. It is why the catalogue holds five and DISPATCH six
+   * (fifteen and sixteen before the 2026-09-27 archive), and `check_documented_counts.py` declines to derive that
    * number for the same reason.
    */
-  it('excludes the ingest path, so fifteen means fifteen', () => {
+  it('excludes the ingest path, so five means five', () => {
     const report = reconcileCatalogue(ENGINE_IDS);
     expect(NOT_A_TEACHING_DOMAIN.has('sbml')).toBe(true);
     expect(report.entries.map((e) => e.id)).not.toContain('sbml');
-    expect(report.entries).toHaveLength(15);
+    expect(report.entries).toHaveLength(5);
   });
 
   /**
@@ -80,12 +71,6 @@ describe('the catalogue against the engine', () => {
    * cannot run. A catalogue listing what the tool cannot do teaches a reader
    * to distrust the rest of it.
    */
-  it('reports an entry the engine dropped', () => {
-    const withoutPcr = ENGINE_IDS.filter((id) => id !== 'pcr');
-    const report = reconcileCatalogue(withoutPcr);
-    expect(report.phantom).toEqual(['pcr']);
-    expect(report.entries.map((e) => e.id)).not.toContain('pcr');
-  });
 });
 
 describe('what each entry has to carry to be useful', () => {

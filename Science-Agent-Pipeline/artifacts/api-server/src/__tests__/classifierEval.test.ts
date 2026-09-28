@@ -21,24 +21,18 @@ import {
   type LabelledQuery,
 } from "../lib/classifierEval";
 import { classifyDomainByKeyword } from "../lib/queryResolver";
+import { DOMAIN_MEANINGS } from "../lib/llmResolver";
 
 /** The domains the LLM resolver is allowed to return; the benchmark should
- *  exercise every one of them or it is not a benchmark of the classifier. */
-const LLM_EXPOSED_DOMAINS = [
-  "mm",
-  "mm_competitive_inhibition",
-  "sir",
-  "seir",
-  "wright_fisher",
-  "gillespie_ssa",
-  "pcr",
-  "molecular_dynamics",
-  "gillespie_ssa_bimolecular",
-  "two_locus_wright_fisher",
-  "lotka_volterra",
-  "cell_cycle_oscillator",
-  "repressilator",
-] as const;
+ *  exercise every one of them or it is not a benchmark of the classifier.
+ *
+ *  DERIVED from DOMAIN_MEANINGS rather than listed here. It used to be a
+ *  hand-written array, and when the non-enzyme domains were archived on
+ *  2026-09-27 it went on naming all thirteen -- so this test failed for
+ *  having a stale copy of the answer rather than for anything the classifier
+ *  did. That is the third hardcoded list on this branch to expire when a
+ *  name moved (ADR 0205, ADR 0206); a derived one cannot. */
+const LLM_EXPOSED_DOMAINS = Object.keys(DOMAIN_MEANINGS);
 
 /**
  * A question the tool genuinely cannot simulate. Used to exercise the third
@@ -122,55 +116,6 @@ describe("classifyDomainByKeyword reports three states, not two", () => {
   });
 });
 
-describe("defects ADR 0190 measured, now fixed by specificity scoring", () => {
-  const domainOf = (q: string) => classifyDomainByKeyword(q).defaults.domain;
-
-  it("routes an incubation-period epidemic to seir, not sir", () => {
-    // Was `sir`: sir sits earlier in the table and matched the bare word
-    // "disease" before seir was ever considered. "incubation period" (18)
-    // now outscores "disease" (7).
-    expect(
-      domainOf(
-        "Simulate a disease with an incubation period before patients become infectious.",
-      ),
-    ).toBe("seir");
-  });
-
-  it("routes 'predator-prey cycles' to lotka_volterra, not pcr", () => {
-    // The most surprising defect found: an ecology question became a DNA
-    // amplification simulation because "cycles" is a PCR keyword and pcr
-    // sits earlier. "predator-prey" (13) now outscores "cycles" (6).
-    expect(domainOf("Model predator-prey cycles in an ecosystem.")).toBe(
-      "lotka_volterra",
-    );
-  });
-
-  it("routes a synthetic genetic oscillator to the repressilator, not the cell cycle", () => {
-    // Was `cell_cycle_oscillator`, which matched "oscillator" first.
-    expect(
-      domainOf("Simulate the Elowitz and Leibler synthetic genetic oscillator."),
-    ).toBe("repressilator");
-  });
-
-  it("routes a two-locus question to two_locus_wright_fisher, not the mm fallback", () => {
-    // Was the `mm` fallback: it matched nothing at all.
-    const { defaults, matched } = classifyDomainByKeyword(
-      "Model two linked genes recombining in a finite population as allele frequencies drift.",
-    );
-    expect(defaults.domain).toBe("two_locus_wright_fisher");
-    expect(matched).toBe(true);
-  });
-
-  it("still routes a plain cell-division question to the cell cycle", () => {
-    // The counterpart of the repressilator fix: widening one domain's
-    // vocabulary must not steal the queries that legitimately belong to its
-    // neighbour.
-    expect(domainOf("Model how cyclin and CDK drive a cell through division.")).toBe(
-      "cell_cycle_oscillator",
-    );
-  });
-});
-
 describe("the benchmark itself", () => {
   it("scores the held-out split at least as well as the dev split", () => {
     // Not a threshold on either number -- thresholds invite tuning until
@@ -225,14 +170,16 @@ describe("the benchmark itself", () => {
     const text = formatSummary(
       benchmarkKeywordClassifier([
         {
-          query: "Model predator-prey cycles in an ecosystem.",
-          expected: "pcr",
+          query: "run a gillespie simulation of first-order decay",
+          expected: "mm_competitive_inhibition",
           why: "deliberately mislabelled so the report has a miss to name",
           split: "dev",
         },
       ]),
     );
     expect(text).toContain("misses:");
-    expect(text).toContain("expected pcr, got lotka_volterra");
+    expect(text).toContain(
+      "expected mm_competitive_inhibition, got gillespie_ssa",
+    );
   });
 });

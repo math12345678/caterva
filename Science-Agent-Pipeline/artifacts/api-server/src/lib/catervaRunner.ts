@@ -11,28 +11,18 @@ import { resolvePythonExecutable } from "./python";
 export type SimulationDomain =
   | "mm"
   | "mm_competitive_inhibition"
-  | "sir"
-  | "seir"
-  | "wright_fisher"
   | "gillespie_ssa"
-  | "pcr"
-  | "molecular_dynamics"
   | "gillespie_ssa_bimolecular"
-  | "two_locus_wright_fisher"
   // Both are in the engine's __all__ and its DISPATCH table (ADR 0007: the
   // engine's surface is the contract). They were briefly absent here,
   // which led to them being deleted from DISPATCH to match -- breaking
   // five boundary-contract tests. Listed here so the drift cannot recur in
   // that direction.
-  | "monte_carlo_pi"
   | "gillespie_ssa_replicates"
-  // Three ODE oscillator domains (ADR 0022): predator-prey (Lotka 1925 /
-  // Volterra 1926), the cdc2-cyclin cell cycle relaxation oscillator
-  // (Tyson 1991), and the synthetic three-gene repressilator (Elowitz &
-  // Leibler 2000).
-  | "lotka_volterra"
-  | "cell_cycle_oscillator"
-  | "repressilator"
+  // Epidemiology, population genetics, PCR, Monte Carlo, the three ODE
+  // oscillators and the Lennard-Jones toy MD were archived on 2026-09-27
+  // (archive/legacy_domains/), and caterva_runner.py answers them with
+  // ARCHIVED_DOMAINS.
   | "sbml";
 
 /**
@@ -84,6 +74,31 @@ export const COMPOSED_DOMAINS: readonly ComposedDomain[] = [
  * insert time, with an error about an enum value rather than about the
  * mistake. This fails where the mistake is.
  */
+/**
+ * The live domains at runtime. The database and the OpenAPI enum still
+ * carry the domains archived on 2026-09-27, because stored rows may hold
+ * them; a value read back from storage is checked here before it is
+ * treated as something this build runs. `satisfies` keeps this list and
+ * the union above from drifting apart silently.
+ */
+const LIVE_SIMULATION_DOMAINS = [
+  "mm",
+  "mm_competitive_inhibition",
+  "gillespie_ssa",
+  "gillespie_ssa_bimolecular",
+  "gillespie_ssa_replicates",
+  "sbml",
+] as const satisfies readonly SimulationDomain[];
+
+type _EveryDomainListed =
+  Exclude<SimulationDomain, (typeof LIVE_SIMULATION_DOMAINS)[number]> extends never ? true : never;
+const _everyDomainListed: _EveryDomainListed = true;
+void _everyDomainListed;
+
+export function isSimulationDomain(value: string): value is SimulationDomain {
+  return (LIVE_SIMULATION_DOMAINS as readonly string[]).includes(value);
+}
+
 export function asSimulationDomain(domain: RunnableDomain): SimulationDomain {
   if ((COMPOSED_DOMAINS as readonly string[]).includes(domain)) {
     throw new Error(

@@ -8,12 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from caterva.continuous.model_building import (
-    antimony_to_sbml,
-    build_michaelis_menten_antimony,
-    build_mm_competitive_antimony,
-    build_sir_antimony,
-)
+from caterva.continuous.model_building import antimony_to_sbml, build_michaelis_menten_antimony, build_mm_competitive_antimony
 from caterva.core.model_provenance import (
     NO_PROVENANCE_MARKER,
     ParameterProvenance,
@@ -53,14 +48,13 @@ DEFAULTED = ParameterProvenance(
 # The property everything else depends on
 # ---------------------------------------------------------------------------
 
+
 MODELS = [
     build_michaelis_menten_antimony(km=2.5, vmax=5.0, s0=10.0),
     build_mm_competitive_antimony(km=2.5, vmax=5.0, ki=1.2, s0=10.0, i=0.5),
-    build_sir_antimony(beta=0.3, gamma=0.1, s0=990.0, i0=10.0, r0_recovered=0.0),
 ]
 
-
-@pytest.mark.parametrize("model", MODELS, ids=["mm", "mm_competitive", "sir"])
+@pytest.mark.parametrize("model", MODELS, ids=["mm", "mm_competitive"])
 def test_annotation_does_not_change_the_model(model):
     """Strip the annotations and you must get the original text back.
 
@@ -75,7 +69,7 @@ def test_annotation_does_not_change_the_model(model):
     assert strip_annotations(result.text) == model
 
 
-@pytest.mark.parametrize("model", MODELS, ids=["mm", "mm_competitive", "sir"])
+@pytest.mark.parametrize("model", MODELS, ids=["mm", "mm_competitive"])
 def test_annotated_model_still_translates_to_sbml(model):
     """Round-tripping the TEXT is not enough.
 

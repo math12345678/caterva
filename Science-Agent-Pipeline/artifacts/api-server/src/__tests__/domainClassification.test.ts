@@ -39,69 +39,18 @@ async function classifiedDomain(query: string): Promise<string> {
 }
 
 describe("keyword classifier: realistic phrasing that used to misclassify", () => {
-  it('"predator and prey populations" resolves to lotka_volterra, not mm', async () => {
-    // Old exact-substring check needed the adjacent phrase "predator prey"
-    // or "predator-prey" -- "predator AND prey" (a completely ordinary way
-    // to phrase this) matched neither and fell through to mm.
-    expect(
-      await classifiedDomain("simulate predator and prey populations over 50 years"),
-    ).toBe("lotka_volterra");
-  });
-
-  it('"allele frequencies" (plural) resolves to wright_fisher, not mm', async () => {
-    // Old check required the exact singular substring "allele frequency".
-    expect(
-      await classifiedDomain(
-        "what happens to allele frequencies in a small population of 20 individuals",
-      ),
-    ).toBe("wright_fisher");
-  });
-
-  it('naming a disease directly ("measles") resolves to sir, not mm', async () => {
-    // measles has no verified literature R0 (ADR 0017) so this still
-    // refuses -- but it must refuse as a SIR query missing beta/gamma, not
-    // silently run as if the question had been about enzyme kinetics.
-    const domain = await classifiedDomain(
-      "I want to model the spread of measles in a school with 500 students",
-    );
-    expect(domain).toBe("sir");
-  });
-
-  it('naming covid resolves to sir and reaches the real literature R0 bridge', async () => {
-    const result = await resolveQuery(
-      "model a covid-19 outbreak s0=990 i0=10 r0_recovered=0 end=100 points=101",
-    );
-    expect(result.domain).toBe("sir");
-    // Real literature-backed resolution (not a hardcoded default): the
-    // parameterProvenance origin for beta/gamma should be "resolved", not
-    // "default" or "user", proving classification reached the disease
-    // registry rather than just guessing the right domain by luck.
-    expect(result.parameterProvenance["beta"]?.origin).toBe("resolved");
-    expect(result.parameterProvenance["gamma"]?.origin).toBe("resolved");
-  });
-
-  it('a real disease outside the registry (measles) explains WHY beta/gamma are unresolved, not just THAT they are', async () => {
-    // Before this fix, an unregistered disease's beta/gamma got the
-    // generic "could not be resolved from literature" sentence -- false by
-    // omission for a real, well-studied disease that simply isn't
-    // registered here yet (only COVID-19 is, per ADR 0017), as opposed to
-    // one the literature is actually silent on.
-    try {
-      await resolveQuery(
-        "the spread of measles in a school with 500 students",
-      );
-      throw new Error("expected resolveQuery to throw");
-    } catch (e) {
-      expect(e).toBeInstanceOf(RequiredParametersMissingError);
-      const err = e as RequiredParametersMissingError;
-      expect(err.domain).toBe("sir");
-      expect(err.details["beta"]).toMatch(
-        /matches Caterva's literature-backed R0 registry/,
-      );
-      expect(err.details["gamma"]).toMatch(
-        /matches Caterva's literature-backed R0 registry/,
-      );
-    }
+  // The classifier's first job survived the 2026-09-27 narrowing: a
+  // question about something Caterva no longer models is refused, never
+  // answered with an enzyme simulation. These phrasings each used to route
+  // to a domain that is now archived.
+  it.each([
+    "simulate predator and prey populations over 50 years",
+    "what happens to allele frequencies in a small population of 20 individuals",
+    "I want to model the spread of measles in a school with 500 students",
+    "model a covid-19 outbreak s0=990 i0=10 end=100",
+    "simulate a lennard-jones cluster of 13 atoms",
+  ])("refuses %j rather than running it as an enzyme", async (q) => {
+    await expect(resolveQuery(q)).rejects.toBeInstanceOf(UnrecognizedQueryError);
   });
 
   it("a genuinely unrecognized query throws UnrecognizedQueryError, not a silent mm default", async () => {
@@ -117,9 +66,11 @@ describe("keyword classifier: realistic phrasing that used to misclassify", () =
     } catch (e) {
       expect(e).toBeInstanceOf(UnrecognizedQueryError);
       const err = e as UnrecognizedQueryError;
-      expect(err.availableDomains).toContain("sir");
-      expect(err.availableDomains).toContain("lotka_volterra");
-      expect(err.availableDomains.length).toBeGreaterThanOrEqual(15);
+      expect(err.availableDomains).toContain("mm");
+      expect(err.availableDomains).toContain("gillespie_ssa");
+      // Archived domains are not offered as if they still ran.
+      expect(err.availableDomains).not.toContain("sir");
+      expect(err.availableDomains).not.toContain("wright_fisher");
     }
   });
 });
@@ -148,9 +99,4 @@ describe("keyword classifier: existing exact-phrase matches still work", () => {
     ).toBe("mm");
   });
 
-  it('"lennard-jones cluster" still resolves to molecular_dynamics', async () => {
-    expect(
-      await classifiedDomain("simulate a lennard-jones cluster of 13 atoms"),
-    ).toBe("molecular_dynamics");
-  });
 });

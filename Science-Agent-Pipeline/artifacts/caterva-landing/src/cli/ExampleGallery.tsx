@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import LineChart from "@/cli/LineChart";
-import { simulateMichaelisMenten, simulateSIR } from "@/lib/simulate";
+import { simulateMichaelisMenten } from "@/lib/simulate";
 import type { Point } from "@/lib/simulate";
 
 interface ExampleCard {
@@ -26,24 +26,27 @@ const MM_EXAMPLE = simulateMichaelisMenten({
   end: 3,
   points: 61,
 });
-const SIR_EXAMPLE = simulateSIR({
-  beta: 0.3,
-  gamma: 0.1,
-  s0: 990,
-  i0: 10,
-  end: 100,
-  points: 101,
+// Competitive inhibition of human LDH-A by oxamate. A competitive inhibitor
+// leaves the rate law in Michaelis-Menten form with Km scaled by
+// (1 + [I]/Ki), so the same integrator is exact here -- no second model.
+// Km 0.03 mM (BRENDA ref 286469) and Ki 0.00059 mM (BRENDA ref 739793) are
+// both Homo sapiens, pyruvate; [I], Vmax and [S]0 are chosen.
+const LDH_KM = 0.03;
+const OXAMATE_KI = 0.00059;
+const OXAMATE_I = 0.001;
+const LDH_FREE = simulateMichaelisMenten({ km: LDH_KM, vmax: 0.05, s0: 0.2, end: 6, points: 61 });
+const LDH_INHIBITED = simulateMichaelisMenten({
+  km: LDH_KM * (1 + OXAMATE_I / OXAMATE_KI),
+  vmax: 0.05,
+  s0: 0.2,
+  end: 6,
+  points: 61,
 });
-// Same SIR integrator as SIR_EXAMPLE, just higher beta / lower gamma --
-// there is no E compartment here, so this must not be labeled SEIR.
-const SIR_HIGH_R0_EXAMPLE = simulateSIR({
-  beta: 0.35,
-  gamma: 0.05,
-  s0: 990,
-  i0: 10,
-  end: 100,
-  points: 101,
-});
+const LDH_BOTH = LDH_FREE.trajectory.map((p, i) => ({
+  t: p.t,
+  S: p.S,
+  S_inhibited: LDH_INHIBITED.trajectory[i]!.S,
+}));
 
 const EXAMPLES: ExampleCard[] = [
   {
@@ -78,50 +81,32 @@ const EXAMPLES: ExampleCard[] = [
     query: "simulate lactate dehydrogenase with pyruvate",
   },
   {
-    id: "sir-demo",
-    domain: "sir",
-    label: "SIR Outbreak",
+    id: "ldh-oxamate-demo",
+    domain: "mm_competitive_inhibition",
+    label: "Competitive inhibition",
     description:
-      "Epidemiological spread with population conservation checking.",
+      "Human LDH-A with and without oxamate. Km 0.03 mM (BRENDA ref 286469) " +
+      "and Ki 0.00059 mM (BRENDA ref 739793), both measured in H. sapiens; " +
+      "the inhibitor raises the apparent Km and leaves Vmax untouched.",
     stats: [
+      { label: "apparent Km", value: (LDH_KM * (1 + OXAMATE_I / OXAMATE_KI)).toFixed(3) + " mM" },
       {
-        label: "peak infected",
-        value: Math.max(...SIR_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
+        label: "[S] left at t=6",
+        value:
+          LDH_INHIBITED.trajectory[LDH_INHIBITED.trajectory.length - 1]!.S.toFixed(3) +
+          " vs " +
+          LDH_FREE.trajectory[LDH_FREE.trajectory.length - 1]!.S.toFixed(3) +
+          " mM",
       },
-      { label: "R\u2080", value: (0.3 / 0.1).toFixed(2) },
     ],
     chart: {
-      data: SIR_EXAMPLE.trajectory,
+      data: LDH_BOTH,
       series: [
-        { key: "S", color: "#3B82F6" },
-        { key: "I", color: "#EF4444" },
-        { key: "R", color: "#1D8A72" },
+        { key: "S", color: "#1D8A72" },
+        { key: "S_inhibited", color: "#F59E0B" },
       ],
     },
-    query: "model an outbreak with beta 0.3 and gamma 0.1",
-  },
-  {
-    id: "sir-high-r0-demo",
-    domain: "sir",
-    label: "SIR (High R\u2080)",
-    description:
-      "Same SIR model with higher transmission and slower recovery, giving a higher R\u2080.",
-    stats: [
-      {
-        label: "peak infected",
-        value: Math.max(...SIR_HIGH_R0_EXAMPLE.trajectory.map((p) => p.I)).toFixed(0),
-      },
-      { label: "R\u2080", value: (0.35 / 0.05).toFixed(2) },
-    ],
-    chart: {
-      data: SIR_HIGH_R0_EXAMPLE.trajectory,
-      series: [
-        { key: "S", color: "#3B82F6" },
-        { key: "I", color: "#EF4444" },
-        { key: "R", color: "#1D8A72" },
-      ],
-    },
-    query: "model an outbreak with beta 0.35 and gamma 0.05",
+    query: "competitive inhibition of lactate dehydrogenase by oxamate",
   },
 ];
 

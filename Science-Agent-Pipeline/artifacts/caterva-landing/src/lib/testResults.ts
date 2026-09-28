@@ -162,20 +162,18 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "110 test files -- kinetics & Michaelis-Menten correctness, " +
-          "epidemiology (SIR/SEIR), stochastic simulation (Gillespie SSA), " +
-          "molecular dynamics, population genetics, PCR, SBML export & " +
-          "provenance, compositional model building with influence " +
-          "ranking, mechanism libraries and verdicts, agents and assay " +
-          "windows, and citation/build guards",
-        // Re-measured 2026-09-27 with `caterva structure` and `caterva md`,
-        // caterva/ run alone, read out of a junit-xml report: 3518 tests,
-        // 3515 passed, 2 failed, 1 skipped, 1176 s. The two failures were
-        // the usage screen not listing the new commands, fixed and re-run
-        // (test_app: 11 passed); the skip is the codegen selftest, which
-        // needs npx and runs for real in the api-server CI job. So the
-        // figure where npm works, as for the other rows: 3518.
-        passed: 3518,
+          "97 test files -- kinetics & Michaelis-Menten correctness, " +
+          "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
+          "GROMACS setup, SBML export & provenance, compositional model " +
+          "building with influence ranking, mechanism libraries and " +
+          "verdicts, agents and assay windows, and citation/build guards",
+        // Re-measured 2026-09-28 after the non-enzyme domains were
+        // archived, caterva/ run alone, read out of a junit-xml report:
+        // 2855 tests, 2854 passed, 0 failed, 1 skipped, 797 s. The skip is
+        // the codegen selftest, which needs npx and runs for real in the
+        // api-server CI job. So the figure where npm works, as for the
+        // other rows: 2855.
+        passed: 2855,
         skipped: 0,
         failed: 0,
       },
@@ -198,7 +196,9 @@ export const TEST_SUITES: TestSuite[] = [
         // licence test, which reads installed JavaScript packages and was
         // run for real with them present (10 passed) -- so, as for the
         // engine row, the figure here is the one where npm works: 1174.
-        passed: 1174,
+        // 2026-09-28: one parametrized SIR export case left with that
+        // domain; the collected count is now 1173.
+        passed: 1173,
         skipped: 1,
         failed: 0,
       },
@@ -210,12 +210,17 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "91 test files -- query resolution, parameter provenance, " +
+          "85 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
           "coverage, body-limit honouring",
-        // Measured 2026-09-17: `81 passed (81) / 854 passed (854)`, run
+        // Measured 2026-09-28 in CI (run 36368330079, api-server job):
+        // 764 tests, 763 passed, 1 failed -- the failure an assertion that
+        // more than five domains are served, stale after the archiving and
+        // corrected in the same change. So: 764.
+        //
+        // Earlier, 2026-09-17: `81 passed (81) / 854 passed (854)`, run
         // alone with the repo's .venv/bin first on PATH.
         //
         // Off that PATH the same run reports 837 passed / 2 failed, and the
@@ -238,7 +243,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 854,
+        passed: 764,
         skipped: 0,
         failed: 0,
       },
@@ -252,7 +257,9 @@ export const TEST_SUITES: TestSuite[] = [
         file:
           "5 test files -- component rendering, nav/section integrity, " +
           "page-claim accuracy, and disabled-source claims",
-        passed: 36,
+        // Measured 2026-09-28, `vitest run`: 5 files, 33 passed. Three
+        // EpiPlayground claim tests left with that playground.
+        passed: 33,
         skipped: 0,
         failed: 0,
       },

@@ -2,14 +2,12 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-The simulation engine. 64 files, 38 test modules, 3,543 engine tests.
+The simulation engine. 64 files, 38 test modules, 2,880 engine tests.
 
-Fifteen domains: Michaelis-Menten (plain and competitively inhibited),
-SIR/SEIR epidemiology, PCR amplification, Monte Carlo, Wright-Fisher
-population genetics (single- and two-locus), Lennard-Jones molecular
-dynamics, Gillespie SSA (first-order decay, bimolecular, replicate
-ensemble), and three ODE oscillators — Lotka-Volterra, the Tyson (1991)
-cdc2-cyclin cell cycle, and the Elowitz & Leibler (2000) repressilator.
+Michaelis-Menten (plain and competitively inhibited), composed enzyme
+mechanisms, Gillespie SSA (first-order decay, bimolecular, replicate
+ensemble), PDB structure lookup and GROMACS setup. The other domains were
+archived on 2026-09-27 (`archive/legacy_domains/`).
 
 ```bash
 python -m caterva.cli --help

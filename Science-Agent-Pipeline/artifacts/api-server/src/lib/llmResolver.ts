@@ -46,17 +46,8 @@ interface OpenAIResponse {
 const SUPPORTED_DOMAINS = [
   "mm",
   "mm_competitive_inhibition",
-  "sir",
-  "seir",
-  "wright_fisher",
   "gillespie_ssa",
-  "pcr",
-  "molecular_dynamics",
   "gillespie_ssa_bimolecular",
-  "two_locus_wright_fisher",
-  "lotka_volterra",
-  "cell_cycle_oscillator",
-  "repressilator",
 ] as const;
 
 /** The domains as a TypeScript-style union, for interpolation into the prompt. */
@@ -79,23 +70,17 @@ export const DOMAIN_MEANINGS: Record<string, string> = {
   mm: "Michaelis-Menten enzyme kinetics (no inhibitor).",
   mm_competitive_inhibition:
     "Michaelis-Menten with competitive inhibitor (requires ki parameter).",
-  sir: "SIR epidemiology (Kermack & McKendrick 1927).",
-  seir: "SEIR epidemiology with exposed period (Anderson & May 1991).",
-  wright_fisher: "Wright-Fisher population genetics.",
   gillespie_ssa:
     "Gillespie stochastic simulation of first-order decay (A -> B).",
-  pcr: "discrete PCR amplification.",
-  molecular_dynamics: "Lennard-Jones molecular dynamics.",
   gillespie_ssa_bimolecular:
     "Gillespie SSA for bimolecular reactions (A + B -> C).",
-  two_locus_wright_fisher:
-    "two-locus Wright-Fisher with recombination and linkage disequilibrium.",
-  lotka_volterra:
-    "predator-prey population dynamics (Lotka 1925, Volterra 1926).",
-  cell_cycle_oscillator:
-    "molecular cell cycle via cyclin-CDK regulation (Tyson 1991).",
-  repressilator:
-    "synthetic genetic oscillator with three repressive genes (Elowitz & Leibler 2000).",
+  // NOT gillespie_ssa_replicates, which DOMAIN_DEFAULTS does carry. It is
+  // reachable by keyword ("replicates", "many seeds") and the archiving
+  // commit's own prompt listed these four without it. No labelled query
+  // names it either, so offering it to the model would put a domain in the
+  // prompt that nothing has ever measured the classifier on. Add fixtures
+  // to src/lib/classifierQueries.ts first, in both splits, and the coverage
+  // test below will then require it here.
 };
 
 const DOMAIN_MEANING_LINES = Object.entries(DOMAIN_MEANINGS)
@@ -125,7 +110,7 @@ ${DOMAIN_MEANING_LINES}
 Rules:
 1. Return numeric values only for parameters the query explicitly states. The pipeline hard-blocks any value that is not user-supplied or literature-backed, so never invent numbers: omit a parameter entirely rather than guessing a value. Return an empty "parameters" object when the query states no numbers.
 2. Return only the JSON object. Do not wrap it in markdown code fences.
-3. If the query is ambiguous, choose the most likely domain and explain in "reasoning".
+3. If the query is ambiguous between these domains, choose the most likely one and explain in "reasoning". If it is about none of them -- an epidemic, population genetics, PCR, a gene circuit, anything that is not enzyme kinetics or stochastic chemical kinetics -- return "domain": "out_of_scope". Caterva is focused on enzymes; forcing such a question into an enzyme model would answer a question nobody asked.
 4. Populate "entities" with any enzyme information you can extract from the query; omit or set to null if none is present.`;
 
 /**
