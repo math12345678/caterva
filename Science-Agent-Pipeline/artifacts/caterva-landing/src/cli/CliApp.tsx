@@ -24,6 +24,7 @@ import FeatureCards from "./FeatureCards";
 import DashboardPreview from "./DashboardPreview";
 import ExampleGallery from "./ExampleGallery";
 import StaggeredHero from "./StaggeredHero";
+import BrandMotion from "@/components/brand/BrandMotion";
 import MetricsBar from "./MetricsBar";
 import PlaygroundTabs from "./PlaygroundTabs";
 import WorkflowCompare from "./WorkflowCompare";
@@ -367,6 +368,10 @@ export default function CliApp() {
       {/* ─── HERO ─── */}
       <ParallaxHero>
         <div className="max-w-3xl mx-auto px-4 md:px-6">
+          <div className="mb-6 -mt-2">
+            <BrandMotion height={typeof window !== "undefined" && window.innerWidth < 640 ? 104 : 150} />
+          </div>
+
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
