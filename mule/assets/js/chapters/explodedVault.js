@@ -142,7 +142,7 @@ function buildStage() {
   rec.appendChild(s('text', { class: 'exp-t-micro exp-rec-t', x: rbox.x + 16, y: rbox.y + 26, text: 'VERIFIED RUN / 0007' }));
   rec.appendChild(s('line', {
     x1: rbox.x + 16, y1: rbox.y + 36, x2: rbox.x + rbox.w - 16, y2: rbox.y + 36,
-    stroke: 'rgba(22,32,31,0.2)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke'
+    stroke: 'rgba(42, 45, 53,0.2)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke'
   }));
   [['6', 'PARAMETERS'], ['3', 'EVIDENCE'], ['4', 'CHECKS']].forEach(([k, v], i) => {
     rec.appendChild(s('text', { class: 'exp-rec-num', x: rbox.x + 16, y: rbox.y + 62 + i * 24, text: k }));

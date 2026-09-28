@@ -111,71 +111,36 @@ app.get("/", (_req: Request, res: Response) => {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      font-family: 'DM Mono', 'Cascadia Code', monospace;
-      background: #0A0E0C;
-      color: rgba(255,255,255,0.9);
+      font-family: 'DM Mono', 'Cascadia Code', ui-monospace, monospace;
+      background: #FDF8EE;
+      color: #2A2D35;
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
     }
-    .card {
-      text-align: center;
-      padding: 3rem;
-    }
-    .logo {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-    .dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      background: #1D8A72;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.4; }
-      50% { opacity: 1; }
-    }
-    h1 {
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      font-size: 1.75rem;
-      font-weight: 600;
-      margin-bottom: 0.75rem;
-      background: linear-gradient(135deg, #ffffff 0%, #c8e6de 50%, #1D8A72 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-    p { color: rgba(255,255,255,0.4); margin-bottom: 2rem; font-size: 0.875rem; }
-    .endpoints {
-      text-align: left;
-      display: inline-block;
-    }
-    .endpoint {
-      display: flex;
-      gap: 1rem;
-      padding: 0.5rem 0;
-      font-size: 0.75rem;
-      color: rgba(255,255,255,0.5);
-    }
-    .method { color: #1D8A72; width: 4rem; }
-    .path { color: rgba(255,255,255,0.7); }
-    .ok { color: rgba(255,255,255,0.25); }
-    a { color: #1D8A72; text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    .card { padding: 3rem 1.5rem; max-width: 40rem; }
+    .logo { display: inline-flex; align-items: center; gap: 0.9rem; margin-bottom: 2rem; }
+    .wordmark { font-family: Spectral, Georgia, serif; font-size: 1.4rem; letter-spacing: 0.32em; }
+    h1 { font-family: Spectral, Georgia, serif; font-weight: 300; font-size: 2rem; margin-bottom: 0.5rem; }
+    p { color: rgba(42,45,53,0.72); margin-bottom: 2rem; font-size: 0.875rem; line-height: 1.6; }
+    .endpoints { background: #2A2D35; color: #FDF8EE; border-radius: 8px; padding: 1.25rem 1.5rem; }
+    .endpoint { display: flex; gap: 1rem; padding: 0.35rem 0; font-size: 0.75rem; }
+    .method { color: #9DB8C4; width: 3.5rem; flex: none; }
+    .path { color: rgba(253,248,238,0.9); }
+    .ok { color: rgba(253,248,238,0.66); margin-left: auto; text-align: right; }
+    a { color: #46626E; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="logo">
-      <span class="dot"></span>
-      <span style="font-size:1.25rem;color:rgba(255,255,255,0.7)">caterva</span>
+    <div class="logo" aria-label="caterva">
+      <svg viewBox="236 172 514 634" height="34" aria-hidden="true"><circle cx="541.3" cy="242.6" r="61.7" fill="#2A2D35"/><circle cx="386.5" cy="281.7" r="44.2" fill="#2A2D35"/><circle cx="688.7" cy="309.3" r="50.9" fill="#5D7F8D"/><circle cx="305.1" cy="403.8" r="59.6" fill="#2A2D35"/><circle cx="297.4" cy="569.0" r="44.2" fill="#2A2D35"/><circle cx="382.6" cy="697.4" r="60.2" fill="#2A2D35"/><circle cx="680.8" cy="684.5" r="44.2" fill="#2A2D35"/><circle cx="542.5" cy="744.6" r="53.5" fill="#2A2D35"/></svg>
+      <span class="wordmark">caterva</span>
     </div>
-    <h1>API Server</h1>
-    <p>Science-Agent-Pipeline backend &mdash; all systems nominal</p>
+    <h1>API server</h1>
+    <p>The backend of the caterva web app. Whether its parts are up is reported by
+    <a href="/api/pipeline/status">/api/pipeline/status</a>, not asserted here.</p>
     <div class="endpoints">
       <div class="endpoint"><span class="method">GET</span><span class="path">/api/healthz</span><span class="ok">health check</span></div>
       <div class="endpoint"><span class="method">GET</span><span class="path">/api/pipeline/status</span><span class="ok">pipeline subsystem status</span></div>
@@ -187,8 +152,8 @@ app.get("/", (_req: Request, res: Response) => {
       <div class="endpoint"><span class="method">POST</span><span class="path">/api/waitlist</span><span class="ok">join the pre-launch waitlist</span></div>
       <div class="endpoint"><span class="method">GET</span><span class="path">/api/waitlist/count</span><span class="ok">waitlist signup count</span></div>
     </div>
-    <p style="margin-top:2rem;font-size:0.625rem">
-      see the <a href="https://github.com/math12345678/caterva">landing page</a> for the full app
+    <p style="margin-top:2rem;font-size:0.75rem">
+      source and documentation: <a href="https://github.com/math12345678/caterva">github.com/math12345678/caterva</a>
     </p>
   </div>
 </body>

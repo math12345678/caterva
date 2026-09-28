@@ -67,21 +67,21 @@ function interactive(group, { id, kind, name, box }) {
 function buildDefs() {
   return s('defs', {}, [
     s('linearGradient', { id: 'vaultDepth', x1: '0', y1: '0', x2: '0', y2: '1' }, [
-      s('stop', { offset: '0', 'stop-color': '#0d1415', 'stop-opacity': '0.2' }),
-      s('stop', { offset: '0.5', 'stop-color': '#070b0c', 'stop-opacity': '0.86' }),
-      s('stop', { offset: '1', 'stop-color': '#0d1415', 'stop-opacity': '0.3' })
+      s('stop', { offset: '0', 'stop-color': '#2a2d35', 'stop-opacity': '0.2' }),
+      s('stop', { offset: '0.5', 'stop-color': '#1f2127', 'stop-opacity': '0.86' }),
+      s('stop', { offset: '1', 'stop-color': '#2a2d35', 'stop-opacity': '0.3' })
     ]),
     s('linearGradient', { id: 'chamberGlow', x1: '0', y1: '0', x2: '0', y2: '1' }, [
-      s('stop', { offset: '0', 'stop-color': '#31b894', 'stop-opacity': '0.16' }),
-      s('stop', { offset: '1', 'stop-color': '#31b894', 'stop-opacity': '0.01' })
+      s('stop', { offset: '0', 'stop-color': '#7f9dab', 'stop-opacity': '0.16' }),
+      s('stop', { offset: '1', 'stop-color': '#7f9dab', 'stop-opacity': '0.01' })
     ]),
     s('linearGradient', { id: 'recordEdge', x1: '0', y1: '0', x2: '0', y2: '1' }, [
-      s('stop', { offset: '0', 'stop-color': '#f1f0ea', 'stop-opacity': '1' }),
+      s('stop', { offset: '0', 'stop-color': '#fdf8ee', 'stop-opacity': '1' }),
       s('stop', { offset: '1', 'stop-color': '#e4e3db', 'stop-opacity': '1' })
     ]),
     s('radialGradient', { id: 'coreDepth', cx: '0.5', cy: '0.5', r: '0.6' }, [
       s('stop', { offset: '0', 'stop-color': '#0f1a1a', 'stop-opacity': '1' }),
-      s('stop', { offset: '1', 'stop-color': '#070b0c', 'stop-opacity': '1' })
+      s('stop', { offset: '1', 'stop-color': '#1f2127', 'stop-opacity': '1' })
     ]),
 
     /* Structural recess. Chambers are cut into mass rather than floating on
@@ -96,14 +96,14 @@ function buildDefs() {
     /* Teal bounce. Where evidence resolves, a little of that light falls on
        the architecture next to it. Illumination, never a glow effect. */
     s('radialGradient', { id: 'bounce', cx: '0.5', cy: '0.5', r: '0.5' }, [
-      s('stop', { offset: '0', 'stop-color': '#31b894', 'stop-opacity': '0.2' }),
-      s('stop', { offset: '0.6', 'stop-color': '#31b894', 'stop-opacity': '0.05' }),
-      s('stop', { offset: '1', 'stop-color': '#31b894', 'stop-opacity': '0' })
+      s('stop', { offset: '0', 'stop-color': '#7f9dab', 'stop-opacity': '0.2' }),
+      s('stop', { offset: '0.6', 'stop-color': '#7f9dab', 'stop-opacity': '0.05' }),
+      s('stop', { offset: '1', 'stop-color': '#7f9dab', 'stop-opacity': '0' })
     ]),
     s('radialGradient', { id: 'bounceReview', cx: '0.5', cy: '0.5', r: '0.5' }, [
-      s('stop', { offset: '0', 'stop-color': '#d8a743', 'stop-opacity': '0.17' }),
-      s('stop', { offset: '0.6', 'stop-color': '#d8a743', 'stop-opacity': '0.04' }),
-      s('stop', { offset: '1', 'stop-color': '#d8a743', 'stop-opacity': '0' })
+      s('stop', { offset: '0', 'stop-color': '#d9ad6a', 'stop-opacity': '0.17' }),
+      s('stop', { offset: '0.6', 'stop-color': '#d9ad6a', 'stop-opacity': '0.04' }),
+      s('stop', { offset: '1', 'stop-color': '#d9ad6a', 'stop-opacity': '0' })
     ]),
 
     /* Fine internal grid for chamber interiors — machined, not decorative. */
@@ -112,17 +112,17 @@ function buildDefs() {
     }, [
       s('path', {
         d: 'M 8 0 L 0 0 L 0 8', fill: 'none',
-        stroke: 'rgba(184,222,213,0.055)', 'stroke-width': '0.5'
+        stroke: 'rgba(213, 225, 230,0.055)', 'stroke-width': '0.5'
       })
     ]),
 
     /* The lateral void is composed, not empty: distant structure falls off
        toward the edges of the field so the monument sits in atmosphere. */
     s('linearGradient', { id: 'distantFade', x1: '0', y1: '0', x2: '1', y2: '0' }, [
-      s('stop', { offset: '0', 'stop-color': '#070b0c', 'stop-opacity': '1' }),
-      s('stop', { offset: '0.34', 'stop-color': '#070b0c', 'stop-opacity': '0' }),
-      s('stop', { offset: '0.66', 'stop-color': '#070b0c', 'stop-opacity': '0' }),
-      s('stop', { offset: '1', 'stop-color': '#070b0c', 'stop-opacity': '1' })
+      s('stop', { offset: '0', 'stop-color': '#1f2127', 'stop-opacity': '1' }),
+      s('stop', { offset: '0.34', 'stop-color': '#1f2127', 'stop-opacity': '0' }),
+      s('stop', { offset: '0.66', 'stop-color': '#1f2127', 'stop-opacity': '0' }),
+      s('stop', { offset: '1', 'stop-color': '#1f2127', 'stop-opacity': '1' })
     ])
   ]);
 }
@@ -537,7 +537,7 @@ function moduleMechanism(kind, box) {
     for (let i = 0; i < 3; i += 1) {
       stack.appendChild(s('rect', {
         x: cx - 17, y: cy - 16 + i * 11, width: 34, height: 8,
-        fill: 'rgba(114,214,193,0.14)', stroke: 'var(--mineral-teal)',
+        fill: 'rgba(157, 184, 196,0.14)', stroke: 'var(--mineral-teal)',
         'stroke-width': 1, 'vector-effect': 'non-scaling-stroke'
       }));
     }
@@ -1138,7 +1138,7 @@ function buildCore() {
   const plateauY = plot.y + plot.h - (vmax / (vmax * 1.12)) * plot.h;
   tier.appendChild(s('line', {
     class: 'plot-grid', x1: plot.x, y1: plateauY, x2: plot.x + plot.w, y2: plateauY,
-    stroke: 'rgba(114,214,193,0.3)', 'stroke-dasharray': '2 4'
+    stroke: 'rgba(157, 184, 196,0.3)', 'stroke-dasharray': '2 4'
   }));
 
   // axis labels
@@ -1208,7 +1208,7 @@ function buildRecord() {
   }));
   g.appendChild(s('line', {
     x1: box.x + 26, y1: box.y + 68, x2: box.x + box.w - 26, y2: box.y + 68,
-    stroke: 'rgba(22,32,31,0.2)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke'
+    stroke: 'rgba(42, 45, 53,0.2)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke'
   }));
 
   RECORD.lines.forEach((line, i) => {
@@ -1226,7 +1226,7 @@ function buildRecord() {
     }
     g.appendChild(s('line', {
       x1: box.x + 26, y1: y + 8, x2: box.x + box.w - 26, y2: y + 8,
-      stroke: 'rgba(22,32,31,0.1)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke'
+      stroke: 'rgba(42, 45, 53,0.1)', 'stroke-width': 1, 'vector-effect': 'non-scaling-stroke'
     }));
   });
 
@@ -1238,7 +1238,7 @@ function buildRecord() {
   g.appendChild(s('path', { class: 'rec-seal-mark', d: `M ${sx - 6} ${sy} L ${sx} ${sy - 6} L ${sx + 6} ${sy} L ${sx} ${sy + 6} Z` }));
   g.appendChild(s('text', {
     class: 't-micro', x: sx, y: sy + 42, 'text-anchor': 'middle',
-    text: 'ILLUSTRATIVE', fill: 'rgba(22,32,31,0.5)', style: 'font-size:7px'
+    text: 'ILLUSTRATIVE', fill: 'rgba(42, 45, 53,0.5)', style: 'font-size:7px'
   }));
 
   interactive(g, {

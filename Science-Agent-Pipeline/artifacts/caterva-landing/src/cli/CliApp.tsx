@@ -382,7 +382,7 @@ export default function CliApp() {
               <motion.h1
                 initial={{ opacity: 1 }}
                 animate={{ opacity: 1 }}
-                className="hero-heading text-[52px] md:text-[84px] mb-6"
+                className="hero-heading text-[46px] md:text-[64px] mb-7"
               >
                 <StaggeredHero
                   lines={[
@@ -451,8 +451,6 @@ export default function CliApp() {
                     />
                   </svg>
                 </a>
-                <StatsBar />
-                <span className="text-fg/66">&middot;</span>
                 <span className="text-fg/66 hidden sm:inline">
                   <kbd className="px-1.5 rounded border border-fg/[0.12] text-fg/66">
                     {"\u2318K"}

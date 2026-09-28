@@ -488,7 +488,9 @@ export default function InteractiveShell({
               }}
               onKeyDown={onKeyDown}
               onBlur={() => setTimeout(() => setShowHints(false), 150)}
-              autoFocus
+              // No autoFocus: focusing an input scrolls the window to it, and this
+              // shell sits ~1,500px down the page, so every visitor landed mid-page.
+              // A click anywhere in the shell focuses it (onClick above).
               spellCheck={false}
               autoComplete="off"
               className="w-full bg-transparent outline-none text-fg/85 caret-signal placeholder:text-fg/66"

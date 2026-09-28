@@ -1,7 +1,10 @@
 # Caterva
 
 <p align="center">
-  <img src="Logo.png" alt="Caterva" width="440">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/Logo-dark.png">
+    <img src="Logo.png" alt="caterva" width="420">
+  </picture>
 </p>
 
 <p align="center">

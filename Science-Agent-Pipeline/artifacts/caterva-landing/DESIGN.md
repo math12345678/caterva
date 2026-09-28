@@ -1,181 +1,140 @@
 ---
-name: Caterva
-description: A scientific-simulation tool that resolves plain-language questions into literature-cited, verifiable results
+name: caterva
+description: Enzyme kinetics and molecular dynamics, every number cited
 colors:
-  primary-teal: "#1D8A72"
-  primary-teal-deep: "#0D6B5A"
-  info-blue: "#3B82F6"
-  caution-amber: "#F59E0B"
-  experimental-violet: "#8B5CF6"
-  rare-accent-pink: "#EC4899"
-  destructive-red: "#EF4444"
-  bg-void: "#0A0E0C"
-  bg-void-deep: "#050807"
-  neutral-fg: "#E5E7E4"
+  paper: "#FDF8EE"
+  paper-raised: "#F6F0E3"
+  ink: "#2A2D35"
+  signal: "#5D7F8D"
+  signal-deep: "#46626E"
+  caution: "#946522"
+  danger: "#A63D35"
+  muted-ink: "#6A6E78"
+  on-ink-signal: "#9DB8C4"
+  on-ink-caution: "#D9AD6A"
+  on-ink-danger: "#E08A80"
 typography:
   display:
-    fontFamily: "Space Grotesk, system-ui, sans-serif"
-    fontWeight: 500
-    lineHeight: 1.1
-  editorial:
-    fontFamily: "Newsreader, Georgia, serif"
+    fontFamily: "Spectral, Georgia, serif"
+    fontWeight: 300
+    lineHeight: 0.98
+  wordmark:
+    fontFamily: "Spectral, Georgia, serif"
     fontWeight: 400
-    lineHeight: 1.3
+    letterSpacing: "0.32em"
   body:
-    fontFamily: "Space Grotesk, system-ui, sans-serif"
-    fontSize: "13px"
+    fontFamily: "Atkinson Hyperlegible Next, system-ui, sans-serif"
+    fontSize: "15px"
     fontWeight: 400
-    lineHeight: 1.5
+    lineHeight: 1.6
   code:
     fontFamily: "DM Mono, Cascadia Code, monospace"
-    fontSize: "11px"
+    fontSize: "13px"
     fontWeight: 400
 rounded:
-  none: "0px"
+  slab: "8px"
 components:
   terminal-window:
-    backgroundColor: "{colors.bg-void}"
-    rounded: "{rounded.none}"
-    padding: "16px"
-  section-label:
-    textColor: "{colors.primary-teal}"
-    typography: "{typography.code}"
+    backgroundColor: "{colors.ink}"
+    textColor: "{colors.paper}"
+    rounded: "{rounded.slab}"
+  section-header:
+    textColor: "{colors.ink}"
+    typography: "{typography.display}"
   badge-live:
-    backgroundColor: "{colors.primary-teal}"
-    textColor: "{colors.bg-void}"
+    backgroundColor: "{colors.signal}"
+    textColor: "{colors.paper}"
 ---
 
-# Design System: Caterva
+# Design System: caterva
 
 ## 1. Overview
 
-**Creative north star: The Lab Terminal.** Not a dashboard, not a SaaS
-funnel — a real terminal window a scientist would actually open, showing
-real commands, real output, real citations. Every section frames its
-content as a `$ caterva <command>` invocation inside a `TerminalWindow`,
-which is the system's one recurring structural device instead of the
-generic "card grid."
+**The mark sets the rule.** caterva's logo is a C of eight dots on paper:
+seven ink, one signal. The page is built the same way. Paper is the
+ground; ink carries the text and the few solid shapes; signal marks the
+one thing in a view that matters (a verified value, a cited number, a live
+capability), and it stays as rare as that one dot.
 
-The mood is a well-run lab bench at night: dark, quiet, precise, nothing
-wasted. Sharp corners everywhere (`radius: 0`) reinforce "instrument," not
-"app." Motion is subdued and functional (reveal-on-scroll, count-up
-stats, gentle hover states), never decorative or attention-grabbing —
-this audience distrusts flash.
+**Scene.** A principal investigator deciding whether to adopt this, on a
+laptop in a daylit office between meetings, reading the page the way they
+read a methods section. That forces a light, printed-paper ground rather
+than a dark console, and a calm, unhurried pace.
 
-Explicitly not: gradient-text logos, glassmorphic hero cards, countdown
-urgency, "trusted by" logo walls, or anything that would make a skeptical
-academic reviewer's first reaction be "this is overselling something."
-The typography mixes a technical sans (Space Grotesk) and monospace (DM
-Mono) for the terminal register with a literary serif (Newsreader) used
-sparingly for a handful of longer-form, editorial moments — the serif is
-the one place the design allows itself to feel unhurried and read like
-a paper abstract rather than a product screen.
+**The one solid shape.** Terminal windows, the playground and every
+command's output are *ink slabs*: solid `#2A2D35` blocks on paper, the way
+the dots are. They keep the "built by people who write the code" signal
+the audience respects, and they are the only heavy shapes on the page, so
+the eye lands where the evidence is.
 
-## 2. Colors: The Instrument Panel
+Explicitly not: glows, blurred colour blobs, gradient text, glass panels,
+drifting particle backgrounds, word-by-word entrance animations, or
+anything that would make a skeptical academic reviewer's first reaction be
+"this is overselling something." All of these existed in the dark system
+and were removed with it.
 
-The background is not black — `hsl(160 40% 3.5%)`, a near-black tinted
-toward the primary teal hue, per the project's own CSS custom properties
-(`src/index.css`). Every neutral in the system carries that same green
-tint rather than sitting at true gray or true black.
+## 2. Colour
 
-- **Primary — Teal (`#1D8A72`)**: the identity color. Verified/live
-  status, the `$` prompt, primary actions, "this is true and checked."
-  Used at high frequency (the single most common accent color in the
-  codebase) — it should read as *the* Caterva color, the way a lab's
-  safety-green reads as "go."
-- **Info — Blue (`#3B82F6`)**: system/architecture context — status,
-  metrics, structural information. Cooler and more neutral than teal on
-  purpose: this is "here is a fact," not "here is a result."
-- **Caution — Amber (`#F59E0B`)**: money, warnings, flagged values,
-  anything the user should read twice before trusting (an unverified
-  default, a pricing tier, a plausibility-bound flag).
-- **Experimental — Violet (`#8B5CF6`)**: people, community, roadmap,
-  forward-looking or exploratory content — the one color reserved for
-  "not yet settled science."
-- **Destructive — Red (`#EF4444`)**: failure states only. Used sparingly
-  and never decoratively.
-- **Rare accent — Pink (`#EC4899`)**: a single specific domain marker
-  (population genetics) in the Roadmap list. Not a general-purpose fifth
-  color; don't reach for it casually.
+Tokens are CSS variables (`--fg`, `--surface`, `--signal`, `--caution`,
+`--danger`, `--muted-ink`) exposed to Tailwind as `fg`, `surface`,
+`signal`, `caution`, `danger`, `muted`. Inside `.ink-surface` they flip, so
+the same class reads correctly on paper and on an ink slab:
 
-Each landing-page section already carries one of these as a subtle
-background tint (`.section-bg-teal/blue/amber/purple`) to differentiate
-long-scroll sections without adding chrome. Keep new sections mapped to
-the semantic role above, not chosen for visual variety alone.
+| token | on paper | on ink | role |
+|---|---|---|---|
+| `fg` | ink `#2A2D35` | paper `#FDF8EE` | text, rules, solid shapes |
+| `surface` | paper `#FDF8EE` | ink `#2A2D35` | the ground |
+| `signal` | `#5D7F8D` | `#9DB8C4` | verified, cited, live, the primary action |
+| `caution` | `#946522` | `#D9AD6A` | read twice: a default, a flag, money |
+| `danger` | `#A63D35` | `#E08A80` | failure only |
+| `muted` | `#6A6E78` | `#A9ACB3` | secondary marks, never meaning on its own |
+
+**Contrast floor.** Text is never lighter than `text-fg/66` (about 4.5:1 on
+paper). The scale in use is three tiers: 66 (tertiary), 70-76 (secondary),
+80+ (primary); hierarchy beyond that comes from size and weight.
 
 ## 3. Typography
 
-Three families, each with a distinct job — this is a "full palette"
-typographic strategy, not a single default:
-
-- **Space Grotesk** (sans): the workhorse. All UI chrome, labels, body
-  copy, headings. Geometric and slightly technical without being cold.
-- **DM Mono** (monospace): the terminal register. Every `$ command`,
-  every code block, every piece of output that should read as "real
-  machine output," every numeric readout (`tabular-nums`).
-- **Newsreader** (serif, optically sized `6..72`): used sparingly for
-  the handful of places the page wants to read like a paper or an essay
-  rather than a tool — long-form claims, not UI labels. If a new section
-  is mostly prose making an argument, this is the family to reach for;
-  if it's showing a result or a control, it isn't.
-
-Scale contrast comes from size + weight, not a single flat 14px-everywhere
-system — section headers, terminal body text, and micro-labels (10-11px
-uppercase tracked-wide) are all visually distinct tiers.
+- **Spectral** Light for the display headline and section headers, Regular
+  for the wordmark (lowercase, tracked 0.32 em). A restrained transitional
+  serif, close to the drawing of the logo's wordmark.
+- **Atkinson Hyperlegible Next** for body and UI text: designed for
+  legibility, which suits readers who check every figure.
+- **DM Mono** for every command, flag and output line.
 
 ## 4. Elevation
 
-Flat by design, not layered. There is no shadow vocabulary to speak of —
-depth comes from `border-white/[0.04-0.08]` hairlines and very low-opacity
-white overlays (`bg-white/[0.01-0.03]`) instead of drop shadows. This is
-correct for the "instrument panel" mood: a real terminal doesn't cast a
-shadow on itself. The one exception is the `glow` prop on `TerminalWindow`,
-a soft `box-shadow` in the teal primary used deliberately, and sparingly,
-to mark the terminal that currently has the user's attention — not a
-default treatment for every panel.
+Flat. Depth comes from the ink slabs and from hairline rules
+(`border-fg/[0.08-0.12]`), not shadows. No glows.
 
 ## 5. Components
 
-- **TerminalWindow**: the system's one true "card." A dark
-  (`bg-[#0A0E0C]`) panel with a faux title bar (three dots + a `path`
-  breadcrumb) and sharp corners. Every section's primary content lives
-  inside one of these rather than a generic rounded card — this is the
-  component that IS the brand.
-- **Section label + rule**: every section opens with a small monospace
-  label in that section's accent color (`text-[11px] font-mono`) followed
-  by a thin gradient rule fading to transparent. Cheap, consistent,
-  reinforces "instrument readout" over "marketing header."
-- **Status badges**: colored dot + short uppercase label, color carries
-  the same semantic meaning as the palette above (teal = live/true, amber
-  = caution, never color alone — always paired with a text label).
-- **Buttons**: sharp corners, low-opacity tinted background
-  (`bg-[color]/[0.06-0.14]`) with a matching low-opacity border, text in
-  the full-strength accent color. No solid-fill primary buttons; even the
-  "featured" pricing CTA stays in this tinted-outline register rather
-  than becoming a filled button. Restraint here is intentional: a solid
-  block of saturated color would break the instrument-panel mood.
-- **Inputs**: dark, low-opacity background, hairline border, teal focus
-  ring/shadow. No visible chrome beyond that.
+- **Mark / Lockup** (`src/components/brand/Mark.tsx`): the measured dot
+  geometry. Ink follows `currentColor`; the signal dot follows `--signal`.
+  Use it in the header, the footer and anywhere the brand appears; never
+  redraw the dots.
+- **TerminalWindow**: an `.ink-surface` slab with a title bar of three dots,
+  the last one signal, echoing the mark.
+- **Section label + rule**: a small monospace number or label, a hairline,
+  then a Spectral header in solid ink.
+- **Status**: dot plus text label, colour carrying the semantic role above
+  and never the meaning on its own.
+- **Buttons**: tinted outline in the role's colour; a solid fill only where
+  a single action must lead, with paper text on it.
 
 ## 6. Do's and Don'ts
 
 **Do:**
-- Frame new content as a real, plausible terminal invocation and output.
-- Keep every color choice mapped to the semantic roles in Section 2.
-- Use sharp corners (`radius: 0`) everywhere; this is load-bearing for
-  the aesthetic, not an oversight to "fix."
-- Pair every color-coded status with a text label.
-- Reach for the serif only for prose that argues something, never for UI.
+- Keep signal rare. If more than about one element in eight is signal, one
+  of them is not the thing that matters.
+- Put evidence in ink slabs; keep everything else light.
+- Derive every number from its source (test counts from `testResults.ts`,
+  capabilities from `lib/domains.ts`), never retype it.
+- Pair every colour-coded status with a text label.
 
 **Don't:**
-- Introduce a new accent color without a semantic reason (see Section 2).
-- Use a solid-filled, high-saturation button. Stay in the tinted-outline
-  register established across every CTA on the page.
-- Add drop shadows or glassmorphism as a default card treatment; flat +
-  hairline borders is the system, `glow` is the rare exception.
-- Add a hero-metric template (big number / small label / gradient
-  accent) — the existing terminal-framed stat rows already do this job
-  without the cliché.
-- Claim anything the codebase can't currently back with a real number,
-  a real citation, or a real test count. This is not a style rule so
-  much as the whole point of the product; treat it as one anyway.
+- Add glows, blurs, gradients, particle fields or entrance choreography.
+- Put body text below the contrast floor to make it "subtle".
+- Introduce a colour without a role from Section 2.
+- Claim anything the codebase cannot back with a real number, citation
+  or test.

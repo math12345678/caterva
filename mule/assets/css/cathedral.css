@@ -122,8 +122,8 @@
 
 .cath-svg .hair { stroke: var(--line-hairline); stroke-width: 1; fill: none; vector-effect: non-scaling-stroke; }
 .cath-svg .struct { stroke: var(--line-structural); stroke-width: 1; fill: none; vector-effect: non-scaling-stroke; }
-.cath-svg .plate { fill: rgba(13, 20, 21, 0.62); }
-.cath-svg .plate-deep { fill: rgba(7, 11, 12, 0.86); }
+.cath-svg .plate { fill: rgba(42, 45, 53, 0.62); }
+.cath-svg .plate-deep { fill: rgba(31, 33, 39, 0.86); }
 
 /* ============================================================
    DISTANT STRUCTURE — the depth layer
@@ -137,13 +137,13 @@
    ============================================================ */
 .distant { pointer-events: none; }
 .distant-line {
-  stroke: rgba(184, 222, 213, 0.14);
+  stroke: rgba(213, 225, 230, 0.14);
   stroke-width: 1;
   fill: none;
   vector-effect: non-scaling-stroke;
 }
-.distant-arcs .distant-line { stroke: rgba(184, 222, 213, 0.1); }
-.distant-datum .distant-line { stroke: rgba(184, 222, 213, 0.06); }
+.distant-arcs .distant-line { stroke: rgba(213, 225, 230, 0.1); }
+.distant-datum .distant-line { stroke: rgba(213, 225, 230, 0.06); }
 
 /* Sheet annotation in the margins. The wide shot is an elevation drawing:
    the monument is portrait and the screen is landscape, so the lateral space
@@ -152,11 +152,11 @@
   font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.2em;
-  fill: rgba(184, 222, 213, 0.26);
+  fill: rgba(213, 225, 230, 0.26);
   pointer-events: none;
 }
 .sheet-rule {
-  stroke: rgba(184, 222, 213, 0.16);
+  stroke: rgba(213, 225, 230, 0.16);
   stroke-width: 1;
   fill: none;
   vector-effect: non-scaling-stroke;
@@ -179,7 +179,7 @@
 /* The axis is assembled from walls and bracing, so it reads as structure
    carrying load rather than a line connecting boxes. */
 .spine-wall {
-  stroke: rgba(184, 222, 213, 0.1);
+  stroke: rgba(213, 225, 230, 0.1);
   stroke-width: 1;
   fill: none;
   vector-effect: non-scaling-stroke;
@@ -240,14 +240,14 @@
 .node-recess { pointer-events: none; }
 .node-grate { opacity: 0.5; pointer-events: none; }
 .node-liner {
-  stroke: rgba(184, 222, 213, 0.07);
+  stroke: rgba(213, 225, 230, 0.07);
   stroke-width: 1;
   fill: none;
   vector-effect: non-scaling-stroke;
   transition: stroke var(--dur-slow) var(--ease-structural);
 }
 .node[data-state="active"] .node-liner,
-.node[data-state="locked"] .node-liner { stroke: rgba(114, 214, 193, 0.22); }
+.node[data-state="locked"] .node-liner { stroke: rgba(157, 184, 196, 0.22); }
 
 /* Engraved metadata. Machine marks: coordinates, tier and datum references.
    Held near-invisible until the camera is close, so the close scale is where
@@ -256,7 +256,7 @@
   font-family: var(--font-mono);
   font-size: 5.4px;
   letter-spacing: 0.18em;
-  fill: rgba(184, 222, 213, 0.3);
+  fill: rgba(213, 225, 230, 0.3);
   pointer-events: none;
   opacity: 0;
   transition: opacity var(--dur-slow) var(--ease-glide);
@@ -269,13 +269,13 @@
   transition: opacity var(--dur-base) var(--ease-structural) var(--d, 0ms);
 }
 .concept-plate {
-  fill: rgba(29, 138, 114, 0.1);
-  stroke: rgba(114, 214, 193, 0.34);
+  fill: rgba(93, 127, 141, 0.1);
+  stroke: rgba(157, 184, 196, 0.34);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
 .concept-text { fill: var(--mineral-teal); }
-.concept-riser { stroke: rgba(114, 214, 193, 0.3); }
+.concept-riser { stroke: rgba(157, 184, 196, 0.3); }
 .cath-svg.is-parsed .concept { opacity: 1; }
 
 /* dormant state: quiet gray = waiting or unavailable */
@@ -284,11 +284,11 @@
 /* active: teal activation */
 .node[data-state="active"] .node-shell,
 .node[data-state="locked"] .node-shell {
-  fill: rgba(29, 138, 114, 0.13);
+  fill: rgba(93, 127, 141, 0.13);
   stroke: var(--signal-teal);
 }
 .node[data-state="active"] .node-inner,
-.node[data-state="locked"] .node-inner { stroke: rgba(114, 214, 193, 0.4); }
+.node[data-state="locked"] .node-inner { stroke: rgba(157, 184, 196, 0.4); }
 .node[data-state="active"] .node-label,
 .node[data-state="locked"] .node-label { fill: var(--mineral-teal); }
 .node[data-state="active"] .node-out,
@@ -447,16 +447,16 @@
 }
 .evidence.is-live { opacity: 1; }
 .evidence .ev-body {
-  fill: rgba(29, 138, 114, 0.16);
+  fill: rgba(93, 127, 141, 0.16);
   stroke: var(--mineral-teal);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
   transition: fill var(--dur-base) var(--ease-glide), stroke var(--dur-base) var(--ease-glide);
 }
 .evidence .ev-tag { fill: var(--fog-teal); }
-.evidence:hover .ev-body { fill: rgba(49, 184, 148, 0.34); }
+.evidence:hover .ev-body { fill: rgba(127, 157, 171, 0.34); }
 .evidence.is-docked .ev-body {
-  fill: rgba(29, 138, 114, 0.26);
+  fill: rgba(93, 127, 141, 0.26);
   stroke: var(--signal-teal);
 }
 
@@ -533,9 +533,9 @@
   vector-effect: non-scaling-stroke;
   transition: stroke var(--dur-base) var(--ease-glide), fill var(--dur-base) var(--ease-glide);
 }
-.berth[data-status="supported"] .param-plate { stroke: rgba(49, 184, 148, 0.62); }
-.berth[data-status="review"] .param-plate { stroke: rgba(216, 167, 67, 0.72); }
-.berth[data-status="user"] .param-plate { stroke: rgba(184, 222, 213, 0.42); }
+.berth[data-status="supported"] .param-plate { stroke: rgba(127, 157, 171, 0.62); }
+.berth[data-status="review"] .param-plate { stroke: rgba(217, 173, 106, 0.72); }
+.berth[data-status="user"] .param-plate { stroke: rgba(213, 225, 230, 0.42); }
 .berth:hover .param-plate { fill: rgba(43, 58, 58, 0.9); }
 
 .berth .status-glyph { font-size: 8px; letter-spacing: 0; }
@@ -576,9 +576,9 @@
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
 }
-.is-verifying .vault-ring { stroke: rgba(114, 214, 193, 0.42); }
-.is-verified .vault-ring { stroke: rgba(49, 184, 148, 0.6); }
-.is-verified .vault-facet { stroke: rgba(114, 214, 193, 0.24); }
+.is-verifying .vault-ring { stroke: rgba(157, 184, 196, 0.42); }
+.is-verified .vault-ring { stroke: rgba(127, 157, 171, 0.6); }
+.is-verified .vault-facet { stroke: rgba(157, 184, 196, 0.24); }
 
 .vault-shell {
   fill: url(#vaultDepth);
@@ -599,7 +599,7 @@
 /* --- sentinels --- */
 .sentinel { cursor: pointer; }
 .sentinel .sent-shell {
-  fill: rgba(13, 20, 21, 0.78);
+  fill: rgba(42, 45, 53, 0.78);
   stroke: var(--structural-slate);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
@@ -621,13 +621,13 @@
 .sentinel[data-state="resolved"] .sent-bounce,
 .sentinel[data-state="review"] .sent-bounce { opacity: 1; }
 
-.sentinel[data-state="scanning"] .sent-shell { stroke: var(--mineral-teal); fill: rgba(29, 138, 114, 0.1); }
+.sentinel[data-state="scanning"] .sent-shell { stroke: var(--mineral-teal); fill: rgba(93, 127, 141, 0.1); }
 .sentinel[data-state="scanning"] .sent-eye { fill: var(--mineral-teal); animation: eye-pulse 1.1s var(--ease-glide) infinite; }
-.sentinel[data-state="resolved"] .sent-shell { stroke: var(--signal-teal); fill: rgba(29, 138, 114, 0.14); }
+.sentinel[data-state="resolved"] .sent-shell { stroke: var(--signal-teal); fill: rgba(93, 127, 141, 0.14); }
 .sentinel[data-state="resolved"] .sent-label { fill: var(--mineral-teal); }
 .sentinel[data-state="resolved"] .sent-eye { fill: var(--signal-teal); }
 .sentinel[data-state="resolved"] .sent-result { opacity: 1; }
-.sentinel[data-state="review"] .sent-shell { stroke: var(--status-review); fill: rgba(216, 167, 67, 0.09); }
+.sentinel[data-state="review"] .sent-shell { stroke: var(--status-review); fill: rgba(217, 173, 106, 0.09); }
 .sentinel[data-state="review"] .sent-label { fill: var(--status-review); }
 .sentinel[data-state="review"] .sent-eye { fill: var(--status-review); }
 .sentinel[data-state="review"] .sent-result { opacity: 1; }
@@ -685,7 +685,7 @@
 .fracture-flag { opacity: 0; transition: opacity 800ms var(--ease-glide) 600ms; }
 .is-critiqued .fracture-flag { opacity: 1; }
 .fracture-flag .flag-plate {
-  fill: rgba(7, 11, 12, 0.92);
+  fill: rgba(31, 33, 39, 0.92);
   stroke: var(--status-review);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
@@ -697,13 +697,13 @@
    SIMULATION CORE — illustrative curve
    ============================================================ */
 .core-chamber .chamber-shell {
-  fill: rgba(7, 11, 12, 0.94);
+  fill: rgba(31, 33, 39, 0.94);
   stroke: var(--structural-slate);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
   transition: stroke var(--dur-slow) var(--ease-structural);
 }
-.is-executed .core-chamber .chamber-shell { stroke: rgba(49, 184, 148, 0.5); }
+.is-executed .core-chamber .chamber-shell { stroke: rgba(127, 157, 171, 0.5); }
 .core-chamber { cursor: pointer; }
 
 .plot-axis {
@@ -726,8 +726,8 @@
    of checking rather than a band appearing: something is being passed over the
    result and compared, and the structure only locks once it completes. */
 .plot-envelope {
-  fill: rgba(49, 184, 148, 0.09);
-  stroke: rgba(114, 214, 193, 0.34);
+  fill: rgba(127, 157, 171, 0.09);
+  stroke: rgba(157, 184, 196, 0.34);
   stroke-width: 1;
   stroke-dasharray: 3 3;
   vector-effect: non-scaling-stroke;
@@ -778,7 +778,7 @@
 /* The envelope bound lines draw on, so the region is constructed, not stamped. */
 .plot-bound {
   fill: none;
-  stroke: rgba(114, 214, 193, 0.42);
+  stroke: rgba(157, 184, 196, 0.42);
   stroke-width: 1;
   stroke-dasharray: var(--len) var(--len);
   stroke-dashoffset: var(--len);
@@ -840,7 +840,7 @@
 }
 .is-released .record { opacity: 1; transform: none; }
 .record .rec-plate { fill: var(--archive-paper); }
-.record .rec-edge { fill: none; stroke: rgba(22, 32, 31, 0.24); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.record .rec-edge { fill: none; stroke: rgba(42, 45, 53, 0.24); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .record text { fill: var(--archive-ink-soft); }
 .record .rec-title { fill: var(--archive-ink); }
 .record .rec-num { fill: var(--archive-ink); font-size: 15px; letter-spacing: 0; }
@@ -850,14 +850,14 @@
 .record .halo { stroke: var(--deep-teal); }
 
 /* perforated tear edge where the record leaves the machine */
-.record .rec-perf { stroke: rgba(22, 32, 31, 0.3); stroke-width: 1; stroke-dasharray: 2 5; vector-effect: non-scaling-stroke; }
+.record .rec-perf { stroke: rgba(42, 45, 53, 0.3); stroke-width: 1; stroke-dasharray: 2 5; vector-effect: non-scaling-stroke; }
 
 /* SENTINEL 04's registration marks: the record squared to a grid as it is
    composed. They appear with polish and fade once the plate is released,
    because a finished record does not carry its own crop marks. */
 .rec-reg-mark {
   fill: none;
-  stroke: rgba(114, 214, 193, 0.45);
+  stroke: rgba(157, 184, 196, 0.45);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
   opacity: 0;
@@ -962,7 +962,7 @@
 .ctrl {
   padding: 0.62em 1.05em;
   border: 1px solid var(--line-hairline);
-  background: rgba(7, 11, 12, 0.7);
+  background: rgba(31, 33, 39, 0.7);
   backdrop-filter: blur(6px);
   font-family: var(--font-mono);
   font-size: var(--step--2);
@@ -999,7 +999,7 @@
   flex-wrap: wrap;
   gap: 1px;
   border: 1px solid var(--line-hairline);
-  background: rgba(7, 11, 12, 0.72);
+  background: rgba(31, 33, 39, 0.72);
   backdrop-filter: blur(6px);
 }
 .tier-btn {
@@ -1036,7 +1036,7 @@
   gap: 0.75rem;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--line-hairline);
-  background: rgba(7, 11, 12, 0.82);
+  background: rgba(31, 33, 39, 0.82);
   backdrop-filter: blur(8px);
 }
 .journey__step {
