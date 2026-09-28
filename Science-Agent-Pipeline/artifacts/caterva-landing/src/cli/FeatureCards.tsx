@@ -33,14 +33,14 @@ export default function FeatureCards() {
   return (
     <section className="max-w-3xl mx-auto px-4 md:px-6 py-10">
       <Reveal>
-        <div className="flex items-center gap-3 text-[10px] text-white/15 uppercase tracking-widest mb-6">
-          <span className="w-5 h-px bg-white/[0.06]" />
+        <div className="flex items-center gap-3 text-[10px] text-fg/66 uppercase tracking-widest mb-6">
+          <span className="w-5 h-px bg-fg/[0.06]" />
           <span>features</span>
-          <span className="flex-1 h-px bg-white/[0.06]" />
+          <span className="flex-1 h-px bg-fg/[0.06]" />
         </div>
         <TerminalWindow path="~ — caterva features --list">
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span> caterva features --list
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span> caterva features --list
           </div>
           <div className="space-y-0">
             {FEATURES.map((f, i) => (
@@ -54,21 +54,21 @@ export default function FeatureCards() {
                   delay: i * 0.06,
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                className="group flex gap-4 py-3 border-b border-white/[0.03] last:border-0"
+                className="group flex gap-4 py-3 border-b border-fg/[0.06] last:border-0"
               >
-                <div className="shrink-0 w-8 h-8 rounded-lg bg-white/[0.03] border border-white/[0.05] flex items-center justify-center text-[14px] text-white/40 group-hover:text-[#1D8A72] group-hover:border-[#1D8A72]/20 transition-all duration-300">
+                <div className="shrink-0 w-8 h-8 rounded-lg bg-fg/[0.03] border border-fg/[0.10] flex items-center justify-center text-[14px] text-fg/70 group-hover:text-signal group-hover:border-signal/20 transition-all duration-300">
                   {f.icon}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[10px] text-white/15 font-mono">
+                    <span className="text-[10px] text-fg/66 font-mono">
                       {f.step}
                     </span>
-                    <span className="text-[13px] text-white/80 font-sans font-medium group-hover:text-white transition-colors">
+                    <span className="text-[13px] text-fg/85 font-sans font-medium group-hover:text-fg transition-colors">
                       {f.title}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/50 leading-relaxed">
+                  <p className="text-[11px] text-fg/76 leading-relaxed">
                     {f.desc}
                   </p>
                 </div>

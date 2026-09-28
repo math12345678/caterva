@@ -35,7 +35,7 @@
   width: min(150vw, 1800px);
   aspect-ratio: 1;
   translate: -50% -50%;
-  background: radial-gradient(circle, rgba(29, 138, 114, 0.13) 0%, rgba(29, 138, 114, 0.04) 34%, transparent 68%);
+  background: radial-gradient(circle, rgba(93, 127, 141, 0.13) 0%, rgba(93, 127, 141, 0.04) 34%, transparent 68%);
 }
 .void__axis {
   position: absolute;
@@ -106,12 +106,12 @@
   padding: clamp(1rem, 2.2vw, 1.6rem) clamp(1.1rem, 2.6vw, 2rem);
   border: 1px solid var(--line-structural);
   background:
-    linear-gradient(to bottom, rgba(23, 35, 36, 0.5), rgba(7, 11, 12, 0.2));
+    linear-gradient(to bottom, rgba(23, 35, 36, 0.5), rgba(31, 33, 39, 0.2));
   transition: border-color var(--dur-base) var(--ease-glide), background var(--dur-base) var(--ease-glide);
 }
 .terminal__field:focus-within {
-  border-color: rgba(114, 214, 193, 0.55);
-  background: linear-gradient(to bottom, rgba(23, 35, 36, 0.78), rgba(7, 11, 12, 0.3));
+  border-color: rgba(157, 184, 196, 0.55);
+  background: linear-gradient(to bottom, rgba(23, 35, 36, 0.78), rgba(31, 33, 39, 0.3));
 }
 
 /* internal coordinate guides */

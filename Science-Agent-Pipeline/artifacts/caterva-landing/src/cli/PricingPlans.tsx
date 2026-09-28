@@ -16,8 +16,8 @@ const PLANS = [
       "Community support",
     ],
     cta: "Get Started",
-    gradient: "from-[#1D8A72]/10 to-transparent",
-    border: "hover:border-[#1D8A72]/25",
+    gradient: "from-signal/10 to-transparent",
+    border: "hover:border-signal/25",
     featured: false,
   },
   {
@@ -34,8 +34,8 @@ const PLANS = [
       "Classroom dashboard (beta)",
     ],
     cta: "Join Waitlist",
-    gradient: "from-[#F59E0B]/10 to-transparent",
-    border: "hover:border-[#F59E0B]/30",
+    gradient: "from-caution/10 to-transparent",
+    border: "hover:border-caution/30",
     featured: true,
     badge: "Recommended",
   },
@@ -54,8 +54,8 @@ const PLANS = [
       "Batch simulation API",
     ],
     cta: "Contact Us",
-    gradient: "from-[#8B5CF6]/10 to-transparent",
-    border: "hover:border-[#8B5CF6]/25",
+    gradient: "from-muted/10 to-transparent",
+    border: "hover:border-muted/25",
     featured: false,
   },
 ];
@@ -68,19 +68,19 @@ export default function PricingPlans() {
     >
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#F59E0B] text-[11px] font-mono font-medium">
+          <span className="text-caution text-[11px] font-mono font-medium">
             PRICING
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-caution/20 to-transparent" />
         </div>
         <h2 className="section-header">Simple, transparent pricing</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
           Start free. Upgrade when your lab needs more.
         </p>
 
         <TerminalWindow path="~ — caterva pricing --list" glow>
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span> caterva pricing --list
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span> caterva pricing --list
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -102,18 +102,18 @@ export default function PricingPlans() {
                 )}
 
                 <div className="mb-4">
-                  <h3 className="text-[14px] font-sans font-medium text-white/80 mb-1">
+                  <h3 className="text-[14px] font-sans font-medium text-fg/85 mb-1">
                     {plan.name}
                   </h3>
                   <div className="flex items-baseline gap-1">
-                    <span className="text-[28px] font-mono font-medium text-white/90">
+                    <span className="text-[28px] font-mono font-medium text-fg/92">
                       {plan.price}
                     </span>
-                    <span className="text-[11px] text-white/30">
+                    <span className="text-[11px] text-fg/70">
                       {plan.period}
                     </span>
                   </div>
-                  <p className="text-[11px] text-white/50 mt-2 leading-relaxed">
+                  <p className="text-[11px] text-fg/76 mt-2 leading-relaxed">
                     {plan.desc}
                   </p>
                 </div>
@@ -122,10 +122,10 @@ export default function PricingPlans() {
                   {plan.features.map((f) => (
                     <li
                       key={f}
-                      className="flex items-start gap-2 text-[11px] text-white/40"
+                      className="flex items-start gap-2 text-[11px] text-fg/70"
                     >
                       <svg
-                        className="w-3.5 h-3.5 mt-0.5 shrink-0 text-[#1D8A72]"
+                        className="w-3.5 h-3.5 mt-0.5 shrink-0 text-signal"
                         viewBox="0 0 14 14"
                         fill="none"
                       >
@@ -146,8 +146,8 @@ export default function PricingPlans() {
                   href="#waitlist"
                   className={`block w-full text-center rounded-lg border py-2.5 text-[12px] font-medium transition-all duration-300 ${
                     plan.featured
-                      ? "border-[#F59E0B]/30 bg-[#F59E0B]/[0.08] text-[#F59E0B] hover:bg-[#F59E0B]/[0.14] hover:shadow-[0_0_30px_rgba(245,158,11,0.15)]"
-                      : "border-white/[0.08] text-white/40 hover:text-white/70 hover:border-white/[0.15] bg-white/[0.02]"
+                      ? "border-caution/30 bg-caution/[0.08] text-caution hover:bg-caution/[0.14]"
+                      : "border-fg/[0.16] text-fg/70 hover:text-fg/78 hover:border-fg/[0.30] bg-fg/[0.02]"
                   }`}
                 >
                   {plan.cta}
@@ -156,16 +156,16 @@ export default function PricingPlans() {
             ))}
           </div>
 
-          <p className="text-[10px] text-white/20 mt-6 text-center leading-relaxed">
+          <p className="text-[10px] text-fg/66 mt-6 text-center leading-relaxed">
             All plans include full provenance tracing. No hidden fees. Cancel
             anytime.
             <br />
-            <span className="text-white/15">
+            <span className="text-fg/66">
               Educational discounts available —{" "}
             </span>
             <a
               href="mailto:admin.terrium@gmail.com"
-              className="text-[#1D8A72]/60 hover:text-[#1D8A72] transition-colors"
+              className="text-signal/60 hover:text-signal transition-colors"
             >
               contact us
             </a>

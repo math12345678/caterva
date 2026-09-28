@@ -58,30 +58,30 @@ export default function FAQSection() {
     >
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#3B82F6] text-[11px] font-mono font-medium">
+          <span className="text-muted text-[11px] font-mono font-medium">
             FAQ
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-muted/20 to-transparent" />
         </div>
         <h2 className="section-header">Frequently asked questions</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
           Everything you need to know about verified scientific simulation.
         </p>
 
         <TerminalWindow path="~ — caterva faq" glow>
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span> caterva faq --all
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span> caterva faq --all
           </div>
           <Accordion
             type="single"
             collapsible
-            className="divide-y divide-white/[0.04]"
+            className="divide-y divide-fg/[0.04]"
           >
             {FAQS.map((faq, i) => (
               <AccordionItem key={faq.id} value={faq.id} className="py-1">
                 <AccordionTrigger className="faq-trigger group">
                   <span className="flex items-center gap-3">
-                    <span className="text-[10px] text-white/15 font-mono tabular-nums w-5 text-right shrink-0">
+                    <span className="text-[10px] text-fg/66 font-mono tabular-nums w-5 text-right shrink-0">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span>{faq.q}</span>

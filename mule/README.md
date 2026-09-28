@@ -9,6 +9,14 @@ repository, `mule`.
 | `assets/` | images and styles it references |
 | `_shots/` | screenshots used on the page |
 
+## Merged into the main site
+
+Since 2026-09-28 these chapters also run inside the main site
+(`Science-Agent-Pipeline/artifacts/caterva-landing/src/mule/`), scoped and
+with current content: the real LDH Km in place of the illustrative 0.42,
+today's runtimes, and a re-recorded transcript. This standalone copy still
+ships as the MuleRun listing; change content in both, or retire this one.
+
 ## Running it
 
 Open `index.html` in a browser, or serve the directory:

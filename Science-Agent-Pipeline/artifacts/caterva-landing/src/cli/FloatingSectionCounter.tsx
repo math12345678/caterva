@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_ITEMS = [
-  "how",
+  "system",
+  "microscope",
   "examples",
   "playground",
   "compare",
@@ -95,26 +96,26 @@ export default function FloatingSectionCounter() {
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 hidden md:block"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-white/[0.06] bg-[#0A0E0C]/90 backdrop-blur-md px-3.5 py-1.5 shadow-lg shadow-black/30">
+          <div className="inline-flex items-center gap-2 rounded-full border border-fg/[0.12] bg-surface/90 backdrop-blur-md px-3.5 py-1.5 shadow-lg shadow-surface/30">
             <motion.span
               key={index}
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-[10px] text-white/30 font-mono tabular-nums"
+              className="text-[10px] text-fg/70 font-mono tabular-nums"
             >
               {String(index + 1).padStart(2, "0")}
             </motion.span>
-            <span className="w-px h-3 bg-white/[0.06]" />
+            <span className="w-px h-3 bg-fg/[0.06]" />
             <motion.span
               key={label}
               initial={{ opacity: 0, x: -4 }}
               animate={{ opacity: 1, x: 0 }}
-              className="text-[10px] text-white/50 font-mono uppercase tracking-wider"
+              className="text-[10px] text-fg/76 font-mono uppercase tracking-wider"
             >
               {label}
             </motion.span>
-            <span className="w-px h-3 bg-white/[0.06]" />
-            <span className="text-[10px] text-white/15 font-mono">
+            <span className="w-px h-3 bg-fg/[0.06]" />
+            <span className="text-[10px] text-fg/66 font-mono">
               / {NAV_ITEMS.length}
             </span>
           </div>

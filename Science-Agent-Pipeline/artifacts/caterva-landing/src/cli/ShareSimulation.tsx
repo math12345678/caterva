@@ -196,7 +196,7 @@ export default function ShareSimulation({
     >
       <motion.button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] px-3 py-1.5 text-[11px] text-white/40 hover:text-[#1D8A72] hover:border-[#1D8A72]/25 hover:bg-[#1D8A72]/[0.04] transition-all duration-300"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-fg/[0.16] bg-fg/[0.02] px-3 py-1.5 text-[11px] text-fg/70 hover:text-signal hover:border-signal/25 hover:bg-signal/[0.04] transition-all duration-300"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
         aria-label="Share simulation"
@@ -213,15 +213,15 @@ export default function ShareSimulation({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-            className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-white/[0.08] bg-[#0d1311] p-4 shadow-2xl z-50 backdrop-blur-xl"
+            className="absolute right-0 top-full mt-2 w-72 rounded-xl border border-fg/[0.16] bg-surface p-4 shadow-2xl z-50 backdrop-blur-xl"
           >
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] text-white/50 font-medium">
+              <span className="text-[11px] text-fg/76 font-medium">
                 Share this simulation
               </span>
               <button
                 onClick={() => setOpen(false)}
-                className="text-white/20 hover:text-white/50 transition-colors p-2.5 -m-2.5"
+                className="text-fg/66 hover:text-fg/76 transition-colors p-2.5 -m-2.5"
                 aria-label="Close share panel"
               >
                 <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
@@ -239,7 +239,7 @@ export default function ShareSimulation({
             <div className="flex items-center gap-2 mb-2">
               <motion.button
                 onClick={handleCopy}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-[#1D8A72]/20 bg-[#1D8A72]/[0.06] py-2 text-[11px] text-[#1D8A72] transition-all duration-200 hover:bg-[#1D8A72]/[0.10]"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-signal/20 bg-signal/[0.06] py-2 text-[11px] text-signal transition-all duration-200 hover:bg-signal/[0.10]"
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -252,7 +252,7 @@ export default function ShareSimulation({
             <div className="flex gap-2 mb-3">
               <motion.button
                 onClick={handleTwitter}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] py-2 text-[11px] text-white/40 hover:text-white/70 hover:border-white/[0.15] transition-all duration-200"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-fg/[0.16] bg-fg/[0.02] py-2 text-[11px] text-fg/70 hover:text-fg/78 hover:border-fg/[0.30] transition-all duration-200"
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -261,7 +261,7 @@ export default function ShareSimulation({
               </motion.button>
               <motion.button
                 onClick={handleLinkedIn}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/[0.08] bg-white/[0.02] py-2 text-[11px] text-white/40 hover:text-white/70 hover:border-white/[0.15] transition-all duration-200"
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-fg/[0.16] bg-fg/[0.02] py-2 text-[11px] text-fg/70 hover:text-fg/78 hover:border-fg/[0.30] transition-all duration-200"
                 whileHover={{ scale: 1.01 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -271,14 +271,14 @@ export default function ShareSimulation({
             </div>
 
             {/* Embed code */}
-            <div className="border-t border-white/[0.04] pt-3">
+            <div className="border-t border-fg/[0.08] pt-3">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] text-white/25 uppercase tracking-wide">
+                <span className="text-[10px] text-fg/66 uppercase tracking-wide">
                   embed markdown
                 </span>
                 <motion.button
                   onClick={handleCopyEmbed}
-                  className="text-[10px] text-white/25 hover:text-[#1D8A72] transition-colors flex items-center gap-1"
+                  className="text-[10px] text-fg/66 hover:text-signal transition-colors flex items-center gap-1"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
                 >
@@ -286,14 +286,14 @@ export default function ShareSimulation({
                   {copiedEmbed ? "copied" : "copy"}
                 </motion.button>
               </div>
-              <pre className="text-[10px] text-white/30 font-mono leading-relaxed bg-white/[0.02] rounded-lg p-2 overflow-x-auto max-h-24">
+              <pre className="text-[10px] text-fg/70 font-mono leading-relaxed bg-fg/[0.02] rounded-lg p-2 overflow-x-auto max-h-24">
                 {embedMarkdown}
               </pre>
             </div>
 
             {/* URL preview */}
-            <div className="mt-3 text-[10px] text-white/20 truncate border-t border-white/[0.04] pt-2">
-              <span className="text-white/15">url: </span>
+            <div className="mt-3 text-[10px] text-fg/66 truncate border-t border-fg/[0.08] pt-2">
+              <span className="text-fg/66">url: </span>
               {shareUrl}
             </div>
           </motion.div>

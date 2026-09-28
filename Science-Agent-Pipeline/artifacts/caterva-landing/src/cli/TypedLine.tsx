@@ -40,10 +40,10 @@ export default function TypedLine({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-[#1D8A72]">$</span>
-      <span className="text-white/90">{shown}</span>
+      <span className="text-signal">$</span>
+      <span className="text-fg/92">{shown}</span>
       {!done && (
-        <span className="inline-block h-4 w-2 bg-white/70 animate-pulse" />
+        <span className="inline-block h-4 w-2 bg-fg/70 animate-pulse" />
       )}
     </div>
   );

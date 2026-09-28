@@ -31,6 +31,12 @@ matching English phrases in legitimate documentation:
   * CliApp.tsx                 a decorative pulse-dot carrying aria-hidden,
                                which is correct accessibility practice.
   * DashboardPreview.tsx       a Tailwind `overflow-hidden` layout class.
+  * mule/chapters.html         (caterva-landing, merged 2026-09-28) the
+                               same three accessibility patterns reviewed in
+                               mule/index.html: a visually-hidden keyboard
+                               hint for screen readers, aria-hidden
+                               decorative brackets, and an empty aria-hidden
+                               rule span. Read at lines 41, 48 and 549.
   * BUILD_PIPELINE.md and co.  docs that mention "Claude" or "LLM", and an
                                API guide with a "System:" line in an example
                                transcript.
@@ -127,6 +133,16 @@ does with each one, including a critical. Restoring the equality test
 fails three of its seven cases.
 
 CURRENT EXEMPTIONS (15; the verdicts live in trojan-baseline.json)
+
+Recounted 2026-09-28 after merging main, and the number is a coincidence:
+three entries came in from main (accessibility markup in the merged MuleRun
+chapters) and three went out, for `Business/` files the history rewrite
+removed when the repository was published. An exemption for a file that is
+not in the tree can never match a finding; it is a verdict with nothing left
+to apply to. Two more had their `file` corrected from `Terium/` to
+`caterva/` -- the code moved in the rename and the verdict moved with it,
+which matters because this guard rejects an exemption recorded against a
+different file than the one the finding is in.
 
 TWO MORE ARRIVED WITH A MERGE, 2026-09-24, and both are the same cry-wolf
 idiom as the two below. Verdicts, reached by reading each in full:

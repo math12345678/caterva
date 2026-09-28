@@ -36,7 +36,7 @@ Three states, not two, and the difference is recorded per row:
 | `absent` | in the tree, not in this file — fails the build |
 
 `hashed` exists so this file cannot quietly claim more than was done.
-**All fourteen are now `reviewed`** — every image below has been opened
+**All nineteen are now `reviewed`** — every image below has been opened
 and read. The state stays in the schema because the next image added
 starts unreviewed, and without somewhere to say so it would read as
 audited from the moment it landed.
@@ -50,7 +50,7 @@ hides best.
 ## The register
 
 <!-- PUBLIC-IMAGES-START
-e8605d3ff345900f  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/favicon.svg
+15084a555b59a5b7  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/favicon.svg
 790805bf4a0ac4cb  reviewed  mule/_shots/01-hero.png
 6737793581a7406d  reviewed  mule/_shots/02-atlas-system.png
 2925ce1e7d0348b4  reviewed  mule/_shots/02b-atlas-natural.png
@@ -64,6 +64,11 @@ ecc1ad2db83e7d84  reviewed  mule/_shots/07-microscope-l1.png
 9619c95dd0e18a0b  reviewed  mule/_shots/10-manifest.png
 d42dfd5902b61a88  reviewed  mule/_shots/11-dock-open.png
 b5f414e5928e0b8f  reviewed  mule/_shots/12-mode-failure-atlas.png
+2c1384fbef386d41  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/apple-touch-icon.png
+fb5b10b918b86554  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/icon-192.png
+ffd7f707df8aae98  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/icon-512.png
+43afe2c6e5e7b4ea  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/icon-maskable-512.png
+d26ec3b1c386e051  reviewed  Science-Agent-Pipeline/artifacts/caterva-landing/public/social-preview.png
 PUBLIC-IMAGES-END -->
 
 ## What the reviewed ones actually show
@@ -120,10 +125,25 @@ open, and the mode dock. No results, no counts. `02b` reads *"SEVEN
 REGIONS. EIGHT DECLARED ROUTES."* — a statement about the diagram, not
 about the software.
 
-**`favicon.svg`** — hand-written SVG: a cream rounded square and eleven
-circles forming a C, the Caterva mark (replaced the teal "T" tile on
-2026-09-27; re-reviewed then). No text, no embedded fonts, no traced
-artwork, nothing licensed from anywhere.
+**`favicon.svg`** — generated SVG: a paper (#FDF8EE) rounded square and
+eight circles forming a C, seven ink (#2A2D35) and one signal (#5D7F8D),
+the caterva mark rebuilt from the owner's artwork on 2026-09-28 (it
+replaced the eleven-dot version; re-reviewed then). No text, no embedded
+fonts, nothing licensed from anywhere.
+
+**`apple-touch-icon.png`, `icon-192.png`, `icon-512.png`** — the same mark
+on a paper rounded tile, rendered from `docs/brand/caterva-mark.svg` at
+180, 192 and 512 px. Opened and read 2026-09-28: the eight dots and
+nothing else. No text, no numbers.
+
+**`icon-maskable-512.png`** — the mark on a full-bleed paper square with
+padding for Android's mask. Opened and read 2026-09-28: no text.
+
+**`social-preview.png`** — 1280 x 640 link card: the mark, the wordmark
+"caterva" in Spectral Light, and one line, *"enzyme kinetics and molecular
+dynamics, every number cited"*, in signal blue. Opened and read
+2026-09-28. The line is a description of scope, not a metric; it carries
+no count, customer or endorsement.
 
 ### A wording tension worth noting
 

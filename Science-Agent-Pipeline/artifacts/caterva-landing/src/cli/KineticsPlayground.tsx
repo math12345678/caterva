@@ -62,7 +62,7 @@ export default function KineticsPlayground() {
         <div className="space-y-6">
           {/* Presets */}
           <div>
-            <span className="text-[10px] text-white/25 uppercase tracking-widest mb-2 block">
+            <span className="text-[10px] text-fg/66 uppercase tracking-widest mb-2 block">
               enzyme presets
             </span>
             <div className="flex flex-wrap gap-1.5">
@@ -70,8 +70,8 @@ export default function KineticsPlayground() {
                 <motion.button
                   key={p.label}
                   onClick={() => applyPreset(p)}
-                  className="px-2.5 py-1 rounded-md text-[10px] border border-white/[0.06] text-white/40
-                        hover:border-[#1D8A72]/30 hover:text-[#1D8A72] hover:bg-[#1D8A72]/[0.04]
+                  className="px-2.5 py-1 rounded-md text-[10px] border border-fg/[0.12] text-fg/70
+                        hover:border-signal/30 hover:text-signal hover:bg-signal/[0.04]
                         transition-all duration-200 font-mono"
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
@@ -92,7 +92,7 @@ export default function KineticsPlayground() {
               step={0.01}
               unit="mM"
               onChange={setKm}
-              color="#1D8A72"
+              color="#5D7F8D"
             />
             <ParamSlider
               label="Vmax"
@@ -102,7 +102,7 @@ export default function KineticsPlayground() {
               step={0.1}
               unit="mM/s"
               onChange={setVmax}
-              color="#3B82F6"
+              color="#6A6E78"
             />
             <ParamSlider
               label="[S]₀"
@@ -112,29 +112,29 @@ export default function KineticsPlayground() {
               step={0.1}
               unit="mM"
               onChange={setS0}
-              color="#F59E0B"
+              color="#946522"
             />
           </div>
 
           {/* Computed values */}
-          <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-3 space-y-2">
+          <div className="rounded-lg border border-fg/[0.12] bg-fg/[0.015] p-3 space-y-2">
             <div className="flex justify-between text-[11px]">
-              <span className="text-white/35">Km (affinity)</span>
-              <span className="text-[#1D8A72] font-mono">{kmDisplay} mM</span>
+              <span className="text-fg/70">Km (affinity)</span>
+              <span className="text-signal font-mono">{kmDisplay} mM</span>
             </div>
             <div className="flex justify-between text-[11px]">
-              <span className="text-white/35">v₀ (initial rate)</span>
-              <span className="text-[#3B82F6] font-mono">{v0} mM/s</span>
+              <span className="text-fg/70">v₀ (initial rate)</span>
+              <span className="text-muted font-mono">{v0} mM/s</span>
             </div>
             <div className="flex justify-between text-[11px]">
-              <span className="text-white/35">residual</span>
-              <span className="text-[#F59E0B] font-mono">
+              <span className="text-fg/70">residual</span>
+              <span className="text-caution font-mono">
                 {result.finalResidual.toExponential(2)}
               </span>
             </div>
             <div className="flex justify-between text-[11px]">
-              <span className="text-white/35">integration</span>
-              <span className="text-white/45 font-mono">
+              <span className="text-fg/70">integration</span>
+              <span className="text-fg/70 font-mono">
                 RK4 (200 steps/pt)
               </span>
             </div>
@@ -143,12 +143,12 @@ export default function KineticsPlayground() {
 
         {/* Chart column */}
         <div className="md:col-span-2">
-          <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-3">
+          <div className="rounded-lg border border-fg/[0.08] bg-fg/[0.01] p-3">
             <div className="flex items-center justify-between mb-2 text-[10px]">
-              <span className="text-white/30 font-mono">
+              <span className="text-fg/70 font-mono">
                 substrate depletion over {end}s
               </span>
-              <span className="text-white/15 font-mono">{points} points</span>
+              <span className="text-fg/66 font-mono">{points} points</span>
             </div>
             <motion.div
               key={`${km}-${vmax}-${s0}`}
@@ -158,13 +158,13 @@ export default function KineticsPlayground() {
             >
               <LineChart
                 data={result.trajectory}
-                series={[{ key: "S", color: "#1D8A72" }]}
+                series={[{ key: "S", color: "#5D7F8D" }]}
                 height={260}
               />
             </motion.div>
-            <div className="mt-2 flex items-center gap-4 text-[9px] text-white/25 font-mono">
+            <div className="mt-2 flex items-center gap-4 text-[9px] text-fg/66 font-mono">
               <span className="flex items-center gap-1">
-                <span className="w-2 h-0.5 rounded bg-[#1D8A72]" /> [S]
+                <span className="w-2 h-0.5 rounded bg-signal" /> [S]
               </span>
               <span>t₀ = {result.trajectory[0]?.S.toFixed(1)} mM</span>
               <span>

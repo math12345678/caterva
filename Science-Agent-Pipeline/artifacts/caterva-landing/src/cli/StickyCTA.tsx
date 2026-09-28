@@ -78,12 +78,12 @@ export default function StickyCTA() {
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4 cta-inner">
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[#1D8A72] animate-pulse" />
-                <span className="text-[13px] text-white/70 font-medium">
+                <span className="w-2 h-2 rounded-full bg-signal animate-pulse" />
+                <span className="text-[13px] text-fg/78 font-medium">
                   Ready to try scientific simulation?
                 </span>
               </div>
-              <span className="text-[11px] text-white/30 hidden md:inline">
+              <span className="text-[11px] text-fg/70 hidden md:inline">
                 Pre-launch — pilot spots available
               </span>
             </div>
@@ -92,7 +92,7 @@ export default function StickyCTA() {
               <Magnetic strength={0.1}>
                 <a
                   href="#waitlist"
-                  className="inline-flex items-center gap-2 rounded-lg border border-[#1D8A72]/30 bg-[#1D8A72]/[0.08] px-4 py-2 text-[12px] text-[#1D8A72] font-medium transition-all duration-300 hover:bg-[#1D8A72]/[0.14] hover:shadow-[0_0_25px_rgba(29,138,114,0.15)]"
+                  className="inline-flex items-center gap-2 rounded-lg border border-signal/30 bg-signal/[0.08] px-4 py-2 text-[12px] text-signal font-medium transition-all duration-300 hover:bg-signal/[0.14]"
                 >
                   Join waitlist
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
@@ -109,7 +109,7 @@ export default function StickyCTA() {
 
               <button
                 onClick={handleDismiss}
-                className="p-2.5 -m-1 rounded-md text-white/20 hover:text-white/40 transition-colors"
+                className="p-2.5 -m-1 rounded-md text-fg/66 hover:text-fg/70 transition-colors"
                 aria-label="Dismiss"
               >
                 <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
