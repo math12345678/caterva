@@ -50,7 +50,15 @@ def main() -> int:
     if code not in (0, 4):
         print(f"FAIL: --summarise exited {code} on real output")
         return 1
-    print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, and the summary.")
+    # And the enzyme analysis, which fetches lysozyme's catalytic residues
+    # (M-CSA via `caterva prepare`) and drives gmx distance and gmx rmsf.
+    code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT)],
+                          cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
+    if code not in (0, 4) or not (OUT / "rep2" / "catalytic.xvg").exists():
+        print(f"FAIL: caterva analyze exited {code} on real output")
+        return 1
+    print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
+          "and the enzyme analysis.")
     return 0
 
 

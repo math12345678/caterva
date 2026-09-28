@@ -60,6 +60,9 @@ What it does today, across five simulation domains and two structure tools:
   labelled, chain breaks, truncated side chains, the biological assembly),
   each ranked by distance to the enzyme's catalytic residues from M-CSA,
   and says which chain to start from.
+- **Trajectory analysis**: `caterva analyze` measures the catalytic
+  geometry and active-site flexibility in every replica and reports them
+  against the crystal, only once the replicas agree.
 - **Molecular dynamics setup**: `caterva md` writes a GROMACS system where
   every setting is measured, chosen or cited, run at the assay conditions
   of a cited constant.
@@ -92,7 +95,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,067 tests (2,894 engine + 1173 literature)
+make test      # runs all 4,084 tests (2,911 engine + 1173 literature)
 ```
 
 ### Or download the release
@@ -519,7 +522,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                2,894 tests
+│   └── tests/                2,911 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -610,9 +613,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,067 tests
+make test        # run all 4,084 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (2,894 tests)
+make test-sim    # simulation engine only (2,911 tests)
 make test-lit    # literature layer only (1173 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches

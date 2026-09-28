@@ -143,9 +143,9 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "98 test files -- kinetics & Michaelis-Menten correctness, " +
-          "stochastic simulation (Gillespie SSA), PDB structure lookup " +
-          "and preparation audit, " +
+          "99 test files -- kinetics & Michaelis-Menten correctness, " +
+          "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
+          "preparation audit and trajectory analysis, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
           "building with influence ranking, mechanism libraries and " +
           "verdicts, agents and assay windows, and citation/build guards",
@@ -156,8 +156,9 @@ export const TEST_SUITES: TestSuite[] = [
         // api-server CI job. So the figure where npm works, as for the
         // other rows: 2855. Plus the 22 tests of `caterva prepare`, run
         // alone 2026-09-28 (22 passed), and the md replica and
-        // convergence tests (26 passed with the setup suite): 2894.
-        passed: 2894,
+        // convergence tests (26 passed with the setup suite): 2894. Plus
+        // the 17 `caterva analyze` tests (42 passed with setup and app): 2911.
+        passed: 2911,
         skipped: 0,
         failed: 0,
       },

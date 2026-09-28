@@ -131,7 +131,14 @@ within-run convergence. A single run is allowed and labelled "one sample".
 overclaim in the field, and a tool can make the honest option the default.
 *Done when* a deliberately under-sampled run is reported as unconverged.
 
-### M3. `caterva analyze`: enzyme questions, not generic plots
+### M3. `caterva analyze`: enzyme questions, not generic plots (catalytic geometry and flexibility shipped 2026-09-28)
+
+Shipped: every pairwise distance between catalytic functional groups
+against the crystal, and pocket-versus-rest RMSF, each gated on the M2
+convergence verdict; measured by gmx distance / gmx rmsf with the commands
+written to analyze.sh. Pending: angles, hydrogen-bond occupancy, and ligand
+pose (needs M4). Built on GROMACS's own tools rather than MDAnalysis or
+MDTraj, which keeps Caterva dependency-free.
 
 Analyses chosen from the enzyme's own biology:
 
