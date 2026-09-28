@@ -200,7 +200,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "75 test files -- query resolution, parameter provenance, " +
+          "76 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -208,7 +208,8 @@ export const TEST_SUITES: TestSuite[] = [
         // Measured 2026-09-28 in CI (run 36368330079, api-server job):
         // 764 tests, 763 passed, 1 failed -- the failure an assertion that
         // more than five domains are served, stale after the archiving and
-        // corrected in the same change. So: 764.
+        // corrected in the same change. So: 764. Plus the 2 tests of
+        // runnerErrorReachesCaller.test.ts (2 passed, 2026-09-28): 766.
         //
         // Earlier, 2026-09-17: `81 passed (81) / 854 passed (854)`, run
         // alone with the repo's .venv/bin first on PATH.
@@ -233,7 +234,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 764,
+        passed: 766,
         skipped: 0,
         failed: 0,
       },

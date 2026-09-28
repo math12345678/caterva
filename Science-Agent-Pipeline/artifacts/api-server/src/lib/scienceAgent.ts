@@ -481,6 +481,23 @@ async function ensureRunnerScript(): Promise<void> {
 }
 
 /**
+ * The `error` of the runner's last stdout line when it is a JSON failure
+ * record ({"ok": false, "error": "..."}), else null.
+ */
+export function runnerError(stdout: string): string | null {
+  const last = stdout.trim().split("\n").pop();
+  if (!last) return null;
+  try {
+    const parsed = JSON.parse(last) as { ok?: unknown; error?: unknown };
+    return parsed.ok === false && typeof parsed.error === "string" && parsed.error
+      ? parsed.error
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Spawn the Python science-agent runner with an arbitrary JSON payload and
  * parse its stdout. Shared by resolveKineticValue() (enzyme kinetics) and
  * resolveEpidemiologyParameters() (ADR 0017 / ADR 0020) so there is exactly
@@ -535,7 +552,14 @@ async function spawnScienceAgent(
       const hadNoOutput = !trimmed;
 
       if (hadNonZeroExit || hadNoOutput) {
-        const message = stderr || `Science agent runner exited with code ${code}`;
+        // The runner reports a caught failure as {"ok": false, "error": ...}
+        // on STDOUT and exits 1, so stderr is empty exactly when the reason
+        // is known. Reading only stderr turned "BRENDA returned 500" into
+        // "exited with code 1" (found 2026-09-28, BRENDA down for 2.7.1.1).
+        const message =
+          stderr ||
+          runnerError(trimmed) ||
+          `Science agent runner exited with code ${code}`;
         reject(new Error(message));
         return;
       }
