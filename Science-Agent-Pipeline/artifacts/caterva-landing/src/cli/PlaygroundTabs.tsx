@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import KineticsPlayground from "./KineticsPlayground";
-import EpiPlayground from "./EpiPlayground";
 import Reveal from "./Reveal";
 
-type PlaygroundDomain = "mm" | "sir";
+type PlaygroundDomain = "mm";
 
 const TABS: {
   id: PlaygroundDomain;
@@ -17,12 +16,6 @@ const TABS: {
     label: "Enzyme Kinetics",
     desc: "Michaelis-Menten with Km, Vmax, and [S]₀",
     color: "#1D8A72",
-  },
-  {
-    id: "sir",
-    label: "Epidemiology",
-    desc: "SIR model with β, γ, and population parameters",
-    color: "#3B82F6",
   },
 ];
 
@@ -49,8 +42,8 @@ export default function PlaygroundTabs() {
           time. No backend.
         </p>
 
-        {/* Domain Tabs */}
-        <div className="flex items-center gap-0.5 mb-6 p-0.5 rounded-lg border border-white/[0.05] bg-white/[0.015] w-fit">
+        {/* Domain Tabs: shown only when there is more than one */}
+        {TABS.length > 1 && (<div className="flex items-center gap-0.5 mb-6 p-0.5 rounded-lg border border-white/[0.05] bg-white/[0.015] w-fit">
           {TABS.map((tab) => (
             <button
               key={tab.id}
@@ -80,7 +73,7 @@ export default function PlaygroundTabs() {
               </span>
             </button>
           ))}
-        </div>
+        </div>)}
 
         {/* Active description */}
         <p className="font-sans text-[11px] text-white/25 mb-6 font-mono">
@@ -97,7 +90,7 @@ export default function PlaygroundTabs() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
           >
-            {domain === "mm" ? <KineticsPlayground /> : <EpiPlayground />}
+            <KineticsPlayground />
           </motion.div>
         </AnimatePresence>
       </Reveal>

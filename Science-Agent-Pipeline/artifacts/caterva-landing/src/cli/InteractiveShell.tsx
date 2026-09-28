@@ -9,7 +9,7 @@ interface ShellLine {
 
 interface InteractiveShellProps {
   onNavigate: (sectionId: string) => void;
-  onSimulate: (domain: "mm" | "sir") => void;
+  onSimulate: (domain: "mm") => void;
 }
 
 const COMMANDS = [
@@ -49,7 +49,7 @@ function HelpOutput() {
     ["about", "what caterva is"],
     ["domains", "list simulation domains, live and planned"],
     ["test", "jump to the real test suite results"],
-    ["simulate [mm|sir]", "jump to the live interactive simulator"],
+    ["simulate", "jump to the live enzyme-kinetics simulator"],
     ["waitlist", "join the waitlist"],
     ["pricing", "view pricing plans"],
     ["cite", "how to cite caterva in your work"],
@@ -59,7 +59,7 @@ function HelpOutput() {
     ["version", "show version info"],
     ["export", "list supported export formats"],
     ["glossary", "open the key terms and definitions reference"],
-    ["playground", "open the interactive kinetics & epidemiology demo"],
+    ["playground", "open the interactive enzyme-kinetics demo"],
     ["compare", "compare traditional vs caterva workflow"],
     ["theme", "show current theme"],
     ["ls", "list this page as a filesystem"],
@@ -80,11 +80,9 @@ function HelpOutput() {
 function DomainsOutput() {
   const domains = [
     ["enzyme-kinetics", "live"],
-    ["sir-seir-epidemiology", "live"],
-    ["pcr-amplification", "planned"],
-    ["monte-carlo", "planned"],
-    ["population-genetics", "planned"],
-    ["molecular-dynamics-setup", "planned"],
+    ["stochastic-kinetics", "live"],
+    ["enzyme-structures", "live"],
+    ["gromacs-md-setup", "live"],
   ];
   return (
     <div className="space-y-0.5">
@@ -258,7 +256,7 @@ export default function InteractiveShell({
         break;
       }
       case "simulate": {
-        const domain = rest[0]?.toLowerCase() === "sir" ? "sir" : "mm";
+        const domain = "mm";
         push(
           "output",
           <span className="text-white/40">
