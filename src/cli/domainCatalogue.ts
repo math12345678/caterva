@@ -54,8 +54,8 @@ export interface DomainEntry {
 /**
  * `sbml` is deliberately absent, and that is the one judgement call in this
  * file. It is a generic ingest path — "run the model in this file" — not a
- * teaching domain, which is why the README's own count is fifteen against
- * DISPATCH's sixteen. `check_documented_counts.py` makes the same
+ * teaching domain, which is why the catalogue holds five domains against
+ * DISPATCH's six. `check_documented_counts.py` makes the same
  * distinction and refuses to derive the number for the same reason.
  */
 export const NOT_A_TEACHING_DOMAIN = new Set(['sbml']);
@@ -78,48 +78,6 @@ export const DOMAIN_CATALOGUE: DomainEntry[] = [
     literatureBacked: true,
   },
   {
-    id: 'sir',
-    title: 'SIR epidemic',
-    summary: 'How an infection spreads through a population and burns out.',
-    example: 'simulate sir --beta 0.3 --gamma 0.1 --i0 0.01 --end 160',
-    literatureBacked: true,
-  },
-  {
-    id: 'seir',
-    title: 'SEIR epidemic',
-    summary: 'SIR with an exposed-but-not-yet-infectious stage.',
-    example: 'simulate seir --beta 0.3 --sigma 0.2 --gamma 0.1 --i0 0.01 --end 160',
-    literatureBacked: true,
-  },
-  {
-    id: 'pcr',
-    title: 'PCR amplification',
-    summary: 'How much DNA you have after N cycles, with efficiency below 1.',
-    example: 'simulate pcr --cycles 30 --efficiency 0.9 --initial 1000',
-    literatureBacked: false,
-  },
-  {
-    id: 'monte_carlo_pi',
-    title: 'Monte Carlo estimation of pi',
-    summary: 'Why random sampling converges, and how slowly (1/sqrt(N)).',
-    example: 'simulate monte_carlo_pi --samples 100000 --seed 1',
-    literatureBacked: false,
-  },
-  {
-    id: 'wright_fisher',
-    title: 'Wright–Fisher drift',
-    summary: 'How allele frequencies wander in a finite population.',
-    example: 'python -m caterva.cli wf --population-size 100 --starting-frequency 0.5 --generations 200 --seed 1',
-    literatureBacked: false,
-  },
-  {
-    id: 'two_locus_wright_fisher',
-    title: 'Two-locus Wright–Fisher',
-    summary: 'Linkage disequilibrium, and how recombination decays it.',
-    example: 'python -m caterva.cli ld --population-size 500 --recombination-rate 0.01 --generations 200 --seed 1',
-    literatureBacked: false,
-  },
-  {
     id: 'gillespie_ssa',
     title: 'Gillespie SSA — decay',
     summary: 'Exact stochastic A → B, where small numbers make noise matter.',
@@ -139,34 +97,6 @@ export const DOMAIN_CATALOGUE: DomainEntry[] = [
     summary: 'Many runs of the same system, to see the spread rather than one path.',
     example: 'python -m caterva.cli ssa --a0 100 --k 0.1 --end 50 --seed 1 --out runs.csv',
     literatureBacked: false,
-  },
-  {
-    id: 'molecular_dynamics',
-    title: 'Molecular dynamics (Lennard-Jones)',
-    summary: 'Atoms attracting and repelling, with energy conserved.',
-    example: 'simulate molecular_dynamics --atoms 13 --steps 1000 --dt 0.001',
-    literatureBacked: false,
-  },
-  {
-    id: 'lotka_volterra',
-    title: 'Lotka–Volterra',
-    summary: 'Predator and prey populations cycling against each other.',
-    example: 'simulate lotka_volterra --alpha 1.1 --beta 0.4 --delta 0.1 --gamma 0.4 --end 100',
-    literatureBacked: false,
-  },
-  {
-    id: 'repressilator',
-    title: 'Repressilator',
-    summary: 'Three genes repressing each other in a ring, producing oscillation.',
-    example: 'simulate repressilator --end 500',
-    literatureBacked: true,
-  },
-  {
-    id: 'cell_cycle_oscillator',
-    title: 'Cell-cycle oscillator',
-    summary: 'The biochemical clock that drives division.',
-    example: 'simulate cell_cycle_oscillator --end 200',
-    literatureBacked: true,
   },
 ];
 

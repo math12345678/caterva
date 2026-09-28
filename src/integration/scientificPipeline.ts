@@ -1194,146 +1194,7 @@ ${integrityReport}
     };
   }
 
-  private async runSir(parameters: Record<string, any>): Promise<any> {
-    const numeric = (name: string): number | undefined => {
-      const raw = parameters[name];
-      if (raw === undefined || raw === null) return undefined;
-      const value = typeof raw === 'object' ? raw.value : raw;
-      return typeof value === 'number' && Number.isFinite(value)
-        ? value
-        : undefined;
-    };
 
-    // No unit conversion, and that is deliberate rather than an omission.
-    // `beta` and `gamma` are per-time rates and s0/i0 are head counts; the
-    // substrate-unit machinery below converts concentrations against s0's
-    // unit and would be meaningless here. Applying it "for consistency"
-    // would be the 60,000x units bug (ADR 0141) wearing a different label.
-    const engineParameters = {
-      beta: numeric('beta') ?? null,
-      gamma: numeric('gamma') ?? null,
-      s0: numeric('s0') ?? null,
-      i0: numeric('i0') ?? null,
-      // NOT `integrationWindowFor`. That derives a window from substrate
-      // depletion — km, vmax and s0 — and returns the 10 s default whenever
-      // they are absent, which for an epidemic is always. Calling it here
-      // would be an enzyme timescale silently applied to a different
-      // system: the same mistake one level down from the one this whole
-      // function exists to avoid.
-      //
-      // The caller's `end` is used when given. No default is DERIVED from
-      // gamma, tempting as `1/gamma` is: turning it into a window needs a
-      // multiplier, and this project does not invent constants. So the
-      // documented default stands, and the note below tells the caller how
-      // to change it — which is the difference between a refusal that is
-      // actionable and one that is merely regretful.
-      end: numeric('end') ?? ScientificPipeline.SIMULATION_END_TIME_S,
-      points: ScientificPipeline.SIMULATION_POINTS,
-    };
-
-    const result = await runCaterva('sir', engineParameters, {
-      required: ['beta', 'gamma', 's0', 'i0'],
-    });
-
-    const trajectory = (result.trajectory as any[]).map((point) => ({
-      time: point.time,
-      susceptible: point['[S]'],
-      infected: point['[I]'],
-      recovered: point['[R]'],
-    }));
-
-    return {
-      domain: 'sir',
-      trajectory,
-      metrics: ScientificPipeline.summariseSir(
-        trajectory,
-        engineParameters.gamma,
-        engineParameters.end
-      ),
-      solver: result.solver,
-      engineFlagged: result.flagged,
-      engineFlagReason: result.flagReason,
-    };
-  }
-
-  /**
-   * The judgement in an SIR result, separated from the machinery.
-   *
-   * Static and pure so it can be driven directly: the interesting cases are
-   * a truncated window and a resolved epidemic, and neither should need a
-   * Python subprocess to assert.
-   */
-  static summariseSir(
-    trajectory: Array<{
-      time: number;
-      susceptible: number;
-      infected: number;
-      recovered: number;
-    }>,
-    gamma: number | null,
-    end: number
-  ): Record<string, unknown> {
-    const peak = trajectory.reduce(
-      (best, point) => (point.infected > best.infected ? point : best),
-      trajectory[0] ?? { time: 0, infected: 0, susceptible: 0, recovered: 0 }
-    );
-    const first = trajectory[0];
-    const last = trajectory[trajectory.length - 1];
-
-    // A PEAK AT THE EDGE OF THE WINDOW IS NOT A PEAK.
-    //
-    // `integrationWindowFor` defaults to 10, which is a sensible enzyme
-    // assay and far too short for an epidemic: measured with beta 0.3,
-    // gamma 0.1, s0 990, i0 10, infections are still climbing steeply at
-    // t=10 and do not peak until roughly t=30 at ~290 infected.
-    //
-    // Reported naively, that window says `peakInfected: 65` — a real number
-    // from a real integration, describing the boundary of the run rather
-    // than the epidemic. Somebody would plan around it.
-    //
-    // Three states, not two: a peak that was reached, a peak that was not,
-    // and never a boundary silently promoted to a maximum.
-    const stillRising =
-      trajectory.length > 1 &&
-      last !== undefined &&
-      peak.time === last.time &&
-      last.infected > trajectory[trajectory.length - 2]!.infected;
-
-    return {
-        // null, not the boundary value. "I did not see the peak" must never
-        // read as "the peak was here", and a number is not improved by
-        // being the largest one available.
-      peakInfected: stillRising ? null : peak.infected,
-      peakTime: stillRising ? null : peak.time,
-      peakReachedWithinWindow: !stillRising,
-      highestInfectedSeen: peak.infected,
-      ...(stillRising
-          ? {
-              note:
-                `Infections were still rising when the run ended at ` +
-                `t=${last?.time}. The highest value seen (` +
-                `${peak.infected}) is the edge of the window, not the peak ` +
-                `of the epidemic. Pass a larger 'end' in parameters — with ` +
-                `gamma=${gamma}, the mean infectious ` +
-                `period is ${gamma ? 1 / gamma : '?'}, ` +
-                `so this window covered under ` +
-                `${gamma ? (end * gamma).toFixed(1) : '?'} ` +
-                `of them.`,
-            }
-          : {}),
-        finalSusceptible: last?.susceptible ?? 0,
-      finalRecovered: last?.recovered ?? 0,
-      // Susceptibles who were infected at some point, as a fraction of
-      // those who could be. The standard epidemiological reading of this
-      // curve, and NOT "conversion percentage".
-      attackRate:
-        first && first.susceptible > 0
-          ? ((first.susceptible - (last?.susceptible ?? 0)) /
-              first.susceptible) *
-            100
-          : 0,
-    };
-  }
 
   private async runSimulation(
     parameters: Record<string, any>,
@@ -1356,9 +1217,6 @@ ${integrityReport}
     // Running the wrong model is not a partial answer, it is a different
     // answer -- the sentence this file already uses about classification,
     // applied here where it was not.
-    if (domain === 'sir') {
-      return this.runSir(parameters);
-    }
 
     if (domain === 'competitive' || domain === 'noncompetitive' || domain === 'product') {
       return this.runInhibition(domain, parameters);
@@ -1598,10 +1456,6 @@ ${integrityReport}
         'mm',
       ],
     },
-    sir: {
-      required: ['beta', 'gamma', 's0', 'i0'],
-      aliases: ['sir', 'epidemic', 'infection', 'outbreak', 'susceptible'],
-    },
     // The three the dashboard offered and the API rejected (ADR 0149).
     //
     // `required` is NOT written out here. It is read from
@@ -1729,7 +1583,6 @@ ${integrityReport}
    */
   static readonly DISPATCHABLE_DOMAINS = [
     'mm',
-    'sir',
     'competitive',
     'noncompetitive',
     'product',

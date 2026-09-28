@@ -717,8 +717,21 @@ Biological Plausibility: ${record.validation.biologicalPlausibility}
  * passes, because the Map is populated. The defect only exists ACROSS
  * processes, which is the only way a user ever meets it.
  */
+/** Where records were written while the project was called Terrium. Read-only. */
+export function legacyRecordsDir(): string {
+  const home = process.env['HOME'] || os.homedir();
+  return path.join(home, '.terrium', 'records');
+}
+
 export function recordsDir(): string {
-  return path.join(os.homedir(), '.caterva', 'records');
+  // HOME first, then os.homedir(). They agree in a normal process, but
+  // os.homedir() reads the real environment while a test runner (jest)
+  // gives each test a COPY of process.env, so a test that set HOME to a
+  // scratch directory was still reading and writing the user's real
+  // ~/.caterva -- and passing only because earlier runs had left files
+  // there (found 2026-09-27, when the rename emptied that directory).
+  const home = process.env['HOME'] || os.homedir();
+  return path.join(home, '.caterva', 'records');
 }
 
 export class ReproducibilityService {
@@ -798,8 +811,13 @@ export class ReproducibilityService {
     if (cached) return cached;
 
     try {
-      const file = path.join(recordsDir(), `${jobId}.json`);
-      if (!fs.existsSync(file)) return undefined;
+      // Records written before the rename (2026-09-27) live in
+      // ~/.terrium/records. Read there too, so a job run under the old name
+      // still verifies; new records are only ever written to ~/.caterva.
+      const file = [recordsDir(), legacyRecordsDir()]
+        .map((dir) => path.join(dir, `${jobId}.json`))
+        .find((candidate) => fs.existsSync(candidate));
+      if (file === undefined) return undefined;
       const parsed = JSON.parse(fs.readFileSync(file, 'utf-8')) as ExecutionRecord;
       parsed.timestamp = new Date(parsed.timestamp);
       this.records.set(jobId, parsed);

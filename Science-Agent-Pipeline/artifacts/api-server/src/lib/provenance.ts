@@ -290,8 +290,9 @@ export const RESOLVABLE_FIELDS: Record<string, string[]> = {
  * that the set below can be DERIVED from it. The bridge imports this;
  * there is one list, not two.
  */
-export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set([
-  "sir",
+export const EPIDEMIOLOGY_BRIDGE_DOMAINS: ReadonlySet<string> = new Set<string>([
+  // Empty since epidemiology was archived on 2026-09-27; kept so the bridge
+  // still has one list to consult if the domain ever returns.
 ]);
 
 /**
@@ -1286,17 +1287,6 @@ const DEFINITIONAL: {
   contradictedBy: string[];
   reason: string;
 }[] = [
-  {
-    domain: "wright_fisher",
-    key: "selection_coefficient",
-    value: 0,
-    contradictedBy: ["selection", "selective", "advantage", "fitness",
-                     "beneficial", "deleterious", "adaptive"],
-    reason:
-      "s = 0 because the neutral Wright-Fisher model IS drift without " +
-      "selection. This is what the query asked for, not an assumption " +
-      "Caterva added; a non-zero s would be the unrequested change.",
-  },
   // NOT `mutation_rate`. It was here, and it was wrong.
   //
   // `RESOLVABLE_FIELDS.wright_fisher` is `["mutation_rate"]` -- Caterva

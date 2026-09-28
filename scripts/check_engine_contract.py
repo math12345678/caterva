@@ -97,7 +97,7 @@ def verify_module_exports() -> List[str]:
     
     # Expected module structure
     expected_modules = [
-        'core', 'continuous', 'discrete', 'scenarios'
+        'core', 'continuous', 'discrete'
     ]
     
     # Expected core submodules
@@ -117,7 +117,9 @@ def verify_module_exports() -> List[str]:
     
     # Check discrete submodules
     discrete_dir = caterva_dir / 'discrete'
-    expected_discrete = ['__init__.py', 'pcr.py', 'monte_carlo.py', 'molecular_dynamics.py', 'gillespie_ssa.py', 'population_genetics']
+    # pcr, monte_carlo, molecular_dynamics, population_genetics and scenarios
+    # were archived on 2026-09-27 (archive/legacy_domains/).
+    expected_discrete = ['__init__.py', 'gillespie_ssa.py']
     
     for discrete_file in expected_discrete:
         if discrete_file == 'population_genetics':

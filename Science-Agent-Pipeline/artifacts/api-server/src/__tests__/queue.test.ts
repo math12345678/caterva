@@ -75,14 +75,14 @@ describe("updateJob", () => {
       const unsub = queue.subscribe(job.jobId, (updated) => {
         expect(updated.status).toBe("completed");
         expect(updated.result).toBeDefined();
-        expect(updated.result!.domain).toBe("sir");
+        expect(updated.result!.domain).toBe("mm");
         unsub();
         // reset queue after test
         done();
       });
       queue.setJobResult(job.jobId, {
         runId: "r1",
-        domain: "sir",
+        domain: "mm",
         parameters: {},
         trajectory: [],
         provenance: { reasoning: "test", modelCitations: [], flags: [] },
@@ -196,7 +196,7 @@ describe("cancelJob", () => {
     const job = queue.createJob("already done");
     queue.setJobResult(job.jobId, {
       runId: "r1",
-      domain: "sir",
+      domain: "mm",
       parameters: {},
       trajectory: [],
       provenance: { reasoning: "x", modelCitations: [], flags: [] },

@@ -38,7 +38,7 @@ COMMANDS = {
     "compose": ("caterva.compose.__main__", "the model builder and its analyses"),
     "structure": ("caterva.structure.__main__", "an enzyme's PDB structures, cited, and a ChimeraX script"),
     "md": ("caterva.md.__main__", "a GROMACS setup whose every parameter is measured, chosen or cited"),
-    "sim": ("caterva.cli", "the simulation engine: wf, kimura, ne, sweep, scenarios, ld, ssa"),
+    "sim": ("caterva.cli", "exact stochastic chemical kinetics (Gillespie SSA)"),
 }
 
 USAGE = """caterva {version} -- mechanistic models whose every number says where it came from.

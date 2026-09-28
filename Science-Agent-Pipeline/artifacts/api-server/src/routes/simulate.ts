@@ -17,7 +17,7 @@ import type { ModelGroundingReport } from "../lib/modelGrounding";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
-import { asSimulationDomain, runCaterva, type SimulationDomain, type CatervaResult } from "../lib/catervaRunner";
+import { asSimulationDomain, isSimulationDomain, runCaterva, type SimulationDomain, type CatervaResult } from "../lib/catervaRunner";
 import { SimulationParameterSchemas, CustomModelBody } from "../lib/schemas";
 import {
   NetworkRequestSchema,
@@ -1354,6 +1354,10 @@ async function findCachedSimulation(
 
     const row = rows[0];
     if (!row) return undefined;
+    // A row stored before a domain was archived (2026-09-27) is not replayed:
+    // this build no longer runs that domain, and a cache hit would serve a
+    // result the engine can no longer reproduce.
+    if (!isSimulationDomain(row.domain)) return undefined;
 
     return {
       // The row's own createdAt, which is also what the replay notice

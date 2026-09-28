@@ -30,7 +30,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { ReproducibilityService, recordsDir } from '../reproducibilityEngine';
+import { ReproducibilityService, legacyRecordsDir, recordsDir } from '../reproducibilityEngine';
 
 let home: string;
 let originalHome: string | undefined;
@@ -160,5 +160,23 @@ describe('persistence never turns a good run into a failed one', () => {
 
     // Still usable within this process, which is what the caller needs now.
     expect(service.getRecord('job_eps')).toBeDefined();
+  });
+});
+
+describe('records written under the old name still verify', () => {
+  it('reads a record from ~/.terrium/records, and writes new ones to ~/.caterva', () => {
+    // A job recorded before the rename. Copy a real record there by hand,
+    // as an older version of Caterva would have left it.
+    const writer = new ReproducibilityService();
+    writer.recordExecution('job_legacy', 'ldh / pyruvate', INPUTS, CONDITIONS, OUTPUT);
+    fs.mkdirSync(legacyRecordsDir(), { recursive: true });
+    fs.renameSync(
+      path.join(recordsDir(), 'job_legacy.json'),
+      path.join(legacyRecordsDir(), 'job_legacy.json'),
+    );
+
+    const reader = new ReproducibilityService();
+    expect(reader.getRecord('job_legacy')?.jobId).toBe('job_legacy');
+    expect(fs.existsSync(path.join(recordsDir(), 'job_legacy.json'))).toBe(false);
   });
 });

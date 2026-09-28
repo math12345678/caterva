@@ -50,11 +50,6 @@ describe('acceptance follows the pipeline, not a copy of it', () => {
     }
   });
 
-  it('accepts `sir`, which the old list made unreachable over HTTP', () => {
-    // ADR 0020 wired epidemiology end to end. The API refused it for as
-    // long as both existed, because the list predated the domain.
-    expect(accepts('sir')).toBe(true);
-  });
 
   it('accepts `mm`, so the CLI and the API share a vocabulary', () => {
     // `sweep mm --parameter ...` is the CLI's own documented example. A

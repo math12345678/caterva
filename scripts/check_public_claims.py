@@ -79,18 +79,42 @@ def _integrator_is_fixed_step() -> tuple[bool, str]:
     )
 
 
-def _four_domains_are_built() -> tuple[bool, str]:
-    """True while PCR, Monte Carlo, popgen and MD exist in the engine."""
+def _four_domains_are_archived() -> tuple[bool, str]:
+    """True while PCR, Monte Carlo, popgen and MD sit in the archive.
+
+    Until 2026-09-27 this checked they were BUILT, because the FAQ called
+    them "Planned" while they shipped. Caterva then narrowed to enzymes and
+    archived them. "Planned" is still wrong -- archived is not planned --
+    so the rule stands, re-anchored on where the code now is.
+    """
+    base = ROOT / "archive" / "legacy_domains"
     paths = {
-        "PCR": ROOT / "caterva" / "discrete" / "pcr.py",
-        "Monte Carlo": ROOT / "caterva" / "discrete" / "monte_carlo.py",
-        "population genetics": ROOT / "caterva" / "discrete" / "population_genetics",
-        "molecular dynamics": ROOT / "caterva" / "discrete" / "molecular_dynamics.py",
+        "PCR": base / "pcr.py",
+        "Monte Carlo": base / "monte_carlo.py",
+        "population genetics": base / "population_genetics",
+        "molecular dynamics": base / "molecular_dynamics.py",
     }
     missing = [name for name, path in paths.items() if not path.exists()]
     if missing:
-        return False, f"these are no longer built: {missing}; 'Planned' may be right again"
-    return True, "all four exist under caterva/discrete/"
+        return False, f"these are no longer in the archive: {missing}; re-check what the phrase should say"
+    return True, "all four are archived under archive/legacy_domains/"
+
+
+def _counts_are_checked() -> tuple[bool, str]:
+    """True while test counts are verified against the tree on every build."""
+    guard = ROOT / "scripts" / "check_documented_counts.py"
+    if not guard.exists():
+        return False, "check_documented_counts.py is gone; a hardcoded count may be the only one left"
+    return True, "check_documented_counts.py derives counts from the tree"
+
+
+def _tolerances_vary() -> tuple[bool, str]:
+    """True while the suite uses tolerances looser than 1e-10 somewhere."""
+    loose = any("1e-4" in p.read_text(encoding="utf-8", errors="replace")
+                for p in (ROOT / "caterva" / "tests").glob("test_*.py"))
+    if not loose:
+        return False, "no test uses a tolerance as loose as 1e-4 any more; re-check the phrase"
+    return True, "tolerances still range down to 1e-4"
 
 
 #: forbidden phrase -> (why it is wrong, predicate re-deriving that from code)
@@ -105,22 +129,22 @@ CLAIMS: dict[str, tuple[str, Callable[[], tuple[bool, str]]]] = {
         _integrator_is_fixed_step,
     ),
     "Planned: PCR": (
-        "PCR, Monte Carlo, population genetics and molecular dynamics all "
-        "ship in caterva/discrete/ -- listing them as planned understates the "
-        "product and is simply out of date",
-        _four_domains_are_built,
+        "PCR, Monte Carlo, population genetics and molecular dynamics were "
+        "archived on 2026-09-27 when Caterva narrowed to enzymes; they are "
+        "not planned, and saying so promises work that is not coming",
+        _four_domains_are_archived,
     ),
     "304+ tests": (
         "the real count is over 1,800 and is checked on every build by "
         "check_documented_counts.py; a hardcoded figure here drifts silently",
-        _four_domains_are_built,
+        _counts_are_checked,
     ),
     "to 1e-10 tolerance": (
         "tolerances range from 1e-10 on analytic cases to 1e-4 where a "
         "stochastic method makes anything tighter meaningless. Stating the "
         "tightest as the general case is the same defect as a fabricated "
         "number, one step smaller",
-        _four_domains_are_built,
+        _tolerances_vary,
     ),
 }
 

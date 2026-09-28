@@ -39,8 +39,7 @@ vi.mock("../lib/llmResolver", async (importOriginal) => {
 // beta/gamma supplied so the epidemiology bridge short-circuits: no
 // network, and what is under test is the citation handling.
 const QUERY =
-  "model a covid-19 outbreak in a town of 10000 people with 5 infected " +
-  "over 60 days beta=0.5 gamma=0.2";
+  "michaelis menten kinetics with km=0.5 vmax=2 s0=10";
 
 /** A reference that does not exist, in the shape a model would invent. */
 const FABRICATED =
@@ -50,7 +49,7 @@ const FABRICATED =
 
 const llmReturns = (modelCitations: string[]) => {
   vi.mocked(resolveQueryWithLLM).mockResolvedValue({
-    domain: "sir",
+    domain: "mm",
     parameters: {},
     reasoning: "test",
     modelCitations,
@@ -77,13 +76,13 @@ describe("model-authored citations never reach the caller", () => {
   }, 60000);
 
   it("still publishes the curated domain citation", async () => {
-    // The fix must not be "return no citations". The SIR entry is real,
-    // checked, and the thing a reader is entitled to.
+    // The fix must not be "return no citations". The Michaelis-Menten entry
+    // is real, checked, and the thing a reader is entitled to.
     llmReturns([FABRICATED]);
     const resolved = await resolveQuery(QUERY);
 
     expect(resolved.provenance.modelCitations.length).toBe(1);
-    expect(resolved.provenance.modelCitations[0]).toMatch(/Kermack/);
+    expect(resolved.provenance.modelCitations[0]).toMatch(/Michaelis/);
   }, 60000);
 
   it("says that it discarded something, rather than dropping it silently", async () => {
@@ -122,11 +121,11 @@ describe("model-authored citations never reach the caller", () => {
     // silently lost on four of the paths through resolveQuery, so it is
     // appended at final assembly instead. This pins that.
     //
-    // An epidemiology query with beta/gamma supplied takes the bridge
-    // path; the assertion is that the flag is present anyway.
+    // An enzyme query with km/vmax supplied takes the override path; the
+    // assertion is that the flag is present anyway.
     llmReturns([FABRICATED]);
     const resolved = await resolveQuery(QUERY);
-    expect(resolved.domain).toBe("sir");
+    expect(resolved.domain).toBe("mm");
     expect(
       resolved.provenance.flags.some((f) =>
         f.startsWith("discarded_unverified_model_citation"),

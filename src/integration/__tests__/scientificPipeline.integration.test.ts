@@ -427,21 +427,21 @@ describe('ScientificPipeline Fail-Fast Behavior', () => {
     expect(response.validated).toBe(true);
   });
 
-  it('classifies an epidemic query as sir and names the SIR parameters it needs', async () => {
-    // The other half: the fix must not turn every query into mm. An SIR
-    // query with no SIR parameters must still be blocked, and must be
-    // blocked for the RIGHT parameters.
+  it('refuses an epidemic query rather than running it as an enzyme', async () => {
+    // The other half: the fix must not turn every query into mm. SIR was
+    // archived on 2026-09-27 when Caterva narrowed to enzymes, so an
+    // epidemic query must now stop at Layer 1 as a domain this pipeline
+    // does not run -- never be simulated as Michaelis-Menten.
     const response = await pipeline.execute({
       query: 'sir epidemic outbreak',
       parameters: {}
     });
 
     expect(response.validated).toBe(false);
-    const errors = response.validationErrors.join(' ');
-    expect(errors).toMatch(/beta/);
-    expect(errors).toMatch(/gamma/);
-    expect(errors).not.toMatch(/does not name a domain/i);
+    expect(response.validationErrors.join(' ')).toMatch(/does not name a domain/i);
+    expect(response.results.trajectory).toHaveLength(0);
   });
+
 
   it('should stop on parameter out of range', async () => {
     const request: SimulationRequest = {

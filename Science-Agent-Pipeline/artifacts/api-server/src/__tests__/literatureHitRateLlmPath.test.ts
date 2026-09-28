@@ -30,13 +30,12 @@ vi.mock("../lib/llmResolver", async (importOriginal) => {
 // and no network call is made. What is under test is the recording, not
 // the R0 lookup.
 const QUERY =
-  "model a covid-19 outbreak in a town of 10000 people with 5 infected " +
-  "over 60 days beta=0.5 gamma=0.2";
+  "michaelis menten kinetics with km=0.5 vmax=2 s0=10";
 
 beforeEach(() => {
   verifiableMetricsCollector.reset();
   vi.mocked(resolveQueryWithLLM).mockResolvedValue({
-    domain: "sir",
+    domain: "mm",
     parameters: {},
     reasoning: "test",
     modelCitations: [],
@@ -65,7 +64,7 @@ describe("literature-hit accounting on the LLM path", () => {
   }, 60000);
 
   it("counts user-supplied values as attempts, not as literature hits", async () => {
-    // beta and gamma came from the query text. They are attempts the
+    // km and vmax came from the query text. They are attempts the
     // literature did not answer, and counting them as hits would inflate
     // the rate with numbers the user typed themselves.
     await resolveQuery(QUERY);

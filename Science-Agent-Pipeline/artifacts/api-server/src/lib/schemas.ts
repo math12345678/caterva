@@ -96,62 +96,10 @@ export const SimulationParameterSchemas: Record<
     end: optionalNumeric,
     points: integer.nullish(),
   }),
-  sir: z.object({
-    beta: numeric,
-    gamma: numeric,
-    s0: numeric,
-    i0: numeric,
-    r0_recovered: optionalNumeric,
-    end: optionalNumeric,
-    points: integer.nullish(),
-  }),
-  seir: z.object({
-    beta: numeric,
-    sigma: numeric,
-    gamma: numeric,
-    s0: numeric,
-    e0: numeric,
-    i0: numeric,
-    r0_recovered: optionalNumeric,
-    end: optionalNumeric,
-    points: integer.nullish(),
-  }),
   gillespie_ssa: z.object({
     a0: integer,
     k: numeric,
     end: numeric,
-    seed: integer.nullish(),
-  }),
-  pcr: z.object({
-    n0: numeric,
-    efficiency: numeric,
-    cycles: integer,
-  }),
-  wright_fisher: z.object({
-    population_size: integer,
-    starting_frequency: numeric,
-    generations: integer,
-    replicate_runs: integer,
-    mutation_rate: optionalNumeric,
-    selection_coefficient: optionalNumeric,
-    dominance: optionalNumeric,
-    seed: integer.nullish(),
-  }),
-  two_locus_wright_fisher: z.object({
-    population_size: integer,
-    generations: integer,
-    recombination_rate: numeric,
-    starting_frequencies: z.array(numeric).length(4),
-    replicate_runs: integer,
-    mutation_rate: optionalNumeric,
-    seed: integer.nullish(),
-  }),
-  molecular_dynamics: z.object({
-    n_particles: integer,
-    temperature: numeric,
-    timestep: numeric,
-    n_steps: integer,
-    density: numeric.optional(),
     seed: integer.nullish(),
   }),
   gillespie_ssa_bimolecular: z.object({
@@ -159,10 +107,6 @@ export const SimulationParameterSchemas: Record<
     b0: integer,
     k: numeric,
     end: numeric,
-    seed: integer.nullish(),
-  }),
-  monte_carlo_pi: z.object({
-    n_samples: integer,
     seed: integer.nullish(),
   }),
   gillespie_ssa_replicates: z.object({
@@ -177,27 +121,6 @@ export const SimulationParameterSchemas: Record<
   // are the source papers' own standard parameter sets, not caller inputs
   // -- see caterva/continuous/model_building.py -- so only the
   // integration window is a request-time parameter.
-  lotka_volterra: z
-    .object({
-      alpha: optionalNumeric,
-      beta: optionalNumeric,
-      gamma: optionalNumeric,
-      delta: optionalNumeric,
-      p0: optionalNumeric,
-      v0: optionalNumeric,
-      end: optionalNumeric,
-      points: integer.nullish(),
-    }),
-  cell_cycle_oscillator: z.object({
-    end: optionalNumeric,
-    points: integer.nullish(),
-    seed: integer.nullish(),
-  }),
-  repressilator: z.object({
-    end: optionalNumeric,
-    points: integer.nullish(),
-    seed: integer.nullish(),
-  }),
   sbml: z.object({
     sbml_string: z.string(),
     start: optionalNumeric,
