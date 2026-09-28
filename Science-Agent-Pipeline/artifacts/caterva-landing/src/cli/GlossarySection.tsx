@@ -8,17 +8,17 @@ interface Term {
   term: string;
   symbol?: string | null;
   definition: string;
-  category: "math" | "bio" | "epi" | "engine";
+  category: "math" | "bio" | "md" | "engine";
 }
 
 const CATEGORY_STYLES: Record<
   Term["category"],
   { label: string; color: string; bg: string }
 > = {
-  math: { label: "math", color: "#3B82F6", bg: "bg-[#3B82F6]/10" },
-  bio: { label: "bio", color: "#1D8A72", bg: "bg-[#1D8A72]/10" },
-  epi: { label: "epi", color: "#EF4444", bg: "bg-[#EF4444]/10" },
-  engine: { label: "engine", color: "#F59E0B", bg: "bg-[#F59E0B]/10" },
+  math: { label: "math", color: "#6A6E78", bg: "bg-muted/10" },
+  bio: { label: "bio", color: "#5D7F8D", bg: "bg-signal/10" },
+  md: { label: "md", color: "#2A2D35", bg: "bg-fg/10" },
+  engine: { label: "engine", color: "#946522", bg: "bg-caution/10" },
 };
 
 const TERMS: Term[] = [
@@ -63,43 +63,51 @@ const TERMS: Term[] = [
     category: "bio",
   },
   {
-    id: "sir",
-    term: "Susceptible-Infected-Recovered Model",
-    symbol: "SIR",
+    id: "ki",
+    term: "Inhibition Constant",
+    symbol: "K\u1D62",
     definition:
-      "A compartmental epidemiological model where the population flows from Susceptible (S) → Infected (I) → Recovered (R). Governed by transmission rate β and recovery rate γ. Population N = S+I+R is conserved.",
-    category: "epi",
+      "The dissociation constant of an enzyme-inhibitor complex. A competitive inhibitor at concentration [I] raises the apparent Km to Km(1 + [I]/Ki) and leaves Vmax unchanged.",
+    category: "bio",
   },
   {
-    id: "r0",
-    term: "Basic Reproduction Number",
-    symbol: "R\u2080",
+    id: "catalytic-residue",
+    term: "Catalytic Residue",
+    symbol: null,
     definition:
-      "The average number of secondary infections caused by one infected individual in a fully susceptible population. R₀ = β/γ. If R₀ > 1, an epidemic occurs; if R₀ < 1, the outbreak fades.",
-    category: "epi",
+      "A residue that takes part in the chemistry, as curated by the Mechanism and Catalytic Site Atlas (M-CSA). caterva prepare maps them onto your structure by alignment and ranks every defect by its distance to them.",
+    category: "md",
   },
   {
-    id: "beta",
-    term: "Transmission Rate",
-    symbol: "\u03B2",
+    id: "replica",
+    term: "Replica",
+    symbol: null,
     definition:
-      "The rate at which susceptible individuals become infected upon contact with infected individuals. Units: 1/day. Higher β means faster spread.",
-    category: "epi",
+      "An independent run from the same starting structure with different initial velocities. One trajectory is one sample; a spread across replicas is what makes a simulated quantity a result.",
+    category: "md",
   },
   {
-    id: "gamma",
-    term: "Recovery Rate",
-    symbol: "\u03B3",
+    id: "block-averaging",
+    term: "Block Averaging",
+    symbol: null,
     definition:
-      "The rate at which infected individuals recover (or are removed). 1/γ is the average infectious period in days.",
-    category: "epi",
+      "Flyvbjerg and Petersen (1989): averaging a correlated time series in ever longer blocks until its error stops growing. It is how caterva md --summarise tells a converged run from one shorter than its own correlation time.",
+    category: "md",
+  },
+  {
+    id: "rmsf",
+    term: "Root-Mean-Square Fluctuation",
+    symbol: "RMSF",
+    definition:
+      "How far each residue moves about its average position during a run. caterva analyze compares the active-site pocket with the rest of the protein.",
+    category: "md",
   },
   {
     id: "conserved",
     term: "Conserved Quantity",
     symbol: null,
     definition:
-      "A value that remains constant throughout a simulation — e.g., total population N = S+I+R in SIR models, or enzyme mass balance. Caterva checks these invariants at every timestep as a validation signal.",
+      "A value that remains constant throughout a simulation — e.g., molecule count a + c = a0 in a bimolecular SSA, or substrate plus product in Michaelis-Menten. Caterva checks these invariants at every timestep as a validation signal.",
     category: "engine",
   },
   {
@@ -136,20 +144,20 @@ export default function GlossarySection() {
     >
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#3B82F6] text-[11px] font-mono font-medium">
+          <span className="text-muted text-[11px] font-mono font-medium">
             glossary
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-muted/20 to-transparent" />
         </div>
         <h2 className="section-header">Key terms</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
           A quick reference for students and researchers. Click any term to
           expand.
         </p>
 
         <TerminalWindow path="~ — caterva glossary" glow>
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span>{" "}
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span>{" "}
             <span className="font-mono text-[12px]">
               caterva glossary --all
             </span>
@@ -163,13 +171,13 @@ export default function GlossarySection() {
                 onClick={() => setFilter(cat)}
                 className={`px-2.5 py-1 rounded-md text-[10px] font-mono transition-all duration-200 ${
                   filter === cat
-                    ? "bg-white/[0.06] text-white/80 border border-white/[0.08]"
-                    : "text-white/25 hover:text-white/50 border border-transparent"
+                    ? "bg-fg/[0.06] text-fg/85 border border-fg/[0.16]"
+                    : "text-fg/66 hover:text-fg/76 border border-transparent"
                 }`}
               >
                 {cat}
                 {cat !== "all" && (
-                  <span className="ml-1 text-white/15">
+                  <span className="ml-1 text-fg/66">
                     ({TERMS.filter((t) => t.category === cat).length})
                   </span>
                 )}
@@ -178,7 +186,7 @@ export default function GlossarySection() {
           </div>
 
           {/* Terms list */}
-          <div className="space-y-0 divide-y divide-white/[0.04]">
+          <div className="space-y-0 divide-y divide-fg/[0.04]">
             {filtered.map((term) => {
               const catStyle = CATEGORY_STYLES[term.category];
               const isOpen = openId === term.id;
@@ -197,11 +205,11 @@ export default function GlossarySection() {
                       {catStyle.label}
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="text-[12px] text-white/70 font-sans group-hover:text-white/90 transition-colors">
+                      <span className="text-[12px] text-fg/78 font-sans group-hover:text-fg/92 transition-colors">
                         {term.term}
                       </span>
                       {term.symbol && (
-                        <span className="ml-1.5 text-[11px] text-white/25 font-mono">
+                        <span className="ml-1.5 text-[11px] text-fg/66 font-mono">
                           ({term.symbol})
                         </span>
                       )}
@@ -209,7 +217,7 @@ export default function GlossarySection() {
                     <motion.span
                       animate={{ rotate: isOpen ? 180 : 0 }}
                       transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                      className="text-white/15 text-[10px] shrink-0"
+                      className="text-fg/66 text-[10px] shrink-0"
                     >
                       <svg className="w-3 h-3" viewBox="0 0 10 10" fill="none">
                         <path
@@ -232,7 +240,7 @@ export default function GlossarySection() {
                         transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                         className="overflow-hidden"
                       >
-                        <p className="pl-[72px] pr-2 pb-3 text-[11px] text-white/40 leading-relaxed">
+                        <p className="pl-[72px] pr-2 pb-3 text-[11px] text-fg/70 leading-relaxed">
                           {term.definition}
                         </p>
                       </motion.div>
@@ -243,7 +251,7 @@ export default function GlossarySection() {
             })}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-white/[0.04] text-[10px] text-white/15 font-mono">
+          <div className="mt-4 pt-3 border-t border-fg/[0.08] text-[10px] text-fg/66 font-mono">
             {filtered.length} term{filtered.length !== 1 ? "s" : ""}
             {filter !== "all" && ` in ${filter}`}
           </div>

@@ -1,3 +1,4 @@
+import { GUARD_COUNT, LIVE_DOMAIN_COUNT } from "@/lib/domains";
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import AnimatedCounter from "@/components/ui/animated-counter";
@@ -21,28 +22,28 @@ const METRICS: MetricItem[] = [
     target: totals().passed,
     suffix: "",
     label: "tests passing",
-    color: "#1D8A72",
+    color: "#5D7F8D",
   },
   {
     key: "domains",
-    target: 15,
+    target: LIVE_DOMAIN_COUNT,
     suffix: "",
-    label: "simulation domains",
-    color: "#3B82F6",
+    label: "live capabilities",
+    color: "#6A6E78",
   },
   {
     key: "sources",
     target: 3,
     suffix: "",
     label: "literature sources",
-    color: "#F59E0B",
+    color: "#946522",
   },
   {
     key: "guards",
-    target: 72,
+    target: GUARD_COUNT,
     suffix: "",
     label: "correctness guards",
-    color: "#8B5CF6",
+    color: "#6A6E78",
   },
 ];
 
@@ -94,7 +95,7 @@ export default function MetricsBar({ className = "" }: { className?: string }) {
               <span>0{m.suffix}</span>
             )}
           </span>
-          <span className="text-[11px] text-white/25">{m.label}</span>
+          <span className="text-[11px] text-fg/66">{m.label}</span>
         </motion.div>
       ))}
     </div>

@@ -16,19 +16,11 @@ const MILESTONES: Milestone[] = [
   {
     id: "classroom-pilot",
     title: "Classroom Pilot Program",
-    desc: "First cohort of university teaching labs using Caterva for enzyme kinetics and epidemiology coursework.",
+    desc: "First cohort of university teaching labs using Caterva for enzyme kinetics and molecular dynamics coursework.",
     status: "in-progress",
     eta: "Fall 2026",
     icon: "\u{1F393}",
-    color: "#1D8A72",
-  },
-  {
-    id: "pcr-domain",
-    title: "PCR Amplification Domain",
-    desc: "PCR cycle simulation — exact closed-form growth, plateau modeling, mutation-verified.",
-    status: "live",
-    icon: "\u{1F9EC}",
-    color: "#3B82F6",
+    color: "#5D7F8D",
   },
   {
     id: "batch-api",
@@ -37,23 +29,7 @@ const MILESTONES: Milestone[] = [
     status: "planned",
     eta: "Q1 2027",
     icon: "\u2699",
-    color: "#F59E0B",
-  },
-  {
-    id: "monte-carlo",
-    title: "Monte Carlo / Stochastic Solver",
-    desc: "Gillespie SSA (decay, bimolecular association, replicate ensembles) and Monte Carlo estimation — stochastic simulation for small-number regimes.",
-    status: "live",
-    icon: "\u{1F3B2}",
-    color: "#8B5CF6",
-  },
-  {
-    id: "population-genetics",
-    title: "Population Genetics Domain",
-    desc: "Wright-Fisher drift and selection, plus two-locus linkage disequilibrium.",
-    status: "live",
-    icon: "\u{1F9EC}",
-    color: "#EC4899",
+    color: "#946522",
   },
   {
     id: "sbml-export",
@@ -62,7 +38,7 @@ const MILESTONES: Milestone[] = [
     status: "planned",
     eta: "Q3 2027",
     icon: "\u{1F4E6}",
-    color: "#F97316",
+    color: "#946522",
   },
   {
     id: "self-hosted",
@@ -70,15 +46,55 @@ const MILESTONES: Milestone[] = [
     desc: "Docker Compose + Kubernetes Helm charts for universities wanting on-premise deployment.",
     status: "exploring",
     icon: "\u{1F3D7}",
-    color: "#06B6D4",
+    color: "#6A6E78",
   },
   {
-    id: "molecular-dynamics",
-    title: "Molecular Dynamics Setup",
-    desc: "Natural-language configuration of MD simulations — force fields, solvation, and equilibration, already live for Lennard-Jones clusters.",
+    id: "stochastic",
+    title: "Exact Stochastic Kinetics",
+    desc: "Gillespie SSA: first-order decay, bimolecular association and replicate ensembles, each checked against its closed form.",
+    status: "live",
+    icon: "\u{1F3B2}",
+    color: "#5D7F8D",
+  },
+  {
+    id: "structure-audit",
+    title: "Structure Preparation Audit",
+    desc: "caterva prepare: sequence differences, chain breaks and truncated side chains, ranked by distance to the M-CSA catalytic residues.",
+    status: "live",
+    icon: "\u{1F52C}",
+    color: "#5D7F8D",
+  },
+  {
+    id: "md-replicas",
+    title: "GROMACS Setup and Replicas",
+    desc: "caterva md at the assay conditions of a cited constant, three replicas by default, and a convergence verdict from block averaging.",
     status: "live",
     icon: "\u269B",
-    color: "#10B981",
+    color: "#5D7F8D",
+  },
+  {
+    id: "enzyme-analysis",
+    title: "Enzyme Trajectory Analysis",
+    desc: "caterva analyze: catalytic geometry and active-site flexibility against the crystal, reported only when the replicas agree.",
+    status: "live",
+    icon: "\u{1F4CF}",
+    color: "#5D7F8D",
+  },
+  {
+    id: "ligands",
+    title: "Ligands with Provenance",
+    desc: "Parameterise bound substrates and inhibitors with GAFF2 or OpenFF, recording the charge method, and show where the two disagree.",
+    status: "planned",
+    icon: "\u{1F9EA}",
+    color: "#946522",
+  },
+  {
+    id: "ki-bridge",
+    title: "Simulation beside Measured Ki",
+    desc: "Binding free energies set beside the cited inhibition constant at its assay conditions, with both uncertainties shown.",
+    status: "planned",
+    icon: "\u2696",
+    color: "#946522",
   },
 ];
 
@@ -88,27 +104,27 @@ const STATUS_CONFIG: Record<
 > = {
   live: {
     label: "Live",
-    bg: "bg-[#1D8A72]/15",
-    text: "text-[#1D8A72]",
-    dot: "bg-[#1D8A72]",
+    bg: "bg-signal/15",
+    text: "text-signal",
+    dot: "bg-signal",
   },
   "in-progress": {
     label: "In Progress",
-    bg: "bg-[#3B82F6]/15",
-    text: "text-[#3B82F6]",
-    dot: "bg-[#3B82F6] animate-pulse",
+    bg: "bg-muted/15",
+    text: "text-muted",
+    dot: "bg-muted animate-pulse",
   },
   planned: {
     label: "Planned",
-    bg: "bg-[#F59E0B]/10",
-    text: "text-[#F59E0B]/80",
-    dot: "bg-[#F59E0B]/60",
+    bg: "bg-caution/10",
+    text: "text-caution/80",
+    dot: "bg-caution/60",
   },
   exploring: {
     label: "Exploring",
-    bg: "bg-white/[0.04]",
-    text: "text-white/35",
-    dot: "bg-white/20",
+    bg: "bg-fg/[0.04]",
+    text: "text-fg/70",
+    dot: "bg-fg/20",
   },
 };
 
@@ -120,19 +136,19 @@ export default function RoadmapSection() {
     >
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#3B82F6] text-[11px] font-mono font-medium">
+          <span className="text-muted text-[11px] font-mono font-medium">
             ROADMAP
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#3B82F6]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-muted/20 to-transparent" />
         </div>
         <h2 className="section-header">What's coming next</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-sm">
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
           Our public roadmap. Everything we're building, in the open.
         </p>
 
         <TerminalWindow path="~ — caterva roadmap --list" glow>
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span> caterva roadmap --list
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span> caterva roadmap --list
             --sort=status
           </div>
 
@@ -161,7 +177,7 @@ export default function RoadmapSection() {
               className="absolute left-[19px] top-2 bottom-2 w-px"
               style={{
                 background:
-                  "linear-gradient(to bottom, rgba(59,130,246,0.3), rgba(59,130,246,0.15), rgba(139,92,246,0.1), transparent)",
+                  "linear-gradient(to bottom, rgba(106,110,120,0.3), rgba(106,110,120,0.15), rgba(106,110,120,0.1), transparent)",
               }}
             />
 
@@ -200,7 +216,7 @@ export default function RoadmapSection() {
                           {m.icon}
                         </span>
                         <h3
-                          className="text-[14px] font-sans font-medium transition-colors group-hover:text-white/90"
+                          className="text-[14px] font-sans font-medium transition-colors group-hover:text-fg/92"
                           style={{ color: m.color }}
                         >
                           {m.title}
@@ -211,12 +227,12 @@ export default function RoadmapSection() {
                           {cfg.label}
                         </span>
                         {m.eta && (
-                          <span className="text-[10px] text-white/20 font-mono">
+                          <span className="text-[10px] text-fg/66 font-mono">
                             {m.eta}
                           </span>
                         )}
                       </div>
-                      <p className="text-[12px] text-white/35 leading-relaxed group-hover:text-white/45 transition-colors">
+                      <p className="text-[12px] text-fg/70 leading-relaxed group-hover:text-fg/70 transition-colors">
                         {m.desc}
                       </p>
                     </div>
@@ -226,13 +242,13 @@ export default function RoadmapSection() {
             </div>
           </div>
 
-          <div className="mt-6 pt-4 border-t border-white/[0.04] flex items-center gap-3 text-[11px] text-white/25">
-            <span className="text-[#3B82F6]">?</span>
+          <div className="mt-6 pt-4 border-t border-fg/[0.08] flex items-center gap-3 text-[11px] text-fg/66">
+            <span className="text-muted">?</span>
             <span>
               Have a feature request?{" "}
               <a
                 href="mailto:admin.terrium@gmail.com"
-                className="text-[#3B82F6]/60 hover:text-[#3B82F6] transition-colors"
+                className="text-muted/60 hover:text-muted transition-colors"
               >
                 admin.terrium@gmail.com
               </a>{" "}

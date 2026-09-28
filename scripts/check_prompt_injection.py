@@ -31,6 +31,12 @@ matching English phrases in legitimate documentation:
   * CliApp.tsx                 a decorative pulse-dot carrying aria-hidden,
                                which is correct accessibility practice.
   * DashboardPreview.tsx       a Tailwind `overflow-hidden` layout class.
+  * mule/chapters.html         (caterva-landing, merged 2026-09-28) the
+                               same three accessibility patterns reviewed in
+                               mule/index.html: a visually-hidden keyboard
+                               hint for screen readers, aria-hidden
+                               decorative brackets, and an empty aria-hidden
+                               rule span. Read at lines 41, 48 and 549.
   * BUILD_PIPELINE.md and co.  docs that mention "Claude" or "LLM", and an
                                API guide with a "System:" line in an example
                                transcript.

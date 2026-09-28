@@ -26,6 +26,17 @@ done: there was no release to version.
   NADH" came back as a Ki of NADH (0.00059 mM). It now matches the row's
   compound cell; `resolve_kinetic_value(..., "NADH", quantity="ki")` is
   not found, as it should be.
+## [Unreleased: site]
+
+### Fixed
+- The website called BRENDA ref 739793's Ki "oxamate". It is not: the
+  ref measures a quinoline sulfonamide against His-tagged human LDH-A, and
+  its 0.00059 mM is competitive against NADH, not pyruvate. The hero and
+  the example gallery now use the same paper's pyruvate row (0.00252 mM,
+  noncompetitive, pH 7.5, 37 C) and draw noncompetitive inhibition (Vmax
+  falls, Km holds). The two example queries naming oxamate are gone: BRENDA
+  has no oxamate Ki for human LDH, so the resolver could not answer them.
+  The 2026 entry below that says "oxamate" is kept as it was written.
 
 ## [0.3.1] - 2026-09-22
 

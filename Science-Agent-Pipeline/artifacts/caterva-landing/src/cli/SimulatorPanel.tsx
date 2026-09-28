@@ -29,7 +29,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-0.5 min-w-0">
-      <span className="text-[9px] text-white/25 uppercase tracking-wide">
+      <span className="text-[9px] text-fg/66 uppercase tracking-wide">
         {label}
       </span>
       <input
@@ -43,7 +43,7 @@ function Field({
           // doesn't stop typed/pasted/cleared values from reaching the integrator.
           onChange(Number.isFinite(v) ? Math.max(min, v) : min);
         }}
-        className="w-full rounded-lg border border-white/[0.06] bg-white/[0.02] px-2.5 py-1.5 text-white/80 text-[12px] outline-none transition-all duration-200 focus:border-[#1D8A72]/30 focus:shadow-[0_0_12px_rgba(29,138,114,0.06)]"
+        className="w-full rounded-lg border border-fg/[0.12] bg-fg/[0.02] px-2.5 py-1.5 text-fg/85 text-[12px] outline-none transition-all duration-200 focus:border-signal/30"
       />
     </label>
   );
@@ -72,9 +72,9 @@ export default function SimulatorPanel(_props: SimulatorPanelProps) {
         initial={{ opacity: 0.4 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.25 }}
-        className="mb-5 text-white/80 text-[12px]"
+        className="mb-5 text-fg/85 text-[12px]"
       >
-        <span className="text-[#1D8A72]">$</span> {command}
+        <span className="text-signal">$</span> {command}
       </motion.div>
 
         <>
@@ -96,31 +96,31 @@ export default function SimulatorPanel(_props: SimulatorPanelProps) {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="rounded-lg border border-white/[0.04] bg-white/[0.01] p-2">
+            <div className="rounded-lg border border-fg/[0.08] bg-fg/[0.01] p-2">
               <LineChart
                 data={mm.trajectory}
-                series={[{ key: "S", color: "#1D8A72" }]}
+                series={[{ key: "S", color: "#5D7F8D" }]}
               />
             </div>
           </motion.div>
-          <div className="mt-4 text-[11px] text-white/30 space-y-1.5">
+          <div className="mt-4 text-[11px] text-fg/70 space-y-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-white/20">rate law:</span>
-              <span className="text-white/50">
+              <span className="text-fg/66">rate law:</span>
+              <span className="text-fg/76">
                 dS/dt = -Vmax&middot;S / (Km + S)
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-white/20">final [S] at t={mmEnd}:</span>
-              <span className="text-white/50">
+              <span className="text-fg/66">final [S] at t={mmEnd}:</span>
+              <span className="text-fg/76">
                 {mm.trajectory[mm.trajectory.length - 1].S.toFixed(3)}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-white/20">residual:</span>
+              <span className="text-fg/66">residual:</span>
               <span
                 className={
-                  mm.finalResidual < 1e-2 ? "text-[#1D8A72]" : "text-yellow-500"
+                  mm.finalResidual < 1e-2 ? "text-signal" : "text-yellow-500"
                 }
               >
                 {mm.finalResidual.toExponential(2)}
@@ -132,7 +132,7 @@ export default function SimulatorPanel(_props: SimulatorPanelProps) {
           </div>
         </>
 
-      <div className="mt-5 pt-4 border-t border-white/[0.04] text-[11px] text-white/20 leading-relaxed">
+      <div className="mt-5 pt-4 border-t border-fg/[0.08] text-[11px] text-fg/66 leading-relaxed">
         Runs RK4 integration in your browser using the same rate laws verified
         in caterva/caterva_engine.py. The production engine integrates via
         roadrunner against exact closed-form solutions to 1e-10; this demo

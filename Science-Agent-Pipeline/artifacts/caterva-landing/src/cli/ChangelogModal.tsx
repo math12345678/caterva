@@ -84,22 +84,22 @@ const TAG_STYLES: Record<
   { bg: string; text: string; icon: string; dotColor: string }
 > = {
   feature: {
-    bg: "bg-[#1D8A72]/15",
-    text: "text-[#1D8A72]",
+    bg: "bg-signal/15",
+    text: "text-signal",
     icon: "✦",
-    dotColor: "#1D8A72",
+    dotColor: "#5D7F8D",
   },
   fix: {
-    bg: "bg-[#F59E0B]/15",
-    text: "text-[#F59E0B]",
+    bg: "bg-caution/15",
+    text: "text-caution",
     icon: "◆",
-    dotColor: "#F59E0B",
+    dotColor: "#946522",
   },
   improvement: {
-    bg: "bg-[#3B82F6]/15",
-    text: "text-[#3B82F6]",
+    bg: "bg-muted/15",
+    text: "text-muted",
     icon: "▲",
-    dotColor: "#3B82F6",
+    dotColor: "#6A6E78",
   },
 };
 
@@ -129,7 +129,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm"
+            className="fixed inset-0 z-50 bg-surface/70 backdrop-blur-sm"
             onClick={onClose}
           />
 
@@ -146,25 +146,25 @@ export default function ChangelogModal({ open, onClose }: Props) {
               role="dialog"
               aria-modal="true"
               aria-label="Changelog"
-              className="relative w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border border-white/[0.08] bg-[#0A0E0C] shadow-2xl"
+              className="relative w-full max-w-lg max-h-[80vh] overflow-y-auto rounded-xl border border-fg/[0.16] bg-surface shadow-2xl"
               style={{
                 boxShadow:
-                  "0 0 80px rgba(29,138,114,0.1), 0 30px 60px rgba(0,0,0,0.6)",
+                  "0 0 80px rgba(93,127,141,0.1), 0 30px 60px rgba(42,45,53,0.6)",
               }}
             >
               {/* Terminal title bar */}
-              <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 border-b border-white/[0.05] bg-[#0A0E0C]/95 backdrop-blur-xl">
+              <div className="sticky top-0 z-10 flex items-center gap-2 px-4 py-3 border-b border-fg/[0.10] bg-surface/95 backdrop-blur-xl">
                 <div className="flex gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-red-500/60" />
                   <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/60" />
                   <span className="w-2.5 h-2.5 rounded-full bg-green-500/60" />
                 </div>
-                <span className="flex-1 text-center text-[10px] font-mono text-white/25 uppercase tracking-widest">
+                <span className="flex-1 text-center text-[10px] font-mono text-fg/66 uppercase tracking-widest">
                   changelog — caterva changelog
                 </span>
                 <button
                   onClick={onClose}
-                  className="text-white/25 hover:text-white/60 transition-colors p-2.5 -m-2.5"
+                  className="text-fg/66 hover:text-fg/80 transition-colors p-2.5 -m-2.5"
                   aria-label="Close changelog"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none">
@@ -181,18 +181,18 @@ export default function ChangelogModal({ open, onClose }: Props) {
               {/* Content */}
               <div className="p-5">
                 <div className="mb-5">
-                  <h2 className="text-[15px] font-sans font-medium text-white/80 mb-1">
+                  <h2 className="text-[15px] font-sans font-medium text-fg/85 mb-1">
                     Release notes
                   </h2>
-                  <p className="text-[11px] text-white/30 font-mono">
-                    <span className="text-[#1D8A72]">$</span> caterva changelog
+                  <p className="text-[11px] text-fg/70 font-mono">
+                    <span className="text-signal">$</span> caterva changelog
                     --recent
                   </p>
                 </div>
 
                 {/* Timeline */}
                 <div className="relative">
-                  <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-[#1D8A72]/30 via-[#1D8A72]/10 to-transparent" />
+                  <div className="absolute left-[15px] top-2 bottom-2 w-px bg-gradient-to-b from-signal/30 via-signal/10 to-transparent" />
 
                   <div className="space-y-5">
                     {RELEASES.map((rel, i) => {
@@ -217,7 +217,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                           </div>
 
                           {/* Card */}
-                          <div className="flex-1 min-w-0 pb-4 border-b border-white/[0.03] last:border-b-0">
+                          <div className="flex-1 min-w-0 pb-4 border-b border-fg/[0.06] last:border-b-0">
                             <div className="flex flex-wrap items-center gap-2 mb-1.5">
                               <span
                                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide ${style.bg} ${style.text}`}
@@ -225,14 +225,14 @@ export default function ChangelogModal({ open, onClose }: Props) {
                                 <span>{style.icon}</span>
                                 {rel.tag}
                               </span>
-                              <span className="text-[10px] text-white/20 font-mono">
+                              <span className="text-[10px] text-fg/66 font-mono">
                                 {rel.date}
                               </span>
                             </div>
-                            <h3 className="text-[13px] font-sans font-medium text-white/70 mb-1">
+                            <h3 className="text-[13px] font-sans font-medium text-fg/78 mb-1">
                               {rel.title}
                             </h3>
-                            <p className="text-[11px] text-white/50 leading-relaxed">
+                            <p className="text-[11px] text-fg/76 leading-relaxed">
                               {rel.desc}
                             </p>
                           </div>
@@ -243,7 +243,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                 </div>
 
                 {/* Footer */}
-                <div className="mt-6 pt-3 border-t border-white/[0.04] flex items-center justify-between text-[10px] text-white/20">
+                <div className="mt-6 pt-3 border-t border-fg/[0.08] flex items-center justify-between text-[10px] text-fg/66">
                   <span>{RELEASES.length} releases shown</span>
                   {/* Full history lives in CHANGELOG.md -- not linked here
                       because the repository isn't public yet, and a link

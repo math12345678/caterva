@@ -143,9 +143,9 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "99 test files -- kinetics & Michaelis-Menten correctness, " +
+          "100 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
-          "preparation audit and trajectory analysis, " +
+          "preparation audit and trajectory analysis, binding free-energy targets from cited Ki, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
           "building with influence ranking, mechanism libraries and " +
           "verdicts, agents and assay windows, and citation/build guards",
@@ -158,7 +158,10 @@ export const TEST_SUITES: TestSuite[] = [
         // alone 2026-09-28 (22 passed), and the md replica and
         // convergence tests (26 passed with the setup suite): 2894. Plus
         // the 17 `caterva analyze` tests (42 passed with setup and app): 2911.
-        passed: 2911,
+        // Plus the 27 `caterva bind` tests and the 2 guide examples they
+        // added to test_using_caterva_guide.py (per-file collect diff
+        // against d2ef8b4; all 29 passed 2026-09-28): 2940.
+        passed: 2940,
         skipped: 0,
         failed: 0,
       },
@@ -240,11 +243,14 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "5 test files -- component rendering, nav/section integrity, " +
-          "page-claim accuracy, and disabled-source claims",
-        // Measured 2026-09-28, `vitest run`: 5 files, 33 passed. Three
-        // EpiPlayground claim tests left with that playground.
-        passed: 33,
+          "6 test files -- component rendering, nav/section integrity, " +
+          "page-claim accuracy, disabled-source claims, and the merged " +
+          "MuleRun chapters' content",
+        // Measured 2026-09-28, `vitest run`: 6 files, 39 passed (33, plus
+        // three MergedChapters tests from the MuleRun merge and two that pin
+        // the inhibitor attribution to BRENDA ref 739793's pyruvate row, plus
+        // a render of the hero demo).
+        passed: 39,
         skipped: 0,
         failed: 0,
       },

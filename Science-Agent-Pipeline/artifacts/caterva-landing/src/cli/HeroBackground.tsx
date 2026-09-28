@@ -5,7 +5,7 @@ const blobs = [
     size: 700,
     x: -15,
     y: -20,
-    color: "rgba(29,138,114,0.10)",
+    color: "rgba(93,127,141,0.10)",
     duration: 18,
     delay: 0,
   },
@@ -13,7 +13,7 @@ const blobs = [
     size: 500,
     x: 55,
     y: -5,
-    color: "rgba(59,130,246,0.07)",
+    color: "rgba(106,110,120,0.07)",
     duration: 22,
     delay: -5,
   },
@@ -21,7 +21,7 @@ const blobs = [
     size: 450,
     x: 25,
     y: 45,
-    color: "rgba(245,158,11,0.04)",
+    color: "rgba(148,101,34,0.04)",
     duration: 14,
     delay: -8,
   },
@@ -29,7 +29,7 @@ const blobs = [
     size: 300,
     x: 75,
     y: 55,
-    color: "rgba(139,92,246,0.04)",
+    color: "rgba(106,110,120,0.04)",
     duration: 20,
     delay: -3,
   },
@@ -37,7 +37,7 @@ const blobs = [
     size: 550,
     x: -5,
     y: 60,
-    color: "rgba(29,138,114,0.06)",
+    color: "rgba(93,127,141,0.06)",
     duration: 16,
     delay: -6,
   },
@@ -50,14 +50,14 @@ export default function HeroBackground() {
       style={{ zIndex: 0 }}
     >
       {/* base gradient */}
-      <div className="absolute inset-0 bg-gradient-to-b from-[#050807] via-[#050807] to-[#050807]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-surface via-surface to-surface" />
 
       {/* light wash from top */}
       <div
         className="absolute top-0 left-1/2 -translate-x-1/2 w-[1200px] h-[600px] opacity-[0.15]"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 0%, rgba(29,138,114,0.25) 0%, transparent 60%)",
+            "radial-gradient(ellipse at 50% 0%, rgba(93,127,141,0.25) 0%, transparent 60%)",
         }}
       />
 
@@ -93,7 +93,7 @@ export default function HeroBackground() {
         className="absolute inset-0 opacity-[0.15]"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(29,138,114,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(29,138,114,0.03) 1px, transparent 1px)",
+            "linear-gradient(rgba(93,127,141,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(93,127,141,0.03) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />

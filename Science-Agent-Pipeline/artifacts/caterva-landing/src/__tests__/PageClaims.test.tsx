@@ -206,3 +206,28 @@ describe("presets and samples do not contradict the resolver", () => {
     expect(rendered).toMatch(/"vmax"[\s\S]{0,200}derived: kcat/);
   });
 });
+
+/**
+ * BRENDA ref 739793 is a quinoline sulfonamide against His-tagged human
+ * LDH-A, not oxamate (Tests/fixtures/brenda_ldh_fixture.html). Its pyruvate
+ * row is 0.00252 mM, noncompetitive; its 0.00059 mM is competitive against
+ * NADH. The page once paired 0.00059 with Km(pyruvate) as "Ki (oxamate)".
+ */
+describe("the inhibition demo cites what ref 739793 measured", () => {
+  const files = ["DashboardPreview.tsx", "ExampleGallery.tsx", "CommandPalette.tsx", "AgentSimulator.tsx"]
+    .map((f) => readFileSync(path.join(__dirname, "..", "cli", f), "utf-8"));
+
+  it("never names oxamate or the NADH-row value", () => {
+    for (const src of files) {
+      expect(src.toLowerCase()).not.toContain("oxamate");
+      expect(src).not.toMatch(/KI = 0\.00059|Ki 0\.00059/);
+    }
+  });
+
+  it("uses the pyruvate row and draws noncompetitive inhibition", () => {
+    const [dash, galleryNow] = files;
+    expect(dash).toContain("const KI = 0.00252;");
+    expect(dash).toContain("VMAX / (1 + inhibitor / KI)");
+    expect(galleryNow).toContain("INHIBITOR_KI = 0.00252");
+  });
+});

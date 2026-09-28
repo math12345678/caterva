@@ -127,7 +127,7 @@ svg { display: block; }
    plate, no blur: a bar drawn across the sheet would cover the artifact the
    whole page exists to produce. */
 .masthead.is-on-paper .wordmark { color: var(--void); }
-.masthead.is-on-paper .nav a { color: rgba(7, 11, 12, 0.74); }
+.masthead.is-on-paper .nav a { color: rgba(31, 33, 39, 0.74); }
 .masthead.is-on-paper .nav a:hover,
 .masthead.is-on-paper .nav a:focus-visible { color: var(--void); }
 
@@ -156,7 +156,7 @@ svg { display: block; }
      from 62% down, which put the fade across the navigation itself and let the
      measured ratio fall to 3.8:1 at the end of the crossing. The scrim has to
      be opaque wherever there is type, and may only soften past it. */
-  background: linear-gradient(to bottom, var(--void) 0%, var(--void) 86%, rgba(7, 11, 12, 0) 100%);
+  background: linear-gradient(to bottom, var(--void) 0%, var(--void) 86%, rgba(31, 33, 39, 0) 100%);
   opacity: 1;
   transition: opacity var(--dur-base) var(--ease-glide);
   pointer-events: none;
@@ -171,23 +171,19 @@ svg { display: block; }
 .masthead .nav a { transition: color var(--dur-base) var(--ease-glide); }
 
 .wordmark {
-  font-family: var(--font-sans);
+  font-family: "Spectral", Georgia, "Times New Roman", serif;
   font-size: clamp(1rem, 1.6vw, 1.3rem);
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.32em;
   color: var(--text-primary);
   text-transform: lowercase;
   display: inline-flex;
-  align-items: baseline;
-  gap: 0.55em;
+  align-items: center;
+  gap: 0.7em;
 }
-.wordmark::after {
-  content: "";
-  width: 5px; height: 5px;
-  background: var(--signal-teal);
-  transform: rotate(45deg) translateY(-0.15em);
-  opacity: 0.9;
-}
+/* The mark, drawn from the brand's measured geometry: ink dots follow the
+   text colour, the one signal dot follows --mineral-teal (signal on ink). */
+.wordmark__mark { height: 1.55em; width: auto; flex: none; }
 
 .nav { display: flex; align-items: center; gap: clamp(0.85rem, 2vw, 2rem); }
 .nav a {
@@ -274,3 +270,6 @@ svg { display: block; }
 @media (prefers-reduced-motion: reduce) {
   [data-reveal] { opacity: 1; transform: none; transition: none; }
 }
+
+/* On a paper sheet the mark uses signal-on-paper, as in the master artwork. */
+.masthead.is-on-paper .wordmark { --mineral-teal: #5d7f8d; }

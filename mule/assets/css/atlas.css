@@ -41,7 +41,7 @@
   border-top: 1px solid var(--line-hairline);
   border-bottom: 1px solid var(--line-hairline);
   background:
-    radial-gradient(120% 90% at 62% 40%, rgba(29, 138, 114, 0.09), transparent 62%),
+    radial-gradient(120% 90% at 62% 40%, rgba(93, 127, 141, 0.09), transparent 62%),
     var(--graphite);
   touch-action: none;
   cursor: grab;
@@ -68,7 +68,7 @@
      which region mattered least, which is not its job. */
   background:
     linear-gradient(to right, var(--void) 0%, transparent 7%, transparent 93%, var(--void) 100%),
-    linear-gradient(to bottom, rgba(7, 11, 12, 0.6) 0%, transparent 9%, transparent 94%, rgba(7, 11, 12, 0.72) 100%);
+    linear-gradient(to bottom, rgba(31, 33, 39, 0.6) 0%, transparent 9%, transparent 94%, rgba(31, 33, 39, 0.72) 100%);
   z-index: 2;
 }
 
@@ -90,11 +90,11 @@
   stroke-width: calc(1px / var(--atl-scale, 1));
 }
 .atl-tick {
-  stroke: rgba(184, 222, 213, 0.1);
+  stroke: rgba(213, 225, 230, 0.1);
   stroke-width: calc(1px / var(--atl-scale, 1));
 }
 .atl-riser {
-  stroke: rgba(184, 222, 213, 0.07);
+  stroke: rgba(213, 225, 230, 0.07);
   stroke-width: calc(1.5px / var(--atl-scale, 1));
 }
 
@@ -116,9 +116,9 @@
   transition: fill var(--dur-fast) var(--ease-glide), stroke var(--dur-fast) var(--ease-glide);
 }
 .atl-region.is-operable:hover .atl-region__fill,
-.atl-region.is-operable:focus-visible .atl-region__fill { fill: rgba(29, 138, 114, 0.1); }
+.atl-region.is-operable:focus-visible .atl-region__fill { fill: rgba(93, 127, 141, 0.1); }
 .atl-region.is-operable:hover .atl-region__edge,
-.atl-region.is-operable:focus-visible .atl-region__edge { stroke: rgba(49, 184, 148, 0.5); }
+.atl-region.is-operable:focus-visible .atl-region__edge { stroke: rgba(127, 157, 171, 0.5); }
 
 .atl-region.is-operable:focus { outline: none; }
 .atl-region.is-operable:focus-visible .atl-region__reg { stroke: var(--signal-teal); }
@@ -135,7 +135,7 @@
 }
 .atl-region__edge {
   fill: none;
-  stroke: rgba(184, 222, 213, 0.16);
+  stroke: rgba(213, 225, 230, 0.16);
   stroke-width: 2;
 }
 .atl-region__reg {
@@ -147,8 +147,8 @@
 /* The trust layer is the dominant region, and dominance is built from
    weight and enclosure rather than from glow: a brighter plate, a teal
    edge, and the only ring structure on the map. */
-.atl-region.is-dominant .atl-region__fill { fill: rgba(29, 138, 114, 0.07); }
-.atl-region.is-dominant .atl-region__edge { stroke: rgba(49, 184, 148, 0.34); }
+.atl-region.is-dominant .atl-region__fill { fill: rgba(93, 127, 141, 0.07); }
+.atl-region.is-dominant .atl-region__edge { stroke: rgba(127, 157, 171, 0.34); }
 .atl-region.is-dominant .atl-region__reg { stroke: var(--deep-teal); }
 
 /* Region typography. Sized in atlas units divided by scale, so a label
@@ -202,12 +202,12 @@
 .atl-ring__outer,
 .atl-ring__inner {
   fill: none;
-  stroke: rgba(49, 184, 148, 0.34);
+  stroke: rgba(127, 157, 171, 0.34);
   stroke-width: 3.5;
 }
-.atl-ring__inner { stroke: rgba(49, 184, 148, 0.2); stroke-width: 2.5; }
+.atl-ring__inner { stroke: rgba(127, 157, 171, 0.2); stroke-width: 2.5; }
 .atl-ring__spokes {
-  stroke: rgba(49, 184, 148, 0.13);
+  stroke: rgba(127, 157, 171, 0.13);
   stroke-width: 2;
 }
 /* The single ambient motion of OBSERVE mode. The trust layer is the part
@@ -302,7 +302,7 @@
 .atl-open__origin { stroke: var(--signal-teal); }
 
 /* --- 02 facet: interpretation -------------------------------- */
-.atl-facet__fill { fill: rgba(13, 20, 21, 0.86); stroke: none; }
+.atl-facet__fill { fill: rgba(42, 45, 53, 0.86); stroke: none; }
 .atl-facet__edge {
   fill: none;
   stroke: var(--line-structural);
@@ -312,19 +312,19 @@
   stroke: var(--line-hairline);
   stroke-width: calc(1px / var(--atl-scale, 1));
 }
-.atl-node--facet-major .atl-facet__edge { stroke: rgba(114, 214, 193, 0.42); }
+.atl-node--facet-major .atl-facet__edge { stroke: rgba(157, 184, 196, 0.42); }
 
 /* --- 03 archive: evidence -----------------------------------
    Stacked record edges seen side-on. No leaf carries a title,
    because a fabricated citation is exactly what this product
    promises not to produce. */
 .atl-archive__edge {
-  fill: rgba(13, 20, 21, 0.72);
+  fill: rgba(42, 45, 53, 0.72);
   stroke: var(--line-hairline);
   stroke-width: calc(1px / var(--atl-scale, 1));
 }
 .atl-archive__leaf {
-  stroke: rgba(184, 222, 213, 0.2);
+  stroke: rgba(213, 225, 230, 0.2);
   stroke-width: calc(1px / var(--atl-scale, 1));
   transition: stroke var(--dur-base) var(--ease-glide);
 }
@@ -333,12 +333,12 @@
   stroke-width: calc(2.5px / var(--atl-scale, 1));
 }
 .atl-node--archive.is-done .atl-archive__leaf,
-.atl-node--archive.is-active .atl-archive__leaf { stroke: rgba(114, 214, 193, 0.5); }
+.atl-node--archive.is-active .atl-archive__leaf { stroke: rgba(157, 184, 196, 0.5); }
 
 .atl-manifold__fill { fill: rgba(23, 35, 36, 0.9); stroke: none; }
 .atl-manifold__edge {
   fill: none;
-  stroke: rgba(114, 214, 193, 0.34);
+  stroke: rgba(157, 184, 196, 0.34);
   stroke-width: calc(1.5px / var(--atl-scale, 1));
 }
 .atl-manifold__port {
@@ -359,26 +359,26 @@
   stroke-width: calc(1.2px / var(--atl-scale, 1));
 }
 .atl-plate__rail {
-  stroke: rgba(114, 214, 193, 0.34);
+  stroke: rgba(157, 184, 196, 0.34);
   stroke-width: calc(1.5px / var(--atl-scale, 1));
 }
 /* The assumption register is the one configuration plate that must not
    read as settled, so its edge carries the review colour. */
-.atl-node[data-node="assumption-register"] .atl-plate__edge { stroke: rgba(216, 167, 67, 0.46); }
+.atl-node[data-node="assumption-register"] .atl-plate__edge { stroke: rgba(217, 173, 106, 0.46); }
 
 /* --- 05 rack / router: execution ---------------------------- */
-.atl-rack__fill { fill: rgba(13, 20, 21, 0.9); stroke: none; }
+.atl-rack__fill { fill: rgba(42, 45, 53, 0.9); stroke: none; }
 .atl-rack__edge {
   fill: none;
   stroke: var(--line-structural);
   stroke-width: calc(1.2px / var(--atl-scale, 1));
 }
 .atl-rack__vent {
-  stroke: rgba(184, 222, 213, 0.16);
+  stroke: rgba(213, 225, 230, 0.16);
   stroke-width: calc(1px / var(--atl-scale, 1));
 }
-.atl-node--rack-active .atl-rack__edge { stroke: rgba(49, 184, 148, 0.5); }
-.atl-node--rack-active .atl-rack__fill { fill: rgba(29, 138, 114, 0.1); }
+.atl-node--rack-active .atl-rack__edge { stroke: rgba(127, 157, 171, 0.5); }
+.atl-node--rack-active .atl-rack__fill { fill: rgba(93, 127, 141, 0.1); }
 /* Compute outside the product is drawn dashed and dimmer. Caterva does
    not own it and must not appear to. */
 .atl-rack__external {
@@ -393,7 +393,7 @@
 .atl-router__fill { fill: rgba(23, 35, 36, 0.92); stroke: none; }
 .atl-router__edge {
   fill: none;
-  stroke: rgba(114, 214, 193, 0.38);
+  stroke: rgba(157, 184, 196, 0.38);
   stroke-width: calc(1.5px / var(--atl-scale, 1));
 }
 .atl-router__port {
@@ -406,10 +406,10 @@
 .atl-node--router .atl-node__label { font-size: calc(22px / var(--atl-scale, 1)); }
 
 /* --- 06 shield: trust --------------------------------------- */
-.atl-shield__fill { fill: rgba(29, 138, 114, 0.12); stroke: none; }
+.atl-shield__fill { fill: rgba(93, 127, 141, 0.12); stroke: none; }
 .atl-shield__edge {
   fill: none;
-  stroke: rgba(49, 184, 148, 0.55);
+  stroke: rgba(127, 157, 171, 0.55);
   stroke-width: calc(2px / var(--atl-scale, 1));
 }
 .atl-shield__jamb {
@@ -417,8 +417,8 @@
   stroke-width: calc(2.5px / var(--atl-scale, 1));
   opacity: 0.72;
 }
-.atl-shape--shield.is-review .atl-shield__fill { fill: rgba(216, 167, 67, 0.11); }
-.atl-shape--shield.is-review .atl-shield__edge { stroke: rgba(216, 167, 67, 0.6); }
+.atl-shape--shield.is-review .atl-shield__fill { fill: rgba(217, 173, 106, 0.11); }
+.atl-shape--shield.is-review .atl-shield__edge { stroke: rgba(217, 173, 106, 0.6); }
 .atl-shape--shield.is-review .atl-shield__jamb { stroke: var(--status-review); }
 /* Trust modules carry the brightest type on the map. */
 .atl-node--shield .atl-node__label,
@@ -428,11 +428,11 @@
 .atl-paper__fill { fill: var(--archive-paper); stroke: none; }
 .atl-paper__edge {
   fill: none;
-  stroke: rgba(22, 32, 31, 0.24);
+  stroke: rgba(42, 45, 53, 0.24);
   stroke-width: calc(1px / var(--atl-scale, 1));
 }
 .atl-paper__rule {
-  stroke: rgba(22, 32, 31, 0.26);
+  stroke: rgba(42, 45, 53, 0.26);
   stroke-width: calc(2px / var(--atl-scale, 1));
 }
 /* On paper the notation inverts, or it is invisible. This is the same
@@ -444,7 +444,7 @@
 .atl-node--paper .atl-node__sub,
 .atl-node--paper-major .atl-node__sub { fill: var(--archive-ink-soft); }
 .atl-node--paper .atl-node__status--supported .atl-node__glyph { fill: #12674f; }
-.atl-node--paper .atl-node__status--review .atl-node__glyph { fill: #8a6410; }
+.atl-node--paper .atl-node__status--review .atl-node__glyph { fill: #946522; }
 
 /* ============================================================
    LANES
@@ -695,12 +695,12 @@
 .atl-states__btn:hover { color: var(--text-primary); border-color: var(--line-structural); }
 .atl-states__btn.is-active {
   color: var(--mineral-teal);
-  border-color: rgba(49, 184, 148, 0.5);
+  border-color: rgba(127, 157, 171, 0.5);
 }
 .atl-states__btn.is-active::before { opacity: 1; }
 .atl-states__btn[data-atlas-state="failure"].is-active {
   color: var(--status-review);
-  border-color: rgba(216, 167, 67, 0.55);
+  border-color: rgba(217, 173, 106, 0.55);
 }
 
 /* --- readout ------------------------------------------------ */
@@ -715,7 +715,7 @@
   flex-wrap: wrap;
   border-top: 1px solid var(--line-hairline);
   padding-top: 0.6rem;
-  background: linear-gradient(to top, rgba(7, 11, 12, 0.86), transparent);
+  background: linear-gradient(to top, rgba(31, 33, 39, 0.86), transparent);
 }
 .atl-readout__log {
   font-family: var(--font-mono);
@@ -777,7 +777,7 @@
   letter-spacing: var(--track-label-tight);
   text-transform: uppercase;
   color: var(--text-tertiary);
-  background: rgba(7, 11, 12, 0.72);
+  background: rgba(31, 33, 39, 0.72);
   border-left: 1px solid var(--structural-slate);
   transition: color var(--dur-fast) var(--ease-glide), border-color var(--dur-fast) var(--ease-glide);
 }
@@ -939,7 +939,7 @@
   gap: 0.25rem;
   padding: 0.7rem 0.85rem;
   border-left: 2px solid var(--status-review);
-  background: rgba(216, 167, 67, 0.07);
+  background: rgba(217, 173, 106, 0.07);
 }
 .atl-rec__failure .label { color: var(--status-review); }
 .atl-rec__failure p {
@@ -964,7 +964,7 @@
 }
 .atl-rec__rel:hover, .atl-rec__rel:focus-visible {
   color: var(--mineral-teal);
-  border-color: rgba(49, 184, 148, 0.5);
+  border-color: rgba(127, 157, 171, 0.5);
 }
 
 /* The honesty label is pinned. A tall record can scroll, and the first
@@ -1026,7 +1026,7 @@
     opacity: 1;
     pointer-events: auto;
   }
-  .atl-jumps__btn { background: rgba(7, 11, 12, 0.88); }
+  .atl-jumps__btn { background: rgba(31, 33, 39, 0.88); }
   /* At this width there is genuinely not enough row for the longest lines —
      the five failure paths need ~580px and the stage is 356px — so the log
      stops being a single line and wraps to two instead of ellipsing. The

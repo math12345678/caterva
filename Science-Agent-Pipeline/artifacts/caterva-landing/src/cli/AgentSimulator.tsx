@@ -31,12 +31,12 @@ const STAGE_LABEL: Record<PipelineStage, string> = {
 };
 
 const STAGE_COLORS: Record<PipelineStage, string> = {
-  idle: "text-white/40",
+  idle: "text-fg/70",
   pending: "text-blue-400",
   resolving: "text-yellow-400",
   validating: "text-orange-400",
-  running: "text-[#1D8A72]",
-  completed: "text-[#1D8A72]",
+  running: "text-signal",
+  completed: "text-signal",
   failed: "text-red-400",
 };
 
@@ -73,7 +73,6 @@ const DOMAIN_PARAMS: Record<
 
 const EXAMPLE_QUERIES = [
   "simulate lactate dehydrogenase with pyruvate",
-  "model an outbreak with beta 0.4 and gamma 0.1",
   "enzyme kinetics km 5 vmax 10",
 ];
 
@@ -110,15 +109,15 @@ const DOMAIN_CONSTRAINTS: Record<
 
 function seriesForResponse(response: SimulationResponse) {
   const colorMap: Record<string, string> = {
-    S: "#1D8A72",
-    P: "#F59E0B",
-    I: "#EF4444",
-    R: "#3B82F6",
-    E: "#8B5CF6",
+    S: "#5D7F8D",
+    P: "#946522",
+    I: "#A63D35",
+    R: "#6A6E78",
+    E: "#6A6E78",
   };
   if (response.trajectory.length === 0) return [];
   const keys = Object.keys(response.trajectory[0]!).filter((k) => k !== "t");
-  return keys.map((key) => ({ key, color: colorMap[key] ?? "#ffffff" }));
+  return keys.map((key) => ({ key, color: colorMap[key] ?? "#FDF8EE" }));
 }
 
 interface EnzymeInfo {
@@ -515,12 +514,12 @@ export default function AgentSimulator({
 
   return (
     <TerminalWindow path="~/caterva — agent simulator" glow>
-      <div className="mb-5 text-white/90">
-        <span className="text-[#1D8A72]">$</span> caterva agent --simulate
+      <div className="mb-5 text-fg/92">
+        <span className="text-signal">$</span> caterva agent --simulate
       </div>
 
       {stage === "idle" && !resolvedDomain && !result && (
-        <p className="text-white/30 text-[12px] mb-5 leading-relaxed">
+        <p className="text-fg/70 text-[12px] mb-5 leading-relaxed">
           Ask a scientific question in plain language. The agent resolves
           parameters from literature via LLM + keyword matching, then runs the
           Caterva ODE engine.
@@ -537,7 +536,7 @@ export default function AgentSimulator({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="e.g. simulate lactate dehydrogenase with pyruvate"
-            className="w-full rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2.5 text-white/90 text-[12px] outline-none transition-all duration-300 focus:border-[#1D8A72]/40 focus:bg-[#1D8A72]/[0.02] focus:shadow-[0_0_20px_rgba(29,138,114,0.06)] placeholder:text-white/20"
+            className="w-full rounded-lg border border-fg/[0.16] bg-fg/[0.03] px-3 py-2.5 text-fg/92 text-[12px] outline-none transition-all duration-300 focus:border-signal/40 focus:bg-signal/[0.02] placeholder:text-fg/66"
           />
         </div>
         <button
@@ -545,7 +544,7 @@ export default function AgentSimulator({
           ref={resolveBtnRef}
           onClick={handleResolve}
           disabled={!query.trim() || stage === "resolving"}
-          className="px-4 py-2.5 rounded-lg border border-white/[0.08] text-white/50 text-[12px] transition-all duration-300 hover:border-[#1D8A72]/30 hover:text-[#1D8A72] hover:bg-[#1D8A72]/[0.04] disabled:opacity-30 disabled:hover:border-white/[0.08] disabled:hover:text-white/50 disabled:hover:bg-transparent"
+          className="px-4 py-2.5 rounded-lg border border-fg/[0.16] text-fg/76 text-[12px] transition-all duration-300 hover:border-signal/30 hover:text-signal hover:bg-signal/[0.04] disabled:opacity-30 disabled:hover:border-fg/[0.16] disabled:hover:text-fg/76 disabled:hover:bg-transparent"
         >
           {stage === "resolving" ? (
             <span className="flex items-center gap-1.5">
@@ -559,7 +558,7 @@ export default function AgentSimulator({
         <button
           type="submit"
           disabled={stage !== "idle" || !resolvedDomain || hasParamErrors}
-          className="px-5 py-2.5 rounded-lg border border-[#1D8A72]/25 text-[#1D8A72] text-[12px] transition-all duration-300 hover:bg-[#1D8A72]/[0.06] hover:shadow-[0_0_20px_rgba(29,138,114,0.08)] disabled:opacity-30 disabled:hover:shadow-none disabled:hover:bg-transparent"
+          className="px-5 py-2.5 rounded-lg border border-signal/25 text-signal text-[12px] transition-all duration-300 hover:bg-signal/[0.06] disabled:opacity-30 disabled:hover:shadow-none disabled:hover:bg-transparent"
         >
           {hasParamErrors ? "fix parameter errors" : "run pipeline"}
         </button>
@@ -570,7 +569,7 @@ export default function AgentSimulator({
           <button
             key={q}
             onClick={() => setQuery(q)}
-            className="text-[10px] text-white/30 hover:text-[#1D8A72] border border-white/[0.06] hover:border-[#1D8A72]/20 rounded-md px-2 py-1 transition-all duration-200 bg-white/[0.02] hover:bg-[#1D8A72]/[0.03]"
+            className="text-[10px] text-fg/70 hover:text-signal border border-fg/[0.12] hover:border-signal/20 rounded-md px-2 py-1 transition-all duration-200 bg-fg/[0.02] hover:bg-signal/[0.03]"
           >
             {q}
           </button>
@@ -578,7 +577,7 @@ export default function AgentSimulator({
         <button
           onClick={() => setShowEnzymes(!showEnzymes)}
           disabled={enzymesLoading}
-          className="text-[10px] text-white/30 hover:text-[#1D8A72] border border-white/[0.06] hover:border-[#1D8A72]/20 rounded-md px-2 py-1 transition-all duration-200 bg-white/[0.02] hover:bg-[#1D8A72]/[0.03] ml-auto disabled:opacity-40"
+          className="text-[10px] text-fg/70 hover:text-signal border border-fg/[0.12] hover:border-signal/20 rounded-md px-2 py-1 transition-all duration-200 bg-fg/[0.02] hover:bg-signal/[0.03] ml-auto disabled:opacity-40"
         >
           {enzymesLoading ? (
             <span className="flex items-center gap-1">
@@ -603,10 +602,10 @@ export default function AgentSimulator({
             exit={{ opacity: 0, height: 0 }}
             className="mb-5 overflow-hidden"
           >
-            <div className="rounded-lg border border-white/[0.06] max-h-48 overflow-y-auto text-[10px]">
+            <div className="rounded-lg border border-fg/[0.12] max-h-48 overflow-y-auto text-[10px]">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-white/[0.04] text-white/20">
+                  <tr className="border-b border-fg/[0.08] text-fg/66">
                     <th className="text-left p-2 font-normal">EC</th>
                     <th className="text-left p-2 font-normal">Enzyme</th>
                     <th className="text-left p-2 font-normal">Substrates</th>
@@ -619,14 +618,14 @@ export default function AgentSimulator({
                   {enzymes.map((e) => (
                     <tr
                       key={e.ecNumber}
-                      className="border-b border-white/[0.03] hover:bg-white/[0.02] transition-colors"
+                      className="border-b border-fg/[0.06] hover:bg-fg/[0.02] transition-colors"
                     >
-                      <td className="p-2 text-[#1D8A72]">{e.ecNumber}</td>
-                      <td className="p-2 text-white/60">{e.name}</td>
-                      <td className="p-2 text-white/40">
+                      <td className="p-2 text-signal">{e.ecNumber}</td>
+                      <td className="p-2 text-fg/80">{e.name}</td>
+                      <td className="p-2 text-fg/70">
                         {e.substrates.join(", ")}
                       </td>
-                      <td className="p-2 text-white/25 hidden sm:table-cell">
+                      <td className="p-2 text-fg/66 hidden sm:table-cell">
                         {e.organism}
                       </td>
                     </tr>
@@ -644,13 +643,13 @@ export default function AgentSimulator({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mb-5 rounded-lg border border-[#1D8A72]/15 bg-[#1D8A72]/[0.02] p-4"
+            className="mb-5 rounded-lg border border-signal/15 bg-signal/[0.02] p-4"
           >
-            <div className="flex items-center gap-2 text-[11px] text-white/30 mb-4">
-              <span className="inline-flex items-center gap-1 rounded bg-[#1D8A72]/10 px-2 py-0.5 text-[10px] text-[#1D8A72] uppercase tracking-wide">
+            <div className="flex items-center gap-2 text-[11px] text-fg/70 mb-4">
+              <span className="inline-flex items-center gap-1 rounded bg-signal/10 px-2 py-0.5 text-[10px] text-signal uppercase tracking-wide">
                 {resolvedDomain}
               </span>
-              <span className="text-white/20">
+              <span className="text-fg/66">
                 domain resolved — edit parameters below
               </span>
             </div>
@@ -660,7 +659,7 @@ export default function AgentSimulator({
                 const err = paramErrors[field.key];
                 return (
                   <label key={field.key} className="flex flex-col gap-1">
-                    <span className="text-[10px] text-white/25">
+                    <span className="text-[10px] text-fg/66">
                       {field.label}
                     </span>
                     <input
@@ -670,10 +669,10 @@ export default function AgentSimulator({
                       onChange={(e) =>
                         handleParamChange(field.key, e.target.value)
                       }
-                      className={`rounded-lg border bg-white/[0.02] px-2.5 py-1.5 text-white/80 text-[11px] outline-none transition-all duration-200 ${
+                      className={`rounded-lg border bg-fg/[0.02] px-2.5 py-1.5 text-fg/85 text-[11px] outline-none transition-all duration-200 ${
                         err
-                          ? "border-red-500/30 focus:border-red-400/50 focus:shadow-[0_0_12px_rgba(239,68,68,0.08)]"
-                          : "border-white/[0.06] focus:border-[#1D8A72]/30 focus:shadow-[0_0_12px_rgba(29,138,114,0.06)]"
+                          ? "border-red-500/30 focus:border-red-400/50"
+                          : "border-fg/[0.12] focus:border-signal/30"
                       }`}
                     />
                     {err && (
@@ -685,7 +684,7 @@ export default function AgentSimulator({
             </div>
 
             {reasoning && (
-              <p className="text-[11px] text-white/30 italic mb-2 leading-relaxed">
+              <p className="text-[11px] text-fg/70 italic mb-2 leading-relaxed">
                 {reasoning}
               </p>
             )}
@@ -704,7 +703,7 @@ export default function AgentSimulator({
             )}
 
             {modelCitations.length > 0 && (
-              <div className="text-[10px] text-white/20 space-y-0.5 border-t border-white/[0.04] pt-2 mt-2">
+              <div className="text-[10px] text-fg/66 space-y-0.5 border-t border-fg/[0.08] pt-2 mt-2">
                 {modelCitations.map((c, i) => (
                   <div key={i} className="truncate">
                     {c}
@@ -720,22 +719,22 @@ export default function AgentSimulator({
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="mb-5 rounded-lg border border-[#1D8A72]/10 bg-[#1D8A72]/[0.02] p-4"
+            className="mb-5 rounded-lg border border-signal/10 bg-signal/[0.02] p-4"
           >
             <div className="flex items-center justify-between text-[11px] mb-3">
               <span
                 className={`flex items-center gap-2 ${STAGE_COLORS[stage]}`}
               >
                 {stage === "running" && (
-                  <span className="inline-block w-2 h-2 rounded-full bg-[#1D8A72] animate-pulse" />
+                  <span className="inline-block w-2 h-2 rounded-full bg-signal animate-pulse" />
                 )}
                 {STAGE_LABEL[stage]}
               </span>
-              <span className="text-white/30">{progress}%</span>
+              <span className="text-fg/70">{progress}%</span>
             </div>
-            <div className="h-1.5 w-full bg-white/[0.04] rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-fg/[0.04] rounded-full overflow-hidden">
               <motion.div
-                className="h-full rounded-full bg-gradient-to-r from-[#1D8A72]/60 to-[#1D8A72]"
+                className="h-full rounded-full bg-gradient-to-r from-signal/60 to-signal"
                 initial={{ width: 0 }}
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.4, ease: "easeOut" }}
@@ -777,11 +776,11 @@ export default function AgentSimulator({
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4 }}
           >
-            <div className="flex items-center gap-3 text-[11px] text-white/30 mb-4">
-              <span className="inline-flex items-center gap-1 rounded bg-[#1D8A72]/10 px-2 py-0.5 text-[10px] text-[#1D8A72] uppercase tracking-wide">
+            <div className="flex items-center gap-3 text-[11px] text-fg/70 mb-4">
+              <span className="inline-flex items-center gap-1 rounded bg-signal/10 px-2 py-0.5 text-[10px] text-signal uppercase tracking-wide">
                 {result.domain}
               </span>
-              <span className="text-white/20">runId: {result.runId}</span>
+              <span className="text-fg/66">runId: {result.runId}</span>
               <span className="ml-auto flex items-center gap-2">
                 <ShareSimulation
                   query={query}
@@ -802,7 +801,7 @@ export default function AgentSimulator({
               </span>
             </div>
 
-            <div className="rounded-lg border border-white/[0.06] bg-white/[0.015] p-3 mb-4">
+            <div className="rounded-lg border border-fg/[0.12] bg-fg/[0.015] p-3 mb-4">
               <LineChart
                 data={
                   (result.trajectory ??
@@ -813,9 +812,9 @@ export default function AgentSimulator({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
-              <div className="rounded-lg border border-white/[0.06] p-3 bg-white/[0.015]">
+              <div className="rounded-lg border border-fg/[0.12] p-3 bg-fg/[0.015]">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-white/20 text-[10px] uppercase tracking-wide">
+                  <span className="text-fg/66 text-[10px] uppercase tracking-wide">
                     parameters
                   </span>
                   <button
@@ -828,20 +827,20 @@ export default function AgentSimulator({
                         })
                         .catch(() => {});
                     }}
-                    className="flex items-center gap-1 rounded border border-white/[0.06] px-1.5 py-0.5 text-[9px] text-white/25 hover:text-white/50 hover:border-white/[0.12] transition-all duration-200"
+                    className="flex items-center gap-1 rounded border border-fg/[0.12] px-1.5 py-0.5 text-[9px] text-fg/66 hover:text-fg/76 hover:border-fg/[0.24] transition-all duration-200"
                   >
                     {paramsCopied ? "copied" : "copy"}
                   </button>
                 </div>
-                <pre className="text-white/60 overflow-x-auto text-[11px]">
+                <pre className="text-fg/80 overflow-x-auto text-[11px]">
                   {JSON.stringify(result.parameters, null, 2)}
                 </pre>
               </div>
-              <div className="rounded-lg border border-white/[0.06] p-3 bg-white/[0.015]">
-                <div className="text-white/20 text-[10px] uppercase tracking-wide mb-2">
+              <div className="rounded-lg border border-fg/[0.12] p-3 bg-fg/[0.015]">
+                <div className="text-fg/66 text-[10px] uppercase tracking-wide mb-2">
                   provenance
                 </div>
-                <p className="text-white/60 mb-2 leading-relaxed">
+                <p className="text-fg/80 mb-2 leading-relaxed">
                   {result.provenance.reasoning}
                 </p>
                 {result.provenance.flags &&
@@ -859,11 +858,11 @@ export default function AgentSimulator({
                   )}
                 {result.provenance.modelCitations &&
                   result.provenance.modelCitations.length > 0 && (
-                    <div className="border-t border-white/[0.04] pt-2 mt-2 space-y-0.5">
+                    <div className="border-t border-fg/[0.08] pt-2 mt-2 space-y-0.5">
                       {result.provenance.modelCitations.map((citation, i) => (
                         <div
                           key={i}
-                          className="text-[10px] text-white/25 truncate"
+                          className="text-[10px] text-fg/66 truncate"
                         >
                           {citation}
                         </div>

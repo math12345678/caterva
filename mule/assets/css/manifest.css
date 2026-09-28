@@ -40,7 +40,7 @@
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 30px 70px -40px rgba(0, 0, 0, 0.9);
 }
 
-/* Faint fibre, so the stock does not read as flat #f1f0ea. */
+/* Faint fibre, so the stock does not read as flat #fdf8ee. */
 .manifest__sheet::before {
   content: '';
   position: absolute;
@@ -48,7 +48,7 @@
   pointer-events: none;
   opacity: 0.5;
   background-image:
-    repeating-linear-gradient(0deg, rgba(22, 32, 31, 0.022) 0 1px, transparent 1px 3px);
+    repeating-linear-gradient(0deg, rgba(42, 45, 53, 0.022) 0 1px, transparent 1px 3px);
 }
 
 /* --- 2. head -----------------------------------------------
@@ -75,7 +75,7 @@
 
 .manifest__rule {
   height: 1px;
-  background: rgba(22, 32, 31, 0.22);
+  background: rgba(42, 45, 53, 0.22);
 }
 
 /* --- 3. the five statements --------------------------------
@@ -95,10 +95,10 @@
   align-items: baseline;
   gap: 0 1.25rem;
   padding: clamp(1rem, 2.2vw, 1.5rem) 0;
-  border-top: 1px solid rgba(22, 32, 31, 0.12);
+  border-top: 1px solid rgba(42, 45, 53, 0.12);
 }
 
-.manifest__item:last-child { border-bottom: 1px solid rgba(22, 32, 31, 0.12); }
+.manifest__item:last-child { border-bottom: 1px solid rgba(42, 45, 53, 0.12); }
 
 .manifest__i {
   font-size: var(--step--1);
@@ -147,7 +147,7 @@
   text-transform: uppercase;
   text-decoration: none;
   /* Subtle, but it is the only link out of the manifest. */
-  color: rgba(22, 32, 31, 0.7);
+  color: rgba(42, 45, 53, 0.7);
   padding: 0.5rem 0;
   border-bottom: 1px solid transparent;
   transition: color var(--dur-fast) linear, border-color var(--dur-fast) linear;

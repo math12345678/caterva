@@ -77,18 +77,18 @@ const DOMAINS = [
 ];
 
 const DOMAIN_COLORS: Record<string, string> = {
-  mm: "#3b82f6",
-  mm_competitive_inhibition: "#f59e0b",
-  sir: "#ef4444",
+  mm: "#6A6E78",
+  mm_competitive_inhibition: "#946522",
+  sir: "#A63D35",
   seir: "#d946ef",
   pcr: "#06b6d4",
-  monte_carlo_pi: "#8b5cf6",
+  monte_carlo_pi: "#6A6E78",
   wright_fisher: "#6366f1",
   two_locus_wright_fisher: "#84cc16",
   molecular_dynamics: "#14b8a6",
-  gillespie_ssa: "#fb923c",
-  gillespie_ssa_bimolecular: "#f43f5e",
-  gillespie_ssa_replicates: "#ec4899",
+  gillespie_ssa: "#946522",
+  gillespie_ssa_bimolecular: "#A63D35",
+  gillespie_ssa_replicates: "#6A6E78",
 };
 
 const STAGES = [
@@ -169,7 +169,7 @@ export function LiveArchitectureDashboard() {
     <div className="w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6 rounded-lg space-y-6">
       {/* Header */}
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+        <h1 className="text-3xl font-bold text-fg flex items-center gap-2">
           <Zap className="w-8 h-8 text-blue-400" />
           Live Architecture Dashboard
         </h1>
@@ -185,7 +185,7 @@ export function LiveArchitectureDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-slate-300 uppercase">Active Jobs</p>
-                <p className="text-2xl font-bold text-white">
+                <p className="text-2xl font-bold text-fg">
                   {snapshot.activeJobs}
                 </p>
               </div>
@@ -252,7 +252,7 @@ export function LiveArchitectureDashboard() {
         <TabsContent value="latency" className="space-y-4">
           <Card className="bg-slate-700 border-slate-600">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-fg flex items-center gap-2">
                 <Clock className="w-5 h-5" />
                 Latency Timeline (Last 30 seconds)
               </CardTitle>
@@ -273,12 +273,12 @@ export function LiveArchitectureDashboard() {
                         backgroundColor: "#1e293b",
                         border: "1px solid #475569",
                       }}
-                      labelStyle={{ color: "#e2e8f0" }}
+                      labelStyle={{ color: "#2A2D35" }}
                     />
                     <Line
                       type="monotone"
                       dataKey="latency"
-                      stroke="#3b82f6"
+                      stroke="#6A6E78"
                       dot={false}
                       name="Latency (ms)"
                       strokeWidth={2}
@@ -298,7 +298,7 @@ export function LiveArchitectureDashboard() {
         <TabsContent value="stages" className="space-y-4">
           <Card className="bg-slate-700 border-slate-600">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-fg flex items-center gap-2">
                 <GitBranch className="w-5 h-5" />
                 Pipeline Stage Metrics
               </CardTitle>
@@ -318,11 +318,11 @@ export function LiveArchitectureDashboard() {
                       backgroundColor: "#1e293b",
                       border: "1px solid #475569",
                     }}
-                    labelStyle={{ color: "#e2e8f0" }}
+                    labelStyle={{ color: "#2A2D35" }}
                   />
                   <Legend wrapperStyle={{ color: "#cbd5e1" }} />
-                  <Bar dataKey="successCount" fill="#10b981" name="Success" />
-                  <Bar dataKey="failureCount" fill="#ef4444" name="Failure" />
+                  <Bar dataKey="successCount" fill="#5D7F8D" name="Success" />
+                  <Bar dataKey="failureCount" fill="#A63D35" name="Failure" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
@@ -333,7 +333,7 @@ export function LiveArchitectureDashboard() {
         <TabsContent value="domains" className="space-y-4">
           <Card className="bg-slate-700 border-slate-600">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
+              <CardTitle className="text-fg flex items-center gap-2">
                 <Database className="w-5 h-5" />
                 Domain Distribution (Top 5)
               </CardTitle>
@@ -362,7 +362,7 @@ export function LiveArchitectureDashboard() {
                       backgroundColor: "#1e293b",
                       border: "1px solid #475569",
                     }}
-                    labelStyle={{ color: "#e2e8f0" }}
+                    labelStyle={{ color: "#2A2D35" }}
                   />
                 </PieChart>
               </ResponsiveContainer>
@@ -399,7 +399,7 @@ export function LiveArchitectureDashboard() {
           {selectedDomain && (
             <Card className="bg-slate-700 border-slate-600">
               <CardHeader>
-                <CardTitle className="text-white text-base">
+                <CardTitle className="text-fg text-base">
                   {selectedDomain} Details
                 </CardTitle>
               </CardHeader>
@@ -410,17 +410,17 @@ export function LiveArchitectureDashboard() {
                     <div key={d.domain} className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-300">Total Runs:</span>
-                        <span className="text-white font-mono">{d.count}</span>
+                        <span className="text-fg font-mono">{d.count}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-300">Avg Resolution:</span>
-                        <span className="text-white font-mono">
+                        <span className="text-fg font-mono">
                           {Math.round(d.avgResolutionMs)}ms
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-slate-300">Success Rate:</span>
-                        <span className="text-white font-mono">
+                        <span className="text-fg font-mono">
                           {Math.round(d.parameterSuccessRate)}%
                         </span>
                       </div>
@@ -436,7 +436,7 @@ export function LiveArchitectureDashboard() {
           <div className="grid grid-cols-2 gap-4">
             <Card className="bg-slate-700 border-slate-600">
               <CardHeader>
-                <CardTitle className="text-white text-sm">
+                <CardTitle className="text-fg text-sm">
                   LLM Success Rate
                 </CardTitle>
               </CardHeader>
@@ -452,7 +452,7 @@ export function LiveArchitectureDashboard() {
 
             <Card className="bg-slate-700 border-slate-600">
               <CardHeader>
-                <CardTitle className="text-white text-sm">
+                <CardTitle className="text-fg text-sm">
                   Literature Hit Rate
                 </CardTitle>
               </CardHeader>
@@ -480,7 +480,7 @@ export function LiveArchitectureDashboard() {
 
           <Card className="bg-slate-700 border-slate-600">
             <CardHeader>
-              <CardTitle className="text-white text-base">
+              <CardTitle className="text-fg text-base">
                 5-Stage Pipeline Summary
               </CardTitle>
             </CardHeader>
@@ -527,7 +527,7 @@ export function LiveArchitectureDashboard() {
       {/* Architecture Overview */}
       <Card className="bg-slate-700 border-slate-600">
         <CardHeader>
-          <CardTitle className="text-white">Architecture Components</CardTitle>
+          <CardTitle className="text-fg">Architecture Components</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

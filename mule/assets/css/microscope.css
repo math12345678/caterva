@@ -23,7 +23,7 @@
   position: relative;
   padding: clamp(3.5rem, 7vh, 6.5rem) var(--gutter) clamp(4rem, 8vh, 7rem);
   background:
-    radial-gradient(90% 60% at 50% 40%, rgba(49, 184, 148, 0.045), transparent 68%),
+    radial-gradient(90% 60% at 50% 40%, rgba(127, 157, 171, 0.045), transparent 68%),
     var(--void);
   border-top: 1px solid var(--line-hairline);
   overflow: hidden;
@@ -87,7 +87,7 @@
 }
 
 .mi-gauge__stop:last-child { border-right: 0; }
-.mi-gauge__stop:hover { background: rgba(184, 222, 213, 0.04); }
+.mi-gauge__stop:hover { background: rgba(213, 225, 230, 0.04); }
 
 .mi-gauge__i {
   font-size: var(--step--2);
@@ -198,7 +198,7 @@
   50% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scale(1.045); }
 }
 
-.mi-seed__btn:hover .mi-seed__ring { border-color: rgba(49, 184, 148, 0.4); }
+.mi-seed__btn:hover .mi-seed__ring { border-color: rgba(127, 157, 171, 0.4); }
 .mi-seed__btn:hover .mi-seed__ring--2 { transform: translate(-50%, -50%) rotate(45deg) scale(1.07); }
 
 .mi-seed__n {
@@ -225,7 +225,7 @@
   margin-top: 0.9rem;
   padding: 0.25rem 0.6rem;
   color: var(--status-review);
-  border: 1px solid rgba(216, 167, 67, 0.35);
+  border: 1px solid rgba(217, 173, 106, 0.35);
 }
 
 .mi-seed__cue {
@@ -259,7 +259,7 @@
   align-content: center;
   gap: 1.1rem;
   padding: clamp(1.2rem, 2.4vw, 2rem);
-  background: linear-gradient(165deg, rgba(23, 35, 36, 0.86), rgba(7, 11, 12, 0.9));
+  background: linear-gradient(165deg, rgba(23, 35, 36, 0.86), rgba(31, 33, 39, 0.9));
   border: 1px solid var(--line-hairline);
   border-top-color: var(--line-structural);
   backdrop-filter: blur(3px);
@@ -436,8 +436,8 @@
   position: relative;
   color: var(--signal-teal);
   padding: 0.1em 0.3em;
-  border: 1px solid rgba(49, 184, 148, 0.5);
-  background: rgba(49, 184, 148, 0.09);
+  border: 1px solid rgba(127, 157, 171, 0.5);
+  background: rgba(127, 157, 171, 0.09);
 }
 
 .mi-eq__note {
@@ -522,7 +522,7 @@
 }
 
 /* 04 the scope interval */
-.mi-sc__band { fill: rgba(49, 184, 148, 0.1); stroke: rgba(49, 184, 148, 0.34); stroke-width: 1; }
+.mi-sc__band { fill: rgba(127, 157, 171, 0.1); stroke: rgba(127, 157, 171, 0.34); stroke-width: 1; }
 .mi-sc__axis { fill: none; stroke: var(--line-structural); stroke-width: 1; }
 .mi-sc__stop { fill: none; stroke: var(--signal-teal); stroke-width: 1.4; }
 .mi-sc__km { fill: none; stroke: var(--mineral-teal); stroke-width: 1.6; }
@@ -582,8 +582,8 @@
   place-items: center;
   font-size: 0.85rem;
   color: var(--signal-teal);
-  border: 1px solid rgba(49, 184, 148, 0.45);
-  background: rgba(49, 184, 148, 0.08);
+  border: 1px solid rgba(127, 157, 171, 0.45);
+  background: rgba(127, 157, 171, 0.08);
 }
 
 .mi-ck__gate-t {
@@ -622,11 +622,11 @@
   justify-content: space-between;
   gap: 0.75rem;
   padding-bottom: 0.6rem;
-  border-bottom: 1px solid rgba(22, 32, 31, 0.22);
+  border-bottom: 1px solid rgba(42, 45, 53, 0.22);
 }
 
 .mi-rec__head .label { color: var(--archive-ink-soft); }
-.mi-rec__id { font-size: var(--step--2); letter-spacing: 0.14em; color: #8a6410; }
+.mi-rec__id { font-size: var(--step--2); letter-spacing: 0.14em; color: #946522; }
 
 .mi-rec__body {
   margin: 0;
@@ -639,7 +639,7 @@
   font-size: var(--step--2);
   letter-spacing: 0.1em;
   color: var(--archive-ink-soft);
-  border-bottom: 1px solid rgba(22, 32, 31, 0.1);
+  border-bottom: 1px solid rgba(42, 45, 53, 0.1);
   white-space: nowrap;
 }
 
@@ -649,7 +649,7 @@
   font-size: var(--step--1);
   line-height: 1.4;
   color: var(--archive-ink);
-  border-bottom: 1px solid rgba(22, 32, 31, 0.1);
+  border-bottom: 1px solid rgba(42, 45, 53, 0.1);
 }
 
 .mi-rec__v[data-tone='supported'] { color: #0f5c46; }

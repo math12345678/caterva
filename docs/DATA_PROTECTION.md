@@ -48,8 +48,8 @@ how broadly it has been followed — treat it as the reason to take advice,
 not as the advice.
 
 **The fix is cheap and removes the question entirely:** self-host the three
-families the landing page actually uses — DM Mono, Newsreader, Space
-Grotesk. The OFL explicitly permits it. Concretely:
+families the landing page actually uses: Spectral, Atkinson Hyperlegible
+Next and DM Mono. The OFL explicitly permits it. Concretely:
 
 1. Download the families from `fonts.google.com` (or `google-webfonts-helper`).
 2. Put the `.woff2` files under `caterva-landing/public/fonts/`.

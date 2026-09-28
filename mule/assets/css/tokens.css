@@ -1,15 +1,17 @@
 /* ============================================================
-   caterva — design tokens
-   Base is dark and near-monochrome. Teal is an event, not a decoration.
+   caterva — design tokens (the brand's on-ink expression)
+   Ground is ink, text is paper; signal is an event, not a decoration.
+   Values derive from docs/brand/README.md: ink #2A2D35, paper #FDF8EE,
+   signal #5D7F8D (#9DB8C4 on ink).
    Amber is reserved exclusively for disclosed uncertainty / review.
    ============================================================ */
 
 :root {
   /* --- base ------------------------------------------------ */
-  --void: #070b0c;
-  --graphite: #0d1415;
-  --deep-slate: #172324;
-  --structural-slate: #2b3a3a;
+  --void: #1f2127;
+  --graphite: #2a2d35;
+  --deep-slate: #33373f;
+  --structural-slate: #474b55;
   /* --structural-slate is a SURFACE colour — hairlines, ticks, scrollbar
      thumbs, disabled borders — and at 1.67:1 on the page ground it cannot
      carry text. It was nevertheless being used for three real text runs: the
@@ -17,24 +19,24 @@
      the evidence rail's "Select a link to inspect" hint. This is the same
      family lifted to a legible weight, so those keep reading as the faintest
      tier of type instead of as decoration that happens to contain words. */
-  --slate-text: #7f9290;
+  --slate-text: #9a9ea7;
 
   /* --- caterva -------------------------------------------- */
-  --deep-teal: #1d8a72;
+  --deep-teal: #5d7f8d;
   /* The same signal, darkened for the pale sheets. --deep-teal is tuned for
      type on graphite, where it reads 4.6:1; on the archive stock it falls to
      3.7:1, and inside the seam gradient — where the pilot's eyebrow actually
      sits, over a wash measured at rgb(193,193,189) — to 2.36:1. Rather than
      darken the token and dull the teal everywhere it belongs, paper gets its
      own step. */
-  --deep-teal-ink: #115941;
-  --signal-teal: #31b894;
-  --mineral-teal: #72d6c1;
-  --fog-teal: #b8ded5;
+  --deep-teal-ink: #46626e;
+  --signal-teal: #7f9dab;
+  --mineral-teal: #9db8c4;
+  --fog-teal: #d5e1e6;
 
   /* --- documentation -------------------------------------- */
-  --archive-paper: #f1f0ea;
-  --archive-ink: #16201f;
+  --archive-paper: #fdf8ee;
+  --archive-ink: #2a2d35;
   /* The secondary tier ON PAPER: field labels, record captions, the small
      print of the invitation. It had been written inline as rgba(22,32,31,α)
      with α drifting between 0.48 and 0.62 across six files, and every one of
@@ -42,7 +44,7 @@
      quiet tier of the archival record was below AA. One token, measured once,
      at 5.09:1 on #f1f0ea and better on the lighter form plates. */
   --archive-ink-soft: rgba(22, 32, 31, 0.66);
-  --warm-gray: #b6bbb3;
+  --warm-gray: #bdb8ae;
 
   /* --- status --------------------------------------------- */
   /* Status is always word + glyph, never colour alone, but the word still has
@@ -51,17 +53,17 @@
      3.60:1 on panel surfaces, so the two states that report trouble were the
      two hardest to read. Raised to clear AA on both grounds while keeping each
      hue distinguishable from the others. */
-  --status-supported: #31b894;
-  --status-review: #d8a743;
-  --status-blocked: #cc7a75;
-  --status-pending: #8a9d9b;
+  --status-supported: #9db8c4;
+  --status-review: #d9ad6a;
+  --status-blocked: #e08a80;
+  --status-pending: #a9acb3;
 
   /* --- derived surfaces ----------------------------------- */
   --line-hairline: rgba(184, 222, 213, 0.13);
   --line-structural: rgba(184, 222, 213, 0.26);
   --line-grid: rgba(184, 222, 213, 0.055);
-  --text-primary: #dfe7e4;
-  --text-secondary: #93a29f;
+  --text-primary: #f3eee4;
+  --text-secondary: #b4b7be;
   /* Measured against the surfaces it is actually printed on, not against the
      void alone. The previous #6c7b79 was 4.47:1 on the page background —
      under AA by a hair — and this is the quietest text colour in the system,
@@ -77,7 +79,7 @@
      rather than by lifting this any further, because pushing it high enough
      for every backdrop would collapse the distance to --text-secondary and
      the three-step hierarchy would stop reading as a hierarchy. */
-  --text-tertiary: #8a9d9b;
+  --text-tertiary: #a9acb3;
   --glass: rgba(13, 20, 21, 0.82);
   --glass-strong: rgba(7, 11, 12, 0.93);
 
@@ -97,9 +99,9 @@
      The old fallbacks were "Helvetica Neue", Arial. Those still work, but they
      skip the modern system UI faces, so a visitor without the webfont landed
      on Arial rather than on what their OS actually uses. */
-  --font-sans: "Inter Tight", "Inter", system-ui, -apple-system, "Segoe UI",
+  --font-sans: "Atkinson Hyperlegible Next", system-ui, -apple-system, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo,
+  --font-mono: "DM Mono", ui-monospace, "SFMono-Regular", Menlo,
     Consolas, "Liberation Mono", monospace;
 
   --step--2: clamp(0.5625rem, 0.55rem + 0.06vw, 0.625rem);

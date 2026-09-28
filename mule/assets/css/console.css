@@ -22,7 +22,7 @@
   position: relative;
   padding: clamp(3.25rem, 6vh, 5.5rem) var(--gutter) clamp(3.5rem, 7vh, 6rem);
   background:
-    radial-gradient(120% 80% at 50% -10%, rgba(49, 184, 148, 0.05), transparent 60%),
+    radial-gradient(120% 80% at 50% -10%, rgba(127, 157, 171, 0.05), transparent 60%),
     linear-gradient(180deg, var(--void) 0%, #060a0b 46%, var(--void) 100%);
   border-top: 1px solid var(--line-hairline);
   overflow: hidden;
@@ -107,7 +107,7 @@
 .con-in {
   position: relative;
   padding: clamp(1.1rem, 1.8vw, 1.6rem);
-  background: linear-gradient(170deg, rgba(23, 35, 36, 0.72), rgba(13, 20, 21, 0.6));
+  background: linear-gradient(170deg, rgba(23, 35, 36, 0.72), rgba(42, 45, 53, 0.6));
   border: 1px solid var(--line-hairline);
   border-top: 1px solid var(--line-structural);
 }
@@ -167,12 +167,12 @@
 .con-in__acts .ctrl { flex: 1 1 auto; }
 
 .ctrl--primary {
-  border-color: rgba(49, 184, 148, 0.5);
+  border-color: rgba(127, 157, 171, 0.5);
   color: var(--mineral-teal);
-  background: rgba(49, 184, 148, 0.07);
+  background: rgba(127, 157, 171, 0.07);
 }
 
-.ctrl--primary:hover { background: rgba(49, 184, 148, 0.14); }
+.ctrl--primary:hover { background: rgba(127, 157, 171, 0.14); }
 
 /* Pause is disabled until a run is actually in flight. A disabled control is
    exempt from the contrast minimum, but 0.34 drove it to 1.51:1 — not "clearly
@@ -210,7 +210,7 @@
 }
 
 .con-cases__btn:last-child { border-right: 0; }
-.con-cases__btn:hover { color: var(--text-primary); background: rgba(184, 222, 213, 0.05); }
+.con-cases__btn:hover { color: var(--text-primary); background: rgba(213, 225, 230, 0.05); }
 
 .con-cases__btn.is-active {
   color: var(--void);
@@ -386,19 +386,19 @@
 .ag[data-tone='blocked'] .ag__status { color: var(--status-blocked); }
 
 .ag[data-tone='active'] .ag__mark {
-  border-color: rgba(49, 184, 148, 0.55);
-  background: rgba(49, 184, 148, 0.08);
+  border-color: rgba(127, 157, 171, 0.55);
+  background: rgba(127, 157, 171, 0.08);
 }
 .ag[data-tone='active'] .gl-line { stroke: var(--signal-teal); }
 .ag[data-tone='active'] .gl-accent { stroke: var(--mineral-teal); }
 .ag[data-tone='active'] .gl-fill { fill: var(--signal-teal); }
 
-.ag[data-tone='supported'] .ag__mark { border-color: rgba(49, 184, 148, 0.34); }
+.ag[data-tone='supported'] .ag__mark { border-color: rgba(127, 157, 171, 0.34); }
 .ag[data-tone='supported'] .gl-line { stroke: var(--deep-teal); }
 .ag[data-tone='supported'] .gl-accent { stroke: var(--signal-teal); }
 .ag[data-tone='supported'] .gl-fill { fill: var(--signal-teal); }
 
-.ag[data-tone='review'] .ag__mark { border-color: rgba(216, 167, 67, 0.45); }
+.ag[data-tone='review'] .ag__mark { border-color: rgba(217, 173, 106, 0.45); }
 .ag[data-tone='review'] .gl-line { stroke: #9a7a34; }
 .ag[data-tone='review'] .gl-accent { stroke: var(--status-review); }
 .ag[data-tone='review'] .gl-fill { fill: var(--status-review); }
@@ -436,7 +436,7 @@
   content: '';
   position: absolute;
   inset: -5px;
-  border: 1px solid rgba(49, 184, 148, 0.3);
+  border: 1px solid rgba(127, 157, 171, 0.3);
   animation: ag-halo 1.9s var(--ease-glide) infinite;
 }
 
@@ -473,7 +473,7 @@
 
 .ag.is-resolved .ag__io-r--out p { color: var(--text-primary); }
 .ag.is-resolved .ag__io-r--out { border-left-color: var(--deep-teal); }
-.ag.is-resolved[data-tone='review'] .ag__io-r--out { border-left-color: rgba(216, 167, 67, 0.5); }
+.ag.is-resolved[data-tone='review'] .ag__io-r--out { border-left-color: rgba(217, 173, 106, 0.5); }
 .ag.is-resolved[data-tone='blocked'] .ag__io-r--out { border-left-color: rgba(184, 93, 89, 0.5); }
 
 /* --- the disclosure, surfaced inline --- */
@@ -485,7 +485,7 @@
   font-size: var(--step--1);
   line-height: 1.45;
   color: #e8c887;
-  background: rgba(216, 167, 67, 0.07);
+  background: rgba(217, 173, 106, 0.07);
   border-left: 2px solid var(--status-review);
 }
 
@@ -519,7 +519,7 @@
   font-size: var(--step--1);
   line-height: 1.5;
   color: var(--text-secondary);
-  background: rgba(7, 11, 12, 0.6);
+  background: rgba(31, 33, 39, 0.6);
   border: 1px solid var(--line-hairline);
   border-left: 2px solid var(--structural-slate);
 }
@@ -536,7 +536,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0.9rem;
-  background: linear-gradient(170deg, rgba(13, 20, 21, 0.7), rgba(7, 11, 12, 0.5));
+  background: linear-gradient(170deg, rgba(42, 45, 53, 0.7), rgba(31, 33, 39, 0.5));
   border: 1px solid var(--line-hairline);
   scrollbar-width: thin;
   scrollbar-color: var(--structural-slate) transparent;
@@ -648,7 +648,7 @@
 .ws-par__i--user { border-left-color: var(--structural-slate); }
 .ws-par__i--review {
   border-left-color: var(--status-review);
-  background: rgba(216, 167, 67, 0.06);
+  background: rgba(217, 173, 106, 0.06);
 }
 .ws-par__i--review .ws-par__v { color: var(--status-review); }
 
@@ -745,7 +745,7 @@
 /* the disclosed assumption — the loudest thing in the workspace */
 .ws-block--assumption {
   border-left-color: var(--status-review);
-  background: rgba(216, 167, 67, 0.08);
+  background: rgba(217, 173, 106, 0.08);
 }
 
 .ws-block--assumption .ws-block__t { color: var(--status-review); }
@@ -772,7 +772,7 @@
 /* the finished record — archive paper */
 .ws-block--record {
   background: var(--archive-paper);
-  border-color: rgba(22, 32, 31, 0.2);
+  border-color: rgba(42, 45, 53, 0.2);
   border-left-color: var(--archive-ink);
   box-shadow: 0 18px 44px -22px rgba(0, 0, 0, 0.8);
 }
@@ -782,7 +782,7 @@
 .ws-rec__i {
   position: relative;
   padding: 0.35rem 0 0.35rem 1.1rem;
-  border-top: 1px solid rgba(22, 32, 31, 0.12);
+  border-top: 1px solid rgba(42, 45, 53, 0.12);
   font-size: var(--step--1);
   color: var(--archive-ink);
 }
@@ -803,11 +803,11 @@
    it can never be mistaken for a completed result. */
 .ws-block--record[data-tone='review'] {
   background: #f0ece1;
-  border-left-color: #8a6410;
+  border-left-color: #946522;
 }
 .ws-block--record[data-tone='review'] .ws-rec__i::before {
   content: '\25B2';
-  color: #8a6410;
+  color: #946522;
 }
 
 /* --- 6. responsive -----------------------------------------

@@ -103,7 +103,7 @@ export default function LineChart({
             x2={width - pad.right}
             y1={yf(v)}
             y2={yf(v)}
-            stroke="rgba(255,255,255,0.04)"
+            stroke="rgba(42,45,53,0.04)"
             strokeWidth={1}
           />
         ))}
@@ -116,7 +116,7 @@ export default function LineChart({
             x2={xf(t)}
             y1={pad.top}
             y2={height - pad.bottom}
-            stroke="rgba(255,255,255,0.04)"
+            stroke="rgba(42,45,53,0.04)"
             strokeWidth={1}
           />
         ))}
@@ -127,7 +127,7 @@ export default function LineChart({
           x2={pad.left}
           y1={pad.top}
           y2={height - pad.bottom}
-          stroke="rgba(255,255,255,0.08)"
+          stroke="rgba(42,45,53,0.08)"
           strokeWidth={1}
         />
         <line
@@ -135,7 +135,7 @@ export default function LineChart({
           x2={width - pad.right}
           y1={height - pad.bottom}
           y2={height - pad.bottom}
-          stroke="rgba(255,255,255,0.08)"
+          stroke="rgba(42,45,53,0.08)"
           strokeWidth={1}
         />
 
@@ -146,7 +146,7 @@ export default function LineChart({
             x={pad.left - 6}
             y={yf(v) + 3}
             textAnchor="end"
-            fill="rgba(255,255,255,0.2)"
+            fill="rgba(42,45,53,0.2)"
             fontSize="8"
             fontFamily="DM Mono, monospace"
           >
@@ -163,7 +163,7 @@ export default function LineChart({
             x={xf(t)}
             y={height - pad.bottom + 12}
             textAnchor="middle"
-            fill="rgba(255,255,255,0.2)"
+            fill="rgba(42,45,53,0.2)"
             fontSize="8"
             fontFamily="DM Mono, monospace"
           >

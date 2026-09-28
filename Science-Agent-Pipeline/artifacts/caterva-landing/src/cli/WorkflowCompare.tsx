@@ -94,9 +94,9 @@ const CARD_COLORS = {
     dot: "bg-red-400/60",
   },
   with: {
-    border: "border-[#1D8A72]/20",
-    bg: "bg-[#1D8A72]/[0.02]",
-    dot: "bg-[#1D8A72]",
+    border: "border-signal/20",
+    bg: "bg-signal/[0.02]",
+    dot: "bg-signal",
   },
 };
 
@@ -111,13 +111,13 @@ export default function WorkflowCompare() {
     <section className="max-w-3xl mx-auto px-4 md:px-6 py-10" id="compare">
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
-          <span className="text-[#F59E0B] text-[11px] font-mono font-medium">
+          <span className="text-caution text-[11px] font-mono font-medium">
             compare
           </span>
-          <span className="h-px flex-1 bg-gradient-to-r from-[#F59E0B]/20 to-transparent" />
+          <span className="h-px flex-1 bg-gradient-to-r from-caution/20 to-transparent" />
         </div>
         <h2 className="section-header">The difference</h2>
-        <p className="font-sans text-[13px] text-white/50 mb-8 -mt-2 max-w-md">
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-md">
           Toggle between the old way and the Caterva way.
         </p>
 
@@ -125,8 +125,8 @@ export default function WorkflowCompare() {
           path={`~ — caterva compare --mode ${activeTab === "without" ? "traditional" : "caterva"}`}
           glow
         >
-          <div className="mb-4 text-white/90">
-            <span className="text-[#1D8A72]">$</span>{" "}
+          <div className="mb-4 text-fg/92">
+            <span className="text-signal">$</span>{" "}
             <span className="font-mono text-[12px]">
               caterva workflow --compare
             </span>
@@ -139,7 +139,7 @@ export default function WorkflowCompare() {
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all duration-300 ${
                 activeTab === "without"
                   ? "bg-red-500/10 border border-red-500/20 text-red-400"
-                  : "border border-white/[0.04] text-white/25 hover:text-white/45"
+                  : "border border-fg/[0.08] text-fg/66 hover:text-fg/70"
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-red-400/60" />
@@ -149,14 +149,14 @@ export default function WorkflowCompare() {
               onClick={() => setActiveTab("with")}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-mono transition-all duration-300 ${
                 activeTab === "with"
-                  ? "bg-[#1D8A72]/10 border border-[#1D8A72]/20 text-[#1D8A72]"
-                  : "border border-white/[0.04] text-white/25 hover:text-white/45"
+                  ? "bg-signal/10 border border-signal/20 text-signal"
+                  : "border border-fg/[0.08] text-fg/66 hover:text-fg/70"
               }`}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-[#1D8A72]" />
+              <span className="w-1.5 h-1.5 rounded-full bg-signal" />
               caterva
             </button>
-            <span className="ml-auto text-[10px] text-white/15 font-mono uppercase tracking-wider">
+            <span className="ml-auto text-[10px] text-fg/66 font-mono uppercase tracking-wider">
               {label}
             </span>
           </div>
@@ -194,14 +194,14 @@ export default function WorkflowCompare() {
                       <span
                         className={`w-1.5 h-1.5 rounded-full ${colors.dot} shrink-0`}
                       />
-                      <span className="text-[12px] text-white/70 font-sans font-medium">
+                      <span className="text-[12px] text-fg/78 font-sans font-medium">
                         {step.label}
                       </span>
-                      <span className="text-[9px] text-white/15 font-mono tracking-wider">
+                      <span className="text-[9px] text-fg/66 font-mono tracking-wider">
                         step {i + 1}
                       </span>
                     </div>
-                    <p className="text-[11px] text-white/50 leading-relaxed pl-5">
+                    <p className="text-[11px] text-fg/76 leading-relaxed pl-5">
                       {step.detail}
                     </p>
                   </div>
@@ -216,16 +216,16 @@ export default function WorkflowCompare() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
-            className={`mt-5 pt-4 border-t border-white/[0.04] flex items-center justify-between text-[10px]`}
+            className={`mt-5 pt-4 border-t border-fg/[0.08] flex items-center justify-between text-[10px]`}
           >
-            <span className="text-white/25 font-mono">
+            <span className="text-fg/66 font-mono">
               {activeTab === "without"
                 ? "4 steps \u2022 3 tools"
                 : "4 steps \u2022 1 tool \u2022 under 30 s (measured)"}
             </span>
             <span
               className={`font-mono ${
-                activeTab === "without" ? "text-red-400/60" : "text-[#1D8A72]"
+                activeTab === "without" ? "text-red-400/60" : "text-signal"
               }`}
             >
               {activeTab === "without"

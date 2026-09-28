@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AnimatedCounter from "@/components/ui/animated-counter";
 import { totals } from "@/lib/testResults";
+import { LIVE_DOMAIN_COUNT } from "@/lib/domains";
 
 const staticStats = [
   {
@@ -9,7 +10,7 @@ const staticStats = [
     suffix: "",
     label: "tests passing",
   },
-  { key: "domains", target: 15, suffix: "", label: "simulation domains" },
+  { key: "domains", target: LIVE_DOMAIN_COUNT, suffix: "", label: "live capabilities" },
 ];
 
 const API_BASE = import.meta.env.VITE_API_URL || "";
@@ -66,10 +67,10 @@ export default function StatsBar() {
     <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-[11px]">
       {stats.map((s) => (
         <div key={s.key} className="flex items-center gap-1.5">
-          <span className="text-[#1D8A72] font-semibold text-[14px] tabular-nums">
+          <span className="text-signal font-semibold text-[14px] tabular-nums">
             <AnimatedCounter target={s.target} suffix={s.suffix} />
           </span>
-          <span className="text-white/25">{s.label}</span>
+          <span className="text-fg/66">{s.label}</span>
         </div>
       ))}
     </div>

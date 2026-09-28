@@ -90,7 +90,7 @@ export default function BackendHealth() {
       <button
         ref={toggleRef}
         onClick={() => setShowPanel((p) => !p)}
-        className="flex items-center gap-1.5 text-[10px] text-white/30 hover:text-white/60 transition-colors"
+        className="flex items-center gap-1.5 text-[10px] text-fg/70 hover:text-fg/80 transition-colors"
         title={
           status === "ok"
             ? "Backend connected — click for details"
@@ -102,7 +102,7 @@ export default function BackendHealth() {
         <span className="relative flex size-2">
           {status === "ok" && (
             <motion.span
-              className="absolute inline-flex h-full w-full rounded-full bg-[#1D8A72]"
+              className="absolute inline-flex h-full w-full rounded-full bg-signal"
               animate={{ opacity: [0.6, 0.2, 0.6] }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -110,10 +110,10 @@ export default function BackendHealth() {
           <span
             className={`relative inline-flex size-2 rounded-full ${
               status === "ok"
-                ? "bg-[#1D8A72]"
+                ? "bg-signal"
                 : status === "error"
                   ? "bg-red-400"
-                  : "bg-white/20"
+                  : "bg-fg/20"
             }`}
           />
         </span>
@@ -147,15 +147,15 @@ export default function BackendHealth() {
               role="dialog"
               aria-modal="true"
               aria-label="Pipeline Status"
-              className="fixed top-14 left-4 z-50 w-72 rounded-xl border border-white/[0.08] bg-[#0a0f0c] shadow-2xl p-4"
+              className="fixed top-14 left-4 z-50 w-72 rounded-xl border border-fg/[0.16] bg-surface shadow-2xl p-4"
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-white/60 text-[11px] font-medium">
+                <span className="text-fg/80 text-[11px] font-medium">
                   Pipeline Status
                 </span>
                 {detail && (
                   <span
-                    className={`text-[9px] uppercase tracking-wide ${detail.status === "healthy" ? "text-[#1D8A72]" : "text-yellow-500"}`}
+                    className={`text-[9px] uppercase tracking-wide ${detail.status === "healthy" ? "text-signal" : "text-yellow-500"}`}
                   >
                     {detail.status}
                   </span>
@@ -168,34 +168,34 @@ export default function BackendHealth() {
                     {detail.subsystems.map((s) => (
                       <div key={s.label} className="flex items-center gap-2">
                         <span
-                          className={`shrink-0 w-1.5 h-1.5 rounded-full ${s.ok ? "bg-[#1D8A72]" : "bg-red-400"}`}
+                          className={`shrink-0 w-1.5 h-1.5 rounded-full ${s.ok ? "bg-signal" : "bg-red-400"}`}
                         />
-                        <span className="text-white/40 truncate">{s.label}</span>
+                        <span className="text-fg/70 truncate">{s.label}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="border-t border-white/[0.04] pt-2 text-[10px] space-y-1">
+                  <div className="border-t border-fg/[0.08] pt-2 text-[10px] space-y-1">
                     <div className="flex justify-between">
-                      <span className="text-white/25">jobs in queue</span>
-                      <span className="text-white/50">{detail.queue.total}</span>
+                      <span className="text-fg/66">jobs in queue</span>
+                      <span className="text-fg/76">{detail.queue.total}</span>
                     </div>
                     {Object.entries(detail.queue.byStatus).map(([s, count]) => (
                       <div key={s} className="flex justify-between">
-                        <span className="text-white/25 pl-3">{s}</span>
-                        <span className="text-white/50">{count}</span>
+                        <span className="text-fg/66 pl-3">{s}</span>
+                        <span className="text-fg/76">{count}</span>
                       </div>
                     ))}
-                    <div className="flex justify-between pt-1 border-t border-white/[0.03]">
-                      <span className="text-white/25">uptime</span>
-                      <span className="text-white/50">
+                    <div className="flex justify-between pt-1 border-t border-fg/[0.06]">
+                      <span className="text-fg/66">uptime</span>
+                      <span className="text-fg/76">
                         {formatUptime(detail.uptime)}
                       </span>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="text-[10px] text-white/40">
+                <div className="text-[10px] text-fg/70">
                   {detailError
                     ? "Pipeline details unavailable."
                     : "Loading pipeline details…"}

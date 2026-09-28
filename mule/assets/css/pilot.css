@@ -20,7 +20,7 @@
   inset: 0 0 auto 0;
   height: clamp(6rem, 18vh, 13rem);
   z-index: -1;
-  background: linear-gradient(to bottom, var(--void), rgba(13, 20, 21, 0.72) 32%, rgba(241, 240, 234, 0) 100%);
+  background: linear-gradient(to bottom, var(--void), rgba(42, 45, 53, 0.72) 32%, rgba(241, 240, 234, 0) 100%);
 }
 
 /* ---------- the record becomes the sheet ----------
@@ -55,7 +55,7 @@
   bottom: 12%;
   width: 14px;
   height: 14px;
-  border: 1px solid rgba(22, 32, 31, 0.28);
+  border: 1px solid rgba(42, 45, 53, 0.28);
 }
 .pilot__sheet::before { left: 2%; border-right: 0; border-top: 0; }
 .pilot__sheet::after { right: 2%; border-left: 0; border-top: 0; }
@@ -74,8 +74,8 @@
   inset: 0;
   z-index: -2;
   background-image:
-    linear-gradient(to right, rgba(22, 32, 31, 0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(22, 32, 31, 0.05) 1px, transparent 1px);
+    linear-gradient(to right, rgba(42, 45, 53, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(42, 45, 53, 0.05) 1px, transparent 1px);
   background-size: 72px 72px;
   mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, #000 20%, transparent 80%);
 }
@@ -102,7 +102,7 @@
   max-width: 42ch;
   font-size: var(--step-1);
   line-height: 1.6;
-  color: rgba(22, 32, 31, 0.78);
+  color: rgba(42, 45, 53, 0.78);
 }
 .pilot__secondary {
   max-width: 44ch;
@@ -122,7 +122,7 @@
 .pilot__note {
   max-width: 42ch;
   padding-left: 0.9rem;
-  border-left: 1px solid rgba(22, 32, 31, 0.25);
+  border-left: 1px solid rgba(42, 45, 53, 0.25);
   font-family: var(--font-mono);
   font-size: var(--step--2);
   letter-spacing: 0.06em;
@@ -137,8 +137,8 @@
   gap: 1.15rem;
   padding: clamp(1.4rem, 3vw, 2.4rem);
   background: #fbfaf6;
-  border: 1px solid rgba(22, 32, 31, 0.2);
-  box-shadow: 0 1px 0 rgba(22, 32, 31, 0.06), 0 24px 48px -32px rgba(22, 32, 31, 0.35);
+  border: 1px solid rgba(42, 45, 53, 0.2);
+  box-shadow: 0 1px 0 rgba(42, 45, 53, 0.06), 0 24px 48px -32px rgba(42, 45, 53, 0.35);
   position: relative;
 }
 .pilot__form::before {
@@ -165,7 +165,7 @@
   width: 100%;
   padding: 0.7rem 0.8rem;
   background: #ffffff;
-  border: 1px solid rgba(22, 32, 31, 0.22);
+  border: 1px solid rgba(42, 45, 53, 0.22);
   color: var(--archive-ink);
   font-family: var(--font-sans);
   font-size: var(--step-0);
@@ -178,7 +178,7 @@
 .field textarea:focus {
   outline: none;
   border-color: var(--deep-teal);
-  box-shadow: inset 0 0 0 1px rgba(29, 138, 114, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(93, 127, 141, 0.35);
 }
 .field input:focus-visible,
 .field textarea:focus-visible { outline: 1px solid var(--deep-teal); outline-offset: 2px; }
@@ -233,7 +233,7 @@
 }
 .pilot__submit:hover:not(:disabled) { background: var(--deep-teal); }
 .pilot__submit:hover:not(:disabled) .pilot__submit-mark { transform: rotate(45deg) scale(1.4); background: var(--archive-paper); }
-.pilot__submit:disabled { background: rgba(22, 32, 31, 0.35); cursor: default; }
+.pilot__submit:disabled { background: rgba(42, 45, 53, 0.35); cursor: default; }
 .pilot__submit:focus-visible { outline: 1px solid var(--deep-teal); outline-offset: 3px; }
 
 .pilot__status {
