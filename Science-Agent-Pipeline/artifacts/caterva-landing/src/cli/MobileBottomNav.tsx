@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 
 const NAV_ITEMS = [
-  { id: "how", label: "How", icon: "⌂" },
+  { id: "system", label: "Run", icon: "⌂" },
   { id: "examples", label: "Demo", icon: "◉" },
   { id: "agent", label: "Agent", icon: "⚡" },
   { id: "simulate", label: "Sim", icon: "⟐" },

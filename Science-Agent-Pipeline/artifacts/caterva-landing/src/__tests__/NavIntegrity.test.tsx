@@ -67,6 +67,10 @@ function renderedIds(): Set<string> {
       ids.add(m[1]!);
     }
   }
+  // The merged MuleRun chapters (the Evidence Cathedral and the rest) are
+  // static markup rendered by src/mule/MuleChapters.tsx.
+  const mule = readFileSync(path.join(__dirname, "..", "mule", "chapters.html"), "utf-8");
+  for (const m of mule.matchAll(/\bid="([a-z-]+)"/g)) ids.add(m[1]!);
   return ids;
 }
 

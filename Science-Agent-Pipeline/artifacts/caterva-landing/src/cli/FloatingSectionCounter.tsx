@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_ITEMS = [
-  "how",
+  "system",
+  "microscope",
   "examples",
   "playground",
   "compare",

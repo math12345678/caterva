@@ -1,0 +1,593 @@
+  <section id="system" class="stage" aria-labelledby="stage-heading">
+    <h1 id="stage-heading" class="visually-hidden">
+      caterva — Caterva runs the science. An evidence-first simulation architecture.
+    </h1>
+    <!-- ---------- computational void / inquiry terminal ---------- -->
+    <div class="void" data-void aria-hidden="true">
+      <div class="void__grid"></div>
+      <div class="void__horizon"></div>
+      <div class="void__axis"></div>
+    </div>
+
+    <div class="inquiry" data-inquiry>
+      <form class="inquiry__form" data-inquiry-form novalidate>
+        <p class="inquiry__ask display">What do you want to understand?</p>
+
+        <div class="terminal">
+          <div class="terminal__meta">
+            <label class="label label--micro" for="question">Scientific question / input 0007</label>
+            <span class="label label--micro terminal__state" data-terminal-state>AWAITING INPUT</span>
+          </div>
+
+          <div class="terminal__field">
+            <span class="terminal__tick terminal__tick--tl" aria-hidden="true"></span>
+            <span class="terminal__tick terminal__tick--tr" aria-hidden="true"></span>
+            <span class="terminal__tick terminal__tick--bl" aria-hidden="true"></span>
+            <span class="terminal__tick terminal__tick--br" aria-hidden="true"></span>
+            <span class="terminal__guides" aria-hidden="true"></span>
+            <textarea
+              id="question"
+              name="question"
+              class="terminal__input"
+              rows="1"
+              spellcheck="false"
+              autocomplete="off"
+              enterkeyhint="go"
+              aria-describedby="terminal-hint"
+            >How does substrate concentration affect enzyme velocity?</textarea>
+            <span class="terminal__caret" data-caret aria-hidden="true"></span>
+          </div>
+
+          <p id="terminal-hint" class="visually-hidden">
+            Press Enter to construct an illustrative verified run. Typed questions route into the same demonstration sequence.
+          </p>
+        </div>
+
+        <div class="inquiry__actions">
+          <button type="submit" class="construct" data-construct>
+            <span class="construct__bracket" aria-hidden="true">[</span>
+            <span class="construct__label">Construct verified run</span>
+            <span class="construct__bracket" aria-hidden="true">]</span>
+            <span class="construct__fill" aria-hidden="true"></span>
+          </button>
+          <button type="button" class="ghost-action" data-use-sample>
+            Use the sample question
+          </button>
+        </div>
+
+        <!-- The first screen used to say only "evidence-first simulation
+             architecture", which names a category and claims nothing. A
+             reader could leave the page without ever learning what the tool
+             does. This states the behaviour instead, and — more importantly —
+             draws the line the rest of the page kept blurring: the terminal
+             above is an illustration, the transcript below it is real output. -->
+        <div class="inquiry__foot">
+          <p class="inquiry__claim">
+            Caterva resolves measured kinetic parameters from published literature, reports the
+            organism and citation behind each one, and
+            <span class="inquiry__claim-em">refuses to invent the ones it cannot source</span>.
+          </p>
+          <p class="disclaimer inquiry__caveat">
+            This terminal builds an illustrative run<br />
+            <a class="inquiry__jump" href="#proof">the transcript below is real command-line output &#8595;</a>
+          </p>
+        </div>
+      </form>
+    </div>
+
+    <!-- ---------- the evidence cathedral ---------- -->
+    <div class="cathedral" data-cathedral hidden>
+      <div class="cathedral__viewport" data-viewport></div>
+
+      <div class="cathedral__hud">
+        <div class="hud__rail" data-rail role="list" aria-label="Run progress"></div>
+        <div class="hud__log" aria-live="polite" aria-atomic="true">
+          <span class="label label--micro hud__log-key">SYSTEM</span>
+          <span class="mono hud__log-line" data-log>SYSTEM IDLE / AWAITING SCIENTIFIC QUESTION</span>
+        </div>
+      </div>
+
+      <!-- After the run settles, the architecture stays explorable. On a
+           phone this becomes a prev/next walk through close stations; on
+           desktop it re-frames whole tiers. -->
+      <div class="cathedral__journey" data-journey hidden>
+        <button type="button" class="journey__step" data-journey-prev aria-label="Previous station">
+          <span aria-hidden="true">&#8592;</span>
+        </button>
+        <p class="journey__now">
+          <span class="label label--micro" data-journey-index>01 / 12</span>
+          <span class="journey__label mono" data-journey-label aria-live="polite">Question</span>
+        </p>
+        <button type="button" class="journey__step" data-journey-next aria-label="Next station">
+          <span aria-hidden="true">&#8594;</span>
+        </button>
+      </div>
+
+      <div class="cathedral__tiers" data-tiers hidden>
+        <span class="label label--micro tiers__key">Examine</span>
+        <div class="tiers__set" role="group" aria-label="Frame a tier of the architecture">
+          <button type="button" class="tier-btn" data-frame="full" aria-pressed="true">Whole</button>
+          <button type="button" class="tier-btn" data-frame="question" aria-pressed="false">Question</button>
+          <button type="button" class="tier-btn" data-frame="array" aria-pressed="false">Interpretation</button>
+          <button type="button" class="tier-btn" data-frame="config" aria-pressed="false">Configuration</button>
+          <button type="button" class="tier-btn" data-frame="vault" aria-pressed="false">Verification</button>
+          <button type="button" class="tier-btn" data-frame="core" aria-pressed="false">Core</button>
+          <button type="button" class="tier-btn" data-frame="record" aria-pressed="false">Record</button>
+        </div>
+      </div>
+
+      <div class="cathedral__controls">
+        <button type="button" class="ctrl" data-replay>Replay the run</button>
+        <button type="button" class="ctrl" data-skip>Skip to complete</button>
+        <button type="button" class="ctrl ctrl--quiet" data-reset>New question</button>
+      </div>
+
+      <p class="cathedral__vault-line display" data-vault-line aria-hidden="true">
+        Generation is one step.<br /><span class="display-teal">Verification surrounds it.</span>
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- PROOF — the real tool, quoted literally               -->
+  <!--                                                       -->
+  <!-- Everything else on this page illustrates an intended   -->
+  <!-- architecture with placeholder records. That is honest, -->
+  <!-- and on its own it reads as a mockup of a product that  -->
+  <!-- does not exist yet. The command-line tool does exist,  -->
+  <!-- and the three behaviours that actually distinguish it  -->
+  <!-- — provenance, the cross-species warning, and three     -->
+  <!-- exit codes instead of two — are shown here verbatim    -->
+  <!-- rather than described in the abstract, and shown       -->
+  <!-- before the architecture rather than after it.          -->
+  <!-- Source: src/cli/commandResolve.ts.                     -->
+  <!-- ==================================================== -->
+  <section id="proof" class="proof" aria-labelledby="proof-title">
+    <div class="proof__inner">
+      <div class="proof__head">
+        <p class="eyebrow" data-reveal>Real output / command-line tool</p>
+        <h2 id="proof-title" class="proof__title display" data-reveal>
+          Every number says where it came from.<br />
+          <span class="display-dim">The ones it cannot source, it will not invent.</span>
+        </h2>
+        <p class="prose" data-reveal>
+          Ask for a measured parameter and Caterva searches BRENDA for an exact
+          organism match, then a cross-species match, then PubMed. What comes back
+          is the measurement, the organism it was measured in, and the reference —
+          and a warning that cannot be switched off when the organism is not the
+          one you asked for.
+        </p>
+      </div>
+
+      <div class="proof__body">
+        <div class="transcript" data-reveal>
+          <div class="transcript__meta">
+            <span class="label label--micro">scientific resolve / recorded session</span>
+            <span class="label label--micro transcript__exit">EXIT 0</span>
+          </div>
+          <!-- tabindex + role: the pre scrolls horizontally on narrow viewports
+               so terminal lines are never re-wrapped (a wrapped transcript is a
+               misquoted one), and a scrollable region has to be reachable by
+               keyboard as well as by touch. -->
+          <pre class="transcript__code" tabindex="0" role="group"
+               aria-label="Recorded terminal session resolving a Michaelis constant (Km)"><span class="t-cmd">$ scientific resolve "lactate dehydrogenase" \
+      --substrate pyruvate --organism "Homo sapiens"</span>
+
+<span class="t-ok">&#10003;</span> <b>KM = 2.5 mM</b>
+
+  <span class="t-key">System  </span>  lactate dehydrogenase / pyruvate
+  <span class="t-key">Organism</span>  Oryctolagus cuniculus
+  <span class="t-key">Source  </span>  brenda_cross_species
+  <span class="t-key">Citation</span>  BRENDA ref 649716
+
+<span class="t-warn">&#9888; <b>Cross-species match.</b> This was measured in Oryctolagus
+  cuniculus, not Homo sapiens.
+  Real and citable, but do not report it as a Homo
+  sapiens measurement.</span></pre>
+          <p class="transcript__foot disclaimer">
+            A rabbit value is real, and it is not a human measurement. The warning is
+            not suppressible.
+          </p>
+        </div>
+
+        <div class="exits" data-reveal>
+          <p class="exits__head label label--micro">Three outcomes, three exit codes</p>
+
+          <div class="exits__row">
+            <p class="exits__code mono" aria-hidden="true">0</p>
+            <p class="exits__what"><span class="visually-hidden">Exit code 0. </span>Found</p>
+            <p class="exits__why">A real measurement, with its unit, organism and citation.</p>
+          </div>
+
+          <div class="exits__row exits__row--review">
+            <p class="exits__code mono" aria-hidden="true">2</p>
+            <p class="exits__what"><span class="visually-hidden">Exit code 2. </span>The literature has nothing</p>
+            <p class="exits__why">
+              BRENDA and PubMed were searched and returned nothing. This is an answer,
+              not a failure — no value has been invented to fill the gap.
+            </p>
+          </div>
+
+          <div class="exits__row exits__row--blocked">
+            <p class="exits__code mono" aria-hidden="true">1</p>
+            <p class="exits__what"><span class="visually-hidden">Exit code 1. </span>The lookup could not be performed</p>
+            <p class="exits__why">
+              Not the same as “no value exists”. Nothing was learned about this system
+              at all.
+            </p>
+          </div>
+
+          <p class="exits__foot">
+            Most tools collapse the last two. They are different facts, and a tool that
+            reports “no result” when it could not reach the registry teaches you to read
+            an absence of evidence as evidence of absence.
+          </p>
+        </div>
+      </div>
+
+      <p class="proof__note disclaimer">
+        Transcript recorded from the command-line tool. The interactive architecture
+        below this section is an illustrative demonstration and uses placeholder records
+        throughout.
+      </p>
+    </div>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- CATERVA ATLAS — the operable system map               -->
+  <!-- ==================================================== -->
+  <section id="atlas" class="atlas" data-atlas data-atlas-state="view" aria-labelledby="atlas-title">
+    <div class="atlas__head">
+      <p class="eyebrow" data-reveal>Live system map / Illustrative architecture</p>
+      <h2 id="atlas-title" class="atlas__title display" data-reveal>
+        See the system think.
+      </h2>
+      <p class="prose atlas__lede" data-reveal>
+        A scientific question becomes a verified run through specialized agents, evidence
+        routes, execution environments, and independent checks.
+      </p>
+    </div>
+
+    <div class="atlas__stage" data-atlas-stage>
+      <!-- The map is injected here as SVG. -->
+
+      <div class="atlas__chrome">
+        <div class="atl-zoom" role="group" aria-label="Map zoom level">
+          <button class="atl-zoom__btn" type="button" data-atlas-zoom="system" aria-pressed="true">System</button>
+          <button class="atl-zoom__btn" type="button" data-atlas-zoom="layers" aria-pressed="false">Layers</button>
+          <button class="atl-zoom__btn" type="button" data-atlas-zoom="agents" aria-pressed="false">Agents</button>
+        </div>
+
+        <div class="atl-states" role="group" aria-label="Architecture state">
+          <button class="atl-states__btn is-active" type="button" data-atlas-state="view" aria-pressed="true">View architecture</button>
+          <button class="atl-states__btn" type="button" data-atlas-state="run" aria-pressed="false">Run illustrative pipeline</button>
+          <button class="atl-states__btn" type="button" data-atlas-state="failure" aria-pressed="false">Show failure paths</button>
+        </div>
+
+        <div class="atl-jumps" role="group" aria-label="Jump to region">
+          <button class="atl-jumps__btn" type="button" data-atlas-region="intake"><span class="atl-jumps__i">01</span> Intake</button>
+          <button class="atl-jumps__btn" type="button" data-atlas-region="interpretation"><span class="atl-jumps__i">02</span> Interpretation</button>
+          <button class="atl-jumps__btn" type="button" data-atlas-region="evidence"><span class="atl-jumps__i">03</span> Evidence</button>
+          <button class="atl-jumps__btn" type="button" data-atlas-region="configuration"><span class="atl-jumps__i">04</span> Configuration</button>
+          <button class="atl-jumps__btn" type="button" data-atlas-region="execution"><span class="atl-jumps__i">05</span> Execution</button>
+          <button class="atl-jumps__btn" type="button" data-atlas-region="trust"><span class="atl-jumps__i">06</span> Trust</button>
+          <button class="atl-jumps__btn" type="button" data-atlas-region="output"><span class="atl-jumps__i">07</span> Output</button>
+        </div>
+
+        <div class="atl-readout">
+          <p class="atl-readout__log" data-atlas-log>System map ready</p>
+          <p class="atl-readout__caption" data-atlas-caption>Seven regions. Eight declared routes.</p>
+        </div>
+      </div>
+
+      <aside class="atlas__panel" data-atlas-panel hidden aria-label="Component record"></aside>
+    </div>
+
+    <p class="atlas__hint">
+      <span><b>Click</b> any module to inspect it &nbsp;/&nbsp; <b>Hover</b> a route to trace its path &nbsp;/&nbsp; <b>Drag</b> to pan, <b>scroll with ⌘ or Ctrl</b> to zoom</span>
+      <span>Illustrative v1 architecture</span>
+    </p>
+
+    <!-- The map is an image to assistive technology, so every state change
+         it makes is also announced here in words. -->
+    <p class="visually-hidden" role="status" aria-live="polite" data-atlas-live></p>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- LIVE ORCHESTRATION CONSOLE                           -->
+  <!-- ==================================================== -->
+  <section id="orchestration" class="console" data-console data-con-case="success" aria-labelledby="con-title">
+    <div class="console__head">
+      <p class="eyebrow" data-reveal>Orchestration / Live demo</p>
+      <h2 id="con-title" class="console__title display" data-reveal>
+        Not one model.<br />
+        <span class="display-dim">A coordinated scientific system.</span>
+      </h2>
+      <p class="prose console__lede" data-reveal>
+        Caterva routes a question through specialized agents. Each stage has a distinct
+        responsibility, visible inputs, and an inspectable output.
+      </p>
+    </div>
+
+    <div class="console__deck">
+      <!-- ---------- LEFT: the scientific input ---------- -->
+      <div class="console__col console__col--in">
+        <div class="con-col__head">
+          <p class="label label--micro">Scientific input</p>
+          <p class="label label--micro con-col__k">One question</p>
+        </div>
+        <div class="con-in">
+          <p class="label label--micro con-in__k" data-con-scenario>Demonstration scenario</p>
+          <p class="con-in__q display">How does substrate concentration affect enzyme velocity?</p>
+          <p class="disclaimer con-in__note" data-con-note>
+            Illustrative interface demonstration. Not a scientific result.
+          </p>
+
+          <dl class="con-in__meta">
+            <div class="con-in__row">
+              <dt class="label label--micro">Run state</dt>
+              <dd class="mono con-in__state" data-con-state>IDLE</dd>
+            </div>
+            <div class="con-in__row">
+              <dt class="label label--micro">Agents</dt>
+              <dd class="mono">09 / specialized</dd>
+            </div>
+            <div class="con-in__row">
+              <dt class="label label--micro">Execution</dt>
+              <dd class="mono">Illustrative</dd>
+            </div>
+          </dl>
+
+          <div class="con-in__acts">
+            <button class="ctrl ctrl--primary" type="button" data-con-run>Run demonstration</button>
+            <button class="ctrl ctrl--quiet" type="button" data-con-pause disabled>Resume</button>
+          </div>
+
+          <div class="con-cases" role="group" aria-label="Demonstration case">
+            <button class="con-cases__btn is-active" type="button" data-con-mode="success" aria-pressed="true">Successful run</button>
+            <button class="con-cases__btn" type="button" data-con-mode="failure" aria-pressed="false">Failure case</button>
+          </div>
+
+          <p class="con-in__foot">
+            Each agent can be inspected at any point in the run. The workspace on the right
+            only gains a block because an agent emitted it.
+          </p>
+
+          <a class="con-in__back" href="#atlas">Back to the architecture map</a>
+        </div>
+      </div>
+
+      <!-- ---------- CENTRE: the live agent timeline ---------- -->
+      <div class="console__col console__col--time">
+        <div class="con-col__head">
+          <p class="label label--micro">Agent timeline</p>
+          <p class="label label--micro con-col__k">Nine responsibilities</p>
+        </div>
+        <div class="con-time">
+          <ol class="con-agents" data-con-agents></ol>
+        </div>
+      </div>
+
+      <!-- ---------- RIGHT: the output workspace ---------- -->
+      <div class="console__col console__col--ws">
+        <div class="con-col__head">
+          <p class="label label--micro">Output workspace</p>
+          <p class="label label--micro con-col__k">Assembles as the run proceeds</p>
+        </div>
+        <div class="con-ws">
+          <div class="con-ws__body" data-con-workspace></div>
+          <p class="con-ws__empty" data-con-empty>
+            Empty until an agent produces something it can defend.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <p class="visually-hidden" role="status" aria-live="polite" data-con-live></p>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- TEXT ALTERNATIVE — the architecture in plain language -->
+  <!-- ==================================================== -->
+  <section id="pipeline-summary" class="summary" aria-labelledby="summary-title">
+    <div class="summary__inner">
+      <div class="summary__lede">
+        <p class="eyebrow">The architecture</p>
+        <h2 id="summary-title" class="summary__title display">
+          The same architecture,<br />
+          <span class="display-dim">written out in words.</span>
+        </h2>
+        <p class="prose">
+          One question enters. A scientific chain of custody leaves.
+        </p>
+        <p class="prose">
+          Caterva identifies the model a question implies, attaches source support to its
+          parameters, configures the run, executes it where the method permits, and checks
+          the result through separate verification stages.
+        </p>
+      </div>
+
+      <div class="summary__pipeline">
+        <p class="label label--micro">Pipeline / text description</p>
+        <ol class="pipeline-list" data-pipeline-list></ol>
+        <p class="disclaimer summary__note">
+          Caterva is pre-validation. This site demonstrates the intended architecture and
+          interaction model. It does not present scientific results, and it does not
+          guarantee correctness.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- CHAPTER 01 — EVIDENCE                                -->
+  <!-- ==================================================== -->
+  <section id="evidence" class="chapter chapter--evidence" aria-labelledby="ch1-title">
+    <div class="chapter__head">
+      <p class="eyebrow" data-reveal>01 / Evidence</p>
+      <h2 id="ch1-title" class="chapter__title display" data-reveal style="--reveal-delay:60ms">
+        Science should leave a trail.
+      </h2>
+      <p class="prose" data-reveal style="--reveal-delay:120ms">
+        Caterva does not silently choose a number. Every value is linked to a source, bounded
+        by the conditions that source declared, or marked for review.
+      </p>
+    </div>
+
+    <div class="rail-shell" data-reveal style="--reveal-delay:180ms">
+      <div class="rail-shell__meta">
+        <span class="label label--micro">Evidence rail / parameter Km</span>
+        <span class="label label--micro rail-shell__hint">Select a link to inspect</span>
+      </div>
+      <div class="evidence-rail" data-evidence-rail></div>
+      <div class="rail-detail" data-rail-detail aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- EVIDENCE MICROSCOPE                                  -->
+  <!-- ==================================================== -->
+  <section id="microscope" class="micro" data-microscope aria-labelledby="mi-title">
+    <div class="micro__head">
+      <p class="eyebrow" data-reveal>Evidence microscope / Deep inspection</p>
+      <h2 id="mi-title" class="micro__title display" data-reveal>
+        Inspect the reason,<br />
+        <span class="display-dim">not just the result.</span>
+      </h2>
+      <p class="prose micro__lede" data-reveal>
+        A scientific parameter is not a number until its scope, basis, and review state
+        are visible.
+      </p>
+    </div>
+
+    <div class="micro__body">
+      <!-- the depth gauge: six stops, always jumpable -->
+      <nav class="mi-gauge" data-mi-gauge aria-label="Inspection depth"></nav>
+
+      <div class="micro__field" data-mi-field>
+        <!-- the parameter, floating in quiet dark space -->
+        <div class="mi-seed" data-mi-seed>
+          <button class="mi-seed__btn" type="button" data-mi-open>
+            <span class="mi-seed__ring" aria-hidden="true"></span>
+            <span class="mi-seed__ring mi-seed__ring--2" aria-hidden="true"></span>
+            <span class="mi-seed__n mono">Km</span>
+            <span class="mi-seed__v display">0.03</span>
+            <span class="mi-seed__u mono">mM</span>
+            <span class="mi-seed__badge label label--micro">Human LDH · BRENDA ref 286469</span>
+            <span class="mi-seed__cue label label--micro">Open the evidence</span>
+          </button>
+        </div>
+
+        <!-- one level at a time is mounted here -->
+        <div class="micro__stage" data-mi-stage></div>
+      </div>
+
+      <p class="disclaimer micro__note">
+        This is an interface demonstration. It is not a research-ready parameter
+        recommendation.
+      </p>
+    </div>
+
+    <p class="visually-hidden" role="status" aria-live="polite" data-mi-live></p>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- CHAPTER 02 — TRUST LAYER                             -->
+  <!-- ==================================================== -->
+  <section id="separation" class="chapter chapter--trust" aria-labelledby="ch2-title">
+    <div class="chapter__head">
+      <p class="eyebrow" data-reveal>02 / Trust layer</p>
+      <h2 id="ch2-title" class="chapter__title display" data-reveal style="--reveal-delay:60ms">
+        Code that runs is not<br />necessarily science that holds.
+      </h2>
+      <p class="prose" data-reveal style="--reveal-delay:120ms">
+        Generation, execution, tracing, correctness, critique and presentation are separated,
+        because each one fails in a different way.
+      </p>
+    </div>
+
+    <div class="exploded" data-exploded>
+      <div class="exploded__stage" data-exploded-stage></div>
+      <div class="exploded__controls">
+        <div class="exploded__steps" data-exploded-steps role="tablist" aria-label="Verification stages"></div>
+        <p class="exploded__readout mono" data-exploded-readout aria-live="polite"></p>
+      </div>
+    </div>
+
+    <p class="trust-statement display" data-reveal>
+      Generation is one step.<br />
+      <span class="display-teal">Verification surrounds it.</span>
+    </p>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- CHAPTER 03 — EXECUTION                               -->
+  <!-- ==================================================== -->
+  <section id="execution" class="chapter chapter--execution" aria-labelledby="ch3-title">
+    <div class="chapter__head">
+      <p class="eyebrow" data-reveal>03 / Execution</p>
+      <h2 id="ch3-title" class="chapter__title display" data-reveal style="--reveal-delay:60ms">
+        Run where the method permits.<br />
+        <span class="display-dim">Prepare where it does not.</span>
+      </h2>
+      <p class="prose" data-reveal style="--reveal-delay:120ms">
+        Work is routed by real computational limits, not by a single blanket claim.
+      </p>
+    </div>
+
+    <div class="strata" data-strata></div>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- SYSTEM MANIFEST                                      -->
+  <!-- The one section printed on archive paper rather than  -->
+  <!-- drawn in the dark. Five refusals, set as a document,  -->
+  <!-- because a commitment reads differently on paper than  -->
+  <!-- it does on a screen.                                  -->
+  <!-- ==================================================== -->
+  <section id="manifest" class="manifest" aria-labelledby="manifest-title">
+    <div class="manifest__sheet">
+      <div class="manifest__head">
+        <p class="manifest__label mono">System manifest / V1.0</p>
+        <span class="manifest__rule" aria-hidden="true"></span>
+      </div>
+
+      <h2 id="manifest-title" class="visually-hidden">System manifest, version 1.0</h2>
+
+      <ol class="manifest__list">
+        <li class="manifest__item" data-reveal>
+          <span class="manifest__i mono" aria-hidden="true">01</span>
+          <p class="manifest__stmt">Caterva does not silently choose a measured parameter.</p>
+        </li>
+        <li class="manifest__item" data-reveal style="--reveal-delay:90ms">
+          <span class="manifest__i mono" aria-hidden="true">02</span>
+          <p class="manifest__stmt">Caterva does not treat code execution as scientific validation.</p>
+        </li>
+        <li class="manifest__item" data-reveal style="--reveal-delay:180ms">
+          <span class="manifest__i mono" aria-hidden="true">03</span>
+          <p class="manifest__stmt">Caterva does not hide the assumptions that shape a run.</p>
+        </li>
+        <li class="manifest__item" data-reveal style="--reveal-delay:270ms">
+          <span class="manifest__i mono" aria-hidden="true">04</span>
+          <p class="manifest__stmt">Caterva does not promise browser execution where real compute is required.</p>
+        </li>
+        <li class="manifest__item" data-reveal style="--reveal-delay:360ms">
+          <span class="manifest__i mono" aria-hidden="true">05</span>
+          <p class="manifest__stmt">Caterva preserves the path from question to result.</p>
+        </li>
+      </ol>
+
+      <div class="manifest__close">
+        <p class="manifest__coda display" data-reveal style="--reveal-delay:450ms">
+          Science should not depend on invisible assumptions.
+        </p>
+        <a class="manifest__back mono" href="#atlas" data-manifest-back>
+          [ Read the architecture ]
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================================================== -->
+  <!-- PILOT INVITATION                                     -->
+  <!-- ==================================================== -->

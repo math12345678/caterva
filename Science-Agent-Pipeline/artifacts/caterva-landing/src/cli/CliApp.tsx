@@ -1,3 +1,4 @@
+import MuleChapters from "@/mule/MuleChapters";
 import { Lockup, Mark } from "@/components/brand/Mark";
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import {
@@ -77,7 +78,8 @@ function LazyFallback({ rows = 4 }: { rows?: number }) {
 }
 
 const NAV_ITEMS = [
-  "how",
+  "system",
+  "microscope",
   "examples",
   "playground",
   "compare",
@@ -100,7 +102,11 @@ const NAV_ITEMS = [
 
 // The header carries the few sections a first-time visitor needs; the side
 // dots and the command palette (⌘K) still reach every section.
-const HEADER_NAV = ["how", "examples", "playground", "agent", "domains", "cite", "waitlist"] as const;
+const HEADER_NAV = ["system", "microscope", "playground", "agent", "domains", "cite", "waitlist"] as const;
+const HEADER_LABEL: Partial<Record<(typeof HEADER_NAV)[number], string>> = {
+  system: "watch a run",
+  microscope: "evidence",
+};
 
 import { DOMAINS } from "@/lib/domains";
 
@@ -260,7 +266,7 @@ export default function CliApp() {
       id="top"
     >
       <a
-        href="#how"
+        href="#system"
         className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[9999] focus:px-4 focus:py-2 focus:rounded-lg focus:border focus:border-signal/40 focus:bg-surface focus:text-signal focus:text-[13px] focus:font-medium focus:shadow-lg"
       >
         Skip to main content
@@ -293,7 +299,7 @@ export default function CliApp() {
 
           <nav className="hidden md:flex items-center gap-1" aria-label="Main sections">
             {HEADER_NAV.map((item) => (
-              <Magnetic key={item} strength={0.06}>
+              <Magnetic key={HEADER_LABEL[item] ?? item} strength={0.06}>
                 <a
                   href={`#${item}`}
                   className="px-2.5 py-1 rounded-md text-fg/76 hover:text-fg hover:bg-fg/[0.05] transition-colors duration-200 text-[13px]"
@@ -437,8 +443,17 @@ export default function CliApp() {
                 className="flex flex-wrap items-center gap-5 text-[11px] mb-4"
               >
                 <a
+                  href="#system"
+                  className="inline-flex items-center gap-2 rounded-lg bg-ink px-5 py-2.5 text-[13px] text-paper font-medium transition-colors duration-200 hover:bg-signal-deep"
+                >
+                  watch a run be built
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path d="M6 2v7M2 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </a>
+                <a
                   href="#agent"
-                  className="inline-flex items-center gap-2 rounded-xl border border-signal/30 bg-signal/[0.06] px-5 py-2.5 text-[13px] text-signal font-medium transition-all duration-300 hover:bg-signal/[0.10]"
+                  className="inline-flex items-center gap-2 rounded-lg border border-signal/30 bg-signal/[0.06] px-5 py-2.5 text-[13px] text-signal font-medium transition-colors duration-200 hover:bg-signal/[0.10]"
                 >
                   try the agent
                   <svg className="w-3.5 h-3.5" viewBox="0 0 12 12" fill="none">
@@ -503,99 +518,10 @@ export default function CliApp() {
         </div>
       </ParallaxHero>
       <div className="section-divider" />
-      {/* HOW IT WORKS */}
-      <Section id="how" className="pb-16 pt-16">
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-80px" }}
-          variants={{ visible: { transition: { staggerChildren: 0.15 } } }}
-        >
-          <div className="flex items-center gap-4 mb-8">
-            <span className="text-fg/66 text-[11px] font-mono font-medium">
-              00
-            </span>
-            <span className="h-px flex-1 bg-gradient-to-r from-fg/[0.06] to-transparent" />
-          </div>
-          <h2 className="section-header">How it works</h2>
-          <p className="font-sans text-[13px] text-fg/76 mb-10 -mt-2 max-w-sm">
-            Three steps from question to verified result.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-0">
-              {[
-                {
-                  n: "01",
-                  title: "Ask in plain language",
-                  desc: 'Type your biological question naturally — "lactate dehydrogenase with pyruvate" or "competitive inhibition of LDH by oxamate". No syntax to learn.',
-                },
-                {
-                  n: "02",
-                  title: "We look it up",
-                  desc: "We query BRENDA and PubMed to find real kinetic parameters and literature citations for your system.",
-                },
-                {
-                  n: "03",
-                  title: "You get a verified simulation",
-                  desc: "A running ODE model with conserved-quantity checks, parameter bounds, and every number linked to its source paper.",
-                },
-              ].map((step, i) => (
-                <motion.div
-                  key={step.n}
-                  variants={{
-                    hidden: { opacity: 0, y: 20 },
-                    visible: {
-                      opacity: 1,
-                      y: 0,
-                      transition: { duration: 0.6, ease: [0.16, 1, 0.3, 1] },
-                    },
-                  }}
-                  className="relative flex gap-5 pb-10 last:pb-0"
-                >
-                  <div className="flex flex-col items-center">
-                    <div className="how-step-number text-signal/30 w-14 text-center">
-                      {step.n}
-                    </div>
-                    {i < 2 && <div className="how-step-line" />}
-                  </div>
-                  <div className="pt-2">
-                    <h3 className="font-sans text-[15px] font-medium text-fg/85 mb-1.5">
-                      {step.title}
-                    </h3>
-                    <p className="font-sans text-[13px] text-fg/70 leading-relaxed max-w-md">
-                      {step.desc}
-                    </p>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-            <motion.div
-              variants={{
-                hidden: { opacity: 0, y: 20 },
-                visible: {
-                  opacity: 1,
-                  y: 0,
-                  transition: { duration: 0.6, delay: 0.3 },
-                },
-              }}
-            >
-              <TerminalWindow
-                path="smyan@caterva: ~"
-                glow
-                className="glow-teal-border"
-              >
-                <InteractiveShell
-                  onNavigate={scrollToSection}
-                  onSimulate={setSimDomain}
-                />
-              </TerminalWindow>
-              <div className="mt-4">
-                <PipelineFlow />
-              </div>
-            </motion.div>
-          </div>
-        </motion.div>
-      </Section>
+      {/* THE RUN: the MuleRun chapters, merged (Evidence Cathedral, system
+          atlas, orchestration console, evidence rail, microscope, trust
+          layer, runtimes). One full-width ink chapter on the paper page. */}
+      <MuleChapters />
       {/* EXAMPLES */}
       <Section id="examples" className="pb-12 pt-8">
         <Reveal>
