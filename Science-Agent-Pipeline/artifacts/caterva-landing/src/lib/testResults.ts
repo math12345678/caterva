@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "97 test files -- kinetics & Michaelis-Menten correctness, " +
+          "98 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup " +
           "and preparation audit, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -155,8 +155,9 @@ export const TEST_SUITES: TestSuite[] = [
         // the codegen selftest, which needs npx and runs for real in the
         // api-server CI job. So the figure where npm works, as for the
         // other rows: 2855. Plus the 22 tests of `caterva prepare`, run
-        // alone 2026-09-28 (22 passed): 2877.
-        passed: 2877,
+        // alone 2026-09-28 (22 passed), and the md replica and
+        // convergence tests (26 passed with the setup suite): 2894.
+        passed: 2894,
         skipped: 0,
         failed: 0,
       },

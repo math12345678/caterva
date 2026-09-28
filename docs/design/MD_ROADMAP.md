@@ -114,7 +114,14 @@ hand. *Done when* the report on a known problem entry (a mutant, a
 structure with missing loops) names every defect a structural biologist
 would, verified on at least five hand-checked entries.
 
-### M2. Replicas and convergence by default
+### M2. Replicas and convergence by default (shipped 2026-09-28)
+
+Shipped: `--replicas` (default 3) with recorded seeds, per-replica backbone
+RMSD from `run.sh`, and `caterva md --summarise` (block averaging,
+effective sample count, between-replica agreement). Verified on synthetic
+AR(1) series of known correlation time and on a real two-replica GROMACS
+run of 1AKI. Next: the same summary for the M3 enzyme quantities.
+
 
 `caterva md --replicas 5` writes independent runs with recorded seeds and
 reports every quantity as a spread across replicas, with block averaging for

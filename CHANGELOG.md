@@ -73,6 +73,12 @@ Caterva narrows to enzymes: kinetics, structure and dynamics.
   its identity and the rejected candidates named. On 1I10 it finds LDH-A's
   catalytic Arg105 truncated in chain D and unmodelled in chain G, and
   recommends chains A or C. No new dependencies.
+- **`caterva md` runs three replicas by default** from one minimised system,
+  differing only in velocity seeds (all recorded), and **`caterva md
+  --summarise DIR`** reports each replica's block-averaged error
+  (Flyvbjerg & Petersen 1989), its effective sample count, and whether the
+  replicas agree: consistent, replicas disagree, unconverged, or one sample.
+  Exit 4 unless consistent.
 - `docs/design/MD_ROADMAP.md`: what the dynamics side will add
   (structure-preparation audit, replicas by default, enzyme-specific
   analysis, ligand provenance, simulation beside measured Ki), and why each

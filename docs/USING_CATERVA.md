@@ -406,6 +406,26 @@ points at PROPKA). `run.sh` needs `gmx` on PATH (or `GMX=/path/to/gmx`);
 it was run end to end with GROMACS 2021 on 1I10 chain A, and CI runs every
 stage on lysozyme (1AKI) with Ubuntu's GROMACS.
 
+**Three replicas by default.** `run.sh` builds and minimises the system
+once, then runs `rep1`, `rep2`, `rep3`, which differ only in their initial
+velocities (seeds recorded in PROVENANCE.md). One trajectory is an
+anecdote; `--replicas 1` is allowed and labelled one sample. When the runs
+finish:
+
+```bash
+caterva md --summarise ldha-md
+```
+
+It reads each replica's backbone RMSD, estimates its error by block
+averaging (Flyvbjerg & Petersen 1989, which corrects for correlated frames),
+counts how many independent samples each run is really worth, and compares
+the replicas with each other. The verdict is **consistent**, **replicas
+disagree** (each run found a different state), **unconverged** (a run is
+shorter than its own correlation time), or **one sample**; anything but
+consistent exits 4. On synthetic runs with a known correlation time it
+called every under-sampled set unconverged, and raised a false alarm on
+about 6 in 100 converged ones: it errs towards "not yet".
+
 ## Exact stochastic kinetics: `caterva sim ssa`
 
 When the molecule counts are small enough that a smooth curve hides what

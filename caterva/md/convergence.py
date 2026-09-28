@@ -187,13 +187,17 @@ def report(s: Summary) -> List[str]:
     for r in s.replicas:
         e = "n/a" if math.isnan(r.result.sem) else f"{r.result.sem:.3g}"
         L.append(f"| {r.name} | {r.kept} of {r.frames} | {r.result.mean:.4g} {s.unit} | {e} | "
-                 f"{'yes' if r.result.plateaued else '**no**'} | {r.result.effective_samples:.0f} |")
+                 f"{'yes' if r.result.plateaued else '**no**'} | "
+                 f"{'n/a' if math.isnan(r.result.effective_samples) else f'{r.result.effective_samples:.0f}'} |")
     L.append("")
     if s.spread is None:
         L.append(f"Mean {s.mean:.4g} {s.unit} from one run: report it as one sample.")
     else:
-        L.append(f"Across {len(s.replicas)} replicas: {s.mean:.4g} ± {s.spread:.2g} {s.unit} "
-                 "(mean ± SD of replica means). Report the spread, not only the mean.")
+        figure = (f"{s.mean:.4g} ± {s.spread:.2g} {s.unit} (mean ± SD of {len(s.replicas)} replica means)")
+        if s.verdict == "consistent":
+            L.append(f"Result: {figure}. Report the spread, not only the mean.")
+        else:
+            L.append(f"Not a result yet: {figure}, but see the verdict above. Do not report this number.")
     L += ["", f"The first {DISCARD:.0%} of each run is discarded as relaxation (a choice). Errors are "
           "Flyvbjerg & Petersen (1989) block averages, J. Chem. Phys. 91:461, doi:10.1063/1.457480."]
     return L
