@@ -480,6 +480,21 @@ fold error in Ki. Agreement with a single publication is reported as
 consistency, not validation. Tagged or immobilised constructs, and the
 molecule each Ki was measured against, travel as caveats.
 
+### `caterva bind --survey`: which Ki values can judge a method
+
+```bash
+caterva bind --ec 1.1.1.27 --organism human --survey
+```
+
+Before a force field or a free-energy protocol is validated against an
+enzyme's published Ki values, it is worth knowing whether those values can
+judge it. The survey builds the target for every inhibitor BRENDA records,
+one per compound, species and isoform (never pooled), and calls one a
+benchmark only with at least two publications, a stated inhibition mode
+and a stated assay temperature. On the recorded human LDH page the answer
+is none: every Ki comes from a single paper, and gossypol's rows state
+neither mode nor temperature. `--organism ""` surveys every species.
+
 ### `caterva complex`: the ligand where the crystal put it
 
 ```bash

@@ -19,6 +19,11 @@ done: there was no release to version.
   assay temperatures, filtered by inhibition mode (`--state free|ternary`)
   and isoform (`--isoform`), and a computed free energy is judged against
   the band at 2σ (exit 0 agrees, 4 disagrees). See docs/USING_CATERVA.md.
+- `caterva bind --survey`: every inhibitor's target for an enzyme, per
+  compound, species and isoform, marked as a benchmark only with two
+  publications, a stated mode and a stated temperature.
+- The API tests replay a recorded real BRENDA page for EC 2.7.1.1
+  (`Tests/fixtures/recorded/`) instead of failing when BRENDA is down.
 - `caterva complex`: builds the equilibrated complex `caterva fep` needs
   from a PDB entry and your ligand topology, posing the ligand on the
   crystal's by Kabsch superposition and refusing a different conformer or

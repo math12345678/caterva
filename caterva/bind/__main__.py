@@ -78,6 +78,62 @@ def _fmt_row(m: Measurement) -> str:
             f"  BRENDA ref {m.reference or '?'}")
 
 
+#: What makes a Ki target a sound benchmark: independent laboratories, a
+#: stated mode (so the binding event is known) and a stated temperature.
+BENCHMARK_RULE = "at least 2 publications, inhibition mode stated, assay temperature stated"
+
+
+def survey(html: str, ec: str, organism: str, state: str) -> List[dict]:
+    """One row per (compound, isoform): its band and whether it can benchmark."""
+    from caterva.bind.core import target
+    groups: dict = {}
+    for m in _rows(html, ec, organism, None):
+        if m.compound == "unknown compound":
+            continue
+        # Species and isoforms are different proteins: never one band.
+        groups.setdefault((m.compound, m.organism, m.isoform), []).append(m)
+    out = []
+    for (compound, species, isoform), ms in sorted(groups.items(),
+                                                   key=lambda kv: (kv[0][0].lower(), kv[0][1], kv[0][2] or "")):
+        t = target(ms, state, isoform)
+        missing = []
+        if len(t.references) < 2:
+            missing.append("one publication")
+        if any(m.mode == "unstated" for m in t.used):
+            missing.append("mode not stated")
+        if any(m.temperature_c is None for m in t.used):
+            missing.append("temperature not stated")
+        if t.lo is None:
+            missing = [f"no row measured the {state} state"]
+        out.append({
+            "compound": compound, "organism": species, "isoform": isoform, "rows": len(ms), "used": len(t.used),
+            "references": t.references,
+            "band_kcal": None if t.lo is None else [round(t.lo, 2), round(t.hi, 2)],
+            "benchmark": not missing, "why_not": missing,
+        })
+    out.sort(key=lambda r: (not r["benchmark"], r["band_kcal"] is None, r["compound"].lower()))
+    return out
+
+
+def render_survey(rows: List[dict], ec: str, organism: str, state: str) -> str:
+    good = [r for r in rows if r["benchmark"]]
+    lines = [f"Ki targets for EC {ec} in {organism or 'every organism'}, {state} state: {len(rows)} compound/isoform pair(s), "
+             f"{len(good)} usable as a benchmark ({BENCHMARK_RULE}).", ""]
+    for r in rows:
+        tag = ", ".join(x for x in (None if organism else r["organism"], r["isoform"]) if x)
+        name = r["compound"] + (f" [{tag}]" if tag else "")
+        name = name if len(name) <= 48 else name[:45] + "..."
+        band = (f"{r['band_kcal'][0]:6.2f} to {r['band_kcal'][1]:6.2f} kcal/mol"
+                if r["band_kcal"] else "            no target")
+        mark = "BENCHMARK" if r["benchmark"] else "not yet: " + ", ".join(r["why_not"])
+        lines.append(f"  {name:<48} {band}  {r['used']}/{r['rows']} row(s), "
+                     f"{len(r['references'])} ref(s)  {mark}")
+    if not good:
+        lines += ["", "None qualifies: a force field validated on this enzyme's published Ki values "
+                  "would be validated against single, partly described measurements."]
+    return "\n".join(lines)
+
+
 def report(rows: List[Measurement], state: str, computed: Optional[tuple], unit: str,
            isoform: Optional[str] = None) -> tuple[str, int, dict]:
     t = target(rows, state, isoform)
@@ -142,6 +198,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--inhibitor", help="the compound, exactly as BRENDA names it (see --list)")
     g.add_argument("--list", action="store_true", help="list compounds with a Ki for this enzyme and organism")
+    g.add_argument("--survey", action="store_true",
+                   help="every inhibitor's target, and which are sound benchmarks for a free-energy method")
     p.add_argument("--state", choices=("free", "ternary"), default="free",
                    help="what the simulation modelled: inhibitor with apo enzyme (free) or with E·S (ternary)")
     p.add_argument("--isoform", help="the isoform simulated (e.g. LDH-A); rows naming another are excluded")
@@ -177,6 +235,17 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva bind") -> in
     except Exception as e:  # network, missing file, missing literature layer
         print(f"caterva bind: could not read BRENDA for {a.ec}: {e}", file=sys.stderr)
         return EXIT_REFUSED
+
+    if a.survey:
+        rows = survey(html, a.ec, organism, a.state)
+        if not rows:
+            print(f"No Ki rows for EC {a.ec} in {organism}.")
+            return EXIT_REFUSED
+        if a.json:
+            print(json.dumps(rows, indent=2, default=str))
+        else:
+            print(render_survey(rows, a.ec, organism, a.state))
+        return EXIT_OK
 
     if a.list:
         names = _compound_names(html, a.ec, organism)

@@ -150,3 +150,37 @@ def test_nadh_has_no_ki_row_of_its_own(capsys):
     """The row that once made the website print 0.00059 as oxamate's Ki."""
     code, _, _ = run(capsys, "--inhibitor", "NADH")
     assert code == 3
+
+
+# --- the survey --------------------------------------------------------------
+
+def test_survey_finds_no_sound_benchmark_among_human_ldh_kis(capsys):
+    """The recorded page's answer: every human Ki is one publication."""
+    code, out, _ = run(capsys, "--survey")
+    assert code == 0
+    assert "0 usable as a benchmark" in out
+    assert "gossypol [LDH-A]" in out and "gossypol [LDH-B]" in out  # isoforms never pooled
+
+
+def test_survey_never_pools_species(capsys):
+    from caterva.bind.__main__ import survey
+    rows = survey(KI_PAGE.read_text(), "1.1.1.27", "", "free")
+    gossypol = [(r["organism"], r["isoform"]) for r in rows if r["compound"] == "gossypol"]
+    assert len(gossypol) == len(set(gossypol)) == 5
+    assert ("Plasmodium falciparum", None) in gossypol
+
+
+def test_the_benchmark_rule(monkeypatch):
+    """Two publications, a stated mode and a stated temperature: then, and
+    only then, a benchmark."""
+    import caterva.bind.__main__ as cli
+    def fake_rows(html, ec, organism, inhibitor):
+        return [core.measurement(0.002, "X", "Homo sapiens", "1", "competitive, pH 7.5, 25°C", 7.5, 25.0),
+                core.measurement(0.003, "X", "Homo sapiens", "2", "competitive, pH 7.5, 25°C", 7.5, 25.0),
+                core.measurement(0.002, "Y", "Homo sapiens", "3", "competitive, pH 7.5, 25°C", 7.5, 25.0),
+                core.measurement(0.002, "Y", "Homo sapiens", "4", "pH 7.5", 7.5, None)]
+    monkeypatch.setattr(cli, "_rows", fake_rows)
+    rows = {r["compound"]: r for r in cli.survey("", "1.1.1.1", "Homo sapiens", "free")}
+    assert rows["X"]["benchmark"] and rows["X"]["why_not"] == []
+    assert not rows["Y"]["benchmark"]
+    assert set(rows["Y"]["why_not"]) == {"mode not stated", "temperature not stated"}
