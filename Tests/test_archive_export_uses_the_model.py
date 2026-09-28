@@ -11,10 +11,11 @@ implementations against a shared fixture; it says nothing about a call site
 that hands one of them different arguments" — and it recurred inside the
 work that was fixing a hardcoded list.
 
-So this drives the real `build_archive()` on the **SIR** domain, whose
-species are S, I and R. A hardcoded `["S", "P"]` produces a report naming a
-species the model does not have and omitting two it does, and the archive
-still opens and still runs.
+So this drives the real `build_archive()` on competitive inhibition, whose
+species are S and P and whose inhibitor is a fixed parameter. A hardcoded
+list naming the inhibitor produces a report naming a species the model does
+not have, and the archive still opens and still runs. (It drove SIR until
+that domain was archived on 2026-09-27.)
 """
 
 from __future__ import annotations
@@ -46,16 +47,13 @@ def exporter():
     return load_exporter()
 
 
-SIR_PAYLOAD = {
-    "domain": "sir",
+# Competitive inhibition rather than plain Michaelis-Menten: a model whose
+# report is not the one a hardcoded MM list would produce. (These tests used
+# SIR until it was archived on 2026-09-27.)
+MMCI_PAYLOAD = {
+    "domain": "mm_competitive_inhibition",
     "format": "omex",
-    "parameters": {
-        "beta": 0.3,
-        "gamma": 0.1,
-        "s0": 990,
-        "i0": 10,
-        "r0_recovered": 0,
-    },
+    "parameters": {"km": 2.5, "vmax": 5.0, "ki": 1.2, "s0": 10.0, "i": 0.5},
     "endTime": 20.0,
     "points": 101,
     "provenance": {},
@@ -74,17 +72,15 @@ def report_labels(archive_bytes: bytes, tmp_path: Path) -> set[str]:
 
 
 class TestTheExportScriptReadsTheModel:
-    def test_an_sir_archive_reports_s_i_and_r(self, exporter, tmp_path):
-        code, data, detail = exporter.build_archive(dict(SIR_PAYLOAD))
+    def test_an_inhibition_archive_reports_the_model_species_and_flux(self, exporter, tmp_path):
+        code, data, detail = exporter.build_archive(dict(MMCI_PAYLOAD))
         assert code == 0, detail.get("error")
 
-        # J0 (infection) and J1 (recovery) are the model's two reactions;
-        # their fluxes are recorded alongside the compartment sizes. For an
-        # epidemic model the infection RATE is the curve people argue
-        # about, so an archive without it reproduces the plot nobody
-        # actually discusses.
+        # J0 is the model's one reaction; its flux is recorded alongside the
+        # species. The inhibitor is a fixed parameter, not a species, so it
+        # must NOT appear -- a list written at the call site would add it.
         labels = report_labels(data, tmp_path)
-        assert labels == {"time", "S", "I", "R", "J0", "J1"}, (
+        assert labels == {"time", "S", "P", "J0"}, (
             "the SED-ML report does not match the model; a hardcoded list at "
             "the call site would look exactly like this"
         )
@@ -97,21 +93,21 @@ class TestTheExportScriptReadsTheModel:
         being simulated. Passing `recorded` is now ignored rather than
         obeyed, and this pins that.
         """
-        payload = dict(SIR_PAYLOAD)
-        payload["recorded"] = ["S", "P"]  # wrong, and from the old call site
+        payload = dict(MMCI_PAYLOAD)
+        payload["recorded"] = ["S", "I"]  # wrong: I is not a species here
 
         code, data, detail = exporter.build_archive(payload)
         assert code == 0, detail.get("error")
-        assert report_labels(data, tmp_path) == {"time", "S", "I", "R", "J0", "J1"}
+        assert report_labels(data, tmp_path) == {"time", "S", "P", "J0"}
 
     def test_the_archive_still_replays(self, exporter, tmp_path):
         # Deriving the list must not break the property the archive exists
         # for, on a domain that is not Michaelis-Menten.
         roadrunner = pytest.importorskip("roadrunner")
 
-        code, data, detail = exporter.build_archive(dict(SIR_PAYLOAD))
+        code, data, detail = exporter.build_archive(dict(MMCI_PAYLOAD))
         assert code == 0, detail.get("error")
-        destination = tmp_path / "sir.omex"
+        destination = tmp_path / "mmci.omex"
         destination.write_bytes(data)
 
         with zipfile.ZipFile(destination) as opened:
@@ -127,14 +123,15 @@ class TestTheExportScriptReadsTheModel:
             simulation.getNumberOfPoints() + 1,
         )
         assert len(result) == 101
-        # An epidemic that infects nobody would mean the parameters did not
-        # survive the trip.
-        assert float(result[-1][3]) > float(result[0][3])
+        # Substrate that is never consumed would mean the parameters did not
+        # survive the trip. Columns: time, S, P.
+        assert float(result[-1][1]) < float(result[0][1])
+        assert float(result[-1][2]) > float(result[0][2])
 
 
 class TestWhatTheExportRefuses:
     def test_no_time_course_means_no_archive(self, exporter):
-        payload = dict(SIR_PAYLOAD)
+        payload = dict(MMCI_PAYLOAD)
         del payload["endTime"]
 
         code, _, detail = exporter.build_archive(payload)
@@ -145,7 +142,7 @@ class TestWhatTheExportRefuses:
         assert "will not guess" in detail["error"]
 
     def test_a_domain_with_no_builder_is_refused_not_improvised(self, exporter):
-        payload = dict(SIR_PAYLOAD)
+        payload = dict(MMCI_PAYLOAD)
         payload["domain"] = "not-a-domain"
 
         code, _, detail = exporter.build_archive(payload)

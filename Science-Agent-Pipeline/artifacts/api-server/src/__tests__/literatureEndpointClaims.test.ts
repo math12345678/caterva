@@ -51,7 +51,9 @@ describe("GET /api/pipeline/literature does not overclaim", () => {
   it("the weaker claim it now makes is true: every domain has a reference", async () => {
     const res = await request(app).get("/api/pipeline/literature");
     const domains = res.body.domains as { domain: string }[];
-    expect(domains.length).toBeGreaterThan(5);
+    // Four live natural-language domains since 2026-09-27; a loop over
+    // none would make every assertion below vacuous.
+    expect(domains.length).toBeGreaterThanOrEqual(4);
 
     for (const { domain } of domains) {
       const entry = DOMAIN_LITERATURE_MAP[domain];

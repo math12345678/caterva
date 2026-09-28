@@ -107,7 +107,7 @@ def test_a_predicate_that_stops_holding_fails_the_guard(monkeypatch, capsys) -> 
 
 
 def test_the_domains_predicate_checks_files_that_exist() -> None:
-    holds, detail = guard._four_domains_are_built()
+    holds, detail = guard._four_domains_are_archived()
     assert holds, detail
 
 

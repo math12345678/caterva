@@ -152,12 +152,13 @@ same thing against BRENDA.
 runs. That is normal. It is written here because the absence of a figure is
 what makes a slow suite look like a broken one.
 
-Measured on the reference container, `-p no:randomly`:
+Measured on GitHub's `ubuntu-latest` runners (CI run 36368330079,
+2026-09-28), `-p no:randomly`:
 
 | suite | time |
 |---|---|
-| `caterva/tests` (engine) | ENGINE_TIME |
-| `Tests/` (literature) | ~2.9 min |
+| `caterva/tests` (engine) | 4.5-10 min |
+| `Tests/` (literature) | ~5 min |
 
 Test counts are deliberately absent from that table: they are stated once
 above and checked by `check_documented_counts.py`, and a second copy here
