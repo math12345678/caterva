@@ -12,6 +12,21 @@ onward and [Keep a Changelog](https://keepachangelog.com/) in shape.
 Entries before 0.1.0 are grouped by date, because that is how the work was
 done: there was no release to version.
 
+## [Unreleased: tools]
+
+### Added
+- `caterva bind`: cited Ki values become ΔG°bind targets at their own
+  assay temperatures, filtered by inhibition mode (`--state free|ternary`)
+  and isoform (`--isoform`), and a computed free energy is judged against
+  the band at 2σ (exit 0 agrees, 4 disagrees). See docs/USING_CATERVA.md.
+
+### Fixed
+- The Ki parser matched a requested compound anywhere in a row, including
+  its commentary, so the quinoline sulfonamide row "competitive versus
+  NADH" came back as a Ki of NADH (0.00059 mM). It now matches the row's
+  compound cell; `resolve_kinetic_value(..., "NADH", quantity="ki")` is
+  not found, as it should be.
+
 ## [0.3.1] - 2026-09-22
 
 Nobody could tell what to type. The release worked and explained nothing,

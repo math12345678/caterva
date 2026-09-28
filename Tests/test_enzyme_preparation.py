@@ -9,6 +9,12 @@ Measured before this existed: `resolve_kinetic_value("1.1.1.27",
 "Homo sapiens", "NADH", quantity="ki")` returned 0.00059, whose commentary
 reads "competitive versus NADH, pH 7.5, 37 C, recombinant His-tagged
 enzyme". Nothing in the result said so.
+
+That query was itself wrong, found later: the row's compound is a
+quinoline sulfonamide, and "NADH" matched only its commentary. The parser
+now matches the compound cell (see brenda_client._compound_cell), so these
+tests ask for the compound that was measured, and a Ki "of NADH" is not
+found.
 """
 
 from __future__ import annotations
@@ -132,12 +138,23 @@ def _ldh_ki(substrate: str):
     )
 
 
+QUINOLINE = "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid"
+
+
+def test_a_molecule_named_only_in_the_commentary_has_no_Ki() -> None:
+    """"competitive versus NADH" says what the quinoline competes WITH. It
+    is not a Ki of NADH, and returning it as one is how the website came to
+    print this number as oxamate's."""
+    result = _ldh_ki("NADH")
+    assert not result.found
+
+
 def test_the_his_tagged_row_that_motivated_this_is_reported() -> None:
     """The measured case. 0.00059 is a His-tagged construct's Ki, and it was
     returned as the human enzyme's with nothing saying so."""
-    result = _ldh_ki("NADH")
+    result = _ldh_ki(QUINOLINE)
     assert result.found
-    assert result.value == 0.00059
+    assert result.value in (0.00059, 0.00252)
     assert result.preparation is not None
     assert result.preparation.status == "tagged"
     assert result.preparation.differs_from_the_free_enzyme
@@ -151,7 +168,7 @@ def test_it_travels_as_a_FIELD_not_only_a_log_line() -> None:
 
     So the assertion is on the RESULT OBJECT, not on `search_log`.
     """
-    result = _ldh_ki("NADH")
+    result = _ldh_ki(QUINOLINE)
     assert result.preparation is not None, (
         "the preparation verdict reached the log but not the result; a "
         "finding that only reaches the log reaches nobody"
@@ -161,7 +178,7 @@ def test_it_travels_as_a_FIELD_not_only_a_log_line() -> None:
 def test_the_search_log_says_it_too() -> None:
     """Belt and braces: the log is not the delivery mechanism, but a reader
     reading it should not have to infer this from the value."""
-    joined = " ".join(_ldh_ki("NADH").search_log)
+    joined = " ".join(_ldh_ki(QUINOLINE).search_log)
     assert "TAGGED" in joined
     assert "His-tagged" in joined
 

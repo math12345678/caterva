@@ -286,6 +286,22 @@ def has_data_table(html: str, table_label: str) -> bool:
     return _find_table_container(BeautifulSoup(html, "html.parser"), table_label) is not None
 
 
+def _compound_cell(cell_texts: list, target_organism: str | None) -> str | None:
+    """The compound named by a data row: the first cell after the value that
+    is not an organism, an accession, a placeholder or a bare number. None
+    when the row has no such cell before its commentary would begin."""
+    for cell in cell_texts[1:3]:
+        c = cell.strip()
+        if not c or c == "-":
+            continue
+        if GENERIC_ORGANISM_PATTERN.fullmatch(c) or (target_organism and c == target_organism):
+            return None
+        if UNIPROT_CELL_PATTERN.match(c) or re.match(r"^\d+\.?\d*$", c):
+            continue
+        return c
+    return None
+
+
 def parse_brenda_km_html(
     html: str,
     ec_number: str,
@@ -422,9 +438,21 @@ def parse_brenda_km_html(
             continue
         km_value = float(km_match.group(1))
 
+        # Match the target against the row's COMPOUND cell, not the whole
+        # row. The commentary names other molecules too: BRENDA's LDH Ki row
+        # "0.00059 | 3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-
+        # 4-yl]aminobenzoic acid | Homo sapiens | P00338 | competitive versus
+        # NADH, ..." was matched on "NADH" in its commentary and relabelled
+        # the Ki OF NADH. It is the Ki of the quinoline, measured against
+        # NADH -- a different molecule and a different claim, and the
+        # website then called it oxamate. Only a row with no identifiable
+        # compound cell (organism in cell 1, as on EC 3.1.1.7) falls back to
+        # the whole row, which is the only text it has.
+        compound_cell = _compound_cell(cell_texts, target_organism)
+        haystack = (compound_cell if compound_cell is not None else full_text).lower()
         matched_substrate = None
         for sub in target_substrates:
-            if sub.lower() in full_text.lower():
+            if sub.lower() in haystack:
                 matched_substrate = sub
                 break
 

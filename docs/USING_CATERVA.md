@@ -447,6 +447,39 @@ produced. On a 200-step test run of lysozyme it lists all fifteen
 distances between the six M-CSA catalytic residues, and correctly calls
 every one unconverged.
 
+### `caterva bind`: the number a free-energy calculation is held to
+
+```bash
+caterva bind --ec 1.1.1.27 --organism human --list
+caterva bind --ec 1.1.1.27 --organism human --inhibitor gossypol --isoform LDH-A --computed "-7.2±0.4"
+```
+
+Every Ki BRENDA records for the inhibitor becomes ΔG°bind = RT ln(Ki / 1 M)
+at the temperature it was measured at. A row with no temperature gets a
+range over 4-37 °C, not a guessed value. Before any row is used, three
+questions are asked of it, because each is a way to validate against the
+wrong number:
+
+- **Which binding event.** A competitive Ki is the Kd of inhibitor and free
+  enzyme; an uncompetitive one is the Kd of inhibitor and enzyme-substrate
+  complex; a mixed-type row gives one of two constants without saying
+  which. `--state free` (the default) or `--state ternary` says what you
+  simulated, and rows that measured something else are listed as not
+  comparable, with the reason.
+- **Which protein.** Gossypol's three human rows are LDH-A, LDH-B and
+  LDH-C: three proteins. `--isoform` keeps the one simulated.
+- **Which molecule.** A Ki belongs to the compound in its row. "Competitive
+  versus NADH" names what the inhibitor competes with; it is not a Ki of
+  NADH, and `--inhibitor NADH` is refused.
+
+The report gives the band's width before any verdict, because a computed
+value cannot be judged more finely than the literature disagrees with
+itself. `--computed` (kcal/mol, or `--unit kj`) is judged at 2σ: **agrees**
+(exit 0) or **disagrees** (exit 4), with the gap in kcal/mol and as a
+fold error in Ki. Agreement with a single publication is reported as
+consistency, not validation. Tagged or immobilised constructs, and the
+molecule each Ki was measured against, travel as caveats.
+
 ## Exact stochastic kinetics: `caterva sim ssa`
 
 When the molecule counts are small enough that a smooth curve hides what
