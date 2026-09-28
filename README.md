@@ -71,6 +71,10 @@ What it does today, across five simulation domains and two structure tools:
   rows whose inhibition mode and isoform match what was simulated, and
   judges a free-energy calculation against that band, saying first how
   finely the literature itself can judge it.
+- **Complexes from the crystal pose**: `caterva complex` puts your
+  parameterised ligand where the PDB entry has it (superposed, with its
+  fit, conformer and handedness checked) and equilibrates the complex
+  for `caterva fep`.
 - **Free-energy calculations held to a Ki**: `caterva fep` writes an
   absolute binding free energy (double decoupling, Boresch restraints,
   BAR) at the cited Ki's own assay temperature, and `--summarise` judges
@@ -107,7 +111,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,134 tests (2,960 engine + 1174 literature)
+make test      # runs all 4,144 tests (2,970 engine + 1174 literature)
 ```
 
 ### Or download the release
@@ -534,7 +538,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                2,960 tests
+│   └── tests/                2,970 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -625,9 +629,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,134 tests
+make test        # run all 4,144 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (2,960 tests)
+make test-sim    # simulation engine only (2,970 tests)
 make test-lit    # literature layer only (1174 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches

@@ -55,6 +55,8 @@ METHODS = {m.key: m for m in (
            "Beutler et al. (1994) Chem. Phys. Lett. 222:529", "10.1016/0009-2614(94)00397-1"),
     Method("sd", "leap-frog stochastic dynamics integrator",
            "van Gunsteren & Berendsen (1988) Mol. Simul. 1:173", "10.1080/08927028808080941"),
+    Method("kabsch", "optimal rigid superposition",
+           "Kabsch (1976) Acta Cryst. A 32:922", "10.1107/S0567739476001873"),
     Method("mcsa", "Mechanism and Catalytic Site Atlas (M-CSA)",
            "Ribeiro et al. (2018) Nucleic Acids Res. 46:D618", "10.1093/nar/gkx1012"),
     Method("needleman-wunsch", "global sequence alignment",

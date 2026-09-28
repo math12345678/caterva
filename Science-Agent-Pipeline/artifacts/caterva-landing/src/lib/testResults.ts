@@ -143,9 +143,9 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "101 test files -- kinetics & Michaelis-Menten correctness, " +
+          "102 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
-          "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, " +
+          "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
           "building with influence ranking, mechanism libraries and " +
           "verdicts, agents and assay windows, and citation/build guards",
@@ -162,8 +162,9 @@ export const TEST_SUITES: TestSuite[] = [
         // added to test_using_caterva_guide.py (per-file collect diff
         // against d2ef8b4; all 29 passed 2026-09-28): 2940. Plus the 18
         // `caterva fep` tests and its 2 guide examples (all passed
-        // 2026-09-28): 2960.
-        passed: 2960,
+        // 2026-09-28): 2960. Plus the 9 `caterva complex` tests and its
+        // guide example (all passed 2026-09-28): 2970.
+        passed: 2970,
         skipped: 0,
         failed: 0,
       },
