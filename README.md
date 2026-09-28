@@ -87,7 +87,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,029 tests (2,855 engine + 1174 literature)
+make test      # runs all 4,028 tests (2,855 engine + 1173 literature)
 ```
 
 ### Or download the release
@@ -518,7 +518,7 @@ Caterva/
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1174 tests
+│   └── ...                   1173 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
@@ -605,10 +605,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,029 tests
+make test        # run all 4,028 tests
 make test-fast   # skip the slow property/robustness suites
 make test-sim    # simulation engine only (2,855 tests)
-make test-lit    # literature layer only (1174 tests)
+make test-lit    # literature layer only (1173 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

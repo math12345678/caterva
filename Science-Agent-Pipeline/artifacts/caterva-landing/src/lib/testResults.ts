@@ -177,7 +177,9 @@ export const TEST_SUITES: TestSuite[] = [
         // licence test, which reads installed JavaScript packages and was
         // run for real with them present (10 passed) -- so, as for the
         // engine row, the figure here is the one where npm works: 1174.
-        passed: 1174,
+        // 2026-09-28: one parametrized SIR export case left with that
+        // domain; the collected count is now 1173.
+        passed: 1173,
         skipped: 1,
         failed: 0,
       },
