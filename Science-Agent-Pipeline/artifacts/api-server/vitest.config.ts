@@ -30,6 +30,12 @@ export default defineConfig({
     // build about something that did not change.
     testTimeout: 60000,
     hookTimeout: 30000,
+    // Recorded real BRENDA pages replace live fetches for the ECs they
+    // cover (Tests/fixtures/recorded/README.md): five hexokinase tests
+    // failed three CI runs on BRENDA returning 500, not on a defect.
+    env: {
+      CATERVA_BRENDA_RECORDED: path.resolve(__dirname, "../../../Tests/fixtures/recorded"),
+    },
     clearMocks: true,
     restoreMocks: true,
   },
