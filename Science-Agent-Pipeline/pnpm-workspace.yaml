@@ -92,9 +92,23 @@ overrides:
   "rollup>@rollup/rollup-linux-s390x-gnu": "-"
   # drizzle-kit uses esbuild internally on an older version that's vulnerable, this overrides it
   "@esbuild-kit/esm-loader": "npm:tsx@^4.21.0"
-  esbuild: "0.27.3"
+  esbuild: "0.28.1"
   # enhanced-resolve@5.21.x dropped `getType` which @tailwindcss/node@4.3.x depends on
   enhanced-resolve: ~5.18.0
+  # Patched floors for vulnerable transitive dependencies (Dependabot,
+  # 2026-09-28). Each selector covers only the vulnerable range, so a
+  # package on another major line is never forced across it.
+  "fast-uri@>=3.0.0 <3.1.6": "^3.1.6"
+  "js-yaml@>=4.0.0 <4.3.2": "^4.3.2"
+  "js-yaml@>=3.0.0 <3.15.2": "^3.15.2"
+  "qs@<6.16.0": "^6.16.0"
+  "browserslist@<4.28.7": "^4.28.7"
+  "postcss@<8.5.23": "^8.5.23"
+  "brace-expansion@>=4.0.0 <5.0.9": "^5.0.9"
+  "nanoid@<3.3.18": "^3.3.18"
+  "shell-quote@<1.9.0": "^1.9.0"
+  "baseline-browser-mapping@>=2.0.0 <2.11.0": "^2.11.0"
+  "@vitest/mocker@>=2.1.0 <4.1.11": "^4.1.11"
 
 allowBuilds:
   esbuild: true
