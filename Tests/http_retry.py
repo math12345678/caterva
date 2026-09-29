@@ -46,6 +46,43 @@ DEFAULT_BASE_DELAY = 1.0
 
 RETRYABLE_STATUSES = frozenset({429, 502, 503})
 
+# ---------------------------------------------------------------------------
+# One answer per question, per process
+# ---------------------------------------------------------------------------
+#
+# Traced 2026-09-29 on one API lookup (hexokinase Km, human): 20 requests, of
+# which NCBI Taxonomy was asked for "Homo sapiens" FOUR times and for
+# "lymphocytes" three, and PubChem for the same compound names twice. The
+# fourth taxonomy call drew a 429 and a 1 s backoff: NCBI allows 3 requests/s
+# without a key, and the API test suite runs many of these processes at
+# once, which is how the flagship hexokinase tests came to time out in CI
+# three runs running.
+#
+# The same GET within one process gets the same answer: the runner is one
+# process per lookup, `caterva compose` one per model, and neither lives long
+# enough for BRENDA, NCBI or PubChem to change underneath it. So a response
+# is kept for the life of the process and handed back to the next identical
+# request. Only definitive answers are kept (anything below 500 except 429);
+# a server error or a throttle is never remembered, so the next caller
+# retries it for real.
+MEMO_MAX = 512
+_MEMO: dict = {}
+
+
+def _memo_key(url: str, kwargs: dict) -> tuple:
+    params = kwargs.get("params")
+    if isinstance(params, dict):
+        params = tuple(sorted((str(k), str(v)) for k, v in params.items()))
+    headers = kwargs.get("headers")
+    if isinstance(headers, dict):
+        headers = tuple(sorted((str(k), str(v)) for k, v in headers.items()))
+    return (url, repr(params), repr(headers), bool(kwargs.get("follow_redirects", False)))
+
+
+def clear_memo() -> None:
+    """Forget every remembered response (for tests that need a cold start)."""
+    _MEMO.clear()
+
 
 def retry_get(
     url: str,
@@ -68,12 +105,18 @@ def retry_get(
     Other exceptions (timeout, connection error) are NOT retried --
     they indicate a different class of problem.
     """
+    key = _memo_key(url, kwargs)
+    if key in _MEMO:
+        return _MEMO[key]
+
     last_exc: Exception | None = None
 
     for attempt in range(max_retries + 1):
         try:
             r = httpx.get(url, **kwargs)
             if r.status_code not in RETRYABLE_STATUSES:
+                if r.status_code < 500 and len(_MEMO) < MEMO_MAX:
+                    _MEMO[key] = r
                 return r
             # 429/502/503: retryable server-side blip.
             last_exc = httpx.HTTPStatusError(

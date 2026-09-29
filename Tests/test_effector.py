@@ -245,3 +245,48 @@ def test_extractor_finds_effectors_across_the_real_ldh_fixture():
         "every row matched, which means the extractor is firing on ordinary "
         "commentary rather than on effector clauses"
     )
+
+
+# ---------------------------------------------------------------------------
+# What the compound phrase is not (BRENDA hexokinase, EC 2.7.1.1)
+# ---------------------------------------------------------------------------
+#
+# Each of these went to PubChem as a "compound" on 2026-09-29 and came back
+# 404. The strings are BRENDA's own, from the recorded hexokinase page.
+
+def test_a_role_word_is_not_part_of_the_name():
+    found = extract_effectors(
+        "wild type enzyme, at 25°C, in the presence of 0.02 mM activator LY-2121260")
+    assert [(e.compound_text, e.role, e.concentration_text) for e in found] == [
+        ("LY-2121260", "activator", "0.02 mM")]
+
+
+def test_a_role_with_no_compound_is_not_looked_up():
+    found = extract_effectors("in absence of activator")
+    assert len(found) == 1 and found[0].presence == "absent" and not found[0].named
+    asked = []
+    resolve_effectors(found, lambda name: asked.append(name) or "", lambda cid: "")
+    assert asked == [], "a bare role word was sent to PubChem"
+
+
+@pytest.mark.parametrize("commentary", [
+    "truncated enzyme with removed helix alpha13",
+    "glucokinase with C-terminal 5 alanine addition",
+])
+def test_a_change_to_the_protein_is_not_an_effector(commentary):
+    assert extract_effectors(commentary) == []
+
+
+def test_either_of_two_compounds_is_two_effectors_neither_known_present():
+    found = extract_effectors(
+        "wild type enzyme, at 30°C, in 100 mM Tris and 125 mM KCl, pH 7.4, "
+        "in the presence of 14 mM beta-mercaptoethanol or 5 mM dithiothreitol")
+    reducing = [(e.compound_text, e.concentration_text, e.presence)
+                for e in found if e.compound_text != "KCl"]
+    assert reducing == [("beta-mercaptoethanol", "14 mM", "unstated"),
+                        ("dithiothreitol", "5 mM", "unstated")]
+
+
+def test_both_of_two_compounds_are_present():
+    found = extract_effectors("in the presence of 1 mM MgCl2 and 2 mM ATP")
+    assert [(e.compound_text, e.presence) for e in found] == [("MgCl2", "present"), ("ATP", "present")]

@@ -130,6 +130,45 @@ _BARE_SALT_RE = re.compile(
 
 _ABSENT_RE = re.compile(_ABSENT_LEAD, re.IGNORECASE)
 
+# ---------------------------------------------------------------------------
+# What the compound phrase is NOT
+# ---------------------------------------------------------------------------
+#
+# Traced 2026-09-29 on BRENDA's hexokinase page (EC 2.7.1.1), where each of
+# these went to PubChem as a compound name and came back 404:
+#
+#   "in the presence of 0.02 mM activator LY-2121260"
+#       -> "activator LY-2121260". The role word stuck to the name, so a
+#          real compound (a glucokinase activator) never resolved.
+#   "in absence of activator"
+#       -> "activator": a role with no compound named at all.
+#   "truncated enzyme with removed helix alpha13"
+#   "glucokinase with C-terminal 5 alanine addition"
+#       -> a change to the protein, read as a compound because of "with".
+#   "in the presence of 14 mM beta-mercaptoethanol or 5 mM dithiothreitol"
+#       -> one "compound" naming two, with the second one's concentration
+#          inside it.
+
+#: Words that say what a compound DOES, written before its name.
+ROLE_WORDS = ("activator", "inhibitor", "effector", "cofactor", "coenzyme")
+_ROLE_RE = re.compile(
+    r"^(?:allosteric\s+|synthetic\s+|small[- ]molecule\s+)?(?P<role>" + "|".join(ROLE_WORDS) + r")s?\b\s*",
+    re.IGNORECASE,
+)
+
+#: Vocabulary of a change to the protein itself. A phrase using it after
+#: "with" describes the construct, not something added to the assay.
+_PROTEIN_CHANGE_RE = re.compile(
+    r"\b(?:removed|deleted|deletion|addition|insertion|substitution|mutation|"
+    r"truncat\w*|helix|strand|loop|domain|terminal|residues?)\b",
+    re.IGNORECASE,
+)
+
+#: "X or Y" / "X and Y" inside one clause, each side possibly with its own
+#: concentration: "beta-mercaptoethanol or 5 mM dithiothreitol".
+_CONJUNCTION_RE = re.compile(r"\s+(?P<word>or|and)\s+", re.IGNORECASE)
+_LEADING_CONC_RE = re.compile(rf"^(?P<conc>{_CONCENTRATION})\s+")
+
 
 class Effector(BaseModel):
     """One cofactor or effector clause, as reported."""
@@ -148,6 +187,17 @@ class Effector(BaseModel):
 
     #: PubChem resolution, reusing buffer_identity. None when not attempted.
     identity: BufferIdentity | None = None
+
+    #: What the commentary says the compound does ("activator"), when it
+    #: says so before the name. Kept off `compound_text`, which is what
+    #: PubChem is asked for.
+    role: str | None = None
+
+    @property
+    def named(self) -> bool:
+        """False when the clause names a role and no compound ("in absence
+        of activator"): there is nothing to look up."""
+        return self.compound_text.strip().lower() not in ROLE_WORDS
 
     @property
     def comparison_key(self) -> tuple[object, str]:
@@ -198,15 +248,40 @@ def extract_effectors(commentary: str | None) -> list[Effector]:
         compound = m.group("compound").strip(" ,;.-")
         if not compound:
             continue
-        found.append(
-            Effector(
-                raw=m.group(0).strip(),
-                compound_text=compound,
-                presence=_presence_of(m.group("lead")),
-                concentration_text=(m.group("conc") or None),
-            )
-        )
         claimed.append((m.start(), m.end()))
+        if _PROTEIN_CHANGE_RE.search(compound):
+            # "enzyme with removed helix alpha13": the construct, not the assay.
+            continue
+        presence = _presence_of(m.group("lead"))
+        parts = [(compound, m.group("conc") or None)]
+        joined = _CONJUNCTION_RE.search(compound)
+        if joined:
+            # "X or Y": either was used, and the row does not say which, so
+            # neither is known to be present. "X and Y": both were.
+            first, rest = compound[: joined.start()], compound[joined.end():]
+            conc = _LEADING_CONC_RE.match(rest)
+            parts = [(first, m.group("conc") or None),
+                     (rest[conc.end():] if conc else rest, conc.group("conc") if conc else None)]
+            if joined.group("word").lower() == "or" and presence == "present":
+                presence = "unstated"
+        for text, conc_text in parts:
+            role = None
+            named = _ROLE_RE.match(text)
+            if named:
+                role = named.group("role").lower()
+                text = text[named.end():].strip() or role
+            text = text.strip(" ,;.-")
+            if not text:
+                continue
+            found.append(
+                Effector(
+                    raw=m.group(0).strip(),
+                    compound_text=text,
+                    presence=presence,
+                    concentration_text=conc_text,
+                    role=role,
+                )
+            )
 
     for m in _BARE_SALT_RE.finditer(commentary):
         # Skip anything a presence/absence clause already took, so
@@ -238,6 +313,10 @@ def resolve_effectors(
     """
     resolved: list[Effector] = []
     for e in effectors:
+        if not e.named:
+            # "in absence of activator": no compound to ask PubChem about.
+            resolved.append(e)
+            continue
         try:
             identity = buffer_identity.resolve_identity(
                 e.compound_text, cid_provider, parent_provider

@@ -194,7 +194,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "83 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "84 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -210,8 +210,11 @@ export const TEST_SUITES: TestSuite[] = [
         // 36611881353): 1172 passed, 2 skipped, and 1 failed -- the runner's
         // golden output shape, which now carries `commentary` and
         // `rowScope`; the expectation was updated and a populated boundary
-        // test added (both passed locally): 1174.
-        passed: 1174,
+        // test added (both passed locally): 1174. Superseded the same day by
+        // a full local run (2026-09-29, .venv, JavaScript packages present
+        // so the licence test ran): 1187 passed, 1 skipped (stdpopsim),
+        // after 6 effector-parsing tests and 6 request-memo tests: 1187.
+        passed: 1187,
         skipped: 1,
         failed: 0,
       },
