@@ -140,10 +140,10 @@ export default function ShareSimulation({
     // uses to show the provenance flags/citations panel.
     const isVerified = citationCount > 0 && !hasFlags;
     const provenanceClaim = isVerified
-      ? "Verified ODE results with full provenance."
+      ? "Every constant cited with its source."
       : "Simulation run on Caterva.";
     const embedProvenanceClaim = isVerified
-      ? "verified scientific simulations with full provenance"
+      ? "simulations whose constants cite their sources"
       : "scientific simulations";
 
     const text = `I just ran a ${domain} simulation on Caterva: "${query}". ${provenanceClaim} ${url}`;

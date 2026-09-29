@@ -1265,7 +1265,7 @@ export function renderCathedral(mountEl, question) {
   svg.appendChild(s('title', { id: 'cath-title', text: 'The Evidence Cathedral' }));
   svg.appendChild(s('desc', {
     id: 'cath-desc',
-    text: 'A vertical computational architecture. A question enters at the top, passes through model selection, literature retrieval, configuration and compute routing, is executed in a central core, is surrounded by four verification sentinels, and is released as a verified scientific record at the base.'
+    text: 'A vertical computational architecture. A question enters at the top, passes through model selection, literature retrieval, configuration and compute routing, is executed in a central core, is surrounded by four verification sentinels, and is released at the base with the source of every number attached.'
   }));
 
   svg.appendChild(buildDefs());

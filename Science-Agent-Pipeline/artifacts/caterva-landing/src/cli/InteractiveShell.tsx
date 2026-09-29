@@ -51,7 +51,7 @@ function HelpOutput() {
     ["domains", "list the capabilities, and which release has each"],
     ["test", "jump to the real test suite results"],
     ["simulate", "jump to the live enzyme-kinetics simulator"],
-    ["waitlist", "join the waitlist"],
+    ["waitlist", "how to hear about releases"],
     ["get", "how to download or build caterva"],
     ["cite", "how to cite caterva in your work"],
     ["whoami", "who built this"],
@@ -268,7 +268,7 @@ export default function InteractiveShell({
       case "waitlist":
         push(
           "output",
-          <span className="text-fg/70">scrolling to the waitlist...</span>,
+          <span className="text-fg/70">scrolling to release updates...</span>,
         );
         onNavigate("waitlist");
         break;
@@ -277,8 +277,8 @@ export default function InteractiveShell({
           "output",
           <span className="text-fg/70">
             you&apos;re looking at a project built by{" "}
-            <span className="text-signal">Smyan Reddy</span> and a small
-            team, pre-launch, aiming for real classroom pilots.
+            <span className="text-signal">Smyan Reddy</span>, open source
+            under Apache-2.0.
           </span>,
         );
         break;
@@ -286,7 +286,7 @@ export default function InteractiveShell({
         push(
           "output",
           <div className="text-fg/70">
-            about.md&nbsp;&nbsp;domains.txt&nbsp;&nbsp;tests.log&nbsp;&nbsp;simulate/&nbsp;&nbsp;waitlist.form
+            about.md&nbsp;&nbsp;domains.txt&nbsp;&nbsp;tests.log&nbsp;&nbsp;simulate/&nbsp;&nbsp;updates.md
           </div>,
         );
         break;

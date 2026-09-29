@@ -99,17 +99,17 @@ export default function NotFound() {
                 {
                   label: "Home — landing page",
                   href: "/",
-                  desc: "Ask a question, get a verified simulation",
+                  desc: "Write one line, get cited constants",
                 },
                 {
-                  label: "Agent — try the demo",
+                  label: "Agent",
                   href: "/#agent",
                   desc: "Describe your experiment in plain language",
                 },
                 {
-                  label: "Waitlist — join the pilot",
-                  href: "/#waitlist",
-                  desc: "Pre-launch spots available",
+                  label: "Get Caterva",
+                  href: "/#get",
+                  desc: "Download v0.4.0 or build from the main branch",
                 },
               ].map((link, i) => (
                 <motion.a

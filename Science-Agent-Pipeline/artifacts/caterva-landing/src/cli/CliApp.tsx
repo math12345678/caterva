@@ -40,9 +40,7 @@ import Magnetic from "@/components/ui/Magnetic";
 import BackendHealth from "@/components/ui/backend-health";
 import ShortcutHelp from "@/components/ui/shortcut-help";
 import BackToTop from "@/components/ui/back-to-top";
-import { WaitlistForm } from "@/components/ui/WaitlistForm";
 import FooterMetrics from "@/components/ui/footer-metrics";
-import WaitlistCounter from "@/components/ui/waitlist-counter";
 import { totals } from "@/lib/testResults";
 
 const FAQSection = lazy(() => import("./FAQSection"));
@@ -742,16 +740,46 @@ export default function CliApp() {
             <span className="h-px flex-1 bg-gradient-to-r from-caution/20 to-transparent" />
           </div>
           <h2 className="section-header">Hear when a release ships</h2>
+          {/*
+            This was an email form. It posts to the API server's
+            /api/waitlist, and that server is not deployed anywhere, so no
+            sign-up could reach it. GitHub already sends release
+            notifications and publishes a feed; both work today.
+          */}
           <TerminalWindow path="~ &mdash; updates" glow>
-            <p className="text-fg/70 text-[13px] mb-6 leading-relaxed">
+            <p className="text-fg/70 text-[13px] mb-5 leading-relaxed">
               The next release will carry the structure and molecular dynamics
-              tools that are on the main branch today. Leave an email to hear
+              tools that are on the main branch today. GitHub will tell you
               when it is out.
             </p>
-            <div className="mb-4">
-              <WaitlistCounter />
-            </div>
-            <WaitlistForm />
+            <ol className="space-y-2 text-[12px] text-fg/76 mb-5 list-decimal pl-5">
+              <li>
+                Open{" "}
+                <a
+                  href="https://github.com/math12345678/caterva"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-signal hover:underline underline-offset-4"
+                >
+                  the repository
+                </a>
+                .
+              </li>
+              <li>
+                Choose <span className="font-mono text-fg/88">Watch</span>,
+                then <span className="font-mono text-fg/88">Custom</span>, then{" "}
+                <span className="font-mono text-fg/88">Releases</span>.
+              </li>
+            </ol>
+            <p className="text-[11px] text-fg/66 font-mono">
+              or follow the feed:{" "}
+              <a
+                href="https://github.com/math12345678/caterva/releases.atom"
+                className="text-signal hover:underline underline-offset-4 break-all"
+              >
+                github.com/math12345678/caterva/releases.atom
+              </a>
+            </p>
           </TerminalWindow>
         </Reveal>
       </Section>
