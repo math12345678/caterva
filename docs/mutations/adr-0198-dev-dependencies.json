@@ -1,0 +1,60 @@
+{
+  "_why": [
+    "ADR 0198's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0198 adds a check that names the declared dependencies which are not",
+    "installed, because two failing tests had been blaming the wrong files for",
+    "a whole session.",
+    "",
+    "V1 restores the defect the checker itself shipped with: resolving a",
+    "distribution to a module by s/-/_/ instead of asking the installed",
+    "metadata. That reported five packages missing when two were, because",
+    "libroadrunner imports as roadrunner, python-libsbml as libsbml and",
+    "beautifulsoup4 as bs4. A checker that invents missing dependencies is",
+    "worse than the confusing failure it replaced -- its install command",
+    "becomes noise and the two real packages are lost in it.",
+    "",
+    "V2 makes an unreadable manifest parse as zero dependencies, so every",
+    "dependency is trivially satisfied and the check passes most confidently",
+    "exactly when it knows least.",
+    "",
+    "V3 makes could-not-determine exit 0 rather than 3.",
+    "",
+    "Not included, because no test here catches it: whether REQUIRED_JS lists",
+    "the right JS packages. It names one, zod, found by running the failing",
+    "selftest and reading what it needed. Nothing verifies that a second",
+    "Python guard does not quietly depend on a different node_modules.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0198-dev-dependencies.json"
+  ],
+  "test": "cd Terium && python3 -m pytest tests/test_dev_dependencies_guard.py --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "V1",
+      "description": "distribution names are guessed from module names again",
+      "_claimed": "caught by the differing-import-name tests",
+      "_note": "The false-positive failure this checker shipped with for one run. Three installed packages are reported missing because their import name is not their distribution name. The output stays plausible, which is the problem: nothing about five names instead of two looks wrong until somebody tries to install them.",
+      "file": "scripts/check_dev_dependencies.py",
+      "find": "    try:\n        metadata.distribution(name)\n        return True\n    except metadata.PackageNotFoundError:\n        return False",
+      "replace": "    import importlib.util\n\n    try:\n        return importlib.util.find_spec(name.replace(\"-\", \"_\")) is not None\n    except (ImportError, ValueError):\n        return False"
+    },
+    {
+      "id": "V2",
+      "description": "an unreadable manifest parses as zero dependencies",
+      "_claimed": "caught by the absent-manifest tests",
+      "_note": "The vacuous pass. With no names to check, every declared dependency is satisfied and the guard reports OK -- strongest exactly where it knows least. This is the shape check_documented_citations_are_real.py was fixed for in ADR 0144, recurring in a different file.",
+      "file": "scripts/check_dev_dependencies.py",
+      "find": "        return [], f\"{shown} does not exist\"",
+      "replace": "        return [], None"
+    },
+    {
+      "id": "V3",
+      "description": "could-not-determine exits 0 instead of 3",
+      "_claimed": "caught by the exit-code test",
+      "_note": "'Nothing was checked' reported as 'everything is fine'. The three-state rule applied to this guard's own verdict; exit 1 would be wrong too, since nothing was found to be wrong.",
+      "file": "scripts/check_dev_dependencies.py",
+      "find": "        print(\"  Nothing was checked. This is not a clean result.\")\n        return 3",
+      "replace": "        print(\"  Nothing was checked. This is not a clean result.\")\n        return 0"
+    }
+  ]
+}

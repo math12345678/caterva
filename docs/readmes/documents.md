@@ -2,7 +2,7 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-The constitution, 176 ADRs, architecture notes and the Word deliverables.
+The constitution, 204 ADRs, architecture notes and the Word deliverables.
 29 files.
 
 ## Start here

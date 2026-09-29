@@ -45,7 +45,19 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import yaml
+try:
+    import yaml
+except ImportError:
+    # Three states, matching check_ci_toolchain.py, which imports the same
+    # package and got this right. This file used to import it bare and die
+    # with an unhandled ModuleNotFoundError -- a traceback is not a verdict,
+    # and the guard-selftest harness recorded it as a failing check rather
+    # than as a check that could not run.
+    sys.stderr.write(
+        "check_ci_red_step_is_last: PyYAML is not installed.\n"
+        "  This is 'could not check', NOT 'checked and fine'. Exiting 3.\n"
+    )
+    raise SystemExit(3)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "tests.yml"

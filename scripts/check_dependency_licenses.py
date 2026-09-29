@@ -162,6 +162,51 @@ PERMISSION: dict[str, tuple[str, str]] = {
     "lxml": ("BSD-3-Clause", "Use, modify and redistribute with the notice retained."),
     "pydantic": ("MIT", "Use, copy, modify, distribute, sell."),
     # --- Dev / test -------------------------------------------------------
+    "pyyaml": (
+        "MIT",
+        "Copyright (c) 2017-2021 Ingy dot Net; 2006-2016 Kirill Simonov. Read "
+        "from PyYAML-6.0.2.dist-info/LICENSE in the installed wheel. Use, "
+        "copy, modify, merge, publish, distribute, sublicense, sell.",
+    ),
+    "setuptools": (
+        "MIT",
+        "The PEP 517 build backend scripts/build_release.py calls to produce "
+        "the wheel; build-time only, and nothing at run time imports it. "
+        "Declared in requirements-release.txt, which only the release "
+        "workflow installs.\n"
+        "      NOT read from a shipped licence FILE, because setuptools "
+        "80.9.0 does not ship one: its installed metadata directory contains "
+        "PKG-INFO, SOURCES.txt, dependency_links.txt, entry_points.txt, "
+        "requires.txt and top_level.txt, and no LICENSE. The licence is read "
+        "instead from `License-Expression: MIT` in that PKG-INFO -- which is "
+        "this table's actual rule rather than an exception to it: the point "
+        "of the rule is to read what travels with the code rather than a "
+        "summary on a package index, and PKG-INFO travels with the code. "
+        "Checked with importlib.metadata against the installed 80.9.0.\n"
+        "      MIT grants use, copy, modify, merge, publish, distribute, "
+        "sublicense and sell, on condition the copyright and permission "
+        "notice are retained. The setuptools tree also vendors packages that "
+        "carry their own LICENSE files; none of them is redistributed by "
+        "Terrium, which ships no setuptools code at all.",
+    ),
+    "pyinstaller": (
+        "GPL-2.0-or-later WITH Bootloader-exception",
+        "Read from pyinstaller-6.22.2.dist-info/licenses/COPYING.txt in the "
+        "installed wheel, not from the package index. The GPL alone would be "
+        "a problem: Terrium.app embeds PyInstaller's bootloader, and copyleft "
+        "on that would reach the whole bundle. The Bootloader Exception is "
+        "what makes the release lawful -- the authors give 'unlimited "
+        "permission to link or embed compiled bootloader and related files "
+        "into combinations with other programs, and to distribute those "
+        "combinations without any restriction'. Build-time only otherwise: "
+        "nothing imports it and nothing at runtime needs it (ADR 0201).",
+    ),
+    "ruff": (
+        "MIT",
+        "Copyright (c) 2022 Charles Marsh. Read from "
+        "ruff-0.11.11.dist-info/licenses/LICENSE in the installed wheel. "
+        "Use, copy, modify, merge, publish, distribute, sublicense, sell.",
+    ),
     "pytest": ("MIT", "Use, copy, modify, distribute, sell."),
     "pytest-timeout": ("MIT", "Use, copy, modify, distribute, sell."),
     "hypothesis": ("MPL-2.0", "File-level copyleft; Caterva does not modify it."),

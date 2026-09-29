@@ -15,7 +15,7 @@ VENV    := .venv
 BIN      = $(VENV)/$(if $(wildcard $(VENV)/Scripts/python.exe),Scripts,bin)
 
 .DEFAULT_GOAL := help
-.PHONY: cite help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean release-artifacts release-app
+.PHONY: help setup doctor check check-python require-pytest test test-fast test-sim test-lit test-slow guards pr demo publish-check evidence cli clean classifier-bench query-log llm-doctor deps-check guards-all dmg setup-js cite release-artifacts release-app
 
 help:
 	@echo "Caterva"
@@ -83,6 +83,8 @@ setup: check-python
 doctor:
 	@if command -v "$(PYTHON)" >/dev/null 2>&1; then \
 		"$(PYTHON)" scripts/doctor.py; \
+		echo ""; \
+		"$(PYTHON)" scripts/check_dev_dependencies.py || true; \
 	else \
 		echo "No '$(PYTHON)' on PATH, so nothing here can run."; \
 		echo ""; \
@@ -231,6 +233,27 @@ test-slow: require-pytest
 # Not included, and deliberately: check_codegen_loads.py and the api-server
 # suite, both of which need a completed pnpm install. `make pr` names them
 # at the end rather than pretending they ran.
+#: Opens a freshly built export in a tool that did not write it.
+#:
+#: NOT part of `guards`, and deliberately so. It needs a second interpreter
+#: holding tellurium or basico, which cannot live in the pinned environment
+#: (tellurium requires antimony>=3.1.0, requirements.txt pins 2.14.0), and a
+#: check that cannot pass here would sit permanently red -- the failure
+#: ADR 0179 spent a commit removing.
+#:
+#: Without a reader it exits 3, "could not check", which is the honest
+#: answer rather than a green tick.
+#:
+#:     make interop READER=/path/to/other/venv/bin/python
+interop:
+	@if [ -z "$(READER)" ]; then \
+		echo ">> no READER given; the check will report that it could not run"; \
+	fi
+	@TERRIUM_INTEROP_PYTHON="$(READER)" "$(PY)" scripts/verify_export_opens_elsewhere.py
+
+interop-selftest:
+	@"$(PY)" scripts/verify_export_opens_elsewhere.py --selftest
+
 guards: require-pytest
 	@echo ">> environment"
 	@"$(PY)" scripts/check_env.py
@@ -256,6 +279,9 @@ guards: require-pytest
 	@"$(PY)" scripts/check_forbidden_packages.py
 	@echo ">> guard wiring"
 	@"$(PY)" scripts/check_guard_wiring.py
+	@echo ">> guards refuse on an empty tree"
+	@"$(PY)" scripts/check_guards_refuse_on_empty.py --selftest
+	@"$(PY)" scripts/check_guards_refuse_on_empty.py
 	@echo ">> pinned versions resolve on PyPI"
 	@"$(PY)" scripts/check_pins_resolve.py
 	@echo ">> no Tellurium integration claims"
@@ -364,6 +390,87 @@ evidence: check-python
 publish-check: check-python
 	@"$(PY)" scripts/publish_preflight.py
 
+setup-js:
+	@# Install the JavaScript dependencies the Python guards read.
+	@#
+	@# `make setup` installs Python only, so there was no documented way to
+	@# get node_modules -- and several *Python* guards need them:
+	@# check_dependency_licenses.py reads the LICENSE file shipped inside each
+	@# package, and check_codegen_loads.py loads generated modules against the
+	@# installed zod. Without this a contributor sees those guards fail and
+	@# nothing tells them the cause is an uninstalled workspace (ADR 0173).
+	@#
+	@# Two managers on purpose: the root package.json is npm (it has
+	@# package-lock.json and no packageManager field); Science-Agent-Pipeline
+	@# is a pnpm workspace.
+	@command -v npm >/dev/null 2>&1 || { echo "npm not found -- install Node 22+"; exit 3; }
+	npm ci --no-audit --no-fund
+	@command -v pnpm >/dev/null 2>&1 || corepack enable
+	cd Science-Agent-Pipeline && pnpm install --frozen-lockfile
+	@# Build the composite library projects.
+	@#
+	@# check_typescript_compiles runs `tsc --noEmit` per workspace, and a
+	@# workspace that REFERENCES a composite project cannot type-check until
+	@# that project's dist/ exists -- TS6305, "output file has not been built
+	@# from source file". Installing alone left 5 of 7 workspaces failing on
+	@# that and nothing said the cause was build ordering rather than code.
+	@#
+	@# --force because `tsc --build` trusts its .tsbuildinfo: with dist/
+	@# deleted but the cache intact it exits 0 and builds nothing.
+	cd Science-Agent-Pipeline && npx tsc --build --force lib/api-zod lib/db lib/api-client-react
+
+dmg: check-python
+	@# Build Terrium.app and Terrium.dmg (ADR 0176).
+	@# Refuses to produce a DMG it has not verified: the app's own headless
+	@# --selftest must produce a report with its provenance sections, the
+	@# viewer must typeset THAT report with nothing unhandled, and the
+	@# signature must verify. Output: release/build/Terrium.dmg
+	@TERRIUM_PYTHON="$(PY)" ./release/build_dmg.sh
+
+guards-all: check-python
+	@# Every guard, reported together. `make guards` stops at the first
+	@# failure, which is right for a gate and wrong for a report: during one
+	@# session it died at the 5th of 28 guards and the other 23 never ran,
+	@# their silence reading exactly like success. Slower on purpose -- one
+	@# guard runs both pytest suites -- so this is the command for "what is
+	@# the whole state?", not the one in the inner loop.
+	@"$(PY)" scripts/run_all_guards.py
+
+deps-check: check-python
+	@# Which declared dependencies are missing, in terms of what to install.
+	@# Advisory on purpose: it is NOT a prerequisite of `test`, because 1162
+	@# of 1164 tests pass without them and blocking every test to report two
+	@# would trade a small confusing failure for a large one.
+	@"$(PY)" scripts/check_dev_dependencies.py
+
+llm-doctor:
+	@# Does each configured LLM provider actually answer? One small
+	@# completion each, with the model Terrium would really send.
+	@# The script exits 0 if any provider works, 1 if every configured one is
+	@# broken, and 3 if none is configured -- "nothing was checked" is not
+	@# "everything is fine". (make collapses non-zero to its own Error N.)
+	@cd Science-Agent-Pipeline/artifacts/api-server && \
+		node "$$(ls -d ../../node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs | head -1)" \
+		src/lib/runLLMDoctor.ts
+
+query-log:
+	@# What real students actually asked, if this deployment opted in.
+	@# The script exits 3 when logging was never switched on or the log is
+	@# empty: "nobody has collected any" and "a rate of zero" are different
+	@# facts. Note make prints "Error 3" but exits 2 itself -- GNU make
+	@# collapses every recipe failure to its own code, so a caller that needs
+	@# the three-state code must run runQueryLogSummary.ts directly.
+	@cd Science-Agent-Pipeline/artifacts/api-server && \
+		node "$$(ls -d ../../node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs | head -1)" \
+		src/lib/runQueryLogSummary.ts $(LOG)
+
+classifier-bench:
+	@# Scores the keyword domain classifier over every labelled set, offline.
+	@# No API key and no network: the fixtures are committed, so the numbers
+	@# in ADR 0167 and ADR 0168 are reproducible from a fresh checkout.
+	@cd Science-Agent-Pipeline/artifacts/api-server && \
+		node "$$(ls -d ../../node_modules/.pnpm/tsx@*/node_modules/tsx/dist/cli.mjs | head -1)" \
+		src/lib/runKeywordBenchmark.ts
 # The release artifacts, exactly as .github/workflows/release.yml builds them
 # (ADR 0177). `release-app` needs PyInstaller: pip install -r requirements-release.txt
 release-artifacts: check-python

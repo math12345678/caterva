@@ -24,13 +24,6 @@
       "reason": "The same cross-species CLI warning, quoted verbatim in the README's example output so readers can see what the tool actually prints. Documenting real output is not an instruction to an AI reader; changing the quote to satisfy the scanner would make the documentation wrong."
     },
     {
-      "fingerprint": "a3362a8da806c301",
-      "file": "Business/build-stages/STAGE_10_PART_14.md",
-      "rule": "injection/trust-assertion",
-      "reviewed": "2026-08-11",
-      "reason": "The same cross-species CLI warning, quoted in the build-stage record that describes why it was added. A historical record of what the code printed on a given date; rewording it would falsify the record."
-    },
-    {
       "fingerprint": "40b5576c50401a01",
       "file": "mule/index.html",
       "rule": "concealment/hidden-markup",
@@ -57,20 +50,6 @@
       "rule": "injection/exfiltration",
       "reviewed": "2026-09-06",
       "reason": "The scanner read the word 'token' as a credential. The flagged text is a code comment distinguishing 'nothing found' from 'nothing checked' for ADR 0039's pool-source classification, where a token is a parsed unit of substrate text that failed to resolve to a known compound -- there is no credential, no secret, and no destination anywhere in this file. Nothing is sent anywhere: the surrounding literal is an exact-equality contract fixture for the runner's JSON shape."
-    },
-    {
-      "fingerprint": "960ae51f4a9b0a1e",
-      "file": "Business/build-stages/STAGE_10_PART_13.md",
-      "rule": "injection/tool-abuse",
-      "reviewed": "2026-09-06",
-      "reason": "Recursive false positive. This line is a row of the triage table in the stage record that examined the FIRST prompt-injection scan, and it quotes a to-do item from CODE_QUALITY_IMPROVEMENTS.md about adding a typed parameter registry to prevent key mismatches -- a TypeScript refactor note. The rule that fires looks for shell-profile and install-hook modification; nothing here touches either. The record exists to say that string was benign, and reproducing it to say so re-trips the rule."
-    },
-    {
-      "fingerprint": "02711b332996b1d0",
-      "file": "Business/build-stages/STAGE_10_PART_13.md",
-      "rule": "injection/exfiltration",
-      "reviewed": "2026-09-06",
-      "reason": "The same recursion, one rule over. The line quotes SECURITY_HARDENING.md's former wording about secrets being taken from the process environment at point of use, in the course of explaining that a concurrent agent had since rephrased it. Describing where a program obtains its configuration is a security disclosure, not an instruction to collect anything or send it anywhere -- the original finding was triaged as a false positive in August 2026 for exactly that reason, and quoting the sentence to record the verdict reproduces the match."
     },
     {
       "fingerprint": "c52a9a047fed2b35",
@@ -113,6 +92,27 @@
       "rule": "concealment/hidden-markup",
       "reviewed": "2026-09-28",
       "reason": "`aria-hidden=\"true\"` on an EMPTY span (line 549) used as a CSS-drawn rule in the manifest section. There is no text in it at all. Same markup as the reviewed mule/index.html entry."
+    },
+    {
+      "fingerprint": "c883b1af96e517ba",
+      "file": "docs/mutations/adr-0068-live-data-sources.json",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-08-24",
+      "reason": "The flagged text is a mutation PAYLOAD -- the 'replace' side of a patch that overwrites a NOTICE line about a live data source with an empty reassurance, so a guard can be proven to catch exactly that substitution. The string exists to imitate concealment, and the scanner flagging it is the scanner working. Exempting the imitation, not the behaviour: the entry is keyed to one fingerprint in one file, so the same phrasing anywhere outside a mutation's replace field is still a finding."
+    },
+    {
+      "fingerprint": "178237af29100ee6",
+      "file": "caterva/compose/timeseries.py",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-09-24",
+      "reason": "The cry-wolf idiom, in a comment about a real numerical detail: the cross-correlation sums elementwise rather than using the matmul because BLAS on macOS Accelerate sets divide-by-zero and overflow flags inside its own vectorised kernels, numpy attributes them to the caller, and every run printed RuntimeWarnings about arithmetic this function never performs -- which a suite that turns warnings into errors would have failed on. The flagged clause gives the reason that matters: spurious warnings cost a reader's attention to the real ones. The rule looks for text asserting that code is safe; this asserts nothing about safety and asks for MORE attention to warnings, not less. Same verdict and same idiom as the adr-0037 and enzyme_preparation entries. Worded here without quoting the line, because reproducing it re-trips the rule."
+    },
+    {
+      "fingerprint": "dd923bac4151fea2",
+      "file": "caterva/tests/test_compose_library_signaling.py",
+      "rule": "injection/trust-assertion",
+      "reviewed": "2026-09-24",
+      "reason": "The same idiom in a class docstring, explaining why every motif in the signalling library must balance at composition time: a dimensionally wrong rate law still integrates and still produces a smooth curve, so there is no later point at which the error becomes visible, and a library shipping with a standing finding against it costs the reader's attention to findings generally. An argument for the unit checker existing, not a claim that any code is safe. Described rather than quoted, for the same reason as the entry above."
     }
   ]
 }

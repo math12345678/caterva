@@ -1,0 +1,58 @@
+{
+  "_why": [
+    "ADR 0191's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0191 replaced first-match-wins with specificity scoring and widened",
+    "the keyword vocabulary from each domain's definition. The interesting",
+    "result was an ablation, not the headline: scoring alone moved the",
+    "independent set by zero points, and only became load-bearing once the",
+    "vocabulary was wide enough to create collisions for it to resolve.",
+    "",
+    "S1 restores first-match-wins under the widened vocabulary -- the D arm",
+    "of that ablation. It is the mutation that shows scoring is doing work:",
+    "with the wide vocabulary in place, removing scoring costs accuracy on",
+    "the LLM-authored fixture.",
+    "",
+    "",
+    "The word-boundary matcher that S2 used to target is gone. The mutation",
+    "harness reported it NOT CAUGHT, which sent me to measure it rather than",
+    "to write a test for it: across all 131 labelled queries it changed no",
+    "classification at all. It was removed instead of tested. A mutation that",
+    "cannot be caught because the code does nothing is a signal about the code,",
+    "not a gap in the suite.",
+    "",
+    "S3 restores the fallback-reported-as-a-match collapse, which ADR 0190",
+    "fixed and which this record's held-out reasoning depends on: if a",
+    "fallback cannot be seen, the fallback count that exposed the shared-",
+    "author bias cannot be seen either.",
+    "",
+    "Not included, because these tests do not catch it: whether the labels in",
+    "the LLM-authored fixture are correct. They are the domain each query was",
+    "commissioned for, never independently verified, and no mutation here",
+    "tests that assumption. The ADR says so; a set file implying coverage",
+    "would overstate the evidence.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0191-classifier-scoring.json"
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/classifierEval.test.ts src/__tests__/llmAuthoredQueries.test.ts src/__tests__/llmConfigState.test.ts",
+  "mutations": [
+    {
+      "id": "S1",
+      "description": "specificity scoring reverts to first-match-wins over the table",
+      "_claimed": "caught by the fixed-defect tests and by the beats-what-it-replaced floor",
+      "_note": "The D arm of the ablation, as a mutation. Accuracy on the LLM-authored fixture falls from 62/78 to 59/78, and the repressilator and two-locus confusions triple -- the collisions the wider vocabulary introduced, which only scoring resolves. Every query still gets a domain, so nothing errors; the classifier just quietly gets worse.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "    if (score > 0 && (best === undefined || score > best.score)) {",
+      "replace": "    if (score > 0 && best === undefined) {"
+    },
+    {
+      "id": "S3",
+      "description": "the fallback reports itself as a genuine match again",
+      "_claimed": "caught by the three-state tests and the fallback bound",
+      "_note": "ADR 0190's defect, restored. The domain returned is unchanged, so every test asserting only on the domain still passes. This is the mutation that would let a future shared-author fixture look independent: with no visible fallback count, 'matched nothing' and 'answered mm' are one fact again.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "  return { defaults: fallback, matched: false };",
+      "replace": "  return { defaults: fallback, matched: true };"
+    }
+  ]
+}

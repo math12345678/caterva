@@ -142,6 +142,45 @@ jobs:
       - name: Model-citation guard
         run: python scripts/check_model_citations_cite_models.py
 
+      # The licence guard reads the LICENSE file that ships inside each
+      # installed package, so the JS workspaces have to exist before it runs.
+      # Without them it reported `wouter` and `zod` as unrecorded and failed
+      # the build -- which is the guard behaving correctly on an environment
+      # that could not answer, not a licensing problem.
+      #
+      # Installing here rather than relaxing the guard: a check that skips
+      # what it cannot reach would go quiet exactly when a new dependency
+      # arrives unlicensed, which is the case it exists for.
+      - name: Set up Node for the licence guard
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # `corepack enable`, not `corepack prepare --activate`. See the
+      # api-server job below, where getting this wrong reddened every build.
+      - name: Enable pnpm via corepack
+        run: corepack enable
+
+      - name: Install JS workspaces
+        working-directory: Science-Agent-Pipeline
+        run: pnpm install --frozen-lockfile
+
+      # The root package.json is npm, not pnpm -- it has package-lock.json and
+      # no packageManager field. Its devDependencies (eslint, jest, ts-node
+      # and friends) are read by the same licence guard, so leaving them out
+      # moved the failure rather than fixing it.
+      - name: Install root JS dependencies
+        run: npm ci --no-audit --no-fund
+
+      # check_typescript_compiles runs `tsc --noEmit` per workspace, and a
+      # workspace referencing a composite project cannot type-check until that
+      # project's dist/ exists (TS6305). Without this, 5 of 7 workspaces failed
+      # on build ordering and the guard's output read like broken code.
+      # --force because `tsc --build` trusts its .tsbuildinfo cache.
+      - name: Build the composite TypeScript libraries
+        working-directory: Science-Agent-Pipeline
+        run: npx tsc --build --force lib/api-zod lib/db lib/api-client-react
+
       # Every dependency carries a recorded grant of permission to use
       # it. Unrecorded fails, deliberately.
       - name: Dependency-licence guard
@@ -155,13 +194,17 @@ jobs:
       - name: Pinned-version resolution guard
         run: python scripts/check_pins_resolve.py
 
-      # The quickstart-clone guard — now the LAST step in this job, see the
-      # note there — tells the MAINTAINER, in a log only somebody with push
-      # access opens. This one checks the thing that tells the STRANGER: the
-      # "Not public yet" notice on README.md and START_HERE.md.
+      # The quickstart-clone guard checks that no document promises a
+      # stranger anonymous access it does not have. This one checks the
+      # thing that TELLS the stranger: the "Not public" notice on README.md
+      # and START_HERE.md.
       #
-      # Unlike the step above, this one is GREEN today and is expected to
-      # stay green in both directions. It fails if the repositories are
+      # ("Not public YET" until ADR 0179 settled that the repositories stay
+      # private. The word was a forecast nobody had made, and the guard's
+      # sentinel moved with the prose so the two cannot drift.)
+      #
+      # This one is GREEN today and is expected to stay green in both
+      # directions. It fails if the repositories are
       # private and the front page does not say so, and it fails again the
       # day they are published and the notice is left standing -- a warning
       # turning away visitors who can plainly clone the thing. Nothing else
@@ -171,6 +214,22 @@ jobs:
 
       - name: Availability-notice guard
         run: python scripts/check_availability_notice_matches_reality.py || [ $? -eq 3 ]
+
+      # Every OTHER guard, run against an empty directory, where reporting
+      # OK is a failure because there was nothing to be clean. Five guards
+      # were found doing exactly that by hand (ADR 0183, 0185); the same
+      # hand procedure also produced five FALSE positives, which is why it
+      # is a script now and not something somebody remembers to do.
+      #
+      # Its selftest runs first and separately: it plants a guard that
+      # always passes and one that always refuses, and asserts the starved
+      # tree contains exactly one file -- so a starve that silently stopped
+      # starving cannot look identical to a working one.
+      - name: Guards-refuse-on-empty guard (self-check)
+        run: python scripts/check_guards_refuse_on_empty.py --selftest
+
+      - name: Guards-refuse-on-empty guard
+        run: python scripts/check_guards_refuse_on_empty.py
 
       # A step named "Install pnpm" that installs no pnpm and exits 0 is the
       # exact shape this project calls worse than no check, and it cost two

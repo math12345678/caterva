@@ -13316,6 +13316,700 @@ reachable by running the thing rather than reading about it.
 
 ---
 
+## Pass: the classifier nobody measured (ADR 0190)
+
+The brief was to find out whether the AI agent pipeline works. It does — 645
+api-server tests green, a live query resolving `km = 10.73 mM` from BRENDA
+with every other parameter marked `origin=user`. What had never been measured
+was the part doing the "AI": which domain the query gets classified into.
+
+### The measurement
+
+25 labelled queries, all 13 LLM-exposed domains, Groq `openai/gpt-oss-120b`:
+
+| classifier | correct | could not determine |
+|---|---|---|
+| keyword table | 15/25 (60.0%) | 4 |
+| LLM | 24/25 (96.0%) | 0 |
+
+**+36.0 points.** The LLM earns its call. That was not obvious beforehand: on
+three ad-hoc queries the two agreed exactly, which is how the question had
+stayed open.
+
+### The harness got it wrong first, and that is the part worth reading
+
+The first run scored the LLM at **−7 against the baseline**. The misses were
+HTTP 429s from Groq's free-tier token limit. `resolveQueryWithLLM` flattens
+every failure into `null` — no key, dead model, rate limit, malformed body —
+so the harness counted a billing tier as the model's accuracy and would have
+published it.
+
+It now paces, retries, and **refuses to print a comparison at all** while any
+query is unanswered. An absent LLM reports NOT MEASURED, never zero.
+
+### Three defects, all the same shape
+
+The third state collapsed into a confident second state, so the system kept
+answering and nothing recorded that it had stopped knowing.
+
+- The keyword table substitutes `mm` when nothing matches. A caller could not
+  distinguish a real enzyme-kinetics match from a query it never understood.
+- **Five provider keys were set and `LLM_PROVIDER` was not**, so `getApiKey`
+  resolved nothing and the LLM was never called. `/pipeline/status` said
+  `"Not set"` — sending whoever debugged it to add a sixth key.
+- Groq retired `llama-3.3-70b-versatile`; the default 404s. A unit test pinned
+  that id and passed the whole time, because a mocked `fetch` cannot return a
+  404 nobody asked for.
+
+### The table's misses are structural
+
+`sir` is checked before `seir`, so *"an incubation period before patients
+become infectious"* — the definition of the E compartment — routes to `sir`.
+`"oscillator"` matches the cell cycle before `repressilator` is reached. And
+*"predator-prey cycles"* becomes **`pcr`**, because `"cycles"` is a PCR
+keyword sitting earlier in the table: an ecology question answered with a DNA
+amplification model.
+
+These are pinned as individually named tests, so fixing one fails loudly and
+says which defect got fixed, rather than a score quietly moving.
+
+### What I did not do
+
+I did not touch the trust model. `origin: "llm"` is still blocked identically
+to `origin: "default"`; the LLM classifies and extracts entities and supplies
+no value that survives. Asked to "make the AI pipeline work", the tempting
+reading was to let LLM numbers through — that would delete the thing the
+project exists for, and it is a decision for the owner, not a fix.
+
+I also did not repair the keyword table. Its ordering defects are measured and
+pinned, not fixed; reordering it carries its own regression risk.
+
+| | |
+|---|---|
+| Found | a 36-point accuracy gap nobody had measured, an LLM that was never called, and a default model that 404s |
+| Built | 20 tests across 2 files, a benchmark that scores the extracted (not copied) classifier, three-state config reporting |
+| Verified | two mutations, both caught, reproducible under `scripts/mutate.py`; both restores checked by `diff`; 645/645 api-server tests |
+| **Still red, not mine** | `make test` fails 2 Python tests — `cffconvert` is declared in `requirements-dev.txt` and installed in no venv on this machine. Pre-existing at HEAD. The ADR index links 0146 and 0150, which are another agent's uncommitted files. |
+
+---
+
+## Pass: the set that shared my hand (ADR 0191)
+
+Last pass measured the keyword classifier at 60% and left it unrepaired.
+This pass repaired it. The first thing the repair found was that **60% was
+wrong**, and that I had produced the wrong number myself.
+
+### The number was measuring my own hand
+
+ADR 0190's queries were written *after* I read the keyword table, to probe
+orderings that looked fragile. That makes them good at finding defects and
+worthless as a measure of accuracy: without intending to, I had written the
+table's vocabulary into the questions.
+
+Queries written from each domain's definition instead, before any tuning:
+the same committed classifier scores **17.9%**. Twenty-one of twenty-eight
+naturally-phrased queries matched no keyword at all and were answered `mm` by
+fallback. I had overstated the baseline by about forty points and amended
+ADR 0190 to say so.
+
+### Then my fix scored 100%, which is a warning, not a result
+
+After widening the vocabulary, the held-out set scored **28/28**. It should
+not have been reassuring: I had written the queries and the vocabulary, from
+the same source, so they matched by construction. "Written before tuning" was
+not enough independence when the same person does both.
+
+So I commissioned a third set from an LLM — shown one sentence per domain,
+never the keyword table — and committed it as a fixture. **79.5%.** That is
+the number I stand behind, and the suite now asserts the classifier does
+**not** score 100% on it, because a perfect score there would mean the
+fixture had stopped being independent.
+
+### The ablation contradicted my own reasoning
+
+| variant | accuracy | fallbacks |
+|---|---|---|
+| first-match-wins, original vocabulary (was committed) | 69.2% | 11 |
+| scoring, original vocabulary | 69.2% | 11 |
+| **scoring, wide vocabulary (shipped)** | **79.5%** | **2** |
+| first-match-wins, wide vocabulary | 75.6% | 3 |
+
+Specificity scoring got my longest justification and bought **zero points on
+its own**. Every point came from vocabulary. Scoring only became load-bearing
+once the wider vocabulary created the collisions it resolves — which is a
+real interaction, and not the one I had argued for before running it.
+
+### A change I made on reasoning and deleted on measurement
+
+Keyword matching briefly used a word-boundary regex, because `includes` lets
+`"ki"` fire inside `"kinetics"`. The mutation harness reported that mutation
+**NOT CAUGHT**. That sent me to measure instead of to write a test for it:
+across all 131 labelled queries the regex changed **no classification at
+all**, and left one more query matching nothing than plain `includes` did.
+
+I deleted it rather than testing it. A mutation nothing can catch because the
+code does nothing is a fact about the code, not a gap in the suite. The
+reasoning was sound and the effect was zero, and only running it showed that.
+
+| | |
+|---|---|
+| Found | my own published baseline overstated by ~40 points, and a "held-out" set that shared its author with the thing it scored |
+| Built | a third set commissioned from an LLM and committed as a fixture, a four-arm ablation, 10 more tests (24 across the two classifier files) |
+| Verified | two mutations, both caught, reproducible under `scripts/mutate.py`; a third deleted rather than tested; 655/655 api-server tests |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+### Follow-up in the same pass: the confound was real and negligible
+
+I flagged that the fixture was written by the same model being scored on it,
+called +17.9 points "an upper bound", and could have stopped there. A second
+fixture from a different model settled it in twenty minutes.
+
+| set | previous keyword | keyword (shipped) | LLM |
+|---|---|---|---|
+| Groq-authored, 78 | 69.2% | **79.5%** | **97.4%** |
+| Mistral-authored, 72 | 41.7% | **51.4%** | **97.2%** |
+
+Self-authorship was worth **0.2 points**. My upper bound was wrong in the
+other direction: the gap on the Mistral set is **+45.8**.
+
+And the thing I would have missed entirely by not running it: **the keyword
+table has no single accuracy.** 79.5% or 51.4%, same classifier, same 13
+domains, differing only in which model phrased the question — a 28-point
+swing, where the LLM moves 0.2. Every accuracy figure I have quoted for that
+classifier, including in my own ADR's decision section, is an accuracy
+against one way of asking. The suite now asserts the spread exists, so nobody
+can quote one number as "the" accuracy without a test failing.
+
+Three times this pass a number I was ready to report turned out to be
+measuring the measurement apparatus rather than the thing: a rate limit as
+accuracy, my own vocabulary as a held-out set, and a self-authored fixture as
+independent evidence. Only the third one I caught before writing it down.
+
+---
+
+## Pass: mentioning a thing to exclude it (ADR 0192)
+
+Four queries in the fixtures said, in so many words, that there was no
+inhibitor — and every one of them was given the inhibitor model. The matcher
+saw the word and could not see the "no" in front of it.
+
+That is not an ordinary miss. **Naming a thing in order to rule it out made
+that thing more likely to be selected.** The student who bothered to be
+explicit got the worst answer on offer.
+
+Negation handling: +2.6 and +2.8 points on two independent fixtures, neutral
+on the third, negative on none. The `mm -> mm_competitive_inhibition`
+confusion disappears entirely.
+
+### Two of three mutations were NOT CAUGHT, and both tests passed for the wrong reason
+
+The every-negator test asserted the domain came back `mm` over phrasings like
+*"enzyme kinetics in the absence of an inhibitor"*. It passed whether or not
+negation worked, and for two independent reasons: `"enzyme kinetics"`
+outscores `"inhibitor"` anyway, and where it does not, **the `mm` fallback
+returns `mm` regardless**. I had written a test whose assertion the fallback
+satisfies unconditionally.
+
+It now asserts `matched === false` on queries carrying no keyword except the
+negated one — the question actually being asked.
+
+The later-mention test negated one word and asserted a different one, so the
+first occurrence of the keyword under test was never the negated one, and the
+"check only the first occurrence" mutation sailed straight through.
+
+I would not have found either without the mutation harness. Both looked
+right, and both were green.
+
+### The `ki` detour, and a lesson narrowed rather than reversed
+
+Sharpening those tests turned one red: *"Run it lacking an inhibitor."* still
+chose inhibition, because `"ki"` — a two-character keyword I added last pass
+— matches inside `"la**cki**ng"`.
+
+The obvious repair was to restore the word-boundary regex I deleted last
+pass. Measured, it **costs** accuracy: 82.1% → 80.8% and 54.2% → 52.8%,
+because boundaries also stop `"decay"` matching `"decaying"`.
+
+The defect was never the matcher. It was a two-character keyword in a table
+whose scoring assumes terms mean something. Dropping `ki` fixed it with no
+accuracy cost. So last pass's deletion was right, and its lesson narrows to:
+*check the shortest term in the table before reaching for the matcher.*
+
+### A fixture that was not a measurement
+
+I generated fixtures from three more providers. Two failed every domain — and
+my generator **wrote the files anyway**, valid JSON with an empty array. The
+benchmark scored them `0/0`, printed `NaN%`, and gave the spread across
+"five" sets as `NaN points`. Nothing errored. A reader would have counted
+five rows and believed five measurements existed.
+
+That is the same defect as the rest of this record, one level up: an absence
+presented as a result. The generator now refuses below eight domains and
+exits 3; the benchmark names empty fixtures instead of scoring them.
+
+| | |
+|---|---|
+| Found | a classifier that punished precision, two of my own tests passing for the wrong reason, a keyword too short to be safe, and a generator that wrote absences as data |
+| Built | negation-aware matching, 8 tests, a third independent fixture, `make classifier-bench` (offline, refuses to print an aggregate) |
+| Verified | three mutations, all caught after two rounds of sharpening; ablation across three fixtures; 680 of 681 api-server tests -- the one failure is a pre-existing live-network flake that passes in isolation |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: the parent outvoted the child (ADR 0194)
+
+You asked me to take the nesting problem. The first thing measuring it did
+was correct the framing I gave you.
+
+I had called `seir -> sir` and bimolecular-vs-unimolecular "semantic nesting
+that no keyword mechanism touches", implying a coverage gap. It is not. The
+child's distinctive phrase was usually *already in the query*:
+
+> "how an infection spreads when there's a **hidden incubation phase**"
+
+`"incubation"` matched SEIR and lost, because summed scoring gave SIR
+`"infection"` (9) + `"spreads"` (7) = 16 against SEIR's 10. The query said the
+one word that distinguishes the two models and got the other one.
+
+### Why summing was wrong, not just badly weighted
+
+Four pairs are genuinely nested — an SEIR epidemic *is* an SIR epidemic with
+one more compartment. So the parent's vocabulary is true of the child as
+well. `"infection"` is not evidence for SIR *over* SEIR; it is evidence for
+both. Summing it as though it discriminated is double-counting, and no
+adjustment of weights fixes a term that carries no information about the
+choice being made.
+
+`refines` declares the four pairs; a winner is promoted to a child whose
+distinctive terms appear unnegated, regardless of score. Regardless of score
+is the whole rule, and it is only defensible because containment means no
+quantity of parent evidence is evidence against the child.
+
+| fixture | before | after |
+|---|---|---|
+| Groq, 78 | 82.1% | **89.7%** |
+| Mistral, 72 | 54.2% | **56.9%** |
+| OpenRouter, 78 | 75.6% | **76.9%** |
+
+All three up, none down. Target confusions 8→3 and 7→4. **Over-promotion —
+the failure mode an absolute rule is most likely to have — measured at zero
+across all 228 fixture queries.**
+
+### One mutation reported NOT CAUGHT rather than papered over
+
+Promotion only counts terms the parent does not also list. The mutation that
+deletes that filter is **NOT CAUGHT**, and I am reporting it that way.
+
+Measured: all four pairs share exactly zero keywords, so the filter removes
+nothing and deleting it changes no classification. I kept it — it costs
+nothing and stays correct whatever the table later holds — and added an
+invariant test asserting the zero-overlap fact, so the day someone adds a
+shared term the filter becomes load-bearing and that test says so.
+
+I could have made the mutation catchable by adding an overlapping keyword.
+That would have been fitting the evidence to the table, and the number it
+produced would have meant nothing.
+
+| | |
+|---|---|
+| Found | that the nesting failure was scoring, not coverage — the opposite of what I told you last pass |
+| Built | `refines` on four pairs, `resolveNesting`, 15 tests including an over-promotion guard and a zero-overlap invariant |
+| Verified | three mutations, two caught and one honestly NOT CAUGHT; over-promotion measured at zero over 228 queries; 696 api-server tests |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: fluent invention is not usage (ADR 0195) — a rejected approach
+
+This pass produced no working code, and that is the result rather than a
+failure to report around.
+
+After the nesting fix, the largest remaining error was coverage: 37 queries
+matching **no keyword at all**. They fail because students paraphrase — the
+repressilator as *"that biological timer circuit I read about"*, two-locus
+recombination as *"genes mixing and swapping"*, predator-prey as *"hunters
+and hunted"*.
+
+The vocabulary that would fix it is sitting in the fixtures. **Taking it from
+there is exactly what must not happen** — terms lifted from the test set make
+the test pass and measure nothing, which is the shared-author failure from
+two records ago, one level down.
+
+So I asked a model for the lay vocabulary from the domain definition alone:
+Mistral, shown one sentence per domain, never the fixtures or the keyword
+table, chosen because it authored one fixture and not the other two. 251
+terms, filtered for length, genericness, and cross-domain collision.
+
+### It does not work
+
+Held out: 89.7% → 89.7%, and 76.9% → 78.2%. One query, on one fixture, for
+251 terms and a whole generation-and-merge pipeline.
+
+The reason is legible in the terms. Asked how a student describes the
+repressilator, it gave *buzzing genes*, *gene heartbeat*, *gene pendulum*,
+*gene metronome*, *gene chatter*, *gene bounce*. Fluent, evocative, and
+**zero hits** against the three real repressilator queries that fell through.
+Across everything, **7 of 251 terms match any of the 228 fixture queries**.
+
+The part worth keeping: a model asked *"what words would someone use"*
+answers from **fluency, not usage**. Yet the same model asked to *be* a
+student and write a query produces text good enough to benchmark against.
+**Generating an instance works; describing the distribution does not.** I
+would not have predicted that, and I would have kept believing the opposite
+if I had shipped the terms without measuring which ones ever fired.
+
+I also re-measured over-promotion, as the previous record said must happen
+before any vocabulary widening. It stayed at **zero** across 228 queries. The
+risk did not materialise — the terms simply never fired.
+
+Everything is reverted. The generated file is kept as marked-REJECTED
+evidence that nothing reads, with the prompt recorded so it can be redone.
+
+| | |
+|---|---|
+| Found | that LLM-proposed vocabulary is plausible paraphrase, not observed paraphrase — 97% of it never matches anything |
+| Built | nothing that survived; the classifier is byte-identical to last pass |
+| Verified | held-out measurement before and after, term-utilisation count, over-promotion re-checked at zero; 696 tests |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: the questions nobody collected (ADR 0196)
+
+Three records in a row have ended on the same sentence: five labelled query
+sets exist and no student wrote a line of any of them. ADR 0195 closed off
+the last route that avoided the problem — model-proposed vocabulary is fluent
+invention, and 97% of it never matched a real query.
+
+So this pass built the smallest thing that makes the question answerable, and
+stopped there rather than reaching for another classifier tweak.
+
+### What is actually unknown
+
+The keyword classifier scores between **57% and 90%** depending only on which
+model phrased the questions. That spread is wider than every improvement I
+have made to it. Which end a real student experiences is unknown, and no
+further generation settles it, because every set so far was written by
+whoever was also building the thing being measured.
+
+### The three decisions that made this acceptable to build
+
+**Off unless switched on.** No default path. This is the first thing in the
+repository that records what a person typed, and a tool whose whole argument
+is that it refuses to invent data should not quietly start collecting it
+either. The mutation that gives it a default path is the sharpest one in the
+table: nothing errors, nothing looks different, a deployment that never opted
+in simply begins writing student text to disk.
+
+**No identifiers, by construction.** Date rather than timestamp — a time of
+day lets a session be reassembled by timing. No user, session, request id or
+address, not because those are hard to strip later but because a log that
+never held them cannot leak them.
+
+**A human labels it, and the tool refuses to help.** An ambiguous prefix is
+rejected rather than resolved to its first match. Labelling with an LLM was
+the obvious shortcut and would have destroyed the result: the LLM classifier
+scores ~100% on such a set by construction, and the keyword score would
+measure agreement rather than correctness. That is ADR 0195's failure one
+level down again, and I could see it coming this time.
+
+### The number that costs nothing
+
+`make query-log` reports the fallback rate on real questions with no
+labelling at all. It refuses to quote a percentage below 30 queries — three
+fallbacks in five is not "a 60% fallback rate" — and exits 3 both when
+logging was never switched on and when the log is empty, because *nobody has
+collected any* and *a rate of zero* are different facts.
+
+| | |
+|---|---|
+| Found | that the remaining problem was not a code change, and building around it twice had already failed |
+| Built | opt-in query capture, redaction, a resumable human labelling tool, `make query-log`, 34 tests |
+| Verified | five mutations, all caught first run; exit-3 semantics checked directly; end-to-end capture with redaction; 730 api-server tests |
+| **For you** | Set `TERRIUM_QUERY_LOG` on the deployment students use. One variable, and at the end of term you have the first real number in any of these records. |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: three ways to say no (ADR 0197)
+
+Your original question was "is the AI agent pipeline working?". Answering it
+took me an afternoon of manual `curl`, and the answer was three separate
+configuration failures that nothing in the repository reported. That should
+have been one command, so now it is.
+
+`make llm-doctor` sends one small completion per keyed provider, using the
+model Terrium would really send, and reports four states. Against your keys:
+
+```
+  OK      groq / openrouter / mistral
+  BROKEN  siliconflow   account balance or quota exhausted -- key is valid,
+                        there is nothing to spend
+  BROKEN  tokenrouter   the API key was rejected (check for a required prefix)
+```
+
+**Two of your five providers are unusable right now.** Neither is a code
+defect and nothing in this repository can fix them.
+
+### Why a completion and not a model listing
+
+The cheap check would be `/v1/models`. It proves less: SiliconFlow listed its
+models perfectly while refusing every completion for lack of balance, and
+Groq listed models while the *configured* one was absent. And a 200 is not a
+success — SiliconFlow answers HTTP 200 with the error in the body, so a
+checker trusting the status reports an unusable provider as healthy.
+
+### It condemned a working provider first
+
+The first run said **Groq BROKEN**. Groq was fine — 78 queries had gone
+through it an hour earlier producing every measurement in the last four
+records.
+
+My probe asked for `max_tokens: 8`. `gpt-oss-120b` is a reasoning model: it
+spent the whole budget thinking and returned `finish_reason: "length"` with
+empty content. Measured directly — at 8 tokens the content is `''`, at 64 it
+is `'ok'`.
+
+**A check that condemns something working is worse than no check**, because
+somebody acts on the report. This one would have sent you to fix the only
+provider that had just done all the work. Fixed by raising the budget and by
+treating that finish_reason as `ok`, with the converse asserted so the fix
+cannot quietly become "accept every empty answer".
+
+I also left an abort timer uncleared, so every probe held the event loop open
+for its full 20-second timeout. Six providers now take 4 seconds.
+
+| | |
+|---|---|
+| Found | two unusable providers in your config, and a false BROKEN in my own checker |
+| Built | four-state provider diagnosis, `make llm-doctor`, 18 tests |
+| Verified | four mutations, all caught; run against the real keys; exit-3 path checked with every key unset; 748 api-server tests |
+| **For you** | `SILICONFLOW_API_KEY` has no balance; `TOKENROUTER_API_KEY` is malformed (the API wants a `tr_` prefix). Both work again once fixed. |
+| **Still red, not mine** | ADR index links 0146 and 0150, another agent's uncommitted files. `make test` still fails 2 Python tests on the missing `cffconvert` dev dependency. |
+
+---
+
+## Pass: a failure wearing two costumes (ADR 0198)
+
+I flagged the same two failing tests **five times** as "pre-existing, not
+mine" and never once looked at what they were. This pass looked.
+
+They are one failure. `cffconvert` is pinned in `requirements-dev.txt` and
+installed in no virtualenv here; `zod` is declared in `lib/api-zod` and that
+workspace had no `node_modules`. Symlinking it made the codegen selftest pass
+instantly, with no change to the check it was supposedly failing.
+
+Both guards were behaving correctly — each refused to call an unchecked thing
+valid, which is the discipline this repository is built on. What was missing
+was anything saying *why*, in terms of what to install. The messages named
+the citation file and the zod pin, which is where I would have gone if I had
+ever followed them up.
+
+`make deps-check` now says it in one line, and found `python-libsedml`
+missing, which nobody knew.
+
+### It reported five missing; three were installed
+
+The first version resolved distribution names to module names with `s/-/_/`.
+So `libroadrunner` (imports as `roadrunner`), `python-libsbml` (`libsbml`)
+and `beautifulsoup4` (`bs4`) all looked absent.
+
+**That is worse than the failure it was written to fix.** A real dependency
+with a confusing message costs an hour; a checker that invents three
+dependencies makes its own output untrustworthy and buries the two real ones
+— and the output looks completely plausible until somebody tries to install
+them. Asking `importlib.metadata` for the name the manifest actually uses
+removed the mapping rather than extending it.
+
+### A test that switched itself off
+
+Mutation V1 restores the guessing and was reported **NOT CAUGHT**.
+
+My test guarded itself with `if not guard.is_installed(...): pytest.skip()`.
+V1 breaks `is_installed` — so under the mutation the precondition failed and
+every case skipped itself. A test that disables itself under exactly the
+defect it exists to catch, and in the summary line it is indistinguishable
+from one that passed.
+
+The rule I did not have written down until now: **a test's guard clause must
+not route through the code under test.**
+
+| | |
+|---|---|
+| Found | that a failure I deferred five times was one uninstalled dependency in two disguises; then a false-positive in my own fix; then a test that disabled itself |
+| Built | `scripts/check_dev_dependencies.py` with a `--selftest`, `make deps-check`, wired into `make doctor`, 11 tests |
+| Verified | three mutations, all caught after fixing the self-disabling test; picked up unasked by the guard-selftest discovery harness |
+| **For you** | `python3 -m pip install -r requirements-dev.txt` fixes the citation test. I have not run it: the venv is shared with another agent and that is your call. |
+| **Precisely** | `make test` is now 1 failed / 1175 passed, down from 2 failures — but only half of that is this pass's doing. The codegen test passes here because I symlinked `lib/api-zod/node_modules` while diagnosing it, and **that symlink is not committed**. On a clean checkout it fails exactly as before. |
+
+---
+
+## Pass: the failure that hid the others (ADR 0199)
+
+I have been reporting the state of this repository incorrectly all session,
+and this pass found out why.
+
+`make guards` is a sequential list and make stops at the first failure. It
+died at the **5th of 28** guards, on two ADR index entries pointing at
+another agent's uncommitted files. **Twenty-three guards never executed
+once.**
+
+I then wrote *"only the two pre-existing failures remain"* **five times** —
+in five ADRs and five commit messages — on the strength of having seen five
+guards out of twenty-eight. The silence of the other twenty-three read
+exactly like success, and I passed it on to you as such. That is the same
+mistake this repository documents over and over: an absence taken for a
+result. I made it in my own reporting while writing records about it.
+
+### What was hiding back there
+
+**A guard wiring violation I introduced that same session.** ADR 0198's new
+checker had no `EXPECTED_WIRING` entry — the repo's rule is that a guard is
+not delivered until something runs it unasked. Nothing told me, because
+`check_guard_wiring.py` runs *after* the guard that was failing.
+
+**A TypeScript syntax error committed at HEAD.** `CliApp.tsx` opens a JSX
+comment at line 686 and closes it at line 700 with `*/` and no `}`. One
+character. That file has not compiled since commit `982ebca`.
+`check_typescript_compiles.py` catches it correctly and is wired into
+`verify_build.py` — which fails on the *same ADR entry* before reaching the
+TypeScript stage. A working guard, a real defect, and a harness that never
+got there.
+
+### The whole picture, for the first time
+
+`make guards-all`: **37 ok, 4 failed**, 793 seconds. All four failures reduce
+to two causes and neither is a defect in this code — three are those same two
+ADR links, and the fourth is ADR 0198's missing dependencies in a **third
+costume**: all five skips are `could not import cffconvert` and `libsedml`,
+making a guard about silent skips fail for a reason unrelated to skipping.
+
+TIMEOUT is reported as its own state, not as a failure. One guard runs both
+pytest suites for eleven minutes, and a timeout is the runner's limit rather
+than the guard's verdict.
+
+### The fix, measured rather than assumed
+
+TS1005 and TS1382 go 2 → 0. But `terrium-landing` goes from 2 errors to
+**6**, because a file that cannot be parsed reports only its parse error —
+fixing it revealed four that were behind it. All six are missing type
+packages, not code. Saying "the error count is unchanged at 21" would be
+true and misleading; saying "the syntax errors are gone and four were
+revealed" is what happened.
+
+| | |
+|---|---|
+| Found | that I had been reporting five guards out of twenty-eight as the whole state, five times over; a wiring violation of my own; and a one-character compile break committed at HEAD |
+| Built | `scripts/run_all_guards.py`, `make guards-all`, the missing wiring entry, the missing `}` |
+| Verified | full sweep of 41 invocations; guard wiring back to OK at 73 guards; syntax errors 2 → 0 with the revealed errors counted honestly |
+| **The good news** | 37 of 41 guards pass, and every remaining failure is another agent's in-flight work or two uninstalled packages. The repository is in better shape than I have been telling you. |
+
+---
+
+## Pass: a package nobody declared (ADR 0200)
+
+You installed the dev requirements. ADR 0198's two failures went away and
+three different ones appeared — which is not a regression, it is ADR 0199's
+masking one level up. `make test` runs the engine suite then the literature
+suite and stops at the first. While engine was red, **the literature suite
+had never run at all.**
+
+Engine is now **1215 passed, 0 skipped** (was 1175 passed, 4 skipped, 1
+failed).
+
+### The alarming line in your output is not the problem
+
+The install downgraded antimony 3.1.3 → 2.14.0 and printed
+`tellurium 2.2.13 requires antimony>=3.1.0`. `requirements.txt` line 26 says,
+in as many words, *"do NOT `pip install tellurium`"* — the umbrella package
+pulls in libcombine and libnuml, which Terrium does not use and which fail to
+build where no wheels exist. The install restored exactly the pins this
+project requires. **The conflict is with a package the project tells you not
+to have.**
+
+### The real find
+
+**PyYAML is imported by two guards and declared in no requirements file.**
+They fail differently, and the difference is the whole point:
+
+- `check_ci_toolchain.py` → *"could not check, NOT checked and fine. Exiting 3."*
+- `check_ci_red_step_is_last.py` → unhandled `ModuleNotFoundError`, traceback
+
+A traceback is not a verdict. The selftest harness recorded the crash as a
+failing *check* rather than as a check that could not run.
+
+And `check_dependencies_declared.py` said *"every third-party import is
+declared"* the entire time — honestly, given its scope. It excludes
+`scripts/`, on reasoning written into the file: *"its imports are stdlib-only
+— if it ever grows third-party imports, those must be declared."*
+
+**The second sentence was a promise nothing kept.** `scripts/` grew one, and
+the check whose job was to notice had been told not to look. That is the
+shape this repository keeps finding, and it was sitting inside the guard for
+exactly this class of defect.
+
+Fixed: PyYAML declared, the crash given its sibling's three-state import,
+`scripts/` now scanned — proven by removing the declaration and watching it
+fail, then restored byte-identical.
+
+| | |
+|---|---|
+| Found | an undeclared dependency two guards need, a guard that crashes instead of reporting, and the guard for undeclared dependencies excluding the directory where one appeared |
+| Built | the declaration, the three-state import, the widened scan, and a `\d` SyntaxWarning fix |
+| Verified | the extended check catches the removal and passes on restore; both selftests exit 0 with PyYAML and 3 without; `make deps-check` OK on 15 declared deps |
+| **Now visible** | The literature suite runs and reports 5 failures — including `terrium_pitch_deck.pptx` claiming 1,852 tests against the repository's 2,332. I have not fixed these and cannot say whether they pre-date the session, because they could not run before. |
+| **Worth knowing** | The packages went to `advanced_analysis/venv`, not the repo's `.venv`. On a bare shell `make` still picks a Python without them and the original failures return. Use `TERRIUM_PYTHON=...` or activate that venv. |
+
+---
+
+## Pass: the first release (ADR 0201)
+
+`make dmg` produces a signed, verified **84 MB `Terrium.dmg`** containing an
+app that runs on a Mac with nothing installed — no Python, no Node, no
+internet.
+
+### The constraint came from your repository, not your request
+
+`scripts/demo.py` warns that a demo with its own rendering path is the worst
+kind of check that cannot fail. **A shipped app is a demo that ships**, with a
+longer life and a wider audience. So the app cannot produce a document of its
+own: it runs a frozen `report_lab.py` — the same builder the CLI calls — and
+shows the bytes that come back. The viewer typesets them and *reports any line
+it cannot typeset* rather than dropping it.
+
+### Five things were wrong, and measurement found each
+
+**The dependency set, three times.** Tracing `demo.py` showed *no*
+third-party imports — it runs the builder as a **subprocess**, so the trace
+saw only the parent. Then excluding numpy failed. Then excluding antimony
+failed, because `import Terium` pulls in the entire engine. Only building and
+*running* the frozen binary settled it.
+
+**`hdiutil`: "No space left on device" — on a disk with 111 GB free.** It had
+under-sized the volume it was creating. The message is true of that volume and
+false of everything a person would check.
+
+**Signing refused with "resource fork, Finder information, or similar
+detritus".** This repo is under `~/Desktop`, which macOS syncs to iCloud; the
+file provider re-adds attributes faster than `xattr -cr` clears them. The app
+is now built outside the synced tree.
+
+**A check that could not fail — in the file whose own header warns about
+them.** `viewer.html`'s unhandled-line list was unreachable: the paragraph
+branch absorbed every unrecognised line, so a blockquote rendered as ordinary
+prose and the warning banner could never appear. I wrote that bug while
+quoting the rule against it. The negative-case assertion caught it on the
+first run, which is the only reason I know.
+
+**And the build script shipped what it promised not to.** It printed the
+signing failure and carried on to build a DMG from an unsigned app. Now fatal.
+
+| | |
+|---|---|
+| Built | `Terrium.app` (Swift/WKWebView + frozen builder + committed fixture), `viewer.html`, `build_dmg.sh`, `test_viewer.mjs`, `make dmg` |
+| Verified | app-level headless `--selftest`; 11 viewer checks against *this build's* report, not a sample; signature verifies; DMG mounts and the app launches from it |
+| **You must do** | Sign with a **Developer ID Application** certificate and notarise. The only certificate here is *Apple Development*, which signs for this Mac only — a downloaded copy will say "damaged". `READ ME FIRST.txt` gives users the right-click → Open workaround meanwhile. |
+| **Nobody has looked at it** | Screen recording is unavailable in this environment. The app is verified headlessly; its layout, fonts and dark-mode palette have never been seen. **Open it before it reaches a student.** |
 ## Seventy-third pass — the build nothing compiled
 
 An audit rather than a hunt for a known defect. Measured on `874b191`
@@ -13651,7 +14345,7 @@ which evaluates to the set literal because an empty set is falsy.
 
 Both came back NOT CAUGHT, both correctly. An inert mutation reads exactly
 like an untested claim, and the only reason neither became a false
-"verified" line in ADR 0167 is that the harness graded them instead of me.
+"verified" line in ADR 0191 is that the harness graded them instead of me.
 
 | | |
 |---|---|
@@ -13743,7 +14437,7 @@ minute; theirs landed, mine aborted safely on an anchor mismatch.
 | | |
 |---|---|
 | Built | the settled units module (my half), verified against the other author's tests: 7/7, 15 → 0, engine green, jest e2e 32/32 |
-| Destroyed | the other author's untracked draft — unrecoverable, recorded in ADR 0168 rather than smoothed over |
+| Destroyed | the other author's untracked draft — unrecoverable, recorded in ADR 0192 rather than smoothed over |
 | Settled | via `docs/COORDINATION-sbml-units.txt`; the protocol is now written down as the standing substitute for the absent `make claim` |
 | Flake, named | one jest test failed at 429s under two-agent load and passed at 3.9s in isolation — contention, not defect, and the timeout was not raised to hide it |
 | **For the owner** | the 0146/0150 documents are the other author's per the channel agreement; the two doc-link reds stay until they exist. And the claim system the brief promises should exist — two agents just demonstrated the cost of its absence |
@@ -13770,7 +14464,7 @@ reasonably against stale reads.
 is**: a claim file naming paths, ceding the module ("your half is
 better"), splitting the rest, and asking for an answer in the file. The
 answer came nine hours later, matched the split exactly, and held. Their
-ADR 0168 records the collision from their side, including the destroyed
+ADR 0192 records the collision from their side, including the destroyed
 draft; nothing in it needed correcting.
 
 Substance, briefly: `declare_units` (theirs) writes the unitDefinitions,
@@ -13832,7 +14526,7 @@ URLs still 403 a robot under any user agent; the registrar confirms both
 DOIs, and the checker's "re-verify by hand" stands as its correct answer.
 
 **Housekeeping the release demanded:** CI's build-guards step now runs
-`--no-typescript` (honest since ADR 0167 made the flag mean what it
+`--no-typescript` (honest since ADR 0191 made the flag mean what it
 says; this job has no Node toolchain, and the api-server job typechecks
 where one exists). Four grandfathered mutation tables registered with
 reasons. The pitch deck's 1,852 updated to the measured 2,344.

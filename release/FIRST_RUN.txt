@@ -1,0 +1,33 @@
+Terrium 0.1.0 — first run
+=========================
+
+1. Drag Terrium.app to the Applications folder beside it.
+2. The first time only: RIGHT-CLICK Terrium.app and choose "Open", then
+   confirm. A normal double-click will be refused.
+
+Why the right-click is needed
+-----------------------------
+This build is not notarised by Apple. macOS quarantines anything downloaded
+without a Developer ID signature and reports it as "damaged". The app is not
+damaged; it is unsigned for distribution. Right-click → Open is macOS's own
+way to run it anyway, and you only do it once.
+
+If macOS still refuses, remove the quarantine flag directly:
+
+    xattr -dr com.apple.quarantine /Applications/Terrium.app
+
+What it does
+------------
+Opens a window and produces one lab report: the Michaelis-Menten kinetics of
+lactate dehydrogenase acting on pyruvate, with every parameter marked either
+"literature" (with the BRENDA reference it came from) or "yours" (a condition
+you chose, which no database reports).
+
+It makes no network requests. The BRENDA page is a saved copy inside the app,
+and the report tells you that itself rather than leaving you to assume.
+
+What it does not do
+-------------------
+This is the first release and it runs one worked example. It is not a general
+simulator yet: you cannot enter your own enzyme, and the other twelve domains
+the engine supports are not exposed. Those are in the command-line tool.

@@ -106,7 +106,13 @@ describe("LLM_PROVIDER selection reaches the actual HTTP request", () => {
     const headers = init!.headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer fake-groq-key");
     const body = JSON.parse(init!.body as string);
-    expect(body.model).toBe("llama-3.3-70b-versatile");
+    // Was "llama-3.3-70b-versatile" until Groq retired it: the id returned
+    // HTTP 404, which the resolver turns into null, so every query silently
+    // fell back to keyword matching. This assertion pinned the broken id and
+    // passed the whole time, because it checks what we send rather than
+    // whether the provider accepts it -- a mocked fetch cannot fail a 404.
+    // Checked against Groq's live /v1/models on 2026-08-23 (ADR 0190).
+    expect(body.model).toBe("openai/gpt-oss-120b");
   });
 
   it("openrouter: uses OpenRouter's URL and OPENROUTER_API_KEY", async () => {

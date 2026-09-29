@@ -39,6 +39,7 @@ Usage:
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,45 @@ EXPECTED_MAX_SKIPS = 0
 #: fails too -- same rule as EXPECTED_WIRING and NOT-YET-REPRODUCIBLE.txt.
 #: A baseline that can be added to but never emptied records a problem
 #: instead of fixing it.
+#: The module whose ABSENCE justifies an allowed skip, where there is one.
+#:
+#: `ALLOWED_SKIPS` says a skip is expected. It does not check that the
+#: reason is still true. If someone installs stdpopsim and
+#: test_popgen_resolver skips anyway -- for an import error, a fixture, any
+#: second cause -- the entry above would go on calling that expected, and
+#: the guard would report a documented setup working as documented while
+#: something else was quietly broken.
+#:
+#: So the entry is honoured only while the module is genuinely missing.
+#: Installed and still skipping is a skip nothing explains, and it goes red.
+#: An exemption that cannot expire is a rubber stamp -- the same rule the
+#: stale-entry check below applies from the other direction.
+#:
+#: Entries without a module here are unconditional: some skips are not about
+#: a package at all, and inventing a module name for them would be worse
+#: than leaving the condition off.
+ALLOWED_SKIP_REQUIRES_MODULE: dict[str, str] = {
+    "test_popgen_resolver": "stdpopsim",
+}
+
+
+def _allowed_reason_still_holds(key: str) -> bool:
+    """False when the skip's stated cause is absent and it skipped anyway.
+
+    One cause today: a package that turns out to be installed. A
+    platform-conditional variant lived here until 2026-09-27, for three
+    macOS-only doctor tests; it went when those tests stopped skipping --
+    they now simulate the macOS branch on every runner instead. Worth
+    knowing it existed, because the shape recurs: the entry has to expire on
+    the platform the test is about, or it rubber-stamps the one case that
+    matters.
+    """
+    module = ALLOWED_SKIP_REQUIRES_MODULE.get(key)
+    if module is not None and importlib.util.find_spec(module) is not None:
+        return False
+    return True
+
+
 ALLOWED_SKIPS: dict[str, str] = {
     "test_popgen_resolver": (
         "Needs `stdpopsim`, which lives in the optional "
@@ -123,7 +163,7 @@ def _skip_key(reason: str) -> str:
 
 
 def run_suite(path: Path) -> Tuple[int, int, List[str]] | None:
-    """Run one suite. Returns (passed, skipped, skip_reasons) or None.
+    r"""Run one suite. Returns (passed, skipped, skip_reasons) or None.
 
     RESULTS ARE READ FROM JUnit XML, NOT FROM THE TERMINAL OUTPUT.
 
@@ -251,8 +291,15 @@ def main() -> int:
         return 1
 
     if total_skipped > EXPECTED_MAX_SKIPS:
-        unexpected = [r for r in all_reasons if _skip_key(r) not in ALLOWED_SKIPS]
-        allowed_seen = {_skip_key(r) for r in all_reasons} & set(ALLOWED_SKIPS)
+        unexpected = [
+            r for r in all_reasons
+            if _skip_key(r) not in ALLOWED_SKIPS
+            or not _allowed_reason_still_holds(_skip_key(r))
+        ]
+        allowed_seen = {
+            _skip_key(r) for r in all_reasons
+            if _skip_key(r) in ALLOWED_SKIPS and _allowed_reason_still_holds(_skip_key(r))
+        }
 
         if allowed_seen:
             print(f"\nSkipped, and recorded as expected ({len(allowed_seen)}):")
@@ -279,7 +326,30 @@ def main() -> int:
 
         # An allowance whose skip stopped happening is stale, and a baseline
         # that only ever grows records a problem instead of fixing it.
-        stale = sorted(set(ALLOWED_SKIPS) - allowed_seen - CONDITIONAL_ON_ENVIRONMENT)
+        # An entry whose stated cause does not apply HERE is not stale: the
+        # test ran, which is what should happen. Only an entry whose cause
+        # still holds and which nonetheless stopped skipping is stale.
+        #
+        # Without this the conditional entries invert into a trap. On macOS
+        # the three UF_HIDDEN tests run, and on any machine with stdpopsim
+        # installed test_popgen_resolver runs -- and each would be reported
+        # as a stale allowance that should be deleted, which would delete
+        # the record that CI needs it.
+        #
+        # BOTH mechanisms, because they cover different causes. The
+        # predicate reasons about causes it can name -- a missing module, a
+        # platform -- and expires when the cause is absent.
+        # CONDITIONAL_ON_ENVIRONMENT carries the ones it cannot: the codegen
+        # selftest skips on an absent node toolchain, which is neither an
+        # importable module nor a sys.platform, so nothing here can ask
+        # whether that cause still holds. Subtracting the set as well keeps
+        # that entry out of the stale report without pretending the
+        # predicate understood it.
+        stale = sorted(
+            key
+            for key in set(ALLOWED_SKIPS) - allowed_seen - CONDITIONAL_ON_ENVIRONMENT
+            if _allowed_reason_still_holds(key)
+        )
         if stale:
             print(
                 f"\nFAIL: {len(stale)} entr(y/ies) in ALLOWED_SKIPS no longer "

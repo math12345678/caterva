@@ -165,6 +165,14 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     # is what makes it enforcing; the make target is what makes it usable.
     "check_ci_reproducible_locally": ("pytest",),
     "check_doc_paths_resolve": ("pytest",),
+    # Wired 2026-08-23 (ADR 0198). pytest only, on purpose. This guard names
+    # the declared dependencies that are not installed, and the machine most
+    # likely to be missing them is a contributor's -- which is where pytest
+    # runs. Deliberately NOT in verify_build or CI: CI installs from the
+    # manifest it would be checking, so it can only ever report success
+    # there, and a check that cannot fail where it runs is worse than no
+    # check. `make deps-check` and `make doctor` are the human entry points.
+    "check_dev_dependencies": ("pytest",),
     "check_dependency_licenses": ("ci", "pytest", "verify_build"),
     "check_non_affiliation_notice": ("ci", "pytest", "verify_build"),
     # Wired 2026-08-21 (ADR 0144). Every `BRENDA ref NNNNNN` printed in the
@@ -247,6 +255,9 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_env": ("ci",),
     "check_forbidden_packages": ("verify_build", "ci", "pytest"),
     "check_guard_wiring": ("verify_build", "ci"),
+    # CI only, on purpose: it starts 73 subprocesses, which is a
+    # minute nobody wants inside `verify_build --quick`.
+    "check_guards_refuse_on_empty": ("ci",),
     "check_literature_inventory": ("verify_build",),
     "check_license_consistency": ("verify_build",),
     "check_no_disabled_tests": ("verify_build",),

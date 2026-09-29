@@ -556,10 +556,20 @@ async function spawnScienceAgent(
         // on STDOUT and exits 1, so stderr is empty exactly when the reason
         // is known. Reading only stderr turned "BRENDA returned 500" into
         // "exited with code 1" (found 2026-09-28, BRENDA down for 2.7.1.1).
+        //
+        // The last two fallbacks are for the cases runnerError cannot parse:
+        // output that is not the expected JSON at all, which is worth
+        // printing verbatim rather than replacing with an exit status, and
+        // a child that wrote nothing anywhere, which is worth saying out
+        // loud because it looks identical to a silent success otherwise.
         const message =
-          stderr ||
+          stderr.trim() ||
           runnerError(trimmed) ||
-          `Science agent runner exited with code ${code}`;
+          (trimmed
+            ? `Science agent runner exited with code ${code}; ` +
+              `unparseable output: ${trimmed.slice(0, 4000)}`
+            : `Science agent runner exited with code ${code}; ` +
+              "the runner wrote nothing to stdout or stderr");
         reject(new Error(message));
         return;
       }

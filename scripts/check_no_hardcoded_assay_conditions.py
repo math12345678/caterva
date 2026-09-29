@@ -139,7 +139,25 @@ def offending_lines(text: str) -> list[tuple[int, str, str, str]]:
     return findings
 
 
+_MIN_FILES = 60
+#: Fewest files this scan must see before "clean" means anything.
+#:
+#: Measured, not guessed: run in an empty tree this guard printed its success
+#: line having read nothing. The claim is a universal over the files scanned,
+#: and over zero files every universal is true -- so a reader cannot tell a
+#: clean repository from a scan that has stopped reaching its input.
+#:
+#: The floor is this project's established remedy, not an invention here:
+#: `check_public_images_reviewed` refuses with "found only 0 public image(s),
+#: below the floor of 5. The scan is broken, not the pages."
+#:
+#: Set well below the real count so ordinary deletion does not trip it. It is
+#: a smoke alarm for a moved root or a glob that no longer matches, not a
+#: coverage target.
+
+
 def scan() -> list[str]:
+    scan.files_read = 0
     findings = []
     for root in SCAN_ROOTS:
         base = REPO / root
@@ -157,6 +175,7 @@ def scan() -> list[str]:
                 text = path.read_text(encoding="utf-8")
             except (OSError, UnicodeDecodeError):
                 continue
+            scan.files_read += 1
             for number, line, key, literal in offending_lines(text):
                 findings.append(
                     f"{path.relative_to(REPO)}:{number}: {key} = {literal}\n"
@@ -239,9 +258,19 @@ def main() -> int:
         )
         return 1
 
+    if scan.files_read < _MIN_FILES:
+        print(
+            f"FAIL: read only {scan.files_read} source file(s), below the "
+            f"floor of {_MIN_FILES}.\n"
+            "\nThe scan is broken, not the sources. Over zero files "
+            "\"no file hardcodes an assay condition\" is true and means "
+            "nothing."
+        )
+        return 1
+
     print(
-        "OK: no source file states an assay temperature or pH it did not "
-        "measure."
+        f"OK: {scan.files_read} source file(s) read; none states an assay "
+        "temperature or pH it did not measure."
     )
     return 0
 

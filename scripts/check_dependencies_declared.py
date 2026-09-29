@@ -131,8 +131,42 @@ def _local_module_stems() -> set[str]:
     return stems
 
 
+#: Directories scanned for third-party imports.
+#:
+#: `scripts/` was excluded until 2026-08-23 on the documented reasoning that
+#: it is "tooling, not product code or tests" and that "its imports are
+#: stdlib-only -- if it ever grows third-party imports, those must be
+#: declared". The second half was a promise nothing kept: two guards had
+#: grown `import yaml`, PyYAML appeared in no requirements file, and this
+#: check reported "every third-party import is declared" the whole time --
+#: honestly, given its scope, and falsely, given its sentence.
+#:
+#: An assumption that is stated and not enforced is the shape this repository
+#: keeps finding. It is enforced now: a guard that needs a package a
+#: contributor does not have fails on their machine, which is exactly the
+#: person this file protects.
+IMPORT_SCAN_DIRS = [*SOURCE_DIRS, REPO_ROOT / "scripts"]
+
+
+_MIN_FILES = 40
+#: Fewest files this scan must see before "clean" means anything.
+#:
+#: Measured, not guessed: run in an empty tree this guard printed its success
+#: line having read nothing. The claim is a universal over the files scanned,
+#: and over zero files every universal is true -- so a reader cannot tell a
+#: clean repository from a scan that has stopped reaching its input.
+#:
+#: The floor is this project's established remedy, not an invention here:
+#: `check_public_images_reviewed` refuses with "found only 0 public image(s),
+#: below the floor of 5. The scan is broken, not the pages."
+#:
+#: Set well below the real count so ordinary deletion does not trip it. It is
+#: a smoke alarm for a moved root or a glob that no longer matches, not a
+#: coverage target.
+
+
 def _iter_source_files():
-    for src_dir in SOURCE_DIRS:
+    for src_dir in IMPORT_SCAN_DIRS:
         if not src_dir.exists():
             continue
         for path in src_dir.rglob("*.py"):
@@ -212,9 +246,22 @@ def find_undeclared() -> dict[str, list[str]]:
 
 
 def main() -> int:
+    scanned = sum(1 for _ in _iter_source_files())
+    if scanned < _MIN_FILES:
+        print(
+            f"FAIL: found only {scanned} source file(s) to scan, below the "
+            f"floor of {_MIN_FILES}.\n"
+            "\nThe scan is broken, not the requirements. Over zero imports "
+            "\"every import is declared\" is true and means nothing."
+        )
+        return 1
+
     undeclared = find_undeclared()
     if not undeclared:
-        print("OK: every third-party import is declared in a requirements file.")
+        print(
+            f"OK: {scanned} source file(s) scanned; every third-party import "
+            "is declared in a requirements file."
+        )
         return 0
 
     print("Undeclared dependencies found:\n")
@@ -225,7 +272,8 @@ def main() -> int:
         if len(files) > 3:
             print(f"    ...and {len(files) - 3} more file(s)")
     print(
-        "\nThese modules are imported somewhere in caterva/ or Tests/ but "
+        "\nThese modules are imported somewhere in caterva/, Tests/ or "
+        "scripts/ but "
         "are not listed in any requirements*.txt file. A fresh "
         "install (like CI does) will fail to collect the affected tests."
     )

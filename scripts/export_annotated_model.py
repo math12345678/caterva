@@ -43,6 +43,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from caterva.core.model_provenance import (  # noqa: E402
     ParameterProvenance,
     annotate_antimony,
+    provenance_as_json,
     unsourced_parameters,
 )
 
@@ -312,6 +313,13 @@ def build_sbml(payload: dict) -> tuple[int, str, dict]:
         model_taxon_id=payload.get("modelTaxonId"),
     )
     return 0, outcome.sbml, {
+        # The provenance a program can read, rendered from the dict that was
+        # just handed to `annotate_sbml` -- so the JSON in the archive and
+        # the notes in the model are the same facts by construction, not by
+        # two functions agreeing (Bergmann, personal communication,
+        # 2026-08-25). Returned rather than rebuilt in `build_archive`,
+        # which does not have this dict and would have to re-derive it.
+        "provenanceJson": provenance_as_json(provenance),
         "unitsDeclared": units_outcome.declared,
         "unitsRefused": [
             {"symbol": symbol, "reason": reason}
@@ -348,13 +356,14 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
     SED-ML describing a time course nobody ran would be reproducible and
     wrong, which is worse than absent.
     """
-    code, sbml_text, detail = build_sbml(payload)
+    code, sbml_text, sbml_detail = build_sbml(payload)
     if code != 0:
         return code, b"", {"error": sbml_text}
 
     from caterva.core.combine_archive import (
         BIBTEX,
         CFF,
+        JSON,
         SBML_L3V2,
         SEDML_L1V3,
         ArchiveEntry,
@@ -440,6 +449,19 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
             ArchiveEntry("simulation.sedml", SEDML_L1V3, master=True),
         ),
     }
+    # The provenance, in a form a program can read (Bergmann, personal
+    # communication, 2026-08-25). Built from the SAME `provenance` dict the
+    # SBML notes and the Antimony annotation come from, a few lines above --
+    # one construction, three renderings, so no two of them can disagree
+    # about a value.
+    files["provenance.json"] = (
+        sbml_detail["provenanceJson"],
+        ArchiveEntry(
+            "provenance.json", JSON,
+            description="where each parameter's value came from (not a COMBINE standard)",
+        ),
+    )
+
     bibtex = payload.get("bibtex")
     if bibtex:
         files["citations.bib"] = (
@@ -477,7 +499,11 @@ def build_archive(payload: dict) -> tuple[int, bytes, dict]:
         temporary.unlink(missing_ok=True)
 
     return 0, data, {
-        **detail,
+        # Everything build_sbml reported, EXCEPT the rendered provenance
+        # JSON. That is already inside the archive; echoing it in the CLI's
+        # response would put the same document in two places on the wire and
+        # invite a caller to read the copy that is not the one shipped.
+        **{k: v for k, v in sbml_detail.items() if k != "provenanceJson"},
         "entries": sorted(files) + ["manifest.xml"],
         "hasCitations": bool(bibtex),
     }

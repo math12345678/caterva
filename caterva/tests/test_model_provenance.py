@@ -323,3 +323,118 @@ def test_the_header_explains_the_new_marker():
     header = annotate_antimony(model, {}).text
     assert "CITED BY YOU" in header
     assert "did not check" in header
+
+
+# ---------------------------------------------------------------------------
+# The provenance has to survive being used, not just being read
+# ---------------------------------------------------------------------------
+
+
+def _round_trip(antimony_text: str) -> str:
+    """Antimony -> SBML -> Antimony, through the real library.
+
+    The claim under test is about what a conversion keeps, so it is measured
+    against the thing that does the converting. A hand-written expectation
+    here would be an assertion about my beliefs, not about libSBML.
+    """
+    import pytest
+
+    antimony = pytest.importorskip(
+        "antimony", reason="antimony not installed; see requirements.txt"
+    )
+    antimony.clearPreviousLoads()
+    assert antimony.loadAntimonyString(antimony_text) >= 0, antimony.getLastError()
+    sbml = antimony.getSBMLString(antimony.getMainModuleName())
+    antimony.clearPreviousLoads()
+    assert antimony.loadSBMLString(sbml) >= 0, antimony.getLastError()
+    return antimony.getAntimonyString(antimony.getMainModuleName())
+
+
+def test_comments_do_not_survive_a_conversion_and_notes_do():
+    """The measurement this whole change rests on.
+
+    Lucian Smith, asked where per-parameter provenance should live in
+    Antimony given that a comment is the intuitive place (personal
+    communication, 2026-08-25): "the correct way to add human-readable text
+    to an element is to use 'notes'".
+
+    Asserted in BOTH directions on purpose. "The note survives" alone would
+    pass on a library that preserved everything, and would not establish
+    that the comment this project used for months was being discarded.
+    """
+    model = (
+        "model demo()\n"
+        "  km = 0.31;  // a comment nobody keeps\n"
+        '  km notes "a note that is kept"\n'
+        "  S = 10;\n"
+        "end\n"
+    )
+    back = _round_trip(model)
+    assert "a note that is kept" in back
+    assert "a comment nobody keeps" not in back
+
+
+def test_the_assay_conditions_survive_a_conversion():
+    """pH, temperature and buffer are the part that decides comparability.
+
+    They lived only in the footer's "PROVENANCE IN FULL" comment block, so
+    every one of them was discarded the first time anyone loaded an exported
+    model into a tool -- in the export whose entire purpose is that a value
+    travels with its source.
+    """
+    result = annotate_antimony(
+        "model demo()\n  km = 0.31;\nend\n",
+        {
+            "km": ParameterProvenance(
+                origin="resolved",
+                citation="BRENDA ref 740253",
+                organism="Homo sapiens",
+                source="BRENDA",
+                assay_ph=7.4,
+                assay_temperature_c=30.0,
+                assay_buffer="phosphate",
+                assay_unreported=("cofactors",),
+            )
+        },
+    )
+    back = _round_trip(result.text)
+    for fragment in ("740253", "pH 7.4", "30 C", "phosphate", "cofactors",
+                     "Homo sapiens"):
+        assert fragment in back, f"{fragment!r} was lost in conversion"
+
+
+def test_an_unsourced_parameter_is_still_marked_after_a_conversion():
+    """This file's own rule, applied to the artifact that leaves the building.
+
+    The header says "an absent comment would read as approval, so there is
+    never one". That holds only if the marker survives. Without it, a model
+    converted once arrives with citations on every parameter but this one,
+    and silence beside a number surrounded by sourced ones is the strongest
+    endorsement the file can give it.
+    """
+    result = annotate_antimony(
+        "model demo()\n  km = 0.31;\n  S = 10;\nend\n",
+        {"km": ParameterProvenance(origin="resolved", citation="BRENDA ref 740253")},
+    )
+    back = _round_trip(result.text)
+    assert "NO PROVENANCE RECORDED" in back
+
+
+def test_a_quote_in_a_citation_does_not_produce_an_unparseable_model():
+    """Antimony has no escape for `"` inside a notes string.
+
+    Measured: `\\"` is a syntax error ("unexpected element name"), so a
+    citation containing a quotation mark would produce a model file that
+    will not load. A tool that emits a broken model is worse than one that
+    emits a plain number, because the failure arrives later and elsewhere.
+    """
+    result = annotate_antimony(
+        "model demo()\n  km = 0.31;\nend\n",
+        {
+            "km": ParameterProvenance(
+                origin="resolved", citation='Smith 1998 "lactate dehydrogenase"'
+            )
+        },
+    )
+    back = _round_trip(result.text)  # asserts it loads at all
+    assert "Smith 1998" in back

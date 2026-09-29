@@ -108,7 +108,15 @@ def run_main(monkeypatch, fake_resolve, payload, taxon_id=None):
     without anything going red.
     """
     monkeypatch.setattr(fallback_logic, "resolve_kinetic_value", fake_resolve)
-    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", lambda *a, **k: taxon_id)
+    # A callable is accepted as well as a value. The lambda below ignores
+    # the organism, which means every stubbed lookup returns the SAME id --
+    # fine for the shape, and blind to the one thing the two keys exist to
+    # distinguish: `taxonId` is the organism the value was MEASURED in,
+    # `requestedTaxonId` the one the caller ASKED about, and in a
+    # cross-species result they differ. With one value for both, swapping
+    # them changes nothing and no test notices.
+    stub = taxon_id if callable(taxon_id) else (lambda *a, **k: taxon_id)
+    monkeypatch.setattr(enzyme_lookup, "fetch_taxon_id", stub)
     stdout = io.StringIO()
     monkeypatch.setattr(sys, "stdin", io.StringIO(json.dumps(payload)))
     monkeypatch.setattr(sys, "stdout", stdout)
@@ -978,3 +986,34 @@ def test_one_candidate_is_not_an_ambiguity(monkeypatch):
     result = json.loads(stdout.getvalue())
 
     assert result.get("source") != "ec_ambiguous"
+
+
+def test_the_two_taxon_keys_are_not_the_same_lookup(monkeypatch):
+    """`taxonId` and `requestedTaxonId` must be told apart.
+
+    Every other test here stubs the lookup with a single value, so both keys
+    come back identical and swapping them in the runner would change no
+    assertion. This one stubs with a function that names the organism it was
+    asked about, which is the only way the difference is visible.
+
+    The stub value is deliberately not a plausible taxon id. Stubbing Homo
+    sapiens to "9606" would be indistinguishable from the live answer, so
+    the test would keep passing if the stub were removed -- ADR 0128's
+    lesson, that an expected value which can arrive by accident proves
+    nothing.
+    """
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: golden_result(cross_species=True),
+        {"enzymeName": "lactate dehydrogenase", "substrate": "lactate",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27",
+         "allowCrossSpecies": True},
+        taxon_id=lambda organism: f"stub-taxon:{organism}" if organism else None,
+    )
+    assert result["taxonId"] == "stub-taxon:Sus scrofa", (
+        "taxonId must be the organism the value was MEASURED in"
+    )
+    assert result["requestedTaxonId"] == "stub-taxon:Homo sapiens", (
+        "requestedTaxonId must be the organism the caller ASKED about"
+    )
+    assert result["taxonId"] != result["requestedTaxonId"]

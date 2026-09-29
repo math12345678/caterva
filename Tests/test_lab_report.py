@@ -165,18 +165,23 @@ def test_the_absence_of_refusals_is_stated_rather_than_left_blank():
     """An empty section reads as an unfinished document. "Nothing was
     withheld" is a claim, and it is the one a reader wants.
 
-    `resolved={}` rather than the shared `report()` fixture, and that is
-    the whole point of the test. The default fixture resolves a real km
-    whose candidate rows mix diseased and healthy breast tissue, so it
-    now carries a source-mixture refusal -- which means this test was
-    asserting the no-refusals sentence against a document that had a
-    refusal in it, and had been failing rather than covering the branch
-    it names. The else-branch in `_refusals_section` was reachable only
-    by a report with nothing withheld, and no test built one.
+    CONSTRUCTS THE EMPTY CASE, rather than hoping the default has one.
+    Both halves of this were written twice, independently, and each caught
+    something the other did not -- so both are kept.
 
-    The refusal list is asserted empty first. Without that, a future
-    change that stopped emitting refusals entirely would make this test
-    pass for exactly the wrong reason.
+    The first version asserted on the shared `report()` fixture and passed
+    only because that fixture happened to resolve without refusing. The
+    default resolves a real km whose candidate rows mix diseased and healthy
+    breast tissue, so it carries a source-mixture refusal: this test was
+    asserting the no-refusals sentence against a document that HAD a
+    refusal, and had been failing rather than covering the branch it names.
+    The else-branch in `_refusals_section` is reachable only by a report with
+    nothing withheld, and no test built one. `resolved={}` builds it.
+
+    THE REFUSAL LIST IS ASSERTED EMPTY FIRST. Without that, a future change
+    that stopped emitting refusals entirely would make this test pass for
+    exactly the wrong reason -- the document would be silent and this would
+    read that silence as "nothing was withheld".
     """
     result = report(resolved={})
     assert result.refusals == []
@@ -186,6 +191,17 @@ def test_the_absence_of_refusals_is_stated_rather_than_left_blank():
         "Nothing was withheld: every parameter resolved to a cited value "
         "or was supplied by you." in text
     )
+
+    # And the claim must be conditional. Emitting that sentence
+    # unconditionally would satisfy the assertion above while telling a
+    # reader nothing was withheld from a report that withheld something --
+    # the exact inversion the section exists to prevent.
+    withheld = report()
+    assert withheld.refusals, (
+        "the default fixture no longer refuses anything, so this half of "
+        "the test proves nothing; give it a case that does refuse"
+    )
+    assert "Nothing was withheld" not in withheld.markdown
 
 
 def test_a_preparation_caveat_reaches_the_report():
@@ -408,3 +424,146 @@ def test_a_directory_that_is_not_a_repository_says_so(tmp_path):
     version, caveat = _lab_report._code_version(tmp_path)
     assert version == "unknown"
     assert caveat and "not a git checkout" in caveat
+
+
+def test_the_report_states_the_rate_law_it_actually_ran():
+    """The document's numbers are one equation's output. It says which.
+
+    The report claimed *"running the model at each"* and never named the
+    model. That became load-bearing when `release/app/lesson.js` started
+    explaining results in terms of `v = Vmax*S/(Km+S)`: the sentence was
+    true of the report it was written against and asserted about every
+    report, so a domain with a `km` and a different rate law would have been
+    handed an explanation that did not apply to it.
+
+    The fix is not for the lesson to guess better. It is for the document to
+    say, once, here -- and for the lesson to read it.
+    """
+    text = report(rate_law="Michaelis-Menten - v = Vmax*S/(Km + S)").markdown
+    assert "| Rate law | Michaelis-Menten - v = Vmax*S/(Km + S) |" in text
+
+
+def test_an_unstated_rate_law_is_reported_as_unstated():
+    """Not a default. "Assume Michaelis-Menten" is the substitution this
+    project exists to refuse, and it would be invisible: every number would
+    still be there, described by an equation nobody chose.
+    """
+    text = report().markdown
+    assert "| Rate law |" in text, "the row must be present even when unknown"
+    assert "not stated by the caller" in text
+    assert "Michaelis-Menten" not in text.split("## How this document was produced")[1]
+
+
+def test_the_stated_rate_law_matches_the_simulator_in_use():
+    """The `| Rate law |` row is a claim about the code, so check the code.
+
+    ADR 0180 added the row and named this as the gap it left: the rate law
+    was a bare string sitting near the import, so changing the simulator and
+    not the string would make every report assert an equation the run did
+    not use -- the exact lie the row exists to prevent, and silent.
+
+    So this reads the source rather than the runtime. Both places that pick a
+    simulator bind it to `simulator = <name>`, and every name bound that way
+    must appear in `RATE_LAW_BY_SIMULATOR`. Adding a simulator without saying
+    what it computes is then a red build, not a wrong document.
+
+    Reading the AST, not the text: a regex over the file would match the name
+    inside this docstring, in a comment, or in dead code, and would report
+    agreement it had not established.
+    """
+    import ast
+    import importlib.util
+    from pathlib import Path
+
+    source_path = Path(__file__).resolve().parents[1] / "scripts" / "report_lab.py"
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+
+    chosen: list[str] = []
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if (isinstance(target, ast.Name) and target.id == "simulator"
+                    and isinstance(node.value, ast.Name)):
+                chosen.append(node.value.id)
+
+    # A test that found no assignments would pass by examining nothing --
+    # which is this repository's most-recorded defect, and the reason the
+    # count is asserted rather than the loop simply running zero times.
+    assert len(chosen) == 2, (
+        f"expected both simulator choices (band and trajectory), found "
+        f"{len(chosen)}: {chosen}. If a call site moved, this test is "
+        f"looking in the wrong place and is no longer checking anything."
+    )
+
+    spec = importlib.util.spec_from_file_location("_report_lab_src", source_path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    for name in chosen:
+        assert name in module.RATE_LAW_BY_SIMULATOR, (
+            f"`{name}` is used to produce numbers in the report, and nothing "
+            f"says which rate law it implements. Add it to "
+            f"RATE_LAW_BY_SIMULATOR."
+        )
+        assert module.RATE_LAW == module.RATE_LAW_BY_SIMULATOR[name], (
+            f"the report states {module.RATE_LAW!r} but runs `{name}`, which "
+            f"is {module.RATE_LAW_BY_SIMULATOR[name]!r}."
+        )
+
+
+def test_the_reproducibility_claim_names_who_can_act_on_it(monkeypatch):
+    """A private commit hash is an instruction most readers cannot follow.
+
+    The section used to tell every reader to "check out that commit and
+    re-run". Jonathan Karr (BioSimulators), asked whether a commit hash is a
+    sufficient reproducibility baseline for a teaching tool, named the limit
+    (personal communication, 2026-08-25):
+
+        "If your source code is private, Git hashes will only be useful to
+         you because other people won't know what they mean."
+
+    Terrium's repositories are private and staying that way (ADR 0179), so
+    the instruction was addressed to a reader who cannot follow it -- in the
+    one section whose job is to say how the numbers can be checked.
+    """
+    import lab_report
+
+    # A clean tree, so the reproducible branch is the one under test. Without
+    # this the assertion passes or fails on whether the working copy happens
+    # to be committed, which is a fact about the machine and not the code.
+    monkeypatch.setattr(lab_report, "_code_version", lambda: ("abc1234", None))
+    text = "\n".join(lab_report._provenance_lines("Michaelis-Menten"))
+
+    assert "If you have access to the repository:" in text
+    assert "If you do not:" in text
+    assert "private" in text
+
+    # Karr's second point: a hash identifies code, not the environment. The
+    # same source under a different NumPy can produce different numbers.
+    assert "does not pin" in text
+    assert "requirements.txt" in text
+
+
+def test_a_dirty_tree_still_refuses_outright(monkeypatch):
+    """The new wording must not have softened the refusal it sits beside.
+
+    Splitting the claim into "if you have access" / "if you do not" is about
+    WHO can check it. Whether it can be checked at all is a separate
+    question, and an uncommitted working tree still answers it no -- so the
+    two branches must stay mutually exclusive.
+    """
+    import lab_report
+
+    monkeypatch.setattr(
+        lab_report, "_code_version",
+        lambda: ("abc1234", "the working tree was modified"),
+    )
+    text = "\n".join(lab_report._provenance_lines("Michaelis-Menten"))
+
+    assert "not reproducible as it stands" in text
+    assert "If you have access to the repository:" not in text, (
+        "a dirty tree must not also offer the instruction that assumes a "
+        "clean one"
+    )

@@ -1083,9 +1083,14 @@ ${colors.bright}Commands:${colors.reset}
     refuses to read one enzyme's rows under another's name.
 
   domains [--json]
-    Every model Caterva can run, each with a command that runs it.
-    The values in those commands are examples, not defaults -- Caterva
-    has no defaults for measured quantities.
+    Every domain the engine can actually simulate, asked OF the engine
+    rather than listed here. If it cannot be asked it says so and prints
+    nothing: a catalogue that looks authoritative and was never checked
+    is the failure this command exists to correct (ADR 0122).
+
+    Each comes with a command that runs it. The values in those commands
+    are examples, not defaults -- Caterva has no defaults for measured
+    quantities.
     ${colors.dim}Example:${colors.reset} domains
 
   catalog <ec-number> | --enzyme NAME [--json]
@@ -1223,6 +1228,12 @@ ${colors.bright}Commands:${colors.reset}
       --s0 VALUE           initial substrate -- an experimental condition
                            you choose, so it cannot be looked up
       --enzyme-conc VALUE  [E]0, needed for Vmax = kcat x [E]0
+      --yes                accept the names Terrium inferred without
+                           being asked. Only reached when the query
+                           names a system rather than an enzyme AND no
+                           terminal is attached to confirm with -- so
+                           it is for scripts and CI, where "nobody was
+                           there to ask" would otherwise stop the run.
       --km / --vmax        supply either yourself; user values win
       --model NAME         michaelis-menten (default) or a competitive /
                            uncompetitive / non-competitive inhibition model,

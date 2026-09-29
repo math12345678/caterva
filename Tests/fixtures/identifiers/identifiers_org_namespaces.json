@@ -1,13 +1,22 @@
 {
   "_captured_on": "2026-08-15",
+  "_captured_on_eco": "2026-08-28",
   "_source": "https://registry.api.identifiers.org/restApi/namespaces/search/findByPrefix?prefix=<prefix>",
   "_why": "These four patterns are the only thing standing between a resolvable annotation and a fabricated one. BRENDA is the cautionary case: its namespace covers EC NUMBERS ONLY (sample 1.1.1.1), so a BRENDA reference id such as 649716 has no identifiers.org form at all. Assuming otherwise would have emitted https://identifiers.org/brenda:649716 -- a machine-actionable-looking URI that resolves to nothing.",
   "namespaces": {
-    "pubmed": {
-      "mirId": "MIR:00000015",
-      "name": "PubMed",
-      "pattern": "^\\d+$",
-      "sampleId": "16333295"
+    "brenda": {
+      "_note": "EC numbers ONLY. NOT reference ids. See _why.",
+      "mirId": "MIR:00000071",
+      "name": "BRENDA",
+      "pattern": "^((\\d+\\.-\\.-\\.-)|(\\d+\\.\\d+\\.-\\.-)|(\\d+\\.\\d+\\.\\d+\\.-)|(\\d+\\.\\d+\\.\\d+\\.\\d+))$",
+      "sampleId": "1.1.1.1"
+    },
+    "combine.specifications": {
+      "_note": "Used for the FORMAT of each entry in a COMBINE archive manifest, not for citing anything -- so it is not mintable. Captured here so check_identifier_patterns_fresh.py watches a pattern the archive writer depends on.",
+      "mirId": "MIR:00000258",
+      "name": "COMBINE specifications",
+      "pattern": "^\\w+(\\-|\\.|\\w)*$",
+      "sampleId": "sed-ml.level-1.version-1"
     },
     "doi": {
       "mirId": "MIR:00000019",
@@ -15,31 +24,29 @@
       "pattern": "^(doi\\:)?10\\.\\d+/.*$",
       "sampleId": "10.1038/nbt1156"
     },
-    "taxonomy": {
-      "mirId": "MIR:00000006",
-      "name": "Taxonomy",
-      "pattern": "^\\d+$",
-      "sampleId": "9606"
-    },
     "ec-code": {
       "mirId": "MIR:00000004",
       "name": "Enzyme Nomenclature",
       "pattern": "^\\d+\\.-\\.-\\.-|\\d+\\.\\d+\\.-\\.-|\\d+\\.\\d+\\.\\d+\\.-|\\d+\\.\\d+\\.\\d+\\.(n)?\\d+$",
       "sampleId": "1.1.1.1"
     },
-    "brenda": {
-      "mirId": "MIR:00000071",
-      "name": "BRENDA",
-      "pattern": "^((\\d+\\.-\\.-\\.-)|(\\d+\\.\\d+\\.-\\.-)|(\\d+\\.\\d+\\.\\d+\\.-)|(\\d+\\.\\d+\\.\\d+\\.\\d+))$",
-      "sampleId": "1.1.1.1",
-      "_note": "EC numbers ONLY. NOT reference ids. See _why."
+    "eco": {
+      "mirId": "MIR:00000055",
+      "name": "Evidence Code Ontology",
+      "pattern": "^ECO:\\d{7}$",
+      "sampleId": "0000006"
     },
-    "combine.specifications": {
-      "mirId": "MIR:00000258",
-      "name": "COMBINE specifications",
-      "pattern": "^\\w+(\\-|\\.|\\w)*$",
-      "sampleId": "sed-ml.level-1.version-1",
-      "_note": "Used for the FORMAT of each entry in a COMBINE archive manifest, not for citing anything -- so it is not mintable. Captured here so check_identifier_patterns_fresh.py watches a pattern the archive writer depends on."
+    "pubmed": {
+      "mirId": "MIR:00000015",
+      "name": "PubMed",
+      "pattern": "^\\d+$",
+      "sampleId": "16333295"
+    },
+    "taxonomy": {
+      "mirId": "MIR:00000006",
+      "name": "Taxonomy",
+      "pattern": "^\\d+$",
+      "sampleId": "9606"
     }
   }
 }

@@ -1,0 +1,55 @@
+{
+  "_why": [
+    "ADR 0163's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "The record presented two mutations and was carrying them as prose. This",
+    "encodes them so a reader can re-run the claim instead of trusting it --",
+    "which is the whole point of ADR 0069's harness, written after the",
+    "hand-run one had given a wrong answer three separate ways.",
+    "",
+    "Both mutations target the same line of README.md:",
+    "",
+    "    km    0.03 mM    brenda_exact  BRENDA ref 286469",
+    "",
+    "and the argument is that neither is detectable by reading strings.",
+    "",
+    "A. `0.03` -> `0.398`. A REAL value on that BRENDA page -- the other",
+    "candidate row, under the same reference. Every string guard passes it,",
+    "because 0.398 does occur on the page.",
+    "",
+    "B. `286469` -> `286442`. A REAL lactate dehydrogenase reference. Every",
+    "string guard passes it too, because 286442 is a genuine LDH ref.",
+    "",
+    "Only the PAIR is wrong in each case, and only running the resolver can",
+    "check a pair. That is the layer ADR 0162 named as open and this one",
+    "closed, and it is why the test command below runs the front-page test",
+    "rather than any of the citation-string guards -- those are correct and",
+    "would report OK on both mutations.",
+    "",
+    "Set file added 2026-08-24, after the record itself. The mutations are",
+    "taken verbatim from its own table; nothing here is a new claim.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0163-front-page-pair.json"
+  ],
+  "test": "cd Tests && python3 -m pytest test_front_page_example_is_what_the_tool_produces.py --no-header -p no:cacheprovider",
+  "mutations": [
+    {
+      "id": "A",
+      "description": "wrong value, right reference: 0.03 -> 0.398",
+      "_claimed": "caught by the front-page test, which runs the resolver",
+      "_note": "0.398 is the other candidate row on the same page under the same reference. check_citations_match_their_enzyme reports OK on this, correctly -- the value does occur on the page. Only the pairing is wrong, and only the resolver knows the pairing.",
+      "file": "README.md",
+      "find": "  km    0.03 mM    brenda_exact  BRENDA ref 286469",
+      "replace": "  km    0.398 mM    brenda_exact  BRENDA ref 286469"
+    },
+    {
+      "id": "B",
+      "description": "right value, a real reference belonging to the other row: 286469 -> 286442",
+      "_claimed": "caught by the front-page test, which runs the resolver",
+      "_note": "286442 is a genuine LDH reference, so every string-matching guard passes. The resolver returns 286469 for this substrate and organism, and nothing short of running it can tell the two apart.",
+      "file": "README.md",
+      "find": "  km    0.03 mM    brenda_exact  BRENDA ref 286469",
+      "replace": "  km    0.03 mM    brenda_exact  BRENDA ref 286442"
+    }
+  ]
+}

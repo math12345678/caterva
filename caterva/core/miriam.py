@@ -128,7 +128,27 @@ NAMESPACES, PATTERNS_CAPTURED_ON = _load()
 #: holds is a reference id, which that namespace does not cover. Listing it
 #: here would let a future caller pass an EC number and a reference id to
 #: the same function and get a URI for both.
-MINTABLE = ("pubmed", "doi", "taxonomy", "ec-code")
+MINTABLE = ("pubmed", "doi", "taxonomy", "ec-code", "eco")
+
+#: Namespaces whose accessions already carry the prefix, e.g. `ECO:0000269`.
+#:
+#: identifiers.org resolves those with a SLASH, not a colon. Measured, not
+#: assumed:
+#:
+#:     https://identifiers.org/eco:ECO:0000269   -> 404
+#:     https://identifiers.org/eco/ECO:0000269   -> 200
+#:
+#: The colon form is correct for every namespace Terrium already mints --
+#: pubmed, taxonomy, doi and ec-code all resolve, checked at the same time --
+#: so this is an exception, not a correction. ECO is the exception because
+#: `eco:ECO:0000269` is a double prefix and the resolver rejects it.
+#:
+#: Worth stating plainly: adding `eco` to MINTABLE without this would have
+#: emitted a link that 404s, into an SBML annotation whose whole purpose is
+#: to be followable. `mint()`'s own refusal message already names that
+#: outcome -- "minting it anyway would produce a link that does not
+#: resolve" -- about a case it could not yet detect.
+_PREFIX_EMBEDDED_IN_ACCESSION = frozenset({"eco"})
 
 
 @dataclass(frozen=True)
@@ -184,6 +204,8 @@ def mint(prefix: str, accession: str) -> MintResult:
             f"link that does not resolve.",
         )
 
+    if prefix in _PREFIX_EMBEDDED_IN_ACCESSION:
+        return MintResult(f"{BASE}/{prefix}/{accession}")
     return MintResult(f"{BASE}/{prefix}:{accession}")
 
 

@@ -109,6 +109,28 @@ HISTORICAL_DOCS_NOT_CHECKED = [
 ]
 
 # Suites `make test` runs, in the order it runs them.
+#: THE DOCUMENTED NUMBERS ARE CI'S, AND THE LITERATURE ONE DEPENDS ON AN
+#: OPTIONAL PACKAGE.
+#:
+#: `Tests/test_popgen_resolver.py` opens with
+#: `pytest.importorskip("stdpopsim")`, and stdpopsim is declared ONLY in
+#: requirements-popgen.txt -- which `make setup` and CI both skip, because it
+#: is GPL-3.0 and kept separate from Apache-2.0 Terrium on purpose (see that
+#: file). So the literature suite collects 1,180 tests where stdpopsim is
+#: absent and 1,201 where it is present: the same command, two honest
+#: answers, 21 apart.
+#:
+#: README records CI's figure, because CI is where this guard decides the
+#: build. If you have installed requirements-popgen.txt and this guard tells
+#: you the literature count is 21 short, that is why, and the README is not
+#: wrong -- your environment is a superset of the documented one. Do not
+#: "fix" it by writing 1,201; that reddens CI for everyone else.
+#:
+#: Learned the hard way, 2026-09-24: these counts were measured on a machine
+#: missing python-libsedml (which HIDES tests) and carrying stdpopsim (which
+#: ADDS them). The engine number came out exactly right and the literature
+#: number was 21 too high, because the search was for things absent HERE and
+#: never for things absent THERE.
 SUITES = [
     ("engine", REPO_ROOT / "caterva" / "tests"),
     ("literature", REPO_ROOT / "Tests"),
@@ -997,7 +1019,54 @@ def main() -> int:
         #
         # It is said out loud instead: written, not written because
         # unknown, or nothing to write.
-        if skipped:
+        # A suite can collect "successfully" and still be short.
+        #
+        # pytest reports no error when a whole module skips at import --
+        # `tests.test_combine_archive: collection skipped` -- so the run
+        # looks clean and simply contains fewer tests. Writing that number
+        # produces an authoritative-looking undercount, which is how README
+        # came to claim 1,179 engine tests against CI's 1,217: --write was
+        # run under an interpreter without cffconvert and python-libsedml.
+        # Twice, by the same author, the second time while fixing the first.
+        #
+        # `skipped` above cannot see it, because nothing failed. So the
+        # dependency set is checked directly, and test counts are withheld
+        # for the same reason: a number nobody could have measured here.
+        undercounting: list[str] = []
+        try:
+            import importlib.util as _il
+            _spec = _il.spec_from_file_location(
+                "_dev_deps", Path(__file__).parent / "check_dev_dependencies.py")
+            if _spec and _spec.loader:
+                _dd = _il.module_from_spec(_spec)
+                _spec.loader.exec_module(_dd)
+                _declared, _problem = _dd.parse_requirements(
+                    Path(__file__).parent.parent / "requirements-dev.txt")
+                if _problem is None:
+                    undercounting = _dd.missing_python(_declared)
+        except Exception:
+            # Could not determine. Say nothing rather than claim the
+            # environment is complete.
+            undercounting = []
+
+        if undercounting:
+            # Withholding the KEYS, not setting a flag. `rewrite` gates on
+            # `{"make_test", "engine", "literature"} <= set(actual)` and
+            # writes whatever it finds there; `skipped` is a local that it
+            # never sees. Setting it printed this warning and rewrote the
+            # counts anyway -- the guard announced a refusal it had not
+            # performed, which is worse than the bug it was added to stop.
+            for _k in ("make_test", "engine", "literature"):
+                actual.pop(_k, None)
+            print(
+                "REFUSING to write test counts: this interpreter is missing "
+                + ", ".join(undercounting)
+                + ".\n      A module that skips at import is not collected, so the "
+                "suite runs clean\n      and counts short. Guard and ADR counts "
+                "still will be.\n      Re-run with a fully installed environment "
+                "(see `make deps-check`)."
+            )
+        elif skipped:
             print(
                 "NOTE: at least one suite could not be collected, so the "
                 "test counts are\n      unknown and will NOT be written. "

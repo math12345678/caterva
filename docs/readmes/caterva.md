@@ -2,7 +2,7 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-The simulation engine. 64 files, 38 test modules, 2,988 engine tests.
+The simulation engine. 64 files, 38 test modules, 3,013 engine tests.
 
 Michaelis-Menten (plain and competitively inhibited), composed enzyme
 mechanisms, Gillespie SSA (first-order decay, bimolecular, replicate
@@ -34,7 +34,7 @@ Physical impossibility is rejected (`ok=False`); implausible-but-real is
 flagged (`ok=True, flagged=True`), never silently accepted or silently
 rejected.
 
-See [`documents`](https://github.com/Terrium-sim/documents) for the constitution and the 176 ADRs.
+See [`documents`](https://github.com/Terrium-sim/documents) for the constitution and the 204 ADRs.
 
 ## Licence, and one thing worth knowing
 

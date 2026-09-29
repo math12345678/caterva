@@ -99,6 +99,25 @@ class TestSuccesses:
     def test_well_formed_accessions_mint(self, prefix, accession, expected):
         assert mint(prefix, accession).uri == expected
 
+    #: Namespaces whose registry entry contradicts itself, and how.
+    #:
+    #: Not a transcription error on our side -- checked against the live
+    #: registry on 2026-08-28. identifiers.org publishes ECO with
+    #: `pattern: ^ECO:\d{7}$` and `sampleId: 0000006`, and the sample does
+    #: not match the pattern. The pattern is the one that is right: the
+    #: published sample 404s and the pattern-conforming form resolves.
+    #:
+    #:     https://identifiers.org/eco/0000006       -> 404
+    #:     https://identifiers.org/eco/ECO:0000006   -> 200
+    #:
+    #: The fixture keeps the registry's value verbatim. It is a CAPTURE, and
+    #: editing it to be self-consistent would turn a record of what the
+    #: registry says into a record of what we wish it said -- while quietly
+    #: destroying the evidence for this exemption.
+    _REGISTRY_SAMPLE_IS_INCONSISTENT = {
+        "eco": "sampleId omits the ECO: prefix its own pattern requires",
+    }
+
     def test_every_registry_sample_id_mints_in_its_own_namespace(self):
         # The registry publishes a sample for each namespace. If Caterva
         # cannot mint the registry's own example, Caterva's copy of the
@@ -106,6 +125,17 @@ class TestSuccesses:
         # fixture without needing the network.
         for prefix in MINTABLE:
             sample = NAMESPACES[prefix].sample_id
+            if prefix in self._REGISTRY_SAMPLE_IS_INCONSISTENT:
+                # Asserted in the OTHER direction, so the exemption cannot
+                # become a blind spot: the sample must still be rejected for
+                # the documented reason. If the registry fixes its entry
+                # this fails, and the exemption should then go.
+                assert not mint(prefix, sample).minted, (
+                    f"{prefix}'s sample now mints; the registry may have "
+                    f"corrected its entry, so remove the exemption "
+                    f"({self._REGISTRY_SAMPLE_IS_INCONSISTENT[prefix]})"
+                )
+                continue
             assert mint(prefix, sample).minted, f"{prefix} rejects its own sample {sample}"
 
 

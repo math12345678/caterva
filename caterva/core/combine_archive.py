@@ -36,11 +36,51 @@ SBML **from the archive**, and compares against the original trajectory. A
 schema-valid experiment that reproduces a different curve is still a broken
 export.
 
-NOT verified here: that other tools accept it. libSEDML is the reference
-implementation and that is good evidence, not proof. No COPASI or Tellurium
-install exists in this environment to try it against, and saying "opens in
-COPASI" without having opened it in COPASI is the kind of claim this
-project does not make elsewhere.
+TELLURIUM HAS NOW OPENED ONE (2026-08-28)
+-----------------------------------------
+This paragraph used to say no Tellurium install existed to try it against,
+and that claiming "opens in Tellurium" without having done so was not a
+claim this project makes. One was installed and it was tried:
+
+    te.executeCombineArchive("terrium_export.omex")   -> succeeded
+
+Tellurium 2.2.13.1 opened the archive, read the SED-ML, resolved all four
+data generators (time, [S], [P], J0) against the model, and ran the exact
+time course the export recorded -- `simulate(start=0.0, end=10.0,
+steps=50)`. Loading `model.xml` alone and simulating gives a last row of
+[10.0, 7.5857, 2.4143], identical to four decimal places to what Terrium's
+own in-process run produces from the same parameters.
+
+WHAT THAT DOES AND DOES NOT ESTABLISH
+-------------------------------------
+It establishes that the archive is readable and runnable by a tool that did
+not write it, which is what this module exists for.
+
+It is NOT two independent solvers agreeing. Terrium integrates through
+roadrunner and so does Tellurium, so the matching trajectory says the
+exported SBML reconstructs the same model by a different route -- fresh
+parse of the written bytes rather than the in-process object -- not that two
+implementations of the mathematics concur.
+
+COPASI 4.46.300 was tried too, via basico, and it loads and simulates the
+exported model. That pairing IS two independent solvers: COPASI does not use
+roadrunner, and its substrate at t=10 is 7.585661077467333 against Terrium's
+7.585660864700605 -- a relative difference of 2.8e-08, which is the size of
+two adaptive integrators disagreeing at their default tolerances rather than
+a difference in the model.
+
+So the plural above is half measured. JWS Online and the BioSimulators
+runners are still inference. COPASI was handed `model.xml` rather than the
+archive, because `run_combine_archive` is absent from basico 0.86.
+
+A NOTE FOR ANYONE TRYING THIS
+-----------------------------
+Tellurium cannot be installed alongside Terrium's pinned environment.
+requirements.txt pins `antimony==2.14.0`; tellurium 2.2.13.1 requires
+`antimony>=3.1.0`, and pip resolves that by upgrading antimony out from
+under the pin. The check above was run with two separate virtualenvs -- one
+pinned, which exported, and one with tellurium, which read -- which is also
+the arrangement a real consumer is in.
 
 WHY THE FORMAT URIs ARE `http://`
 ---------------------------------
@@ -78,6 +118,28 @@ BIBTEX = "application/x-bibtex"
 #: identifier in the file whose job is saying truthfully what each entry is.
 CFF = "application/x-yaml"
 PLAIN_TEXT = "text/plain"
+
+#: The provenance report, as a file a program can read.
+#:
+#: Frank Bergmann, asked whether SED-ML should carry per-parameter
+#: provenance, said it should not, and said where it should go instead
+#: (personal communication, 2026-08-25):
+#:
+#:   "What I'd suggest is to use a combination, perhaps stored as COMBINE
+#:    archive, that would contain: the sbml model, the sed-ml experiment,
+#:    some kind of structured format of your provenance report (could be
+#:    json, markdown, anything really), and all the other data..."
+#:
+#: The archive already carried the first two. The provenance existed only
+#: inside SBML `notes`, which is prose -- and his objection to that is not
+#: that it is wrong but that "this makes automated extraction difficult".
+#:
+#: Eduard Kerkhoven arrived at the same file from the other direction, on
+#: whether provenance belongs per-parameter or in Git history (personal
+#: communication, 2026-08-25): "It is essential though that the metadata is
+#: provided in flat-text format, so that Git can easily diff any changes."
+#: JSON with sorted keys and one field per line diffs; an XML blob does not.
+JSON = "application/json"
 
 MANIFEST_PATH = "manifest.xml"
 

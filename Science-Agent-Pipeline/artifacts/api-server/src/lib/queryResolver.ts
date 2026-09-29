@@ -1391,11 +1391,34 @@ interface DomainDefaults {
   keywords: string[];
   reasoning: string;
   modelCitations: string[];
+  /**
+   * The domain this one is a special case of, when it is one.
+   *
+   * Four pairs here are nested rather than merely similar: an SEIR epidemic
+   * *is* an SIR epidemic with one more compartment; a bimolecular Gillespie
+   * run *is* a Gillespie run; competitive inhibition *is* Michaelis-Menten
+   * with an inhibitor; two-locus Wright-Fisher *is* Wright-Fisher at two
+   * loci.
+   *
+   * That structure breaks the scoring rule. Summed scores treat every
+   * matched term as evidence for one domain over the others, but a parent's
+   * terms are true of the child as well -- "infection", "spreads" and
+   * "disease" describe an SEIR epidemic exactly as well as an SIR one. So
+   * the parent accumulates score on words that do not discriminate, and
+   * outvotes the child's one genuinely decisive phrase. Measured: "an
+   * infection spreads when there's a hidden incubation phase" scored SIR 16
+   * ("infection" + "spreads") against SEIR 10 ("incubation"), and the query
+   * that says incubation got the model without one.
+   *
+   * See `resolveNesting`.
+   */
+  refines?: SimulationDomain;
 }
 
 const DOMAIN_DEFAULTS: DomainDefaults[] = [
   {
     domain: "mm_competitive_inhibition",
+    refines: "mm",
     parameters: {
       km: 2,
       ki: 1.0,
@@ -1406,6 +1429,14 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
       points: 51,
     },
     keywords: [
+      "active site",
+      "competes",
+      "competing",
+      "compete",
+      "outcompete",
+      "rival ligand",
+      "occupies the active site",
+      "blocks the active site",
       "competitive inhibition",
       "competitive",
       "inhibition",
@@ -1425,6 +1456,21 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "mm",
     parameters: { km: 2, vmax: 5, s0: 10, end: 10, points: 51 },
     keywords: [
+      "enzyme kinetics",
+      "reaction rate",
+      "turnover",
+      "catalysis",
+      "catalytic",
+      "initial velocity",
+      "product formation",
+      "progress curve",
+      "saturates",
+      "saturation",
+      "dehydrogenase",
+      "protease",
+      "ethanol",
+      "purified enzyme",
+      "digested",
       "enzyme",
       "michaelis",
       "km",
@@ -1482,8 +1528,17 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
   },
   {
     domain: "gillespie_ssa_bimolecular",
+    refines: "gillespie_ssa",
     parameters: { a0: 100, b0: 100, k: 0.005, end: 10 },
     keywords: [
+      "collide",
+      "collision",
+      "receptor",
+      "ligand",
+      "pairing",
+      "pair up",
+      "both reactants",
+      "form a product",
       "bimolecular",
       "second order",
       "second-order",
@@ -1503,6 +1558,13 @@ const DOMAIN_DEFAULTS: DomainDefaults[] = [
     domain: "gillespie_ssa",
     parameters: { a0: 1000, k: 0.5, end: 10 },
     keywords: [
+      "discrete event",
+      "molecule counts",
+      "low copy number",
+      "copy number",
+      "first-order decay",
+      "one reaction at a time",
+      "run to run",
       "gillespie",
       "stochastic",
       "ssa",
@@ -1676,6 +1738,447 @@ function validateArrayOverride(key: string, arr: number[]): void {
  * Array syntax requires `=` or `:` so it cannot be confused with a scalar
  * followed by unrelated text.
  */
+/**
+ * Classify a query to a simulation domain using the keyword table above.
+ *
+ * This is the resolver's behaviour when no LLM is configured, and it is the
+ * baseline the LLM classifier has to beat. It was extracted from
+ * `resolveQuery` rather than copied so that a benchmark measures the code
+ * that actually runs -- two implementations of one classification would
+ * drift, and the benchmark would then be measuring the copy.
+ *
+ * `matched` is the part callers could not previously see. First-match-wins
+ * over an ordered table means a query that matches nothing still yields a
+ * domain -- `mm`, because that is the fallback -- and the caller had no way
+ * to tell that apart from a genuine `mm` match. Reporting the two as one
+ * fact is what makes the keyword baseline look more accurate than it is:
+ * every unrecognised query is silently scored as an enzyme-kinetics query.
+ */
+export interface KeywordClassification {
+  defaults: DomainDefaults;
+  /** true when some keyword actually matched; false when nothing matched
+   *  and the `mm` fallback was substituted. */
+  matched: boolean;
+}
+
+/**
+ * Does `term` occur in `text`?
+ *
+ * This was briefly a word-boundary regex, on the reasoning that plain
+ * `includes` lets a short keyword fire on a word that merely contains it --
+ * "ki" inside "kinetics", "ring" inside "during". The reasoning is sound and
+ * the measurement did not support it: across all three labelled sets (131
+ * queries) the regex changed not one classification, and left one more query
+ * matching nothing than the substring test did.
+ *
+ * So it is gone. Summing scores across a domain's matched terms already
+ * makes a stray two-character hit irrelevant -- a spurious "ki" scores 2
+ * against an "enzyme kinetics" match scoring 15 -- which is why the
+ * pathology is real in principle and absent in practice. Keeping the regex
+ * would have meant carrying escaping logic, a lookbehind, and a plausible
+ * story, in exchange for nothing anybody could observe.
+ *
+ * If a future keyword is short enough to matter on its own, this is the
+ * decision to revisit, with a measurement rather than the argument.
+ */
+/**
+ * Words that turn a mention of a thing into a statement about its absence.
+ *
+ * Deliberately short and literal. Every entry here is a word that, sitting
+ * just before a keyword, reverses what that keyword is evidence for. A
+ * longer list would start catching hedges ("hardly", "rarely") that weaken a
+ * mention without negating it, and this mechanism has no way to represent
+ * "weaker".
+ */
+const NEGATORS = new Set([
+  "no",
+  "not",
+  "without",
+  "absent",
+  "absence",
+  "free",
+  "lacking",
+  "lack",
+  "lacks",
+  "excluding",
+  "minus",
+  "never",
+]);
+
+/** How many words before a keyword are searched for a negator. */
+const NEGATION_WINDOW_WORDS = 4;
+
+function isNegatedAt(lowerText: string, index: number): boolean {
+  const before = lowerText.slice(Math.max(0, index - 48), index);
+  const words = before.split(/[^a-z']+/).filter(Boolean);
+  return words
+    .slice(-NEGATION_WINDOW_WORDS)
+    .some((word) => NEGATORS.has(word));
+}
+
+/**
+ * Does `term` occur in `text`, other than as something the query denies?
+ *
+ * Plain substring matching scored these four real queries as competitive
+ * inhibition:
+ *
+ *   "...as I add more substrate, no inhibitor involved."
+ *   "...the typical hyperbolic curve for an enzyme without any inhibitors?"
+ *   "Can you run a kinetic assay without any inhibitors present?"
+ *   "What's the velocity curve like when no inhibitor is blocking the enzyme?"
+ *
+ * Every one of them says, in so many words, that there is no inhibitor --
+ * and every one was routed to the inhibitor model because the word
+ * "inhibitor" appeared. A student who took the trouble to rule something out
+ * got the model they ruled out.
+ *
+ * So a keyword only counts where at least one of its occurrences is not
+ * preceded by a negator. This is a genuinely shallow mechanism: it cannot
+ * represent scope, and "not sure how the inhibitor works" reads as negated
+ * when it is not. Whether that trade is worth taking is a measurement, and
+ * it is in ADR 0192 rather than in this comment.
+ */
+/**
+ * Every position at which `term` occurs in `lowerText`.
+ *
+ * Substring, not word-boundary. That decision has now been made twice and
+ * measured twice, and the second time nearly went the other way.
+ *
+ * ADR 0191 deleted a word-boundary regex because across 131 queries it
+ * changed no classification. Then this record's vocabulary added `"ki"` --
+ * two characters, a genuine keyword for the inhibition model -- and `"ki"`
+ * occurs inside `"lacking"`. "Run it lacking an inhibitor." selected the
+ * inhibition model on a fragment of the word ruling it out, and negation
+ * could not help: the fragment sits inside a word no negator precedes.
+ *
+ * The obvious repair was to bring the regex back. Measured, it costs
+ * accuracy on two of the three independent fixtures (82.1% -> 80.8%,
+ * 54.2% -> 52.8%) because boundaries also stop `"decay"` matching
+ * `"decaying"` and the like, and it raises the fallback count by a quarter.
+ *
+ * The defect was never the matcher. It was a two-character keyword, in a
+ * table whose scoring assumes terms are long enough to mean something. `ki`
+ * is a parameter name rather than something a student writes in a sentence,
+ * and `extractParameterOverrides` already reads `ki=0.5` on its own path, so
+ * it was removed from the keyword list and the matcher left alone.
+ *
+ * What to do if this recurs: check the shortest term in the table before
+ * reaching for the matcher.
+ */
+function termOccurrences(lowerText: string, term: string): number[] {
+  const needle = term.toLowerCase();
+  const found: number[] = [];
+  let i = lowerText.indexOf(needle);
+  while (i !== -1) { found.push(i); i = lowerText.indexOf(needle, i + needle.length); }
+  return found;
+}
+
+function matchesTerm(text: string, term: string): boolean {
+  const haystack = text.toLowerCase();
+  return termOccurrences(haystack, term).some(
+    (index) => !isNegatedAt(haystack, index),
+  );
+}
+
+/**
+ * Classify a query to a simulation domain by scoring, not by table order.
+ *
+ * The previous rule was first-match-wins over an ordered list, and ADR 0190
+ * measured what that costs. Because `mm_competitive_inhibition` sits early
+ * and lists the bare word "inhibition", and `pcr` lists the bare word
+ * "cycles", an earlier domain's single generic word beat a later domain's
+ * exact name: "predator-prey cycles in an ecosystem" classified as PCR.
+ *
+ * Scoring by specificity fixes that without reordering anything. A matched
+ * term scores its own length, so a longer, more specific phrase outranks a
+ * short generic one no matter where each sits in the table -- "predator-prey"
+ * (13) beats "cycles" (6). Table order survives only as the tie-break, so
+ * the previous behaviour still decides genuinely equal matches.
+ *
+ * Scores are summed rather than maxed: a query matching several of a
+ * domain's terms is better evidence for it than a query matching one.
+ *
+ * `matched` stays the third state. Nothing here changes the fact that a
+ * query matching no term at all is a query this classifier cannot answer,
+ * and saying so is the whole reason the field exists.
+ */
+/**
+ * Terms a child domain has that its parent does not.
+ *
+ * These are the only words that can distinguish the two. A term both lists
+ * -- if any -- is evidence for the pair, not for either member, and counting
+ * it would recreate the problem at one remove.
+ */
+function distinctiveTerms(child: DomainDefaults, parent: DomainDefaults): string[] {
+  const parentTerms = new Set(parent.keywords.map((k) => k.toLowerCase()));
+  return child.keywords.filter((k) => !parentTerms.has(k.toLowerCase()));
+}
+
+/**
+ * Promote a scored winner to the nested special case the query asked for.
+ *
+ * The rule: if the winning domain has a child that `refines` it, and any of
+ * that child's *distinctive* terms appear in the query, the child wins --
+ * regardless of score.
+ *
+ * "Regardless of score" is the whole point and deserves the scrutiny. It is
+ * not a tie-break or a weight; a single distinctive phrase beats any amount
+ * of accumulated parent vocabulary. That is justified only because the
+ * relationship is genuine containment: every parent term is true of the
+ * child too, so no quantity of parent evidence is evidence *against* the
+ * child. "Incubation phase" says SEIR and nothing else does, however many
+ * times a query also says "infection" and "spreads".
+ *
+ * It is applied repeatedly, so a chain (were one ever declared) resolves to
+ * its most specific member. A cycle would hang, so the walk is bounded by
+ * the number of domains and asserts rather than looping.
+ *
+ * The obvious failure mode is over-promotion: a query mentioning an
+ * inhibitor only in passing gets the inhibition model. Two things bound it
+ * -- the negation handling of ADR 0192, which is why "no inhibitor involved"
+ * does not promote, and the requirement that the term be distinctive. What
+ * remains is measured in ADR 0194 rather than argued here.
+ */
+function resolveNesting(
+  winner: DomainDefaults,
+  query: string,
+): DomainDefaults {
+  let current = winner;
+
+  for (let step = 0; step <= DOMAIN_DEFAULTS.length; step++) {
+    const child = DOMAIN_DEFAULTS.find(
+      (candidate) =>
+        candidate.refines === current.domain &&
+        distinctiveTerms(candidate, current).some((term) =>
+          matchesTerm(query, term),
+        ),
+    );
+    if (!child) return current;
+    current = child;
+  }
+
+  // Unreachable unless `refines` describes a cycle, which would be a
+  // declaration error rather than a query the classifier cannot handle.
+  throw new Error(
+    `refines relation cycles at "${current.domain}"; a domain cannot be a special case of itself`,
+  );
+}
+
+/**
+ * The declared `refines` graph, as data.
+ *
+ * Exported so its shape can be asserted directly rather than inferred from
+ * classifications. The cycle guard in `resolveNesting` is unreachable with
+ * correct declarations, and a test that could only reach it by stubbing the
+ * table would be testing the stub; testing the declarations is the honest
+ * version of the same check.
+ */
+/**
+ * Every domain the table declares, in table order.
+ *
+ * Exported because the tests kept holding their own copy of this list and
+ * the copies kept expiring -- when the non-enzyme domains were archived on
+ * 2026-09-27, two separate hardcoded arrays went on naming thirteen domains
+ * and failed for saying so rather than for anything the classifier did. A
+ * list derived from DOMAIN_DEFAULTS cannot disagree with DOMAIN_DEFAULTS.
+ */
+export function declaredDomains(): string[] {
+  return DOMAIN_DEFAULTS.map((d) => d.domain);
+}
+
+export function refinementPairs(): {
+  child: string;
+  parent: string;
+  childTerms: string[];
+  parentTerms: string[];
+  /** Terms the child has that the parent does not; the only ones that can
+   *  promote. Currently equal to the child's whole list, because no declared
+   *  pair shares a term -- see the invariant test. */
+  distinctive: string[];
+}[] {
+  return DOMAIN_DEFAULTS.filter((d) => d.refines !== undefined).map((child) => {
+    const parent = DOMAIN_DEFAULTS.find((p) => p.domain === child.refines);
+    if (parent === undefined) {
+      throw new Error(
+        `"${child.domain}" refines "${child.refines}", which is not a declared domain`,
+      );
+    }
+    return {
+      child: child.domain,
+      parent: parent.domain,
+      childTerms: child.keywords,
+      parentTerms: parent.keywords,
+      distinctive: distinctiveTerms(child, parent),
+    };
+  });
+}
+
+/**
+ * Is the occurrence at `index` a whole word, rather than a fragment of a
+ * longer one?
+ *
+ * The same defect as ADR 0205's enzyme patterns, one layer up. The
+ * repressilator lists the keyword "repress", which occurs inside
+ * "repressors" -- so "a toggle switch between two repressors" scored as a
+ * repressilator and never reached the compositional fallthrough that is
+ * supposed to answer it. "ring" has the same shape and occurs inside
+ * "bring".
+ *
+ * A keyword is meant as a word. Where the query inflects it ("spreads" for
+ * "spread") the stem path below still finds it, at half credit, which is
+ * the right relative weight anyway.
+ */
+function isWholeWordAt(text: string, index: number, term: string): boolean {
+  const before = index > 0 ? text[index - 1]! : "";
+  const afterIndex = index + term.length;
+  const after = afterIndex < text.length ? text[afterIndex]! : "";
+  const wordish = /[a-z0-9]/;
+  if (before !== "" && wordish.test(before) && wordish.test(term[0]!)) {
+    return false;
+  }
+  if (
+    after !== "" &&
+    wordish.test(after) &&
+    wordish.test(term[term.length - 1]!)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * How much evidence one keyword gives for a domain, in characters.
+ *
+ * Three things had to survive the same function, and each was measured
+ * fixing a defect the others did not:
+ *
+ *  - LENGTH, not a count (ADR 0190/0191). A domain that matches "gillespie"
+ *    has said more than one matching three short generic words. Counting
+ *    matches let "a random trajectory for A + B to C using the Gillespie
+ *    approach" land on molecular_dynamics, which owns "trajectory".
+ *  - NEGATION (ADR 0192). "no inhibitor involved" contains "inhibitor".
+ *    Scoring it undoes the negation work outright: measured, that one query
+ *    classified as mm_competitive_inhibition.
+ *  - STEMMING. "measles spreads" must reach the keyword "spread".
+ *
+ * Negation is testable only where the term literally occurs, because that
+ * is the only case with a position to look behind. A stem-only match has no
+ * such position and is accepted; that is the honest limit of the check, not
+ * an oversight.
+ */
+function keywordEvidence(
+  lowerQuery: string,
+  queryTokens: Set<string>,
+  keyword: string,
+): number {
+  const occurrences = termOccurrences(lowerQuery, keyword).filter((index) =>
+    isWholeWordAt(lowerQuery, index, keyword),
+  );
+  if (occurrences.length > 0) {
+    return occurrences.some((index) => !isNegatedAt(lowerQuery, index))
+      ? keyword.length
+      : 0;
+  }
+  const keywordWords = tokenizeForMatching(keyword);
+  if (
+    keywordWords.length > 0 &&
+    keywordWords.every((w) => queryTokens.has(lightStem(w)))
+  ) {
+    // Half credit. A stem match is real evidence -- "measles spreads" is
+    // about the keyword "spread" -- but it is weaker than the query having
+    // actually written the term, and scoring the two the same inverts
+    // classifications on the difference. Measured: molecular_dynamics lists
+    // "trajectories" (12) and gillespie_ssa lists "gillespie" (9), so "a
+    // random trajectory ... using the Gillespie approach" scored as
+    // molecular dynamics on a stemmed plural, over a domain the query had
+    // named outright.
+    return keyword.length / 2;
+  }
+  return 0;
+}
+
+export function classifyDomainByKeyword(query: string): KeywordClassification {
+  // Strip explicit parameter-override tokens ("km=2", "vmax=5", ...) before
+  // classifying. "km" and "vmax" are themselves mm keywords -- someone
+  // writing "the km of this reaction" IS naming enzyme kinetics vocabulary
+  // -- but every fully-specified mm/mm_competitive_inhibition query ALSO
+  // writes "km=<value>" as parameter syntax, which would otherwise inflate
+  // mm purely from bookkeeping that has nothing to do with which of the two
+  // domains is meant. That let mm silently outscore
+  // mm_competitive_inhibition on a query that explicitly said "competitive
+  // inhibition", just because it also supplied km=/vmax= inline.
+  // Classification must run on what the query SAYS, not on which parameter
+  // names it happens to assign.
+  const classificationText = query
+    .split(/\s+/)
+    .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token))
+    .join(" ");
+  const lower = classificationText.toLowerCase();
+  const queryTokens = new Set(
+    tokenizeForMatching(classificationText).map(lightStem),
+  );
+
+  // `matchEnzyme` recognises ~25 specific enzymes by name (with a verified
+  // EC number, no network round trip) for the entity-extraction step
+  // below -- but classification never consulted it, so a query naming one
+  // of those exact enzymes ("citrate synthase kinetics") could fail to
+  // reach "mm" unless the enzyme was ALSO hardcoded into the mm keyword
+  // list. Treating a real hit as a classification signal removes the second
+  // list rather than growing it.
+  const enzymeMatch = matchEnzyme(query);
+
+  let best: DomainDefaults | undefined;
+  let bestScore = 0;
+  for (const candidate of DOMAIN_DEFAULTS) {
+    let score = 0;
+    for (const keyword of candidate.keywords) {
+      score += keywordEvidence(lower, queryTokens, keyword);
+    }
+    // Naming a real enzyme is generic evidence for "this is an enzyme-
+    // kinetics question", so it should land on plain mm by default. The
+    // credit is the enzyme name's own length, because that is the unit
+    // every other score is in -- naming "lactate dehydrogenase" IS matching
+    // a long, specific term. mm takes it whole and
+    // mm_competitive_inhibition half, keeping the 2:1 ratio: giving both
+    // the same share made them tie on any plain enzyme-kinetics query with
+    // no inhibitor language, with array order silently deciding. With the
+    // smaller share mm wins outright when nothing else distinguishes them,
+    // while a query that also says "competitive"/"inhibitor" still wins on
+    // its own keywords -- inhibition is an additional claim the query has
+    // to make, not the default assumption for every enzyme mentioned.
+    if (enzymeMatch && candidate.domain === "mm") {
+      score += enzymeMatch.enzymeName.length;
+    } else if (
+      enzymeMatch &&
+      candidate.domain === "mm_competitive_inhibition"
+    ) {
+      score += enzymeMatch.enzymeName.length / 2;
+    }
+    // Strictly greater: the first domain in the table wins a tie, which is
+    // the old behaviour for equally-specific matches.
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+
+  if (best !== undefined) {
+    // Scoring picked the best-evidenced domain; nesting then asks whether
+    // the query named a special case of it. See `resolveNesting`.
+    return { defaults: resolveNesting(best, query), matched: true };
+  }
+
+  // Nothing matched. Report that rather than deciding here: callers that
+  // resolve a query turn this into an UnrecognizedQueryError refusal, while
+  // callers that only want to record what was asked need a domain-shaped
+  // answer and must not be made to throw. `matched: false` is the whole
+  // signal -- the returned defaults are a placeholder, not a guess anyone
+  // is entitled to run.
+  const fallback =
+    DOMAIN_DEFAULTS.find((d) => d.domain === "mm") ?? DOMAIN_DEFAULTS[0]!;
+  return { defaults: fallback, matched: false };
+}
+
 export function extractParameterOverrides(
   query: string,
 ): Record<string, number | number[]> {
@@ -2526,68 +3029,8 @@ export async function resolveQuery(
     };
   }
 
-  // Strip explicit parameter-override tokens ("km=2", "vmax=5", ...)
-  // before classifying. "km" and "vmax" are themselves mm keywords
-  // (someone writing "the km of this reaction" IS naming enzyme kinetics
-  // vocabulary) -- but every fully-specified mm/mm_competitive_inhibition
-  // query ALSO writes "km=<value>" as parameter syntax, which would
-  // otherwise inflate mm's score by 1-2 points purely from bookkeeping
-  // that has nothing to do with which of the two domains is meant. That
-  // let mm silently outscore mm_competitive_inhibition on a query that
-  // explicitly said "competitive inhibition", just because it also
-  // supplied km=/vmax= inline -- classification must run on what the
-  // query SAYS, not on which parameter names it happens to assign.
-  const classificationText = query
-    .split(/\s+/)
-    .filter((token) => !PARAMETER_TOKEN_PATTERN.test(token))
-    .join(" ");
-  const lower = classificationText.toLowerCase();
-  const queryTokens = new Set(
-    tokenizeForMatching(classificationText).map(lightStem),
-  );
-
-  // `matchEnzyme` already recognizes ~25 specific enzymes by name (with a
-  // verified EC number, no network round trip) for the entity-extraction
-  // step below -- but classification never consulted it, so a query
-  // naming one of those exact enzymes (e.g. "citrate synthase kinetics",
-  // "chymotrypsin activity") could still fail to reach "mm" if the enzyme
-  // itself wasn't ALSO separately hardcoded into the mm keyword list. That
-  // is the same class of bug as the domain-classification gap above, just
-  // one layer down: two independent lists of the same enzymes, silently
-  // drifting apart. Treating a real `matchEnzyme` hit as a strong
-  // classification signal removes the second list rather than growing it.
-  const enzymeMatch = matchEnzyme(query);
-
-  let best: DomainDefaults | undefined;
-  let bestScore = 0;
-  for (const candidate of DOMAIN_DEFAULTS) {
-    let score = candidate.keywords.filter((keyword) =>
-      keywordMatches(lower, queryTokens, keyword),
-    ).length;
-    // Naming a real enzyme is generic evidence for "this is an enzyme-
-    // kinetics question" -- it should land on plain mm by default, so mm
-    // gets the larger share (+2). mm_competitive_inhibition gets a smaller
-    // share (+1) rather than none: giving both the same boost made them
-    // tie on any plain enzyme-kinetics query with no inhibitor language,
-    // with array order (mm_competitive_inhibition is declared first)
-    // silently deciding the wrong one every time. With the smaller share,
-    // mm wins outright when nothing else distinguishes them, but a query
-    // that ALSO says "inhibitor"/"competitive"/"inhibition" adds enough on
-    // top (mm_competitive_inhibition's own keyword score) to still win --
-    // inhibition is a real, additional claim the query has to make, not
-    // the default assumption for every enzyme mentioned.
-    if (enzymeMatch && candidate.domain === "mm") {
-      score += 2;
-    } else if (enzymeMatch && candidate.domain === "mm_competitive_inhibition") {
-      score += 1;
-    }
-    if (score > bestScore) {
-      best = candidate;
-      bestScore = score;
-    }
-  }
-
-  if (!best) {
+  const { defaults: best, matched } = classifyDomainByKeyword(query);
+  if (!matched) {
     // Previously fell through to `mm` (Michaelis-Menten) unconditionally --
     // whatever domain happened to sit first in DOMAIN_DEFAULTS when nothing
     // else matched. That is a worse failure than refusing: a query about
@@ -2595,6 +3038,12 @@ export async function resolveQuery(
     // populations" would silently receive an enzyme-kinetics simulation,
     // with the domain mismatch invisible anywhere in the response. See
     // UnrecognizedQueryError's own doc comment for the full reasoning.
+    //
+    // The refusal lives here rather than inside classifyDomainByKeyword
+    // because that function is also called just to record what a query
+    // looked like (see routes/simulate.ts) -- logging what was asked must
+    // not itself throw. The classifier reports "nothing matched"; this,
+    // the resolution path, is what turns that into a refusal.
     throw new UnrecognizedQueryError(
       query,
       DOMAIN_DEFAULTS.map((d) => d.domain),

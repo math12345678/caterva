@@ -82,6 +82,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 # one fact stored twice with nothing comparing them.
 from check_quickstart_clone_works import (  # noqa: E402
     CONTROLS,
+    documented_authenticated_clones,
     documented_clone_urls,
     reachable_anonymously,
 )
@@ -90,7 +91,16 @@ from check_quickstart_clone_works import (  # noqa: E402
 #: README.md's first line; README.md is what GitHub renders.
 FRONT_DOORS = ("README.md", "START_HERE.md")
 
-SENTINEL = "**Not public yet.**"
+#: "yet" was a forecast, and it expired.
+#:
+#: ADR 0143 wrote this notice expecting publication to come. The owner has
+#: since decided the repositories stay private (ADR 0179), so "not public
+#: YET" told a reader that access was on its way -- a claim about the future
+#: that nobody had made. "Not public" is true whatever is decided later, and
+#: this guard's inverse property is untouched: publish the repositories and
+#: it still demands the notice be deleted, so the notice cannot outlive the
+#: thing it describes.
+SENTINEL = "**Not public.**"
 ADR_LINK = "0143-the-first-command-a-stranger-runs.md"
 
 
@@ -121,12 +131,26 @@ def anything_reachable() -> bool | None:
     visitor who can clone the thing in front of them is the case this guard
     exists to catch.
     """
-    refs = documented_clone_urls()
-    if not refs:
+    # Both forms, because the question is about the REPOSITORY and the
+    # documents no longer name it the same way.
+    #
+    # ADR 0179 converted the quickstarts to `gh repo clone owner/repo`, and
+    # this function read only `git clone https://...` -- so it found nothing
+    # to probe and exited 3, "could not check". A guard that stops being able
+    # to see is a guard that has stopped guarding, and it would have gone on
+    # reporting could-not-check for as long as the repositories stayed
+    # private, which is now indefinitely.
+    #
+    # The authenticated reference names `owner/repo`; the anonymous URL for
+    # it is derivable, and that URL is exactly what a stranger would try.
+    urls = [r.url for r in documented_clone_urls()]
+    urls += [f"https://github.com/{r.repo}.git"
+             for r in documented_authenticated_clones()]
+    if not urls:
         return None
     seen_answer = False
-    for ref in refs:
-        got = reachable_anonymously(ref.url)
+    for url in dict.fromkeys(urls):
+        got = reachable_anonymously(url)
         if got is None:
             continue
         seen_answer = True
@@ -142,8 +166,10 @@ def _report(doors: list[Door], reachable: bool) -> int:
     if not reachable:
         if not missing:
             print("Private, and both front doors say so. Nothing to fix here.")
-            print("  The clone guard still reports this on every CI run and")
-            print("  is still the thing that goes green when it is published.")
+            print("  The quickstarts use `gh repo clone`, which is the command")
+            print("  that works for a reader who has access (ADR 0179). This")
+            print("  guard is the one that fires on publication: make them")
+            print("  public and it demands this notice be deleted.")
             return 0
         print("The repositories are private and the front page does not say so.\n")
         for door in missing:

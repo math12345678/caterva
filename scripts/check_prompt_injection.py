@@ -64,6 +64,33 @@ THE MECHANISM DID NOT EXIST UNTIL 2026-08-11 (Part 22)
 
 The paragraph above, and the failure message below, both told readers to
 record benign findings in `trojan-baseline.json`. Nothing read that file.
+
+THE FOUR VERDICTS RECORDED ON 2026-08-24
+----------------------------------------
+Said plainly, because of who did it: the analysis below was prepared by an
+AI agent and applied on the owner's instruction to proceed. That is worth
+writing down, since an agent clearing findings about *text aimed at agents*
+is the shape this guard exists to catch. The reasoning is here to be
+disagreed with, and reverting is one commit.
+
+  * `START_HERE.md` -- a signpost row whose label names the machine half of
+    the audience, beside a link. Quoting that label here made THIS file trip
+    the same rule, so it is described rather than reproduced -- the trap the
+    commandResolve.ts entry already records. Exempts the POINTER only;
+    `docs/AGENT_BRIEF.md` is an instruction surface that nothing here has
+    reviewed.
+  * `Tests/enzyme_preparation.py` -- a docstring naming the cost of erring
+    in each direction on the recombinant/native threshold. Text that
+    volunteers its own failure modes is not talking a reviewer out of
+    anything.
+  * `docs/mutations/adr-0037-organism-column.json` -- a `_note` describing
+    a MUTATION's diagnostic power, not any code's safety.
+  * `docs/mutations/adr-0068-live-data-sources.json` -- a mutation PAYLOAD:
+    the `replace` side of a patch that rewrites a NOTICE line into a bland
+    reassurance, so a guard can be proven to catch exactly that. The string
+    exists to imitate concealment, and the scanner flagging it is the
+    scanner working. The entry is keyed to that one fingerprint, so the
+    same phrasing anywhere else is still a finding.
 Following the instruction did nothing: the entry landed, the build stayed
 red, and the reader believed they had recorded an exemption.
 
@@ -105,7 +132,47 @@ thing it exists for.
 does with each one, including a critical. Restoring the equality test
 fails three of its seven cases.
 
-CURRENT EXEMPTIONS (12; the verdicts live in trojan-baseline.json)
+CURRENT EXEMPTIONS (15; the verdicts live in trojan-baseline.json)
+
+Recounted 2026-09-28 after merging main, and the number is a coincidence:
+three entries came in from main (accessibility markup in the merged MuleRun
+chapters) and three went out, for `Business/` files the history rewrite
+removed when the repository was published. An exemption for a file that is
+not in the tree can never match a finding; it is a verdict with nothing left
+to apply to. Two more had their `file` corrected from `Terium/` to
+`caterva/` -- the code moved in the rename and the verdict moved with it,
+which matters because this guard rejects an exemption recorded against a
+different file than the one the finding is in.
+
+TWO MORE ARRIVED WITH A MERGE, 2026-09-24, and both are the same cry-wolf
+idiom as the two below. Verdicts, reached by reading each in full:
+
+  * `Terium/compose/timeseries.py` -- a comment explaining why the
+    cross-correlation sums elementwise instead of going through BLAS: on
+    macOS Accelerate the matmul sets floating-point flags from inside its
+    own kernels, numpy attributes them to the caller, and every run printed
+    RuntimeWarnings about arithmetic the function never performed. The
+    flagged clause gives the reason that matters: spurious warnings cost a
+    reader's attention to the real ones. It argues for keeping warnings
+    meaningful, in a comment whose subject is a concrete numerical detail.
+  * `Terium/tests/test_compose_library_signaling.py` -- a class docstring
+    for the motif unit-checker, making the same point about a library that
+    ships with a standing finding against it. Same idiom, same direction:
+    it justifies why every motif must balance at composition time, since a
+    dimensionally wrong rate law still integrates and still draws a smooth
+    curve.
+
+    Both are described here rather than quoted. Reproducing the wording to
+    explain it re-trips the rule -- this guard's notes already record that
+    happening three times, and writing this section is the fourth: the two
+    sentences above were quoted verbatim on the first attempt and CI came
+    back with four findings instead of two, the extra pair being these very
+    lines.
+
+Neither asserts that any code is safe, which is what the rule
+`injection/trust-assertion` is looking for; both argue for MORE attention to
+a warning. This idiom is house style here and will keep producing this
+finding -- it is the plainest way the codebase has to state ADR 0028.
 
 Six were added on 2026-09-06, once the criticals became visible. Three of
 them are RECURSIVE -- the stage record that triaged the first scan quotes
@@ -286,6 +353,40 @@ def _load_baseline() -> tuple[dict[str, dict[str, str]], list[str]]:
     return baseline, problems
 
 
+#: Fewest files that must exist under the scan root for "clean" to mean
+#: anything.
+#:
+#: This guard refuses in six ways already -- npx missing, timeout, OSError,
+#: empty stdout, unparseable JSON, wrong JSON shape -- each saying that a
+#: scan which did not happen is not a clean scan. It had no answer for the
+#: seventh: a scan that ran perfectly over nothing. Measured, with the guard
+#: placed outside the tree it scans, it printed its success line having seen
+#: no files.
+#:
+#: The floor is on the INPUT rather than the output, because trojan-scan
+#: reports no denominator -- its `summary` counts findings, and zero findings
+#: is exactly what a clean repository is supposed to produce. Counting the
+#: files that exist is a sanity check on what was handed to the tool, not a
+#: second implementation of what the tool does with them.
+#:
+#: Established remedy, not an invention (ADR 0185):
+#: `check_public_images_reviewed` refuses with "found only 0 public image(s),
+#: below the floor of 5. The scan is broken, not the pages."
+_MIN_FILES = 100
+
+
+def _files_under_root() -> int:
+    """How many files the scanner was pointed at. Cheap and approximate."""
+    count = 0
+    for path in REPO_ROOT.rglob("*"):
+        parts = set(path.parts)
+        if parts & {"node_modules", ".git", "__pycache__", ".venv", "venv"}:
+            continue
+        if path.is_file():
+            count += 1
+            if count >= _MIN_FILES:
+                break          # the floor is a threshold, not a census
+    return count
 def triage(
     findings: list, baseline: dict[str, dict[str, str]]
 ) -> tuple[list[str], list[str]]:
@@ -350,8 +451,17 @@ def triage(
             exempted.append(f"{location}:{line} [{rule}] -- {entry['reason']}")
             continue
 
+        # The fingerprint is PRINTED, because the sentence below tells the
+        # reader to record a verdict in trojan-baseline.json and that file is
+        # keyed on exactly this value. Without it the instruction cannot be
+        # followed: the only other way to obtain a fingerprint is to re-run
+        # the scanner and read its raw JSON, which is precisely what someone
+        # reading a CI log cannot do. Measured 2026-09-24: two findings
+        # arrived with a merge, both benign, and clearing them needed a
+        # round trip through CI purely to learn two hex strings.
         violations.append(
-            f"{location}:{line} [{rule}] {message} -- text aimed at an AI "
+            f"{location}:{line} [{rule}] fingerprint={fingerprint or '?'} "
+            f"{message} -- text aimed at an AI "
             "reader rather than a human one. Several agents commit to this "
             "repository and read each other's files, so prose is an "
             "execution surface here."
@@ -370,6 +480,15 @@ def check() -> list[str]:
             "explicit opt-out, not a pass."
         )
         return []
+
+    seen = _files_under_root()
+    if seen < _MIN_FILES:
+        return [
+            f"only {seen} file(s) exist under the scan root, below the floor "
+            f"of {_MIN_FILES}. The scan is broken, not the tree -- over an "
+            "empty directory 'no injection indicators' is true and means "
+            "nothing."
+        ]
 
     if shutil.which("npx") is None:
         return [

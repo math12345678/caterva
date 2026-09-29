@@ -229,7 +229,7 @@ def _code_version(root: "pathlib.Path | None" = None) -> tuple[str, str | None]:
                            "produced this cannot be named.")
 
 
-def _provenance_lines() -> list[str]:
+def _provenance_lines(rate_law: str | None = None) -> list[str]:
     """How this document was produced, at the bottom of the document.
 
     WHY A REPORT HAS TO SAY THIS
@@ -264,19 +264,80 @@ def _provenance_lines() -> list[str]:
         "|---|---|",
         f"| Caterva commit | `{version}` |",
         f"| Generated | {generated} |",
-        "",
     ]
+
+    # WHICH EQUATION THE NUMBERS CAME OUT OF
+    #
+    # The document said "running the model at each" and never said what the
+    # model was. Every figure in it -- the band, the disagreement spread, the
+    # trajectory -- is the output of one specific rate law, and a reader
+    # cannot check a number without knowing which.
+    #
+    # It became load-bearing when `release/app/lesson.js` began explaining
+    # results in terms of `v = Vmax*S/(Km+S)`. That sentence was TRUE of this
+    # run and asserted about any run: nothing in the document said the run
+    # used Michaelis-Menten, so a future domain with a `km` and a different
+    # rate law would have been handed an explanation that did not apply to
+    # it. The fix is not for the lesson to guess better -- it is for the
+    # document to say, once, here.
+    #
+    # None rather than a default: a run whose rate law is not known to the
+    # caller must report that it is not known, because "assume Michaelis-
+    # Menten" is exactly the substitution this project exists to refuse.
+    if rate_law:
+        lines.append(f"| Rate law | {rate_law} |")
+    else:
+        lines.append(
+            "| Rate law | not stated by the caller — the equation behind "
+            "these numbers is not recorded in this document |"
+        )
+    lines.append("")
     if caveat:
         lines += [
             f"**This document is not reproducible as it stands:** {caveat}",
             "",
         ]
     else:
+        # WHO CAN ACTUALLY ACT ON THIS
+        #
+        # The sentence used to be "check out that commit and re-run", said to
+        # every reader. Jonathan Karr (BioSimulators), asked whether a commit
+        # hash is a sufficient reproducibility baseline, gave the limit
+        # directly (personal communication, 2026-08-25):
+        #
+        #   "If your source code is private, Git hashes will only be useful
+        #    to you because other people won't know what they mean."
+        #
+        # Terrium's repositories are private and are staying that way
+        # (ADR 0179). So the instruction was addressed to a reader who cannot
+        # follow it, in the section of the document whose entire job is to
+        # say how the numbers can be checked. It is now addressed to whoever
+        # can act on it, and says plainly who that is.
+        #
+        # The second half is Karr's other point. A hash identifies the code
+        # and not the environment it ran in: the same source under a
+        # different NumPy can produce different numbers. Terrium pins its
+        # dependencies, which is why the claim is made at all -- but the pins
+        # live in requirements.txt, not in this document, so the document
+        # says what it is standing on rather than implying it covered
+        # everything.
         lines += [
-            "Check out that commit and re-run the command that produced "
-            "this — with the same seed — and every number above should come "
-            "back identical. If it does not, one of them is wrong and this "
-            "row is how you find out which.",
+            "**If you have access to the repository:** check out that commit "
+            "and re-run the command that produced this — with the same seed — "
+            "and every number above should come back identical. If it does "
+            "not, one of them is wrong and this row is how you find out which.",
+            "",
+            "**If you do not:** the hash above identifies the code to someone "
+            "who has it and nothing more, because these repositories are "
+            "private. It is not a link you can follow, and this document does "
+            "not pretend otherwise.",
+            "",
+            "**What the hash does not pin:** the environment. The same source "
+            "under a different NumPy or solver build can produce different "
+            "numbers. Terrium pins its dependencies in `requirements.txt`, "
+            "which is what makes the claim above worth making, but those pins "
+            "are not recorded here — so this is reproducibility of the code, "
+            "not of the whole stack a container would capture.",
             "",
         ]
     return lines
@@ -294,6 +355,7 @@ def build_report(
     ensembles: dict[str, Any] | None = None,
     bands: dict[str, Any] | None = None,
     also_refused: Sequence[str] = (),
+    rate_law: str | None = None,
 ) -> LabReport:
     """Assemble one document from what the run actually established.
 
@@ -640,7 +702,7 @@ def build_report(
             "",
         ]
 
-    lines += _provenance_lines()
+    lines += _provenance_lines(rate_law)
 
     return LabReport(
         title=title,

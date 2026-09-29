@@ -82,3 +82,12 @@ types-PyYAML==6.0.12.20260815
 # (mypy-1.15.0.dist-info/LICENSE): "Mypy (and mypyc) are licensed under
 # the terms of the MIT license".
 mypy==1.15.0
+
+# Freezes scripts/report_lab.py into the binary inside Terrium.app
+# (release/build_dmg.sh, ADR 0201). Build-time only: nothing imports it, and
+# nothing at runtime needs it.
+#
+# GPL-2.0-with-exception -- the exception explicitly permits distributing
+# frozen applications under any licence, which is the only way this project
+# uses it.
+pyinstaller==6.22.2

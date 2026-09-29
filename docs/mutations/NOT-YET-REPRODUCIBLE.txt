@@ -98,17 +98,13 @@
        # mid-pass. Asked, not claimed.
 0113   # the conditions that stayed on the screen -- arrived 2026-08-17,
 0166   # the suite nobody ran -- NOT the ADR 0069 story. The restores here
-0125   # a score that could only be zero -- another author's table, no set
        # file shipped with it. Parked rather than re-derived: a set built
        # from someone else's prose risks the confident NOT CAUGHT the
        # harness exists to prevent (registered 2026-08-29 to unblock the
        # guard for CI; the ask stands with its author).
-0128   # the stage that failed -- same situation and same reasoning as 0125.
-0151   # the front page the guard never looked at -- same; note its table
        # includes a mutation another record already claimed and could not
        # catch, so a naive set file would grade a claim its own ADR
        # disputes.
-0163   # run the tool instead of matching the string -- most recent of the
        # four (2026-08-23) and post-harness, so this entry is debt by
        # choice, not history: its evidence spans a live-resolver run that
        # a set file's test command cannot assume network for.

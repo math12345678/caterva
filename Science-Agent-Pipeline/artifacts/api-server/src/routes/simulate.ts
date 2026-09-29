@@ -14,6 +14,7 @@ import {
 import { getDb, isDbAvailable } from "@workspace/db";
 import { logger } from "../lib/logger";
 import type { ModelGroundingReport } from "../lib/modelGrounding";
+import { recordQuery } from "../lib/queryLog";
 import { citationObligations } from "../lib/dataSources";
 import type { SourceObligation } from "../lib/dataSources";
 import { buildTrajectoryCsv } from "../lib/trajectoryCsv";
@@ -1645,8 +1646,33 @@ async function runPipeline(
 
     queue.updateJob(jobId, { status: "resolving" });
     // Deferred: the resolution graph is large and only needed once a job
-    // actually starts resolving.
-    const { resolveQuery } = await import("../lib/queryResolver");
+    // actually starts resolving. classifyDomainByKeyword lives in the same
+    // module, so it is taken from the same deferred import rather than a
+    // static one, which would pull the graph back in at module load.
+    const { resolveQuery, classifyDomainByKeyword } = await import(
+      "../lib/queryResolver"
+    );
+
+    // Record the question as asked, if this deployment opted in.
+    //
+    // Off unless TERRIUM_QUERY_LOG names a file. Placed here, before
+    // resolution, so a query is recorded whether or not the run goes on to
+    // succeed -- a question that ends in "could not be resolved from
+    // literature" is exactly the kind this log exists to count, and logging
+    // only successes would collect the queries the classifier already
+    // handles. See queryLog.ts for what is and is not written.
+    {
+      const guess = classifyDomainByKeyword(query);
+      recordQuery(
+        {
+          query,
+          keywordDomain: guess.defaults.domain,
+          keywordMatched: guess.matched,
+        },
+        new Date(),
+      );
+    }
+
     const resolved = await resolveQuery(query, {
       allowCrossSpecies,
       allowVariants,

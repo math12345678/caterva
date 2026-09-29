@@ -38,6 +38,26 @@ def to_sbml(antimony_text: str) -> str:
     return antimony.getSBMLString(antimony.getMainModuleName())
 
 
+def identity_uris(sbml_text: str) -> dict[str, list[str]]:
+    """`read_back`, minus the evidence class.
+
+    Two different kinds of annotation ride on the same parameter and
+    `read_back` is qualifier-blind, so it returns both:
+
+      identity  -- WHICH paper, WHICH organism (pubmed, doi, taxonomy)
+      evidence  -- HOW the value is known (an ECO term)
+
+    The tests below are about the first. Asserting on the union made them
+    fail the moment the second was added (ADR 0187), which is not a defect
+    they were written to detect. Separating the categories is a narrowing of
+    scope, not a weakening: `test_a_resolved_parameter_carries_an_evidence_code`
+    asserts the evidence term directly, so nothing here stops watching it.
+    """
+    return {
+        name: [u for u in uris if "identifiers.org/eco/" not in u]
+        for name, uris in read_back(sbml_text).items()
+    }
+
 @pytest.fixture
 def base_sbml() -> str:
     return to_sbml(PLAIN_MODEL)
@@ -50,6 +70,48 @@ def test_antimony_comments_do_not_survive_translation_to_sbml():
     for the module existing. If a future Antimony gains comment-preserving
     translation this test fails, and the right response is to re-examine
     whether the SBML annotator is still needed — not to delete the test.
+
+    IT FAILED, AND THE RE-EXAMINATION IS BELOW
+    ------------------------------------------
+    It fired on 2026-08-25, and the cause was not a change in Antimony. It
+    was ADR 0182: `annotate_antimony` now emits a `notes` statement beside
+    each comment, and notes DO survive translation — so the strings this
+    test watched for started arriving in the SBML by a route it did not
+    know about.
+
+    The premise is intact. Comments are still discarded; the module was
+    never built on "provenance cannot reach SBML from Antimony", it was
+    built on "comments cannot". So the test now uses a plain comment rather
+    than the annotator's output, which measures the stated claim instead of
+    a by-product of how the annotator happens to be written today.
+
+    Is the SBML annotator still needed? Yes, and for a reason notes cannot
+    address. A note is prose. `annotate_sbml` writes CVTerms — a PubMed
+    identifier as a resolvable URI under `bqbiol:isDescribedBy`, a taxon
+    under `bqbiol:hasTaxon` — which is what lets a consumer follow a
+    citation rather than read one. Frank Bergmann's advice (ADR 0181) is
+    exactly this split: identifiers in CVTerms, prose in notes. Notes made
+    the human-readable half durable; they did not make it machine-readable.
+    """
+    sbml = to_sbml(
+        PLAIN_MODEL.replace(
+            "  Km = 2.5;",
+            "  Km = 2.5;  // BRENDA ref 649716, Homo sapiens",
+        )
+    )
+    for lost in ("BRENDA", "649716", "Homo sapiens"):
+        assert lost not in sbml, (
+            f"{lost!r} survived into SBML; this module's premise may no longer hold"
+        )
+
+
+def test_a_note_reaches_sbml_where_a_comment_does_not():
+    """The other half, so the pair says something the first cannot alone.
+
+    Without this, the test above passes on a translator that dropped
+    everything, and would keep passing if `annotate_antimony`'s notes
+    silently stopped being emitted — which is the failure ADR 0182 exists
+    to prevent, going unnoticed in the file that documents the loss.
     """
     annotated = annotate_antimony(
         PLAIN_MODEL,
@@ -62,10 +124,10 @@ def test_antimony_comments_do_not_survive_translation_to_sbml():
         },
     )
     sbml = to_sbml(annotated.text)
-
-    for lost in ("BRENDA", "649716", "Homo sapiens"):
-        assert lost not in sbml, (
-            f"{lost!r} survived into SBML; this module's premise may no longer hold"
+    for kept in ("649716", "Homo sapiens"):
+        assert kept in sbml, (
+            f"{kept!r} did not reach SBML; the Antimony notes of ADR 0182 "
+            f"are not being emitted or are no longer surviving translation"
         )
 
 
@@ -75,7 +137,7 @@ class TestWhatSurvives:
             base_sbml,
             {"km": SbmlParameterProvenance(origin="resolved", citation="PMID 12345678")},
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
     def test_a_taxon_is_annotated_only_when_it_was_actually_resolved(self, base_sbml):
         # An organism NAME is not an identifier. Deriving taxonomy:9606 from
@@ -85,7 +147,7 @@ class TestWhatSurvives:
             base_sbml,
             {"km": SbmlParameterProvenance(origin="resolved", organism="Homo sapiens")},
         )
-        assert read_back(without.sbml)["Km"] == []
+        assert identity_uris(without.sbml)["Km"] == []
 
         with_id = annotate_sbml(
             base_sbml,
@@ -138,7 +200,7 @@ class TestWhatIsRefusedRatherThanFaked:
             },
         )
         # No fabricated URI...
-        assert read_back(out.sbml)["Km"] == []
+        assert identity_uris(out.sbml)["Km"] == []
         assert "identifiers.org/brenda" not in out.sbml
         # ...but the reference is not lost either.
         assert "649716" in out.sbml
@@ -298,7 +360,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
                 )
             },
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
     def test_the_exact_string_the_cli_formats_is_handled(self, base_sbml):
         # Belt and braces: even WITHOUT the structured fields, the spelling
@@ -307,7 +369,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
             base_sbml,
             {"km": SbmlParameterProvenance(origin="resolved", citation="PubMed ref 12345678")},
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
     def test_a_brenda_registry_still_yields_no_uri_through_the_structured_path(
         self, base_sbml
@@ -325,7 +387,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
                 )
             },
         )
-        assert read_back(out.sbml)["Km"] == []
+        assert identity_uris(out.sbml)["Km"] == []
         assert "identifiers.org/brenda" not in out.sbml
 
     def test_an_unknown_registry_falls_back_to_scanning_the_text(self, base_sbml):
@@ -342,7 +404,7 @@ class TestStructuredIdentifiersBeatReparsingProse:
                 )
             },
         )
-        assert read_back(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
+        assert identity_uris(out.sbml)["Km"] == ["https://identifiers.org/pubmed:12345678"]
 
 
 class TestAnIndependentReaderCanUseTheAnnotations:
@@ -483,8 +545,15 @@ class TestTheWriteIsReconciledWithAnIndependentRead:
             ec_number="1.1.1.27",
             model_taxon_id="9606",
         )
-        assert out.cvterms_written == 3
-        assert out.triples_read_back == 3
+        # Four, and naming them is the point of asserting a number at all:
+        #   pubmed:12345678        the paper           (bqbiol:isDescribedBy)
+        #   eco/ECO:0000269        how it is known     (bqbiol:isDescribedBy)
+        #   ec-code:1.1.1.27       the enzyme          (model level)
+        #   taxonomy:9606          the organism        (bqbiol:hasTaxon)
+        # It was three until the evidence term was added (ADR 0187). A bare
+        # count that nobody can decompose is a number that drifts silently.
+        assert out.cvterms_written == 4
+        assert out.triples_read_back == 4
         assert "read back by an independent parser" in out.summary()
 
     def test_annotations_lost_in_writing_are_refused(self, base_sbml, monkeypatch):
@@ -536,3 +605,116 @@ class TestTheWriteIsReconciledWithAnIndependentRead:
         out = annotate_sbml(base_sbml, {})
         assert out.cvterms_written == 0
         assert out.triples_read_back == 0
+
+
+# ---------------------------------------------------------------------------
+# How the value is known, as an ontology term (ADR 0181, Gennari)
+# ---------------------------------------------------------------------------
+
+
+def test_a_resolved_parameter_carries_an_evidence_code(base_sbml):
+    """ECO:0000269 -- experimental evidence used in manual assertion.
+
+    John Gennari, asked whether there is an accepted way to mark an
+    annotation as computed rather than taken from a source, named evidence
+    codes (personal communication, 2026-08-27). This is also the one CVTerm
+    use Bergmann's advice endorses: he warned that provenance PROSE in a
+    CVTerm changes their semantic intent because readers expect
+    ontology-based terms. An ECO term is one.
+
+    Asserted on the resolvable URI, not on the string "ECO", because the
+    accession appears in the notes too and matching there would pass whether
+    or not a CVTerm was written.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(
+            origin="resolved", citation="PMID 16333295",
+            citation_source="pubmed", reference_id="16333295",
+        )},
+    )
+    assert "https://identifiers.org/eco/ECO:0000269" in out.sbml
+
+
+def test_a_user_supplied_parameter_gets_no_evidence_code(base_sbml):
+    """Not weak evidence -- not evidence.
+
+    An s0 the student chose is a condition of the experiment, not a claim
+    about the world, and an evidence ontology has nothing to say about it.
+    ECO:0000035 ("no evidence data found") would be wrong: nobody looked,
+    because none was called for. The notes already record that it was
+    supplied, so silence here is the accurate statement rather than a gap.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(origin="user", note="chosen by you")},
+    )
+    assert "identifiers.org/eco/" not in out.sbml
+
+
+def test_the_evidence_uri_uses_the_form_that_resolves(base_sbml):
+    """`eco:ECO:0000269` is a double prefix and 404s.
+
+    Measured against identifiers.org rather than assumed:
+
+        https://identifiers.org/eco:ECO:0000269   -> 404
+        https://identifiers.org/eco/ECO:0000269   -> 200
+
+    The colon form is right for every other namespace Terrium mints, so this
+    is an exception rather than a correction -- and emitting it without
+    noticing would have put a dead link inside an annotation whose entire
+    purpose is to be followable.
+
+    Offline: this asserts the shape Terrium emits, not that the network
+    answers. The resolution check that produced those numbers is recorded in
+    `miriam.py` beside the exception.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(
+            origin="resolved", citation="PMID 16333295",
+            citation_source="pubmed", reference_id="16333295",
+        )},
+    )
+    assert "eco:ECO:" not in out.sbml, "the double-prefix form does not resolve"
+    assert "eco/ECO:0000269" in out.sbml
+
+
+def test_an_uncited_resolved_value_gets_no_evidence_code(base_sbml):
+    """ECO:0000269 says a person read an experiment. Name the experiment.
+
+    A `resolved` parameter carrying no citation and no reference id was
+    getting the term anyway, so the model asserted that a paper measured the
+    value while naming no paper -- a provenance tool inventing evidence, in
+    the field added to describe evidence.
+
+    The refusal is REPORTED, not silent: a missing annotation is
+    indistinguishable from a parameter nobody looked at, and the whole point
+    of `refused_uris` is that a gap says why it is there.
+    """
+    out = annotate_sbml(
+        base_sbml, {"Km": SbmlParameterProvenance(origin="resolved")}
+    )
+    assert "identifiers.org/eco/" not in out.sbml
+    reasons = [why for _, acc, why in out.refused_uris if acc.startswith("ECO")]
+    assert reasons, "the omission must be reported, not merely performed"
+    assert "nothing here to have read" in reasons[0]
+
+
+def test_a_resolved_value_with_only_a_brenda_reference_still_gets_one(base_sbml):
+    """A BRENDA reference id is not a URI, and is still a citation.
+
+    `mint()` refuses to build a link for it (ADR 0064: BRENDA's namespace
+    covers EC numbers, not reference ids), so the row carries no
+    isDescribedBy. That is a fact about identifiers.org, not about whether a
+    curator read a paper -- and gating the evidence term on a *mintable*
+    citation would drop it for exactly the rows Terrium sources most.
+    """
+    out = annotate_sbml(
+        base_sbml,
+        {"Km": SbmlParameterProvenance(
+            origin="resolved", citation="BRENDA ref 740253",
+            citation_source="BRENDA", reference_id="740253",
+        )},
+    )
+    assert "eco/ECO:0000269" in out.sbml

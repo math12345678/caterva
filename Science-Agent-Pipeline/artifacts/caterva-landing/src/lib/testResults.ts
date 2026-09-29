@@ -136,6 +136,25 @@ export interface TestSuite {
   files: SuiteFile[];
 }
 
+// FILE COUNTS ONLY, 2026-09-24. The two figures above were corrected --
+// engine 100 -> 107, api-server 81 -> 91 -- across five merges of main, which
+// brought a batch of new api-server suites, plus one added here
+// (enzymePatternBoundaries.test.ts, ADR 0205; keywordsAreWords.test.ts,
+// ADR 0206). Both were measured by
+// check_landing_test_counts.py against the filesystem, which is what that
+// guard compares by default.
+//
+// The PASS counts below were NOT re-measured and are still the ones dated
+// in each entry. Saying so matters more in this file than in most: its
+// whole claim is that no number here is one nobody checked, and a file
+// count refreshed beside a stale pass count would read as a fresh run of
+// everything. It is not. Re-running all four suites needs an environment
+// this one is not: node and the npm cache are blocked here, so neither
+// vitest suite can run at all, and python-libsedml is absent, so two
+// pytest modules skip at import and the totals come out short. The next
+// person with a complete environment should run --full and replace the
+// pass counts.
+
 export const TEST_SUITES: TestSuite[] = [
   {
     name: "simulation engine",
@@ -143,7 +162,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "103 test files -- kinetics & Michaelis-Menten correctness, " +
+          "104 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR free-energy estimators, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -204,7 +223,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "76 test files -- query resolution, parameter provenance, " +
+          "86 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +

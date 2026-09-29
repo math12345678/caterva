@@ -49,6 +49,26 @@ from fallback_logic import resolve_kinetic_value  # noqa: E402
 from lab_report import DerivedValue, SuppliedValue, build_report  # noqa: E402
 from ensemble import ensemble_from_entries  # noqa: E402
 from model_ensemble import ensemble_over  # noqa: E402
+
+#: Which simulator implements which rate law, by function name.
+#:
+#: The report states the equation its numbers came out of (ADR 0180). That
+#: statement was a bare string sitting near the import, which meant changing
+#: the simulator and not the string would make the document assert an
+#: equation the run did not use -- a lie of exactly the kind the row was
+#: added to prevent, and silent.
+#:
+#: A map keyed by the simulator's name closes it, because
+#: `test_the_stated_rate_law_matches_the_simulator_in_use` reads which
+#: simulator `_band_for` assigns and fails if it is not a key here. Adding a
+#: simulator without saying what it computes is then a red build rather than
+#: a wrong document.
+RATE_LAW_BY_SIMULATOR = {
+    "simulate_michaelis_menten": "Michaelis-Menten — v = Vmax·S/(Km + S)",
+}
+
+#: The rate law every number in the report comes out of.
+RATE_LAW = RATE_LAW_BY_SIMULATOR["simulate_michaelis_menten"]
 from spread_consequence import consequence_of  # noqa: E402
 
 
@@ -204,12 +224,19 @@ def band_for(candidates, *, parameter, inputs, seed, draws):
 
     from caterva.continuous.simulations import simulate_michaelis_menten
 
+    # Bound to a name the test can read. There are TWO places that choose a
+    # simulator -- this one for the band, and `main` for the trajectory in
+    # the Result section -- and the `| Rate law |` row is a claim about both.
+    # An earlier version of this comment said "the only place", which was
+    # wrong and is the sort of wrong that makes a checker look in one spot.
+    simulator = simulate_michaelis_menten
+
     try:
         drawn = ensemble_from_entries(
             candidates, draws=draws, seed=seed, value_attr="value"
         )
         return ensemble_over(
-            simulate=simulate_michaelis_menten,
+            simulate=simulator,
             base_parameters={
                 "km": inputs["km"], "vmax": inputs["vmax"], "s0": inputs["s0"]
             },
@@ -667,7 +694,11 @@ def main() -> int:
         try:
             from caterva.continuous.simulations import simulate_michaelis_menten
 
-            simulation = simulate_michaelis_menten(
+            # The second simulator choice, bound for the same reason as the
+            # one in `_band_for`: this produces the trajectory the Result
+            # section prints, so the rate law row is a claim about it too.
+            simulator = simulate_michaelis_menten
+            simulation = simulator(
                 km=inputs["km"],
                 vmax=inputs["vmax"],
                 s0=inputs["s0"],
@@ -693,6 +724,12 @@ def main() -> int:
         bands=bands,
         simulation=simulation,
         bibtex=payload.get("bibtex"),
+        # Stated because the document's numbers are this equation's output
+        # and a reader cannot check one without knowing which (see
+        # `lab_report._provenance_lines`). Named here, at the only place
+        # that chooses the simulator, rather than as a constant elsewhere
+        # that could go on saying "Michaelis-Menten" after the choice moved.
+        rate_law=RATE_LAW,
         also_refused=also_refused + band_refusals + derive_refusals,
     )
 

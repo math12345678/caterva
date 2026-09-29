@@ -1,0 +1,60 @@
+{
+  "_why": [
+    "ADR 0194's mutation table, re-derived under scripts/mutate.py.",
+    "",
+    "ADR 0194 fixed the classifier's blindness to nested domains: SEIR",
+    "contains SIR, bimolecular Gillespie contains Gillespie, and summed",
+    "keyword scoring let the parent's non-discriminating vocabulary outvote",
+    "the child's one decisive phrase.",
+    "",
+    "P1 removes promotion entirely -- the defect restored.",
+    "",
+    "P2 drops the distinctiveness filter and is reported NOT CAUGHT. That is",
+    "the honest result rather than a gap to paper over: no declared pair shares",
+    "a keyword, so the filter is a no-op today and deleting it changes nothing.",
+    "An invariant test pins the zero-overlap fact, so the day it stops being",
+    "true the filter becomes load-bearing and that test fails.",
+    "",
+    "P3 makes promotion ignore negation, by promoting on any occurrence",
+    "rather than an unnegated one. 'no inhibitor involved' then selects the",
+    "inhibition model again, undoing ADR 0168 through this path rather than",
+    "through the one that record guarded.",
+    "",
+    "Not included, because no test here catches it: whether the four declared",
+    "pairs are the right four. Nothing verifies that, say, repressilator is",
+    "NOT a refinement of cell_cycle_oscillator; that judgement is argued in",
+    "the ADR and asserted nowhere.",
+    "",
+    "Run:  python3 scripts/mutate.py --set docs/mutations/adr-0194-nested-domains.json"
+  ],
+  "test": "cd Science-Agent-Pipeline/artifacts/api-server && npx vitest run src/__tests__/nestedDomains.test.ts src/__tests__/negatedKeywords.test.ts src/__tests__/classifierEval.test.ts src/__tests__/llmAuthoredQueries.test.ts",
+  "mutations": [
+    {
+      "id": "P1",
+      "description": "nesting promotion is removed; the scored winner stands",
+      "_claimed": "caught by the names-the-special-case tests",
+      "_note": "The original defect. 'an infection spreads when there is a hidden incubation phase' goes back to SIR, and accuracy across the three independent fixtures falls by 7.7, 2.7 and 1.3 points. Nothing errors -- the student asking about an incubation period simply gets the model that has none.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "    return { defaults: resolveNesting(best.defaults, query), matched: true };",
+      "replace": "    return { defaults: best.defaults, matched: true };"
+    },
+    {
+      "id": "P2",
+      "description": "promotion fires on terms the child and parent share",
+      "_claimed": "NOT CAUGHT -- and expected to be; see the note",
+      "_note": "Removes the distinctiveness filter. Reported NOT CAUGHT, honestly: no declared child/parent pair shares a single keyword, so the filter removes nothing and deleting it changes no classification. It is kept because it costs nothing and is correct whatever the table later contains -- keyword lists change, and 120 terms were added to them one ADR ago. An invariant test asserts the zero-overlap fact directly, so the day a shared term is added the filter stops being decorative and that test fails and says so. Making this mutation catchable would mean inventing an overlap no classifier needs, which is fitting the evidence to the table.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "        distinctiveTerms(candidate, current).some((term) =>",
+      "replace": "        candidate.keywords.some((term) =>"
+    },
+    {
+      "id": "P3",
+      "description": "promotion ignores whether the query negates the term",
+      "_claimed": "caught by the denied-distinctive-term test",
+      "_note": "Promotes on a raw substring rather than an unnegated match, so 'no inhibitor involved' selects the inhibition model through the promotion path. ADR 0168's negation handling is still present and still correct; this route simply goes around it, which is why the interaction is asserted rather than assumed.",
+      "file": "Science-Agent-Pipeline/artifacts/api-server/src/lib/queryResolver.ts",
+      "find": "        distinctiveTerms(candidate, current).some((term) =>\n          matchesTerm(query, term),\n        ),",
+      "replace": "        distinctiveTerms(candidate, current).some((term) =>\n          query.toLowerCase().includes(term.toLowerCase()),\n        ),"
+    }
+  ]
+}

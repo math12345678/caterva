@@ -125,11 +125,36 @@ def check() -> list[str]:
     return violations
 
 
+_MIN_SIMULATE_FNS = 3
+#: Fewest simulate_* functions this scan must see before "clean" means anything.
+#:
+#: Measured: with the guard placed outside the tree it scans, it printed its
+#: success line having examined nothing. "all stochastic domains comply with ADR 0005"
+#: is a universal, and over an empty set every universal is true -- so a
+#: renamed directory or a moved root produces exactly this sentence.
+#:
+#: The floor is this project's established remedy (ADR 0185), not an
+#: invention: `check_public_images_reviewed` already refuses with "found only
+#: 0 public image(s), below the floor of 5. The scan is broken, not the
+#: pages." Set well below the real count so ordinary deletion does not trip
+#: it -- a smoke alarm for a scan that stopped reaching its input.
+
+
 def main() -> int:
+    found = len(_simulate_functions())
+    if found < _MIN_SIMULATE_FNS:
+        print(
+            f"FAIL: found only {found} simulate_* function(s) under "
+            f"{CATERVA_DIR.name}/, below the floor of {_MIN_SIMULATE_FNS}.\n"
+            "\nThe scan is broken, not the domains. Over zero functions "
+            "\"all stochastic domains comply\" is true and means nothing."
+        )
+        return 1
+
     violations = check()
     if not violations:
-        print("OK: all stochastic domains comply with ADR 0005 "
-              "(numpy.random.default_rng(seed)).")
+        print(f"OK: {found} simulate_* function(s) checked; all stochastic "
+              "domains comply with ADR 0005 (numpy.random.default_rng(seed)).")
         return 0
 
     print("ADR 0005 violations found:\n")
