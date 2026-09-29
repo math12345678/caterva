@@ -449,6 +449,9 @@ def test_not_found_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        # The isoforms the rows measured, when an isoform was asked for and
+        # none of them is it (source "isoform_withheld"). Empty otherwise.
+        "isoformsAvailable": [],
         "substratesAvailable": [],
         "relatedness": [],
         "literatureCandidates": [
@@ -503,6 +506,9 @@ def test_core_candidate_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        # The isoforms the rows measured, when an isoform was asked for and
+        # none of them is it (source "isoform_withheld"). Empty otherwise.
+        "isoformsAvailable": [],
         "substratesAvailable": [],
         "relatedness": [],
         "literatureCandidates": [
@@ -662,6 +668,9 @@ def test_cross_species_withheld_output_shape(monkeypatch):
         # a withheld variant (ADR 0029). Emitted unconditionally so a
         # consumer never distinguishes "absent" from "empty".
         "variantCandidatesAvailable": [],
+        # The isoforms the rows measured, when an isoform was asked for and
+        # none of them is it (source "isoform_withheld"). Empty otherwise.
+        "isoformsAvailable": [],
         "substratesAvailable": [],
         # Empty here because the opt-in was never given, so no relatedness
         # check ran. Populated on the too_distant path, where it carries the

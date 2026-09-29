@@ -65,6 +65,9 @@ export interface ResolverQuery {
    * reject candidates that are not plausibly comparable.
    */
   allowCrossSpecies?: boolean;
+  /** The isoform asked for ("LDH-A"): rows measuring it are used, and a
+   * constant only measured on other isoforms is refused. */
+  isoform?: string;
   /**
    * The conditions the model is meant to represent, for Bakker's
    * condition-proximity axis.
@@ -427,9 +430,48 @@ export interface UnresolvedKinetic {
    * fact, and the one the old sentence was true about.
    */
   candidates: KineticCandidatePaper[];
+  /**
+   * Why nothing came back, in the runner's word ("isoform_withheld",
+   * "variant_withheld", "cross_species_withheld", "not_found", ...).
+   *
+   * Read because the CLI printed "BRENDA and PubMed were searched and
+   * returned nothing" for every miss, which is false when BRENDA returned
+   * rows and a policy withheld them: another isoform, a variant, another
+   * organism. Those are reversible, and only if the reader is told.
+   */
+  source: string | null;
+  /** What was withheld, by kind: the isoforms, variants or organisms the
+   * rows measured. Empty unless `source` says rows were withheld. */
+  isoformsAvailable: string[];
+  variantCandidatesAvailable: string[];
+  crossSpeciesOrganismsAvailable: string[];
 }
 
 export type ResolverResult = ResolvedKinetic | UnresolvedKinetic;
+
+/**
+ * What to tell a reader when rows WERE found and a policy withheld them, or
+ * null when nothing was withheld. Each case is reversible, so each names the
+ * way to reverse it.
+ */
+export function withheldSentence(result: UnresolvedKinetic): string | null {
+  const list = (xs: string[], fallback: string) => (xs.length ? xs.join(', ') : fallback);
+  switch (result.source) {
+    case 'isoform_withheld':
+      return `BRENDA holds this ${result.quantity} only for other isoforms ` +
+        `(${list(result.isoformsAvailable, 'unnamed')}). An isoform is a different gene product; ` +
+        `pass --isoform with one of those to use it.`;
+    case 'variant_withheld':
+      return `BRENDA's rows for this ${result.quantity} were all measured on protein variants ` +
+        `(${list(result.variantCandidatesAvailable, 'unnamed')}), which describe the variant, not the enzyme.`;
+    case 'cross_species_withheld':
+      return `BRENDA holds this ${result.quantity} only for other organisms ` +
+        `(${list(result.crossSpeciesOrganismsAvailable, 'unnamed')}). Pass --allow-cross-species ` +
+        `to use one from a related organism, flagged as such.`;
+    default:
+      return null;
+  }
+}
 
 /**
  * Read the runner's `literatureCandidates`, keeping only usable entries.
@@ -825,6 +867,7 @@ export async function resolveKinetic(
         quantity,
         enzymeConc: query.enzymeConc,
         allowCrossSpecies: query.allowCrossSpecies === true,
+        ...(query.isoform ? { isoform: query.isoform } : {}),
         physiologicalReference: query.physiologicalReference
       })
     );
@@ -857,7 +900,18 @@ export async function resolveKinetic(
       { query, quantity, candidateCount: candidates.length },
       'Literature resolver found no value; reporting absence rather than a default'
     );
-    return { found: false, quantity, logs, candidates };
+    const names = (v: unknown) =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+    return {
+      found: false,
+      quantity,
+      logs,
+      candidates,
+      source: typeof parsed['source'] === 'string' ? (parsed['source'] as string) : null,
+      isoformsAvailable: names(parsed['isoformsAvailable']),
+      variantCandidatesAvailable: names(parsed['variantCandidatesAvailable']),
+      crossSpeciesOrganismsAvailable: names(parsed['crossSpeciesOrganismsAvailable']),
+    };
   }
 
   // The value is emitted under the key matching the quantity ("km", "ki",

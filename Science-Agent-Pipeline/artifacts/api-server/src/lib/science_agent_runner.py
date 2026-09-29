@@ -75,7 +75,7 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import enzyme_lookup
 import epidemiology_resolver
@@ -205,6 +205,7 @@ def resolve_kinetic_value(
     quantity: str = "km",
     allow_cross_species: bool = False,
     allow_variants: bool = False,
+    isoform: Optional[str] = None,
 ) -> KineticResult:
     """Thin wrapper around the real fallback logic in Tests/fallback_logic.py.
 
@@ -235,6 +236,7 @@ def resolve_kinetic_value(
         quantity=quantity,
         allow_cross_species=allow_cross_species,
         allow_variants=allow_variants,
+        isoform=isoform,
     )
 
 
@@ -535,6 +537,10 @@ def main() -> None:
         #: reason allowCrossSpecies reads that way: the permissive reading of
         #: a missing flag is how the old behaviour returns silently.
         allow_variants = payload.get("allowVariants") is True
+        #: The isoform the query is about ("LDH-A"), when it names one. Rows
+        #: measuring it are used; a constant only measured on other isoforms
+        #: is refused, source "isoform_withheld" (fallback_logic).
+        isoform = payload.get("isoform") if isinstance(payload.get("isoform"), str) else None
         #: The conditions the model represents. An experimental condition
         #: the caller states, never assumed here (ADR 0012/0013).
         physiological = _parse_physiological(payload)
@@ -739,6 +745,7 @@ def main() -> None:
             quantity=quantity,
             allow_cross_species=allow_cross_species,
             allow_variants=allow_variants,
+            isoform=isoform,
         )
         result.search_log = resolution_log + result.search_log
 
@@ -965,6 +972,9 @@ def main() -> None:
                         # that cannot name what it refused leaves the opt-in
                         # it demands unexercisable.
                         "variantCandidatesAvailable": result.variant_candidates_available,
+                        # Which isoforms the rows measured, when the one
+                        # asked for is not among them.
+                        "isoformsAvailable": result.isoforms_available,
                         # The same courtesy for the field a student is far
                         # MORE likely to get wrong. An organism has one
                         # binomial name; a metabolite has a dozen aliases,

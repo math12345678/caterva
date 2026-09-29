@@ -137,6 +137,9 @@ export interface ScienceAgentResult {
    * the enzyme (ADR 0029). Populated only when
    * `source === "variant_withheld"`. */
   variantCandidatesAvailable?: string[];
+  /** The isoforms BRENDA's rows measured, when the one asked for is not
+   * among them. Populated only when `source === "isoform_withheld"`. */
+  isoformsAvailable?: string[];
   /** Which protein the winning row measured. Present on FOUND results too:
    * `unstated` is the majority case in BRENDA and it is NOT wild-type, so a
    * reader must be able to tell "the row did not say" from "the row said
@@ -428,6 +431,8 @@ export interface EntityExtraction {
   /** Opt in to a value measured on a sequence variant (ADR 0029). Absent
    * means false, for the same reason allowCrossSpecies reads that way. */
   allowVariants?: boolean;
+  /** The isoform asked for ("LDH-A"); the runner keeps rows measuring it. */
+  isoform?: string;
   /**
    * The conditions the model is meant to represent (ADR 0024, Decision 3).
    *
@@ -639,6 +644,7 @@ export async function resolveKineticValue(
     enzymeConc: entities.enzymeConc,
     allowCrossSpecies: entities.allowCrossSpecies === true,
     allowVariants: entities.allowVariants === true,
+    ...(entities.isoform ? { isoform: entities.isoform } : {}),
     // Omitted rather than sent as undefined: the runner's
     // _parse_physiological refuses a partial reference, and an explicit
     // `undefined` in the JSON payload is indistinguishable from a partial

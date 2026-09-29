@@ -539,6 +539,8 @@ export interface ParameterProvenance {
     | "cross_species_withheld"
     | "cross_species_too_distant"
     | "variant_withheld"
+    /** An isoform was asked for and every row measured another one. */
+    | "isoform_withheld"
     /**
      * The run stopped at the ENZYME NAME, before any database was asked
      * for a value.

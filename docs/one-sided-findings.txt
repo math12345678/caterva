@@ -70,13 +70,15 @@ selectedForm      # DEBT. `selectedFormFlags` on the API path only. ADR 0052:
 absent_values
 present_values
 
-# ADR 0024 / Jeske, organism relatedness and what was withheld
+# ADR 0024 / Jeske, organism relatedness and what was withheld.
+# crossSpeciesOrganismsAvailable and variantCandidatesAvailable left this
+# list on 2026-09-29: the CLI printed "BRENDA and PubMed were searched and
+# returned nothing" when rows had been found and withheld, and now reads both
+# (with isoformsAvailable) to say what was withheld and how to get it.
 candidate_organism
 query_organism
 shared_name
 shared_rank
-crossSpeciesOrganismsAvailable
-variantCandidatesAvailable
 requestedTaxonId
 taxonId
 

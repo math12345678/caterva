@@ -29,6 +29,7 @@ import {
   ResolverUnavailableError,
   resolveKinetic,
   rowScopeLines,
+  withheldSentence,
   type KineticQuantity,
 } from '../literature/literatureResolver';
 
@@ -54,6 +55,8 @@ export interface ResolveOptions {
   enzymeConc?: number;
   /** --allow-cross-species. Off unless the flag is present (ADR 0024). */
   allowCrossSpecies?: boolean;
+  /** --isoform LDH-A: use rows that measured this isoform. */
+  isoform?: string;
   /** --physiological "7.4,37" [--physiological-tolerance "0.4,5"] */
   physiologicalReference?: {
     ph: number;
@@ -88,6 +91,7 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       quantity,
       enzymeConc: options.enzymeConc,
       allowCrossSpecies: options.allowCrossSpecies === true,
+      ...(options.isoform ? { isoform: options.isoform } : {}),
       physiologicalReference: options.physiologicalReference,
     });
   } catch (err) {
@@ -121,6 +125,8 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
             status: 'not_found',
             quantity,
             logs: result.logs,
+            source: result.source,
+            withheld: withheldSentence(result),
             // Machine-readable too, not only in the prose above. A script
             // driving `resolve --json` is exactly the caller who would go
             // and fetch these.
@@ -147,7 +153,12 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
       // Two messages now, because they are two different facts, and ADR
       // 0065's rule applies: a search that found nothing and a search that
       // found something nobody used must not share a rendering.
-      if (papers.length === 0) {
+      const withheld = withheldSentence(result);
+      if (withheld) {
+        // Rows WERE found; a policy withheld them. "Returned nothing" would
+        // be false, and would hide the one change that gets a value.
+        process.stdout.write(`${c(DIM, '  ' + withheld)}\n`);
+      } else if (papers.length === 0) {
         process.stdout.write(
           `${c(DIM, '  BRENDA and PubMed were searched and returned nothing. This is an')}\n` +
             `${c(DIM, '  answer, not a failure — no value has been invented to fill the gap.')}\n`,

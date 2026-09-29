@@ -470,6 +470,7 @@ function buildUnresolvedKineticProvenance(
     | "cross_species_withheld"
     | "cross_species_too_distant"
     | "variant_withheld"
+    | "isoform_withheld"
     | "ec_not_resolved"
     | "ec_ambiguous",
   organismsAvailable?: string[],
@@ -520,6 +521,23 @@ function buildUnresolvedKineticProvenance(
   // the reader. Same argument as cross-species, one field over — and the
   // same consequence if collapsed: the opt-in becomes unexercisable,
   // because nobody is told there is anything to opt into.
+  // An isoform was asked for and BRENDA holds this constant only for
+  // others. Not "not found": the reader can ask for one of those instead.
+  if (reason === "isoform_withheld") {
+    const named =
+      organismsAvailable && organismsAvailable.length > 0
+        ? organismsAvailable.join(", ")
+        : "other isoforms";
+    return {
+      origin: "default",
+      unresolvedReason: "isoform_withheld",
+      note:
+        `The query names an isoform, and every ${K} BRENDA holds for this system ` +
+        `was measured on another (${named}). An isoform is a different gene ` +
+        `product, so its ${K} is a different protein's; name one of those to use it.`,
+    };
+  }
+
   if (reason === "variant_withheld") {
     const named =
       organismsAvailable && organismsAvailable.length > 0
@@ -695,7 +713,13 @@ async function applyKineticResolution(
     });
 
     if (!agentResult.found) {
-      if (agentResult.source === "variant_withheld") {
+      if (agentResult.source === "isoform_withheld") {
+        provenanceUpdates[key] = buildUnresolvedKineticProvenance(
+          key,
+          "isoform_withheld",
+          agentResult.isoformsAvailable,
+        );
+      } else if (agentResult.source === "variant_withheld") {
         provenanceUpdates[key] = buildUnresolvedKineticProvenance(
           key,
           "variant_withheld",
@@ -1927,6 +1951,17 @@ const NOT_AN_INHIBITOR = new Set([
  * inhibitor means no Ki is looked up, never a Ki looked up under the
  * substrate's name.
  */
+/**
+ * The isoform a query names: "isozyme 2", "isoform LDH-A", or a code like
+ * "LDH-A" / "HK-II". The same two patterns caterva.bind.core.read_isoform
+ * applies to BRENDA's commentary, so the query and the rows are read alike.
+ * Undefined when none is named.
+ */
+export function extractIsoform(query: string): string | undefined {
+  const m = query.match(/\b(?:isozyme|isoenzyme|isoform)\s+([A-Za-z0-9-]+)|\b([A-Z]{2,5}-[A-Z0-9]{1,2})\b/);
+  return m ? (m[1] ?? m[2]) : undefined;
+}
+
 export function extractInhibitor(query: string): string | undefined {
   const word = "([a-z0-9][\\w\\-()\\[\\],'+]*(?:\\s+acid)?)";
   const patterns = [
@@ -1976,6 +2011,7 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
       enzymeName: matched.enzymeName,
       substrate,
       inhibitor: extractInhibitor(query),
+      isoform: extractIsoform(query),
       organism: namedOrganism ?? matched.organism,
       ecNumber: matched.ecNumber,
     };
@@ -2391,7 +2427,11 @@ export async function resolveQuery(
       hasUnoverriddenKinetic
     ) {
       const result = await applyKineticResolution(
-        { ...llmResult.entities, inhibitor: llmResult.entities?.inhibitor ?? extractInhibitor(query) },
+        {
+          ...llmResult.entities,
+          inhibitor: llmResult.entities?.inhibitor ?? extractInhibitor(query),
+          isoform: llmResult.entities?.isoform ?? extractIsoform(query),
+        },
         effectiveOverrides,
         llmResult.domain,
         allowCrossSpecies,

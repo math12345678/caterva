@@ -200,7 +200,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "84 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "85 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -220,7 +220,9 @@ export const TEST_SUITES: TestSuite[] = [
         // a full local run (2026-09-29, .venv, JavaScript packages present
         // so the licence test ran): 1187 passed, 1 skipped (stdpopsim),
         // after 6 effector-parsing tests and 6 request-memo tests: 1187.
-        passed: 1187,
+        // Plus the 7 resolver isoform tests on the recorded LDH Ki page
+        // (all passed 2026-09-29): 1194.
+        passed: 1194,
         skipped: 1,
         failed: 0,
       },
@@ -232,7 +234,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "77 test files -- query resolution, parameter provenance, " +
+          "78 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -244,7 +246,9 @@ export const TEST_SUITES: TestSuite[] = [
         // runnerErrorReachesCaller.test.ts (2 passed, 2026-09-28): 766.
         // Plus the 10 tests of inhibitorIsTheKiCompound.test.ts (10 passed
         // locally 2026-09-29, with kiProvenance.test.ts's 4 after its query
-        // was made to name the inhibitor): 776.
+        // was made to name the inhibitor): 776. CI run 36614528701 agreed
+        // (776 passed). Plus the 6 tests of isoformFromQuery.test.ts (6
+        // passed locally 2026-09-29): 782.
         //
         // Earlier, 2026-09-17: `81 passed (81) / 854 passed (854)`, run
         // alone with the repo's .venv/bin first on PATH.
@@ -269,7 +273,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 776,
+        passed: 782,
         skipped: 0,
         failed: 0,
       },

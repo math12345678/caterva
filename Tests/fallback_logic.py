@@ -28,6 +28,7 @@ was never wired to anything real - this version is.
 from __future__ import annotations
 
 import os
+import re
 from typing import Callable
 
 import httpx
@@ -187,6 +188,13 @@ class KineticResult(BaseModel):
     #: cannot say what it refused leaves the user unable to exercise the
     #: opt-in it just demanded of them.
     variant_candidates_available: list[str] = []
+
+    #: The isoforms BRENDA's rows measured, when an isoform was asked for
+    #: and no row measured it or named none. Populated only for
+    #: source="isoform_withheld". A constant of another isoform is another
+    #: protein's, so it is refused rather than returned; the refusal names
+    #: what exists so the caller can ask for one of those instead.
+    isoforms_available: list[str] = []
 
     #: Cofactors and effectors reported for the row that WON selection,
     #: with presence state and PubChem identity where resolvable.
@@ -800,7 +808,58 @@ def _report_preparation(entry, log, tier, quantity=None) -> None:
         log.append(f"{tier}: {sentence}")
 
 
-def _partition_variants(entries):
+def _isoform_of(conditions):
+    """The isoform a row's commentary names, read by caterva.bind.core (the
+    parser `caterva bind` and `caterva compose --isoform` use). Raises
+    ImportError where the caterva package is not importable."""
+    from caterva.bind.core import read_isoform
+    return read_isoform(conditions)
+
+
+def _same_isoform(a, b):
+    key = lambda name: re.sub(r"[\s_-]+", "", name).lower()
+    return a is not None and b is not None and key(a) == key(b)
+
+
+def _partition_isoform(entries, isoform, log, where):
+    """`(rows, matched, refused_isoforms)` for a request for one isoform.
+
+    Rows naming the isoform win. Failing those, rows naming no isoform are
+    kept (whether they measured it is unknown, and the log says so). Failing
+    those too, every row measured another isoform: `rows` is empty and
+    `refused_isoforms` names what exists. The same three cases, in the same
+    order, as `caterva compose --isoform` (caterva/compose/isoform.py).
+    """
+    try:
+        named = [(e, _isoform_of(e.conditions)) for e in entries]
+    except ImportError:
+        log.append(f"isoform {isoform!r} asked for, but caterva's isoform reader is not "
+                   f"importable here, so {where} rows were NOT filtered by isoform")
+        return entries, False, []
+    matching = [e for e, iso in named if _same_isoform(iso, isoform)]
+    if matching:
+        log.append(f"Kept the {len(matching)} of {len(entries)} {where} row(s) measuring {isoform}")
+        return matching, True, []
+    unnamed = [e for e, iso in named if iso is None]
+    if unnamed:
+        log.append(f"No {where} row names {isoform}; kept the {len(unnamed)} naming no isoform, "
+                   f"which may or may not have measured it")
+        return unnamed, False, []
+    return [], False, sorted({iso for _, iso in named if iso})
+
+
+def _isoform_withheld_result(isoform, available, log):
+    log.append(f"Every candidate row measured another isoform ({', '.join(available)}), "
+               f"not {isoform}: a constant of another isoform is a different protein's")
+    return KineticResult(
+        found=False,
+        source="isoform_withheld",
+        isoforms_available=available,
+        search_log=log,
+    )
+
+
+def _partition_variants(entries, keep_isozymes=False):
     """`(usable, withheld)` — rows measuring the enzyme, and rows measuring
     a variant of it.
 
@@ -817,7 +876,10 @@ def _partition_variants(entries):
     usable, withheld = [], []
     for entry in entries:
         verdict = getattr(entry, "variant", None)
-        if verdict is not None and verdict.status == "variant":
+        if (verdict is not None and verdict.status == "variant"
+                and not (keep_isozymes and verdict.kind == "isozyme")):
+            # An isozyme row is kept when it is the isozyme that was asked
+            # for: then it is the enzyme, not a variant of it.
             withheld.append(entry)
         else:
             usable.append(entry)
@@ -858,6 +920,7 @@ def resolve_kinetic_value(
     allow_cross_species: bool = False,
     allow_variants: bool = False,
     lineage_provider: LineageProvider | None = None,
+    isoform: str | None = None,
 ) -> KineticResult:
     """Resolve a kinetic value for (enzyme, organism, substrate) by trying
     BRENDA exact match, then BRENDA cross-species, then PubMed literature
@@ -884,6 +947,14 @@ def resolve_kinetic_value(
         taxon_id_provider, table_label=table_label,
     )
     if exact:
+        # An isoform asked for narrows the pool first, for the same reason
+        # variants are removed before selection: min() over three isoforms'
+        # rows picks a protein, not a value.
+        isoform_matched = False
+        if isoform:
+            exact, isoform_matched, other_isoforms = _partition_isoform(exact, isoform, log, "exact-match")
+            if not exact:
+                return _isoform_withheld_result(isoform, other_isoforms, log)
         # Variant rows are removed BEFORE selection, not flagged after it.
         #
         # That ordering is the whole point. Selection is min(), point
@@ -894,7 +965,7 @@ def resolve_kinetic_value(
         # would attach a warning to a value that had already been selected
         # FOR being a mutant. See ADR 0029.
         if not allow_variants:
-            usable, withheld = _partition_variants(exact)
+            usable, withheld = _partition_variants(exact, keep_isozymes=isoform_matched)
             if withheld:
                 log.append(
                     f"Excluded {len(withheld)} of {len(exact)} exact-match "
@@ -1106,8 +1177,14 @@ def resolve_kinetic_value(
                 search_log=log,
             )
 
+        isoform_matched = False
+        if isoform:
+            acceptable, isoform_matched, other_isoforms = _partition_isoform(
+                acceptable, isoform, log, "cross-species")
+            if not acceptable:
+                return _isoform_withheld_result(isoform, other_isoforms, log)
         if not allow_variants:
-            usable, withheld = _partition_variants(acceptable)
+            usable, withheld = _partition_variants(acceptable, keep_isozymes=isoform_matched)
             if withheld:
                 log.append(
                     f"Excluded {len(withheld)} of {len(acceptable)} "

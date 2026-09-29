@@ -129,6 +129,9 @@ EMITTED_AS: dict[str, str | None] = {
     # The chosen row's commentary: isoform, inhibition mode, and what an
     # inhibitor was measured against. Emitted verbatim beside `variant`.
     "commentary": "commentary",
+    # The isoforms the rows measured, when the one asked for is not among
+    # them (source "isoform_withheld").
+    "isoforms_available": "isoformsAvailable",
     "relatedness": "relatedness",
     "effectors": "effectors",
     "selection_tie": "selectionTie",

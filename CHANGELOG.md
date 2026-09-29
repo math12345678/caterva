@@ -54,6 +54,16 @@ done: there was no release to version.
   `scripts/refresh_export_samples.py`. The panel had shown a command that
   does not exist, a JSON format the CLI does not write, and a CSV
   trajectory where the real CSV is the parameter audit trail.
+- Isoforms reach the API and the TypeScript CLI too. The resolver takes an
+  `isoform` and keeps the rows measuring it before choosing; a row naming
+  the isozyme asked for is no longer withheld as a "variant"; and a
+  constant only measured on other isoforms is refused as
+  `isoform_withheld`, naming them. The API reads the isoform from the
+  query ("human LDH-A inhibited by gossypol"); `scientific resolve` takes
+  `--isoform`. The CLI also stopped printing "BRENDA and PubMed were
+  searched and returned nothing" when rows were found and withheld
+  (another isoform, a variant, another organism): it now says what was
+  withheld and the flag that reaches it.
 - `caterva analyze` reports the chi1 rotamer of each catalytic residue:
   per replica, the fraction of frames in the well it started in (+60, 180
   or -60), and kept, flipped, partial or replicas disagree. The angles

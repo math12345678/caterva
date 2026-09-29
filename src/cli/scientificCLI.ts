@@ -1183,6 +1183,9 @@ ${colors.bright}Commands:${colors.reset}
                            relatedness check, so this permits a related
                            organism's value -- not any organism's. Whatever it
                            returns is still not a measurement of your organism.
+      --isoform NAME       Use rows that measured this isoform, e.g. LDH-A. A
+                           value BRENDA holds only for other isoforms is
+                           refused and the isoforms it does hold are named.
       --enzyme-conc VALUE  [E]0, e.g. 0.001mM. Bridges a kcat to a usable
                            Vmax = kcat x [E]0. Never defaulted (ADR 0013).
       --json               machine-readable output
@@ -1729,6 +1732,7 @@ async function main() {
         enzymeConc,
         json: booleans.has('json'),
         allowCrossSpecies: booleans.has('allow-cross-species'),
+        ...(typeof flags['isoform'] === 'string' ? { isoform: flags['isoform'] } : {}),
         physiologicalReference: physiological.reference,
       });
       process.exit(code);

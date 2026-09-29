@@ -10,6 +10,12 @@ export interface EntityExtraction {
    * substrate, or nothing. Absent means none was named, and no Ki is looked up.
    */
   inhibitor?: string;
+  /**
+   * The isoform the query is about ("LDH-A"), when it names one. Rows that
+   * measured it are used; a constant only measured on other isoforms is
+   * refused (runner source "isoform_withheld").
+   */
+  isoform?: string;
   organism: string;
   ecNumber?: string;
 }
