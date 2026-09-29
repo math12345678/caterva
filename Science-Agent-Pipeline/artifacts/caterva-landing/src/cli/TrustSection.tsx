@@ -1,4 +1,4 @@
-import { GUARD_COUNT, LIVE_DOMAIN_COUNT } from "@/lib/domains";
+import { CAPABILITY_COUNT, GUARD_COUNT } from "@/lib/domains";
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import Reveal from "./Reveal";
@@ -71,31 +71,31 @@ function AnimatedMetric({
   );
 }
 
+// What each source is used for, as the code uses it (2026-09-29). PubMed
+// was listed as "Literature citations" beside BRENDA, as if both supplied
+// values; it supplies papers to read, never a number. KEGG was listed
+// although no query reaches it by default; it is mentioned in the sources
+// panel's footnote with the reason.
 const TRUST_SOURCES = [
   {
     name: "BRENDA",
-    desc: "Enzyme functional data",
+    desc: "Km, kcat and Ki, with references",
     url: "https://www.brenda-enzymes.org",
   },
   {
-    name: "KEGG",
-    // Listed as an integration, not as a live source: KEGG is OFF
-    // unless CATERVA_ENABLE_KEGG is set, because its terms require a
-    // service-provider licence Caterva does not hold (see
-    // Tests/enzyme_lookup.py). It also resolves substrate NAMES, never a
-    // kinetic value, so it never backs a parameter even when enabled.
-    desc: "Pathway data — integrated, disabled pending a licence",
-    url: "https://www.genome.jp/kegg/",
-  },
-  {
     name: "PubMed",
-    desc: "Literature citations",
+    desc: "Papers to read, never a value",
     url: "https://pubmed.ncbi.nlm.nih.gov",
   },
   {
     name: "roadrunner",
     desc: "High-performance SBML solver",
     url: "https://github.com/sys-bio/roadrunner",
+  },
+  {
+    name: "GROMACS",
+    desc: "Molecular dynamics engine",
+    url: "https://www.gromacs.org",
   },
 ];
 
@@ -112,10 +112,11 @@ export default function TrustSection() {
           </span>
           <span className="h-px flex-1 bg-gradient-to-r from-caution/20 to-transparent" />
         </div>
-        <h2 className="section-header">Built on real science</h2>
-        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
-          Every number is traceable. Every simulation is verified. No black
-          boxes.
+        <h2 className="section-header">What is checked, and what is not</h2>
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-md">
+          Every literature constant names its source, and a number nobody
+          measured says so. The solvers are checked against exact answers;
+          the models are not validated against experiment.
         </p>
 
         {/* Metrics Grid */}
@@ -126,11 +127,11 @@ export default function TrustSection() {
             delay={0}
           />
           <AnimatedMetric
-            target={LIVE_DOMAIN_COUNT}
-            label="live capabilities"
+            target={CAPABILITY_COUNT}
+            label="capabilities built"
             delay={200}
           />
-          <AnimatedMetric target={3} label="literature sources" delay={400} />
+          <AnimatedMetric target={4} label="export formats" delay={400} />
           <AnimatedMetric
             target={GUARD_COUNT}
             label="correctness guards"
@@ -170,10 +171,9 @@ export default function TrustSection() {
         </div>
 
         {/* Pipeline Verification */}
-        <TerminalWindow path="~ — how we validate" glow>
-          <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span> caterva validate
-            --pipeline
+        <TerminalWindow path="~ — checks" glow>
+          <div className="mb-4 text-[11px] font-mono text-fg/60">
+            # what every run is checked against
           </div>
 
           <div className="space-y-0">
@@ -181,13 +181,13 @@ export default function TrustSection() {
               {
                 step: "01",
                 title: "Literature Resolution",
-                desc: "LLM + structured keyword matching against BRENDA & PubMed. Every parameter gets a source citation.",
+                desc: "Each constant is looked up in BRENDA under the compound it belongs to. One that is found names its reference; one that is not says why.",
                 icon: "\u2318",
               },
               {
                 step: "02",
                 title: "Parameter Validation",
-                desc: "Cross-checked against known plausibility bounds. Flagged values are surfaced with warnings — never silently accepted.",
+                desc: "Units, organism, isoform, inhibition mode and assay conditions are compared with the model. A mismatch is printed beside the value, never silently accepted.",
                 icon: "\u2713",
               },
               {
@@ -199,7 +199,7 @@ export default function TrustSection() {
               {
                 step: "04",
                 title: "Provenance Output",
-                desc: "Full reasoning trail, citation list, parameter flags, and trajectory exported with every run.",
+                desc: "The report and all four exports carry each value's citation, conditions, source row and spread. A placeholder is marked in every one.",
                 icon: "\u2261",
               },
             ].map((item) => (

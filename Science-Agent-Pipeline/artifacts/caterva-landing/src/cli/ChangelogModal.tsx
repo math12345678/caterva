@@ -185,8 +185,7 @@ export default function ChangelogModal({ open, onClose }: Props) {
                     Release notes
                   </h2>
                   <p className="text-[11px] text-fg/70 font-mono">
-                    <span className="text-signal">$</span> caterva changelog
-                    --recent
+                    from CHANGELOG.md
                   </p>
                 </div>
 

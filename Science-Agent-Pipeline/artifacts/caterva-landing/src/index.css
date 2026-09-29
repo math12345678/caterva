@@ -1148,27 +1148,32 @@
 
 /* ─── CITE SECTION ─── */
 
+/* Colours resolve through --fg / --signal / --caution rather than fixed ink
+   values, so a code block reads on the paper page AND inside an
+   .ink-surface slab. With fixed rgba(42,45,53,...) every block inside a
+   TerminalWindow (the export samples, the citation formats, the build
+   commands) was ink text on an ink background: present and unreadable. */
 .cite-code-block {
   position: relative;
   border-radius: 0.75rem;
-  border: 1px solid rgba(42, 45, 53, 0.06);
-  background: rgba(42, 45, 53, 0.4);
+  border: 1px solid color-mix(in oklab, var(--fg) 8%, transparent);
+  background: color-mix(in oklab, var(--fg) 5%, transparent);
   padding: 1.25rem;
   font-family: "DM Mono", monospace;
   font-size: 11px;
   line-height: 1.7;
-  color: rgba(42, 45, 53, 0.72);
+  color: color-mix(in oklab, var(--fg) 80%, transparent);
   overflow-x: auto;
 }
 
 .cite-code-block .keyword {
-  color: #5D7F8D;
+  color: var(--signal);
 }
 .cite-code-block .string {
-  color: #946522;
+  color: var(--caution);
 }
 .cite-code-block .comment {
-  color: rgba(42, 45, 53, 0.72);
+  color: color-mix(in oklab, var(--fg) 62%, transparent);
 }
 
 .cite-copy-btn {
@@ -1177,18 +1182,18 @@
   right: 0.5rem;
   padding: 0.25rem 0.75rem;
   border-radius: 0.5rem;
-  border: 1px solid rgba(42, 45, 53, 0.06);
-  background: rgba(42, 45, 53, 0.03);
-  color: rgba(42, 45, 53, 0.72);
+  border: 1px solid color-mix(in oklab, var(--fg) 10%, transparent);
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  color: color-mix(in oklab, var(--fg) 72%, transparent);
   font-size: 10px;
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .cite-copy-btn:hover {
-  border-color: rgba(93, 127, 141, 0.3);
-  background: rgba(93, 127, 141, 0.08);
-  color: #5D7F8D;
+  border-color: color-mix(in oklab, var(--signal) 40%, transparent);
+  background: color-mix(in oklab, var(--signal) 12%, var(--surface));
+  color: var(--signal);
 }
 
 /* ─── TRUST BADGES ─── */

@@ -47,7 +47,7 @@ import { totals } from "@/lib/testResults";
 
 const FAQSection = lazy(() => import("./FAQSection"));
 const TrustSection = lazy(() => import("./TrustSection"));
-const PricingPlans = lazy(() => import("./PricingPlans"));
+const GetCaterva = lazy(() => import("./GetCaterva"));
 const HowToCiteSection = lazy(() => import("./HowToCiteSection"));
 const RoadmapSection = lazy(() => import("./RoadmapSection"));
 const TeamSection = lazy(() => import("./TeamSection"));
@@ -95,7 +95,7 @@ const NAV_ITEMS = [
   "exports",
   "roadmap",
   "team",
-  "pricing",
+  "get",
   "cite",
   "status",
   "waitlist",
@@ -103,13 +103,14 @@ const NAV_ITEMS = [
 
 // The header carries the few sections a first-time visitor needs; the side
 // dots and the command palette (⌘K) still reach every section.
-const HEADER_NAV = ["system", "microscope", "playground", "agent", "domains", "cite", "waitlist"] as const;
+const HEADER_NAV = ["system", "microscope", "playground", "agent", "domains", "cite", "get"] as const;
 const HEADER_LABEL: Partial<Record<(typeof HEADER_NAV)[number], string>> = {
   system: "watch a run",
   microscope: "evidence",
+  get: "get caterva",
 };
 
-import { DOMAINS } from "@/lib/domains";
+import { DOMAINS, RELEASE_TAG, STATUS_LABEL } from "@/lib/domains";
 
 function Section({
   children,
@@ -378,8 +379,8 @@ export default function CliApp() {
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="inline-flex items-center gap-2 rounded-full border border-signal/20 bg-signal/[0.04] px-3 py-1 text-[11px] text-fg/76 mb-10"
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-caution animate-pulse" />
-            <span className="text-caution/70">pre-launch</span> &middot;
+            <span className="w-1.5 h-1.5 rounded-full bg-signal" />
+            <span className="text-fg/76">{RELEASE_TAG}</span> &middot;
             <button
               onClick={() => setChangelogOpen(true)}
               className="bg-transparent border-none p-0 text-fg/70 hover:text-signal transition-colors cursor-pointer font-sans text-[11px]"
@@ -398,17 +399,17 @@ export default function CliApp() {
                 <StaggeredHero
                   lines={[
                     {
-                      text: "Ask a question.",
+                      text: "Write one line.",
                       className: "text-fg hero-heading-strong",
                       delayOffset: 0.1,
                     },
                     {
-                      text: "Get a verified",
+                      text: "Get cited",
                       className: "text-fg/80 hero-heading-strong",
                       delayOffset: 0.45,
                     },
                     {
-                      text: "simulation.",
+                      text: "constants.",
                       className: "text-fg/70 hero-heading-strong",
                       delayOffset: 0.75,
                     },
@@ -423,9 +424,9 @@ export default function CliApp() {
                 className="font-sans text-[15px] md:text-[17px] text-fg/70 max-w-md mb-8 leading-relaxed"
               >
                 Enzyme kinetics and molecular dynamics for research groups and
-                teaching labs. Real constants from the literature, audited
-                structures, simulations that say whether they converged. Every
-                number traceable to its citation.
+                teaching labs. Constants from the literature with their
+                references, audited structures, simulations that say whether
+                they converged. A number nobody measured says so.
               </motion.p>
 
               <motion.div
@@ -435,7 +436,7 @@ export default function CliApp() {
                 className="mb-5 text-[12px] text-fg/66"
               >
                 <TypedLine
-                  command="caterva agent --simulate 'lactate dehydrogenase with pyruvate'"
+                  command={'caterva compose "Michaelis-Menten with a competitive inhibitor" --subject 1.1.1.27 --organism human --substrate pyruvate --inhibitor gossypol'}
                   delayMs={500}
                   speedMs={18}
                 />
@@ -457,10 +458,10 @@ export default function CliApp() {
                   </svg>
                 </a>
                 <a
-                  href="#agent"
+                  href="#get"
                   className="inline-flex items-center gap-2 rounded-lg border border-signal/30 bg-signal/[0.06] px-5 py-2.5 text-[13px] text-signal font-medium transition-colors duration-200 hover:bg-signal/[0.10]"
                 >
-                  try the agent
+                  get caterva
                   <svg className="w-3.5 h-3.5" viewBox="0 0 12 12" fill="none">
                     <path
                       d="M2 6h7M6 2l4 4-4 4"
@@ -593,9 +594,9 @@ export default function CliApp() {
             Enzyme kinetics, exact stochastic kinetics, and the structure
             and molecular-dynamics tools that sit beside them.
           </p>
-          <TerminalWindow path="~ &mdash; caterva domains --list" glow>
+          <TerminalWindow path="~ &mdash; what it does" glow>
             <div className="mb-4 text-fg/92">
-              <span className="text-signal">$</span> caterva domains --list
+              <span className="text-signal">#</span> what it does
             </div>
             <div className="space-y-2">
               {DOMAINS.map((d, i) => (
@@ -608,13 +609,13 @@ export default function CliApp() {
                   className="flex items-start gap-3 text-[12px] group"
                 >
                   <span
-                    className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] uppercase tracking-wide transition-all ${
-                      d.status === "live"
+                    className={`mt-0.5 shrink-0 rounded-md px-1.5 py-0.5 text-[10px] tracking-wide transition-all ${
+                      d.status === "released"
                         ? "bg-signal/15 text-signal group-hover:bg-signal/20"
-                        : "bg-fg/5 text-fg/70 group-hover:bg-fg/[0.08]"
+                        : "bg-caution/10 text-caution/80 group-hover:bg-caution/15"
                     }`}
                   >
-                    {d.status}
+                    {STATUS_LABEL[d.status]}
                   </span>
                   <div>
                     <span className="text-fg/85 group-hover:text-fg transition-colors">
@@ -640,10 +641,11 @@ export default function CliApp() {
           </div>
           <h2 className="section-header">Test suite</h2>
           <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2">
-            {totals().passed.toLocaleString()} tests across the full stack
-            — zero failures.
+            {totals().passed.toLocaleString()} passing and{" "}
+            {totals().failed.toLocaleString()} failing across four suites, as
+            last measured. Each count names its run in the source.
           </p>
-          <TerminalWindow path="~ &mdash; caterva test --run --no-skip -v" glow>
+          <TerminalWindow path="~ &mdash; make test" glow>
             <TestPanelBody />
           </TerminalWindow>
         </Reveal>
@@ -658,9 +660,11 @@ export default function CliApp() {
             </span>
             <span className="h-px flex-1 bg-gradient-to-r from-caution/20 to-transparent" />
           </div>
-          <h2 className="section-header">Try the agent</h2>
-          <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2">
-            Describe your experiment. We handle the rest.
+          <h2 className="section-header">The agent</h2>
+          <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-lg">
+            Describe an experiment in plain language. It looks each constant up
+            and refuses to simulate on one it cannot source. It needs the API
+            server that ships with Caterva; where none is running, it says so.
           </p>
           <AgentSimulator
             key={rerunQuery}
@@ -681,7 +685,8 @@ export default function CliApp() {
           </div>
           <h2 className="section-header">Recent runs</h2>
           <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2">
-            Your past simulations, ready to re-run or export.
+            Runs you made with the agent, kept in this browser and nowhere
+            else.
           </p>
           <RecentRuns onReRun={setRerunQuery} />
         </Reveal>
@@ -717,9 +722,9 @@ export default function CliApp() {
         <TeamSection />
       </Suspense>
       <div className="section-divider-purple" />
-      {/* PRICING */}
+      {/* GET CATERVA (was a pricing table for tiers that do not exist) */}
       <Suspense fallback={<LazyFallback />}>
-        <PricingPlans />
+        <GetCaterva />
       </Suspense>
       <div className="section-divider-blue" />
       {/* HOW TO CITE */}
@@ -736,14 +741,12 @@ export default function CliApp() {
             </span>
             <span className="h-px flex-1 bg-gradient-to-r from-caution/20 to-transparent" />
           </div>
-          <h2 className="section-header">Join the waitlist</h2>
-          <TerminalWindow path="~ &mdash; caterva waitlist --join" glow>
-            <div className="mb-4 text-fg/92">
-              <span className="text-signal">$</span> caterva waitlist --join
-            </div>
+          <h2 className="section-header">Hear when a release ships</h2>
+          <TerminalWindow path="~ &mdash; updates" glow>
             <p className="text-fg/70 text-[13px] mb-6 leading-relaxed">
-              Caterva is pre-launch. Join the waitlist and we&apos;ll reach out
-              when a pilot spot opens up.
+              The next release will carry the structure and molecular dynamics
+              tools that are on the main branch today. Leave an email to hear
+              when it is out.
             </p>
             <div className="mb-4">
               <WaitlistCounter />
@@ -766,7 +769,7 @@ export default function CliApp() {
             <div className="flex items-center gap-3">
               <Mark size={16} className="text-fg" />
               <span>
-                enzyme kinetics and molecular dynamics, every number cited
+                enzyme kinetics and molecular dynamics, constants cited
               </span>
             </div>
             <div className="flex items-center gap-4">
@@ -783,10 +786,18 @@ export default function CliApp() {
                 cite
               </a>
               <a
-                href="#pricing"
+                href="#get"
                 className="text-fg/66 hover:text-fg/76 transition-colors"
               >
-                pricing
+                get caterva
+              </a>
+              <a
+                href="https://github.com/math12345678/caterva"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-fg/66 hover:text-fg/76 transition-colors"
+              >
+                github
               </a>
               <span className="flex items-center gap-1.5">
                 <span className="text-signal">exit</span>
@@ -801,7 +812,7 @@ export default function CliApp() {
             </div>
           </div>
           <div className="mt-4 flex flex-col md:flex-row items-center justify-between gap-1 text-[10px] text-fg/66">
-            <span>Built by Smyan Reddy and team &middot; Pre-launch</span>
+            <span>Built by Smyan Reddy &middot; Apache-2.0</span>
             <FooterMetrics />
           </div>
         </div>

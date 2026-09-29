@@ -122,14 +122,11 @@ export default function WorkflowCompare() {
         </p>
 
         <TerminalWindow
-          path={`~ — caterva compare --mode ${activeTab === "without" ? "traditional" : "caterva"}`}
+          path={`~ — ${activeTab === "without" ? "by hand" : "with caterva"}`}
           glow
         >
-          <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span>{" "}
-            <span className="font-mono text-[12px]">
-              caterva workflow --compare
-            </span>
+          <div className="mb-4 text-[11px] font-mono text-fg/60">
+            # the same model, built by hand and with caterva
           </div>
 
           {/* Toggle */}

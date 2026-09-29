@@ -107,7 +107,7 @@ export default function TestPanelBody() {
   return (
     <div>
       <div className="mb-4 text-fg/92">
-        <span className="text-signal">$</span> caterva test --run --no-skip
+        <span className="text-signal">$</span> make test
         -v
       </div>
 

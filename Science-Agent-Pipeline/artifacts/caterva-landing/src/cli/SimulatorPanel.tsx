@@ -63,7 +63,9 @@ export default function SimulatorPanel(_props: SimulatorPanelProps) {
     [km, vmax, s0, mmEnd],
   );
 
-  const command = `caterva simulate mm --km ${km} --vmax ${vmax} --s0 ${s0} --end ${mmEnd}`;
+  // Not a command: this panel integrates in the browser, and no Caterva
+  // command takes these flags. It once printed `caterva simulate mm ...`.
+  const command = `# Michaelis-Menten in this browser: Km ${km}, Vmax ${vmax}, S0 ${s0}, t ${mmEnd}`;
 
   return (
     <TerminalWindow path="~/caterva — live simulator" glow>
@@ -74,7 +76,7 @@ export default function SimulatorPanel(_props: SimulatorPanelProps) {
         transition={{ duration: 0.25 }}
         className="mb-5 text-fg/85 text-[12px]"
       >
-        <span className="text-signal">$</span> {command}
+        <span className="font-mono text-[11px] text-fg/60">{command}</span>
       </motion.div>
 
         <>

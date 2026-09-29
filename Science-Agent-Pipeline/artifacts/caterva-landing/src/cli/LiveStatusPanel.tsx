@@ -1,59 +1,88 @@
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import TerminalWindow from "./TerminalWindow";
 import Reveal from "./Reveal";
 
-interface ServiceStatus {
+// Where Caterva's numbers come from, and what runs where.
+//
+// This panel was "caterva status --all", a command that does not exist,
+// over a green status dot on a list that was never checked, beside an
+// uptime and a waitlist count fetched from an API a static page does not
+// have. It also said BRENDA supplies Vmax, which Caterva never looks up:
+// Vmax is kcat times the enzyme concentration you set (ADR 0013/0019).
+//
+// Each entry below is a host the code calls, read from the source on
+// 2026-09-29 (Tests/enzyme_lookup.py, caterva/prepare, caterva/structure),
+// and says what that service supplies and what it does not.
+interface Source {
   name: string;
-  endpoint: string;
-  description: string;
+  where: string;
+  supplies: string;
 }
 
-const SERVICES: ServiceStatus[] = [
+const REMOTE: Source[] = [
   {
     name: "BRENDA",
-    endpoint: "brenda-enzymes.org",
-    description: "Enzyme kinetic parameters (Km, Vmax, kcat)",
+    where: "brenda-enzymes.org",
+    supplies:
+      "Km, kcat and Ki rows, each with its organism, reference and the row's own commentary. Vmax is never looked up: it is kcat times the enzyme concentration you set.",
   },
   {
-    name: "PubMed",
-    endpoint: "eutils.ncbi.nlm.nih.gov",
-    description: "Literature citations & abstracts",
+    name: "UniProt",
+    where: "rest.uniprot.org",
+    supplies:
+      "Which protein an EC number and organism name, and the sequence a structure is checked against.",
   },
   {
-    name: "Caterva engine",
-    endpoint: "local · libRoadRunner",
-    description: "ODE integration, run on the machine that asks",
+    name: "PubChem",
+    where: "pubchem.ncbi.nlm.nih.gov",
+    supplies: "Other names for a compound, so one substance named two ways is recognised.",
   },
   {
-    name: "API Server",
-    endpoint: "this site's /api",
-    description: "Agent pipeline & SSE streaming",
+    name: "PubMed and CORE",
+    where: "eutils.ncbi.nlm.nih.gov · core.ac.uk",
+    supplies:
+      "Papers to read when BRENDA holds no value. Candidates for a person to check, never a number.",
+  },
+  {
+    name: "RCSB PDB",
+    where: "files.rcsb.org",
+    supplies: "Structures for the preparation audit and the molecular dynamics setup.",
   },
 ];
 
-const API_BASE = import.meta.env.VITE_API_URL || "";
+const LOCAL: Source[] = [
+  {
+    name: "Caterva engine",
+    where: "your machine",
+    supplies: "ODE and stochastic simulation (libRoadRunner), analysis, and the free-energy estimators.",
+  },
+  {
+    name: "GROMACS",
+    where: "your machine",
+    supplies:
+      "Molecular dynamics. Caterva writes the inputs and reads the trajectories; GROMACS runs the physics.",
+  },
+];
+
+function SourceRow({ s, i }: { s: Source; i: number }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+      className="grid grid-cols-1 sm:grid-cols-[9.5rem_1fr] gap-x-4 gap-y-0.5 py-2.5 border-b border-fg/[0.06] last:border-b-0"
+    >
+      <div className="min-w-0">
+        <div className="text-[12px] text-fg/88 font-sans font-medium">{s.name}</div>
+        <div className="text-[10px] text-fg/60 font-mono break-words">{s.where}</div>
+      </div>
+      <p className="text-[11px] text-fg/74 leading-relaxed">{s.supplies}</p>
+    </motion.div>
+  );
+}
 
 export default function LiveStatusPanel() {
-  const [uptime, setUptime] = useState<number | null>(null);
-  const [waitlist, setWaitlist] = useState<number | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    Promise.all([
-      fetch(`${API_BASE}/api/metrics`, { signal: controller.signal })
-        .then((r) => r.json().then((d) => Math.round(d.uptime / 3600)))
-        .catch(() => null),
-      fetch(`${API_BASE}/api/waitlist/count`, { signal: controller.signal })
-        .then((r) => r.json().then((d) => d.count))
-        .catch(() => null),
-    ]).then(([u, w]) => {
-      setUptime(u);
-      setWaitlist(w);
-    });
-    return () => controller.abort();
-  }, []);
-
   return (
     <section
       className="max-w-3xl mx-auto px-4 md:px-6 py-10 section-bg-blue"
@@ -62,78 +91,39 @@ export default function LiveStatusPanel() {
       <Reveal>
         <div className="flex items-center gap-4 mb-6">
           <span className="text-muted text-[11px] font-mono font-medium">
-            status
+            sources
           </span>
           <span className="h-px flex-1 bg-gradient-to-r from-muted/20 to-transparent" />
         </div>
-        <h2 className="section-header">System architecture</h2>
+        <h2 className="section-header">Where the numbers come from</h2>
         <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-md">
-          Data sources and compute infrastructure behind the pipeline.
+          Every service Caterva calls, what it supplies, and what it does not.
         </p>
 
-        <TerminalWindow path="~ — caterva status --all" glow>
-          <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span>{" "}
-            <span className="font-mono text-[12px]">
-              caterva status --all
-            </span>
+        <TerminalWindow path="~ — sources" glow>
+          <div className="mb-3 text-[11px] font-mono text-fg/60">
+            # looked up over the network
           </div>
-
-          {/* static reference, not a live check */}
-          <div className="flex items-center gap-3 mb-5 p-3 rounded-lg border border-fg/[0.08] bg-fg/[0.01]">
-            <div className="w-2.5 h-2.5 rounded-full bg-signal" />
-            <span className="text-[12px] text-fg/78 font-sans">
-              Data sources & infrastructure
-            </span>
-            {uptime !== null && (
-              <>
-                <span className="w-px h-3 bg-fg/[0.06]" />
-                <span className="text-[11px] text-fg/66 font-mono">
-                  {uptime}h uptime
-                </span>
-              </>
-            )}
-            {waitlist !== null && (
-              <>
-                <span className="w-px h-3 bg-fg/[0.06]" />
-                <span className="text-[11px] text-fg/66 font-mono">
-                  {waitlist} waiting
-                </span>
-              </>
-            )}
+          <div className="mb-5">
+            {REMOTE.map((s, i) => (
+              <SourceRow key={s.name} s={s} i={i} />
+            ))}
           </div>
-
-          {/* Service list */}
-          <div className="space-y-3">
-            {SERVICES.map((svc, i) => (
-              <motion.div
-                key={svc.name}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.4, delay: i * 0.06 }}
-                className="flex items-start gap-3 p-2.5 rounded-lg border border-fg/[0.06] hover:border-fg/[0.12] transition-all group"
-              >
-                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-signal" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-[12px] text-fg/78 font-sans font-medium">
-                      {svc.name}
-                    </span>
-                    <span className="text-[10px] text-fg/66 font-mono">
-                      {svc.endpoint}
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-fg/70">
-                    {svc.description}
-                  </p>
-                </div>
-              </motion.div>
+          <div className="mb-3 text-[11px] font-mono text-fg/60">
+            # computed on the machine that asks
+          </div>
+          <div>
+            {LOCAL.map((s, i) => (
+              <SourceRow key={s.name} s={s} i={i + REMOTE.length} />
             ))}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-fg/[0.08] text-[9px] text-fg/66 font-mono flex items-center justify-between">
-            <span>static reference</span>
-            <span>{SERVICES.length} services listed</span>
+          <div className="mt-4 pt-3 border-t border-fg/[0.08] space-y-1 text-[10px] text-fg/60 font-mono">
+            <p>
+              KEGG support is off by default: its licence terms need an
+              operator's agreement, given by setting CATERVA_ENABLE_KEGG.
+            </p>
+            <p>A list, not a live check. Read from the source code on 2026-09-29.</p>
           </div>
         </TerminalWindow>
       </Reveal>

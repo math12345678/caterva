@@ -78,23 +78,23 @@ export default function StickyCTA() {
           <div className="max-w-3xl mx-auto flex items-center justify-between gap-4 cta-inner">
             <div className="flex items-center gap-3">
               <div className="hidden sm:flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-signal animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-signal" />
                 <span className="text-[13px] text-fg/78 font-medium">
-                  Ready to try scientific simulation?
+                  Free and open source
                 </span>
               </div>
               <span className="text-[11px] text-fg/70 hidden md:inline">
-                Pre-launch — pilot spots available
+                Apache-2.0 · runs on your machine
               </span>
             </div>
 
             <div className="flex items-center gap-2">
               <Magnetic strength={0.1}>
                 <a
-                  href="#waitlist"
+                  href="#get"
                   className="inline-flex items-center gap-2 rounded-lg border border-signal/30 bg-signal/[0.08] px-4 py-2 text-[12px] text-signal font-medium transition-all duration-300 hover:bg-signal/[0.14]"
                 >
-                  Join waitlist
+                  Get Caterva
                   <svg className="w-3 h-3" viewBox="0 0 12 12" fill="none">
                     <path
                       d="M2 6h7M6 2l4 4-4 4"

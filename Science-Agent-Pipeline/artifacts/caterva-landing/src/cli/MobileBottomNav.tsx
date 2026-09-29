@@ -6,7 +6,7 @@ const NAV_ITEMS = [
   { id: "examples", label: "Demo", icon: "◉" },
   { id: "agent", label: "Agent", icon: "⚡" },
   { id: "simulate", label: "Sim", icon: "⟐" },
-  { id: "pricing", label: "Plans", icon: "◆" },
+  { id: "get", label: "Get", icon: "◆" },
 ];
 
 export default function MobileBottomNav() {

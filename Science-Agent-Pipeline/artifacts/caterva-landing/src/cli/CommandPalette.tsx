@@ -3,12 +3,13 @@ import { Command } from "cmdk";
 import { motion, AnimatePresence } from "framer-motion";
 
 const NAV_ITEMS = [
-  { id: "domains", label: "Simulation Domains", icon: "\u25C7" },
+  { id: "domains", label: "Capabilities", icon: "\u25C7" },
   { id: "tests", label: "Test Results", icon: "\u2713" },
   { id: "agent", label: "Agent Simulator", icon: "\u26A1" },
   { id: "runs", label: "Recent Runs", icon: "\u21BB" },
   { id: "simulate", label: "Live Simulator", icon: "\u25A6" },
-  { id: "waitlist", label: "Join Waitlist", icon: "\u2709" },
+  { id: "get", label: "Get Caterva", icon: "\u2193" },
+  { id: "waitlist", label: "Release updates", icon: "\u2709" },
 ];
 
 const EXAMPLE_QUERIES = [

@@ -7,46 +7,51 @@ import {
 import Reveal from "./Reveal";
 import TerminalWindow from "./TerminalWindow";
 
+// Rewritten 2026-09-29 against the repository. The previous answers
+// described a hosted "platform" with pilot spots, a waitlist "typically 1-2
+// weeks", planned paid tiers, a private repository and fifteen domains. The
+// repository is public, nothing is priced, and the non-enzyme
+// domains were archived on 2026-09-27.
 const FAQS = [
   {
     id: "what-is-caterva",
     q: "What is Caterva?",
-    a: 'Caterva is a scientific computing platform built for teaching labs. You describe a biological system in plain language — "lactate dehydrogenase with pyruvate" or "SIR outbreak with beta 0.3" — and Caterva resolves real kinetic parameters from BRENDA, with PubMed for supporting citations, then runs a verified ODE simulation with full provenance. Every number traces back to a citation.',
+    a: "Free, open-source software (Apache-2.0) for enzyme kinetics and molecular dynamics, run on your own machine. `caterva compose` builds an enzyme model from a one-line description and looks up Km, kcat and Ki in BRENDA, giving each value's reference, organism and assay conditions; a constant it cannot find stays a labelled placeholder. `caterva sim` runs exact stochastic kinetics. On the main branch, `prepare`, `md`, `analyze`, `bind`, `complex` and `fep` audit a structure, set up GROMACS, analyse the trajectories and hold a binding free energy to a cited Ki.",
   },
   {
     id: "how-accurate",
     q: "How accurate are the simulations?",
-    a: "Every domain is checked against something that is not the solver itself: an exact closed-form solution, an independent integrator (scipy's solve_ivp, which shares no code with roadrunner), or a physical invariant tested across the input space with Hypothesis. Tolerances vary by domain, from 1e-10 on the analytic cases to 1e-4 where a stochastic method makes anything tighter meaningless. Parameters are sourced exclusively from peer-reviewed literature — BRENDA for enzyme kinetics (Km, Ki, kcat) and PubMed for supporting citations. KEGG support is implemented but disabled by default: KEGG's terms require a licence for service providers and Caterva does not hold one, so no query reaches it unless an operator sets CATERVA_ENABLE_KEGG. Even enabled, it resolves substrate NAMES, never a kinetic value. We flag low-confidence values and never fabricate numbers. The RK4 integrator checks conserved quantities (population, mass) at every timestep.",
+    a: "Every solver is checked against something that is not itself: an exact closed-form solution, an independent integrator (scipy's solve_ivp, which shares no code with roadrunner), or a physical invariant tested across the input space with Hypothesis. That shows the equations are solved correctly. It is not validation against experiment: a model is as good as its constants, and the report says which were measured, which were chosen and which are placeholders nobody measured. The free-energy pipeline (`caterva fep`) has not yet been shown to reproduce a measured Ki, and it takes the ligand's force-field parameters from you rather than generating them.",
   },
   {
     id: "no-code",
     q: "Do I need to write code?",
-    a: "No. You ask questions in plain English. The natural language agent resolves your query into structured parameters, validates them against known bounds, and runs the simulation. You can also fine-tune parameters via sliders, and the terminal shell supports commands like `simulate mm --km 2 --vmax 5`.",
+    a: 'No programming, but it is a command-line tool. One line builds a model: `caterva compose "Michaelis-Menten with a competitive inhibitor" --subject 1.1.1.27 --organism human --substrate pyruvate --inhibitor gossypol`. The sliders on this page drive a Michaelis-Menten demo computed in your browser.',
   },
   {
     id: "domains",
-    q: "What scientific domains are supported?",
-    a: "Fifteen domains are built: enzyme kinetics (plain and competitively inhibited Michaelis-Menten), SIR/SEIR epidemiology, PCR amplification, Monte Carlo, population genetics (Wright-Fisher, one- and two-locus), Lennard-Jones molecular dynamics, Gillespie SSA (three variants), and three ODE oscillators — Lotka-Volterra, the Tyson cell-cycle model and the Elowitz-Leibler repressilator. We release a domain only after its suite passes; the counts in README.md are checked against the repository on every build by scripts/check_documented_counts.py.",
+    q: "What does it cover?",
+    a: "Enzymes. Michaelis-Menten kinetics, plain and inhibited, and mechanisms composed from a library of motifs, with constants from BRENDA; exact Gillespie SSA; and, on the main branch, structure audit, GROMACS setup with replicas, trajectory analysis and binding free energies. Epidemiology, population genetics, PCR and the oscillators were moved to archive/legacy_domains on 2026-09-27; the v0.4.0 release still runs them.",
   },
   {
     id: "pricing",
     q: "How much does it cost?",
-    a: "Caterva is pre-launch and currently free for pilot users. Join the waitlist and we'll reach out when spots open up — typically 1–2 weeks. We plan to offer free tiers for classrooms and researchers, with paid plans for high-throughput institutional use.",
+    a: "Nothing. Caterva is free, open-source software (Apache-2.0) that runs on your own machine. There is no account and no paid plan.",
   },
   {
     id: "data-sources",
     q: "Where do the parameters come from?",
-    a: "Parameters are sourced from BRENDA (the world's most comprehensive enzyme database) and PubMed. KEGG is integrated but off by default pending a licence, and supplies substrate names rather than parameter values. Every resolved value includes a citation trail — you can trace any number back to its source paper. No black-box AI hallucinations here.",
+    a: "Kinetic constants come from BRENDA, each with its reference, organism and assay conditions, and when BRENDA holds several values for one constant the report shows how far they spread. PubMed and CORE supply papers to read when BRENDA has nothing, never a value. KEGG support is off by default pending a licence, and supplies substrate names rather than values. Numbers you choose, such as concentrations, are labelled as chosen.",
   },
   {
     id: "self-host",
     q: "Can I run Caterva on my own infrastructure?",
-    a: "Not yet — the repository isn't public. The engine and literature layer are built to run locally and will ship Apache-2.0 licensed once it is; join the waitlist to hear when. In the meantime, the landing page simulator runs RK4 integration directly in your browser — no server required for basic exploration. The full pipeline (agent + SSE streaming) requires the API server.",
+    a: "Yes. The command-line tools run on your own machine and need nothing else. The agent on this page needs the API server in the repository (Science-Agent-Pipeline/artifacts/api-server); where that server is not running, the agent says so rather than answering.",
   },
   {
     id: "compare",
     q: "How does this compare to other simulation tools?",
-    a: "Unlike general-purpose ODE tools (Copasi, Caterva standalone), Caterva removes the parameter-hunting step. Unlike LLM-only science tools, every number is validated against real databases and closed-form solutions. The result: simulations you can cite in a lab report, not just interesting animations.",
+    a: "General-purpose tools such as COPASI and Tellurium simulate whatever constants you give them; finding those constants is left to you. Caterva looks them up in BRENDA, cites each one and labels any it could not find, then exports SBML and Antimony so the model opens in those tools. It does not replace them: its models are built from a library of mechanism motifs rather than written freely.",
   },
 ];
 
@@ -65,12 +70,12 @@ export default function FAQSection() {
         </div>
         <h2 className="section-header">Frequently asked questions</h2>
         <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
-          Everything you need to know about verified scientific simulation.
+          What it is, what it costs, and what it does not do.
         </p>
 
-        <TerminalWindow path="~ — caterva faq" glow>
+        <TerminalWindow path="~ — faq" glow>
           <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span> caterva faq --all
+            <span className="text-signal">#</span> frequently asked
           </div>
           <Accordion
             type="single"

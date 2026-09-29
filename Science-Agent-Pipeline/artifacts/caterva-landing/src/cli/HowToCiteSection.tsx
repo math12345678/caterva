@@ -70,10 +70,9 @@ export default function HowToCiteSection() {
           Every simulation is citable. Copy the BibTeX, APA, or Markdown below.
         </p>
 
-        <TerminalWindow path="~ — caterva cite --format bibtex" glow>
-          <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span> caterva cite --format{" "}
-            {activeTab}
+        <TerminalWindow path="~ — how to cite" glow>
+          <div className="mb-4 text-[11px] font-mono text-fg/60">
+            # {activeTab}
           </div>
 
           <div className="flex gap-1.5 mb-4">

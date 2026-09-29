@@ -1,7 +1,7 @@
 {
   "name": "caterva",
   "short_name": "caterva",
-  "description": "Enzyme kinetics and molecular dynamics, every number cited.",
+  "description": "Enzyme kinetics and molecular dynamics, with cited constants.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FDF8EE",

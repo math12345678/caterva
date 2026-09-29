@@ -17,19 +17,24 @@ const CONTRIBUTORS: Contributor[] = [
     role: "Creator & Lead Developer",
     gradient: "from-signal to-signal-deep",
     links: [
-      { label: "github", href: "https://github.com/smyan" },
+      // github.com/smyan is somebody else's account; this one owns the repo.
+      { label: "github", href: "https://github.com/math12345678" },
       { label: "email", href: "mailto:admin.terrium@gmail.com" },
     ],
   },
   {
     initials: "??",
     name: "You?",
-    role: "Contributor — join us",
+    role: "Contributor",
     gradient: "from-muted to-muted",
-    // The repository isn't public yet (see README.md's own "Not public
-    // yet" notice), so a "contribute" link to it would be a dead end for
-    // every visitor. The waitlist is the real, working way in today.
-    links: [{ label: "join waitlist", href: "#waitlist" }],
+    // The repository is public, so contributing is a real
+    // path now rather than a waitlist.
+    links: [
+      {
+        label: "contributing guide",
+        href: "https://github.com/math12345678/caterva/blob/main/CONTRIBUTING.md",
+      },
+    ],
   },
 ];
 
@@ -43,14 +48,14 @@ const ECOSYSTEM = [
   },
   {
     name: "KEGG",
-    desc: "Kyoto Encyclopedia of Genes and Genomes — pathway & genomic reference.",
+    desc: "Substrate names for an EC number. Off by default pending a licence.",
     url: "https://www.genome.jp/kegg/",
     color: "#6A6E78",
     emoji: "\u{1F517}",
   },
   {
     name: "PubMed",
-    desc: "30M+ biomedical citations — every parameter linked to its source paper.",
+    desc: "Papers to read when BRENDA holds no value, never a value itself.",
     url: "https://pubmed.ncbi.nlm.nih.gov",
     color: "#946522",
     emoji: "\u{1F4DA}",
@@ -61,6 +66,20 @@ const ECOSYSTEM = [
     url: "https://github.com/sys-bio/roadrunner",
     color: "#6A6E78",
     emoji: "\u26A1",
+  },
+  {
+    name: "GROMACS",
+    desc: "The molecular dynamics engine. Caterva writes its inputs and reads its trajectories.",
+    url: "https://www.gromacs.org",
+    color: "#5D7F8D",
+    emoji: "\u{1F9EA}",
+  },
+  {
+    name: "M-CSA",
+    desc: "Catalytic residues, which the structure audit ranks every defect against.",
+    url: "https://www.ebi.ac.uk/thornton-srv/m-csa/",
+    color: "#946522",
+    emoji: "\u{1F52C}",
   },
 ];
 
@@ -79,12 +98,13 @@ export default function TeamSection() {
         </div>
         <h2 className="section-header">Built by humans, for humans</h2>
         <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
-          A small team building big things. Open source, open science.
+          One developer, in the open. Every change is in the repository's
+          history.
         </p>
 
-        <TerminalWindow path="~ — caterva team --list" glow>
+        <TerminalWindow path="~ — who builds it" glow>
           <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span> caterva team --list
+            <span className="text-signal">#</span> who builds it
           </div>
 
           {/* Contributors grid */}
@@ -214,15 +234,16 @@ export default function TeamSection() {
               </svg>
             </span>
             <span className="text-fg/70">
-              Caterva will be Apache-2.0 licensed. The repository isn&apos;t
-              public yet &mdash;{" "}
+              Caterva is Apache-2.0 licensed and public at{" "}
               <a
-                href="#waitlist"
+                href="https://github.com/math12345678/caterva"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-muted/60 hover:text-muted transition-colors"
               >
-                join the waitlist
-              </a>{" "}
-              to hear when it is.
+                github.com/math12345678/caterva
+              </a>
+              . Issues and pull requests are welcome.
             </span>
           </div>
         </TerminalWindow>

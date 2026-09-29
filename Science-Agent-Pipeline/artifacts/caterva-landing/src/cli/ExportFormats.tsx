@@ -114,7 +114,13 @@ export default function ExportFormats() {
               transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
               className="relative"
             >
-              <pre className="cite-code-block text-[11px] leading-relaxed max-h-[400px] overflow-auto whitespace-pre">
+              <pre
+                className={`cite-code-block text-[11px] leading-relaxed max-h-[400px] overflow-auto ${
+                  // The methods section is prose and wraps; the rest are
+                  // files whose line breaks mean something.
+                  format === "methods" ? "whitespace-pre-wrap" : "whitespace-pre"
+                }`}
+              >
                 <code>{SAMPLE[format].text}</code>
               </pre>
               <button

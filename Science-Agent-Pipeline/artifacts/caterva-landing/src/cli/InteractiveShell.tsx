@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { totals } from "@/lib/testResults";
+import { DOMAINS, STATUS_LABEL } from "@/lib/domains";
 
 interface ShellLine {
   kind: "input" | "output";
@@ -27,7 +28,7 @@ const COMMANDS = [
   "status",
   "export",
   "cite",
-  "pricing",
+  "get",
   "version",
   "glossary",
   "playground",
@@ -47,11 +48,11 @@ function AboutOutput() {
 function HelpOutput() {
   const rows: [string, string][] = [
     ["about", "what caterva is"],
-    ["domains", "list simulation domains, live and planned"],
+    ["domains", "list the capabilities, and which release has each"],
     ["test", "jump to the real test suite results"],
     ["simulate", "jump to the live enzyme-kinetics simulator"],
     ["waitlist", "join the waitlist"],
-    ["pricing", "view pricing plans"],
+    ["get", "how to download or build caterva"],
     ["cite", "how to cite caterva in your work"],
     ["whoami", "who built this"],
     ["history", "show command history"],
@@ -78,26 +79,23 @@ function HelpOutput() {
 }
 
 function DomainsOutput() {
-  const domains = [
-    ["enzyme-kinetics", "live"],
-    ["stochastic-kinetics", "live"],
-    ["enzyme-structures", "live"],
-    ["gromacs-md-setup", "live"],
-  ];
+  // From lib/domains.ts, not a second hand-kept copy (this one had drifted
+  // to four entries, all "live").
+  const domains = DOMAINS.map((d) => [d.id, STATUS_LABEL[d.status]] as const);
   return (
     <div className="space-y-0.5">
       {domains.map(([name, status]) => (
         <div key={name} className="flex gap-3">
           <span
             className={
-              status === "live"
+              status === STATUS_LABEL.released
                 ? "text-signal w-36 shrink-0"
                 : "text-fg/70 w-36 shrink-0"
             }
           >
             {name}
           </span>
-          <span className="text-fg/66 uppercase text-[9px] mt-0.5">
+          <span className="text-fg/66 text-[9px] mt-0.5">
             {status}
           </span>
         </div>
@@ -364,12 +362,12 @@ export default function InteractiveShell({
         );
         onNavigate("cite");
         break;
-      case "pricing":
+      case "get":
         push(
           "output",
-          <span className="text-fg/70">opening pricing plans...</span>,
+          <span className="text-fg/70">opening how to get caterva...</span>,
         );
-        onNavigate("pricing");
+        onNavigate("get");
         break;
       case "glossary":
         push(

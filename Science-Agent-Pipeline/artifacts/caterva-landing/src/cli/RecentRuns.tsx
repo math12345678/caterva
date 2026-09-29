@@ -324,8 +324,8 @@ export default function RecentRuns({
 
   return (
     <TerminalWindow path="~/caterva — recent runs" glow>
-      <div className="mb-4 text-fg/92">
-        <span className="text-signal">$</span> caterva runs --recent
+      <div className="mb-4 text-[11px] font-mono text-fg/60">
+        # runs from this browser
       </div>
       <p className="text-fg/70 text-[12px] mb-5 leading-relaxed">
         Latest pipeline runs. Click a row to inspect, select two to compare.

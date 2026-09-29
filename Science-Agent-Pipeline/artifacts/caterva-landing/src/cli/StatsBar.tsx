@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import AnimatedCounter from "@/components/ui/animated-counter";
 import { totals } from "@/lib/testResults";
-import { LIVE_DOMAIN_COUNT } from "@/lib/domains";
+import { CAPABILITY_COUNT } from "@/lib/domains";
 
 const staticStats = [
   {
@@ -10,7 +10,7 @@ const staticStats = [
     suffix: "",
     label: "tests passing",
   },
-  { key: "domains", target: LIVE_DOMAIN_COUNT, suffix: "", label: "live capabilities" },
+  { key: "domains", target: CAPABILITY_COUNT, suffix: "", label: "capabilities built" },
 ];
 
 const API_BASE = import.meta.env.VITE_API_URL || "";

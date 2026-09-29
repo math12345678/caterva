@@ -155,12 +155,9 @@ export default function GlossarySection() {
           expand.
         </p>
 
-        <TerminalWindow path="~ — caterva glossary" glow>
-          <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span>{" "}
-            <span className="font-mono text-[12px]">
-              caterva glossary --all
-            </span>
+        <TerminalWindow path="~ — glossary" glow>
+          <div className="mb-4 text-[11px] font-mono text-fg/60">
+            # the terms this page and the reports use
           </div>
 
           {/* Category filter */}

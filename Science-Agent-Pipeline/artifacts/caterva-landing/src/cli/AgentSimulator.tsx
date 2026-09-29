@@ -514,8 +514,8 @@ export default function AgentSimulator({
 
   return (
     <TerminalWindow path="~/caterva — agent simulator" glow>
-      <div className="mb-5 text-fg/92">
-        <span className="text-signal">$</span> caterva agent --simulate
+      <div className="mb-5 text-[11px] font-mono text-fg/60">
+        # a question in plain language, resolved against the literature
       </div>
 
       {stage === "idle" && !resolvedDomain && !result && (

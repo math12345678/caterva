@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   "exports",
   "roadmap",
   "team",
-  "pricing",
+  "get",
   "cite",
   "status",
   "waitlist",
@@ -40,10 +40,10 @@ const LABELS: Record<string, string> = {
   exports: "Exports",
   roadmap: "Roadmap",
   team: "Team",
-  pricing: "Pricing",
+  get: "Get Caterva",
   cite: "Cite",
-  status: "Status",
-  waitlist: "Waitlist",
+  status: "Sources",
+  waitlist: "Updates",
 };
 
 export default function FloatingSectionCounter() {

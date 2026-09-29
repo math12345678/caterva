@@ -38,10 +38,7 @@ export default function FeatureCards() {
           <span>features</span>
           <span className="flex-1 h-px bg-fg/[0.06]" />
         </div>
-        <TerminalWindow path="~ — caterva features --list">
-          <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span> caterva features --list
-          </div>
+        <TerminalWindow path="~ — features">
           <div className="space-y-0">
             {FEATURES.map((f, i) => (
               <motion.div

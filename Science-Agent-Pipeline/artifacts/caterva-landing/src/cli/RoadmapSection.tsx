@@ -2,99 +2,94 @@ import { motion } from "framer-motion";
 import Reveal from "./Reveal";
 import TerminalWindow from "./TerminalWindow";
 
+// Rewritten 2026-09-29 against the repository and the v0.4.0 tag. The
+// previous list had a "Classroom Pilot Program" in progress (there is no
+// pilot), dated quarters for a batch API and for SBML export (SBML export
+// shipped in v0.4.0; nothing has a date), Helm charts under exploration,
+// every MD tool as "Live" although no release carries them, and the Ki
+// comparison as "Planned" although it is built. Statuses now say where a
+// thing is: in a release, on the main branch, or planned with no date.
 interface Milestone {
   id: string;
   title: string;
   desc: string;
-  status: "live" | "in-progress" | "planned" | "exploring";
-  eta?: string;
+  status: "released" | "main" | "planned";
   icon: string;
   color: string;
 }
 
 const MILESTONES: Milestone[] = [
   {
-    id: "classroom-pilot",
-    title: "Classroom Pilot Program",
-    desc: "First cohort of university teaching labs using Caterva for enzyme kinetics and molecular dynamics coursework.",
-    status: "in-progress",
-    eta: "Fall 2026",
-    icon: "\u{1F393}",
+    id: "compose",
+    title: "Enzyme Models with Cited Constants",
+    desc: "caterva compose: Michaelis-Menten, inhibition and composed mechanisms, with Km, kcat and Ki from BRENDA and a labelled placeholder wherever none was found.",
+    status: "released",
+    icon: "\u{1F9EC}",
     color: "#5D7F8D",
   },
   {
-    id: "batch-api",
-    title: "Batch Simulation API",
-    desc: "Submit multiple simulation queries at once. Ideal for parameter sweeps and sensitivity analysis.",
-    status: "planned",
-    eta: "Q1 2027",
-    icon: "\u2699",
-    color: "#946522",
-  },
-  {
-    id: "sbml-export",
-    title: "SBML Import & Export",
-    desc: "Interoperate with the broader systems biology ecosystem. Import existing SBML models, export Caterva runs.",
-    status: "planned",
-    eta: "Q3 2027",
+    id: "exports",
+    title: "SBML, Antimony, CSV and Methods Export",
+    desc: "caterva compose --export: every number carries its origin into the file, including what its source row measured and how far the other rows disagree.",
+    status: "released",
     icon: "\u{1F4E6}",
-    color: "#946522",
-  },
-  {
-    id: "self-hosted",
-    title: "Self-Hosted Deployment",
-    desc: "Docker Compose + Kubernetes Helm charts for universities wanting on-premise deployment.",
-    status: "exploring",
-    icon: "\u{1F3D7}",
-    color: "#6A6E78",
+    color: "#5D7F8D",
   },
   {
     id: "stochastic",
     title: "Exact Stochastic Kinetics",
-    desc: "Gillespie SSA: first-order decay, bimolecular association and replicate ensembles, each checked against its closed form.",
-    status: "live",
+    desc: "caterva sim: Gillespie SSA for first-order decay, bimolecular association and replicate ensembles, each checked against its closed form.",
+    status: "released",
     icon: "\u{1F3B2}",
     color: "#5D7F8D",
   },
   {
     id: "structure-audit",
     title: "Structure Preparation Audit",
-    desc: "caterva prepare: sequence differences, chain breaks and truncated side chains, ranked by distance to the M-CSA catalytic residues.",
-    status: "live",
+    desc: "caterva prepare: sequence differences, chain breaks, truncated side chains and uncertain protonation states, ranked by distance to the M-CSA catalytic residues.",
+    status: "main",
     icon: "\u{1F52C}",
-    color: "#5D7F8D",
+    color: "#946522",
   },
   {
     id: "md-replicas",
     title: "GROMACS Setup and Replicas",
     desc: "caterva md at the assay conditions of a cited constant, three replicas by default, and a convergence verdict from block averaging.",
-    status: "live",
+    status: "main",
     icon: "\u269B",
-    color: "#5D7F8D",
+    color: "#946522",
   },
   {
     id: "enzyme-analysis",
     title: "Enzyme Trajectory Analysis",
-    desc: "caterva analyze: catalytic geometry and active-site flexibility against the crystal, reported only when the replicas agree.",
-    status: "live",
+    desc: "caterva analyze: catalytic geometry, hydrogen bonds and active-site flexibility against the crystal, read natively from .xtc and reported only when the replicas agree.",
+    status: "main",
     icon: "\u{1F4CF}",
-    color: "#5D7F8D",
-  },
-  {
-    id: "ligands",
-    title: "Ligands with Provenance",
-    desc: "Parameterise bound substrates and inhibitors with GAFF2 or OpenFF, recording the charge method, and show where the two disagree.",
-    status: "planned",
-    icon: "\u{1F9EA}",
     color: "#946522",
   },
   {
     id: "ki-bridge",
-    title: "Simulation beside Measured Ki",
-    desc: "Binding free energies set beside the cited inhibition constant at its assay conditions, with both uncertainties shown.",
-    status: "planned",
+    title: "Binding Free Energy against a Cited Ki",
+    desc: "caterva bind, complex and fep: an absolute binding free energy run at the assay temperature of a cited Ki and judged against it. Built, and not yet shown to reproduce a measured Ki.",
+    status: "main",
     icon: "\u2696",
     color: "#946522",
+  },
+  {
+    id: "ligands",
+    title: "Ligands with Provenance",
+    desc: "Parameterise bound substrates and inhibitors with GAFF2 or OpenFF, recording the charge method, and show where the two disagree. Today the ligand topology is yours to supply.",
+    status: "planned",
+    icon: "\u{1F9EA}",
+    color: "#6A6E78",
+  },
+  {
+    id: "sbml-import",
+    title: "SBML Import",
+    desc: "Read an existing SBML model and resolve its constants the way compose does.",
+    status: "planned",
+    icon: "\u{1F4E5}",
+    color: "#6A6E78",
   },
 ];
 
@@ -102,26 +97,20 @@ const STATUS_CONFIG: Record<
   Milestone["status"],
   { label: string; bg: string; text: string; dot: string }
 > = {
-  live: {
-    label: "Live",
+  released: {
+    label: "In v0.4.0",
     bg: "bg-signal/15",
     text: "text-signal",
     dot: "bg-signal",
   },
-  "in-progress": {
-    label: "In Progress",
-    bg: "bg-muted/15",
-    text: "text-muted",
-    dot: "bg-muted animate-pulse",
-  },
-  planned: {
-    label: "Planned",
+  main: {
+    label: "On main",
     bg: "bg-caution/10",
     text: "text-caution/80",
     dot: "bg-caution/60",
   },
-  exploring: {
-    label: "Exploring",
+  planned: {
+    label: "Planned",
     bg: "bg-fg/[0.04]",
     text: "text-fg/70",
     dot: "bg-fg/20",
@@ -141,15 +130,15 @@ export default function RoadmapSection() {
           </span>
           <span className="h-px flex-1 bg-gradient-to-r from-muted/20 to-transparent" />
         </div>
-        <h2 className="section-header">What's coming next</h2>
-        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-sm">
-          Our public roadmap. Everything we're building, in the open.
+        <h2 className="section-header">What exists, and what is next</h2>
+        <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2 max-w-md">
+          Where each tool is today: in a release, on the main branch, or
+          planned with no date.
         </p>
 
-        <TerminalWindow path="~ — caterva roadmap --list" glow>
-          <div className="mb-4 text-fg/92">
-            <span className="text-signal">$</span> caterva roadmap --list
-            --sort=status
+        <TerminalWindow path="~ — roadmap" glow>
+          <div className="mb-4 text-[11px] font-mono text-fg/60">
+            # released, built, planned
           </div>
 
           {/* Status legend */}
@@ -162,7 +151,7 @@ export default function RoadmapSection() {
             ).map(([key, cfg]) => (
               <span
                 key={key}
-                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-wide ${cfg.bg} ${cfg.text}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] tracking-wide ${cfg.bg} ${cfg.text}`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
                 {cfg.label}
@@ -222,15 +211,10 @@ export default function RoadmapSection() {
                           {m.title}
                         </h3>
                         <span
-                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] uppercase tracking-wide ${cfg.bg} ${cfg.text}`}
+                          className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] tracking-wide ${cfg.bg} ${cfg.text}`}
                         >
                           {cfg.label}
                         </span>
-                        {m.eta && (
-                          <span className="text-[10px] text-fg/66 font-mono">
-                            {m.eta}
-                          </span>
-                        )}
                       </div>
                       <p className="text-[12px] text-fg/70 leading-relaxed group-hover:text-fg/70 transition-colors">
                         {m.desc}

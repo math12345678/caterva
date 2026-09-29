@@ -102,8 +102,7 @@ export const WaitlistForm: React.FC<{
                 You&apos;re on the list.
               </p>
               <p className="text-[12px] text-fg/70 mt-0.5">
-                We&apos;ll notify you when your spot is ready. Typically 1–2
-                weeks.
+                You&apos;ll hear when the next release is out.
               </p>
             </div>
           </div>
@@ -164,7 +163,7 @@ export const WaitlistForm: React.FC<{
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
             >
-              {loading ? <LoadingDots /> : "Join Waitlist"}
+              {loading ? <LoadingDots /> : "Notify me"}
             </motion.button>
           </Magnetic>
 
@@ -188,7 +187,7 @@ export const WaitlistForm: React.FC<{
             className="mt-3 text-[10px] leading-relaxed text-fg/70 font-mono"
           >
             Your email is stored on our own server so we can tell you when
-            Caterva is ready. Not shared, not sold, no mailing list, no
+            a release ships. Not shared, not sold, no mailing list, no
             tracking. Email{" "}
             <a
               href="mailto:admin.terrium@gmail.com"

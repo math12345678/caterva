@@ -1,4 +1,4 @@
-import { GUARD_COUNT, LIVE_DOMAIN_COUNT } from "@/lib/domains";
+import { CAPABILITY_COUNT, GUARD_COUNT } from "@/lib/domains";
 import { useEffect, useState, useRef } from "react";
 import { motion } from "framer-motion";
 import AnimatedCounter from "@/components/ui/animated-counter";
@@ -26,9 +26,9 @@ const METRICS: MetricItem[] = [
   },
   {
     key: "domains",
-    target: LIVE_DOMAIN_COUNT,
+    target: CAPABILITY_COUNT,
     suffix: "",
-    label: "live capabilities",
+    label: "capabilities built",
     color: "#6A6E78",
   },
   {
