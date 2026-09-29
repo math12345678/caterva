@@ -254,9 +254,34 @@ def test_golden_found_output_shape(monkeypatch):
         # FOUND results, not only withheld ones: `unstated` is the majority
         # case in BRENDA and it is not the same as wild-type.
         "variant": None,
+        # The chosen row's commentary, verbatim, and what it says was
+        # measured. None because `golden_result()` carries no commentary;
+        # the populated case is test_row_scope_crosses_the_boundary.
+        "commentary": None,
+        "rowScope": None,
         "literatureCandidates": [],
         "logs": ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
     }
+
+
+def test_row_scope_crosses_the_boundary(monkeypatch):
+    """A row's commentary and its parsed scope must reach the JSON.
+
+    The null golden case cannot tell "transmitted" from "dropped", so this
+    carries the gossypol row BRENDA returns for human LDH (ref 711801):
+    LDH-B, and no inhibition mode stated.
+    """
+    row = golden_result()
+    row.commentary = ("LDH-B, pH not specified in the publication, "
+                      "temperature not specified in the publication")
+    result = run_main(
+        monkeypatch,
+        lambda *a, **k: row,
+        {"enzymeName": "lactate dehydrogenase", "substrate": "gossypol",
+         "organism": "Homo sapiens", "ecNumber": "1.1.1.27", "quantity": "ki"},
+    )
+    assert result["commentary"] == row.commentary
+    assert result["rowScope"] == {"isoform": "LDH-B", "inhibitionMode": "unstated", "versus": None}
 
 
 def test_assay_conditions_cross_the_boundary(monkeypatch):

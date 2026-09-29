@@ -203,8 +203,12 @@ export const TEST_SUITES: TestSuite[] = [
         // run for real with them present (10 passed) -- so, as for the
         // engine row, the figure here is the one where npm works: 1174.
         // 2026-09-28: one parametrized SIR export case left with that
-        // domain; the collected count is now 1173.
-        passed: 1173,
+        // domain; the collected count is now 1173. CI on 2026-09-29 (run
+        // 36611881353): 1172 passed, 2 skipped, and 1 failed -- the runner's
+        // golden output shape, which now carries `commentary` and
+        // `rowScope`; the expectation was updated and a populated boundary
+        // test added (both passed locally): 1174.
+        passed: 1174,
         skipped: 1,
         failed: 0,
       },

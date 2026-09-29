@@ -2,7 +2,7 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-The literature layer and its 91 files — 1,174 tests.
+The literature layer and its 91 files — 1,175 tests.
 
 This is what makes Caterva more than a solver: the resolvers that fetch real
 measured kinetic parameters from BRENDA and PubMed, the citation verifier, and the
