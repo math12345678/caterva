@@ -101,6 +101,41 @@ def setup(a) -> int:
     return EXIT_OK
 
 
+def _leg(directory: Path, leg: str, rep: int, n_windows: int, lines: List[str], warnings: List[str]):
+    """(ΔG, σ) kJ/mol for one leg of one replica, from Caterva's own MBAR on
+    the raw dhdl files when every window wrote every state's energy; from
+    `gmx bar`'s log otherwise (runs set up before the estimator existed)."""
+    from caterva.fep.core import read_bar
+    from caterva.fep.estimators import analyse_leg
+    d = directory / leg / f"rep{rep}"
+    xvgs = [d / f"lambda{i}" / "prod.xvg" for i in range(n_windows)]
+    if all(x.is_file() and x.stat().st_size > 0 for x in xvgs):
+        try:
+            a = analyse_leg(xvgs)
+        except ValueError as e:
+            if "calc-lambda-neighbors" not in str(e):
+                lines.append(f"  rep{rep}: {leg} leg unreadable: {e}")
+                return None
+        else:
+            gmx = ""
+            if (d / "bar.log").is_file():
+                g, ge = read_bar((d / "bar.log").read_text())
+                gmx = f"; gmx bar {g:.2f} ± {ge:.2f}"
+            lines.append(
+                f"  rep{rep} {leg:<7} MBAR {a.dg_mbar:8.2f} ± {a.err_mbar:.2f} kJ/mol (BAR {a.dg_bar:.2f} ± "
+                f"{a.err_bar:.2f}{gmx}); {sum(a.samples_used)} independent of {sum(a.samples_raw)} samples, "
+                f"min overlap {a.min_overlap:.3f} ({a.min_overlap_pair[0]}-{a.min_overlap_pair[1]})")
+            warnings.extend(f"rep{rep} {leg}: {w}" for w in a.warnings)
+            return a.dg_mbar, a.err_mbar
+    log = d / "bar.log"
+    if not log.is_file():
+        lines.append(f"  rep{rep}: {leg} leg not finished (no prod.xvg for every window, no bar.log)")
+        return None
+    g, ge = read_bar(log.read_text())
+    lines.append(f"  rep{rep} {leg:<7} gmx bar {g:8.2f} ± {ge:.2f} kJ/mol (no all-state energies for MBAR)")
+    return g, ge
+
+
 def summarise(directory: Path) -> int:
     from caterva.fep.core import read_bar
     rec_path = directory / "caterva-fep.json"
@@ -111,16 +146,16 @@ def summarise(directory: Path) -> int:
     rec = json.loads(rec_path.read_text())
     per_rep: List[float] = []
     bar_errs: List[float] = []
-    lines = []
+    lines: List[str] = []
+    warnings: List[str] = []
     for rep in range(1, rec["replicas"] + 1):
         legs = {}
         for leg in ("complex", "solvent"):
-            log = directory / leg / f"rep{rep}" / "bar.log"
-            if not log.is_file():
+            got = _leg(directory, leg, rep, rec["windows"][leg], lines, warnings)
+            if got is None:
                 legs = None
-                lines.append(f"  rep{rep}: {leg} leg not finished ({log} missing)")
                 break
-            legs[leg] = read_bar(log.read_text())
+            legs[leg] = got
         if legs is None:
             continue
         (gc, ec), (gs, es) = legs["complex"], legs["solvent"]
@@ -137,6 +172,8 @@ def summarise(directory: Path) -> int:
     print(f"TARGET  {lo:.2f} to {hi:.2f} kcal/mol ({', '.join('BRENDA ref ' + r for r in t['references'])})")
     for c in t["caveats"]:
         print(f"  caveat: {c}")
+    for w in warnings:
+        print(f"  WARNING {w}")
     if len(per_rep) < 2:
         print(f"NOT A RESULT: {len(per_rep)} finished replica(s). One run's BAR error is its "
               f"statistical error, not the spread between independent runs.")

@@ -19,7 +19,17 @@ done: there was no release to version.
   assay temperatures, filtered by inhibition mode (`--state free|ternary`)
   and isoform (`--isoform`), and a computed free energy is judged against
   the band at 2σ (exit 0 agrees, 4 disagrees). See docs/USING_CATERVA.md.
-- `caterva bind --survey`: every inhibitor's target for an enzyme, per
+- Caterva's own free-energy estimators: MBAR, BAR, equilibration
+  detection, statistical-inefficiency subsampling, overlap and
+  forward/reverse convergence, validated on harmonic oscillators with
+  exact answers and calibrated error bars; `caterva fep --summarise` uses
+  them on the raw dhdl files. The FEP setup now writes energies at every
+  state (`calc-lambda-neighbors = -1`) so MBAR can use them.
+- `caterva complex --check`: did the ligand keep its crystal pose, with
+  symmetric poses counted as one (graph automorphisms from the .itp).
+- `caterva fep`'s solvent build starts from a pristine topology, so an
+  interrupted build can be re-run (solvate had counted the water twice).
+ every inhibitor's target for an enzyme, per
   compound, species and isoform, marked as a benchmark only with two
   publications, a stated mode and a stated temperature.
 - The API tests replay a recorded real BRENDA page for EC 2.7.1.1

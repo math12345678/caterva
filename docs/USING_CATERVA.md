@@ -519,6 +519,18 @@ equilibrates (NVT, NPT, protein restrained) with the same settings as
 On 181L, an ideal benzene built elsewhere and rotated at random fits the
 crystal's at 0.026 Å.
 
+After `build.sh`, `caterva complex --check t4l --ligand BNZ` says whether
+the ligand kept its crystal pose through equilibration: the protein's
+C-alpha atoms are superposed on the start, and the ligand's heavy atoms
+are compared (exit 4 when they moved more than 2 Å), counting the
+molecule's symmetric poses as one. Its graph symmetries are found from the
+.itp's bonds (benzene has twelve). On 181L the benzene read 2.70 Å by atom
+name and 0.77 Å counting symmetry, with its centroid 0.29 Å from where it
+started: it had turned in its cavity, not left it. A ligand that
+wandered off during 200 ps of equilibration would take the Boresch
+restraints `caterva fep` chooses with it, so this is checked before the
+compute is spent.
+
 ### `caterva fep`: a binding free energy that knows what it must reproduce
 
 ```bash
@@ -550,6 +562,20 @@ replica, ΔG°bind = ΔG_solvent + ΔG_restraints_on − ΔG_complex, reports
 the mean ± the larger of the SEM and the propagated BAR error, and judges
 it at 2σ (exit 0 agrees, 4 disagrees). Fewer than two finished replicas
 is not a result.
+
+The legs are integrated by Caterva's own estimators
+(`caterva/fep/estimators.py`), not by `gmx bar` alone: per window,
+equilibration is detected (Chodera 2016) and the samples are thinned to
+independent ones at the statistical inefficiency (Chodera et al. 2007);
+MBAR (Shirts & Chodera 2008) then uses every sample at every state, with
+BAR over neighbours beside it. The report gives the smallest overlap
+between neighbouring states, whether the first and second halves of the
+data agree, and whether MBAR and BAR agree, and says which fails. Their
+tests are harmonic oscillators, whose free energies are known exactly:
+the estimates recover them, and the 2σ error bars cover the exact answer
+about 95% of the time over hundreds of datasets. That test caught a wrong
+BAR variance (69% coverage) and a statistical inefficiency that read 3.5
+for a process whose exact value is 3.0, both fixed.
 
 It has been run end to end on T4 lysozyme L99A with benzene (PDB 181L),
 GROMACS 2026.1: 118 windows over two replicas and both legs, BAR, the

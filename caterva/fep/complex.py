@@ -18,7 +18,10 @@ protein restrained, at the temperature you name (by default the one
 `caterva fep` will run at, if you pass the same Ki). Crystal waters and
 every other HETATM are dropped, and listed.
 
-Exit codes: 0 written, 3 refused and said why, 2 malformed question, 1 a crash.
+    caterva complex --check t4l --ligand BNZ      (after build.sh)
+
+Exit codes: 0 written (or: the ligand kept its pose), 4 it left its pose,
+3 refused and said why, 2 malformed question, 1 a crash.
 """
 from __future__ import annotations
 
@@ -198,7 +201,7 @@ def ligand_gro(atoms: Sequence[LigandAtom], resname: str) -> str:
     return "\n".join(lines) + "\n"
 
 
-def build_script(pdb_id: str, moltype: str, itp_name: str, setup: MdSetup) -> str:
+def build_script(pdb_id: str, moltype: str, itp_name: str, setup: MdSetup, resname: str = "") -> str:
     ff, water, seed = setup.force_field, setup.water, setup.seed
     return f"""#!/usr/bin/env bash
 # Caterva complex: PDB {pdb_id.upper()} with {moltype} in its crystal pose. Read BUILD.md.
@@ -235,26 +238,171 @@ echo SOL | "$GMX" genion -s ions.tpr -o ionized.gro -p topol.top -pname NA -nnam
 "$GMX" mdrun -deffnm nvt $MDRUN_FLAGS
 "$GMX" grompp -f npt.mdp -c nvt.gro -r nvt.gro -t nvt.cpt -p topol.top -o npt.tpr
 "$GMX" mdrun -deffnm npt $MDRUN_FLAGS
-echo "done: equilibrated complex in $(pwd)/npt.gro, topology $(pwd)/topol.top"
+echo "done: equilibrated complex in $(pwd)/npt.gro, topology $(pwd)/topol.top"\necho "check the pose held: caterva complex --check $(pwd) --ligand {resname or moltype}"
 """
+
+
+#: A ligand whose heavy atoms moved more than this from the crystal pose,
+#: after the protein is superposed, is reported as having left it. 2 A: a
+#: chosen threshold, about the distance at which a pose is called different
+#: in docking benchmarks.
+POSE_KEPT_NM = 0.20
+
+
+def _gro(path: Path):
+    lines = Path(path).read_text().splitlines()
+    n = int(lines[1].split()[0])
+    return [(l[5:10].strip(), l[10:15].strip(), np.array([float(l[20:28]), float(l[28:36]), float(l[36:44])]))
+            for l in lines[2:2 + n]]
+
+
+def itp_graph(itp: Path) -> Tuple[List[str], List[str], List[Tuple[int, int]]]:
+    """(atom names, elements, bonds as 0-based pairs) from an .itp's first
+    moleculetype. Elements are read from the atom names' leading letters."""
+    names, bonds, section = [], [], None
+    for raw in Path(itp).read_text().splitlines():
+        line = raw.split(";", 1)[0].strip()
+        if not line:
+            continue
+        if line.startswith("["):
+            section = line.strip("[] ").lower()
+            if section == "moleculetype" and names:
+                break
+            continue
+        f = line.split()
+        if section == "atoms" and len(f) >= 5:
+            names.append(f[4])
+        elif section == "bonds" and len(f) >= 2:
+            bonds.append((int(f[0]) - 1, int(f[1]) - 1))
+    return names, [_element(n) for n in names], bonds
+
+
+def automorphisms(elements: Sequence[str], bonds: Sequence[Tuple[int, int]], limit: int = 20000) -> List[List[int]]:
+    """Every relabelling of the atoms that keeps elements and bonds, by
+    backtracking (the molecule's graph symmetries). Benzene's heavy atoms
+    have 12; an asymmetric ligand has 1. Capped, and the cap is reported
+    by the caller rather than silently truncating a symmetric answer."""
+    n = len(elements)
+    adj = [set() for _ in range(n)]
+    for i, j in bonds:
+        adj[i].add(j); adj[j].add(i)
+    deg = [len(a) for a in adj]
+    order = sorted(range(n), key=lambda i: -deg[i])
+    out: List[List[int]] = []
+    image = [-1] * n
+    used = [False] * n
+
+    def extend(k: int) -> None:
+        if len(out) >= limit:
+            return
+        if k == n:
+            out.append(image.copy())
+            return
+        i = order[k]
+        for j in range(n):
+            if used[j] or elements[j] != elements[i] or deg[j] != deg[i]:
+                continue
+            if any(image[a] != -1 and image[a] not in adj[j] for a in adj[i]):
+                continue
+            image[i], used[j] = j, True
+            extend(k + 1)
+            image[i], used[j] = -1, False
+
+    extend(0)
+    return out
+
+
+def symmetric_rmsd(A: np.ndarray, B: np.ndarray, perms: Sequence[Sequence[int]]) -> float:
+    """min over graph symmetries of RMSD(A, B[perm])."""
+    return min(float(np.sqrt(((A - B[list(p)]) ** 2).sum(1).mean())) for p in perms)
+
+
+def check(directory: Path, resname: str, itp: Optional[Path] = None) -> Tuple[float, float, int]:
+    """(ligand heavy-atom RMSD nm, protein C-alpha RMSD nm, C-alpha count)
+    between the built start (boxed.gro) and the equilibrated npt.gro, after
+    superposing the protein's C-alpha atoms."""
+    start, end = _gro(directory / "boxed.gro"), _gro(directory / "npt.gro")
+    n = len(start)
+    if [a[:2] for a in end[:n]] != [a[:2] for a in start]:
+        raise ValueError("npt.gro does not begin with the atoms of boxed.gro; not this build's output")
+    ca = [i for i, (res, name, _) in enumerate(start) if name == "CA" and res != resname]
+    lig = [i for i, (res, name, _) in enumerate(start) if res == resname and not name.upper().startswith("H")]
+    if len(ca) < 3 or not lig:
+        raise ValueError(f"need C-alpha atoms and {resname} heavy atoms in {directory}/boxed.gro")
+    P = np.array([end[i][2] for i in ca]); Q = np.array([start[i][2] for i in ca])
+    R, t = kabsch(P, Q)
+    ca_rmsd = float(np.sqrt((((P @ R + t) - Q) ** 2).sum(1).mean()))
+    L = np.array([end[i][2] for i in lig]) @ R + t
+    L0 = np.array([start[i][2] for i in lig])
+    perms: List[List[int]] = [list(range(len(lig)))]
+    itp = itp or next((p for p in sorted(directory.glob("*.itp")) if not p.name.startswith("posre")
+                       and resname in p.read_text()), None)
+    if itp is not None:
+        names, elems, bonds = itp_graph(itp)
+        heavy = [k for k, e in enumerate(elems) if e != "H"]
+        lig_names = [start[i][1] for i in lig]
+        if [names[k] for k in heavy] == lig_names:
+            remap = {k: m for m, k in enumerate(heavy)}
+            hb = [(remap[a], remap[b]) for a, b in bonds if a in remap and b in remap]
+            perms = automorphisms([elems[k] for k in heavy], hb)
+    return symmetric_rmsd(L0, L, perms), ca_rmsd, len(ca)
+
+
+def centroid_shift(directory: Path, resname: str) -> float:
+    """How far the ligand's heavy-atom centroid moved, protein superposed:
+    blind to symmetry and to rotation in place, so it says whether the
+    ligand stayed where it was even when the RMSD cannot."""
+    start, end = _gro(directory / "boxed.gro"), _gro(directory / "npt.gro")
+    ca = [i for i, (res, name, _) in enumerate(start) if name == "CA" and res != resname]
+    lig = [i for i, (res, name, _) in enumerate(start) if res == resname and not name.upper().startswith("H")]
+    P = np.array([end[i][2] for i in ca]); Q = np.array([start[i][2] for i in ca])
+    R, t = kabsch(P, Q)
+    c1 = (np.array([end[i][2] for i in lig]) @ R + t).mean(0)
+    c0 = np.array([start[i][2] for i in lig]).mean(0)
+    return float(np.linalg.norm(c1 - c0))
 
 
 def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") -> int:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--pdb", required=True, help="PDB entry id, or a local .pdb file")
+    p.add_argument("--check", type=Path, metavar="DIR",
+                   help="after build.sh: did the ligand keep its crystal pose through equilibration?")
+    p.add_argument("--pdb", help="PDB entry id, or a local .pdb file")
     p.add_argument("--chain", help="keep one chain (and take the ligand from it)")
-    p.add_argument("--ligand", required=True, help="the ligand's residue name in the entry (e.g. BNZ)")
-    p.add_argument("--ligand-itp", type=Path, required=True, help="your ligand topology (.itp)")
-    p.add_argument("--ligand-coords", type=Path, required=True,
+    p.add_argument("--ligand", help="the ligand's residue name in the entry (e.g. BNZ)")
+    p.add_argument("--ligand-itp", type=Path, help="your ligand topology (.itp)")
+    p.add_argument("--ligand-coords", type=Path,
                    help="the coordinates your parameterisation tool wrote (.gro or .pdb), same atom names as the itp")
     p.add_argument("--temperature", type=float, default=298.15, help="kelvin (default 298.15, chosen)")
-    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--out", type=Path)
     try:
         a = p.parse_args(argv)
     except SystemExit as e:
         return EXIT_USAGE if e.code else EXIT_OK
 
+    if a.check:
+        if not a.ligand:
+            print(f"{prog}: --check needs --ligand (the residue name)", file=sys.stderr)
+            return EXIT_USAGE
+        try:
+            rmsd, ca, n = check(a.check, a.ligand)
+        except (OSError, ValueError) as e:
+            print(f"{prog}: {e}", file=sys.stderr)
+            return EXIT_REFUSED
+        kept = rmsd <= POSE_KEPT_NM
+        shift = centroid_shift(a.check, a.ligand)
+        print(f"{a.ligand}: heavy atoms {rmsd * 10:.2f} A from the crystal pose after equilibration, "
+              f"counting its symmetry-equivalent poses as the same pose; centroid moved "
+              f"{shift * 10:.2f} A (protein superposed on {n} C-alpha atoms, which moved {ca * 10:.2f} A).")
+        print("KEPT its pose: ready for caterva fep." if kept else
+              f"LEFT its pose (more than {POSE_KEPT_NM * 10:.0f} A): the restraints caterva fep would "
+              "choose would hold a pose the complex does not have. Check the ligand topology and "
+              "protonation before spending the compute.")
+        return EXIT_OK if kept else 4
+    missing = [f for f in ("pdb", "ligand", "ligand_itp", "ligand_coords", "out") if getattr(a, f) is None]
+    if missing:
+        print(f"{prog}: missing " + ", ".join("--" + m.replace("_", "-") for m in missing), file=sys.stderr)
+        return EXIT_USAGE
     for f in (a.ligand_itp, a.ligand_coords):
         if not f.is_file():
             print(f"{prog}: {f} does not exist", file=sys.stderr)
@@ -293,7 +441,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") ->
     (out / "em.mdp").write_text(mdps["em.mdp"])
     (out / "nvt.mdp").write_text(mdps["rep1/nvt.mdp"])
     (out / "npt.mdp").write_text(mdps["npt.mdp"])
-    (out / "build.sh").write_text(build_script(pdb_id, moltype, a.ligand_itp.name, setup))
+    (out / "build.sh").write_text(build_script(pdb_id, moltype, a.ligand_itp.name, setup, a.ligand))
     (out / "BUILD.md").write_text(
         f"# Complex: PDB {pdb_id.upper()} + {a.ligand}\n\n"
         f"- Ligand pose: the entry's {a.ligand} ({where}); your coordinates superposed onto it "
