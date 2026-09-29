@@ -54,6 +54,10 @@ done: there was no release to version.
   `scripts/refresh_export_samples.py`. The panel had shown a command that
   does not exist, a JSON format the CLI does not write, and a CSV
   trajectory where the real CSV is the parameter audit trail.
+- `caterva analyze` reports the chi1 rotamer of each catalytic residue:
+  per replica, the fraction of frames in the well it started in (+60, 180
+  or -60), and kept, flipped, partial or replicas disagree. The angles
+  equal `gmx angle`'s to 0.001 degree on real lysozyme frames.
 - `caterva compose --isoform NAME`: each constant comes from a row that
   measured that isoform. For human LDH and gossypol, `--isoform LDH-A`
   gives LDH-A's Ki (0.0019 mM) where the resolver's pick was LDH-B's

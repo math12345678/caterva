@@ -28,3 +28,9 @@ the matching atoms of that run's em.gro. `lyso_1aki_rep1_gmx_hbond.txt`:
 per-frame hydrogen-bond counts from `gmx hbond -r 'resnr A and not name N H
 O C CA HA OC1 OC2' -t '<same for B>'` on the full trajectory, one line per
 catalytic pair (A B then 21 counts).
+
+`lyso_1aki_rep1_gmx_chi1.txt`: chi1 (N-CA-CB-gamma) of six catalytic
+residues, one line each (residue number, name, then the 21 per-frame angles
+in degrees), from `gmx angle -type dihedral` (GROMACS 2026.1, 2026-09-29) on
+`lyso_1aki_res1-59.xtc` with an index of the four atoms per residue taken
+from `lyso_1aki_res1-59.gro.gz`.

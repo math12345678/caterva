@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "109 test files -- kinetics & Michaelis-Menten correctness, " +
+          "110 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -185,8 +185,10 @@ export const TEST_SUITES: TestSuite[] = [
         // test that the GROMACS route fits gmx rmsf to a whole reference
         // (18 passed with test_analyze.py, 2026-09-29): 3064. Plus the 13
         // `compose --isoform` tests and the guide check of its example
-        // (all passed 2026-09-29): 3078.
-        passed: 3078,
+        // (all passed 2026-09-29): 3078. Plus the 18 chi1 rotamer tests,
+        // anchored on gmx angle's per-frame output (all passed): 3096. Plus
+        // 1 test that a one-frame run has no RMSF on either route: 3097.
+        passed: 3097,
         skipped: 0,
         failed: 0,
       },

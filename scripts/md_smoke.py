@@ -67,6 +67,13 @@ def main() -> int:
                     "--out", str(OUT), "--ns", "0.001", "--replicas", "2"], check=True, cwd=ROOT)
     em = OUT / "em.mdp"
     em.write_text(re.sub(r"^nsteps\s*=\s*50000$", "nsteps          = 500", em.read_text(), flags=re.M))
+    # A frame every 50 steps, so the 200-step production run keeps five and
+    # RMSF has something to fluctuate over. At the setup's own interval it
+    # kept only frame 0, where the native route rightly measures no RMSF and
+    # gmx rmsf printed 0.0001 nm of rounding; nothing compared the two.
+    md = OUT / "md.mdp"
+    md.write_text(re.sub(r"^nstxout-compressed\s*=\s*\d+$", "nstxout-compressed = 50",
+                         md.read_text(), flags=re.M))
     run = OUT / "run.sh"
     run.write_text(re.sub(r'(mdrun -deffnm "\$d/(?:nvt|npt|md)") \$MDRUN_FLAGS$',
                           r"\1 $MDRUN_FLAGS -nsteps 200", run.read_text(), flags=re.M))

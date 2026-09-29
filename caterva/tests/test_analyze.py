@@ -208,3 +208,24 @@ def test_native_distances_match_gmx_distance_on_a_real_trajectory(tmp_path):
     asp = [idx[(20, "OD1")], idx[(20, "OD2")]]
     got = distance_series(xtc.read(fix / "t4l_bnz_first6000.xtc"), glu, asp)
     assert [round(x, 3) for x in got] == [0.818, 0.806, 0.825]
+
+
+def test_one_frame_has_no_rmsf_on_either_route(tmp_path):
+    # A 200-step run that writes compressed frames every 250 steps keeps
+    # frame 0 alone. gmx rmsf still prints 0.0001-0.0002 nm there (single-
+    # precision rounding), which the GROMACS route used to report as motion
+    # while the native route called RMSF not measurable. Found by CI once it
+    # compared the two routes (2026-09-29).
+    from caterva.analyze.__main__ import MIN_RMSF_FRAMES, measure
+
+    p = plan(read_pdb(_protein(), "A"), [(10, "HIS"), (20, "ASP")])
+    rep = tmp_path / "rep1"
+    rep.mkdir()
+    one = "0.0 " + " ".join("0.5" for _ in p.pairs) + "\n"
+    (rep / "catalytic.xvg").write_text(one)
+    (rep / "rmsf.xvg").write_text("".join(f"{r} 0.0001\n" for r in sorted(set(p.pocket) | set(p.rest))))
+    _, flex = measure(tmp_path, p, [rep])
+    assert MIN_RMSF_FRAMES == 2 and flex.per_replica == []
+    (rep / "catalytic.xvg").write_text(one + one.replace("0.0 ", "0.5 ", 1))
+    _, flex = measure(tmp_path, p, [rep])
+    assert [name for name, _, _ in flex.per_replica] == ["rep1"]

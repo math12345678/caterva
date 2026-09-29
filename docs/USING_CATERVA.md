@@ -505,10 +505,13 @@ measurements as GROMACS commands go in `analyze.sh`: `--gromacs` runs
 them instead, `--script-only` writes them for a cluster and `--no-run`
 reads what they produced. On two real lysozyme replicas the two routes
 give the same fifteen catalytic distances (two differ by 0.001 nm, the
-precision GROMACS prints) and the same verdicts. Their pocket RMSF agrees
-to 0.0009 nm on average; in the most mobile loop (residues 67-72)
-`gmx rmsf` reads about 10% higher, a difference not yet explained, and
-reported here rather than hidden.
+precision GROMACS prints) and the same verdicts, and the same RMSF to
+0.0001 nm on every residue. Until 2026-09-29 `gmx rmsf` read about 10%
+higher in the most mobile loop (residues 67-72): `analyze.sh` gave it the
+tpr's coordinates as the fit reference, and a tpr stores them wrapped into
+the box, with those residues a box length from their neighbours. The script
+now makes the reference and the trajectory whole first, and CI compares the
+two routes' RMSF on every run.
 
 It also counts hydrogen bonds between each pair of catalytic side chains,
 frame by frame, with the criterion of `gmx hbond` (donor-acceptor at most
@@ -517,6 +520,17 @@ and reports each pair's occupancy per replica: kept, lost, formed, rarely
 formed or partial, with the thresholds printed. On the two lysozyme
 replicas, every per-frame count for six catalytic pairs equals
 `gmx hbond`'s, and those counts are a test.
+
+It reads each catalytic residue's first side-chain dihedral (chi1,
+N-CA-CB-gamma) in every frame too, because a side chain can turn over while
+every distance between functional-group centres stays put. Each frame is
+put in the well it is nearest (+60, 180 or -60 degrees; named by angle
+because gauche+ and gauche- are used both ways round), and each residue is
+reported as kept, flipped (to which well, when the replicas agree),
+partial, or replicas disagree, with the thresholds printed. The angles
+equal `gmx angle -type dihedral`'s to 0.001 degree on six lysozyme
+catalytic residues over 21 frames, and that comparison is a test. Like the
+hydrogen bonds, this is measured on the native route only.
 
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and

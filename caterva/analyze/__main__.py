@@ -36,6 +36,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from caterva.analyze.plan import POCKET_RADIUS, Plan, plan, read_pdb
 from caterva.analyze.hbonds import Occupancy
+from caterva.analyze.rotamers import Rotamer
 from caterva.md.convergence import CONFIDENCE, Summary, summarise
 
 CONFIDENCE_PCT = CONFIDENCE * 100
@@ -46,6 +47,9 @@ CONFIDENCE_PCT = CONFIDENCE * 100
 MOVED_NM = 0.1
 
 EXIT_NOT_A_RESULT = 4
+#: A fluctuation needs at least two frames; below that RMSF is not measured,
+#: on either route.
+MIN_RMSF_FRAMES = 2
 
 
 class AnalyzeError(Exception):
@@ -164,6 +168,8 @@ class Analysis:
     #: Hydrogen-bond occupancy between catalytic side chains; None when the
     #: GROMACS route measured (it does not count hydrogen bonds).
     hbonds: Optional[List["Occupancy"]] = None
+    #: chi1 rotamers of the catalytic residues; None on the GROMACS route.
+    rotamers: Optional[List["Rotamer"]] = None
 
     @property
     def all_consistent(self) -> bool:
@@ -175,10 +181,18 @@ def measure(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[Distan
     flex = []
     pocket, rest = set(p.pocket), set(p.rest)
     for r in reps:
+        frames = None
         if p.pairs:
             cols = read_columns(r / "catalytic.xvg")
+            frames = len(cols[0])
             for i in range(len(p.pairs)):
                 per_pair[i].append((r.name, [x for x in cols[i + 1]]))
+        if frames is not None and frames < MIN_RMSF_FRAMES:
+            # One frame has no fluctuation. gmx rmsf still prints 0.0001-
+            # 0.0002 nm, its single-precision sqrt(<x^2> - <x>^2) on
+            # coordinates of a few nm, and the native route says not
+            # measurable; CI's comparison of the two routes found it.
+            continue
         cols = read_columns(r / "rmsf.xvg")
         rmsf = dict(zip((int(x) for x in cols[0]), cols[1]))
         pv = [v for k, v in rmsf.items() if k in pocket and not math.isnan(v)]
@@ -236,7 +250,8 @@ def _gro_atoms(path: Path):
              np.array([float(l[20 + 8 * k:28 + 8 * k]) for k in range(3)])) for l in lines[2:2 + n]]
 
 
-def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"]]:
+def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
+                   ) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"], List["Rotamer"]]:
     """The same distances and RMSF as analyze.sh, computed by Caterva from the
     trajectories it reads itself (caterva/md/xtc.py), with no GROMACS."""
     import numpy as np
@@ -272,6 +287,13 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List
                     groups[site.resnr] = None  # glycine: no side chain to bond
     start_x = np.array([a[3] for a in atoms])
     start_box = _gro_box(ref_lines[-1])
+    from caterva.analyze.rotamers import Rotamer, chi1_atoms, chi1_series, dihedral, populations
+    chi_sites = []
+    for site in p.sites:
+        idx = chi1_atoms(atoms, site.resnr)
+        if idx is not None:
+            chi_sites.append((site, idx))
+    chi_pops: Dict[int, List[Tuple[str, Dict[str, float]]]] = {site.resnr: [] for site, _ in chi_sites}
     hb: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.pairs))}
     for r in reps:
         traj = xtc.read(r / "md.xtc")
@@ -282,6 +304,10 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List
                 hb[i].append((r.name, frac, mean))
         for i, (ia, ib) in enumerate(pair_atoms):
             per_pair[i].append((r.name, distance_series(traj, ia, ib)))
+        for site, idx in chi_sites:
+            chi_pops[site.resnr].append((r.name, populations(chi1_series(traj, idx))))
+        if len(traj) < MIN_RMSF_FRAMES:
+            continue
         f_ca = xtc.rmsf(traj, [i for _, i in ca], ref)
         rmsf = {res: float(v) for (res, _), v in zip(ca, f_ca)}
         pv = [v for k, v in rmsf.items() if k in pocket]
@@ -296,7 +322,9 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List
         if ga is None or gb is None:
             continue
         occupancies.append(Occupancy(q.label, hb[i], count_frame(start_x, start_box, ga, gb)))
-    return results, Flexibility(flex), occupancies
+    rotamers = [Rotamer(site.label, dihedral(*(start_x[i] for i in idx), start_box), chi_pops[site.resnr])
+                for site, idx in chi_sites]
+    return results, Flexibility(flex), occupancies, rotamers
 
 
 #: Occupancy thresholds for naming what happened to a hydrogen bond. Chosen,
@@ -365,6 +393,7 @@ def report(a: Analysis) -> List[str]:
         who = "every pair" if len(labels) == len(a.distances) and len(labels) > 1 else ", ".join(labels)
         L.append(f"- {who}: {reason}")
     L += hbond_section(a)
+    L += rotamer_section(a)
     f = a.flexibility
     L += ["", "## Active-site flexibility", "",
           f"Mean Cα RMSF of the {len(a.plan.pocket)} residues within {POCKET_RADIUS:g} Å of a catalytic "
@@ -460,6 +489,34 @@ def hbond_section(a: Analysis) -> List[str]:
     return L
 
 
+def rotamer_section(a: Analysis) -> List[str]:
+    from caterva.analyze.rotamers import FLIPPED, KEPT, SPLIT, WELLS, rotamer_verdict
+    L = ["", "## Catalytic side-chain rotamers", ""]
+    if a.rotamers is None:
+        return L + ["Not measured on the GROMACS route (`--gromacs`); the native route measures them."]
+    if not a.rotamers:
+        return L + ["No catalytic residue has a chi1 (glycine and alanine have none)."]
+    L += ["chi1 (N-CA-CB-gamma) of each catalytic residue, frame by frame, in the well it is nearest: "
+          "+60, 180 or -60 degrees. The distances above are between functional-group centres and cannot "
+          "see a side chain turn over; this can. Per replica, the fraction of frames in the well the "
+          "residue started in.", ""]
+    names = [n for n, _ in a.rotamers[0].per_replica]
+    L += ["| residue | chi1 at start | " + " | ".join(names) + " | verdict |",
+          "|---|---|" + "---|" * len(names) + "---|"]
+    for r in a.rotamers:
+        v = rotamer_verdict(r)
+        if not a.all_consistent and v != "one replica":
+            v = f"({v}, not yet a result)"
+        L.append(f"| {r.label} | {r.at_start:.0f} ({r.start_well}) | "
+                 + " | ".join(f"{k:.2f}" for k in r.kept) + f" | {v} |")
+    L += ["", f"Verdicts (chosen thresholds): kept, in the starting well in at least {KEPT:.0%} of frames in "
+          f"every replica; flipped, in at most {FLIPPED:.0%}, named by the well it moved to when the replicas "
+          f"agree on one; replicas disagree, when their fractions differ by more than {SPLIT:.0%}. "
+          f"The wells are named by angle ({', '.join(WELLS)}) because gauche+ and gauche- are used in both "
+          f"senses in the literature."]
+    return L
+
+
 def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.splitlines()[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -505,13 +562,13 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
                                        "elsewhere and rerun with --no-run")
                 run_gromacs(d, p, reps, gmx)
             distances, flex = measure(d, p, reps)
-            hbonds = None
+            hbonds = rotamers = None
         else:
-            distances, flex, hbonds = measure_native(d, p, reps)
+            distances, flex, hbonds, rotamers = measure_native(d, p, reps)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3
-    a = Analysis(pdb, chain, source, p, distances, flex, hbonds)
+    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers)
     text = "\n".join(report(a)) + "\n"
     print(text, end="")
     (d / "ANALYSIS.md").write_text(text, encoding="utf-8")
