@@ -253,11 +253,12 @@ export const TEST_SUITES: TestSuite[] = [
           "6 test files -- component rendering, nav/section integrity, " +
           "page-claim accuracy, disabled-source claims, and the merged " +
           "MuleRun chapters' content",
-        // Measured 2026-09-28, `vitest run`: 6 files, 39 passed (33, plus
+        // Measured 2026-09-28, `vitest run`: 6 files, 44 passed (33, plus
         // three MergedChapters tests from the MuleRun merge and two that pin
         // the inhibitor attribution to BRENDA ref 739793's pyruvate row, plus
-        // a render of the hero demo).
-        passed: 39,
+        // a render of the hero demo, plus the reduced-motion lockup test and four that pin the
+        // motion frame by frame).
+        passed: 44,
         skipped: 0,
         failed: 0,
       },

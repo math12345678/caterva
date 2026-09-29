@@ -68,7 +68,7 @@ the audience respects, and they are the only heavy shapes on the page, so
 the eye lands where the evidence is.
 
 Explicitly not: glows, blurred colour blobs, gradient text, glass panels,
-drifting particle backgrounds, word-by-word entrance animations, or
+drifting particle backgrounds, word-by-word entrance animations on content (the mark's own motion, §5c, is the one exception), or
 anything that would make a skeptical academic reviewer's first reaction be
 "this is overselling something." All of these existed in the dark system
 and were removed with it.
@@ -138,6 +138,18 @@ its 13.3-fold disagreement, and the "real output" panel quotes a recorded
 `scripts/cite.py` run verbatim. What is illustrative (the agent
 choreography) says so. `MergedChapters.test.ts` keeps archived domains and
 the old 0.42 example out.
+
+## 5c. The mark in motion
+
+`src/components/brand/BrandMotion.tsx`, at the top of the hero, is the one
+piece of choreography on the page, and it is the brand's, not the
+content's: a swell travels round the C, the signal dot hands its colour
+from the C's upper end to its open end, the C steps aside and the wordmark
+sets itself letter by letter, then everything returns (11 s loop). It is
+drawn live from the measured geometry, never a video. The headline and
+every number stay static and present on first paint, so the rule in §1
+still holds for content. Reduced motion shows the settled lockup, still;
+off screen or in a hidden tab the loop stops.
 
 ## 6. Do's and Don'ts
 
