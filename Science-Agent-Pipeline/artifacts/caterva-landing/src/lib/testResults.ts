@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "107 test files -- kinetics & Michaelis-Menten correctness, " +
+          "108 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -176,8 +176,10 @@ export const TEST_SUITES: TestSuite[] = [
         // lysozyme) and 5 replica-sufficiency tests: 3024. Plus 15
         // protonation-audit tests: 3039. Plus 5 tests that each constant is
         // looked up under its own compound and the report says what its row
-        // measured: 3044.
-        passed: 3044,
+        // measured: 3044. Plus the 17 tests of test_row_scope.py (what a
+        // value's source row measured, and the spread of the other rows,
+        // carried into all four exports; 17 passed 2026-09-29): 3061.
+        passed: 3061,
         skipped: 0,
         failed: 0,
       },
@@ -270,8 +272,9 @@ export const TEST_SUITES: TestSuite[] = [
         // three MergedChapters tests from the MuleRun merge and two that pin
         // the inhibitor attribution to BRENDA ref 739793's pyruvate row, plus
         // a render of the hero demo, plus the reduced-motion lockup test and four that pin the
-        // motion frame by frame).
-        passed: 44,
+        // motion frame by frame). Plus 1 PageClaims test pinning the export
+        // samples to the generated file of a real run (2026-09-29): 45.
+        passed: 45,
         skipped: 0,
         failed: 0,
       },

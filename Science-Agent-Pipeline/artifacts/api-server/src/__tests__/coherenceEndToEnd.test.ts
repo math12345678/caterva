@@ -68,9 +68,11 @@ vi.mock("../lib/scienceAgent", async (importOriginal) => {
   };
 });
 
-// Both km and ki are left to resolution; everything else is supplied.
+// Both km and ki are left to resolution; everything else is supplied. The
+// query names the inhibitor, because a Ki is the inhibitor's constant and
+// is not looked up without one (inhibitorIsTheKiCompound.test.ts).
 const CI_QUERY =
-  "simulate competitive inhibition of lactate dehydrogenase on lactate " +
+  "simulate competitive inhibition of lactate dehydrogenase by oxamate on lactate " +
   "in Homo sapiens vmax=5 s0=10 i0=1 end=10 points=51";
 
 /** Queue the two per-key lookups in the order queryResolver makes them. */
@@ -140,7 +142,7 @@ describe("coherence reaches the caller", () => {
       KI_2003_DIFFERENT_CONDITIONS as never,
     );
     const resolved = await resolveQuery(
-      "simulate competitive inhibition of lactate dehydrogenase on lactate " +
+      "simulate competitive inhibition of lactate dehydrogenase by oxamate on lactate " +
         "in Homo sapiens km=2 vmax=5 s0=10 i0=1 end=10 points=51",
     );
 

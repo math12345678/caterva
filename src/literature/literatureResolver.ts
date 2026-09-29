@@ -280,7 +280,68 @@ export interface ResolvedKinetic {
    * here and is what `check_both_front_ends_read_it.py` exists to stop.
    */
   ensembleCandidates?: EnsembleCandidate[];
+  /**
+   * The winning row's commentary, verbatim, and what it says was measured:
+   * the isoform, and for a Ki the inhibition mode and what the inhibitor
+   * was measured against.
+   *
+   * Parsed in Python by `caterva.bind.core` (the reader `caterva bind` and
+   * `caterva compose` use) and reported here as is, never re-derived. On
+   * human LDH the gossypol Ki the resolver returns is LDH-B's, from a paper
+   * that also gives LDH-A's and LDH-C's and states no mode for any.
+   */
+  commentary?: string | null;
+  rowScope?: RowScope | null;
   logs: string[];
+}
+
+/** What the winning row says it measured (runner key `rowScope`). */
+export interface RowScope {
+  isoform: string | null;
+  /** "competitive", "noncompetitive", ..., or "unstated". */
+  inhibitionMode: string | null;
+  versus: string | null;
+}
+
+/**
+ * Plain sentences about what the row measured, for a quantity. A Km row is
+ * never told it "states no inhibition mode": that is true of every Km and
+ * says nothing. Empty when the scope has nothing to say.
+ */
+export function rowScopeLines(quantity: string, scope: RowScope | null | undefined): string[] {
+  if (!scope) return [];
+  const lines: string[] = [];
+  if (scope.isoform) {
+    lines.push(
+      `The row measured isoform ${scope.isoform}. If the enzyme you mean is another isoform, this is a different protein's constant.`,
+    );
+  }
+  if (quantity.toLowerCase() === 'ki' && scope.inhibitionMode) {
+    if (scope.inhibitionMode === 'unstated') {
+      lines.push(
+        'The row states no inhibition mode, so which mechanism this Ki belongs to is unknown.',
+      );
+    } else {
+      lines.push(
+        `The row measured ${scope.inhibitionMode} inhibition` +
+          (scope.versus ? ` versus ${scope.versus}` : '') +
+          '. A Ki belongs to that mode and that assay.',
+      );
+    }
+  }
+  return lines;
+}
+
+function parseRowScope(raw: unknown): RowScope | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
+  const scope = {
+    isoform: text(r['isoform']),
+    inhibitionMode: text(r['inhibitionMode']),
+    versus: text(r['versus']),
+  };
+  return scope.isoform || scope.inhibitionMode || scope.versus ? scope : null;
 }
 
 /** One row the evidence could not rank below another. */
@@ -603,6 +664,9 @@ export function mapFoundResult(
     // is not a candidate, and letting one through would put a blank line in
     // front of a student where a measurement should be.
     ensembleCandidates: parseEnsembleCandidates(parsed['ensembleCandidates']),
+    // Read through, like the tie: an all-null scope is no scope.
+    commentary: typeof parsed['commentary'] === 'string' ? (parsed['commentary'] as string) : null,
+    rowScope: parseRowScope(parsed['rowScope']),
     // BRENDA cross-species means the value came from a DIFFERENT organism
     // than the one asked about. Still real and citable, but the caller must
     // be able to see it rather than have it presented as a same-organism

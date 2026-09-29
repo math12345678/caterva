@@ -250,13 +250,6 @@ class ModelDossier:
 
     #: The inhibition mode each motif's inhibition constant assumes. Product
     #: inhibition in this library is the product competing for free enzyme.
-    _MODE_OF_MOTIF = {
-        "competitive_inhibition": "competitive",
-        "uncompetitive_inhibition": "uncompetitive",
-        "noncompetitive_inhibition": "noncompetitive",
-        "product_inhibition": "competitive",
-    }
-
     def _row_scope_lines(self, measured: dict, by_id: dict) -> List[str]:
         """What each value's own BRENDA row says it measured, where that could
         make it the wrong number for this model: another isoform, or (for an
@@ -266,38 +259,22 @@ class ModelDossier:
         is gossypol's Ki for LDH-B; the same paper gives 0.0019 for LDH-A and
         0.0042 for LDH-C, and none states a mode. A competitive-inhibition
         model built on it inherits all three unknowns, and should say so.
+
+        The judgement is `row_scope.read_scope`, shared with the exports.
         """
-        try:
-            from caterva.bind.core import read_isoform, read_mode
-        except ImportError:  # pragma: no cover
-            return []
+        from caterva.compose.row_scope import read_scope
+
         notes: List[str] = []
         for identifier in sorted(measured):
-            record = measured[identifier]
-            text = getattr(record, "commentary", None)
-            if not text:
-                continue
             quantity = by_id.get(identifier)
-            isoform = read_isoform(text)
-            if isoform:
-                notes.append(f"`{identifier}`: the row measured isoform {isoform}; if the enzyme "
-                             f"you mean is another isoform, this is a different protein's constant")
-            want = self._MODE_OF_MOTIF.get(getattr(quantity, "motif_name", ""))
-            if want and getattr(quantity, "table", None) == "ki":
-                mode, versus = read_mode(text)
-                if mode == "unstated":
-                    notes.append(f"`{identifier}`: the row states no inhibition mode, so whether it "
-                                 f"is the {want} constant this model uses is unknown")
-                elif mode != want and not (want == "noncompetitive" and mode == "mixed"):
-                    notes.append(f"`{identifier}`: the row measured **{mode}** inhibition"
-                                 + (f" (versus {versus})" if versus else "")
-                                 + f"; this model is {want}, so the value belongs to a different "
-                                   f"mechanism")
-                substrate = getattr(self.model, "substrate", None)
-                if versus and substrate and versus.strip().lower() != substrate.strip().lower():
-                    notes.append(f"`{identifier}`: the row measured inhibition **versus {versus}**, "
-                                 f"not versus {substrate}, the substrate in this model: a Ki is "
-                                 f"specific to the assay it was measured in")
+            scope = read_scope(
+                getattr(measured[identifier], "commentary", None),
+                motif=getattr(quantity, "motif_name", None),
+                table=getattr(quantity, "table", None),
+                substrate=getattr(self.model, "substrate", None),
+            )
+            if scope is not None:
+                notes += [f"`{identifier}`: {c.text}" for c in scope.concerns]
         if not notes:
             return []
         return ["", "What each value's own row says it measured:", ""] + [f"- {n}" for n in notes]
@@ -448,49 +425,22 @@ class ModelDossier:
         The lab-report path has printed this since it was written. The
         composed model did not until ADR 0178, which is the gap this closes.
         """
+        # ONE PAPER REPORTING TWO VALUES IS NOT TWO PAPERS DISAGREEING.
+        # BRENDA's Ki rows for EC 1.1.1.27 are both reference 739793: the
+        # same publication, two measurements, most often different
+        # conditions or a different inhibitor. `Spread.what` and `.why` say
+        # which case this is, in the same words every export uses.
         disagreements = []
         for identifier in sorted(measured):
             record = measured[identifier]
-            span = getattr(record, "disagreement", None)
-            if span is None:
+            spread = getattr(record, "spread", None)
+            if spread is None:
                 continue
-            low, high = span
-            fold = high / low if low else float("inf")
-            rows = [r for r in getattr(record, "alternatives", ()) if isinstance(r, dict)]
-            values = {r.get("value") for r in rows if r.get("value") is not None}
-            references = sorted({
-                str(r["reference_id"]) for r in rows if r.get("reference_id")
-            })
-
-            # ONE PAPER REPORTING TWO VALUES IS NOT TWO PAPERS DISAGREEING.
-            # BRENDA's Ki rows for EC 1.1.1.27 are both reference 739793:
-            # the same publication, two measurements, most often different
-            # conditions or a different inhibitor. Calling that "the
-            # literature disagrees" would invent a controversy, and telling
-            # the reader to decide "which paper you believe" would send them
-            # to one paper to adjudicate itself.
-            if len(references) == 1:
-                what = (
-                    f"one source (BRENDA ref {references[0]}) reports "
-                    f"{len(values)} values"
-                )
-                why = (
-                    "two rows from one publication usually differ in the "
-                    "conditions or the exact substrate, so read that paper "
-                    "before choosing"
-                )
-            else:
-                what = (
-                    f"{len(references)} sources report {len(values)} values"
-                    + (f" (BRENDA ref {', '.join(references)})" if references else "")
-                )
-                why = "which one is right is a question about the papers"
-
             disagreements.append(
-                f"- `{identifier}`: {what}, spanning **{low:g} to {high:g} "
-                f"{record.unit}** ({fold:.3g}-fold). The model carries "
+                f"- `{identifier}`: {spread.what}, spanning **{spread.low:g} to {spread.high:g} "
+                f"{spread.unit}** ({spread.fold:.3g}-fold). The model carries "
                 f"{record.value:g} — the resolver's pick, not a verdict; "
-                f"{why}."
+                f"{spread.why}."
             )
         if not disagreements:
             return []

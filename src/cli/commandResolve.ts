@@ -28,6 +28,7 @@
 import {
   ResolverUnavailableError,
   resolveKinetic,
+  rowScopeLines,
   type KineticQuantity,
 } from '../literature/literatureResolver';
 
@@ -347,6 +348,19 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
         `${c(DIM, '  Expressed recombinantly — same sequence, different host.')}\n`,
       );
     }
+  }
+
+  // WHAT THE ROW SAYS IT MEASURED
+  //
+  // The isoform, and for a Ki the inhibition mode and what the inhibitor was
+  // measured against, as the runner parsed them from the row's commentary.
+  // The API puts the same reading into provenance.flags; this is the other
+  // half, which `check_both_front_ends_read_it.py` requires.
+  const scopeLines = rowScopeLines(String(result.quantity), result.rowScope);
+  if (scopeLines.length > 0) {
+    process.stdout.write(`\n${c(YELLOW, '⚠')} ${c(BOLD, 'What the source row measured')}\n`);
+    for (const line of scopeLines) process.stdout.write(`${c(DIM, '  ' + line)}\n`);
+    if (result.commentary) process.stdout.write(`${c(DIM, '  Row: ' + result.commentary)}\n`);
   }
 
   // COFACTORS AND EFFECTORS (ADR 0032)

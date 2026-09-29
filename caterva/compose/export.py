@@ -242,6 +242,16 @@ CSV_COLUMNS = (
     "assay_temperature_c",
     "assay_buffer",
     "assay_not_reported_by_source",
+    # What the value's own source row says it measured, verbatim and parsed.
+    "source_row_commentary",
+    "measured_isoform",
+    "inhibition_mode",
+    "inhibition_measured_versus",
+    # The spread of the values the resolver ranked, when they differ. Not an
+    # uncertainty estimate; the provenance column says so on the same row.
+    "reported_values_low",
+    "reported_values_high",
+    "reported_values_references",
     "provenance",
 )
 
@@ -249,6 +259,61 @@ CSV_COLUMNS = (
 # ---------------------------------------------------------------------------
 # Records
 # ---------------------------------------------------------------------------
+
+
+#: Marks, in every per-quantity sentence, what the value's own source row
+#: says it measured (isoform, inhibition mode) where that could make it the
+#: wrong number for this model. See `row_scope.py`.
+SCOPE_MARKER = "SOURCE ROW"
+#: Marks the range of values the resolver ranked for one quantity.
+SPREAD_MARKER = "VALUES DISAGREE"
+
+
+@dataclass(frozen=True)
+class Spread:
+    """The values the resolver ranked for one quantity, when they differ.
+
+    NOT an uncertainty estimate: the range is bounded by which rows happen to
+    be in the database, not by any statement about the true value. Every
+    rendering says so, because a range printed beside a value reads as an
+    error bar unless it is told not to.
+    """
+    low: float
+    high: float
+    unit: str
+    carried: float
+    n_values: int
+    references: Tuple[str, ...]
+
+    @property
+    def fold(self) -> float:
+        return self.high / self.low if self.low else float("inf")
+
+    @property
+    def one_source(self) -> bool:
+        """One publication reporting several rows, which is not a controversy:
+        the rows usually differ in conditions or the exact substrate."""
+        return len(self.references) == 1
+
+    @property
+    def what(self) -> str:
+        if self.one_source:
+            return f"one source (BRENDA ref {self.references[0]}) reports {self.n_values} values"
+        return (f"{len(self.references) or 'several'} sources report {self.n_values} values"
+                + (f" (BRENDA ref {', '.join(self.references)})" if self.references else ""))
+
+    @property
+    def why(self) -> str:
+        if self.one_source:
+            return ("two rows from one publication usually differ in the conditions or the "
+                    "exact substrate, so read that paper before choosing")
+        return "which one is right is a question about the papers"
+
+    def sentence(self) -> str:
+        return (f"{self.what}, spanning {self.low:g} to {self.high:g} {self.unit} "
+                f"({self.fold:.3g}-fold); this model carries {self.carried:g}, the resolver's "
+                f"pick, not a verdict; {self.why}. The range is not an uncertainty estimate: "
+                f"it is bounded by which rows are in the database")
 
 
 @dataclass(frozen=True)
@@ -343,6 +408,19 @@ class Measurement:
         low, high = min(values), max(values)
         return None if low == high else (low, high)
 
+    @property
+    def spread(self) -> Optional["Spread"]:
+        """The disagreement as a record every artefact renders the same way,
+        or None when the ranked rows agree."""
+        span = self.disagreement
+        if span is None:
+            return None
+        rows = [r for r in self.alternatives if isinstance(r, dict)]
+        values = {r.get("value") for r in rows if r.get("value") is not None}
+        references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
+        return Spread(low=span[0], high=span[1], unit=self.unit, carried=float(self.value),
+                      n_values=max(len(values), 2), references=references)
+
     def __post_init__(self) -> None:
         if not str(self.citation).strip():
             raise ExportRefused(
@@ -388,6 +466,10 @@ class ParameterOrigin:
     #: sentences.
     table: Optional[str] = None
     measurement: Optional[Measurement] = None
+    #: What the measurement's own source row says it measured, judged
+    #: against this model (`row_scope.RowScope`). None when the row carried
+    #: no commentary or the number is not a measurement.
+    scope: Optional[Any] = None
 
     def __post_init__(self) -> None:
         if self.origin not in ORIGINS:
@@ -481,7 +563,16 @@ class ParameterOrigin:
                 "Caterva did not read the paper: this is the origin it was "
                 "given, not a verification of it"
             )
-            return "; ".join(parts) + "."
+            text = "; ".join(parts) + "."
+            # What the row itself says, and how far the other rows are from
+            # it. Separate sentences, each with its marker, so one grep finds
+            # every value whose own source qualifies it.
+            for concern in (self.scope.concerns if self.scope is not None else ()):
+                text += f" {SCOPE_MARKER}: {concern.plain}."
+            spread = self.measurement.spread
+            if spread is not None:
+                text += f" {SPREAD_MARKER}: {spread.sentence()}."
+            return text
         if self.placeholder:
             where = f"{self.motif}.{self.symbol}" if self.motif else self.symbol
             return (
@@ -631,6 +722,13 @@ def provenance_of(
 
     origins: List[ParameterOrigin] = []
     creators = _species_creators(composition)
+    # The model's substrate, for judging what an inhibitor's Ki was measured
+    # against. A ComposedModel has one; a bare Composition does not.
+    substrate = getattr(source, "substrate", None)
+    try:
+        from caterva.compose.row_scope import read_scope
+    except ImportError:  # pragma: no cover - flat layout
+        from compose.row_scope import read_scope  # type: ignore[no-redef]
 
     for species_id in composition.species_ids:
         if species_id in supplied:
@@ -696,6 +794,11 @@ def provenance_of(
                     description=parameter.description or parameter.name,
                     table=parameter.table,
                     measurement=measurement,
+                    scope=(
+                        read_scope(measurement.commentary, motif=instance.motif.name,
+                                   table=parameter.table, substrate=substrate)
+                        if measurement is not None else None
+                    ),
                 )
             )
 
@@ -1363,6 +1466,13 @@ def _cell(measurement: Optional[Measurement], field: str) -> str:
     return f"{value:g}" if isinstance(value, float) else str(value)
 
 
+def _spread_cells(measurement: Optional[Measurement]) -> List[str]:
+    spread = measurement.spread if measurement is not None else None
+    if spread is None:
+        return ["", "", ""]
+    return [f"{spread.low:g}", f"{spread.high:g}", " ".join(spread.references)]
+
+
 def to_parameter_csv(model: ProvenancedModel) -> str:
     """Every number in the model, one row each, with where it came from.
 
@@ -1405,6 +1515,11 @@ def to_parameter_csv(model: ProvenancedModel) -> str:
                 _cell(measurement, "assay_temperature_c"),
                 _cell(measurement, "assay_buffer"),
                 ", ".join(measurement.assay_unreported) if measurement else "",
+                (measurement.commentary or "") if measurement else "",
+                (origin.scope.isoform or "") if origin.scope is not None else "",
+                (origin.scope.mode or "") if origin.scope is not None else "",
+                (origin.scope.versus or "") if origin.scope is not None else "",
+                *_spread_cells(measurement),
                 origin.sentence(),
             ]
         )
@@ -1504,6 +1619,11 @@ def to_methods_paragraph(model: ProvenancedModel) -> str:
             elif origin.measurement.organism:
                 detail += f", measured in {origin.measurement.organism}"
             lines.append(f"- {_quantity_line(origin)} ({detail})")
+            for concern in (origin.scope.concerns if origin.scope is not None else ()):
+                lines.append(f"  - {concern.text[0].upper()}{concern.text[1:]}.")
+            spread = origin.measurement.spread
+            if spread is not None:
+                lines.append(f"  - The values disagree: {spread.sentence()}.")
         lines.append("")
     elif resolvable:
         lines += [
@@ -1576,6 +1696,9 @@ def _conservation_laws(network: Any) -> List[str]:
 __all__ = [
     "CHOSEN_MARKER",
     "CSV_COLUMNS",
+    "SCOPE_MARKER",
+    "SPREAD_MARKER",
+    "Spread",
     "ExportRefused",
     "MEASURED_MARKER",
     "Measurement",

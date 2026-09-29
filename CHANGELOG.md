@@ -35,6 +35,22 @@ done: there was no release to version.
   measured (isoform, mode, what it competed with). The README's headline
   example, which promised a Ki the live system did not return, now shows
   live output.
+- All four `compose --export` formats carry what each value's own source
+  row measured (isoform, inhibition mode, what it was measured against)
+  and the spread of the other rows the resolver ranked. Both had reached
+  the report only: the exports handed a lab gossypol's LDH-B Ki with no
+  word that it is one isoform's constant with no stated mode, and dropped
+  the 13-fold spread in human LDH's pyruvate Km although the record
+  carried it. The CSV gains seven columns; each per-value sentence gains
+  `SOURCE ROW:` and `VALUES DISAGREE:` clauses. One reader
+  (`compose/row_scope.py`) serves the report and the exports.
+- The API looks a Ki up under the inhibitor the query names ("... by
+  oxamate"), not under the substrate taken from the enzyme's own name, and
+  reports the row's isoform and mode; the CLI's `resolve` prints the same.
+- The landing page's export samples are generated from a real run by
+  `scripts/refresh_export_samples.py`. The panel had shown a command that
+  does not exist, a JSON format the CLI does not write, and a CSV
+  trajectory where the real CSV is the parameter audit trail.
 - The MD smoke test read the hydrogen-bond table as distances and failed
   CI with a 0.697 nm "disagreement"; it now reads only the geometry section.
 - `caterva prepare --ph`: a protonation-risk audit of the active site from
