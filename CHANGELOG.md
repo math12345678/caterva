@@ -19,6 +19,10 @@ done: there was no release to version.
   assay temperatures, filtered by inhibition mode (`--state free|ternary`)
   and isoform (`--isoform`), and a computed free energy is judged against
   the band at 2σ (exit 0 agrees, 4 disagrees). See docs/USING_CATERVA.md.
+- `caterva complex`: builds the equilibrated complex `caterva fep` needs
+  from a PDB entry and your ligand topology, posing the ligand on the
+  crystal's by Kabsch superposition and refusing a different conformer or
+  stereoisomer (a mirror image can pass an RMSD test).
 - `caterva fep`: an absolute binding free-energy calculation (double
   decoupling, Boresch restraints with their analytic correction, BAR) run
   at the cited Ki's assay temperature and judged against `caterva bind`'s
