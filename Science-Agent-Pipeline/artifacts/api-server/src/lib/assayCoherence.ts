@@ -365,7 +365,7 @@ function assessEffectors(parameters: ParameterUnderTest[]): EffectorCoherence {
 
   const described = names
     .map((k, i) =>
-      `${k}: ${lists[i].map((e) => `${e.compound_text} (${e.presence})`).join(", ")}`,
+      `${k}: ${lists[i].map((e) => `${e.role ? `${e.role} ` : ""}${e.compound_text} (${e.presence})`).join(", ")}`,
     )
     .join("; ");
   return {

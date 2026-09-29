@@ -378,7 +378,8 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     process.stdout.write(`\n${c(BOLD, 'Measured with')}\n`);
     for (const e of present) {
       const conc = e.concentration_text ? `${e.concentration_text} ` : '';
-      process.stdout.write(`  ${c(GREEN, '+')} ${conc}${e.compound_text}\n`);
+      const role = e.role ? `${e.role} ` : '';
+      process.stdout.write(`  ${c(GREEN, '+')} ${conc}${role}${e.compound_text}\n`);
     }
     for (const e of absent) {
       process.stdout.write(

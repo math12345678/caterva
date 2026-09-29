@@ -124,6 +124,8 @@ export interface Effector {
   presence: string;
   concentration_text?: string | null;
   identity?: BufferIdentity | null;
+  /** "activator", "inhibitor", ... when the row names the role (effector.py). */
+  role?: string | null;
 }
 
 export interface ReliabilityAxes {

@@ -405,6 +405,12 @@ export interface Effector {
   concentration_text?: string | null;
   /** PubChem resolution, reused from the buffer machinery. */
   identity?: BufferIdentity | null;
+  /**
+   * What the row says the compound does, when it says so before the name
+   * ("0.02 mM activator LY-2121260" -> role "activator"). Kept off
+   * `compound_text`, which is what PubChem is asked for.
+   */
+  role?: string | null;
 }
 
 export interface BufferIdentity {
