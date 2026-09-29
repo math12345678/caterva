@@ -25,6 +25,18 @@ done: there was no release to version.
   exact answers and calibrated error bars; `caterva fep --summarise` uses
   them on the raw dhdl files. The FEP setup now writes energies at every
   state (`calc-lambda-neighbors = -1`) so MBAR can use them.
+- Each constant is looked up under the compound it belongs to. 29 library
+  constants name their own port (an inhibitor's Ki, a product's Km, a
+  phosphatase's Km, ATP, a second substrate); `compose` takes
+  `--inhibitor`, `--product` and `--compound PORT=NAME`; an unnamed
+  compound means no search and a reason naming the flag, never a lookup
+  under the substrate's name or under no name at all. Mixed inhibition's
+  Kic and Kiu are refused. The report says what each value's own row
+  measured (isoform, mode, what it competed with). The README's headline
+  example, which promised a Ki the live system did not return, now shows
+  live output.
+- The MD smoke test read the hydrogen-bond table as distances and failed
+  CI with a 0.697 nm "disagreement"; it now reads only the geometry section.
 - `caterva prepare --ph`: a protonation-risk audit of the active site from
   measured pKa spreads in folded proteins (Grimsley et al. 2009, values
   read from the PubMed abstract): which residues' charge is settled at the

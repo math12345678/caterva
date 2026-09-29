@@ -174,8 +174,10 @@ export const TEST_SUITES: TestSuite[] = [
         // distance on real frames, and the unwritable-cache test: 3004. Plus
         // 15 hydrogen-bond tests (equal to gmx hbond frame by frame on real
         // lysozyme) and 5 replica-sufficiency tests: 3024. Plus 15
-        // protonation-audit tests: 3039.
-        passed: 3039,
+        // protonation-audit tests: 3039. Plus 5 tests that each constant is
+        // looked up under its own compound and the report says what its row
+        // measured: 3044.
+        passed: 3044,
         skipped: 0,
         failed: 0,
       },

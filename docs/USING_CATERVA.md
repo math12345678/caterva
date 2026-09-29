@@ -330,6 +330,29 @@ Two commands carry an enzyme from its kinetics to its structure and on to a
 molecular dynamics setup, with the same rule throughout: every number says
 where it came from.
 
+### Which compound each constant belongs to
+
+BRENDA files every Km, Ki and kcat under a compound, and a constant is only
+meaningful under the right one. A competitive inhibitor's Ki is the
+inhibitor's; a reverse Km is the product's; a phosphatase's Km is the
+phosphorylated form's. `compose` looks each constant up under its own
+compound: `--substrate` names the substrate, `--inhibitor` the inhibitor,
+`--product` the product, and `--compound PORT=NAME` any other (the report
+names the port each unsearched constant needs). A constant whose compound
+was not named is not searched under the substrate's name: it stays a
+labelled placeholder, and the reason says which flag would fill it. Mixed
+inhibition's Kic and Kiu are never filled from one database row, which
+cannot say which of the two it measured.
+
+Until 2026-09-29 every constant was looked up under the one substrate, so
+an inhibition model's Ki came back as a Ki "of" the substrate, or not at
+all; the API server did the same, and still does (it is next).
+
+The report also says what each value's own BRENDA row measured, where that
+could make it the wrong number for the model: another isoform, another
+inhibition mode, a mode not stated, or inhibition measured against a
+different molecule than the model's substrate.
+
 ### `caterva structure`: which structures exist, and which protein each is
 
 ```bash

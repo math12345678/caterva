@@ -268,7 +268,7 @@ LINEAR_PATHWAY_SEGMENT = Motif(
             ),
         ),
         MotifParameter(
-            "Kmp", KIND_AFFINITY, 0.5, "mM", table="km",
+            "Kmp", KIND_AFFINITY, 0.5, "mM", table="km", ligand="P",
             description=(
                 "Michaelis constant for the product, i.e. for the reverse "
                 "direction; illustrative placeholder"
@@ -435,27 +435,27 @@ MOIETY_CONSERVED_CYCLE = Motif(
     ),
     parameters=(
         MotifParameter(
-            "kcat_regen", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat",
+            "kcat_regen", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat", ligand="C_spent",
             description=(
                 "turnover number of the regenerating enzyme; illustrative "
                 "placeholder"
             ),
         ),
         MotifParameter(
-            "Km_regen", KIND_AFFINITY, 0.1, "mM", table="km",
+            "Km_regen", KIND_AFFINITY, 0.1, "mM", table="km", ligand="C_spent",
             description=(
                 "affinity of the regenerating enzyme for the spent form; "
                 "illustrative placeholder"
             ),
         ),
         MotifParameter(
-            "kcat_demand", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat",
+            "kcat_demand", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat", ligand="C_active",
             description=(
                 "turnover number of the demand step; illustrative placeholder"
             ),
         ),
         MotifParameter(
-            "Km_demand", KIND_AFFINITY, 0.1, "mM", table="km",
+            "Km_demand", KIND_AFFINITY, 0.1, "mM", table="km", ligand="C_active",
             description=(
                 "affinity of the demand step for the active form; "
                 "illustrative placeholder"
@@ -548,7 +548,7 @@ COFACTOR_COUPLED_STEP = Motif(
             ),
         ),
         MotifParameter(
-            "Km_c", KIND_AFFINITY, 0.05, "mM", table="km",
+            "Km_c", KIND_AFFINITY, 0.05, "mM", table="km", ligand="C_active",
             description=(
                 "Michaelis constant for the cofactor; illustrative "
                 "placeholder"
@@ -640,7 +640,7 @@ ALLOSTERIC_FEEDBACK = Motif(
             ),
         ),
         MotifParameter(
-            "Ki", KIND_AFFINITY, 0.1, "mM", table="ki",
+            "Ki", KIND_AFFINITY, 0.1, "mM", table="ki", ligand="F",
             description=(
                 "end-product concentration giving half inhibition; "
                 "illustrative placeholder"
@@ -740,7 +740,7 @@ TRANSPORTER_LIMITED_UPTAKE = Motif(
             ),
         ),
         MotifParameter(
-            "Kh", KIND_AFFINITY, 1e-4, "mM", table="km",
+            "Kh", KIND_AFFINITY, 1e-4, "mM", table="km", ligand="H_out",
             description=(
                 "driving-ion concentration at half maximal transport; "
                 "illustrative placeholder"

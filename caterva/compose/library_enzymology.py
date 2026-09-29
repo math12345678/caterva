@@ -319,14 +319,14 @@ SUBSTRATE_CHANNELING = Motif(
             ),
         ),
         MotifParameter(
-            "kcat2", KIND_RATE_CONSTANT, 50.0, "1/s", table="kcat",
+            "kcat2", KIND_RATE_CONSTANT, 50.0, "1/s", table="kcat", ligand="I",
             description=(
                 "turnover of the second active site on intermediate "
                 "recaptured from bulk; illustrative placeholder"
             ),
         ),
         MotifParameter(
-            "Km2", KIND_AFFINITY, 0.1, "mM", table="km",
+            "Km2", KIND_AFFINITY, 0.1, "mM", table="km", ligand="I",
             description="second site's Michaelis constant; illustrative placeholder",
         ),
     ),
@@ -424,7 +424,7 @@ FUTILE_CYCLE = Motif(
             ),
         ),
         MotifParameter(
-            "Km_atp", KIND_AFFINITY, 0.1, "mM", table="km",
+            "Km_atp", KIND_AFFINITY, 0.1, "mM", table="km", ligand="ATP",
             description=(
                 "kinase affinity for ATP. Separate from Km_kin because they "
                 "are separate measurements on separate substrates, and one "
@@ -433,11 +433,11 @@ FUTILE_CYCLE = Motif(
             ),
         ),
         MotifParameter(
-            "kcat_pptase", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat",
+            "kcat_pptase", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat", ligand="Xp",
             description="phosphatase turnover number; illustrative placeholder",
         ),
         MotifParameter(
-            "Km_pptase", KIND_AFFINITY, 0.1, "mM", table="km",
+            "Km_pptase", KIND_AFFINITY, 0.1, "mM", table="km", ligand="Xp",
             description=(
                 "phosphatase affinity for the phosphorylated form; "
                 "illustrative placeholder"

@@ -446,13 +446,35 @@ class TestThePipeline:
 
         model = compose(
             "enzyme kinetics with a competitive inhibitor", subject="hexokinase",
+            substrate="glucose", compounds={"@inhibitor": "N-acetylglucosamine"},
         )
         assert not model.structure_only
         requests = model.parameter_requests()
         assert {r.table for r in requests} == {"kcat", "km", "ki"}
         assert all(r.subject == "hexokinase" for r in requests)
+        # Each constant is looked up under ITS compound: the Ki under the
+        # inhibitor, the Km and kcat under the substrate.
+        by_table = {r.table: r.substrate for r in requests}
+        assert by_table == {"km": "glucose", "kcat": "glucose", "ki": "N-acetylglucosamine"}
         # The unit travels, so substitution can be checked rather than assumed.
         assert all(r.expected_unit for r in requests)
+
+    def test_a_constant_whose_compound_is_not_named_is_not_searched(self) -> None:
+        """Before, every constant was searched under the one substrate, or
+        under no compound at all, where BRENDA's permissive match accepts any
+        compound's row. An unnamed compound now means no search, and the
+        reason names the flag that would fill it."""
+        from caterva.compose.pipeline import compose
+
+        model = compose("enzyme kinetics with a competitive inhibitor",
+                        subject="hexokinase", substrate="glucose")
+        assert {r.table for r in model.parameter_requests()} == {"km", "kcat"}
+        (ki_reason,) = [v for k, v in model.unsearched().items() if k.endswith("Ki")]
+        assert "the inhibitor's constant" in ki_reason and "--inhibitor NAME" in ki_reason
+
+        bare = compose("enzyme kinetics with a competitive inhibitor", subject="hexokinase")
+        assert bare.parameter_requests() == []
+        assert all("--substrate NAME" in v for k, v in bare.unsearched().items() if not k.endswith("Ki"))
 
     def test_a_constant_with_no_database_table_is_not_requested(self) -> None:
         # `ks` and `kd` in a Hill motif are real rate constants with no
@@ -568,3 +590,33 @@ class TestCoverage:
     def test_the_two_lists_do_not_overlap(self) -> None:
         # A query in both would make one of the two assertions vacuous.
         assert not (set(self.BUILDS) & set(self.REFUSES))
+
+
+class TestWhatEachRowMeasured:
+    """The report says when a value's own row makes it the wrong number for
+    this model. Found live on human LDH with --inhibitor gossypol: 0.0014 mM
+    is gossypol's Ki for LDH-B, with no inhibition mode stated."""
+
+    def _lines(self, commentary, substrate="pyruvate"):
+        from types import SimpleNamespace
+        from caterva.compose.report import ModelDossier
+        q = SimpleNamespace(parameter_id="reaction_Ki", motif_name="competitive_inhibition", table="ki")
+        m = SimpleNamespace(commentary=commentary)
+        r = ModelDossier.__new__(ModelDossier)
+        object.__setattr__(r, "model", SimpleNamespace(substrate=substrate))
+        return "\n".join(r._row_scope_lines({"reaction_Ki": m}, {"reaction_Ki": q}))
+
+    def test_isoform_and_missing_mode_are_named(self):
+        text = self._lines("LDH-B, pH not specified in the publication, temperature not specified")
+        assert "isoform LDH-B" in text and "states no inhibition mode" in text
+
+    def test_another_mode_is_a_different_mechanism(self):
+        text = self._lines("noncompetitive versus pyruvate, pH 7.5, 37°C")
+        assert "**noncompetitive** inhibition" in text and "different mechanism" in text
+
+    def test_competitive_against_another_molecule_is_named(self):
+        text = self._lines("competitive versus NADH, pH 7.5, 37°C")
+        assert "versus NADH" in text and "not versus pyruvate" in text
+
+    def test_a_matching_row_says_nothing(self):
+        assert self._lines("competitive versus pyruvate, pH 7.5, 25°C") == ""

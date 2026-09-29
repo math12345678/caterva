@@ -76,7 +76,7 @@ import re
 
 import argparse
 import sys
-from typing import Any, Callable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 #: `--robustness` given with no sample count. argparse cannot use `None`
 #: for both "flag absent" and "flag present, number unstated", and the
@@ -149,6 +149,18 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
                              "it needs a Km; it cannot know what the Km is FOR, "
                              "and BRENDA's km and ki tables cannot be read "
                              "without it")
+    parser.add_argument("--inhibitor",
+                        help="the inhibitor an inhibition constant belongs to. BRENDA files "
+                             "a Ki under the inhibitor, so without this an inhibition "
+                             "model's Ki is left a labelled placeholder rather than looked "
+                             "up under the substrate's name")
+    parser.add_argument("--product",
+                        help="the product, for constants measured on it: a reverse Km, a "
+                             "product-inhibition Kp")
+    parser.add_argument("--compound", action="append", default=[], metavar="PORT=NAME",
+                        help="the compound on any other port of the mechanism, e.g. "
+                             "--compound ATP=ATP or --compound B=NAD+; the report says which "
+                             "port each unsearched constant needs")
     parser.add_argument("--shapes", action="store_true",
                         help="list every shape this can build, and exit")
     parser.add_argument("--antimony", action="store_true",
@@ -837,6 +849,21 @@ def _validate_section(
 # ---------------------------------------------------------------------------
 
 
+def compounds_from(args) -> Dict[str, str]:
+    """--inhibitor, --product and --compound PORT=NAME as a ports -> names map."""
+    out: Dict[str, str] = {}
+    if getattr(args, "inhibitor", None):
+        out["@inhibitor"] = args.inhibitor
+    if getattr(args, "product", None):
+        out["@product"] = args.product
+    for item in getattr(args, "compound", None) or []:
+        port, sep, name = item.partition("=")
+        if not sep or not port.strip() or not name.strip():
+            raise SystemExit(f"--compound takes PORT=NAME, got {item!r}")
+        out[port.strip()] = name.strip()
+    return out
+
+
 def _search_the_literature(
     model: Any, args: Any,
 ) -> Tuple[Any, Optional[str], bool]:
@@ -895,9 +922,12 @@ def _search_the_literature(
             return model, f"No search was run: {exc}", True
         model = replace(model, subject=ec)
 
+    # Only constants measured on the primary substrate need --substrate;
+    # an inhibitor's Ki needs the inhibitor instead (see unsearched()).
     needs_substrate = sorted(
         q.table for q in model.resolvable
-        if q.table in ("km", "ki") and q.table is not None
+        if q.table in ("km", "ki") and q.table is not None and q.primary
+        and not q.lookup_refused and q.ligand_port not in compounds_from(args)
     )
     if needs_substrate and not args.substrate:
         return model, (
@@ -914,18 +944,23 @@ def _search_the_literature(
         from caterva.compose.pipeline import compose_and_parameterise
         _, search = compose_and_parameterise(
             model.query, subject=ec, organism=args.organism,
-            substrate=args.substrate,
+            substrate=args.substrate, compounds=compounds_from(args),
         )
     except LiteratureLayerUnavailable as exc:
         return model, str(exc), True
     except Exception as exc:  # noqa: BLE001 - a failed search is a note, not a crash
         return model, f"The literature search failed: {type(exc).__name__}: {exc}", True
 
+    skipped = replace(model, compounds=compounds_from(args)).unsearched()
     if search is None:
+        if skipped:
+            return model.with_measured({}, not_found=skipped), (
+                "No search was run: every constant this model could look up belongs to a "
+                "compound that was not named. " + "; ".join(sorted(set(skipped.values())))), False
         return model, "No search was run: this model has nothing a database could supply.", False
 
     measured = measured_from_search(search)
-    not_found = unresolved_from_search(search)
+    not_found = {**skipped, **unresolved_from_search(search)}
     failures = [
         run for branch in getattr(search, "branches", ())
         for record in getattr(branch.build.run, "rounds", ())
@@ -1005,7 +1040,8 @@ def _export(description: str, subject: Optional[str], fmt: str,
     try:
         model = compose(description, subject=subject,
                         organism=getattr(args, "organism", None),
-                        substrate=getattr(args, "substrate", None))
+                        substrate=getattr(args, "substrate", None),
+                        compounds=compounds_from(args) if args is not None else None)
         if subject and args is not None:
             # An export that quietly carried placeholders while the report
             # beside it carried measurements would be the disagreement the
@@ -1135,7 +1171,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: Optional[str] = None) -> in
         # verdict can read them, and printed by their sections afterwards
         # without being computed a second time.
         model = compose(args.description, subject=args.subject,
-                        organism=args.organism, substrate=args.substrate)
+                        organism=args.organism, substrate=args.substrate,
+                        compounds=compounds_from(args))
         search_note = None
         search_refused = False
         if args.subject:

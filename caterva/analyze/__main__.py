@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from caterva.analyze.plan import POCKET_RADIUS, Plan, plan, read_pdb
+from caterva.analyze.hbonds import Occupancy
 from caterva.md.convergence import CONFIDENCE, Summary, summarise
 
 CONFIDENCE_PCT = CONFIDENCE * 100

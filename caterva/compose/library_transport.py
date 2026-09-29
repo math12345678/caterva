@@ -465,7 +465,7 @@ SYMPORT = Motif(
             ),
         ),
         MotifParameter(
-            "Ks", KIND_AFFINITY, 0.1, "mM", table="km",
+            "Ks", KIND_AFFINITY, 0.1, "mM", table="km", ligand="S_out",
             description=(
                 "cargo concentration at half the maximal flux, measured "
                 "with driver saturating and nothing on the far side. Taken "
@@ -548,7 +548,7 @@ ANTIPORT = Motif(
             ),
         ),
         MotifParameter(
-            "Kb", KIND_AFFINITY, 1.0, "mM", table="km",
+            "Kb", KIND_AFFINITY, 1.0, "mM", table="km", ligand="B_in",
             description=(
                 "concentration of the outward-moving solute at half the "
                 "maximal exchange, with the other solute saturating. Taken "
@@ -639,7 +639,7 @@ PRIMARY_ACTIVE_TRANSPORT = Motif(
             ),
         ),
         MotifParameter(
-            "Km_atp", KIND_AFFINITY, 0.5, "mM", table="km",
+            "Km_atp", KIND_AFFINITY, 0.5, "mM", table="km", ligand="ATP",
             description=(
                 "ATP concentration at half maximal pumping. Illustrative "
                 "default"

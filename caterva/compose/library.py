@@ -25,6 +25,11 @@ refusal -- it removes the quantity that had to be refused.
 
 from __future__ import annotations
 
+#: Why mixed inhibition's Kic and Kiu are never filled from one database row.
+MIXED_KI_REFUSAL = (
+    "a mixed inhibitor has two constants, Kic (from free enzyme) and Kiu (from the enzyme-substrate complex), and a database Ki row does not say which one it measured; supply both yourself"
+)
+
 from typing import Dict, Tuple
 
 try:
@@ -98,7 +103,7 @@ COMPETITIVE_INHIBITION = Motif(
     parameters=(
         MotifParameter("kcat", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat"),
         MotifParameter("Km", KIND_AFFINITY, 0.1, "mM", table="km"),
-        MotifParameter("Ki", KIND_AFFINITY, 0.5, "mM", table="ki",
+        MotifParameter("Ki", KIND_AFFINITY, 0.5, "mM", table="ki", ligand="I",
                        description="inhibitor dissociation constant"),
     ),
     reactions=(
@@ -130,7 +135,7 @@ UNCOMPETITIVE_INHIBITION = Motif(
     parameters=(
         MotifParameter("kcat", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat"),
         MotifParameter("Km", KIND_AFFINITY, 0.1, "mM", table="km"),
-        MotifParameter("Ki", KIND_AFFINITY, 0.5, "mM", table="ki"),
+        MotifParameter("Ki", KIND_AFFINITY, 0.5, "mM", table="ki", ligand="I"),
     ),
     reactions=(
         ReactionTemplate(
@@ -284,9 +289,9 @@ PHOSPHORYLATION_CYCLE = Motif(
                        description="kinase turnover number"),
         MotifParameter("Km_kin", KIND_AFFINITY, 0.1, "mM", table="km",
                        description="kinase affinity for the unphosphorylated form"),
-        MotifParameter("kcat_pptase", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat",
+        MotifParameter("kcat_pptase", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat", ligand="Xp",
                        description="phosphatase turnover number"),
-        MotifParameter("Km_pptase", KIND_AFFINITY, 0.1, "mM", table="km",
+        MotifParameter("Km_pptase", KIND_AFFINITY, 0.1, "mM", table="km", ligand="Xp",
                        description="phosphatase affinity for the phosphorylated form"),
     ),
     reactions=(
@@ -484,7 +489,7 @@ ORDERED_BI_BI = Motif(
         MotifParameter("kcat", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat"),
         MotifParameter("Kma", KIND_AFFINITY, 0.1, "mM", table="km",
                        description="Michaelis constant for the first substrate"),
-        MotifParameter("Kmb", KIND_AFFINITY, 0.1, "mM", table="km",
+        MotifParameter("Kmb", KIND_AFFINITY, 0.1, "mM", table="km", ligand="B",
                        description="Michaelis constant for the second substrate"),
         MotifParameter("Kia", KIND_AFFINITY, 0.2, "mM", table="ki",
                        description="dissociation constant of the first substrate"),
@@ -519,7 +524,7 @@ PING_PONG_BI_BI = Motif(
     parameters=(
         MotifParameter("kcat", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat"),
         MotifParameter("Kma", KIND_AFFINITY, 0.1, "mM", table="km"),
-        MotifParameter("Kmb", KIND_AFFINITY, 0.1, "mM", table="km"),
+        MotifParameter("Kmb", KIND_AFFINITY, 0.1, "mM", table="km", ligand="B"),
     ),
     reactions=(
         ReactionTemplate(
@@ -574,10 +579,10 @@ REVERSIBLE_CATALYSIS = Motif(
     parameters=(
         MotifParameter("kcat_f", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat",
                        description="forward turnover number"),
-        MotifParameter("kcat_r", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat",
+        MotifParameter("kcat_r", KIND_RATE_CONSTANT, 10.0, "1/s", table="kcat", ligand="P",
                        description="reverse turnover number"),
         MotifParameter("Kms", KIND_AFFINITY, 0.1, "mM", table="km"),
-        MotifParameter("Kmp", KIND_AFFINITY, 0.5, "mM", table="km"),
+        MotifParameter("Kmp", KIND_AFFINITY, 0.5, "mM", table="km", ligand="P"),
     ),
     reactions=(
         ReactionTemplate(
@@ -607,7 +612,7 @@ PRODUCT_INHIBITION = Motif(
     parameters=(
         MotifParameter("kcat", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat"),
         MotifParameter("Km", KIND_AFFINITY, 0.1, "mM", table="km"),
-        MotifParameter("Kp", KIND_AFFINITY, 0.5, "mM", table="ki",
+        MotifParameter("Kp", KIND_AFFINITY, 0.5, "mM", table="ki", ligand="P",
                        description="product dissociation constant"),
     ),
     reactions=(
@@ -643,7 +648,7 @@ NONCOMPETITIVE_INHIBITION = Motif(
     parameters=(
         MotifParameter("kcat", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat"),
         MotifParameter("Km", KIND_AFFINITY, 0.1, "mM", table="km"),
-        MotifParameter("Ki", KIND_AFFINITY, 0.5, "mM", table="ki"),
+        MotifParameter("Ki", KIND_AFFINITY, 0.5, "mM", table="ki", ligand="I"),
     ),
     reactions=(
         ReactionTemplate(
@@ -673,9 +678,9 @@ MIXED_INHIBITION = Motif(
     parameters=(
         MotifParameter("kcat", KIND_RATE_CONSTANT, 100.0, "1/s", table="kcat"),
         MotifParameter("Km", KIND_AFFINITY, 0.1, "mM", table="km"),
-        MotifParameter("Kic", KIND_AFFINITY, 0.5, "mM", table="ki",
+        MotifParameter("Kic", KIND_AFFINITY, 0.5, "mM", table="ki", ligand="I", lookup_refused=MIXED_KI_REFUSAL,
                        description="dissociation constant from free enzyme"),
-        MotifParameter("Kiu", KIND_AFFINITY, 2.0, "mM", table="ki",
+        MotifParameter("Kiu", KIND_AFFINITY, 2.0, "mM", table="ki", ligand="I", lookup_refused=MIXED_KI_REFUSAL,
                        description="dissociation constant from the ES complex"),
     ),
     reactions=(

@@ -169,6 +169,7 @@ def to_parameter_source(
                 getattr(result, "assay_unreported", []) or []
             ),
             candidates=tuple(getattr(result, "ensemble_candidates", []) or []),
+            commentary=getattr(result, "commentary", None),
         ),
         None,
     )

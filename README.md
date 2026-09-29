@@ -31,8 +31,10 @@
 
 ```bash
 caterva compose "Michaelis-Menten with a competitive inhibitor" \
-    --subject 1.1.1.27 --organism human --substrate pyruvate
-# -> Km 0.03 mM (BRENDA ref 286469), Ki 0.00059 mM (BRENDA ref 739793)
+    --subject 1.1.1.27 --organism human --substrate pyruvate --inhibitor gossypol
+# -> Km 0.03 mM for pyruvate (BRENDA ref 286469)
+#    Ki 0.0014 mM for gossypol (BRENDA ref 711801), and the report says the
+#    row measured isoform LDH-B and states no inhibition mode
 #    kcat: never measured in human, so it stays a labelled placeholder and
 #    the report names the organisms where it was measured
 ```
@@ -111,7 +113,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,213 tests (3,039 engine + 1174 literature)
+make test      # runs all 4,218 tests (3,044 engine + 1174 literature)
 ```
 
 ### Or download the release
@@ -538,7 +540,7 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                3,039 tests
+│   └── tests/                3,044 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
@@ -629,9 +631,9 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,213 tests
+make test        # run all 4,218 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,039 tests)
+make test-sim    # simulation engine only (3,044 tests)
 make test-lit    # literature layer only (1174 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches

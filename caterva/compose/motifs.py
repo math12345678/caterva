@@ -141,6 +141,19 @@ class MotifParameter:
     #: Which BRENDA table serves it, when one does. `None` means no lookup
     #: exists, which the report must say rather than claiming a failed search.
     table: Optional[str] = None
+    #: The port whose COMPOUND this constant is measured for, when it is not
+    #: the motif's first substrate port: a competitive inhibitor's Ki is the
+    #: inhibitor's (port I), a reverse Km is the product's (port P), a
+    #: phosphatase's Km is the phosphorylated form's (port Xp). BRENDA files
+    #: every Km, Ki and kcat under a compound, so looking one up under the
+    #: wrong compound returns another molecule's constant under this one's
+    #: name. `None` means the first substrate port.
+    ligand: Optional[str] = None
+    #: Why no single database value can fill this constant, when none can:
+    #: a mixed inhibitor's Kic and Kiu are two constants, and a BRENDA Ki row
+    #: does not say which one it measured. Set, the constant is never looked
+    #: up; the reason is reported instead.
+    lookup_refused: Optional[str] = None
 
     def __post_init__(self) -> None:
         if self.kind not in RESOLVABLE_KINDS | CHOSEN_KINDS:
@@ -204,6 +217,12 @@ class Motif:
         port_names = [p.name for p in self.ports]
         if len(set(port_names)) != len(port_names):
             raise MotifError(f"motif {self.name!r} has duplicate port names")
+        for parameter in self.parameters:
+            if parameter.ligand is not None and parameter.ligand not in port_names:
+                raise MotifError(
+                    f"motif {self.name!r}: parameter {parameter.name!r} names port "
+                    f"{parameter.ligand!r} as its compound, and the motif has no such port. "
+                    f"The lookup would be silently skipped.")
         parameter_names = [p.name for p in self.parameters]
         if len(set(parameter_names)) != len(parameter_names):
             raise MotifError(f"motif {self.name!r} has duplicate parameter names")

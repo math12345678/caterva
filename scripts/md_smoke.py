@@ -24,9 +24,16 @@ OUT = ROOT / "md-smoke"
 
 
 def _distance_rows(text: str) -> dict:
-    """pair -> simulated mean (nm) from an ANALYSIS.md catalytic-geometry table."""
+    """pair -> simulated mean (nm) from an ANALYSIS.md catalytic-geometry table.
+
+    Only that section is read. The hydrogen-bond table below it has rows of
+    the same shape (`| Asp48-Ser50 | 1 | 1.00 |`), and reading the whole file
+    let an occupancy of 1.00 overwrite a 0.30 nm distance: the "0.697 nm
+    disagreement" CI reported on 2026-09-29 was this parser, not the geometry.
+    """
+    section = text.split("## Catalytic geometry", 1)[-1].split("\n## ", 1)[0]
     rows = {}
-    for line in text.splitlines():
+    for line in section.splitlines():
         m = re.match(r"\|\s*([A-Z][a-z]{2}\d+\S*[A-Z][a-z]{2}\d+)\s*\|\s*[\d.]+\s*\|\s*([\d.]+)", line)
         if m:
             rows[m.group(1)] = float(m.group(2))

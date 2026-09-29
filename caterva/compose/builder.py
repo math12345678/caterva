@@ -73,6 +73,16 @@ class ResolvableQuantity:
     table: Optional[str]
     description: str
     placeholder: float
+    #: The motif port whose compound this constant belongs to (see
+    #: MotifParameter.ligand), and that port's role: "substrate",
+    #: "regulator" (an inhibitor or effector), "product", "partner".
+    ligand_port: Optional[str] = None
+    ligand_role: Optional[str] = None
+    #: Set when no single database value can fill it (MotifParameter.lookup_refused).
+    lookup_refused: Optional[str] = None
+    #: True when the compound is the motif's first substrate: the one the
+    #: caller's --substrate names. Everything else needs its own name.
+    primary: bool = True
 
 
 @dataclass
@@ -209,6 +219,9 @@ class Composition:
             for parameter in instance.motif.parameters:
                 if parameter.kind not in RESOLVABLE_KINDS:
                     continue
+                first = next((p.name for p in instance.motif.ports if p.role == "substrate"), None)
+                port = parameter.ligand or first
+                role = next((p.role for p in instance.motif.ports if p.name == port), None)
                 out.append(
                     ResolvableQuantity(
                         parameter_id=instance.parameter_id(parameter.name),
@@ -219,6 +232,10 @@ class Composition:
                         table=parameter.table,
                         description=parameter.description,
                         placeholder=parameter.default,
+                        ligand_port=port,
+                        ligand_role=role,
+                        lookup_refused=parameter.lookup_refused,
+                        primary=port is not None and port == first,
                     )
                 )
         return tuple(out)

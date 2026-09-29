@@ -195,7 +195,9 @@ class ModelDossier:
             f"`{self.model.subject}`"
             + (f" in {self.model.organism}" if self.model.organism else "")
             + (f", substrate {self.model.substrate}" if self.model.substrate else "")
-            + ".",
+            + "".join(f", {k.lstrip('@') if k.startswith('@') else 'port ' + k} {v}"
+                      for k, v in sorted((getattr(self.model, "compounds", None) or {}).items()))
+            + ". Each constant is looked up under the compound it belongs to.",
             "",
             "| quantity | value | origin | source |",
             "|---|---|---|---|",
@@ -241,9 +243,64 @@ class ModelDossier:
                 f"Any conclusion resting on one of these is a statement "
                 f"about the library's value, not about this enzyme.",
             ]
+        lines += self._row_scope_lines(measured, by_id)
         lines += self._condition_lines(measured)
         lines += self._disagreement_lines(measured)
         return lines
+
+    #: The inhibition mode each motif's inhibition constant assumes. Product
+    #: inhibition in this library is the product competing for free enzyme.
+    _MODE_OF_MOTIF = {
+        "competitive_inhibition": "competitive",
+        "uncompetitive_inhibition": "uncompetitive",
+        "noncompetitive_inhibition": "noncompetitive",
+        "product_inhibition": "competitive",
+    }
+
+    def _row_scope_lines(self, measured: dict, by_id: dict) -> List[str]:
+        """What each value's own BRENDA row says it measured, where that could
+        make it the wrong number for this model: another isoform, or (for an
+        inhibition constant) another inhibition mode, or none stated.
+
+        Found on human LDH: `--inhibitor gossypol` returned 0.0014 mM, which
+        is gossypol's Ki for LDH-B; the same paper gives 0.0019 for LDH-A and
+        0.0042 for LDH-C, and none states a mode. A competitive-inhibition
+        model built on it inherits all three unknowns, and should say so.
+        """
+        try:
+            from caterva.bind.core import read_isoform, read_mode
+        except ImportError:  # pragma: no cover
+            return []
+        notes: List[str] = []
+        for identifier in sorted(measured):
+            record = measured[identifier]
+            text = getattr(record, "commentary", None)
+            if not text:
+                continue
+            quantity = by_id.get(identifier)
+            isoform = read_isoform(text)
+            if isoform:
+                notes.append(f"`{identifier}`: the row measured isoform {isoform}; if the enzyme "
+                             f"you mean is another isoform, this is a different protein's constant")
+            want = self._MODE_OF_MOTIF.get(getattr(quantity, "motif_name", ""))
+            if want and getattr(quantity, "table", None) == "ki":
+                mode, versus = read_mode(text)
+                if mode == "unstated":
+                    notes.append(f"`{identifier}`: the row states no inhibition mode, so whether it "
+                                 f"is the {want} constant this model uses is unknown")
+                elif mode != want and not (want == "noncompetitive" and mode == "mixed"):
+                    notes.append(f"`{identifier}`: the row measured **{mode}** inhibition"
+                                 + (f" (versus {versus})" if versus else "")
+                                 + f"; this model is {want}, so the value belongs to a different "
+                                   f"mechanism")
+                substrate = getattr(self.model, "substrate", None)
+                if versus and substrate and versus.strip().lower() != substrate.strip().lower():
+                    notes.append(f"`{identifier}`: the row measured inhibition **versus {versus}**, "
+                                 f"not versus {substrate}, the substrate in this model: a Ki is "
+                                 f"specific to the assay it was measured in")
+        if not notes:
+            return []
+        return ["", "What each value's own row says it measured:", ""] + [f"- {n}" for n in notes]
 
     def _condition_lines(self, measured: dict) -> List[str]:
         """The pH, temperature and buffer each value was measured under.

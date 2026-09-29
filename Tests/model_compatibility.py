@@ -127,6 +127,8 @@ class ParameterSource:
     #: an actionable constraint, which is the whole difference between a
     #: constraint and a demotion (ADR 0171).
     candidates: Tuple[Any, ...] = ()
+    #: The source row's own commentary (isoform, inhibition mode, assay).
+    commentary: Optional[str] = None
 
     @property
     def conditions_stated(self) -> bool:

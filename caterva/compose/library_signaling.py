@@ -529,7 +529,7 @@ TWO_COMPONENT_SYSTEM = Motif(
             ),
         ),
         MotifParameter(
-            "Km_atp", KIND_AFFINITY, 0.1, "mM", table="km",
+            "Km_atp", KIND_AFFINITY, 0.1, "mM", table="km", ligand="ATP",
             description=(
                 "sensor affinity for ATP. Separate from Ks because they are "
                 "separate measurements on separate ligands, and one number "

@@ -296,6 +296,9 @@ class Measurement:
     assay_ph: Optional[float] = None
     assay_temperature_c: Optional[float] = None
     assay_buffer: Optional[str] = None
+    #: The source row's commentary, verbatim: which isoform, and for a Ki
+    #: which inhibition mode, the value was measured with.
+    commentary: Optional[str] = None
     #: Conditions the SOURCE did not state, named rather than omitted. "The
     #: 1974 paper did not report a pH" is permanent and sends a researcher to
     #: the bench; "Caterva has no pH" may be a parser bug on our side. The
@@ -785,6 +788,7 @@ def measured_from_search(search: Any) -> Dict[str, Measurement]:
             # here is how a 13-fold disagreement became a single confident
             # number three layers downstream.
             alternatives=tuple(getattr(source, "candidates", ()) or ()),
+            commentary=getattr(source, "commentary", None),
         )
     return out
 

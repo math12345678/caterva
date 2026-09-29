@@ -207,6 +207,11 @@ class KineticResult(BaseModel):
     #: None means no tie was found, which is different from an empty tie:
     #: see `SelectionTie.is_tied`.
     selection_tie: "SelectionTie | None" = None
+    #: The chosen row's BRENDA commentary, verbatim ("competitive versus
+    #: NADH, pH 7.5, 37 C", "LDH-B, pH not specified ..."). It says which
+    #: isoform and, for a Ki, which inhibition mode the value measured, and
+    #: a caller building a model with one mechanism needs both.
+    commentary: str | None = None
 
     #: Every row on the non-dominated frontier, with the reliability score
     #: each was graded by -- Bakker's weights, before they are sampled.
@@ -966,6 +971,7 @@ def resolve_kinetic_value(
             assay_temperature_c=best.assay_temperature_c,
             assay_buffer=best.assay_buffer,
             assay_unreported=list(best.assay_unreported),
+            commentary=best.conditions,
             search_log=log,
         )
 
@@ -1190,6 +1196,7 @@ def resolve_kinetic_value(
             assay_temperature_c=best.assay_temperature_c,
             assay_buffer=best.assay_buffer,
             assay_unreported=list(best.assay_unreported),
+            commentary=best.conditions,
             search_log=log,
         )
 

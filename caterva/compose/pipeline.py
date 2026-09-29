@@ -88,6 +88,56 @@ class ComposedModel:
     #: it the verdict could only say "none has been run" and advise running
     #: one, which is circular when running one is what just failed.
     search_refused: Optional[str] = None
+    #: Names for the other compounds a constant can belong to, port -> name,
+    #: plus two role-wide keys: "@inhibitor" for every regulator port and
+    #: "@product" for every product port. A competitive inhibitor's Ki is
+    #: filed in BRENDA under the INHIBITOR, and before this every constant
+    #: was looked up under the one --substrate, so an inhibitor's Ki came
+    #: back as a Ki "of" the substrate, or not at all.
+    compounds: Mapping[str, str] = field(default_factory=dict)
+
+    def compound_for(self, quantity: ResolvableQuantity) -> Optional[str]:
+        """The compound a constant is measured for, or None if unnamed."""
+        port = quantity.ligand_port
+        if port is None:
+            return None
+        if port in self.compounds:
+            return self.compounds[port]
+        if quantity.ligand_role == "regulator" and "@inhibitor" in self.compounds:
+            return self.compounds["@inhibitor"]
+        if quantity.ligand_role == "product" and "@product" in self.compounds:
+            return self.compounds["@product"]
+        return self.substrate if quantity.primary else None
+
+    def unsearched(self) -> Dict[str, str]:
+        """Constants that were deliberately not looked up, and why: their
+        compound was not named, or no single database value can fill them.
+        Reported as placeholders with the reason, never searched under the
+        substrate's name."""
+        out: Dict[str, str] = {}
+        if self.subject is None:
+            return out
+        for q in self.resolvable:
+            if q.table is None:
+                continue
+            if q.lookup_refused:
+                out[q.parameter_id] = f"not looked up: {q.lookup_refused}"
+            elif self.compound_for(q) is None:
+                if q.primary:
+                    how = "--substrate NAME"
+                elif q.ligand_role == "regulator":
+                    how = f"--inhibitor NAME (or --compound {q.ligand_port}=NAME)"
+                elif q.ligand_role == "product":
+                    how = f"--product NAME (or --compound {q.ligand_port}=NAME)"
+                else:
+                    how = f"--compound {q.ligand_port}=NAME"
+                what = {"regulator": "the inhibitor's", "product": "the product's",
+                        "substrate": "a substrate's", "partner": "a partner compound's"}.get(
+                            q.ligand_role or "", "another compound's")
+                out[q.parameter_id] = (
+                    f"not looked up: this is {what} constant (port {q.ligand_port}), and BRENDA files it "
+                    f"under that compound, not the substrate. Name it with {how}")
+        return out
 
     @property
     def structure_only(self) -> bool:
@@ -175,18 +225,21 @@ class ComposedModel:
         # resolved once here rather than per scout, which is what the field's
         # own comment says it is for.
         ec_number = self.ec_number
+        skip = self.unsearched()
         return [
             ParameterRequest(
                 quantity=quantity.parameter_id,
                 subject=self.subject,
-                substrate=self.substrate,
+                # The compound THIS constant is measured for (ligand port),
+                # not the one substrate every constant used to share.
+                substrate=self.compound_for(quantity),
                 organism=self.organism,
                 ec_number=ec_number,
                 table=quantity.table,
                 expected_unit=quantity.unit,
             )
             for quantity in self.resolvable
-            if quantity.table is not None
+            if quantity.table is not None and quantity.parameter_id not in skip
         ]
 
     @property
@@ -309,6 +362,7 @@ def compose(
     organism: Optional[str] = None,
     substrate: Optional[str] = None,
     name: Optional[str] = None,
+    compounds: Optional[Mapping[str, str]] = None,
 ) -> ComposedModel:
     """Recognise a shape and build the model, or raise `UnrecognisedShape`.
 
@@ -341,6 +395,7 @@ def compose(
         subject=subject,
         organism=organism,
         substrate=substrate,
+        compounds=dict(compounds or {}),
     )
 
 
@@ -352,6 +407,7 @@ def compose_and_parameterise(
     organism: Optional[str] = None,
     substrate: Optional[str] = None,
     simulate: Optional[Callable[[Any], Any]] = None,
+    compounds: Optional[Mapping[str, str]] = None,
 ) -> Tuple[ComposedModel, Any]:
     """Compose, then run the agent architecture over the result.
 
@@ -360,7 +416,7 @@ def compose_and_parameterise(
     `ModelSearch` would report a completed search over zero quantities as
     though the model were parameterised.
     """
-    model = compose(query, subject=subject, organism=organism, substrate=substrate)
+    model = compose(query, subject=subject, organism=organism, substrate=substrate, compounds=compounds)
     requests = model.parameter_requests()
     if not requests:
         return model, None
