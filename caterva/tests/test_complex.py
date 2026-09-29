@@ -137,3 +137,66 @@ def test_the_command_writes_a_build_from_a_local_entry(tmp_path, capsys):
     assert "10.1107/S0567739476001873" in (out / "BUILD.md").read_text()
     # The gro rounds to 1e-3 nm, so the fit is exact to that, not to 1e-9.
     assert "RMSD 0.00" in capsys.readouterr().out
+
+
+# --- did the ligand keep its pose through equilibration ------------------------
+
+def _write_gro(path, atoms):
+    lines = ["t", f"{len(atoms):5d}"]
+    for i, (res, name, xyz) in enumerate(atoms, 1):
+        lines.append(f"{1:5d}{res:<5}{name:>5}{i:5d}{xyz[0]:8.3f}{xyz[1]:8.3f}{xyz[2]:8.3f}")
+    path.write_text("\n".join(lines) + "\n   6.0 6.0 6.0\n")
+
+
+def _system():
+    ca = [("ALA", "CA", np.array(v)) for v in ((1, 1, 1), (1.4, 1, 1), (1, 1.5, 1.2), (1.3, 1.3, 1.8))]
+    lig = [("LIG", n, np.array(v) + 1.2) for n, v in HEAVY.items()] + [("LIG", "H1", np.array([1.2, 1.1, 1.2]))]
+    return ca + lig
+
+
+def test_a_rigidly_moved_system_has_kept_its_pose(tmp_path, capsys):
+    start = _system()
+    R, t = _rot([1, 1, 0], 0.4), np.array([0.5, -0.2, 0.3])
+    _write_gro(tmp_path / "boxed.gro", start)
+    _write_gro(tmp_path / "npt.gro", [(r, n, x @ R + t) for r, n, x in start] + [("SOL", "OW", np.zeros(3))])
+    assert cx.main(["--check", str(tmp_path), "--ligand", "LIG"]) == 0
+    assert "KEPT" in capsys.readouterr().out
+    lig, ca, n = cx.check(tmp_path, "LIG")
+    assert lig < 1e-2 and ca < 1e-2 and n == 4  # gro precision is 1e-3 nm
+
+
+def test_a_ligand_that_drifted_out_is_reported(tmp_path, capsys):
+    start = _system()
+    moved = [(r, n, x + (np.array([0.3, 0, 0]) if r == "LIG" else 0)) for r, n, x in start]
+    _write_gro(tmp_path / "boxed.gro", start)
+    _write_gro(tmp_path / "npt.gro", moved)
+    assert cx.main(["--check", str(tmp_path), "--ligand", "LIG"]) == 4
+    assert "LEFT its pose" in capsys.readouterr().out
+    assert cx.check(tmp_path, "LIG")[0] == pytest.approx(0.3, abs=2e-3)
+
+
+def test_check_refuses_output_from_another_build(tmp_path, capsys):
+    _write_gro(tmp_path / "boxed.gro", _system())
+    _write_gro(tmp_path / "npt.gro", [("GLY", "N", np.zeros(3))] * 10)
+    assert cx.main(["--check", str(tmp_path), "--ligand", "LIG"]) == 3
+    assert "not this build" in capsys.readouterr().err
+
+
+# --- symmetry: a ring that turned in place has not left ---------------------------
+
+RING = [(0.139 * math.cos(math.radians(60 * k)), 0.139 * math.sin(math.radians(60 * k)), 0.0) for k in range(6)]
+RING_BONDS = [(k, (k + 1) % 6) for k in range(6)]
+
+
+def test_benzene_has_twelve_graph_symmetries_and_an_asymmetric_chain_one():
+    assert len(cx.automorphisms(["C"] * 6, RING_BONDS)) == 12
+    assert len(cx.automorphisms(["C", "N", "O"], [(0, 1), (1, 2)])) == 1
+
+
+def test_a_ring_rotated_sixty_degrees_is_the_same_pose():
+    """Found on 181L: benzene rotated in its cavity read 2.70 A by atom name;
+    counting its symmetric poses it was 0.77 A, centroid 0.29 A."""
+    A = np.array(RING)
+    B = A @ _rot([0, 0, 1], math.radians(60))
+    assert np.sqrt(((A - B) ** 2).sum(1).mean()) > 0.13  # by name: every atom moved a bond length
+    assert cx.symmetric_rmsd(A, B, cx.automorphisms(["C"] * 6, RING_BONDS)) < 1e-9

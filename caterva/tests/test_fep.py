@@ -180,7 +180,7 @@ def test_the_legs_are_what_double_decoupling_needs(tmp_path):
     assert "couple-moltype          = LIG" in cplx
     assert "restraint-lambdas" in cplx and "restraint-lambdas" not in solv
     assert "[ intermolecular_interactions ]" in (out / "complex" / "topol.top").read_text()
-    stop = (out / "solvent" / "topol.top").read_text()
+    stop = (out / "solvent" / "topol.base.top").read_text()
     assert '#include "lig.itp"' in stop and "[ intermolecular_interactions ]" not in stop
     assert (out / "solvent" / "ligand.gro").read_text().count("LIG") == 7  # title + 6 atoms
     script = (out / "run.sh").read_text()
@@ -258,3 +258,10 @@ def test_no_two_windows_or_stages_share_a_noise_seed(tmp_path):
                                        capture_output=True, text=True).stdout)
                 assert v not in seen
                 seen.add(v)
+
+
+def test_the_solvent_build_can_be_rerun(tmp_path):
+    """solvate and genion append to topol.top; a re-run must start clean."""
+    run(tmp_path)
+    script = (tmp_path / "out" / "run.sh").read_text()
+    assert script.index("cp topol.base.top topol.top") < script.index("solvate")

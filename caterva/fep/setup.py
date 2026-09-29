@@ -174,7 +174,7 @@ class FepSetup:
             "init-lambda-state       = __LAMBDA__\n"
             + schedule(leg).mdp()
             + "sc-alpha                = 0.5\nsc-power                = 1\nsc-sigma                = 0.3\n"
-            "sc-r-power              = 6\nnstdhdl                 = 100\ncalc-lambda-neighbors   = 1\n"
+            "sc-r-power              = 6\nnstdhdl                 = 100\ncalc-lambda-neighbors   = -1\n"
             "separate-dhdl-file      = yes\n"
         )
         if stage == "em":
@@ -267,7 +267,11 @@ class FepSetup:
             src = self.topology.parent / inc
             if src.is_file() and f'#include "{src.name}"' in self._solvent_top() and src.name != self.ligand_itp.name:
                 shutil.copyfile(src, out / "solvent" / src.name)
-        put("solvent/topol.top", self._solvent_top())
+        # The pristine topology: `gmx solvate` and `genion` edit topol.top in
+        # place, so a solvent build that was interrupted and re-run counted
+        # its water twice (found re-running the solvent leg). run.sh always
+        # starts from this copy.
+        put("solvent/topol.base.top", self._solvent_top())
         put("solvent/ligand.gro", self._ligand_gro())
         put("solvent/ions.mdp", "; places ions only; nothing is simulated with it\nintegrator = steep\nnsteps = 0\n"
             "cutoff-scheme = Verlet\ncoulombtype = cutoff\nrcoulomb = 1.0\nrvdw = 1.0\n")
@@ -294,6 +298,7 @@ cd "$(dirname "$0")"
 # Solvent leg system: the ligand, in the pose it has in the complex, in water.
 if [ ! -f solvent/start.gro ]; then
   ( cd solvent
+    cp topol.base.top topol.top
     "$GMX" editconf -f ligand.gro -o boxed.gro -c -d 1.2 -bt dodecahedron
     "$GMX" solvate -cp boxed.gro -cs spc216.gro -o solvated.gro -p topol.top
     "$GMX" grompp -f ions.mdp -c solvated.gro -p topol.top -o ions.tpr -maxwarn 1
