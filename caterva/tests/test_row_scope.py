@@ -29,7 +29,7 @@ from caterva.compose.export import (
 )
 from caterva.compose.library import COMPETITIVE_INHIBITION, NONCOMPETITIVE_INHIBITION
 from caterva.compose.row_scope import (
-    ISOFORM, MODE_MISMATCH, MODE_UNSTATED, VERSUS, read_scope,
+    ISOFORM, MODE_MISMATCH, MODE_UNSTATED, PREPARATION, VERSUS, read_scope,
 )
 
 LDH_B_ROW = "LDH-B, pH not specified in the publication, temperature not specified in the publication"
@@ -72,6 +72,23 @@ class TestReadScope:
         assert scope.versus == "NADH"
         assert kinds(scope) == [VERSUS]
         assert "not versus pyruvate" in scope.concerns[0].plain
+
+    def test_a_tagged_construct_is_not_the_free_enzyme(self):
+        # BRENDA 739793, human LDH-A and a quinoline sulfonamide: the row the
+        # resolver returns for that inhibitor. The API flagged the tag; the
+        # composed report did not, until this.
+        row = ("pH 7.5, 37°C, recombinant His-tagged enzyme, pyruvate reduction, "
+               "competitive versus NADH")
+        scope = read_scope(row, motif="competitive_inhibition", table="ki", substrate="pyruvate")
+        assert scope.preparation == "tagged"
+        assert kinds(scope) == [VERSUS, PREPARATION]
+        assert '("His-tagged")' in scope.concerns[-1].plain
+
+    def test_a_curator_who_says_the_preparation_did_not_move_this_number_is_believed(self):
+        # The clause names one quantity, and only that quantity is excused.
+        row = "PEGylated enzyme, does not alter the Km value"
+        assert PREPARATION not in kinds(read_scope(row, motif="competitive_inhibition", table="km"))
+        assert PREPARATION in kinds(read_scope(row, motif="competitive_inhibition", table="ki"))
 
     def test_a_row_that_matches_the_model_raises_nothing(self):
         scope = read_scope("competitive versus pyruvate, pH 7.5, 25°C", motif="competitive_inhibition",
@@ -133,7 +150,7 @@ def ldh():
 class TestEveryExportCarriesIt:
     def test_csv_columns(self, ldh):
         for column in ("source_row_commentary", "measured_isoform", "inhibition_mode",
-                       "inhibition_measured_versus", "reported_values_low",
+                       "inhibition_measured_versus", "measured_preparation", "reported_values_low",
                        "reported_values_high", "reported_values_references"):
             assert column in CSV_COLUMNS
         assert CSV_COLUMNS[-1] == "provenance"

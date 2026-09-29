@@ -14,10 +14,17 @@ value belongs in this model at all:
   states no mode leaves it unknown which one this is.
 - **what the inhibitor was measured against.** A Ki measured versus NADH
   is not the Ki versus pyruvate, even in a competitive model.
+- **the preparation.** A His-tagged, immobilised or covalently modified
+  enzyme is a real, citable measurement of that preparation and not of the
+  free enzyme (ADR 0092). The API flagged it; the model builder did not:
+  human LDH's quinoline sulfonamide Ki (0.00059 mM, BRENDA 739793) came
+  from a His-tagged construct and the composed report said nothing.
 
 The commentary is parsed by `caterva.bind.core` (`read_isoform`,
-`read_mode`), the same reader `caterva bind` uses, so the model builder, the
-report and the four export formats cannot disagree about what a row said.
+`read_mode`), the same reader `caterva bind` uses, and the preparation by
+the literature layer's `enzyme_preparation.classify`, the reader the API
+uses, so the model builder, the report, the four export formats and the API
+cannot disagree about what a row said.
 This module decides only what that reading MEANS for a given model; the
 report prints it in Markdown and the exports print it in their own columns
 and comments, from the one `RowScope` this returns.
@@ -47,6 +54,14 @@ ISOFORM = "isoform"
 MODE_UNSTATED = "mode_unstated"
 MODE_MISMATCH = "mode_mismatch"
 VERSUS = "versus"
+PREPARATION = "preparation"
+
+#: How each altered preparation is named in a sentence.
+_PREPARED = {
+    "tagged": "a tagged construct",
+    "immobilised": "an immobilised enzyme",
+    "modified": "a covalently modified enzyme",
+}
 
 
 @dataclass(frozen=True)
@@ -72,6 +87,9 @@ class RowScope:
     #: The molecule the inhibition was measured against, when stated.
     versus: Optional[str]
     concerns: Tuple[Concern, ...] = ()
+    #: "tagged", "immobilised", "modified", "native" or "unstated", as the
+    #: literature layer classifies the row; None when that layer is absent.
+    preparation: Optional[str] = None
 
     @property
     def any(self) -> bool:
@@ -84,6 +102,18 @@ def _reader():
     except ImportError:  # pragma: no cover - flat layout
         from bind.core import read_isoform, read_mode  # type: ignore[no-redef]
     return read_isoform, read_mode
+
+
+def _preparation(text: str):
+    """The literature layer's verdict on how the enzyme was prepared, or
+    None where that layer is not installed (the wheel and the app folder do
+    not ship it, ADR 0177; a model that resolved a value from BRENDA always
+    had it)."""
+    try:
+        from caterva.checkout import literature_module
+        return literature_module("enzyme_preparation").classify(text)
+    except Exception:  # LiteratureLayerUnavailable, or an import failure
+        return None
 
 
 def read_scope(
@@ -131,10 +161,20 @@ def read_scope(
                     f"the row measured inhibition **versus {versus}**, not versus "
                     f"{substrate}, the substrate in this model: a Ki is specific to the "
                     f"assay it was measured in")))
-    return RowScope(isoform, mode, versus, tuple(concerns))
+
+    verdict = _preparation(text)
+    preparation = getattr(verdict, "status", None)
+    # `differs_for` honours a curator's "does not alter the Km value": the
+    # clause names one quantity, and only that quantity is excused.
+    if verdict is not None and verdict.differs_for(table) and preparation in _PREPARED:
+        concerns.append(Concern(PREPARATION, (
+            f"the row measured **{_PREPARED[preparation]}** (\"{verdict.evidence}\"), not the "
+            f"free enzyme; a real measurement of that preparation, which may not be the "
+            f"protein you mean")))
+    return RowScope(isoform, mode, versus, tuple(concerns), preparation)
 
 
 __all__ = [
     "Concern", "RowScope", "read_scope", "MODE_OF_MOTIF", "INHIBITION_TABLES",
-    "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS",
+    "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS", "PREPARATION",
 ]

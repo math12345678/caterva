@@ -44,6 +44,9 @@ done: there was no release to version.
   carried it. The CSV gains seven columns; each per-value sentence gains
   `SOURCE ROW:` and `VALUES DISAGREE:` clauses. One reader
   (`compose/row_scope.py`) serves the report and the exports.
+  The preparation is among them: a Ki measured on a His-tagged construct
+  (human LDH's quinoline sulfonamide, BRENDA 739793) is named as one in the
+  report and every export, as the API already did.
 - The API looks a Ki up under the inhibitor the query names ("... by
   oxamate"), not under the substrate taken from the enzyme's own name, and
   reports the row's isoform and mode; the CLI's `resolve` prints the same.

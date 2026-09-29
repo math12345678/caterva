@@ -247,6 +247,7 @@ CSV_COLUMNS = (
     "measured_isoform",
     "inhibition_mode",
     "inhibition_measured_versus",
+    "measured_preparation",
     # The spread of the values the resolver ranked, when they differ. Not an
     # uncertainty estimate; the provenance column says so on the same row.
     "reported_values_low",
@@ -1519,6 +1520,7 @@ def to_parameter_csv(model: ProvenancedModel) -> str:
                 (origin.scope.isoform or "") if origin.scope is not None else "",
                 (origin.scope.mode or "") if origin.scope is not None else "",
                 (origin.scope.versus or "") if origin.scope is not None else "",
+                (origin.scope.preparation or "") if origin.scope is not None else "",
                 *_spread_cells(measurement),
                 origin.sentence(),
             ]

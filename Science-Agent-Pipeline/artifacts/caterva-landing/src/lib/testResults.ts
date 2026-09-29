@@ -178,8 +178,11 @@ export const TEST_SUITES: TestSuite[] = [
         // looked up under its own compound and the report says what its row
         // measured: 3044. Plus the 17 tests of test_row_scope.py (what a
         // value's source row measured, and the spread of the other rows,
-        // carried into all four exports; 17 passed 2026-09-29): 3061.
-        passed: 3061,
+        // carried into all four exports; 17 passed 2026-09-29): 3061. CI
+        // on 4873cb6 agreed: 3060 passed, 1 skipped. Plus 2 tests that a
+        // tagged, immobilised or modified preparation is named in the
+        // report and the exports (19 passed with the file): 3063.
+        passed: 3063,
         skipped: 0,
         failed: 0,
       },
