@@ -25,6 +25,11 @@ done: there was no release to version.
   exact answers and calibrated error bars; `caterva fep --summarise` uses
   them on the raw dhdl files. The FEP setup now writes energies at every
   state (`calc-lambda-neighbors = -1`) so MBAR can use them.
+- A native .xtc reader (`caterva/md/xtc.py`), exact against `gmx trjconv`
+  on real output, with periodic-image handling and RMSF (agreeing with
+  `gmx rmsf`). `caterva complex --check` follows the ligand through every
+  frame; `caterva fep --trajectory` chooses restraint anchors among
+  C-alpha atoms that stay still.
 - Thermodynamic integration beside MBAR and BAR, and `caterva fep
   --optimise`: thermodynamic length per step from a pilot leg and an
   equal-length schedule (Shenfeld et al. 2009). On real benzene output

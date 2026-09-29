@@ -143,9 +143,9 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "103 test files -- kinetics & Michaelis-Menten correctness, " +
+          "104 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
-          "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR free-energy estimators, " +
+          "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
           "building with influence ranking, mechanism libraries and " +
           "verdicts, agents and assay windows, and citation/build guards",
@@ -169,7 +169,9 @@ export const TEST_SUITES: TestSuite[] = [
         // and symmetry tests and 1 solvent-rebuild test: 2988. Plus 3 tests
         // on real GROMACS output (BAR reproduces gmx bar pair by pair): 2991.
         // Plus 5 TI and thermodynamic-length tests and 1 guide example: 2997.
-        passed: 2997,
+        // Plus 5 tests of the native .xtc reader (exact against gmx trjconv on
+        // a real trajectory): 3002.
+        passed: 3002,
         skipped: 0,
         failed: 0,
       },

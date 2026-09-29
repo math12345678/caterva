@@ -348,6 +348,39 @@ def check(directory: Path, resname: str, itp: Optional[Path] = None) -> Tuple[fl
     return symmetric_rmsd(L0, L, perms), ca_rmsd, len(ca)
 
 
+def pose_over_trajectory(directory: Path, resname: str, xtc_name: str = "npt.xtc",
+                         itp: Optional[Path] = None) -> List[Tuple[float, float, float]]:
+    """(time ps, symmetric RMSD nm, centroid shift nm) of the ligand in every
+    frame of the equilibration, read natively from the .xtc: each frame's
+    protein C-alpha atoms made whole and superposed on the start, the ligand
+    made whole and moved to the periodic image nearest the protein."""
+    from caterva.md import xtc
+    start = _gro(directory / "boxed.gro")
+    ca = [i for i, (res, name, _) in enumerate(start) if name == "CA" and res != resname]
+    lig = [i for i, (res, name, _) in enumerate(start) if res == resname and not name.upper().startswith("H")]
+    Q = np.array([start[i][2] for i in ca])
+    L0 = np.array([start[i][2] for i in lig])
+    perms: List[List[int]] = [list(range(len(lig)))]
+    itp = itp or next((p for p in sorted(directory.glob("*.itp")) if not p.name.startswith("posre")
+                       and resname in p.read_text()), None)
+    if itp is not None:
+        names, elems, bonds = itp_graph(itp)
+        heavy = [k for k, e in enumerate(elems) if e != "H"]
+        if [names[k] for k in heavy] == [start[i][1] for i in lig]:
+            remap = {k: m for m, k in enumerate(heavy)}
+            perms = automorphisms([elems[k] for k in heavy],
+                                  [(remap[a], remap[b]) for a, b in bonds if a in remap and b in remap])
+    out = []
+    for f in xtc.frames(directory / xtc_name):
+        P = xtc.make_whole(f.x[ca], f.box)
+        L = xtc.make_whole(f.x[lig], f.box)
+        L = L + xtc.nearest_image(L.mean(0) - P.mean(0), f.box)[0] - (L.mean(0) - P.mean(0))
+        R, t = kabsch(P, Q)
+        Lf = L @ R + t
+        out.append((f.time, symmetric_rmsd(L0, Lf, perms), float(np.linalg.norm(Lf.mean(0) - L0.mean(0)))))
+    return out
+
+
 def centroid_shift(directory: Path, resname: str) -> float:
     """How far the ligand's heavy-atom centroid moved, protein superposed:
     blind to symmetry and to rotation in place, so it says whether the
@@ -390,10 +423,19 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva complex") ->
             print(f"{prog}: {e}", file=sys.stderr)
             return EXIT_REFUSED
         kept = rmsd <= POSE_KEPT_NM
+        over = None
+        if (a.check / "npt.xtc").is_file():
+            series = pose_over_trajectory(a.check, a.ligand)
+            worst = max(series, key=lambda r: r[1])
+            over = (f"  over npt.xtc ({len(series)} frames, read natively): worst {worst[1] * 10:.2f} A at "
+                    f"{worst[0]:.0f} ps, centroid at most {max(r[2] for r in series) * 10:.2f} A from the start")
+            kept = kept and worst[1] <= POSE_KEPT_NM
         shift = centroid_shift(a.check, a.ligand)
         print(f"{a.ligand}: heavy atoms {rmsd * 10:.2f} A from the crystal pose after equilibration, "
               f"counting its symmetry-equivalent poses as the same pose; centroid moved "
               f"{shift * 10:.2f} A (protein superposed on {n} C-alpha atoms, which moved {ca * 10:.2f} A).")
+        if over:
+            print(over)
         print("KEPT its pose: ready for caterva fep." if kept else
               f"LEFT its pose (more than {POSE_KEPT_NM * 10:.0f} A): the restraints caterva fep would "
               "choose would hold a pose the complex does not have. Check the ligand topology and "

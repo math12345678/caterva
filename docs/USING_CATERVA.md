@@ -529,7 +529,20 @@ name and 0.77 Å counting symmetry, with its centroid 0.29 Å from where it
 started: it had turned in its cavity, not left it. A ligand that
 wandered off during 200 ps of equilibration would take the Boresch
 restraints `caterva fep` chooses with it, so this is checked before the
-compute is spent.
+compute is spent. When `npt.xtc` is there, every frame is checked, not
+only the last: on 181L the benzene stayed within 0.29-0.91 Å of the
+crystal pose over all 11 frames, centroid within 0.62 Å.
+
+Trajectories are read by Caterva itself (`caterva/md/xtc.py`), a direct
+implementation of GROMACS's compressed-coordinate decoder: on the real
+181L equilibration, every coordinate of every frame (11 x 33,327 atoms)
+equals what `gmx trjconv` writes, and C-alpha RMSF computed from it
+agrees with `gmx rmsf` to 0.0002 nm on average. Given the equilibration
+(`caterva fep --trajectory npt.xtc`), restraint anchors are chosen only
+among C-alpha atoms that fluctuate less than 1 Å, and their RMSF is
+recorded in PROVENANCE.md. (On 181L the anchors picked by geometry alone
+were already still, 0.12-0.14 Å; that equilibration restrained the
+protein, so an unrestrained trajectory is the test that matters.)
 
 ### `caterva fep`: a binding free energy that knows what it must reproduce
 

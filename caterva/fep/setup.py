@@ -81,6 +81,7 @@ class FepSetup:
     water: str = "tip3p"
     restraint: Optional[Restraint] = None
     moleculetype: str = ""
+    trajectory: Optional[Path] = None
     parameters: List[Parameter] = field(default_factory=list)
 
     def __post_init__(self) -> None:
@@ -88,7 +89,7 @@ class FepSetup:
             raise ValueError("replicas must be 1 to 100 (per-window seeds are spaced by replica)")
         atoms = read_gro(self.complex_gro)
         ligand_atoms(atoms, self.ligand_resname)  # raises with what IS there
-        self.restraint = choose_restraint(atoms, self.ligand_resname)
+        self.restraint = choose_restraint(atoms, self.ligand_resname, self._flexibility(atoms))
         self.moleculetype = moleculetype_name(self.ligand_itp)
         if "intermolecular_interactions" in self.topology.read_text():
             raise ValueError(f"{self.topology} already has [ intermolecular_interactions ]; "
@@ -110,7 +111,11 @@ class FepSetup:
             Parameter("restraint atoms", f"P1-P2-P3 {', '.join(_short(a) for a in r.protein)}; "
                                          f"L1-L2-L3 {', '.join(_short(a) for a in r.ligand)}",
                       "chosen", f"picked so no angle nears 0 or 180 degrees (smallest sine {r.quality:.2f}); "
-                                "reference values measured on your complex"),
+                                "reference values measured on your complex"
+                                + (f"; anchors' RMSF over {self.trajectory.name}: "
+                                   + ", ".join(f"{x * 10:.2f} A" for x in r.anchor_rmsf)
+                                   + " (C-alpha atoms above 1 A excluded)" if r.anchor_rmsf else
+                                   "; no trajectory given, so anchor flexibility was not measured")),
             Parameter("restraint force constants", f"{K_DISTANCE:g} kJ/mol/nm^2, {K_ANGLE:g} kJ/mol/rad^2",
                       "chosen", "10 kcal/mol/A^2 and 10 kcal/mol/rad^2, the values in common use"),
             Parameter("restraint correction", f"+{self.restraint_kj():.2f} kJ/mol "
@@ -145,6 +150,20 @@ class FepSetup:
                       "chosen", "YOURS: supplied, not generated; its charges and types decide the answer"),
             Parameter("engine", "GROMACS", "method", m["gromacs"].cite()),
         ]
+
+    def _flexibility(self, atoms) -> Optional[Dict[int, float]]:
+        """C-alpha RMSF (nm) over the equilibration trajectory, read natively."""
+        if self.trajectory is None:
+            return None
+        from caterva.md import xtc
+        ca = [a for a in atoms if a.name == "CA" and a.resname != self.ligand_resname]
+        idx = [a.index - 1 for a in ca]
+        traj = xtc.read(self.trajectory)
+        if not traj or traj[0].x.shape[0] != len(atoms):
+            raise ValueError(f"{self.trajectory}: {traj[0].x.shape[0] if traj else 0} atoms per frame, "
+                             f"the complex has {len(atoms)}; not this system's trajectory")
+        ref = xtc.make_whole(traj[0].x[idx], traj[0].box)
+        return {a.index: float(v) for a, v in zip(ca, xtc.rmsf(traj, idx, ref))}
 
     def seeds(self) -> List[int]:
         return [self.seed + r for r in range(self.replicas)]

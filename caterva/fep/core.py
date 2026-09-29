@@ -132,6 +132,8 @@ class Restraint:
     phi_b: float
     phi_c: float
     quality: float  # smallest sine among the angles that keep it well defined
+    #: RMSF (nm) of P1, P2, P3 over an equilibration trajectory, when one was given.
+    anchor_rmsf: Optional[Tuple[float, float, float]] = None
 
     def gromacs(self) -> str:
         """The [ intermolecular_interactions ] block: off in state A, on in B."""
@@ -160,7 +162,14 @@ def _label(a: Atom) -> str:
     return f"{a.resname}{a.resnr}:{a.name} (atom {a.index})"
 
 
-def choose_restraint(atoms: Sequence[Atom], ligand_resname: str) -> Restraint:
+#: A C-alpha that fluctuates more than this over equilibration is not used
+#: as a restraint anchor: an anchor on a moving loop drags the restrained
+#: pose with it. 0.1 nm (1 A): a chosen threshold.
+MAX_ANCHOR_RMSF_NM = 0.10
+
+
+def choose_restraint(atoms: Sequence[Atom], ligand_resname: str,
+                     flexibility: Optional[Dict[int, float]] = None) -> Restraint:
     """Pick restraint atoms so every angle stays well away from 0 and 180 degrees.
 
     A Boresch angle near collinear makes its dihedral undefined and the
@@ -191,8 +200,14 @@ def choose_restraint(atoms: Sequence[Atom], ligand_resname: str) -> Restraint:
     _, l2, l3 = best_lig
 
     ca = [a for a in atoms if a.name == "CA" and a.resname in AMINO_ACIDS]
-    pocket = sorted((a for a in ca if float(np.linalg.norm(_v(a) - centroid)) < 1.5),
-                    key=lambda a: float(np.linalg.norm(_v(a) - centroid)))[:16]
+    near = [a for a in ca if float(np.linalg.norm(_v(a) - centroid)) < 1.5]
+    if flexibility is not None:
+        rigid = [a for a in near if flexibility.get(a.index, 0.0) <= MAX_ANCHOR_RMSF_NM]
+        if len(rigid) < 3:
+            raise ValueError(f"only {len(rigid)} C-alpha atom(s) near the ligand fluctuate less than "
+                             f"{MAX_ANCHOR_RMSF_NM * 10:.0f} A over the trajectory; no stable anchors")
+        near = rigid
+    pocket = sorted(near, key=lambda a: float(np.linalg.norm(_v(a) - centroid)))[:16]
     if len(pocket) < 3:
         raise ValueError("fewer than 3 C-alpha atoms within 1.5 nm of the ligand: is it in the pocket?")
     best = None
@@ -206,13 +221,16 @@ def choose_restraint(atoms: Sequence[Atom], ligand_resname: str) -> Restraint:
             ta, tb = angle(p2, p1, l1), angle(p1, l1, l2)
             q = min(math.sin(ta), math.sin(tb), math.sin(angle(p3, p2, p1)), best_lig[0])
             score = q - 0.1 * max(0.0, abs(r - 0.6) - 0.2)
+            if flexibility is not None:  # stiller anchors, other things equal
+                score -= sum(flexibility.get(x.index, 0.0) for x in (p1, p2, p3))
             if best is None or score > best[0]:
                 best = (score, q, p1, p2, p3, r, ta, tb)
     if best is None:
         raise ValueError("no C-alpha within 0.3-1.2 nm of the ligand's central atom")
     _, q, p1, p2, p3, r, ta, tb = best
+    fl = tuple(flexibility.get(x.index, 0.0) for x in (p1, p2, p3)) if flexibility is not None else None
     return Restraint((p1, p2, p3), (l1, l2, l3), r, ta, tb,
-                     dihedral(p3, p2, p1, l1), dihedral(p2, p1, l1, l2), dihedral(p1, l1, l2, l3), q)
+                     dihedral(p3, p2, p1, l1), dihedral(p2, p1, l1, l2), dihedral(p1, l1, l2, l3), q, fl)
 
 
 def restraint_cost_kj(rst: Restraint, temperature_k: float) -> float:

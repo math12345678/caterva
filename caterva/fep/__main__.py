@@ -79,7 +79,8 @@ def setup(a) -> int:
     phs = sorted({m.ph for m in t.used if m.ph is not None})
     try:
         s = FepSetup(t, a.complex, a.topology, a.ligand, a.ligand_itp, temperature_for(t, a.temperature),
-                     ph=phs[0] if len(phs) == 1 else None, replicas=a.replicas, ns=a.ns)
+                     ph=phs[0] if len(phs) == 1 else None, replicas=a.replicas, ns=a.ns,
+                     trajectory=a.trajectory)
     except ValueError as e:
         print(f"caterva fep: {e}", file=sys.stderr)
         return EXIT_REFUSED
@@ -93,6 +94,8 @@ def setup(a) -> int:
     print(f"  run at     {s.temperature.kelvin:.2f} K ({s.temperature.origin}: {s.temperature.source})")
     print(f"  restraint  |P1 L1| {r.r:.3f} nm, smallest sine {r.quality:.2f}, "
           f"correction +{s.restraint_kj() / KJ_PER_KCAL:.2f} kcal/mol at 1 M")
+    if r.anchor_rmsf:
+        print(f"  anchors    RMSF {', '.join(f'{x * 10:.2f}' for x in r.anchor_rmsf)} A over {a.trajectory.name}")
     for c in t.caveats:
         print(f"  caveat     {c}")
     if s.replicas < 2:
@@ -247,6 +250,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva fep") -> int
     p.add_argument("--topology", type=Path, help="its topology (.top); local #includes are copied")
     p.add_argument("--ligand", help="the ligand's residue name in the .gro")
     p.add_argument("--ligand-itp", type=Path, help="the ligand's topology (.itp): yours, not generated")
+    p.add_argument("--trajectory", type=Path,
+                   help="the complex's equilibration (.xtc): restraint anchors are chosen among C-alpha atoms that stay still")
     p.add_argument("--temperature", type=float, help="°C; default: the Ki's assay temperature")
     p.add_argument("--replicas", type=int, default=3)
     p.add_argument("--ns", type=float, default=5.0, help="production per window, ns")
