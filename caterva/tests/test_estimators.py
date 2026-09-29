@@ -150,3 +150,62 @@ def test_the_reader_parses_real_gromacs_dhdl(tmp_path):
     assert np.all(w.du[5] == 0.0)  # a state's energy relative to itself
     z = np.load(FIX / "benzene_solvent_rep1.npz")
     assert np.allclose(w.du, z["du"][5], rtol=1e-6, atol=1e-6)
+
+
+# --- thermodynamic integration and thermodynamic length ---------------------------
+
+def test_ti_recovers_the_exact_answer_for_a_linear_spring_path():
+    """u_l(x) = K(l)(x - m)^2 / 2 with K(l) = K0 + (K1 - K0) l: <du/dl> =
+    (K1 - K0) / (2 K(l)) exactly, and its integral is ln(K1/K0)/2."""
+    K0, K1 = 1.0, 10.0
+    lam = np.linspace(0, 1, 201)[:, None]
+    means = ((K1 - K0) / (2 * (K0 + (K1 - K0) * lam)))
+    dg, err = est.ti(lam, means, np.zeros_like(means))
+    assert dg == pytest.approx(0.5 * math.log(K1 / K0), rel=1e-4) and err == 0.0
+
+
+def test_ti_follows_a_two_component_path_one_component_at_a_time():
+    lam = np.array([[0, 0], [0.5, 0], [1, 0], [1, 0.5], [1, 1]], float)
+    means = np.array([[7, 9], [2, 9], [2, 9], [5, 4], [5, 4]], float)
+    dg, _ = est.ti(lam, means, np.zeros_like(means))
+    # coul over its three states: 0.5*(7+2)*0.5 + 0.5*(2+2)*0.5 = 3.25; the
+    # later coul means (5) never count, coul is not moving there. vdw from
+    # the corner state, whose vdw derivative IS on the path:
+    # 0.5*(9+4)*0.5 + 0.5*(4+4)*0.5 = 5.25; the first two vdw means never count.
+    assert dg == pytest.approx(3.25 + 5.25)
+
+
+def test_redistribution_equalises_thermodynamic_length():
+    lam = np.linspace(0, 1, 6)[:, None]
+    L = np.array([3.0, 1.0, 1.0, 1.0, 2.0])  # uneven steps
+    new = est.redistribute(lam, L, 9)[:, 0]
+    cum = np.concatenate([[0], np.cumsum(L)])
+    s = np.interp(new, lam[:, 0], cum)  # each new state's position along the length
+    assert np.allclose(np.diff(s), cum[-1] / 8, atol=1e-3)
+    assert new[0] == 0 and new[-1] == 1 and np.all(np.diff(new) > 0)
+
+
+def _fixture_windows():
+    z = np.load(FIX / "benzene_solvent_rep1.npz")
+    return [est.Window(i, float(z["temperature"]), np.arange(z["du"].shape[2]), z["du"][i].astype(float),
+                       ["coul", "vdw"], z["lambdas"], z["dhdl"][i].astype(float)) for i in range(25)], z
+
+
+def test_ti_agrees_with_mbar_on_real_output():
+    """Three estimators on one real leg: TI (-0.05), MBAR (-0.33), BAR
+    (-0.17) kJ/mol, each within the others' errors."""
+    ws, z = _fixture_windows()
+    n = ws[0].du.shape[1]
+    lam = z["lambdas"]
+    means = np.array([w.dhdl.mean(axis=1) for w in ws])
+    sems = np.array([w.dhdl.std(axis=1, ddof=1) / math.sqrt(n) for w in ws])
+    dg_ti, e_ti = est.ti(lam, means, sems)
+    r = est.mbar(np.concatenate([w.du for w in ws], axis=1), [n] * 25)
+    kt = est.R_KJ * float(z["temperature"])
+    assert abs(dg_ti - r.f[-1] * kt) < 2 * math.hypot(e_ti, r.df[-1] * kt) + 1.0
+
+
+def test_real_step_lengths_show_where_the_schedule_is_uneven():
+    ws, _ = _fixture_windows()
+    L = est.segment_lengths(ws, [np.arange(w.du.shape[1]) for w in ws])
+    assert len(L) == 24 and L.max() > 3 * L.min()  # windows sit where they do little work

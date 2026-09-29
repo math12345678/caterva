@@ -168,7 +168,8 @@ export const TEST_SUITES: TestSuite[] = [
         // harmonic-oscillator answers, calibrated error bars), 5 pose-check
         // and symmetry tests and 1 solvent-rebuild test: 2988. Plus 3 tests
         // on real GROMACS output (BAR reproduces gmx bar pair by pair): 2991.
-        passed: 2991,
+        // Plus 5 TI and thermodynamic-length tests and 1 guide example: 2997.
+        passed: 2997,
         skipped: 0,
         failed: 0,
       },

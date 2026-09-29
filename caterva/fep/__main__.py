@@ -123,7 +123,8 @@ def _leg(directory: Path, leg: str, rep: int, n_windows: int, lines: List[str], 
                 gmx = f"; gmx bar {g:.2f} ± {ge:.2f}"
             lines.append(
                 f"  rep{rep} {leg:<7} MBAR {a.dg_mbar:8.2f} ± {a.err_mbar:.2f} kJ/mol (BAR {a.dg_bar:.2f} ± "
-                f"{a.err_bar:.2f}{gmx}); {sum(a.samples_used)} independent of {sum(a.samples_raw)} samples, "
+                f"{a.err_bar:.2f}" + (f", TI {a.dg_ti:.2f} ± {a.err_ti:.2f}" if a.dg_ti is not None else "")
+                + f"{gmx}); {sum(a.samples_used)} independent of {sum(a.samples_raw)} samples, "
                 f"min overlap {a.min_overlap:.3f} ({a.min_overlap_pair[0]}-{a.min_overlap_pair[1]})")
             warnings.extend(f"rep{rep} {leg}: {w}" for w in a.warnings)
             return a.dg_mbar, a.err_mbar
@@ -192,10 +193,52 @@ def summarise(directory: Path) -> int:
     return EXIT_OK if v.word == "agrees" else EXIT_NOT_A_RESULT
 
 
+def optimise(directory: Path, leg: str, rep: int) -> int:
+    """Where the windows of a leg should go, from a pilot run of it."""
+    import numpy as np
+    from caterva.fep.estimators import TARGET_STEP_KT, analyse_leg, redistribute
+    rec_path = directory / "caterva-fep.json"
+    n = json.loads(rec_path.read_text())["windows"][leg] if rec_path.is_file() else None
+    d = directory / leg / f"rep{rep}"
+    xvgs = sorted(d.glob("lambda*/prod.xvg"), key=lambda p: int(p.parent.name[6:]))
+    if not xvgs or (n and len(xvgs) != n):
+        print(f"caterva fep: {d} has {len(xvgs)} finished window(s)" + (f" of {n}" if n else "")
+              + "; optimising needs the whole pilot leg", file=sys.stderr)
+        return EXIT_REFUSED
+    try:
+        a = analyse_leg(xvgs)
+    except ValueError as e:
+        print(f"caterva fep: {e}", file=sys.stderr)
+        return EXIT_REFUSED
+    if a.lambdas is None:
+        print("caterva fep: the dhdl files carry no lambda vectors", file=sys.stderr)
+        return EXIT_REFUSED
+    lam = np.array(a.lambdas)
+    L = np.array(a.lengths)
+    total = float(L.sum())
+    need = max(2, int(math.ceil(total / TARGET_STEP_KT)) + 1)
+    same = redistribute(lam, L, len(lam))
+    print(f"{leg} leg, replica {rep}: {len(lam)} windows, thermodynamic length {total:.2f} kT "
+          f"(Shenfeld et al. 2009, doi:10.1103/PhysRevE.80.046705)")
+    print("  step lengths (kT): " + " ".join(f"{x:.2f}" for x in L))
+    print(f"  longest step {L.max():.2f} kT ({int(L.argmax())}-{int(L.argmax()) + 1}), "
+          f"shortest {L.min():.2f} kT ({int(L.argmin())}-{int(L.argmin()) + 1})")
+    print(f"  equal-length schedule, same {len(lam)} windows: every step {total / (len(lam) - 1):.2f} kT")
+    print(f"  windows needed for every step <= {TARGET_STEP_KT:g} kT: {need}")
+    print("  for the mdp files (equal length, same count):")
+    for c, name in enumerate(a.components):
+        print(f"    {name + '-lambdas':<23} = " + " ".join(f"{x:g}" for x in same[:, c]))
+    return EXIT_OK
+
+
 def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva fep") -> int:
     p = argparse.ArgumentParser(prog=prog, description=__doc__.split("\n\n")[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--summarise", type=Path, metavar="DIR", help="combine a finished run and judge it")
+    p.add_argument("--optimise", type=Path, metavar="DIR",
+                   help="from a finished pilot leg: where its lambda windows should go")
+    p.add_argument("--leg", choices=("complex", "solvent"), default="solvent")
+    p.add_argument("--rep", type=int, default=1)
     p.add_argument("--ec"); p.add_argument("--organism", default="Homo sapiens")
     p.add_argument("--inhibitor"); p.add_argument("--isoform")
     p.add_argument("--state", choices=("free", "ternary"), default="free")
@@ -214,6 +257,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva fep") -> int
         return EXIT_USAGE if e.code else EXIT_OK
     if a.summarise:
         return summarise(a.summarise)
+    if a.optimise:
+        return optimise(a.optimise, a.leg, a.rep)
     return setup(a)
 
 

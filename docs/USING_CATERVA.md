@@ -584,7 +584,22 @@ total exactly (-1.31 kJ/mol). With equilibration removed and the samples
 thinned to independent ones (3,107 of 6,275), MBAR gives -0.33 +/- 0.83
 and BAR -0.17 +/- 0.66: the same answer, with an error bar that counts
 independent samples rather than all of them. Those files are kept as a
-test (`caterva/tests/fixtures/fep/`).
+test (`caterva/tests/fixtures/fep/`). Thermodynamic integration (Kirkwood
+1935) on the same windows' dH/dλ gives -0.05 +/- 0.97: three estimators,
+one answer. When TI parts from MBAR, <dH/dλ> is too curved between
+windows for the trapezoid rule, and the report says so.
+
+```bash
+caterva fep --optimise ldha-gossypol --leg solvent --rep 1
+```
+
+`--optimise` reads a finished pilot leg and says where its windows should
+go. It measures each step's thermodynamic length (Shenfeld et al. 2009:
+the spread, in kT, of the energy gap between neighbouring states) and
+places the same number of windows at equal length along the same path,
+and says how many are needed to keep every step under 1 kT. On the
+benzene solvent leg the 25 windows' steps ran from 0.21 to 0.91 kT, and
+15 windows would keep every step under 1 kT: about 40% less compute.
 
 It has been run end to end on T4 lysozyme L99A with benzene (PDB 181L),
 GROMACS 2026.1: 118 windows over two replicas and both legs, BAR, the

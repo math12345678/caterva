@@ -48,6 +48,9 @@ class Window:
     temperature: float               # K
     time: np.ndarray                 # ps
     du: np.ndarray                   # (K, n) reduced u_k(x_n) - u_state(x_n)
+    components: List[str] = field(default_factory=list)   # e.g. ["coul", "vdw"]
+    lambdas: Optional[np.ndarray] = None                   # (K, C) every state's lambda vector
+    dhdl: Optional[np.ndarray] = None                      # (C, n) dH/dlambda, kJ/mol
 
 
 _TEMP = re.compile(r"T\s*=\s*([\d.]+)\s*\(K\)")
@@ -76,6 +79,12 @@ def read_dhdl(path: Path) -> Window:
         raise ValueError(f"{path}: no 'T = ... (K)' and lambda state in the subtitle")
     data = np.array(rows)
     dh_cols = [i for i, l in sorted(legends.items()) if "H \\xl\\f{} to" in l or "\\xD\\f{}H" in l and " to " in l]
+    dhdl_cols = [(i, re.search(r"(\w+)-lambda", l).group(1)) for i, l in sorted(legends.items())
+                 if l.startswith("dH/d") and re.search(r"(\w+)-lambda", l)]
+    targets = []
+    for i in dh_cols:
+        m = re.search(r"to \(([^)]*)\)", legends[i]) or re.search(r"to ([-\d.]+)", legends[i])
+        targets.append([float(v) for v in m.group(1).split(",")] if m else [])
     if not dh_cols:
         raise ValueError(f"{path}: no energy differences to other states")
     beta = 1.0 / (R_KJ * temperature)
@@ -84,7 +93,9 @@ def read_dhdl(path: Path) -> Window:
     if len(dh_cols) < 3:
         raise ValueError(f"{path}: energies at {len(dh_cols)} states only; MBAR needs every state "
                          "(calc-lambda-neighbors = -1)")
-    return Window(state, temperature, data[:, 0], du)
+    lambdas = np.array(targets) if targets and all(len(t) == len(targets[0]) for t in targets) else None
+    dhdl = data[:, [c + 1 for c, _ in dhdl_cols]].T if dhdl_cols else None
+    return Window(state, temperature, data[:, 0], du, [c for _, c in dhdl_cols], lambdas, dhdl)
 
 
 # -- correlation and equilibration ------------------------------------------------
@@ -232,6 +243,64 @@ def bar(w_f: np.ndarray, w_r: np.ndarray) -> Tuple[float, float]:
     return df, math.sqrt(max(var, 0.0))
 
 
+# -- thermodynamic integration ------------------------------------------------------
+
+def ti(lambdas: np.ndarray, means: np.ndarray, sems: np.ndarray) -> Tuple[float, float]:
+    """ΔG = sum over components c of integral <dH/dlambda_c> dlambda_c along
+    the path through the states in order, by the trapezoid rule (Kirkwood
+    1935). lambdas (K, C); means and sems (K, C), kJ/mol. The error
+    propagates each window's standard error through the trapezoid weights.
+    """
+    K, C = lambdas.shape
+    w = np.zeros((K, C))
+    for i in range(K - 1):
+        d = lambdas[i + 1] - lambdas[i]
+        w[i] += 0.5 * d
+        w[i + 1] += 0.5 * d
+    return float(np.sum(w * means)), float(np.sqrt(np.sum((w * sems) ** 2)))
+
+
+# -- thermodynamic length and where windows should go ---------------------------------
+
+def segment_lengths(windows: Sequence["Window"], idx_sets: Sequence[np.ndarray]) -> np.ndarray:
+    """Thermodynamic length of each step between neighbouring states
+    (Shenfeld et al. 2009): the standard deviation, in kT, of the reduced
+    energy gap between them, averaged over the samples of both ends. A step
+    longer than about 1 kT is where overlap runs out."""
+    K = len(windows)
+    L = np.zeros(K - 1)
+    for i in range(K - 1):
+        a, b = windows[i], windows[i + 1]
+        sa = np.std(a.du[i + 1, idx_sets[i]] - a.du[i, idx_sets[i]])
+        sb = np.std(b.du[i, idx_sets[i + 1]] - b.du[i + 1, idx_sets[i + 1]])
+        L[i] = 0.5 * (sa + sb)
+    return L
+
+
+#: The step length a schedule should not exceed, in kT: about where
+#: neighbouring states stop sharing configurations. A chosen threshold.
+TARGET_STEP_KT = 1.0
+
+
+def redistribute(lambdas: np.ndarray, lengths: np.ndarray, n: int) -> np.ndarray:
+    """n states along the same path, spaced to equal thermodynamic length.
+
+    The path is the piecewise-linear curve through the current states; its
+    cumulative length is known at them, so a state at length s is placed by
+    interpolating along the segment that contains s. With lengths measured
+    on a pilot run, this equalises the difficulty of every step, which is
+    the schedule that minimises the variance of the total (Shenfeld 2009).
+    """
+    cum = np.concatenate([[0.0], np.cumsum(lengths)])
+    out = []
+    for s in np.linspace(0.0, cum[-1], n):
+        i = min(int(np.searchsorted(cum, s, side="right")) - 1, len(lengths) - 1)
+        seg = cum[i + 1] - cum[i]
+        t = 0.0 if seg == 0 else (s - cum[i]) / seg
+        out.append(lambdas[i] + t * (lambdas[i + 1] - lambdas[i]))
+    return np.round(np.array(out), 4)
+
+
 # -- the analysis of one leg -------------------------------------------------------
 
 @dataclass
@@ -248,6 +317,11 @@ class LegAnalysis:
     err_bar: float
     min_overlap: float
     min_overlap_pair: Tuple[int, int]
+    dg_ti: Optional[float] = None
+    err_ti: Optional[float] = None
+    lengths: List[float] = field(default_factory=list)       # kT per step
+    components: List[str] = field(default_factory=list)
+    lambdas: Optional[List[List[float]]] = None
     forward: List[Tuple[float, float, float]] = field(default_factory=list)   # (fraction, dG, err)
     reverse: List[Tuple[float, float, float]] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
@@ -321,10 +395,26 @@ def analyse_leg(paths: Sequence[Path]) -> LegAnalysis:
     if abs(a.dg_mbar - a.dg_bar) > 2 * math.hypot(a.err_mbar, a.err_bar):
         a.warnings.append(f"MBAR and BAR disagree ({a.dg_mbar:.2f} vs {a.dg_bar:.2f} kJ/mol): "
                           "the states are too far apart for either to be trusted")
+    L = segment_lengths(windows, idx_sets)
+    a.lengths = [float(x) for x in L]
+    worst = int(np.argmax(L))
+    if L[worst] > TARGET_STEP_KT:
+        a.warnings.append(f"step {worst}-{worst + 1} is {L[worst]:.1f} kT long (> {TARGET_STEP_KT:g}): "
+                          "`caterva fep --optimise` places windows to even it out")
+    if windows[0].lambdas is not None and all(w.dhdl is not None for w in windows):
+        lam = windows[0].lambdas
+        means = np.array([w.dhdl[:, ix].mean(axis=1) for w, ix in zip(windows, idx_sets)])
+        sems = np.array([w.dhdl[:, ix].std(axis=1, ddof=1) / math.sqrt(len(ix)) for w, ix in zip(windows, idx_sets)])
+        a.dg_ti, a.err_ti = ti(lam, means, sems)
+        a.components = list(windows[0].components)
+        a.lambdas = lam.tolist()
+        if abs(a.dg_ti - a.dg_mbar) > 2 * math.hypot(a.err_ti, a.err_mbar):
+            a.warnings.append(f"TI and MBAR disagree ({a.dg_ti:.2f} vs {a.dg_mbar:.2f} kJ/mol): <dH/dlambda> "
+                              "is not smooth enough between windows for the trapezoid rule")
     if min(n_k) < 20:
         a.warnings.append(f"as few as {min(n_k)} independent samples in a window after subsampling")
     return a
 
 
-__all__ = ["Window", "read_dhdl", "statistical_inefficiency", "detect_equilibration", "subsample",
+__all__ = ["ti", "segment_lengths", "redistribute", "TARGET_STEP_KT", "Window", "read_dhdl", "statistical_inefficiency", "detect_equilibration", "subsample",
            "mbar", "MbarResult", "bar", "LegAnalysis", "analyse_leg", "MIN_OVERLAP"]

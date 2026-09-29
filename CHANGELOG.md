@@ -25,7 +25,11 @@ done: there was no release to version.
   exact answers and calibrated error bars; `caterva fep --summarise` uses
   them on the raw dhdl files. The FEP setup now writes energies at every
   state (`calc-lambda-neighbors = -1`) so MBAR can use them.
-- `caterva complex --check`: did the ligand keep its crystal pose, with
+- Thermodynamic integration beside MBAR and BAR, and `caterva fep
+  --optimise`: thermodynamic length per step from a pilot leg and an
+  equal-length schedule (Shenfeld et al. 2009). On real benzene output
+  TI, MBAR and BAR agree, and 15 windows would do the work of 25.
+ did the ligand keep its crystal pose, with
   symmetric poses counted as one (graph automorphisms from the .itp).
 - `caterva fep`'s solvent build starts from a pristine topology, so an
   interrupted build can be re-run (solvate had counted the water twice).

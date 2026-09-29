@@ -8,7 +8,8 @@ calc-lambda-neighbors = -1).
 
 - `benzene_solvent_rep1.npz`: `du[window, state, sample]`, each window's
   samples' reduced energy at every state relative to its own, as
-  `read_dhdl` returns it (stored float32), and `temperature`.
+  `read_dhdl` returns it (stored float32); `dhdl[window, component, sample]`
+  (coul, vdw; kJ/mol); `lambdas[state, component]`; and `temperature`.
 - `benzene_solvent_lambda5.xvg.gz`: window 5's dhdl.xvg as GROMACS wrote it.
 - `benzene_solvent_rep1_gmxbar.txt`: `gmx bar`'s 24 neighbour free
   energies (kJ/mol, as printed to 2 decimals) on the same 25 files. Its
