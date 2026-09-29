@@ -106,7 +106,19 @@ def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
         if p.pairs:
             lines.append(f'{gmx} distance -s {r}/md.tpr -f {r}/md.xtc -select {sel} '
                          f'-oall {r}/catalytic.xvg -tu ns')
-        lines.append(f"printf 'C-alpha\\n' | {gmx} rmsf -s {r}/md.tpr -f {r}/md.xtc -res -o {r}/rmsf.xvg")
+        # gmx rmsf fits every frame to the -s coordinates AS STORED, and a
+        # tpr stores them wrapped into the box: on lysozyme (1AKI, 2026-09-29)
+        # residues 66-74 sat a box length from their neighbours, and the fit
+        # to that broken reference put their RMSF about 10% high. So the
+        # reference is em.gro made whole (the one the native route fits to)
+        # and the trajectory is made whole first; the two routes then agree
+        # to 0.0001 nm on every residue.
+        lines.append(f"printf 'Protein\\n' | {gmx} trjconv -s {r}/md.tpr -f em.gro -pbc mol "
+                     f"-o {r}/rmsf_reference.pdb")
+        lines.append(f"printf 'Protein\\n' | {gmx} trjconv -s {r}/md.tpr -f {r}/md.xtc -pbc mol "
+                     f"-o {r}/md_whole.xtc")
+        lines.append(f"printf 'C-alpha\\n' | {gmx} rmsf -s {r}/rmsf_reference.pdb -f {r}/md_whole.xtc "
+                     f"-res -o {r}/rmsf.xvg")
     return lines
 
 

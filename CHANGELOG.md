@@ -54,6 +54,18 @@ done: there was no release to version.
   `scripts/refresh_export_samples.py`. The panel had shown a command that
   does not exist, a JSON format the CLI does not write, and a CSV
   trajectory where the real CSV is the parameter audit trail.
+- `caterva analyze --gromacs` put the RMSF of lysozyme's residues 66-74
+  about 10% above the native route, a gap recorded as unexplained. It was
+  the GROMACS route's: `gmx rmsf` fits to the `-s` coordinates as stored,
+  and the tpr stores them wrapped, with those residues a box length from
+  their neighbours. The generated script now makes the reference and the
+  trajectory whole first; the routes agree to 0.0001 nm on every residue,
+  and the MD smoke job now fails if their mean RMSF differ.
+- The effector parser no longer sends role words ("activator LY-2121260"),
+  changes to the protein ("with removed helix alpha13") or two compounds
+  joined by "or" to PubChem as one name; and identical HTTP requests are
+  answered once per process, which stopped NCBI's rate limit firing on a
+  single lookup.
 - The MD smoke test read the hydrogen-bond table as distances and failed
   CI with a 0.697 nm "disagreement"; it now reads only the geometry section.
 - `caterva prepare --ph`: a protonation-risk audit of the active site from

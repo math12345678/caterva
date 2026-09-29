@@ -40,6 +40,23 @@ def _distance_rows(text: str) -> dict:
     return rows
 
 
+def _flexibility_rows(text: str) -> dict:
+    """replica -> (pocket, rest) mean Calpha RMSF (nm) from the flexibility table.
+
+    Compared across the two routes since 2026-09-29. Before then the GROMACS
+    route fitted to the wrapped tpr coordinates and, on lysozyme, put the
+    RMSF of residues 66-74 about 10% above the native route's; nothing
+    compared them, so the gap was recorded as unexplained rather than caught.
+    """
+    section = text.split("## Active-site flexibility", 1)[-1].split("\n## ", 1)[0]
+    rows = {}
+    for line in section.splitlines():
+        m = re.match(r"\|\s*(rep\w+)\s*\|\s*([\d.]+)\s*\|\s*([\d.]+)\s*\|", line)
+        if m:
+            rows[m.group(1)] = (float(m.group(2)), float(m.group(3)))
+    return rows
+
+
 def main() -> int:
     gmx = os.environ.get("GMX", "gmx")
     if shutil.which(gmx) is None and not Path(gmx).exists():
@@ -72,14 +89,16 @@ def main() -> int:
     # trajectories it reads itself, and by gmx distance / gmx rmsf. The two
     # distance tables must agree, so this job checks the native reader and
     # geometry against GROMACS on every run.
-    tables = {}
+    tables, flex = {}, {}
     for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
         code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
                               cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
         if code not in (0, 4):
             print(f"FAIL: caterva analyze ({route}) exited {code} on real output")
             return 1
-        tables[route] = _distance_rows((OUT / "ANALYSIS.md").read_text())
+        text = (OUT / "ANALYSIS.md").read_text()
+        tables[route] = _distance_rows(text)
+        flex[route] = _flexibility_rows(text)
     if not (OUT / "rep2" / "catalytic.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
@@ -93,6 +112,17 @@ def main() -> int:
         return 1
     print(f"OK: native and GROMACS agree on {len(tables['native'])} catalytic distances "
           f"(largest difference {worst:.4f} nm).")
+    if not flex["native"] or flex["native"].keys() != flex["gromacs"].keys():
+        print(f"FAIL: native and GROMACS flexibility tables list different replicas: "
+              f"{sorted(flex['native'])} vs {sorted(flex['gromacs'])}")
+        return 1
+    worst_f = max(abs(a - b) for k in flex["native"]
+                  for a, b in zip(flex["native"][k], flex["gromacs"][k]))
+    if worst_f > 0.0005:
+        print(f"FAIL: native and GROMACS mean RMSF differ by up to {worst_f:.4f} nm")
+        return 1
+    print(f"OK: native and GROMACS agree on mean Calpha RMSF for {len(flex['native'])} replicas "
+          f"(largest difference {worst_f:.4f} nm).")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0

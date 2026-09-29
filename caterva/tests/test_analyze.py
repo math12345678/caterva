@@ -80,8 +80,24 @@ def test_histidine_protonation_variants_keep_their_ring_nitrogens():
 def test_one_gromacs_call_per_replica_measures_every_pair():
     p = plan(read_pdb(_protein(), "A"), [(10, "HIS"), (20, "ASP")])
     lines = commands(p, ["rep1", "rep2"])
-    assert sum("distance" in l for l in lines) == 2 and sum("rmsf" in l for l in lines) == 2
+    assert sum("distance" in l for l in lines) == 2
+    assert sum(" rmsf " in l for l in lines) == 2
     assert "-oall rep1/catalytic.xvg" in lines[0]
+
+
+def test_gmx_rmsf_fits_to_a_whole_reference_not_the_wrapped_tpr():
+    # A tpr stores coordinates wrapped into the box. gmx rmsf fits to -s as
+    # stored, so on 1AKI residues 66-74 (split a box length from their
+    # neighbours) came out ~10% high. Measured against the native route:
+    # 0.0063 nm apart with -s md.tpr, 0.00007 nm with a whole reference.
+    p = plan(read_pdb(_protein(), "A"), [(10, "HIS"), (20, "ASP")])
+    lines = commands(p, ["rep1"])
+    rmsf = next(l for l in lines if " rmsf " in l)
+    assert "-s rep1/rmsf_reference.pdb" in rmsf and "-f rep1/md_whole.xtc" in rmsf
+    assert "-s rep1/md.tpr" not in rmsf
+    made_whole = [l for l in lines if "trjconv" in l]
+    assert any("-f em.gro -pbc mol" in l for l in made_whole)
+    assert any("-f rep1/md.xtc -pbc mol" in l for l in made_whole)
 
 
 # --- the setup directory -------------------------------------------------------------
