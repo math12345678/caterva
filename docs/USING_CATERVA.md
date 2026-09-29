@@ -480,6 +480,30 @@ fold error in Ki. Agreement with a single publication is reported as
 consistency, not validation. Tagged or immobilised constructs, and the
 molecule each Ki was measured against, travel as caveats.
 
+### `caterva complex`: the ligand where the crystal put it
+
+```bash
+caterva complex --pdb 181L --ligand BNZ --ligand-itp bnz.itp --ligand-coords bnz.gro --out t4l
+```
+
+`caterva fep` starts from an equilibrated complex; this builds one from a
+PDB entry and the two files your parameterisation tool wrote (the .itp and
+its coordinates). Your ligand is superposed onto the entry's own copy by
+the heavy-atom names they share (Kabsch 1976), carrying its hydrogens, and
+the fit is printed. It refuses, and says which atoms, when fewer than
+three names are shared or the fit is worse than 1 Å (a different
+conformer). It also refuses a ligand whose handedness differs from the
+crystal's: writing its tests showed that the mirror image of a small
+ligand can superpose within 1 Å, so an inverted stereocentre is checked
+directly, from the sign of the volume of every compact group of four
+heavy atoms. `build.sh` then runs pdb2gmx, inserts the ligand into the
+topology after the force field, solvates, neutralises, minimises and
+equilibrates (NVT, NPT, protein restrained) with the same settings as
+`caterva md`. Waters and every other HETATM are dropped, and listed.
+
+On 181L, an ideal benzene built elsewhere and rotated at random fits the
+crystal's at 0.026 Å.
+
 ### `caterva fep`: a binding free energy that knows what it must reproduce
 
 ```bash

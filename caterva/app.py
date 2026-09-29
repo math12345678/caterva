@@ -40,6 +40,7 @@ COMMANDS = {
     "md": ("caterva.md.__main__", "a GROMACS setup whose every parameter is measured, chosen or cited"),
     "analyze": ("caterva.analyze.__main__", "catalytic geometry and active-site flexibility across replicas"),
     "bind": ("caterva.bind.__main__", "the measured binding free energy a simulation is held to, from cited Ki"),
+    "complex": ("caterva.fep.complex", "a PDB entry and your ligand topology, posed and equilibrated for caterva fep"),
     "fep": ("caterva.fep.__main__", "an absolute binding free energy, run at and judged against a cited Ki"),
     "prepare": ("caterva.prepare.__main__", "audit a PDB entry before simulating it, defects ranked by distance to the active site"),
     "sim": ("caterva.cli", "exact stochastic chemical kinetics (Gillespie SSA)"),

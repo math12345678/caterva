@@ -178,7 +178,21 @@ BRENDA_ENZYME_URL = "https://www.brenda-enzymes.org/enzyme.php"
 
 def fetch_brenda_html(ec_number: str, timeout: float = 15) -> str:
     """Fetch the raw HTML for a BRENDA enzyme page. The only network call
-    in this module - keep it isolated so parsing stays testable offline."""
+    in this module - keep it isolated so parsing stays testable offline.
+
+    When CATERVA_BRENDA_RECORDED names a directory holding
+    brenda_<ec>.html.gz, that recorded real page is returned instead (see
+    Tests/fixtures/recorded/README.md). Only test configurations set it;
+    an EC with no recording there is still fetched live.
+    """
+    import os
+    recorded = os.environ.get("CATERVA_BRENDA_RECORDED")
+    if recorded:
+        import gzip
+        from pathlib import Path
+        page = Path(recorded) / f"brenda_{ec_number}.html.gz"
+        if page.is_file():
+            return gzip.decompress(page.read_bytes()).decode("utf-8")
     r = retry_get(BRENDA_ENZYME_URL, params={"ecno": ec_number}, timeout=timeout)
     r.raise_for_status()
     return r.text
