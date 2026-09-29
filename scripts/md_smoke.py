@@ -23,6 +23,16 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "md-smoke"
 
 
+def _distance_rows(text: str) -> dict:
+    """pair -> simulated mean (nm) from an ANALYSIS.md catalytic-geometry table."""
+    rows = {}
+    for line in text.splitlines():
+        m = re.match(r"\|\s*([A-Z][a-z]{2}\d+\S*[A-Z][a-z]{2}\d+)\s*\|\s*[\d.]+\s*\|\s*([\d.]+)", line)
+        if m:
+            rows[m.group(1)] = float(m.group(2))
+    return rows
+
+
 def main() -> int:
     gmx = os.environ.get("GMX", "gmx")
     if shutil.which(gmx) is None and not Path(gmx).exists():
@@ -51,12 +61,31 @@ def main() -> int:
         print(f"FAIL: --summarise exited {code} on real output")
         return 1
     # And the enzyme analysis, which fetches lysozyme's catalytic residues
-    # (M-CSA via `caterva prepare`) and drives gmx distance and gmx rmsf.
-    code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT)],
-                          cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
-    if code not in (0, 4) or not (OUT / "rep2" / "catalytic.xvg").exists():
-        print(f"FAIL: caterva analyze exited {code} on real output")
+    # (M-CSA via `caterva prepare`), twice: measured by Caterva from the
+    # trajectories it reads itself, and by gmx distance / gmx rmsf. The two
+    # distance tables must agree, so this job checks the native reader and
+    # geometry against GROMACS on every run.
+    tables = {}
+    for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
+        code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
+                              cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
+        if code not in (0, 4):
+            print(f"FAIL: caterva analyze ({route}) exited {code} on real output")
+            return 1
+        tables[route] = _distance_rows((OUT / "ANALYSIS.md").read_text())
+    if not (OUT / "rep2" / "catalytic.xvg").exists():
+        print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
+    if not tables["native"] or tables["native"].keys() != tables["gromacs"].keys():
+        print(f"FAIL: native and GROMACS analyses list different pairs: "
+              f"{sorted(tables['native'])} vs {sorted(tables['gromacs'])}")
+        return 1
+    worst = max(abs(tables["native"][k] - tables["gromacs"][k]) for k in tables["native"])
+    if worst > 0.002:
+        print(f"FAIL: native and GROMACS catalytic distances differ by up to {worst:.4f} nm")
+        return 1
+    print(f"OK: native and GROMACS agree on {len(tables['native'])} catalytic distances "
+          f"(largest difference {worst:.4f} nm).")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0
