@@ -54,6 +54,13 @@ done: there was no release to version.
   `scripts/refresh_export_samples.py`. The panel had shown a command that
   does not exist, a JSON format the CLI does not write, and a CSV
   trajectory where the real CSV is the parameter audit trail.
+- `caterva compose --isoform NAME`: each constant comes from a row that
+  measured that isoform. For human LDH and gossypol, `--isoform LDH-A`
+  gives LDH-A's Ki (0.0019 mM) where the resolver's pick was LDH-B's
+  (0.0014 mM); a row naming no isoform is used only when none names the one
+  asked for, and the report says its isoform is unknown; a constant held
+  only for other isoforms is refused. The spread line says why the carried
+  value was carried.
 - `caterva analyze --gromacs` put the RMSF of lysozyme's residues 66-74
   about 10% above the native route, a gap recorded as unexplained. It was
   the GROMACS route's: `gmx rmsf` fits to the `-s` coordinates as stored,

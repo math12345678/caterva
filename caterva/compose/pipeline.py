@@ -95,6 +95,10 @@ class ComposedModel:
     #: was looked up under the one --substrate, so an inhibitor's Ki came
     #: back as a Ki "of" the substrate, or not at all.
     compounds: Mapping[str, str] = field(default_factory=dict)
+    #: The isoform the model is about ("LDH-A"), when the caller named one.
+    #: Constants are then taken from rows that measured it (isoform.py), and
+    #: the report says where no row did.
+    isoform: Optional[str] = None
 
     def compound_for(self, quantity: ResolvableQuantity) -> Optional[str]:
         """The compound a constant is measured for, or None if unnamed."""

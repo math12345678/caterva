@@ -272,6 +272,7 @@ class ModelDossier:
                 motif=getattr(quantity, "motif_name", None),
                 table=getattr(quantity, "table", None),
                 substrate=getattr(self.model, "substrate", None),
+                isoform=getattr(self.model, "isoform", None),
             )
             if scope is not None:
                 notes += [f"`{identifier}`: {c.text}" for c in scope.concerns]
@@ -439,7 +440,7 @@ class ModelDossier:
             disagreements.append(
                 f"- `{identifier}`: {spread.what}, spanning **{spread.low:g} to {spread.high:g} "
                 f"{spread.unit}** ({spread.fold:.3g}-fold). The model carries "
-                f"{record.value:g} — the resolver's pick, not a verdict; "
+                f"{record.value:g} — {spread.carried_as}; "
                 f"{spread.why}."
             )
         if not disagreements:

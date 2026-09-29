@@ -154,6 +154,11 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
                              "a Ki under the inhibitor, so without this an inhibition "
                              "model's Ki is left a labelled placeholder rather than looked "
                              "up under the substrate's name")
+    parser.add_argument("--isoform",
+                        help="the isoform the model is about, e.g. LDH-A. Each constant is taken "
+                             "from a row that measured it; where none did, a row naming no "
+                             "isoform is used and the report says so, and a constant only "
+                             "measured on other isoforms is refused")
     parser.add_argument("--product",
                         help="the product, for constants measured on it: a reverse Km, a "
                              "product-inhibition Kp")
@@ -902,6 +907,8 @@ def _search_the_literature(
     from caterva.checkout import LiteratureLayerUnavailable, literature_module
 
     subject = args.subject
+    if getattr(args, "isoform", None):
+        model = replace(model, isoform=args.isoform)
     ec = model.ec_number
     if ec is None and re.fullmatch(r"\s*\d+(\.\d+){0,2}\.?\s*", subject or ""):
         # "2.7.1" is an EC class, not an enzyme, and looking it up in
@@ -961,6 +968,13 @@ def _search_the_literature(
 
     measured = measured_from_search(search)
     not_found = {**skipped, **unresolved_from_search(search)}
+    isoform_notes: List[str] = []
+    if getattr(args, "isoform", None):
+        from caterva.compose.isoform import select_isoform
+        by_isoform = select_isoform(measured, args.isoform)
+        measured = by_isoform.measured
+        not_found.update(by_isoform.refused)
+        isoform_notes = by_isoform.notes
     failures = [
         run for branch in getattr(search, "branches", ())
         for record in getattr(branch.build.run, "rounds", ())
@@ -1013,6 +1027,8 @@ def _search_the_literature(
             f"({', '.join(still)}): the search ran and returned nothing for "
             f"them, which is different from their not having been looked for"
         )
+    if isoform_notes:
+        note += ". " + "; ".join(isoform_notes)
     return sourced, note, False
 
 

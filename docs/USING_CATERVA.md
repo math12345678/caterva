@@ -346,12 +346,33 @@ cannot say which of the two it measured.
 
 Until 2026-09-29 every constant was looked up under the one substrate, so
 an inhibition model's Ki came back as a Ki "of" the substrate, or not at
-all; the API server did the same, and still does (it is next).
+all. The API server did the same until the same day; it now looks a Ki up
+under the inhibitor the query names ("... inhibited by gossypol") and looks
+none up when the query names none.
 
-The report also says what each value's own BRENDA row measured, where that
-could make it the wrong number for the model: another isoform, another
-inhibition mode, a mode not stated, or inhibition measured against a
-different molecule than the model's substrate.
+The report and every export also say what each value's own BRENDA row
+measured, where that could make it the wrong number for the model: another
+isoform, another inhibition mode, a mode not stated, inhibition measured
+against a different molecule than the model's substrate, or a tagged,
+immobilised or modified preparation rather than the free enzyme.
+
+### Asking for one isoform
+
+```bash
+caterva compose "Michaelis-Menten with a competitive inhibitor" \
+    --subject 1.1.1.27 --organism human --substrate pyruvate \
+    --inhibitor gossypol --isoform LDH-A
+```
+
+Human LDH is three proteins, and BRENDA 711801 gives gossypol's Ki for each
+(0.0019 mM for LDH-A, 0.0014 for LDH-B, 0.0042 for LDH-C). Without
+`--isoform` the resolver returns the first it ranks, LDH-B's, and the report
+says so. With it, each constant comes from a row that measured the isoform
+asked for; where no row names that isoform, a row naming none is used and
+the report says whether it measured LDH-A is unknown; and a constant BRENDA
+only holds for other isoforms is refused rather than filled with another
+protein's value. The names compare without case or hyphens, and are read by
+the same parser `caterva bind --isoform` uses.
 
 ### `caterva structure`: which structures exist, and which protein each is
 

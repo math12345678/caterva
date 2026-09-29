@@ -285,6 +285,12 @@ class Spread:
     carried: float
     n_values: int
     references: Tuple[str, ...]
+    chosen_because: Optional[str] = None
+
+    @property
+    def carried_as(self) -> str:
+        """Why the carried value is the carried value."""
+        return self.chosen_because or "the resolver's pick, not a verdict"
 
     @property
     def fold(self) -> float:
@@ -312,8 +318,8 @@ class Spread:
 
     def sentence(self) -> str:
         return (f"{self.what}, spanning {self.low:g} to {self.high:g} {self.unit} "
-                f"({self.fold:.3g}-fold); this model carries {self.carried:g}, the resolver's "
-                f"pick, not a verdict; {self.why}. The range is not an uncertainty estimate: "
+                f"({self.fold:.3g}-fold); this model carries {self.carried:g}, "
+                f"{self.carried_as}; {self.why}. The range is not an uncertainty estimate: "
                 f"it is bounded by which rows are in the database")
 
 
@@ -393,6 +399,10 @@ class Measurement:
     #: happen to be in BRENDA, not by any statement about the true value, and
     #: every artefact that prints it says so.
     alternatives: Tuple[Any, ...] = ()
+    #: Why this row was carried rather than the resolver's pick, when it was
+    #: not the resolver's pick: "the row for LDH-A, as --isoform asked".
+    #: None means the resolver chose it.
+    chosen_because: Optional[str] = None
 
     @property
     def disagreement(self) -> Optional[Tuple[float, float]]:
@@ -420,7 +430,8 @@ class Measurement:
         values = {r.get("value") for r in rows if r.get("value") is not None}
         references = tuple(sorted({str(r["reference_id"]) for r in rows if r.get("reference_id")}))
         return Spread(low=span[0], high=span[1], unit=self.unit, carried=float(self.value),
-                      n_values=max(len(values), 2), references=references)
+                      n_values=max(len(values), 2), references=references,
+                      chosen_because=self.chosen_because)
 
     def __post_init__(self) -> None:
         if not str(self.citation).strip():
@@ -726,6 +737,7 @@ def provenance_of(
     # The model's substrate, for judging what an inhibitor's Ki was measured
     # against. A ComposedModel has one; a bare Composition does not.
     substrate = getattr(source, "substrate", None)
+    isoform = getattr(source, "isoform", None)
     try:
         from caterva.compose.row_scope import read_scope
     except ImportError:  # pragma: no cover - flat layout
@@ -797,7 +809,7 @@ def provenance_of(
                     measurement=measurement,
                     scope=(
                         read_scope(measurement.commentary, motif=instance.motif.name,
-                                   table=parameter.table, substrate=substrate)
+                                   table=parameter.table, substrate=substrate, isoform=isoform)
                         if measurement is not None else None
                     ),
                 )

@@ -122,21 +122,40 @@ def read_scope(
     motif: Optional[str] = None,
     table: Optional[str] = None,
     substrate: Optional[str] = None,
+    isoform: Optional[str] = None,
 ) -> Optional[RowScope]:
     """The scope of one row, judged against the model it was put in.
 
     `motif` and `table` are the motif the constant belongs to and the table
-    it was looked up in; `substrate` is the model's substrate. None when the
-    row carries no commentary: there is nothing to read, which is not the
-    same as a row that was read and found consistent.
+    it was looked up in; `substrate` is the model's substrate; `isoform` is
+    the isoform the model was asked to be about (`--isoform`), if any. None
+    when the row carries no commentary: there is nothing to read, which is
+    not the same as a row that was read and found consistent.
     """
     if not commentary or not str(commentary).strip():
+        if isoform:
+            # Nothing to read, and an isoform was asked for: that it could
+            # not be checked is itself the finding.
+            return RowScope(None, None, None, (Concern(ISOFORM, (
+                f"the row carries no commentary, so whether it measured **{isoform}**, the "
+                f"one asked for, is unknown")),))
         return None
     read_isoform, read_mode = _reader()
     text = str(commentary)
+    wanted = isoform
     isoform = read_isoform(text)
     concerns = []
-    if isoform:
+    if wanted:
+        from caterva.compose.isoform import same_isoform
+        if isoform is None:
+            concerns.append(Concern(ISOFORM, (
+                f"the row names no isoform, so whether it measured **{wanted}**, the one "
+                f"asked for, is unknown")))
+        elif not same_isoform(isoform, wanted):
+            concerns.append(Concern(ISOFORM, (
+                f"the row measured isoform **{isoform}**, not {wanted}, the one asked for: "
+                f"a different protein's constant")))
+    elif isoform:
         concerns.append(Concern(ISOFORM, (
             f"the row measured isoform {isoform}; if the enzyme you mean is another "
             f"isoform, this is a different protein's constant")))

@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "108 test files -- kinetics & Michaelis-Menten correctness, " +
+          "109 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -183,8 +183,10 @@ export const TEST_SUITES: TestSuite[] = [
         // tagged, immobilised or modified preparation is named in the
         // report and the exports (19 passed with the file): 3063. Plus 1
         // test that the GROMACS route fits gmx rmsf to a whole reference
-        // (18 passed with test_analyze.py, 2026-09-29): 3064.
-        passed: 3064,
+        // (18 passed with test_analyze.py, 2026-09-29): 3064. Plus the 13
+        // `compose --isoform` tests and the guide check of its example
+        // (all passed 2026-09-29): 3078.
+        passed: 3078,
         skipped: 0,
         failed: 0,
       },
