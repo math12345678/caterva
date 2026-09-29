@@ -101,7 +101,55 @@ def _dist(d: Optional[float]) -> str:
     return "?" if d is None else f"{d:.1f}"
 
 
-def report(a: Audit) -> List[str]:
+def protonation_section(a: Audit, ph: Optional[float]) -> List[str]:
+    """Titratable residues at the active site, judged at the assay pH."""
+    from caterva.prepare.protonation import SETTLED, SOURCE, assess
+    sites = [t for t in a.titratable if t.chain == (a.chains[0] if a.chains else t.chain)]
+    L = ["## Protonation at the active site", ""]
+    if not sites:
+        return L + ["No titratable residue within the active-site radius of chain "
+                    f"{a.chains[0] if a.chains else '?'} (or no catalytic residues were placed).", ""]
+    if ph is None:
+        names = ", ".join(f"{t.resname.title()}{t.auth_seq_id}" for t in sites)
+        return L + [f"{len(sites)} titratable residue(s) within {ACTIVE_SITE_RADIUS:g} Å of a catalytic atom "
+                    f"in chain {sites[0].chain}: {names}. Pass --ph with the assay pH to judge which of "
+                    "their charge states are uncertain there.", ""]
+    L += [f"Each titratable residue within {ACTIVE_SITE_RADIUS:g} Å of a catalytic atom in chain "
+          f"{sites[0].chain}, judged at pH {ph:g} from how far folded proteins move that group's pKa "
+          f"({SOURCE}). This is not a pKa prediction: it says where typical behaviour does not settle "
+          "the charge, so a structure-based estimate (PROPKA) or constant-pH simulation is needed "
+          "before trusting the state GROMACS assigns.", "",
+          "| residue | Å to active site | at pH | state |", "|---|---|---|---|"]
+    uncertain, wrong = [], []
+    for t in sites:
+        ti = assess(t.resname, ph)
+        name = f"{t.resname.title()}{t.auth_seq_id}" + (" (catalytic)" if t.catalytic else "")
+        if ti is None:
+            L.append(f"| {name} | {t.distance:.1f} | not assessed | {t.resname.title()} is not in the survey; "
+                     "taken as charged below pH 12 |")
+            continue
+        state = {True: "settled, protonated", False: "settled, deprotonated", None: "**uncertain**"}[ti.settled]
+        if ti.default_contradicted:
+            state = "**pdb2gmx default contradicts it**"
+            wrong.append(name)
+        elif ti.settled is None:
+            uncertain.append(name)
+        L.append(f"| {name} | {t.distance:.1f} | {ti.describe()} | {state} |")
+    L.append("")
+    if wrong:
+        L.append(f"- Set these by hand before simulating (pdb2gmx -asp/-glu/-lys/-his): {', '.join(wrong)}.")
+    if uncertain:
+        L.append(f"- Charge state not settled by typical behaviour at pH {ph:g}: {', '.join(uncertain)}. "
+                 "Start with any catalytic one: its pKa is the one the mechanism may depend on.")
+    if not wrong and not uncertain:
+        L.append(f"- Every assessed residue's state is settled at pH {ph:g} and pdb2gmx's default agrees.")
+    L += [f"- Settled means the protonated fraction is below {SETTLED:.0%} or above {1 - SETTLED:.0%} for "
+          "any pKa within one standard deviation of the survey mean (Henderson-Hasselbalch); a chosen rule.",
+          ""]
+    return L
+
+
+def report(a: Audit, ph: Optional[float] = None) -> List[str]:
     q = []
     if a.resolution is not None:
         q.append(f"{a.resolution} Å")
@@ -151,6 +199,7 @@ def report(a: Audit) -> List[str]:
                      f"{f.what} | `{f.source}` |")
         L.append("")
 
+    L += protonation_section(a, ph)
     L += ["## Not checked", ""] + [f"- {n}" for n in a.not_checked] + [""]
     L += ["## Sources", ""]
     for key in ("pdb", "mcsa", "needleman-wunsch", "blosum62"):
@@ -185,6 +234,8 @@ def build_parser(prog: str = "caterva prepare") -> argparse.ArgumentParser:
     p.add_argument("--out", metavar="FILE", help="write the report here as well as printing it")
     p.add_argument("--json", metavar="FILE", help="write the findings as JSON")
     p.add_argument("--no-cache", action="store_true", help="fetch everything fresh")
+    p.add_argument("--ph", type=float, metavar="PH",
+                   help="the assay pH: judge which active-site residues have an uncertain charge there")
     return p
 
 
@@ -202,7 +253,7 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva prepare",
             print(f"caterva prepare: could not reach the PDB or UniProt ({e})", file=sys.stderr)
             return 3
         raise
-    text = "\n".join(report(a)) + "\n"
+    text = "\n".join(report(a, args.ph)) + "\n"
     print(text, end="")
     if args.out:
         Path(args.out).write_text(text, encoding="utf-8")

@@ -93,6 +93,17 @@ class ChainSummary:
 
 
 @dataclass
+class TitratableSite:
+    """A titratable residue within ACTIVE_SITE_RADIUS of a catalytic atom (or
+    catalytic itself). Its charge at the assay pH is judged in the report."""
+    chain: str
+    auth_seq_id: str
+    resname: str
+    distance: float  # to the nearest catalytic atom, A
+    catalytic: bool
+
+
+@dataclass
 class Audit:
     pdb_id: str
     title: str
@@ -105,6 +116,7 @@ class Audit:
     reference: Optional[Reference]
     not_checked: List[str]
     chain_summary: List[ChainSummary] = field(default_factory=list)
+    titratable: List[TitratableSite] = field(default_factory=list)
 
     def by_severity(self, severity: str) -> List[Finding]:
         return [f for f in self.findings if f.severity == severity]
@@ -433,6 +445,20 @@ def audit(cif_text: str, sequence_of: Callable[[str], str],
                 f.what = (f"CATALYTIC RESIDUE {(cr.found or cr.expected).title()}{cr.auth_seq_id} "
                           f"({cr.reference}; {cr.roles or 'catalytic'}). " + f.what)
 
+    # --- titratable residues at the active site (judged against a pH in the report)
+    from caterva.prepare.protonation import TITRATABLE
+    titratable: List[TitratableSite] = []
+    for chain, cats in cat_res.items():
+        cat_ids = {(r.chain, r.auth_seq_id) for r in cats}
+        for r in residues.values():
+            if r.chain != chain or r.comp.upper() not in TITRATABLE or not r.atoms:
+                continue
+            is_cat = (r.chain, r.auth_seq_id) in cat_ids
+            d = 0.0 if is_cat else _min_distance(r, cats)
+            if d is not None and d <= ACTIVE_SITE_RADIUS:
+                titratable.append(TitratableSite(chain, r.auth_seq_id, r.comp.upper(), d, is_cat))
+    titratable.sort(key=lambda t: (t.chain, t.distance))
+
     summary: List[ChainSummary] = []
     for chain in chains:
         mine = [f for f in findings if f.chain == chain]
@@ -441,12 +467,13 @@ def audit(cif_text: str, sequence_of: Callable[[str], str],
         summary.append(ChainSummary(chain, sum(f.severity == "blocks" for f in mine),
                                     sum(f.near_active_site for f in mine), intact))
 
-    not_checked.append("protonation states at the assay pH (PROPKA is not run yet; see MD_ROADMAP M1)")
+    not_checked.append("structure-based pKa values: PROPKA is not run, so the protonation section judges "
+                       "each active-site residue only by how far folded proteins typically move its group's pKa")
     not_checked.append("ligand and cofactor parameters (caterva md strips ligands; see MD_ROADMAP M4)")
 
     return Audit(entry_id, title, method, resolution, r_free, chains, findings, catalytic,
-                 reference, not_checked, summary)
+                 reference, not_checked, summary, titratable)
 
 
-__all__ = ["Audit", "ChainSummary", "Finding", "CatalyticResidue", "Reference", "audit",
+__all__ = ["Audit", "ChainSummary", "Finding", "CatalyticResidue", "Reference", "TitratableSite", "audit",
            "choose_reference", "load_mcsa", "ACTIVE_SITE_RADIUS", "MIN_TRANSFER_IDENTITY"]

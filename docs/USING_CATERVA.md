@@ -426,6 +426,20 @@ consistent exits 4. On synthetic runs with a known correlation time it
 called every under-sampled set unconverged, and raised a false alarm on
 about 6 in 100 converged ones: it errs towards "not yet".
 
+With `--ph` (the assay pH), `caterva prepare` also judges every titratable
+residue within the active-site radius. It does not predict pKa values: it
+takes how far folded proteins move each group's pKa (Grimsley, Scholtz &
+Pace 2009: 541 measured values in 78 proteins, a mean and standard
+deviation per group) and asks whether, for any pKa within one standard
+deviation, the residue is below 10% or above 90% protonated at that pH
+(Henderson-Hasselbalch). If so its charge is settled; if not it is
+uncertain, and needs PROPKA or a constant-pH simulation before the state
+GROMACS assigns can be trusted. It also says when pdb2gmx's default
+contradicts even typical behaviour (Asp at pH 1, for instance), which is
+an error to fix by hand. On lactate dehydrogenase (1I10) at pH 7.5 it
+flags the catalytic His192, the proton relay, as uncertain; pdb2gmx would
+set it from hydrogen bonds without consulting the pH at all.
+
 ### `caterva analyze`: the questions the mechanism asks
 
 ```bash

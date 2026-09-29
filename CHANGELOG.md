@@ -25,6 +25,11 @@ done: there was no release to version.
   exact answers and calibrated error bars; `caterva fep --summarise` uses
   them on the raw dhdl files. The FEP setup now writes energies at every
   state (`calc-lambda-neighbors = -1`) so MBAR can use them.
+- `caterva prepare --ph`: a protonation-risk audit of the active site from
+  measured pKa spreads in folded proteins (Grimsley et al. 2009, values
+  read from the PubMed abstract): which residues' charge is settled at the
+  assay pH, which is uncertain, and where pdb2gmx's default contradicts
+  typical behaviour. Not a pKa predictor, and it says so.
 - `caterva analyze` counts hydrogen bonds between catalytic side chains
   (the `gmx hbond` criterion, equal to it frame by frame on real
   lysozyme), and reports each distance's 95% confidence interval across
