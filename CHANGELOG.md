@@ -25,6 +25,11 @@ done: there was no release to version.
   exact answers and calibrated error bars; `caterva fep --summarise` uses
   them on the raw dhdl files. The FEP setup now writes energies at every
   state (`calc-lambda-neighbors = -1`) so MBAR can use them.
+- `caterva analyze` counts hydrogen bonds between catalytic side chains
+  (the `gmx hbond` criterion, equal to it frame by frame on real
+  lysozyme), and reports each distance's 95% confidence interval across
+  replicas with the number of replicas needed to decide held or moved.
+  `caterva md --summarise` reports the interval too.
 - `caterva analyze` measures natively (no GROMACS needed), agreeing with
   `gmx distance` exactly on a real trajectory; `--gromacs` keeps the old
   route as a cross-check. An unwritable download cache no longer crashes

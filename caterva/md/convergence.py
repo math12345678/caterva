@@ -41,6 +41,39 @@ MIN_EFFECTIVE_SAMPLES = 10
 DISAGREEMENT_FACTOR = 2.0
 
 
+#: Two-sided confidence level for the mean across replicas.
+CONFIDENCE = 0.95
+
+
+def t_quantile(df: int) -> float:
+    """Student's t for a two-sided CONFIDENCE interval with df degrees of freedom."""
+    from scipy.stats import t
+    return float(t.ppf(0.5 + CONFIDENCE / 2, df))
+
+
+def ci_halfwidth(spread: float, n: int) -> float:
+    """Half-width of the CONFIDENCE interval of a mean of n replica means
+    whose standard deviation is `spread`: t(n-1) * spread / sqrt(n). With two
+    replicas t is 12.7, which is the honest price of having only two."""
+    if n < 2 or spread is None or math.isnan(spread):
+        return float("nan")
+    return t_quantile(n - 1) * spread / math.sqrt(n)
+
+
+def replicas_needed(spread: float, target: float, have: int, cap: int = 1000) -> Optional[int]:
+    """The fewest replicas whose CONFIDENCE interval half-width reaches
+    `target`, if the replica-to-replica spread stays what it is now. None
+    when even `cap` would not, or when the spread is not yet known."""
+    if spread is None or math.isnan(spread) or target <= 0:
+        return None
+    if spread == 0:
+        return max(2, have)
+    for n in range(max(2, have), cap + 1):
+        if ci_halfwidth(spread, n) <= target:
+            return n
+    return None
+
+
 def read_xvg(path: Path) -> List[Tuple[float, float]]:
     """(time, value) pairs from a GROMACS .xvg, skipping # comments and @ directives."""
     rows = []
@@ -123,6 +156,14 @@ class Summary:
     verdict: str  # "one sample" | "unconverged" | "replicas disagree" | "consistent"
     reasons: List[str] = field(default_factory=list)
 
+    @property
+    def ci95(self) -> float:
+        """CONFIDENCE-interval half-width of the mean across replicas."""
+        return ci_halfwidth(self.spread, len(self.replicas)) if self.spread is not None else float("nan")
+
+    def replicas_for(self, target: float) -> Optional[int]:
+        return replicas_needed(self.spread, target, len(self.replicas))
+
 
 def summarise(series: Sequence[Tuple[str, Sequence[float]]], quantity: str, unit: str) -> Summary:
     reps: List[Replica] = []
@@ -193,7 +234,9 @@ def report(s: Summary) -> List[str]:
     if s.spread is None:
         L.append(f"Mean {s.mean:.4g} {s.unit} from one run: report it as one sample.")
     else:
-        figure = (f"{s.mean:.4g} ± {s.spread:.2g} {s.unit} (mean ± SD of {len(s.replicas)} replica means)")
+        figure = (f"{s.mean:.4g} ± {s.spread:.2g} {s.unit} (mean ± SD of {len(s.replicas)} replica means; "
+                  f"{CONFIDENCE:.0%} confidence interval of the mean ± {s.ci95:.2g} {s.unit}, Student's t "
+                  f"with {len(s.replicas) - 1} degree(s) of freedom)")
         if s.verdict == "consistent":
             L.append(f"Result: {figure}. Report the spread, not only the mean.")
         else:
@@ -203,5 +246,5 @@ def report(s: Summary) -> List[str]:
     return L
 
 
-__all__ = ["MIN_EFFECTIVE_SAMPLES", "BlockResult", "Replica", "Summary", "block_average", "collect", "read_xvg",
+__all__ = ["CONFIDENCE", "t_quantile", "ci_halfwidth", "replicas_needed", "MIN_EFFECTIVE_SAMPLES", "BlockResult", "Replica", "Summary", "block_average", "collect", "read_xvg",
            "report", "summarise", "DISCARD", "MIN_BLOCKS"]

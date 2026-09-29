@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "104 test files -- kinetics & Michaelis-Menten correctness, " +
+          "106 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -171,8 +171,10 @@ export const TEST_SUITES: TestSuite[] = [
         // Plus 5 TI and thermodynamic-length tests and 1 guide example: 2997.
         // Plus 5 tests of the native .xtc reader (exact against gmx trjconv on
         // a real trajectory): 3002. Plus native `caterva analyze` against gmx
-        // distance on real frames, and the unwritable-cache test: 3004.
-        passed: 3004,
+        // distance on real frames, and the unwritable-cache test: 3004. Plus
+        // 15 hydrogen-bond tests (equal to gmx hbond frame by frame on real
+        // lysozyme) and 5 replica-sufficiency tests: 3024.
+        passed: 3024,
         skipped: 0,
         failed: 0,
       },

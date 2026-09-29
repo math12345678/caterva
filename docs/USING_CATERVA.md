@@ -450,7 +450,24 @@ give the same fifteen catalytic distances (two differ by 0.001 nm, the
 precision GROMACS prints) and the same verdicts. Their pocket RMSF agrees
 to 0.0009 nm on average; in the most mobile loop (residues 67-72)
 `gmx rmsf` reads about 10% higher, a difference not yet explained, and
-reported here rather than hidden. On a 200-step test run of lysozyme it lists all fifteen
+reported here rather than hidden.
+
+It also counts hydrogen bonds between each pair of catalytic side chains,
+frame by frame, with the criterion of `gmx hbond` (donor-acceptor at most
+0.35 nm, acceptor-donor-hydrogen at most 30 degrees; backbone excluded),
+and reports each pair's occupancy per replica: kept, lost, formed, rarely
+formed or partial, with the thresholds printed. On the two lysozyme
+replicas, every per-frame count for six catalytic pairs equals
+`gmx hbond`'s, and those counts are a test.
+
+Each catalytic distance now carries the 95% confidence interval of its
+mean across replicas (Student's t, which is 12.7 for two replicas), and
+the report says whether there are enough replicas to decide held or moved:
+the interval must be within +/- 0.05 nm, half the moved threshold. When it
+is not, it says how many replicas would be, if the spread between runs
+stays as observed. On two 10 ps lysozyme replicas: 13 of 15 distances are
+unresolved, and 10 replicas would resolve them. `caterva md --summarise`
+reports the same interval. On a 200-step test run of lysozyme it lists all fifteen
 distances between the six M-CSA catalytic residues, and correctly calls
 every one unconverged.
 

@@ -35,7 +35,9 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from caterva.analyze.plan import POCKET_RADIUS, Plan, plan, read_pdb
-from caterva.md.convergence import Summary, summarise
+from caterva.md.convergence import CONFIDENCE, Summary, summarise
+
+CONFIDENCE_PCT = CONFIDENCE * 100
 
 #: A consistent mean this far from the crystal distance is reported as the
 #: geometry having changed. 0.1 nm (1 A) is about a hydrogen bond's length
@@ -146,6 +148,9 @@ class Analysis:
     plan: Plan
     distances: List[DistanceResult] = field(default_factory=list)
     flexibility: Optional[Flexibility] = None
+    #: Hydrogen-bond occupancy between catalytic side chains; None when the
+    #: GROMACS route measured (it does not count hydrogen bonds).
+    hbonds: Optional[List["Occupancy"]] = None
 
     @property
     def all_consistent(self) -> bool:
@@ -197,7 +202,28 @@ def distance_series(traj, ia: Sequence[int], ib: Sequence[int]) -> List[float]:
     return out
 
 
-def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[DistanceResult], Flexibility]:
+def _gro_box(line: str):
+    """A .gro box line as box vectors (rows): 3 values for a rectangular box,
+    9 for a triclinic one, in the order v1(x) v2(y) v3(z) v1(y) v1(z) v2(x)
+    v2(z) v3(x) v3(y)."""
+    import numpy as np
+    v = [float(x) for x in line.split()]
+    box = np.diag(v[:3])
+    if len(v) == 9:
+        box[0, 1], box[0, 2], box[1, 0], box[1, 2], box[2, 0], box[2, 1] = v[3:9]
+    return box
+
+
+def _gro_atoms(path: Path):
+    """(resnr, resname, name, xyz) for every atom of a .gro file."""
+    import numpy as np
+    lines = path.read_text().splitlines()
+    n = int(lines[1].split()[0])
+    return [(int(l[0:5]), l[5:10].strip(), l[10:15].strip(),
+             np.array([float(l[20 + 8 * k:28 + 8 * k]) for k in range(3)])) for l in lines[2:2 + n]]
+
+
+def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"]]:
     """The same distances and RMSF as analyze.sh, computed by Caterva from the
     trajectories it reads itself (caterva/md/xtc.py), with no GROMACS."""
     import numpy as np
@@ -218,11 +244,29 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List
     ca = [(r, index[(r, "CA")]) for r in residues if (r, "CA") in index]
     ref_lines = ref_gro.read_text().splitlines()
     ref = np.array([[float(ref_lines[2 + i][20 + 8 * k:28 + 8 * k]) for k in range(3)] for _, i in ca])
+    from caterva.analyze.hbonds import Occupancy, count_frame, occupancy, side_chain_group
     per_pair: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.pairs))}
     flex = []
     pocket, rest = set(p.pocket), set(p.rest)
+    atoms = _gro_atoms(ref_gro)
+    groups = {}
+    for q in p.pairs:
+        for site in (q.a, q.b):
+            if site.resnr not in groups:
+                try:
+                    groups[site.resnr] = side_chain_group(atoms, site.resnr)
+                except ValueError:
+                    groups[site.resnr] = None  # glycine: no side chain to bond
+    start_x = np.array([a[3] for a in atoms])
+    start_box = _gro_box(ref_lines[-1])
+    hb: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.pairs))}
     for r in reps:
         traj = xtc.read(r / "md.xtc")
+        for i, q in enumerate(p.pairs):
+            ga, gb = groups[q.a.resnr], groups[q.b.resnr]
+            if ga is not None and gb is not None:
+                frac, mean, _ = occupancy(traj, ga, gb)
+                hb[i].append((r.name, frac, mean))
         for i, (ia, ib) in enumerate(pair_atoms):
             per_pair[i].append((r.name, distance_series(traj, ia, ib)))
         f_ca = xtc.rmsf(traj, [i for _, i in ca], ref)
@@ -233,7 +277,35 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List
             flex.append((r.name, sum(pv) / len(pv), sum(rv) / len(rv)))
     results = [DistanceResult(q.label, q.crystal_nm, summarise(per_pair[i], q.label, "nm"))
                for i, q in enumerate(p.pairs)]
-    return results, Flexibility(flex)
+    occupancies = []
+    for i, q in enumerate(p.pairs):
+        ga, gb = groups[q.a.resnr], groups[q.b.resnr]
+        if ga is None or gb is None:
+            continue
+        occupancies.append(Occupancy(q.label, hb[i], count_frame(start_x, start_box, ga, gb)))
+    return results, Flexibility(flex), occupancies
+
+
+#: Occupancy thresholds for naming what happened to a hydrogen bond. Chosen,
+#: and printed with the table.
+KEPT, LOST, FORMED, SPLIT = 0.8, 0.2, 0.5, 0.5
+
+
+def hbond_verdict(o) -> str:
+    fr = o.fractions
+    if len(fr) < 2:
+        return "one replica"
+    if max(fr) - min(fr) > SPLIT:
+        return "replicas disagree"
+    if o.at_start > 0 and min(fr) >= KEPT:
+        return "kept"
+    if o.at_start > 0 and max(fr) <= LOST:
+        return "lost"
+    if o.at_start == 0 and min(fr) >= FORMED:
+        return "formed"
+    if o.at_start == 0 and max(fr) <= LOST:
+        return "rarely formed"
+    return "partial"
 
 
 def run_gromacs(directory: Path, p: Plan, reps: Sequence[Path], gmx: str) -> None:
@@ -256,8 +328,8 @@ def report(a: Analysis) -> List[str]:
     L += ["## Catalytic geometry", "",
           "Distance between the functional groups of each pair of catalytic residues "
           "(geometric centres), across replicas, against the starting crystal structure.", "",
-          "| pair | crystal (nm) | simulated (nm, mean ± SD of replicas) | change | verdict |",
-          "|---|---|---|---|---|"]
+          "| pair | crystal (nm) | simulated (nm, mean ± SD of replicas) | 95% CI of the mean | change | verdict |",
+          "|---|---|---|---|---|---|"]
     for d in a.distances:
         s = d.summary
         sim = f"{s.mean:.3f}" + (f" ± {s.spread:.3f}" if s.spread is not None else "")
@@ -268,8 +340,10 @@ def report(a: Analysis) -> List[str]:
             ch = f"({d.drift_nm:+.3f}, not yet a result)"
         else:
             ch = f"**{d.drift_nm:+.3f}, moved**" if d.moved else f"{d.drift_nm:+.3f}, held"
-        L.append(f"| {d.label} | {cr} | {sim} | {ch} | {s.verdict} |")
+        ci = "n/a" if math.isnan(s.ci95) else f"± {s.ci95:.3f}"
+        L.append(f"| {d.label} | {cr} | {sim} | {ci} | {ch} | {s.verdict} |")
     L.append("")
+    L += replica_sufficiency(a)
     grouped: Dict[str, List[str]] = {}
     for d in a.distances:
         if d.summary.verdict != "consistent" and d.summary.reasons:
@@ -277,6 +351,7 @@ def report(a: Analysis) -> List[str]:
     for reason, labels in grouped.items():
         who = "every pair" if len(labels) == len(a.distances) and len(labels) > 1 else ", ".join(labels)
         L.append(f"- {who}: {reason}")
+    L += hbond_section(a)
     f = a.flexibility
     L += ["", "## Active-site flexibility", "",
           f"Mean Cα RMSF of the {len(a.plan.pocket)} residues within {POCKET_RADIUS:g} Å of a catalytic "
@@ -304,11 +379,71 @@ def report(a: Analysis) -> List[str]:
     L += ["", "## Not measured", "",
           "- ligand pose and contacts: `caterva md` strips ligands until they can be parameterised "
           "(MD roadmap M4)",
-          "- angles and hydrogen-bond occupancy between catalytic groups (next)", "",
+          "- angles between catalytic groups (next)", "",
           f"`{MOVED_NM:g} nm` is the chosen threshold for calling a distance changed. The measuring commands "
           "are in analyze.sh. Errors: Flyvbjerg & Petersen (1989) J. Chem. Phys. 91:461, "
           "doi:10.1063/1.457480. Catalytic residues: Ribeiro et al. (2018) Nucleic Acids Res. "
           "46:D618, doi:10.1093/nar/gkx1012."]
+    return L
+
+
+#: The precision a catalytic distance needs before "held" or "moved" can be
+#: decided with confidence: half the moved threshold, so the interval cannot
+#: straddle both answers. A choice, derived from MOVED_NM.
+RESOLVE_NM = MOVED_NM / 2
+
+
+def replica_sufficiency(a: Analysis) -> List[str]:
+    """Are there enough replicas to decide held or moved? From the spread the
+    replicas actually show, not a rule of thumb."""
+    measured = [d for d in a.distances if d.summary.spread is not None and not math.isnan(d.summary.ci95)]
+    if not measured:
+        return []
+    n = len(measured[0].summary.replicas)
+    short = [(d, d.summary.replicas_for(RESOLVE_NM)) for d in measured if d.summary.ci95 > RESOLVE_NM]
+    if not short:
+        return [f"- Replicas: {n} are enough; every distance's {int(CONFIDENCE_PCT)}% confidence interval is "
+                f"within ± {RESOLVE_NM:g} nm, half the {MOVED_NM:g} nm moved threshold.", ""]
+    worst = max(short, key=lambda x: x[0].summary.ci95)
+    needs = [k for _, k in short if k is not None]
+    most = max(needs) if needs else None
+    return [f"- Replicas: {n} are not enough to decide held or moved for {len(short)} of {len(measured)} "
+            f"distances: their {int(CONFIDENCE_PCT)}% confidence intervals are wider than ± {RESOLVE_NM:g} nm "
+            f"(worst: {worst[0].label}, ± {worst[0].summary.ci95:.3f} nm). "
+            + (f"If the spread between runs stays as it is, {most} replicas would resolve all of them."
+               if most else "Even many more replicas would not, at the spread seen: the runs are too short.")
+            + " (With few replicas the interval is wide by construction: Student's t for 2 replicas is 12.7; "
+              "and two runs estimate the spread itself poorly, so treat that count as a first guess.)",
+            ""]
+
+
+def hbond_section(a: Analysis) -> List[str]:
+    L = ["", "## Hydrogen bonds between catalytic side chains", ""]
+    if a.hbonds is None:
+        return L + ["Not measured on the GROMACS route (`--gromacs`); the native route counts them."]
+    bonded = [o for o in a.hbonds if o.at_start or any(f > 0 for f in o.fractions)]
+    L += ["Fraction of frames in which two catalytic side chains are hydrogen-bonded, per replica. "
+          "Donor-acceptor at most 0.35 nm and acceptor-donor-hydrogen at most 30 degrees, the criterion "
+          "of `gmx hbond`; backbone atoms excluded.", ""]
+    if not bonded:
+        return L + [f"None of the {len(a.hbonds)} pairs of catalytic side chains hydrogen-bonded, at the "
+                    "start or in any frame."]
+    names = [n for n, _, _ in bonded[0].per_replica]
+    L += ["| pair | bonds at start | " + " | ".join(names) + " | verdict |",
+          "|---|---|" + "---|" * len(names) + "---|"]
+    for o in bonded:
+        v = hbond_verdict(o)
+        if not a.all_consistent and v not in ("one replica",):
+            v = f"({v}, not yet a result)"
+        L.append(f"| {o.label} | {o.at_start} | " + " | ".join(f"{f:.2f}" for f in o.fractions) + f" | {v} |")
+    never = len(a.hbonds) - len(bonded)
+    if never:
+        L += ["", f"The other {never} pair(s) never hydrogen-bonded, at the start or in any frame."]
+    L += ["", f"Verdicts (chosen thresholds): kept, bonded at the start and in at least {KEPT:.0%} of frames "
+          f"in every replica; lost, bonded at the start and in at most {LOST:.0%}; formed, not bonded at the "
+          f"start and in at least {FORMED:.0%}; rarely formed, not bonded at the start and in at most "
+          f"{LOST:.0%}; replicas disagree, when their occupancies differ by more "
+          f"than {SPLIT:.0%}."]
     return L
 
 
@@ -357,12 +492,13 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
                                        "elsewhere and rerun with --no-run")
                 run_gromacs(d, p, reps, gmx)
             distances, flex = measure(d, p, reps)
+            hbonds = None
         else:
-            distances, flex = measure_native(d, p, reps)
+            distances, flex, hbonds = measure_native(d, p, reps)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3
-    a = Analysis(pdb, chain, source, p, distances, flex)
+    a = Analysis(pdb, chain, source, p, distances, flex, hbonds)
     text = "\n".join(report(a)) + "\n"
     print(text, end="")
     (d / "ANALYSIS.md").write_text(text, encoding="utf-8")

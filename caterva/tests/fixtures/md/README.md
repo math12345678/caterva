@@ -20,3 +20,11 @@ the run's em.gro), so selections can be made on the trajectory.
 (resnr 11 and name OE1 OE2) plus cog of (resnr 20 and name OD1 OD2)'`
 (T4 lysozyme's catalytic Glu11 and Asp20 carboxylates) printed 0.818,
 0.806 and 0.825 nm for the three frames.
+
+`lyso_1aki_res1-59.xtc` and `lyso_1aki_res1-59.gro.gz`: residues 1-59 (900
+atoms) of hen lysozyme (1AKI), all 21 frames of replica 1 of a 10 ps
+`caterva md` run (GROMACS 2026.1, 2026-09-29), cut with `gmx trjconv`, and
+the matching atoms of that run's em.gro. `lyso_1aki_rep1_gmx_hbond.txt`:
+per-frame hydrogen-bond counts from `gmx hbond -r 'resnr A and not name N H
+O C CA HA OC1 OC2' -t '<same for B>'` on the full trajectory, one line per
+catalytic pair (A B then 21 counts).
