@@ -224,8 +224,25 @@ def test_one_frame_has_no_rmsf_on_either_route(tmp_path):
     one = "0.0 " + " ".join("0.5" for _ in p.pairs) + "\n"
     (rep / "catalytic.xvg").write_text(one)
     (rep / "rmsf.xvg").write_text("".join(f"{r} 0.0001\n" for r in sorted(set(p.pocket) | set(p.rest))))
-    _, flex = measure(tmp_path, p, [rep])
+    _, flex, _ = measure(tmp_path, p, [rep])
     assert MIN_RMSF_FRAMES == 2 and flex.per_replica == []
     (rep / "catalytic.xvg").write_text(one + one.replace("0.0 ", "0.5 ", 1))
-    _, flex = measure(tmp_path, p, [rep])
+    _, flex, _ = measure(tmp_path, p, [rep])
     assert [name for name, _, _ in flex.per_replica] == ["rep1"]
+
+
+def test_the_gromacs_route_reads_chi1_with_gmx_angle_on_the_whole_trajectory(tmp_path):
+    from caterva.analyze.__main__ import write_chi1_index
+
+    p = plan(read_pdb(_protein(), "A"), [(10, "HIS"), (20, "ASP")])
+    groups = [(10, "His10", (0, 1, 2, 5)), (20, "Asp20", (7, 8, 9, 12))]
+    lines = commands(p, ["rep1"], chi1=groups)
+    angles = [l for l in lines if " angle " in l]
+    assert angles == [
+        "printf '0\\n' | $GMX angle -f rep1/md_whole.xtc -n chi1.ndx -type dihedral -ov rep1/chi1_10.xvg",
+        "printf '1\\n' | $GMX angle -f rep1/md_whole.xtc -n chi1.ndx -type dihedral -ov rep1/chi1_20.xvg",
+    ]
+    # After the trjconv that makes md_whole.xtc, never before it.
+    assert lines.index(angles[0]) > next(i for i, l in enumerate(lines) if "md_whole.xtc -pbc" in l or "-o rep1/md_whole.xtc" in l)
+    write_chi1_index(tmp_path, groups)
+    assert (tmp_path / "chi1.ndx").read_text() == "[ chi1_10 ]\n1 2 3 6\n[ chi1_20 ]\n8 9 10 13\n"

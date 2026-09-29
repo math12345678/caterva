@@ -103,7 +103,31 @@ def catalytic_residues(pdb: str, chain: Optional[str]) -> Tuple[List[Tuple[int, 
     return out, source
 
 
-def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
+def chi1_groups(directory: Path, p: Plan) -> List[Tuple[int, str, Tuple[int, int, int, int]]]:
+    """(resnr, label, 0-based N/CA/CB/gamma indices) for each catalytic
+    residue with a chi1, read from em.gro; empty before run.sh has made it."""
+    from caterva.analyze.rotamers import chi1_atoms
+    gro = directory / "em.gro"
+    if not gro.exists():
+        return []
+    atoms = _gro_atoms(gro)
+    out = []
+    for site in p.sites:
+        idx = chi1_atoms(atoms, site.resnr)
+        if idx is not None:
+            out.append((site.resnr, site.label, idx))
+    return out
+
+
+def write_chi1_index(directory: Path, groups) -> None:
+    """chi1.ndx: one group of four atoms (1-based) per catalytic residue."""
+    lines = []
+    for resnr, _, idx in groups:
+        lines += [f"[ chi1_{resnr} ]", " ".join(str(i + 1) for i in idx)]
+    (directory / "chi1.ndx").write_text("\n".join(lines) + "\n")
+
+
+def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = ()) -> List[str]:
     sel = " ".join(f"'{q.selection()}'" for q in p.pairs)
     lines = []
     for r in reps:
@@ -123,13 +147,18 @@ def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
                      f"-o {r}/md_whole.xtc")
         lines.append(f"printf 'C-alpha\\n' | {gmx} rmsf -s {r}/rmsf_reference.pdb -f {r}/md_whole.xtc "
                      f"-res -o {r}/rmsf.xvg")
+        # chi1 of each catalytic residue, on the whole-molecule trajectory
+        # (protein atoms first, so em.gro's indices hold in it).
+        for g, (resnr, _, _) in enumerate(chi1):
+            lines.append(f"printf '{g}\\n' | {gmx} angle -f {r}/md_whole.xtc -n chi1.ndx -type dihedral "
+                         f"-ov {r}/chi1_{resnr}.xvg")
     return lines
 
 
-def script(p: Plan, reps: Sequence[str]) -> str:
+def script(p: Plan, reps: Sequence[str], chi1: Sequence = ()) -> str:
     return ("#!/usr/bin/env bash\n# Written by `caterva analyze`. Needs GROMACS (gmx on PATH, or GMX=...).\n"
             "set -euo pipefail\nGMX=\"${GMX:-gmx}\"\ncd \"$(dirname \"$0\")\"\n\n"
-            + "\n".join(commands(p, reps)) + "\n")
+            + "\n".join(commands(p, reps, chi1=chi1)) + "\n")
 
 
 @dataclass
@@ -176,7 +205,8 @@ class Analysis:
         return bool(self.distances) and all(d.summary.verdict == "consistent" for d in self.distances)
 
 
-def measure(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[DistanceResult], Flexibility]:
+def measure(directory: Path, p: Plan, reps: Sequence[Path],
+            chi1: Sequence = ()) -> Tuple[List[DistanceResult], Flexibility, List["Rotamer"]]:
     per_pair: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.pairs))}
     flex = []
     pocket, rest = set(p.pocket), set(p.rest)
@@ -201,7 +231,27 @@ def measure(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[Distan
             flex.append((r.name, sum(pv) / len(pv), sum(rv) / len(rv)))
     results = [DistanceResult(q.label, q.crystal_nm, summarise(per_pair[i], q.label, "nm"))
                for i, q in enumerate(p.pairs)]
-    return results, Flexibility(flex)
+    return results, Flexibility(flex), _gromacs_rotamers(directory, reps, chi1)
+
+
+def _gromacs_rotamers(directory: Path, reps: Sequence[Path], chi1: Sequence) -> List["Rotamer"]:
+    """Rotamers from gmx angle's chi1_<resnr>.xvg, with the starting chi1
+    computed from em.gro (the same dihedral, checked against gmx angle)."""
+    from caterva.analyze.rotamers import dihedral, populations
+    if not chi1:
+        return []
+    gro = directory / "em.gro"
+    x = [a[3] for a in _gro_atoms(gro)]
+    box = _gro_box(gro.read_text().splitlines()[-1])
+    out = []
+    for resnr, label, idx in chi1:
+        per = []
+        for r in reps:
+            xvg = r / f"chi1_{resnr}.xvg"
+            if xvg.exists():
+                per.append((r.name, populations(read_columns(xvg)[1])))
+        out.append(Rotamer(label, dihedral(*(x[i] for i in idx), box), per))
+    return out
 
 
 def _gro_index(path: Path) -> Dict[Tuple[int, str], int]:
@@ -349,8 +399,8 @@ def hbond_verdict(o) -> str:
     return "partial"
 
 
-def run_gromacs(directory: Path, p: Plan, reps: Sequence[Path], gmx: str) -> None:
-    for line in commands(p, [r.name for r in reps], gmx=shlex_quote(gmx)):
+def run_gromacs(directory: Path, p: Plan, reps: Sequence[Path], gmx: str, chi1: Sequence = ()) -> None:
+    for line in commands(p, [r.name for r in reps], gmx=shlex_quote(gmx), chi1=chi1):
         proc = subprocess.run(["bash", "-c", line], cwd=directory, capture_output=True, text=True)
         if proc.returncode != 0:
             raise AnalyzeError(f"GROMACS failed:\n  {line}\n{proc.stderr.strip()[-800:]}")
@@ -493,7 +543,7 @@ def rotamer_section(a: Analysis) -> List[str]:
     from caterva.analyze.rotamers import FLIPPED, KEPT, SPLIT, WELLS, rotamer_verdict
     L = ["", "## Catalytic side-chain rotamers", ""]
     if a.rotamers is None:
-        return L + ["Not measured on the GROMACS route (`--gromacs`); the native route measures them."]
+        return L + ["Not measured."]
     if not a.rotamers:
         return L + ["No catalytic residue has a chi1 (glycine and alanine have none)."]
     L += ["chi1 (N-CA-CB-gamma) of each catalytic residue, frame by frame, in the well it is nearest: "
@@ -548,7 +598,10 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
             raise AnalyzeError(f"no catalytic residues of {pdb} could be placed in the simulated chain")
         p = plan(read_pdb(protein.read_text(), chain), residues)
         reps = replicas(d)
-        (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"]))
+        chi1 = chi1_groups(d, p)
+        if chi1:
+            write_chi1_index(d, chi1)
+        (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1))
         if args.script_only:
             print(f"Wrote {d}/analyze.sh ({len(p.pairs)} catalytic distances, pocket of {len(p.pocket)} residues).")
             return 0
@@ -560,9 +613,9 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
                 if shutil.which(gmx) is None and not Path(gmx).exists():
                     raise AnalyzeError(f"GROMACS not found ({gmx!r}): set GMX=/path/to/gmx, or run analyze.sh "
                                        "elsewhere and rerun with --no-run")
-                run_gromacs(d, p, reps, gmx)
-            distances, flex = measure(d, p, reps)
-            hbonds = rotamers = None
+                run_gromacs(d, p, reps, gmx, chi1)
+            distances, flex, rotamers = measure(d, p, reps, chi1)
+            hbonds = None
         else:
             distances, flex, hbonds, rotamers = measure_native(d, p, reps)
     except AnalyzeError as e:

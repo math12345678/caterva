@@ -188,7 +188,8 @@ export const TEST_SUITES: TestSuite[] = [
         // (all passed 2026-09-29): 3078. Plus the 18 chi1 rotamer tests,
         // anchored on gmx angle's per-frame output (all passed): 3096. Plus
         // 1 test that a one-frame run has no RMSF on either route: 3097.
-        passed: 3097,
+        // Plus 1 test of the GROMACS route's gmx angle commands: 3098.
+        passed: 3098,
         skipped: 0,
         failed: 0,
       },

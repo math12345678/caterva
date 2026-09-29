@@ -67,7 +67,8 @@ done: there was no release to version.
 - `caterva analyze` reports the chi1 rotamer of each catalytic residue:
   per replica, the fraction of frames in the well it started in (+60, 180
   or -60), and kept, flipped, partial or replicas disagree. The angles
-  equal `gmx angle`'s to 0.001 degree on real lysozyme frames.
+  equal `gmx angle`'s to 0.001 degree on real lysozyme frames; the
+  `--gromacs` route measures them with `gmx angle` and CI compares the two.
 - `caterva compose --isoform NAME`: each constant comes from a row that
   measured that isoform. For human LDH and gossypol, `--isoform LDH-A`
   gives LDH-A's Ki (0.0019 mM) where the resolver's pick was LDH-B's

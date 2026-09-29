@@ -57,6 +57,17 @@ def _flexibility_rows(text: str) -> dict:
     return rows
 
 
+def _rotamer_rows(text: str) -> dict:
+    """residue -> per-replica fractions in the starting chi1 well."""
+    section = text.split("## Catalytic side-chain rotamers", 1)[-1].split("\n## ", 1)[0]
+    rows = {}
+    for line in section.splitlines():
+        m = re.match(r"\|\s*([A-Z][a-z]{2}\d+)\s*\|\s*-?\d+ \([^)]*\)\s*\|(.*)\|[^|]*\|\s*$", line)
+        if m:
+            rows[m.group(1)] = tuple(float(v) for v in m.group(2).split("|") if v.strip())
+    return rows
+
+
 def main() -> int:
     gmx = os.environ.get("GMX", "gmx")
     if shutil.which(gmx) is None and not Path(gmx).exists():
@@ -96,7 +107,7 @@ def main() -> int:
     # trajectories it reads itself, and by gmx distance / gmx rmsf. The two
     # distance tables must agree, so this job checks the native reader and
     # geometry against GROMACS on every run.
-    tables, flex = {}, {}
+    tables, flex, rot = {}, {}, {}
     for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
         code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
                               cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
@@ -106,6 +117,7 @@ def main() -> int:
         text = (OUT / "ANALYSIS.md").read_text()
         tables[route] = _distance_rows(text)
         flex[route] = _flexibility_rows(text)
+        rot[route] = _rotamer_rows(text)
     if not (OUT / "rep2" / "catalytic.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
@@ -130,6 +142,10 @@ def main() -> int:
         return 1
     print(f"OK: native and GROMACS agree on mean Calpha RMSF for {len(flex['native'])} replicas "
           f"(largest difference {worst_f:.4f} nm).")
+    if not rot["native"] or rot["native"] != rot["gromacs"]:
+        print(f"FAIL: native and GROMACS chi1 rotamer tables differ: {rot['native']} vs {rot['gromacs']}")
+        return 1
+    print(f"OK: native and GROMACS agree on the chi1 rotamers of {len(rot['native'])} catalytic residues.")
     print("OK: minimisation, then NVT, NPT, production and RMSD for two replicas, the summary, "
           "and the enzyme analysis.")
     return 0

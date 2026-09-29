@@ -529,8 +529,10 @@ because gauche+ and gauche- are used both ways round), and each residue is
 reported as kept, flipped (to which well, when the replicas agree),
 partial, or replicas disagree, with the thresholds printed. The angles
 equal `gmx angle -type dihedral`'s to 0.001 degree on six lysozyme
-catalytic residues over 21 frames, and that comparison is a test. Like the
-hydrogen bonds, this is measured on the native route only.
+catalytic residues over 21 frames, and that comparison is a test. The
+GROMACS route measures the same with `gmx angle` (an index of the four
+atoms per residue is written to `chi1.ndx`), and CI checks that the two
+routes' rotamer tables are identical.
 
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and
