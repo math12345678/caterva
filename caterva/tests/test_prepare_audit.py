@@ -226,3 +226,16 @@ def test_json_output_round_trips(tmp_path):
     cli.main([_local(tmp_path, "1L63"), "--json", str(out)], fetch=_fetch)
     data = json.loads(out.read_text())
     assert data["pdb_id"] == "1L63" and data["reference"]["mcsa_id"] == 921
+
+
+def test_an_unwritable_cache_does_not_stop_the_fetch(tmp_path):
+    """A read-only cache crashed `caterva analyze` before it measured anything."""
+    from caterva.prepare.__main__ import cached
+    ro = tmp_path / "ro"
+    ro.mkdir()
+    ro.chmod(0o500)
+    try:
+        get = cached(lambda url: "text of " + url, ro / "caterva")
+        assert get("https://example/x") == "text of https://example/x"
+    finally:
+        ro.chmod(0o700)

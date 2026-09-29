@@ -170,8 +170,9 @@ export const TEST_SUITES: TestSuite[] = [
         // on real GROMACS output (BAR reproduces gmx bar pair by pair): 2991.
         // Plus 5 TI and thermodynamic-length tests and 1 guide example: 2997.
         // Plus 5 tests of the native .xtc reader (exact against gmx trjconv on
-        // a real trajectory): 3002.
-        passed: 3002,
+        // a real trajectory): 3002. Plus native `caterva analyze` against gmx
+        // distance on real frames, and the unwritable-cache test: 3004.
+        passed: 3004,
         skipped: 0,
         failed: 0,
       },

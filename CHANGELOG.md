@@ -25,6 +25,10 @@ done: there was no release to version.
   exact answers and calibrated error bars; `caterva fep --summarise` uses
   them on the raw dhdl files. The FEP setup now writes energies at every
   state (`calc-lambda-neighbors = -1`) so MBAR can use them.
+- `caterva analyze` measures natively (no GROMACS needed), agreeing with
+  `gmx distance` exactly on a real trajectory; `--gromacs` keeps the old
+  route as a cross-check. An unwritable download cache no longer crashes
+  `caterva prepare` or `caterva analyze`.
 - A native .xtc reader (`caterva/md/xtc.py`), exact against `gmx trjconv`
   on real output, with periodic-image handling and RMSF (agreeing with
   `gmx rmsf`). `caterva complex --check` follows the ligand through every

@@ -441,9 +441,16 @@ than 0.1 nm, a stated choice) only when the replicas agree; otherwise it is
 not yet a result. It also compares the active-site pocket's flexibility
 (Cα RMSF within 8 Å of a catalytic residue) with the rest of the protein.
 
-GROMACS does the measuring. The exact commands go in `analyze.sh`, so
-`--script-only` writes them for a cluster and `--no-run` reads what they
-produced. On a 200-step test run of lysozyme it lists all fifteen
+Caterva does the measuring itself, reading the trajectories with its own
+.xtc decoder, so this runs where GROMACS is not installed. The same
+measurements as GROMACS commands go in `analyze.sh`: `--gromacs` runs
+them instead, `--script-only` writes them for a cluster and `--no-run`
+reads what they produced. On two real lysozyme replicas the two routes
+give the same fifteen catalytic distances (two differ by 0.001 nm, the
+precision GROMACS prints) and the same verdicts. Their pocket RMSF agrees
+to 0.0009 nm on average; in the most mobile loop (residues 67-72)
+`gmx rmsf` reads about 10% higher, a difference not yet explained, and
+reported here rather than hidden. On a 200-step test run of lysozyme it lists all fifteen
 distances between the six M-CSA catalytic residues, and correctly calls
 every one unconverged.
 

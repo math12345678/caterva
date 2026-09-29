@@ -250,9 +250,12 @@ def make_whole(x: np.ndarray, box: np.ndarray) -> np.ndarray:
 def kabsch_fit(P: np.ndarray, Q: np.ndarray):
     """Rotation R, translation t minimising |P R + t - Q|; never a reflection."""
     pc, qc = P.mean(0), Q.mean(0)
-    U, _, Vt = np.linalg.svd((P - pc).T @ (Q - qc))
-    D = np.diag([1.0, 1.0, np.sign(np.linalg.det(Vt.T @ U.T))])
-    R = U @ D @ Vt
+    with np.errstate(all="ignore"):  # Accelerate BLAS flags finite products; checked below
+        U, _, Vt = np.linalg.svd((P - pc).T @ (Q - qc))
+        D = np.diag([1.0, 1.0, np.sign(np.linalg.det(Vt.T @ U.T))])
+        R = U @ D @ Vt
+    if not np.all(np.isfinite(R)):
+        raise FloatingPointError("superposition produced a non-finite rotation")
     return R, qc - pc @ R
 
 
@@ -264,7 +267,8 @@ def rmsf(traj: Sequence[Frame], idx: Sequence[int], reference: np.ndarray) -> np
     for f in traj:
         x = make_whole(f.x[idx], f.box)
         R, t = kabsch_fit(x, reference)
-        fitted.append(x @ R + t)
+        with np.errstate(all="ignore"):
+            fitted.append(x @ R + t)
     X = np.array(fitted)
     return np.sqrt(((X - X.mean(0)) ** 2).sum(-1).mean(0))
 

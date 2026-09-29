@@ -67,8 +67,14 @@ def cached(fetch: Callable[[str], str], cache: Optional[Path]) -> Callable[[str]
         if path.exists():
             return path.read_text(encoding="utf-8")
         text = fetch(url)
-        cache.mkdir(parents=True, exist_ok=True)
-        path.write_text(text, encoding="utf-8")
+        # The cache saves a download next time; it is not worth failing the
+        # answer over. An unwritable cache (a sandbox, a read-only home)
+        # crashed `caterva analyze` before it measured anything.
+        try:
+            cache.mkdir(parents=True, exist_ok=True)
+            path.write_text(text, encoding="utf-8")
+        except OSError:
+            pass
         return text
     return get
 

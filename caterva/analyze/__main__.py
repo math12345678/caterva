@@ -11,8 +11,10 @@ of the active-site pocket against the rest of the protein. Each quantity is
 reported as a spread across replicas with block-averaged errors, and called
 a result only when the replicas agree (see `caterva md --summarise`).
 
-GROMACS does the measuring (`gmx distance`, `gmx rmsf`); the commands are
-written to analyze.sh so they can be read, rerun, or run elsewhere.
+Caterva does the measuring itself, from the .xtc files it reads natively
+(caterva/md/xtc.py), so this runs where GROMACS is not installed. The
+same measurements as GROMACS commands are written to analyze.sh, and
+`--gromacs` uses them instead, as a cross-check.
 
 Exit codes: 0 every quantity is a consistent result, 4 at least one is not
 (unconverged, replicas disagree, one sample), 2 malformed question,
@@ -170,6 +172,70 @@ def measure(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[Distan
     return results, Flexibility(flex)
 
 
+def _gro_index(path: Path) -> Dict[Tuple[int, str], int]:
+    """(residue number, atom name) -> 0-based index in the simulated system,
+    first occurrence; the numbering pdb2gmx keeps."""
+    lines = path.read_text().splitlines()
+    n = int(lines[1].split()[0])
+    out: Dict[Tuple[int, str], int] = {}
+    for i, l in enumerate(lines[2:2 + n]):
+        out.setdefault((int(l[0:5]), l[10:15].strip()), i)
+    return out
+
+
+def distance_series(traj, ia: Sequence[int], ib: Sequence[int]) -> List[float]:
+    """Per frame, the distance (nm) between the geometric centres of two atom
+    groups, each made whole, across periodic boundaries: `gmx distance -select
+    'cog of (...) plus cog of (...)'`, computed by Caterva."""
+    import numpy as np
+    from caterva.md import xtc
+    out = []
+    for f in traj:
+        ca_ = xtc.make_whole(f.x[list(ia)], f.box).mean(0)
+        cb_ = xtc.make_whole(f.x[list(ib)], f.box).mean(0)
+        out.append(float(np.linalg.norm(xtc.nearest_image(cb_ - ca_, f.box)[0])))
+    return out
+
+
+def measure_native(directory: Path, p: Plan, reps: Sequence[Path]) -> Tuple[List[DistanceResult], Flexibility]:
+    """The same distances and RMSF as analyze.sh, computed by Caterva from the
+    trajectories it reads itself (caterva/md/xtc.py), with no GROMACS."""
+    import numpy as np
+    from caterva.md import xtc
+    ref_gro = directory / "em.gro"
+    if not ref_gro.exists():
+        raise AnalyzeError(f"{ref_gro} does not exist: run {directory}/run.sh first")
+    index = _gro_index(ref_gro)
+
+    def atoms_of(site) -> List[int]:
+        missing = [n for n in site.atoms if (site.resnr, n) not in index]
+        if missing:
+            raise AnalyzeError(f"{site.label}: atom(s) {', '.join(missing)} not in {ref_gro.name}")
+        return [index[(site.resnr, n)] for n in site.atoms]
+
+    pair_atoms = [(atoms_of(q.a), atoms_of(q.b)) for q in p.pairs]
+    residues = sorted(set(p.pocket) | set(p.rest))
+    ca = [(r, index[(r, "CA")]) for r in residues if (r, "CA") in index]
+    ref_lines = ref_gro.read_text().splitlines()
+    ref = np.array([[float(ref_lines[2 + i][20 + 8 * k:28 + 8 * k]) for k in range(3)] for _, i in ca])
+    per_pair: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.pairs))}
+    flex = []
+    pocket, rest = set(p.pocket), set(p.rest)
+    for r in reps:
+        traj = xtc.read(r / "md.xtc")
+        for i, (ia, ib) in enumerate(pair_atoms):
+            per_pair[i].append((r.name, distance_series(traj, ia, ib)))
+        f_ca = xtc.rmsf(traj, [i for _, i in ca], ref)
+        rmsf = {res: float(v) for (res, _), v in zip(ca, f_ca)}
+        pv = [v for k, v in rmsf.items() if k in pocket]
+        rv = [v for k, v in rmsf.items() if k in rest]
+        if pv and rv:
+            flex.append((r.name, sum(pv) / len(pv), sum(rv) / len(rv)))
+    results = [DistanceResult(q.label, q.crystal_nm, summarise(per_pair[i], q.label, "nm"))
+               for i, q in enumerate(p.pairs)]
+    return results, Flexibility(flex)
+
+
 def run_gromacs(directory: Path, p: Plan, reps: Sequence[Path], gmx: str) -> None:
     for line in commands(p, [r.name for r in reps], gmx=shlex_quote(gmx)):
         proc = subprocess.run(["bash", "-c", line], cwd=directory, capture_output=True, text=True)
@@ -258,6 +324,8 @@ def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
                    help="write analyze.sh and stop; run it, then rerun without this flag")
     p.add_argument("--no-run", action="store_true",
                    help="use the .xvg files analyze.sh already wrote; do not call GROMACS")
+    p.add_argument("--gromacs", action="store_true",
+                   help="measure with gmx distance and gmx rmsf (analyze.sh) instead of Caterva's own reader")
     return p
 
 
@@ -281,13 +349,16 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
             return 0
         if not reps:
             raise AnalyzeError(f"no finished replicas (rep*/md.xtc) under {d}: run {d}/run.sh first")
-        if not args.no_run:
-            gmx = os.environ.get("GMX", "gmx")
-            if shutil.which(gmx) is None and not Path(gmx).exists():
-                raise AnalyzeError(f"GROMACS not found ({gmx!r}): set GMX=/path/to/gmx, or run analyze.sh "
-                                   "elsewhere and rerun with --no-run")
-            run_gromacs(d, p, reps, gmx)
-        distances, flex = measure(d, p, reps)
+        if args.gromacs or args.no_run:
+            if not args.no_run:
+                gmx = os.environ.get("GMX", "gmx")
+                if shutil.which(gmx) is None and not Path(gmx).exists():
+                    raise AnalyzeError(f"GROMACS not found ({gmx!r}): set GMX=/path/to/gmx, or run analyze.sh "
+                                       "elsewhere and rerun with --no-run")
+                run_gromacs(d, p, reps, gmx)
+            distances, flex = measure(d, p, reps)
+        else:
+            distances, flex = measure_native(d, p, reps)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3

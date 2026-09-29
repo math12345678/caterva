@@ -106,11 +106,14 @@ def read_coords(path: Path) -> List[LigandAtom]:
 def kabsch(P: np.ndarray, Q: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """Rotation R and translation t minimising |(P R + t) - Q| (Kabsch 1976)."""
     pc, qc = P.mean(axis=0), Q.mean(axis=0)
-    H = (P - pc).T @ (Q - qc)
-    U, _, Vt = np.linalg.svd(H)
-    d = np.sign(np.linalg.det(Vt.T @ U.T))
-    D = np.diag([1.0, 1.0, d])  # a rotation, never a reflection
-    R = U @ D @ Vt
+    with np.errstate(all="ignore"):  # Accelerate BLAS flags finite products; checked below
+        H = (P - pc).T @ (Q - qc)
+        U, _, Vt = np.linalg.svd(H)
+        d = np.sign(np.linalg.det(Vt.T @ U.T))
+        D = np.diag([1.0, 1.0, d])  # a rotation, never a reflection
+        R = U @ D @ Vt
+    if not np.all(np.isfinite(R)):
+        raise FloatingPointError("superposition produced a non-finite rotation")
     return R, qc - pc @ R
 
 

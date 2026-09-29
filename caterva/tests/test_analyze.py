@@ -175,3 +175,20 @@ def test_read_columns_skips_gromacs_headers(tmp_path):
     p = tmp_path / "x.xvg"
     p.write_text("# c\n@ t\n0 1 2\n1 3 4\n")
     assert read_columns(p) == [[0.0, 1.0], [1.0, 3.0], [2.0, 4.0]]
+
+
+def test_native_distances_match_gmx_distance_on_a_real_trajectory(tmp_path):
+    """T4 lysozyme's catalytic Glu11 and Asp20 carboxylates, three frames of
+    a real run: `gmx distance` printed 0.818, 0.806, 0.825 nm."""
+    import gzip
+    from caterva.analyze.__main__ import _gro_index, distance_series
+    from caterva.md import xtc
+    from pathlib import Path
+    fix = Path(__file__).parent / "fixtures" / "md"
+    gro = tmp_path / "first6000.gro"
+    gro.write_bytes(gzip.decompress((fix / "t4l_bnz_first6000.gro.gz").read_bytes()))
+    idx = _gro_index(gro)
+    glu = [idx[(11, "OE1")], idx[(11, "OE2")]]
+    asp = [idx[(20, "OD1")], idx[(20, "OD2")]]
+    got = distance_series(xtc.read(fix / "t4l_bnz_first6000.xtc"), glu, asp)
+    assert [round(x, 3) for x in got] == [0.818, 0.806, 0.825]
