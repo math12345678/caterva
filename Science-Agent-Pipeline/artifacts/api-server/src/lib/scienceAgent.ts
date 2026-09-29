@@ -153,6 +153,23 @@ export interface ScienceAgentResult {
    * `unstated` is the majority case and is NOT `native`. A reader must be
    * able to tell "the row did not say" from "the row said native enzyme".
    */
+  /**
+   * The chosen BRENDA row's commentary, verbatim ("LDH-B, pH not specified
+   * ...", "competitive versus NADH, pH 7.5, 37 C ..."). Emitted by the runner
+   * beside `variant`.
+   */
+  commentary?: string | null;
+  /**
+   * What `commentary` says about the measurement's scope, decided in Python
+   * by caterva.bind.core (the one implementation): which isoform the row
+   * measured, and for an inhibition constant which mode and against what.
+   * `inhibitionMode` is "unstated" when the row gives none.
+   */
+  rowScope?: {
+    isoform: string | null;
+    inhibitionMode: string;
+    versus: string | null;
+  } | null;
   preparation?: {
     status: string;
     evidence?: string | null;

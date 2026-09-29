@@ -214,7 +214,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "76 test files -- query resolution, parameter provenance, " +
+          "77 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -224,6 +224,9 @@ export const TEST_SUITES: TestSuite[] = [
         // more than five domains are served, stale after the archiving and
         // corrected in the same change. So: 764. Plus the 2 tests of
         // runnerErrorReachesCaller.test.ts (2 passed, 2026-09-28): 766.
+        // Plus the 10 tests of inhibitorIsTheKiCompound.test.ts (10 passed
+        // locally 2026-09-29, with kiProvenance.test.ts's 4 after its query
+        // was made to name the inhibitor): 776.
         //
         // Earlier, 2026-09-17: `81 passed (81) / 854 passed (854)`, run
         // alone with the repo's .venv/bin first on PATH.
@@ -248,7 +251,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 766,
+        passed: 776,
         skipped: 0,
         failed: 0,
       },

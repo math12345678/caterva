@@ -32,9 +32,13 @@ vi.mock("../lib/scienceAgent", async (importOriginal) => {
   };
 });
 
-// km is user-overridden so only ki flows through kinetic resolution.
+// km is user-overridden so only ki flows through kinetic resolution. The
+// query names the inhibitor: a Ki is the inhibitor's constant, and one that
+// names none has no Ki to look up (inhibitorIsTheKiCompound.test.ts). This
+// query used to say only "on lactate", and the Ki was looked up under
+// lactate, which is the substrate.
 const CI_LDH_QUERY =
-  "simulate competitive inhibition of lactate dehydrogenase on lactate " +
+  "simulate competitive inhibition of lactate dehydrogenase by oxamate on lactate " +
   "km=2 vmax=5 s0=10 i0=0 end=10 points=51";
 
 const KI_RESULT = {
@@ -77,6 +81,10 @@ describe("Ki resolution — per-key lookup", () => {
     });
     const flag = resolved.provenance.flags.find((f) => /resolved ki/i.test(f));
     expect(flag).toMatch(/1\.2/);
+    const kiCall = vi.mocked(resolveKineticValue).mock.calls
+      .map(([arg]) => arg as { quantity: string; substrate?: string })
+      .find((c) => c.quantity === "ki");
+    expect(kiCall?.substrate).toBe("oxamate");
   });
 
   it("a wrong-constant swap is never cross-applied (km must not leak into ki)", async () => {

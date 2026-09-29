@@ -313,6 +313,41 @@ function selectionTieFlags(
  * Silent for `unstated`, `absent` and `native`. A flag on every row in the
  * corpus is noise, and noise is how the flags that matter stop being read.
  */
+/**
+ * What the chosen row says it measured, when that can make it the wrong
+ * number for this model: another isoform, or (for an inhibition constant)
+ * a mode not stated or measured against another molecule. Reported, not
+ * judged: the reading was made in Python (runner `_row_scope`).
+ *
+ * Found on human LDH: gossypol's Ki resolved to 0.0014 mM, which is its
+ * LDH-B value (0.0019 for LDH-A, 0.0042 for LDH-C), and no row states a mode.
+ */
+export function rowScopeFlags(
+  key: string,
+  scope: ScienceAgentResult["rowScope"],
+): string[] {
+  if (!scope) return [];
+  const out: string[] = [];
+  const name = key.toUpperCase();
+  if (scope.isoform) {
+    out.push(
+      `${name} was measured on isoform ${scope.isoform}; for another isoform it is a different protein's constant.`,
+    );
+  }
+  if (key === "ki") {
+    if (scope.inhibitionMode === "unstated") {
+      out.push(`${name}: the source row states no inhibition mode, so which binding event it measured is unknown.`);
+    } else {
+      out.push(
+        `${name}: the source row measured ${scope.inhibitionMode} inhibition` +
+          (scope.versus ? ` versus ${scope.versus}` : "") +
+          "; a Ki is specific to that mode and assay.",
+      );
+    }
+  }
+  return out;
+}
+
 function preparationFlags(
   key: string,
   preparation: ScienceAgentResult["preparation"],
@@ -637,8 +672,22 @@ async function applyKineticResolution(
   // gets its own lookup and its own citation (ADR 0008). A cross-species
   // Ki therefore never borrows a verified Km's provenance.
   for (const key of kineticKeys) {
+    // A Ki is the INHIBITOR's constant: BRENDA files it under the inhibitor.
+    // With none named, nothing is looked up; before, the substrate's name
+    // was used and the Ki came back as one "of" the substrate, or not at all.
+    if (key === "ki" && !entities.inhibitor) {
+      provenanceUpdates[key] = {
+        origin: "default",
+        unresolvedReason: "not_found",
+        note:
+          "No Ki was looked up: a Ki belongs to the inhibitor, and the query names none. " +
+          'Name it ("... inhibition of lactate dehydrogenase by gossypol") or supply ki=.',
+      };
+      continue;
+    }
     const agentResult = await resolveKineticValue({
       ...entities,
+      ...(key === "ki" ? { substrate: entities.inhibitor } : {}),
       quantity: key as "km" | "ki",
       allowVariants,
       physiologicalReference,
@@ -799,6 +848,7 @@ async function applyKineticResolution(
       );
       flags.push(...selectedFormFlags(key, agentResult.selectedForm));
       flags.push(...preparationFlags(key, agentResult.preparation));
+      flags.push(...rowScopeFlags(key, agentResult.rowScope));
     } else {
       provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
     }
@@ -1865,6 +1915,34 @@ function guessEnzymeNameFromQuery(query: string): string | undefined {
  * Python bridge, which resolves an EC number for it live via UniProt
  * before attempting BRENDA -- see science_agent_runner.py::resolve_ec_number.
  */
+const NOT_AN_INHIBITOR = new Set([
+  "a", "an", "the", "its", "this", "that", "competitive", "noncompetitive", "uncompetitive",
+  "mixed", "product", "substrate", "feedback", "allosteric", "an", "some",
+]);
+
+/**
+ * The inhibitor a query names, or undefined. Recognises "... inhibition of
+ * X by Y", "inhibited by Y", "with Y as (an) inhibitor", "inhibitor Y" and
+ * "Y inhibitor". Returns undefined rather than guessing: an unnamed
+ * inhibitor means no Ki is looked up, never a Ki looked up under the
+ * substrate's name.
+ */
+export function extractInhibitor(query: string): string | undefined {
+  const word = "([a-z0-9][\\w\\-()\\[\\],'+]*(?:\\s+acid)?)";
+  const patterns = [
+    new RegExp(`\\binhibit(?:ed|ion|or|s)?\\b[^.;]*?\\bby\\s+${word}`, "i"),
+    new RegExp(`\\b(?:with|using|plus)\\s+${word}\\s+as\\s+(?:an?\\s+)?inhibitor`, "i"),
+    new RegExp(`\\binhibitor\\s+${word}`, "i"),
+    new RegExp(`\\b${word}\\s+(?:as\\s+)?(?:an?\\s+)?inhibitor\\b`, "i"),
+  ];
+  for (const p of patterns) {
+    const m = query.match(p);
+    const name = m?.[1]?.trim().replace(/[.,;]+$/, "");
+    if (name && !NOT_AN_INHIBITOR.has(name.toLowerCase())) return name;
+  }
+  return undefined;
+}
+
 function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
   // The organism the query NAMES wins over the table's default.
   //
@@ -1888,12 +1966,16 @@ function extractEntitiesFromQuery(query: string): EntityExtraction | undefined {
 
   const matched = matchEnzyme(query);
   if (matched) {
-    const lower = query.toLowerCase();
+    // Look for the substrate OUTSIDE the enzyme's own name. "lactate
+    // dehydrogenase" contains "lactate", and reading it as the substrate made
+    // every LDH query a lactate query whatever it said (found 2026-09-29).
+    const lower = query.toLowerCase().replace(new RegExp(matched.pattern.source, "gi"), " ");
     const substrate =
       matched.substrates.find((s) => lower.includes(s)) ?? matched.substrates[0]!;
     return {
       enzymeName: matched.enzymeName,
       substrate,
+      inhibitor: extractInhibitor(query),
       organism: namedOrganism ?? matched.organism,
       ecNumber: matched.ecNumber,
     };
@@ -2309,7 +2391,7 @@ export async function resolveQuery(
       hasUnoverriddenKinetic
     ) {
       const result = await applyKineticResolution(
-        llmResult.entities,
+        { ...llmResult.entities, inhibitor: llmResult.entities?.inhibitor ?? extractInhibitor(query) },
         effectiveOverrides,
         llmResult.domain,
         allowCrossSpecies,

@@ -4,6 +4,12 @@ import type { SimulationDomain } from "./catervaRunner";
 export interface EntityExtraction {
   enzymeName?: string;
   substrate?: string;
+  /**
+   * The inhibitor an inhibition constant belongs to. BRENDA files a Ki under
+   * the INHIBITOR; looking it up under the substrate returned a Ki "of" the
+   * substrate, or nothing. Absent means none was named, and no Ki is looked up.
+   */
+  inhibitor?: string;
   organism: string;
   ecNumber?: string;
 }

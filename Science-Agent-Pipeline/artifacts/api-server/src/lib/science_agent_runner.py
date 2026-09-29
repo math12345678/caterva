@@ -295,6 +295,20 @@ def _resolved_effectors_dict(effectors):
         return [e.model_dump() for e in effectors]
 
 
+def _row_scope(commentary):
+    """{isoform, inhibitionMode, versus} from a BRENDA row's commentary, or
+    None when there is no commentary. Parsed by caterva.bind.core, the one
+    implementation of this reading."""
+    if not commentary:
+        return None
+    try:
+        from caterva.bind.core import read_isoform, read_mode
+    except ImportError:
+        return None
+    mode, versus = read_mode(commentary)
+    return {"isoform": read_isoform(commentary), "inhibitionMode": mode, "versus": versus}
+
+
 def _buffer_identity_dict(raw_buffer):
     """Resolve a reported buffer string to a comparable identity, or None.
 
@@ -771,6 +785,16 @@ def main() -> None:
                 "variant": (
                     result.variant.model_dump() if result.variant else None
                 ),
+                # The chosen row's BRENDA commentary, verbatim: which isoform
+                # it measured and, for a Ki, which inhibition mode and against
+                # which molecule. Without it a reader cannot tell gossypol's
+                # LDH-B Ki from its LDH-A one, or a Ki measured versus NADH
+                # from one versus the modelled substrate.
+                "commentary": getattr(result, "commentary", None),
+                # What that commentary says, decided HERE by the same parser
+                # `caterva bind` and `caterva compose` use, so the TypeScript
+                # side reports it rather than re-deriving it (ADR 0027).
+                "rowScope": _row_scope(getattr(result, "commentary", None)),
                 # How the enzyme was PREPARED (ADR 0092): immobilised,
                 # affinity-tagged, covalently modified, native, or unstated.
                 #

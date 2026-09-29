@@ -126,6 +126,9 @@ EMITTED_AS: dict[str, str | None] = {
     # variant filter, and the human LDH Ki was resolving to a His-tagged
     # construct with nothing in the response saying so.
     "preparation": "preparation",
+    # The chosen row's commentary: isoform, inhibition mode, and what an
+    # inhibitor was measured against. Emitted verbatim beside `variant`.
+    "commentary": "commentary",
     "relatedness": "relatedness",
     "effectors": "effectors",
     "selection_tie": "selectionTie",
@@ -181,6 +184,7 @@ RUNNER_ONLY: dict[str, str] = {
     "gamma": "epidemiology bridge (ADR 0020)",
     "betaGammaValidation": "epidemiology bridge (ADR 0020)",
     "reliability": "graded in the runner from the result, not carried on it",
+    "rowScope": "isoform and inhibition mode parsed in the runner from `commentary` (caterva.bind.core)",
 }
 
 #: The only keys that genuinely need no receiver: the envelope itself.
