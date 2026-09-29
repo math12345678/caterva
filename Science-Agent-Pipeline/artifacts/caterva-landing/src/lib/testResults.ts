@@ -166,8 +166,9 @@ export const TEST_SUITES: TestSuite[] = [
         // guide example (all passed 2026-09-28): 2970. Plus 3 `bind --survey`
         // tests and its guide example: 2974. Plus 8 estimator tests (exact
         // harmonic-oscillator answers, calibrated error bars), 5 pose-check
-        // and symmetry tests and 1 solvent-rebuild test: 2988.
-        passed: 2988,
+        // and symmetry tests and 1 solvent-rebuild test: 2988. Plus 3 tests
+        // on real GROMACS output (BAR reproduces gmx bar pair by pair): 2991.
+        passed: 2991,
         skipped: 0,
         failed: 0,
       },

@@ -577,6 +577,15 @@ about 95% of the time over hundreds of datasets. That test caught a wrong
 BAR variance (69% coverage) and a statistical inefficiency that read 3.5
 for a process whose exact value is 3.0, both fixed.
 
+On real GROMACS output (the solvent leg for benzene, 25 windows, 50 ps
+each), Caterva's BAR on the same samples as `gmx bar` reproduces every
+one of its 24 neighbour free energies to within 0.005 kJ/mol, and its
+total exactly (-1.31 kJ/mol). With equilibration removed and the samples
+thinned to independent ones (3,107 of 6,275), MBAR gives -0.33 +/- 0.83
+and BAR -0.17 +/- 0.66: the same answer, with an error bar that counts
+independent samples rather than all of them. Those files are kept as a
+test (`caterva/tests/fixtures/fep/`).
+
 It has been run end to end on T4 lysozyme L99A with benzene (PDB 181L),
 GROMACS 2026.1: 118 windows over two replicas and both legs, BAR, the
 correction and the verdict, with every stage cut to 0.5 ps to test the

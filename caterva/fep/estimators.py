@@ -167,21 +167,30 @@ def mbar(u_kn: np.ndarray, N_k: Sequence[int], tol: float = 1e-10, max_iter: int
     mask = N > 0
     f = np.zeros(K)
     for it in range(1, max_iter + 1):
-        log_denom = _logsumexp((f + logN)[mask][:, None] - u[mask], axis=0)
-        f_new = -_logsumexp(-u - log_denom[None, :], axis=1)
+        with np.errstate(under="ignore"):
+            log_denom = _logsumexp((f + logN)[mask][:, None] - u[mask], axis=0)
+            f_new = -_logsumexp(-u - log_denom[None, :], axis=1)
         f_new -= f_new[0]
         if np.max(np.abs(f_new - f)) < tol:
             f = f_new
             break
         f = f_new
-    log_denom = _logsumexp((f + logN)[mask][:, None] - u[mask], axis=0)
-    W = np.exp(f[:, None] - u - log_denom[None, :]).T  # (Ntot, K), columns sum to 1
-    overlap = W.T @ W * N[None, :]
-    # Asymptotic covariance (eq. D6), through the SVD of W for stability.
-    U, S, Vt = np.linalg.svd(W, full_matrices=False)
-    V = Vt.T
-    inner = np.eye(K) - (S[:, None] * (V.T @ np.diag(N) @ V)) * S[None, :]
-    theta = V @ np.diag(S) @ np.linalg.pinv(inner) @ np.diag(S) @ V.T
+    # Floating-point flags are silenced here and finiteness is checked
+    # instead: exp() of a decoupled state's 1e16 kT overlap energy underflows
+    # to the 0 it should be, and Apple's Accelerate BLAS raises spurious
+    # divide/overflow flags even on small random finite matrices (measured:
+    # six warnings, finite output). A real non-finite result still raises.
+    with np.errstate(all="ignore"):
+        log_denom = _logsumexp((f + logN)[mask][:, None] - u[mask], axis=0)
+        W = np.exp(f[:, None] - u - log_denom[None, :]).T  # (Ntot, K), columns sum to 1
+        overlap = W.T @ W * N[None, :]
+        # Asymptotic covariance (eq. D6), through the SVD of W for stability.
+        U, S, Vt = np.linalg.svd(W, full_matrices=False)
+        V = Vt.T
+        inner = np.eye(K) - (S[:, None] * (V.T @ np.diag(N) @ V)) * S[None, :]
+        theta = V @ np.diag(S) @ np.linalg.pinv(inner) @ np.diag(S) @ V.T
+    if not (np.all(np.isfinite(f)) and np.all(np.isfinite(overlap)) and np.all(np.isfinite(theta))):
+        raise FloatingPointError("MBAR produced a non-finite free energy, overlap or covariance")
     d = np.diag(theta)
     var = d + d[0] - 2 * theta[:, 0]
     return MbarResult(f, np.sqrt(np.clip(var, 0, None)), overlap, it)

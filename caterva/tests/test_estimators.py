@@ -110,3 +110,43 @@ def test_an_equilibration_transient_is_detected_and_dropped():
 def test_subsampling_never_repeats_and_stays_in_range():
     idx = est.subsample(101, 3.7)
     assert idx[0] == 0 and idx[-1] <= 100 and len(np.unique(idx)) == len(idx)
+
+
+# --- real GROMACS output ---------------------------------------------------------
+
+import gzip
+from pathlib import Path
+
+FIX = Path(__file__).parent / "fixtures" / "fep"
+
+
+def test_bar_reproduces_gmx_bar_on_real_gromacs_output():
+    """On the same 25 windows, the same samples: every neighbour pair agrees
+    with `gmx bar` to its printed precision, and so does the total (-1.31)."""
+    z = np.load(FIX / "benzene_solvent_rep1.npz")
+    du, kt = z["du"].astype(float), est.R_KJ * float(z["temperature"])
+    ref = [float(x) for x in (FIX / "benzene_solvent_rep1_gmxbar.txt").read_text().split()]
+    total = 0.0
+    for i in range(24):
+        d, _ = est.bar(du[i, i + 1] - du[i, i], du[i + 1, i] - du[i + 1, i + 1])
+        assert d * kt == pytest.approx(ref[i], abs=0.006)
+        total += d * kt
+    assert total == pytest.approx(-1.31, abs=0.01)
+
+
+def test_mbar_agrees_with_bar_on_real_output_and_the_leg_is_diagnosed(tmp_path):
+    z = np.load(FIX / "benzene_solvent_rep1.npz")
+    du, kt = z["du"].astype(float), est.R_KJ * float(z["temperature"])
+    r = est.mbar(np.concatenate(list(du), axis=1), [du.shape[2]] * 25)
+    assert r.f[-1] * kt == pytest.approx(-1.31, abs=2 * r.df[-1] * kt)
+    assert 0.0 < r.overlap[10, 11] < 1.0
+
+
+def test_the_reader_parses_real_gromacs_dhdl(tmp_path):
+    p = tmp_path / "prod.xvg"
+    p.write_bytes(gzip.decompress((FIX / "benzene_solvent_lambda5.xvg.gz").read_bytes()))
+    w = est.read_dhdl(p)
+    assert (w.state, w.temperature, w.du.shape) == (5, 310.15, (25, 251))
+    assert np.all(w.du[5] == 0.0)  # a state's energy relative to itself
+    z = np.load(FIX / "benzene_solvent_rep1.npz")
+    assert np.allclose(w.du, z["du"][5], rtol=1e-6, atol=1e-6)
