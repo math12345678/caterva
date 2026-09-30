@@ -200,18 +200,18 @@ CI_ONLY: dict[str, str] = {
     ),
     # --- Classified 2026-09-30, with the root-typescript job --------------
     #
-    # The job's install, type-check and jest steps are NOT here: `make
-    # test-ts` runs all three, so they are reachable. Only the step that
-    # reads jest's JSON is CI-only, and the reason is a difference in what
-    # a skip means, not in what a laptop can run.
+    # The job's install, type-check, jest and every-file-ran steps are NOT
+    # here: `make test-ts` runs all four, so they are reachable. Only the
+    # step that fails on a skipped test is CI-only, and the reason is a
+    # difference in what a skip means, not in what a laptop can run.
     "jq -e '.numPendingTests == 0": (
         "fails the root-typescript job when any jest test was skipped. On a "
         "laptop a skip is allowed and announced: catervaBridge, "
         "inhibitionModels and literatureResolver skip, with a console "
         "warning check_no_disabled_tests insists on, when the Python engine "
         "will not import, which is right before `make setup`. In CI the "
-        "engine is installed two steps earlier, so a skip there means it "
-        "stopped importing. `make test-ts` prints jest's own count of "
+        "engine is installed earlier in the same job, so a skip there means "
+        "it stopped importing. `make test-ts` prints jest's own count of "
         "skipped tests, which is the same number."
     ),
     "jq -r '\"\\(.numTotalTestSuites) files": (

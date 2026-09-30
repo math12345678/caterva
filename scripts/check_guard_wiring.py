@@ -261,7 +261,11 @@ EXPECTED_WIRING: dict[str, tuple[str, ...]] = {
     "check_scripts_reachable": ("verify_build",),
     "check_static_assets": ("verify_build",),
     "check_typescript_compiles": ("verify_build",),
-    "check_typescript_suites_discovered": ("verify_build",),
+    # CI added 2026-09-30, in the root-typescript job's --jest-results form.
+    # verify_build's listing form needs both node_modules trees and sits in
+    # the TypeScript group CI's `test` job skips, so until then no CI job
+    # asked whether jest had collected every root test file.
+    "check_typescript_suites_discovered": ("verify_build", "ci"),
     # Wired 2026-08-14. All seven ran in NO harness until this date --
     # written, correct, and invisible. check_guard_wiring named them
     # together on one run, which is the Stage 4 amendment catching its own

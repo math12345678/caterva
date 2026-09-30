@@ -54,6 +54,12 @@ node_modules/
 # Coverage output from `npm run test:coverage`.
 coverage/
 
+# The report `make test-ts` and CI's root-typescript job have jest write
+# (`--json --outputFile=`), which check_typescript_suites_discovered then
+# reads to confirm every test file under src/ ran. A run's output, not
+# source; anchored because it is only ever written at the root.
+/root-jest-results.json
+
 # Compiled TypeScript output. `tsconfig.json` gained an `outDir` so that
 # `npm run build` emits somewhere, and 41 compiled .js files were committed
 # on 2026-08-11 -- a duplicate of every source file in the tree, which goes

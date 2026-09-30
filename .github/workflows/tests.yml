@@ -456,12 +456,13 @@ jobs:
   # exporters behind it. Its tests are jest suites under src/**/__tests__,
   # and until 2026-09-30 NO job ran them: `test` runs caterva/ and Tests/,
   # `api-server` runs that workspace's vitest suite and stops, `md-setup`
-  # runs GROMACS. check_typescript_suites_discovered checks, on a laptop,
-  # that jest COLLECTS every file; nothing checked that any of them passed.
+  # runs GROMACS. check_typescript_suites_discovered checked, on a laptop
+  # and nowhere else, that jest COLLECTS every file; nothing checked that
+  # any of them passed. This job runs both questions.
   #
   # jest, not vitest, because it is this package's runner ("test": "jest")
   # and all but four files were written for it. Those four were written
-  # for vitest on 2026-09-30, in a sandbox where bunx could fetch vitest
+  # for vitest on 2026-09-29 and 30, in a sandbox where bunx could fetch vitest
   # and the root package had no node_modules. Moving them was four files;
   # moving the package to vitest meant rewriting the twenty-one that call
   # jest.mock, jest.fn or jest.requireActual. The commit that added this
@@ -522,12 +523,26 @@ jobs:
       - name: Root package tests (jest)
         run: npm test -- --ci --json --outputFile=root-jest-results.json
 
+      # A green jest step says every file it COLLECTED passed; it cannot say
+      # every file was collected. testMatch is `**/__tests__/**/*.test.ts`
+      # under roots `src`, so a test file renamed or moved out of a
+      # __tests__ directory, or a narrowed testMatch, roots or "test"
+      # script, drops files and the step stays green over the rest.
+      # check_typescript_suites_discovered is the guard for exactly that,
+      # and until this step it ran in no CI job: verify_build runs it in
+      # its TypeScript group, which the `test` job skips with
+      # --no-typescript. Here it reads the report the step above wrote, so
+      # it checks the run that happened rather than asking jest to list
+      # again, and fails naming every file under src/ that did not run.
+      - name: Every root test file ran
+        run: python scripts/check_typescript_suites_discovered.py --jest-results root-jest-results.json
+
       # jest counts a skipped test as not failed, so a green step cannot say
       # whether every test ran. Three suites skip on purpose when the Python
       # engine will not import on the machine running them -- loudly, which
       # check_no_disabled_tests requires -- and that is right on a laptop
-      # without `make setup`. Here the engine was installed four steps up,
-      # so a skip means it stopped importing and those tests stopped
+      # without `make setup`. Here the engine was installed earlier in this
+      # job, so a skip means it stopped importing and those tests stopped
       # running: the case check_no_silent_skips exists for on the Python
       # side, which counts pytest only. Prints the counts, names every test
       # that did not run, then fails if there was one.

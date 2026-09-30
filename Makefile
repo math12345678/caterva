@@ -219,7 +219,9 @@ test-slow: require-pytest
 
 # The root TypeScript package: src/, the `scientific` CLI and the resolver,
 # engine bridge and exporters behind it, as the `root-typescript` CI job
-# runs it -- type-check first, then every jest suite under src/.
+# runs it -- type-check first, then every jest suite under src/, then a
+# check that every test file under src/ is one jest actually ran (read
+# from the report jest writes to root-jest-results.json, gitignored).
 #
 # Not part of `test` or `pr`, for the reason the api-server suite is not:
 # everything else in this file needs Python and nothing more, and a missing
@@ -230,7 +232,7 @@ test-slow: require-pytest
 # .venv -- and three of them skip, loudly, when the engine will not import,
 # which CI does not allow. The first run installs node_modules with
 # `npm ci`, the command CI uses; node_modules/ is gitignored.
-test-ts:
+test-ts: check-python
 	@if ! command -v npm >/dev/null 2>&1; then \
 		echo "No npm on PATH, so the root TypeScript package cannot be installed"; \
 		echo "or tested. Install Node (CI uses Node 22) and run this again."; \
@@ -238,7 +240,8 @@ test-ts:
 	fi
 	@[ -x node_modules/.bin/jest ] || { echo ">> installing the root package: npm ci (exactly package-lock.json)"; npm ci; }
 	npm run type-check
-	npm test -- --ci
+	npm test -- --ci --json --outputFile=root-jest-results.json
+	@"$(PY)" scripts/check_typescript_suites_discovered.py --jest-results root-jest-results.json
 
 # The guards CI runs, in CI's order, minus the test suites -- plus the
 # two that keep this target and the docs honest, which run under pytest
