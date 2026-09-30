@@ -53,6 +53,9 @@ def test_no_temperature_gives_a_range_not_a_guess():
     ("non-competitive inhibition", "noncompetitive", None),
     ("uncompetitive vs. lactate, 25°C", "uncompetitive", "lactate"),
     ("mixed-type inhibition versus NAD+", "mixed", "NAD+"),
+    # BRENDA's wording, rabbit hexokinase and MgADP- (ref 640206): read as
+    # mixed with nothing measured against until "inhibitor" was accepted.
+    ("erythrocyte enzyme, mixed inhibitor versus glucose", "mixed", "glucose"),
     ("pH 7.0, 4°C", "unstated", None),
     (None, "unstated", None),
 ])

@@ -49,6 +49,30 @@ MODE_OF_MOTIF = {
 #: reporting "states no inhibition mode" for one would be noise.
 INHIBITION_TABLES = frozenset({"ki"})
 
+
+def mode_fits(mode: Optional[str], want: Optional[str]) -> bool:
+    """True when a row's stated inhibition mode is the one a model of mode
+    `want` uses. A mixed-type row counts for a noncompetitive model, as
+    this module has always read it: noncompetitive inhibition is the limit
+    of mixed inhibition in which the two constants are equal, which is the
+    assumption a noncompetitive model already makes. One definition, read
+    by this module's report and by `ki_mode`'s choice of row, so the row
+    the model is made to carry is never a row the report then calls the
+    wrong mechanism."""
+    return mode is not None and want is not None and (
+        mode == want or (want == "noncompetitive" and mode == "mixed"))
+
+
+def versus_is(versus: Optional[str], substrate: Optional[str]) -> bool:
+    """True when a row's "versus X" names the model's substrate. Compared
+    without case or surrounding space, and nothing looser: "D-glucose" and
+    "glucose" are not folded together here. A wrong guess at synonymy would
+    silence a real concern, where a spurious concern costs the reader one
+    sentence. Shared with `ki_mode`, so the row it prefers as "versus the
+    substrate" is a row this module does not flag."""
+    return bool(versus and substrate and versus.strip().lower() == substrate.strip().lower())
+
+
 #: Concern kinds, in the order a reader should meet them.
 ISOFORM = "isoform"
 MODE_UNSTATED = "mode_unstated"
@@ -170,12 +194,12 @@ def read_scope(
                 concerns.append(Concern(MODE_UNSTATED, (
                     f"the row states no inhibition mode, so whether it is the {want} "
                     f"constant this model uses is unknown")))
-            elif mode != want and not (want == "noncompetitive" and mode == "mixed"):
+            elif not mode_fits(mode, want):
                 concerns.append(Concern(MODE_MISMATCH, (
                     f"the row measured **{mode}** inhibition"
                     + (f" (versus {versus})" if versus else "")
                     + f"; this model is {want}, so the value belongs to a different mechanism")))
-            if versus and substrate and versus.strip().lower() != substrate.strip().lower():
+            if versus and substrate and not versus_is(versus, substrate):
                 concerns.append(Concern(VERSUS, (
                     f"the row measured inhibition **versus {versus}**, not versus "
                     f"{substrate}, the substrate in this model: a Ki is specific to the "
@@ -194,6 +218,6 @@ def read_scope(
 
 
 __all__ = [
-    "Concern", "RowScope", "read_scope", "MODE_OF_MOTIF", "INHIBITION_TABLES",
+    "Concern", "RowScope", "read_scope", "mode_fits", "versus_is", "MODE_OF_MOTIF", "INHIBITION_TABLES",
     "ISOFORM", "MODE_UNSTATED", "MODE_MISMATCH", "VERSUS", "PREPARATION",
 ]
