@@ -108,6 +108,15 @@ the scout returns 32.0 over the resolver's default minimum 21.1 (pH 6.0 /
 25). The run converges in two rounds and ends with no `ph_mismatch` finding.
 Km was never reported as moved.
 
+Added 2026-09-30: the two rows are of different substrates. That kcat
+request names none, so its frontier holds every substrate the turnover
+table has; 21.1 1/s (BRENDA ref 684519) is a pyruvate row and 32.0 1/s
+(ref 670748) an NAD+ row. The re-selection line now says so ("re-selected
+to 32.0 1/s for NAD+ ... replacing 21.1 1/s for pyruvate"), and the scout
+carries the row's own commentary rather than the default's. Asked for
+pyruvate's kcat, the same search raises no window and keeps 21.1 1/s, with
+the pH gap reported (Tests/test_agent_architecture_on_real_brenda.py).
+
 **Nothing was multiplied, moved or manufactured.** 32.0 was already a row of
 kcat's own frontier; the same guarantee holds in the metric by construction:
 `unassessable` rows are never chosen, and re-selection only ever copies a
