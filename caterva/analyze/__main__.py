@@ -9,8 +9,9 @@ the distance between their functional groups in each replica, against the
 same distance in the starting crystal structure; and the flexibility (RMSF)
 of the active-site pocket against the rest of the protein. Where two
 catalytic groups are both in contact with a third, the angle between them at
-the third (caterva/analyze/angles.py); and at every catalytic residue, the
-water that reaches its functional atoms (caterva/analyze/water.py). Each
+the third (caterva/analyze/angles.py) and which face of the third they are on
+(caterva/analyze/faces.py); and at every catalytic residue, the water that
+reaches its functional atoms (caterva/analyze/water.py). Each
 distance and angle is reported as a spread across replicas with
 block-averaged errors, and called a result only when the replicas agree
 (see `caterva md --summarise`).
@@ -40,6 +41,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from caterva.analyze.plan import CONTACT_NM, POCKET_RADIUS, Plan, plan, read_pdb
 from caterva.analyze.angles import AngleResult
+from caterva.analyze.faces import Face
 from caterva.analyze.hbonds import Occupancy
 from caterva.analyze.rotamers import Rotamer
 from caterva.analyze.water import Hydration
@@ -142,6 +144,8 @@ def water_selections(p: Plan) -> str:
 def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = ()) -> List[str]:
     sel = " ".join(f"'{q.selection()}'" for q in p.pairs)
     angle_sel = " ".join(f"'{t.selection()}'" for t in p.angles)
+    plane_sel = " ".join(f"'{t.selection()}'" for t in p.faces)
+    arm_sel = " ".join(f"'{t.arm_selection()}'" for t in p.faces)
     water_sel = water_selections(p)
     lines = []
     for r in reps:
@@ -177,6 +181,15 @@ def commands(p: Plan, reps: Sequence[str], gmx: str = "$GMX", chi1: Sequence = (
         if p.angles:
             lines.append(f"{gmx} gangle -s {r}/md.tpr -f {r}/md.xtc -g1 angle -group1 {angle_sel} "
                          f"-oav {r}/angles.xvg")
+        # Which face of the vertex the partners are on: the angle between
+        # the normal of each angle's plane and the arm from the vertex to
+        # its own CA, one -oav column per angle whose vertex has a CA
+        # (caterva/analyze/faces.py). On the frames of a lysozyme replica,
+        # as stored and across the periodic box, it equals 90 degrees minus
+        # the native elevation to 0.001 degree (2026-09-29).
+        if p.faces:
+            lines.append(f"{gmx} gangle -s {r}/md.tpr -f {r}/md.xtc -g1 plane -group1 {plane_sel} "
+                         f"-g2 vector -group2 {arm_sel} -oav {r}/faces.xvg")
         # Water at each catalytic residue: -os prints how many water oxygens
         # each selection holds, frame by frame.
         if p.sites:
@@ -238,14 +251,17 @@ class Analysis:
     angles: List["AngleResult"] = field(default_factory=list)
     #: Water at each catalytic residue; None when it was not measured.
     water: Optional[List["Hydration"]] = None
+    #: Which face of each angle's vertex its partners are on; None when it
+    #: was not measured.
+    faces: Optional[List["Face"]] = None
 
     @property
     def distances_consistent(self) -> bool:
         """Every catalytic distance is a consistent result: the evidence the
         other sections' verdicts rest on (the flexibility ratio, and the
-        hydrogen bonds, rotamers and water, which have no block-averaged
-        error of their own). A section says "not yet a result" when this is
-        False.
+        hydrogen bonds, rotamers, faces and water, which have no
+        block-averaged error of their own). A section says "not yet a
+        result" when this is False.
 
         The angles are left out of this gate on purpose. Each angle is fixed
         by three of these distances (the law of cosines, frame by frame), so
@@ -353,6 +369,39 @@ def gromacs_angles(p: Plan, reps: Sequence[Path]) -> List[AngleResult]:
             for i, t in enumerate(p.angles)]
 
 
+def _face(t, per_replica) -> Face:
+    """A Face for one of the plan's angles, with its crystal values."""
+    from caterva.analyze.faces import polar_sine
+    return Face(t.label, t.crystal_elevation_deg, polar_sine(t.crystal_deg, t.crystal_elevation_deg),
+                list(per_replica))
+
+
+def gromacs_faces(p: Plan, reps: Sequence[Path]) -> List[Face]:
+    """Faces from gmx gangle's faces.xvg (-oav: one column per angle whose
+    vertex has a CA, in the plan's order: the angle between the normal of
+    the angle's plane and the arm to the CA, which is 90 degrees minus the
+    elevation) and the angles themselves from angles.xvg, which the polar
+    sine needs; judged frame by frame as the native route judges them."""
+    from caterva.analyze.faces import face_fractions, from_gangle, polar_sine, side
+    faces = p.faces
+    if not faces:
+        return []
+    where = [p.angles.index(t) for t in faces]
+    per: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(faces))}
+    for r in reps:
+        angles = _gromacs_output(r / "angles.xvg", "angles between catalytic groups", len(p.angles))
+        cols = _gromacs_output(r / "faces.xvg", "which face of each angle's vertex its partners are on",
+                               len(faces))
+        if len(cols[0]) != len(angles[0]):
+            raise AnalyzeError(f"{r / 'faces.xvg'} has {len(cols[0])} frames and {r / 'angles.xvg'} "
+                               f"{len(angles[0])}: run analyze.sh again")
+        for i, t in enumerate(faces):
+            crystal = side(polar_sine(t.crystal_deg, t.crystal_elevation_deg))
+            per[i].append(face_fractions(r.name, angles[where[i] + 1], [from_gangle(x) for x in cols[i + 1]],
+                                         crystal))
+    return [_face(t, per[i]) for i, t in enumerate(faces)]
+
+
 def gromacs_water(directory: Path, p: Plan, reps: Sequence[Path]) -> List[Hydration]:
     """Water counts from gmx select's water.xvg (-os: one column per
     catalytic residue) and, for the start, water_start.xvg from em.gro."""
@@ -417,11 +466,12 @@ def _gro_atoms(path: Path):
 
 def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
                    ) -> Tuple[List[DistanceResult], Flexibility, List["Occupancy"], List["Rotamer"],
-                              List[AngleResult], List[Hydration]]:
-    """The same distances, RMSF, chi1, angles and water counts as analyze.sh,
-    and the hydrogen bonds it does not count, computed by Caterva from the
-    trajectories it reads itself (caterva/md/xtc.py), with no GROMACS. Each
-    trajectory is read once and every quantity taken from it."""
+                              List[AngleResult], List[Hydration], List[Face]]:
+    """The same distances, RMSF, chi1, angles, faces and water counts as
+    analyze.sh, and the hydrogen bonds it does not count, computed by
+    Caterva from the trajectories it reads itself (caterva/md/xtc.py), with
+    no GROMACS. Each trajectory is read once and every quantity taken from
+    it."""
     import numpy as np
     from caterva.md import xtc
     ref_gro = directory / "em.gro"
@@ -467,6 +517,13 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
     from caterva.analyze import water as wat
     angle_atoms = [(atoms_of(t.a), atoms_of(t.v), atoms_of(t.b)) for t in p.angles]
     per_angle: Dict[int, List[Tuple[str, List[float]]]] = {i: [] for i in range(len(p.angles))}
+    from caterva.analyze.faces import elevation_series, face_fractions, polar_sine, side
+    face_where = [p.angles.index(t) for t in p.faces]
+    for t in p.faces:
+        if (t.v.resnr, "CA") not in index:
+            raise AnalyzeError(f"{t.v.label}: atom CA not in {ref_gro.name}")
+    face_ca = [index[(t.v.resnr, "CA")] for t in p.faces]
+    per_face: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.faces))}
     site_atoms = [atoms_of(s) for s in p.sites]
     oxygens = np.array(wat.water_oxygens(atoms), dtype=int)
     per_water: Dict[int, List[Tuple[str, float, float]]] = {i: [] for i in range(len(p.sites))}
@@ -474,6 +531,11 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
         traj = xtc.read(r / "md.xtc")
         for i, (ia, iv, ib) in enumerate(angle_atoms):
             per_angle[i].append((r.name, angle_series(traj, ia, iv, ib)))
+        for i, t in enumerate(p.faces):
+            j = face_where[i]
+            crystal = side(polar_sine(t.crystal_deg, t.crystal_elevation_deg))
+            per_face[i].append(face_fractions(r.name, per_angle[j][-1][1],
+                                              elevation_series(traj, *angle_atoms[j], face_ca[i]), crystal))
         for i, idx in enumerate(site_atoms):
             per_water[i].append(wat.summarise_counts(r.name, wat.counts(traj, idx, oxygens)))
         for i, q in enumerate(p.pairs):
@@ -507,7 +569,8 @@ def measure_native(directory: Path, p: Plan, reps: Sequence[Path]
               for i, t in enumerate(p.angles)]
     water = [Hydration(s.label, wat.count_frame(start_x, start_box, site_atoms[i], oxygens), per_water[i])
              for i, s in enumerate(p.sites)]
-    return results, Flexibility(flex), occupancies, rotamers, angles, water
+    faces = [_face(t, per_face[i]) for i, t in enumerate(p.faces)]
+    return results, Flexibility(flex), occupancies, rotamers, angles, water, faces
 
 
 #: Occupancy thresholds for naming what happened to a hydrogen bond. Chosen,
@@ -584,6 +647,7 @@ def report(a: Analysis) -> List[str]:
     L += hbond_section(a)
     L += rotamer_section(a)
     L += angle_section(a)
+    L += face_section(a)
     L += water_section(a)
     f = a.flexibility
     L += ["", "## Active-site flexibility", "",
@@ -611,9 +675,7 @@ def report(a: Analysis) -> List[str]:
         L += ["Not measurable: RMSF needs more than one frame per replica, and these runs are too short."]
     L += ["", "## Not measured", "",
           "- ligand pose and contacts: `caterva md` strips ligands until they can be parameterised "
-          "(MD roadmap M4)",
-          "- which side of a catalytic group its partners are on: the angles above cannot tell, and it "
-          "would take a signed dihedral, which needs a fourth point", "",
+          "(MD roadmap M4)", "",
           f"`{MOVED_NM:g} nm` is the chosen threshold for calling a distance changed. The measuring commands "
           "are in analyze.sh. Errors: Flyvbjerg & Petersen (1989) J. Chem. Phys. 91:461, "
           "doi:10.1063/1.457480. Catalytic residues: Ribeiro et al. (2018) Nucleic Acids Res. "
@@ -734,9 +796,9 @@ def angle_section(a: Analysis) -> List[str]:
           "Each angle is fixed, frame by frame, by three distances in the table above (the sides of its "
           "triangle), so it adds no information about where the groups are: it states that triangle as its "
           "shape at one group, with a verdict of its own. Nor can it tell which side of the group a partner "
-          "is on, since a partner that turns about the line through the other two keeps the same angle. "
-          "An angle that is not yet a result makes the exit code 4, but the sections below and above are "
-          "judged by the distances alone.", ""]
+          "is on, since a partner that turns about the line through the other two keeps the same angle; "
+          "the next section does. An angle that is not yet a result makes the exit code 4, but the sections "
+          "below and above are judged by the distances alone.", ""]
     names = [r.name for r in a.angles[0].summary.replicas]
     L += ["| angle (vertex in the middle) | crystal (°) | " + " | ".join(names)
           + " | simulated (°, mean ± SD of replicas) | 95% CI of the mean | change | verdict |",
@@ -767,6 +829,52 @@ def angle_section(a: Analysis) -> List[str]:
               "their atoms within a hydrogen bond or salt bridge of each other (0.35 nm), given the 0.10-0.14 "
               "nm from each group's centre to its atoms. It is an upper bound, not a test for a bond: two "
               "groups within it need not be bonded (the native route's hydrogen-bond table says which are)."]
+    return L
+
+
+def face_section(a: Analysis) -> List[str]:
+    from caterva.analyze.angles import MOVED_DEG
+    from caterva.analyze.faces import FLAT_DEG, FLAT_IN_CRYSTAL, KEPT, SPLIT, face_name, face_verdict
+    L = ["", "## Which face of the vertex its partners are on", ""]
+    if a.faces is None:
+        return L + ["Not measured."]
+    if not a.faces:
+        if not a.angles:
+            return L + ["None measured: there is no angle above to take the faces of."]
+        return L + ["None measured: no vertex of an angle above has a Cα in the structure to take its faces "
+                    "against."]
+    L += ["For each angle above: seen from the vertex's own Cα, does the first partner run clockwise or "
+          "anticlockwise to the second about the vertex? That is which face of the vertex each partner is "
+          "on. Neither the angle nor the distances can see it: a partner that turns about the line through "
+          "the other two keeps them all. It is measured as the elevation of the arm from the vertex's "
+          "functional-group centre to its Cα out of the plane of the angle (each arm to its nearest periodic "
+          "image), signed as the dihedral first partner-vertex-second partner-Cα, positive clockwise. "
+          "Because the Cα is the vertex's own, a side chain that turns over under its partners changes face "
+          "too; the rotamer table says whether one did.", "",
+          "Out of flat is arcsin(sin(angle) × sin(elevation)): each of the three arms from the vertex (to the "
+          "two partners and to its Cα) stands at least that far out of the plane of the other two. A frame is "
+          f"on a face only when it is at least {FLAT_DEG:g}°; nearer flat, which face is noise, and the frame "
+          "is on neither. Per replica, the fraction of frames on the crystal's face and, in brackets, on the "
+          "other face; the rest are flat. Every frame is counted, as for the rotamers and water.", ""]
+    names = [n for n, _, _ in a.faces[0].per_replica]
+    L += ["| angle (vertex in the middle) | out of flat, crystal (°) | crystal face | " + " | ".join(names)
+          + " | verdict |",
+          "|---|---|---|" + "---|" * len(names) + "---|"]
+    for f in a.faces:
+        v = face_verdict(f)
+        if not a.distances_consistent and v not in ("one replica", "no frames", FLAT_IN_CRYSTAL):
+            v = f"({v}, not yet a result)"
+        cells = " | ".join("n/a" if f.crystal_side == 0 or math.isnan(k) else f"{k:.2f} ({o:.2f})"
+                           for _, k, o in f.per_replica)
+        L.append(f"| {f.label} | {f.crystal_out_of_flat_deg:+.1f} | {face_name(f.crystal_side)} | {cells} | {v} |")
+    L += ["", f"Verdicts (chosen thresholds): kept its face, on the crystal's face in at least {KEPT:.0%} of "
+              f"frames in every replica; changed face, on the other face in at least {KEPT:.0%}; went flat, "
+              f"flat in at least {KEPT:.0%}; replicas disagree, when their fractions on either face differ by "
+              f"more than {SPLIT:.0%}; partial, anything else. Flat in the crystal: the crystal's own arms are "
+              f"within {FLAT_DEG:g}° of flat, so there is no face to keep. `{FLAT_DEG:g}°` is half the "
+              f"{MOVED_DEG:g}° angle threshold: a partner counted on opposite faces in two frames has turned at "
+              f"least {MOVED_DEG:g}° through the flat arrangement, which moves a group 0.4 nm from the vertex "
+              f"by about {MOVED_NM:g} nm."]
     return L
 
 
@@ -827,7 +935,8 @@ def build_parser(prog: str = "caterva analyze") -> argparse.ArgumentParser:
                    help="write analyze.sh and stop; run it, then rerun without this flag")
     p.add_argument("--no-run", action="store_true",
                    help="use the .xvg files analyze.sh already wrote; do not call GROMACS (a run whose "
-                        "analyze.sh predates the angle and water tables is refused by name: run it again)")
+                        "analyze.sh predates the angle, face and water tables is refused by name: run it "
+                        "again)")
     p.add_argument("--gromacs", action="store_true",
                    help="measure with gmx distance, rmsf, angle, gangle and select (analyze.sh) instead "
                         "of Caterva's own reader")
@@ -854,7 +963,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
         (d / "analyze.sh").write_text(script(p, [r.name for r in reps] or ["rep1"], chi1))
         if args.script_only:
             print(f"Wrote {d}/analyze.sh ({len(p.pairs)} catalytic distances, {len(p.angles)} angles, "
-                  f"water at {len(p.sites)} residues, pocket of {len(p.pocket)} residues).")
+                  f"the faces of {len(p.faces)}, water at {len(p.sites)} residues, pocket of {len(p.pocket)} "
+                  "residues).")
             return 0
         if not reps:
             raise AnalyzeError(f"no finished replicas (rep*/md.xtc) under {d}: run {d}/run.sh first")
@@ -867,13 +977,14 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva analyze",
                 run_gromacs(d, p, reps, gmx, chi1)
             distances, flex, rotamers = measure(d, p, reps, chi1)
             angles, water = gromacs_angles(p, reps), gromacs_water(d, p, reps)
+            faces = gromacs_faces(p, reps)
             hbonds = None
         else:
-            distances, flex, hbonds, rotamers, angles, water = measure_native(d, p, reps)
+            distances, flex, hbonds, rotamers, angles, water, faces = measure_native(d, p, reps)
     except AnalyzeError as e:
         print(f"caterva analyze: {e}", file=sys.stderr)
         return 3
-    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water)
+    a = Analysis(pdb, chain, source, p, distances, flex, hbonds, rotamers, angles, water, faces)
     text = "\n".join(report(a)) + "\n"
     print(text, end="")
     (d / "ANALYSIS.md").write_text(text, encoding="utf-8")

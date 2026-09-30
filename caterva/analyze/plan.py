@@ -14,7 +14,8 @@ distance; its value in the starting structure is computed here, from the
 same atoms, so the trajectory is compared with the crystal rather than
 with itself. Where two groups are both in contact with a third
 (CONTACT_NM), the angle between them at the third is planned the same way,
-with its crystal value.
+with its crystal value; and so is which face of the third they are on,
+taken against the third residue's own CA (caterva/analyze/faces.py).
 
 Nothing here runs GROMACS. It reads a PDB file and returns selections.
 """
@@ -121,6 +122,12 @@ class Angle:
     v: Site
     b: Site
     crystal_deg: float
+    #: Which face of v the partners are on in the crystal: the elevation of
+    #: the arm from v's centre to v's own CA out of the plane of the angle,
+    #: signed as the dihedral a-v-b-CA (caterva/analyze/faces.py). None when
+    #: the vertex residue has no CA in the structure, and then no face is
+    #: measured for this angle.
+    crystal_elevation_deg: Optional[float] = None
 
     @property
     def label(self) -> str:
@@ -128,8 +135,14 @@ class Angle:
 
     def selection(self) -> str:
         """Three positions, vertex in the middle: what `gmx gangle -g1 angle`
-        reads as one angle."""
+        reads as one angle, and `-g1 plane` as the plane of the angle."""
         return f"{self.a.selection()} plus {self.v.selection()} plus {self.b.selection()}"
+
+    def arm_selection(self) -> str:
+        """Two positions, the vertex's functional-group centre and its own
+        CA: what `gmx gangle -g2 vector` reads as the arm whose elevation out
+        of the plane of the angle says which face of v the partners are on."""
+        return f"{self.v.selection()} plus cog of (resnr {self.v.resnr} and name CA)"
 
 
 @dataclass
@@ -140,6 +153,12 @@ class Plan:
     rest: List[int]
     notes: List[str]
     angles: List[Angle] = field(default_factory=list)
+
+    @property
+    def faces(self) -> List[Angle]:
+        """The angles whose faces are measured: every one whose vertex
+        residue has its CA, in the order of `angles`."""
+        return [t for t in self.angles if t.crystal_elevation_deg is not None]
 
 
 def _cog(atoms: Sequence[Atom]) -> Tuple[float, float, float]:
@@ -157,19 +176,38 @@ def _angle_deg(pa: Sequence[float], pv: Sequence[float], pb: Sequence[float]) ->
     return math.degrees(math.atan2(math.sqrt(sum(c * c for c in cross)), sum(u[k] * w[k] for k in range(3))))
 
 
-def contact_angles(sites: Sequence[Site], centres: Dict[int, Tuple[float, float, float]]) -> List[Angle]:
+def _elevation_deg(pa: Sequence[float], pv: Sequence[float], pb: Sequence[float],
+                   pr: Sequence[float]) -> float:
+    """The elevation of v->r out of the plane of a-v-b, in degrees, signed
+    by the normal (b - v) x (a - v): caterva/analyze/faces.py's
+    elevation_deg, without a periodic box, for the crystal."""
+    u = [pa[k] - pv[k] for k in range(3)]
+    w = [pb[k] - pv[k] for k in range(3)]
+    r = [pr[k] - pv[k] for k in range(3)]
+    n = (w[1] * u[2] - w[2] * u[1], w[2] * u[0] - w[0] * u[2], w[0] * u[1] - w[1] * u[0])
+    nxr = (n[1] * r[2] - n[2] * r[1], n[2] * r[0] - n[0] * r[2], n[0] * r[1] - n[1] * r[0])
+    return math.degrees(math.atan2(sum(n[k] * r[k] for k in range(3)), math.sqrt(sum(c * c for c in nxr))))
+
+
+def contact_angles(sites: Sequence[Site], centres: Dict[int, Tuple[float, float, float]],
+                   anchors: Optional[Dict[int, Tuple[float, float, float]]] = None) -> List[Angle]:
     """Every angle a-v-b whose arms v-a and v-b are both within CONTACT_NM
     in the starting structure, vertex by vertex in the order of `sites`.
     Only sites with their functional atoms take part: a CA stand-in tracks
     the backbone, and the contact the cutoff is derived from is between side
-    chains' functional groups."""
+    chains' functional groups. `anchors` holds each residue's CA, from which
+    the crystal face of each angle is taken; a vertex missing from it gets
+    no face."""
+    anchors = anchors or {}
     functional = [s for s in sites if s.functional and s.resnr in centres]
     out: List[Angle] = []
     for v in functional:
         near = [s for s in functional if s is not v
                 and math.dist(centres[s.resnr], centres[v.resnr]) / 10.0 <= CONTACT_NM]
         for a, b in itertools.combinations(near, 2):
-            out.append(Angle(a, v, b, _angle_deg(centres[a.resnr], centres[v.resnr], centres[b.resnr])))
+            pa, pv, pb = centres[a.resnr], centres[v.resnr], centres[b.resnr]
+            face = _elevation_deg(pa, pv, pb, anchors[v.resnr]) if v.resnr in anchors else None
+            out.append(Angle(a, v, b, _angle_deg(pa, pv, pb), face))
     return out
 
 
@@ -216,7 +254,16 @@ def plan(atoms: Sequence[Atom], catalytic: Sequence[Tuple[int, str]]) -> Plan:
     pocket = sorted({r for r, rs in by_res.items()
                      if any(math.dist(x.xyz, y.xyz) <= POCKET_RADIUS for x in rs for y in cat_atoms)})
     rest = sorted(set(by_res) - set(pocket))
-    return Plan(sites, pairs, pocket, rest, notes, contact_angles(sites, centres))
+    anchors: Dict[int, Tuple[float, float, float]] = {}
+    for s in sites:
+        ca = [x for x in by_res[s.resnr] if x.name == "CA"]
+        if ca:
+            anchors[s.resnr] = ca[0].xyz
+    angles = contact_angles(sites, centres, anchors)
+    for label in sorted({t.v.label for t in angles if t.crystal_elevation_deg is None}):
+        notes.append(f"{label} has no CA in the structure, so which face of it its partners are on is not "
+                     "measured")
+    return Plan(sites, pairs, pocket, rest, notes, angles)
 
 
 __all__ = ["Atom", "Site", "Pair", "Angle", "Plan", "plan", "read_pdb", "contact_angles", "FUNCTIONAL_ATOMS",

@@ -271,7 +271,8 @@ def test_moved_is_strictly_beyond_the_threshold():
 def test_one_gangle_call_per_replica_measures_every_angle():
     p = plan(read_pdb(_triad(ser_y=4.0)), CATALYTIC)
     lines = commands(p, ["rep1", "rep2"])
-    gangle = [l for l in lines if " gangle " in l]
+    # The other gangle call per replica, -g1 plane, is the faces' (test_faces.py).
+    gangle = [l for l in lines if " gangle " in l and " -g1 angle " in l]
     assert len(gangle) == 2
     assert gangle[0].startswith("$GMX gangle -s rep1/md.tpr -f rep1/md.xtc -g1 angle -group1 ")
     assert gangle[0].endswith("-oav rep1/angles.xvg")
@@ -327,6 +328,10 @@ def _fake_run(tmp_path, angle_means, distance_sd=0.005, angle_phi=0.5, n=4000):
             f"{i * 0.001:.3f} " + " ".join(f"{c[i]:.5f}" for c in cols) + "\n" for i in range(n)))
         ang = _ar1(rng, n, mu, 0.5, phi=angle_phi)
         (d / "angles.xvg").write_text("".join(f"{i * 0.5:.1f} {v:.3f}\n" for i, v in enumerate(ang)))
+        # gmx gangle -g1 plane -g2 vector for the angle's face: the triad
+        # lies in one plane, so its Calpha arms are in the plane of the angle
+        # (90 degrees from its normal) and the crystal has no face to keep.
+        (d / "faces.xvg").write_text("".join(f"{i * 0.5:.1f} 90.000\n" for i in range(n)))
         (d / "rmsf.xvg").write_text("10 0.05\n20 0.05\n30 0.06\n40 0.20\n")
         (d / "water.xvg").write_text("0.0 1 0 2\n0.5 1 1 2\n")
     (tmp_path / "water_start.xvg").write_text("0.0 1 0 2\n")
@@ -387,7 +392,11 @@ def test_the_report_says_what_an_angle_adds_and_what_it_cannot_see(tmp_path, cap
     assert "fixed, frame by frame, by three distances in the table above" in section
     assert "swings round" not in out and "this sees that" not in out
     assert "It is an upper bound, not a test for a bond" in section
-    assert "a signed dihedral" in out.split("## Not measured")[1]
+    # Which face a partner is on is measured now (caterva/analyze/faces.py),
+    # so the angle section points to it and "Not measured" no longer lists it.
+    assert "the next section does" in section
+    assert "## Which face of the vertex its partners are on" in out
+    assert "signed dihedral" not in out.split("## Not measured")[1]
 
 
 def test_no_angle_is_said_rather_than_left_blank(tmp_path, capsys):

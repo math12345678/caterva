@@ -17,8 +17,11 @@ give, because the angle is not linear in them.
 Nor can an angle tell which side of the vertex a partner is on. It lies in
 [0, 180] and does not change when a turns about the line through v and b,
 so a partner can swing round to the vertex's other face at fixed arms and
-a fixed angle. Telling the faces apart needs a fourth point (a signed
-dihedral); that is not measured, and the report says so.
+a fixed angle. Telling the faces apart needs a fourth point off that line,
+fixed to the vertex: caterva/analyze/faces.py takes the vertex residue's own
+CA, reads the face as the elevation of the arm to it out of the plane of the
+angle, and says why that and not the signed dihedral a-v-b-CA, which has no
+value when the CA is in line with v and b.
 
 Each group is reduced to its functional-group centre of geometry, the same
 centre the pair distances use (caterva/analyze/plan.py), and the angle is

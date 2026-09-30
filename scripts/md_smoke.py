@@ -101,6 +101,19 @@ def _angle_rows(text: str) -> dict:
     return out
 
 
+def _face_rows(text: str) -> dict:
+    """angle -> every cell of its row in the face table: how far the crystal
+    is from flat, the crystal's face, each replica's fractions on it and on
+    the other face, and the verdict. The two routes measure the same
+    elevation (gmx gangle -g1 plane -g2 vector against the native one, to
+    0.00061 degrees per frame on both 10 ps lysozyme replicas, 2026-09-29)
+    and decide each frame's face the same way, so the rows must be
+    identical. A frame whose polar sine sat within gangle's rounding of the
+    band edge could split them; on those replicas the nearest was 0.00099
+    from it, a hundred times the rounding."""
+    return _table_rows(text, "## Which face of the vertex its partners are on")
+
+
 def _water_rows(text: str) -> dict:
     """residue -> every cell of its row: atoms, count at start, per replica
     mean and fraction, verdict. Water counts are integers on both routes, so
@@ -145,10 +158,10 @@ def main() -> int:
     # And the enzyme analysis, which fetches lysozyme's catalytic residues
     # (M-CSA via `caterva prepare`), twice: measured by Caterva from the
     # trajectories it reads itself, and by gmx distance, rmsf, angle, gangle
-    # and select. The distance, flexibility, rotamer, angle and water tables
-    # must agree, so this job checks the native reader and geometry against
-    # GROMACS on every run.
-    tables, flex, rot, ang, wet = {}, {}, {}, {}, {}
+    # and select. The distance, flexibility, rotamer, angle, face and water
+    # tables must agree, so this job checks the native reader and geometry
+    # against GROMACS on every run.
+    tables, flex, rot, ang, wet, face = {}, {}, {}, {}, {}, {}
     for route, extra in (("native", []), ("gromacs", ["--gromacs"])):
         code = subprocess.run([sys.executable, "-m", "caterva.app", "analyze", str(OUT), *extra],
                               cwd=ROOT, env={**os.environ, "GMX": gmx}).returncode
@@ -161,6 +174,7 @@ def main() -> int:
         rot[route] = _rotamer_rows(text)
         ang[route] = _angle_rows(text)
         wet[route] = _water_rows(text)
+        face[route] = _face_rows(text)
     if not (OUT / "rep2" / "catalytic.xvg").exists():
         print("FAIL: caterva analyze --gromacs wrote no catalytic.xvg")
         return 1
@@ -205,6 +219,14 @@ def main() -> int:
         return 1
     print(f"OK: native and GROMACS agree on {len(ang['native'])} angles between catalytic groups "
           f"(largest difference in the printed means {worst_a:.1f} degrees; the table prints 0.1).")
+    # Which face of each angle's vertex its partners are on: gmx gangle's
+    # plane-vector angle against the native elevation. One row per angle,
+    # so an empty table is a failure here too.
+    if not face["native"] or face["native"] != face["gromacs"]:
+        print(f"FAIL: native and GROMACS face tables differ: {face['native']} vs {face['gromacs']}")
+        return 1
+    print(f"OK: native and GROMACS agree on which face of the vertex the partners of {len(face['native'])} "
+          "angles are on, row for row.")
     # Water at each catalytic residue: gmx select against the native count.
     if not wet["native"] or wet["native"] != wet["gromacs"]:
         print(f"FAIL: native and GROMACS water tables differ: {wet['native']} vs {wet['gromacs']}")

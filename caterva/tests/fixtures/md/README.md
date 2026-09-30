@@ -97,3 +97,36 @@ so the reference had to come from the full system. `gmx select` with the
 water selections on the wrapped full trajectory and wrapped em.gro printed
 exactly `lyso_1aki_rep1_gmx_water.txt` again (compared with diff), so that
 file is the water reference for the wrapped fixture too.
+
+`lyso_1aki_rep1_gmx_faces.txt`: which face of each angle's vertex its
+partners are on (caterva/analyze/faces.py), for the same 24 angles, one line
+each in the format of `lyso_1aki_rep1_gmx_angles.txt`: residue numbers a, v,
+b, then the 21 per-frame values `gmx gangle -g1 plane -group1 'cog of (resnr
+a and name ...) plus cog of (resnr v and name ...) plus cog of (resnr b and
+name ...)' -g2 vector -group2 'cog of (resnr v and name ...) plus cog of
+(resnr v and name CA)' -oav` printed (GROMACS 2026.1, 2026-09-29) on
+`lyso_1aki_res1-59.xtc` with `lyso_1aki_res1-59.gro.gz` as the structure:
+the angle in degrees between the normal of the plane a-v-b, which gangle
+takes as (v - a) x (b - a), and the arm from v's centre to its CA. 90 minus
+it is the elevation Caterva measures. The residues are in M-CSA's order
+(48, 50, 46, 59, 52, 35), as the lysozyme run had them, which decides which
+partner of each angle comes first and so the sign of its face.
+
+`lyso_1aki_rep1_gmx_faces_wrapped.txt`: the same command on the wrapped
+full replica 1 (`gmx trjconv -trans -4.304 -5.831 -1.931 -pbc atom -ur tric`
+on rep1/md.xtc, as for `lyso_1aki_res1-59_water_wrapped.xtc`, whose first
+900 atoms it equals exactly in every frame) with rep1/md.tpr, so that
+gangle makes the split groups whole. Taken without periodic handling, 489
+of the 504 elevations on the wrapped fixture are more than a degree off
+and 282 have the wrong sign.
+
+`lyso_1aki_rep1_gmx_dihedrals.txt`: `gmx gangle -g1 dihedral -group1 'cog
+of (resnr a ...) plus cog of (resnr v ...) plus cog of (resnr b ...) plus
+cog of (resnr v and name CA)' -oav` on `lyso_1aki_res1-59.xtc` (GROMACS
+2026.1, 2026-09-29), the signed dihedral a-v-b-CA, for each of the 24
+angles taken both ways round (48 lines: a v b, then b v a). Its sign equals
+the elevation's in all 1,008 values; it is kept to show why the elevation
+and not this dihedral is thresholded. Asp48 sits almost in line with Asn59
+and its CA (179.3 degrees at most), and there the dihedral
+Asn46-Asn59-Asp48-CA runs from -168.9 to +132.4 degrees while the CA stays
+within 11.3 degrees of the plane of the angle.
