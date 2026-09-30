@@ -1233,6 +1233,192 @@ recorded as one rather than papered over.
 
 ---
 
+## Your own rates: `caterva rates`
+
+Everything above asks the literature for a constant. `caterva rates` is the
+other door: you measured initial rates yourself, at several substrate
+concentrations and perhaps several inhibitor concentrations, and want the
+constants, how well your data determine them, which mechanisms they rule
+out, and how they compare with the values BRENDA cites. It runs from the app
+folder; only the literature comparison needs the source checkout.
+
+**The file** is a CSV whose header names each column and its unit:
+
+```
+substrate (mM),rate (uM/min),sigma (uM/min),inhibitor (uM),group
+```
+
+Only `substrate` and `rate` are required; `--substrate-column` and its
+siblings name columns called something else. Lines starting with `#` are
+comments. Rows with identical conditions are replicates. A unit it cannot
+read is refused with the column named; an arbitrary readout that needs no
+conversion (`counts/min/min`, `A340/min`, `ppm`) is accepted, and then the
+literature comparison is refused for it, because a Km in ppm cannot be
+compared with one in mM without a molar mass.
+
+**The error bars are never invented.** Give exactly one of: a `sigma` column;
+`--sigma-from replicates` (the pooled spread of your replicates, with its
+degrees of freedom; add `--error-model proportional` when the noise grows
+with the rate); or `--sigma-from residuals` (ordinary least squares, sigma
+from the fit's own scatter, which is what R's `nls` reports and which
+assumes the rate law is right, so no goodness-of-fit chi-square is printed
+for it). With none of these it refuses, names the three, and exits 3.
+
+### A worked example, on real data
+
+`examples/rates/puromycin.csv` is Treloar's 1974 galactosyltransferase data,
+published in Bates & Watts (1988), *Nonlinear Regression Analysis and Its
+Applications*, Appendix A1.3, and shipped with R as `datasets::Puromycin`:
+rates from puromycin-treated and untreated cells, in duplicate, substrate in
+parts per million and rate in counts per minute per minute.
+
+```
+caterva rates examples/rates/puromycin.csv --sigma-from residuals --group state --model michaelis-menten
+```
+
+The verdict comes first (real output; this is the whole of it):
+
+```
+- [treated] Michaelis-Menten, the law asked for (--model michaelis-menten); no other law was fitted or tested.
+- [treated] Michaelis-Menten: Vmax 212.7 (197.3 to 229.3 counts/min/min), Km 0.06412 (0.04692 to 0.08616 ppm) (95% profile intervals).
+- [untreated] Michaelis-Menten, the law asked for (--model michaelis-menten); no other law was fitted or tested.
+- [untreated] Michaelis-Menten: Vmax 160.3 (145.6 to 176.5 counts/min/min), Km 0.04771 (0.03137 to 0.07006 ppm) (95% profile intervals).
+- Between groups: Vmax differs between treated and untreated: sharing it fits worse than separate values (F(1, 19) = 25.5, p = 7.08e-05).
+- Between groups: Km: no difference between treated and untreated detectable by these data (F(1, 19) = 1.72, p = 0.206); the shared fit gives Km = 0.05797 (0.04599 to 0.07234). Not detected is not the same as equal.
+```
+
+then each group's fit, here the treated one in full:
+
+```
+| constant | estimate | standard error | 95% profile interval | unit |
+|---|---|---|---|---|
+| Vmax | 212.7 | 6.947 | 197.3 to 229.3 | counts/min/min |
+| Km | 0.06412 | 0.008281 | 0.04692 to 0.08616 | ppm |
+
+- Residual standard error 10.93 counts/min/min on 10 degrees of freedom. No goodness-of-fit chi-square is given: sigma was estimated from these residuals, so the chi-square is 10 by construction and cannot test the law it was computed from.
+- Correlations of the estimates: Vmax-Km +0.765.
+- Starts: 6 of 6 reached this minimum; no start found a different one.
+- Condition number of the weighted Jacobian (log constants): 6.38.
+- Lack of fit: lack of fit F = 1.07 on 4 and 6 degrees of freedom, p = 0.447: no departure from this law's shape beyond the replicates' own scatter.
+- Substrate range: Your 6 substrate concentration(s) span 0.31 to 17 times Km (below Km: 2; above: 4; in the guideline range of 0.2 to 5 times Km: 4). The Assay Guidance Manual asks for 8 or more in that range, with several on each side of Km.
+- Substrate range: The range brackets Km with fewer than 8 concentrations in the guideline range. Eight concentrations evenly spaced on a log scale from 0.2 times the lowest to 5 times the highest Km in its interval would satisfy the guideline wherever Km lies: 0.0094, 0.016, 0.028, 0.048, 0.084, 0.14, 0.25, 0.43 ppm.
+```
+
+and the test between groups:
+
+```
+| shared constant | statistic | p | verdict |
+|---|---|---|---|
+| Vmax | F(1, 19) = 25.52 | 7.08e-05 | differs |
+| Km | F(1, 19) = 1.718 | 0.206 | no difference detected |
+| all | F(2, 19) = 24.14 | 6.07e-06 | the groups differ |
+```
+
+These are R's numbers. R 4.6.0's `nls` on `datasets::Puromycin` gives Vm
+212.7 (standard error 6.947), K 0.06412 (0.008281) and a residual standard
+error of 10.93 on 10 degrees of freedom for the treated cells, and `confint`
+the same profile intervals, 197.3 to 229.3 and 0.04692 to 0.08616; the tests
+hold the command to them (`caterva/tests/test_rates_puromycin.py`). The
+interval for Km is asymmetric, 0.0172 below the estimate and 0.0220 above,
+which a +-2 SE interval cannot be. The shared-Km row is Bates & Watts' own
+question of these data, whether puromycin changes Vm only; its F of 1.718 on
+1 and 19 degrees of freedom is R's `anova` of the same two fits, and the
+test also recomputes it with `scipy.optimize.curve_fit`, sharing no code with
+the command.
+
+Without `--model`, rates with no inhibitor are also tested against substrate
+inhibition and the Hill law, and on this file the untreated group says:
+
+```
+- [untreated] The data reject Michaelis-Menten in favour of the Hill law (p = 0.0232).
+- [untreated] The Hill exponent is below 1 (n = 0.621): the rate rises more gradually with [S] than Michaelis-Menten allows. Negative cooperativity, a mixture of enzyme forms with different Km, or an error that changes with [S] all do this, and the exponent cannot say which.
+- [untreated] Two alternatives were tested, each at 0.05, so the chance that at least one rejects a true Michaelis-Menten law is up to 0.0975.
+- [untreated] Hill: Vmax 195.1 (160.1 to 399 counts/min/min), K0.5 0.08241 (0.04204 to 2.583 ppm), n 0.6207 (0.3334 to 0.9288) (95% profile intervals).
+```
+
+That F test is R's too (`anova` of the two `nls` fits gives F 7.84 on 1 and
+8, p 0.0232), and so are the Hill estimates and standard errors. R's
+`confint` cannot profile this fit (it stops at its iteration limit), so the
+Hill intervals are held instead to an independent profile, computed in the
+tests with the other two constants refitted without bounds. Whether the
+departure matters is a judgement about the experiment the command cannot
+make for you; it reports the finding and what it can and cannot mean. The
+groups' verdicts now differ, so the comparison between groups uses
+Michaelis-Menten for both and a note says so.
+
+### Inhibitors: which mechanism, and what would decide it
+
+With an inhibitor column, the default fits competitive, uncompetitive,
+noncompetitive and mixed inhibition, and tests each simpler one against
+mixed. Competitive (Ki' going to infinity) and uncompetitive (Ki going to
+infinity) are restrictions on the boundary of the parameter space, and are
+tested against the 50:50 mixture of chi-square(0) and chi-square(1), half
+the ordinary p-value (Self & Liang 1987); noncompetitive (Ki = Ki') is an
+ordinary one-degree-of-freedom test. Competitive against uncompetitive is not
+a test at all, and the report says so, printing their fit statistics and
+AICc side by side as a description. The verdict names what the data rule
+out, what they cannot tell apart, and the measurement that would: inhibited
+rates at [S] of 5 Km or more separate competitive from the rest, and at 0.2
+Km or less separate uncompetitive.
+
+Ki is the dissociation constant of the inhibitor from free enzyme (Kic) and
+Ki' from the enzyme-substrate complex (Kiu); a noncompetitive inhibitor has
+one constant that is both.
+
+### What the data determine
+
+A constant the data cannot bound is never printed as a number. Rates taken
+only far below Km determine Vmax/Km and neither constant alone, and the
+report says exactly that, with the interval of the ratio and a one-sided
+bound on each ("Km > [the bound]: the data do not determine an upper bound"),
+instead of an estimate with an absurd interval.
+It also says whether your substrate range brackets Km, against the Assay
+Guidance Manual's design range of 0.2 to 5 Km with 8 or more concentrations,
+and lists concentrations that would (above, for the puromycin rates, whose
+lowest concentration is a third of Km).
+
+### Against the literature
+
+From the source checkout, name the enzyme, the organism and the compounds:
+
+```
+caterva rates my_rates.csv --sigma-from replicates --ec 1.1.1.27 --organism human --substrate pyruvate --inhibitor oxamate
+```
+
+The fitted Km is compared with the Km BRENDA cites for the substrate, and
+the fitted inhibition constant with the Ki BRENDA files under the inhibitor
+for the mechanism your data support, chosen by the same resolver
+`caterva compose` asks (`--isoform` narrows both). Each comparison prints the
+cited value, its BRENDA reference and commentary, what the commentary says
+about isoform, mode and construct, the spread of equally good rows, whether
+your interval contains the cited value, and the ratio, with units converted.
+A mixed fit's two constants are not compared, because a database row does
+not say which of the two it measured. From the app folder the fit is
+reported and the comparison is refused, with exit code 3.
+
+### For teaching, and for papers
+
+`--show-linearizations` prints the Lineweaver-Burk, Eadie-Hofstee and
+Hanes-Woolf points and the Km and Vmax each straight line gives, beside the
+nonlinear fit, with one sentence on why they differ. They are never the
+reported estimate. For the treated cells (points left out here):
+
+```
+| Lineweaver-Burk | 1/[S] | 1/v | ... | 195.8 | 0.04841 |
+| Eadie-Hofstee | v/[S] | v | ... | 193.9 | 0.04352 |
+| Hanes-Woolf | [S] | [S]/v | ... | 216.2 | 0.06791 |
+| nonlinear fit (michaelis-menten) | | | | 212.7 | 0.06412 |
+```
+
+`--json` prints everything; `--export csv` the constants with units and
+intervals; `--export curves` the fitted curves on a grid, with the measured
+rates, one row per point and units in the headers; `--export methods` a
+methods paragraph naming the law, the weighting, the interval method, the
+references and the software versions. Exit codes are compose's: `0` done,
+`2` malformed question, `3` refused and said why, `1` a crash.
+
+---
+
 ## What it refuses to do
 
 These are decisions, not gaps, and each refusal says why:
@@ -1261,6 +1447,7 @@ If you find Caterva doing any of these, that is a bug worth reporting.
 | `Not built.` + "is a named pathway" | Needs a pathway database Caterva does not read. Describe the steps you want. |
 | `Not exported.` | The export refused and the reason is printed above it. The report still ran. |
 | Exit code 3 | Something refused and said why; the rest of the report is still there and still valid. A **refused literature search** is one of these: an enzyme name that means more than one enzyme, or a model needing a Km with no `--substrate`. A search that ran and found nothing is *not* a refusal — it produced its answer, and the provenance table states it per constant. |
+| `caterva rates`: "no uncertainty was given for the rates" | Exit 3. Add a `sigma` column, or pass `--sigma-from replicates` or `--sigma-from residuals`; the refusal names all three and what each assumes. |
 | Exit code 2 | The question was not well formed. |
 | macOS: "cannot be opened because the developer cannot be verified" | The folder is unsigned. `xattr -dr com.apple.quarantine .` inside the folder. "Open Anyway" in System Settings clears one file, not the libraries, so it will not work. |
 | Windows: "Windows protected your PC" | SmartScreen. More info > Run anyway. Run `.\caterva.exe` from a terminal. |
