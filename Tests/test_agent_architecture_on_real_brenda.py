@@ -35,6 +35,7 @@ Two things, neither of which was a hypothesis first:
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 
 import pathlib
 import sys
@@ -305,6 +306,51 @@ class TestOnRealMarkup:
         # carried row is one of its members, now recognisable as itself.
         assert sum(1 for c in measured.alternatives
                    if c["value"] == 32.0 and c["conditions"] == measured.commentary) == 1
+
+    def test_a_re_selection_to_another_substrates_row_says_so(self) -> None:
+        """The substrate is the per-row field nothing downstream carries:
+        neither `ParameterSource` nor the Measurement has one, because a
+        request names it. This kcat request names none, as the API's
+        `parameterize` may, so the resolver's rows are of every substrate
+        the table holds, and the window moves from one substrate's row to
+        another's. Both substrates are read off the committed page's own
+        compound cells (column 1), not through the resolver's parser.
+
+        A limit as much as a fix: the run now says its kcat is an NAD+
+        turnover number beside a lactate Km, rather than not choosing one.
+        Asked for pyruvate's kcat, the same search raises no window and
+        keeps 21.1 1/s at pH 6, with the pH gap reported."""
+        kcat_request = ParameterRequest(
+            quantity="kcat", subject="L-lactate dehydrogenase",
+            substrate="", ec_number=LDH, table="kcat",
+        )
+        search = search_model(
+            network=NETWORK, requests=[REQUESTS[0], kcat_request], resolve=resolve,
+        )
+        page = (FIXTURES / FIXTURE_FOR_TABLE["kcat"]).read_text(encoding="utf-8")
+        rows = list(_page_rows(page))
+
+        def compound(value: str, reference: str) -> str:
+            (cells,) = [c for c in rows if c.get(0) == value and c.get(5) == reference]
+            return cells[1]
+
+        chosen, default = compound("32", "670748"), compound("21.1", "684519")
+        assert (chosen, default) == ("NAD+", "pyruvate")
+        assert search.first_pass.rejected_values() == (
+            f"kcat: re-selected to 32.0 1/s for {chosen} at pH 8, 25 C under an assay window, "
+            f"replacing 21.1 1/s for {default} at pH 6, 25 C",)
+        assert search.first_pass.resolutions["kcat"].reason.endswith(
+            f"; the row chosen is for {chosen}, the resolver's default for {default}: the "
+            "request named no substrate, so its rows are of every substrate the table holds")
+        named = search_model(
+            network=NETWORK, resolve=resolve,
+            requests=[REQUESTS[0], replace(kcat_request, substrate=default)],
+        ).first_pass
+        kcat = named.resolutions["kcat"].source
+        assert (kcat.value, kcat.ph, kcat.citation) == (21.1, 6.0, "BRENDA ref 684519")
+        assert not named.run.constraints.of_kind("assay_window")
+        assert named.rejected_values() == ()
+        assert "measured 2.0 pH units apart (kcat at pH 6, Km at pH 8)" in named.summary()
 
 
 def _page_rows(page: str):

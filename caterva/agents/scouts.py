@@ -105,6 +105,18 @@ def _row_citation(resolver_citation: Optional[str], reference_id: Any) -> str:
                                          reference_id=str(reference_id)))
 
 
+def frontier_row(source: Any) -> Optional[dict]:
+    """The frontier row a `ParameterSource` carries: the one among its
+    `candidates` with its value and its commentary. The resolver's pick, or
+    since 2026-09-30 the row an assay window re-selected, whose commentary
+    is now its own. None when no row has both, as for a stand-in resolver
+    that states no commentary."""
+    commentary = getattr(source, "commentary", None) or None
+    return next((row for row in getattr(source, "candidates", ()) or ()
+                 if row.get("value") == source.value
+                 and (row.get("conditions") or None) == commentary), None)
+
+
 def _describe_windows(
     refs: List[Tuple[Optional[float], Optional[float], Optional[str], Any]],
 ) -> str:
@@ -261,9 +273,19 @@ class ParameterScout:
         from its own frontier dict. What stays is what belongs to the
         resolver's answer rather than to one row: the frontier itself
         (`candidates`, which the spread is taken over, and which holds the
-        new row), `evidence_only` and `mode_default`. The frontier dict has
-        no substrate, and neither has `ParameterSource`: the request names
-        it, for every row alike.
+        new row), `evidence_only` and `mode_default`.
+
+        The substrate is the one per-row field with nowhere to go:
+        `ParameterSource` has none, nor has the Measurement compose builds,
+        because a request names one. A request that names none gets rows of
+        every substrate the table holds, and the row nearest the window can
+        be another substrate's: on the committed LDH turnover page kcat
+        moves from 21.1 1/s, a pyruvate row, to 32.0 1/s, an NAD+ row. So
+        when the frontier's labels differ (`_score_frontier`'s "substrate")
+        the scout's note names both, and so does the line the search's
+        summary prints for the re-selection (`ModelBuild.rejected_values`).
+        A request that names a substrate labels every row with it, and
+        nothing is said.
         """
         refs = []
         for window in windows:
@@ -376,6 +398,18 @@ class ParameterScout:
             f"of {len(source.candidates)} frontier row(s) fall outside the "
             f"window"
         )
+        # Which substrate each row is for, when the frontier's labels say
+        # they differ (docstring above): nothing downstream carries it.
+        was = (frontier_row(source) or {}).get("substrate")
+        now = best.get("substrate")
+        if was and now and was != now:
+            new_reason += (
+                f"; the row chosen is for {now}, the resolver's default for "
+                f"{was}"
+                + ("" if self.request.substrate else
+                   ": the request named no substrate, so its rows are of "
+                   "every substrate the table holds")
+            )
         return chosen, new_reason, new_reason
 
 
@@ -426,4 +460,4 @@ def brenda_resolver(**resolver_kwargs: Any) -> Callable[..., Any]:
     return resolve
 
 
-__all__ = ["ParameterScout", "param_key", "PARAM_PREFIX", "brenda_resolver"]
+__all__ = ["ParameterScout", "param_key", "PARAM_PREFIX", "brenda_resolver", "frontier_row"]

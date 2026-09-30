@@ -115,7 +115,9 @@ class ParameterSource:
     #: Every alternative row the resolver returned for this quantity, as the
     #: plain dicts `KineticResult.ensemble_candidates` carries them: value,
     #: unit, organism, reference_id, conditions, and -- since the assay
-    #: window work -- ph and temperature_c on each row.
+    #: window work -- ph and temperature_c on each row; since 2026-09-30
+    #: also substrate, the parser's label for the row (the request's name
+    #: when it named one, the row's compound when it did not).
     #:
     #: Deliberately Optional rather than "falsy and gone": the coercion
     #: result and the registry row carry no frontier AT ALL, which is a

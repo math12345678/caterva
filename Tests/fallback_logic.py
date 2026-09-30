@@ -881,6 +881,18 @@ def _score_frontier(
             "organism": measured,
             "reference_id": getattr(entry, "reference_id", None),
             "conditions": getattr(entry, "conditions", None),
+            # The row's compound, as the parser labels it: for a request
+            # naming a substrate, that name on every row it matched; for a
+            # request naming none, the row's own compound cell, so the
+            # frontier holds rows of every substrate the table has. Read by
+            # the agents' assay-window re-selection, which can move to
+            # another substrate's row only in the second case and says so
+            # (caterva/agents/scouts.py). The label says nothing more in the
+            # first: the match is a substring of the compound cell, and on
+            # the committed LDH turnover page a "pyruvate" request's
+            # phenylpyruvate rows (94.7 and 6467 1/s, ref 761568) read
+            # "pyruvate".
+            "substrate": getattr(entry, "substrate", None),
             # The row's assay conditions, as PARSED by the existing
             # condition parser (`_parse_ph` / `_parse_temperature` /
             # `AssayConditions`) when the entry was built -- the same values
