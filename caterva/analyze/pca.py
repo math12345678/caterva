@@ -160,15 +160,25 @@ On the 21 frames of lysozyme replica 1 in caterva/tests/fixtures/md
 `gmx covar` gives the same eigenvalues to within 6e-6 relative (it prints
 six significant digits) and the same trace; `gmx anaeig -proj` the same
 projections on PC1 and PC2 (up to the sign of each mode) to the 1e-5 nm it
-prints; `gmx analyze -cc` the same cosine contents after conversion; and
-`gmx anaeig -over` on the two halves of the replica the same RMSIP^2 to the
-0.001 it prints. The references are in lyso_1aki_rep1_gmx_pca.txt and the
-comparison is a test. On a 0.4 ps smoke run (two replicas of 21 frames,
-2026-09-30), gmx covar run directly gave the first ten eigenvalues of each
-replica to within 8.2e-6 relative of Caterva's, gmx analyze the cosine
-contents to 4e-6 after conversion, and gmx anaeig -over the RMSIP^2 (0.1029
-here, 0.103 there) to its 0.001; scripts/md_smoke.py compares the two
-routes' tables on every CI run.
+prints; `gmx analyze -cc` the same cosine contents after conversion (to
+7e-6); and `gmx anaeig -over` on the two halves of the replica the same
+RMSIP^2 to the 0.001 it prints. The references are in
+lyso_1aki_rep1_gmx_pca.txt and the comparison is a test.
+
+On two 0.4 ps smoke runs (scripts/md_smoke.py, two replicas of 21 frames
+each, 2026-09-30), gmx covar, anaeig and analyze run directly, each replica
+made whole by gmx trjconv -pbc mol and fitted to em.gro made whole the same
+way, gave the first ten eigenvalues of every replica to within 1.3e-5
+relative of Caterva's (the worst, a tenth eigenvalue of 1.1e-4 nm^2, off by
+1.5e-9 nm^2: of the order of single precision's 6e-8 of the largest, 0.016
+nm^2, which gmx covar works in; 7e-6 on the other run) and the traces to
+1.6e-6; the projections on PC1 and PC2 to 5.1e-6 nm; the cosine contents to
+1.1e-5 after conversion; and RMSIP^2 between the replicas 0.10902 and
+0.12955 here, 0.109 and 0.130 there. With gmx covar left to make the
+molecules whole itself (-s md.tpr on the raw md.xtc, so fitted to the tpr's
+coordinates) and Caterva fitted to the same coordinates, the eigenvalues
+agreed to 1.5e-5. scripts/md_smoke.py compares the two routes' tables on
+every CI run.
 """
 from __future__ import annotations
 

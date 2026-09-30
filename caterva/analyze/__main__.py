@@ -173,11 +173,14 @@ def pca_commands(reps: Sequence[str], gmx: str = "$GMX") -> List[str]:
     The fit reference and the trajectory are the ones gmx rmsf uses above
     (em.gro made whole, and the replica made whole), for the reason given
     there, and the same group is the fit and the analysis group, so gmx
-    covar fits without mass weights as the native route does. -last keeps
-    RMSIP_MODES eigenvectors in every file: gmx anaeig -over refuses two
-    files with different numbers of them, which replicas of different
-    lengths would otherwise write. The trace, which -last cuts from
-    eigenval.xvg, is read from covar's log instead.
+    covar fits without mass weights as the native route does. No -ref: the
+    covariance is then about the average of the fitted frames, as the native
+    one is about the replica's mean; with -ref it would be about em.gro, and
+    a replica whose mean had moved away from em.gro would show that
+    displacement as a motion. -last keeps RMSIP_MODES eigenvectors in every
+    file: gmx anaeig -over refuses two files with different numbers of them,
+    which replicas of different lengths would otherwise write. The trace,
+    which -last cuts from eigenval.xvg, is read from covar's log instead.
 
     A replica with fewer than RMSIP_MODES + 1 frames has fewer eigenvectors
     than anaeig is asked for, and anaeig stops with a fatal error. The

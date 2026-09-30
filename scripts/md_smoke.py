@@ -203,16 +203,20 @@ def _pca_agree(native: dict, gromacs: dict) -> tuple:
     - eigenvalues and totals (4 significant digits in the report): gmx
       covar prints 6 and does the same linear algebra in single precision,
       so the two agree to about 1e-5 relative (6e-6 on the lysozyme
-      fixture, test_pca.py; 8.2e-6 on a smoke run, 2026-09-30), and their
-      printed values may differ by one unit in the 4th digit, 1e-3
-      relative, and no more;
+      fixture, test_pca.py; 1.3e-5 and 7e-6 on two smoke runs, 2026-09-30,
+      the worst a tenth eigenvalue of 1.1e-4 nm^2 off by 1.5e-9 nm^2, of
+      the order of single precision's 6e-8 of the first), and their printed
+      values may differ by one unit in the 4th digit, 1e-3 relative, and no
+      more;
     - shares and the between-replica share (2 decimals): one unit, 0.01;
     - RMSIP (3 decimals): gmx anaeig -over prints RMSIP^2 to 0.001, which
       puts the GROMACS RMSIP within 0.0005 / (2 RMSIP) of the exact one,
-      and each printed value adds 0.0005 of rounding;
+      and each printed value adds 0.0005 of rounding (on a smoke run,
+      2026-09-30, RMSIP^2 0.12955 printed 0.360 natively, and gmx's 0.130
+      0.361);
     - cosine content (3 decimals): gmx analyze works from projections gmx
-      anaeig printed to 1e-5 nm, and lands within 2e-5 of the native value
-      on the fixture (4e-6 on a smoke run), so one unit of the printed
+      anaeig printed to 1e-5 nm, and lands within 7e-6 of the native value
+      on the fixture (1.1e-5 on two smoke runs), so one unit of the printed
       digit, 0.001, and a little over.
     A verdict may differ only where the value it rests on lies within that
     tolerance of the threshold."""
@@ -397,10 +401,11 @@ def main() -> int:
         print("FAIL: native and GROMACS principal motions differ:\n  " + "\n  ".join(problems))
         return 1
     print(f"OK: native and GROMACS agree on the principal motions of the active site for {len(reps)} "
-          f"replicas and the pooled frames: eigenvalues and totals to {worst['eigenvalue']:.1e} relative, "
-          f"shares to {worst['share']:.2f}, RMSIP to {worst['rmsip']:.3f} "
-          f"({', '.join(f'{k} {v[0]}' for k, v in pm_n['rmsip'].items())}), cosine content to "
-          f"{worst['cosine']:.3f}.")
+          f"replicas and the pooled frames (largest differences in the printed values: eigenvalues and "
+          f"totals {worst['eigenvalue']:.1e} relative, printed to 4 significant digits; shares "
+          f"{worst['share']:.2f}; RMSIP {worst['rmsip']:.3f}, "
+          f"{', '.join(f'{k} {v[0]}' for k, v in pm_n['rmsip'].items())}; cosine content "
+          f"{worst['cosine']:.3f}).")
     print("   (200 steps are 0.4 ps: these modes are the thermal motion of the minimised structure over "
           "a fraction of a picosecond, and every replica is expected to look diffusion-like. The comparison "
           "checks that the two routes compute the same thing; it says nothing about the enzyme or about "
