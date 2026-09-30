@@ -74,6 +74,20 @@ evidence against the model's mechanism for this inhibitor and substrate,
 which no choice of row can fix. A competitive LDH model of this inhibitor
 with `--substrate pyruvate` carries 0.00059 mM and gets that note.
 
+That finding is `evidence_against`, and the sentence is
+`evidence_against_sentence`. Both are public because the literature layer
+makes the same finding for the API and the TypeScript CLI
+(`fallback_logic`, `KineticResult.mechanism_evidence`, emitted by the
+runner as `mechanismEvidence`): a Ki asked for there by mode and model
+substrate is checked for it by this function, over the rows its mode step
+ranked, so the three front ends cannot come to disagree about which rows
+are evidence against a model (ADR 0027). Only a row stating "versus X" is
+read as measured against X. The recorded hexokinase page has Trypanosoma
+cruzi's ADP rows "competitive to ATP" and "noncompetitive to glucose";
+`read_mode` reads neither as measured against anything, so neither is
+taken as evidence against a competitive glucose model, although the
+second states exactly that.
+
 MIXED FOR NONCOMPETITIVE, AND NOT THE REVERSE
 ---------------------------------------------
 `mode_fits` lets a mixed row stand in for a noncompetitive model and
@@ -161,7 +175,8 @@ the API's inhibition domains and `scientific resolve --mode`). There it
 runs before a row is chosen, over every row the isoform and variant steps
 kept, where `select_mode` runs after, over the rows the resolver returned;
 `fallback_logic._partition_mode` says what that changes. The rule itself
-is here once.
+is here once, and so is `evidence_against` (above), which the literature
+layer applies to the row it returns.
 
 A row is read by `caterva.bind.core.read_mode`, the reader `row_scope` and
 `caterva bind` use, so the three agree about what a row states. That reader
@@ -175,7 +190,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field, replace
-from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple, TypeVar
 
 try:
     from caterva.compose.isoform import same_isoform
@@ -313,6 +328,74 @@ def rank(row: Reading, want: str, substrate: Optional[str] = None,
     return (iso, *mode)
 
 
+# -- Evidence against the model's mechanism ---------------------------------
+#
+# ONE FINDING, THREE FRONT ENDS. `caterva compose` puts it in the report's
+# notes (`_about_the_carried_row`); the literature layer puts it on the
+# KineticResult of a Ki asked for by mode and model substrate
+# (`fallback_logic._mechanism_evidence`), which the runner emits for the API
+# and the TypeScript CLI to print. Both call these two functions. The
+# callers differ in which rows they pass, exactly as they do for `rank`.
+
+_R = TypeVar("_R", bound=Reading)
+
+
+def evidence_against(carried: Reading, rows: Iterable[_R], want: str,
+                     substrate: Optional[str],
+                     isoform: Optional[str] = None) -> Optional[_R]:
+    """The first of `rows` that is evidence against a `want` model of
+    `substrate`, for the row carried; None when there is none.
+
+    Such a row states another inhibition mode, measured versus the model's
+    substrate, and does not name another isoform than the one asked for. It
+    counts only when the row carried does not itself state the model's mode
+    versus that substrate: a row that does is the constant of this model's
+    assay, and another row's other mode is then the constant of a different
+    assay, not a contradiction. The LDH case of the module docstring:
+    carrying "competitive versus NADH" for a competitive pyruvate model, the
+    row "noncompetitive versus pyruvate" says that, measured against
+    pyruvate, the inhibitor is not competitive. No choice of row fixes that,
+    so a caller reports it and changes nothing.
+
+    With no substrate there is nothing to be measured against, and the
+    answer is None. `carried` is skipped by identity when it is among
+    `rows` (the pick is, in compose), so a pick of another mode kept by
+    --any-mode is never evidence against itself. Rows are taken in the
+    order given, and the caller's order is its own: the resolver's for
+    compose, BRENDA's page order for the literature layer. Over the 766 Ki
+    rows on the three committed BRENDA pages (counted 2026-09-30, grouping
+    rows by organism and inhibitor), this finds something for one inhibitor
+    only, ref 739793's, and for two models of it: competitive with pyruvate
+    (the pyruvate row) and noncompetitive with NADH (the NADH row). Each
+    time one row qualifies, so no real pool has had two to choose between."""
+    settled = (carried.mode != "unstated" and mode_fits(carried.mode, want)
+               and versus_is(carried.versus, substrate))
+    if not substrate or settled:
+        return None
+    return next((r for r in rows if r is not carried
+                 and isoform_rank(r, isoform) is not None
+                 and r.mode != "unstated" and not mode_fits(r.mode, want)
+                 and versus_is(r.versus, substrate)), None)
+
+
+def row_label(value: float, unit: Optional[str], reference: Optional[str]) -> str:
+    """"0.00252 mM, BRENDA ref 739793": a row as the notes name it."""
+    ref = f", BRENDA ref {reference}" if reference else ""
+    return f"{value:g} {unit or ''}".rstrip() + ref
+
+
+def evidence_against_sentence(against: Reading, against_label: str, carried: Reading,
+                              carried_label: str, want: str, substrate: str) -> str:
+    """What `evidence_against` found, as the one sentence every Python
+    surface says it in: compose's note (after the constant's name) and the
+    literature layer's log. Lower case first, for the note."""
+    return (f"a ranked row states {against.says()} ({against_label}), "
+            f"measured against {substrate}, this model's substrate, and the row carried "
+            f"({carried_label}) states {carried.says()}. Measured against {substrate} "
+            f"this inhibitor is not {want}, which is evidence against this model's "
+            f"mechanism for it; no choice of row fixes that")
+
+
 @dataclass(frozen=True)
 class _Row(Reading):
     """One ranked row, read once, with its value and its place."""
@@ -325,8 +408,7 @@ class _Row(Reading):
     order: int = 0
 
     def label(self) -> str:
-        ref = f", BRENDA ref {self.reference}" if self.reference else ""
-        return f"{self.value:g} {self.unit or ''}".rstrip() + ref
+        return row_label(self.value, self.unit, self.reference)
 
 
 def _reference(m: Any) -> Optional[str]:
@@ -484,21 +566,12 @@ def _about_the_carried_row(identifier: str, carried: _Row, best: Optional[_Row],
     # A ranked row that states another mode versus the model's own
     # substrate, when the carried row does not state the model's mode
     # versus it: measured against this substrate, the inhibitor is not what
-    # the model says it is. The module docstring gives the LDH case.
-    settled = (carried.mode != "unstated" and mode_fits(carried.mode, want)
-               and versus_is(carried.versus, substrate))
-    if substrate and not settled:
-        against = next((r for r in rows if r is not carried
-                        and _isoform_rank(r, isoform) is not None
-                        and r.mode != "unstated" and not mode_fits(r.mode, want)
-                        and versus_is(r.versus, substrate)), None)
-        if against is not None:
-            notes.append(
-                f"`{identifier}`: a ranked row states {against.says()} ({against.label()}), "
-                f"measured against {substrate}, this model's substrate, and the row carried "
-                f"({carried.label()}) states {carried.says()}. Measured against {substrate} "
-                f"this inhibitor is not {want}, which is evidence against this model's "
-                f"mechanism for it; no choice of row fixes that")
+    # the model says it is. The module docstring gives the LDH case; the
+    # finding is `evidence_against`, which the literature layer makes too.
+    against = evidence_against(carried, rows, want, substrate, isoform)
+    if against is not None and substrate:
+        notes.append(f"`{identifier}`: " + evidence_against_sentence(
+            against, against.label(), carried, carried.label(), want, substrate))
     if carried.kitz_wilson and not told_kitz_wilson:
         notes.append(
             f"`{identifier}`: the row carried ({carried.label()}) states no inhibition mode, "
@@ -625,4 +698,4 @@ def constants_of(model: Any) -> Dict[str, Tuple[Optional[str], Optional[str]]]:
 
 __all__ = ["ANY_MODE_FLAG", "KITZ_WILSON_MEANING", "ModeSelection", "select_mode",
            "constants_of", "MODES", "Reading", "read_row", "isoform_rank", "mode_rank",
-           "rank"]
+           "rank", "evidence_against", "evidence_against_sentence", "row_label"]

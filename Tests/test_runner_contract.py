@@ -259,6 +259,11 @@ def test_golden_found_output_shape(monkeypatch):
         # the populated case is test_row_scope_crosses_the_boundary.
         "commentary": None,
         "rowScope": None,
+        # A row that is evidence against the model's mechanism, for a Ki
+        # asked for by mode and model substrate. None here: this is a Km,
+        # asked for with neither. The populated case, on the committed LDH
+        # page, is test_evidence_against_the_mechanism_crosses_the_boundary.
+        "mechanismEvidence": None,
         "literatureCandidates": [],
         "logs": ["BRENDA exact: 1.1.1.27, Homo sapiens, lactate"],
     }
@@ -301,6 +306,66 @@ def test_a_kitz_wilson_row_says_what_it_is(monkeypatch):
     )
     assert result["rowScope"] == {"isoform": "MAO-B", "inhibitionMode": "unstated",
                                   "versus": None, "kitzWilson": True}
+
+
+def _ldh_page_resolver():
+    """The real resolver, reading the committed, unmodified BRENDA LDH page
+    (Tests/fixtures/ki_mode/brenda_1.1.1.27.html.gz, errors="replace" as
+    its README says) with UniProt stubbed and no literature search, as
+    Tests/test_ki_mode_resolution.py reads it. Built once per test, before
+    `run_main` replaces `fallback_logic.resolve_kinetic_value`: built after,
+    it would capture the replacement and call itself."""
+    import gzip
+    from pathlib import Path
+
+    page = gzip.decompress(
+        (Path(__file__).parent / "fixtures" / "ki_mode" / "brenda_1.1.1.27.html.gz").read_bytes()
+    ).decode("utf-8", errors="replace")
+    real = fallback_logic.resolve_kinetic_value
+
+    def resolve(*a, **k):
+        return real(*a, **k, html_provider=lambda ec: page,
+                    uniprot_provider=lambda ec, organism: None,
+                    taxon_id_provider={"Homo sapiens": "9606"}.get,
+                    search_literature=False)
+    return resolve
+
+
+QUINOLINE = "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid"
+
+
+def test_evidence_against_the_mechanism_crosses_the_boundary(monkeypatch):
+    """BRENDA ref 739793, human LDH and the quinoline sulfonamide, through
+    the real resolver and the real runner. A competitive pyruvate model
+    carries 0.00059 mM "competitive versus NADH", the only row of its mode;
+    the same paper's 0.00252 mM "noncompetitive versus pyruvate" says that
+    against pyruvate the inhibitor is not competitive. `caterva compose`
+    notes it; this is the same finding, on the wire."""
+    payload = {"enzymeName": "lactate dehydrogenase", "organism": "Homo sapiens",
+               "ecNumber": "1.1.1.27", "quantity": "ki", "substrate": QUINOLINE,
+               "inhibitionMode": "competitive", "modelSubstrate": "pyruvate"}
+    resolve = _ldh_page_resolver()
+    result = run_main(monkeypatch, resolve, payload)
+    assert result["found"] is True and result["ki"] == 0.00059
+    assert result["rowScope"]["inhibitionMode"] == "competitive"
+    assert result["rowScope"]["versus"] == "NADH"
+    assert result["mechanismEvidence"] == {
+        "value": 0.00252,
+        "unit": "mM",
+        "organism": "Homo sapiens",
+        "referenceId": "739793",
+        "inhibitionMode": "noncompetitive",
+        "versus": "pyruvate",
+        "conditions": ("pH 7.5, 37°C, recombinant His-tagged enzyme, pyruvate reduction, "
+                       "noncompetitive versus pyruvate"),
+        "modelMode": "competitive",
+        "modelSubstrate": "pyruvate",
+    }
+
+    # The noncompetitive model carries the pyruvate row itself: the row of
+    # its own mode and substrate, which nothing contradicts.
+    result = run_main(monkeypatch, resolve, {**payload, "inhibitionMode": "noncompetitive"})
+    assert result["ki"] == 0.00252 and result["mechanismEvidence"] is None
 
 
 def test_mode_withheld_output_shape(monkeypatch):

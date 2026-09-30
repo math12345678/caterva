@@ -474,6 +474,20 @@ versus another molecule rank alike, as they do in `caterva compose` without
 give a noncompetitive model 7.8 mM "versus glucose" with `--model-substrate
 glucose`, and 3.0 mM "versus MgATP2-", the lower, without it.
 
+With the mode and the model's substrate, both also say what `caterva
+compose`'s report says when a row is evidence against the model's
+mechanism: a row stating another mode, measured versus the model's
+substrate, while the row returned does not state the model's mode versus
+it. For human LDH and the quinoline sulfonamide of BRENDA ref 739793, a
+competitive pyruvate model gets 0.00059 mM "competitive versus NADH", the
+only competitive row, and the API's `provenance.flags` and `scientific
+resolve` both name 0.00252 mM "noncompetitive versus pyruvate": measured
+against pyruvate the inhibitor is not competitive, and no choice of row
+fixes that. The runner sends the row as `mechanismEvidence`, found by the
+function in `ki_mode.py` that compose's note comes from. Only a row saying
+"versus X" is read as measured against X, so the Trypanosoma cruzi ADP
+rows above ("competitive to ATP", "noncompetitive to glucose") are not.
+
 ### `caterva structure`: which structures exist, and which protein each is
 
 ```bash

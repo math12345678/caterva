@@ -27,6 +27,7 @@
 
 import {
   ResolverUnavailableError,
+  mechanismEvidenceLines,
   resolveKinetic,
   rowScopeLines,
   withheldSentence,
@@ -385,6 +386,25 @@ export async function commandResolve(options: ResolveOptions): Promise<number> {
     process.stdout.write(`\n${c(YELLOW, '⚠')} ${c(BOLD, 'What the source row measured')}\n`);
     for (const line of scopeLines) process.stdout.write(`${c(DIM, '  ' + line)}\n`);
     if (result.commentary) process.stdout.write(`${c(DIM, '  Row: ' + result.commentary)}\n`);
+  }
+
+  // EVIDENCE AGAINST THE MODEL'S MECHANISM
+  //
+  // Right after what the row measured, because it qualifies it. For
+  // `--mode competitive --model-substrate pyruvate` on human LDH and BRENDA
+  // ref 739793's quinoline sulfonamide, the row taken states "competitive
+  // versus NADH", and the same paper's other row states "noncompetitive
+  // versus pyruvate". The mode step set that row aside, correctly, and with
+  // it the one fact a reader of this model needs: against pyruvate, the
+  // inhibitor is not competitive. `caterva compose` says it in its report;
+  // the runner's `mechanismEvidence` carries the same finding, made by the
+  // same Python function, and the API says it in provenance.flags.
+  const againstLines = mechanismEvidenceLines(String(result.quantity), result.mechanismEvidence);
+  if (againstLines.length > 0) {
+    process.stdout.write(
+      `\n${c(YELLOW, '⚠')} ${c(BOLD, "Evidence against this model's mechanism")}\n`,
+    );
+    for (const line of againstLines) process.stdout.write(`${c(DIM, '  ' + line)}\n`);
   }
 
   // COFACTORS AND EFFECTORS (ADR 0032)

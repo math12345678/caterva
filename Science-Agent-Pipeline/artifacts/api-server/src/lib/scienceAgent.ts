@@ -185,6 +185,34 @@ export interface ScienceAgentResult {
      */
     kitzWilson?: boolean;
   } | null;
+  /**
+   * A row that is evidence against the model's mechanism for the Ki
+   * returned: it states another inhibition mode, measured versus the
+   * model's substrate, while the row returned does not state the model's
+   * mode versus it. BRENDA ref 739793 on human LDH: a competitive pyruvate
+   * model gets 0.00059 mM "competitive versus NADH", and this names 0.00252
+   * mM "noncompetitive versus pyruvate". Decided in Python by
+   * caterva.compose.ki_mode's `evidence_against`, the function `caterva
+   * compose`'s report uses; reported here, never re-derived (ADR 0027).
+   * Null unless a Ki was asked for with `inhibitionMode` and
+   * `modelSubstrate` and such a row exists; absent from older runners.
+   */
+  mechanismEvidence?: {
+    value: number;
+    unit: string | null;
+    organism: string | null;
+    referenceId: string | null;
+    /** The mode the row states ("noncompetitive"). */
+    inhibitionMode: string;
+    /** What the row was measured versus, in its own words ("pyruvate"). */
+    versus: string;
+    /** The row's commentary, verbatim. */
+    conditions: string | null;
+    /** The mode of the model the Ki was asked for ("competitive"). */
+    modelMode: string;
+    /** The model's substrate, as it was sent. */
+    modelSubstrate: string;
+  } | null;
   preparation?: {
     status: string;
     evidence?: string | null;

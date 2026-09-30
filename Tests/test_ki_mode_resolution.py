@@ -129,6 +129,71 @@ class TestTheQuinolineSulfonamide:
         assert refused.source == "mode_withheld" and len(refused.modes_available) == 2
 
 
+class TestEvidenceAgainstTheMechanism:
+    """The row that says the model's mechanism is wrong for this inhibitor.
+
+    A competitive pyruvate model rightly carries 0.00059 mM "competitive
+    versus NADH": it is the only row stating the model's mode. The same
+    paper's 0.00252 mM "noncompetitive versus pyruvate" says that against
+    pyruvate the inhibitor is not competitive. `_partition_mode` sets that
+    row aside, so without `mechanism_evidence` it reached no caller but
+    `caterva compose`, which says it in its notes."""
+
+    def test_a_competitive_pyruvate_model_is_told_the_pyruvate_row(self):
+        r = ldh(inhibition_mode="competitive")
+        assert r.found and r.value == 0.00059
+        assert r.mechanism_evidence.model_dump() == {
+            "value": 0.00252, "unit": "mM", "organism": "Homo sapiens",
+            "reference_id": "739793", "inhibition_mode": "noncompetitive",
+            "versus": "pyruvate", "conditions": NONCOMPETITIVE_VS_PYRUVATE,
+            "model_mode": "competitive", "model_substrate": "pyruvate"}
+        # caterva compose's note, word for word (caterva/tests/test_ki_mode.py).
+        assert r.search_log[-1] == (
+            "A ranked row states noncompetitive inhibition versus pyruvate (0.00252 mM, BRENDA "
+            "ref 739793), measured against pyruvate, this model's substrate, and the row carried "
+            "(0.00059 mM, BRENDA ref 739793) states competitive inhibition versus NADH. Measured "
+            "against pyruvate this inhibitor is not competitive, which is evidence against this "
+            "model's mechanism for it; no choice of row fixes that")
+
+    def test_a_noncompetitive_nadh_model_is_told_the_nadh_row(self):
+        # The same paper the other way round, and the only other model any
+        # of the 766 Ki rows on the three committed pages gives this finding
+        # for: the noncompetitive row is the only one of that mode, measured
+        # versus pyruvate, and against NADH the inhibitor was competitive.
+        r = ki("1.1.1.27", QUINOLINE, inhibition_mode="noncompetitive", model_substrate="NADH")
+        assert r.found and r.value == 0.00252 and r.commentary == NONCOMPETITIVE_VS_PYRUVATE
+        e = r.mechanism_evidence
+        assert (e.value, e.inhibition_mode, e.versus, e.conditions) == (
+            0.00059, "competitive", "NADH", COMPETITIVE_VS_NADH)
+        assert (e.model_mode, e.model_substrate) == ("noncompetitive", "NADH")
+
+    def test_none_when_the_row_returned_is_the_models_own_assay(self):
+        # Noncompetitive versus pyruvate is this model's mode and substrate;
+        # the NADH row's other mode is a different assay's constant.
+        assert ldh(inhibition_mode="noncompetitive").mechanism_evidence is None
+
+    def test_none_for_a_model_of_the_other_substrate(self):
+        r = ki("1.1.1.27", QUINOLINE, inhibition_mode="competitive", model_substrate="NADH")
+        assert r.value == 0.00059 and r.mechanism_evidence is None
+
+    def test_none_without_the_models_substrate_or_without_a_mode(self):
+        # Nothing to be measured against, and nothing to contradict.
+        assert ki("1.1.1.27", QUINOLINE, inhibition_mode="competitive").mechanism_evidence is None
+        assert ldh().mechanism_evidence is None
+
+    def test_none_where_no_row_states_a_mode(self):
+        r = ki("1.1.1.27", "gossypol", inhibition_mode="competitive", model_substrate="pyruvate")
+        assert r.found and r.mechanism_evidence is None
+
+    def test_the_cross_species_tier_says_it_too_and_whose_row_it_is(self):
+        r = ki("1.1.1.27", QUINOLINE, organism="Mus musculus", allow_cross_species=True,
+               lineage_provider=fixture_lineage_provider, inhibition_mode="competitive",
+               model_substrate="pyruvate")
+        assert r.found and r.source == "brenda_cross_species" and r.value == 0.00059
+        assert (r.mechanism_evidence.value, r.mechanism_evidence.organism) == (
+            0.00252, "Homo sapiens")
+
+
 class TestNoStatedMode:
     def test_gossypol_is_unchanged_and_the_log_says_why(self):
         # BRENDA 711801: three rows, one per isoform, none stating a mode.
@@ -349,6 +414,8 @@ CASES = [
     *[("1.1.1.27", "Homo sapiens", QUINOLINE, m, "pyruvate", None)
       for m in ("competitive", "noncompetitive", "uncompetitive")],
     ("1.1.1.27", "Homo sapiens", QUINOLINE, "competitive", "NADH", None),
+    # The other model the pyruvate/NADH pair is evidence against.
+    ("1.1.1.27", "Homo sapiens", QUINOLINE, "noncompetitive", "NADH", None),
     ("1.1.1.27", "Homo sapiens", "gossypol", "competitive", "pyruvate", None),
     ("1.1.1.27", "Homo sapiens", "gossypol", "noncompetitive", "pyruvate", "LDH-A"),
     # An isoform no row names (test_isoform_resolution's): both refuse for
@@ -432,6 +499,16 @@ class TestTheSameRowAsCompose:
             carried = composed.measured["reaction_Ki"]
             assert resolved.found, resolved.search_log
             assert (resolved.value, resolved.commentary) == (carried.value, carried.commentary)
+            # And the same evidence against the model's mechanism, in the
+            # same words: compose's note is the resolver's log line, and the
+            # resolver carries the row for the API and the CLI.
+            prefix = "`reaction_Ki`: a ranked row states "
+            said = [n[len("`reaction_Ki`: "):] for n in composed.notes if n.startswith(prefix)]
+            if said:
+                assert said[0][0].upper() + said[0][1:] in resolved.search_log
+                assert resolved.mechanism_evidence is not None
+            else:
+                assert resolved.mechanism_evidence is None, resolved.mechanism_evidence
 
 
 class TestWhereComposeCannotSeeTheRow:

@@ -326,7 +326,100 @@ export interface ResolvedKinetic {
    */
   commentary?: string | null;
   rowScope?: RowScope | null;
+  /**
+   * A row that is evidence against the model's mechanism (runner key
+   * `mechanismEvidence`), for a Ki asked for with `--mode` and
+   * `--model-substrate`.
+   *
+   * BRENDA ref 739793 gives human LDH and one quinoline sulfonamide 0.00059
+   * mM "competitive versus NADH" and 0.00252 mM "noncompetitive versus
+   * pyruvate". `--mode competitive --model-substrate pyruvate` correctly
+   * takes the first, and `rowScope` says it was measured versus NADH. The
+   * second row, which says that against pyruvate the inhibitor is not
+   * competitive, was set aside by the mode step, and `caterva compose` said
+   * so where this command said nothing. Decided in Python by the function
+   * compose uses (caterva.compose.ki_mode's `evidence_against`); read here,
+   * never re-derived. Null when there is none.
+   */
+  mechanismEvidence?: MechanismEvidence | null;
   logs: string[];
+}
+
+/** A row that is evidence against the model's mechanism (runner key
+ * `mechanismEvidence`): what it states, and the model it contradicts. */
+export interface MechanismEvidence {
+  value: number;
+  unit: string | null;
+  organism: string | null;
+  referenceId: string | null;
+  /** The mode the row states ("noncompetitive"). */
+  inhibitionMode: string;
+  /** What the row was measured versus, in its own words ("pyruvate"). */
+  versus: string;
+  /** The row's commentary, verbatim. */
+  conditions: string | null;
+  /** The model's mode, as --mode gave it ("competitive"). */
+  modelMode: string;
+  /** The model's substrate, as --model-substrate gave it. */
+  modelSubstrate: string;
+}
+
+/**
+ * The finding in plain sentences, for a Ki. Empty for any other quantity or
+ * when there is none. Puts the runner's fields into words and decides
+ * nothing: the runner sends the row only when it is evidence against the
+ * model. The API says the same in `mechanismEvidenceFlags`.
+ */
+export function mechanismEvidenceLines(
+  quantity: string,
+  mechanismEvidence: MechanismEvidence | null | undefined,
+): string[] {
+  if (quantity.toLowerCase() !== 'ki' || !mechanismEvidence) return [];
+  const where = [
+    mechanismEvidence.organism,
+    mechanismEvidence.referenceId ? `BRENDA ref ${mechanismEvidence.referenceId}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const value = `${mechanismEvidence.value} ${mechanismEvidence.unit ?? 'mM'}`;
+  const lines = [
+    `Another row for this inhibitor, ${value}${where ? ` (${where})` : ''}, states ` +
+      `${mechanismEvidence.inhibitionMode} inhibition versus ${mechanismEvidence.versus}, and ` +
+      `${mechanismEvidence.modelSubstrate} is this model's substrate.`,
+    `Measured against it, the inhibitor is not ${mechanismEvidence.modelMode}, and a ` +
+      `${mechanismEvidence.modelMode} model says it is. That is evidence against this model's ` +
+      'mechanism for this inhibitor, and no choice of row fixes it.',
+  ];
+  if (mechanismEvidence.conditions) lines.push(`Other row: ${mechanismEvidence.conditions}`);
+  return lines;
+}
+
+/** Read through, like the tie: a finding missing what its sentence needs
+ * is no finding, rather than a line with "undefined" in it. */
+function parseMechanismEvidence(raw: unknown): MechanismEvidence | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v : null);
+  const value = r['value'];
+  const inhibitionMode = text(r['inhibitionMode']);
+  const versus = text(r['versus']);
+  const modelMode = text(r['modelMode']);
+  const modelSubstrate = text(r['modelSubstrate']);
+  if (typeof value !== 'number' || !Number.isFinite(value) || !inhibitionMode || !versus ||
+      !modelMode || !modelSubstrate) {
+    return null;
+  }
+  return {
+    value,
+    unit: text(r['unit']),
+    organism: text(r['organism']),
+    referenceId: text(r['referenceId']),
+    inhibitionMode,
+    versus,
+    conditions: text(r['conditions']),
+    modelMode,
+    modelSubstrate,
+  };
 }
 
 /** What the winning row says it measured (runner key `rowScope`). */
@@ -794,6 +887,7 @@ export function mapFoundResult(
     // Read through, like the tie: an all-null scope is no scope.
     commentary: typeof parsed['commentary'] === 'string' ? (parsed['commentary'] as string) : null,
     rowScope: parseRowScope(parsed['rowScope']),
+    mechanismEvidence: parseMechanismEvidence(parsed['mechanismEvidence']),
     // BRENDA cross-species means the value came from a DIFFERENT organism
     // than the one asked about. Still real and citable, but the caller must
     // be able to see it rather than have it presented as a same-organism

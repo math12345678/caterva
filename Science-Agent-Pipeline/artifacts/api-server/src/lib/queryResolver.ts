@@ -376,6 +376,48 @@ export function rowScopeFlags(
   return out;
 }
 
+/**
+ * Say when a row BRENDA gives for this inhibitor is evidence against the
+ * model's mechanism: it states another inhibition mode, measured versus the
+ * model's own substrate.
+ *
+ * BRENDA ref 739793 gives human LDH and one quinoline sulfonamide 0.00059 mM
+ * "competitive versus NADH" and 0.00252 mM "noncompetitive versus pyruvate".
+ * A competitive model of pyruvate carries the first, which is the right row:
+ * it is the only one stating the model's mode, and `rowScopeFlags` says it
+ * was measured versus NADH. What that flag cannot say is that the same
+ * paper, measuring against pyruvate, found the inhibitor noncompetitive:
+ * the row that says so was set aside by the mode step and never reached this
+ * side. `caterva compose` says it in its report; this is the same finding,
+ * made by the same Python function (caterva.compose.ki_mode's
+ * `evidence_against`), in the runner's `mechanismEvidence`.
+ *
+ * Nothing is decided here. The runner sends the row only when it is
+ * evidence against the model, so this only puts its fields into words.
+ */
+export function mechanismEvidenceFlags(
+  key: string,
+  mechanismEvidence: ScienceAgentResult["mechanismEvidence"],
+): string[] {
+  if (key !== "ki" || !mechanismEvidence) return [];
+  const name = key.toUpperCase();
+  const where = [
+    mechanismEvidence.organism,
+    mechanismEvidence.referenceId ? `BRENDA ref ${mechanismEvidence.referenceId}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const value = `${mechanismEvidence.value} ${mechanismEvidence.unit ?? "mM"}`;
+  return [
+    `${name}: evidence against this model's mechanism. Another row for this inhibitor, ` +
+      `${value}${where ? ` (${where})` : ""}, states ${mechanismEvidence.inhibitionMode} ` +
+      `inhibition versus ${mechanismEvidence.versus}, and ${mechanismEvidence.modelSubstrate} is ` +
+      `this model's substrate: measured against it, the inhibitor is not ` +
+      `${mechanismEvidence.modelMode}, and this model says it is. No choice of row fixes that.` +
+      (mechanismEvidence.conditions ? ` The other row: "${mechanismEvidence.conditions}".` : ""),
+  ];
+}
+
 function preparationFlags(
   key: string,
   preparation: ScienceAgentResult["preparation"],
@@ -950,6 +992,11 @@ async function applyKineticResolution(
       flags.push(...selectedFormFlags(key, agentResult.selectedForm));
       flags.push(...preparationFlags(key, agentResult.preparation));
       flags.push(...rowScopeFlags(key, agentResult.rowScope, entities.isoform));
+      // After what the row measured, because it qualifies it: another row,
+      // which the runner set aside for stating another mode, says the
+      // mechanism this model gives the row is not the inhibitor's against
+      // this model's substrate.
+      flags.push(...mechanismEvidenceFlags(key, agentResult.mechanismEvidence));
     } else {
       provenanceUpdates[key] = buildUnresolvedKineticProvenance(key, "not_found");
     }

@@ -135,6 +135,12 @@ EMITTED_AS: dict[str, str | None] = {
     # What the rows state, when a Ki was asked for by the model's inhibition
     # mode and every row states another (source "mode_withheld").
     "modes_available": "modesAvailable",
+    # A row stating another inhibition mode versus the model's substrate,
+    # for a Ki asked for by mode: evidence against the model's mechanism
+    # (BRENDA ref 739793, LDH). Found by caterva.compose.ki_mode's
+    # `evidence_against` in the resolver, because only the resolver holds
+    # the row; the runner emits it and decides nothing.
+    "mechanism_evidence": "mechanismEvidence",
     "relatedness": "relatedness",
     "effectors": "effectors",
     "selection_tie": "selectionTie",

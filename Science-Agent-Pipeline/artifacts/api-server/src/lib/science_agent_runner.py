@@ -338,6 +338,34 @@ def _row_scope(commentary):
             "kitzWilson": row.kitz_wilson}
 
 
+def _mechanism_evidence_dict(evidence):
+    """The resolver's MechanismEvidence on the wire, or None when it found
+    none: a row stating another inhibition mode measured versus the model's
+    substrate, for a Ki asked for by mode (`inhibitionMode`) and model
+    substrate (`modelSubstrate`).
+
+    Decided in the literature layer by caterva.compose.ki_mode's
+    `evidence_against`, the function `caterva compose` notes the same
+    finding with, because only the resolver holds the row: the mode step
+    removes a row of another mode before anything else sees it
+    (fallback_logic._mechanism_evidence). Nothing here judges it. Keys are
+    camelCase beside `rowScope`, whose `inhibitionMode` and `versus` say
+    the same things of the row returned."""
+    if evidence is None:
+        return None
+    return {
+        "value": evidence.value,
+        "unit": evidence.unit,
+        "organism": evidence.organism,
+        "referenceId": evidence.reference_id,
+        "inhibitionMode": evidence.inhibition_mode,
+        "versus": evidence.versus,
+        "conditions": evidence.conditions,
+        "modelMode": evidence.model_mode,
+        "modelSubstrate": evidence.model_substrate,
+    }
+
+
 def _buffer_identity_dict(raw_buffer):
     """Resolve a reported buffer string to a comparable identity, or None.
 
@@ -848,6 +876,16 @@ def main() -> None:
                 # `caterva bind` and `caterva compose` use, so the TypeScript
                 # side reports it rather than re-deriving it (ADR 0027).
                 "rowScope": _row_scope(getattr(result, "commentary", None)),
+                # A row that is evidence against the model's mechanism for
+                # the Ki returned: BRENDA ref 739793's "noncompetitive
+                # versus pyruvate" row, for a competitive pyruvate model
+                # that correctly carries its "competitive versus NADH" row.
+                # `caterva compose` notes it; without this the API and the
+                # CLI, choosing the same row by the same ranking, did not.
+                # None unless a Ki was asked for with inhibitionMode and
+                # modelSubstrate and such a row exists.
+                "mechanismEvidence": _mechanism_evidence_dict(
+                    getattr(result, "mechanism_evidence", None)),
                 # How the enzyme was PREPARED (ADR 0092): immobilised,
                 # affinity-tagged, covalently modified, native, or unstated.
                 #
