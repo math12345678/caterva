@@ -12,7 +12,7 @@
 // to already be on the machine that last updated this file.
 //
 // Whoever updates this file after adding/removing tests should re-run all
-// four suites and paste the real numbers -- that's the entire point of the
+// five suites and paste the real numbers -- that's the entire point of the
 // terminal panel this feeds: it should never show a number nobody checked.
 //
 // Nobody did, for a while. Audited 2026-09-03 against live runs, this file
@@ -27,7 +27,7 @@
 // scripts/check_landing_test_counts.py now guards them. By default it
 // compares the "NN test files" figure in each description against the
 // filesystem, which is instant and runs in `make guards`; `--full` runs
-// all four suites and compares pass counts exactly (~40 minutes).
+// all five suites and compares pass counts exactly (~40 minutes).
 //
 // MEASUREMENT NOTES, because these counts are contention-sensitive:
 // running several suites at once produces spurious failures and DIFFERENT
@@ -315,6 +315,28 @@ export const TEST_SUITES: TestSuite[] = [
         // motion frame by frame). Plus 1 PageClaims test pinning the export
         // samples to the generated file of a real run (2026-09-29): 45.
         passed: 45,
+        skipped: 0,
+        failed: 0,
+      },
+    ],
+  },
+  {
+    name: "scientific CLI and library (root TypeScript package)",
+    workingDirectory: "./",
+    files: [
+      {
+        file:
+          "72 test files -- the `scientific` CLI end to end and its " +
+          "refusals, the literature resolver, the Python engine bridge, " +
+          "inhibition models, exports, request validation, result storage " +
+          "and reproducibility checks",
+        // Measured 2026-09-30 in CI (run 36710144379, root-typescript job,
+        // commit 87969e7): jest reported 72 files, 944 tests, all passing,
+        // none skipped, and a step compared the files jest ran with the
+        // files on disk (72 of 72). These tests had never run in CI before
+        // that day; four of them had been written for the wrong runner and
+        // could not load, and were converted without changing an assertion.
+        passed: 944,
         skipped: 0,
         failed: 0,
       },

@@ -15,6 +15,13 @@ done: there was no release to version.
 ## [Unreleased: tools]
 
 ### Added
+- CI runs the root TypeScript package's tests, which it never had: the
+  `scientific` CLI and the literature resolver, 72 files and 944 tests, in
+  a new root-typescript job with a type-check and a step that fails if jest
+  ran fewer files than are on disk. All 944 passed on the first run. Four
+  files written in this cycle for vitest could not load under the package's
+  runner (jest); they were converted without changing an assertion.
+  `make test-ts` runs the same steps locally.
 - `scientific simulate --resolve --model competitive|noncompetitive|product`
   looks its Ki up under `--inhibitor` for the model's mode, with `--substrate`
   as the model's substrate, and refuses without an inhibitor; until now it

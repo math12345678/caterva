@@ -41,7 +41,7 @@ import BackendHealth from "@/components/ui/backend-health";
 import ShortcutHelp from "@/components/ui/shortcut-help";
 import BackToTop from "@/components/ui/back-to-top";
 import FooterMetrics from "@/components/ui/footer-metrics";
-import { totals } from "@/lib/testResults";
+import { TEST_SUITES, totals } from "@/lib/testResults";
 
 const FAQSection = lazy(() => import("./FAQSection"));
 const TrustSection = lazy(() => import("./TrustSection"));
@@ -640,7 +640,7 @@ export default function CliApp() {
           <h2 className="section-header">Test suite</h2>
           <p className="font-sans text-[13px] text-fg/76 mb-8 -mt-2">
             {totals().passed.toLocaleString()} passing and{" "}
-            {totals().failed.toLocaleString()} failing across four suites, as
+            {totals().failed.toLocaleString()} failing across {TEST_SUITES.length} suites, as
             last measured. Each count names its run in the source.
           </p>
           <TerminalWindow path="~ &mdash; make test" glow>
