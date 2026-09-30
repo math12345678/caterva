@@ -381,34 +381,79 @@ def composed_from(result):
         SimpleNamespace(resolutions={"reaction_Ki": SimpleNamespace(source=source)}))
 
 
+def compose_selects(resolved, mode, substrate, isoform=None, any_mode=False):
+    """What `caterva compose` carries for a Ki, from the resolver's answer to
+    the question compose now asks (narrowed.select_for_model, the function
+    the command calls): the answer becomes a ParameterSource as the agents'
+    scout makes it (caterva.agents.adapters), and a refusal keeps the
+    resolver's word for it, as the scout's Resolution does."""
+    from types import SimpleNamespace
+
+    from caterva.agents.adapters import to_parameter_source
+    from caterva.compose.narrowed import select_for_model
+
+    source, why_not = to_parameter_source("ki", resolved)
+    resolution = SimpleNamespace(source=source, reason=why_not,
+                                 outcome=None if source is not None else resolved.source)
+    return select_for_model(SimpleNamespace(resolutions={"reaction_Ki": resolution}),
+                            {"reaction_Ki": (TestTheSameRowAsCompose.MOTIF[mode], "ki")},
+                            substrate=substrate, isoform=isoform, any_mode=any_mode)
+
+
+#: The note `narrowed.carry` adds when the selections alone arrive at
+#: another row than the resolver's.
+CARRIED = "choosing among the rows the evidence alone returned arrives at"
+
+
 class TestTheSameRowAsCompose:
-    """One ranking, so one answer. For each case, `caterva compose`'s
-    selection (select_isoform, then select_mode, over the Measurement the
-    resolver's no-mode answer becomes) and the resolver asked for the mode
-    must carry the same row, or both refuse.
+    """One ranking, so one answer. `caterva compose` asks the resolver with
+    the model's mode, substrate and isoform, as the API does, and carries the
+    row it returns; its selections (select_isoform, then select_mode) then
+    say what the choice did, shown the resolver's row beside the row the
+    evidence alone would take.
 
     WHAT THIS DOES AND DOES NOT CHECK. Both sides rank with the same
     function, caterva.compose.ki_mode.rank, so agreement here cannot show
     that the rule is right; the rule is held to BRENDA's own rows by the
-    tests above (0.00252 and 0.00059 mM of ref 739793, the refusals, the
+    tests above (0.00059 and 0.00252 mM of ref 739793, the refusals, the
     mixed and Kitz-Wilson rows). What it checks is everything around the
-    rule, which the two callers do differently: which rows each ranks, the
-    isoform-then-mode order, the tie-break, and when each refuses. A
-    difference would be one of those.
-
-    They differ where a row of the model's mode is dominated on evidence:
-    compose ranks the frontier, the resolver the whole pool
-    (`_partition_mode`, and the Trypanosoma cruzi test below). In every
-    case in CASES the rows of one inhibitor are graded alike, so that does
-    not arise."""
+    rule: what compose sends, what comes back, and that the selections,
+    choosing among what they are shown, arrive at the resolver's row by
+    themselves, so the report's account of the choice is of the row carried
+    (`narrowed.carry` would otherwise have to move it, and says so)."""
 
     MOTIF = {"competitive": "competitive_inhibition",
              "noncompetitive": "noncompetitive_inhibition",
              "uncompetitive": "uncompetitive_inhibition"}
 
     @pytest.mark.parametrize("ec, organism, inhibitor, mode, substrate, isoform", CASES)
-    def test_compose_and_the_resolver_agree(self, ec, organism, inhibitor, mode, substrate,
-                                           isoform):
+    def test_compose_carries_the_resolvers_row(self, ec, organism, inhibitor, mode, substrate,
+                                               isoform):
+        from caterva.compose.ki_mode import ANY_MODE_FLAG
+
+        resolved = ki(ec, inhibitor, organism=organism, inhibition_mode=mode,
+                      model_substrate=substrate, isoform=isoform)
+        chosen = compose_selects(resolved, mode, substrate, isoform)
+        if not resolved.found:
+            reason = chosen.withheld["reaction_Ki"]
+            assert "reaction_Ki" not in chosen.measured
+            if resolved.source == "mode_withheld":
+                assert ANY_MODE_FLAG in reason
+            else:
+                assert resolved.source == "isoform_withheld" and f"(--isoform {isoform})" in reason
+            return
+        carried = chosen.measured["reaction_Ki"]
+        assert (carried.value, carried.commentary) == (resolved.value, resolved.commentary)
+        assert not any(CARRIED in note for note in chosen.notes), chosen.notes
+
+    @pytest.mark.parametrize("ec, organism, inhibitor, mode, substrate, isoform", CASES)
+    def test_the_selections_over_the_unasked_answer_agree_here_too(
+            self, ec, organism, inhibitor, mode, substrate, isoform):
+        """How compose chose until 2026-09-30: select_isoform then
+        select_mode over the answer the resolver gives unasked. In every case
+        here the rows of one inhibitor are graded alike, so its frontier holds
+        them all and this agrees with the resolver asked; the Trypanosoma
+        cruzi case below is one where it did not."""
         from caterva.compose.isoform import select_isoform
         from caterva.compose.ki_mode import select_mode
 
@@ -434,13 +479,15 @@ class TestTheSameRowAsCompose:
             assert (resolved.value, resolved.commentary) == (carried.value, carried.commentary)
 
 
-class TestWhereComposeCannotSeeTheRow:
+class TestWhereComposeCouldNotSeeTheRow:
     """Trypanosoma cruzi hexokinase and ADP, on the recorded page: 0.13 mM
     (no commentary), 1.3 mM ("natural hexokinase from epimastigotes, at pH
     7.5"), 1.5 mM ("competitive to ATP"), 7.0 mM ("noncompetitive to
-    glucose"). The evidence frontier keeps 1.3 alone, so compose's
-    alternatives hold one row and a competitive model can only carry it; the
-    resolver narrows by mode first and returns the competitive row."""
+    glucose"). The evidence frontier keeps 1.3 alone. Until 2026-09-30
+    compose asked the resolver for no mode and chose among that frontier, so
+    a competitive model carried 1.3, a row stating no mode, where the API
+    got 1.5; this class pinned the difference. Compose now asks with the
+    mode, and the two agree."""
 
     CRUZI = dict(organism="Trypanosoma cruzi")
 
@@ -455,14 +502,44 @@ class TestWhereComposeCannotSeeTheRow:
     def test_the_resolver_returns_the_row_of_the_mode(self, mode, value, commentary):
         r = ki("2.7.1.1", "ADP", inhibition_mode=mode, model_substrate="glucose", **self.CRUZI)
         assert (r.value, r.commentary) == (value, commentary)
+        # And says what it would have returned unasked, for compose's report.
+        assert r.evidence_only[0]["value"] == 1.3
 
-    def test_compose_over_the_frontier_carries_the_row_stating_no_mode(self):
+    @pytest.mark.parametrize("mode, value, commentary", [
+        ("competitive", 1.5, "competitive to ATP"),
+        ("noncompetitive", 7.0, "noncompetitive to glucose"),
+    ])
+    def test_compose_now_carries_the_same_row(self, mode, value, commentary):
+        resolved = ki("2.7.1.1", "ADP", inhibition_mode=mode, model_substrate="glucose",
+                      **self.CRUZI)
+        chosen = compose_selects(resolved, mode, "glucose")
+        carried = chosen.measured["reaction_Ki"]
+        assert (carried.value, carried.commentary) == (value, commentary)
+        # The report says which row the mode replaced, and why, as it did
+        # when compose could see both rows.
+        assert chosen.notes[0].startswith(
+            "`reaction_Ki`: the resolver's pick (1.3 mM, BRENDA ref 640265) states no "
+            "inhibition mode;")
+        assert carried.chosen_because.startswith(f"the row stating {mode} inhibition")
+
+    def test_choosing_after_the_frontier_is_what_carried_the_other_row(self):
+        """The old order, kept as the reason for the new one: the mode rule
+        applied to the unasked answer can only carry 1.3."""
         from caterva.compose.ki_mode import select_mode
 
         measured = composed_from(plain("2.7.1.1", "ADP", "Trypanosoma cruzi"))
         out = select_mode(measured, {"reaction_Ki": ("competitive_inhibition", "ki")},
                           substrate="glucose")
         assert out.measured["reaction_Ki"].value == 1.3
+
+    def test_any_mode_still_reads_only_the_unasked_rows(self):
+        """A limit, not a virtue (caterva/compose/narrowed.py): with
+        `--any-mode` compose asks for no mode and says what the default would
+        carry over the rows that answer holds, which lack 1.5, so it keeps 1.3
+        and says nothing, where the default carries 1.5."""
+        unasked = ki("2.7.1.1", "ADP", **self.CRUZI)
+        chosen = compose_selects(unasked, "competitive", "glucose", any_mode=True)
+        assert chosen.measured["reaction_Ki"].value == 1.3 and chosen.notes == []
 
 
 class TestTheArgument:

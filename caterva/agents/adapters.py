@@ -63,9 +63,40 @@ NOT_FOUND_REASONS = {
         "not extracted from free text"
     ),
     "not_found": "nothing found in BRENDA or the literature search",
+    # The three refusals of rows that WERE found. Before 2026-09-30 the
+    # first two could not reach this adapter, because `caterva compose`
+    # asked the resolver for neither an isoform nor a mode; the third
+    # could, and read as "an outcome this adapter does not know how to
+    # explain". What each withheld is appended from the result's own list.
+    "isoform_withheld": (
+        "every row BRENDA holds for this constant measured another isoform "
+        "than the one asked for, and a constant of another isoform is a "
+        "different protein's, so none is used"
+    ),
+    "mode_withheld": (
+        "every row BRENDA holds for this constant states another inhibition "
+        "mode than the model's, and each is a constant of a different "
+        "mechanism, so none is used"
+    ),
+    "variant_withheld": (
+        "every row BRENDA holds for this constant measured a protein variant, "
+        "and variants are withheld (ADR 0029)"
+    ),
+}
+
+#: Where each refusal's list of what it withheld is, what to call it, and
+#: how to join it (a mode clause can hold a comma: "versus NAD+, pH 7").
+_WITHHELD_LISTS = {
+    "isoform_withheld": ("isoforms_available", "the rows measured", ", "),
+    "mode_withheld": ("modes_available", "the rows state", "; "),
+    "variant_withheld": ("variant_candidates_available", "the variants", ", "),
 }
 
 FOUND_SOURCES = frozenset({"brenda_exact", "brenda_cross_species"})
+#: Outcomes in which the resolver found rows for the model's isoform or
+#: mode question and refused every one: `caterva compose` reports these as
+#: values returned and not used, not as values that do not exist.
+WITHHELD_SOURCES = frozenset({"isoform_withheld", "mode_withheld"})
 
 
 def citation_text(citation: Any) -> Optional[str]:
@@ -138,6 +169,10 @@ def to_parameter_source(
         available = list(getattr(result, "cross_species_organisms_available", []) or [])
         if available:
             reason += f" -- available in: {', '.join(sorted(available))}"
+        field_name, what, sep = _WITHHELD_LISTS.get(source, (None, None, None))
+        withheld = list(getattr(result, field_name, []) or []) if field_name else []
+        if withheld:
+            reason += f" -- {what}: {sep.join(withheld)}"
         # The resolver lists the substrate labels BRENDA's table DOES carry
         # when the one asked for is absent. It was computed and dropped
         # here, so "glucoze" read as "nothing found in BRENDA" -- a fact
@@ -170,6 +205,7 @@ def to_parameter_source(
             ),
             candidates=tuple(getattr(result, "ensemble_candidates", []) or []),
             commentary=getattr(result, "commentary", None),
+            evidence_only=tuple(getattr(result, "evidence_only", []) or []),
         ),
         None,
     )
@@ -180,6 +216,7 @@ __all__ = [
     "citation_text",
     "NOT_FOUND_REASONS",
     "FOUND_SOURCES",
+    "WITHHELD_SOURCES",
 ]
 
 

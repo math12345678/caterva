@@ -206,12 +206,25 @@ class ComposedModel:
             not_found=dict(not_found or {}),
         )
 
-    def parameter_requests(self) -> List[Any]:
+    def parameter_requests(self, *, any_mode: bool = False) -> List[Any]:
         """`ParameterRequest`s for `caterva/agents`, or an empty list.
 
         Empty when no subject was named -- see the module docstring. An
         empty list here is a decision, not an oversight, and the caller must
         report the structure rather than an empty search.
+
+        WHAT THE MODEL IS OF TRAVELS WITH EACH REQUEST. Every request carries
+        the model's isoform, when `isoform` is set; an inhibition constant of
+        an inhibition motif (`row_scope.INHIBITION_TABLES`,
+        `row_scope.MODE_OF_MOTIF`) also carries the motif's mode and the
+        model's substrate, unless `any_mode`. The resolver then ranks every
+        row by them before it chooses one, as it does for the API and the
+        TypeScript CLI, and the three carry one row for one model. Before
+        2026-09-30 none of this was sent: the resolver chose on evidence
+        alone and compose chose again among the few rows it returned, which
+        for Trypanosoma cruzi hexokinase and ADP, competitive model, was
+        1.3 mM, a row stating no mode, where the resolver asked for the mode
+        returns 1.5 mM, "competitive to ATP" (caterva/compose/narrowed.py).
         """
         if self.subject is None:
             return []
@@ -230,6 +243,16 @@ class ComposedModel:
         # own comment says it is for.
         ec_number = self.ec_number
         skip = self.unsearched()
+        try:
+            from .row_scope import INHIBITION_TABLES, MODE_OF_MOTIF
+        except ImportError:  # pragma: no cover - flat layout
+            from row_scope import INHIBITION_TABLES, MODE_OF_MOTIF  # type: ignore[no-redef]
+
+        def mode_of(quantity: ResolvableQuantity) -> Optional[str]:
+            if any_mode or quantity.table not in INHIBITION_TABLES:
+                return None
+            return MODE_OF_MOTIF.get(quantity.motif_name)
+
         return [
             ParameterRequest(
                 quantity=quantity.parameter_id,
@@ -241,6 +264,11 @@ class ComposedModel:
                 ec_number=ec_number,
                 table=quantity.table,
                 expected_unit=quantity.unit,
+                isoform=self.isoform,
+                inhibition_mode=mode_of(quantity),
+                # The model's substrate, which a Ki's mode is judged against;
+                # only sent with a mode, the one thing it ranks.
+                model_substrate=self.substrate if mode_of(quantity) else None,
             )
             for quantity in self.resolvable
             if quantity.table is not None and quantity.parameter_id not in skip
@@ -412,6 +440,8 @@ def compose_and_parameterise(
     substrate: Optional[str] = None,
     simulate: Optional[Callable[[Any], Any]] = None,
     compounds: Optional[Mapping[str, str]] = None,
+    isoform: Optional[str] = None,
+    any_mode: bool = False,
 ) -> Tuple[ComposedModel, Any]:
     """Compose, then run the agent architecture over the result.
 
@@ -419,9 +449,15 @@ def compose_and_parameterise(
     was named -- there is nothing to search for, and returning an empty
     `ModelSearch` would report a completed search over zero quantities as
     though the model were parameterised.
+
+    `isoform` is the isoform the model is about and `any_mode` turns off
+    ranking a Ki by the model's inhibition mode; both reach the resolver
+    with each request (`ComposedModel.parameter_requests`).
     """
     model = compose(query, subject=subject, organism=organism, substrate=substrate, compounds=compounds)
-    requests = model.parameter_requests()
+    if isoform:
+        model = replace(model, isoform=isoform)
+    requests = model.parameter_requests(any_mode=any_mode)
     if not requests:
         return model, None
 

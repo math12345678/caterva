@@ -340,8 +340,14 @@ export function rowScopeFlags(
       : [];
   }
   const out: string[] = [];
-  const same = (a: string, b: string) =>
-    a.replace(/[\s_-]+/g, "").toLowerCase() === b.replace(/[\s_-]+/g, "").toLowerCase();
+  // caterva.bind.core.same_isoform, the comparison the runner filtered by:
+  // case, spaces, hyphens and underscores ignored ("MAO B" is "MAO-B"), and
+  // a row naming two isoforms ("I and II") the same as either. The runner's
+  // reading already spells one isoform one way, so nothing more is needed
+  // here, and nothing more is done: a looser rule here than there would
+  // call a row the runner refused the query's isoform, or the reverse.
+  const names = (s: string) => s.split(/\s+and\s+/).map((n) => n.replace(/[\s_-]+/g, "").toLowerCase());
+  const same = (a: string, b: string) => names(a).some((x) => names(b).includes(x));
   if (isoform) {
     if (!scope.isoform) {
       out.push(`${name}: the source row names no isoform, so whether it measured ${isoform}, the one the query names, is unknown.`);
@@ -2029,14 +2035,50 @@ const NOT_AN_INHIBITOR = new Set([
  * substrate's name.
  */
 /**
- * The isoform a query names: "isozyme 2", "isoform LDH-A", or a code like
- * "LDH-A" / "HK-II". The same two patterns caterva.bind.core.read_isoform
- * applies to BRENDA's commentary, so the query and the rows are read alike.
- * Undefined when none is named.
+ * The isoform a query names: "isozyme 2", "isoform LDH-A", "isoform MAO B",
+ * or a code like "LDH-A", "MAO B" or "HK-II". Undefined when none is named.
+ *
+ * Spelled as caterva.bind.core.read_isoform spells a row's reading, so the
+ * runner's filter and rowScopeFlags compare like with like: an abbreviation
+ * BRENDA writes codes after (LDH, MAO, HK, HXK) and its code, joined by a
+ * hyphen whatever joined them ("MAO B" is "MAO-B"). Until 2026-09-30 this
+ * took one token after the keyword, so "isoform MAO B" was sent as "MAO",
+ * which names no row; the row reader had the same defect.
+ *
+ * It reads fewer forms than the row reader, which also takes a full enzyme
+ * name and a code ("hexokinase II") and codes run together ("HK1"): in a
+ * query those are as often the enzyme itself ("hexokinase 2 in yeast" names
+ * yeast's second hexokinase, or a question about hexokinase), and an isoform
+ * read where none was meant filters every constant by it.
  */
+const ISOFORM_STEM = String.raw`(?:HXK|LDH|MAO|HK)`;
+const ISOFORM_CODE = String.raw`(?:P?(?:VI{0,3}|IV|I{1,3})[a-c]?|[A-Z]\d?(?:[A-Z]\d)*|\d{1,2})`;
+const STEM_AND_CODE = new RegExp(String.raw`(?<![\w-])(${ISOFORM_STEM})[ -](${ISOFORM_CODE})(?![\w-])`);
+const ISOFORM_KEYWORD = /\b(?:isozyme|isoenzyme|isoform)s?\s+/i;
+/** Words after a keyword that are not a name ("the isoform of LDH"), as the row reader skips them. */
+const NOT_AN_ISOFORM_NAME = new Set([
+  "a", "an", "and", "as", "at", "by", "for", "from", "in", "is", "not", "of", "or", "the",
+  "to", "was", "were", "with",
+]);
+
 export function extractIsoform(query: string): string | undefined {
-  const m = query.match(/\b(?:isozyme|isoenzyme|isoform)\s+([A-Za-z0-9-]+)|\b([A-Z]{2,5}-[A-Z0-9]{1,2})\b/);
-  return m ? (m[1] ?? m[2]) : undefined;
+  const keyword = query.match(ISOFORM_KEYWORD);
+  if (keyword && keyword.index !== undefined) {
+    const rest = query.slice(keyword.index + keyword[0].length);
+    const named = rest.match(new RegExp(`^${STEM_AND_CODE.source}`));
+    if (named) return `${named[1]}-${named[2]}`;
+    const token = rest.match(/^[A-Za-z0-9][A-Za-z0-9-]*/);
+    if (token && !NOT_AN_ISOFORM_NAME.has(token[0].toLowerCase())) return token[0];
+  }
+  const named = query.match(STEM_AND_CODE);
+  if (named) return `${named[1]}-${named[2]}`;
+  // Any other upper-case code joined by a hyphen, unless it is part of a
+  // longer name ("RO-28-1675") or a strain ("E. coli XL-1 Blue"), as the row
+  // reader excludes them.
+  for (const code of query.matchAll(/(?<![\w-])([A-Z]{2,5}-[A-Z0-9]{1,2})(?![\w-]|\.\d)/g)) {
+    if (!/(?:\bcoli|\bstrains?)\s+$/i.test(query.slice(0, code.index))) return code[1];
+  }
+  return undefined;
 }
 
 export function extractInhibitor(query: string): string | undefined {

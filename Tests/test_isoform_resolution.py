@@ -78,3 +78,58 @@ def test_the_isozyme_asked_for_is_not_withheld_as_a_variant():
     assert len(usable) == 1 and len(withheld) == 2
     usable, withheld = _partition_variants(rows, keep_isozymes=True)
     assert len(usable) == 2 and [w.variant.kind for w in withheld] == ["substitution"]
+
+
+# -- Isoform names BRENDA writes with a space ---------------------------------
+#
+# The committed monoamine oxidase page (Tests/fixtures/ki_mode/, fetched
+# 2026-09-29, unmodified) writes one isoform "MAO-A", "MAO A", "isoform MAO A"
+# and "monoamine oxidase A". The reader took "isoform MAO A" as "MAO" and the
+# rest of the spaced forms as naming no isoform (caterva/bind/core.py).
+
+MAO_PAGE = Path(__file__).parent / "fixtures" / "ki_mode" / "brenda_1.4.3.4.html.gz"
+
+
+def mao(inhibitor, isoform=None):
+    import gzip
+    page = gzip.decompress(MAO_PAGE.read_bytes()).decode("utf-8", errors="replace")
+    return resolve_kinetic_value(
+        "1.4.3.4", "Homo sapiens", inhibitor, quantity="ki",
+        html_provider=lambda ec: page,
+        uniprot_provider=lambda ec, org: None,
+        taxon_id_provider={"Homo sapiens": "9606"}.get,
+        search_literature=False,
+        isoform=isoform,
+    )
+
+
+def test_clorgyline_for_mao_a_is_the_row_written_isoform_mao_a():
+    """Human MAO and clorgyline: two Ki rows. 1.2e-05 mM, ref 742446,
+    "isoform MAO A, at pH 7.4 and 37°C"; and 1.28e-06 mM, "pH and temperature
+    not specified in the publication", naming no isoform. Read as "MAO", the
+    first was some other isoform's, no row named MAO-A, and the one naming
+    none, 1.28e-06, was returned with "may or may not have measured it"."""
+    r = mao("Clorgyline", "MAO-A")
+    assert r.found and r.value == pytest.approx(1.2e-05)
+    assert r.commentary == "isoform MAO A, at pH 7.4 and 37°C"
+    assert r.citation.reference_id == "742446"
+    assert "Kept the 1 of 2 exact-match row(s) measuring MAO-A" in r.search_log
+    # Asked for the other isoform, that row is another protein's: the row
+    # naming none is kept, and said to be unknown.
+    b = mao("Clorgyline", "MAO-B")
+    assert b.value == pytest.approx(1.28e-06)
+    assert any(line.startswith("No exact-match row names MAO-B") for line in b.search_log)
+
+
+def test_isatin_for_mao_b_counts_every_spelling_of_mao_b():
+    """Isatin's 26 human Ki rows name MAO-B in three spellings; 13 name it,
+    where the hyphen-only reader found 10."""
+    r = mao("isatin", "MAO-B")
+    assert r.found and r.value == pytest.approx(0.00031)
+    assert "Kept the 13 of 26 exact-match row(s) measuring MAO-B" in r.search_log
+
+
+def test_names_compare_as_caterva_compares_them():
+    """One function: caterva.bind.core.same_isoform."""
+    assert _same_isoform("MAO B", "MAO-B") and _same_isoform("MAOB", "mao-b")
+    assert _same_isoform("I and II", "II") and not _same_isoform("I and II", "III")

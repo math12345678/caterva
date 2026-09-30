@@ -32,12 +32,25 @@ describe("extractIsoform", () => {
     ["competitive inhibition of human LDH-A by gossypol with pyruvate", "LDH-A"],
     ["lactate dehydrogenase isoform LDH-C with pyruvate", "LDH-C"],
     ["hexokinase isozyme 2 with glucose", "2"],
+    // BRENDA writes these with a space (ref 742446: "isoform MAO B"); the
+    // keyword used to take one token and send "MAO", which names no row.
+    // Spelled as the runner's row reader spells them.
+    ["competitive inhibition of human monoamine oxidase isoform MAO B by isatin", "MAO-B"],
+    ["competitive inhibition of human MAO A by clorgyline with kynuramine", "MAO-A"],
+    ["rat HK I inhibited by glucose 6-phosphate", "HK-I"],
   ])("reads %j", (query, isoform) => {
     expect(extractIsoform(query)).toBe(isoform);
   });
 
-  it("returns undefined when no isoform is named", () => {
-    expect(extractIsoform("competitive inhibition of lactate dehydrogenase by gossypol")).toBeUndefined();
+  it.each([
+    "competitive inhibition of lactate dehydrogenase by gossypol",
+    // A strain and a compound code, which the hyphen pattern used to take.
+    "hexokinase expressed in E. coli XL-1 Blue with glucose",
+    "hexokinase activated by RO-28-1675 with glucose",
+    // A keyword followed by an ordinary word names nothing.
+    "the isoform of lactate dehydrogenase inhibited by gossypol",
+  ])("returns undefined when no isoform is named: %j", (query) => {
+    expect(extractIsoform(query)).toBeUndefined();
   });
 });
 
@@ -75,5 +88,18 @@ describe("rowScopeFlags with an isoform named in the query", () => {
   it("names a different isoform as a different protein", () => {
     expect(rowScopeFlags("ki", { isoform: "LDH-B", inhibitionMode: "unstated", versus: null }, "LDH-A")[0])
       .toContain("not LDH-A, the one the query names");
+  });
+
+  it("compares names as the runner filtered by them (caterva.bind.core.same_isoform)", () => {
+    // "MAO B", "MAO-B" and "MAOB" are one isoform, and a row naming two
+    // ("isoenzyme I and isoenzyme II", read "I and II") is either. Called a
+    // different protein here, the runner's own choice would be contradicted.
+    const unstated = { inhibitionMode: "unstated", versus: null };
+    const kiOnly = ["KI: the source row states no inhibition mode, so which binding event it measured is unknown."];
+    expect(rowScopeFlags("ki", { isoform: "MAO-B", ...unstated }, "MAO B")).toEqual(kiOnly);
+    expect(rowScopeFlags("ki", { isoform: "MAO-B", ...unstated }, "MAOB")).toEqual(kiOnly);
+    expect(rowScopeFlags("ki", { isoform: "I and II", ...unstated }, "II")).toEqual(kiOnly);
+    expect(rowScopeFlags("ki", { isoform: "I and II", ...unstated }, "III")[0])
+      .toContain("not III, the one the query names");
   });
 });

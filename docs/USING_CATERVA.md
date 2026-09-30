@@ -371,8 +371,13 @@ says so. With it, each constant comes from a row that measured the isoform
 asked for; where no row names that isoform, a row naming none is used and
 the report says whether it measured LDH-A is unknown; and a constant BRENDA
 only holds for other isoforms is refused rather than filled with another
-protein's value. The names compare without case or hyphens, and are read by
-the same parser `caterva bind --isoform` uses.
+protein's value. The names compare without case, spaces or hyphens ("MAO B",
+"MAO-B" and "MAOB" are one isoform), and are read by the same parser
+`caterva bind --isoform` uses, which reads the ways BRENDA writes them:
+"LDH-A", "isoform MAO B", "monoamine oxidase B", "HK I", "hexokinase II".
+Two numberings of one protein are not taken as one: ask for "HK-I" where
+the rows write "hexokinase I", not "HK1", and a refusal names the isoforms
+BRENDA holds, spelled as it will match them.
 
 ### A Ki from a row of the model's own inhibition mode
 
@@ -454,17 +459,21 @@ The API's competitive-inhibition model and the TypeScript CLI's
 `scientific resolve --quantity ki --mode competitive|uncompetitive|noncompetitive`
 choose with the same ranking, one function in `caterva/compose/ki_mode.py`.
 They apply it in the literature layer, before a row is chosen, to every row
-the isoform and variant steps kept, where `caterva compose` applies it to
-the rows the resolver returned, which are the best-evidenced ones. That can
-differ. Trypanosoma cruzi hexokinase has four Ki rows for ADP: 0.13 mM, 1.3
-mM ("at pH 7.5"), 1.5 mM ("competitive to ATP") and 7.0 mM
-("noncompetitive to glucose"). The resolver keeps 1.3 mM alone, the one row
-reporting a pH, so compose's choice for a competitive model has only that
-row, which states no mode; `--mode competitive` returns 1.5 mM. A Ki every
-row of which states another mode is refused there too, with the modes
-named. The API always sends its model's mode. The CLI has no `--any-mode`:
-leaving `--mode` out keeps the resolver's pick, with its stated mode
-printed beside it.
+the isoform and variant steps kept, and so, since 2026-09-30, does
+`caterva compose`: it sends each constant's isoform, mode and substrate to
+the same resolver and carries the row it returns, so the three front ends
+carry one row for one model. Before then compose applied the ranking after
+the resolver, to the best-evidenced rows it returned, and that could differ.
+Trypanosoma cruzi hexokinase has four Ki rows for ADP: 0.13 mM, 1.3 mM ("at
+pH 7.5"), 1.5 mM ("competitive to ATP") and 7.0 mM ("noncompetitive to
+glucose"). The evidence alone keeps 1.3 mM, the one row reporting a pH,
+which states no mode; a competitive model now carries 1.5 mM in compose as
+in the API, and the report says it replaced 1.3 mM and why. With
+`--any-mode` compose still chooses as it did, so there it carries 1.3 mM
+without saying that the default would carry 1.5 mM. A Ki every row of which
+states another mode is refused there too, with the modes named. The API
+always sends its model's mode. The CLI has no `--any-mode`: leaving `--mode`
+out keeps the resolver's pick, with its stated mode printed beside it.
 
 The API sends its model's substrate with the mode; the CLI takes it as
 `--model-substrate`, because `--substrate` names the inhibitor for a Ki.

@@ -28,7 +28,6 @@ was never wired to anything real - this version is.
 from __future__ import annotations
 
 import os
-import re
 from typing import Callable
 
 import httpx
@@ -257,6 +256,38 @@ class KineticResult(BaseModel):
     #: draw", which the caller must report as a resolution failure rather
     #: than as a band with no members.
     ensemble_candidates: list = []
+
+    #: What this call would have returned had it not been asked for an
+    #: isoform or an inhibition mode: the row the evidence alone chooses,
+    #: FIRST, then the rest of that evidence frontier, as the dicts
+    #: `ensemble_candidates` holds. Set on found results when `isoform`, or
+    #: `inhibition_mode` for a Ki, was applied; empty otherwise, and empty
+    #: when that call would have returned nothing (every row a variant).
+    #:
+    #: WHY A SECOND ANSWER RIDES ON THE FIRST
+    #: --------------------------------------
+    #: `caterva compose` asks this resolver for each constant with the
+    #: model's isoform and mode, so the isoform and the mode are ranked
+    #: before the evidence frontier, over every row, and compose carries the
+    #: same row the API and the TypeScript CLI get. Until 2026-09-30 compose
+    #: asked without them and chose among `ensemble_candidates` afterwards,
+    #: and the two could disagree: Trypanosoma cruzi hexokinase and ADP,
+    #: competitive model, 1.3 mM (a row stating no mode, alone on the
+    #: frontier) in compose and 1.5 mM ("competitive to ATP") here.
+    #:
+    #: Compose's report says which row the choice replaced and why ("the
+    #: resolver's pick (0.00059 mM) measured competitive inhibition ..."),
+    #: and whether a row of another mode, measured against the model's own
+    #: substrate, is evidence against the model's mechanism. Both need the
+    #: rows this call set aside, which `ensemble_candidates`, the frontier
+    #: of what was kept, no longer holds. Asking twice would fetch and parse
+    #: BRENDA's page twice (the monoamine oxidase page takes about two
+    #: seconds to parse, per call); these rows are already here.
+    #:
+    #: Not emitted by the runner: the API and the TypeScript CLI say what the
+    #: returned row measured (`rowScope`) and never show an answer the
+    #: resolver was not asked for (docs/undelivered-fields-baseline.txt).
+    evidence_only: list = []
 
     #: Set when the value returned IS one of the named forms the pool mixed.
     #:
@@ -780,6 +811,26 @@ def _score_frontier(
     return scored
 
 
+def _evidence_only(pool, allow_variants, tier, organism, quantity,
+                   relatedness_by_organism=None) -> list:
+    """`KineticResult.evidence_only`: the frontier the call without `isoform`
+    and `inhibition_mode` would choose from, its choice first.
+
+    The same steps that call takes, on the same rows: variants removed as it
+    removes them (keep_isozymes=False: with no isoform asked, an isozyme row
+    is a variant), then `_best_evidenced`. Its log lines are discarded, since
+    they describe a choice this call did not make, and the frontier is
+    scored as `ensemble_candidates` is scored."""
+    rows = list(pool)
+    if not allow_variants:
+        rows, _ = _partition_variants(rows)
+    if not rows:
+        return []
+    best, _, frontier = _best_evidenced(rows, [], tier, organism, relatedness_by_organism,
+                                        quantity=quantity)
+    return _score_frontier([best] + [e for e in frontier if e is not best], organism)
+
+
 def _preparation_of(entry) -> "PreparationVerdict":
     """One place the verdict is derived, so the field and the log agree.
 
@@ -827,8 +878,14 @@ def _isoform_of(conditions):
 
 
 def _same_isoform(a, b):
-    key = lambda name: re.sub(r"[\s_-]+", "", name).lower()
-    return a is not None and b is not None and key(a) == key(b)
+    """Whether two isoform names name one isoform, by caterva.bind.core's
+    `same_isoform`: the comparison `caterva compose --isoform` and `caterva
+    bind --isoform` use. This held its own copy until 2026-09-30; the copies
+    agreed only while nothing changed either. Raises ImportError where the
+    caterva package is not importable, as `_isoform_of` does, and is only
+    reached after `_isoform_of` has succeeded."""
+    from caterva.bind.core import same_isoform
+    return same_isoform(a, b)
 
 
 def _partition_isoform(entries, isoform, log, where):
@@ -968,30 +1025,30 @@ def _partition_mode(entries, mode, substrate, isoform, isoform_matched, log, whe
     rank are kept and the ordinary choice among them follows. When no row is
     a candidate, `rows` is empty and `stated` lists what the rows state.
 
-    WHAT DIFFERS FROM COMPOSE, AND WHY
-    ----------------------------------
-    The rule is compose's; the rows it is applied to and the tie-break are
-    not, because this runs BEFORE a row is chosen and compose runs after.
+    WHERE THIS RUNS, AND WHY BEFORE THE FRONTIER
+    --------------------------------------------
+    Before a row is chosen, over every row the isoform and variant steps
+    left, so a row of the model's mode that another row dominates on evidence
+    is still a candidate. Trypanosoma cruzi hexokinase and ADP, on the
+    recorded page (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz), is such a
+    case: 0.13 mM (no commentary), 1.3 mM ("natural hexokinase from
+    epimastigotes, at pH 7.5"), 1.5 mM ("competitive to ATP") and 7.0 mM
+    ("noncompetitive to glucose"). The evidence frontier keeps 1.3 alone, the
+    one row with a pH; asked for competitive, this returns 1.5.
 
-    - Compose ranks `Measurement.alternatives`, which are this module's
-      `ensemble_candidates`: the evidence frontier of what the variant step
-      left. This ranks every row the isoform and variant steps left. A row of
-      the model's mode that another row dominates on evidence is therefore a
-      candidate here and not in compose. Trypanosoma cruzi hexokinase and
-      ADP, on the recorded page (Tests/fixtures/recorded/brenda_2.7.1.1.html.gz),
-      is such a case: 0.13 mM (no commentary), 1.3 mM ("natural hexokinase
-      from epimastigotes, at pH 7.5"), 1.5 mM ("competitive to ATP") and
-      7.0 mM ("noncompetitive to glucose"). The frontier keeps 1.3 alone,
-      the one row with a pH, so compose, building a competitive model, can
-      only carry 1.3, which states no mode; asked for competitive, this
-      returns 1.5. That is compose's own ranking applied to rows compose
-      never saw: the mode ranks before the evidence there too, and the
-      frontier dropping 1.5 happened before any mode was asked about.
-    - Rows ranked alike are chosen among by the evidence frontier and then
-      the lowest value here, and by the resolver's order (its pick first) in
-      compose.
-    - Variant rows are removed before this, not after. Compose chooses among
-      rows the resolver already cleared of variants; and a mode step run
+    Until 2026-09-30 `caterva compose` applied the same rule AFTER this
+    resolver, to the frontier of an answer it had asked for without a mode,
+    and so carried 1.3 for a competitive model where the API returned 1.5.
+    Compose now asks with the model's isoform, mode and substrate
+    (ParameterRequest), and carries the row this returns; its selections
+    only say what the choice did, against the row the evidence alone would
+    take (`KineticResult.evidence_only`, caterva/compose/narrowed.py).
+    Rows ranked alike are chosen among by the evidence frontier and then the
+    lowest value.
+
+    TWO ORDERS AROUND IT
+    --------------------
+    - Variant rows are removed before this, not after. A mode step run
       first could keep only variant rows of the model's mode and have the
       variant step refuse the constant while wild-type rows stating no mode
       sat in the pool, which is a worse answer than asking for no mode at
@@ -1281,6 +1338,8 @@ def resolve_kinetic_value(
             unit=best.unit,
             organism=best.organism,
             source="brenda_exact",
+            evidence_only=(_evidence_only(pool, allow_variants, "exact match", organism, quantity)
+                           if isoform or mode else []),
             effector_contrasts=contrasts,
             form_mixtures=mixtures,
             organism_discrepancies=discrepancies,
@@ -1517,6 +1576,9 @@ def resolve_kinetic_value(
             unit=best.unit,
             organism=best.organism,
             source="brenda_cross_species",
+            evidence_only=(_evidence_only(pool, allow_variants, "cross-species", organism, quantity,
+                                          {v.candidate_organism: v for v in verdicts})
+                           if isoform or mode else []),
             effector_contrasts=contrasts,
             form_mixtures=mixtures,
             organism_discrepancies=discrepancies,
