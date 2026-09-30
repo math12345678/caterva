@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "110 test files -- kinetics & Michaelis-Menten correctness, " +
+          "113 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -189,7 +189,11 @@ export const TEST_SUITES: TestSuite[] = [
         // anchored on gmx angle's per-frame output (all passed): 3096. Plus
         // 1 test that a one-frame run has no RMSF on either route: 3097.
         // Plus 1 test of the GROMACS route's gmx angle commands: 3098.
-        passed: 3098,
+        // Superseded by a full run of caterva/ on the merged tree
+        // (2026-09-30, .venv): 3189 passed, 1 skipped, 435 s, after the
+        // ki-mode (44), angle (24) and water (20) tests and four guide and
+        // shape checks. The skip is the popgen one described below: 3189.
+        passed: 3189,
         skipped: 0,
         failed: 0,
       },
@@ -201,7 +205,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "85 test files -- BRENDA/KEGG parsing, table scoping, " +
+          "87 test files -- BRENDA/KEGG parsing, table scoping, " +
           "organism resolution, citation formatting, fallback logic, and " +
           "the `cite` command that puts a measured constant and its " +
           "reference in front of a reader",
@@ -222,8 +226,10 @@ export const TEST_SUITES: TestSuite[] = [
         // so the licence test ran): 1187 passed, 1 skipped (stdpopsim),
         // after 6 effector-parsing tests and 6 request-memo tests: 1187.
         // Plus the 7 resolver isoform tests on the recorded LDH Ki page
-        // (all passed 2026-09-29): 1194.
-        passed: 1194,
+        // (all passed 2026-09-29): 1194. Plus the HTTP replay tests (92)
+        // and the test-only-environment check (4): a full run of Tests/ on
+        // the merged tree (2026-09-30) gave 1290 passed, 1 skipped: 1290.
+        passed: 1290,
         skipped: 1,
         failed: 0,
       },

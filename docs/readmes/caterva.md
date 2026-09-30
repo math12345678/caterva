@@ -2,7 +2,7 @@
 
 Part of [**Caterva**](https://github.com/math12345678/caterva) — scientific computing for teaching labs.
 
-The simulation engine. 64 files, 38 test modules, 3,098 engine tests.
+The simulation engine. 64 files, 38 test modules, 3,190 engine tests.
 
 Michaelis-Menten (plain and competitively inhibited), composed enzyme
 mechanisms, Gillespie SSA (first-order decay, bimolecular, replicate

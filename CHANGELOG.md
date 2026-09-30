@@ -15,6 +15,39 @@ done: there was no release to version.
 ## [Unreleased: tools]
 
 ### Added
+- `caterva compose` takes a Ki from a row whose stated inhibition mode fits
+  the model (caterva/compose/ki_mode.py). BRENDA 739793 gives human LDH two
+  Ki for one quinoline sulfonamide: 0.00059 mM "competitive versus NADH" and
+  0.00252 mM "noncompetitive versus pyruvate". A noncompetitive model carried
+  the first while its own report called it the wrong mechanism; it now
+  carries the second. A row of the model's mode wins (mixed counts for
+  noncompetitive; versus the model's substrate first), then a row stating
+  none, and a constant held only for other modes is refused naming them;
+  `--any-mode` keeps the resolver's pick. With `--isoform`, the isoform is
+  chosen first. Kitz-Wilson rows (irreversible inactivation) rank last and
+  are named as such. `caterva bind` now reads "mixed inhibitor versus X".
+  Rows are checked against unmodified BRENDA pages in Tests/fixtures/ki_mode/.
+- `caterva analyze` measures the angle at each catalytic group between two
+  partners in contact with it in the crystal, on both routes (`gmx gangle`
+  on the GROMACS route; equal to it to 0.001 degree on 21 real frames, also
+  across the periodic box). Each angle is fixed by three distances the
+  report already has, and the report says so: it adds the triangle's shape
+  at one group and a verdict, not new information, and it cannot tell which
+  face a partner is on.
+- `caterva analyze` counts water at each catalytic residue: water oxygens
+  within 0.35 nm of its functional atoms per frame, per replica, beside
+  em.gro's count (`gmx select` on the GROMACS route; equal per frame on real
+  frames with water, also across the box). `make md-smoke` compares both
+  new tables across the routes.
+- The API tests no longer call NCBI, UniProt or PubChem: `retry_get`
+  replays real recorded responses when `CATERVA_HTTP_RECORDED` is set (the
+  API test config sets it beside `CATERVA_BRENDA_RECORDED`). Requests that
+  may carry a credential are never recorded or replayed (headers are an
+  allowlist). `scripts/record_http_fixtures.py` records the 13 runner
+  payloads the tests send and proves each replays with the network refused;
+  42 recordings, 15,672 bytes. A test fails if anything outside test
+  configuration sets either variable.
+- The API's row-scope flags know the isoform the query named.
 - `caterva bind`: cited Ki values become ΔG°bind targets at their own
   assay temperatures, filtered by inhibition mode (`--state free|ternary`)
   and isoform (`--isoform`), and a computed free energy is judged against
