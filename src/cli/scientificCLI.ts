@@ -1493,6 +1493,19 @@ async function main() {
           sensitivity = parsed;
         }
 
+        // Read the same way `resolve` reads it, and refused the same way when
+        // it swallowed the next token: `--allow-cross-species pyruvate` is the
+        // flag taking a value, and the opt-in silently not happening is the
+        // one outcome worse than an error here. See `resolve` below.
+        if (flags['allow-cross-species'] !== undefined) {
+          error(
+            `--allow-cross-species takes no value (got '${flags['allow-cross-species']}'). ` +
+            'It was probably written before a positional argument. Move it to the ' +
+            'end, or after another flag, so it is not read as taking one.'
+          );
+          process.exit(1);
+        }
+
         const modelRaw = (flags['model'] ?? 'mm').toLowerCase();
         if (!['mm', 'competitive', 'noncompetitive', 'product'].includes(modelRaw)) {
           error(`--model must be mm, competitive, noncompetitive or product (got '${modelRaw}')`);
@@ -1540,6 +1553,7 @@ async function main() {
           exportCitations: flags['export-citations'],
           userCitations: citationResult.citations,
           physiologicalReference: simPhysiological.reference,
+          allowCrossSpecies: booleans.has('allow-cross-species'),
         });
         process.exit(code);
       }

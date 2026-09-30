@@ -299,6 +299,21 @@ export interface SimulateResolvedOptions {
     temperatureToleranceC: number;
   };
   /**
+   * `--allow-cross-species`: accept a value measured in a related organism
+   * when the one asked about has none (ADR 0024), for every lookup this
+   * command makes.
+   *
+   * THIS FLAG WAS DOCUMENTED, SUGGESTED, AND IGNORED. `help` listed it for
+   * `simulate --resolve` ("as in `resolve`"), the argv parser swept it out
+   * of the parameter overrides, and every literature refusal this command
+   * prints ended "Or widen the search ... --allow-cross-species". Nothing
+   * passed it on: this options object had no field for it, so each lookup
+   * sent `allowCrossSpecies: false` and a student who took the advice got
+   * the same refusal back with no sign that the flag had done nothing.
+   * `resolve` has passed it since ADR 0024; this is the other front door.
+   */
+  allowCrossSpecies?: boolean;
+  /**
    * `--cite km="Smith 2019"` — sources for values the user supplied.
    *
    * Keyed by lower-case parameter name. Never verified by Caterva, and
@@ -791,6 +806,7 @@ export async function commandSimulateResolved(
           substrate: options.substrate,
           organism: options.organism,
           quantity: 'km',
+          allowCrossSpecies: options.allowCrossSpecies === true,
           physiologicalReference: options.physiologicalReference,
         });
         if (!result.found) {
@@ -848,6 +864,7 @@ export async function commandSimulateResolved(
           organism: options.organism,
           quantity: 'kcat',
           enzymeConc: enzymeConcMM,
+          allowCrossSpecies: options.allowCrossSpecies === true,
           physiologicalReference: options.physiologicalReference,
         });
         if (!result.found || result.bridgedVmax === undefined) {
@@ -919,6 +936,7 @@ export async function commandSimulateResolved(
         substrate: options.substrate,
         organism: options.organism,
         quantity: 'ki',
+        allowCrossSpecies: options.allowCrossSpecies === true,
       });
       if (result.found) {
         userValues['ki'] = { value: result.value, unit: result.unit };
