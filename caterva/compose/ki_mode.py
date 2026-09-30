@@ -83,8 +83,10 @@ makes the same finding for the API and the TypeScript CLI
 (`fallback_logic`, `KineticResult.mechanism_evidence`, emitted by the
 runner as `mechanismEvidence`): a Ki asked for there by mode and model
 substrate is checked for it by this function, over the rows its mode step
-ranked, so the three front ends cannot come to disagree about which rows
-are evidence against a model (ADR 0027). Only a row stating "versus X" is
+ranked. One rule, then, and not three (ADR 0027); but each front end runs
+it over the rows it has, and compose's rows (the resolver's answer and the
+evidence view beside it) are not always every row the literature layer's
+mode step saw, so the rule cannot drift while the inputs still can. Only a row stating "versus X" is
 read as measured against X. The recorded hexokinase page has Trypanosoma
 cruzi's ADP rows "competitive to ATP" and "noncompetitive to glucose";
 `read_mode` reads neither as measured against anything, so neither is
@@ -370,7 +372,9 @@ def evidence_against(carried: Reading, rows: Iterable[_R], want: str,
     `rows` (the pick is, in compose), so a pick of another mode kept by
     --any-mode is never evidence against itself. Rows are taken in the
     order given, and the caller's order is its own: the resolver's for
-    compose, BRENDA's page order for the literature layer. Over the 766 Ki
+    compose; for the literature layer, the order its isoform and mode steps
+    leave the rows in, which is BRENDA's page order only when no isoform
+    was named. Over the 766 Ki
     rows on the three committed BRENDA pages (counted 2026-09-30, grouping
     rows by organism and inhibitor), this finds something for one inhibitor
     only, ref 739793's, and for two models of it: competitive with pyruvate

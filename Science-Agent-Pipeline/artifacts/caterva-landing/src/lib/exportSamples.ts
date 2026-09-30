@@ -14,7 +14,7 @@ export interface ExportSample {
 }
 
 export const EXPORT_COMMAND = "caterva compose \"Michaelis-Menten with a competitive inhibitor\" \\\n    --subject 1.1.1.27 --organism human --substrate pyruvate --inhibitor gossypol \\\n    --export";
-export const EXPORT_RUN_DATE = "2026-09-29";
+export const EXPORT_RUN_DATE = "2026-09-30";
 
 export const EXPORT_SAMPLES: ExportSample[] = [
   {

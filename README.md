@@ -113,7 +113,7 @@ git clone https://github.com/math12345678/caterva.git
 cd caterva
 make setup     # creates .venv, installs everything (2-5 min)
 make check     # verifies the stack genuinely works
-make test      # runs all 4,592 tests (3,227 engine + 1365 literature)
+make test      # runs all 4,778 tests (3,356 engine + 1422 literature)
 ```
 
 ### Or download the release
@@ -411,13 +411,20 @@ methods*.
 ### Inhibition models
 
 ```bash
-scientific simulate x --resolve --model noncompetitive \
-  --enzyme ldh --substrate pyruvate --organism "Homo sapiens" \
-  --s0 10mM --i0 0.1mM --enzyme-conc 0.001mM
+scientific simulate mm --resolve --model noncompetitive \
+  --ec 1.1.1.27 --substrate pyruvate --organism "Homo sapiens" \
+  --inhibitor "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid" \
+  --vmax 0.01mM/s --s0 10mM --i0 0.001mM
+# -> Ki 0.00252 mM (BRENDA ref 739793): the row stating noncompetitive
+#    inhibition versus pyruvate, not the 0.00059 mM competitive-versus-NADH
+#    row, because this model is noncompetitive. Vmax is yours: BRENDA holds
+#    no human LDH kcat to derive it from.
 ```
 
-`--model mm|competitive|noncompetitive|product`. Ki resolves from BRENDA's
-Ki table with its own citation. Competitive inhibition uses the engine's
+`--model mm|competitive|noncompetitive|product`. The Ki is looked up under
+`--inhibitor` (BRENDA files a Ki under its inhibitor; without one the run
+refuses rather than asking for a Ki "of" the substrate), for the model's
+inhibition mode, with its own citation. Competitive inhibition uses the engine's
 first-class domain; non-competitive and product inhibition are emitted as
 SBML and run through the engine's `sbml` escape hatch — the same solver
 either way, never a second simulator.
@@ -540,11 +547,11 @@ in ADR 0005 (`docs/adr/0005-rng-convention.md`) and enforced automatically by
 Caterva/
 ├── caterva/                  simulation engine (ODE + discrete/stochastic)
 │   ├── caterva_engine.py     public entry point (88 names)
-│   └── tests/                3,227 tests
+│   └── tests/                3,356 tests
 ├── Tests/                      literature layer (BRENDA / KEGG / PubMed)
 │   ├── brenda_client.py        BRENDA parser (Km, kcat, Ki tables)
 │   ├── fallback_logic.py       kinetic-value resolver orchestrator
-│   └── ...                   1365 tests
+│   └── ...                   1422 tests
 ├── Science-Agent-Pipeline/     API server, database layer, landing page
 │   ├── artifacts/api-server/   Express + TypeScript API
 │   ├── lib/db/                 Drizzle ORM schema + migrations
@@ -631,10 +638,10 @@ them together.
 ```bash
 make doctor      # diagnose a broken setup; reports everything it checked
 make check       # verify the environment actually works (builds + integrates a real model)
-make test        # run all 4,592 tests
+make test        # run all 4,778 tests
 make test-fast   # skip the slow property/robustness suites
-make test-sim    # simulation engine only (3,227 tests)
-make test-lit    # literature layer only (1365 tests)
+make test-sim    # simulation engine only (3,356 tests)
+make test-lit    # literature layer only (1422 tests)
 python3 scripts/verify_build.py --quick  # all 76 guard scripts, incl. TypeScript compile
 make clean       # remove caches
 ```

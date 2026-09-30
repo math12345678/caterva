@@ -15,6 +15,31 @@ done: there was no release to version.
 ## [Unreleased: tools]
 
 ### Added
+- `scientific simulate --resolve --model competitive|noncompetitive|product`
+  looks its Ki up under `--inhibitor` for the model's mode, with `--substrate`
+  as the model's substrate, and refuses without an inhibitor; until now it
+  asked BRENDA for a Ki "of" the substrate. It takes `--isoform`, and
+  `--allow-cross-species` (listed in its help since 2026-08-18) now reaches
+  its lookups, which it never did. `product` asks for a noncompetitive Ki:
+  this CLI's product model integrates the noncompetitive rate law with P for
+  I, which a test pins. A successful run reports the Ki's inhibitor, mode and
+  source row through `--json` and the exports. Custom-model `ki` annotations
+  take `inhibitor=` and `inhibition=`, and one naming no inhibitor is not
+  looked up. The TypeScript CLI also dropped the runner's `referenceId`
+  ("Citation BRENDA", "BRENDA ref ?"); it now prints the reference. The
+  README's inhibition example, which could not run, is replaced by one that
+  does (Ki 0.00252 mM, BRENDA 739793).
+- The isoform reader reads the names BRENDA writes with a space ("isoform
+  MAO B", "hexokinase 2"), reads a request the way it reads a row, and no
+  longer reads plurals or strain codes as isoforms; every Ki, Km and kcat
+  row on the committed BRENDA pages was audited. `caterva compose` now asks
+  the resolver for its isoform and mode, so both rank before the evidence
+  frontier and carry the same row (T. cruzi hexokinase and ADP: 1.5 mM on
+  both); the README examples are unchanged.
+- The API and `scientific resolve` say when a row is evidence against the
+  model's mechanism, as compose does, from the same Python function: for
+  BRENDA 739793 a competitive pyruvate model is told that, measured against
+  pyruvate, the inhibitor is noncompetitive (0.00252 mM).
 - The API and `scientific resolve` choose a Ki row by the model's
   inhibition mode, with `caterva compose`'s ranking, which now lives in one
   place (caterva/compose/ki_mode.py). The resolver narrows the pool before a

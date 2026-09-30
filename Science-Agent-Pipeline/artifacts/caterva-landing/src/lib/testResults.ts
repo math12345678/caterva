@@ -143,7 +143,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "114 test files -- kinetics & Michaelis-Menten correctness, " +
+          "116 test files -- kinetics & Michaelis-Menten correctness, " +
           "stochastic simulation (Gillespie SSA), PDB structure lookup, " +
           "preparation audit and trajectory analysis, binding free-energy targets from cited Ki and the FEP setup held to them, complexes posed from the crystal, native MBAR/BAR/TI free-energy estimators, a native .xtc reader, " +
           "GROMACS setup, SBML export & provenance, compositional model " +
@@ -194,8 +194,10 @@ export const TEST_SUITES: TestSuite[] = [
         // ki-mode (44), angle (24) and water (20) tests and four guide and
         // shape checks. The skip is the popgen one described below: 3189.
         // Plus the 37 face tests: a full run on the merged tree
-        // (2026-09-30) gave 3226 passed, 1 skipped, 432 s: 3226.
-        passed: 3226,
+        // (2026-09-30) gave 3226 passed, 1 skipped, 432 s: 3226. Then the
+        // isoform-reader and compose-asks-the-resolver tests: a full run on
+        // the merged tree (2026-09-30) gave 3355 passed, 1 skipped: 3355.
+        passed: 3355,
         skipped: 0,
         failed: 0,
       },
@@ -233,7 +235,9 @@ export const TEST_SUITES: TestSuite[] = [
         // the merged tree (2026-09-30) gave 1290 passed, 1 skipped: 1290.
         // Plus the resolver's mode tests (69) and 6 runner-contract cases:
         // a full run after merging them gave 1365 passed, 1 skipped: 1365.
-        passed: 1365,
+        // Then the isoform-reader, simulate and mechanism-evidence tests: a
+        // full run on the merged tree (2026-09-30): 1422 passed, 1 skipped.
+        passed: 1422,
         skipped: 1,
         failed: 0,
       },
@@ -245,7 +249,7 @@ export const TEST_SUITES: TestSuite[] = [
     files: [
       {
         file:
-          "79 test files -- query resolution, parameter provenance, " +
+          "80 test files -- query resolution, parameter provenance, " +
           "literature verification, model grounding for caller-supplied " +
           "models, gap classification, front-door coverage, rate limiting, " +
           "SSE job routes, parameterize bridge, route-level front-door " +
@@ -262,7 +266,9 @@ export const TEST_SUITES: TestSuite[] = [
         // passed locally 2026-09-29): 782. Plus 3 tests of isoform-aware
         // row-scope flags in the same file: 785. CI run 36660211058 agreed
         // (785 passed, 42 s). Plus the 8 tests of kiModeFromDomain.test.ts
-        // (passed locally 2026-09-30): 793.
+        // (passed locally 2026-09-30): 793. Plus, counted with vitest list
+        // before and after: isoformFromQuery +15, mechanismEvidence +5,
+        // modelAnnotations +9, modelGrounding +6 (all passed locally): 828.
         //
         // Earlier, 2026-09-17: `81 passed (81) / 854 passed (854)`, run
         // alone with the repo's .venv/bin first on PATH.
@@ -287,7 +293,7 @@ export const TEST_SUITES: TestSuite[] = [
         // total in the passed column turns any failure into an invisible
         // one, which is the specific dishonesty this panel exists to
         // avoid.
-        passed: 793,
+        passed: 828,
         skipped: 0,
         failed: 0,
       },
