@@ -389,3 +389,30 @@ def test_the_chance_rmsip_is_what_random_subspaces_give():
     assert abs(mean - 0.0741) < 1e-4 and abs(sd - 0.00966) < 1e-5
     assert abs(sq.mean() - mean) < 4 * sd / math.sqrt(len(sq))
     assert abs(sq.std(ddof=1) / sd - 1) < 0.06
+
+
+def test_the_smoke_runs_comparison_reads_the_section_and_catches_a_difference(lysozyme, tmp_path, monkeypatch):
+    """scripts/md_smoke.py compares the two routes' principal-motion tables
+    on every CI run; here it reads the sections both routes print for the
+    fixture's halves, finds them in agreement, and finds an eigenvalue
+    moved by 1% and an RMSIP moved by 0.01."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("md_smoke", Path(__file__).parents[2] / "scripts" / "md_smoke.py")
+    smoke = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(smoke)
+    monkeypatch.setattr(pca, "RMSIP_MODES", 5)
+    monkeypatch.setattr(pca, "MIN_PCA_FRAMES", 10)
+    X, p = lysozyme["X"], lysozyme["plan"]
+    native = pca.from_frames([("rep1", X[:10]), ("rep2", X[10:])], 47, [s.label for s in p.sites])
+    gromacs = gromacs_pca(tmp_path, p, _write_gmx_outputs(tmp_path, _gmx()), lysozyme["idx"])
+    texts = ["\n".join(pca_section(Analysis("1AKI", "A", "test", p, [], None, motions=m)))
+             for m in (native, gromacs)]
+    tables = [smoke._pca_tables(t) for t in texts]
+    assert sorted(tables[0]["eigen"]) == ["pooled", "rep1", "rep2"] and list(tables[0]["rmsip"]) == ["rep1–rep2"]
+    assert tables[0]["between"] == 0.20 and tables[0]["chance_edge"] is not None
+    assert smoke._pca_agree(*tables)[0] == []
+    moved = smoke._pca_tables(texts[1].replace("| rep1 | 10 | 0.008722 |", "| rep1 | 10 | 0.008809 |")
+                              .replace("| 0.546 | 0.298 |", "| 0.556 | 0.298 |"))
+    problems = smoke._pca_agree(tables[0], moved)[0]
+    assert any("eigenvalue 0.008722 natively, 0.008809" in x for x in problems)
+    assert any("RMSIP 0.546 natively, 0.556" in x for x in problems)
