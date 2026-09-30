@@ -15,6 +15,27 @@ done: there was no release to version.
 ## [Unreleased: tools]
 
 ### Added
+- The API and `scientific resolve` choose a Ki row by the model's
+  inhibition mode, with `caterva compose`'s ranking, which now lives in one
+  place (caterva/compose/ki_mode.py). The resolver narrows the pool before a
+  row is chosen (`inhibition_mode=`, `model_substrate=`), and refuses a Ki
+  held only for other mechanisms as `mode_withheld`, naming the modes. The
+  API sends "competitive" for mm_competitive_inhibition with the model's
+  substrate; the CLI takes `--mode` and `--model-substrate`. BRENDA 739793:
+  noncompetitive gives 0.00252 mM, uncompetitive is refused naming both
+  rows. One known difference, pinned by a test: for T. cruzi hexokinase and
+  ADP the resolver, ranking before its evidence frontier, gives 1.5 mM
+  ("competitive to ATP") where compose, ranking only the frontier, carries
+  1.3 mM.
+- `caterva analyze` says which face of each angle's vertex its partners are
+  on: the elevation of the vertex's arm to its own Cα out of the plane of
+  the angle, signed like the dihedral a-v-b-Cα (the dihedral itself has no
+  value when the Cα lines up, which happens in lysozyme). A frame counts on
+  a face only outside a 7.5-degree dead band. Equal to `gmx gangle -g1
+  plane -g2 vector` to 0.001 degree on 24 angles x 21 frames, as stored and
+  across the periodic box; the smoke job compares the routes, tolerating one
+  frame on the band edge, which gangle's 0.001-degree output can put on the
+  other side.
 - `caterva compose` takes a Ki from a row whose stated inhibition mode fits
   the model (caterva/compose/ki_mode.py). BRENDA 739793 gives human LDH two
   Ki for one quinoline sulfonamide: 0.00059 mM "competitive versus NADH" and

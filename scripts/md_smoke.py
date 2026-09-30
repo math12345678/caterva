@@ -114,6 +114,41 @@ def _face_rows(text: str) -> dict:
     return _table_rows(text, "## Which face of the vertex its partners are on")
 
 
+#: Frames the smoke run keeps per replica: 200 steps, one every 50.
+SMOKE_FRAMES = 5
+
+
+def _faces_agree(native: dict, gromacs: dict) -> tuple:
+    """(agree, rows that differed by one edge frame).
+
+    The GROMACS route rebuilds each frame's polar sine from gmx gangle's
+    output, printed to 0.001 degree, so it differs from the native value by
+    about 1e-5. A frame whose polar sine sits that close to the band edge
+    lands on opposite sides on the two routes. On the 10 ps lysozyme
+    replicas the nearest frame was 0.00099 from the edge, but CI makes a new
+    trajectory every run, and with about 1.3 frames per unit of polar sine
+    near the edges a split is expected in well under 1% of runs (the review
+    of this check, 2026-09-30). So: every row identical, except at most one
+    row in which the fractions differ by one frame and no more. A real
+    disagreement between the routes moves more than one frame or more than
+    one row."""
+    if not native or native.keys() != gromacs.keys():
+        return False, 0
+    differing = [k for k in native if native[k] != gromacs[k]]
+    if len(differing) > 1:
+        return False, len(differing)
+    for k in differing:
+        for x, y in zip(native[k], gromacs[k]):
+            if x == y:
+                continue
+            try:
+                if abs(float(x) - float(y)) > 1 / SMOKE_FRAMES + 0.006:
+                    return False, 1
+            except ValueError:
+                continue  # the verdict may follow the one frame
+    return True, len(differing)
+
+
 def _water_rows(text: str) -> dict:
     """residue -> every cell of its row: atoms, count at start, per replica
     mean and fraction, verdict. Water counts are integers on both routes, so
@@ -222,11 +257,14 @@ def main() -> int:
     # Which face of each angle's vertex its partners are on: gmx gangle's
     # plane-vector angle against the native elevation. One row per angle,
     # so an empty table is a failure here too.
-    if not face["native"] or face["native"] != face["gromacs"]:
+    faces_ok, edge_rows = _faces_agree(face["native"], face["gromacs"])
+    if not faces_ok:
         print(f"FAIL: native and GROMACS face tables differ: {face['native']} vs {face['gromacs']}")
         return 1
     print(f"OK: native and GROMACS agree on which face of the vertex the partners of {len(face['native'])} "
-          "angles are on, row for row.")
+          "angles are on, row for row"
+          + (f", except one frame on the band edge in {edge_rows} row (gangle prints 0.001 degree)."
+             if edge_rows else "."))
     # Water at each catalytic residue: gmx select against the native count.
     if not wet["native"] or wet["native"] != wet["gromacs"]:
         print(f"FAIL: native and GROMACS water tables differ: {wet['native']} vs {wet['gromacs']}")

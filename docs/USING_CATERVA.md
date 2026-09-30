@@ -680,9 +680,12 @@ of the three arms from the vertex at least 7.5 degrees out of the plane of
 the other two; nearer flat the sign is noise. 7.5 degrees is half the
 15-degree angle threshold, so a partner counted on opposite faces in two
 frames has turned at least 15 degrees across the flat arrangement. Without
-that band the faces of lysozyme's 24 angles changed 81 times between
-consecutive frames over two 10 ps replicas; with it, 6 times, each to or
-from a lone frame just past the band. Each angle is reported with how far
+that band the sign of lysozyme's 24 angles flipped 81 times between
+consecutive frames over two 10 ps replicas. With it, counting only the
+frames that are on a face and skipping the flat frames between them, the
+face changed 6 times, each to or from a lone frame just past the band; the
+two counts are of different things, and only 2 of the 6 fall on strictly
+consecutive frames. Each angle is reported with how far
 its crystal arms are from flat, the crystal's face (or flat, with no face
 to keep), and per replica the fraction of frames on the crystal's face and
 on the other; it is called kept its face, changed face, went flat, partial
