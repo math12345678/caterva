@@ -231,7 +231,8 @@ def main(argv: Optional[Sequence[str]] = None, prog: str = "caterva rates",
         sys.stdout.write(report.render(analysis))
     if refused:
         reasons = ([analysis.literature_refused] if analysis.literature_refused else
-                   [f"{c.constant}: {c.refused}" for c in analysis.literature if c.declined])
+                   [f"{c.constant}" + (f" [{c.group}]" if c.group else "") + f": {c.refused}"
+                    for c in analysis.literature if c.declined])
         print(f"{prog}: a literature comparison was not made: " + "; ".join(reasons),
               file=sys.stderr)
         return EXIT_REFUSED
