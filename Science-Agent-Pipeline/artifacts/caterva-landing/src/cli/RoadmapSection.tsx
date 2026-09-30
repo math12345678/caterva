@@ -36,6 +36,14 @@ const MILESTONES: Milestone[] = [
     color: "#5D7F8D",
   },
   {
+    id: "right-row",
+    title: "Constants from the Right Row",
+    desc: "caterva compose --isoform, and a Ki taken from a row of the model's own inhibition mode: a constant BRENDA holds only for another isoform or another mechanism is refused, naming what exists, rather than filled with a different protein's or mechanism's value.",
+    status: "main",
+    icon: "\u{1F3AF}",
+    color: "#946522",
+  },
+  {
     id: "stochastic",
     title: "Exact Stochastic Kinetics",
     desc: "caterva sim: Gillespie SSA for first-order decay, bimolecular association and replicate ensembles, each checked against its closed form.",
@@ -62,7 +70,7 @@ const MILESTONES: Milestone[] = [
   {
     id: "enzyme-analysis",
     title: "Enzyme Trajectory Analysis",
-    desc: "caterva analyze: catalytic geometry, hydrogen bonds and active-site flexibility against the crystal, read natively from .xtc and reported only when the replicas agree.",
+    desc: "caterva analyze: catalytic distances and angles, hydrogen bonds, chi1 rotamers, active-site water and flexibility against the crystal, read natively from .xtc, equal to gmx distance, gangle, hbond, angle and select on real frames, and reported only when the replicas agree.",
     status: "main",
     icon: "\u{1F4CF}",
     color: "#946522",

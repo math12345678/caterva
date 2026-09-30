@@ -39,7 +39,7 @@ export const DOMAINS: { id: string; status: CapabilityStatus; desc: string }[] =
   {
     id: "trajectory-analysis",
     status: "main",
-    desc: "caterva analyze: catalytic geometry, hydrogen bonds and active-site flexibility, reported only when the replicas agree",
+    desc: "caterva analyze: catalytic distances and angles, hydrogen bonds, side-chain rotamers, active-site water and flexibility, each checked against GROMACS and reported only when the replicas agree",
   },
   {
     id: "binding-free-energy",
