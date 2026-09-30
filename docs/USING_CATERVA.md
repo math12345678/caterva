@@ -834,9 +834,49 @@ translated across the periodic box, and both are tests. The GROMACS route
 runs `gmx select`, and CI checks that the two routes' water tables are
 identical.
 
+And the principal motions of the active site: every heavy atom of the
+catalytic residues (backbone and side chain, 47 atoms on lysozyme), each
+frame superposed on the same atoms of `em.gro`, and the covariance of
+their coordinates split into modes, per replica and with every replica's
+frames pooled. The report gives the three largest eigenvalues (the
+mean-square fluctuation along each mode, nm²), the total, the share of it
+in the first mode and in the first ten, and, from the pooled analysis, the
+share that is the replicas sitting in different places rather than moving
+about them. Two questions are answered from it. Do the replicas move the
+same way? The root-mean-square inner product (RMSIP) of each pair's first
+ten modes (Amadei, Ceruso & Di Nola 1999) is set beside what two random
+ten-dimensional subspaces of the 3N - 6 directions the fit leaves would
+give (RMSIP² = 10/(3N - 6), 0.074 with standard deviation 0.010 on
+lysozyme; derived exactly, and checked against random subspaces), and
+called same motions (RMSIP² at least 0.5), no more alike than chance
+(within three standard deviations of that) or partly shared. Is a
+replica's largest motion only diffusion? The cosine content of its
+projection on PC1 and PC2 (Hess 2000, 2002) is 1 when the replica went one
+way along the mode and did not come back, which is what random diffusion
+does; at 0.5 or more (a stated choice: the cosine is then at least half of
+the projection's mean square) the replica is called diffusion-like, not
+converged. Frames with no correlation in time would give PC1 0.05 at 21
+frames and reach 0.5 with probability 0.0003, and the report prints that
+beside the values. A low cosine content does not show convergence: a
+replica can sample one basin thoroughly and never find the next. A
+diffusion-like replica, or a pair no more alike than chance, makes the exit
+code 4. Fewer than 21 frames per replica is refused rather than reported:
+the ten modes compared must be at most half of the directions the frames
+can span. On the 21 frames of a lysozyme replica the eigenvalues equal
+`gmx covar`'s to the six digits it prints, the projections equal
+`gmx anaeig`'s, the cosine contents equal `gmx analyze -cc`'s once its
+normalisation is converted (it prints (n + 1)/n times the bounded value,
+so a pure cosine reads 1.048 there at 21 frames), and the RMSIP² between
+the replica's two halves equals `gmx anaeig -over`'s to the 0.001 it
+prints; all four are tests. That replica's PC1 has a cosine content of
+0.77 over its 10 ps. The GROMACS route runs `gmx covar`, `gmx anaeig` and
+`gmx analyze` (the atoms are written to `pca.ndx`), and CI compares the
+two routes' tables.
+
 `--gromacs --no-run` on a run whose `analyze.sh` was written before the
-angle, face and water tables existed is refused, naming the missing file,
-rather than reporting without them: run `analyze.sh` again first.
+angle, face and water tables or the principal motions existed is refused,
+naming the missing file, rather than reporting without them: run
+`analyze.sh` again first.
 
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and
