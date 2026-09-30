@@ -53,9 +53,17 @@ def read_isoform(commentary: Optional[str]) -> Optional[str]:
     return (m.group(1) or m.group(2)) if m else None
 
 
+#: "competitive versus NADH", "mixed-type inhibition versus NAD+", and
+#: "mixed inhibitor versus glucose". The last is BRENDA's own wording for
+#: rabbit erythrocyte hexokinase and MgADP- (ref 640206: 3 mM versus
+#: MgATP2-, 7.8 mM versus glucose). Before "inhibitor" was accepted here,
+#: both rows read as mixed with nothing measured against, so a glucose
+#: model could not tell the glucose Ki from the MgATP2- one. Of the 766 Ki
+#: rows parsed from the hexokinase (recorded), LDH and monoamine oxidase
+#: pages on 2026-09-29, those two are the only readings the word changes.
 _MODE = re.compile(
     r"\b(non-?competitive|uncompetitive|competitive|mixed(?:-type)?|partial(?:ly)?\s+\w+)\b"
-    r"(?:\s+(?:inhibition\s+)?(?:versus|vs\.?|with respect to)\s+([^,;]+))?",
+    r"(?:\s+(?:inhibit(?:ion|or)\s+)?(?:versus|vs\.?|with respect to)\s+([^,;]+))?",
     re.I,
 )
 

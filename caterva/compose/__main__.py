@@ -159,6 +159,12 @@ def build_parser(prog: str = "python -m caterva.compose") -> argparse.ArgumentPa
                              "from a row that measured it; where none did, a row naming no "
                              "isoform is used and the report says so, and a constant only "
                              "measured on other isoforms is refused")
+    parser.add_argument("--any-mode", action="store_true",
+                        help="take an inhibition constant from the row the resolver ranked first, "
+                             "whatever inhibition mode it states. By default a Ki comes from a row "
+                             "stating this model's mode (mixed counts for noncompetitive), else from "
+                             "one stating none, and a Ki only measured for another mode is refused. "
+                             "The report flags a mismatch either way")
     parser.add_argument("--product",
                         help="the product, for constants measured on it: a reverse Km, a "
                              "product-inhibition Kp")
@@ -903,6 +909,15 @@ def _search_the_literature(
     numbers; the resolver refuses and names all six rather than picking,
     because a wrong EC number is a citation for the wrong protein rather
     than merely a wrong value.
+
+    THE RESOLVER RANKS ROWS BY EVIDENCE; THE MODEL KNOWS WHAT IT NEEDS.
+    The resolver cannot tell LDH-A's row from LDH-B's, or a competitive Ki
+    from a noncompetitive one, because nothing in its grades is about the
+    model. Two selections then choose among the rows it ranked: the isoform
+    `--isoform` asked for (isoform.py), and for an inhibition constant, a
+    row whose stated mode fits the motif (ki_mode.py, on unless
+    `--any-mode`). A constant either refuses is a placeholder whose reason
+    says so, never one described as not found.
     """
     from caterva.checkout import LiteratureLayerUnavailable, literature_module
 
@@ -969,12 +984,31 @@ def _search_the_literature(
     measured = measured_from_search(search)
     not_found = {**skipped, **unresolved_from_search(search)}
     isoform_notes: List[str] = []
+    # Constants the search returned a value for and the selections below
+    # refused. They end up placeholders like the ones the search found
+    # nothing for, and must not be described as found-nothing.
+    withheld: Dict[str, str] = {}
     if getattr(args, "isoform", None):
         from caterva.compose.isoform import select_isoform
         by_isoform = select_isoform(measured, args.isoform)
         measured = by_isoform.measured
-        not_found.update(by_isoform.refused)
+        withheld.update(by_isoform.refused)
         isoform_notes = by_isoform.notes
+    # The isoform first, then the mode, over the same ranked rows; ki_mode's
+    # docstring says why in that order. On by default: a noncompetitive model
+    # carrying a competitive constant is wrong whether or not the report
+    # admits it. --any-mode keeps the resolver's pick.
+    from caterva.compose.ki_mode import constants_of, select_mode
+    by_mode = select_mode(
+        measured, constants_of(model),
+        substrate=getattr(model, "substrate", None) or getattr(args, "substrate", None),
+        isoform=getattr(args, "isoform", None),
+        any_mode=bool(getattr(args, "any_mode", False)),
+    )
+    measured = by_mode.measured
+    withheld.update(by_mode.refused)
+    not_found.update(withheld)
+    selection_notes = isoform_notes + by_mode.notes
     failures = [
         run for branch in getattr(search, "branches", ())
         for record in getattr(branch.build.run, "rounds", ())
@@ -1001,7 +1035,34 @@ def _search_the_literature(
             "every table was searched and none held a value for this "
             "enzyme, organism and substrate"
         )
-        return sourced, f"The search returned no measured value: {why}", False
+        if not withheld:
+            return sourced, f"The search returned no measured value: {why}", False
+        # "Every table was searched and none held a value" would be false
+        # here: values came back and were refused, each for a reason the
+        # provenance table prints beside it. The rest of what the search
+        # did is still said. An earlier version returned before `why` was
+        # built, so a refused Ki beside a failed kcat search read as if
+        # the Ki were the only thing that had happened.
+        note = (
+            f"No measured value was used: the search returned values for "
+            f"{', '.join(sorted(withheld))} and each was withheld, for the "
+            f"reason the provenance table gives"
+        )
+        rest = [q for q in sourced.unmeasured if q not in withheld]
+        if rest and failures:
+            note += (f". {len(rest)} still the motif library's placeholder "
+                     f"({', '.join(rest)}), and part of the search failed: {why}")
+        elif rest:
+            note += (
+                f". {len(rest)} still the motif library's placeholder "
+                f"({', '.join(rest)}): the search ran and returned nothing for "
+                f"them, which is different from their not having been looked for"
+            )
+        elif failures:
+            note += f". Part of the search failed: {why}"
+        if selection_notes:
+            note += ". " + "; ".join(selection_notes)
+        return sourced, note, False
 
     note = (
         f"{len(measured)} constant(s) resolved from the literature: "
@@ -1020,15 +1081,22 @@ def _search_the_literature(
                 f"{', '.join(chosen)}, which the search chose; pass "
                 f"--organism to choose it yourself"
             )
-    still = sourced.unmeasured
+    still = [q for q in sourced.unmeasured if q not in withheld]
     if still:
         note += (
             f". {len(still)} still the motif library's placeholder "
             f"({', '.join(still)}): the search ran and returned nothing for "
             f"them, which is different from their not having been looked for"
         )
-    if isoform_notes:
-        note += ". " + "; ".join(isoform_notes)
+    if withheld:
+        # Found and refused is a third fact, beside found and not found:
+        # "returned nothing" said of a refused --isoform constant was false.
+        note += (
+            f". {len(withheld)} returned by the search and not used "
+            f"({', '.join(sorted(withheld))}): the provenance table says why"
+        )
+    if selection_notes:
+        note += ". " + "; ".join(selection_notes)
     return sourced, note, False
 
 

@@ -374,6 +374,82 @@ only holds for other isoforms is refused rather than filled with another
 protein's value. The names compare without case or hyphens, and are read by
 the same parser `caterva bind --isoform` uses.
 
+### A Ki from a row of the model's own inhibition mode
+
+```bash
+caterva compose "Michaelis-Menten with a noncompetitive inhibitor" \
+    --subject 1.1.1.27 --organism human --substrate pyruvate \
+    --inhibitor "3-[7-(2,4-dimethoxypyrimidin-5-yl)-3-sulfamoylquinolin-4-yl]aminobenzoic acid"
+```
+
+BRENDA 739793 gives two Ki values for this inhibitor and human LDH, from
+one paper under one set of conditions: 0.00059 mM, "competitive versus
+NADH", and 0.00252 mM, "noncompetitive versus pyruvate". They are constants
+of two mechanisms. The resolver grades rows on their evidence, gives these
+two the same grades, and returns the first, so until 2026-09-29 this
+noncompetitive model carried the competitive constant and only the report
+said it was the wrong one.
+
+An inhibition constant now comes from a row whose stated mode is the
+model's (a mixed row counts for noncompetitive), preferring a row measured
+against the model's substrate, then one naming nothing it was measured
+against, then one measured against another molecule. Failing that it comes
+from a row stating no mode, and the report says whether it is this model's
+constant is unknown. A Ki BRENDA holds only for other modes is refused: it
+stays a labelled placeholder, and the reason names each row's mode. The run
+above carries 0.00252 mM. The report says which row it replaced and why,
+and every export says why the carried row was carried, in its sentence
+about the spread of values. The competitive model keeps 0.00059 mM, and its
+report still says that row was measured against NADH. It also says more: the
+other row found this inhibitor noncompetitive against pyruvate, the
+competitive model's own substrate, which is evidence that a competitive
+model of this inhibitor and substrate is the wrong mechanism, and no choice
+of row can fix that. A row of the model's mode measured against another
+molecule is still preferred to a row stating no mode, because it names the
+mechanism the model uses and its report says what it was measured against;
+it is not known to be the constant against the model's substrate. The
+gossypol example is unchanged: none of its rows states a mode, so the
+resolver's pick stays and the report says the mode is unknown.
+
+```bash
+caterva compose "Michaelis-Menten with a noncompetitive inhibitor" \
+    --subject 2.7.1.1 --organism "Oryctolagus cuniculus" --substrate glucose \
+    --inhibitor MgADP-
+```
+
+Both of rabbit hexokinase's MgADP- rows (BRENDA 640206) state mixed
+inhibition, one versus MgATP2- (3 mM, the resolver's pick) and one versus
+glucose (7.8 mM). A model with glucose as its substrate carries 7.8 mM.
+
+With `--isoform`, the isoform is chosen first and the mode second, and the
+mode step is told the isoform, so it never moves a constant onto another
+isoform's row. For human monoamine oxidase and benzylhydrazine (BRENDA
+702238), `--isoform MAO-A` alone takes MAO-A's first ranked row, 1.95 mM; a
+competitive model then moves to MAO-A's 2.096 mM row, "determined from
+competitive inhibition data". Choosing the mode first would keep MAO-B's
+competitive 0.026 mM, and the isoform step, which does not read modes,
+would then take 1.95 mM; a mode step not told the isoform would move 1.95 mM
+to MAO-B's 0.026 mM. Within the choice, a row naming the isoform you asked
+for beats a row naming none, whatever either says about mode.
+
+The 1.95 mM row was "determined from Kitz-Wilson plots". That is not a
+reversible Ki: it is the K_I of an irreversible inactivation (the paper,
+Binda et al. 2008, shows these hydrazines alkylate the enzyme's flavin).
+BRENDA files it in the Ki table and states no mode, so it is ranked after
+every other row stating no mode. When one is carried the report says what
+it is, and when the choice moved to one, so does the reason every export
+prints for it. It is not refused, because the alternative is a placeholder
+that says less than the row does. Only the words "Kitz-Wilson" are
+recognised.
+
+A row in another unit is never substituted, because the constant keeps the
+resolver's unit. When one states the model's mode and the row carried
+states none, the report says it was passed over and why.
+
+`--any-mode` turns the choice off and keeps the resolver's pick whatever
+mode it states. The report still flags a mismatch, and says which row the
+default would have used, or that it would have refused the constant.
+
 ### `caterva structure`: which structures exist, and which protein each is
 
 ```bash
