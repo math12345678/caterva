@@ -610,6 +610,57 @@ GROMACS route measures the same with `gmx angle` (an index of the four
 atoms per residue is written to `chi1.ndx`), and CI checks that the two
 routes' rotamer tables are identical.
 
+It measures the angles between catalytic groups. Where two groups are both
+within 0.6 nm of a third in the crystal (functional-group centres), the
+angle between them at the third is read in every frame, between the same
+centres the distances use, each arm to its nearest periodic image. 0.6 nm
+is as far apart as two groups can be and still have two atoms within a
+hydrogen bond or salt bridge (0.35 nm), given the 0.10-0.14 nm from each
+group's centre to its atoms, measured on 1AKI; groups within it need not
+be bonded. An angle is fixed, frame by frame, by three distances already
+in the report (the sides of its triangle), so it adds no information about
+where the groups are: it states the triangle as its shape at one group,
+with a verdict of its own. It cannot tell which side of a group a partner
+is on, since a partner that turns about the line through the other two
+keeps its angle; that would need a signed dihedral, which is not measured.
+Each angle is reported as a distance is: its crystal value, each
+replica's mean, the change, and held or moved (more than 15 degrees, the
+turn that moves a group 0.4 nm from the vertex by about the 0.1 nm
+distance threshold) only when the replicas agree. An angle that is not yet
+a result makes the exit code 4, as a distance does, but the other
+sections' verdicts (hydrogen bonds, rotamers, water, flexibility) are
+judged by the distances alone. Lysozyme's six catalytic residues give 24
+angles, among five of them (Glu35 has no partner within 0.6 nm). On 21
+frames of a lysozyme replica every one equals `gmx gangle -g1 angle`'s to
+0.001 degree, the precision it prints, both as the run stored the frames
+and with the frames translated so that the active site straddles the
+periodic box; both comparisons are tests. The GROMACS route runs
+`gmx gangle`, and CI compares the two routes' angle tables.
+
+And the water at each catalytic residue: in every frame, the number of
+water oxygens within 0.35 nm of any of its functional atoms, reported per
+replica as the mean count and the fraction of frames with at least one
+water, beside the count in `em.gro`, and called hydrated, dry,
+intermittent or replicas disagree with the thresholds printed. Every frame
+is counted, as for the hydrogen bonds and rotamers; nothing is discarded
+as relaxation. 0.35 nm is the donor-acceptor limit of `gmx hbond`, so a
+counted water can hydrogen-bond to the group. On a lysozyme run it also
+takes in the first shell of water around the protein's carboxylate and
+hydroxyl oxygens and stops short of the second: `gmx rdf` puts that
+water's first peak at 0.27-0.28 nm and its first low at 0.32 nm. A
+residue standing in with its Cα (glycine, say) has its count shown but
+marked as a stand-in and given no verdict: water at a Cα is backbone
+exposure, not the hydration of a catalytic group. On 21 frames of a
+lysozyme replica, cut down to residues 1-59 and the 272 waters that come
+near the active site, every count equals `gmx select`'s, as stored and
+translated across the periodic box, and both are tests. The GROMACS route
+runs `gmx select`, and CI checks that the two routes' water tables are
+identical.
+
+`--gromacs --no-run` on a run whose `analyze.sh` was written before the
+angle and water tables existed is refused, naming the missing file, rather
+than reporting without them: run `analyze.sh` again first.
+
 Each catalytic distance now carries the 95% confidence interval of its
 mean across replicas (Student's t, which is 12.7 for two replicas), and
 the report says whether there are enough replicas to decide held or moved:
